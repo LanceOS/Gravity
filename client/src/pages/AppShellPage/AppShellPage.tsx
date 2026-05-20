@@ -19,6 +19,10 @@ import { WorkspacePage } from '../WorkspacePage/WorkspacePage';
 
 type AppSection = 'directory' | 'workspace' | 'settings' | 'account';
 
+function getActiveWorkspaceStorageKey(userId: string) {
+  return `gravity_active_workspace:${userId}`;
+}
+
 export function AppShellPage() {
   const {
     activeProjectId,
@@ -144,9 +148,11 @@ export function AppShellPage() {
     inviteLoading: workspaceInviteLoading,
     inviteError: workspaceInviteError,
     approveLoadingId,
+    revokeLoadingId,
     updateSettings,
     saveSettings,
     createInvite,
+    revokeInvite,
     approveJoinRequest,
   } = useWorkspaceSettings({
     currentUser,
@@ -167,9 +173,29 @@ export function AppShellPage() {
     }
 
     if (!activeWorkspaceId || !workspaces.some((workspace) => workspace.id === activeWorkspaceId)) {
-      setActiveWorkspaceId(workspaces[0].id);
+      const storedWorkspaceId =
+        typeof window === 'undefined' ? null : window.localStorage.getItem(getActiveWorkspaceStorageKey(currentUser.id));
+      const nextWorkspaceId =
+        storedWorkspaceId && workspaces.some((workspace) => workspace.id === storedWorkspaceId)
+          ? storedWorkspaceId
+          : workspaces[0].id;
+      setActiveWorkspaceId(nextWorkspaceId);
     }
   }, [currentUser, workspaces, activeWorkspaceId]);
+
+  useEffect(() => {
+    if (!currentUser || typeof window === 'undefined') {
+      return;
+    }
+
+    const storageKey = getActiveWorkspaceStorageKey(currentUser.id);
+    if (!activeWorkspaceId) {
+      window.localStorage.removeItem(storageKey);
+      return;
+    }
+
+    window.localStorage.setItem(storageKey, activeWorkspaceId);
+  }, [currentUser, activeWorkspaceId]);
 
   useEffect(() => {
     if (!activeWorkspaceId) {
@@ -463,6 +489,7 @@ export function AppShellPage() {
   };
 
   const handleCreateInvite = async (input: { email: string; expirationHours: number }) => Boolean(await createInvite(input));
+  const handleRevokeInvite = async (inviteId: string) => Boolean(await revokeInvite(inviteId));
   const handleApproveJoinRequest = async (requestId: string) => Boolean(await approveJoinRequest(requestId));
 
   useEffect(() => {
@@ -605,11 +632,13 @@ export function AppShellPage() {
           members={workspaceMembers}
           joinRequests={workspaceJoinRequests}
           approveLoadingId={approveLoadingId}
+          revokeLoadingId={revokeLoadingId}
           onBackToWorkspace={() => setActiveSection('workspace')}
           onOpenDirectory={() => setActiveSection('directory')}
           onChangeSettings={updateSettings}
           onSaveSettings={saveSettings}
           onCreateInvite={handleCreateInvite}
+          onRevokeInvite={handleRevokeInvite}
           onApproveJoinRequest={handleApproveJoinRequest}
         />
       ) : (

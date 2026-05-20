@@ -216,7 +216,7 @@ async function run() {
     assert(updateSettings.response.ok, 'Workspace settings update should succeed.');
     assert(updateSettings.data.workspaceKey === 'ROPS-SECRET-2', 'Workspace settings update should persist the new workspace key.');
 
-    const createPeerInvite = await postJson(
+    const createRevokedPeerInvite = await postJson(
       '/api/workspaces/invites',
       {
         workspace_id: workspaceId,
@@ -225,17 +225,18 @@ async function run() {
       },
       { 'X-User-Id': ownerId },
     );
-    assert(createPeerInvite.response.status === 201, 'Peer invite creation should return 201.');
-    assert(typeof createPeerInvite.data.invite_url === 'string', 'Peer invite should return an invite_url.');
-    assert(typeof createPeerInvite.data.validation_code === 'string', 'Peer invite should return a validation_code.');
-    assert(typeof createPeerInvite.data.expires_at === 'string', 'Peer invite should return an expires_at timestamp.');
+    assert(createRevokedPeerInvite.response.status === 201, 'Peer invite creation should return 201.');
+    assert(typeof createRevokedPeerInvite.data.id === 'string', 'Peer invite should return an id.');
+    assert(typeof createRevokedPeerInvite.data.invite_url === 'string', 'Peer invite should return an invite_url.');
+    assert(typeof createRevokedPeerInvite.data.validation_code === 'string', 'Peer invite should return a validation_code.');
+    assert(typeof createRevokedPeerInvite.data.expires_at === 'string', 'Peer invite should return an expires_at timestamp.');
 
     const peerInvites = await getJson(`/api/workspaces/${workspaceId}/peer-invites`, { 'X-User-Id': ownerId });
     assert(peerInvites.response.ok, 'Owner should be able to list peer invites.');
     assert(
       peerInvites.data.some(
         (invite: { email: string; validation_code: string }) =>
-          invite.email === 'guest-user@peer.com' && invite.validation_code === createPeerInvite.data.validation_code,
+          invite.email === 'guest-user@peer.com' && invite.validation_code === createRevokedPeerInvite.data.validation_code,
       ),
       'Created peer invite should appear in the workspace peer invite listing.',
     );
@@ -243,8 +244,36 @@ async function run() {
     const collaboratorPeerInviteList = await getJson(`/api/workspaces/${workspaceId}/peer-invites`, { 'X-User-Id': collaboratorId });
     assert(collaboratorPeerInviteList.response.status === 403, 'Non-owner collaborators should not be allowed to list peer invites.');
 
-    const invalidPeerValidation = await postJson('/api/workspaces/validate', {
+    const revokePendingPeerInvite = await postJson(
+      `/api/workspaces/${workspaceId}/peer-invites/${createRevokedPeerInvite.data.id}/revoke`,
+      {},
+      { 'X-User-Id': ownerId },
+    );
+    assert(revokePendingPeerInvite.response.ok, 'Owners should be able to revoke pending peer invites.');
+    assert(typeof revokePendingPeerInvite.data.revoked_at === 'string', 'Revoked peer invites should expose revoked_at.');
+
+    const revokedPeerValidation = await postJson('/api/workspaces/validate', {
       email: 'guest-user@peer.com',
+      validation_code: createRevokedPeerInvite.data.validation_code,
+      invite_url: createRevokedPeerInvite.data.invite_url,
+      username: 'GuestExpert',
+      password_hash: '$2b$12$SecureBcryptHashHereForTestingOnly1234567890123456789012',
+    });
+    assert(revokedPeerValidation.response.status === 400, 'Revoked peer invites should no longer validate.');
+
+    const createPeerInvite = await postJson(
+      '/api/workspaces/invites',
+      {
+        workspace_id: workspaceId,
+        email: 'guest-validated@peer.com',
+        expiration_hours: 24,
+      },
+      { 'X-User-Id': ownerId },
+    );
+    assert(createPeerInvite.response.status === 201, 'Second peer invite creation should return 201.');
+
+    const invalidPeerValidation = await postJson('/api/workspaces/validate', {
+      email: 'guest-validated@peer.com',
       validation_code: 'GRAV-0000-X',
       invite_url: createPeerInvite.data.invite_url,
       username: 'GuestExpert',
@@ -305,6 +334,29 @@ async function run() {
     assert(
       scopedComments.data.some((comment: { author?: { username?: string } }) => comment.author?.username === 'GuestExpert'),
       'Scoped guest comment listing should include the nested author object.',
+    );
+
+    const revokeValidatedPeerInvite = await postJson(
+      `/api/workspaces/${workspaceId}/peer-invites/${createPeerInvite.data.id}/revoke`,
+      {},
+      { 'X-User-Id': ownerId },
+    );
+    assert(revokeValidatedPeerInvite.response.ok, 'Owners should be able to revoke validated peer invites.');
+    assert(typeof revokeValidatedPeerInvite.data.revoked_at === 'string', 'Revoked validated invites should expose revoked_at.');
+
+    const revokedScopedProjects = await getJson('/api/projects', {
+      'X-Workspace-Key': validatePeerInvite.data.workspace_private_key,
+    });
+    assert(revokedScopedProjects.response.status === 401, 'Revoked scoped workspace keys should be rejected for project hydration.');
+
+    const peerInvitesAfterRevoke = await getJson(`/api/workspaces/${workspaceId}/peer-invites`, { 'X-User-Id': ownerId });
+    assert(peerInvitesAfterRevoke.response.ok, 'Owner should still be able to list peer invites after revocation.');
+    assert(
+      peerInvitesAfterRevoke.data.some(
+        (invite: { id: string; revoked_at?: string | null }) =>
+          invite.id === createPeerInvite.data.id && typeof invite.revoked_at === 'string',
+      ),
+      'Validated peer invites should report revoked_at once access is revoked.',
     );
 
     console.log('workspace-api.test.ts passed');

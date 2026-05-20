@@ -37,6 +37,34 @@ function createWorkspacePrivateKey() {
   return `sec_wsp_${randomUUID().replace(/-/g, '')}`;
 }
 
+function mapPeerInvite(invite: {
+  id: string;
+  email: string;
+  inviteUrl: string;
+  validationCode: string;
+  workspacePrivateKey: string;
+  expiresAt: Date;
+  isUsed: boolean;
+  usedAt: Date | null;
+  guestUsername: string | null;
+  createdAt: Date;
+  revokedAt: Date | null;
+}) {
+  return {
+    id: invite.id,
+    email: invite.email,
+    invite_url: invite.inviteUrl,
+    validation_code: invite.validationCode,
+    workspace_private_key: invite.workspacePrivateKey,
+    expires_at: invite.expiresAt.toISOString(),
+    is_used: invite.isUsed,
+    used_at: invite.usedAt ? invite.usedAt.toISOString() : null,
+    guest_username: invite.guestUsername ?? null,
+    created_at: invite.createdAt.toISOString(),
+    revoked_at: invite.revokedAt ? invite.revokedAt.toISOString() : null,
+  };
+}
+
 export function createWorkspacesRouter() {
   const router = Router();
 
@@ -314,18 +342,7 @@ export function createWorkspacesRouter() {
       res.json(
         inviteRows
           .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
-          .map((invite) => ({
-            id: invite.id,
-            email: invite.email,
-            invite_url: invite.inviteUrl,
-            validation_code: invite.validationCode,
-            workspace_private_key: invite.workspacePrivateKey,
-            expires_at: invite.expiresAt.toISOString(),
-            is_used: invite.isUsed,
-            used_at: invite.usedAt ? invite.usedAt.toISOString() : null,
-            guest_username: invite.guestUsername ?? null,
-            created_at: invite.createdAt.toISOString(),
-          })),
+          .map((invite) => mapPeerInvite(invite)),
       );
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load peer invites.' });
@@ -435,18 +452,61 @@ export function createWorkspacesRouter() {
         isUsed: false,
         expiresAt: new Date(Date.now() + expirationHours * 60 * 60 * 1000),
         usedAt: null,
+        revokedAt: null,
         createdAt: new Date(),
       };
 
       await db.insert(validations).values(validation);
 
-      res.status(201).json({
-        invite_url: inviteUrl,
-        validation_code: validation.validationCode,
-        expires_at: validation.expiresAt.toISOString(),
-      });
+      res.status(201).json(mapPeerInvite(validation));
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create peer invite.' });
+    }
+  });
+
+  router.post('/workspaces/:workspaceId/peer-invites/:inviteId/revoke', async (req, res) => {
+    const { workspaceId, inviteId } = req.params;
+    const actorUserId = await resolveRequestActorUserId(req);
+    if (!actorUserId) {
+      res.status(401).json({ error: 'Unauthorized.' });
+      return;
+    }
+
+    try {
+      const membershipRows = await db
+        .select()
+        .from(workspaceMembers)
+        .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, actorUserId)))
+        .limit(1);
+      const membership = membershipRows[0];
+      if (!membership || !['owner', 'admin'].includes(membership.role)) {
+        res.status(403).json({ error: 'Owner or admin access is required.' });
+        return;
+      }
+
+      const inviteRows = await db
+        .select()
+        .from(validations)
+        .where(and(eq(validations.id, inviteId), eq(validations.workspaceId, workspaceId)))
+        .limit(1);
+      const invite = inviteRows[0];
+
+      if (!invite) {
+        res.status(404).json({ error: 'Peer invite not found.' });
+        return;
+      }
+
+      if (invite.revokedAt) {
+        res.json(mapPeerInvite(invite));
+        return;
+      }
+
+      const revokedAt = new Date();
+      await db.update(validations).set({ revokedAt }).where(eq(validations.id, invite.id));
+
+      res.json(mapPeerInvite({ ...invite, revokedAt }));
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to revoke peer invite.' });
     }
   });
 
@@ -478,6 +538,11 @@ export function createWorkspacesRouter() {
 
       if (!validation || !validation.workspaceId) {
         res.status(401).json({ error: 'Invalid validation request.' });
+        return;
+      }
+
+      if (validation.revokedAt) {
+        res.status(400).json({ error: 'This validation has been revoked.' });
         return;
       }
 

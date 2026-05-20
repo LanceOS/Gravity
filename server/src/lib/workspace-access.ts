@@ -33,6 +33,7 @@ export async function resolveWorkspaceAccessContext(workspaceKey: string) {
       workspacePrivateKey: validations.workspacePrivateKey,
       expiresAt: validations.expiresAt,
       isUsed: validations.isUsed,
+      revokedAt: validations.revokedAt,
       username: authUsers.name,
       avatarUrl: userProfiles.avatarUrl,
       role: userProfiles.role,
@@ -45,6 +46,10 @@ export async function resolveWorkspaceAccessContext(workspaceKey: string) {
 
   const row = rows[0];
   if (!row || !row.workspaceId || !row.guestUserId || !row.isUsed) {
+    return null;
+  }
+
+  if (row.revokedAt) {
     return null;
   }
 

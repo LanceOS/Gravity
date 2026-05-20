@@ -40,6 +40,7 @@ export async function initializeDatabase() {
       is_used BOOLEAN NOT NULL DEFAULT FALSE,
       expires_at TIMESTAMPTZ NOT NULL,
       used_at TIMESTAMPTZ,
+      revoked_at TIMESTAMPTZ,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
@@ -184,6 +185,7 @@ export async function initializeDatabase() {
     ALTER TABLE validations ADD COLUMN IF NOT EXISTS guest_username TEXT;
     ALTER TABLE validations ADD COLUMN IF NOT EXISTS guest_password_hash TEXT;
     ALTER TABLE validations ADD COLUMN IF NOT EXISTS used_at TIMESTAMPTZ;
+    ALTER TABLE validations ADD COLUMN IF NOT EXISTS revoked_at TIMESTAMPTZ;
   `);
 
   const { runMigrations } = await getMigrations(auth.options);

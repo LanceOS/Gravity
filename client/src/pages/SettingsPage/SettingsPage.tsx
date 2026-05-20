@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { ArrowLeft, Check, Copy, Globe, Link2, Mail, Settings2, ShieldCheck, UserPlus, Users } from 'lucide-react';
 import type { User } from '../../context/TicketContext';
 import type { WorkspaceSummary } from '../../hooks/useWorkspaceDirectory';
@@ -33,12 +33,45 @@ interface SettingsPageProps {
   members: WorkspaceMember[];
   joinRequests: WorkspaceJoinRequest[];
   approveLoadingId: string | null;
+  revokeLoadingId: string | null;
   onBackToWorkspace: () => void;
   onOpenDirectory: () => void;
   onChangeSettings: (updates: Partial<WorkspaceAdminSettings>) => void;
   onSaveSettings: () => void;
   onCreateInvite: (input: CreateWorkspaceInviteInput) => Promise<boolean>;
+  onRevokeInvite: (inviteId: string) => Promise<boolean>;
   onApproveJoinRequest: (requestId: string) => Promise<boolean>;
+}
+
+const COPY_FEEDBACK_STORAGE_KEY = 'gravity_peer_invite_copy_feedback';
+const COPY_FEEDBACK_DURATION_MS = 2200;
+
+function getInviteStateLabel(invite: WorkspaceInvite) {
+  if (invite.revokedAt) {
+    return 'Revoked';
+  }
+
+  if (invite.isUsed) {
+    return 'Validated';
+  }
+
+  return 'Pending';
+}
+
+function getInviteStateStyle(invite: WorkspaceInvite) {
+  if (invite.revokedAt) {
+    return inviteStateRevokedStyle;
+  }
+
+  return invite.isUsed ? inviteStateUsedStyle : inviteStatePendingStyle;
+}
+
+function getInviteRevokeLabel(invite: WorkspaceInvite, revokeLoadingId: string | null) {
+  if (revokeLoadingId !== invite.id) {
+    return invite.isUsed ? 'Revoke Access' : 'Revoke Invite';
+  }
+
+  return invite.isUsed ? 'Revoking Access...' : 'Revoking...';
 }
 
 const SETTINGS_CATEGORIES: Array<{
@@ -180,25 +213,82 @@ function AccessSection({
   invites,
   invitesLoading,
   inviteLoading,
+  revokeLoadingId,
   onCreateInvite,
+  onRevokeInvite,
 }: {
   invites: WorkspaceInvite[];
   invitesLoading: boolean;
   inviteLoading: boolean;
+  revokeLoadingId: string | null;
   onCreateInvite: (input: CreateWorkspaceInviteInput) => Promise<boolean>;
+  onRevokeInvite: (inviteId: string) => Promise<boolean>;
 }) {
   const latestInvite = invites[0] ?? null;
   const [email, setEmail] = useState('');
   const [expirationHours, setExpirationHours] = useState('24');
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
+  const scheduleCopyFeedbackReset = (key: string, expiresAt: number) => {
+    window.setTimeout(() => {
+      const rawValue = window.sessionStorage.getItem(COPY_FEEDBACK_STORAGE_KEY);
+      if (!rawValue) {
+        setCopiedField((current) => (current === key ? null : current));
+        return;
+      }
+
+      try {
+        const savedValue = JSON.parse(rawValue) as { key?: string; expiresAt?: number };
+        if (savedValue.key !== key || savedValue.expiresAt !== expiresAt) {
+          return;
+        }
+      } catch {
+        window.sessionStorage.removeItem(COPY_FEEDBACK_STORAGE_KEY);
+      }
+
+      window.sessionStorage.removeItem(COPY_FEEDBACK_STORAGE_KEY);
+      setCopiedField((current) => (current === key ? null : current));
+    }, Math.max(expiresAt - Date.now(), 0));
+  };
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+
+    const rawValue = window.sessionStorage.getItem(COPY_FEEDBACK_STORAGE_KEY);
+    if (!rawValue) {
+      return undefined;
+    }
+
+    try {
+      const savedValue = JSON.parse(rawValue) as { key?: string; expiresAt?: number };
+      if (typeof savedValue.key !== 'string' || typeof savedValue.expiresAt !== 'number') {
+        window.sessionStorage.removeItem(COPY_FEEDBACK_STORAGE_KEY);
+        return undefined;
+      }
+
+      if (savedValue.expiresAt <= Date.now()) {
+        window.sessionStorage.removeItem(COPY_FEEDBACK_STORAGE_KEY);
+        return undefined;
+      }
+
+      setCopiedField(savedValue.key);
+      scheduleCopyFeedbackReset(savedValue.key, savedValue.expiresAt);
+    } catch {
+      window.sessionStorage.removeItem(COPY_FEEDBACK_STORAGE_KEY);
+    }
+
+    return undefined;
+  }, []);
+
   const handleCopy = async (key: string, value: string) => {
     try {
       await navigator.clipboard.writeText(value);
       setCopiedField(key);
-      window.setTimeout(() => {
-        setCopiedField((current) => (current === key ? null : current));
-      }, 1600);
+      const expiresAt = Date.now() + COPY_FEEDBACK_DURATION_MS;
+      window.sessionStorage.setItem(COPY_FEEDBACK_STORAGE_KEY, JSON.stringify({ key, expiresAt }));
+      scheduleCopyFeedbackReset(key, expiresAt);
     } catch {
       setCopiedField(null);
     }
@@ -213,6 +303,10 @@ function AccessSection({
       setEmail('');
       setExpirationHours('24');
     }
+  };
+
+  const handleRevokeInvite = async (inviteId: string) => {
+    await onRevokeInvite(inviteId);
   };
 
   return (
@@ -266,8 +360,8 @@ function AccessSection({
               <div className="settings-page__eyebrow">Most Recent Invite</div>
               <div style={listRowTitleStyle}>{latestInvite.email}</div>
             </div>
-            <span style={latestInvite.isUsed ? inviteStateUsedStyle : inviteStatePendingStyle}>
-              {latestInvite.isUsed ? 'Validated' : 'Pending'}
+            <span style={getInviteStateStyle(latestInvite)}>
+              {getInviteStateLabel(latestInvite)}
             </span>
           </div>
 
@@ -302,8 +396,23 @@ function AccessSection({
 
           <div style={inviteMetaRowStyle}>
             <span>Expires {new Date(latestInvite.expiresAt).toLocaleString()}</span>
+            {latestInvite.revokedAt ? <span>Revoked {new Date(latestInvite.revokedAt).toLocaleString()}</span> : null}
             {latestInvite.guestUsername ? <span>Validated by {latestInvite.guestUsername}</span> : <span>Awaiting guest validation</span>}
           </div>
+
+          {!latestInvite.revokedAt ? (
+            <div style={inviteActionGroupStyle}>
+              <button
+                type="button"
+                className="settings-page__secondary-button"
+                style={{ ...compactActionStyle, ...dangerActionStyle }}
+                onClick={() => void handleRevokeInvite(latestInvite.id)}
+                disabled={revokeLoadingId === latestInvite.id}
+              >
+                {getInviteRevokeLabel(latestInvite, revokeLoadingId)}
+              </button>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -319,13 +428,27 @@ function AccessSection({
           </div>
 
           <div style={listRowMetaStyle}>
-            <span>{invite.isUsed ? 'Validated' : 'Pending validation'}</span>
+            <span>{getInviteStateLabel(invite)}</span>
             <span>Expires {new Date(invite.expiresAt).toLocaleString()}</span>
+            {invite.revokedAt ? <span>Revoked {new Date(invite.revokedAt).toLocaleString()}</span> : null}
             {invite.guestUsername ? <span>Guest: {invite.guestUsername}</span> : null}
-            <button type="button" className="settings-page__secondary-button" style={compactActionStyle} onClick={() => void handleCopy(`invite-row-${invite.id}`, invite.inviteUrl)}>
-              <Copy size={12} />
-              {copiedField === `invite-row-${invite.id}` ? 'Copied URL' : 'Copy URL'}
-            </button>
+            <div style={inviteActionGroupStyle}>
+              <button type="button" className="settings-page__secondary-button" style={compactActionStyle} onClick={() => void handleCopy(`invite-row-${invite.id}`, invite.inviteUrl)}>
+                <Copy size={12} />
+                {copiedField === `invite-row-${invite.id}` ? 'Copied URL' : 'Copy URL'}
+              </button>
+              {!invite.revokedAt ? (
+                <button
+                  type="button"
+                  className="settings-page__secondary-button"
+                  style={{ ...compactActionStyle, ...dangerActionStyle }}
+                  onClick={() => void handleRevokeInvite(invite.id)}
+                  disabled={revokeLoadingId === invite.id}
+                >
+                  {getInviteRevokeLabel(invite, revokeLoadingId)}
+                </button>
+              ) : null}
+            </div>
           </div>
         </div>
       ))}
@@ -446,11 +569,13 @@ export function SettingsPage({
   members,
   joinRequests,
   approveLoadingId,
+  revokeLoadingId,
   onBackToWorkspace,
   onOpenDirectory,
   onChangeSettings,
   onSaveSettings,
   onCreateInvite,
+  onRevokeInvite,
   onApproveJoinRequest,
 }: SettingsPageProps) {
   const [activeCategory, setActiveCategory] = useState<SettingsCategoryId>('overview');
@@ -536,7 +661,9 @@ export function SettingsPage({
               invites={invites}
               invitesLoading={invitesLoading}
               inviteLoading={inviteLoading}
+              revokeLoadingId={revokeLoadingId}
               onCreateInvite={onCreateInvite}
+              onRevokeInvite={onRevokeInvite}
             />
           ) : null}
 
@@ -608,6 +735,13 @@ const inviteStateUsedStyle: CSSProperties = {
   color: '#34d399',
 };
 
+const inviteStateRevokedStyle: CSSProperties = {
+  ...inviteStatePendingStyle,
+  border: '1px solid rgba(248, 113, 113, 0.25)',
+  background: 'rgba(248, 113, 113, 0.12)',
+  color: '#fca5a5',
+};
+
 const detailGridStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
@@ -653,6 +787,18 @@ const compactActionStyle: CSSProperties = {
   gap: '6px',
   minHeight: '34px',
   padding: '0 12px',
+};
+
+const inviteActionGroupStyle: CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  justifyContent: 'flex-end',
+  gap: '8px',
+};
+
+const dangerActionStyle: CSSProperties = {
+  borderColor: 'rgba(248, 113, 113, 0.2)',
+  color: '#fca5a5',
 };
 
 const metaCardStyle: CSSProperties = {

@@ -28,6 +28,7 @@ export interface WorkspaceInvite {
   expiresAt: string;
   isUsed: boolean;
   usedAt: string | null;
+  revokedAt: string | null;
   guestUsername: string | null;
   createdAt: string;
 }
@@ -74,6 +75,7 @@ function normalizeWorkspaceInvite(invite: Record<string, unknown>): WorkspaceInv
     expiresAt: String(invite.expires_at ?? invite.expiresAt ?? ''),
     isUsed: Boolean(invite.is_used ?? invite.isUsed),
     usedAt: invite.used_at ? String(invite.used_at) : invite.usedAt ? String(invite.usedAt) : null,
+    revokedAt: invite.revoked_at ? String(invite.revoked_at) : invite.revokedAt ? String(invite.revokedAt) : null,
     guestUsername: invite.guest_username ? String(invite.guest_username) : invite.guestUsername ? String(invite.guestUsername) : null,
     createdAt: String(invite.created_at ?? invite.createdAt ?? ''),
   };
@@ -92,6 +94,7 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [approveLoadingId, setApproveLoadingId] = useState<string | null>(null);
+  const [revokeLoadingId, setRevokeLoadingId] = useState<string | null>(null);
 
   const refreshWorkspaceAdmin = useCallback(async () => {
     if (!currentUser || !activeWorkspaceId) {
@@ -250,24 +253,46 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
       }
 
       await refreshWorkspaceAdmin();
-      return normalizeWorkspaceInvite({
-        id: data.validation_code || data.invite_url,
-        email: input.email,
-        invite_url: data.invite_url,
-        validation_code: data.validation_code,
-        workspace_private_key: '',
-        expires_at: data.expires_at,
-        is_used: false,
-        used_at: null,
-        guest_username: null,
-        created_at: new Date().toISOString(),
-      });
+      return normalizeWorkspaceInvite(data as Record<string, unknown>);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create invite.';
       setInviteError(message);
       return null;
     } finally {
       setInviteLoading(false);
+    }
+  }, [activeWorkspaceId, currentUser, refreshWorkspaceAdmin]);
+
+  const revokeInvite = useCallback(async (inviteId: string) => {
+    if (!currentUser || !activeWorkspaceId) {
+      return false;
+    }
+
+    setRevokeLoadingId(inviteId);
+    setInviteError(null);
+
+    try {
+      const response = await fetch(`/api/v1/workspaces/${activeWorkspaceId}/peer-invites/${inviteId}/revoke`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Id': currentUser.id,
+        },
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to revoke invite.');
+      }
+
+      await refreshWorkspaceAdmin();
+      return true;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to revoke invite.';
+      setInviteError(message);
+      return false;
+    } finally {
+      setRevokeLoadingId(null);
     }
   }, [activeWorkspaceId, currentUser, refreshWorkspaceAdmin]);
 
@@ -315,9 +340,11 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
     inviteLoading,
     inviteError,
     approveLoadingId,
+    revokeLoadingId,
     updateSettings,
     saveSettings,
     createInvite,
+    revokeInvite,
     approveJoinRequest,
     refreshWorkspaceAdmin,
   };

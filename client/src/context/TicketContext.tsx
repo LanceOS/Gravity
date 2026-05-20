@@ -133,6 +133,42 @@ const initialFilters = {
   search: '',
 };
 
+const CURRENT_USER_STORAGE_KEY = 'gravity_user';
+
+function readStoredUser(): User | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const rawUser = window.localStorage.getItem(CURRENT_USER_STORAGE_KEY);
+  if (!rawUser) {
+    return null;
+  }
+
+  try {
+    const parsedUser = JSON.parse(rawUser) as Record<string, unknown>;
+    if (typeof parsedUser.id !== 'string' || typeof parsedUser.name !== 'string' || typeof parsedUser.email !== 'string') {
+      window.localStorage.removeItem(CURRENT_USER_STORAGE_KEY);
+      return null;
+    }
+
+    return {
+      id: parsedUser.id,
+      name: parsedUser.name,
+      email: parsedUser.email,
+      avatar: typeof parsedUser.avatar === 'string' ? parsedUser.avatar : '',
+      role: typeof parsedUser.role === 'string' ? parsedUser.role : 'guest_contributor',
+      tutorial_completed:
+        typeof parsedUser.tutorial_completed === 'number' || typeof parsedUser.tutorial_completed === 'boolean'
+          ? parsedUser.tutorial_completed
+          : undefined,
+    };
+  } catch {
+    window.localStorage.removeItem(CURRENT_USER_STORAGE_KEY);
+    return null;
+  }
+}
+
 const initialState: State = {
   tickets: [],
   projects: [],
@@ -143,7 +179,7 @@ const initialState: State = {
   activeTicket: null,
   activeView: 'board',
   filters: initialFilters,
-  currentUser: null,
+  currentUser: readStoredUser(),
   theme: 'dark',
   loading: false,
 };
@@ -357,6 +393,19 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     fetchInitialData(state.currentUser.id);
   }, [state.currentUser, fetchInitialData]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    if (state.currentUser) {
+      window.localStorage.setItem(CURRENT_USER_STORAGE_KEY, JSON.stringify(state.currentUser));
+      return;
+    }
+
+    window.localStorage.removeItem(CURRENT_USER_STORAGE_KEY);
+  }, [state.currentUser]);
 
   // Sync user settings (default view and theme) when user logs in
   useEffect(() => {
