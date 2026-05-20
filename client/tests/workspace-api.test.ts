@@ -282,7 +282,7 @@ async function run() {
     assert(invalidPeerValidation.response.status === 401, 'Invalid peer validation codes should be rejected.');
 
     const validatePeerInvite = await postJson('/api/workspaces/validate', {
-      email: 'guest-user@peer.com',
+      email: 'guest-validated@peer.com',
       validation_code: createPeerInvite.data.validation_code,
       invite_url: createPeerInvite.data.invite_url,
       username: 'GuestExpert',
@@ -292,6 +292,19 @@ async function run() {
     assert(validatePeerInvite.data.authorized === true, 'Peer invite validation should authorize the guest.');
     assert(typeof validatePeerInvite.data.workspace_private_key === 'string', 'Peer validation should return a workspace_private_key.');
     assert(validatePeerInvite.data.guest_profile.username === 'GuestExpert', 'Peer validation should return the guest profile.');
+
+    const guestUserId = validatePeerInvite.data.guest_profile.id as string;
+
+    const guestWorkspaceList = await getJson(`/api/workspaces?userId=${encodeURIComponent(guestUserId)}`);
+    assert(guestWorkspaceList.response.ok, 'Validated guests should be able to load workspace summaries through user-based access.');
+    assert(
+      guestWorkspaceList.data.some((workspace: { id: string }) => workspace.id === workspaceId),
+      'Validated guests should see the shared workspace in user-based workspace listings.',
+    );
+
+    const guestProjects = await getJson(`/api/projects?userId=${encodeURIComponent(guestUserId)}&workspaceId=${encodeURIComponent(workspaceId)}`);
+    assert(guestProjects.response.ok, 'Validated guests should be able to hydrate projects through user-based access.');
+    assert(guestProjects.data.length >= 1, 'Validated guests should receive at least one project through user-based access.');
 
     const invalidWorkspaceKeyProjects = await getJson('/api/projects', { 'X-Workspace-Key': 'sec_wsp_invalid' });
     assert(invalidWorkspaceKeyProjects.response.status === 401, 'Invalid scoped workspace keys should be rejected for project hydration.');
@@ -348,6 +361,14 @@ async function run() {
       'X-Workspace-Key': validatePeerInvite.data.workspace_private_key,
     });
     assert(revokedScopedProjects.response.status === 401, 'Revoked scoped workspace keys should be rejected for project hydration.');
+
+    const revokedGuestWorkspaceList = await getJson(`/api/workspaces?userId=${encodeURIComponent(guestUserId)}`);
+    assert(revokedGuestWorkspaceList.response.ok, 'Revoked guests should still receive a valid workspace listing response.');
+    assert(revokedGuestWorkspaceList.data.length === 0, 'Revoked guests should no longer see the shared workspace in user-based listings.');
+
+    const revokedGuestProjects = await getJson(`/api/projects?userId=${encodeURIComponent(guestUserId)}&workspaceId=${encodeURIComponent(workspaceId)}`);
+    assert(revokedGuestProjects.response.ok, 'Revoked guests should still receive a valid project listing response.');
+    assert(revokedGuestProjects.data.length === 0, 'Revoked guests should no longer receive workspace projects through user-based access.');
 
     const peerInvitesAfterRevoke = await getJson(`/api/workspaces/${workspaceId}/peer-invites`, { 'X-User-Id': ownerId });
     assert(peerInvitesAfterRevoke.response.ok, 'Owner should still be able to list peer invites after revocation.');

@@ -60,6 +60,7 @@ export async function initializeDatabase() {
       workspace_id TEXT NOT NULL,
       user_id TEXT NOT NULL,
       role TEXT NOT NULL DEFAULT 'member',
+      provisioned_by_validation_id TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       PRIMARY KEY (workspace_id, user_id)
     );
@@ -129,6 +130,7 @@ export async function initializeDatabase() {
       project_id TEXT NOT NULL,
       user_id TEXT NOT NULL,
       role TEXT NOT NULL DEFAULT 'developer',
+      provisioned_by_validation_id TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       PRIMARY KEY (project_id, user_id)
     );
@@ -186,6 +188,8 @@ export async function initializeDatabase() {
     ALTER TABLE validations ADD COLUMN IF NOT EXISTS guest_password_hash TEXT;
     ALTER TABLE validations ADD COLUMN IF NOT EXISTS used_at TIMESTAMPTZ;
     ALTER TABLE validations ADD COLUMN IF NOT EXISTS revoked_at TIMESTAMPTZ;
+    ALTER TABLE workspace_members ADD COLUMN IF NOT EXISTS provisioned_by_validation_id TEXT;
+    ALTER TABLE project_members ADD COLUMN IF NOT EXISTS provisioned_by_validation_id TEXT;
   `);
 
   const { runMigrations } = await getMigrations(auth.options);

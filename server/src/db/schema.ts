@@ -67,6 +67,7 @@ export const workspaceMembers = pgTable(
     workspaceId: text('workspace_id').notNull(),
     userId: text('user_id').notNull(),
     role: text('role').notNull().default('member'),
+    provisionedByValidationId: text('provisioned_by_validation_id'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
@@ -141,6 +142,7 @@ export const projectMembers = pgTable(
     projectId: text('project_id').notNull(),
     userId: text('user_id').notNull(),
     role: text('role').notNull().default('developer'),
+    provisionedByValidationId: text('provisioned_by_validation_id'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({

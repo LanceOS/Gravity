@@ -192,10 +192,15 @@ export async function getUserSettingsRecord(userId: string): Promise<RawSettings
   };
 }
 
-export async function addUserToWorkspaceProjects(workspaceId: string, userId: string, role = 'developer') {
+export async function addUserToWorkspaceProjects(
+  workspaceId: string,
+  userId: string,
+  role = 'developer',
+  provisionedByValidationId?: string,
+) {
   await db.execute(sql`
-    INSERT INTO project_members (project_id, user_id, role, created_at)
-    SELECT p.id, ${userId}, ${role}, NOW()
+    INSERT INTO project_members (project_id, user_id, role, provisioned_by_validation_id, created_at)
+    SELECT p.id, ${userId}, ${role}, ${provisionedByValidationId ?? null}, NOW()
     FROM projects p
     WHERE p.workspace_id = ${workspaceId}
     ON CONFLICT (project_id, user_id) DO NOTHING
@@ -204,8 +209,8 @@ export async function addUserToWorkspaceProjects(workspaceId: string, userId: st
 
 export async function addWorkspaceMembersToProject(workspaceId: string, projectId: string) {
   await db.execute(sql`
-    INSERT INTO project_members (project_id, user_id, role, created_at)
-    SELECT ${projectId}, wm.user_id, CASE WHEN wm.role = 'owner' THEN 'owner' ELSE 'developer' END, NOW()
+    INSERT INTO project_members (project_id, user_id, role, provisioned_by_validation_id, created_at)
+    SELECT ${projectId}, wm.user_id, CASE WHEN wm.role = 'owner' THEN 'owner' ELSE 'developer' END, wm.provisioned_by_validation_id, NOW()
     FROM workspace_members wm
     WHERE wm.workspace_id = ${workspaceId}
     ON CONFLICT (project_id, user_id) DO NOTHING
@@ -307,16 +312,26 @@ export async function ensureWorkspaceSettingsRecord(workspaceId: string) {
     .onConflictDoNothing({ target: workspaceSettings.workspaceId });
 }
 
-export async function ensureWorkspaceMembership(workspaceId: string, userId: string, role = 'member') {
+export async function ensureWorkspaceMembership(
+  workspaceId: string,
+  userId: string,
+  role = 'member',
+  provisionedByValidationId?: string,
+) {
   await db
     .insert(workspaceMembers)
-    .values({ workspaceId, userId, role })
+    .values({ workspaceId, userId, role, provisionedByValidationId: provisionedByValidationId ?? null })
     .onConflictDoNothing({ target: [workspaceMembers.workspaceId, workspaceMembers.userId] });
 }
 
-export async function ensureProjectMembership(projectId: string, userId: string, role = 'developer') {
+export async function ensureProjectMembership(
+  projectId: string,
+  userId: string,
+  role = 'developer',
+  provisionedByValidationId?: string,
+) {
   await db
     .insert(projectMembers)
-    .values({ projectId, userId, role })
+    .values({ projectId, userId, role, provisionedByValidationId: provisionedByValidationId ?? null })
     .onConflictDoNothing({ target: [projectMembers.projectId, projectMembers.userId] });
 }

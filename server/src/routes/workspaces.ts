@@ -4,6 +4,7 @@ import { Router } from 'express';
 import { db } from '../db/index.js';
 import {
   authUsers,
+  projectMembers,
   projects,
   validations,
   workspaceInvites,
@@ -502,7 +503,19 @@ export function createWorkspacesRouter() {
       }
 
       const revokedAt = new Date();
-      await db.update(validations).set({ revokedAt }).where(eq(validations.id, invite.id));
+      await db.transaction(async (tx) => {
+        await tx.update(validations).set({ revokedAt }).where(eq(validations.id, invite.id));
+
+        if (invite.guestUserId) {
+          await tx
+            .delete(projectMembers)
+            .where(eq(projectMembers.provisionedByValidationId, invite.id));
+
+          await tx
+            .delete(workspaceMembers)
+            .where(eq(workspaceMembers.provisionedByValidationId, invite.id));
+        }
+      });
 
       res.json(mapPeerInvite({ ...invite, revokedAt }));
     } catch (error) {
@@ -581,8 +594,8 @@ export function createWorkspacesRouter() {
       }
 
       await ensureUserDefaults(guestUserId);
-      await ensureWorkspaceMembership(validation.workspaceId, guestUserId, 'member');
-      await addUserToWorkspaceProjects(validation.workspaceId, guestUserId);
+  await ensureWorkspaceMembership(validation.workspaceId, guestUserId, 'member', validation.id);
+  await addUserToWorkspaceProjects(validation.workspaceId, guestUserId, 'developer', validation.id);
 
       await db
         .update(validations)
