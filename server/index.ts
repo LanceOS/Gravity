@@ -46,11 +46,14 @@ const allowedSettingsFields = new Set([
   'projectLayout',
 ]);
 
-const allowedWorkspaceSettingsFields = new Set(['hostUrl', 'joinMode', 'workspaceKey']);
+const allowedWorkspaceSettingsFields = new Set(['hostUrl', 'joinMode', 'workspaceKey', 'defaultProjectId']);
+const allowedProjectFields = new Set(['name', 'description', 'status']);
 
 type JoinMode = 'approval_required' | 'auto_join';
+type ProjectStatus = 'planned' | 'active' | 'completed';
 
 const isJoinMode = (value: unknown): value is JoinMode => value === 'approval_required' || value === 'auto_join';
+const isProjectStatus = (value: unknown): value is ProjectStatus => value === 'planned' || value === 'active' || value === 'completed';
 
 function ensureUserSettings(userId: string) {
   centralDb.prepare(`
@@ -442,7 +445,8 @@ app.patch('/api/settings/:userId', (req, res) => {
 
 // Test Connection with Warning for OpenAI API
 app.post('/api/ai/test-key', async (req, res) => {
-  const provider = isAIProvider(req.body?.provider) ? req.body.provider : 'openai';
+  const requestedProvider = req.body?.provider;
+  const provider: AIProvider = isAIProvider(requestedProvider) ? requestedProvider : 'openai';
   const { apiKey } = req.body;
   if (!apiKey) {
     res.status(400).json({ error: 'API Key is required to test.' });
@@ -627,10 +631,10 @@ app.get('/api/workspaces/:workspaceId/settings', (req, res) => {
   try {
     ensureWorkspaceSettingsRecord(workspaceId);
     const workspace = centralDb.prepare(`
-      SELECT id, workspaceKey, key
+      SELECT id, workspaceKey, key, defaultProjectId
       FROM workspaces
       WHERE id = ?
-    `).get(workspaceId) as { id: string; workspaceKey: string; key: string } | undefined;
+    `).get(workspaceId) as { id: string; workspaceKey: string; key: string; defaultProjectId: string | null } | undefined;
 
     if (!workspace) {
       res.status(404).json({ error: 'Workspace not found.' });
@@ -643,7 +647,7 @@ app.get('/api/workspaces/:workspaceId/settings', (req, res) => {
       WHERE workspaceId = ?
     `).get(workspaceId);
 
-    res.json({ ...settings, workspaceKey: workspace.workspaceKey, key: workspace.key });
+    res.json({ ...settings, workspaceKey: workspace.workspaceKey, key: workspace.key, defaultProjectId: workspace.defaultProjectId || null });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
@@ -667,6 +671,23 @@ app.patch('/api/workspaces/:workspaceId/settings', (req, res) => {
     if (!workspace) {
       res.status(404).json({ error: 'Workspace not found.' });
       return;
+    }
+
+    if ('defaultProjectId' in updates) {
+      if (updates.defaultProjectId === null || updates.defaultProjectId === '') {
+        updates.defaultProjectId = null;
+      } else {
+        const project = centralDb.prepare(`
+          SELECT id
+          FROM projects
+          WHERE id = ? AND workspaceId = ?
+        `).get(updates.defaultProjectId, workspaceId);
+
+        if (!project) {
+          res.status(400).json({ error: 'Default project must belong to this workspace.' });
+          return;
+        }
+      }
     }
 
     if (updates.hostUrl !== undefined || updates.joinMode !== undefined) {
@@ -693,7 +714,7 @@ app.patch('/api/workspaces/:workspaceId/settings', (req, res) => {
       `).run(...settingsParams);
     }
 
-    if (typeof updates.hostUrl === 'string' || typeof updates.workspaceKey === 'string') {
+    if (typeof updates.hostUrl === 'string' || typeof updates.workspaceKey === 'string' || 'defaultProjectId' in updates) {
       const workspaceFields: string[] = [];
       const workspaceParams: unknown[] = [];
 
@@ -707,6 +728,11 @@ app.patch('/api/workspaces/:workspaceId/settings', (req, res) => {
         workspaceParams.push(updates.workspaceKey.trim());
       }
 
+      if ('defaultProjectId' in updates) {
+        workspaceFields.push('defaultProjectId = ?');
+        workspaceParams.push(updates.defaultProjectId ?? null);
+      }
+
       if (workspaceFields.length > 0) {
         workspaceParams.push(workspaceId);
         centralDb.prepare(`
@@ -718,7 +744,7 @@ app.patch('/api/workspaces/:workspaceId/settings', (req, res) => {
     }
 
     const settings = centralDb.prepare(`
-      SELECT ws.workspaceId, ws.hostUrl, ws.joinMode, ws.createdAt, ws.updatedAt, w.workspaceKey, w.key
+      SELECT ws.workspaceId, ws.hostUrl, ws.joinMode, ws.createdAt, ws.updatedAt, w.workspaceKey, w.key, w.defaultProjectId
       FROM workspace_settings ws
       JOIN workspaces w ON w.id = ws.workspaceId
       WHERE ws.workspaceId = ?
@@ -1383,15 +1409,13 @@ app.post('/api/projects', (req, res) => {
         `).run(id, ownerId);
       }
 
-      mirrorWorkspaceMembersToProject(id, resolvedWorkspaceId);
+      centralDb.prepare(`
+        UPDATE workspaces
+        SET defaultProjectId = COALESCE(defaultProjectId, ?)
+        WHERE id = ?
+      `).run(id, resolvedWorkspaceId);
 
-      if (!workspaceId) {
-        centralDb.prepare(`
-          UPDATE workspaces
-          SET defaultProjectId = COALESCE(defaultProjectId, ?)
-          WHERE id = ?
-        `).run(id, resolvedWorkspaceId);
-      }
+      mirrorWorkspaceMembersToProject(id, resolvedWorkspaceId);
 
       getProjectDb(id);
     });
@@ -1408,6 +1432,65 @@ app.post('/api/projects', (req, res) => {
       return;
     }
 
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.patch('/api/projects/:projectId', (req, res) => {
+  const { projectId } = req.params;
+  const updates = Object.fromEntries(
+    Object.entries({ ...req.body }).filter(([field]) => allowedProjectFields.has(field))
+  );
+
+  if ('status' in updates && !isProjectStatus(updates.status)) {
+    res.status(400).json({ error: 'Unsupported project status.' });
+    return;
+  }
+
+  try {
+    const existingProject = centralDb.prepare('SELECT * FROM projects WHERE id = ?').get(projectId) as any;
+    if (!existingProject) {
+      res.status(404).json({ error: 'Project not found.' });
+      return;
+    }
+
+    const projectFields: string[] = [];
+    const projectParams: unknown[] = [];
+
+    if (typeof updates.name === 'string') {
+      const normalizedName = updates.name.trim();
+      if (!normalizedName) {
+        res.status(400).json({ error: 'Project name is required.' });
+        return;
+      }
+
+      projectFields.push('name = ?');
+      projectParams.push(normalizedName);
+    }
+
+    if (typeof updates.description === 'string') {
+      projectFields.push('description = ?');
+      projectParams.push(updates.description.trim());
+    }
+
+    if (isProjectStatus(updates.status)) {
+      projectFields.push('status = ?');
+      projectParams.push(updates.status);
+    }
+
+    if (projectFields.length > 0) {
+      projectParams.push(projectId);
+      centralDb.prepare(`
+        UPDATE projects
+        SET ${projectFields.join(', ')}
+        WHERE id = ?
+      `).run(...projectParams);
+    }
+
+    const project = centralDb.prepare('SELECT * FROM projects WHERE id = ?').get(projectId);
+    broadcastEvent('projects-updated', centralDb.prepare('SELECT * FROM projects').all());
+    res.json(project);
+  } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
 });

@@ -19,6 +19,14 @@ export interface Project {
   workspaceId?: string | null;
 }
 
+type CreateProjectInput = {
+  name: string;
+  description: string;
+  key: string;
+  status?: Project['status'];
+  workspaceId?: string;
+};
+
 export interface Domain {
   id: string;
   name: string;
@@ -212,7 +220,7 @@ interface TicketContextType extends State {
   updateTicket: (id: string, updates: Partial<Ticket>) => Promise<void>;
   deleteTicket: (id: string) => Promise<void>;
   addComment: (ticketId: string, body: string) => Promise<void>;
-  createProject: (project: { name: string; description: string; key: string; status?: Project['status'] }) => Promise<Project | null>;
+  createProject: (project: CreateProjectInput) => Promise<Project | null>;
   joinProject: (inviteCode: string) => Promise<Project | null>;
   signIn: (email: string, password?: string) => Promise<boolean>;
   signUp: (name: string, email: string, password?: string) => Promise<boolean>;
@@ -520,7 +528,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [state.currentUser, fetchCommentsForTicket, activeProjectId]);
 
-  const createProject = useCallback(async (projectInput: { name: string; description: string; key: string; status?: Project['status'] }) => {
+  const createProject = useCallback(async (projectInput: CreateProjectInput) => {
     if (!state.currentUser) {
       return null;
     }

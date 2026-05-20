@@ -4,6 +4,7 @@ import { AuthScreen } from '../../components/AuthScreen';
 import { CreateTicketModal } from '../../components/CreateTicketModal';
 import { LocalAIChat } from '../../components/LocalAIChat';
 import { OnboardingModal } from '../../components/OnboardingModal';
+import type { SidebarProps } from '../../components/Sidebar';
 import { useTickets, type Ticket } from '../../context/TicketContext';
 import { useAccountSettings } from '../../hooks/useAccountSettings';
 import { useWorkspaceDirectory } from '../../hooks/useWorkspaceDirectory';
@@ -25,6 +26,7 @@ export function AppShellPage() {
     activeView,
     addComment,
     comments,
+    createProject,
     createTicket,
     currentUser,
     cycles,
@@ -54,6 +56,11 @@ export function AppShellPage() {
   const [isSimulatorOpen, setIsSimulatorOpen] = useState(false);
   const [createInitialStatus, setCreateInitialStatus] = useState<Ticket['status'] | undefined>(undefined);
   const [createParentId, setCreateParentId] = useState<string | undefined>(undefined);
+  const [projectCreateLoading, setProjectCreateLoading] = useState(false);
+  const [projectCreateError, setProjectCreateError] = useState<string | null>(null);
+  const [projectManageLoading, setProjectManageLoading] = useState(false);
+  const [projectManageError, setProjectManageError] = useState<string | null>(null);
+  const [defaultProjectLoading, setDefaultProjectLoading] = useState(false);
 
   const {
     workspaces,
@@ -61,6 +68,7 @@ export function AppShellPage() {
     pendingAction,
     error: workspaceDirectoryError,
     successMessage: workspaceDirectorySuccess,
+    refreshWorkspaces,
     createWorkspace,
     requestJoinByInvite,
   } = useWorkspaceDirectory({ currentUser });
@@ -183,6 +191,11 @@ export function AppShellPage() {
   }, [activeWorkspaceId, activeWorkspace?.defaultProjectId, activeWorkspaceProjects, activeProjectId, setActiveProjectId]);
 
   useEffect(() => {
+    setProjectCreateError(null);
+    setProjectManageError(null);
+  }, [activeWorkspaceId]);
+
+  useEffect(() => {
     const controller = registerWebMCPTools({
       createTicket,
       updateTicket,
@@ -255,9 +268,22 @@ export function AppShellPage() {
   };
 
   const handleSelectWorkspace = (workspaceId: string) => {
+    const workspace = workspaces.find((candidate) => candidate.id === workspaceId) || null;
+    const workspaceProjects = projects.filter((project) => project.workspaceId === workspaceId);
+    const currentWorkspaceProject = workspaceProjects.find((project) => project.id === activeProjectId) || null;
+    const preferredProject = currentWorkspaceProject
+      || workspaceProjects.find((project) => project.id === workspace?.defaultProjectId)
+      || workspaceProjects[0]
+      || null;
+
     setActiveWorkspaceId(workspaceId);
+    if (preferredProject) {
+      setActiveProjectId(preferredProject.id);
+    } else {
+      setActiveProjectId('');
+    }
     setActiveTicket(null);
-    setFilters({ projectId: '', assigneeId: '', domainId: '', cycleId: '' });
+    setFilters({ assigneeId: '', domainId: '', cycleId: '' });
     setActiveSection('workspace');
   };
 
@@ -271,6 +297,101 @@ export function AppShellPage() {
     setActiveTicket(null);
     setFilters({ assigneeId: '', domainId: '', cycleId: '' });
     setActiveSection('workspace');
+  };
+
+  const handleCreateProject = async (projectInput: { name: string; description: string; key: string }) => {
+    if (!activeWorkspaceId || !currentUser) {
+      return;
+    }
+
+    setProjectCreateLoading(true);
+    setProjectCreateError(null);
+
+    try {
+      const project = await createProject({
+        ...projectInput,
+        status: 'active',
+        workspaceId: activeWorkspaceId,
+      });
+
+      if (!project) {
+        throw new Error('Failed to create project in this workspace.');
+      }
+
+      await refreshWorkspaces();
+      setActiveTicket(null);
+      setActiveSection('workspace');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to create project in this workspace.';
+      setProjectCreateError(message);
+      throw error;
+    } finally {
+      setProjectCreateLoading(false);
+    }
+  };
+
+  const handleUpdateProjectInfo = async (
+    projectId: string,
+    updates: { name: string; description: string; status: 'planned' | 'active' | 'completed' }
+  ) => {
+    if (!currentUser) {
+      return;
+    }
+
+    setProjectManageLoading(true);
+    setProjectManageError(null);
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update project.');
+      }
+
+      await fetchInitialData(currentUser.id);
+      await refreshWorkspaces();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to update project.';
+      setProjectManageError(message);
+      throw error;
+    } finally {
+      setProjectManageLoading(false);
+    }
+  };
+
+  const handleSetDefaultProject = async (projectId: string) => {
+    if (!activeWorkspaceId) {
+      return;
+    }
+
+    setDefaultProjectLoading(true);
+    setProjectManageError(null);
+
+    try {
+      const response = await fetch(`/api/workspaces/${activeWorkspaceId}/settings`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ defaultProjectId: projectId }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update the workspace default project.');
+      }
+
+      await refreshWorkspaces();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to update the workspace default project.';
+      setProjectManageError(message);
+      throw error;
+    } finally {
+      setDefaultProjectLoading(false);
+    }
   };
 
   const handleShowProjectIssues = () => {
@@ -419,7 +540,7 @@ export function AppShellPage() {
     );
   }
 
-  const sidebarProps = {
+  const sidebarProps: SidebarProps = {
     workspaces: workspaces.map((workspace) => ({ id: workspace.id, name: workspace.name })),
     projects: activeWorkspaceProjects,
     domains,
@@ -432,7 +553,7 @@ export function AppShellPage() {
     activeProjectTicketCount: openTickets.length,
     domainCounts,
     cycleCounts,
-    activeArea: activeSection === 'settings' ? 'settings' : activeSection === 'account' ? 'account' : 'workspace',
+    activeArea: activeSection === 'settings' ? 'settings' : 'workspace',
     onSelectWorkspace: handleSelectWorkspace,
     onOpenWorkspaceDirectory: () => setActiveSection('directory'),
     onSelectProject: handleSelectProject,
@@ -494,13 +615,25 @@ export function AppShellPage() {
             projects={activeWorkspaceProjects}
             tickets={tickets}
             users={users}
+            workspaceName={activeWorkspace.name}
+            activeProjectId={activeProjectId}
+            defaultProjectId={activeWorkspace.defaultProjectId}
+            projectCreateLoading={projectCreateLoading}
+            projectCreateError={projectCreateError}
+            projectManageLoading={projectManageLoading}
+            projectManageError={projectManageError}
+            defaultProjectLoading={defaultProjectLoading}
             onAddComment={addComment}
+            onCreateProject={handleCreateProject}
             onDeleteTicket={handleDeleteTicket}
             onOpenCreateSubtask={handleOpenCreateSubtask}
             onOpenCreateTicket={handleOpenCreateTicket}
+            onSelectProject={handleSelectProject}
             onSelectTicket={setActiveTicket}
             onSetFilters={setFilters}
             onSetView={setView}
+            onSetDefaultProject={handleSetDefaultProject}
+            onUpdateProjectInfo={handleUpdateProjectInfo}
             onUpdateTicket={updateTicket}
           />
         </WorkspaceLayout>

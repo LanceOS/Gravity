@@ -5,6 +5,7 @@ import type { TicketFilters } from '../../utils/ticketView';
 import { TicketBoard } from '../../components/TicketBoard';
 import { TicketList } from '../../components/TicketList';
 import { TicketDetail } from '../../components/TicketDetail';
+import { WorkspaceProjectPanel } from '../../components/WorkspaceProjectPanel';
 import {
   filterTickets,
   getWorkspaceHeaderTitle,
@@ -24,13 +25,25 @@ interface WorkspacePageProps {
   projects: Project[];
   tickets: Ticket[];
   users: User[];
+  workspaceName: string;
+  activeProjectId: string;
+  defaultProjectId: string | null;
+  projectCreateLoading: boolean;
+  projectCreateError: string | null;
+  projectManageLoading: boolean;
+  projectManageError: string | null;
+  defaultProjectLoading: boolean;
   onAddComment: (ticketId: string, body: string) => Promise<void>;
+  onCreateProject: (project: { name: string; description: string; key: string }) => Promise<void>;
   onDeleteTicket: (ticketId: string) => Promise<void>;
   onOpenCreateSubtask: (parentId: string) => void;
   onOpenCreateTicket: (initialStatus?: Ticket['status']) => void;
+  onSelectProject: (projectId: string) => void;
   onSelectTicket: (ticket: Ticket | null) => void;
   onSetFilters: (filters: Partial<TicketFilters>) => void;
   onSetView: (view: 'board' | 'list') => void;
+  onSetDefaultProject: (projectId: string) => Promise<void>;
+  onUpdateProjectInfo: (projectId: string, updates: { name: string; description: string; status: Project['status'] }) => Promise<void>;
   onUpdateTicket: (id: string, updates: Partial<Ticket>) => Promise<void>;
 }
 
@@ -45,13 +58,25 @@ export function WorkspacePage({
   projects,
   tickets,
   users,
+  workspaceName,
+  activeProjectId,
+  defaultProjectId,
+  projectCreateLoading,
+  projectCreateError,
+  projectManageLoading,
+  projectManageError,
+  defaultProjectLoading,
   onAddComment,
+  onCreateProject,
   onDeleteTicket,
   onOpenCreateSubtask,
   onOpenCreateTicket,
+  onSelectProject,
   onSelectTicket,
   onSetFilters,
   onSetView,
+  onSetDefaultProject,
+  onUpdateProjectInfo,
   onUpdateTicket,
 }: WorkspacePageProps) {
   const filteredTickets = useMemo(() => filterTickets(tickets, filters), [tickets, filters]);
@@ -139,36 +164,63 @@ export function WorkspacePage({
 
       <div className="workspace-page__content">
         <div className={`workspace-page__issues ${activeTicket ? 'workspace-page__issues--hidden' : ''}`}>
-          {activeView === 'board' ? (
-            <TicketBoard
+          <div className="workspace-page__issues-shell">
+            <WorkspaceProjectPanel
+              workspaceName={workspaceName}
               projects={projects}
-              filters={filters}
-              filteredCount={filteredTickets.length}
-              totalCount={tickets.length}
-              ticketsByColumn={groupedTickets}
-              domainById={domainById}
-              userAvatarById={userAvatarById}
-              hasActiveFilters={hasFiltersApplied}
-              onFilterChange={onSetFilters}
-              onClearFilters={handleClearFilters}
-              onMoveTicket={onUpdateTicket}
-              onSelectTicket={(ticket) => onSelectTicket(ticket)}
-              onOpenCreateTicket={onOpenCreateTicket}
+              activeProjectId={activeProjectId}
+              defaultProjectId={defaultProjectId}
+              projectCreateLoading={projectCreateLoading}
+              projectCreateError={projectCreateError}
+              projectManageLoading={projectManageLoading}
+              projectManageError={projectManageError}
+              defaultProjectLoading={defaultProjectLoading}
+              onSelectProject={onSelectProject}
+              onCreateProject={onCreateProject}
+              onUpdateProject={onUpdateProjectInfo}
+              onSetDefaultProject={onSetDefaultProject}
             />
-          ) : (
-            <TicketList
-              filters={filters}
-              filteredCount={filteredTickets.length}
-              totalCount={tickets.length}
-              groupedTickets={groupedTickets}
-              domainById={domainById}
-              userAvatarById={userAvatarById}
-              hasActiveFilters={hasFiltersApplied}
-              onFilterChange={onSetFilters}
-              onClearFilters={handleClearFilters}
-              onSelectTicket={(ticket) => onSelectTicket(ticket)}
-            />
-          )}
+
+            <div className="workspace-page__issues-content">
+              {projects.length === 0 ? (
+                <div className="workspace-page__empty-state">
+                  <div className="workspace-page__empty-state-title">No projects in this workspace yet</div>
+                  <p className="workspace-page__empty-state-copy">
+                    Use the project form above to create the first project. Once a project exists, tickets, domains, and cycles will become available inside this workspace.
+                  </p>
+                </div>
+              ) : activeView === 'board' ? (
+                <TicketBoard
+                  projects={projects}
+                  filters={filters}
+                  filteredCount={filteredTickets.length}
+                  totalCount={tickets.length}
+                  ticketsByColumn={groupedTickets}
+                  domainById={domainById}
+                  userAvatarById={userAvatarById}
+                  hasActiveFilters={hasFiltersApplied}
+                  onFilterChange={onSetFilters}
+                  onClearFilters={handleClearFilters}
+                  onMoveTicket={onUpdateTicket}
+                  onSelectTicket={(ticket) => onSelectTicket(ticket)}
+                  onOpenCreateTicket={onOpenCreateTicket}
+                />
+              ) : (
+                <TicketList
+                  filters={filters}
+                  filteredCount={filteredTickets.length}
+                  totalCount={tickets.length}
+                  groupedTickets={groupedTickets}
+                  domainById={domainById}
+                  userAvatarById={userAvatarById}
+                  hasActiveFilters={hasFiltersApplied}
+                  onFilterChange={onSetFilters}
+                  onClearFilters={handleClearFilters}
+                  onSelectTicket={(ticket) => onSelectTicket(ticket)}
+                />
+              )}
+            </div>
+          </div>
         </div>
 
         {activeTicket ? (

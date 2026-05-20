@@ -1,0 +1,474 @@
+.workspace-page {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.workspace-page__header {
+  height: 48px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  background: var(--sidebar-bg);
+  flex-shrink: 0;
+  gap: 16px;
+}
+
+.workspace-page__title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.workspace-page__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-heading);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.workspace-page__view-toggle {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--border);
+  padding: 2px;
+  border-radius: 6px;
+}
+
+.workspace-page__view-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.workspace-page__view-button--active {
+  background: var(--card-bg);
+  color: var(--text-heading);
+}
+
+.workspace-page__content {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  position: relative;
+  min-width: 0;
+}
+
+.workspace-page__issues {
+  flex: 1;
+  overflow: hidden;
+}
+
+.workspace-page__issues-shell {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.workspace-page__issues-content {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.workspace-page__issues--hidden {
+  display: none;
+}
+
+.workspace-page__projects-panel {
+  flex-shrink: 0;
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--border);
+  background:
+    radial-gradient(circle at top left, rgba(59, 130, 246, 0.08), transparent 35%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.01), rgba(255, 255, 255, 0));
+  display: grid;
+  gap: 16px;
+}
+
+.workspace-page__projects-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.workspace-page__projects-title-block {
+  display: grid;
+  gap: 6px;
+}
+
+.workspace-page__projects-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.workspace-page__projects-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.workspace-page__projects-title {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.1;
+  color: var(--text-heading);
+}
+
+.workspace-page__projects-count {
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--accent-border);
+  background: rgba(59, 130, 246, 0.08);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.workspace-page__projects-subtitle {
+  margin: 0;
+  max-width: 680px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.workspace-page__projects-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.workspace-page__projects-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-heading);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.workspace-page__projects-button:hover {
+  border-color: var(--accent-border);
+}
+
+.workspace-page__projects-button--primary,
+.workspace-page__projects-button--active {
+  border-color: var(--accent-border);
+  background: rgba(59, 130, 246, 0.12);
+  color: var(--accent);
+}
+
+.workspace-page__project-feedback {
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.workspace-page__project-feedback--error {
+  border: 1px solid rgba(239, 68, 68, 0.22);
+  background: rgba(239, 68, 68, 0.08);
+  color: #f87171;
+}
+
+.workspace-page__project-composer {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.workspace-page__project-form-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1.4fr) minmax(120px, 0.5fr) minmax(0, 1.5fr);
+}
+
+.workspace-page__project-field {
+  display: grid;
+  gap: 6px;
+}
+
+.workspace-page__project-field--compact {
+  min-width: 0;
+}
+
+.workspace-page__project-field--wide {
+  min-width: 0;
+}
+
+.workspace-page__project-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.workspace-page__project-input {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text-heading);
+  font: inherit;
+}
+
+.workspace-page__project-input--key {
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.workspace-page__project-input--textarea {
+  min-height: 78px;
+  resize: vertical;
+}
+
+.workspace-page__project-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.workspace-page__project-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.workspace-page__project-card {
+  text-align: left;
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.workspace-page__project-card:hover,
+.workspace-page__project-card--active {
+  border-color: var(--accent-border);
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.workspace-page__project-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.workspace-page__project-card-badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.workspace-page__project-badge {
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--accent-border);
+  background: rgba(59, 130, 246, 0.12);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.workspace-page__project-key {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+}
+
+.workspace-page__project-status {
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.workspace-page__project-status--planned {
+  background: rgba(245, 158, 11, 0.14);
+  color: #f59e0b;
+}
+
+.workspace-page__project-status--active {
+  background: rgba(16, 185, 129, 0.14);
+  color: #34d399;
+}
+
+.workspace-page__project-status--completed {
+  background: rgba(148, 163, 184, 0.16);
+  color: #cbd5e1;
+}
+
+.workspace-page__project-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+.workspace-page__project-description {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.workspace-page__project-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.workspace-page__project-meta-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.workspace-page__project-meta-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+.workspace-page__project-manager {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.workspace-page__project-manager-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.workspace-page__project-manager-title {
+  margin: 4px 0 0;
+  font-size: 18px;
+  color: var(--text-heading);
+}
+
+.workspace-page__project-manager-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.workspace-page__empty-state {
+  height: 100%;
+  display: grid;
+  place-content: center;
+  gap: 10px;
+  padding: 32px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.workspace-page__empty-state-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+.workspace-page__empty-state-copy {
+  margin: 0;
+  max-width: 540px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.workspace-page__spin {
+  animation: workspace-page-spin 0.9s linear infinite;
+}
+
+@keyframes workspace-page-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.workspace-page__detail {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+@media (max-width: 960px) {
+  .workspace-page__projects-header {
+    flex-direction: column;
+  }
+
+  .workspace-page__projects-actions {
+    width: 100%;
+  }
+
+  .workspace-page__project-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-page__project-manager-header {
+    flex-direction: column;
+  }
+}
