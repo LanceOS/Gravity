@@ -1,12 +1,14 @@
-import { asc, eq } from 'drizzle-orm';
-import { Router } from 'express';
+import { and, asc, eq } from 'drizzle-orm';
+import { type Response, Router } from 'express';
 import { db } from '../db/index.js';
-import { cycles, domains, tickets } from '../db/schema.js';
+import { cycles, domains, projects, tickets } from '../db/schema.js';
 import { broadcastEvent } from '../realtime.js';
 import { createId, getProjectIdFromRequest, normalizeIsoDate } from '../lib/platform.js';
+import { getWorkspaceAccess, optionalWorkspaceAccess, type WorkspaceAccessLocals } from '../lib/workspace-access.js';
 import {
   addCommentRecord,
   createTicketRecord,
+  getTicketById,
   deleteTicketRecord,
   getTicketDetails,
   listComments,
@@ -26,6 +28,25 @@ function mapCycle(cycle: typeof cycles.$inferSelect) {
 
 export function createTicketsRouter() {
   const router = Router();
+
+  async function ensureWorkspaceCanAccessTicket(ticketId: string, workspaceId: string) {
+    const ticket = await getTicketById(ticketId);
+    if (!ticket) {
+      return { allowed: false as const, reason: 'not_found' as const };
+    }
+
+    const projectRows = await db
+      .select({ workspaceId: projects.workspaceId })
+      .from(projects)
+      .where(eq(projects.id, ticket.projectId))
+      .limit(1);
+    const project = projectRows[0];
+    if (!project || project.workspaceId !== workspaceId) {
+      return { allowed: false as const, reason: 'forbidden' as const };
+    }
+
+    return { allowed: true as const, ticket };
+  }
 
   router.get('/tickets', async (req, res) => {
     const projectId = getProjectIdFromRequest(req);
@@ -131,22 +152,51 @@ export function createTicketsRouter() {
     }
   });
 
-  router.get('/tickets/:ticketId/comments', async (req, res) => {
+  router.get('/tickets/:ticketId/comments', optionalWorkspaceAccess, async (req, res: Response<unknown, WorkspaceAccessLocals>) => {
     try {
+      const workspaceAccess = getWorkspaceAccess(res);
+      if (workspaceAccess) {
+        const accessResult = await ensureWorkspaceCanAccessTicket(req.params.ticketId, workspaceAccess.workspaceId);
+        if (!accessResult.allowed) {
+          res.status(accessResult.reason === 'not_found' ? 404 : 403).json({
+            error: accessResult.reason === 'not_found' ? 'Ticket not found.' : 'Workspace access does not permit this ticket.',
+          });
+          return;
+        }
+      }
+
       res.json(await listComments(req.params.ticketId));
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load comments.' });
     }
   });
 
-  router.post('/tickets/:ticketId/comments', async (req, res) => {
-    const { userId, body } = req.body ?? {};
+  router.post('/tickets/:ticketId/comments', optionalWorkspaceAccess, async (req, res: Response<unknown, WorkspaceAccessLocals>) => {
+    const workspaceAccess = getWorkspaceAccess(res);
+    const userId = workspaceAccess?.userId ?? (typeof req.body?.userId === 'string' ? req.body.userId : '');
+    const body =
+      typeof req.body?.content === 'string'
+        ? req.body.content
+        : typeof req.body?.body === 'string'
+          ? req.body.body
+          : '';
+
     if (!userId || !body) {
       res.status(400).json({ error: 'userId and body are required.' });
       return;
     }
 
     try {
+      if (workspaceAccess) {
+        const accessResult = await ensureWorkspaceCanAccessTicket(req.params.ticketId, workspaceAccess.workspaceId);
+        if (!accessResult.allowed) {
+          res.status(accessResult.reason === 'not_found' ? 404 : 403).json({
+            error: accessResult.reason === 'not_found' ? 'Ticket not found.' : 'Workspace access does not permit this ticket.',
+          });
+          return;
+        }
+      }
+
       const comment = await addCommentRecord(req.params.ticketId, userId, body);
       const allComments = await listComments(req.params.ticketId);
       broadcastEvent('comments-updated', { ticketId: req.params.ticketId, comments: allComments });

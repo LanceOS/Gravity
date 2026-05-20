@@ -287,6 +287,51 @@ export function createWorkspacesRouter() {
     }
   });
 
+  router.get('/workspaces/:workspaceId/peer-invites', async (req, res) => {
+    const actorUserId = await resolveRequestActorUserId(req);
+    if (!actorUserId) {
+      res.status(401).json({ error: 'Unauthorized.' });
+      return;
+    }
+
+    try {
+      const membershipRows = await db
+        .select()
+        .from(workspaceMembers)
+        .where(and(eq(workspaceMembers.workspaceId, req.params.workspaceId), eq(workspaceMembers.userId, actorUserId)))
+        .limit(1);
+      const membership = membershipRows[0];
+      if (!membership || !['owner', 'admin'].includes(membership.role)) {
+        res.status(403).json({ error: 'Owner or admin access is required.' });
+        return;
+      }
+
+      const inviteRows = await db
+        .select()
+        .from(validations)
+        .where(eq(validations.workspaceId, req.params.workspaceId));
+
+      res.json(
+        inviteRows
+          .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
+          .map((invite) => ({
+            id: invite.id,
+            email: invite.email,
+            invite_url: invite.inviteUrl,
+            validation_code: invite.validationCode,
+            workspace_private_key: invite.workspacePrivateKey,
+            expires_at: invite.expiresAt.toISOString(),
+            is_used: invite.isUsed,
+            used_at: invite.usedAt ? invite.usedAt.toISOString() : null,
+            guest_username: invite.guestUsername ?? null,
+            created_at: invite.createdAt.toISOString(),
+          })),
+      );
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load peer invites.' });
+    }
+  });
+
   router.post('/workspaces/:workspaceId/invites', async (req, res) => {
     const { workspaceId } = req.params;
     const { createdBy, label } = req.body ?? {};

@@ -21,15 +21,20 @@ export interface WorkspaceMember {
 
 export interface WorkspaceInvite {
   id: string;
-  code: string;
-  label: string;
-  expiresAt: string | null;
-  revokedAt: string | null;
-  maxUses: number | null;
-  useCount: number;
+  email: string;
+  inviteUrl: string;
+  validationCode: string;
+  workspacePrivateKey: string;
+  expiresAt: string;
+  isUsed: boolean;
+  usedAt: string | null;
+  guestUsername: string | null;
   createdAt: string;
-  createdByName?: string;
-  pendingJoinRequestCount?: number;
+}
+
+export interface CreateWorkspaceInviteInput {
+  email: string;
+  expirationHours: number;
 }
 
 export interface WorkspaceJoinRequest {
@@ -58,6 +63,21 @@ const defaultSettings = (workspaceId: string): WorkspaceAdminSettings => ({
   joinMode: 'approval_required',
   workspaceKey: '',
 });
+
+function normalizeWorkspaceInvite(invite: Record<string, unknown>): WorkspaceInvite {
+  return {
+    id: String(invite.id ?? ''),
+    email: String(invite.email ?? ''),
+    inviteUrl: String(invite.invite_url ?? invite.inviteUrl ?? ''),
+    validationCode: String(invite.validation_code ?? invite.validationCode ?? ''),
+    workspacePrivateKey: String(invite.workspace_private_key ?? invite.workspacePrivateKey ?? ''),
+    expiresAt: String(invite.expires_at ?? invite.expiresAt ?? ''),
+    isUsed: Boolean(invite.is_used ?? invite.isUsed),
+    usedAt: invite.used_at ? String(invite.used_at) : invite.usedAt ? String(invite.usedAt) : null,
+    guestUsername: invite.guest_username ? String(invite.guest_username) : invite.guestUsername ? String(invite.guestUsername) : null,
+    createdAt: String(invite.created_at ?? invite.createdAt ?? ''),
+  };
+}
 
 export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWorkspaceSettingsOptions) {
   const [settings, setSettings] = useState<WorkspaceAdminSettings>(() => defaultSettings(activeWorkspaceId));
@@ -91,7 +111,9 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
       const [settingsResponse, membersResponse, invitesResponse, joinRequestsResponse] = await Promise.all([
         fetch(`/api/v1/workspaces/${activeWorkspaceId}/settings`),
         fetch(`/api/v1/workspaces/${activeWorkspaceId}/members`),
-        fetch(`/api/v1/workspaces/${activeWorkspaceId}/invites`),
+        fetch(`/api/v1/workspaces/${activeWorkspaceId}/peer-invites`, {
+          headers: { 'X-User-Id': currentUser.id },
+        }),
         fetch(`/api/v1/workspaces/${activeWorkspaceId}/join-requests`),
       ]);
 
@@ -126,7 +148,7 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
         workspaceKey: settingsData.workspaceKey || '',
       });
       setMembers(Array.isArray(membersData) ? membersData : []);
-      setInvites(Array.isArray(invitesData) ? invitesData : []);
+      setInvites(Array.isArray(invitesData) ? invitesData.map((invite) => normalizeWorkspaceInvite(invite as Record<string, unknown>)) : []);
       setJoinRequests(Array.isArray(joinRequestsData) ? joinRequestsData : []);
     } catch (refreshError) {
       const message = refreshError instanceof Error ? refreshError.message : 'Failed to load workspace administration data.';
@@ -200,7 +222,7 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
     }
   }, [activeWorkspaceId, currentUser, settings]);
 
-  const createInvite = useCallback(async (label?: string) => {
+  const createInvite = useCallback(async (input: CreateWorkspaceInviteInput) => {
     if (!currentUser || !activeWorkspaceId) {
       return null;
     }
@@ -209,12 +231,16 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
     setInviteError(null);
 
     try {
-      const response = await fetch(`/api/v1/workspaces/${activeWorkspaceId}/invites`, {
+      const response = await fetch(`/api/v1/workspaces/invites`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Id': currentUser.id,
+        },
         body: JSON.stringify({
-          createdBy: currentUser.id,
-          label: label || '',
+          workspace_id: activeWorkspaceId,
+          email: input.email,
+          expiration_hours: input.expirationHours,
         }),
       });
       const data = await response.json();
@@ -224,7 +250,18 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
       }
 
       await refreshWorkspaceAdmin();
-      return data as WorkspaceInvite;
+      return normalizeWorkspaceInvite({
+        id: data.validation_code || data.invite_url,
+        email: input.email,
+        invite_url: data.invite_url,
+        validation_code: data.validation_code,
+        workspace_private_key: '',
+        expires_at: data.expires_at,
+        is_used: false,
+        used_at: null,
+        guest_username: null,
+        created_at: new Date().toISOString(),
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create invite.';
       setInviteError(message);

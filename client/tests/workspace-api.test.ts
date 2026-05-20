@@ -8,6 +8,7 @@ const __dirname = path.dirname(__filename);
 const testDataDir = path.join(__dirname, 'workspace_test_data');
 const PORT = 5002;
 const BASE_URL = `http://localhost:${PORT}`;
+const TEST_DATABASE_URL = process.env.WORKSPACE_TEST_DATABASE_URL || process.env.DATABASE_URL || '';
 
 const nativeFetch = globalThis.fetch.bind(globalThis);
 
@@ -60,11 +61,17 @@ function cleanupSandbox() {
 }
 
 async function startServer() {
+  if (!TEST_DATABASE_URL) {
+    throw new Error('WORKSPACE_TEST_DATABASE_URL or DATABASE_URL is required to run workspace-api.test.ts against PostgreSQL.');
+  }
+
   serverProcess = spawn('npx', ['tsx', 'server/index.ts'], {
     cwd: path.join(__dirname, '..', '..'),
     env: {
       ...process.env,
       PORT: PORT.toString(),
+      DATABASE_URL: TEST_DATABASE_URL,
+      NODE_ENV: 'test',
       DB_DIR: testDataDir,
     },
     stdio: 'pipe',
@@ -88,28 +95,28 @@ async function startServer() {
   throw new Error('Workspace API test server failed to start.');
 }
 
-async function postJson(pathname: string, body: unknown) {
+async function postJson(pathname: string, body: unknown, headers: Record<string, string> = {}) {
   const response = await fetch(`${BASE_URL}${pathname}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...headers },
     body: JSON.stringify(body),
   });
   const data = await response.json();
   return { response, data };
 }
 
-async function patchJson(pathname: string, body: unknown) {
+async function patchJson(pathname: string, body: unknown, headers: Record<string, string> = {}) {
   const response = await fetch(`${BASE_URL}${pathname}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...headers },
     body: JSON.stringify(body),
   });
   const data = await response.json();
   return { response, data };
 }
 
-async function getJson(pathname: string) {
-  const response = await fetch(`${BASE_URL}${pathname}`);
+async function getJson(pathname: string, headers: Record<string, string> = {}) {
+  const response = await fetch(`${BASE_URL}${pathname}`, { headers });
   const data = await response.json();
   return { response, data };
 }
@@ -149,6 +156,8 @@ async function run() {
     assert(createWorkspace.response.status === 201, 'Workspace creation should return 201.');
 
     const workspaceId = createWorkspace.data.workspace.id as string;
+    const defaultProjectId = createWorkspace.data.workspace.defaultProjectId as string;
+    assert(Boolean(defaultProjectId), 'Workspace creation should produce a default project id.');
 
     const ownerWorkspaces = await getJson(`/api/workspaces?userId=${encodeURIComponent(ownerId)}`);
     assert(ownerWorkspaces.response.ok, 'Owner workspace listing should succeed.');
@@ -206,6 +215,97 @@ async function run() {
     });
     assert(updateSettings.response.ok, 'Workspace settings update should succeed.');
     assert(updateSettings.data.workspaceKey === 'ROPS-SECRET-2', 'Workspace settings update should persist the new workspace key.');
+
+    const createPeerInvite = await postJson(
+      '/api/workspaces/invites',
+      {
+        workspace_id: workspaceId,
+        email: 'guest-user@peer.com',
+        expiration_hours: 24,
+      },
+      { 'X-User-Id': ownerId },
+    );
+    assert(createPeerInvite.response.status === 201, 'Peer invite creation should return 201.');
+    assert(typeof createPeerInvite.data.invite_url === 'string', 'Peer invite should return an invite_url.');
+    assert(typeof createPeerInvite.data.validation_code === 'string', 'Peer invite should return a validation_code.');
+    assert(typeof createPeerInvite.data.expires_at === 'string', 'Peer invite should return an expires_at timestamp.');
+
+    const peerInvites = await getJson(`/api/workspaces/${workspaceId}/peer-invites`, { 'X-User-Id': ownerId });
+    assert(peerInvites.response.ok, 'Owner should be able to list peer invites.');
+    assert(
+      peerInvites.data.some(
+        (invite: { email: string; validation_code: string }) =>
+          invite.email === 'guest-user@peer.com' && invite.validation_code === createPeerInvite.data.validation_code,
+      ),
+      'Created peer invite should appear in the workspace peer invite listing.',
+    );
+
+    const collaboratorPeerInviteList = await getJson(`/api/workspaces/${workspaceId}/peer-invites`, { 'X-User-Id': collaboratorId });
+    assert(collaboratorPeerInviteList.response.status === 403, 'Non-owner collaborators should not be allowed to list peer invites.');
+
+    const invalidPeerValidation = await postJson('/api/workspaces/validate', {
+      email: 'guest-user@peer.com',
+      validation_code: 'GRAV-0000-X',
+      invite_url: createPeerInvite.data.invite_url,
+      username: 'GuestExpert',
+      password_hash: '$2b$12$InvalidHashForNegativePath',
+    });
+    assert(invalidPeerValidation.response.status === 401, 'Invalid peer validation codes should be rejected.');
+
+    const validatePeerInvite = await postJson('/api/workspaces/validate', {
+      email: 'guest-user@peer.com',
+      validation_code: createPeerInvite.data.validation_code,
+      invite_url: createPeerInvite.data.invite_url,
+      username: 'GuestExpert',
+      password_hash: '$2b$12$SecureBcryptHashHereForTestingOnly1234567890123456789012',
+    });
+    assert(validatePeerInvite.response.ok, 'Peer invite validation should succeed.');
+    assert(validatePeerInvite.data.authorized === true, 'Peer invite validation should authorize the guest.');
+    assert(typeof validatePeerInvite.data.workspace_private_key === 'string', 'Peer validation should return a workspace_private_key.');
+    assert(validatePeerInvite.data.guest_profile.username === 'GuestExpert', 'Peer validation should return the guest profile.');
+
+    const invalidWorkspaceKeyProjects = await getJson('/api/projects', { 'X-Workspace-Key': 'sec_wsp_invalid' });
+    assert(invalidWorkspaceKeyProjects.response.status === 401, 'Invalid scoped workspace keys should be rejected for project hydration.');
+
+    const scopedProjects = await getJson('/api/projects', {
+      'X-Workspace-Key': validatePeerInvite.data.workspace_private_key,
+    });
+    assert(scopedProjects.response.ok, 'Scoped workspace project hydration should succeed for validated guests.');
+    assert(scopedProjects.data.length >= 1, 'Scoped workspace hydration should return at least one project.');
+    assert(Array.isArray(scopedProjects.data[0].domains), 'Scoped workspace hydration should include domains arrays.');
+    assert(Array.isArray(scopedProjects.data[0].cycles), 'Scoped workspace hydration should include cycles arrays.');
+
+    const seedScopedTicket = await postJson(
+      '/api/tickets',
+      {
+        title: 'Scoped guest comment target',
+        description: 'Target ticket for peer validation flows.',
+        projectId: defaultProjectId,
+      },
+      { 'X-Project-Id': defaultProjectId },
+    );
+    assert(seedScopedTicket.response.status === 201, 'Seeding a scoped ticket should succeed.');
+
+    const scopedComment = await postJson(
+      `/api/tickets/${seedScopedTicket.data.id}/comments`,
+      {
+        content: 'Optimistic UI rendering test comment.',
+      },
+      { 'X-Workspace-Key': validatePeerInvite.data.workspace_private_key },
+    );
+    assert(scopedComment.response.status === 201, 'Scoped guest comment creation should succeed.');
+    assert(scopedComment.data.body === 'Optimistic UI rendering test comment.', 'Scoped guest comment body should match.');
+    assert(scopedComment.data.author.username === 'GuestExpert', 'Scoped guest comment should include the nested author username.');
+    assert(scopedComment.data.author.role === 'guest_contributor', 'Scoped guest comment should include the guest role.');
+
+    const scopedComments = await getJson(`/api/tickets/${seedScopedTicket.data.id}/comments`, {
+      'X-Workspace-Key': validatePeerInvite.data.workspace_private_key,
+    });
+    assert(scopedComments.response.ok, 'Scoped guest comment listing should succeed.');
+    assert(
+      scopedComments.data.some((comment: { author?: { username?: string } }) => comment.author?.username === 'GuestExpert'),
+      'Scoped guest comment listing should include the nested author object.',
+    );
 
     console.log('workspace-api.test.ts passed');
   } finally {

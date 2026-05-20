@@ -8,6 +8,7 @@ const __dirname = path.dirname(__filename);
 const testDataDir = path.join(__dirname, 'test_data');
 const PORT = 5001;
 const BASE_URL = `http://localhost:${PORT}`;
+const TEST_DATABASE_URL = process.env.WORKSPACE_TEST_DATABASE_URL || process.env.DATABASE_URL || '';
 
 const nativeFetch = globalThis.fetch.bind(globalThis);
 
@@ -70,12 +71,18 @@ function cleanupSandbox() {
 // Start backend server
 async function startServer(): Promise<void> {
   console.log(`${CYAN}Starting Gravity server on port ${PORT} with DB_DIR=${testDataDir}...${RESET}`);
+
+  if (!TEST_DATABASE_URL) {
+    throw new Error('WORKSPACE_TEST_DATABASE_URL or DATABASE_URL is required to run api.test.ts against PostgreSQL.');
+  }
   
   serverProcess = spawn('npx', ['tsx', 'server/index.ts'], {
     cwd: path.join(__dirname, '..', '..'),
     env: {
       ...process.env,
       PORT: PORT.toString(),
+      DATABASE_URL: TEST_DATABASE_URL,
+      NODE_ENV: 'test',
       DB_DIR: testDataDir,
     },
     stdio: 'pipe'
@@ -553,6 +560,8 @@ const tests = [
       assert(comment.body === 'Jane posted a test comment here.', 'Comment body matches');
       assert(comment.userName === 'Jane Tester', 'Should perform attached database join for username from central DB');
       assert(comment.userAvatar.includes('bottts'), 'Should join avatar');
+      assert(comment.author.username === 'Jane Tester', 'Should return nested author.username in the comment response');
+      assert(comment.author.role === 'guest_contributor', 'Should return nested author.role in the comment response');
     }
   },
   {
@@ -745,6 +754,20 @@ const tests = [
       assert(listRes.ok, 'List cycles should succeed');
       const list = await listRes.json() as any[];
       assert(list.some(c => c.id === createdCycleId), 'Cycle list should include newly created cycle');
+    }
+  },
+  {
+    name: 'Aggregated Project Hydration Includes Domains and Cycles',
+    fn: async () => {
+      const res = await fetch(`${BASE_URL}/api/projects?userId=${testUserId}`);
+      assert(res.ok, 'Aggregated project hydration should succeed');
+      const projects = await res.json() as any[];
+      const gravityProject = projects.find((project) => project.id === 'p-gravity');
+      assert(gravityProject !== undefined, 'Hydration should include the seeded gravity project');
+      assert(Array.isArray(gravityProject.domains), 'Hydration should include a domains array');
+      assert(Array.isArray(gravityProject.cycles), 'Hydration should include a cycles array');
+      assert(gravityProject.domains.some((domain: any) => domain.id === createdDomainId), 'Hydration should include the created domain');
+      assert(gravityProject.cycles.some((cycle: any) => cycle.id === createdCycleId), 'Hydration should include the created cycle');
     }
   },
   {
@@ -946,6 +969,35 @@ const tests = [
       data = await res.json() as any;
       assert(data.error !== undefined, 'Should return error payload');
       assert(data.error.code === -32603, 'Error code should represent execution failure -32603');
+    }
+  },
+  {
+    name: 'Ollama Model Discovery Wrapper - Safe Empty Array Failover',
+    fn: async () => {
+      const res = await fetch(`${BASE_URL}/api/ai/ollama/models?ollamaUrl=${encodeURIComponent('http://localhost:9999')}`);
+      assert(res.status === 200, 'Offline Ollama model discovery should return 200 for safe failover');
+      const data = await res.json() as any;
+      assert(Array.isArray(data), 'Ollama model discovery should return an array payload');
+      assert(data.length === 0, 'Offline Ollama model discovery should return an empty array');
+    }
+  },
+  {
+    name: 'Provider Connection Wrapper API - Structured Failure Payload',
+    fn: async () => {
+      const res = await fetch(`${BASE_URL}/api/ai/test-connection`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'deepseek',
+          api_key: 'sk-ds-invalid-mock-test-key'
+        })
+      });
+
+      assert(res.status === 400, 'Structured connection wrapper should return 400 for invalid credentials');
+      const data = await res.json() as any;
+      assert(data.connected === false, 'Structured connection wrapper should report connected=false');
+      assert(data.latency_ms === null, 'Structured connection wrapper should report null latency on failure');
+      assert(typeof data.error === 'string' && data.error.length > 0, 'Structured connection wrapper should include an error string');
     }
   },
   {

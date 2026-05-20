@@ -71,7 +71,8 @@ export function AppShellPage() {
     refreshWorkspaces,
     createWorkspace,
     requestJoinByInvite,
-  } = useWorkspaceDirectory({ currentUser });
+    validatePeerInvite,
+  } = useWorkspaceDirectory({ currentUser, setCurrentUser });
 
   const activeWorkspace = useMemo(
     () => workspaces.find((workspace) => workspace.id === activeWorkspaceId) || null,
@@ -267,6 +268,22 @@ export function AppShellPage() {
     setActiveSection('directory');
   };
 
+  const handleValidatePeerInvite = async (input: {
+    email: string;
+    validationCode: string;
+    inviteUrl: string;
+    username: string;
+    passwordHash: string;
+  }) => {
+    const success = await validatePeerInvite(input);
+    if (success) {
+      setActiveWorkspaceId('');
+      setActiveProjectId('');
+      setActiveTicket(null);
+      setActiveSection('directory');
+    }
+  };
+
   const handleSelectWorkspace = (workspaceId: string) => {
     const workspace = workspaces.find((candidate) => candidate.id === workspaceId) || null;
     const workspaceProjects = projects.filter((project) => project.workspaceId === workspaceId);
@@ -445,7 +462,7 @@ export function AppShellPage() {
     setActiveSection('account');
   };
 
-  const handleCreateInvite = async (label?: string) => Boolean(await createInvite(label));
+  const handleCreateInvite = async (input: { email: string; expirationHours: number }) => Boolean(await createInvite(input));
   const handleApproveJoinRequest = async (requestId: string) => Boolean(await approveJoinRequest(requestId));
 
   useEffect(() => {
@@ -527,6 +544,7 @@ export function AppShellPage() {
           successMessage={workspaceDirectorySuccess}
           onCreateWorkspace={handleCreateWorkspace}
           onRequestJoin={handleRequestJoin}
+          onValidatePeerInvite={handleValidatePeerInvite}
           onOpenWorkspace={handleSelectWorkspace}
           onOpenSettings={(workspaceId) => {
             setActiveWorkspaceId(workspaceId);

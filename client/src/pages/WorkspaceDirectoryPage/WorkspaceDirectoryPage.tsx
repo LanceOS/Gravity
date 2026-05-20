@@ -1,18 +1,19 @@
 import { useMemo, useState, type CSSProperties, type FormEvent } from 'react';
 import { ArrowRight, FolderPlus, Globe, KeyRound, LogOut, Server, Settings2, Users } from 'lucide-react';
 import type { User } from '../../context/TicketContext';
-import type { CreateWorkspaceInput, WorkspaceSummary } from '../../hooks/useWorkspaceDirectory';
+import type { CreateWorkspaceInput, ValidatePeerInviteInput, WorkspaceSummary } from '../../hooks/useWorkspaceDirectory';
 
 interface WorkspaceDirectoryPageProps {
   currentUser: User;
   workspaces: WorkspaceSummary[];
   loading: boolean;
   activeWorkspaceId: string;
-  pendingAction: 'create' | 'join' | null;
+  pendingAction: 'create' | 'join' | 'validate' | null;
   errorMessage: string | null;
   successMessage: string | null;
   onCreateWorkspace: (input: CreateWorkspaceInput) => Promise<void>;
   onRequestJoin: (inviteCode: string, message?: string) => Promise<void>;
+  onValidatePeerInvite: (input: ValidatePeerInviteInput) => Promise<void>;
   onOpenWorkspace: (workspaceId: string) => void;
   onOpenSettings: (workspaceId: string) => void;
   onOpenAccountPreferences: () => void;
@@ -29,6 +30,7 @@ export function WorkspaceDirectoryPage({
   successMessage,
   onCreateWorkspace,
   onRequestJoin,
+  onValidatePeerInvite,
   onOpenWorkspace,
   onOpenSettings,
   onOpenAccountPreferences,
@@ -40,6 +42,11 @@ export function WorkspaceDirectoryPage({
   const [workspaceAccessKey, setWorkspaceAccessKey] = useState('');
   const [inviteCode, setInviteCode] = useState('');
   const [requestMessage, setRequestMessage] = useState('');
+  const [peerEmail, setPeerEmail] = useState('');
+  const [peerValidationCode, setPeerValidationCode] = useState('');
+  const [peerInviteUrl, setPeerInviteUrl] = useState('');
+  const [peerUsername, setPeerUsername] = useState(`${currentUser.name}Guest`);
+  const [peerPasswordHash, setPeerPasswordHash] = useState('');
 
   const workspaceCards = useMemo(() => workspaces.slice().sort((left, right) => left.name.localeCompare(right.name)), [workspaces]);
 
@@ -59,6 +66,17 @@ export function WorkspaceDirectoryPage({
   const handleJoinSubmit = async (event: FormEvent) => {
     event.preventDefault();
     await onRequestJoin(inviteCode, requestMessage);
+  };
+
+  const handlePeerValidationSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    await onValidatePeerInvite({
+      email: peerEmail,
+      validationCode: peerValidationCode,
+      inviteUrl: peerInviteUrl,
+      username: peerUsername,
+      passwordHash: peerPasswordHash,
+    });
   };
 
   return (
@@ -237,6 +255,59 @@ export function WorkspaceDirectoryPage({
 
             <button type="submit" className="btn" disabled={pendingAction !== null}>
               {pendingAction === 'join' ? 'Sending...' : 'Send Join Request'}
+            </button>
+          </form>
+
+          <form onSubmit={handlePeerValidationSubmit} style={panelStyle}>
+            <div style={panelHeaderStyle}>
+              <KeyRound size={18} color="var(--accent)" />
+              <div>
+                <h2 style={panelTitleStyle}>Validate Peer Invite</h2>
+                <p style={panelCopyStyle}>Paste the guest validation link details from the host. This switches the client into the validated guest workspace profile.</p>
+              </div>
+            </div>
+
+            <label style={fieldStyle}>
+              <span className="label">Guest Email</span>
+              <input className="input" value={peerEmail} onChange={(event) => setPeerEmail(event.target.value)} placeholder="guest-user@peer.com" required />
+            </label>
+
+            <label style={fieldStyle}>
+              <span className="label">Validation Code</span>
+              <input
+                className="input"
+                value={peerValidationCode}
+                onChange={(event) => setPeerValidationCode(event.target.value.toUpperCase())}
+                placeholder="GRAV-9821-X"
+                required
+              />
+            </label>
+
+            <label style={fieldStyle}>
+              <span className="label">Invite URL</span>
+              <input className="input" value={peerInviteUrl} onChange={(event) => setPeerInviteUrl(event.target.value)} placeholder="https://host-domain-or-ip.com/api/v1/workspaces/validate" required />
+            </label>
+
+            <label style={fieldStyle}>
+              <span className="label">Guest Username</span>
+              <input className="input" value={peerUsername} onChange={(event) => setPeerUsername(event.target.value)} required />
+            </label>
+
+            <label style={fieldStyle}>
+              <span className="label">Password Hash</span>
+              <textarea
+                className="input"
+                rows={3}
+                value={peerPasswordHash}
+                onChange={(event) => setPeerPasswordHash(event.target.value)}
+                placeholder="$2b$12$SecureBcryptHashHere..."
+                style={{ resize: 'vertical' }}
+                required
+              />
+            </label>
+
+            <button type="submit" className="btn" disabled={pendingAction !== null}>
+              {pendingAction === 'validate' ? 'Validating...' : 'Validate Peer Invite'}
             </button>
           </form>
         </section>

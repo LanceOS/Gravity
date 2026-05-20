@@ -3,6 +3,7 @@ import { ArrowLeft, Check, Globe, Link2, Settings2, ShieldCheck, UserPlus, Users
 import type { User } from '../../context/TicketContext';
 import type { WorkspaceSummary } from '../../hooks/useWorkspaceDirectory';
 import type {
+  CreateWorkspaceInviteInput,
   WorkspaceAdminSettings,
   WorkspaceInvite,
   WorkspaceJoinRequest,
@@ -36,7 +37,7 @@ interface SettingsPageProps {
   onOpenDirectory: () => void;
   onChangeSettings: (updates: Partial<WorkspaceAdminSettings>) => void;
   onSaveSettings: () => void;
-  onCreateInvite: (label?: string) => Promise<boolean>;
+  onCreateInvite: (input: CreateWorkspaceInviteInput) => Promise<boolean>;
   onApproveJoinRequest: (requestId: string) => Promise<boolean>;
 }
 
@@ -184,55 +185,73 @@ function AccessSection({
   invites: WorkspaceInvite[];
   invitesLoading: boolean;
   inviteLoading: boolean;
-  onCreateInvite: (label?: string) => Promise<boolean>;
+  onCreateInvite: (input: CreateWorkspaceInviteInput) => Promise<boolean>;
 }) {
-  const [label, setLabel] = useState('');
+  const [email, setEmail] = useState('');
+  const [expirationHours, setExpirationHours] = useState('24');
 
   const handleCreateInvite = async () => {
-    const success = await onCreateInvite(label);
+    const success = await onCreateInvite({
+      email,
+      expirationHours: Number(expirationHours) || 24,
+    });
     if (success) {
-      setLabel('');
+      setEmail('');
+      setExpirationHours('24');
     }
   };
 
   return (
     <div className="settings-page__section-card">
       <div className="settings-page__section-header">
-        <h2 className="settings-page__section-title">Invite links</h2>
-        <p className="settings-page__section-subtitle">Invite codes create an approval-gated entry point into this workspace. The private workspace key is still required when a member connects.</p>
+        <h2 className="settings-page__section-title">Peer invites</h2>
+        <p className="settings-page__section-subtitle">Issue direct guest validation links for a specific email address. Each invite mints a one-time validation code and a scoped workspace access key.</p>
       </div>
 
       <div className="settings-page__grid">
         <label className="settings-page__field settings-page__field--wide">
-          <span className="settings-page__label">Invite Label</span>
+          <span className="settings-page__label">Guest Email</span>
           <input
             className="settings-page__control"
-            value={label}
-            placeholder="External contractor access"
-            onChange={(event) => setLabel(event.target.value)}
+            value={email}
+            placeholder="guest-user@peer.com"
+            onChange={(event) => setEmail(event.target.value)}
+          />
+        </label>
+
+        <label className="settings-page__field">
+          <span className="settings-page__label">Expires In</span>
+          <input
+            className="settings-page__control"
+            type="number"
+            min={1}
+            value={expirationHours}
+            onChange={(event) => setExpirationHours(event.target.value)}
           />
         </label>
       </div>
 
       <div className="settings-page__actions-row">
-        <button type="button" className="settings-page__secondary-button" onClick={() => void handleCreateInvite()} disabled={inviteLoading}>
+        <button type="button" className="settings-page__secondary-button" onClick={() => void handleCreateInvite()} disabled={inviteLoading || !email.trim()}>
           {inviteLoading ? 'Creating...' : 'Create Invite'}
         </button>
       </div>
 
-      {invitesLoading ? <StatusNotice message={{ message: 'Loading invite links...' }} /> : null}
-      {!invitesLoading && invites.length === 0 ? <StatusNotice message={{ message: 'No invite links exist yet for this workspace.' }} /> : null}
+      {invitesLoading ? <StatusNotice message={{ message: 'Loading peer invites...' }} /> : null}
+      {!invitesLoading && invites.length === 0 ? <StatusNotice message={{ message: 'No peer invites exist yet for this workspace.' }} /> : null}
 
       {invites.map((invite) => (
         <div key={invite.id} style={listRowStyle}>
           <div>
-            <div style={listRowTitleStyle}>{invite.label || invite.code}</div>
-            <div style={listRowCopyStyle}>Code: {invite.code}</div>
+            <div style={listRowTitleStyle}>{invite.email}</div>
+            <div style={listRowCopyStyle}>Validation Code: {invite.validationCode}</div>
+            <div style={listRowCopyStyle}>Invite URL: {invite.inviteUrl}</div>
           </div>
 
           <div style={listRowMetaStyle}>
-            <span>{invite.useCount}{invite.maxUses ? ` / ${invite.maxUses}` : ''} uses</span>
-            <span>{invite.pendingJoinRequestCount || 0} pending</span>
+            <span>{invite.isUsed ? 'Validated' : 'Pending validation'}</span>
+            <span>Expires {new Date(invite.expiresAt).toLocaleString()}</span>
+            {invite.guestUsername ? <span>Guest: {invite.guestUsername}</span> : null}
           </div>
         </div>
       ))}
