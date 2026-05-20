@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  gravity:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gravity-workspace
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - PORT=5000
+      - DB_DIR=/app/data
+    extra_hosts:
+      # Allows connecting to services running on the host OS (e.g., native Ollama)
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - gravity_data:/app/data
+
+volumes:
+  gravity_data:
+    driver: local

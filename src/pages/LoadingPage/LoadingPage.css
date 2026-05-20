@@ -1,0 +1,21 @@
+.loading-page {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.loading-page__panel {
+  text-align: center;
+}
+
+.loading-page__title {
+  font-size: 24px;
+  color: var(--text-heading);
+  margin-bottom: 8px;
+}
+
+.loading-page__subtitle {
+  color: var(--text-muted);
+}

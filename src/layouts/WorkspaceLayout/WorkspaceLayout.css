@@ -1,0 +1,15 @@
+.workspace-layout {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.workspace-layout__main {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+  overflow: hidden;
+}

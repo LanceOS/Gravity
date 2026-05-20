@@ -1,0 +1,267 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+:root {
+  /* HSL Color variables - Light Mode */
+  --bg: #fafafa;
+  --sidebar-bg: #f4f4f5;
+  --card-bg: #ffffff;
+  --card-hover: #f9f9fb;
+  --border: #e4e4e7;
+  --border-focus: #a1a1aa;
+  --text: #3f3f46;
+  --text-heading: #09090b;
+  --text-muted: #71717a;
+  
+  --accent: #aa3bff;
+  --accent-glow: rgba(170, 59, 255, 0.1);
+  --accent-border: rgba(170, 59, 255, 0.3);
+  
+  --priority-no: #71717a;
+  --priority-low: #3b82f6;
+  --priority-medium: #f59e0b;
+  --priority-high: #ef4444;
+  --priority-urgent: #ec4899;
+
+  --sans: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  font-family: var(--sans);
+  font-size: 13px; /* Slightly more compact & professional */
+  line-height: 1.5;
+  color: var(--text);
+  background-color: var(--bg);
+  color-scheme: light dark;
+}
+
+/* Dark Mode Palette override */
+.dark-theme {
+  --bg: #09090b;
+  --sidebar-bg: #0c0c0e;
+  --card-bg: #121214;
+  --card-hover: #17181c;
+  --border: #1f2028;
+  --border-focus: #3f3f46;
+  --text: #c4c4c7;
+  --text-heading: #f4f4f5;
+  --text-muted: #71717a;
+  
+  --accent: #c084fc;
+  --accent-glow: rgba(192, 132, 252, 0.15);
+  --accent-border: rgba(192, 132, 252, 0.4);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  margin: 0;
+  overflow: hidden; /* We handle scrolling inside components */
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Linear-style Core Layout */
+#app-container {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* Premium Glassmorphic Filters & Hover Micro-interactions */
+.glass {
+  background: rgba(18, 18, 20, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.clickable {
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.clickable:hover {
+  background-color: var(--card-hover);
+  transform: translateY(-1px);
+}
+.clickable:active {
+  transform: translateY(1px);
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text-heading);
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  outline: none;
+}
+.btn:hover {
+  background: var(--card-hover);
+  border-color: var(--border-focus);
+  transform: translateY(-1px);
+}
+.btn:active {
+  transform: translateY(1px);
+}
+.btn-primary {
+  background: var(--text-heading);
+  color: var(--bg);
+  border-color: var(--text-heading);
+}
+.btn-primary:hover {
+  opacity: 0.9;
+  border-color: var(--text-heading);
+}
+
+/* Inputs & Form Elements */
+.input {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text-heading);
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+  transition: all 0.15s ease;
+}
+.input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+.label {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+/* Status & Priority Badge Colors */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  background: var(--card-hover);
+}
+
+.priority-urgent { color: var(--priority-urgent); }
+.priority-high { color: var(--priority-high); }
+.priority-medium { color: var(--priority-medium); }
+.priority-low { color: var(--priority-low); }
+.priority-no { color: var(--priority-no); }
+
+/* Custom Form styles for WebMCP declarative agents */
+form.tool-form-active {
+  outline: 2px dashed var(--accent);
+  background-color: var(--accent-glow) !important;
+}
+button.tool-submit-active {
+  outline: 2px dashed var(--priority-high);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); opacity: 0.8; }
+  100% { transform: scale(1); }
+}
+
+/* Kanban Columns */
+.board-column {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 280px;
+  max-width: 320px;
+  background: transparent;
+  border-right: 1px solid var(--border);
+  height: 100%;
+}
+.board-column:last-child {
+  border-right: none;
+}
+
+/* Dropdowns custom menus */
+.dropdown-menu {
+  position: absolute;
+  z-index: 100;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+  min-width: 160px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+}
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--text);
+}
+.dropdown-item:hover {
+  background: var(--card-hover);
+  color: var(--text-heading);
+}
+
+/* Markdown preview wrapper */
+.markdown-content p {
+  margin-bottom: 8px;
+}
+.markdown-content ul, .markdown-content ol {
+  margin-left: 20px;
+  margin-bottom: 8px;
+}
+.markdown-content code {
+  font-family: var(--mono);
+  background: var(--sidebar-bg);
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-size: 12px;
+}
