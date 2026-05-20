@@ -16,6 +16,7 @@ export interface Project {
   description: string;
   key: string;
   status: 'planned' | 'active' | 'completed';
+  workspaceId?: string | null;
 }
 
 export interface Domain {

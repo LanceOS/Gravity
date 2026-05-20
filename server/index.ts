@@ -46,11 +46,24 @@ const allowedSettingsFields = new Set([
   'projectLayout',
 ]);
 
+const allowedWorkspaceSettingsFields = new Set(['hostUrl', 'joinMode', 'workspaceKey']);
+
+type JoinMode = 'approval_required' | 'auto_join';
+
+const isJoinMode = (value: unknown): value is JoinMode => value === 'approval_required' || value === 'auto_join';
+
 function ensureUserSettings(userId: string) {
   centralDb.prepare(`
     INSERT OR IGNORE INTO user_settings (userId, defaultView, ollamaModel, ollamaEndpoint, theme, apiKey, aiProvider, projectLayout)
     VALUES (?, 'board', '', 'http://localhost:11434', 'dark', '', 'openai', 'standard')
   `).run(userId);
+}
+
+function ensureWorkspaceSettingsRecord(workspaceId: string) {
+  centralDb.prepare(`
+    INSERT OR IGNORE INTO workspace_settings (workspaceId, hostUrl, joinMode, createdAt, updatedAt)
+    VALUES (?, '', 'approval_required', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+  `).run(workspaceId);
 }
 
 async function fetchWithTimeout(url: string, init: RequestInit = {}, timeoutMs = 10000) {
@@ -143,6 +156,154 @@ async function testProviderApiKey(provider: AIProvider, apiKey: string) {
 
 function normalizeOllamaUrl(url: string) {
   return url.replace(/\/$/, '');
+}
+
+function normalizeEntityKey(value: string) {
+  return value.trim().toUpperCase();
+}
+
+function createWorkspaceAccessKey(workspaceKey: string) {
+  return `WS-${normalizeEntityKey(workspaceKey)}-${Math.floor(100000 + Math.random() * 900000)}`;
+}
+
+function createProjectInviteCode(projectKey: string) {
+  return `INV-${normalizeEntityKey(projectKey)}-${Math.floor(1000 + Math.random() * 9000)}`;
+}
+
+function createWorkspaceInviteCode(workspaceKey: string) {
+  return `WSP-${normalizeEntityKey(workspaceKey)}-${Math.floor(1000 + Math.random() * 9000)}`;
+}
+
+function getWorkspaceSummary(workspaceId: string) {
+  ensureWorkspaceSettingsRecord(workspaceId);
+
+  return centralDb.prepare(`
+    SELECT
+      w.id,
+      w.name,
+      w.description,
+      w.key,
+      w.defaultProjectId,
+      w.createdBy,
+      w.createdAt,
+      COALESCE(ws.hostUrl, w.hostUrl, '') AS hostUrl,
+      COALESCE(ws.joinMode, 'approval_required') AS joinMode,
+      COUNT(DISTINCT p.id) AS projectCount,
+      COUNT(DISTINCT wm.userId) AS memberCount,
+      COUNT(DISTINCT pending.id) AS pendingJoinRequestCount
+    FROM workspaces w
+    LEFT JOIN workspace_settings ws ON ws.workspaceId = w.id
+    LEFT JOIN projects p ON p.workspaceId = w.id
+    LEFT JOIN workspace_members wm ON wm.workspaceId = w.id
+    LEFT JOIN workspace_join_requests pending ON pending.workspaceId = w.id AND pending.status = 'pending'
+    WHERE w.id = ?
+    GROUP BY w.id, ws.hostUrl, ws.joinMode
+  `).get(workspaceId) as Record<string, unknown> | undefined;
+}
+
+function listWorkspaces(userId?: string) {
+  if (userId) {
+    return centralDb.prepare(`
+      SELECT
+        w.id,
+        w.name,
+        w.description,
+        w.key,
+        w.defaultProjectId,
+        w.createdBy,
+        w.createdAt,
+        wm.role AS memberRole,
+        COALESCE(ws.hostUrl, w.hostUrl, '') AS hostUrl,
+        COALESCE(ws.joinMode, 'approval_required') AS joinMode,
+        COUNT(DISTINCT p.id) AS projectCount,
+        COUNT(DISTINCT members.userId) AS memberCount,
+        COUNT(DISTINCT pending.id) AS pendingJoinRequestCount
+      FROM workspaces w
+      JOIN workspace_members wm ON wm.workspaceId = w.id AND wm.userId = ?
+      LEFT JOIN workspace_settings ws ON ws.workspaceId = w.id
+      LEFT JOIN projects p ON p.workspaceId = w.id
+      LEFT JOIN workspace_members members ON members.workspaceId = w.id
+      LEFT JOIN workspace_join_requests pending ON pending.workspaceId = w.id AND pending.status = 'pending'
+      GROUP BY w.id, wm.role, ws.hostUrl, ws.joinMode
+      ORDER BY w.createdAt DESC
+    `).all(userId);
+  }
+
+  return centralDb.prepare(`
+    SELECT
+      w.id,
+      w.name,
+      w.description,
+      w.key,
+      w.defaultProjectId,
+      w.createdBy,
+      w.createdAt,
+      COALESCE(ws.hostUrl, w.hostUrl, '') AS hostUrl,
+      COALESCE(ws.joinMode, 'approval_required') AS joinMode,
+      COUNT(DISTINCT p.id) AS projectCount,
+      COUNT(DISTINCT wm.userId) AS memberCount,
+      COUNT(DISTINCT pending.id) AS pendingJoinRequestCount
+    FROM workspaces w
+    LEFT JOIN workspace_settings ws ON ws.workspaceId = w.id
+    LEFT JOIN projects p ON p.workspaceId = w.id
+    LEFT JOIN workspace_members wm ON wm.workspaceId = w.id
+    LEFT JOIN workspace_join_requests pending ON pending.workspaceId = w.id AND pending.status = 'pending'
+    GROUP BY w.id, ws.hostUrl, ws.joinMode
+    ORDER BY w.createdAt DESC
+  `).all();
+}
+
+function getWorkspaceProjects(workspaceId: string) {
+  return centralDb.prepare(`
+    SELECT *
+    FROM projects
+    WHERE workspaceId = ?
+    ORDER BY createdAt ASC
+  `).all(workspaceId);
+}
+
+function getWorkspaceMembers(workspaceId: string) {
+  return centralDb.prepare(`
+    SELECT
+      u.id,
+      u.name,
+      u.email,
+      u.avatar,
+      wm.role,
+      wm.createdAt
+    FROM workspace_members wm
+    JOIN users u ON u.id = wm.userId
+    WHERE wm.workspaceId = ?
+    ORDER BY CASE WHEN wm.role = 'owner' THEN 0 ELSE 1 END, wm.createdAt ASC
+  `).all(workspaceId);
+}
+
+function mirrorWorkspaceMembersToProject(projectId: string, workspaceId: string) {
+  centralDb.prepare(`
+    INSERT OR IGNORE INTO project_members (projectId, userId, role)
+    SELECT ?, wm.userId, CASE WHEN wm.role = 'owner' THEN 'owner' ELSE 'developer' END
+    FROM workspace_members wm
+    WHERE wm.workspaceId = ?
+  `).run(projectId, workspaceId);
+}
+
+function mirrorUserToWorkspaceProjects(workspaceId: string, userId: string, role: string) {
+  centralDb.prepare(`
+    INSERT OR IGNORE INTO project_members (projectId, userId, role)
+    SELECT id, ?, CASE WHEN ? = 'owner' THEN 'owner' ELSE 'developer' END
+    FROM projects
+    WHERE workspaceId = ?
+  `).run(userId, role, workspaceId);
+}
+
+function getWorkspaceAdminMembership(workspaceId: string, userId: string) {
+  return centralDb.prepare(`
+    SELECT *
+    FROM workspace_members
+    WHERE workspaceId = ?
+      AND userId = ?
+      AND role IN ('owner', 'admin')
+  `).get(workspaceId, userId);
 }
 
 // ----------------------------------------------------
@@ -323,7 +484,636 @@ app.get('/api/ollama/models', async (req, res) => {
 });
 
 // ----------------------------------------------------
-// 3. Project & Tenant-Specific REST Endpoints
+// 3. Workspace Directory, Invites, and Connections
+// ----------------------------------------------------
+
+app.get('/api/workspaces', (req, res) => {
+  try {
+    const userId = typeof req.query.userId === 'string' ? req.query.userId : undefined;
+    res.json(listWorkspaces(userId));
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/workspaces', (req, res) => {
+  const { name, description, key, workspaceKey, ownerId, defaultProjectName, defaultProjectKey, hostUrl, joinMode } = req.body;
+  if (!name || !key || !ownerId) {
+    res.status(400).json({ error: 'Workspace name, key, and ownerId are required.' });
+    return;
+  }
+
+  if (joinMode !== undefined && !isJoinMode(joinMode)) {
+    res.status(400).json({ error: 'Unsupported workspace join mode.' });
+    return;
+  }
+
+  const owner = centralDb.prepare('SELECT id FROM users WHERE id = ?').get(ownerId);
+  if (!owner) {
+    res.status(404).json({ error: 'Owner user not found.' });
+    return;
+  }
+
+  const workspaceId = `w-${Date.now()}`;
+  const projectId = `p-${Date.now()}`;
+  const workspaceKeyValue = normalizeEntityKey(key);
+  const projectKey = normalizeEntityKey(defaultProjectKey || workspaceKeyValue);
+  const resolvedWorkspaceAccessKey = typeof workspaceKey === 'string' && workspaceKey.trim().length > 0
+    ? workspaceKey.trim()
+    : createWorkspaceAccessKey(workspaceKeyValue);
+  const resolvedJoinMode = isJoinMode(joinMode) ? joinMode : 'approval_required';
+
+  try {
+    const createWorkspace = centralDb.transaction(() => {
+      centralDb.prepare(`
+        INSERT INTO workspaces (id, name, description, key, workspaceKey, defaultProjectId, hostUrl, createdBy)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        workspaceId,
+        name,
+        description || '',
+        workspaceKeyValue,
+        resolvedWorkspaceAccessKey,
+        projectId,
+        typeof hostUrl === 'string' ? hostUrl.trim() : '',
+        ownerId
+      );
+
+      centralDb.prepare(`
+        INSERT INTO workspace_settings (workspaceId, hostUrl, joinMode, createdAt, updatedAt)
+        VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      `).run(workspaceId, typeof hostUrl === 'string' ? hostUrl.trim() : '', resolvedJoinMode);
+
+      centralDb.prepare(`
+        INSERT INTO workspace_members (workspaceId, userId, role)
+        VALUES (?, ?, 'owner')
+      `).run(workspaceId, ownerId);
+
+      centralDb.prepare(`
+        INSERT INTO projects (id, name, description, key, status, inviteCode, workspaceId)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        projectId,
+        typeof defaultProjectName === 'string' && defaultProjectName.trim().length > 0 ? defaultProjectName.trim() : `${name} Core`,
+        description || '',
+        projectKey,
+        'active',
+        createProjectInviteCode(projectKey),
+        workspaceId
+      );
+
+      centralDb.prepare(`
+        INSERT INTO project_members (projectId, userId, role)
+        VALUES (?, ?, 'owner')
+      `).run(projectId, ownerId);
+
+      getProjectDb(projectId);
+    });
+
+    createWorkspace();
+
+    const workspace = getWorkspaceSummary(workspaceId);
+    const defaultProject = centralDb.prepare('SELECT * FROM projects WHERE id = ?').get(projectId);
+    res.status(201).json({ workspace, defaultProject });
+  } catch (e: any) {
+    if (e.message.includes('UNIQUE constraint failed')) {
+      res.status(400).json({ error: 'Workspace key or default project key already exists.' });
+      return;
+    }
+
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/workspaces/:workspaceId', (req, res) => {
+  const { workspaceId } = req.params;
+
+  try {
+    const workspace = getWorkspaceSummary(workspaceId);
+    if (!workspace) {
+      res.status(404).json({ error: 'Workspace not found.' });
+      return;
+    }
+
+    res.json(workspace);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/workspaces/:workspaceId/projects', (req, res) => {
+  const { workspaceId } = req.params;
+
+  try {
+    res.json(getWorkspaceProjects(workspaceId));
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/workspaces/:workspaceId/members', (req, res) => {
+  const { workspaceId } = req.params;
+
+  try {
+    res.json(getWorkspaceMembers(workspaceId));
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/workspaces/:workspaceId/settings', (req, res) => {
+  const { workspaceId } = req.params;
+
+  try {
+    ensureWorkspaceSettingsRecord(workspaceId);
+    const workspace = centralDb.prepare(`
+      SELECT id, workspaceKey, key
+      FROM workspaces
+      WHERE id = ?
+    `).get(workspaceId) as { id: string; workspaceKey: string; key: string } | undefined;
+
+    if (!workspace) {
+      res.status(404).json({ error: 'Workspace not found.' });
+      return;
+    }
+
+    const settings = centralDb.prepare(`
+      SELECT workspaceId, hostUrl, joinMode, createdAt, updatedAt
+      FROM workspace_settings
+      WHERE workspaceId = ?
+    `).get(workspaceId);
+
+    res.json({ ...settings, workspaceKey: workspace.workspaceKey, key: workspace.key });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.patch('/api/workspaces/:workspaceId/settings', (req, res) => {
+  const { workspaceId } = req.params;
+  const updates = Object.fromEntries(
+    Object.entries({ ...req.body }).filter(([field]) => allowedWorkspaceSettingsFields.has(field))
+  );
+
+  if ('joinMode' in updates && !isJoinMode(updates.joinMode)) {
+    res.status(400).json({ error: 'Unsupported workspace join mode.' });
+    return;
+  }
+
+  try {
+    ensureWorkspaceSettingsRecord(workspaceId);
+
+    const workspace = centralDb.prepare('SELECT * FROM workspaces WHERE id = ?').get(workspaceId) as any;
+    if (!workspace) {
+      res.status(404).json({ error: 'Workspace not found.' });
+      return;
+    }
+
+    if (updates.hostUrl !== undefined || updates.joinMode !== undefined) {
+      const settingsFields: string[] = [];
+      const settingsParams: unknown[] = [];
+
+      if (typeof updates.hostUrl === 'string') {
+        settingsFields.push('hostUrl = ?');
+        settingsParams.push(updates.hostUrl.trim());
+      }
+
+      if (isJoinMode(updates.joinMode)) {
+        settingsFields.push('joinMode = ?');
+        settingsParams.push(updates.joinMode);
+      }
+
+      settingsFields.push('updatedAt = CURRENT_TIMESTAMP');
+      settingsParams.push(workspaceId);
+
+      centralDb.prepare(`
+        UPDATE workspace_settings
+        SET ${settingsFields.join(', ')}
+        WHERE workspaceId = ?
+      `).run(...settingsParams);
+    }
+
+    if (typeof updates.hostUrl === 'string' || typeof updates.workspaceKey === 'string') {
+      const workspaceFields: string[] = [];
+      const workspaceParams: unknown[] = [];
+
+      if (typeof updates.hostUrl === 'string') {
+        workspaceFields.push('hostUrl = ?');
+        workspaceParams.push(updates.hostUrl.trim());
+      }
+
+      if (typeof updates.workspaceKey === 'string' && updates.workspaceKey.trim().length > 0) {
+        workspaceFields.push('workspaceKey = ?');
+        workspaceParams.push(updates.workspaceKey.trim());
+      }
+
+      if (workspaceFields.length > 0) {
+        workspaceParams.push(workspaceId);
+        centralDb.prepare(`
+          UPDATE workspaces
+          SET ${workspaceFields.join(', ')}
+          WHERE id = ?
+        `).run(...workspaceParams);
+      }
+    }
+
+    const settings = centralDb.prepare(`
+      SELECT ws.workspaceId, ws.hostUrl, ws.joinMode, ws.createdAt, ws.updatedAt, w.workspaceKey, w.key
+      FROM workspace_settings ws
+      JOIN workspaces w ON w.id = ws.workspaceId
+      WHERE ws.workspaceId = ?
+    `).get(workspaceId);
+
+    res.json(settings);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/workspaces/:workspaceId/invites', (req, res) => {
+  const { workspaceId } = req.params;
+
+  try {
+    const invites = centralDb.prepare(`
+      SELECT
+        wi.*,
+        u.name AS createdByName,
+        COUNT(DISTINCT wjr.id) AS pendingJoinRequestCount
+      FROM workspace_invites wi
+      JOIN users u ON u.id = wi.createdBy
+      LEFT JOIN workspace_join_requests wjr ON wjr.inviteId = wi.id AND wjr.status = 'pending'
+      WHERE wi.workspaceId = ?
+      GROUP BY wi.id, u.name
+      ORDER BY wi.createdAt DESC
+    `).all(workspaceId);
+
+    res.json(invites);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/workspaces/:workspaceId/invites', (req, res) => {
+  const { workspaceId } = req.params;
+  const { createdBy, label, expiresAt, maxUses } = req.body;
+
+  if (!createdBy) {
+    res.status(400).json({ error: 'createdBy is required.' });
+    return;
+  }
+
+  try {
+    const workspace = centralDb.prepare('SELECT * FROM workspaces WHERE id = ?').get(workspaceId) as any;
+    if (!workspace) {
+      res.status(404).json({ error: 'Workspace not found.' });
+      return;
+    }
+
+    const membership = getWorkspaceAdminMembership(workspaceId, createdBy);
+    if (!membership) {
+      res.status(403).json({ error: 'Only workspace admins can create invite links.' });
+      return;
+    }
+
+    const inviteId = `wi-${Date.now()}`;
+    const code = createWorkspaceInviteCode(workspace.key);
+    centralDb.prepare(`
+      INSERT INTO workspace_invites (id, workspaceId, code, createdBy, label, expiresAt, maxUses)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      inviteId,
+      workspaceId,
+      code,
+      createdBy,
+      typeof label === 'string' ? label.trim() : '',
+      expiresAt || null,
+      Number.isFinite(maxUses) ? maxUses : null
+    );
+
+    const invite = centralDb.prepare('SELECT * FROM workspace_invites WHERE id = ?').get(inviteId);
+    res.status(201).json(invite);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/workspaces/invites/:inviteCode/join-requests', (req, res) => {
+  const { inviteCode } = req.params;
+  const { userId, requesterName, requesterEmail, requesterAvatar, message } = req.body;
+
+  try {
+    const invite = centralDb.prepare(`
+      SELECT wi.*, ws.joinMode
+      FROM workspace_invites wi
+      LEFT JOIN workspace_settings ws ON ws.workspaceId = wi.workspaceId
+      WHERE wi.code = ?
+    `).get(inviteCode) as any;
+
+    if (!invite) {
+      res.status(404).json({ error: 'Invite not found.' });
+      return;
+    }
+
+    if (invite.revokedAt) {
+      res.status(400).json({ error: 'Invite has been revoked.' });
+      return;
+    }
+
+    if (invite.expiresAt && new Date(invite.expiresAt).getTime() < Date.now()) {
+      res.status(400).json({ error: 'Invite has expired.' });
+      return;
+    }
+
+    if (typeof invite.maxUses === 'number' && invite.useCount >= invite.maxUses) {
+      res.status(400).json({ error: 'Invite has reached its maximum number of uses.' });
+      return;
+    }
+
+    const knownUser = userId
+      ? (centralDb.prepare('SELECT id, name, email, avatar FROM users WHERE id = ?').get(userId) as any)
+      : null;
+
+    const resolvedName = knownUser?.name || requesterName;
+    const resolvedEmail = knownUser?.email || requesterEmail;
+    const resolvedAvatar = knownUser?.avatar || requesterAvatar || null;
+
+    if (!resolvedName || !resolvedEmail) {
+      res.status(400).json({ error: 'Requester name and email are required.' });
+      return;
+    }
+
+    if (knownUser) {
+      const existingMember = centralDb.prepare(`
+        SELECT * FROM workspace_members WHERE workspaceId = ? AND userId = ?
+      `).get(invite.workspaceId, knownUser.id);
+
+      if (existingMember) {
+        res.status(400).json({ error: 'User is already a member of this workspace.' });
+        return;
+      }
+    }
+
+    const existingPending = centralDb.prepare(`
+      SELECT *
+      FROM workspace_join_requests
+      WHERE workspaceId = ?
+        AND requesterEmail = ?
+        AND status = 'pending'
+    `).get(invite.workspaceId, resolvedEmail);
+
+    if (existingPending) {
+      res.status(409).json({ error: 'There is already a pending join request for this user.' });
+      return;
+    }
+
+    const requestId = `wjr-${Date.now()}`;
+    const autoJoin = invite.joinMode === 'auto_join' && knownUser;
+
+    const createJoinRequest = centralDb.transaction(() => {
+      centralDb.prepare(`
+        INSERT INTO workspace_join_requests (
+          id,
+          workspaceId,
+          inviteId,
+          requestingUserId,
+          requesterName,
+          requesterEmail,
+          requesterAvatar,
+          message,
+          status,
+          reviewedAt
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        requestId,
+        invite.workspaceId,
+        invite.id,
+        knownUser?.id || userId || null,
+        resolvedName,
+        resolvedEmail,
+        resolvedAvatar,
+        typeof message === 'string' ? message.trim() : '',
+        autoJoin ? 'approved' : 'pending',
+        autoJoin ? new Date().toISOString() : null
+      );
+
+      centralDb.prepare(`
+        UPDATE workspace_invites
+        SET useCount = useCount + 1
+        WHERE id = ?
+      `).run(invite.id);
+
+      if (autoJoin && knownUser) {
+        centralDb.prepare(`
+          INSERT OR IGNORE INTO workspace_members (workspaceId, userId, role)
+          VALUES (?, ?, 'member')
+        `).run(invite.workspaceId, knownUser.id);
+
+        mirrorUserToWorkspaceProjects(invite.workspaceId, knownUser.id, 'member');
+      }
+    });
+
+    createJoinRequest();
+
+    const joinRequest = centralDb.prepare('SELECT * FROM workspace_join_requests WHERE id = ?').get(requestId);
+    res.status(201).json(joinRequest);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/workspaces/:workspaceId/join-requests', (req, res) => {
+  const { workspaceId } = req.params;
+
+  try {
+    const requests = centralDb.prepare(`
+      SELECT
+        wjr.*,
+        reviewer.name AS reviewedByName
+      FROM workspace_join_requests wjr
+      LEFT JOIN users reviewer ON reviewer.id = wjr.reviewedBy
+      WHERE wjr.workspaceId = ?
+      ORDER BY CASE WHEN wjr.status = 'pending' THEN 0 ELSE 1 END, wjr.createdAt DESC
+    `).all(workspaceId);
+
+    res.json(requests);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/workspaces/:workspaceId/join-requests/:requestId/approve', (req, res) => {
+  const { workspaceId, requestId } = req.params;
+  const { reviewerUserId, role } = req.body;
+
+  if (!reviewerUserId) {
+    res.status(400).json({ error: 'reviewerUserId is required.' });
+    return;
+  }
+
+  try {
+    const reviewerMembership = getWorkspaceAdminMembership(workspaceId, reviewerUserId);
+    if (!reviewerMembership) {
+      res.status(403).json({ error: 'Only workspace admins can approve join requests.' });
+      return;
+    }
+
+    const joinRequest = centralDb.prepare(`
+      SELECT *
+      FROM workspace_join_requests
+      WHERE id = ? AND workspaceId = ?
+    `).get(requestId, workspaceId) as any;
+
+    if (!joinRequest) {
+      res.status(404).json({ error: 'Join request not found.' });
+      return;
+    }
+
+    if (joinRequest.status !== 'pending') {
+      res.status(400).json({ error: 'Join request has already been reviewed.' });
+      return;
+    }
+
+    if (!joinRequest.requestingUserId) {
+      res.status(400).json({ error: 'This join request does not yet map to a local user account.' });
+      return;
+    }
+
+    const resolvedRole = typeof role === 'string' && role.trim().length > 0 ? role.trim() : 'member';
+
+    const approveRequest = centralDb.transaction(() => {
+      centralDb.prepare(`
+        INSERT OR IGNORE INTO workspace_members (workspaceId, userId, role)
+        VALUES (?, ?, ?)
+      `).run(workspaceId, joinRequest.requestingUserId, resolvedRole);
+
+      mirrorUserToWorkspaceProjects(workspaceId, joinRequest.requestingUserId, resolvedRole);
+
+      centralDb.prepare(`
+        UPDATE workspace_join_requests
+        SET status = 'approved', reviewedBy = ?, reviewedAt = ?
+        WHERE id = ?
+      `).run(reviewerUserId, new Date().toISOString(), requestId);
+    });
+
+    approveRequest();
+
+    const approved = centralDb.prepare('SELECT * FROM workspace_join_requests WHERE id = ?').get(requestId);
+    res.json(approved);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/workspace-connections', (req, res) => {
+  const userId = req.query.userId as string | undefined;
+  if (!userId) {
+    res.status(400).json({ error: 'userId is required.' });
+    return;
+  }
+
+  try {
+    const connections = centralDb.prepare(`
+      SELECT *
+      FROM workspace_connections
+      WHERE userId = ?
+      ORDER BY COALESCE(lastConnectedAt, createdAt) DESC
+    `).all(userId);
+
+    res.json(connections);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/workspaces/connect', (req, res) => {
+  const { userId, workspaceId, workspaceKey, hostUrl, label } = req.body;
+
+  if (!userId || !workspaceId || !workspaceKey) {
+    res.status(400).json({ error: 'userId, workspaceId, and workspaceKey are required.' });
+    return;
+  }
+
+  try {
+    const workspace = centralDb.prepare(`
+      SELECT w.*, COALESCE(ws.hostUrl, w.hostUrl, '') AS resolvedHostUrl
+      FROM workspaces w
+      LEFT JOIN workspace_settings ws ON ws.workspaceId = w.id
+      WHERE w.id = ?
+    `).get(workspaceId) as any;
+
+    if (!workspace) {
+      res.status(404).json({ error: 'Workspace not found.' });
+      return;
+    }
+
+    if (workspace.workspaceKey !== String(workspaceKey).trim()) {
+      res.status(401).json({ error: 'Workspace key is invalid.' });
+      return;
+    }
+
+    const membership = centralDb.prepare(`
+      SELECT * FROM workspace_members WHERE workspaceId = ? AND userId = ?
+    `).get(workspaceId, userId);
+
+    if (!membership) {
+      res.status(403).json({ error: 'User is not an approved member of this workspace.' });
+      return;
+    }
+
+    const existingConnection = centralDb.prepare(`
+      SELECT * FROM workspace_connections WHERE userId = ? AND remoteWorkspaceId = ?
+    `).get(userId, workspaceId) as any;
+
+    const connectionId = existingConnection?.id || `wc-${Date.now()}`;
+    const effectiveHostUrl = typeof hostUrl === 'string' && hostUrl.trim().length > 0
+      ? hostUrl.trim()
+      : workspace.resolvedHostUrl;
+    const connectionLabel = typeof label === 'string' && label.trim().length > 0
+      ? label.trim()
+      : `${workspace.name} (${workspace.key})`;
+
+    centralDb.prepare(`
+      INSERT INTO workspace_connections (
+        id,
+        userId,
+        label,
+        hostUrl,
+        remoteWorkspaceId,
+        remoteWorkspaceKeyHint,
+        status,
+        lastConnectedAt
+      ) VALUES (?, ?, ?, ?, ?, ?, 'connected', CURRENT_TIMESTAMP)
+      ON CONFLICT(id) DO UPDATE SET
+        label = excluded.label,
+        hostUrl = excluded.hostUrl,
+        remoteWorkspaceId = excluded.remoteWorkspaceId,
+        remoteWorkspaceKeyHint = excluded.remoteWorkspaceKeyHint,
+        status = 'connected',
+        lastConnectedAt = CURRENT_TIMESTAMP
+    `).run(
+      connectionId,
+      userId,
+      connectionLabel,
+      effectiveHostUrl,
+      workspaceId,
+      String(workspaceKey).trim().slice(-4)
+    );
+
+    const connection = centralDb.prepare('SELECT * FROM workspace_connections WHERE id = ?').get(connectionId);
+    res.json({
+      success: true,
+      connection,
+      workspace: getWorkspaceSummary(workspaceId),
+      projects: getWorkspaceProjects(workspaceId),
+    });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ----------------------------------------------------
+// 4. Project & Tenant-Specific REST Endpoints
 // ----------------------------------------------------
 
 // Get all tickets with optional filtering
@@ -503,46 +1293,121 @@ app.delete('/api/tickets/:id', (req, res) => {
 // Projects API
 app.get('/api/projects', (req, res) => {
   const userId = req.query.userId as string;
-  if (userId) {
-    res.json(centralDb.prepare(`
-      SELECT p.* FROM projects p
-      JOIN project_members pm ON p.id = pm.projectId
-      WHERE pm.userId = ?
-    `).all(userId));
-  } else {
-    res.json(centralDb.prepare('SELECT * FROM projects').all());
+  const workspaceId = req.query.workspaceId as string | undefined;
+
+  try {
+    let query = `
+      SELECT DISTINCT p.*
+      FROM projects p
+      LEFT JOIN project_members pm ON pm.projectId = p.id
+      LEFT JOIN workspace_members wm ON wm.workspaceId = p.workspaceId
+      WHERE 1 = 1
+    `;
+    const sqlParams: string[] = [];
+
+    if (userId) {
+      query += ' AND (pm.userId = ? OR wm.userId = ?)';
+      sqlParams.push(userId, userId);
+    }
+
+    if (workspaceId) {
+      query += ' AND p.workspaceId = ?';
+      sqlParams.push(workspaceId);
+    }
+
+    query += ' ORDER BY p.createdAt ASC';
+
+    res.json(centralDb.prepare(query).all(...sqlParams));
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
   }
 });
 
 app.post('/api/projects', (req, res) => {
-  const { name, description, key, status, ownerId } = req.body;
+  const { name, description, key, status, ownerId, workspaceId, workspaceKey, workspaceName } = req.body;
   if (!name || !key) {
     res.status(400).json({ error: 'Project name and key are required.' });
     return;
   }
-  
+
   const id = `p-${Date.now()}`;
-  const inviteCode = `INV-${key.toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
-  
+  const inviteCode = createProjectInviteCode(key);
+
   try {
-    centralDb.prepare(`
-      INSERT INTO projects (id, name, description, key, status, inviteCode)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(id, name, description || '', key.toUpperCase(), status || 'planned', inviteCode);
-    
-    if (ownerId) {
-      centralDb.prepare('INSERT INTO project_members (projectId, userId, role) VALUES (?, ?, ?)')
-        .run(id, ownerId, 'owner');
-    }
-    
-    // Trigger dynamic project DB creation and seeding
-    getProjectDb(id);
-    
+    const normalizedProjectKey = normalizeEntityKey(key);
+    const resolvedWorkspaceId = workspaceId || `w-${Date.now()}`;
+    const normalizedWorkspaceKey = normalizeEntityKey(workspaceKey || key);
+
+    const createProject = centralDb.transaction(() => {
+      if (!workspaceId) {
+        centralDb.prepare(`
+          INSERT INTO workspaces (id, name, description, key, workspaceKey, defaultProjectId, hostUrl, createdBy)
+          VALUES (?, ?, ?, ?, ?, ?, '', ?)
+        `).run(
+          resolvedWorkspaceId,
+          workspaceName || name,
+          description || '',
+          normalizedWorkspaceKey,
+          createWorkspaceAccessKey(normalizedWorkspaceKey),
+          id,
+          ownerId || null
+        );
+
+        centralDb.prepare(`
+          INSERT INTO workspace_settings (workspaceId, hostUrl, joinMode, createdAt, updatedAt)
+          VALUES (?, '', 'approval_required', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        `).run(resolvedWorkspaceId);
+
+        if (ownerId) {
+          centralDb.prepare(`
+            INSERT OR IGNORE INTO workspace_members (workspaceId, userId, role)
+            VALUES (?, ?, 'owner')
+          `).run(resolvedWorkspaceId, ownerId);
+        }
+      } else {
+        const existingWorkspace = centralDb.prepare('SELECT id FROM workspaces WHERE id = ?').get(workspaceId);
+        if (!existingWorkspace) {
+          throw new Error('Workspace not found.');
+        }
+      }
+
+      centralDb.prepare(`
+        INSERT INTO projects (id, name, description, key, status, inviteCode, workspaceId)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(id, name, description || '', normalizedProjectKey, status || 'planned', inviteCode, resolvedWorkspaceId);
+
+      if (ownerId && !workspaceId) {
+        centralDb.prepare(`
+          INSERT OR IGNORE INTO project_members (projectId, userId, role)
+          VALUES (?, ?, 'owner')
+        `).run(id, ownerId);
+      }
+
+      mirrorWorkspaceMembersToProject(id, resolvedWorkspaceId);
+
+      if (!workspaceId) {
+        centralDb.prepare(`
+          UPDATE workspaces
+          SET defaultProjectId = COALESCE(defaultProjectId, ?)
+          WHERE id = ?
+        `).run(id, resolvedWorkspaceId);
+      }
+
+      getProjectDb(id);
+    });
+
+    createProject();
+
     const newProj = centralDb.prepare('SELECT * FROM projects WHERE id = ?').get(id);
     broadcastEvent('projects-updated', centralDb.prepare('SELECT * FROM projects').all());
-    
+
     res.status(201).json(newProj);
   } catch (e: any) {
+    if (e.message.includes('Workspace not found')) {
+      res.status(404).json({ error: e.message });
+      return;
+    }
+
     res.status(500).json({ error: e.message });
   }
 });
@@ -561,12 +1426,24 @@ app.post('/api/projects/invite/accept', (req, res) => {
       res.status(404).json({ error: 'Invalid invite code.' });
       return;
     }
-    
-    // Check if member already
-    const exists = centralDb.prepare('SELECT * FROM project_members WHERE projectId = ? AND userId = ?').get(project.id, userId);
-    if (!exists) {
-      centralDb.prepare('INSERT INTO project_members (projectId, userId, role) VALUES (?, ?, ?)').run(project.id, userId, 'developer');
-    }
+
+    const joinProjectWorkspace = centralDb.transaction(() => {
+      if (project.workspaceId) {
+        centralDb.prepare(`
+          INSERT OR IGNORE INTO workspace_members (workspaceId, userId, role)
+          VALUES (?, ?, 'member')
+        `).run(project.workspaceId, userId);
+
+        mirrorUserToWorkspaceProjects(project.workspaceId, userId, 'member');
+      } else {
+        const exists = centralDb.prepare('SELECT * FROM project_members WHERE projectId = ? AND userId = ?').get(project.id, userId);
+        if (!exists) {
+          centralDb.prepare('INSERT INTO project_members (projectId, userId, role) VALUES (?, ?, ?)').run(project.id, userId, 'developer');
+        }
+      }
+    });
+
+    joinProjectWorkspace();
     
     const joinedProject = centralDb.prepare('SELECT * FROM projects WHERE id = ?').get(project.id);
     
@@ -592,14 +1469,29 @@ app.post('/api/projects/:projectId/members', (req, res) => {
       res.status(404).json({ error: 'User not found.' });
       return;
     }
+
+    const project = centralDb.prepare('SELECT * FROM projects WHERE id = ?').get(projectId) as any;
+    if (!project) {
+      res.status(404).json({ error: 'Project not found.' });
+      return;
+    }
     
     const exists = centralDb.prepare('SELECT * FROM project_members WHERE projectId = ? AND userId = ?').get(projectId, userId);
     if (exists) {
       res.status(400).json({ error: 'User is already a member of this project.' });
       return;
     }
-    
-    centralDb.prepare('INSERT INTO project_members (projectId, userId, role) VALUES (?, ?, ?)').run(projectId, userId, role || 'developer');
+
+    const resolvedRole = role || 'developer';
+
+    centralDb.prepare('INSERT INTO project_members (projectId, userId, role) VALUES (?, ?, ?)').run(projectId, userId, resolvedRole);
+
+    if (project.workspaceId) {
+      centralDb.prepare(`
+        INSERT OR IGNORE INTO workspace_members (workspaceId, userId, role)
+        VALUES (?, ?, ?)
+      `).run(project.workspaceId, userId, resolvedRole === 'owner' ? 'owner' : 'member');
+    }
     
     const allMembers = centralDb.prepare(`
       SELECT u.id, u.name, u.email, u.avatar, pm.role FROM users u

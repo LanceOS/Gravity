@@ -7,10 +7,12 @@ import {
 } from 'lucide-react';
 
 export interface SidebarProps {
+  workspaces: Array<{ id: string; name: string }>;
   projects: Project[];
   domains: Domain[];
   cycles: Cycle[];
   currentUser: User;
+  activeWorkspaceId: string;
   activeProjectId: string;
   filters: TicketFilters;
   theme: 'dark' | 'light';
@@ -20,6 +22,8 @@ export interface SidebarProps {
   cycleCounts: Record<string, number>;
   activeArea?: 'workspace' | 'settings';
   onSelectProject: (projectId: string) => void;
+  onSelectWorkspace: (workspaceId: string) => void;
+  onOpenWorkspaceDirectory: () => void;
   onShowProjectIssues: () => void;
   onShowMyIssues: () => void;
   onSelectCycle: (cycleId: string) => void;
@@ -33,10 +37,12 @@ export interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
+  workspaces,
   projects,
   domains,
   cycles,
   currentUser,
+  activeWorkspaceId,
   activeProjectId,
   filters,
   theme,
@@ -46,6 +52,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   cycleCounts,
   activeArea = 'workspace',
   onSelectProject,
+  onSelectWorkspace,
+  onOpenWorkspaceDirectory,
   onShowProjectIssues,
   onShowMyIssues,
   onSelectCycle,
@@ -99,7 +107,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         style={{
           padding: '16px',
           display: 'flex',
-          alignItems: 'center',
+          alignItems: 'flex-start',
           gap: '10px',
           borderBottom: '1px solid var(--border)'
         }}
@@ -109,21 +117,48 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <circle cx="12" cy="12" r="6" stroke="var(--accent)" strokeWidth="2" strokeDasharray="4 2" />
           <circle cx="12" cy="12" r="2" fill="var(--text-heading)" />
         </svg>
-        <span style={{ fontWeight: 600, fontSize: '15px', color: 'var(--text-heading)', letterSpacing: '-0.3px' }}>Gravity</span>
-        <span 
-          style={{ 
-            fontSize: '9px', 
-            background: 'var(--accent-glow)', 
+        <div style={{ flex: 1, minWidth: 0, display: 'grid', gap: '6px' }}>
+          <span style={{ fontWeight: 600, fontSize: '15px', color: 'var(--text-heading)', letterSpacing: '-0.3px' }}>Gravity</span>
+
+          <select
+            value={activeWorkspaceId}
+            onChange={(event) => onSelectWorkspace(event.target.value)}
+            style={{
+              width: '100%',
+              minHeight: '34px',
+              borderRadius: '8px',
+              border: '1px solid var(--border)',
+              background: 'rgba(255,255,255,0.03)',
+              color: 'var(--text-heading)',
+              padding: '0 10px',
+              fontSize: '12px'
+            }}
+          >
+            {workspaces.map((workspace) => (
+              <option key={workspace.id} value={workspace.id}>
+                {workspace.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <button
+          type="button"
+          onClick={onOpenWorkspaceDirectory}
+          className="clickable"
+          style={{
+            fontSize: '10px',
+            background: 'var(--accent-glow)',
             border: '1px solid var(--accent-border)',
             color: 'var(--accent)',
-            padding: '1px 5px',
-            borderRadius: '4px',
-            marginLeft: 'auto',
-            fontWeight: 500
+            padding: '6px 8px',
+            borderRadius: '8px',
+            fontWeight: 600,
+            cursor: 'pointer'
           }}
         >
-          v1.0
-        </span>
+          All
+        </button>
       </div>
 
       {/* Quick Action Button */}
@@ -320,6 +355,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div 
               onClick={() => {
                 setShowUserDropdown(false);
+                onOpenWorkspaceDirectory();
+              }}
+              className="clickable"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 10px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '12px',
+                color: 'var(--text)'
+              }}
+            >
+              <GlobeIcon />
+              <span>Workspaces</span>
+            </div>
+
+            <div 
+              onClick={() => {
+                setShowUserDropdown(false);
                 onOpenSettings();
               }}
               className="clickable"
@@ -443,3 +499,7 @@ const agentButtonStyle = (extras: React.CSSProperties = {}): React.CSSProperties
   cursor: 'pointer',
   ...extras
 });
+
+function GlobeIcon() {
+  return <FolderTree size={14} color="var(--accent)" />;
+}

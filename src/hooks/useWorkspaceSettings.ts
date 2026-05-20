@@ -1,250 +1,269 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { User } from '../context/TicketContext';
-import {
-  getProviderOption,
-  normalizeWorkspaceSettings,
-  type WorkspaceSettings,
-} from '../utils/settings';
+import type { WorkspaceJoinMode } from './useWorkspaceDirectory';
 
-interface StatusMessage {
-  success: boolean;
+export interface WorkspaceAdminSettings {
+  workspaceId: string;
+  key: string;
+  hostUrl: string;
+  joinMode: WorkspaceJoinMode;
+  workspaceKey: string;
+}
+
+export interface WorkspaceMember {
+  id: string;
+  name: string;
+  email: string;
+  avatar: string;
+  role: string;
+  createdAt: string;
+}
+
+export interface WorkspaceInvite {
+  id: string;
+  code: string;
+  label: string;
+  expiresAt: string | null;
+  revokedAt: string | null;
+  maxUses: number | null;
+  useCount: number;
+  createdAt: string;
+  createdByName?: string;
+  pendingJoinRequestCount?: number;
+}
+
+export interface WorkspaceJoinRequest {
+  id: string;
+  requestingUserId: string | null;
+  requesterName: string;
+  requesterEmail: string;
+  requesterAvatar: string | null;
   message: string;
+  status: 'pending' | 'approved' | 'rejected';
+  reviewedBy: string | null;
+  reviewedByName?: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
 }
 
 interface UseWorkspaceSettingsOptions {
   currentUser: User | null;
-  activeView: 'board' | 'list';
-  theme: 'dark' | 'light';
-  setView: (view: 'board' | 'list') => void;
-  setTheme: (theme: 'dark' | 'light') => void;
+  activeWorkspaceId: string;
 }
 
-export function useWorkspaceSettings({
-  currentUser,
-  activeView,
-  theme,
-  setView,
-  setTheme,
-}: UseWorkspaceSettingsOptions) {
-  const [settings, setSettings] = useState<WorkspaceSettings>(() =>
-    normalizeWorkspaceSettings(null, activeView, theme)
-  );
+const defaultSettings = (workspaceId: string): WorkspaceAdminSettings => ({
+  workspaceId,
+  key: '',
+  hostUrl: '',
+  joinMode: 'approval_required',
+  workspaceKey: '',
+});
+
+export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWorkspaceSettingsOptions) {
+  const [settings, setSettings] = useState<WorkspaceAdminSettings>(() => defaultSettings(activeWorkspaceId));
+  const [members, setMembers] = useState<WorkspaceMember[]>([]);
+  const [invites, setInvites] = useState<WorkspaceInvite[]>([]);
+  const [joinRequests, setJoinRequests] = useState<WorkspaceJoinRequest[]>([]);
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<StatusMessage | null>(null);
-  const [tutorialResult, setTutorialResult] = useState<StatusMessage | null>(null);
-  const [ollamaModels, setOllamaModels] = useState<string[]>([]);
-  const [ollamaModelsLoading, setOllamaModelsLoading] = useState(false);
+  const [invitesLoading, setInvitesLoading] = useState(false);
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [approveLoadingId, setApproveLoadingId] = useState<string | null>(null);
+
+  const refreshWorkspaceAdmin = useCallback(async () => {
+    if (!currentUser || !activeWorkspaceId) {
+      setSettings(defaultSettings(activeWorkspaceId));
+      setMembers([]);
+      setInvites([]);
+      setJoinRequests([]);
+      return;
+    }
+
+    setSettingsLoading(true);
+    setInvitesLoading(true);
+    setSaveError(null);
+    setInviteError(null);
+
+    try {
+      const [settingsResponse, membersResponse, invitesResponse, joinRequestsResponse] = await Promise.all([
+        fetch(`/api/workspaces/${activeWorkspaceId}/settings`),
+        fetch(`/api/workspaces/${activeWorkspaceId}/members`),
+        fetch(`/api/workspaces/${activeWorkspaceId}/invites`),
+        fetch(`/api/workspaces/${activeWorkspaceId}/join-requests`),
+      ]);
+
+      const [settingsData, membersData, invitesData, joinRequestsData] = await Promise.all([
+        settingsResponse.json(),
+        membersResponse.json(),
+        invitesResponse.json(),
+        joinRequestsResponse.json(),
+      ]);
+
+      if (!settingsResponse.ok) {
+        throw new Error(settingsData.error || 'Failed to load workspace settings.');
+      }
+
+      if (!membersResponse.ok) {
+        throw new Error(membersData.error || 'Failed to load workspace members.');
+      }
+
+      if (!invitesResponse.ok) {
+        throw new Error(invitesData.error || 'Failed to load workspace invites.');
+      }
+
+      if (!joinRequestsResponse.ok) {
+        throw new Error(joinRequestsData.error || 'Failed to load workspace join requests.');
+      }
+
+      setSettings({
+        workspaceId: settingsData.workspaceId || activeWorkspaceId,
+        key: settingsData.key || '',
+        hostUrl: settingsData.hostUrl || '',
+        joinMode: settingsData.joinMode === 'auto_join' ? 'auto_join' : 'approval_required',
+        workspaceKey: settingsData.workspaceKey || '',
+      });
+      setMembers(Array.isArray(membersData) ? membersData : []);
+      setInvites(Array.isArray(invitesData) ? invitesData : []);
+      setJoinRequests(Array.isArray(joinRequestsData) ? joinRequestsData : []);
+    } catch (refreshError) {
+      const message = refreshError instanceof Error ? refreshError.message : 'Failed to load workspace administration data.';
+      setSaveError(message);
+      setMembers([]);
+      setInvites([]);
+      setJoinRequests([]);
+    } finally {
+      setSettingsLoading(false);
+      setInvitesLoading(false);
+    }
+  }, [activeWorkspaceId, currentUser]);
+
+  useEffect(() => {
+    void refreshWorkspaceAdmin();
+  }, [refreshWorkspaceAdmin]);
 
   useEffect(() => {
     if (!saveSuccess) {
       return undefined;
     }
 
-    const timer = window.setTimeout(() => setSaveSuccess(false), 2000);
+    const timer = window.setTimeout(() => setSaveSuccess(false), 2500);
     return () => window.clearTimeout(timer);
   }, [saveSuccess]);
 
-  useEffect(() => {
-    if (!currentUser) {
-      setSettings(normalizeWorkspaceSettings(null, activeView, theme));
-      setSaveError(null);
-      setTestResult(null);
-      setTutorialResult(null);
-      setOllamaModels([]);
-      return;
-    }
-
-    let cancelled = false;
-    setSettingsLoading(true);
-
-    fetch(`/api/settings/${currentUser.id}`)
-      .then(async (response) => {
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to load settings.');
-        }
-        return data;
-      })
-      .then((data) => {
-        if (!cancelled) {
-          setSettings(normalizeWorkspaceSettings(data, activeView, theme));
-        }
-      })
-      .catch((error: Error) => {
-        if (!cancelled) {
-          setSaveError(error.message);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setSettingsLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [currentUser, activeView, theme]);
-
-  const refreshOllamaModels = useCallback(async (endpoint?: string) => {
-    const ollamaUrl = (endpoint ?? settings.ollamaEndpoint).trim();
-    if (!ollamaUrl) {
-      setOllamaModels([]);
-      return;
-    }
-
-    setOllamaModelsLoading(true);
-    try {
-      const response = await fetch(`/api/ollama/models?ollamaUrl=${encodeURIComponent(ollamaUrl)}`);
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to detect Ollama models.');
-      }
-
-      const nextModels = Array.isArray(data.models)
-        ? data.models.filter((model: unknown): model is string => typeof model === 'string' && model.length > 0)
-        : [];
-
-      setOllamaModels(nextModels);
-      setSettings((current) => {
-        if (nextModels.length === 0 || nextModels.includes(current.ollamaModel)) {
-          return current;
-        }
-
-        return { ...current, ollamaModel: nextModels[0] };
-      });
-    } catch {
-      setOllamaModels([]);
-    } finally {
-      setOllamaModelsLoading(false);
-    }
-  }, [settings.ollamaEndpoint]);
-
-  useEffect(() => {
-    if (!currentUser) {
-      return;
-    }
-
-    void refreshOllamaModels(settings.ollamaEndpoint);
-  }, [currentUser, settings.ollamaEndpoint, refreshOllamaModels]);
-
-  const updateSettings = useCallback((updates: Partial<WorkspaceSettings>) => {
+  const updateSettings = useCallback((updates: Partial<WorkspaceAdminSettings>) => {
     setSettings((current) => ({ ...current, ...updates }));
     setSaveSuccess(false);
     setSaveError(null);
-
-    if (updates.apiKey !== undefined || updates.aiProvider !== undefined) {
-      setTestResult(null);
-    }
-
-    if (updates.ollamaEndpoint !== undefined) {
-      setOllamaModels([]);
-    }
   }, []);
 
   const saveSettings = useCallback(async () => {
-    if (!currentUser) {
+    if (!currentUser || !activeWorkspaceId) {
       return;
     }
 
     setSaveLoading(true);
-    setSaveSuccess(false);
     setSaveError(null);
+    setSaveSuccess(false);
 
     try {
-      const payload = {
-        ...settings,
-        ollamaModel: ollamaModels.length > 0 ? settings.ollamaModel : '',
-      };
-
-      const response = await fetch(`/api/settings/${currentUser.id}`, {
+      const response = await fetch(`/api/workspaces/${activeWorkspaceId}/settings`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          hostUrl: settings.hostUrl,
+          joinMode: settings.joinMode,
+          workspaceKey: settings.workspaceKey,
+        }),
       });
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to save settings.');
+        throw new Error(data.error || 'Failed to save workspace settings.');
       }
 
-      const normalized = normalizeWorkspaceSettings(data, activeView, theme);
-      setSettings(normalized);
-      setTheme(normalized.theme);
-      setView(normalized.defaultView);
+      setSettings({
+        workspaceId: data.workspaceId || activeWorkspaceId,
+        key: data.key || settings.key,
+        hostUrl: data.hostUrl || '',
+        joinMode: data.joinMode === 'auto_join' ? 'auto_join' : 'approval_required',
+        workspaceKey: data.workspaceKey || settings.workspaceKey,
+      });
       setSaveSuccess(true);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to save settings.';
+      const message = error instanceof Error ? error.message : 'Failed to save workspace settings.';
       setSaveError(message);
     } finally {
       setSaveLoading(false);
     }
-  }, [currentUser, settings, ollamaModels, activeView, theme, setTheme, setView]);
+  }, [activeWorkspaceId, currentUser, settings]);
 
-  const testApiKey = useCallback(async () => {
-    const provider = getProviderOption(settings.aiProvider);
-    if (!settings.apiKey.trim()) {
-      setTestResult({ success: false, message: `Please enter a ${provider.label} API key to test.` });
-      return;
+  const createInvite = useCallback(async (label?: string) => {
+    if (!currentUser || !activeWorkspaceId) {
+      return null;
     }
 
-    setTesting(true);
-    setTestResult(null);
+    setInviteLoading(true);
+    setInviteError(null);
 
     try {
-      const response = await fetch('/api/ai/test-key', {
+      const response = await fetch(`/api/workspaces/${activeWorkspaceId}/invites`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider: settings.aiProvider, apiKey: settings.apiKey.trim() }),
+        body: JSON.stringify({
+          createdBy: currentUser.id,
+          label: label || '',
+        }),
       });
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Connection test failed.');
+        throw new Error(data.error || 'Failed to create invite.');
       }
 
-      setTestResult({ success: true, message: data.message });
+      await refreshWorkspaceAdmin();
+      return data as WorkspaceInvite;
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Connection test failed.';
-      setTestResult({ success: false, message });
+      const message = error instanceof Error ? error.message : 'Failed to create invite.';
+      setInviteError(message);
+      return null;
     } finally {
-      setTesting(false);
+      setInviteLoading(false);
     }
-  }, [settings.aiProvider, settings.apiKey]);
+  }, [activeWorkspaceId, currentUser, refreshWorkspaceAdmin]);
 
-  const resetTutorial = useCallback(async () => {
-    if (!currentUser) {
-      return;
+  const approveJoinRequest = useCallback(async (requestId: string) => {
+    if (!currentUser || !activeWorkspaceId) {
+      return false;
     }
 
-    setTutorialResult(null);
+    setApproveLoadingId(requestId);
+    setInviteError(null);
 
     try {
-      const response = await fetch(`/api/users/${currentUser.id}/tutorial`, {
-        method: 'PATCH',
+      const response = await fetch(`/api/workspaces/${activeWorkspaceId}/join-requests/${requestId}/approve`, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ completed: false }),
+        body: JSON.stringify({ reviewerUserId: currentUser.id }),
       });
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to reset tutorial.');
+        throw new Error(data.error || 'Failed to approve join request.');
       }
 
-      setTutorialResult({
-        success: true,
-        message: 'Tutorial reset. It will appear again the next time you reload or sign in.',
-      });
+      await refreshWorkspaceAdmin();
+      return true;
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to reset tutorial.';
-      setTutorialResult({ success: false, message });
+      const message = error instanceof Error ? error.message : 'Failed to approve join request.';
+      setInviteError(message);
+      return false;
+    } finally {
+      setApproveLoadingId(null);
     }
-  }, [currentUser]);
+  }, [activeWorkspaceId, currentUser, refreshWorkspaceAdmin]);
 
   return {
     settings,
@@ -252,15 +271,17 @@ export function useWorkspaceSettings({
     saveLoading,
     saveSuccess,
     saveError,
-    testing,
-    testResult,
-    tutorialResult,
-    ollamaModels,
-    ollamaModelsLoading,
+    members,
+    invites,
+    invitesLoading,
+    joinRequests,
+    inviteLoading,
+    inviteError,
+    approveLoadingId,
     updateSettings,
     saveSettings,
-    testApiKey,
-    resetTutorial,
-    refreshOllamaModels,
+    createInvite,
+    approveJoinRequest,
+    refreshWorkspaceAdmin,
   };
 }

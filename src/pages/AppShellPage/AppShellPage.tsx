@@ -2,18 +2,19 @@ import { useEffect, useMemo, useState } from 'react';
 import { AgentSimulator } from '../../components/AgentSimulator';
 import { AuthScreen } from '../../components/AuthScreen';
 import { CreateTicketModal } from '../../components/CreateTicketModal';
-import { EmptyWorkspaceScreen } from '../../components/EmptyWorkspaceScreen';
 import { LocalAIChat } from '../../components/LocalAIChat';
 import { OnboardingModal } from '../../components/OnboardingModal';
 import { useTickets, type Ticket } from '../../context/TicketContext';
+import { useWorkspaceDirectory } from '../../hooks/useWorkspaceDirectory';
 import { useWorkspaceSettings } from '../../hooks/useWorkspaceSettings';
 import { WorkspaceLayout } from '../../layouts/WorkspaceLayout/WorkspaceLayout';
 import { registerWebMCPTools } from '../../utils/webmcp';
 import { LoadingPage } from '../LoadingPage/LoadingPage';
 import { SettingsPage } from '../SettingsPage/SettingsPage';
+import { WorkspaceDirectoryPage } from '../WorkspaceDirectoryPage/WorkspaceDirectoryPage';
 import { WorkspacePage } from '../WorkspacePage/WorkspacePage';
 
-type AppSection = 'workspace' | 'settings';
+type AppSection = 'directory' | 'workspace' | 'settings';
 
 export function AppShellPage() {
   const {
@@ -22,21 +23,19 @@ export function AppShellPage() {
     activeView,
     addComment,
     comments,
-    createProject,
     createTicket,
     currentUser,
     cycles,
     deleteTicket,
     domains,
+    fetchInitialData,
     filters,
     loading,
-    joinProject,
     projects,
     setActiveProjectId,
     setActiveTicket,
     setCurrentUser,
     setFilters,
-    setTheme,
     setView,
     signOut,
     theme,
@@ -46,15 +45,32 @@ export function AppShellPage() {
     users,
   } = useTickets();
 
-  const [activeSection, setActiveSection] = useState<AppSection>('workspace');
+  const [activeSection, setActiveSection] = useState<AppSection>('directory');
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isOllamaOpen, setIsOllamaOpen] = useState(false);
   const [isSimulatorOpen, setIsSimulatorOpen] = useState(false);
   const [createInitialStatus, setCreateInitialStatus] = useState<Ticket['status'] | undefined>(undefined);
   const [createParentId, setCreateParentId] = useState<string | undefined>(undefined);
-  const [pendingWorkspaceAction, setPendingWorkspaceAction] = useState<'create' | 'join' | null>(null);
-  const [workspaceError, setWorkspaceError] = useState<string | null>(null);
 
+  const {
+    workspaces,
+    loading: workspacesLoading,
+    pendingAction,
+    error: workspaceDirectoryError,
+    successMessage: workspaceDirectorySuccess,
+    createWorkspace,
+    requestJoinByInvite,
+  } = useWorkspaceDirectory({ currentUser });
+
+  const activeWorkspace = useMemo(
+    () => workspaces.find((workspace) => workspace.id === activeWorkspaceId) || null,
+    [workspaces, activeWorkspaceId]
+  );
+  const activeWorkspaceProjects = useMemo(
+    () => projects.filter((project) => project.workspaceId === activeWorkspaceId),
+    [projects, activeWorkspaceId]
+  );
   const parentTicket = useMemo(
     () => (createParentId ? tickets.find((ticket) => ticket.id === createParentId) || null : null),
     [tickets, createParentId]
@@ -87,29 +103,59 @@ export function AppShellPage() {
     saveLoading: settingsSaveLoading,
     saveSuccess: settingsSaveSuccess,
     saveError: settingsSaveError,
-    testing: settingsTesting,
-    testResult: settingsTestResult,
-    tutorialResult: settingsTutorialResult,
-    ollamaModels,
-    ollamaModelsLoading,
+    members: workspaceMembers,
+    invites: workspaceInvites,
+    invitesLoading: workspaceInvitesLoading,
+    joinRequests: workspaceJoinRequests,
+    inviteLoading: workspaceInviteLoading,
+    inviteError: workspaceInviteError,
+    approveLoadingId,
     updateSettings,
     saveSettings,
-    testApiKey,
-    resetTutorial,
-    refreshOllamaModels,
+    createInvite,
+    approveJoinRequest,
   } = useWorkspaceSettings({
     currentUser,
-    activeView,
-    theme,
-    setView,
-    setTheme,
+    activeWorkspaceId,
   });
 
   useEffect(() => {
-    if (projects.length === 0) {
-      setActiveSection('workspace');
+    if (!currentUser) {
+      setActiveSection('directory');
+      setActiveWorkspaceId('');
+      return;
     }
-  }, [projects.length]);
+
+    if (workspaces.length === 0) {
+      setActiveSection('directory');
+      setActiveWorkspaceId('');
+      return;
+    }
+
+    if (!activeWorkspaceId || !workspaces.some((workspace) => workspace.id === activeWorkspaceId)) {
+      setActiveWorkspaceId(workspaces[0].id);
+    }
+  }, [currentUser, workspaces, activeWorkspaceId]);
+
+  useEffect(() => {
+    if (!activeWorkspaceId) {
+      return;
+    }
+
+    if (activeWorkspaceProjects.length === 0) {
+      if (activeProjectId) {
+        setActiveProjectId('');
+      }
+      return;
+    }
+
+    if (!activeWorkspaceProjects.some((project) => project.id === activeProjectId)) {
+      const preferredProject = activeWorkspaceProjects.find((project) => project.id === activeWorkspace?.defaultProjectId) || activeWorkspaceProjects[0];
+      if (preferredProject) {
+        setActiveProjectId(preferredProject.id);
+      }
+    }
+  }, [activeWorkspaceId, activeWorkspace?.defaultProjectId, activeWorkspaceProjects, activeProjectId, setActiveProjectId]);
 
   useEffect(() => {
     const controller = registerWebMCPTools({
@@ -160,33 +206,42 @@ export function AppShellPage() {
     setActiveTicket(null);
   };
 
-  const handleCreateProject = async (project: { name: string; description: string; key: string }) => {
-    setPendingWorkspaceAction('create');
-    setWorkspaceError(null);
-
-    try {
-      await createProject(project);
-    } catch (error: unknown) {
-      setWorkspaceError(error instanceof Error ? error.message : 'Failed to create project.');
-    } finally {
-      setPendingWorkspaceAction(null);
+  const handleCreateWorkspace = async (workspaceInput: {
+    name: string;
+    description: string;
+    key: string;
+    workspaceKey?: string;
+    defaultProjectName?: string;
+    defaultProjectKey?: string;
+  }) => {
+    const workspace = await createWorkspace(workspaceInput);
+    if (!workspace || !currentUser) {
+      return;
     }
+
+    await fetchInitialData(currentUser.id);
+    setActiveWorkspaceId(workspace.id);
+    setActiveSection('workspace');
   };
 
-  const handleJoinProject = async (inviteCode: string) => {
-    setPendingWorkspaceAction('join');
-    setWorkspaceError(null);
+  const handleRequestJoin = async (inviteCode: string, message?: string) => {
+    await requestJoinByInvite(inviteCode, message);
+    setActiveSection('directory');
+  };
 
-    try {
-      await joinProject(inviteCode);
-    } catch (error: unknown) {
-      setWorkspaceError(error instanceof Error ? error.message : 'Failed to join project.');
-    } finally {
-      setPendingWorkspaceAction(null);
-    }
+  const handleSelectWorkspace = (workspaceId: string) => {
+    setActiveWorkspaceId(workspaceId);
+    setActiveTicket(null);
+    setFilters({ projectId: '', assigneeId: '', domainId: '', cycleId: '' });
+    setActiveSection('workspace');
   };
 
   const handleSelectProject = (projectId: string) => {
+    const project = projects.find((candidate) => candidate.id === projectId);
+    if (project?.workspaceId) {
+      setActiveWorkspaceId(project.workspaceId);
+    }
+
     setActiveProjectId(projectId);
     setActiveTicket(null);
     setFilters({ assigneeId: '', domainId: '', cycleId: '' });
@@ -230,9 +285,17 @@ export function AppShellPage() {
   };
 
   const handleOpenSettings = () => {
+    if (!activeWorkspace) {
+      setActiveSection('directory');
+      return;
+    }
+
     setActiveTicket(null);
     setActiveSection('settings');
   };
+
+  const handleCreateInvite = async (label?: string) => Boolean(await createInvite(label));
+  const handleApproveJoinRequest = async (requestId: string) => Boolean(await approveJoinRequest(requestId));
 
   useEffect(() => {
     const handleGlobalKeyDown = (event: KeyboardEvent) => {
@@ -260,38 +323,50 @@ export function AppShellPage() {
     return <AuthScreen />;
   }
 
-  if (loading) {
+  if (loading || workspacesLoading) {
     return <LoadingPage />;
   }
 
-  if (projects.length === 0) {
+  const onboarding = currentUser.tutorial_completed === 0 || currentUser.tutorial_completed === false ? (
+    <OnboardingModal
+      onComplete={() => {
+        setCurrentUser({ ...currentUser, tutorial_completed: 1 });
+      }}
+    />
+  ) : null;
+
+  if (activeSection === 'directory' || workspaces.length === 0 || !activeWorkspace) {
     return (
       <>
-        <EmptyWorkspaceScreen
+        <WorkspaceDirectoryPage
           currentUser={currentUser}
-          pendingAction={pendingWorkspaceAction}
-          errorMessage={workspaceError}
-          onCreateProject={handleCreateProject}
-          onJoinProject={handleJoinProject}
+          workspaces={workspaces}
+          loading={workspacesLoading}
+          activeWorkspaceId={activeWorkspaceId}
+          pendingAction={pendingAction}
+          errorMessage={workspaceDirectoryError}
+          successMessage={workspaceDirectorySuccess}
+          onCreateWorkspace={handleCreateWorkspace}
+          onRequestJoin={handleRequestJoin}
+          onOpenWorkspace={handleSelectWorkspace}
+          onOpenSettings={(workspaceId) => {
+            setActiveWorkspaceId(workspaceId);
+            setActiveSection('settings');
+          }}
           onSignOut={signOut}
         />
-
-        {currentUser.tutorial_completed === 0 || currentUser.tutorial_completed === false ? (
-          <OnboardingModal
-            onComplete={() => {
-              setCurrentUser({ ...currentUser, tutorial_completed: 1 });
-            }}
-          />
-        ) : null}
+        {onboarding}
       </>
     );
   }
 
   const sidebarProps = {
-    projects,
+    workspaces: workspaces.map((workspace) => ({ id: workspace.id, name: workspace.name })),
+    projects: activeWorkspaceProjects,
     domains,
     cycles,
     currentUser,
+    activeWorkspaceId,
     activeProjectId,
     filters,
     theme,
@@ -299,7 +374,9 @@ export function AppShellPage() {
     activeProjectTicketCount: openTickets.length,
     domainCounts,
     cycleCounts,
-    activeArea: activeSection,
+    activeArea: activeSection === 'settings' ? 'settings' : 'workspace',
+    onSelectWorkspace: handleSelectWorkspace,
+    onOpenWorkspaceDirectory: () => setActiveSection('directory'),
     onSelectProject: handleSelectProject,
     onShowProjectIssues: handleShowProjectIssues,
     onShowMyIssues: handleShowMyIssues,
@@ -315,36 +392,39 @@ export function AppShellPage() {
 
   return (
     <>
-      <WorkspaceLayout
-        sidebarProps={sidebarProps}
-        rightPanels={
-          <>
-            {isOllamaOpen ? <LocalAIChat onClose={() => setIsOllamaOpen(false)} /> : null}
-            {isSimulatorOpen ? <AgentSimulator onClose={() => setIsSimulatorOpen(false)} /> : null}
-          </>
-        }
-      >
-        {activeSection === 'settings' ? (
-          <SettingsPage
-            currentUser={currentUser}
-            settings={settings}
-            settingsLoading={settingsLoading}
-            saveLoading={settingsSaveLoading}
-            saveSuccess={settingsSaveSuccess}
-            saveError={settingsSaveError}
-            testing={settingsTesting}
-            testResult={settingsTestResult}
-            tutorialResult={settingsTutorialResult}
-            ollamaModels={ollamaModels}
-            ollamaModelsLoading={ollamaModelsLoading}
-            onBackToWorkspace={() => setActiveSection('workspace')}
-            onChangeSettings={updateSettings}
-            onRefreshOllamaModels={refreshOllamaModels}
-            onResetTutorial={resetTutorial}
-            onSaveSettings={saveSettings}
-            onTestApiKey={testApiKey}
-          />
-        ) : (
+      {activeSection === 'settings' ? (
+        <SettingsPage
+          currentUser={currentUser}
+          workspace={activeWorkspace}
+          settings={settings}
+          settingsLoading={settingsLoading}
+          saveLoading={settingsSaveLoading}
+          saveSuccess={settingsSaveSuccess}
+          saveError={settingsSaveError}
+          inviteError={workspaceInviteError}
+          invitesLoading={workspaceInvitesLoading}
+          inviteLoading={workspaceInviteLoading}
+          invites={workspaceInvites}
+          members={workspaceMembers}
+          joinRequests={workspaceJoinRequests}
+          approveLoadingId={approveLoadingId}
+          onBackToWorkspace={() => setActiveSection('workspace')}
+          onOpenDirectory={() => setActiveSection('directory')}
+          onChangeSettings={updateSettings}
+          onSaveSettings={saveSettings}
+          onCreateInvite={handleCreateInvite}
+          onApproveJoinRequest={handleApproveJoinRequest}
+        />
+      ) : (
+        <WorkspaceLayout
+          sidebarProps={sidebarProps}
+          rightPanels={
+            <>
+              {isOllamaOpen ? <LocalAIChat onClose={() => setIsOllamaOpen(false)} /> : null}
+              {isSimulatorOpen ? <AgentSimulator onClose={() => setIsSimulatorOpen(false)} /> : null}
+            </>
+          }
+        >
           <WorkspacePage
             activeTicket={activeTicket}
             activeView={activeView}
@@ -353,7 +433,7 @@ export function AppShellPage() {
             cycles={cycles}
             domains={domains}
             filters={filters}
-            projects={projects}
+            projects={activeWorkspaceProjects}
             tickets={tickets}
             users={users}
             onAddComment={addComment}
@@ -365,31 +445,25 @@ export function AppShellPage() {
             onSetView={setView}
             onUpdateTicket={updateTicket}
           />
-        )}
-      </WorkspaceLayout>
+        </WorkspaceLayout>
+      )}
 
       {isCreateModalOpen ? (
         <CreateTicketModal
           onClose={() => setIsCreateModalOpen(false)}
-          projects={projects}
+          projects={activeWorkspaceProjects}
           domains={domains}
           cycles={cycles}
           users={users}
           parentTicket={parentTicket}
-          defaultProjectId={activeProjectId || projects[0]?.id || ''}
+          defaultProjectId={activeProjectId || activeWorkspaceProjects[0]?.id || ''}
           onSubmitTicket={handleCreateTicketSubmit}
           initialStatus={createInitialStatus}
           parentId={createParentId}
         />
       ) : null}
 
-      {currentUser.tutorial_completed === 0 || currentUser.tutorial_completed === false ? (
-        <OnboardingModal
-          onComplete={() => {
-            setCurrentUser({ ...currentUser, tutorial_completed: 1 });
-          }}
-        />
-      ) : null}
+      {onboarding}
     </>
   );
 }
