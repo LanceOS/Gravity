@@ -1,7 +1,7 @@
-import { and, eq } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import { Router } from 'express';
 import { db } from '../db/index.js';
-import { projectMembers, projects, workspaceMembers, workspaces, workspaceSettings } from '../db/schema.js';
+import { cycles, domains, projectMembers, projects, workspaceMembers, workspaces, workspaceSettings } from '../db/schema.js';
 import {
   addWorkspaceMembersToProject,
   createId,
@@ -10,6 +10,7 @@ import {
   ensureProjectMembership,
   ensureWorkspaceMembership,
   normalizeEntityKey,
+  normalizeIsoDate,
 } from '../lib/platform.js';
 
 function mapProject(project: typeof projects.$inferSelect) {
@@ -20,6 +21,21 @@ function mapProject(project: typeof projects.$inferSelect) {
     key: project.key,
     status: project.status,
     workspaceId: project.workspaceId,
+  };
+}
+
+function mapCycle(cycle: typeof cycles.$inferSelect) {
+  const now = Date.now();
+  const startTime = cycle.startDate.getTime();
+  const endTime = cycle.endDate.getTime();
+
+  return {
+    id: cycle.id,
+    name: cycle.name,
+    startDate: normalizeIsoDate(cycle.startDate),
+    endDate: normalizeIsoDate(cycle.endDate),
+    completed: cycle.completed ? 1 : 0,
+    isActive: !cycle.completed && now >= startTime && now <= endTime,
   };
 }
 
@@ -49,7 +65,47 @@ export function createProjectsRouter() {
         params: [userId ?? null, workspaceId ?? null],
       } as never);
 
-      res.json(result.rows);
+      const projectRows = result.rows as Array<{
+        id: string;
+        name: string;
+        description: string;
+        key: string;
+        status: string;
+        workspaceId: string;
+      }>;
+      const projectIds = projectRows.map((project) => project.id);
+
+      if (projectIds.length === 0) {
+        res.json([]);
+        return;
+      }
+
+      const [domainRows, cycleRows] = await Promise.all([
+        db.select().from(domains).where(inArray(domains.projectId, projectIds)).orderBy(asc(domains.createdAt)),
+        db.select().from(cycles).where(inArray(cycles.projectId, projectIds)).orderBy(asc(cycles.startDate)),
+      ]);
+
+      const domainsByProject = new Map<string, Array<{ id: string; name: string; color: string }>>();
+      for (const domain of domainRows) {
+        const nextDomains = domainsByProject.get(domain.projectId) ?? [];
+        nextDomains.push({ id: domain.id, name: domain.name, color: domain.color });
+        domainsByProject.set(domain.projectId, nextDomains);
+      }
+
+      const cyclesByProject = new Map<string, Array<ReturnType<typeof mapCycle>>>();
+      for (const cycle of cycleRows) {
+        const nextCycles = cyclesByProject.get(cycle.projectId) ?? [];
+        nextCycles.push(mapCycle(cycle));
+        cyclesByProject.set(cycle.projectId, nextCycles);
+      }
+
+      res.json(
+        projectRows.map((project) => ({
+          ...project,
+          domains: domainsByProject.get(project.id) ?? [],
+          cycles: cyclesByProject.get(project.id) ?? [],
+        })),
+      );
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load projects.' });
     }
@@ -112,7 +168,7 @@ export function createProjectsRouter() {
         await tx
           .update(workspaces)
           .set({ defaultProjectId: projectId })
-          .where(and(eq(workspaces.id, targetWorkspaceId!), eq(workspaces.defaultProjectId, null)));
+          .where(and(eq(workspaces.id, targetWorkspaceId!), isNull(workspaces.defaultProjectId)));
       });
 
       await ensureWorkspaceMembership(targetWorkspaceId!, ownerId, 'owner');

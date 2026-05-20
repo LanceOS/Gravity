@@ -15,7 +15,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
 
   const handleSkip = async () => {
     try {
-      const res = await fetch(`/api/users/${currentUser?.id}/tutorial`, {
+      const res = await fetch(`/api/v1/users/${currentUser?.id}/tutorial`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ completed: true })

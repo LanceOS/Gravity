@@ -61,7 +61,7 @@ export function useAccountSettings({
     let cancelled = false;
     setSettingsLoading(true);
 
-    fetch(`/api/settings/${currentUser.id}`)
+    fetch(`/api/v1/settings/${currentUser.id}`)
       .then(async (response) => {
         const data = await response.json();
         if (!response.ok) {
@@ -99,16 +99,19 @@ export function useAccountSettings({
 
     setOllamaModelsLoading(true);
     try {
-      const response = await fetch(`/api/ollama/models?ollamaUrl=${encodeURIComponent(ollamaUrl)}`);
+      const response = await fetch(`/api/v1/ai/ollama/models?ollamaUrl=${encodeURIComponent(ollamaUrl)}`);
       const data = await response.json();
 
       if (!response.ok) {
         throw new Error(data.error || 'Failed to detect Ollama models.');
       }
 
-      const nextModels = Array.isArray(data.models)
-        ? data.models.filter((model: unknown): model is string => typeof model === 'string' && model.length > 0)
-        : [];
+      const rawModels = Array.isArray(data)
+        ? data
+        : Array.isArray(data.models)
+          ? data.models
+          : [];
+      const nextModels = rawModels.filter((model: unknown): model is string => typeof model === 'string' && model.length > 0);
 
       setOllamaModels(nextModels);
       setSettings((current) => {
@@ -162,7 +165,7 @@ export function useAccountSettings({
         ollamaModel: ollamaModels.length > 0 ? settings.ollamaModel : '',
       };
 
-      const response = await fetch(`/api/settings/${currentUser.id}`, {
+      const response = await fetch(`/api/v1/settings/${currentUser.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -197,10 +200,10 @@ export function useAccountSettings({
     setTestResult(null);
 
     try {
-      const response = await fetch('/api/ai/test-key', {
+      const response = await fetch('/api/v1/ai/test-connection', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider: settings.aiProvider, apiKey: settings.apiKey.trim() }),
+        body: JSON.stringify({ provider: settings.aiProvider, api_key: settings.apiKey.trim() }),
       });
       const data = await response.json();
 
@@ -208,7 +211,7 @@ export function useAccountSettings({
         throw new Error(data.error || 'Connection test failed.');
       }
 
-      setTestResult({ success: true, message: data.message });
+      setTestResult({ success: Boolean(data.connected ?? true), message: data.message || 'Connection verified successfully.' });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Connection test failed.';
       setTestResult({ success: false, message });
@@ -225,7 +228,7 @@ export function useAccountSettings({
     setTutorialResult(null);
 
     try {
-      const response = await fetch(`/api/users/${currentUser.id}/tutorial`, {
+      const response = await fetch(`/api/v1/users/${currentUser.id}/tutorial`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ completed: false }),

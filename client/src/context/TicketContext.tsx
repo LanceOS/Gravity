@@ -67,6 +67,12 @@ export interface Comment {
   createdAt: string;
   userName?: string;
   userAvatar?: string;
+  author?: {
+    id: string;
+    username: string;
+    avatar_url?: string;
+    role?: string;
+  };
 }
 
 interface State {
@@ -114,6 +120,7 @@ type Action =
   | { type: 'TOGGLE_THEME' }
   | { type: 'SET_THEME_RAW'; payload: 'dark' | 'light' }
   | { type: 'ADD_COMMENT'; payload: Comment }
+  | { type: 'REPLACE_COMMENT'; payload: { optimisticId: string; comment: Comment } }
   | { type: 'OPTIMISTIC_TICKET_UPDATE'; payload: { id: string; updates: Partial<Ticket> } };
 
 const initialFilters = {
@@ -142,7 +149,8 @@ const initialState: State = {
 };
 
 // API Base URL
-const API_URL = '';
+const API_URL = '/api/v1';
+const AUTH_API_URL = '/api/auth';
 
 function ticketReducer(state: State, action: Action): State {
   switch (action.type) {
@@ -187,6 +195,22 @@ function ticketReducer(state: State, action: Action): State {
       return { ...state, theme: action.payload };
     case 'ADD_COMMENT':
       return { ...state, comments: [...state.comments, action.payload] };
+    case 'REPLACE_COMMENT': {
+      let replaced = false;
+      const nextComments = state.comments.map((comment) => {
+        if (comment.id === action.payload.optimisticId) {
+          replaced = true;
+          return action.payload.comment;
+        }
+
+        return comment;
+      });
+
+      return {
+        ...state,
+        comments: replaced ? nextComments : [...nextComments, action.payload.comment],
+      };
+    }
     case 'OPTIMISTIC_TICKET_UPDATE': {
       const updatedTickets = state.tickets.map(ticket => {
         if (ticket.id === action.payload.id) {
@@ -259,8 +283,8 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     dispatch({ type: 'SET_LOADING', payload: true });
     try {
       const [projectsRes, usersRes] = await Promise.all([
-        fetch(`${API_URL}/api/projects?userId=${encodeURIComponent(userId)}`),
-        fetch(`${API_URL}/api/users`),
+        fetch(`${API_URL}/projects?userId=${encodeURIComponent(userId)}`),
+        fetch(`${API_URL}/users`),
       ]);
 
       const projects = await projectsRes.json();
@@ -282,9 +306,9 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (!projId) return;
     try {
       const [ticketsRes, domainsRes, cyclesRes] = await Promise.all([
-        fetch(`${API_URL}/api/tickets`, { headers: { 'X-Project-Id': projId } }),
-        fetch(`${API_URL}/api/domains`, { headers: { 'X-Project-Id': projId } }),
-        fetch(`${API_URL}/api/cycles`, { headers: { 'X-Project-Id': projId } }),
+        fetch(`${API_URL}/tickets`, { headers: { 'X-Project-Id': projId } }),
+        fetch(`${API_URL}/domains`, { headers: { 'X-Project-Id': projId } }),
+        fetch(`${API_URL}/cycles`, { headers: { 'X-Project-Id': projId } }),
       ]);
 
       const tickets = await ticketsRes.json();
@@ -337,7 +361,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Sync user settings (default view and theme) when user logs in
   useEffect(() => {
     if (state.currentUser) {
-      fetch(`${API_URL}/api/settings/${state.currentUser.id}`)
+      fetch(`${API_URL}/settings/${state.currentUser.id}`)
         .then(res => res.json())
         .then(data => {
           if (data) {
@@ -355,7 +379,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // 2. SSE subscription for real-time live synchronization
   useEffect(() => {
-    const eventSource = new EventSource(`${API_URL}/api/events/subscribe`);
+    const eventSource = new EventSource(`${API_URL}/events/subscribe`);
 
     eventSource.onmessage = (event) => {
       try {
@@ -371,7 +395,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             dispatch({ type: 'SET_COMMENTS_RAW', payload: message.data.comments });
           }
         } else if (message.type === 'users-updated') {
-          fetch(`${API_URL}/api/users`)
+          fetch(`${API_URL}/users`)
             .then(res => res.json())
             .then(users => {
               dispatch({
@@ -399,7 +423,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // 3. Create Ticket with project header
   const createTicket = useCallback(async (ticketInput: any) => {
     try {
-      const response = await fetch(`${API_URL}/api/tickets`, {
+      const response = await fetch(`${API_URL}/tickets`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -413,7 +437,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       
       // Update local state if the ticket belongs to the current active project
       if (ticketInput.projectId === activeProjectId) {
-        const listRes = await fetch(`${API_URL}/api/tickets`, { headers: { 'X-Project-Id': activeProjectId } });
+        const listRes = await fetch(`${API_URL}/tickets`, { headers: { 'X-Project-Id': activeProjectId } });
         const allTickets = await listRes.json();
         dispatch({ type: 'SET_TICKETS_RAW', payload: allTickets });
       }
@@ -431,7 +455,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     dispatch({ type: 'OPTIMISTIC_TICKET_UPDATE', payload: { id, updates } });
 
     try {
-      const response = await fetch(`${API_URL}/api/tickets/${id}`, {
+      const response = await fetch(`${API_URL}/tickets/${id}`, {
         method: 'PATCH',
         headers: { 
           'Content-Type': 'application/json',
@@ -443,7 +467,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (!response.ok) throw new Error('Failed to update ticket');
     } catch (e) {
       console.error('Error updating ticket on server, rolling back:', e);
-      const response = await fetch(`${API_URL}/api/tickets`, { headers: { 'X-Project-Id': activeProjectId } });
+      const response = await fetch(`${API_URL}/tickets`, { headers: { 'X-Project-Id': activeProjectId } });
       const freshTickets = await response.json();
       dispatch({ type: 'SET_TICKETS_RAW', payload: freshTickets });
     }
@@ -459,7 +483,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     try {
-      const response = await fetch(`${API_URL}/api/tickets/${id}`, {
+      const response = await fetch(`${API_URL}/tickets/${id}`, {
         method: 'DELETE',
         headers: { 'X-Project-Id': activeProjectId }
       });
@@ -474,7 +498,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const fetchCommentsForTicket = useCallback(async (ticketId: string) => {
     if (!activeProjectId) return;
     try {
-      const response = await fetch(`${API_URL}/api/tickets/${ticketId}/comments`, {
+      const response = await fetch(`${API_URL}/tickets/${ticketId}/comments`, {
         headers: { 'X-Project-Id': activeProjectId }
       });
       if (response.ok) {
@@ -498,20 +522,27 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // 7. Add Comment with project header
   const addComment = useCallback(async (ticketId: string, body: string) => {
     if (!state.currentUser || !activeProjectId) return;
-    
+
+    const optimisticId = `co-opt-${Date.now()}`;
     const optimisticComment: Comment = {
-      id: `co-opt-${Date.now()}`,
+      id: optimisticId,
       ticketId,
       userId: state.currentUser.id,
       body,
       createdAt: new Date().toISOString(),
       userName: state.currentUser.name,
       userAvatar: state.currentUser.avatar,
+      author: {
+        id: state.currentUser.id,
+        username: state.currentUser.name,
+        avatar_url: state.currentUser.avatar,
+        role: state.currentUser.role,
+      },
     };
     dispatch({ type: 'ADD_COMMENT', payload: optimisticComment });
 
     try {
-      const response = await fetch(`${API_URL}/api/tickets/${ticketId}/comments`, {
+      const response = await fetch(`${API_URL}/tickets/${ticketId}/comments`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -520,8 +551,9 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         body: JSON.stringify({ userId: state.currentUser.id, body }),
       });
       if (!response.ok) throw new Error('Failed to post comment');
-      
-      fetchCommentsForTicket(ticketId);
+
+      const savedComment = (await response.json()) as Comment;
+      dispatch({ type: 'REPLACE_COMMENT', payload: { optimisticId, comment: savedComment } });
     } catch (e) {
       console.error('Error posting comment, rolling back:', e);
       fetchCommentsForTicket(ticketId);
@@ -534,7 +566,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     try {
-      const response = await fetch(`${API_URL}/api/projects`, {
+      const response = await fetch(`${API_URL}/projects`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -565,7 +597,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     try {
-      const response = await fetch(`${API_URL}/api/projects/invite/accept`, {
+      const response = await fetch(`${API_URL}/projects/invite/accept`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ inviteCode, userId: state.currentUser.id }),
@@ -589,7 +621,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // 8. Authentication Actions (Better-Auth inspired credentials flows)
   const signIn = useCallback(async (email: string, password?: string) => {
     try {
-      const response = await fetch(`${API_URL}/api/auth/sign-in`, {
+      const response = await fetch(`${AUTH_API_URL}/sign-in`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -611,7 +643,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const signUp = useCallback(async (name: string, email: string, password?: string) => {
     try {
-      const response = await fetch(`${API_URL}/api/auth/sign-up`, {
+      const response = await fetch(`${AUTH_API_URL}/sign-up`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email, password }),

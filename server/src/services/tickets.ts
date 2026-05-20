@@ -78,7 +78,8 @@ export async function listComments(ticketId: string) {
           c.body,
           c.created_at AS "createdAt",
           u.name AS "userName",
-          COALESCE(up.avatar_url, u.image, '') AS "userAvatar"
+          COALESCE(up.avatar_url, u.image, '') AS "userAvatar",
+          COALESCE(up.role, 'guest_contributor') AS "authorRole"
         FROM comments c
         JOIN "user" u ON u.id = c.user_id
         LEFT JOIN user_profiles up ON up.user_id = u.id
@@ -97,6 +98,12 @@ export async function listComments(ticketId: string) {
     createdAt: normalizeIsoDate(row.createdAt),
     userName: String(row.userName ?? ''),
     userAvatar: String(row.userAvatar ?? ''),
+    author: {
+      id: String(row.userId),
+      username: String(row.userName ?? ''),
+      avatar_url: String(row.userAvatar ?? ''),
+      role: String(row.authorRole ?? 'guest_contributor'),
+    },
   }));
 }
 

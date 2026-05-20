@@ -28,12 +28,18 @@ export async function initializeDatabase() {
 
     CREATE TABLE IF NOT EXISTS validations (
       id TEXT PRIMARY KEY,
+      workspace_id TEXT,
+      issued_by_user_id TEXT,
       email TEXT NOT NULL,
       invite_url TEXT NOT NULL,
       validation_code TEXT NOT NULL,
       workspace_private_key TEXT NOT NULL,
+      guest_user_id TEXT,
+      guest_username TEXT,
+      guest_password_hash TEXT,
       is_used BOOLEAN NOT NULL DEFAULT FALSE,
       expires_at TIMESTAMPTZ NOT NULL,
+      used_at TIMESTAMPTZ,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
@@ -169,6 +175,15 @@ export async function initializeDatabase() {
       body TEXT NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+  `);
+
+  await pool.query(`
+    ALTER TABLE validations ADD COLUMN IF NOT EXISTS workspace_id TEXT;
+    ALTER TABLE validations ADD COLUMN IF NOT EXISTS issued_by_user_id TEXT;
+    ALTER TABLE validations ADD COLUMN IF NOT EXISTS guest_user_id TEXT;
+    ALTER TABLE validations ADD COLUMN IF NOT EXISTS guest_username TEXT;
+    ALTER TABLE validations ADD COLUMN IF NOT EXISTS guest_password_hash TEXT;
+    ALTER TABLE validations ADD COLUMN IF NOT EXISTS used_at TIMESTAMPTZ;
   `);
 
   const { runMigrations } = await getMigrations(auth.options);

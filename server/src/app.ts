@@ -27,7 +27,7 @@ export function createApp() {
   app.all('/api/auth/*splat', toNodeHandler(auth));
 
   app.use(express.json({ limit: '1mb' }));
-  app.use('/api', createApiRouter());
+  app.use('/api/v1', createApiRouter());
 
   app.use((_req, res) => {
     res.status(404).json({ error: 'Not found' });

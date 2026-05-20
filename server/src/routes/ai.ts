@@ -83,24 +83,39 @@ async function testProviderApiKey(provider: string, apiKey: string) {
   }
 }
 
+async function fetchOllamaModels(rawUrl?: string) {
+  const ollamaUrl = normalizeOllamaUrl(rawUrl || 'http://host.docker.internal:11434');
+
+  try {
+    const response = await fetchWithTimeout(`${ollamaUrl}/api/tags`, { method: 'GET' }, 5000);
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response, 'Failed to query Ollama models.'));
+    }
+
+    const data = (await response.json()) as { models?: Array<{ name?: string }> };
+    return (data.models ?? []).map((model) => model.name).filter((name): name is string => Boolean(name));
+  } catch {
+    return [];
+  }
+}
+
+async function measureProviderConnection(provider: string, apiKey: string) {
+  const startedAt = Date.now();
+  await testProviderApiKey(provider, apiKey);
+  return Date.now() - startedAt;
+}
+
 export function createAiRouter() {
   const router = Router();
 
   router.get('/ollama/models', async (req, res) => {
-    const rawUrl = typeof req.query.ollamaUrl === 'string' ? req.query.ollamaUrl : 'http://host.docker.internal:11434';
-    const ollamaUrl = normalizeOllamaUrl(rawUrl);
+    const rawUrl = typeof req.query.ollamaUrl === 'string' ? req.query.ollamaUrl : undefined;
+    res.json(await fetchOllamaModels(rawUrl));
+  });
 
-    try {
-      const response = await fetchWithTimeout(`${ollamaUrl}/api/tags`, { method: 'GET' }, 5000);
-      if (!response.ok) {
-        throw new Error(await readErrorMessage(response, 'Failed to query Ollama models.'));
-      }
-
-      const data = (await response.json()) as { models?: Array<{ name?: string }> };
-      res.json((data.models ?? []).map((model) => model.name).filter(Boolean));
-    } catch {
-      res.json([]);
-    }
+  router.get('/ai/ollama/models', async (req, res) => {
+    const rawUrl = typeof req.query.ollamaUrl === 'string' ? req.query.ollamaUrl : undefined;
+    res.json(await fetchOllamaModels(rawUrl));
   });
 
   router.post('/ai/test-key', async (req, res) => {
@@ -116,6 +131,36 @@ export function createAiRouter() {
       res.json({ message: `${provider} API key validated successfully.` });
     } catch (error) {
       res.status(400).json({ error: error instanceof Error ? error.message : 'Connection test failed.' });
+    }
+  });
+
+  router.post('/ai/test-connection', async (req, res) => {
+    const provider = typeof req.body?.provider === 'string' ? req.body.provider : 'openai';
+    const apiKey =
+      typeof req.body?.api_key === 'string'
+        ? req.body.api_key.trim()
+        : typeof req.body?.apiKey === 'string'
+          ? req.body.apiKey.trim()
+          : '';
+
+    if (!apiKey) {
+      res.status(400).json({ error: 'API key is required.' });
+      return;
+    }
+
+    try {
+      const latencyMs = await measureProviderConnection(provider, apiKey);
+      res.json({
+        connected: true,
+        latency_ms: latencyMs,
+        message: 'Connection verified successfully.',
+      });
+    } catch (error) {
+      res.status(400).json({
+        connected: false,
+        latency_ms: null,
+        error: error instanceof Error ? error.message : 'Connection test failed.',
+      });
     }
   });
 

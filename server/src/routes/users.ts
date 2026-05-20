@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm';
 import { Router } from 'express';
 import { db } from '../db/index.js';
 import { userSettings } from '../db/schema.js';

@@ -1,8 +1,11 @@
+import { randomUUID } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
 import { Router } from 'express';
 import { db } from '../db/index.js';
 import {
+  authUsers,
   projects,
+  validations,
   workspaceInvites,
   workspaceJoinRequests,
   workspaceMembers,
@@ -16,6 +19,7 @@ import {
   createWorkspaceAccessKey,
   createWorkspaceInviteCode,
   ensureProjectMembership,
+  ensureUserDefaults,
   ensureWorkspaceMembership,
   ensureWorkspaceSettingsRecord,
   getUserById,
@@ -23,6 +27,15 @@ import {
   listWorkspaceSummaries,
   normalizeEntityKey,
 } from '../lib/platform.js';
+import { resolveRequestActorUserId } from '../lib/request-auth.js';
+
+function createValidationCode() {
+  return `GRAV-${Math.floor(1000 + Math.random() * 9000)}-${randomUUID().slice(0, 1).toUpperCase()}`;
+}
+
+function createWorkspacePrivateKey() {
+  return `sec_wsp_${randomUUID().replace(/-/g, '')}`;
+}
 
 export function createWorkspacesRouter() {
   const router = Router();
@@ -317,6 +330,178 @@ export function createWorkspacesRouter() {
       });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create workspace invite.' });
+    }
+  });
+
+  router.post('/workspaces/invites', async (req, res) => {
+    const workspaceId =
+      typeof req.body?.workspace_id === 'string'
+        ? req.body.workspace_id
+        : typeof req.body?.workspaceId === 'string'
+          ? req.body.workspaceId
+          : '';
+    const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    const expirationHoursRaw = Number(req.body?.expiration_hours ?? req.body?.expirationHours ?? 24);
+    const expirationHours = Number.isFinite(expirationHoursRaw) && expirationHoursRaw > 0 ? expirationHoursRaw : 24;
+
+    if (!workspaceId || !email) {
+      res.status(400).json({ error: 'workspace_id and email are required.' });
+      return;
+    }
+
+    const actorUserId = await resolveRequestActorUserId(req);
+    if (!actorUserId) {
+      res.status(401).json({ error: 'Unauthorized.' });
+      return;
+    }
+
+    try {
+      const workspaceRows = await db.select().from(workspaces).where(eq(workspaces.id, workspaceId)).limit(1);
+      const workspace = workspaceRows[0];
+      if (!workspace) {
+        res.status(404).json({ error: 'Workspace not found.' });
+        return;
+      }
+
+      const membershipRows = await db
+        .select()
+        .from(workspaceMembers)
+        .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, actorUserId)))
+        .limit(1);
+      const membership = membershipRows[0];
+      if (!membership || !['owner', 'admin'].includes(membership.role)) {
+        res.status(403).json({ error: 'Owner or admin access is required.' });
+        return;
+      }
+
+      const baseUrl = workspace.hostUrl?.trim() || `${req.protocol}://${req.get('host') ?? 'localhost'}`;
+      const inviteUrl = new URL('/api/v1/workspaces/validate', baseUrl).toString();
+      const validation = {
+        id: createId('val'),
+        workspaceId,
+        issuedByUserId: actorUserId,
+        email,
+        inviteUrl,
+        validationCode: createValidationCode(),
+        workspacePrivateKey: createWorkspacePrivateKey(),
+        guestUserId: null,
+        guestUsername: null,
+        guestPasswordHash: null,
+        isUsed: false,
+        expiresAt: new Date(Date.now() + expirationHours * 60 * 60 * 1000),
+        usedAt: null,
+        createdAt: new Date(),
+      };
+
+      await db.insert(validations).values(validation);
+
+      res.status(201).json({
+        invite_url: inviteUrl,
+        validation_code: validation.validationCode,
+        expires_at: validation.expiresAt.toISOString(),
+      });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create peer invite.' });
+    }
+  });
+
+  router.post('/workspaces/validate', async (req, res) => {
+    const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    const validationCode = typeof req.body?.validation_code === 'string' ? req.body.validation_code.trim() : '';
+    const inviteUrl = typeof req.body?.invite_url === 'string' ? req.body.invite_url.trim() : '';
+    const username = typeof req.body?.username === 'string' ? req.body.username.trim() : '';
+    const passwordHash = typeof req.body?.password_hash === 'string' ? req.body.password_hash.trim() : '';
+
+    if (!email || !validationCode || !inviteUrl || !username || !passwordHash) {
+      res.status(400).json({ error: 'email, validation_code, invite_url, username, and password_hash are required.' });
+      return;
+    }
+
+    try {
+      const validationRows = await db
+        .select()
+        .from(validations)
+        .where(
+          and(
+            eq(validations.email, email),
+            eq(validations.validationCode, validationCode),
+            eq(validations.inviteUrl, inviteUrl),
+          ),
+        )
+        .limit(1);
+      const validation = validationRows[0];
+
+      if (!validation || !validation.workspaceId) {
+        res.status(401).json({ error: 'Invalid validation request.' });
+        return;
+      }
+
+      if (validation.isUsed || (validation.usedAt && new Date(validation.usedAt).getTime() <= Date.now())) {
+        res.status(400).json({ error: 'This validation has already been used.' });
+        return;
+      }
+
+      if (new Date(validation.expiresAt).getTime() < Date.now()) {
+        res.status(400).json({ error: 'This validation has expired.' });
+        return;
+      }
+
+      const existingUsers = await db.select().from(authUsers).where(eq(authUsers.email, email)).limit(1);
+      const existingUser = existingUsers[0];
+      const guestUserId = existingUser?.id ?? createId('u');
+
+      if (existingUser) {
+        await db
+          .update(authUsers)
+          .set({
+            name: username,
+            updatedAt: new Date(),
+          })
+          .where(eq(authUsers.id, guestUserId));
+      } else {
+        await db.insert(authUsers).values({
+          id: guestUserId,
+          name: username,
+          email,
+          emailVerified: false,
+          image: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+      }
+
+      await ensureUserDefaults(guestUserId);
+      await ensureWorkspaceMembership(validation.workspaceId, guestUserId, 'member');
+      await addUserToWorkspaceProjects(validation.workspaceId, guestUserId);
+
+      await db
+        .update(validations)
+        .set({
+          guestUserId,
+          guestUsername: username,
+          guestPasswordHash: passwordHash,
+          isUsed: true,
+          usedAt: new Date(),
+        })
+        .where(eq(validations.id, validation.id));
+
+      const guestProfile = await getUserById(guestUserId);
+      if (!guestProfile) {
+        res.status(500).json({ error: 'Failed to provision guest profile.' });
+        return;
+      }
+
+      res.json({
+        authorized: true,
+        workspace_private_key: validation.workspacePrivateKey,
+        guest_profile: {
+          id: guestProfile.id,
+          username: guestProfile.name,
+          role: guestProfile.role,
+        },
+      });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to validate workspace invite.' });
     }
   });
 

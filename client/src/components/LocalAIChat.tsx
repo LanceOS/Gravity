@@ -76,7 +76,7 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose }) => {
     setIsGenerating(true);
 
     try {
-      const response = await fetch('/api/ai/chat', {
+      const response = await fetch('/api/v1/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

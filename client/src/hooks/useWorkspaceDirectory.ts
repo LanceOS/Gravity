@@ -47,7 +47,7 @@ export function useWorkspaceDirectory({ currentUser }: UseWorkspaceDirectoryOpti
     setError(null);
 
     try {
-      const response = await fetch(`/api/workspaces?userId=${encodeURIComponent(currentUser.id)}`);
+      const response = await fetch(`/api/v1/workspaces?userId=${encodeURIComponent(currentUser.id)}`);
       const data = await response.json();
 
       if (!response.ok) {
@@ -89,7 +89,7 @@ export function useWorkspaceDirectory({ currentUser }: UseWorkspaceDirectoryOpti
     setSuccessMessage(null);
 
     try {
-      const response = await fetch('/api/workspaces', {
+      const response = await fetch('/api/v1/workspaces', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -125,7 +125,7 @@ export function useWorkspaceDirectory({ currentUser }: UseWorkspaceDirectoryOpti
     setSuccessMessage(null);
 
     try {
-      const response = await fetch(`/api/workspaces/invites/${encodeURIComponent(inviteCode)}/join-requests`, {
+      const response = await fetch(`/api/v1/workspaces/invites/${encodeURIComponent(inviteCode)}/join-requests`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

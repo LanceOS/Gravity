@@ -342,7 +342,7 @@ export function AppShellPage() {
     setProjectManageError(null);
 
     try {
-      const response = await fetch(`/api/projects/${projectId}`, {
+      const response = await fetch(`/api/v1/projects/${projectId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates),
@@ -373,7 +373,7 @@ export function AppShellPage() {
     setProjectManageError(null);
 
     try {
-      const response = await fetch(`/api/workspaces/${activeWorkspaceId}/settings`, {
+      const response = await fetch(`/api/v1/workspaces/${activeWorkspaceId}/settings`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ defaultProjectId: projectId }),

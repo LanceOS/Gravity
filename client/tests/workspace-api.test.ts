@@ -9,6 +9,28 @@ const testDataDir = path.join(__dirname, 'workspace_test_data');
 const PORT = 5002;
 const BASE_URL = `http://localhost:${PORT}`;
 
+const nativeFetch = globalThis.fetch.bind(globalThis);
+
+function rewriteApiUrl(url: string) {
+  if (!url.startsWith(`${BASE_URL}/api/`) || url.startsWith(`${BASE_URL}/api/auth/`)) {
+    return url;
+  }
+
+  return url.replace(`${BASE_URL}/api/`, `${BASE_URL}/api/v1/`);
+}
+
+globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+  if (typeof input === 'string') {
+    return nativeFetch(rewriteApiUrl(input), init);
+  }
+
+  if (input instanceof URL) {
+    return nativeFetch(new URL(rewriteApiUrl(input.toString())), init);
+  }
+
+  return nativeFetch(input, init);
+}) as typeof fetch;
+
 let serverProcess: ChildProcess | null = null;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -39,7 +61,7 @@ function cleanupSandbox() {
 
 async function startServer() {
   serverProcess = spawn('npx', ['tsx', 'server/index.ts'], {
-    cwd: path.join(__dirname, '..'),
+    cwd: path.join(__dirname, '..', '..'),
     env: {
       ...process.env,
       PORT: PORT.toString(),

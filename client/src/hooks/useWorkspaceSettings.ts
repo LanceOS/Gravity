@@ -89,10 +89,10 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
 
     try {
       const [settingsResponse, membersResponse, invitesResponse, joinRequestsResponse] = await Promise.all([
-        fetch(`/api/workspaces/${activeWorkspaceId}/settings`),
-        fetch(`/api/workspaces/${activeWorkspaceId}/members`),
-        fetch(`/api/workspaces/${activeWorkspaceId}/invites`),
-        fetch(`/api/workspaces/${activeWorkspaceId}/join-requests`),
+        fetch(`/api/v1/workspaces/${activeWorkspaceId}/settings`),
+        fetch(`/api/v1/workspaces/${activeWorkspaceId}/members`),
+        fetch(`/api/v1/workspaces/${activeWorkspaceId}/invites`),
+        fetch(`/api/v1/workspaces/${activeWorkspaceId}/join-requests`),
       ]);
 
       const [settingsData, membersData, invitesData, joinRequestsData] = await Promise.all([
@@ -169,7 +169,7 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
     setSaveSuccess(false);
 
     try {
-      const response = await fetch(`/api/workspaces/${activeWorkspaceId}/settings`, {
+      const response = await fetch(`/api/v1/workspaces/${activeWorkspaceId}/settings`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -209,7 +209,7 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
     setInviteError(null);
 
     try {
-      const response = await fetch(`/api/workspaces/${activeWorkspaceId}/invites`, {
+      const response = await fetch(`/api/v1/workspaces/${activeWorkspaceId}/invites`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -243,7 +243,7 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
     setInviteError(null);
 
     try {
-      const response = await fetch(`/api/workspaces/${activeWorkspaceId}/join-requests/${requestId}/approve`, {
+      const response = await fetch(`/api/v1/workspaces/${activeWorkspaceId}/join-requests/${requestId}/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reviewerUserId: currentUser.id }),

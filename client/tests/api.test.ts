@@ -9,6 +9,28 @@ const testDataDir = path.join(__dirname, 'test_data');
 const PORT = 5001;
 const BASE_URL = `http://localhost:${PORT}`;
 
+const nativeFetch = globalThis.fetch.bind(globalThis);
+
+function rewriteApiUrl(url: string) {
+  if (!url.startsWith(`${BASE_URL}/api/`) || url.startsWith(`${BASE_URL}/api/auth/`)) {
+    return url;
+  }
+
+  return url.replace(`${BASE_URL}/api/`, `${BASE_URL}/api/v1/`);
+}
+
+globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+  if (typeof input === 'string') {
+    return nativeFetch(rewriteApiUrl(input), init);
+  }
+
+  if (input instanceof URL) {
+    return nativeFetch(new URL(rewriteApiUrl(input.toString())), init);
+  }
+
+  return nativeFetch(input, init);
+}) as typeof fetch;
+
 // Visual Terminal Coloring Constants
 const RESET = '\x1b[0m';
 const GREEN = '\x1b[32m';
@@ -50,6 +72,7 @@ async function startServer(): Promise<void> {
   console.log(`${CYAN}Starting Gravity server on port ${PORT} with DB_DIR=${testDataDir}...${RESET}`);
   
   serverProcess = spawn('npx', ['tsx', 'server/index.ts'], {
+    cwd: path.join(__dirname, '..', '..'),
     env: {
       ...process.env,
       PORT: PORT.toString(),

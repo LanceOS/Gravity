@@ -33,12 +33,18 @@ export const userSettings = pgTable('user_settings', {
 
 export const validations = pgTable('validations', {
   id: text('id').primaryKey(),
+  workspaceId: text('workspace_id'),
+  issuedByUserId: text('issued_by_user_id'),
   email: text('email').notNull(),
   inviteUrl: text('invite_url').notNull(),
   validationCode: text('validation_code').notNull(),
   workspacePrivateKey: text('workspace_private_key').notNull(),
+  guestUserId: text('guest_user_id'),
+  guestUsername: text('guest_username'),
+  guestPasswordHash: text('guest_password_hash'),
   isUsed: boolean('is_used').notNull().default(false),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  usedAt: timestamp('used_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

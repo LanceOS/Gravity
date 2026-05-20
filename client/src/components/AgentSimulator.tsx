@@ -16,7 +16,7 @@ export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
   const [prompt, setPrompt] = useState('Create a backend ticket for setup auth, assign to bob, and add comment "Lance is waiting"');
   const [logs, setLogs] = useState<LogEntry[]>([
     { type: 'info', text: '🤖 Gravity MCP Agent Session Initialized.' },
-    { type: 'info', text: 'This simulator makes real JSON-RPC calls to the backend MCP tools (/api/mcp/sse) to show how an external IDE Agent (e.g. VSCode Copilot) modifies Gravity.' }
+    { type: 'info', text: 'This simulator makes real JSON-RPC calls to the backend MCP tools (/api/v1/mcp/sse) to show how an external IDE Agent (e.g. VSCode Copilot) modifies Gravity.' }
   ]);
   const [isRunning, setIsRunning] = useState(false);
   const terminalEndRef = useRef<HTMLDivElement>(null);
@@ -36,7 +36,7 @@ export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
     await new Promise(r => setTimeout(r, 1200));
 
     try {
-      const response = await fetch('/api/mcp/sse', {
+      const response = await fetch('/api/v1/mcp/sse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
