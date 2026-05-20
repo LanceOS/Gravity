@@ -108,6 +108,13 @@ async function measureProviderConnection(provider: string, apiKey: string) {
 export function createAiRouter() {
   const router = Router();
 
+  function normalizeOllamaErrorMessage(error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to contact Ollama.';
+    return /fetch failed|network|econnrefused|enotfound|aborted/i.test(message)
+      ? 'Could not connect to Ollama.'
+      : message;
+  }
+
   router.get('/ollama/models', async (req, res) => {
     const rawUrl = typeof req.query.ollamaUrl === 'string' ? req.query.ollamaUrl : undefined;
     res.json(await fetchOllamaModels(rawUrl));
@@ -191,7 +198,7 @@ export function createAiRouter() {
 
       res.json(await response.json());
     } catch (error) {
-      res.status(502).json({ error: error instanceof Error ? error.message : 'Failed to contact Ollama.' });
+      res.status(502).json({ error: normalizeOllamaErrorMessage(error) });
     }
   });
 

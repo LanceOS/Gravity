@@ -49,25 +49,7 @@ export function createProjectsRouter() {
       const userId = workspaceAccess?.userId ?? (typeof req.query.userId === 'string' ? req.query.userId : undefined);
       const workspaceId = workspaceAccess?.workspaceId ?? (typeof req.query.workspaceId === 'string' ? req.query.workspaceId : undefined);
 
-      const result = await db.execute({
-        sql: `
-          SELECT DISTINCT
-            p.id,
-            p.name,
-            p.description,
-            p.key,
-            p.status,
-            p.workspace_id AS "workspaceId"
-          FROM projects p
-          LEFT JOIN project_members pm ON pm.project_id = p.id
-          WHERE ($1::text IS NULL OR pm.user_id = $1)
-            AND ($2::text IS NULL OR p.workspace_id = $2)
-          ORDER BY p.created_at ASC
-        `,
-        params: [userId ?? null, workspaceId ?? null],
-      } as never);
-
-      const projectRows = result.rows as Array<{
+      let projectRows: Array<{
         id: string;
         name: string;
         description: string;
@@ -75,6 +57,61 @@ export function createProjectsRouter() {
         status: string;
         workspaceId: string;
       }>;
+
+      if (userId && workspaceId) {
+        projectRows = await db
+          .select({
+            id: projects.id,
+            name: projects.name,
+            description: projects.description,
+            key: projects.key,
+            status: projects.status,
+            workspaceId: projects.workspaceId,
+          })
+          .from(projects)
+          .innerJoin(projectMembers, and(eq(projectMembers.projectId, projects.id), eq(projectMembers.userId, userId)))
+          .where(eq(projects.workspaceId, workspaceId))
+          .orderBy(asc(projects.createdAt));
+      } else if (userId) {
+        projectRows = await db
+          .select({
+            id: projects.id,
+            name: projects.name,
+            description: projects.description,
+            key: projects.key,
+            status: projects.status,
+            workspaceId: projects.workspaceId,
+          })
+          .from(projects)
+          .innerJoin(projectMembers, and(eq(projectMembers.projectId, projects.id), eq(projectMembers.userId, userId)))
+          .orderBy(asc(projects.createdAt));
+      } else if (workspaceId) {
+        projectRows = await db
+          .select({
+            id: projects.id,
+            name: projects.name,
+            description: projects.description,
+            key: projects.key,
+            status: projects.status,
+            workspaceId: projects.workspaceId,
+          })
+          .from(projects)
+          .where(eq(projects.workspaceId, workspaceId))
+          .orderBy(asc(projects.createdAt));
+      } else {
+        projectRows = await db
+          .select({
+            id: projects.id,
+            name: projects.name,
+            description: projects.description,
+            key: projects.key,
+            status: projects.status,
+            workspaceId: projects.workspaceId,
+          })
+          .from(projects)
+          .orderBy(asc(projects.createdAt));
+      }
+
       const projectIds = projectRows.map((project) => project.id);
 
       if (projectIds.length === 0) {
@@ -178,7 +215,10 @@ export function createProjectsRouter() {
       await addWorkspaceMembersToProject(targetWorkspaceId!, projectId);
 
       const rows = await db.select().from(projects).where(eq(projects.id, projectId)).limit(1);
-      res.status(201).json(mapProject(rows[0]));
+      res.status(201).json({
+        ...mapProject(rows[0]),
+        inviteCode: rows[0].inviteCode,
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create project.';
       res.status(/duplicate|unique/i.test(message) ? 400 : 500).json({ error: message });

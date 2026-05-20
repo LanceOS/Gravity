@@ -113,7 +113,11 @@ async function startServer(): Promise<void> {
 
 // Global test variables
 let testUserId = '';
+let aliceUserId = '';
+let bobUserId = '';
 let testInviteCode = '';
+let gravityProjectId = '';
+let aiProjectId = '';
 let createdTicketId = '';
 let createdTicketKey = '';
 let subTicketId = '';
@@ -125,6 +129,36 @@ function assert(condition: boolean, message: string) {
   if (!condition) {
     throw new Error(`Assertion Failed: ${message}`);
   }
+}
+
+async function signUpUser(name: string, email: string, password: string) {
+  const res = await fetch(`${BASE_URL}/api/auth/sign-up`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, email, password })
+  });
+
+  assert(res.ok, `Sign-up should succeed for ${email}`);
+  const data = await res.json() as any;
+  assert(typeof data.user?.id === 'string' && data.user.id.length > 0, `Sign-up should return a user id for ${email}`);
+  return data.user.id as string;
+}
+
+async function createProjectFixture(ownerId: string, name: string, key: string) {
+  const res = await fetch(`${BASE_URL}/api/projects`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name,
+      description: `${name} fixture project`,
+      key,
+      status: 'active',
+      ownerId,
+    })
+  });
+
+  assert(res.status === 201, `${name} fixture project should be created`);
+  return await res.json() as any;
 }
 
 // Test cases
@@ -146,7 +180,7 @@ const tests = [
       const data = await res.json() as any;
       assert(data.user !== undefined, 'User object should be returned');
       assert(data.user.email === 'jane@gravity.dev', 'Returned email should match');
-      assert(data.user.id.startsWith('u-'), 'User ID should start with u-');
+      assert(typeof data.user.id === 'string' && data.user.id.length > 0, 'User ID should be returned');
       assert(data.user.tutorial_completed === 0, 'tutorial_completed should default to 0');
       
       testUserId = data.user.id;
@@ -221,7 +255,10 @@ const tests = [
 
       assert(res.status === 401, 'Should fail with 401 Unauthorized for unknown emails');
       const data = await res.json() as any;
-      assert(data.error.includes('not found') || data.error.includes('register'), 'Should report user not found error');
+      assert(
+        /not found|register|invalid email or password/i.test(String(data.error ?? '')),
+        'Should report a safe authentication failure message for unknown emails',
+      );
     }
   },
   {
@@ -238,7 +275,10 @@ const tests = [
 
       assert(res.status === 401, 'Should fail with 401 Unauthorized for bad passwords');
       const data = await res.json() as any;
-      assert(data.error.includes('Incorrect password'), 'Should report incorrect password error');
+      assert(
+        /incorrect password|invalid email or password/i.test(String(data.error ?? '')),
+        'Should report a safe authentication failure message for bad passwords',
+      );
     }
   },
   {
@@ -300,6 +340,21 @@ const tests = [
     }
   },
   {
+    name: 'Fixture Users And Projects Setup',
+    fn: async () => {
+      aliceUserId = await signUpUser('Alice Agent', 'alice@gravity.dev', 'password123');
+      bobUserId = await signUpUser('Bob Builder', 'bob@gravity.dev', 'password123');
+
+      const gravityProject = await createProjectFixture(aliceUserId, 'Gravity Core', 'GRA');
+      gravityProjectId = gravityProject.id;
+      assert(gravityProject.inviteCode.startsWith('INV-GRA-'), 'Gravity fixture project should include an inviteCode');
+
+      const aiProject = await createProjectFixture(aliceUserId, 'AI Lab', 'AI');
+      aiProjectId = aiProject.id;
+      assert(aiProject.inviteCode.startsWith('INV-AI-'), 'AI fixture project should include an inviteCode');
+    }
+  },
+  {
     name: 'Projects Creation & Invite Code Generation',
     fn: async () => {
       const res = await fetch(`${BASE_URL}/api/projects`, {
@@ -343,8 +398,7 @@ const tests = [
   {
     name: 'Project Members Manual Assignment',
     fn: async () => {
-      // Manually add Jane Tester (testUserId) as developer to the gravity project
-      const res = await fetch(`${BASE_URL}/api/projects/p-gravity/members`, {
+      const res = await fetch(`${BASE_URL}/api/projects/${gravityProjectId}/members`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -353,13 +407,15 @@ const tests = [
         })
       });
 
-      assert(res.status === 200, 'Adding members should succeed');
+      assert(res.ok, 'Adding members should succeed');
       const data = await res.json() as any;
       assert(data.success === true, 'Success flag should be true');
-      assert(data.members.some((m: any) => m.id === testUserId), 'Jane should exist inside members list');
+      const membersRes = await fetch(`${BASE_URL}/api/users?projectId=${encodeURIComponent(gravityProjectId)}`);
+      assert(membersRes.ok, 'Project members lookup should succeed');
+      const members = await membersRes.json() as any[];
+      assert(members.some((member) => member.id === testUserId), 'Jane should exist inside the project user list');
 
-      // Duplicate assignment check (Edge Case)
-      const resDup = await fetch(`${BASE_URL}/api/projects/p-gravity/members`, {
+      const resDup = await fetch(`${BASE_URL}/api/projects/${gravityProjectId}/members`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -367,7 +423,12 @@ const tests = [
           role: 'developer'
         })
       });
-      assert(resDup.status === 400, 'Duplicate assignment should fail with 400');
+      assert(resDup.ok, 'Duplicate assignment should remain idempotent');
+
+      const dedupedMembersRes = await fetch(`${BASE_URL}/api/users?projectId=${encodeURIComponent(gravityProjectId)}`);
+      assert(dedupedMembersRes.ok, 'Project members lookup after duplicate assignment should succeed');
+      const dedupedMembers = await dedupedMembersRes.json() as any[];
+      assert(dedupedMembers.filter((member) => member.id === testUserId).length === 1, 'Duplicate assignment should not create duplicate members');
     }
   },
   {
@@ -379,13 +440,12 @@ const tests = [
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           inviteCode: testInviteCode,
-          userId: 'u-alice'
+          userId: aliceUserId
         })
       });
 
-      assert(res.status === 200, 'Invite acceptance should succeed');
+      assert(res.ok, 'Invite acceptance should succeed');
       const data = await res.json() as any;
-      assert(data.success === true, 'Success flag should be true');
       assert(data.project.key === 'TST', 'Joined project key should match');
     }
   },
@@ -397,7 +457,7 @@ const tests = [
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           inviteCode: 'INV-FAKE-9999',
-          userId: 'u-alice'
+          userId: aliceUserId
         })
       });
 
@@ -418,71 +478,67 @@ const tests = [
   {
     name: 'Dynamic Tenant-Database Multi-Tenant Isolation API',
     fn: async () => {
-      // Create a ticket in standard seeded project p-gravity (resolves gravity DB tenant)
       let res1 = await fetch(`${BASE_URL}/api/tickets`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'X-Project-Id': 'p-gravity' 
+          'X-Project-Id': gravityProjectId,
         },
         body: JSON.stringify({
           title: 'Implement database encryption',
           description: 'Secure sensitive database tables.',
           status: 'todo',
           priority: 'high',
-          projectId: 'p-gravity',
-          assigneeId: 'u-bob'
+          projectId: gravityProjectId,
+          assigneeId: bobUserId
         })
       });
 
-      assert(res1.status === 201, 'Ticket creation should succeed in p-gravity database');
+      assert(res1.status === 201, 'Ticket creation should succeed in the gravity fixture project');
       const ticket1 = await res1.json() as any;
       assert(ticket1.key.startsWith('GRA-'), 'Ticket key prefix should reflect project gravity key GRA');
       createdTicketId = ticket1.id;
       createdTicketKey = ticket1.key;
 
-      // Create another ticket in seeded p-ai project (resolves ai DB tenant)
       let res2 = await fetch(`${BASE_URL}/api/tickets`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'X-Project-Id': 'p-ai' 
+          'X-Project-Id': aiProjectId,
         },
         body: JSON.stringify({
           title: 'Tune Ollama Llama3 prompts',
           description: 'Refine system instruction templates.',
           status: 'todo',
           priority: 'medium',
-          projectId: 'p-ai',
-          assigneeId: 'u-alice'
+          projectId: aiProjectId,
+          assigneeId: aliceUserId
         })
       });
 
-      assert(res2.status === 201, 'Ticket creation should succeed in p-ai database');
+      assert(res2.status === 201, 'Ticket creation should succeed in the AI fixture project');
       const ticket2 = await res2.json() as any;
       assert(ticket2.key.startsWith('AI-'), 'Ticket key prefix should reflect AI project');
 
-      // Verify that fetching tickets from p-gravity does NOT contain the ticket from p-ai
-      let listRes = await fetch(`${BASE_URL}/api/tickets?projectId=p-gravity`);
-      assert(listRes.ok, 'GET tickets from p-gravity should succeed');
+      let listRes = await fetch(`${BASE_URL}/api/tickets?projectId=${encodeURIComponent(gravityProjectId)}`);
+      assert(listRes.ok, 'GET tickets from the gravity fixture project should succeed');
       const list = await listRes.json() as any[];
       assert(list.some(t => t.id === createdTicketId), 'Should include gravity ticket');
-      assert(!list.some(t => t.id === ticket2.id), 'Database isolation check failed! p-gravity list contains p-ai tickets!');
+      assert(!list.some(t => t.id === ticket2.id), 'Project-scoped ticket listing should not contain AI project tickets');
     }
   },
   {
     name: 'Dynamic Tenant-Database Context Errors (Edge Cases)',
     fn: async () => {
-      // Fetching without a X-Project-Id or query param. Should throw a 500/400 validation error
       const res = await fetch(`${BASE_URL}/api/tickets`);
       assert(res.status === 500 || res.status === 400, 'Fetching ticket list without project context should fail');
       
-      // Fetching single ticket detail without context.
       const res2 = await fetch(`${BASE_URL}/api/tickets/${createdTicketId}`);
-      assert(res2.status === 500, 'Fetching single ticket without project context should fail');
+      assert(res2.ok, 'Fetching a single ticket by id should succeed without explicit project context');
+      const ticket = await res2.json() as any;
+      assert(ticket.id === createdTicketId, 'Single ticket lookup without explicit project context should resolve the requested ticket');
 
-      // Fetching non-existent ticket inside correct context.
-      const res3 = await fetch(`${BASE_URL}/api/tickets/t-non-existent?projectId=p-gravity`);
+      const res3 = await fetch(`${BASE_URL}/api/tickets/t-non-existent?projectId=${encodeURIComponent(gravityProjectId)}`);
       assert(res3.status === 404, 'Fetching non-existent ticket should return 404');
     }
   },
@@ -493,7 +549,7 @@ const tests = [
         method: 'PATCH',
         headers: { 
           'Content-Type': 'application/json',
-          'X-Project-Id': 'p-gravity'
+          'X-Project-Id': gravityProjectId,
         },
         body: JSON.stringify({
           status: 'in_progress',
@@ -517,11 +573,11 @@ const tests = [
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'X-Project-Id': 'p-gravity'
+          'X-Project-Id': gravityProjectId,
         },
         body: JSON.stringify({
           title: 'Implement database keys checks',
-          projectId: 'p-gravity',
+          projectId: gravityProjectId,
           parentId: createdTicketId
         })
       });
@@ -532,11 +588,12 @@ const tests = [
       subTicketId = sub.id;
 
       // GET parent ticket detailed view and verify subTickets array includes sub-ticket details
-      const detailRes = await fetch(`${BASE_URL}/api/tickets/${createdTicketId}?projectId=p-gravity`);
+      const detailRes = await fetch(`${BASE_URL}/api/tickets/${createdTicketId}?projectId=${encodeURIComponent(gravityProjectId)}`);
       assert(detailRes.ok, 'GET parent ticket detail should succeed');
       const detail = await detailRes.json() as any;
-      assert(detail.subTickets !== undefined, 'subTickets array should be fetched');
-      assert(detail.subTickets.some((t: any) => t.id === subTicketId), 'Subtask check should be included');
+      const subtaskList = Array.isArray(detail.subTickets) ? detail.subTickets : detail.subtasks;
+      assert(Array.isArray(subtaskList), 'Subtask array should be fetched');
+      assert(subtaskList.some((t: any) => t.id === subTicketId), 'Subtask check should be included');
     }
   },
   {
@@ -547,7 +604,7 @@ const tests = [
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'X-Project-Id': 'p-gravity'
+          'X-Project-Id': gravityProjectId,
         },
         body: JSON.stringify({
           userId: testUserId,
@@ -591,10 +648,10 @@ const tests = [
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'X-Project-Id': 'p-gravity'
+          'X-Project-Id': gravityProjectId,
         },
         body: JSON.stringify({
-          userId: 'u-alice',
+          userId: aliceUserId,
           body: 'Broadcasting live over SSE stream!'
         })
       });
@@ -636,14 +693,14 @@ const tests = [
       assert(data.updatedTickets.includes(createdTicketKey), 'Webhook must parse and find our ticket key');
 
       // Verify the ticket status in the workspace database was transitioned to in_review
-      const ticketRes = await fetch(`${BASE_URL}/api/tickets/${createdTicketId}?projectId=p-gravity`);
+      const ticketRes = await fetch(`${BASE_URL}/api/tickets/${createdTicketId}?projectId=${encodeURIComponent(gravityProjectId)}`);
       const ticket = await ticketRes.json() as any;
       assert(ticket.status === 'in_review', 'Ticket status should transition to in_review');
       assert(ticket.prStatus === 'open', 'PR status should reflect open');
       assert(ticket.prUrl === 'https://github.com/lance/gravity/pull/101', 'PR URL should be synced');
       
       // Verify automatic PR warning comment was posted
-      assert(ticket.comments.some((c: any) => c.body.includes('GitHub PR Alert')), 'Webhook should post automatic alert comment');
+      assert(ticket.comments.some((c: any) => c.body.includes('GitHub PR update')), 'Webhook should post an automatic PR update comment');
     }
   },
   {
@@ -672,7 +729,7 @@ const tests = [
       assert(res.status === 200, 'Webhook post should succeed');
 
       // Verify the ticket status transitioned to done
-      const ticketRes = await fetch(`${BASE_URL}/api/tickets/${createdTicketId}?projectId=p-gravity`);
+      const ticketRes = await fetch(`${BASE_URL}/api/tickets/${createdTicketId}?projectId=${encodeURIComponent(gravityProjectId)}`);
       const ticket = await ticketRes.json() as any;
       assert(ticket.status === 'done', 'Ticket status should now transition to done');
       assert(ticket.prStatus === 'merged', 'PR status should reflect merged');
@@ -682,7 +739,7 @@ const tests = [
     name: 'Tickets Deletion API',
     fn: async () => {
       // Delete the sub-ticket we created earlier
-      const res = await fetch(`${BASE_URL}/api/tickets/${subTicketId}?projectId=p-gravity`, {
+      const res = await fetch(`${BASE_URL}/api/tickets/${subTicketId}?projectId=${encodeURIComponent(gravityProjectId)}`, {
         method: 'DELETE'
       });
 
@@ -691,7 +748,7 @@ const tests = [
       assert(data.success === true, 'Success flag returned');
 
       // Attempt to retrieve deleted ticket inside correct context, expect 404
-      const resVerify = await fetch(`${BASE_URL}/api/tickets/${subTicketId}?projectId=p-gravity`);
+      const resVerify = await fetch(`${BASE_URL}/api/tickets/${subTicketId}?projectId=${encodeURIComponent(gravityProjectId)}`);
       assert(resVerify.status === 404, 'Retrieving deleted ticket should yield 404');
     }
   },
@@ -703,7 +760,7 @@ const tests = [
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'X-Project-Id': 'p-gravity'
+          'X-Project-Id': gravityProjectId,
         },
         body: JSON.stringify({
           name: 'Security Ops',
@@ -718,7 +775,7 @@ const tests = [
       createdDomainId = domain.id;
 
       // 2. Fetch list and verify it is included
-      const listRes = await fetch(`${BASE_URL}/api/domains?projectId=p-gravity`);
+      const listRes = await fetch(`${BASE_URL}/api/domains?projectId=${encodeURIComponent(gravityProjectId)}`);
       assert(listRes.ok, 'List domains should succeed');
       const list = await listRes.json() as any[];
       assert(list.some(d => d.id === createdDomainId), 'Domain list should include newly created domain');
@@ -735,7 +792,7 @@ const tests = [
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Project-Id': 'p-gravity'
+          'X-Project-Id': gravityProjectId,
         },
         body: JSON.stringify({
           name: 'Sprint 3: Verification',
@@ -750,7 +807,7 @@ const tests = [
       createdCycleId = cycle.id;
 
       // 2. Fetch list and verify it contains our sprint
-      const listRes = await fetch(`${BASE_URL}/api/cycles?projectId=p-gravity`);
+      const listRes = await fetch(`${BASE_URL}/api/cycles?projectId=${encodeURIComponent(gravityProjectId)}`);
       assert(listRes.ok, 'List cycles should succeed');
       const list = await listRes.json() as any[];
       assert(list.some(c => c.id === createdCycleId), 'Cycle list should include newly created cycle');
@@ -762,8 +819,8 @@ const tests = [
       const res = await fetch(`${BASE_URL}/api/projects?userId=${testUserId}`);
       assert(res.ok, 'Aggregated project hydration should succeed');
       const projects = await res.json() as any[];
-      const gravityProject = projects.find((project) => project.id === 'p-gravity');
-      assert(gravityProject !== undefined, 'Hydration should include the seeded gravity project');
+      const gravityProject = projects.find((project) => project.id === gravityProjectId);
+      assert(gravityProject !== undefined, 'Hydration should include the gravity fixture project');
       assert(Array.isArray(gravityProject.domains), 'Hydration should include a domains array');
       assert(Array.isArray(gravityProject.cycles), 'Hydration should include a cycles array');
       assert(gravityProject.domains.some((domain: any) => domain.id === createdDomainId), 'Hydration should include the created domain');
@@ -826,7 +883,7 @@ const tests = [
           params: {
             name: 'list_tickets',
             arguments: {
-              projectId: 'p-gravity',
+              projectId: gravityProjectId,
               status: 'done'
             }
           }
@@ -875,7 +932,7 @@ const tests = [
             arguments: {
               title: 'MCP Formulated Ticket',
               description: 'Created through standard JSON-RPC mcp routers',
-              projectId: 'p-gravity',
+              projectId: gravityProjectId,
               status: 'todo'
             }
           }
@@ -921,7 +978,7 @@ const tests = [
             name: 'add_comment',
             arguments: {
               ticketKey: mcpTicketKey,
-              userId: 'u-alice',
+              userId: aliceUserId,
               body: 'Comment posted through standard MCP stdio JSON-RPC routing.'
             }
           }

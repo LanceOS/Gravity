@@ -13,7 +13,7 @@ const envSchema = z.object({
   BETTER_AUTH_BASE_URL: z.string().url().optional(),
   CORS_ORIGINS: z.string().optional(),
   TRUSTED_ORIGINS: z.string().optional(),
-  OLLAMA_DEFAULT_ENDPOINT: z.string().url().default('http://host.docker.internal:11434'),
+  OLLAMA_DEFAULT_ENDPOINT: z.string().url().optional(),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
 });
 
@@ -39,6 +39,8 @@ export const env = {
 
     return [`http://localhost:${parsed.PORT}`];
   })(),
-  ollamaDefaultEndpoint: parsed.OLLAMA_DEFAULT_ENDPOINT,
+  ollamaDefaultEndpoint:
+    parsed.OLLAMA_DEFAULT_ENDPOINT ??
+    (parsed.NODE_ENV === 'test' ? 'http://localhost:11434' : 'http://host.docker.internal:11434'),
   nodeEnv: parsed.NODE_ENV,
 };

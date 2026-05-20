@@ -1,13 +1,15 @@
 import { randomUUID } from 'node:crypto';
 import type { Request } from 'express';
-import { eq, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import {
   projects,
   projectMembers,
   userProfiles,
   userSettings,
+  workspaceJoinRequests,
   workspaceMembers,
+  workspaces,
   workspaceSettings,
 } from '../db/schema.js';
 import { env } from '../env.js';
@@ -89,7 +91,11 @@ export function normalizeOllamaUrl(url: string) {
 export async function ensureUserDefaults(userId: string) {
   await db
     .insert(userProfiles)
-    .values({ userId, role: 'guest_contributor' })
+    .values({
+      userId,
+      role: 'guest_contributor',
+      avatarUrl: `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(userId)}`,
+    })
     .onConflictDoNothing({ target: userProfiles.userId });
 
   await db
@@ -218,52 +224,99 @@ export async function addWorkspaceMembersToProject(workspaceId: string, projectI
 }
 
 export async function listWorkspaceSummaries(userId?: string) {
-  const memberSelect = userId ? sql`, wm.role AS member_role` : sql``;
-  const memberJoin = userId
-    ? sql`LEFT JOIN workspace_members wm ON wm.workspace_id = w.id AND wm.user_id = ${userId}`
-    : sql``;
-  const filter = userId
-    ? sql`WHERE EXISTS (
-        SELECT 1 FROM workspace_members wm2 WHERE wm2.workspace_id = w.id AND wm2.user_id = ${userId}
-      )`
-    : sql``;
+  const memberRoleByWorkspace = new Map<string, string>();
+  let accessibleWorkspaceIds: string[] | null = null;
 
-  const result = await db.execute(sql`
-    SELECT
-      w.id,
-      w.name,
-      w.description,
-      w.key,
-      w.default_project_id,
-      COALESCE(ws.host_url, w.host_url, '') AS host_url,
-      COALESCE(ws.join_mode, 'approval_required') AS join_mode,
-      (SELECT COUNT(*) FROM projects p WHERE p.workspace_id = w.id) AS project_count,
-      (SELECT COUNT(*) FROM workspace_members members WHERE members.workspace_id = w.id) AS member_count,
-      (
-        SELECT COUNT(*)
-        FROM workspace_join_requests requests
-        WHERE requests.workspace_id = w.id AND requests.status = 'pending'
-      ) AS pending_join_request_count
-      ${memberSelect}
-    FROM workspaces w
-    LEFT JOIN workspace_settings ws ON ws.workspace_id = w.id
-    ${memberJoin}
-    ${filter}
-    ORDER BY w.created_at ASC
-  `);
+  if (userId) {
+    const membershipRows = await db
+      .select({
+        workspaceId: workspaceMembers.workspaceId,
+        role: workspaceMembers.role,
+      })
+      .from(workspaceMembers)
+      .where(eq(workspaceMembers.userId, userId));
 
-  return (result.rows as Array<Record<string, unknown>>).map((row) => ({
-    id: String(row.id),
-    name: String(row.name),
-    description: String(row.description ?? ''),
-    key: String(row.key),
-    defaultProjectId: row.default_project_id ? String(row.default_project_id) : null,
-    hostUrl: String(row.host_url ?? ''),
-    joinMode: row.join_mode === 'auto_join' ? 'auto_join' : 'approval_required',
-    projectCount: Number(row.project_count ?? 0),
-    memberCount: Number(row.member_count ?? 0),
-    pendingJoinRequestCount: Number(row.pending_join_request_count ?? 0),
-    ...(row.member_role ? { memberRole: String(row.member_role) } : {}),
+    for (const membership of membershipRows) {
+      memberRoleByWorkspace.set(membership.workspaceId, membership.role);
+    }
+
+    accessibleWorkspaceIds = membershipRows.map((membership) => membership.workspaceId);
+    if (accessibleWorkspaceIds.length === 0) {
+      return [];
+    }
+  }
+
+  let workspaceQuery = db
+    .select({
+      id: workspaces.id,
+      name: workspaces.name,
+      description: workspaces.description,
+      key: workspaces.key,
+      defaultProjectId: workspaces.defaultProjectId,
+      workspaceHostUrl: workspaces.hostUrl,
+      settingsHostUrl: workspaceSettings.hostUrl,
+      joinMode: workspaceSettings.joinMode,
+    })
+    .from(workspaces)
+    .leftJoin(workspaceSettings, eq(workspaceSettings.workspaceId, workspaces.id))
+    .orderBy(asc(workspaces.createdAt));
+
+  if (accessibleWorkspaceIds) {
+    workspaceQuery = workspaceQuery.where(inArray(workspaces.id, accessibleWorkspaceIds));
+  }
+
+  const workspaceRows = await workspaceQuery;
+  if (workspaceRows.length === 0) {
+    return [];
+  }
+
+  const workspaceIds = workspaceRows.map((workspace) => workspace.id);
+
+  const [projectCountRows, memberCountRows, pendingJoinRequestCountRows] = await Promise.all([
+    db
+      .select({
+        workspaceId: projects.workspaceId,
+        count: sql<number>`count(*)`,
+      })
+      .from(projects)
+      .where(inArray(projects.workspaceId, workspaceIds))
+      .groupBy(projects.workspaceId),
+    db
+      .select({
+        workspaceId: workspaceMembers.workspaceId,
+        count: sql<number>`count(*)`,
+      })
+      .from(workspaceMembers)
+      .where(inArray(workspaceMembers.workspaceId, workspaceIds))
+      .groupBy(workspaceMembers.workspaceId),
+    db
+      .select({
+        workspaceId: workspaceJoinRequests.workspaceId,
+        count: sql<number>`count(*)`,
+      })
+      .from(workspaceJoinRequests)
+      .where(and(inArray(workspaceJoinRequests.workspaceId, workspaceIds), eq(workspaceJoinRequests.status, 'pending')))
+      .groupBy(workspaceJoinRequests.workspaceId),
+  ]);
+
+  const projectCountByWorkspace = new Map(projectCountRows.map((row) => [row.workspaceId, Number(row.count ?? 0)]));
+  const memberCountByWorkspace = new Map(memberCountRows.map((row) => [row.workspaceId, Number(row.count ?? 0)]));
+  const pendingJoinRequestCountByWorkspace = new Map(
+    pendingJoinRequestCountRows.map((row) => [row.workspaceId, Number(row.count ?? 0)]),
+  );
+
+  return workspaceRows.map((workspace) => ({
+    id: workspace.id,
+    name: workspace.name,
+    description: workspace.description ?? '',
+    key: workspace.key,
+    defaultProjectId: workspace.defaultProjectId ?? null,
+    hostUrl: workspace.settingsHostUrl || workspace.workspaceHostUrl || '',
+    joinMode: workspace.joinMode === 'auto_join' ? 'auto_join' : 'approval_required',
+    projectCount: projectCountByWorkspace.get(workspace.id) ?? 0,
+    memberCount: memberCountByWorkspace.get(workspace.id) ?? 0,
+    pendingJoinRequestCount: pendingJoinRequestCountByWorkspace.get(workspace.id) ?? 0,
+    ...(memberRoleByWorkspace.has(workspace.id) ? { memberRole: memberRoleByWorkspace.get(workspace.id) } : {}),
   }));
 }
 

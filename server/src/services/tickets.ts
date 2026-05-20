@@ -1,6 +1,6 @@
 import { and, asc, eq } from 'drizzle-orm';
 import { db } from '../db/index.js';
-import { comments, tickets } from '../db/schema.js';
+import { authUsers, comments, tickets, userProfiles } from '../db/schema.js';
 import { createId, getProjectByKeyPrefix, nextTicketKey, normalizeIsoDate } from '../lib/platform.js';
 
 type TicketRecord = typeof tickets.$inferSelect;
@@ -67,41 +67,36 @@ export async function getTicketByKey(ticketKey: string) {
 }
 
 export async function listComments(ticketId: string) {
-  const result = await db.execute(
-    // sql generated here keeps the auth user join explicit without duplicating a large relation model.
-    {
-      sql: `
-        SELECT
-          c.id,
-          c.ticket_id AS "ticketId",
-          c.user_id AS "userId",
-          c.body,
-          c.created_at AS "createdAt",
-          u.name AS "userName",
-          COALESCE(up.avatar_url, u.image, '') AS "userAvatar",
-          COALESCE(up.role, 'guest_contributor') AS "authorRole"
-        FROM comments c
-        JOIN "user" u ON u.id = c.user_id
-        LEFT JOIN user_profiles up ON up.user_id = u.id
-        WHERE c.ticket_id = $1
-        ORDER BY c.created_at ASC
-      `,
-      params: [ticketId],
-    } as never,
-  );
+  const rows = await db
+    .select({
+      id: comments.id,
+      ticketId: comments.ticketId,
+      userId: comments.userId,
+      body: comments.body,
+      createdAt: comments.createdAt,
+      userName: authUsers.name,
+      userImage: authUsers.image,
+      userAvatar: userProfiles.avatarUrl,
+      authorRole: userProfiles.role,
+    })
+    .from(comments)
+    .innerJoin(authUsers, eq(authUsers.id, comments.userId))
+    .leftJoin(userProfiles, eq(userProfiles.userId, authUsers.id))
+    .where(eq(comments.ticketId, ticketId))
+    .orderBy(asc(comments.createdAt));
 
-  return (result.rows as Array<Record<string, unknown>>).map((row) => ({
+  return rows.map((row) => ({
     id: String(row.id),
     ticketId: String(row.ticketId),
     userId: String(row.userId),
     body: String(row.body),
     createdAt: normalizeIsoDate(row.createdAt),
     userName: String(row.userName ?? ''),
-    userAvatar: String(row.userAvatar ?? ''),
+    userAvatar: String(row.userAvatar ?? row.userImage ?? ''),
     author: {
       id: String(row.userId),
       username: String(row.userName ?? ''),
-      avatar_url: String(row.userAvatar ?? ''),
+      avatar_url: String(row.userAvatar ?? row.userImage ?? ''),
       role: String(row.authorRole ?? 'guest_contributor'),
     },
   }));

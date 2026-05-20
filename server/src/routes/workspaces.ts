@@ -1,11 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import { and, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import { Router } from 'express';
 import { db } from '../db/index.js';
 import {
   authUsers,
   projectMembers,
   projects,
+  userProfiles,
   validations,
   workspaceInvites,
   workspaceJoinRequests,
@@ -36,6 +37,37 @@ function createValidationCode() {
 
 function createWorkspacePrivateKey() {
   return `sec_wsp_${randomUUID().replace(/-/g, '')}`;
+}
+
+async function loadWorkspaceSettingsPayload(workspaceId: string) {
+  const rows = await db
+    .select({
+      workspaceId: workspaces.id,
+      key: workspaces.key,
+      workspaceHostUrl: workspaces.hostUrl,
+      settingsHostUrl: workspaceSettings.hostUrl,
+      joinMode: workspaceSettings.joinMode,
+      workspaceKey: workspaces.workspaceKey,
+      defaultProjectId: workspaces.defaultProjectId,
+    })
+    .from(workspaces)
+    .leftJoin(workspaceSettings, eq(workspaceSettings.workspaceId, workspaces.id))
+    .where(eq(workspaces.id, workspaceId))
+    .limit(1);
+
+  const settings = rows[0];
+  if (!settings) {
+    return null;
+  }
+
+  return {
+    workspaceId: settings.workspaceId,
+    key: settings.key,
+    hostUrl: settings.settingsHostUrl || settings.workspaceHostUrl || '',
+    joinMode: settings.joinMode === 'auto_join' ? 'auto_join' : 'approval_required',
+    workspaceKey: settings.workspaceKey,
+    defaultProjectId: settings.defaultProjectId,
+  };
 }
 
 function mapPeerInvite(invite: {
@@ -162,23 +194,7 @@ export function createWorkspacesRouter() {
     try {
       const workspaceId = req.params.workspaceId;
       await ensureWorkspaceSettingsRecord(workspaceId);
-      const result = await db.execute({
-        sql: `
-          SELECT
-            w.id AS "workspaceId",
-            w.key,
-            COALESCE(ws.host_url, w.host_url, '') AS "hostUrl",
-            COALESCE(ws.join_mode, 'approval_required') AS "joinMode",
-            w.workspace_key AS "workspaceKey",
-            w.default_project_id AS "defaultProjectId"
-          FROM workspaces w
-          LEFT JOIN workspace_settings ws ON ws.workspace_id = w.id
-          WHERE w.id = $1
-          LIMIT 1
-        `,
-        params: [workspaceId],
-      } as never);
-      const settings = (result.rows as Array<Record<string, unknown>>)[0];
+      const settings = await loadWorkspaceSettingsPayload(workspaceId);
 
       if (!settings) {
         res.status(404).json({ error: 'Workspace not found.' });
@@ -236,24 +252,7 @@ export function createWorkspacesRouter() {
           .where(eq(workspaceSettings.workspaceId, workspaceId));
       });
 
-      const result = await db.execute({
-        sql: `
-          SELECT
-            w.id AS "workspaceId",
-            w.key,
-            COALESCE(ws.host_url, w.host_url, '') AS "hostUrl",
-            COALESCE(ws.join_mode, 'approval_required') AS "joinMode",
-            w.workspace_key AS "workspaceKey",
-            w.default_project_id AS "defaultProjectId"
-          FROM workspaces w
-          LEFT JOIN workspace_settings ws ON ws.workspace_id = w.id
-          WHERE w.id = $1
-          LIMIT 1
-        `,
-        params: [workspaceId],
-      } as never);
-
-      res.json((result.rows as Array<Record<string, unknown>>)[0]);
+      res.json(await loadWorkspaceSettingsPayload(workspaceId));
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to update workspace settings.' });
     }
@@ -261,24 +260,32 @@ export function createWorkspacesRouter() {
 
   router.get('/workspaces/:workspaceId/members', async (req, res) => {
     try {
-      const result = await db.execute({
-        sql: `
-          SELECT
-            u.id,
-            u.name,
-            u.email,
-            COALESCE(up.avatar_url, u.image, '') AS avatar,
-            wm.role,
-            wm.created_at AS "createdAt"
-          FROM workspace_members wm
-          JOIN "user" u ON u.id = wm.user_id
-          LEFT JOIN user_profiles up ON up.user_id = u.id
-          WHERE wm.workspace_id = $1
-          ORDER BY wm.created_at ASC
-        `,
-        params: [req.params.workspaceId],
-      } as never);
-      res.json(result.rows);
+      const members = await db
+        .select({
+          id: authUsers.id,
+          name: authUsers.name,
+          email: authUsers.email,
+          image: authUsers.image,
+          avatarUrl: userProfiles.avatarUrl,
+          role: workspaceMembers.role,
+          createdAt: workspaceMembers.createdAt,
+        })
+        .from(workspaceMembers)
+        .innerJoin(authUsers, eq(authUsers.id, workspaceMembers.userId))
+        .leftJoin(userProfiles, eq(userProfiles.userId, workspaceMembers.userId))
+        .where(eq(workspaceMembers.workspaceId, req.params.workspaceId))
+        .orderBy(asc(workspaceMembers.createdAt));
+
+      res.json(
+        members.map((member) => ({
+          id: member.id,
+          name: member.name,
+          email: member.email,
+          avatar: member.avatarUrl || member.image || '',
+          role: member.role,
+          createdAt: member.createdAt,
+        })),
+      );
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load workspace members.' });
     }
@@ -286,31 +293,45 @@ export function createWorkspacesRouter() {
 
   router.get('/workspaces/:workspaceId/invites', async (req, res) => {
     try {
-      const result = await db.execute({
-        sql: `
-          SELECT
-            wi.id,
-            wi.code,
-            wi.label,
-            wi.expires_at AS "expiresAt",
-            wi.revoked_at AS "revokedAt",
-            wi.max_uses AS "maxUses",
-            wi.use_count AS "useCount",
-            wi.created_at AS "createdAt",
-            creator.name AS "createdByName",
-            (
-              SELECT COUNT(*)
-              FROM workspace_join_requests requests
-              WHERE requests.invite_id = wi.id AND requests.status = 'pending'
-            ) AS "pendingJoinRequestCount"
-          FROM workspace_invites wi
-          JOIN "user" creator ON creator.id = wi.created_by
-          WHERE wi.workspace_id = $1
-          ORDER BY wi.created_at DESC
-        `,
-        params: [req.params.workspaceId],
-      } as never);
-      res.json(result.rows);
+      const invites = await db
+        .select({
+          id: workspaceInvites.id,
+          code: workspaceInvites.code,
+          label: workspaceInvites.label,
+          expiresAt: workspaceInvites.expiresAt,
+          revokedAt: workspaceInvites.revokedAt,
+          maxUses: workspaceInvites.maxUses,
+          useCount: workspaceInvites.useCount,
+          createdAt: workspaceInvites.createdAt,
+          createdByName: authUsers.name,
+        })
+        .from(workspaceInvites)
+        .innerJoin(authUsers, eq(authUsers.id, workspaceInvites.createdBy))
+        .where(eq(workspaceInvites.workspaceId, req.params.workspaceId))
+        .orderBy(desc(workspaceInvites.createdAt));
+
+      const inviteIds = invites.map((invite) => invite.id);
+      const pendingJoinRequestCounts = inviteIds.length
+        ? await db
+            .select({
+              inviteId: workspaceJoinRequests.inviteId,
+              count: sql<number>`count(*)`,
+            })
+            .from(workspaceJoinRequests)
+            .where(and(inArray(workspaceJoinRequests.inviteId, inviteIds), eq(workspaceJoinRequests.status, 'pending')))
+            .groupBy(workspaceJoinRequests.inviteId)
+        : [];
+
+      const pendingJoinRequestCountByInviteId = new Map(
+        pendingJoinRequestCounts.flatMap((row) => (row.inviteId ? [[row.inviteId, Number(row.count ?? 0)] as const] : [])),
+      );
+
+      res.json(
+        invites.map((invite) => ({
+          ...invite,
+          pendingJoinRequestCount: pendingJoinRequestCountByInviteId.get(invite.id) ?? 0,
+        })),
+      );
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load workspace invites.' });
     }
@@ -637,24 +658,21 @@ export function createWorkspacesRouter() {
     }
 
     try {
-      const inviteRows = await db.execute({
-        sql: `
-          SELECT
-            wi.id,
-            wi.workspace_id AS "workspaceId",
-            wi.revoked_at AS "revokedAt",
-            wi.expires_at AS "expiresAt",
-            wi.max_uses AS "maxUses",
-            wi.use_count AS "useCount",
-            COALESCE(ws.join_mode, 'approval_required') AS "joinMode"
-          FROM workspace_invites wi
-          LEFT JOIN workspace_settings ws ON ws.workspace_id = wi.workspace_id
-          WHERE wi.code = $1
-          LIMIT 1
-        `,
-        params: [inviteCode],
-      } as never);
-      const invite = (inviteRows.rows as Array<Record<string, unknown>>)[0];
+      const inviteRows = await db
+        .select({
+          id: workspaceInvites.id,
+          workspaceId: workspaceInvites.workspaceId,
+          revokedAt: workspaceInvites.revokedAt,
+          expiresAt: workspaceInvites.expiresAt,
+          maxUses: workspaceInvites.maxUses,
+          useCount: workspaceInvites.useCount,
+          joinMode: workspaceSettings.joinMode,
+        })
+        .from(workspaceInvites)
+        .leftJoin(workspaceSettings, eq(workspaceSettings.workspaceId, workspaceInvites.workspaceId))
+        .where(eq(workspaceInvites.code, inviteCode))
+        .limit(1);
+      const invite = inviteRows[0];
       if (!invite) {
         res.status(404).json({ error: 'Invite not found.' });
         return;
@@ -728,28 +746,26 @@ export function createWorkspacesRouter() {
 
   router.get('/workspaces/:workspaceId/join-requests', async (req, res) => {
     try {
-      const result = await db.execute({
-        sql: `
-          SELECT
-            request.id,
-            request.requesting_user_id AS "requestingUserId",
-            request.requester_name AS "requesterName",
-            request.requester_email AS "requesterEmail",
-            request.requester_avatar AS "requesterAvatar",
-            request.message,
-            request.status,
-            request.reviewed_by AS "reviewedBy",
-            reviewer.name AS "reviewedByName",
-            request.reviewed_at AS "reviewedAt",
-            request.created_at AS "createdAt"
-          FROM workspace_join_requests request
-          LEFT JOIN "user" reviewer ON reviewer.id = request.reviewed_by
-          WHERE request.workspace_id = $1
-          ORDER BY request.created_at DESC
-        `,
-        params: [req.params.workspaceId],
-      } as never);
-      res.json(result.rows);
+      const joinRequests = await db
+        .select({
+          id: workspaceJoinRequests.id,
+          requestingUserId: workspaceJoinRequests.requestingUserId,
+          requesterName: workspaceJoinRequests.requesterName,
+          requesterEmail: workspaceJoinRequests.requesterEmail,
+          requesterAvatar: workspaceJoinRequests.requesterAvatar,
+          message: workspaceJoinRequests.message,
+          status: workspaceJoinRequests.status,
+          reviewedBy: workspaceJoinRequests.reviewedBy,
+          reviewedByName: authUsers.name,
+          reviewedAt: workspaceJoinRequests.reviewedAt,
+          createdAt: workspaceJoinRequests.createdAt,
+        })
+        .from(workspaceJoinRequests)
+        .leftJoin(authUsers, eq(authUsers.id, workspaceJoinRequests.reviewedBy))
+        .where(eq(workspaceJoinRequests.workspaceId, req.params.workspaceId))
+        .orderBy(desc(workspaceJoinRequests.createdAt));
+
+      res.json(joinRequests);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load join requests.' });
     }
