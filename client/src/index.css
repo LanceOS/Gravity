@@ -61,8 +61,16 @@ body {
   overflow: hidden; /* We handle scrolling inside components */
   background: var(--bg);
   color: var(--text);
+  font-family: var(--sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
 }
 
 /* Linear-style Core Layout */
@@ -123,6 +131,7 @@ body {
   border: 1px solid var(--border);
   background: var(--card-bg);
   color: var(--text-heading);
+  font-family: inherit;
   transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
   outline: none;
 }
@@ -160,6 +169,32 @@ body {
 .input:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+select.input,
+select.settings-page__control,
+select.workspace-page__project-input {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  cursor: pointer;
+  padding-right: 36px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M2.25 4.5 6 8.25 9.75 4.5' stroke='%2371717A' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 12px 12px;
+}
+
+select.input:hover,
+select.settings-page__control:hover,
+select.workspace-page__project-input:hover {
+  border-color: var(--accent-border);
+}
+
+select.input::-ms-expand,
+select.settings-page__control::-ms-expand,
+select.workspace-page__project-input::-ms-expand {
+  display: none;
 }
 
 .label {

@@ -232,19 +232,25 @@ function ticketReducer(state: State, action: Action): State {
     case 'ADD_COMMENT':
       return { ...state, comments: [...state.comments, action.payload] };
     case 'REPLACE_COMMENT': {
-      let replaced = false;
-      const nextComments = state.comments.map((comment) => {
-        if (comment.id === action.payload.optimisticId) {
-          replaced = true;
-          return action.payload.comment;
+      let hasSavedComment = false;
+      const nextComments: Comment[] = [];
+
+      for (const comment of state.comments) {
+        if (comment.id === action.payload.optimisticId || comment.id === action.payload.comment.id) {
+          if (!hasSavedComment) {
+            nextComments.push(action.payload.comment);
+            hasSavedComment = true;
+          }
+
+          continue;
         }
 
-        return comment;
-      });
+        nextComments.push(comment);
+      }
 
       return {
         ...state,
-        comments: replaced ? nextComments : [...nextComments, action.payload.comment],
+        comments: hasSavedComment ? nextComments : [...nextComments, action.payload.comment],
       };
     }
     case 'OPTIMISTIC_TICKET_UPDATE': {

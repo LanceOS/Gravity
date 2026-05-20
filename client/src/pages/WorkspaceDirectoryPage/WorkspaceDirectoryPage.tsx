@@ -340,6 +340,7 @@ const shellStyle: CSSProperties = {
   gap: '24px',
   maxWidth: '1480px',
   margin: '0 auto',
+  alignItems: 'start',
 };
 
 const heroStyle: CSSProperties = {
@@ -523,6 +524,10 @@ const formsColumnStyle: CSSProperties = {
   display: 'grid',
   gap: '16px',
   alignContent: 'start',
+  maxHeight: 'calc(100vh - 64px)',
+  overflowY: 'auto',
+  paddingRight: '8px',
+  minHeight: 0,
 };
 
 const panelStyle: CSSProperties = {

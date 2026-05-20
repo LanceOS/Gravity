@@ -4,6 +4,8 @@ import { X, Sparkles, Send, Cpu, Wifi, WifiOff, FileText, ListPlus, Loader2, Arr
 
 interface LocalAIChatProps {
   onClose: () => void;
+  initialOllamaUrl: string;
+  initialModel: string;
 }
 
 interface Message {
@@ -11,12 +13,12 @@ interface Message {
   content: string;
 }
 
-export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose }) => {
+export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllamaUrl, initialModel }) => {
   const { activeTicket, tickets, projects, users } = useTickets();
 
   // Settings
-  const [ollamaUrl, setOllamaUrl] = useState('http://localhost:11434');
-  const [model, setModel] = useState('llama3');
+  const [ollamaUrl, setOllamaUrl] = useState(() => initialOllamaUrl || 'http://localhost:11434');
+  const [model, setModel] = useState(() => initialModel || '');
   const [isCheckingModel, setIsCheckingModel] = useState(false);
   const [modelStatus, setModelStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
 
@@ -37,8 +39,17 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose }) => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isGenerating]);
 
+  useEffect(() => {
+    setOllamaUrl(initialOllamaUrl || 'http://localhost:11434');
+  }, [initialOllamaUrl]);
+
+  useEffect(() => {
+    setModel(initialModel || '');
+  }, [initialModel]);
+
   // Check Ollama status on mount
   const checkOllamaStatus = async (urlToTest = ollamaUrl) => {
+    setIsCheckingModel(true);
     setModelStatus('checking');
     try {
       const controller = new AbortController();
@@ -59,6 +70,8 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose }) => {
       }
     } catch (e) {
       setModelStatus('disconnected');
+    } finally {
+      setIsCheckingModel(false);
     }
   };
 
@@ -229,6 +242,11 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose }) => {
             onChange={(e) => setModel(e.target.value)}
           />
         </div>
+        {!model && !isCheckingModel ? (
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+            No saved model selected yet. Pick one in Account Preferences or enter a model here for this session.
+          </div>
+        ) : null}
       </div>
 
       {/* Message Feed Scrolling Area */}

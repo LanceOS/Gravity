@@ -435,6 +435,11 @@
   line-height: 1.6;
 }
 
+.workspace-page__empty-state-actions {
+  display: flex;
+  justify-content: center;
+}
+
 .workspace-page__spin {
   animation: workspace-page-spin 0.9s linear infinite;
 }
