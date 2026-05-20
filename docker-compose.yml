@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: secure_dev_password_change_me_in_prod
       POSTGRES_DB: gravity_workspace
     ports:
-      - "5432:5432"
+      - "35432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -24,14 +24,14 @@ services:
     environment:
       DATABASE_URL: postgresql://gravity_user:secure_dev_password_change_me_in_prod@postgres:5432/gravity_workspace
       BETTER_AUTH_SECRET: change-me-before-production
-      BETTER_AUTH_BASE_URL: http://localhost:8080
-      CORS_ORIGINS: http://localhost:3000
-      TRUSTED_ORIGINS: http://localhost:3000,http://localhost:8080
+      BETTER_AUTH_BASE_URL: http://localhost:38080
+      CORS_ORIGINS: http://localhost:33100
+      TRUSTED_ORIGINS: http://localhost:33100,http://localhost:38080
       OLLAMA_DEFAULT_ENDPOINT: http://host.docker.internal:11434
       NODE_ENV: production
       PORT: 8080
     ports:
-      - "8080:8080"
+      - "38080:8080"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -46,7 +46,7 @@ services:
     environment:
       BACKEND_UPSTREAM: http://backend:8080
     ports:
-      - "3000:80"
+      - "33100:80"
     depends_on:
       backend:
         condition: service_started

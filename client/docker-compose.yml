@@ -6,8 +6,8 @@ services:
     container_name: gravity-client
     restart: unless-stopped
     ports:
-      - "3000:80"
+      - "33101:80"
     environment:
-      - BACKEND_UPSTREAM=http://host.docker.internal:8080
+      - BACKEND_UPSTREAM=http://host.docker.internal:38080
     extra_hosts:
       - "host.docker.internal:host-gateway"
