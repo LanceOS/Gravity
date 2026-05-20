@@ -1,5 +1,5 @@
 import { useMemo, useState, type CSSProperties } from 'react';
-import { ArrowLeft, Check, Globe, Link2, Settings2, ShieldCheck, UserPlus, Users } from 'lucide-react';
+import { ArrowLeft, Check, Copy, Globe, Link2, Mail, Settings2, ShieldCheck, UserPlus, Users } from 'lucide-react';
 import type { User } from '../../context/TicketContext';
 import type { WorkspaceSummary } from '../../hooks/useWorkspaceDirectory';
 import type {
@@ -187,8 +187,22 @@ function AccessSection({
   inviteLoading: boolean;
   onCreateInvite: (input: CreateWorkspaceInviteInput) => Promise<boolean>;
 }) {
+  const latestInvite = invites[0] ?? null;
   const [email, setEmail] = useState('');
   const [expirationHours, setExpirationHours] = useState('24');
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  const handleCopy = async (key: string, value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedField(key);
+      window.setTimeout(() => {
+        setCopiedField((current) => (current === key ? null : current));
+      }, 1600);
+    } catch {
+      setCopiedField(null);
+    }
+  };
 
   const handleCreateInvite = async () => {
     const success = await onCreateInvite({
@@ -206,6 +220,14 @@ function AccessSection({
       <div className="settings-page__section-header">
         <h2 className="settings-page__section-title">Peer invites</h2>
         <p className="settings-page__section-subtitle">Issue direct guest validation links for a specific email address. Each invite mints a one-time validation code and a scoped workspace access key.</p>
+      </div>
+
+      <div style={inviteGuideStyle}>
+        <Mail size={16} color="var(--accent)" />
+        <div>
+          <div style={listRowTitleStyle}>Host handoff</div>
+          <div style={listRowCopyStyle}>Create the invite here, then send the guest the invite URL, validation code, and hashing instructions through a secure channel.</div>
+        </div>
       </div>
 
       <div className="settings-page__grid">
@@ -237,6 +259,54 @@ function AccessSection({
         </button>
       </div>
 
+      {latestInvite ? (
+        <div style={inviteSummaryStyle}>
+          <div style={inviteSummaryHeaderStyle}>
+            <div>
+              <div className="settings-page__eyebrow">Most Recent Invite</div>
+              <div style={listRowTitleStyle}>{latestInvite.email}</div>
+            </div>
+            <span style={latestInvite.isUsed ? inviteStateUsedStyle : inviteStatePendingStyle}>
+              {latestInvite.isUsed ? 'Validated' : 'Pending'}
+            </span>
+          </div>
+
+          <div style={detailGridStyle}>
+            <div style={detailCardStyle}>
+              <div style={detailLabelStyle}>Invite URL</div>
+              <div style={detailValueStyle}>{latestInvite.inviteUrl}</div>
+              <button type="button" className="settings-page__secondary-button" style={compactActionStyle} onClick={() => void handleCopy('invite-url', latestInvite.inviteUrl)}>
+                <Copy size={12} />
+                {copiedField === 'invite-url' ? 'Copied' : 'Copy URL'}
+              </button>
+            </div>
+
+            <div style={detailCardStyle}>
+              <div style={detailLabelStyle}>Validation Code</div>
+              <div style={detailValueStyle}>{latestInvite.validationCode}</div>
+              <button type="button" className="settings-page__secondary-button" style={compactActionStyle} onClick={() => void handleCopy('validation-code', latestInvite.validationCode)}>
+                <Copy size={12} />
+                {copiedField === 'validation-code' ? 'Copied' : 'Copy Code'}
+              </button>
+            </div>
+
+            <div style={detailCardStyle}>
+              <div style={detailLabelStyle}>Workspace Private Key</div>
+              <div style={detailValueStyle}>{latestInvite.workspacePrivateKey}</div>
+              <button type="button" className="settings-page__secondary-button" style={compactActionStyle} onClick={() => void handleCopy('workspace-key', latestInvite.workspacePrivateKey)}>
+                <Copy size={12} />
+                {copiedField === 'workspace-key' ? 'Copied' : 'Copy Key'}
+              </button>
+            </div>
+          </div>
+
+          <div style={inviteMetaRowStyle}>
+            <span>Expires {new Date(latestInvite.expiresAt).toLocaleString()}</span>
+            {latestInvite.guestUsername ? <span>Validated by {latestInvite.guestUsername}</span> : <span>Awaiting guest validation</span>}
+          </div>
+        </div>
+      ) : null}
+
       {invitesLoading ? <StatusNotice message={{ message: 'Loading peer invites...' }} /> : null}
       {!invitesLoading && invites.length === 0 ? <StatusNotice message={{ message: 'No peer invites exist yet for this workspace.' }} /> : null}
 
@@ -252,6 +322,10 @@ function AccessSection({
             <span>{invite.isUsed ? 'Validated' : 'Pending validation'}</span>
             <span>Expires {new Date(invite.expiresAt).toLocaleString()}</span>
             {invite.guestUsername ? <span>Guest: {invite.guestUsername}</span> : null}
+            <button type="button" className="settings-page__secondary-button" style={compactActionStyle} onClick={() => void handleCopy(`invite-row-${invite.id}`, invite.inviteUrl)}>
+              <Copy size={12} />
+              {copiedField === `invite-row-${invite.id}` ? 'Copied URL' : 'Copy URL'}
+            </button>
           </div>
         </div>
       ))}
@@ -485,6 +559,100 @@ const metaGridStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
   gap: '12px',
+};
+
+const inviteGuideStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'flex-start',
+  gap: '10px',
+  padding: '14px 16px',
+  marginBottom: '16px',
+  borderRadius: '14px',
+  border: '1px solid var(--border)',
+  background: 'rgba(255, 255, 255, 0.03)',
+};
+
+const inviteSummaryStyle: CSSProperties = {
+  display: 'grid',
+  gap: '14px',
+  padding: '16px',
+  marginBottom: '16px',
+  borderRadius: '16px',
+  border: '1px solid var(--accent-border)',
+  background: 'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))',
+};
+
+const inviteSummaryHeaderStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: '12px',
+};
+
+const inviteStatePendingStyle: CSSProperties = {
+  padding: '6px 10px',
+  borderRadius: '999px',
+  border: '1px solid rgba(245, 158, 11, 0.25)',
+  background: 'rgba(245, 158, 11, 0.12)',
+  color: '#fbbf24',
+  fontSize: '11px',
+  fontWeight: 700,
+  letterSpacing: '0.04em',
+  textTransform: 'uppercase',
+};
+
+const inviteStateUsedStyle: CSSProperties = {
+  ...inviteStatePendingStyle,
+  border: '1px solid rgba(16, 185, 129, 0.25)',
+  background: 'rgba(16, 185, 129, 0.12)',
+  color: '#34d399',
+};
+
+const detailGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+  gap: '12px',
+};
+
+const detailCardStyle: CSSProperties = {
+  display: 'grid',
+  gap: '10px',
+  padding: '14px',
+  borderRadius: '14px',
+  border: '1px solid var(--border)',
+  background: 'rgba(10, 14, 24, 0.28)',
+};
+
+const detailLabelStyle: CSSProperties = {
+  fontSize: '11px',
+  fontWeight: 700,
+  letterSpacing: '0.05em',
+  textTransform: 'uppercase',
+  color: 'var(--text-muted)',
+};
+
+const detailValueStyle: CSSProperties = {
+  fontSize: '12px',
+  lineHeight: 1.6,
+  color: 'var(--text-heading)',
+  wordBreak: 'break-word',
+};
+
+const inviteMetaRowStyle: CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: '12px',
+  fontSize: '12px',
+  color: 'var(--text-muted)',
+};
+
+const compactActionStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: '6px',
+  minHeight: '34px',
+  padding: '0 12px',
 };
 
 const metaCardStyle: CSSProperties = {

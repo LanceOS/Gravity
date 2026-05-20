@@ -267,6 +267,11 @@ export function WorkspaceDirectoryPage({
               </div>
             </div>
 
+            <div style={validationHintStyle}>
+              <div style={validationHintTitleStyle}>What you need from the host</div>
+              <div style={validationHintCopyStyle}>1. The invite URL. 2. The validation code. 3. Your guest email. 4. A bcrypt-style password hash generated on your side.</div>
+            </div>
+
             <label style={fieldStyle}>
               <span className="label">Guest Email</span>
               <input className="input" value={peerEmail} onChange={(event) => setPeerEmail(event.target.value)} placeholder="guest-user@peer.com" required />
@@ -288,6 +293,8 @@ export function WorkspaceDirectoryPage({
               <input className="input" value={peerInviteUrl} onChange={(event) => setPeerInviteUrl(event.target.value)} placeholder="https://host-domain-or-ip.com/api/v1/workspaces/validate" required />
             </label>
 
+            <div style={validationHintInlineStyle}>The invite URL should point at the host server’s `/api/v1/workspaces/validate` endpoint.</div>
+
             <label style={fieldStyle}>
               <span className="label">Guest Username</span>
               <input className="input" value={peerUsername} onChange={(event) => setPeerUsername(event.target.value)} required />
@@ -305,6 +312,10 @@ export function WorkspaceDirectoryPage({
                 required
               />
             </label>
+
+            <div style={securityNoteStyle}>
+              The hash stays in the validation record so the host can verify this guest handoff without needing your raw password.
+            </div>
 
             <button type="submit" className="btn" disabled={pendingAction !== null}>
               {pendingAction === 'validate' ? 'Validating...' : 'Validate Peer Invite'}
@@ -385,6 +396,44 @@ const summaryCardStyle: CSSProperties = {
   border: '1px solid var(--border)',
   background: 'rgba(255, 255, 255, 0.03)',
   color: 'var(--text-heading)',
+};
+
+const validationHintStyle: CSSProperties = {
+  display: 'grid',
+  gap: '6px',
+  padding: '12px 14px',
+  borderRadius: '14px',
+  border: '1px solid var(--border)',
+  background: 'rgba(255, 255, 255, 0.03)',
+};
+
+const validationHintTitleStyle: CSSProperties = {
+  fontSize: '12px',
+  fontWeight: 700,
+  color: 'var(--text-heading)',
+};
+
+const validationHintCopyStyle: CSSProperties = {
+  fontSize: '12px',
+  lineHeight: 1.6,
+  color: 'var(--text-muted)',
+};
+
+const validationHintInlineStyle: CSSProperties = {
+  marginTop: '-4px',
+  fontSize: '11px',
+  lineHeight: 1.5,
+  color: 'var(--text-muted)',
+};
+
+const securityNoteStyle: CSSProperties = {
+  padding: '10px 12px',
+  borderRadius: '12px',
+  border: '1px solid rgba(59, 130, 246, 0.18)',
+  background: 'rgba(59, 130, 246, 0.08)',
+  fontSize: '11px',
+  lineHeight: 1.6,
+  color: 'var(--text-muted)',
 };
 
 const sectionHeaderStyle: CSSProperties = {
