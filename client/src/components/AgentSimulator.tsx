@@ -95,7 +95,7 @@ export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
       addLog('thought', '🤔 [Agent Thought]: No duplicate ticket found. Proceeding to create the new backend ticket assigned to Bob...');
       const createResult = await executeMcpCall('create_ticket', {
         title: 'Setup user authorization flow',
-        description: 'Implement JWT session authorization, credential login routes, and link with the SQLite database schema.',
+        description: 'Implement workspace session authorization, credential login routes, and connect them to the PostgreSQL workspace schema.',
         status: 'todo',
         priority: 'high',
         projectId: 'p-gravity',

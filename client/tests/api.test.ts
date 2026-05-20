@@ -222,7 +222,7 @@ const tests = [
 
       assert(res.ok, 'Tutorial update should succeed');
       const data = await res.json() as any;
-      assert(data.user.tutorial_completed === 1, 'tutorial_completed should now be persisted as 1 (true) in SQLite');
+      assert(data.user.tutorial_completed === 1, 'tutorial_completed should now be persisted as 1 (true) in the workspace database');
     }
   },
   {
@@ -603,7 +603,7 @@ const tests = [
       const data = await res.json() as any;
       assert(data.updatedTickets.includes(createdTicketKey), 'Webhook must parse and find our ticket key');
 
-      // Verify the ticket status in SQLite was transitioned to in_review
+      // Verify the ticket status in the workspace database was transitioned to in_review
       const ticketRes = await fetch(`${BASE_URL}/api/tickets/${createdTicketId}?projectId=p-gravity`);
       const ticket = await ticketRes.json() as any;
       assert(ticket.status === 'in_review', 'Ticket status should transition to in_review');

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect, useCallback, useMemo } from 'react';
 
-// Type definitions matching SQLite DB schemas
+// Type definitions matching the backend API contract.
 export interface User {
   id: string;
   name: string;

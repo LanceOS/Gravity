@@ -89,7 +89,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
                 </div>
                 <h3 style={stepTitleStyle}>Multi-Tenant Project Databases</h3>
                 <p style={descriptionStyle}>
-                  Every project in Gravity runs on its own isolated SQLite database file. This guarantees 100% security, high-speed tenancy boundaries, and absolute privacy for your tickets and domains.
+                  Every workspace in Gravity runs on its own isolated PostgreSQL boundary. This keeps projects, tickets, and members scoped cleanly while supporting a production-grade multi-tenant architecture.
                 </p>
               </>
             )}
