@@ -219,7 +219,10 @@ const tests = [
 
       assert(res.status === 400, 'Should reject duplicate email registration with 400');
       const data = await res.json() as any;
-      assert(data.error.includes('already registered') || data.error.includes('UNIQUE constraint'), 'Should report email already registered');
+      assert(
+        /already|duplicate|exist|registered|unique constraint/i.test(String(data.error ?? '')),
+        'Should report a duplicate-email registration error',
+      );
     }
   },
   {

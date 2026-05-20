@@ -7,22 +7,6 @@ function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
 }
 
-function mapSignUpError(message: string) {
-  return /already|exist|duplicate/i.test(message) ? 'Email already registered.' : message;
-}
-
-function mapSignInError(message: string) {
-  if (/user not found/i.test(message)) {
-    return 'User not found.';
-  }
-
-  if (/invalid password/i.test(message)) {
-    return 'Incorrect password.';
-  }
-
-  return message;
-}
-
 export function createAuthCompatibilityRouter() {
   const router = Router();
   router.use(express.json());
@@ -43,7 +27,7 @@ export function createAuthCompatibilityRouter() {
       const user = await getUserById(result.user.id);
       res.json({ user });
     } catch (error) {
-      const message = mapSignUpError(getErrorMessage(error, 'Registration failed.'));
+      const message = getErrorMessage(error, 'Registration failed.');
       const status = /already|exist|duplicate/i.test(message) ? 400 : 500;
       res.status(status).json({ error: message });
     }
@@ -65,7 +49,7 @@ export function createAuthCompatibilityRouter() {
       const user = await getUserById(result.user.id);
       res.json({ user });
     } catch (error) {
-      const message = mapSignInError(getErrorMessage(error, 'Sign in failed.'));
+      const message = getErrorMessage(error, 'Sign in failed.');
       const status = /invalid|incorrect|not found|unauthorized/i.test(message) ? 401 : 500;
       res.status(status).json({ error: message });
     }
