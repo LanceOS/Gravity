@@ -42,13 +42,16 @@ interface UseWorkspaceDirectoryOptions {
 export function useWorkspaceDirectory({ currentUser, setCurrentUser }: UseWorkspaceDirectoryOptions) {
   const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([]);
   const [loading, setLoading] = useState(false);
+  const [resolvedUserId, setResolvedUserId] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<'create' | 'join' | 'validate' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const refreshWorkspaces = useCallback(async () => {
     if (!currentUser) {
+      setLoading(false);
       setWorkspaces([]);
+      setResolvedUserId(null);
       return [];
     }
 
@@ -71,6 +74,7 @@ export function useWorkspaceDirectory({ currentUser, setCurrentUser }: UseWorksp
       setWorkspaces([]);
       return [];
     } finally {
+      setResolvedUserId(currentUser.id);
       setLoading(false);
     }
   }, [currentUser]);
@@ -204,6 +208,7 @@ export function useWorkspaceDirectory({ currentUser, setCurrentUser }: UseWorksp
   return {
     workspaces,
     loading,
+    resolvedUserId,
     pendingAction,
     error,
     successMessage,

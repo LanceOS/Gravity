@@ -5,7 +5,6 @@ import type { TicketFilters } from '../../utils/ticketView';
 import { TicketBoard } from '../../components/TicketBoard';
 import { TicketList } from '../../components/TicketList';
 import { TicketDetail } from '../../components/TicketDetail';
-import { WorkspaceProjectPanel } from '../../components/WorkspaceProjectPanel';
 import {
   filterTickets,
   getWorkspaceHeaderTitle,
@@ -25,25 +24,15 @@ interface WorkspacePageProps {
   projects: Project[];
   tickets: Ticket[];
   users: User[];
-  workspaceName: string;
   activeProjectId: string;
-  defaultProjectId: string | null;
-  projectCreateLoading: boolean;
-  projectCreateError: string | null;
-  projectManageLoading: boolean;
-  projectManageError: string | null;
-  defaultProjectLoading: boolean;
   onAddComment: (ticketId: string, body: string) => Promise<void>;
-  onCreateProject: (project: { name: string; description: string; key: string }) => Promise<void>;
   onDeleteTicket: (ticketId: string) => Promise<void>;
   onOpenCreateSubtask: (parentId: string) => void;
   onOpenCreateTicket: (initialStatus?: Ticket['status']) => void;
-  onSelectProject: (projectId: string) => void;
+  onOpenProjectManager: () => void;
   onSelectTicket: (ticket: Ticket | null) => void;
   onSetFilters: (filters: Partial<TicketFilters>) => void;
   onSetView: (view: 'board' | 'list') => void;
-  onSetDefaultProject: (projectId: string) => Promise<void>;
-  onUpdateProjectInfo: (projectId: string, updates: { name: string; description: string; status: Project['status'] }) => Promise<void>;
   onUpdateTicket: (id: string, updates: Partial<Ticket>) => Promise<void>;
 }
 
@@ -58,25 +47,15 @@ export function WorkspacePage({
   projects,
   tickets,
   users,
-  workspaceName,
   activeProjectId,
-  defaultProjectId,
-  projectCreateLoading,
-  projectCreateError,
-  projectManageLoading,
-  projectManageError,
-  defaultProjectLoading,
   onAddComment,
-  onCreateProject,
   onDeleteTicket,
   onOpenCreateSubtask,
   onOpenCreateTicket,
-  onSelectProject,
+  onOpenProjectManager,
   onSelectTicket,
   onSetFilters,
   onSetView,
-  onSetDefaultProject,
-  onUpdateProjectInfo,
   onUpdateTicket,
 }: WorkspacePageProps) {
   const filteredTickets = useMemo(() => filterTickets(tickets, filters), [tickets, filters]);
@@ -165,29 +144,22 @@ export function WorkspacePage({
       <div className="workspace-page__content">
         <div className={`workspace-page__issues ${activeTicket ? 'workspace-page__issues--hidden' : ''}`}>
           <div className="workspace-page__issues-shell">
-            <WorkspaceProjectPanel
-              workspaceName={workspaceName}
-              projects={projects}
-              activeProjectId={activeProjectId}
-              defaultProjectId={defaultProjectId}
-              projectCreateLoading={projectCreateLoading}
-              projectCreateError={projectCreateError}
-              projectManageLoading={projectManageLoading}
-              projectManageError={projectManageError}
-              defaultProjectLoading={defaultProjectLoading}
-              onSelectProject={onSelectProject}
-              onCreateProject={onCreateProject}
-              onUpdateProject={onUpdateProjectInfo}
-              onSetDefaultProject={onSetDefaultProject}
-            />
-
             <div className="workspace-page__issues-content">
               {projects.length === 0 ? (
                 <div className="workspace-page__empty-state">
                   <div className="workspace-page__empty-state-title">No projects in this workspace yet</div>
                   <p className="workspace-page__empty-state-copy">
-                    Use the project form above to create the first project. Once a project exists, tickets, domains, and cycles will become available inside this workspace.
+                    Open Manage Projects to create the first project for this workspace. Once a project exists, tickets, domains, and cycles will become available here.
                   </p>
+                  <div className="workspace-page__empty-state-actions">
+                    <button
+                      type="button"
+                      className="workspace-page__projects-button workspace-page__projects-button--primary"
+                      onClick={onOpenProjectManager}
+                    >
+                      Manage Projects
+                    </button>
+                  </div>
                 </div>
               ) : activeView === 'board' ? (
                 <TicketBoard

@@ -19,7 +19,7 @@ export interface SidebarProps {
   activeProjectTicketCount: number;
   domainCounts: Record<string, number>;
   cycleCounts: Record<string, number>;
-  activeArea?: 'workspace' | 'settings' | 'account';
+  activeArea?: 'workspace' | 'settings' | 'account' | 'projects';
   onSelectProject: (projectId: string) => void;
   onSelectWorkspace: (workspaceId: string) => void;
   onOpenWorkspaceDirectory: () => void;
@@ -32,6 +32,7 @@ export interface SidebarProps {
   onOpenOllama: () => void;
   onOpenSimulator: () => void;
   onOpenCreateTicket: () => void;
+  onOpenProjectManager: () => void;
   onOpenSettings: () => void;
 }
 
@@ -61,6 +62,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenOllama,
   onOpenSimulator,
   onOpenCreateTicket,
+  onOpenProjectManager,
   onOpenSettings,
 }) => {
   const [showUserDropdown, setShowUserDropdown] = useState(false);
@@ -119,15 +121,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <span style={{ fontWeight: 600, fontSize: '15px', color: 'var(--text-heading)', letterSpacing: '-0.3px' }}>Gravity</span>
 
           <select
+            className="input"
             value={activeWorkspaceId}
             onChange={(event) => onSelectWorkspace(event.target.value)}
             style={{
               width: '100%',
               minHeight: '34px',
-              borderRadius: '8px',
-              border: '1px solid var(--border)',
-              background: 'rgba(255,255,255,0.03)',
-              color: 'var(--text-heading)',
               padding: '0 10px',
               fontSize: '12px'
             }}
@@ -140,23 +139,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </select>
         </div>
 
-        <button
-          type="button"
-          onClick={onOpenWorkspaceDirectory}
-          className="clickable"
-          style={{
-            fontSize: '10px',
-            background: 'var(--accent-glow)',
-            border: '1px solid var(--accent-border)',
-            color: 'var(--accent)',
-            padding: '6px 8px',
-            borderRadius: '8px',
-            fontWeight: 600,
-            cursor: 'pointer'
-          }}
-        >
-          All
-        </button>
       </div>
 
       {/* Quick Action Button */}
@@ -168,7 +150,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         >
           <Sparkles size={14} />
           <span>New Ticket</span>
-          <span style={{ fontSize: '10px', opacity: 0.6, marginLeft: 'auto', background: 'rgba(255,255,255,0.2)', padding: '1px 5px', borderRadius: '3px' }}>C</span>
+          <span style={{ fontSize: '10px', opacity: 0.6, marginLeft: 'auto', background: 'rgba(255,255,255,0.2)', padding: '1px 5px', borderRadius: '3px' }}>N</span>
         </button>
       </div>
 
@@ -392,6 +374,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <Sliders size={14} color="var(--accent)" />
               <span>Account Preferences</span>
+            </div>
+
+            <div 
+              onClick={() => {
+                setShowUserDropdown(false);
+                onOpenProjectManager();
+              }}
+              className="clickable"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 10px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '12px',
+                color: activeArea === 'projects' ? 'var(--text-heading)' : 'var(--text)',
+                background: activeArea === 'projects' ? 'rgba(59, 130, 246, 0.08)' : 'transparent',
+                border: activeArea === 'projects' ? '1px solid rgba(59, 130, 246, 0.18)' : '1px solid transparent'
+              }}
+            >
+              <FolderTree size={14} color="var(--accent)" />
+              <span>Manage Projects</span>
             </div>
 
             <div 

@@ -16,8 +16,9 @@ import { LoadingPage } from '../LoadingPage/LoadingPage';
 import { SettingsPage } from '../SettingsPage/SettingsPage';
 import { WorkspaceDirectoryPage } from '../WorkspaceDirectoryPage/WorkspaceDirectoryPage';
 import { WorkspacePage } from '../WorkspacePage/WorkspacePage';
+import { WorkspaceProjectsPage } from '../WorkspaceProjectsPage/WorkspaceProjectsPage';
 
-type AppSection = 'directory' | 'workspace' | 'settings' | 'account';
+type AppSection = 'directory' | 'workspace' | 'settings' | 'account' | 'projects';
 
 function getActiveWorkspaceStorageKey(userId: string) {
   return `gravity_active_workspace:${userId}`;
@@ -53,8 +54,9 @@ export function AppShellPage() {
     users,
   } = useTickets();
 
-  const [activeSection, setActiveSection] = useState<AppSection>('directory');
+  const [activeSection, setActiveSection] = useState<AppSection>('workspace');
   const [activeWorkspaceId, setActiveWorkspaceId] = useState('');
+  const [workspaceReady, setWorkspaceReady] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isOllamaOpen, setIsOllamaOpen] = useState(false);
   const [isSimulatorOpen, setIsSimulatorOpen] = useState(false);
@@ -69,6 +71,7 @@ export function AppShellPage() {
   const {
     workspaces,
     loading: workspacesLoading,
+    resolvedUserId: workspacesResolvedUserId,
     pendingAction,
     error: workspaceDirectoryError,
     successMessage: workspaceDirectorySuccess,
@@ -77,6 +80,7 @@ export function AppShellPage() {
     requestJoinByInvite,
     validatePeerInvite,
   } = useWorkspaceDirectory({ currentUser, setCurrentUser });
+  const workspacesResolvedForCurrentUser = !currentUser || workspacesResolvedUserId === currentUser.id;
 
   const activeWorkspace = useMemo(
     () => workspaces.find((workspace) => workspace.id === activeWorkspaceId) || null,
@@ -161,14 +165,20 @@ export function AppShellPage() {
 
   useEffect(() => {
     if (!currentUser) {
-      setActiveSection('directory');
+      setActiveSection('workspace');
       setActiveWorkspaceId('');
+      setWorkspaceReady(false);
+      return;
+    }
+
+    if (!workspacesResolvedForCurrentUser || workspacesLoading) {
       return;
     }
 
     if (workspaces.length === 0) {
-      setActiveSection('directory');
       setActiveWorkspaceId('');
+      setWorkspaceReady(true);
+      setActiveSection((current) => (current === 'account' ? current : 'directory'));
       return;
     }
 
@@ -179,9 +189,14 @@ export function AppShellPage() {
         storedWorkspaceId && workspaces.some((workspace) => workspace.id === storedWorkspaceId)
           ? storedWorkspaceId
           : workspaces[0].id;
-      setActiveWorkspaceId(nextWorkspaceId);
+
+      if (nextWorkspaceId !== activeWorkspaceId) {
+        setActiveWorkspaceId(nextWorkspaceId);
+      }
     }
-  }, [currentUser, workspaces, activeWorkspaceId]);
+
+    setWorkspaceReady(true);
+  }, [currentUser, workspacesResolvedForCurrentUser, workspacesLoading, workspaces, activeWorkspaceId]);
 
   useEffect(() => {
     if (!currentUser || typeof window === 'undefined') {
@@ -330,7 +345,7 @@ export function AppShellPage() {
     setActiveSection('workspace');
   };
 
-  const handleSelectProject = (projectId: string) => {
+  const updateProjectSelection = (projectId: string, nextSection: 'workspace' | 'projects') => {
     const project = projects.find((candidate) => candidate.id === projectId);
     if (project?.workspaceId) {
       setActiveWorkspaceId(project.workspaceId);
@@ -339,7 +354,15 @@ export function AppShellPage() {
     setActiveProjectId(projectId);
     setActiveTicket(null);
     setFilters({ assigneeId: '', domainId: '', cycleId: '' });
-    setActiveSection('workspace');
+    setActiveSection(nextSection);
+  };
+
+  const handleSelectProject = (projectId: string) => {
+    updateProjectSelection(projectId, 'workspace');
+  };
+
+  const handleSelectProjectForManagement = (projectId: string) => {
+    updateProjectSelection(projectId, 'projects');
   };
 
   const handleCreateProject = async (projectInput: { name: string; description: string; key: string }) => {
@@ -488,6 +511,16 @@ export function AppShellPage() {
     setActiveSection('account');
   };
 
+  const handleOpenProjectManager = () => {
+    if (!activeWorkspace) {
+      setActiveSection('directory');
+      return;
+    }
+
+    setActiveTicket(null);
+    setActiveSection('projects');
+  };
+
   const handleCreateInvite = async (input: { email: string; expirationHours: number }) => Boolean(await createInvite(input));
   const handleRevokeInvite = async (inviteId: string) => Boolean(await revokeInvite(inviteId));
   const handleApproveJoinRequest = async (requestId: string) => Boolean(await approveJoinRequest(requestId));
@@ -504,7 +537,7 @@ export function AppShellPage() {
         return;
       }
 
-      if (event.key === 'c' || event.key === 'C') {
+      if (event.key === 'n' || event.key === 'N') {
         event.preventDefault();
         handleOpenCreateTicket();
       }
@@ -518,7 +551,11 @@ export function AppShellPage() {
     return <AuthScreen />;
   }
 
-  if (loading || workspacesLoading) {
+  if (loading || workspacesLoading || !workspacesResolvedForCurrentUser) {
+    return <LoadingPage />;
+  }
+
+  if (currentUser && !workspaceReady) {
     return <LoadingPage />;
   }
 
@@ -558,7 +595,7 @@ export function AppShellPage() {
     );
   }
 
-  if (activeSection === 'directory' || workspaces.length === 0 || !activeWorkspace) {
+  if (activeSection === 'directory' || workspaces.length === 0) {
     return (
       <>
         <WorkspaceDirectoryPage
@@ -585,6 +622,10 @@ export function AppShellPage() {
     );
   }
 
+  if (!activeWorkspace) {
+    return <LoadingPage />;
+  }
+
   const sidebarProps: SidebarProps = {
     workspaces: workspaces.map((workspace) => ({ id: workspace.id, name: workspace.name })),
     projects: activeWorkspaceProjects,
@@ -598,7 +639,7 @@ export function AppShellPage() {
     activeProjectTicketCount: openTickets.length,
     domainCounts,
     cycleCounts,
-    activeArea: activeSection === 'settings' ? 'settings' : 'workspace',
+    activeArea: activeSection === 'projects' ? 'projects' : 'workspace',
     onSelectWorkspace: handleSelectWorkspace,
     onOpenWorkspaceDirectory: () => setActiveSection('directory'),
     onSelectProject: handleSelectProject,
@@ -611,6 +652,7 @@ export function AppShellPage() {
     onOpenOllama: () => setIsOllamaOpen((previous) => !previous),
     onOpenSimulator: () => setIsSimulatorOpen((previous) => !previous),
     onOpenCreateTicket: () => handleOpenCreateTicket(),
+    onOpenProjectManager: handleOpenProjectManager,
     onOpenSettings: handleOpenSettings,
   };
 
@@ -646,43 +688,58 @@ export function AppShellPage() {
           sidebarProps={sidebarProps}
           rightPanels={
             <>
-              {isOllamaOpen ? <LocalAIChat onClose={() => setIsOllamaOpen(false)} /> : null}
+              {isOllamaOpen ? (
+                <LocalAIChat
+                  onClose={() => setIsOllamaOpen(false)}
+                  initialOllamaUrl={accountSettings.ollamaEndpoint}
+                  initialModel={accountSettings.ollamaModel || ollamaModels[0] || ''}
+                />
+              ) : null}
               {isSimulatorOpen ? <AgentSimulator onClose={() => setIsSimulatorOpen(false)} /> : null}
             </>
           }
         >
-          <WorkspacePage
-            activeTicket={activeTicket}
-            activeView={activeView}
-            comments={comments}
-            currentUser={currentUser}
-            cycles={cycles}
-            domains={domains}
-            filters={filters}
-            projects={activeWorkspaceProjects}
-            tickets={tickets}
-            users={users}
-            workspaceName={activeWorkspace.name}
-            activeProjectId={activeProjectId}
-            defaultProjectId={activeWorkspace.defaultProjectId}
-            projectCreateLoading={projectCreateLoading}
-            projectCreateError={projectCreateError}
-            projectManageLoading={projectManageLoading}
-            projectManageError={projectManageError}
-            defaultProjectLoading={defaultProjectLoading}
-            onAddComment={addComment}
-            onCreateProject={handleCreateProject}
-            onDeleteTicket={handleDeleteTicket}
-            onOpenCreateSubtask={handleOpenCreateSubtask}
-            onOpenCreateTicket={handleOpenCreateTicket}
-            onSelectProject={handleSelectProject}
-            onSelectTicket={setActiveTicket}
-            onSetFilters={setFilters}
-            onSetView={setView}
-            onSetDefaultProject={handleSetDefaultProject}
-            onUpdateProjectInfo={handleUpdateProjectInfo}
-            onUpdateTicket={updateTicket}
-          />
+          {activeSection === 'projects' ? (
+            <WorkspaceProjectsPage
+              workspaceName={activeWorkspace.name}
+              projects={activeWorkspaceProjects}
+              activeProjectId={activeProjectId}
+              defaultProjectId={activeWorkspace.defaultProjectId}
+              projectCreateLoading={projectCreateLoading}
+              projectCreateError={projectCreateError}
+              projectManageLoading={projectManageLoading}
+              projectManageError={projectManageError}
+              defaultProjectLoading={defaultProjectLoading}
+              onBackToWorkspace={() => setActiveSection('workspace')}
+              onCreateProject={handleCreateProject}
+              onSelectProject={handleSelectProjectForManagement}
+              onSetDefaultProject={handleSetDefaultProject}
+              onUpdateProjectInfo={handleUpdateProjectInfo}
+            />
+          ) : (
+            <WorkspacePage
+              activeTicket={activeTicket}
+              activeView={activeView}
+              comments={comments}
+              currentUser={currentUser}
+              cycles={cycles}
+              domains={domains}
+              filters={filters}
+              projects={activeWorkspaceProjects}
+              tickets={tickets}
+              users={users}
+              activeProjectId={activeProjectId}
+              onAddComment={addComment}
+              onDeleteTicket={handleDeleteTicket}
+              onOpenCreateSubtask={handleOpenCreateSubtask}
+              onOpenCreateTicket={handleOpenCreateTicket}
+              onOpenProjectManager={handleOpenProjectManager}
+              onSelectTicket={setActiveTicket}
+              onSetFilters={setFilters}
+              onSetView={setView}
+              onUpdateTicket={updateTicket}
+            />
+          )}
         </WorkspaceLayout>
       )}
 
