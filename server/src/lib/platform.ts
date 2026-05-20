@@ -57,7 +57,7 @@ export function createWorkspaceAccessKey(workspaceKey: string) {
 }
 
 export function createProjectInviteCode(projectKey: string) {
-  return `INV-${normalizeEntityKey(projectKey)}-${Math.floor(1000 + Math.random() * 9000)}`;
+  return `INV-${normalizeEntityKey(projectKey)}-${randomUUID().replace(/-/g, '').slice(0, 8).toUpperCase()}`;
 }
 
 export function createWorkspaceInviteCode(workspaceKey: string) {
@@ -246,7 +246,7 @@ export async function listWorkspaceSummaries(userId?: string) {
     }
   }
 
-  let workspaceQuery = db
+  const workspaceQuery = db
     .select({
       id: workspaces.id,
       name: workspaces.name,
@@ -258,14 +258,11 @@ export async function listWorkspaceSummaries(userId?: string) {
       joinMode: workspaceSettings.joinMode,
     })
     .from(workspaces)
-    .leftJoin(workspaceSettings, eq(workspaceSettings.workspaceId, workspaces.id))
-    .orderBy(asc(workspaces.createdAt));
+    .leftJoin(workspaceSettings, eq(workspaceSettings.workspaceId, workspaces.id));
 
-  if (accessibleWorkspaceIds) {
-    workspaceQuery = workspaceQuery.where(inArray(workspaces.id, accessibleWorkspaceIds));
-  }
-
-  const workspaceRows = await workspaceQuery;
+  const workspaceRows = accessibleWorkspaceIds
+    ? await workspaceQuery.where(inArray(workspaces.id, accessibleWorkspaceIds)).orderBy(asc(workspaces.createdAt))
+    : await workspaceQuery.orderBy(asc(workspaces.createdAt));
   if (workspaceRows.length === 0) {
     return [];
   }

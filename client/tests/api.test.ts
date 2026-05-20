@@ -399,6 +399,30 @@ const tests = [
     }
   },
   {
+    name: 'Projects Creation Duplicate Key Returns Friendly Error',
+    fn: async () => {
+      const res = await fetch(`${BASE_URL}/api/projects`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Sandboxed Duplicate',
+          description: 'Duplicate key validation',
+          key: 'TST',
+          status: 'active',
+          ownerId: testUserId,
+        })
+      });
+
+      assert(res.status === 409, 'Duplicate project keys should be rejected with 409');
+      const data = await res.json() as any;
+      assert(
+        data.error === 'Project key TST is already in use. Choose a different global project key.',
+        'Duplicate project keys should return a friendly conflict message',
+      );
+      assert(!String(data.error).includes('Failed query:'), 'Duplicate project keys should not leak raw SQL details');
+    }
+  },
+  {
     name: 'Project Members Manual Assignment',
     fn: async () => {
       const res = await fetch(`${BASE_URL}/api/projects/${gravityProjectId}/members`, {

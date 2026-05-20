@@ -29,6 +29,7 @@ import {
   listWorkspaceSummaries,
   normalizeEntityKey,
 } from '../lib/platform.js';
+import { buildProjectKeyConflictMessage, mapProjectCreationError, projectKeyExists } from '../lib/project-creation.js';
 import { resolveRequestActorUserId } from '../lib/request-auth.js';
 
 function createValidationCode() {
@@ -125,6 +126,11 @@ export function createWorkspacesRouter() {
       const resolvedWorkspaceAccessKey = workspaceKey?.trim() || createWorkspaceAccessKey(normalizedWorkspaceKey);
       const resolvedProjectKey = normalizeEntityKey(defaultProjectKey || key);
 
+      if (await projectKeyExists(resolvedProjectKey)) {
+        res.status(409).json({ error: buildProjectKeyConflictMessage(resolvedProjectKey) });
+        return;
+      }
+
       await db.transaction(async (tx) => {
         await tx.insert(workspaces).values({
           id: workspaceId,
@@ -171,8 +177,8 @@ export function createWorkspacesRouter() {
       const workspace = await getWorkspaceSummary(workspaceId, ownerId);
       res.status(201).json({ workspace });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to create workspace.';
-      res.status(/duplicate|unique/i.test(message) ? 400 : 500).json({ error: message });
+      const mapped = mapProjectCreationError(error, normalizeEntityKey(defaultProjectKey || key));
+      res.status(mapped.status).json({ error: mapped.message });
     }
   });
 

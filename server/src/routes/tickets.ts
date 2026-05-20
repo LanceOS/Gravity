@@ -29,6 +29,10 @@ function mapCycle(cycle: typeof cycles.$inferSelect) {
 export function createTicketsRouter() {
   const router = Router();
 
+  function normalizeRouteParam(value: string | string[]) {
+    return Array.isArray(value) ? value[0] ?? '' : value;
+  }
+
   async function ensureWorkspaceCanAccessTicket(ticketId: string, workspaceId: string) {
     const ticket = await getTicketById(ticketId);
     if (!ticket) {
@@ -98,7 +102,8 @@ export function createTicketsRouter() {
 
   router.get('/tickets/:ticketId', async (req, res) => {
     try {
-      const ticket = await getTicketDetails(req.params.ticketId, getProjectIdFromRequest(req) || undefined);
+      const ticketId = normalizeRouteParam(req.params.ticketId);
+      const ticket = await getTicketDetails(ticketId, getProjectIdFromRequest(req) || undefined);
       if (!ticket) {
         res.status(404).json({ error: 'Ticket not found.' });
         return;
@@ -118,7 +123,8 @@ export function createTicketsRouter() {
     }
 
     try {
-      const updated = await updateTicketRecord(req.params.ticketId, req.body ?? {}, projectId);
+      const ticketId = normalizeRouteParam(req.params.ticketId);
+      const updated = await updateTicketRecord(ticketId, req.body ?? {}, projectId);
       if (!updated) {
         res.status(404).json({ error: 'Ticket not found.' });
         return;
@@ -139,7 +145,8 @@ export function createTicketsRouter() {
     }
 
     try {
-      const deleted = await deleteTicketRecord(req.params.ticketId, projectId);
+      const ticketId = normalizeRouteParam(req.params.ticketId);
+      const deleted = await deleteTicketRecord(ticketId, projectId);
       if (!deleted) {
         res.status(404).json({ error: 'Ticket not found.' });
         return;
@@ -154,9 +161,10 @@ export function createTicketsRouter() {
 
   router.get('/tickets/:ticketId/comments', optionalWorkspaceAccess, async (req, res: Response<unknown, WorkspaceAccessLocals>) => {
     try {
+      const ticketId = normalizeRouteParam(req.params.ticketId);
       const workspaceAccess = getWorkspaceAccess(res);
       if (workspaceAccess) {
-        const accessResult = await ensureWorkspaceCanAccessTicket(req.params.ticketId, workspaceAccess.workspaceId);
+        const accessResult = await ensureWorkspaceCanAccessTicket(ticketId, workspaceAccess.workspaceId);
         if (!accessResult.allowed) {
           res.status(accessResult.reason === 'not_found' ? 404 : 403).json({
             error: accessResult.reason === 'not_found' ? 'Ticket not found.' : 'Workspace access does not permit this ticket.',
@@ -165,13 +173,14 @@ export function createTicketsRouter() {
         }
       }
 
-      res.json(await listComments(req.params.ticketId));
+      res.json(await listComments(ticketId));
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load comments.' });
     }
   });
 
   router.post('/tickets/:ticketId/comments', optionalWorkspaceAccess, async (req, res: Response<unknown, WorkspaceAccessLocals>) => {
+    const ticketId = normalizeRouteParam(req.params.ticketId);
     const workspaceAccess = getWorkspaceAccess(res);
     const userId = workspaceAccess?.userId ?? (typeof req.body?.userId === 'string' ? req.body.userId : '');
     const body =
@@ -188,7 +197,7 @@ export function createTicketsRouter() {
 
     try {
       if (workspaceAccess) {
-        const accessResult = await ensureWorkspaceCanAccessTicket(req.params.ticketId, workspaceAccess.workspaceId);
+        const accessResult = await ensureWorkspaceCanAccessTicket(ticketId, workspaceAccess.workspaceId);
         if (!accessResult.allowed) {
           res.status(accessResult.reason === 'not_found' ? 404 : 403).json({
             error: accessResult.reason === 'not_found' ? 'Ticket not found.' : 'Workspace access does not permit this ticket.',
@@ -197,9 +206,9 @@ export function createTicketsRouter() {
         }
       }
 
-      const comment = await addCommentRecord(req.params.ticketId, userId, body);
-      const allComments = await listComments(req.params.ticketId);
-      broadcastEvent('comments-updated', { ticketId: req.params.ticketId, comments: allComments });
+      const comment = await addCommentRecord(ticketId, userId, body);
+      const allComments = await listComments(ticketId);
+      broadcastEvent('comments-updated', { ticketId, comments: allComments });
       res.status(201).json(comment);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to add comment.' });

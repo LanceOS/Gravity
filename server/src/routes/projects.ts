@@ -12,6 +12,7 @@ import {
   normalizeEntityKey,
   normalizeIsoDate,
 } from '../lib/platform.js';
+import { buildProjectKeyConflictMessage, mapProjectCreationError, projectKeyExists } from '../lib/project-creation.js';
 import { getWorkspaceAccess, optionalWorkspaceAccess, type WorkspaceAccessLocals } from '../lib/workspace-access.js';
 
 function mapProject(project: typeof projects.$inferSelect) {
@@ -160,6 +161,11 @@ export function createProjectsRouter() {
     try {
       const projectId = createId('p');
       const normalizedKey = normalizeEntityKey(key);
+      if (await projectKeyExists(normalizedKey)) {
+        res.status(409).json({ error: buildProjectKeyConflictMessage(normalizedKey) });
+        return;
+      }
+
       let targetWorkspaceId = workspaceId as string | undefined;
 
       await db.transaction(async (tx) => {
@@ -220,8 +226,8 @@ export function createProjectsRouter() {
         inviteCode: rows[0].inviteCode,
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to create project.';
-      res.status(/duplicate|unique/i.test(message) ? 400 : 500).json({ error: message });
+      const mapped = mapProjectCreationError(error, normalizeEntityKey(key));
+      res.status(mapped.status).json({ error: mapped.message });
     }
   });
 
