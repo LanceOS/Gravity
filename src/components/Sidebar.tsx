@@ -2,8 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import type { Cycle, Domain, Project, User } from '../context/TicketContext';
 import type { TicketFilters } from '../utils/ticketView';
 import { 
-  Inbox, Database, Sun, Moon, LogOut, CheckCircle,
-  Terminal, Cpu, Sparkles, ChevronDown, ChevronRight, Sliders, FolderTree
+  Inbox, Database, LogOut, CheckCircle,
+  Terminal, Cpu, Sparkles, ChevronDown, ChevronRight, Sliders, FolderTree, Settings2
 } from 'lucide-react';
 
 export interface SidebarProps {
@@ -15,12 +15,11 @@ export interface SidebarProps {
   activeWorkspaceId: string;
   activeProjectId: string;
   filters: TicketFilters;
-  theme: 'dark' | 'light';
   myIssuesCount: number;
   activeProjectTicketCount: number;
   domainCounts: Record<string, number>;
   cycleCounts: Record<string, number>;
-  activeArea?: 'workspace' | 'settings';
+  activeArea?: 'workspace' | 'settings' | 'account';
   onSelectProject: (projectId: string) => void;
   onSelectWorkspace: (workspaceId: string) => void;
   onOpenWorkspaceDirectory: () => void;
@@ -28,7 +27,7 @@ export interface SidebarProps {
   onShowMyIssues: () => void;
   onSelectCycle: (cycleId: string) => void;
   onSelectDomain: (domainId: string) => void;
-  onToggleTheme: () => void;
+  onOpenAccountPreferences: () => void;
   onSignOut: () => void;
   onOpenOllama: () => void;
   onOpenSimulator: () => void;
@@ -45,7 +44,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   activeWorkspaceId,
   activeProjectId,
   filters,
-  theme,
   myIssuesCount,
   activeProjectTicketCount,
   domainCounts,
@@ -58,7 +56,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onShowMyIssues,
   onSelectCycle,
   onSelectDomain,
-  onToggleTheme,
+  onOpenAccountPreferences,
   onSignOut,
   onOpenOllama,
   onOpenSimulator,
@@ -376,6 +374,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div 
               onClick={() => {
                 setShowUserDropdown(false);
+                onOpenAccountPreferences();
+              }}
+              className="clickable"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 10px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '12px',
+                color: activeArea === 'account' ? 'var(--text-heading)' : 'var(--text)',
+                background: activeArea === 'account' ? 'rgba(59, 130, 246, 0.08)' : 'transparent',
+                border: activeArea === 'account' ? '1px solid rgba(59, 130, 246, 0.18)' : '1px solid transparent'
+              }}
+            >
+              <Sliders size={14} color="var(--accent)" />
+              <span>Account Preferences</span>
+            </div>
+
+            <div 
+              onClick={() => {
+                setShowUserDropdown(false);
                 onOpenSettings();
               }}
               className="clickable"
@@ -392,28 +413,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 border: activeArea === 'settings' ? '1px solid rgba(59, 130, 246, 0.18)' : '1px solid transparent'
               }}
             >
-              <Sliders size={14} color="var(--accent)" />
+              <Settings2 size={14} color="var(--accent)" />
               <span>Workspace Settings</span>
-            </div>
-            
-            <div 
-              onClick={() => {
-                onToggleTheme();
-              }}
-              className="clickable"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '8px 10px',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '12px',
-                color: 'var(--text)'
-              }}
-            >
-              {theme === 'dark' ? <Sun size={14} color="orange" /> : <Moon size={14} color="var(--accent)" />}
-              <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
             </div>
 
             <div 

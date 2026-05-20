@@ -5,16 +5,18 @@ import { CreateTicketModal } from '../../components/CreateTicketModal';
 import { LocalAIChat } from '../../components/LocalAIChat';
 import { OnboardingModal } from '../../components/OnboardingModal';
 import { useTickets, type Ticket } from '../../context/TicketContext';
+import { useAccountSettings } from '../../hooks/useAccountSettings';
 import { useWorkspaceDirectory } from '../../hooks/useWorkspaceDirectory';
 import { useWorkspaceSettings } from '../../hooks/useWorkspaceSettings';
 import { WorkspaceLayout } from '../../layouts/WorkspaceLayout/WorkspaceLayout';
+import { AccountPreferencesPage } from '../AccountPreferencesPage/AccountPreferencesPage';
 import { registerWebMCPTools } from '../../utils/webmcp';
 import { LoadingPage } from '../LoadingPage/LoadingPage';
 import { SettingsPage } from '../SettingsPage/SettingsPage';
 import { WorkspaceDirectoryPage } from '../WorkspaceDirectoryPage/WorkspaceDirectoryPage';
 import { WorkspacePage } from '../WorkspacePage/WorkspacePage';
 
-type AppSection = 'directory' | 'workspace' | 'settings';
+type AppSection = 'directory' | 'workspace' | 'settings' | 'account';
 
 export function AppShellPage() {
   const {
@@ -36,11 +38,11 @@ export function AppShellPage() {
     setActiveTicket,
     setCurrentUser,
     setFilters,
+    setTheme,
     setView,
     signOut,
     theme,
     tickets,
-    toggleTheme,
     updateTicket,
     users,
   } = useTickets();
@@ -97,6 +99,29 @@ export function AppShellPage() {
       ),
     [cycles, openTickets]
   );
+  const {
+    settings: accountSettings,
+    settingsLoading: accountSettingsLoading,
+    saveLoading: accountSaveLoading,
+    saveSuccess: accountSaveSuccess,
+    saveError: accountSaveError,
+    testing: accountTesting,
+    testResult: accountTestResult,
+    tutorialResult: accountTutorialResult,
+    ollamaModels,
+    ollamaModelsLoading,
+    updateSettings: updateAccountSettings,
+    saveSettings: saveAccountSettings,
+    testApiKey,
+    resetTutorial,
+    refreshOllamaModels,
+  } = useAccountSettings({
+    currentUser,
+    activeView,
+    theme,
+    setView,
+    setTheme,
+  });
   const {
     settings,
     settingsLoading,
@@ -294,6 +319,11 @@ export function AppShellPage() {
     setActiveSection('settings');
   };
 
+  const handleOpenAccountPreferences = () => {
+    setActiveTicket(null);
+    setActiveSection('account');
+  };
+
   const handleCreateInvite = async (label?: string) => Boolean(await createInvite(label));
   const handleApproveJoinRequest = async (requestId: string) => Boolean(await approveJoinRequest(requestId));
 
@@ -335,6 +365,34 @@ export function AppShellPage() {
     />
   ) : null;
 
+  if (activeSection === 'account') {
+    return (
+      <>
+        <AccountPreferencesPage
+          currentUser={currentUser}
+          settings={accountSettings}
+          settingsLoading={accountSettingsLoading}
+          saveLoading={accountSaveLoading}
+          saveSuccess={accountSaveSuccess}
+          saveError={accountSaveError}
+          testing={accountTesting}
+          testResult={accountTestResult}
+          tutorialResult={accountTutorialResult}
+          ollamaModels={ollamaModels}
+          ollamaModelsLoading={ollamaModelsLoading}
+          onBack={() => setActiveSection(activeWorkspace ? 'workspace' : 'directory')}
+          onOpenDirectory={() => setActiveSection('directory')}
+          onChangeSettings={updateAccountSettings}
+          onRefreshOllamaModels={() => void refreshOllamaModels()}
+          onResetTutorial={() => void resetTutorial()}
+          onSaveSettings={() => void saveAccountSettings()}
+          onTestApiKey={() => void testApiKey()}
+        />
+        {onboarding}
+      </>
+    );
+  }
+
   if (activeSection === 'directory' || workspaces.length === 0 || !activeWorkspace) {
     return (
       <>
@@ -353,6 +411,7 @@ export function AppShellPage() {
             setActiveWorkspaceId(workspaceId);
             setActiveSection('settings');
           }}
+          onOpenAccountPreferences={handleOpenAccountPreferences}
           onSignOut={signOut}
         />
         {onboarding}
@@ -369,12 +428,11 @@ export function AppShellPage() {
     activeWorkspaceId,
     activeProjectId,
     filters,
-    theme,
     myIssuesCount,
     activeProjectTicketCount: openTickets.length,
     domainCounts,
     cycleCounts,
-    activeArea: activeSection === 'settings' ? 'settings' : 'workspace',
+    activeArea: activeSection === 'settings' ? 'settings' : activeSection === 'account' ? 'account' : 'workspace',
     onSelectWorkspace: handleSelectWorkspace,
     onOpenWorkspaceDirectory: () => setActiveSection('directory'),
     onSelectProject: handleSelectProject,
@@ -382,7 +440,7 @@ export function AppShellPage() {
     onShowMyIssues: handleShowMyIssues,
     onSelectCycle: handleSelectCycle,
     onSelectDomain: handleSelectDomain,
-    onToggleTheme: toggleTheme,
+    onOpenAccountPreferences: handleOpenAccountPreferences,
     onSignOut: signOut,
     onOpenOllama: () => setIsOllamaOpen((previous) => !previous),
     onOpenSimulator: () => setIsSimulatorOpen((previous) => !previous),

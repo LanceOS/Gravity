@@ -15,6 +15,7 @@ interface WorkspaceDirectoryPageProps {
   onRequestJoin: (inviteCode: string, message?: string) => Promise<void>;
   onOpenWorkspace: (workspaceId: string) => void;
   onOpenSettings: (workspaceId: string) => void;
+  onOpenAccountPreferences: () => void;
   onSignOut: () => void;
 }
 
@@ -30,6 +31,7 @@ export function WorkspaceDirectoryPage({
   onRequestJoin,
   onOpenWorkspace,
   onOpenSettings,
+  onOpenAccountPreferences,
   onSignOut,
 }: WorkspaceDirectoryPageProps) {
   const [workspaceName, setWorkspaceName] = useState('');
@@ -87,10 +89,17 @@ export function WorkspaceDirectoryPage({
           {errorMessage ? <div style={errorStyle}>{errorMessage}</div> : null}
           {successMessage ? <div style={successStyle}>{successMessage}</div> : null}
 
-          <button type="button" className="btn" style={signOutButtonStyle} onClick={onSignOut}>
-            <LogOut size={14} />
-            Sign Out
-          </button>
+          <div style={heroActionsStyle}>
+            <button type="button" className="btn" style={accountButtonStyle} onClick={onOpenAccountPreferences}>
+              <Settings2 size={14} />
+              Account Preferences
+            </button>
+
+            <button type="button" className="btn" style={signOutButtonStyle} onClick={onSignOut}>
+              <LogOut size={14} />
+              Sign Out
+            </button>
+          </div>
         </section>
 
         <section style={workspaceColumnStyle}>
@@ -457,6 +466,15 @@ const emptyCardStyle: CSSProperties = {
 };
 
 const signOutButtonStyle: CSSProperties = {
-  alignSelf: 'flex-start',
+  gap: '8px',
+};
+
+const heroActionsStyle: CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: '10px',
+};
+
+const accountButtonStyle: CSSProperties = {
   gap: '8px',
 };
