@@ -27,5 +27,5 @@ services:
   # Vite dev server exposed on localhost:33101 are accepted.
   backend:
     environment:
-      - CORS_ORIGINS=http://localhost:33100,http://localhost:33101
-      - TRUSTED_ORIGINS=http://localhost:33100,http://localhost:33101
+      CORS_ORIGINS: http://localhost:33100,http://localhost:33101
+      TRUSTED_ORIGINS: http://localhost:33100,http://localhost:33101
