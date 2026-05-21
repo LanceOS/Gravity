@@ -118,7 +118,8 @@ textarea {
   cursor: pointer;
   transition: border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
-.clickable:not(button):not(.btn):hover {
+.clickable:not(button):not(.btn):hover,
+button.clickable:not(.btn):hover {
   background-color: var(--card-hover);
 }
 
