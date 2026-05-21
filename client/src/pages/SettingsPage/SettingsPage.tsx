@@ -17,6 +17,7 @@ import type { User } from '../../context/TicketContext';
 import type { WorkspaceSummary } from '../../hooks/useWorkspaceDirectory';
 import type {
   CreateWorkspaceInviteInput,
+  FederationConnection,
   WorkspaceAdminSettings,
   WorkspaceInvite,
   WorkspaceJoinRequest,
@@ -34,6 +35,10 @@ interface SettingsPageProps {
   saveSuccess: boolean;
   saveError: string | null;
   inviteError: string | null;
+  federationConnections: FederationConnection[];
+  connectionsLoading: boolean;
+  connectionsError: string | null;
+  retryingConnectionId: string | null;
   invitesLoading: boolean;
   inviteLoading: boolean;
   invites: WorkspaceInvite[];
@@ -48,6 +53,7 @@ interface SettingsPageProps {
   onCreateInvite: (input: CreateWorkspaceInviteInput) => Promise<boolean>;
   onRevokeInvite: (inviteId: string) => Promise<boolean>;
   onApproveJoinRequest: (requestId: string) => Promise<boolean>;
+  onRetryConnection: (connectionId: string) => Promise<void>;
 }
 
 const COPY_FEEDBACK_STORAGE_KEY = 'gravity_peer_invite_copy_feedback';
@@ -96,6 +102,26 @@ const SETTINGS_CATEGORIES: Array<{
     icon: UserPlus,
   },
 ];
+
+function formatConnectionTimestamp(value: string | null) {
+  return value ? new Date(value).toLocaleString() : 'Not yet recorded';
+}
+
+function getFederationConnectionStatus(connection: FederationConnection) {
+  if (connection.status === 'failed') {
+    return { label: 'Failed', variant: 'error' as const };
+  }
+
+  if (connection.syncState.consecutiveFailures > 0) {
+    return { label: 'Retrying', variant: 'warning' as const };
+  }
+
+  if (connection.lastSyncedEventId > 0) {
+    return { label: 'Synced', variant: 'success' as const };
+  }
+
+  return { label: 'Connected', variant: 'accent' as const };
+}
 
 function OverviewSection({
   workspace,
@@ -173,6 +199,124 @@ function OverviewSection({
             </div>
           </div>
         </Grid>
+      </Stack>
+    </Card>
+  );
+}
+
+function FederationConnectionsSection({
+  federationConnections,
+  connectionsLoading,
+  connectionsError,
+  retryingConnectionId,
+  onRetryConnection,
+}: {
+  federationConnections: FederationConnection[];
+  connectionsLoading: boolean;
+  connectionsError: string | null;
+  retryingConnectionId: string | null;
+  onRetryConnection: (connectionId: string) => Promise<void>;
+}) {
+  return (
+    <Card style={{ padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)' }}>
+      <Stack gap="var(--space-5)">
+        <div>
+          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--text-heading)' }}>Federation Connections</h2>
+          <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '12.5px', lineHeight: 1.5 }}>
+            Review guest-side host links, sync cursors, and retry health for this workspace.
+          </p>
+        </div>
+
+        {connectionsLoading && <div style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Loading federation connections...</div>}
+
+        {connectionsError && (
+          <Alert type="warning">
+            {connectionsError}
+          </Alert>
+        )}
+
+        {!connectionsLoading && federationConnections.length === 0 && !connectionsError && (
+          <div style={{ color: 'var(--text-muted)', fontSize: '13px', textAlign: 'center', padding: 'var(--space-4)' }}>
+            No guest federation connections exist for this workspace yet.
+          </div>
+        )}
+
+        <Stack gap="var(--space-3)">
+          {federationConnections.map((connection) => {
+            const status = getFederationConnectionStatus(connection);
+
+            return (
+              <div
+                key={connection.id}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 'var(--space-4)',
+                  padding: 'var(--space-4)',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'var(--card-hover)',
+                  border: '1px solid var(--border)'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 'var(--space-4)' }}>
+                  <div>
+                    <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-heading)' }}>
+                      {connection.hostDisplayName || connection.workspaceName || 'Federated Host'}
+                    </div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px', wordBreak: 'break-word' }}>{connection.hostUrl}</div>
+                  </div>
+                  <Badge variant={status.variant}>{status.label}</Badge>
+                </div>
+
+                <Grid columns={3} gap="var(--space-3)">
+                  <div style={{ padding: 'var(--space-3)', borderRadius: 'var(--radius-sm)', background: 'var(--bg)', border: '1px solid var(--border)' }}>
+                    <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Last Success</div>
+                    <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--text-heading)', lineHeight: 1.4 }}>
+                      {formatConnectionTimestamp(connection.syncState.lastSuccessAt)}
+                    </div>
+                  </div>
+
+                  <div style={{ padding: 'var(--space-3)', borderRadius: 'var(--radius-sm)', background: 'var(--bg)', border: '1px solid var(--border)' }}>
+                    <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Sync Cursor</div>
+                    <div style={{ marginTop: '6px', fontSize: '16px', fontWeight: 700, color: 'var(--text-heading)' }}>{connection.lastSyncedEventId}</div>
+                  </div>
+
+                  <div style={{ padding: 'var(--space-3)', borderRadius: 'var(--radius-sm)', background: 'var(--bg)', border: '1px solid var(--border)' }}>
+                    <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Retries</div>
+                    <div style={{ marginTop: '6px', fontSize: '16px', fontWeight: 700, color: 'var(--text-heading)' }}>{connection.syncState.consecutiveFailures}</div>
+                  </div>
+                </Grid>
+
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)', fontSize: '11px', color: 'var(--text-muted)' }}>
+                  <span>Last attempt: {formatConnectionTimestamp(connection.syncState.lastAttemptAt)}</span>
+                  <span>Created: {formatConnectionTimestamp(connection.createdAt)}</span>
+                  {connection.syncState.nextAttemptAt && <span>Next retry: {formatConnectionTimestamp(connection.syncState.nextAttemptAt)}</span>}
+                  <span>Applied last sweep: {connection.syncState.lastAppliedCount}</span>
+                </div>
+
+                {connection.syncState.lastError && (
+                  <div style={{ padding: 'var(--space-3)', borderRadius: 'var(--radius-sm)', background: 'rgba(255, 184, 0, 0.08)', border: '1px solid rgba(255, 184, 0, 0.2)', color: 'var(--text-heading)', fontSize: '12px', lineHeight: 1.5 }}>
+                    {connection.syncState.lastError}
+                  </div>
+                )}
+
+                {(connection.status === 'failed' || connection.syncState.consecutiveFailures > 0) && (
+                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => void onRetryConnection(connection.id)}
+                      loading={retryingConnectionId === connection.id}
+                      disabled={retryingConnectionId !== null && retryingConnectionId !== connection.id}
+                    >
+                      {retryingConnectionId === connection.id ? 'Retrying...' : 'Retry Sync'}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </Stack>
       </Stack>
     </Card>
   );
@@ -600,6 +744,10 @@ export function SettingsPage({
   saveSuccess,
   saveError,
   inviteError,
+  federationConnections,
+  connectionsLoading,
+  connectionsError,
+  retryingConnectionId,
   invitesLoading,
   inviteLoading,
   invites,
@@ -614,6 +762,7 @@ export function SettingsPage({
   onCreateInvite,
   onRevokeInvite,
   onApproveJoinRequest,
+  onRetryConnection,
 }: SettingsPageProps) {
   const [activeCategory, setActiveCategory] = useState<SettingsCategoryId>('overview');
 
@@ -749,7 +898,16 @@ export function SettingsPage({
             )}
 
             {activeCategory === 'overview' && (
-              <OverviewSection workspace={workspace} settings={settings} onChangeSettings={onChangeSettings} />
+              <>
+                <OverviewSection workspace={workspace} settings={settings} onChangeSettings={onChangeSettings} />
+                <FederationConnectionsSection
+                  federationConnections={federationConnections}
+                  connectionsLoading={connectionsLoading}
+                  connectionsError={connectionsError}
+                  retryingConnectionId={retryingConnectionId}
+                  onRetryConnection={onRetryConnection}
+                />
+              </>
             )}
 
             {activeCategory === 'access' && (

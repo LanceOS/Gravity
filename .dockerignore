@@ -1,3 +1,11 @@
+<<<<<<< HEAD
+**/node_modules
+**/dist
+**/.vite
+**/.tsbuildinfo
+.git
+*.log
+=======
 # Version control
 .git
 .gitignore
@@ -33,3 +41,4 @@ server
 *.sln
 *.sw?
 *.local
+>>>>>>> main

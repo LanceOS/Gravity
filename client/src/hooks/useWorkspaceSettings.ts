@@ -52,6 +52,33 @@ export interface WorkspaceJoinRequest {
   createdAt: string;
 }
 
+export interface FederationConnectionSyncState {
+  consecutiveFailures: number;
+  nextAttemptAt: string | null;
+  lastAttemptAt: string | null;
+  lastSuccessAt: string | null;
+  lastError: string | null;
+  lastAppliedCount: number;
+}
+
+export interface FederationConnection {
+  id: string;
+  workspaceId: string;
+  workspaceName: string;
+  hostUrl: string;
+  hostDisplayName: string;
+  hostPublicKey: string;
+  lastSyncedEventId: number;
+  status: string;
+  createdAt: string;
+  syncState: FederationConnectionSyncState;
+}
+
+export interface FederationConnectionRetryResult {
+  appliedCount: number;
+  lastSyncedEventId: number;
+}
+
 interface UseWorkspaceSettingsOptions {
   currentUser: User | null;
   activeWorkspaceId: string;
@@ -81,18 +108,49 @@ function normalizeWorkspaceInvite(invite: Record<string, unknown>): WorkspaceInv
   };
 }
 
+function normalizeFederationConnection(connection: Record<string, unknown>): FederationConnection {
+  const rawSyncState =
+    connection.syncState && typeof connection.syncState === 'object' && !Array.isArray(connection.syncState)
+      ? (connection.syncState as Record<string, unknown>)
+      : {};
+
+  return {
+    id: String(connection.id ?? ''),
+    workspaceId: String(connection.workspaceId ?? ''),
+    workspaceName: String(connection.workspaceName ?? ''),
+    hostUrl: String(connection.hostUrl ?? ''),
+    hostDisplayName: String(connection.hostDisplayName ?? ''),
+    hostPublicKey: String(connection.hostPublicKey ?? ''),
+    lastSyncedEventId: Number(connection.lastSyncedEventId ?? 0),
+    status: String(connection.status ?? 'unknown'),
+    createdAt: String(connection.createdAt ?? ''),
+    syncState: {
+      consecutiveFailures: Number(rawSyncState.consecutiveFailures ?? 0),
+      nextAttemptAt: typeof rawSyncState.nextAttemptAt === 'string' ? rawSyncState.nextAttemptAt : null,
+      lastAttemptAt: typeof rawSyncState.lastAttemptAt === 'string' ? rawSyncState.lastAttemptAt : null,
+      lastSuccessAt: typeof rawSyncState.lastSuccessAt === 'string' ? rawSyncState.lastSuccessAt : null,
+      lastError: typeof rawSyncState.lastError === 'string' ? rawSyncState.lastError : null,
+      lastAppliedCount: Number(rawSyncState.lastAppliedCount ?? 0),
+    },
+  };
+}
+
 export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWorkspaceSettingsOptions) {
   const [settings, setSettings] = useState<WorkspaceAdminSettings>(() => defaultSettings(activeWorkspaceId));
   const [members, setMembers] = useState<WorkspaceMember[]>([]);
   const [invites, setInvites] = useState<WorkspaceInvite[]>([]);
   const [joinRequests, setJoinRequests] = useState<WorkspaceJoinRequest[]>([]);
+  const [federationConnections, setFederationConnections] = useState<FederationConnection[]>([]);
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [invitesLoading, setInvitesLoading] = useState(false);
+  const [connectionsLoading, setConnectionsLoading] = useState(false);
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
+  const [connectionsError, setConnectionsError] = useState<string | null>(null);
+  const [retryingConnectionId, setRetryingConnectionId] = useState<string | null>(null);
   const [approveLoadingId, setApproveLoadingId] = useState<string | null>(null);
   const [revokeLoadingId, setRevokeLoadingId] = useState<string | null>(null);
 
@@ -102,13 +160,17 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
       setMembers([]);
       setInvites([]);
       setJoinRequests([]);
+      setFederationConnections([]);
+      setConnectionsError(null);
       return;
     }
 
     setSettingsLoading(true);
     setInvitesLoading(true);
+    setConnectionsLoading(true);
     setSaveError(null);
     setInviteError(null);
+    setConnectionsError(null);
 
     try {
       const [settingsResponse, membersResponse, invitesResponse, joinRequestsResponse] = await Promise.all([
@@ -153,15 +215,38 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
       setMembers(Array.isArray(membersData) ? membersData : []);
       setInvites(Array.isArray(invitesData) ? invitesData.map((invite) => normalizeWorkspaceInvite(invite as Record<string, unknown>)) : []);
       setJoinRequests(Array.isArray(joinRequestsData) ? joinRequestsData : []);
+
+      try {
+        const connectionsResponse = await fetch(`/api/v1/federation/connections?workspaceId=${encodeURIComponent(activeWorkspaceId)}`, {
+          headers: { 'X-User-Id': currentUser.id },
+        });
+        const connectionsData = await connectionsResponse.json();
+
+        if (!connectionsResponse.ok) {
+          throw new Error(connectionsData.error || 'Failed to load federation connections.');
+        }
+
+        setFederationConnections(
+          Array.isArray(connectionsData)
+            ? connectionsData.map((connection) => normalizeFederationConnection(connection as Record<string, unknown>))
+            : [],
+        );
+      } catch (connectionError) {
+        const message = connectionError instanceof Error ? connectionError.message : 'Failed to load federation connections.';
+        setFederationConnections([]);
+        setConnectionsError(message);
+      }
     } catch (refreshError) {
       const message = refreshError instanceof Error ? refreshError.message : 'Failed to load workspace administration data.';
       setSaveError(message);
       setMembers([]);
       setInvites([]);
       setJoinRequests([]);
+      setFederationConnections([]);
     } finally {
       setSettingsLoading(false);
       setInvitesLoading(false);
+      setConnectionsLoading(false);
     }
   }, [activeWorkspaceId, currentUser]);
 
@@ -327,6 +412,44 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
     }
   }, [activeWorkspaceId, currentUser, refreshWorkspaceAdmin]);
 
+  const retryFederationConnection = useCallback(async (connectionId: string) => {
+    if (!currentUser || !activeWorkspaceId) {
+      return null;
+    }
+
+    setRetryingConnectionId(connectionId);
+    setConnectionsError(null);
+
+    try {
+      const response = await fetch(`/api/v1/federation/connections/${connectionId}/sync`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Id': currentUser.id,
+        },
+        body: JSON.stringify({ reason: 'manual_retry' }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to retry federation sync.');
+      }
+
+      await refreshWorkspaceAdmin();
+      return {
+        appliedCount: Number(data.appliedCount ?? 0),
+        lastSyncedEventId: Number(data.lastSyncedEventId ?? 0),
+      } satisfies FederationConnectionRetryResult;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to retry federation sync.';
+      await refreshWorkspaceAdmin();
+      setConnectionsError(message);
+      return null;
+    } finally {
+      setRetryingConnectionId(null);
+    }
+  }, [activeWorkspaceId, currentUser, refreshWorkspaceAdmin]);
+
   return {
     settings,
     settingsLoading,
@@ -339,6 +462,10 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
     joinRequests,
     inviteLoading,
     inviteError,
+    federationConnections,
+    connectionsLoading,
+    connectionsError,
+    retryingConnectionId,
     approveLoadingId,
     revokeLoadingId,
     updateSettings,
@@ -346,6 +473,7 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
     createInvite,
     revokeInvite,
     approveJoinRequest,
+    retryFederationConnection,
     refreshWorkspaceAdmin,
   };
 }
