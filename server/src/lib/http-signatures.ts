@@ -79,3 +79,39 @@ export function createSignedFederationHeaders(input: FederationSignatureInput & 
     [FEDERATION_SIGNATURE_HEADER]: signature,
   };
 }
+
+class SignatureTTLSet {
+  private cache = new Map<string, number>();
+
+  constructor(private ttlMs: number = 5 * 60 * 1000) {
+    const interval = setInterval(() => this.cleanup(), 30_000);
+    if (interval && typeof interval.unref === 'function') {
+      interval.unref();
+    }
+  }
+
+  public add(signature: string): boolean {
+    this.cleanup();
+    if (this.cache.has(signature)) {
+      return false;
+    }
+    this.cache.set(signature, Date.now() + this.ttlMs);
+    return true;
+  }
+
+  public has(signature: string): boolean {
+    this.cleanup();
+    return this.cache.has(signature);
+  }
+
+  private cleanup() {
+    const now = Date.now();
+    for (const [sig, expiry] of this.cache.entries()) {
+      if (now > expiry) {
+        this.cache.delete(sig);
+      }
+    }
+  }
+}
+
+export const signatureTTLSet = new SignatureTTLSet();

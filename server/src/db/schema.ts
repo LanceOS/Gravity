@@ -1,4 +1,4 @@
-import { boolean, integer, jsonb, pgTable, primaryKey, serial, text, timestamp } from 'drizzle-orm/pg-core';
+import { boolean, index, integer, jsonb, pgTable, primaryKey, serial, text, timestamp } from 'drizzle-orm/pg-core';
 
 export const authUsers = pgTable('user', {
   id: text('id').primaryKey(),
@@ -47,7 +47,9 @@ export const validations = pgTable('validations', {
   usedAt: timestamp('used_at', { withTimezone: true }),
   revokedAt: timestamp('revoked_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => ({
+  emailCodeUrlIdx: index('validations_email_code_url_idx').on(table.email, table.validationCode, table.inviteUrl),
+}));
 
 export const workspaces = pgTable('workspaces', {
   id: text('id').primaryKey(),
@@ -72,6 +74,7 @@ export const workspaceMembers = pgTable(
   },
   (table) => ({
     pk: primaryKey({ columns: [table.workspaceId, table.userId] }),
+    userIdIdx: index('workspace_members_user_id_idx').on(table.userId),
   }),
 );
 
@@ -147,7 +150,9 @@ export const peerConnections = pgTable('peer_connections', {
   lastError: text('last_error'),
   lastAppliedCount: integer('last_applied_count').notNull().default(0),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => ({
+  workspaceIdIdx: index('peer_connections_workspace_id_idx').on(table.workspaceId),
+}));
 
 export const federationInvites = pgTable('federation_invites', {
   id: text('id').primaryKey(),
@@ -173,6 +178,7 @@ export const workspacePeers = pgTable(
   },
   (table) => ({
     pk: primaryKey({ columns: [table.workspaceId, table.identityId] }),
+    identityIdIdx: index('workspace_peers_identity_id_idx').on(table.identityId),
   }),
 );
 
@@ -185,7 +191,9 @@ export const syncOutbox = pgTable('sync_outbox', {
   action: text('action').notNull(),
   payload: jsonb('payload').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => ({
+  workspaceIdIdx: index('sync_outbox_workspace_id_idx').on(table.workspaceId),
+}));
 
 export const projects = pgTable('projects', {
   id: text('id').primaryKey(),
@@ -198,7 +206,9 @@ export const projects = pgTable('projects', {
   createdBy: text('created_by').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => ({
+  workspaceIdIdx: index('projects_workspace_id_idx').on(table.workspaceId),
+}));
 
 export const projectMembers = pgTable(
   'project_members',
@@ -211,6 +221,7 @@ export const projectMembers = pgTable(
   },
   (table) => ({
     pk: primaryKey({ columns: [table.projectId, table.userId] }),
+    userIdIdx: index('project_members_user_id_idx').on(table.userId),
   }),
 );
 
@@ -220,7 +231,9 @@ export const domains = pgTable('domains', {
   name: text('name').notNull(),
   color: text('color').notNull().default('#6B7280'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => ({
+  projectIdIdx: index('domains_project_id_idx').on(table.projectId),
+}));
 
 export const cycles = pgTable('cycles', {
   id: text('id').primaryKey(),
@@ -230,7 +243,9 @@ export const cycles = pgTable('cycles', {
   endDate: timestamp('end_date', { withTimezone: true }).notNull(),
   completed: boolean('completed').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => ({
+  projectIdIdx: index('cycles_project_id_idx').on(table.projectId),
+}));
 
 export const tickets = pgTable('tickets', {
   id: text('id').primaryKey(),
@@ -248,7 +263,13 @@ export const tickets = pgTable('tickets', {
   prUrl: text('pr_url'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => ({
+  projectIdIdx: index('tickets_project_id_idx').on(table.projectId),
+  assigneeIdIdx: index('tickets_assignee_id_idx').on(table.assigneeId),
+  domainIdIdx: index('tickets_domain_id_idx').on(table.domainId),
+  cycleIdIdx: index('tickets_cycle_id_idx').on(table.cycleId),
+  parentIdIdx: index('tickets_parent_id_idx').on(table.parentId),
+}));
 
 export const comments = pgTable('comments', {
   id: text('id').primaryKey(),
@@ -256,7 +277,10 @@ export const comments = pgTable('comments', {
   userId: text('user_id').notNull(),
   body: text('body').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => ({
+  ticketIdIdx: index('comments_ticket_id_idx').on(table.ticketId),
+  userIdIdx: index('comments_user_id_idx').on(table.userId),
+}));
 
 export const schema = {
   authUsers,

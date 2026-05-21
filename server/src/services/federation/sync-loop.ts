@@ -1,4 +1,4 @@
-import { and, asc, eq, gt } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, sql } from 'drizzle-orm';
 import { db } from '../../db/index.js';
 import {
   authUsers,
@@ -75,13 +75,16 @@ export class CommentCreateHandler implements FederationEventHandler {
       throw new Error(`Federation ticket event ${eventId} is missing required ticket fields.`);
     }
 
-    const localTicketRows = await tx
-      .select({ id: tickets.id })
-      .from(tickets)
-      .where(and(eq(tickets.id, ticketId), eq(tickets.projectId, projectId)))
-      .limit(1);
-    if (!localTicketRows[0]) {
-      throw new Error(`Missing local ticket replica ${ticketId} for federation comment event ${eventId}.`);
+    const localTicketExists = connection?.existingTickets?.has(ticketId);
+    if (!localTicketExists) {
+      const localTicketRows = await tx
+        .select({ id: tickets.id })
+        .from(tickets)
+        .where(and(eq(tickets.id, ticketId), eq(tickets.projectId, projectId)))
+        .limit(1);
+      if (!localTicketRows[0]) {
+        throw new Error(`Missing local ticket replica ${ticketId} for federation comment event ${eventId}.`);
+      }
     }
 
     const commentPayload = isRecord(payload.comment) ? payload.comment : null;
@@ -92,49 +95,52 @@ export class CommentCreateHandler implements FederationEventHandler {
     const commentId = asString(commentPayload.id);
     const commentUserId = asString(commentPayload.userId);
     const commentBody = asString(commentPayload.body);
-    const commentUserName = asString(commentPayload.userName, 'Federated Peer');
-    const commentUserAvatar = asString(commentPayload.userAvatar, createFederatedAuthorAvatar(commentUserId || commentId));
-    const commentAuthor = isRecord(commentPayload.author) ? commentPayload.author : null;
 
     if (!commentId || !commentUserId || !commentBody) {
       throw new Error(`Federation comment event ${eventId} is missing required comment fields.`);
     }
 
-    await tx
-      .insert(authUsers)
-      .values({
-        id: commentUserId,
-        name: commentUserName,
-        email: createFederatedAuthorEmail(commentUserId),
-        emailVerified: false,
-        image: commentUserAvatar,
-        createdAt: parseFederationDate(commentPayload.createdAt),
-        updatedAt: parseFederationDate(commentPayload.createdAt),
-      })
-      .onConflictDoUpdate({
-        target: authUsers.id,
-        set: {
-          name: commentUserName,
-          image: commentUserAvatar,
-          updatedAt: new Date(),
-        },
-      });
+    if (!connection?.preUpsertedUsers?.has(commentUserId)) {
+      const commentUserName = asString(commentPayload.userName, 'Federated Peer');
+      const commentUserAvatar = asString(commentPayload.userAvatar, createFederatedAuthorAvatar(commentUserId || commentId));
+      const commentAuthor = isRecord(commentPayload.author) ? commentPayload.author : null;
 
-    await tx
-      .insert(userProfiles)
-      .values({
-        userId: commentUserId,
-        role: asString(commentAuthor?.role, 'guest_contributor'),
-        avatarUrl: commentUserAvatar,
-        createdAt: parseFederationDate(commentPayload.createdAt),
-      })
-      .onConflictDoUpdate({
-        target: userProfiles.userId,
-        set: {
+      await tx
+        .insert(authUsers)
+        .values({
+          id: commentUserId,
+          name: commentUserName,
+          email: createFederatedAuthorEmail(commentUserId),
+          emailVerified: false,
+          image: commentUserAvatar,
+          createdAt: parseFederationDate(commentPayload.createdAt),
+          updatedAt: parseFederationDate(commentPayload.createdAt),
+        })
+        .onConflictDoUpdate({
+          target: authUsers.id,
+          set: {
+            name: commentUserName,
+            image: commentUserAvatar,
+            updatedAt: parseFederationDate(commentPayload.createdAt),
+          },
+        });
+
+      await tx
+        .insert(userProfiles)
+        .values({
+          userId: commentUserId,
           role: asString(commentAuthor?.role, 'guest_contributor'),
           avatarUrl: commentUserAvatar,
-        },
-      });
+          createdAt: parseFederationDate(commentPayload.createdAt),
+        })
+        .onConflictDoUpdate({
+          target: userProfiles.userId,
+          set: {
+            role: asString(commentAuthor?.role, 'guest_contributor'),
+            avatarUrl: commentUserAvatar,
+          },
+        });
+    }
 
     await tx
       .insert(comments)
@@ -167,7 +173,8 @@ export class TicketDeleteHandler implements FederationEventHandler {
       entityType: string;
       action: string;
       payload: Record<string, any>;
-    }
+    },
+    connection?: any
   ): Promise<{ changedProjectIds: string[]; changedTicketIds: string[] }> {
     const { eventId, payload } = event;
     const ticketPayload = isRecord(payload.ticket) ? payload.ticket : null;
@@ -185,6 +192,10 @@ export class TicketDeleteHandler implements FederationEventHandler {
     await tx.delete(comments).where(eq(comments.ticketId, ticketId));
     await tx.delete(tickets).where(eq(tickets.parentId, ticketId));
     await tx.delete(tickets).where(eq(tickets.id, ticketId));
+
+    if (connection && connection.existingTickets) {
+      connection.existingTickets.delete(ticketId);
+    }
 
     return {
       changedProjectIds: [projectId],
@@ -206,7 +217,8 @@ export class TicketCreateUpdateHandler implements FederationEventHandler {
       entityType: string;
       action: string;
       payload: Record<string, any>;
-    }
+    },
+    connection?: any
   ): Promise<{ changedProjectIds: string[]; changedTicketIds: string[] }> {
     const { eventId, payload } = event;
     const ticketPayload = isRecord(payload.ticket) ? payload.ticket : null;
@@ -265,6 +277,10 @@ export class TicketCreateUpdateHandler implements FederationEventHandler {
           updatedAt: parseFederationDate(ticketPayload.updatedAt),
         },
       });
+
+    if (connection && connection.existingTickets) {
+      connection.existingTickets.add(ticketId);
+    }
 
     return {
       changedProjectIds: [projectId],
@@ -391,6 +407,156 @@ export async function syncFederatedConnection(input: {
 
   try {
     const result = await db.transaction(async (tx) => {
+      const projectsMap = new Map<string, any>();
+      const projectsToCheck = new Set<string>();
+      const ticketsToCheck = new Set<string>();
+      const usersMap = new Map<string, any>();
+      const profilesMap = new Map<string, any>();
+
+      for (const rawEvent of rawEvents) {
+        if (!isRecord(rawEvent)) continue;
+        const payload = isRecord(rawEvent.payload) ? rawEvent.payload : null;
+        if (!payload) continue;
+
+        const projectPayload = isRecord(payload.project) ? payload.project : null;
+        if (projectPayload) {
+          const projectId = asString(projectPayload.id);
+          if (projectId) {
+            projectsMap.set(projectId, {
+              id: projectId,
+              workspaceId: asString(projectPayload.workspaceId, connection.workspaceId),
+              name: asString(projectPayload.name, 'Federated Project'),
+              description: asString(projectPayload.description),
+              key: asString(projectPayload.key),
+              status: asString(projectPayload.status, 'active'),
+              inviteCode: asString(projectPayload.inviteCode, `fed-${projectId}`),
+              createdBy: asString(projectPayload.createdBy, 'federated-host'),
+              createdAt: parseFederationDate(projectPayload.createdAt),
+              updatedAt: parseFederationDate(projectPayload.updatedAt),
+            });
+          }
+        }
+
+        const ticketPayload = isRecord(payload.ticket) ? payload.ticket : null;
+        if (ticketPayload) {
+          const ticketId = asString(ticketPayload.id);
+          const projectId = asString(ticketPayload.projectId);
+          if (projectId) projectsToCheck.add(projectId);
+          if (ticketId) ticketsToCheck.add(ticketId);
+
+          const parentId = asNullableString(ticketPayload.parentId);
+          if (parentId) ticketsToCheck.add(parentId);
+        }
+
+        const commentPayload = isRecord(payload.comment) ? payload.comment : null;
+        if (commentPayload) {
+          const commentId = asString(commentPayload.id);
+          const commentUserId = asString(commentPayload.userId);
+          const commentUserName = asString(commentPayload.userName, 'Federated Peer');
+          const commentUserAvatar = asString(commentPayload.userAvatar, createFederatedAuthorAvatar(commentUserId || commentId));
+          const commentAuthor = isRecord(commentPayload.author) ? commentPayload.author : null;
+
+          if (commentUserId) {
+            usersMap.set(commentUserId, {
+              id: commentUserId,
+              name: commentUserName,
+              email: createFederatedAuthorEmail(commentUserId),
+              emailVerified: false,
+              image: commentUserAvatar,
+              createdAt: parseFederationDate(commentPayload.createdAt),
+              updatedAt: parseFederationDate(commentPayload.createdAt),
+            });
+
+            profilesMap.set(commentUserId, {
+              userId: commentUserId,
+              role: asString(commentAuthor?.role, 'guest_contributor'),
+              avatarUrl: commentUserAvatar,
+              createdAt: parseFederationDate(commentPayload.createdAt),
+            });
+          }
+        }
+      }
+
+      if (projectsMap.size > 0) {
+        const projectsList = Array.from(projectsMap.values());
+        await tx
+          .insert(projects)
+          .values(projectsList)
+          .onConflictDoUpdate({
+            target: projects.id,
+            set: {
+              workspaceId: sql`EXCLUDED.workspace_id`,
+              name: sql`EXCLUDED.name`,
+              description: sql`EXCLUDED.description`,
+              key: sql`EXCLUDED.key`,
+              status: sql`EXCLUDED.status`,
+              inviteCode: sql`EXCLUDED.invite_code`,
+              createdBy: sql`EXCLUDED.created_by`,
+              updatedAt: sql`EXCLUDED.updated_at`,
+            },
+          });
+      }
+
+      if (usersMap.size > 0) {
+        const usersList = Array.from(usersMap.values());
+        await tx
+          .insert(authUsers)
+          .values(usersList)
+          .onConflictDoUpdate({
+            target: authUsers.id,
+            set: {
+              name: sql`EXCLUDED.name`,
+              image: sql`EXCLUDED.image`,
+              updatedAt: sql`EXCLUDED."updatedAt"`,
+            },
+          });
+      }
+
+      if (profilesMap.size > 0) {
+        const profilesList = Array.from(profilesMap.values());
+        await tx
+          .insert(userProfiles)
+          .values(profilesList)
+          .onConflictDoUpdate({
+            target: userProfiles.userId,
+            set: {
+              role: sql`EXCLUDED.role`,
+              avatarUrl: sql`EXCLUDED.avatar_url`,
+            },
+          });
+      }
+
+      const existingProjects = new Set<string>();
+      if (projectsToCheck.size > 0) {
+        const projRows = await tx
+          .select({ id: projects.id })
+          .from(projects)
+          .where(and(inArray(projects.id, Array.from(projectsToCheck)), eq(projects.workspaceId, connection.workspaceId)));
+        for (const r of projRows) {
+          existingProjects.add(r.id);
+        }
+      }
+
+      const existingTickets = new Set<string>();
+      if (ticketsToCheck.size > 0) {
+        const tickRows = await tx
+          .select({ id: tickets.id })
+          .from(tickets)
+          .where(inArray(tickets.id, Array.from(ticketsToCheck)));
+        for (const r of tickRows) {
+          existingTickets.add(r.id);
+        }
+      }
+
+      const preUpsertedUsers = new Set<string>(usersMap.keys());
+
+      const handlerContext = {
+        ...connection,
+        existingTickets,
+        existingProjects,
+        preUpsertedUsers,
+      };
+
       const changedProjectIds = new Set<string>();
       const changedTicketIds = new Set<string>();
       let lastAppliedEventId = connection.lastSyncedEventId;
@@ -423,41 +589,6 @@ export async function syncFederatedConnection(input: {
           throw new Error(`Federation event ${eventId} is missing a payload.`);
         }
 
-        // Apply Project replica upsert if present in payload
-        const projectPayload = isRecord(payload.project) ? payload.project : null;
-        if (projectPayload) {
-          const projectId = asString(projectPayload.id);
-          if (projectId) {
-            await tx
-              .insert(projects)
-              .values({
-                id: projectId,
-                workspaceId: asString(projectPayload.workspaceId, connection.workspaceId),
-                name: asString(projectPayload.name, 'Federated Project'),
-                description: asString(projectPayload.description),
-                key: asString(projectPayload.key),
-                status: asString(projectPayload.status, 'active'),
-                inviteCode: asString(projectPayload.inviteCode, `fed-${projectId}`),
-                createdBy: asString(projectPayload.createdBy, 'federated-host'),
-                createdAt: parseFederationDate(projectPayload.createdAt),
-                updatedAt: parseFederationDate(projectPayload.updatedAt),
-              })
-              .onConflictDoUpdate({
-                target: projects.id,
-                set: {
-                  workspaceId: asString(projectPayload.workspaceId, connection.workspaceId),
-                  name: asString(projectPayload.name, 'Federated Project'),
-                  description: asString(projectPayload.description),
-                  key: asString(projectPayload.key),
-                  status: asString(projectPayload.status, 'active'),
-                  inviteCode: asString(projectPayload.inviteCode, `fed-${projectId}`),
-                  createdBy: asString(projectPayload.createdBy, 'federated-host'),
-                  updatedAt: parseFederationDate(projectPayload.updatedAt),
-                },
-              });
-          }
-        }
-
         const ticketPayload = isRecord(payload.ticket) ? payload.ticket : null;
         if (!ticketPayload) {
           throw new Error(`Federation ${entityType} event ${eventId} is missing ticket data.`);
@@ -470,16 +601,10 @@ export async function syncFederatedConnection(input: {
           throw new Error(`Federation ticket event ${eventId} is missing required ticket fields.`);
         }
 
-        const localProjectRows = await tx
-          .select({ id: projects.id })
-          .from(projects)
-          .where(and(eq(projects.id, projectId), eq(projects.workspaceId, connection.workspaceId)))
-          .limit(1);
-        if (!localProjectRows[0]) {
+        if (!existingProjects.has(projectId)) {
           throw new Error(`Missing local project replica ${projectId} for federation event ${eventId}.`);
         }
 
-        // Apply concrete Event Handler (Command Pattern)
         const handler = eventHandlers.find((h) => h.canHandle(entityType, action));
         if (!handler) {
           throw new Error(`Unsupported federation event ${entityType}:${action}.`);
@@ -488,7 +613,7 @@ export async function syncFederatedConnection(input: {
         const handlerResult = await handler.handle(
           tx,
           { eventId, workspaceId, entityType, action, payload },
-          connection
+          handlerContext
         );
 
         for (const pId of handlerResult.changedProjectIds) {

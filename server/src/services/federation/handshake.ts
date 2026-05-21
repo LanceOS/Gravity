@@ -1,8 +1,10 @@
 import { eq } from 'drizzle-orm';
+import { sign, verify } from 'node:crypto';
 import { db } from '../../db/index.js';
 import { federationInvites, peerConnections, workspacePeers } from '../../db/schema.js';
 import { env } from '../../env.js';
-import { normalizeFederationPublicKey } from '../../lib/http-signatures.js';
+import { decryptNodePrivateKey } from '../../lib/crypto.js';
+import { normalizeFederationPublicKey, isFederationTimestampFresh } from '../../lib/http-signatures.js';
 import { ensureLocalNodeIdentity } from '../../lib/node-identity.js';
 import { createId, normalizeEntityKey } from '../../lib/platform.js';
 import {
@@ -41,6 +43,8 @@ export async function acceptFederationHandshake(input: {
   guestPublicKey: string;
   guestDisplayName: string;
   guestHostUrl?: string;
+  handshakeSignature: string;
+  handshakeTimestamp: string;
 }) {
   const inviteRows = await db
     .select()
@@ -63,6 +67,25 @@ export async function acceptFederationHandshake(input: {
 
   if (invite.expiresAt.getTime() < Date.now()) {
     return { ok: false as const, status: 400, error: 'Federation invite has expired.' };
+  }
+
+  if (!isFederationTimestampFresh(input.handshakeTimestamp)) {
+    return { ok: false as const, status: 401, error: 'Handshake timestamp is outside the accepted window.' };
+  }
+
+  const challenge = [input.inviteToken, input.handshakeTimestamp, input.guestHostUrl || ''].join('\n');
+  try {
+    const verified = verify(
+      null,
+      Buffer.from(challenge, 'utf8'),
+      normalizeFederationPublicKey(input.guestPublicKey),
+      Buffer.from(input.handshakeSignature, 'base64'),
+    );
+    if (!verified) {
+      return { ok: false as const, status: 401, error: 'Invalid handshake signature.' };
+    }
+  } catch (err) {
+    return { ok: false as const, status: 400, error: 'Cryptographic verification failed.' };
   }
 
   const workspace = await getWorkspaceById(invite.workspaceId);
@@ -125,6 +148,20 @@ export async function connectToFederatedWorkspace(input: {
   }
 
   const localNodeIdentity = await ensureLocalNodeIdentity();
+  const timestamp = new Date().toISOString();
+  const challenge = [input.inviteToken, timestamp, env.betterAuthBaseUrl].join('\n');
+  const privateKey = decryptNodePrivateKey(localNodeIdentity.encryptedPrivateKey);
+  if (!privateKey) {
+    throw new Error('Failed to decrypt local node private key.');
+  }
+
+  let handshakeSignature: string;
+  try {
+    handshakeSignature = sign(null, Buffer.from(challenge, 'utf8'), privateKey).toString('base64');
+  } catch (err) {
+    throw new Error('Failed to generate cryptographic handshake signature.');
+  }
+
   const response = await fetch(`${hostUrl}/api/v1/federation/handshakes/accept`, {
     method: 'POST',
     headers: {
@@ -135,6 +172,8 @@ export async function connectToFederatedWorkspace(input: {
       guestPublicKey: localNodeIdentity.publicKey,
       guestDisplayName: localNodeIdentity.displayName,
       guestHostUrl: env.betterAuthBaseUrl,
+      handshakeSignature,
+      handshakeTimestamp: timestamp,
     }),
   });
 

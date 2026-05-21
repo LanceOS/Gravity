@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { generateKeyPairSync, sign } from 'node:crypto';
 import { db } from '../src/db/index.js';
 import { ensureLocalNodeIdentity } from '../src/lib/node-identity.js';
 import {
@@ -25,7 +26,10 @@ import {
   createFederatedComment,
   recordFederationSyncFailure,
   listFederationOutboxEvents,
+  syncFederatedConnection,
 } from '../src/services/federation/index.js';
+
+import { createSignedFederationHeaders } from '../src/lib/http-signatures.js';
 
 import { ExponentialBackoffPolicy } from '../src/services/federation/sync-state.js';
 import {
@@ -92,22 +96,31 @@ describe('Federation Modular Service', () => {
         issuedByUserId: owner.id,
       });
 
-      const guestPublicKey = 'pub_guest_key_1234567890abcdefghijklmnopqrstuvwxyz';
+      const { publicKey, privateKey } = generateKeyPairSync('ed25519');
+      const guestPublicKey = publicKey.export({ type: 'spki', format: 'pem' }).toString();
+      const guestPrivateKey = privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
+
       const guestDisplayName = 'External Partner Node';
       const guestHostUrl = 'http://external-partner.test';
+
+      const handshakeTimestamp = new Date().toISOString();
+      const challenge = [invite.inviteToken, handshakeTimestamp, guestHostUrl].join('\n');
+      const handshakeSignature = sign(null, Buffer.from(challenge, 'utf8'), guestPrivateKey).toString('base64');
 
       const result = await acceptFederationHandshake({
         inviteToken: invite.inviteToken,
         guestPublicKey,
         guestDisplayName,
         guestHostUrl,
+        handshakeSignature,
+        handshakeTimestamp,
       });
 
       expect(result.ok).toBe(true);
       if (!result.ok) return;
 
       expect(result.workspace.id).toBe(workspace.id);
-      expect(result.guestIdentity.publicKey).toBe(guestPublicKey);
+      expect(result.guestIdentity.publicKey).toBe(guestPublicKey.trim());
       expect(result.guestIdentity.displayName).toBe(guestDisplayName);
 
       // Verify DB invite updated
@@ -116,7 +129,7 @@ describe('Federation Modular Service', () => {
         .from(federationInvites)
         .where(eq(federationInvites.id, invite.id));
       expect(inviteRows[0].acceptedAt).not.toBeNull();
-      expect(inviteRows[0].acceptedByPublicKey).toBe(guestPublicKey);
+      expect(inviteRows[0].acceptedByPublicKey).toBe(guestPublicKey.trim());
 
       // Verify workspace peer created
       const peerRows = await db
@@ -407,6 +420,273 @@ describe('Federation Modular Service', () => {
       expect(inviteRes.body.id).toBeDefined();
       expect(inviteRes.body.workspaceId).toBe(workspace.id);
       expect(inviteRes.body.handshakeUrl).toContain('/api/v1/federation/handshakes/accept');
+    });
+  });
+
+  describe('Cryptographic Replay Protection', () => {
+    it('rejects duplicate requests using the same signature with 401 Unauthorized', async () => {
+      const { workspace, project } = await seedWorkspaceFixture();
+
+      const { publicKey, privateKey } = generateKeyPairSync('ed25519');
+      const guestPublicKey = publicKey.export({ type: 'spki', format: 'pem' }).toString();
+      const guestPrivateKey = privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
+
+      const identity = await db
+        .insert(identities)
+        .values({
+          id: 'idn-replay-peer',
+          displayName: 'Replay Partner',
+          publicKey: guestPublicKey.trim(),
+          createdAt: new Date(),
+        })
+        .returning();
+
+      await db.insert(workspacePeers).values({
+        workspaceId: workspace.id,
+        identityId: identity[0].id,
+        invitedByUserId: 'owner-1',
+        status: 'verified',
+        createdAt: new Date(),
+      });
+
+      const body = {
+        title: 'Replay Protection Ticket',
+        projectId: project.id,
+      };
+
+      const path = `/api/v1/federation/workspaces/${workspace.id}/tickets`;
+      const timestamp = new Date().toISOString();
+
+      const headers = createSignedFederationHeaders({
+        method: 'POST',
+        path,
+        timestamp,
+        body,
+        publicKey: guestPublicKey,
+        privateKey: guestPrivateKey,
+      });
+
+      // First request should succeed
+      const firstRes = await api()
+        .post(path)
+        .set(headers)
+        .send(body);
+
+      expect(firstRes.status).toBe(201);
+      expect(firstRes.body.ticket).toBeDefined();
+
+      // Second identical request should be rejected as a replay attack
+      const secondRes = await api()
+        .post(path)
+        .set(headers)
+        .send(body);
+
+      expect(secondRes.status).toBe(401);
+      expect(secondRes.body.error).toContain('Duplicate federation signature detected');
+    });
+  });
+
+  describe('Cryptographic Handshake Verification - Negative Cases', () => {
+    it('rejects handshake accept when timestamp is outside accepted window', async () => {
+      const { owner, workspace } = await seedWorkspaceFixture();
+
+      const invite = await createFederationInvite({
+        workspaceId: workspace.id,
+        issuedByUserId: owner.id,
+      });
+
+      const { publicKey, privateKey } = generateKeyPairSync('ed25519');
+      const guestPublicKey = publicKey.export({ type: 'spki', format: 'pem' }).toString();
+      const guestPrivateKey = privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
+
+      const guestDisplayName = 'Stale Partner';
+      const guestHostUrl = 'http://external-partner.test';
+
+      const handshakeTimestamp = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+      const challenge = [invite.inviteToken, handshakeTimestamp, guestHostUrl].join('\n');
+      const handshakeSignature = sign(null, Buffer.from(challenge, 'utf8'), guestPrivateKey).toString('base64');
+
+      const result = await acceptFederationHandshake({
+        inviteToken: invite.inviteToken,
+        guestPublicKey,
+        guestDisplayName,
+        guestHostUrl,
+        handshakeSignature,
+        handshakeTimestamp,
+      });
+
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain('timestamp');
+    });
+
+    it('rejects handshake accept when signature is invalid', async () => {
+      const { owner, workspace } = await seedWorkspaceFixture();
+
+      const invite = await createFederationInvite({
+        workspaceId: workspace.id,
+        issuedByUserId: owner.id,
+      });
+
+      const { publicKey } = generateKeyPairSync('ed25519');
+      const guestPublicKey = publicKey.export({ type: 'spki', format: 'pem' }).toString();
+
+      const guestDisplayName = 'Invalid Sign Partner';
+      const guestHostUrl = 'http://external-partner.test';
+
+      const handshakeTimestamp = new Date().toISOString();
+      const handshakeSignature = Buffer.from('invalid-signature-data').toString('base64');
+
+      const result = await acceptFederationHandshake({
+        inviteToken: invite.inviteToken,
+        guestPublicKey,
+        guestDisplayName,
+        guestHostUrl,
+        handshakeSignature,
+        handshakeTimestamp,
+      });
+
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain('Invalid handshake signature');
+    });
+  });
+
+  describe('O(N) Sync Loop Batch Integrations', () => {
+    it('batch syncs multiple related workspace project, ticket, and comment events', async () => {
+      const { workspace, project } = await seedWorkspaceFixture();
+
+      const connectionId = 'pcn-batch-sync';
+      await db.insert(peerConnections).values({
+        id: connectionId,
+        workspaceId: workspace.id,
+        hostUrl: 'http://batch-host.test',
+        hostDisplayName: 'Batch Host',
+        hostPublicKey: 'pub_batch_host_key',
+        status: 'active',
+        consecutiveFailures: 0,
+        createdAt: new Date(),
+      });
+
+      const timestamp = new Date().toISOString();
+      const mockOutboxEvents = [
+        {
+          eventId: 10,
+          workspaceId: workspace.id,
+          entityType: 'ticket',
+          action: 'create',
+          payload: {
+            project: { id: project.id, key: project.key, name: project.name },
+            ticket: {
+              id: 'ticket-batch-1',
+              key: `${project.key}-101`,
+              title: 'Batch Seed Ticket 1',
+              projectId: project.id,
+              createdAt: timestamp,
+              updatedAt: timestamp,
+            },
+          },
+        },
+        {
+          eventId: 11,
+          workspaceId: workspace.id,
+          entityType: 'ticket',
+          action: 'create',
+          payload: {
+            project: { id: project.id, key: project.key, name: project.name },
+            ticket: {
+              id: 'ticket-batch-2',
+              key: `${project.key}-102`,
+              title: 'Batch Seed Ticket 2',
+              projectId: project.id,
+              createdAt: timestamp,
+              updatedAt: timestamp,
+            },
+          },
+        },
+        {
+          eventId: 12,
+          workspaceId: workspace.id,
+          entityType: 'comment',
+          action: 'create',
+          payload: {
+            ticket: { id: 'ticket-batch-1', projectId: project.id },
+            comment: {
+              id: 'comment-batch-1',
+              userId: 'user-batch-1',
+              body: 'Hello batch comment 1',
+              userName: 'Batch Author 1',
+              createdAt: timestamp,
+            },
+          },
+        },
+        {
+          eventId: 13,
+          workspaceId: workspace.id,
+          entityType: 'comment',
+          action: 'create',
+          payload: {
+            ticket: { id: 'ticket-batch-2', projectId: project.id },
+            comment: {
+              id: 'comment-batch-2',
+              userId: 'user-batch-2',
+              body: 'Hello batch comment 2',
+              userName: 'Batch Author 2',
+              createdAt: timestamp,
+            },
+          },
+        },
+      ];
+
+      const originalFetch = global.fetch;
+      global.fetch = vi.fn().mockImplementation(() =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ events: mockOutboxEvents, lastEventId: 13 }),
+        } as Response)
+      );
+
+      try {
+        const result = await syncFederatedConnection({
+          connectionId,
+          limit: 50,
+        });
+
+        if (!result.ok) {
+          console.error('Batch sync failed with error:', result);
+        }
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+
+        expect(result.appliedCount).toBe(4);
+        expect(result.lastSyncedEventId).toBe(13);
+
+        const ticketRows = await db
+          .select()
+          .from(tickets)
+          .where(eq(tickets.projectId, project.id));
+        
+        const seededTicketIds = ticketRows.map((t) => t.id);
+        expect(seededTicketIds).toContain('ticket-batch-1');
+        expect(seededTicketIds).toContain('ticket-batch-2');
+
+        const comment1Rows = await db.select().from(comments).where(eq(comments.id, 'comment-batch-1'));
+        expect(comment1Rows).toHaveLength(1);
+        expect(comment1Rows[0].body).toBe('Hello batch comment 1');
+
+        const comment2Rows = await db.select().from(comments).where(eq(comments.id, 'comment-batch-2'));
+        expect(comment2Rows).toHaveLength(1);
+        expect(comment2Rows[0].body).toBe('Hello batch comment 2');
+
+        const author1Rows = await db.select().from(authUsers).where(eq(authUsers.id, 'user-batch-1'));
+        expect(author1Rows).toHaveLength(1);
+        expect(author1Rows[0].name).toBe('Batch Author 1');
+
+        const author2Rows = await db.select().from(authUsers).where(eq(authUsers.id, 'user-batch-2'));
+        expect(author2Rows).toHaveLength(1);
+        expect(author2Rows[0].name).toBe('Batch Author 2');
+      } finally {
+        global.fetch = originalFetch;
+      }
     });
   });
 });

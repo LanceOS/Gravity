@@ -6,6 +6,7 @@ import {
   FEDERATION_TIMESTAMP_HEADER,
   decodeFederationPublicKey,
   isFederationTimestampFresh,
+  signatureTTLSet,
   verifyFederationRequestSignature,
 } from '../lib/http-signatures.js';
 import { getLocalNodeIdentity } from '../lib/node-identity.js';
@@ -171,9 +172,16 @@ export function createFederationRouter() {
     const guestPublicKey = typeof req.body?.guestPublicKey === 'string' ? req.body.guestPublicKey.trim() : '';
     const guestDisplayName = typeof req.body?.guestDisplayName === 'string' ? req.body.guestDisplayName.trim() : '';
     const guestHostUrl = typeof req.body?.guestHostUrl === 'string' ? req.body.guestHostUrl.trim() : '';
+    const handshakeSignature = typeof req.body?.handshakeSignature === 'string' ? req.body.handshakeSignature.trim() : '';
+    const handshakeTimestamp = typeof req.body?.handshakeTimestamp === 'string' ? req.body.handshakeTimestamp.trim() : '';
 
-    if (!inviteToken || !guestPublicKey || !guestDisplayName) {
-      res.status(400).json({ error: 'inviteToken, guestPublicKey, and guestDisplayName are required.' });
+    if (!inviteToken || !guestPublicKey || !guestDisplayName || !handshakeSignature || !handshakeTimestamp) {
+      res.status(400).json({ error: 'inviteToken, guestPublicKey, guestDisplayName, handshakeSignature, and handshakeTimestamp are required.' });
+      return;
+    }
+
+    if (!isFederationTimestampFresh(handshakeTimestamp)) {
+      res.status(401).json({ error: 'Handshake signature timestamp is outside the accepted window.' });
       return;
     }
 
@@ -183,6 +191,8 @@ export function createFederationRouter() {
         guestPublicKey,
         guestDisplayName,
         guestHostUrl,
+        handshakeSignature,
+        handshakeTimestamp,
       });
 
       if (!result.ok) {
@@ -283,6 +293,11 @@ export function createFederationRouter() {
       return;
     }
 
+    if (!signatureTTLSet.add(signatureInput.signature)) {
+      res.status(401).json({ error: 'Duplicate federation signature detected.' });
+      return;
+    }
+
     try {
       const result = await createFederatedTicket({
         workspaceId,
@@ -348,6 +363,11 @@ export function createFederationRouter() {
       return;
     }
 
+    if (!signatureTTLSet.add(signatureInput.signature)) {
+      res.status(401).json({ error: 'Duplicate federation signature detected.' });
+      return;
+    }
+
     try {
       const result = await updateFederatedTicket({
         workspaceId,
@@ -409,6 +429,11 @@ export function createFederationRouter() {
       return;
     }
 
+    if (!signatureTTLSet.add(signatureInput.signature)) {
+      res.status(401).json({ error: 'Duplicate federation signature detected.' });
+      return;
+    }
+
     try {
       const result = await deleteFederatedTicket({
         workspaceId,
@@ -466,6 +491,11 @@ export function createFederationRouter() {
       return;
     }
 
+    if (!signatureTTLSet.add(signatureInput.signature)) {
+      res.status(401).json({ error: 'Duplicate federation signature detected.' });
+      return;
+    }
+
     try {
       const result = await createFederatedComment({
         workspaceId,
@@ -512,6 +542,11 @@ export function createFederationRouter() {
     });
     if (!isValidSignature) {
       res.status(401).json({ error: 'Invalid federation signature.' });
+      return;
+    }
+
+    if (!signatureTTLSet.add(signatureInput.signature)) {
+      res.status(401).json({ error: 'Duplicate federation signature detected.' });
       return;
     }
 

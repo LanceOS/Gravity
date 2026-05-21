@@ -262,6 +262,23 @@ export async function initializeDatabase() {
     UPDATE peer_connections SET workspace_id = '' WHERE workspace_id IS NULL;
     ALTER TABLE peer_connections ALTER COLUMN workspace_id SET NOT NULL;
     ALTER TABLE peer_connections ADD COLUMN IF NOT EXISTS host_display_name TEXT NOT NULL DEFAULT '';
+
+    CREATE INDEX IF NOT EXISTS validations_email_code_url_idx ON validations (email, validation_code, invite_url);
+    CREATE INDEX IF NOT EXISTS workspace_members_user_id_idx ON workspace_members (user_id);
+    CREATE INDEX IF NOT EXISTS peer_connections_workspace_id_idx ON peer_connections (workspace_id);
+    CREATE INDEX IF NOT EXISTS workspace_peers_identity_id_idx ON workspace_peers (identity_id);
+    CREATE INDEX IF NOT EXISTS sync_outbox_workspace_id_idx ON sync_outbox (workspace_id);
+    CREATE INDEX IF NOT EXISTS projects_workspace_id_idx ON projects (workspace_id);
+    CREATE INDEX IF NOT EXISTS project_members_user_id_idx ON project_members (user_id);
+    CREATE INDEX IF NOT EXISTS domains_project_id_idx ON domains (project_id);
+    CREATE INDEX IF NOT EXISTS cycles_project_id_idx ON cycles (project_id);
+    CREATE INDEX IF NOT EXISTS tickets_project_id_idx ON tickets (project_id);
+    CREATE INDEX IF NOT EXISTS tickets_assignee_id_idx ON tickets (assignee_id);
+    CREATE INDEX IF NOT EXISTS tickets_domain_id_idx ON tickets (domain_id);
+    CREATE INDEX IF NOT EXISTS tickets_cycle_id_idx ON tickets (cycle_id);
+    CREATE INDEX IF NOT EXISTS tickets_parent_id_idx ON tickets (parent_id);
+    CREATE INDEX IF NOT EXISTS comments_ticket_id_idx ON comments (ticket_id);
+    CREATE INDEX IF NOT EXISTS comments_user_id_idx ON comments (user_id);
   `);
 
   const { runMigrations } = await getMigrations(auth.options);
