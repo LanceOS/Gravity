@@ -2,10 +2,26 @@ import React from 'react';
 import type { Domain, Project, Ticket } from '../context/TicketContext';
 import type { TicketFilters, TicketsByStatus } from '../utils/ticketView';
 import { BOARD_COLUMNS } from '../utils/ticketView';
+import { Button } from './ui/Button';
+import { Select } from './ui/Select';
 import { 
   ArrowUp, ArrowRight, ArrowDown, ShieldAlert, Minus, 
   GitPullRequest, GitMerge, Paperclip, MoreHorizontal, Plus
 } from 'lucide-react';
+
+const PRIORITY_FILTER_VALUES: Array<[string, string]> = [
+  ['', 'Any Priority'],
+  ['urgent', 'Urgent'],
+  ['high', 'High'],
+  ['medium', 'Medium'],
+  ['low', 'Low'],
+  ['no_priority', 'No Priority'],
+];
+
+const PRIORITY_FILTER_OPTIONS = PRIORITY_FILTER_VALUES.map(([value, label]) => ({
+  value,
+  label,
+}));
 
 interface TicketBoardProps {
   projects: Project[];
@@ -38,6 +54,8 @@ export const TicketBoard: React.FC<TicketBoardProps> = ({
   onSelectTicket,
   onOpenCreateTicket,
 }) => {
+  const projectOptions = [{ value: '', label: 'Any Project' }, ...projects.map((project) => ({ value: project.id, label: project.name }))];
+
   const handleDragStart = (e: React.DragEvent, ticketId: string) => {
     e.dataTransfer.setData('text/plain', ticketId);
   };
@@ -116,42 +134,32 @@ export const TicketBoard: React.FC<TicketBoardProps> = ({
         />
 
         {/* Priority Filter */}
-        <select 
-          className="input"
-          style={{ width: '120px' }}
+        <Select
           value={filters.priority}
-          onChange={(e) => onFilterChange({ priority: e.target.value })}
-        >
-          <option value="">Any Priority</option>
-          <option value="urgent">Urgent</option>
-          <option value="high">High</option>
-          <option value="medium">Medium</option>
-          <option value="low">Low</option>
-          <option value="no_priority">No Priority</option>
-        </select>
+          onValueChange={(priority) => onFilterChange({ priority })}
+          options={PRIORITY_FILTER_OPTIONS}
+          ariaLabel="Filter board by priority"
+          style={{ width: '120px' }}
+        />
 
         {/* Project Selector Filter */}
-        <select 
-          className="input"
-          style={{ width: '140px' }}
+        <Select
           value={filters.projectId}
-          onChange={(e) => onFilterChange({ projectId: e.target.value })}
-        >
-          <option value="">Any Project</option>
-          {projects.map(p => (
-            <option key={p.id} value={p.id}>{p.name}</option>
-          ))}
-        </select>
+          onValueChange={(projectId) => onFilterChange({ projectId })}
+          options={projectOptions}
+          ariaLabel="Filter board by project"
+          style={{ width: '140px' }}
+        />
 
         {/* Clear Filters Button */}
         {hasActiveFilters && (
-          <button 
+          <Button
             onClick={onClearFilters}
-            className="btn clickable"
-            style={{ padding: '6px 12px', fontSize: '11px', color: 'var(--accent)' }}
+            variant="accent"
+            size="sm"
           >
             Clear Filters
-          </button>
+          </Button>
         )}
 
         <div style={{ marginLeft: 'auto', fontSize: '12px', color: 'var(--text-muted)' }}>
@@ -214,25 +222,22 @@ export const TicketBoard: React.FC<TicketBoardProps> = ({
                   {colTickets.length}
                 </span>
 
-                <button 
+                <Button
                   onClick={() => onOpenCreateTicket(col.id)}
-                  className="clickable"
+                  variant="ghost"
+                  size="sm"
+                  aria-label={`Create ticket in ${col.title}`}
                   style={{
                     marginLeft: 'auto',
-                    border: 'none',
-                    background: 'transparent',
                     color: 'var(--text-muted)',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
                     width: '20px',
-                    height: '20px',
-                    borderRadius: '4px'
+                    minHeight: '20px',
+                    padding: 0,
+                    border: 'none'
                   }}
                 >
                   <Plus size={14} />
-                </button>
+                </Button>
               </div>
 
               {/* Cards scrolling list */}

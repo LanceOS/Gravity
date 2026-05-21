@@ -1,9 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import type { Comment, Cycle, Domain, Project, Ticket, User } from '../context/TicketContext';
+import { Button } from './ui/Button';
+import { Select } from './ui/Select';
 import { 
   X, CheckSquare, GitPullRequest, GitMerge, Send, Trash2, 
   Plus, Edit3, Eye, Calendar, User as UserIcon, Folder, Tag, AlertCircle, ChevronLeft
 } from 'lucide-react';
+
+const STATUS_OPTIONS = [
+  { value: 'backlog', label: '📁 Backlog' },
+  { value: 'todo', label: '📋 Todo' },
+  { value: 'in_progress', label: '⚡ In Progress' },
+  { value: 'in_review', label: '🔍 In Review' },
+  { value: 'done', label: '✅ Done' },
+  { value: 'canceled', label: '❌ Canceled' },
+];
+
+const PRIORITY_OPTIONS = [
+  { value: 'no_priority', label: '➖ No Priority' },
+  { value: 'low', label: '🔵 Low' },
+  { value: 'medium', label: '🟡 Medium' },
+  { value: 'high', label: '🔴 High' },
+  { value: 'urgent', label: '💖 Urgent' },
+];
 
 interface TicketDetailProps {
   activeTicket: Ticket;
@@ -99,6 +118,18 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
     setIsDeleteConfirmOpen(false);
   };
 
+  const handleEditableKeyDown = (event: React.KeyboardEvent<HTMLDivElement>, onActivate: () => void) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      onActivate();
+    }
+  };
+
+  const assigneeOptions = [{ value: '', label: 'Unassigned' }, ...users.map((user) => ({ value: user.id, label: user.name }))];
+  const projectOptions = projects.map((project) => ({ value: project.id, label: project.name }));
+  const domainOptions = [{ value: '', label: 'No Domain' }, ...domains.map((domain) => ({ value: domain.id, label: domain.name }))];
+  const cycleOptions = [{ value: '', label: 'No Cycle' }, ...cycles.map((cycle) => ({ value: cycle.id, label: cycle.name }))];
+
   return (
     <>
       <div 
@@ -122,23 +153,21 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
           background: 'var(--sidebar-bg)'
         }}
       >
-        <button 
+        <Button
           onClick={onClose}
-          className="clickable"
+          variant="ghost"
+          size="sm"
           style={{
-            border: 'none',
-            background: 'transparent',
             color: 'var(--text)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px',
+            padding: '4px 6px',
+            border: 'none',
+            minHeight: '28px',
             fontSize: '13px'
           }}
         >
           <ChevronLeft size={16} />
           <span>Back</span>
-        </button>
+        </Button>
 
         <span style={{ color: 'var(--text-muted)' }}>/</span>
         
@@ -147,25 +176,19 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
         </span>
 
         {/* Delete button */}
-        <button 
+        <Button
           onClick={handleDelete}
-          className="clickable"
+          variant="danger"
+          size="sm"
           style={{
             marginLeft: 'auto',
-            border: 'none',
-            background: 'transparent',
-            color: '#ef4444',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
             fontSize: '12px',
-            opacity: 0.8
+            opacity: 0.9
           }}
         >
           <Trash2 size={14} />
           <span>Delete Ticket</span>
-        </button>
+        </Button>
       </div>
 
       {/* Main Details Panel Layout */}
@@ -188,23 +211,33 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                 autoFocus
               />
             ) : (
-              <h1 
+              <div
                 onClick={() => setIsEditingTitle(true)}
-                style={{ 
-                  fontSize: '22px', 
-                  fontWeight: 600, 
-                  color: 'var(--text-heading)', 
-                  margin: 0,
-                  cursor: 'pointer',
-                  border: '1px solid transparent',
-                  padding: '4px',
-                  borderRadius: '4px'
-                }}
-                className="clickable"
+                onKeyDown={(event) => handleEditableKeyDown(event, () => setIsEditingTitle(true))}
+                className="editable-display editable-display--title"
+                role="button"
+                tabIndex={0}
                 title="Click to edit title"
               >
-                {activeTicket.title}
-              </h1>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
+                  <h1
+                    style={{
+                      fontSize: '22px',
+                      fontWeight: 600,
+                      color: 'var(--text-heading)',
+                      margin: 0,
+                      flex: 1,
+                      minWidth: 0
+                    }}
+                  >
+                    {activeTicket.title}
+                  </h1>
+                  <span className="editable-display__hint" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                    <Edit3 size={12} />
+                    <span>Edit</span>
+                  </span>
+                </div>
+              </div>
             )}
           </div>
 
@@ -215,43 +248,47 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
               
               {isEditingDesc ? (
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: '4px' }}>
-                  <button 
+                  <Button
                     onClick={() => setDescTab('write')}
-                    className="btn"
-                    style={{ padding: '2px 8px', fontSize: '10px', background: descTab === 'write' ? 'var(--border)' : 'transparent' }}
+                    variant={descTab === 'write' ? 'accent' : 'ghost'}
+                    size="sm"
+                    style={{ padding: '2px 8px', fontSize: '10px' }}
                   >
                     <Edit3 size={10} style={{ marginRight: '4px' }} /> Write
-                  </button>
-                  <button 
+                  </Button>
+                  <Button
                     onClick={() => setDescTab('preview')}
-                    className="btn"
-                    style={{ padding: '2px 8px', fontSize: '10px', background: descTab === 'preview' ? 'var(--border)' : 'transparent' }}
+                    variant={descTab === 'preview' ? 'accent' : 'ghost'}
+                    size="sm"
+                    style={{ padding: '2px 8px', fontSize: '10px' }}
                   >
                     <Eye size={10} style={{ marginRight: '4px' }} /> Preview
-                  </button>
-                  <button 
+                  </Button>
+                  <Button
                     onClick={handleDescSave}
-                    className="btn btn-primary"
+                    variant="primary"
+                    size="sm"
                     style={{ padding: '2px 8px', fontSize: '10px', marginLeft: '8px' }}
                   >
                     Save
-                  </button>
-                  <button 
+                  </Button>
+                  <Button
                     onClick={() => { setIsEditingDesc(false); setDescValue(activeTicket.description || ''); }}
-                    className="btn"
+                    size="sm"
                     style={{ padding: '2px 8px', fontSize: '10px' }}
                   >
                     Cancel
-                  </button>
+                  </Button>
                 </div>
               ) : (
-                <button 
+                <Button
                   onClick={() => setIsEditingDesc(true)}
-                  className="btn clickable"
+                  variant="ghost"
+                  size="sm"
                   style={{ marginLeft: 'auto', padding: '2px 8px', fontSize: '11px' }}
                 >
                   Edit Description
-                </button>
+                </Button>
               )}
             </div>
 
@@ -284,16 +321,24 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             ) : (
               <div 
                 onClick={() => setIsEditingDesc(true)}
-                className="markdown-content clickable"
+                onKeyDown={(event) => handleEditableKeyDown(event, () => setIsEditingDesc(true))}
+                className="markdown-content editable-display editable-display--multiline"
+                role="button"
+                tabIndex={0}
                 style={{ 
                   fontSize: '13px', 
                   lineHeight: '1.6', 
                   minHeight: '60px', 
-                  cursor: 'pointer',
-                  padding: '6px',
-                  borderRadius: '6px'
+                  display: 'grid',
+                  gap: '8px'
                 }}
               >
+                <div style={{ display: 'flex', justifyContent: 'flex-end', minHeight: '18px' }}>
+                  <span className="editable-display__hint" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 500 }}>
+                    <Edit3 size={12} />
+                    <span>Edit description</span>
+                  </span>
+                </div>
                 {activeTicket.description ? (
                   <MarkdownMock text={activeTicket.description} />
                 ) : (
@@ -310,14 +355,15 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                 Sub-tasks Checklist
               </span>
               
-              <button 
+              <Button
                 onClick={() => onOpenCreateSubtask(activeTicket.id)}
-                className="btn clickable"
-                style={{ marginLeft: 'auto', padding: '2px 8px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                variant="ghost"
+                size="sm"
+                style={{ marginLeft: 'auto', padding: '2px 8px', fontSize: '11px' }}
               >
                 <Plus size={12} />
                 <span>Add Subtask</span>
-              </button>
+              </Button>
             </div>
 
             {subtasks.length > 0 ? (
@@ -430,14 +476,14 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                 value={commentInput}
                 onChange={(e) => setCommentInput(e.target.value)}
               />
-              <button 
+              <Button
                 type="submit" 
-                className="btn btn-primary clickable"
-                style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                variant="primary"
+                style={{ padding: '8px 16px' }}
               >
                 <Send size={12} />
                 <span>Comment</span>
-              </button>
+              </Button>
             </form>
 
           </div>
@@ -461,93 +507,67 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
           {/* Status */}
           <div>
             <span className="label">Status</span>
-            <select 
-              className="input"
+            <Select
               value={activeTicket.status}
-              onChange={(e) => onUpdateTicket(activeTicket.id, { status: e.target.value as Ticket['status'] })}
-            >
-              <option value="backlog">📁 Backlog</option>
-              <option value="todo">📋 Todo</option>
-              <option value="in_progress">⚡ In Progress</option>
-              <option value="in_review">🔍 In Review</option>
-              <option value="done">✅ Done</option>
-              <option value="canceled">❌ Canceled</option>
-            </select>
+              onValueChange={(nextStatus) => onUpdateTicket(activeTicket.id, { status: nextStatus as Ticket['status'] })}
+              options={STATUS_OPTIONS}
+              ariaLabel="Select ticket status"
+            />
           </div>
 
           {/* Priority */}
           <div>
             <span className="label">Priority</span>
-            <select 
-              className="input"
+            <Select
               value={activeTicket.priority}
-              onChange={(e) => onUpdateTicket(activeTicket.id, { priority: e.target.value as Ticket['priority'] })}
-            >
-              <option value="no_priority">➖ No Priority</option>
-              <option value="low">🔵 Low</option>
-              <option value="medium">🟡 Medium</option>
-              <option value="high">🔴 High</option>
-              <option value="urgent">💖 Urgent</option>
-            </select>
+              onValueChange={(nextPriority) => onUpdateTicket(activeTicket.id, { priority: nextPriority as Ticket['priority'] })}
+              options={PRIORITY_OPTIONS}
+              ariaLabel="Select ticket priority"
+            />
           </div>
 
           {/* Assignee */}
           <div>
             <span className="label">Assignee</span>
-            <select 
-              className="input"
+            <Select
               value={activeTicket.assigneeId || ''}
-              onChange={(e) => onUpdateTicket(activeTicket.id, { assigneeId: e.target.value || null })}
-            >
-              <option value="">Unassigned</option>
-              {users.map(u => (
-                <option key={u.id} value={u.id}>{u.name}</option>
-              ))}
-            </select>
+              onValueChange={(nextAssigneeId) => onUpdateTicket(activeTicket.id, { assigneeId: nextAssigneeId || null })}
+              options={assigneeOptions}
+              ariaLabel="Select ticket assignee"
+            />
           </div>
 
           {/* Project */}
           <div>
             <span className="label">Project</span>
-            <select 
-              className="input"
+            <Select
               value={activeTicket.projectId}
-              onChange={(e) => onUpdateTicket(activeTicket.id, { projectId: e.target.value })}
-            >
-              {projects.map(p => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
+              onValueChange={(nextProjectId) => onUpdateTicket(activeTicket.id, { projectId: nextProjectId })}
+              options={projectOptions}
+              ariaLabel="Select ticket project"
+            />
           </div>
 
           {/* Domain */}
           <div>
             <span className="label">Domain</span>
-            <select 
-              className="input"
+            <Select
               value={activeTicket.domainId || ''}
-              onChange={(e) => onUpdateTicket(activeTicket.id, { domainId: e.target.value || null })}
-            >
-              <option value="">No Domain</option>
-              {domains.map(d => (
-                <option key={d.id} value={d.id}>{d.name}</option>
-              ))}
-            </select>
+              onValueChange={(nextDomainId) => onUpdateTicket(activeTicket.id, { domainId: nextDomainId || null })}
+              options={domainOptions}
+              ariaLabel="Select ticket domain"
+            />
           </div>
 
           {/* Cycle */}
           <div>
             <span className="label">Cycle / Milestone</span>
-            <select 
-              className="input"
+            <Select
               value={activeTicket.cycleId || ''}
-              onChange={(e) => onUpdateTicket(activeTicket.id, { cycleId: e.target.value || null })}
-            >
-              <option value="">No Cycle</option>
-              {cycles.map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
+              onValueChange={(nextCycleId) => onUpdateTicket(activeTicket.id, { cycleId: nextCycleId || null })}
+              options={cycleOptions}
+              ariaLabel="Select ticket cycle"
+            />
           </div>
 
           {/* GitHub PR Integration badge indicator */}
@@ -645,37 +665,19 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-              <button
+              <Button
                 onClick={() => setIsDeleteConfirmOpen(false)}
-                className="clickable"
-                style={{
-                  border: '1px solid var(--border)',
-                  background: 'transparent',
-                  color: 'var(--text)',
-                  borderRadius: '6px',
-                  padding: '8px 12px',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                }}
+                size="sm"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => void confirmDelete()}
-                className="clickable"
-                style={{
-                  border: 'none',
-                  background: '#ef4444',
-                  color: '#fff',
-                  borderRadius: '6px',
-                  padding: '8px 12px',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                }}
+                variant="danger"
+                size="sm"
               >
                 Delete Ticket
-              </button>
+              </Button>
             </div>
           </div>
         </div>

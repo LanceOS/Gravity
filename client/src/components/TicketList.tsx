@@ -1,10 +1,31 @@
 import React from 'react';
 import type { Domain, Ticket } from '../context/TicketContext';
 import type { TicketFilters, TicketsByStatus } from '../utils/ticketView';
+import { Button } from './ui/Button';
+import { Select } from './ui/Select';
 import { 
   ArrowUp, ArrowRight, ArrowDown, ShieldAlert, Minus, Check, 
   GitPullRequest, GitMerge, Paperclip, Compass
 } from 'lucide-react';
+
+const PRIORITY_FILTER_OPTIONS = [
+  { value: '', label: 'Any Priority' },
+  { value: 'urgent', label: 'Urgent' },
+  { value: 'high', label: 'High' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'low', label: 'Low' },
+  { value: 'no_priority', label: 'No Priority' },
+];
+
+const STATUS_FILTER_OPTIONS = [
+  { value: '', label: 'Any Status' },
+  { value: 'backlog', label: 'Backlog' },
+  { value: 'todo', label: 'Todo' },
+  { value: 'in_progress', label: 'In Progress' },
+  { value: 'in_review', label: 'In Review' },
+  { value: 'done', label: 'Done' },
+  { value: 'canceled', label: 'Canceled' },
+];
 
 interface TicketListProps {
   filters: TicketFilters;
@@ -95,45 +116,32 @@ export const TicketList: React.FC<TicketListProps> = ({
         />
 
         {/* Priority Filter */}
-        <select 
-          className="input"
-          style={{ width: '120px' }}
+        <Select
           value={filters.priority}
-          onChange={(e) => onFilterChange({ priority: e.target.value })}
-        >
-          <option value="">Any Priority</option>
-          <option value="urgent">Urgent</option>
-          <option value="high">High</option>
-          <option value="medium">Medium</option>
-          <option value="low">Low</option>
-          <option value="no_priority">No Priority</option>
-        </select>
+          onValueChange={(priority) => onFilterChange({ priority })}
+          options={PRIORITY_FILTER_OPTIONS}
+          ariaLabel="Filter list by priority"
+          style={{ width: '120px' }}
+        />
 
         {/* Status Filter */}
-        <select 
-          className="input"
-          style={{ width: '120px' }}
+        <Select
           value={filters.status}
-          onChange={(e) => onFilterChange({ status: e.target.value })}
-        >
-          <option value="">Any Status</option>
-          <option value="backlog">Backlog</option>
-          <option value="todo">Todo</option>
-          <option value="in_progress">In Progress</option>
-          <option value="in_review">In Review</option>
-          <option value="done">Done</option>
-          <option value="canceled">Canceled</option>
-        </select>
+          onValueChange={(status) => onFilterChange({ status })}
+          options={STATUS_FILTER_OPTIONS}
+          ariaLabel="Filter list by status"
+          style={{ width: '120px' }}
+        />
 
         {/* Clear Filters Button */}
         {hasActiveFilters && (
-          <button 
+          <Button
             onClick={onClearFilters}
-            className="btn clickable"
-            style={{ padding: '6px 12px', fontSize: '11px', color: 'var(--accent)' }}
+            variant="accent"
+            size="sm"
           >
             Clear Filters
-          </button>
+          </Button>
         )}
 
         <div style={{ marginLeft: 'auto', fontSize: '12px', color: 'var(--text-muted)' }}>

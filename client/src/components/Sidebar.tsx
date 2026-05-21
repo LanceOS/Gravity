@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { Cycle, Domain, Project, User } from '../context/TicketContext';
 import type { TicketFilters } from '../utils/ticketView';
+import { Button } from './ui/Button';
+import { Select } from './ui/Select';
 import { 
   Inbox, Database, LogOut, CheckCircle,
   Terminal, Cpu, Sparkles, ChevronDown, ChevronRight, Sliders, FolderTree, Settings2
@@ -69,6 +71,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [projectsCollapsed, setProjectsCollapsed] = useState(false);
   const [collapsedProjects, setCollapsedProjects] = useState<Record<string, boolean>>({});
   const profileRef = useRef<HTMLDivElement>(null);
+  const workspaceOptions = workspaces.map((workspace) => ({ value: workspace.id, label: workspace.name }));
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -120,38 +123,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div style={{ flex: 1, minWidth: 0, display: 'grid', gap: '6px' }}>
           <span style={{ fontWeight: 600, fontSize: '15px', color: 'var(--text-heading)', letterSpacing: '-0.3px' }}>Gravity</span>
 
-          <select
-            className="input"
+          <Select
             value={activeWorkspaceId}
-            onChange={(event) => onSelectWorkspace(event.target.value)}
+            onValueChange={onSelectWorkspace}
+            options={workspaceOptions}
+            ariaLabel="Select workspace"
             style={{
               width: '100%',
+            }}
+            triggerStyle={{
               minHeight: '34px',
               padding: '0 10px',
               fontSize: '12px'
             }}
-          >
-            {workspaces.map((workspace) => (
-              <option key={workspace.id} value={workspace.id}>
-                {workspace.name}
-              </option>
-            ))}
-          </select>
+          />
         </div>
 
       </div>
 
       {/* Quick Action Button */}
       <div style={{ padding: '12px 16px 8px 16px' }}>
-        <button 
+        <Button
           onClick={onOpenCreateTicket}
-          className="btn btn-primary clickable"
-          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '8px' }}
+          variant="primary"
+          fullWidth
+          style={{ padding: '8px 10px' }}
         >
           <Sparkles size={14} />
           <span>New Ticket</span>
           <span style={{ fontSize: '10px', opacity: 0.6, marginLeft: 'auto', background: 'rgba(255,255,255,0.2)', padding: '1px 5px', borderRadius: '3px' }}>N</span>
-        </button>
+        </Button>
       </div>
 
       {/* Main Navigation Scroll Area */}
@@ -250,23 +251,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <span>Agent Integrations</span>
           </div>
           
-          <button 
+          <Button
             onClick={onOpenOllama}
-            className="clickable"
+            variant="ghost"
+            size="sm"
+            fullWidth
             style={agentButtonStyle()}
           >
             <Sparkles size={12} color="var(--accent)" />
             <span>Ollama AI Assistant</span>
-          </button>
+          </Button>
 
-          <button 
+          <Button
             onClick={onOpenSimulator}
-            className="clickable"
+            variant="ghost"
+            size="sm"
+            fullWidth
             style={agentButtonStyle({ marginTop: '4px' })}
           >
             <Terminal size={12} />
             <span>MCP Agent Simulator</span>
-          </button>
+          </Button>
         </div>
 
       </div>

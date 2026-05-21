@@ -28,10 +28,13 @@
 .settings-page__back-button,
 .settings-page__save-button,
 .settings-page__secondary-button {
+  appearance: none;
+  -webkit-appearance: none;
   border: none;
   border-radius: 10px;
   cursor: pointer;
   font: inherit;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
 }
 
 .settings-page__back-button {
@@ -42,6 +45,24 @@
   background: rgba(255, 255, 255, 0.04);
   color: var(--text);
   border: 1px solid var(--border);
+}
+
+.settings-page__back-button:hover {
+  background: var(--card-hover);
+  color: var(--text-heading);
+  border-color: var(--border-focus);
+}
+
+.settings-page__back-button:active {
+  transform: translateY(1px);
+}
+
+.settings-page__back-button:focus-visible,
+.settings-page__save-button:focus-visible,
+.settings-page__secondary-button:focus-visible,
+.settings-page__nav-item:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-glow);
 }
 
 .settings-page__page-title {
@@ -58,16 +79,29 @@
 
 .settings-page__save-button {
   padding: 11px 18px;
-  background: var(--text-heading);
-  color: var(--bg);
+  background: var(--accent-solid);
+  color: var(--accent-foreground);
   font-weight: 600;
   min-width: 138px;
+  border: 1px solid var(--accent-solid);
+}
+
+.settings-page__save-button:hover {
+  background: var(--accent-solid-hover);
+  color: var(--accent-foreground);
+  border-color: var(--accent-solid-hover);
+}
+
+.settings-page__save-button:active {
+  transform: translateY(1px);
 }
 
 .settings-page__save-button:disabled,
 .settings-page__secondary-button:disabled {
   opacity: 0.6;
   cursor: default;
+  transform: none;
+  box-shadow: none;
 }
 
 .settings-page__body {
@@ -132,6 +166,13 @@
   color: var(--text);
   cursor: pointer;
   text-align: left;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.settings-page__nav-item:hover {
+  background: rgba(59, 130, 246, 0.04);
+  border-color: rgba(59, 130, 246, 0.12);
+  color: var(--text-heading);
 }
 
 .settings-page__nav-item--active {
@@ -254,6 +295,16 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
+}
+
+.settings-page__secondary-button:hover {
+  background: var(--card-hover);
+  color: var(--text-heading);
+  border-color: var(--border-focus);
+}
+
+.settings-page__secondary-button:active {
+  transform: translateY(1px);
 }
 
 .settings-page__secondary-button--inline {
