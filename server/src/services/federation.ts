@@ -1228,13 +1228,21 @@ export async function syncFederatedConnection(input: {
           throw new Error(`Federation ticket event ${eventId} is missing required ticket fields.`);
         }
 
-        const localProjectRows = await tx.select({ id: projects.id }).from(projects).where(eq(projects.id, projectId)).limit(1);
+        const localProjectRows = await tx
+          .select({ id: projects.id })
+          .from(projects)
+          .where(and(eq(projects.id, projectId), eq(projects.workspaceId, connection.workspaceId)))
+          .limit(1);
         if (!localProjectRows[0]) {
           throw new Error(`Missing local project replica ${projectId} for federation event ${eventId}.`);
         }
 
         if (entityType === 'comment') {
-          const localTicketRows = await tx.select({ id: tickets.id }).from(tickets).where(eq(tickets.id, ticketId)).limit(1);
+          const localTicketRows = await tx
+            .select({ id: tickets.id })
+            .from(tickets)
+            .where(and(eq(tickets.id, ticketId), eq(tickets.projectId, projectId)))
+            .limit(1);
           if (!localTicketRows[0]) {
             throw new Error(`Missing local ticket replica ${ticketId} for federation comment event ${eventId}.`);
           }
