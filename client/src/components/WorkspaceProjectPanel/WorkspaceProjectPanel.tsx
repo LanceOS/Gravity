@@ -41,9 +41,20 @@ export function WorkspaceProjectPanel({
     return [currentProject, ...projects.filter((project) => project.id !== currentProject.id)];
   }, [currentProject, projects]);
 
+  const shouldShowDomains = useMemo(() => {
+    if (!activeProjectId) {
+      return true;
+    }
+
+    return managedProject?.id === activeProjectId;
+  }, [activeProjectId, managedProject]);
+
   const sortedDomains = useMemo(
-    () => [...domains].sort((first, second) => first.name.localeCompare(second.name)),
-    [domains]
+    () =>
+      shouldShowDomains
+        ? [...domains].sort((first, second) => first.name.localeCompare(second.name))
+        : [],
+    [domains, shouldShowDomains]
   );
 
   useEffect(() => {
