@@ -1360,7 +1360,6 @@ export async function syncFederatedConnection(input: {
               parentId: asNullableString(ticketPayload.parentId) ?? null,
               prStatus: asString(ticketPayload.prStatus, 'none'),
               prUrl: asNullableString(ticketPayload.prUrl) ?? null,
-              createdAt: parseFederationDate(ticketPayload.createdAt),
               updatedAt: parseFederationDate(ticketPayload.updatedAt),
             },
           });
