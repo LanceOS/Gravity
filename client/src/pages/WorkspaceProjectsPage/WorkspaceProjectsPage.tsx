@@ -17,7 +17,7 @@ interface WorkspaceProjectsPageProps {
   domainCreateError: string | null;
   onBackToWorkspace: () => void;
   onCreateProject: (project: { name: string; description: string; key: string }) => Promise<void>;
-  onCreateDomain: (domain: { name: string; color: string }) => Promise<void>;
+  onCreateDomain: (domain: { projectId: string; name: string; color: string }) => Promise<void>;
   onSelectProject: (projectId: string) => void;
 }
 
