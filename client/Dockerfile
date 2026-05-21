@@ -5,8 +5,8 @@ WORKDIR /app/client
 COPY client/package.json client/package-lock.json ./
 RUN npm ci
 
-COPY client/. .
-COPY library /app/library
+COPY client ./
+COPY library ../library
 RUN npm run build
 
 FROM nginx:1.27-alpine AS runner

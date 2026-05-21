@@ -1,8 +1,8 @@
 services:
   frontend:
     build:
-      context: ..
-      dockerfile: client/Dockerfile
+      context: .
+      dockerfile: Dockerfile
     container_name: gravity-client
     restart: unless-stopped
     ports:

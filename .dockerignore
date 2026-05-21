@@ -1,6 +1,44 @@
+<<<<<<< HEAD
 **/node_modules
 **/dist
 **/.vite
 **/.tsbuildinfo
 .git
 *.log
+=======
+# Version control
+.git
+.gitignore
+
+# CI / GitHub
+.github
+
+# Local scripts
+scripts
+
+# Server package (not needed for the client/frontend build)
+server
+
+# Dependencies – reinstalled inside the image
+**/node_modules
+
+# Build artifacts
+**/dist
+**/dist-ssr
+**/.vite
+
+# Logs
+**/*.log
+**/logs
+
+# Editor / OS artifacts
+.vscode
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.local
+>>>>>>> main
