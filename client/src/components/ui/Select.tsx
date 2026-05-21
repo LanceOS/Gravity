@@ -275,12 +275,13 @@ export function Select({
       return;
     }
 
-    const nextIndex = activeIndex >= 0 ? activeIndex : selectedIndex >= 0 ? selectedIndex : findNextEnabledIndex(-1, 1);
+    const hasValidActiveIndex = activeIndex >= 0 && activeIndex < options.length;
+    const nextIndex = hasValidActiveIndex ? activeIndex : selectedIndex >= 0 ? selectedIndex : findNextEnabledIndex(-1, 1);
     if (nextIndex >= 0) {
       setActiveIndex(nextIndex);
       focusOption(nextIndex);
     }
-  }, [activeIndex, isOpen, selectedIndex]);
+  }, [activeIndex, isOpen, options.length, selectedIndex]);
 
   return (
     <div className={joinClassNames('select-root', className)} style={style}>
