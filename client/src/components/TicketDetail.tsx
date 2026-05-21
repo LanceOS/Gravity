@@ -329,16 +329,26 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                   fontSize: '13px', 
                   lineHeight: '1.6', 
                   minHeight: '60px', 
-                  display: 'grid',
-                  gap: '8px'
+                  paddingRight: '104px'
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'flex-end', minHeight: '18px' }}>
-                  <span className="editable-display__hint" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 500 }}>
-                    <Edit3 size={12} />
-                    <span>Edit description</span>
-                  </span>
-                </div>
+                <span
+                  className="editable-display__hint"
+                  style={{
+                    position: 'absolute',
+                    top: '8px',
+                    right: '10px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    fontSize: '11px',
+                    fontWeight: 500,
+                    pointerEvents: 'none'
+                  }}
+                >
+                  <Edit3 size={12} />
+                  <span>Edit description</span>
+                </span>
                 {activeTicket.description ? (
                   <MarkdownMock text={activeTicket.description} />
                 ) : (
