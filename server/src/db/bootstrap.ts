@@ -124,11 +124,35 @@ export async function initializeDatabase() {
 
     CREATE TABLE IF NOT EXISTS peer_connections (
       id TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL,
       host_url TEXT NOT NULL,
+      host_display_name TEXT NOT NULL DEFAULT '',
       host_public_key TEXT NOT NULL,
       last_synced_event_id INTEGER NOT NULL DEFAULT 0,
       status TEXT NOT NULL DEFAULT 'active',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS federation_invites (
+      id TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL,
+      issued_by_user_id TEXT NOT NULL,
+      invite_token TEXT NOT NULL UNIQUE,
+      expires_at TIMESTAMPTZ NOT NULL,
+      revoked_at TIMESTAMPTZ,
+      accepted_at TIMESTAMPTZ,
+      accepted_by_public_key TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS workspace_peers (
+      workspace_id TEXT NOT NULL,
+      identity_id TEXT NOT NULL,
+      invited_by_user_id TEXT NOT NULL,
+      peer_host_url TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'verified',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (workspace_id, identity_id)
     );
 
     CREATE TABLE IF NOT EXISTS sync_outbox (
@@ -221,6 +245,17 @@ export async function initializeDatabase() {
     ALTER TABLE project_members ADD COLUMN IF NOT EXISTS provisioned_by_validation_id TEXT;
     ALTER TABLE identities ADD COLUMN IF NOT EXISTS encrypted_private_key TEXT;
     ALTER TABLE identities ADD COLUMN IF NOT EXISTS is_local_owner BOOLEAN NOT NULL DEFAULT FALSE;
+    ALTER TABLE peer_connections ADD COLUMN IF NOT EXISTS workspace_id TEXT;
+    ALTER TABLE peer_connections ADD COLUMN IF NOT EXISTS host_display_name TEXT NOT NULL DEFAULT '';
+  `);
+
+  await pool.query(`
+    UPDATE peer_connections
+    SET workspace_id = COALESCE(workspace_id, '')
+    WHERE workspace_id IS NULL;
+
+    ALTER TABLE peer_connections
+    ALTER COLUMN workspace_id SET NOT NULL;
   `);
 
   const { runMigrations } = await getMigrations(auth.options);
