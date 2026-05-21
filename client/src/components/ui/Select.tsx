@@ -118,7 +118,16 @@ export function Select({
     }
 
     const fallbackIndex = selectedIndex >= 0 && !options[selectedIndex]?.disabled ? selectedIndex : findNextEnabledIndex(-1, 1);
-    const nextIndex = preferredIndex ?? fallbackIndex;
+    const preferredIsEnabled =
+      preferredIndex !== undefined &&
+      preferredIndex >= 0 &&
+      !options[preferredIndex]?.disabled;
+    const nextIndex = preferredIsEnabled ? preferredIndex : fallbackIndex;
+
+    if (nextIndex < 0) {
+      return;
+    }
+
     setIsOpen(true);
     setActiveIndex(nextIndex);
   };
