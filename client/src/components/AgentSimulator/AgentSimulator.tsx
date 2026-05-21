@@ -1,23 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useTickets, Ticket } from '../context/TicketContext';
+import React, { useEffect, useRef, useState } from 'react';
+import { useTickets } from '../../context/TicketContext';
 import { Terminal, X, Play, Loader2, Sparkles, AlertCircle, ArrowRight } from 'lucide-react';
-
-interface AgentSimulatorProps {
-  onClose: () => void;
-}
-
-interface LogEntry {
-  type: 'info' | 'tool' | 'success' | 'error' | 'thought';
-  text: string;
-}
+import type { AgentLogEntry, AgentSimulatorProps } from './types';
+import { delay, getInitialAgentLogs } from './utils';
 
 export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
   const { fetchInitialData, projects, users } = useTickets();
   const [prompt, setPrompt] = useState('Create a backend ticket for setup auth, assign to bob, and add comment "Lance is waiting"');
-  const [logs, setLogs] = useState<LogEntry[]>([
-    { type: 'info', text: '🤖 Gravity MCP Agent Session Initialized.' },
-    { type: 'info', text: 'This simulator makes real JSON-RPC calls to the backend MCP tools (/api/v1/mcp/sse) to show how an external IDE Agent (e.g. VSCode Copilot) modifies Gravity.' }
-  ]);
+  const [logs, setLogs] = useState<AgentLogEntry[]>(getInitialAgentLogs);
   const [isRunning, setIsRunning] = useState(false);
   const terminalEndRef = useRef<HTMLDivElement>(null);
 
@@ -25,7 +15,7 @@ export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
     terminalEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [logs]);
 
-  const addLog = (type: LogEntry['type'], text: string) => {
+  const addLog = (type: AgentLogEntry['type'], text: string) => {
     setLogs(prev => [...prev, { type, text }]);
   };
 
@@ -33,7 +23,7 @@ export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
     addLog('tool', `👉 Calling MCP tool: "${method}" with arguments:\n${JSON.stringify(args, null, 2)}`);
     
     // Simulate slight network delay for premium visual pacing
-    await new Promise(r => setTimeout(r, 1200));
+    await delay(1200);
 
     try {
       const response = await fetch('/api/v1/mcp/sse', {
@@ -85,7 +75,7 @@ export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
     try {
       // 1. Initial LLM thought simulation
       addLog('thought', '🤔 [Agent Thought]: Parsing natural language instructions...\nDetermining required sequence of MCP actions:\n- Project ID: p-gravity (Gravity Core)\n- Task: Create backend ticket "Setup user authorization flow"\n- Assignee: Bob Developer (u-bob)\n- Postcomment: "Lance is waiting for this setup"');
-      await new Promise(r => setTimeout(r, 1800));
+      await delay(1800);
 
       // 2. Call list_tickets tool
       addLog('thought', '🤔 [Agent Thought]: Querying database to check if a ticket with this setup already exists...');
