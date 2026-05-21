@@ -316,6 +316,7 @@ export function Select({
               ref={menuRef}
               id={`${selectId}-listbox`}
               role="listbox"
+              aria-label={ariaLabel}
               className={joinClassNames('select-menu', menuClassName)}
               style={{
                 top: `${menuPosition.top}px`,
