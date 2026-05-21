@@ -78,10 +78,13 @@ export function WorkspacePage({
   );
   const groupedTickets = useMemo(() => groupTicketsByStatus(filteredTickets), [filteredTickets]);
   const listSortedTickets = useMemo(
-    () => sortTicketsForList(filteredTickets, domainById, listSort),
-    [filteredTickets, domainById, listSort]
+    () => (activeView === 'list' ? sortTicketsForList(filteredTickets, domainById, listSort) : filteredTickets),
+    [activeView, filteredTickets, domainById, listSort]
   );
-  const listGroupedTickets = useMemo(() => groupTicketsByStatus(listSortedTickets), [listSortedTickets]);
+  const listGroupedTickets = useMemo(
+    () => (activeView === 'list' ? groupTicketsByStatus(listSortedTickets) : groupedTickets),
+    [activeView, listSortedTickets, groupedTickets]
+  );
   const detailSubtasks = useMemo(
     () => (activeTicket ? tickets.filter((ticket) => ticket.parentId === activeTicket.id) : []),
     [tickets, activeTicket]
