@@ -2,38 +2,8 @@ import { Check, ChevronDown } from 'lucide-react';
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-
-export interface SelectOption {
-  value: string;
-  label: string;
-  disabled?: boolean;
-}
-
-interface SelectProps {
-  value: string;
-  onValueChange: (value: string) => void;
-  options: SelectOption[];
-  placeholder?: string;
-  disabled?: boolean;
-  ariaLabel?: string;
-  className?: string;
-  style?: CSSProperties;
-  triggerClassName?: string;
-  triggerStyle?: CSSProperties;
-  menuClassName?: string;
-  maxMenuHeight?: number;
-}
-
-type MenuPosition = {
-  top: number;
-  left: number;
-  width: number;
-  maxHeight: number;
-};
-
-function joinClassNames(...values: Array<string | undefined>) {
-  return values.filter(Boolean).join(' ');
-}
+import type { MenuPosition, SelectOption, SelectProps } from './types';
+import { joinClassNames } from './utils';
 
 export function Select({
   value,
