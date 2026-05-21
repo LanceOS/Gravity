@@ -10,6 +10,8 @@ const envSchema = z.object({
     .min(1)
     .default('postgresql://gravity_user:secure_dev_password_change_me_in_prod@localhost:5432/gravity_workspace'),
   BETTER_AUTH_SECRET: z.string().min(1).default('change-me-before-production'),
+  NODE_IDENTITY_MASTER_KEY: z.string().min(1).default('change-me-node-identity-master-key-before-production'),
+  NODE_DISPLAY_NAME: z.string().optional(),
   BETTER_AUTH_BASE_URL: z.string().url().optional(),
   CORS_ORIGINS: z.string().optional(),
   TRUSTED_ORIGINS: z.string().optional(),
@@ -29,6 +31,8 @@ export const env = {
   port: parsed.PORT,
   databaseUrl: parsed.DATABASE_URL,
   betterAuthSecret: parsed.BETTER_AUTH_SECRET,
+  nodeIdentityMasterKey: parsed.NODE_IDENTITY_MASTER_KEY,
+  nodeDisplayName: parsed.NODE_DISPLAY_NAME?.trim() || 'Gravity Node',
   betterAuthBaseUrl: parsed.BETTER_AUTH_BASE_URL ?? `http://localhost:${parsed.PORT}`,
   corsOrigins: splitList(parsed.CORS_ORIGINS),
   trustedOrigins: (() => {
