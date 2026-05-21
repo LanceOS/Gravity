@@ -42,7 +42,7 @@ services:
     build:
       context: .
       dockerfile: client/Dockerfile
-    container_name: gravity_frontend
+    container_name: ${GRAVITY_FRONTEND_CONTAINER:-gravity_frontend}
     environment:
       BACKEND_UPSTREAM: http://backend:8080
     ports:
