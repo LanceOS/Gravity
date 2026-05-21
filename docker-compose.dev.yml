@@ -19,7 +19,34 @@ services:
       - "33101:5173"
     # Use host-installed node_modules (mounted) and run Vite dev server so file changes
     # in the workspace are picked up immediately by the containerized dev server.
-    command: sh -c "cd /app/client && npm run dev -- --host 0.0.0.0 --port 5173"
+    # Start a lightweight local forwarder on localhost:5000 so an existing Vite proxy
+    # target of http://localhost:5000 resolves to the backend service inside Compose.
+    command: >
+      sh -c "node -e '
+      const http = require(\"http\");
+      const https = require(\"https\");
+      const { URL } = require(\"url\");
+      const upstream = new URL(process.env.BACKEND_UPSTREAM || \"http://backend:8080\");
+      const client = upstream.protocol === \"https:\" ? https : http;
+      http.createServer((req, res) => {
+        const proxyReq = client.request({
+          protocol: upstream.protocol,
+          hostname: upstream.hostname,
+          port: upstream.port || (upstream.protocol === \"https:\" ? 443 : 80),
+          method: req.method,
+          path: req.url,
+          headers: { ...req.headers, host: upstream.host }
+        }, (proxyRes) => {
+          res.writeHead(proxyRes.statusCode || 502, proxyRes.headers);
+          proxyRes.pipe(res);
+        });
+        proxyReq.on(\"error\", (err) => {
+          res.writeHead(502, { \"content-type\": \"text/plain\" });
+          res.end(\"Upstream proxy error: \" + err.message);
+        });
+        req.pipe(proxyReq);
+      }).listen(5000, \"127.0.0.1\");
+      ' & cd /app/client && npm run dev -- --host 0.0.0.0 --port 5173"
     depends_on:
       - backend
 
