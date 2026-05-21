@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { useTickets } from '../context/TicketContext';
+import { useTickets } from '../../context/TicketContext';
 import { Sparkles, Mail, Lock, User as UserIcon } from 'lucide-react';
+import { getAuthFailureMessage, isAuthSubmissionInvalid } from './utils';
 
 export const AuthScreen: React.FC = () => {
   const { signIn, signUp } = useTickets();
@@ -14,7 +15,7 @@ export const AuthScreen: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
-    if (!email || !password || (isSignUp && !name)) {
+    if (isAuthSubmissionInvalid(isSignUp, name, email, password)) {
       setErrorMsg('Please fill in all required fields.');
       return;
     }
@@ -29,7 +30,7 @@ export const AuthScreen: React.FC = () => {
       }
 
       if (!success) {
-        setErrorMsg(isSignUp ? 'Registration failed. Email might already exist.' : 'Invalid email or password.');
+        setErrorMsg(getAuthFailureMessage(isSignUp));
       }
     } catch (err: any) {
       setErrorMsg(err.message || 'An error occurred during authentication.');

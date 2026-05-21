@@ -1,13 +1,11 @@
 import React, { useState } from 'react';
-import { useTickets } from '../context/TicketContext';
+import { useTickets } from '../../context/TicketContext';
 import { 
   Sparkles, Database, Layers, CheckCircle, Terminal, 
   ChevronRight, ChevronLeft, Check, HelpCircle
 } from 'lucide-react';
-
-interface OnboardingModalProps {
-  onComplete: () => void;
-}
+import type { OnboardingModalProps } from './types';
+import { getNextOnboardingStep, getPreviousOnboardingStep, LAST_ONBOARDING_STEP } from './utils';
 
 export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) => {
   const { currentUser } = useTickets();
@@ -30,8 +28,8 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
   };
 
   const handleNext = () => {
-    if (step < 4) {
-      setStep(step + 1);
+    if (step < LAST_ONBOARDING_STEP) {
+      setStep(getNextOnboardingStep(step));
     } else {
       handleSkip(); // Finish behaves the same: saves state
     }
@@ -39,7 +37,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
 
   const handleBack = () => {
     if (step > 1) {
-      setStep(step - 1);
+      setStep(getPreviousOnboardingStep(step));
     } else {
       setStep(0);
     }
@@ -137,7 +135,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
               </button>
               
               <button onClick={handleNext} className="clickable" style={{ ...navButtonStyle, background: 'var(--text-heading)', color: 'var(--bg)' }}>
-                {step === 4 ? (
+                {step === LAST_ONBOARDING_STEP ? (
                   <>
                     <Check size={16} />
                     Finish Tour
