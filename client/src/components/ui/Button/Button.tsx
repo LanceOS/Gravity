@@ -1,5 +1,5 @@
+import { Button as LibButton } from '@library';
 import type { ButtonProps } from './types';
-import { joinButtonClassNames, sizeClassNames, variantClassNames } from './utils';
 
 export function Button({
   variant = 'default',
@@ -9,13 +9,23 @@ export function Button({
   type = 'button',
   ...props
 }: ButtonProps) {
-  const classes = joinButtonClassNames(
-    'btn',
-    sizeClassNames[size],
-    variantClassNames[variant],
-    fullWidth ? 'btn-block' : '',
-    className ?? '',
-  );
+  let mappedVariant: 'default' | 'primary' | 'secondary' | 'danger' | 'ghost' | 'link' = 'default';
+  if (variant === 'accent' || variant === 'primary') {
+    mappedVariant = 'primary';
+  } else if (variant === 'ghost') {
+    mappedVariant = 'ghost';
+  } else if (variant === 'danger') {
+    mappedVariant = 'danger';
+  }
 
-  return <button type={type} className={classes} {...props} />;
+  return (
+    <LibButton
+      type={type}
+      variant={mappedVariant}
+      size={size as 'sm' | 'md' | 'lg'}
+      fullWidth={fullWidth}
+      className={className}
+      {...props}
+    />
+  );
 }
