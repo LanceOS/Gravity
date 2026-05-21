@@ -13,17 +13,12 @@ interface WorkspaceProjectsPageProps {
   domains: Domain[];
   projectCreateLoading: boolean;
   projectCreateError: string | null;
-  projectManageLoading: boolean;
-  projectManageError: string | null;
-  defaultProjectLoading: boolean;
   domainCreateLoading: boolean;
   domainCreateError: string | null;
   onBackToWorkspace: () => void;
   onCreateProject: (project: { name: string; description: string; key: string }) => Promise<void>;
   onCreateDomain: (domain: { name: string; color: string }) => Promise<void>;
   onSelectProject: (projectId: string) => void;
-  onSetDefaultProject: (projectId: string) => Promise<void>;
-  onUpdateProjectInfo: (projectId: string, updates: { name: string; description: string; status: Project['status'] }) => Promise<void>;
 }
 
 export function WorkspaceProjectsPage({
@@ -34,17 +29,12 @@ export function WorkspaceProjectsPage({
   domains,
   projectCreateLoading,
   projectCreateError,
-  projectManageLoading,
-  projectManageError,
-  defaultProjectLoading,
   domainCreateLoading,
   domainCreateError,
   onBackToWorkspace,
   onCreateProject,
   onCreateDomain,
   onSelectProject,
-  onSetDefaultProject,
-  onUpdateProjectInfo,
 }: WorkspaceProjectsPageProps) {
   return (
     <div className="workspace-page workspace-projects-page">
@@ -74,16 +64,11 @@ export function WorkspaceProjectsPage({
           domains={domains}
           projectCreateLoading={projectCreateLoading}
           projectCreateError={projectCreateError}
-          projectManageLoading={projectManageLoading}
-          projectManageError={projectManageError}
-          defaultProjectLoading={defaultProjectLoading}
           domainCreateLoading={domainCreateLoading}
           domainCreateError={domainCreateError}
           onSelectProject={onSelectProject}
           onCreateProject={onCreateProject}
           onCreateDomain={onCreateDomain}
-          onUpdateProject={onUpdateProjectInfo}
-          onSetDefaultProject={onSetDefaultProject}
         />
       </div>
     </div>

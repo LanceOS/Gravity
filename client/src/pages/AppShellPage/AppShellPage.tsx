@@ -67,9 +67,6 @@ export function AppShellPage() {
   const [listSort, setListSort] = useState<TicketListSort>('created');
   const [projectCreateLoading, setProjectCreateLoading] = useState(false);
   const [projectCreateError, setProjectCreateError] = useState<string | null>(null);
-  const [projectManageLoading, setProjectManageLoading] = useState(false);
-  const [projectManageError, setProjectManageError] = useState<string | null>(null);
-  const [defaultProjectLoading, setDefaultProjectLoading] = useState(false);
   const [domainCreateLoading, setDomainCreateLoading] = useState(false);
   const [domainCreateError, setDomainCreateError] = useState<string | null>(null);
 
@@ -239,7 +236,6 @@ export function AppShellPage() {
 
   useEffect(() => {
     setProjectCreateError(null);
-    setProjectManageError(null);
     setDomainCreateError(null);
   }, [activeWorkspaceId, activeProjectId]);
 
@@ -399,70 +395,6 @@ export function AppShellPage() {
       throw error;
     } finally {
       setProjectCreateLoading(false);
-    }
-  };
-
-  const handleUpdateProjectInfo = async (
-    projectId: string,
-    updates: { name: string; description: string; status: 'planned' | 'active' | 'completed' }
-  ) => {
-    if (!currentUser) {
-      return;
-    }
-
-    setProjectManageLoading(true);
-    setProjectManageError(null);
-
-    try {
-      const response = await fetch(`/api/v1/projects/${projectId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates),
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to update project.');
-      }
-
-      await fetchInitialData(currentUser.id);
-      await refreshWorkspaces();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to update project.';
-      setProjectManageError(message);
-      throw error;
-    } finally {
-      setProjectManageLoading(false);
-    }
-  };
-
-  const handleSetDefaultProject = async (projectId: string) => {
-    if (!activeWorkspaceId) {
-      return;
-    }
-
-    setDefaultProjectLoading(true);
-    setProjectManageError(null);
-
-    try {
-      const response = await fetch(`/api/v1/workspaces/${activeWorkspaceId}/settings`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ defaultProjectId: projectId }),
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to update the workspace default project.');
-      }
-
-      await refreshWorkspaces();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to update the workspace default project.';
-      setProjectManageError(message);
-      throw error;
-    } finally {
-      setDefaultProjectLoading(false);
     }
   };
 
@@ -752,17 +684,12 @@ export function AppShellPage() {
               domains={domains}
               projectCreateLoading={projectCreateLoading}
               projectCreateError={projectCreateError}
-              projectManageLoading={projectManageLoading}
-              projectManageError={projectManageError}
-              defaultProjectLoading={defaultProjectLoading}
               domainCreateLoading={domainCreateLoading}
               domainCreateError={domainCreateError}
               onBackToWorkspace={() => setActiveSection('workspace')}
               onCreateProject={handleCreateProject}
               onCreateDomain={handleCreateDomain}
               onSelectProject={handleSelectProjectForManagement}
-              onSetDefaultProject={handleSetDefaultProject}
-              onUpdateProjectInfo={handleUpdateProjectInfo}
             />
           ) : (
             <WorkspacePage

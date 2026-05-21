@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { FolderPlus, Sparkles, X } from 'lucide-react';
+import { FolderPlus, X } from 'lucide-react';
 import { Button } from '../../ui/Button';
 import type { ProjectCreateOverlayProps } from '../types';
 import { sanitizeProjectKey } from '../utils';
+import './ProjectCreateOverlay.css';
 
 export function ProjectCreateOverlay({
   loading,
@@ -41,7 +42,6 @@ export function ProjectCreateOverlay({
         key: projectKey.trim(),
         description: projectDescription.trim(),
       });
-      onClose();
     } catch {
       if (!errorMessage) {
         setFormError('Failed to create the project.');
@@ -69,155 +69,82 @@ export function ProjectCreateOverlay({
 
   return (
     <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 500,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '16px',
-        background: 'rgba(0, 0, 0, 0.65)',
-        backdropFilter: 'blur(4px)',
-      }}
+      className="project-create-overlay"
       onClick={handleClose}
     >
       <div
-        style={{
-          width: '640px',
-          maxWidth: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-          border: '1px solid var(--border)',
-          borderRadius: '10px',
-          background: 'var(--card-bg)',
-          boxShadow: '0 20px 25px -5px rgba(0,0,0,0.3), 0 10px 10px -5px rgba(0,0,0,0.2)',
-        }}
+        className="project-create-overlay__card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="project-create-overlay-title"
         onClick={(event) => event.stopPropagation()}
       >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '14px 20px',
-            borderBottom: '1px solid var(--border)',
-          }}
-        >
-          <Sparkles size={16} color="var(--accent)" />
-          <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-heading)' }}>Create New Project</span>
-          <Button
+        <div className="project-create-overlay__header">
+          <div>
+            <div className="project-create-overlay__eyebrow">Workspace Projects</div>
+            <h3 id="project-create-overlay-title" className="project-create-overlay__title">New Project</h3>
+          </div>
+
+          <button
             type="button"
+            className="project-create-overlay__close"
             onClick={handleClose}
-            variant="ghost"
-            size="sm"
             aria-label="Close create project overlay"
             disabled={loading}
-            style={{
-              marginLeft: 'auto',
-              width: '28px',
-              minHeight: '28px',
-              padding: 0,
-              border: 'none',
-              color: 'var(--text-muted)',
-            }}
           >
             <X size={16} />
-          </Button>
+          </button>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column' }}>
+        <form className="project-create-overlay__form" onSubmit={handleSubmit}>
           {feedbackMessage ? (
-            <div
-              style={{
-                margin: '16px 20px 0',
-                padding: '10px 12px',
-                borderRadius: '8px',
-                border: '1px solid rgba(239, 68, 68, 0.2)',
-                background: 'rgba(239, 68, 68, 0.08)',
-                color: '#ef4444',
-                fontSize: '12px',
-              }}
-            >
+            <div className="project-create-overlay__feedback">
               {feedbackMessage}
             </div>
           ) : null}
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', padding: '20px' }}>
-            <input
-              type="text"
-              className="input"
-              style={{
-                fontSize: '18px',
-                fontWeight: 500,
-                border: 'none',
-                borderBottom: '1px solid var(--border)',
-                borderRadius: 0,
-                padding: '8px 0',
-                background: 'transparent',
-              }}
-              placeholder="Project name"
-              value={projectName}
-              onChange={(event) => setProjectName(event.target.value)}
-              autoFocus
-              required
-            />
-
-            <textarea
-              className="input"
-              rows={5}
-              style={{
-                border: 'none',
-                borderRadius: 0,
-                padding: '8px 0',
-                fontSize: '13px',
-                lineHeight: 1.5,
-                resize: 'none',
-                background: 'transparent',
-              }}
-              placeholder="Describe the focus of this project within the workspace."
-              value={projectDescription}
-              onChange={(event) => setProjectDescription(event.target.value)}
-            />
-          </div>
-
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'minmax(140px, 180px)',
-              gap: '12px',
-              padding: '16px 20px',
-              borderTop: '1px solid var(--border)',
-              background: 'var(--sidebar-bg)',
-            }}
-          >
-            <div>
-              <span className="label">Project Key</span>
+          <div className="project-create-overlay__grid">
+            <label className="project-create-overlay__field">
+              <span className="workspace-page__project-label">Project Name</span>
               <input
-                className="input"
+                type="text"
+                className="workspace-page__project-input project-create-overlay__name-input"
+                placeholder="Core Platform"
+                value={projectName}
+                onChange={(event) => setProjectName(event.target.value)}
+                autoFocus
+                required
+              />
+            </label>
+
+            <label className="project-create-overlay__field">
+              <span className="workspace-page__project-label">Project Key</span>
+              <input
+                className="workspace-page__project-input workspace-page__project-input--key"
                 value={projectKey}
                 onChange={(event) => setProjectKey(sanitizeProjectKey(event.target.value))}
                 placeholder="CORE"
                 maxLength={8}
                 required
               />
-            </div>
+            </label>
+
+            <label className="project-create-overlay__field project-create-overlay__field--description">
+              <span className="workspace-page__project-label">Description</span>
+              <textarea
+                className="workspace-page__project-input workspace-page__project-input--textarea project-create-overlay__description-input"
+                rows={4}
+                placeholder="Describe the focus of this project within the workspace."
+                value={projectDescription}
+                onChange={(event) => setProjectDescription(event.target.value)}
+              />
+            </label>
           </div>
 
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '12px',
-              padding: '14px 20px',
-              borderTop: '1px solid var(--border)',
-            }}
-          >
-            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Press Ctrl/Cmd + Enter to create the project.</span>
+          <div className="project-create-overlay__actions">
+            <span className="project-create-overlay__hint">Ctrl/Cmd + Enter creates the project.</span>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div className="project-create-overlay__buttons">
               <Button type="button" variant="ghost" onClick={handleClose} disabled={loading}>
                 Cancel
               </Button>
