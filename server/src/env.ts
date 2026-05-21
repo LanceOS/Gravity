@@ -5,6 +5,10 @@ dotenv.config();
 
 const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(8080),
+  FEDERATION_SYNC_INTERVAL_MS: z.coerce.number().int().nonnegative().default(5000),
+  FEDERATION_SYNC_FAILURE_BASE_MS: z.coerce.number().int().positive().default(5000),
+  FEDERATION_SYNC_FAILURE_MAX_MS: z.coerce.number().int().positive().default(60000),
+  FEDERATION_SYNC_FAILURE_MAX_RETRIES: z.coerce.number().int().positive().default(5),
   DATABASE_URL: z
     .string()
     .min(1)
@@ -29,6 +33,10 @@ const splitList = (value?: string) =>
 
 export const env = {
   port: parsed.PORT,
+  federationSyncIntervalMs: parsed.FEDERATION_SYNC_INTERVAL_MS,
+  federationSyncFailureBaseMs: parsed.FEDERATION_SYNC_FAILURE_BASE_MS,
+  federationSyncFailureMaxMs: parsed.FEDERATION_SYNC_FAILURE_MAX_MS,
+  federationSyncFailureMaxRetries: parsed.FEDERATION_SYNC_FAILURE_MAX_RETRIES,
   databaseUrl: parsed.DATABASE_URL,
   betterAuthSecret: parsed.BETTER_AUTH_SECRET,
   nodeIdentityMasterKey: parsed.NODE_IDENTITY_MASTER_KEY,

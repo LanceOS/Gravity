@@ -134,12 +134,47 @@ export const identities = pgTable('identities', {
 
 export const peerConnections = pgTable('peer_connections', {
   id: text('id').primaryKey(),
+  workspaceId: text('workspace_id').notNull(),
   hostUrl: text('host_url').notNull(),
+  hostDisplayName: text('host_display_name').notNull().default(''),
   hostPublicKey: text('host_public_key').notNull(),
   lastSyncedEventId: integer('last_synced_event_id').notNull().default(0),
   status: text('status').notNull().default('active'),
+  consecutiveFailures: integer('consecutive_failures').notNull().default(0),
+  nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }),
+  lastAttemptAt: timestamp('last_attempt_at', { withTimezone: true }),
+  lastSuccessAt: timestamp('last_success_at', { withTimezone: true }),
+  lastError: text('last_error'),
+  lastAppliedCount: integer('last_applied_count').notNull().default(0),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const federationInvites = pgTable('federation_invites', {
+  id: text('id').primaryKey(),
+  workspaceId: text('workspace_id').notNull(),
+  issuedByUserId: text('issued_by_user_id').notNull(),
+  inviteToken: text('invite_token').notNull().unique(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  acceptedAt: timestamp('accepted_at', { withTimezone: true }),
+  acceptedByPublicKey: text('accepted_by_public_key'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const workspacePeers = pgTable(
+  'workspace_peers',
+  {
+    workspaceId: text('workspace_id').notNull(),
+    identityId: text('identity_id').notNull(),
+    invitedByUserId: text('invited_by_user_id').notNull(),
+    peerHostUrl: text('peer_host_url').notNull().default(''),
+    status: text('status').notNull().default('verified'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.workspaceId, table.identityId] }),
+  }),
+);
 
 export const syncOutbox = pgTable('sync_outbox', {
   eventId: serial('event_id').primaryKey(),
@@ -236,6 +271,11 @@ export const schema = {
   workspaceConnections,
   identities,
   peerConnections,
+<<<<<<< HEAD
+=======
+  federationInvites,
+  workspacePeers,
+>>>>>>> main
   syncOutbox,
   projects,
   projectMembers,
