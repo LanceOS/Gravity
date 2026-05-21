@@ -129,10 +129,13 @@ export function WorkspaceProjectPanel({
     }
 
     try {
-      await onCreateDomain({
+      const domainPayload = {
+        projectId: managedProject.id,
         name: domainName.trim(),
         color: domainColor,
-      });
+      };
+
+      await onCreateDomain(domainPayload);
       setDomainName('');
       setDomainColor('#3b82f6');
     } catch {
