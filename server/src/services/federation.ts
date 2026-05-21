@@ -1,7 +1,7 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { and, asc, eq, gt, sql } from 'drizzle-orm';
 import { db } from '../db/index.js';
-import { comments, federationInvites, identities, peerConnections, projects, syncOutbox, tickets, workspaceMembers, workspacePeers, workspaceSettings, workspaces } from '../db/schema.js';
+import { authUsers, comments, federationInvites, identities, peerConnections, projects, syncOutbox, tickets, userProfiles, workspaceMembers, workspacePeers, workspaceSettings, workspaces } from '../db/schema.js';
 import { env } from '../env.js';
 import { decryptNodePrivateKey } from '../lib/crypto.js';
 import { createSignedFederationHeaders, normalizeFederationPublicKey } from '../lib/http-signatures.js';
@@ -383,6 +383,83 @@ function mapTicketRecord(record: typeof tickets.$inferSelect) {
   };
 }
 
+function mapCommentRecord(record: typeof comments.$inferSelect) {
+  return {
+    id: record.id,
+    ticketId: record.ticketId,
+    userId: record.userId,
+    body: record.body,
+    createdAt: normalizeIsoDate(record.createdAt),
+  };
+}
+
+function createFederatedAuthorId(publicKey: string) {
+  return `fedusr-${createHash('sha256').update(normalizeFederationPublicKey(publicKey)).digest('hex').slice(0, 24)}`;
+}
+
+function createFederatedAuthorEmail(userId: string) {
+  return `${userId}@gravity.invalid`;
+}
+
+function createFederatedAuthorAvatar(seed: string) {
+  return `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(seed)}`;
+}
+
+async function ensureFederatedCommentAuthor(input: {
+  userId: string;
+  displayName: string;
+  avatarUrl?: string;
+  role?: string;
+}) {
+  const now = new Date();
+  const avatarUrl = input.avatarUrl?.trim() || createFederatedAuthorAvatar(input.userId);
+
+  await db
+    .insert(authUsers)
+    .values({
+      id: input.userId,
+      name: input.displayName,
+      email: createFederatedAuthorEmail(input.userId),
+      emailVerified: false,
+      image: avatarUrl,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: authUsers.id,
+      set: {
+        name: input.displayName,
+        image: avatarUrl,
+        updatedAt: now,
+      },
+    });
+
+  await db
+    .insert(userProfiles)
+    .values({
+      userId: input.userId,
+      role: input.role?.trim() || 'guest_contributor',
+      avatarUrl,
+      createdAt: now,
+    })
+    .onConflictDoUpdate({
+      target: userProfiles.userId,
+      set: {
+        role: input.role?.trim() || 'guest_contributor',
+        avatarUrl,
+      },
+    });
+}
+
+async function getFederatedCommentContext(workspaceId: string, ticketId: string) {
+  const existing = await getFederatedTicketWithProject(workspaceId, ticketId);
+  if (!existing) {
+    return null;
+  }
+
+  return existing;
+}
+
 type FederatedTicketUpdate = Partial<{
   title: string;
   description: string;
@@ -651,6 +728,94 @@ export async function deleteFederatedTicket(input: {
   };
 }
 
+export async function createFederatedComment(input: {
+  workspaceId: string;
+  actorPublicKey: string;
+  ticketId: string;
+  body: string;
+}) {
+  const verifiedPeer = await getVerifiedWorkspacePeerByPublicKey(input.workspaceId, input.actorPublicKey);
+  if (!verifiedPeer) {
+    return { ok: false as const, status: 403, error: 'Peer is not verified for this workspace.' };
+  }
+
+  const existing = await getFederatedCommentContext(input.workspaceId, input.ticketId);
+  if (!existing) {
+    return { ok: false as const, status: 404, error: 'Ticket not found for workspace.' };
+  }
+
+  const federatedAuthorId = createFederatedAuthorId(verifiedPeer.publicKey);
+  await ensureFederatedCommentAuthor({
+    userId: federatedAuthorId,
+    displayName: verifiedPeer.displayName,
+    avatarUrl: createFederatedAuthorAvatar(verifiedPeer.publicKey),
+  });
+
+  const result = await db.transaction(async (tx) => {
+    const commentRows = await tx
+      .insert(comments)
+      .values({
+        id: createId('co'),
+        ticketId: input.ticketId,
+        userId: federatedAuthorId,
+        body: input.body,
+        createdAt: new Date(),
+      })
+      .returning();
+
+    const createdComment = commentRows[0];
+    const outboxRows = await tx
+      .insert(syncOutbox)
+      .values({
+        workspaceId: input.workspaceId,
+        actorPublicKey: input.actorPublicKey,
+        entityType: 'comment',
+        entityId: createdComment.id,
+        action: 'create',
+        payload: {
+          project: mapProjectReplica(existing.project),
+          ticket: mapTicketRecord(existing.ticket),
+          comment: {
+            ...mapCommentRecord(createdComment),
+            userName: verifiedPeer.displayName,
+            userAvatar: createFederatedAuthorAvatar(verifiedPeer.publicKey),
+            author: {
+              id: federatedAuthorId,
+              username: verifiedPeer.displayName,
+              avatar_url: createFederatedAuthorAvatar(verifiedPeer.publicKey),
+              role: 'guest_contributor',
+            },
+          },
+        },
+        createdAt: new Date(),
+      })
+      .returning();
+
+    return {
+      comment: {
+        ...mapCommentRecord(createdComment),
+        userName: verifiedPeer.displayName,
+        userAvatar: createFederatedAuthorAvatar(verifiedPeer.publicKey),
+        author: {
+          id: federatedAuthorId,
+          username: verifiedPeer.displayName,
+          avatar_url: createFederatedAuthorAvatar(verifiedPeer.publicKey),
+          role: 'guest_contributor',
+        },
+      },
+      ticket: mapTicketRecord(existing.ticket),
+      outboxEventId: outboxRows[0]?.eventId ?? null,
+    };
+  });
+
+  return {
+    ok: true as const,
+    comment: result.comment,
+    ticket: result.ticket,
+    outboxEventId: result.outboxEventId,
+  };
+}
+
 export async function listFederationOutboxEvents(input: {
   workspaceId: string;
   actorPublicKey: string;
@@ -760,6 +925,7 @@ export async function syncFederatedConnection(input: {
   try {
     const result = await db.transaction(async (tx) => {
       const changedProjectIds = new Set<string>();
+      const changedTicketIds = new Set<string>();
       let lastAppliedEventId = connection.lastSyncedEventId;
 
       for (const rawEvent of rawEvents) {
@@ -779,7 +945,7 @@ export async function syncFederatedConnection(input: {
         if (workspaceId !== connection.workspaceId) {
           throw new Error(`Received a federation event for unexpected workspace ${workspaceId}.`);
         }
-        if (entityType !== 'ticket' || (action !== 'create' && action !== 'update' && action !== 'delete')) {
+        if ((entityType === 'ticket' && action !== 'create' && action !== 'update' && action !== 'delete') || (entityType === 'comment' && action !== 'create') || (entityType !== 'ticket' && entityType !== 'comment')) {
           throw new Error(`Unsupported federation event ${entityType}:${action}.`);
         }
         if (!payload) {
@@ -823,7 +989,7 @@ export async function syncFederatedConnection(input: {
 
         const ticketPayload = isRecord(payload.ticket) ? payload.ticket : null;
         if (!ticketPayload) {
-          throw new Error(`Federation ticket event ${eventId} is missing ticket data.`);
+          throw new Error(`Federation ${entityType} event ${eventId} is missing ticket data.`);
         }
 
         const ticketId = asString(ticketPayload.id);
@@ -838,12 +1004,88 @@ export async function syncFederatedConnection(input: {
           throw new Error(`Missing local project replica ${projectId} for federation event ${eventId}.`);
         }
 
+        if (entityType === 'comment') {
+          const localTicketRows = await tx.select({ id: tickets.id }).from(tickets).where(eq(tickets.id, ticketId)).limit(1);
+          if (!localTicketRows[0]) {
+            throw new Error(`Missing local ticket replica ${ticketId} for federation comment event ${eventId}.`);
+          }
+
+          const commentPayload = isRecord(payload.comment) ? payload.comment : null;
+          if (!commentPayload) {
+            throw new Error(`Federation comment event ${eventId} is missing comment data.`);
+          }
+
+          const commentId = asString(commentPayload.id);
+          const commentUserId = asString(commentPayload.userId);
+          const commentBody = asString(commentPayload.body);
+          const commentUserName = asString(commentPayload.userName, 'Federated Peer');
+          const commentUserAvatar = asString(commentPayload.userAvatar, createFederatedAuthorAvatar(commentUserId || commentId));
+          const commentAuthor = isRecord(commentPayload.author) ? commentPayload.author : null;
+
+          if (!commentId || !commentUserId || !commentBody) {
+            throw new Error(`Federation comment event ${eventId} is missing required comment fields.`);
+          }
+
+          await tx
+            .insert(authUsers)
+            .values({
+              id: commentUserId,
+              name: commentUserName,
+              email: createFederatedAuthorEmail(commentUserId),
+              emailVerified: false,
+              image: commentUserAvatar,
+              createdAt: parseFederationDate(commentPayload.createdAt),
+              updatedAt: parseFederationDate(commentPayload.createdAt),
+            })
+            .onConflictDoUpdate({
+              target: authUsers.id,
+              set: {
+                name: commentUserName,
+                image: commentUserAvatar,
+                updatedAt: new Date(),
+              },
+            });
+
+          await tx
+            .insert(userProfiles)
+            .values({
+              userId: commentUserId,
+              role: asString(commentAuthor?.role, 'guest_contributor'),
+              avatarUrl: commentUserAvatar,
+              createdAt: parseFederationDate(commentPayload.createdAt),
+            })
+            .onConflictDoUpdate({
+              target: userProfiles.userId,
+              set: {
+                role: asString(commentAuthor?.role, 'guest_contributor'),
+                avatarUrl: commentUserAvatar,
+              },
+            });
+
+          await tx
+            .insert(comments)
+            .values({
+              id: commentId,
+              ticketId,
+              userId: commentUserId,
+              body: commentBody,
+              createdAt: parseFederationDate(commentPayload.createdAt),
+            })
+            .onConflictDoNothing({ target: comments.id });
+
+          changedProjectIds.add(projectId);
+          changedTicketIds.add(ticketId);
+          lastAppliedEventId = eventId;
+          continue;
+        }
+
         if (action === 'delete') {
           await tx.delete(comments).where(eq(comments.ticketId, ticketId));
           await tx.delete(tickets).where(eq(tickets.parentId, ticketId));
           await tx.delete(tickets).where(eq(tickets.id, ticketId));
 
           changedProjectIds.add(projectId);
+          changedTicketIds.add(ticketId);
           lastAppliedEventId = eventId;
           continue;
         }
@@ -895,6 +1137,7 @@ export async function syncFederatedConnection(input: {
           });
 
         changedProjectIds.add(projectId);
+        changedTicketIds.add(ticketId);
         lastAppliedEventId = eventId;
       }
 
@@ -913,6 +1156,7 @@ export async function syncFederatedConnection(input: {
         appliedCount: rawEvents.length,
         lastSyncedEventId,
         changedProjectIds: [...changedProjectIds],
+        changedTicketIds: [...changedTicketIds],
       };
     });
 
@@ -921,6 +1165,7 @@ export async function syncFederatedConnection(input: {
       appliedCount: result.appliedCount,
       lastSyncedEventId: result.lastSyncedEventId,
       changedProjectIds: result.changedProjectIds,
+      changedTicketIds: result.changedTicketIds,
     };
   } catch (error) {
     return {

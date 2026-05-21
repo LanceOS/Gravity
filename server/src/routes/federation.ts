@@ -13,6 +13,7 @@ import { resolveRequestActorUserId } from '../lib/request-auth.js';
 import {
   acceptFederationHandshake,
   connectToFederatedWorkspace,
+  createFederatedComment,
   createFederatedTicket,
   createFederationInvite,
   deleteFederatedTicket,
@@ -23,7 +24,7 @@ import {
   listWorkspacePeers,
   updateFederatedTicket,
 } from '../services/federation.js';
-import { listTickets } from '../services/tickets.js';
+import { listComments, listTickets } from '../services/tickets.js';
 
 export function createFederationRouter() {
   const router = Router();
@@ -408,6 +409,62 @@ export function createFederationRouter() {
     }
   });
 
+  router.post('/federation/workspaces/:workspaceId/tickets/:ticketId/comments', async (req, res) => {
+    const { workspaceId, ticketId } = req.params;
+    const body = typeof req.body?.body === 'string' ? req.body.body.trim() : typeof req.body?.content === 'string' ? req.body.content.trim() : '';
+
+    if (!body) {
+      res.status(400).json({ error: 'body is required.' });
+      return;
+    }
+
+    const signatureInput = resolveFederationSignature(req);
+    if (!signatureInput) {
+      res.status(401).json({ error: 'Federation signature headers are required.' });
+      return;
+    }
+
+    if (!isFederationTimestampFresh(signatureInput.timestamp)) {
+      res.status(401).json({ error: 'Federation signature timestamp is outside the accepted window.' });
+      return;
+    }
+
+    const isValidSignature = verifyFederationRequestSignature({
+      method: req.method,
+      path: req.originalUrl,
+      timestamp: signatureInput.timestamp,
+      body: req.body ?? {},
+      publicKey: signatureInput.publicKey,
+      signature: signatureInput.signature,
+    });
+    if (!isValidSignature) {
+      res.status(401).json({ error: 'Invalid federation signature.' });
+      return;
+    }
+
+    try {
+      const result = await createFederatedComment({
+        workspaceId,
+        actorPublicKey: signatureInput.publicKey,
+        ticketId,
+        body,
+      });
+
+      if (!result.ok) {
+        res.status(result.status).json({ error: result.error });
+        return;
+      }
+
+      broadcastEvent('comments-updated', { ticketId: result.ticket.id, comments: await listComments(result.ticket.id) });
+      res.status(201).json({
+        comment: result.comment,
+        outboxEventId: result.outboxEventId,
+      });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create federated comment.' });
+    }
+  });
+
   router.get('/federation/workspaces/:workspaceId/outbox', async (req, res) => {
     const { workspaceId } = req.params;
     const signatureInput = resolveFederationSignature(req);
@@ -474,6 +531,10 @@ export function createFederationRouter() {
 
       for (const projectId of result.changedProjectIds) {
         broadcastEvent('tickets-updated', { projectId, tickets: await listTickets(projectId) });
+      }
+
+      for (const ticketId of result.changedTicketIds) {
+        broadcastEvent('comments-updated', { ticketId, comments: await listComments(ticketId) });
       }
 
       res.json({
