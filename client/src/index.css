@@ -396,7 +396,7 @@ select.workspace-page__project-input:hover {
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   overflow-y: auto;
-  animation: lib-fade-in var(--transition-fast) ease-out;
+  animation: lib-fade-in var(--transition-fast);
 }
 
 .select-option {
