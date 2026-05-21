@@ -50,7 +50,7 @@ function NavigationHarness() {
         ]}
       />
 
-      <ContextMenu items={[{ label: 'Rename', onClick: () => setContextAction('rename') }]}> 
+      <ContextMenu items={[{ label: 'Rename', onClick: () => setContextAction('rename') }]}>
         <div>Context target</div>
       </ContextMenu>
       <div>Context value: {contextAction}</div>
