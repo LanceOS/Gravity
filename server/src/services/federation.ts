@@ -1210,7 +1210,6 @@ export async function syncFederatedConnection(input: {
                   status: asString(projectPayload.status, 'active'),
                   inviteCode: asString(projectPayload.inviteCode, `fed-${projectId}`),
                   createdBy: asString(projectPayload.createdBy, 'federated-host'),
-                  createdAt: parseFederationDate(projectPayload.createdAt),
                   updatedAt: parseFederationDate(projectPayload.updatedAt),
                 },
               });
