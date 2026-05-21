@@ -437,7 +437,7 @@ export async function acceptFederationHandshake(input: {
       .update(federationInvites)
       .set({
         acceptedAt: new Date(),
-        acceptedByPublicKey: input.guestPublicKey,
+        acceptedByPublicKey: normalizeFederationPublicKey(input.guestPublicKey),
       })
       .where(eq(federationInvites.id, invite.id));
   });
