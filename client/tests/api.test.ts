@@ -76,7 +76,7 @@ async function startServer(): Promise<void> {
     throw new Error('WORKSPACE_TEST_DATABASE_URL or DATABASE_URL is required to run api.test.ts against PostgreSQL.');
   }
   
-  serverProcess = spawn('npx', ['tsx', 'server/index.ts'], {
+  serverProcess = spawn('npx', ['tsx', 'server/src/index.ts'], {
     cwd: path.join(__dirname, '..', '..'),
     env: {
       ...process.env,
