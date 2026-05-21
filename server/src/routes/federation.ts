@@ -1,17 +1,48 @@
 import { Router } from 'express';
+import { broadcastEvent } from '../realtime.js';
+import {
+  FEDERATION_PUBLIC_KEY_HEADER,
+  FEDERATION_SIGNATURE_HEADER,
+  FEDERATION_TIMESTAMP_HEADER,
+  decodeFederationPublicKey,
+  isFederationTimestampFresh,
+  verifyFederationRequestSignature,
+} from '../lib/http-signatures.js';
 import { getLocalNodeIdentity } from '../lib/node-identity.js';
 import { resolveRequestActorUserId } from '../lib/request-auth.js';
 import {
   acceptFederationHandshake,
   connectToFederatedWorkspace,
+  createFederatedTicket,
   createFederationInvite,
   ensureWorkspaceAdminAccess,
   getWorkspaceById,
   listWorkspacePeers,
 } from '../services/federation.js';
+import { listTickets } from '../services/tickets.js';
 
 export function createFederationRouter() {
   const router = Router();
+
+  function resolveFederationSignature(req: Parameters<typeof verifyFederationRequestSignature>[0] extends never ? never : any) {
+    const encodedPublicKey = req.header(FEDERATION_PUBLIC_KEY_HEADER)?.trim() || '';
+    const signature = req.header(FEDERATION_SIGNATURE_HEADER)?.trim() || '';
+    const timestamp = req.header(FEDERATION_TIMESTAMP_HEADER)?.trim() || '';
+
+    if (!encodedPublicKey || !signature || !timestamp) {
+      return null;
+    }
+
+    try {
+      return {
+        publicKey: decodeFederationPublicKey(encodedPublicKey),
+        signature,
+        timestamp,
+      };
+    } catch {
+      return null;
+    }
+  }
 
   router.get('/federation/identity', async (_req, res) => {
     try {
@@ -172,6 +203,72 @@ export function createFederationRouter() {
       });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to connect to federated workspace.' });
+    }
+  });
+
+  router.post('/federation/workspaces/:workspaceId/tickets', async (req, res) => {
+    const { workspaceId } = req.params;
+    const title = typeof req.body?.title === 'string' ? req.body.title.trim() : '';
+    const projectId = typeof req.body?.projectId === 'string' ? req.body.projectId.trim() : '';
+
+    if (!title || !projectId) {
+      res.status(400).json({ error: 'title and projectId are required.' });
+      return;
+    }
+
+    const signatureInput = resolveFederationSignature(req);
+    if (!signatureInput) {
+      res.status(401).json({ error: 'Federation signature headers are required.' });
+      return;
+    }
+
+    if (!isFederationTimestampFresh(signatureInput.timestamp)) {
+      res.status(401).json({ error: 'Federation signature timestamp is outside the accepted window.' });
+      return;
+    }
+
+    const isValidSignature = verifyFederationRequestSignature({
+      method: req.method,
+      path: req.originalUrl,
+      timestamp: signatureInput.timestamp,
+      body: req.body ?? {},
+      publicKey: signatureInput.publicKey,
+      signature: signatureInput.signature,
+    });
+    if (!isValidSignature) {
+      res.status(401).json({ error: 'Invalid federation signature.' });
+      return;
+    }
+
+    try {
+      const result = await createFederatedTicket({
+        workspaceId,
+        actorPublicKey: signatureInput.publicKey,
+        ticket: {
+          title,
+          description: typeof req.body?.description === 'string' ? req.body.description : undefined,
+          status: typeof req.body?.status === 'string' ? req.body.status : undefined,
+          priority: typeof req.body?.priority === 'string' ? req.body.priority : undefined,
+          projectId,
+          domainId: typeof req.body?.domainId === 'string' ? req.body.domainId : undefined,
+          cycleId: typeof req.body?.cycleId === 'string' ? req.body.cycleId : undefined,
+          assigneeId: typeof req.body?.assigneeId === 'string' ? req.body.assigneeId : undefined,
+          parentId: typeof req.body?.parentId === 'string' ? req.body.parentId : undefined,
+        },
+      });
+
+      if (!result.ok) {
+        res.status(result.status).json({ error: result.error });
+        return;
+      }
+
+      broadcastEvent('tickets-updated', { projectId, tickets: await listTickets(projectId) });
+      res.status(201).json({
+        ticket: result.ticket,
+        outboxEventId: result.outboxEventId,
+      });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create federated ticket.' });
     }
   });
 

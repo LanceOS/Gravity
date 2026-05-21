@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { db } from '../db/index.js';
-import { federationInvites, identities, peerConnections, workspaceMembers, workspacePeers, workspaces } from '../db/schema.js';
+import { federationInvites, identities, peerConnections, projects, syncOutbox, tickets, workspaceMembers, workspacePeers, workspaces } from '../db/schema.js';
 import { env } from '../env.js';
-import { createId } from '../lib/platform.js';
-import { ensureLocalNodeIdentity, getLocalNodeIdentity } from '../lib/node-identity.js';
+import { normalizeFederationPublicKey } from '../lib/http-signatures.js';
+import { createId, normalizeEntityKey, normalizeIsoDate } from '../lib/platform.js';
+import { ensureLocalNodeIdentity } from '../lib/node-identity.js';
 
 function createInviteToken() {
   return `fed_${randomUUID().replace(/-/g, '')}`;
@@ -52,7 +53,8 @@ export async function upsertRemoteIdentity(input: {
   publicKey: string;
   displayName: string;
 }) {
-  const existingRows = await db.select().from(identities).where(eq(identities.publicKey, input.publicKey)).limit(1);
+  const normalizedPublicKey = normalizeFederationPublicKey(input.publicKey);
+  const existingRows = await db.select().from(identities).where(eq(identities.publicKey, normalizedPublicKey)).limit(1);
   const existingIdentity = existingRows[0];
 
   if (existingIdentity) {
@@ -72,7 +74,7 @@ export async function upsertRemoteIdentity(input: {
     .values({
       id: createId('idn'),
       displayName: input.displayName,
-      publicKey: input.publicKey,
+      publicKey: normalizedPublicKey,
       encryptedPrivateKey: null,
       isLocalOwner: false,
       createdAt: new Date(),
@@ -175,6 +177,142 @@ export async function listWorkspacePeers(workspaceId: string) {
     .where(eq(workspacePeers.workspaceId, workspaceId));
 
   return rows;
+}
+
+export async function getVerifiedWorkspacePeerByPublicKey(workspaceId: string, publicKey: string) {
+  const normalizedPublicKey = normalizeFederationPublicKey(publicKey);
+  const rows = await db
+    .select({
+      workspaceId: workspacePeers.workspaceId,
+      identityId: identities.id,
+      displayName: identities.displayName,
+      publicKey: identities.publicKey,
+      status: workspacePeers.status,
+    })
+    .from(workspacePeers)
+    .innerJoin(identities, eq(identities.id, workspacePeers.identityId))
+    .where(and(eq(workspacePeers.workspaceId, workspaceId), eq(identities.publicKey, normalizedPublicKey)))
+    .limit(1);
+
+  const peer = rows[0];
+  if (!peer || peer.status !== 'verified') {
+    return null;
+  }
+
+  return peer;
+}
+
+function mapTicketRecord(record: typeof tickets.$inferSelect) {
+  return {
+    id: record.id,
+    key: record.key,
+    title: record.title,
+    description: record.description,
+    status: record.status,
+    priority: record.priority,
+    assigneeId: record.assigneeId,
+    projectId: record.projectId,
+    domainId: record.domainId,
+    cycleId: record.cycleId,
+    parentId: record.parentId,
+    prStatus: record.prStatus,
+    prUrl: record.prUrl,
+    createdAt: normalizeIsoDate(record.createdAt),
+    updatedAt: normalizeIsoDate(record.updatedAt),
+  };
+}
+
+export async function createFederatedTicket(input: {
+  workspaceId: string;
+  actorPublicKey: string;
+  ticket: {
+    title: string;
+    description?: string;
+    status?: string;
+    priority?: string;
+    projectId: string;
+    domainId?: string | null;
+    cycleId?: string | null;
+    assigneeId?: string | null;
+    parentId?: string | null;
+  };
+}) {
+  const verifiedPeer = await getVerifiedWorkspacePeerByPublicKey(input.workspaceId, input.actorPublicKey);
+  if (!verifiedPeer) {
+    return { ok: false as const, status: 403, error: 'Peer is not verified for this workspace.' };
+  }
+
+  const projectRows = await db
+    .select({ id: projects.id, key: projects.key, workspaceId: projects.workspaceId })
+    .from(projects)
+    .where(eq(projects.id, input.ticket.projectId))
+    .limit(1);
+  const project = projectRows[0];
+  if (!project || project.workspaceId !== input.workspaceId) {
+    return { ok: false as const, status: 404, error: 'Project not found for workspace.' };
+  }
+
+  const result = await db.transaction(async (tx) => {
+    const existing = await tx.execute(sql`
+      SELECT key
+      FROM tickets
+      WHERE project_id = ${input.ticket.projectId}
+        AND key LIKE ${`${normalizeEntityKey(project.key)}-%`}
+    `);
+
+    const maxValue = (existing.rows as Array<{ key: string }>).reduce((highest, row) => {
+      const numeric = Number(row.key.split('-').pop() ?? 0);
+      return Number.isFinite(numeric) && numeric > highest ? numeric : highest;
+    }, 0);
+
+    const ticketRows = await tx
+      .insert(tickets)
+      .values({
+        id: createId('ti'),
+        key: `${normalizeEntityKey(project.key)}-${maxValue + 1}`,
+        title: input.ticket.title,
+        description: input.ticket.description ?? '',
+        status: input.ticket.status ?? 'todo',
+        priority: input.ticket.priority ?? 'no_priority',
+        projectId: input.ticket.projectId,
+        domainId: input.ticket.domainId ?? null,
+        cycleId: input.ticket.cycleId ?? null,
+        assigneeId: input.ticket.assigneeId ?? null,
+        parentId: input.ticket.parentId ?? null,
+        prStatus: 'none',
+        prUrl: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning();
+
+    const createdTicket = ticketRows[0];
+    const outboxRows = await tx
+      .insert(syncOutbox)
+      .values({
+        workspaceId: input.workspaceId,
+        actorPublicKey: input.actorPublicKey,
+        entityType: 'ticket',
+        entityId: createdTicket.id,
+        action: 'create',
+        payload: {
+          ticket: mapTicketRecord(createdTicket),
+        },
+        createdAt: new Date(),
+      })
+      .returning();
+
+    return {
+      ticket: mapTicketRecord(createdTicket),
+      outboxEventId: outboxRows[0]?.eventId ?? null,
+    };
+  });
+
+  return {
+    ok: true as const,
+    ticket: result.ticket,
+    outboxEventId: result.outboxEventId,
+  };
 }
 
 export async function connectToFederatedWorkspace(input: {
