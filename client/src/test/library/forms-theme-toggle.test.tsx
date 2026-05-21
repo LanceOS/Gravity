@@ -261,7 +261,8 @@ describe('library forms and theme toggle', () => {
     await user.type(screen.getByLabelText('Estimate'), '8');
     expect(screen.getByText('Estimate value: 8')).toBeInTheDocument();
 
-    await user.selectOptions(screen.getByLabelText('Priority'), 'high');
+    await user.click(screen.getByRole('button', { name: 'Priority' }));
+    await user.click(screen.getByRole('option', { name: 'High' }));
     expect(screen.getByText('Priority value: high')).toBeInTheDocument();
 
     const checkbox = screen.getByLabelText('Send updates');

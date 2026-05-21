@@ -43,6 +43,10 @@ function renderSettingsPage(overrides: Partial<Parameters<typeof SettingsPage>[0
     inviteError: null,
     invitesLoading: false,
     inviteLoading: false,
+    federationConnections: [],
+    connectionsLoading: false,
+    connectionsError: null,
+    retryingConnectionId: null,
     invites: [
       {
         id: 'invite-1',
@@ -85,6 +89,7 @@ function renderSettingsPage(overrides: Partial<Parameters<typeof SettingsPage>[0
     onCreateInvite: vi.fn().mockResolvedValue(true),
     onRevokeInvite: vi.fn().mockResolvedValue(true),
     onApproveJoinRequest: vi.fn().mockResolvedValue(true),
+    onRetryConnection: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
 
@@ -158,7 +163,8 @@ describe('SettingsPage', () => {
     });
     expect(props.onChangeSettings).toHaveBeenCalledWith({ hostUrl: 'http://peer.example.com' });
 
-    await user.selectOptions(screen.getByLabelText('Join Policy'), 'auto_join');
+    await user.click(screen.getByRole('button', { name: 'Join Policy' }));
+    await user.click(screen.getByRole('option', { name: 'Auto Join' }));
     expect(props.onChangeSettings).toHaveBeenCalledWith({ joinMode: 'auto_join' });
 
     await user.click(screen.getByRole('button', { name: 'Workspace' }));
@@ -212,7 +218,8 @@ describe('AccountPreferencesPage', () => {
     expect(screen.getByText('Loading saved account settings...')).toBeInTheDocument();
     expect(screen.getByText('Unable to save local preferences.')).toBeInTheDocument();
 
-    await user.selectOptions(screen.getByLabelText('Default View Mode'), 'list');
+    await user.click(screen.getByRole('button', { name: 'Default View Mode' }));
+    await user.click(screen.getByRole('option', { name: 'Issues List' }));
     expect(props.onChangeSettings).toHaveBeenCalledWith({ defaultView: 'list' });
 
     await user.click(screen.getByRole('button', { name: 'Back' }));
@@ -234,7 +241,8 @@ describe('AccountPreferencesPage', () => {
 
     await user.click(screen.getByRole('button', { name: /Cloud AI/i }));
     expect(screen.getByText('Cloud AI provider')).toBeInTheDocument();
-    await user.selectOptions(screen.getByLabelText('Provider'), 'anthropic');
+    await user.click(screen.getByRole('button', { name: 'Provider' }));
+    await user.click(screen.getByRole('option', { name: 'Anthropic' }));
     expect(props.onChangeSettings).toHaveBeenCalledWith({ aiProvider: 'anthropic' });
     await user.click(screen.getByRole('button', { name: 'Test OpenAI' }));
     expect(props.onTestApiKey).toHaveBeenCalledTimes(1);
@@ -244,7 +252,8 @@ describe('AccountPreferencesPage', () => {
     expect(screen.getByText('Local Ollama assistant')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Refresh' }));
     expect(props.onRefreshOllamaModels).toHaveBeenCalledTimes(1);
-    await user.selectOptions(screen.getByLabelText('Detected Ollama Model'), 'phi3');
+    await user.click(screen.getByRole('button', { name: 'Detected Ollama Model' }));
+    await user.click(screen.getByRole('option', { name: 'phi3' }));
     expect(props.onChangeSettings).toHaveBeenCalledWith({ ollamaModel: 'phi3' });
 
     await user.click(screen.getByRole('button', { name: /Onboarding/i }));
