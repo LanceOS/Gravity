@@ -747,62 +747,97 @@ export async function createFederatedTicket(input: {
     return { ok: false as const, status: 404, error: 'Project not found for workspace.' };
   }
 
-  const result = await db.transaction(async (tx) => {
-    const existing = await tx.execute(sql`
-      SELECT key
-      FROM tickets
-      WHERE project_id = ${input.ticket.projectId}
-        AND key LIKE ${`${normalizeEntityKey(project.key)}-%`}
-    `);
+  const projectKeyPrefix = normalizeEntityKey(project.key);
+  const isTicketKeyUniqueViolation = (error: unknown) => {
+    if (!(error instanceof Error)) {
+      return false;
+    }
 
-    const maxValue = (existing.rows as Array<{ key: string }>).reduce((highest, row) => {
-      const numeric = Number(row.key.split('-').pop() ?? 0);
-      return Number.isFinite(numeric) && numeric > highest ? numeric : highest;
-    }, 0);
+    const dbError = error as Error & { code?: string; constraint?: string };
+    return (
+      dbError.code === '23505' &&
+      (dbError.constraint === 'tickets_key_unique' ||
+        dbError.message.includes('tickets_key') ||
+        dbError.message.includes('duplicate key'))
+    );
+  };
 
-    const ticketRows = await tx
-      .insert(tickets)
-      .values({
-        id: createId('ti'),
-        key: `${normalizeEntityKey(project.key)}-${maxValue + 1}`,
-        title: input.ticket.title,
-        description: input.ticket.description ?? '',
-        status: input.ticket.status ?? 'todo',
-        priority: input.ticket.priority ?? 'no_priority',
-        projectId: input.ticket.projectId,
-        domainId: input.ticket.domainId ?? null,
-        cycleId: input.ticket.cycleId ?? null,
-        assigneeId: input.ticket.assigneeId ?? null,
-        parentId: input.ticket.parentId ?? null,
-        prStatus: 'none',
-        prUrl: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .returning();
+  let result:
+    | {
+        ticket: ReturnType<typeof mapTicketRecord>;
+        outboxEventId: string | null;
+      }
+    | null = null;
 
-    const createdTicket = ticketRows[0];
-    const outboxRows = await tx
-      .insert(syncOutbox)
-      .values({
-        workspaceId: input.workspaceId,
-        actorPublicKey: input.actorPublicKey,
-        entityType: 'ticket',
-        entityId: createdTicket.id,
-        action: 'create',
-        payload: {
-          project: mapProjectReplica(project),
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      result = await db.transaction(async (tx) => {
+        const existing = await tx.execute(sql`
+          SELECT key
+          FROM tickets
+          WHERE project_id = ${input.ticket.projectId}
+            AND key LIKE ${`${projectKeyPrefix}-%`}
+        `);
+
+        const maxValue = (existing.rows as Array<{ key: string }>).reduce((highest, row) => {
+          const numeric = Number(row.key.split('-').pop() ?? 0);
+          return Number.isFinite(numeric) && numeric > highest ? numeric : highest;
+        }, 0);
+
+        const ticketRows = await tx
+          .insert(tickets)
+          .values({
+            id: createId('ti'),
+            key: `${projectKeyPrefix}-${maxValue + 1}`,
+            title: input.ticket.title,
+            description: input.ticket.description ?? '',
+            status: input.ticket.status ?? 'todo',
+            priority: input.ticket.priority ?? 'no_priority',
+            projectId: input.ticket.projectId,
+            domainId: input.ticket.domainId ?? null,
+            cycleId: input.ticket.cycleId ?? null,
+            assigneeId: input.ticket.assigneeId ?? null,
+            parentId: input.ticket.parentId ?? null,
+            prStatus: 'none',
+            prUrl: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
+
+        const createdTicket = ticketRows[0];
+        const outboxRows = await tx
+          .insert(syncOutbox)
+          .values({
+            workspaceId: input.workspaceId,
+            actorPublicKey: input.actorPublicKey,
+            entityType: 'ticket',
+            entityId: createdTicket.id,
+            action: 'create',
+            payload: {
+              project: mapProjectReplica(project),
+              ticket: mapTicketRecord(createdTicket),
+            },
+            createdAt: new Date(),
+          })
+          .returning();
+
+        return {
           ticket: mapTicketRecord(createdTicket),
-        },
-        createdAt: new Date(),
-      })
-      .returning();
+          outboxEventId: outboxRows[0]?.eventId ?? null,
+        };
+      });
+      break;
+    } catch (error) {
+      if (attempt === 2 || !isTicketKeyUniqueViolation(error)) {
+        throw error;
+      }
+    }
+  }
 
-    return {
-      ticket: mapTicketRecord(createdTicket),
-      outboxEventId: outboxRows[0]?.eventId ?? null,
-    };
-  });
+  if (!result) {
+    throw new Error('Failed to allocate a unique ticket key.');
+  }
 
   return {
     ok: true as const,
