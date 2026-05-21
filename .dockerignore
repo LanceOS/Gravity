@@ -1,4 +1,6 @@
 <<<<<<< HEAD
+=======
+<<<<<<< HEAD
 **/node_modules
 **/dist
 **/.vite
@@ -6,6 +8,7 @@
 .git
 *.log
 =======
+>>>>>>> main
 # Version control
 .git
 .gitignore
@@ -41,4 +44,4 @@ server
 *.sln
 *.sw?
 *.local
->>>>>>> main
+

@@ -616,6 +616,40 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [state.currentUser, fetchCommentsForTicket, activeProjectId]);
 
+// Reusable helper to safely parse HTTP responses and return descriptive errors for network failures
+async function handleResponseJson(response: Response, fallbackError: string) {
+  let text = '';
+  try {
+    text = await response.text();
+  } catch (e) {
+    // Ignore error reading body
+  }
+
+  if (!response.ok) {
+    let errorMessage = fallbackError;
+    try {
+      const parsed = text ? JSON.parse(text) : null;
+      errorMessage = parsed?.error || parsed?.message || fallbackError;
+    } catch {
+      // If response is HTML, it's likely a proxy/gateway/server error page
+      if (text.includes('<!DOCTYPE html>') || text.includes('<html') || text.includes('<body')) {
+        errorMessage = `${fallbackError}: Server returned an HTML page instead of JSON. The backend server might be down, crashed, or unreachable (Status ${response.status}).`;
+      } else if (text) {
+        errorMessage = `${fallbackError}: ${text.slice(0, 150)}`;
+      } else {
+        errorMessage = `${fallbackError} (Status ${response.status})`;
+      }
+    }
+    throw new Error(errorMessage);
+  }
+
+  try {
+    return text ? JSON.parse(text) : {};
+  } catch (e) {
+    throw new Error(`Invalid response format from server (Status ${response.status})`);
+  }
+}
+
   const createProject = useCallback(async (projectInput: CreateProjectInput) => {
     if (!state.currentUser) {
       return null;
@@ -632,12 +666,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create project');
-      }
-
-      const project = await response.json();
+      const project = await handleResponseJson(response, 'Failed to create project');
       await fetchInitialData(state.currentUser.id);
       setActiveProjectId(project.id);
       return project;
@@ -666,12 +695,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create domain');
-      }
-
-      const domain = await response.json();
+      const domain = await handleResponseJson(response, 'Failed to create domain');
       await fetchProjectData(projectId);
       return domain;
     } catch (error) {
@@ -692,12 +716,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         body: JSON.stringify({ inviteCode, userId: state.currentUser.id }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to join project');
-      }
-
-      const data = await response.json();
+      const data = await handleResponseJson(response, 'Failed to join project');
       await fetchInitialData(state.currentUser.id);
       setActiveProjectId(data.project.id);
       return data.project;
@@ -716,12 +735,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         body: JSON.stringify({ email, password }),
       });
 
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.error || 'Sign in failed');
-      }
-
-      const data = await response.json();
+      const data = await handleResponseJson(response, 'Sign in failed');
       dispatch({ type: 'SET_USER', payload: data.user });
       return true;
     } catch (e) {
@@ -738,12 +752,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         body: JSON.stringify({ name, email, password }),
       });
 
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.error || 'Registration failed');
-      }
-
-      const data = await response.json();
+      const data = await handleResponseJson(response, 'Registration failed');
       dispatch({ type: 'SET_USER', payload: data.user });
       return true;
     } catch (e) {
