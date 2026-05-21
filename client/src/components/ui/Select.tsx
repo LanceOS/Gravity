@@ -55,12 +55,12 @@ export function Select({
   const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
-  const [menuPosition, setMenuPosition] = useState<MenuPosition>({
-    top: 0,
-    left: 0,
+  const [menuPosition, setMenuPosition] = useState<MenuPosition>(() => ({
+    top: -9999,
+    left: -9999,
     width: 0,
     maxHeight: maxMenuHeight,
-  });
+  }));
 
   const selectedIndex = useMemo(() => options.findIndex((option) => option.value === value), [options, value]);
   const selectedOption = selectedIndex >= 0 ? options[selectedIndex] : null;
@@ -98,11 +98,17 @@ export function Select({
     const spaceAbove = rect.top - viewportPadding;
     const openAbove = spaceBelow < 160 && spaceAbove > spaceBelow;
     const resolvedMaxHeight = Math.max(120, Math.min(maxMenuHeight, openAbove ? spaceAbove - 6 : spaceBelow - 6));
+    const availableWidth = Math.max(0, window.innerWidth - viewportPadding * 2);
+    const resolvedWidth = Math.min(rect.width, availableWidth);
+    const resolvedLeft = Math.min(
+      Math.max(viewportPadding, rect.left),
+      window.innerWidth - viewportPadding - resolvedWidth,
+    );
 
     setMenuPosition({
       top: openAbove ? Math.max(viewportPadding, rect.top - resolvedMaxHeight - 6) : rect.bottom + 6,
-      left: rect.left,
-      width: rect.width,
+      left: resolvedLeft,
+      width: resolvedWidth,
       maxHeight: resolvedMaxHeight,
     });
   };
@@ -121,9 +127,9 @@ export function Select({
     const preferredIsEnabled =
       preferredIndex !== undefined &&
       preferredIndex >= 0 &&
+      preferredIndex < options.length &&
       !options[preferredIndex]?.disabled;
     const nextIndex = preferredIsEnabled ? preferredIndex : fallbackIndex;
-
     if (nextIndex < 0) {
       return;
     }
@@ -247,7 +253,9 @@ export function Select({
     }
 
     if (event.key === 'Tab') {
+      triggerRef.current?.focus();
       closeMenu();
+      return;
     }
 
     setActiveIndex(index);
@@ -325,6 +333,7 @@ export function Select({
               ref={menuRef}
               id={`${selectId}-listbox`}
               role="listbox"
+              aria-label={ariaLabel}
               className={joinClassNames('select-menu', menuClassName)}
               style={{
                 top: `${menuPosition.top}px`,
@@ -339,7 +348,7 @@ export function Select({
 
                 return (
                   <button
-                    key={`${option.value}-${index}`}
+                    key={option.value}
                     ref={(node) => {
                       optionRefs.current[index] = node;
                     }}
