@@ -46,7 +46,8 @@ export function WorkspaceProjectsPage({
         <div className="workspace-projects-page__actions">
           <Button
             type="button"
-            className="workspace-page__projects-button"
+            variant="ghost"
+            size="sm"
             onClick={onBackToWorkspace}
           >
             <ArrowLeft size={14} />

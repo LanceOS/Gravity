@@ -39,7 +39,7 @@ export const EmptyWorkspaceScreen: React.FC<EmptyWorkspaceScreenProps> = ({
         alignItems: 'center',
         justifyContent: 'center',
         padding: '32px',
-        background: 'radial-gradient(circle at top, var(--accent-glow) 0%, transparent 35%), var(--bg)',
+        background: 'var(--bg)',
         color: 'var(--text)',
       }}
     >
@@ -56,7 +56,7 @@ export const EmptyWorkspaceScreen: React.FC<EmptyWorkspaceScreenProps> = ({
           style={{
             padding: '36px',
             border: '1px solid var(--border)',
-            borderRadius: '20px',
+            borderRadius: '8px',
             background: 'var(--card-bg)',
             display: 'flex',
             flexDirection: 'column',
@@ -68,7 +68,7 @@ export const EmptyWorkspaceScreen: React.FC<EmptyWorkspaceScreenProps> = ({
               style={{
                 width: '52px',
                 height: '52px',
-                borderRadius: '16px',
+                borderRadius: '8px',
                 display: 'grid',
                 placeItems: 'center',
                 background: 'var(--accent-glow)',
@@ -107,7 +107,7 @@ export const EmptyWorkspaceScreen: React.FC<EmptyWorkspaceScreenProps> = ({
             <div
               style={{
                 padding: '12px 14px',
-                borderRadius: '12px',
+                borderRadius: '6px',
                 border: '1px solid rgba(239, 68, 68, 0.2)',
                 background: 'rgba(239, 68, 68, 0.08)',
                 color: '#ef4444',
@@ -187,7 +187,7 @@ export const EmptyWorkspaceScreen: React.FC<EmptyWorkspaceScreenProps> = ({
 
 const infoCardStyle: React.CSSProperties = {
   padding: '14px',
-  borderRadius: '14px',
+  borderRadius: '8px',
   border: '1px solid var(--border)',
   background: 'var(--sidebar-bg)',
   display: 'flex',
@@ -199,7 +199,7 @@ const infoCardStyle: React.CSSProperties = {
 
 const panelStyle: React.CSSProperties = {
   padding: '24px',
-  borderRadius: '20px',
+  borderRadius: '8px',
   border: '1px solid var(--border)',
   background: 'var(--card-bg)',
   display: 'grid',

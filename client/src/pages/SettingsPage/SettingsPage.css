@@ -4,9 +4,7 @@
   flex-direction: column;
   min-width: 0;
   overflow: hidden;
-  background:
-    radial-gradient(circle at top right, rgba(59, 130, 246, 0.08), transparent 28%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0));
+  background: var(--bg);
 }
 
 .settings-page__topbar {
@@ -31,7 +29,7 @@
   appearance: none;
   -webkit-appearance: none;
   border: none;
-  border-radius: 10px;
+  border-radius: 6px;
   cursor: pointer;
   font: inherit;
   transition: border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
@@ -118,7 +116,7 @@
   gap: 14px;
   padding: 14px;
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.02);
 }
 
@@ -152,7 +150,7 @@
   gap: 12px;
   align-items: flex-start;
   padding: 14px;
-  border-radius: 14px;
+  border-radius: 8px;
   border: 1px solid transparent;
   background: transparent;
   color: var(--text);
@@ -202,7 +200,7 @@
 .settings-page__content-header,
 .settings-page__section-card {
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.02);
 }
 
@@ -265,7 +263,7 @@
 .settings-page__control {
   width: 100%;
   min-height: 42px;
-  border-radius: 12px;
+  border-radius: 6px;
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.02);
   color: var(--text-heading);
@@ -301,7 +299,7 @@
 
 .settings-page__notice,
 .settings-page__warning-box {
-  border-radius: 14px;
+  border-radius: 6px;
   padding: 12px 14px;
   font-size: 12px;
   line-height: 1.6;

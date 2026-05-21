@@ -94,7 +94,7 @@ export function WorkspaceDirectoryPage({
       style={{
         minHeight: '100vh',
         padding: 'var(--space-8)',
-        background: 'radial-gradient(circle at top left, rgba(170, 59, 255, 0.08), transparent 30%), radial-gradient(circle at bottom right, rgba(16, 185, 129, 0.05), transparent 30%), var(--bg)',
+        background: 'var(--bg)',
       }}
     >
       <Grid
@@ -190,9 +190,9 @@ export function WorkspaceDirectoryPage({
                   style={{
                     padding: 'var(--space-5)',
                     borderRadius: 'var(--radius-lg)',
-                    border: isActive ? '1px solid rgba(170, 59, 255, 0.4)' : '1px solid var(--border)',
-                    boxShadow: isActive ? '0 0 16px rgba(170, 59, 255, 0.08)' : 'var(--shadow-sm)',
-                    background: isActive ? 'rgba(170, 59, 255, 0.03)' : 'var(--card-bg)',
+                    border: isActive ? '1px solid var(--accent)' : '1px solid var(--border)',
+                    boxShadow: isActive ? '0 0 16px var(--accent-glow)' : 'var(--shadow-sm)',
+                    background: isActive ? 'var(--accent-glow)' : 'var(--card-bg)',
                     transition: 'all var(--transition-normal)',
                   }}
                 >

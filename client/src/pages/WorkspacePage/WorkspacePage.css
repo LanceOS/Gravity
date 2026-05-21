@@ -163,7 +163,7 @@
   gap: 8px;
   min-height: 36px;
   padding: 0 14px;
-  border-radius: 10px;
+  border-radius: 6px;
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.02);
   color: var(--text-heading);
@@ -185,7 +185,7 @@
 
 .workspace-page__project-feedback {
   padding: 12px 14px;
-  border-radius: 12px;
+  border-radius: 6px;
   font-size: 13px;
   line-height: 1.4;
 }
@@ -202,7 +202,7 @@
 .workspace-page__project-domains,
 .workspace-page__project-empty-shell {
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: 8px;
   background: var(--card-bg);
 }
 
@@ -259,7 +259,7 @@
   align-items: center;
   min-height: 26px;
   padding: 0 10px;
-  border-radius: 999px;
+  border-radius: 4px;
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.03);
   color: var(--text-muted);
@@ -332,7 +332,7 @@
   display: grid;
   gap: 0;
   padding: 14px 16px;
-  border-radius: 14px;
+  border-radius: 8px;
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.02);
   color: var(--text);
@@ -374,7 +374,7 @@
   display: grid;
   gap: 4px;
   padding: 10px 12px;
-  border-radius: 12px;
+  border-radius: 6px;
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.025);
 }
@@ -398,7 +398,7 @@
   display: grid;
   gap: 14px;
   padding: 16px;
-  border-radius: 16px;
+  border-radius: 8px;
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.02);
 }
@@ -435,7 +435,7 @@
   width: 100%;
   min-width: 0;
   padding: 9px 10px;
-  border-radius: 9px;
+  border-radius: 6px;
   border: 1px solid var(--border);
   background: var(--card-bg);
   color: var(--text-heading);
@@ -470,7 +470,7 @@
   display: grid;
   gap: 12px;
   padding: 16px;
-  border-radius: 16px;
+  border-radius: 8px;
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.02);
   color: var(--text);
@@ -500,7 +500,7 @@
 
 .workspace-page__project-badge {
   padding: 4px 8px;
-  border-radius: 999px;
+  border-radius: 4px;
   border: 1px solid var(--accent-border);
   background: rgba(59, 130, 246, 0.12);
   color: var(--accent);
@@ -519,7 +519,7 @@
 
 .workspace-page__project-status {
   padding: 4px 8px;
-  border-radius: 999px;
+  border-radius: 4px;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.05em;
@@ -612,7 +612,7 @@
   gap: 8px;
   min-height: 28px;
   padding: 0 10px;
-  border-radius: 999px;
+  border-radius: 4px;
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.03);
   color: var(--text-heading);
@@ -623,7 +623,7 @@
 .workspace-page__domain-chip-swatch {
   width: 10px;
   height: 10px;
-  border-radius: 999px;
+  border-radius: 50%;
   flex-shrink: 0;
 }
 
@@ -645,7 +645,7 @@
   min-width: 0;
   height: 38px;
   padding: 4px;
-  border-radius: 9px;
+  border-radius: 6px;
   border: 1px solid var(--border);
   background: var(--card-bg);
 }
