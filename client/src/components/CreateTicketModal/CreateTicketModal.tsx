@@ -1,48 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import type { Cycle, Domain, Project, Ticket, User } from '../context/TicketContext';
-import { Button } from './ui/Button';
-import { Select } from './ui/Select';
+import type { Ticket } from '../../context/TicketContext';
+import { Button } from '../ui/Button';
+import { Select } from '../ui/Select';
 import { X, Sparkles, AlertCircle } from 'lucide-react';
-
-const STATUS_OPTIONS = [
-  { value: 'backlog', label: '📁 Backlog' },
-  { value: 'todo', label: '📋 Todo' },
-  { value: 'in_progress', label: '⚡ In Progress' },
-  { value: 'in_review', label: '🔍 In Review' },
-  { value: 'done', label: '✅ Done' },
-  { value: 'canceled', label: '❌ Canceled' },
-];
-
-const PRIORITY_OPTIONS = [
-  { value: 'no_priority', label: '➖ No Priority' },
-  { value: 'low', label: '🔵 Low' },
-  { value: 'medium', label: '🟡 Medium' },
-  { value: 'high', label: '🔴 High' },
-  { value: 'urgent', label: '💖 Urgent' },
-];
-
-interface CreateTicketModalProps {
-  onClose: () => void;
-  projects: Project[];
-  domains: Domain[];
-  cycles: Cycle[];
-  users: User[];
-  parentTicket: Ticket | null;
-  defaultProjectId: string;
-  onSubmitTicket: (ticket: {
-    title: string;
-    description: string;
-    status: Ticket['status'];
-    priority: Ticket['priority'];
-    projectId: string;
-    domainId: string | null;
-    cycleId: string | null;
-    assigneeId: string | null;
-    parentId: string | null;
-  }) => Promise<boolean>;
-  initialStatus?: Ticket['status'];
-  parentId?: string;
-}
+import type { CreateTicketModalProps } from './types';
+import { PRIORITY_OPTIONS, STATUS_OPTIONS } from './utils';
 
 export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
   onClose,

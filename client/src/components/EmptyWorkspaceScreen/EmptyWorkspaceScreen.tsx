@@ -1,15 +1,7 @@
 import React, { useState } from 'react';
 import { FolderPlus, LogOut, Sparkles, Ticket, Users } from 'lucide-react';
-import type { User } from '../context/TicketContext';
-
-interface EmptyWorkspaceScreenProps {
-  currentUser: User;
-  pendingAction: 'create' | 'join' | null;
-  errorMessage: string | null;
-  onCreateProject: (project: { name: string; description: string; key: string }) => Promise<void>;
-  onJoinProject: (inviteCode: string) => Promise<void>;
-  onSignOut: () => void;
-}
+import type { EmptyWorkspaceScreenProps } from './types';
+import { normalizeInviteCode, normalizeProjectKey } from './utils';
 
 export const EmptyWorkspaceScreen: React.FC<EmptyWorkspaceScreenProps> = ({
   currentUser,
@@ -156,7 +148,7 @@ export const EmptyWorkspaceScreen: React.FC<EmptyWorkspaceScreenProps> = ({
               <input
                 className="input"
                 value={projectKey}
-                onChange={(event) => setProjectKey(event.target.value.toUpperCase())}
+                onChange={(event) => setProjectKey(normalizeProjectKey(event.target.value))}
                 placeholder="GRA"
                 maxLength={8}
                 required
@@ -188,7 +180,7 @@ export const EmptyWorkspaceScreen: React.FC<EmptyWorkspaceScreenProps> = ({
               <input
                 className="input"
                 value={inviteCode}
-                onChange={(event) => setInviteCode(event.target.value.toUpperCase())}
+                onChange={(event) => setInviteCode(normalizeInviteCode(event.target.value))}
                 placeholder="INV-GRA-1234"
                 required
               />

@@ -1,35 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { FolderPlus, Loader2, Plus } from 'lucide-react';
-import type { Project } from '../context/TicketContext';
-import { Select } from './ui/Select';
-
-interface WorkspaceProjectPanelProps {
-  workspaceName: string;
-  projects: Project[];
-  activeProjectId: string;
-  defaultProjectId: string | null;
-  projectCreateLoading: boolean;
-  projectCreateError: string | null;
-  projectManageLoading: boolean;
-  projectManageError: string | null;
-  defaultProjectLoading: boolean;
-  onSelectProject: (projectId: string) => void;
-  onCreateProject: (project: { name: string; description: string; key: string }) => Promise<void>;
-  onUpdateProject: (projectId: string, updates: { name: string; description: string; status: Project['status'] }) => Promise<void>;
-  onSetDefaultProject: (projectId: string) => Promise<void>;
-}
-
-const PROJECT_STATUS_LABELS: Record<Project['status'], string> = {
-  planned: 'Planned',
-  active: 'Active',
-  completed: 'Archived',
-};
-
-const PROJECT_LIFECYCLE_OPTIONS = [
-  { value: 'planned', label: 'Planned' },
-  { value: 'active', label: 'Active' },
-  { value: 'completed', label: 'Archived' },
-];
+import type { Project } from '../../context/TicketContext';
+import { Select } from '../ui/Select';
+import type { WorkspaceProjectPanelProps } from './types';
+import { PROJECT_LIFECYCLE_OPTIONS, PROJECT_STATUS_LABELS, sanitizeProjectKey } from './utils';
 
 export function WorkspaceProjectPanel({
   workspaceName,
@@ -178,7 +152,7 @@ export function WorkspaceProjectPanel({
               <input
                 className="workspace-page__project-input workspace-page__project-input--key"
                 value={projectKey}
-                onChange={(event) => setProjectKey(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8))}
+                onChange={(event) => setProjectKey(sanitizeProjectKey(event.target.value))}
                 placeholder="CORE"
                 maxLength={8}
                 required
