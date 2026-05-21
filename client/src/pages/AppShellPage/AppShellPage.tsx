@@ -150,7 +150,7 @@ export function AppShellPage() {
       setDensity(accountSettings.projectLayout === 'condensed' ? 'compact' : 'standard');
       setDsTheme(accountSettings.theme);
     }
-  }, [accountSettings.projectLayout, accountSettings.theme, setDensity, setDsTheme]);
+  }, [accountSettings?.projectLayout, accountSettings?.theme, setDensity, setDsTheme]);
   const {
     settings,
     settingsLoading,
