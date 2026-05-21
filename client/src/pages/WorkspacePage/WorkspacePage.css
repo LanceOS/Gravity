@@ -238,14 +238,6 @@
   transition: box-shadow var(--transition-normal), border-color var(--transition-normal);
 }
 
-.workspace-page__current-project:hover,
-.workspace-page__project-browser:hover,
-.workspace-page__project-manager:hover,
-.workspace-page__project-domains:hover {
-  border-color: var(--accent-border);
-  box-shadow: var(--shadow-md);
-}
-
 .workspace-page__current-project {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
@@ -368,7 +360,7 @@
   padding-bottom: 2px;
 }
 
-/* Beautiful Project Strip Cards with Glow Hover Lift */
+/* Beautiful Project Strip Cards */
 .workspace-page__project-strip-card {
   min-width: 0;
   max-width: none;
@@ -385,13 +377,6 @@
   box-shadow: var(--shadow-sm);
   position: relative;
   overflow: hidden;
-}
-
-.workspace-page__project-strip-card:hover {
-  border-color: var(--accent-border);
-  background: var(--accent-glow);
-  transform: translateY(-3px);
-  box-shadow: var(--shadow-md);
 }
 
 .workspace-page__project-strip-card--active {
@@ -449,10 +434,6 @@
   border: 1px solid var(--border);
   background: var(--card-hover);
   transition: border-color var(--transition-normal);
-}
-
-.workspace-page__project-card-fact:hover {
-  border-color: var(--accent-border);
 }
 
 .workspace-page__project-card-fact-label {
@@ -562,13 +543,6 @@
   cursor: pointer;
   transition: all var(--transition-spring);
   box-shadow: var(--shadow-sm);
-}
-
-.workspace-page__project-card:hover {
-  border-color: var(--accent-border);
-  background: var(--accent-glow);
-  transform: translateY(-3px);
-  box-shadow: var(--shadow-md);
 }
 
 .workspace-page__project-card--active {
