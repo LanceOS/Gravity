@@ -7,7 +7,7 @@ services:
     container_name: gravity_frontend_dev
     working_dir: /app/client
     # Run the process as the host user so mounted files are accessible inside
-    user: "1000:1000"
+    user: "${UID:-1000}:${GID:-1000}"
     environment:
       - NODE_ENV=development
       - BACKEND_UPSTREAM=http://backend:8080
