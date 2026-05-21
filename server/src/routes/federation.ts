@@ -1,7 +1,4 @@
 import { Router } from 'express';
-<<<<<<< HEAD
-import { getLocalNodeIdentity } from '../lib/node-identity.js';
-=======
 import { broadcastEvent } from '../realtime.js';
 import {
   FEDERATION_PUBLIC_KEY_HEADER,
@@ -31,13 +28,10 @@ import {
   updateFederatedTicket,
 } from '../services/federation.js';
 import { listComments, listTickets } from '../services/tickets.js';
->>>>>>> main
 
 export function createFederationRouter() {
   const router = Router();
 
-<<<<<<< HEAD
-=======
   function resolveFederationSignature(req: Parameters<typeof verifyFederationRequestSignature>[0] extends never ? never : any) {
     const encodedPublicKey = req.header(FEDERATION_PUBLIC_KEY_HEADER)?.trim() || '';
     const signature = req.header(FEDERATION_SIGNATURE_HEADER)?.trim() || '';
@@ -58,7 +52,6 @@ export function createFederationRouter() {
     }
   }
 
->>>>>>> main
   router.get('/federation/identity', async (_req, res) => {
     try {
       const identity = await getLocalNodeIdentity();
@@ -79,8 +72,6 @@ export function createFederationRouter() {
     }
   });
 
-<<<<<<< HEAD
-=======
   router.get('/federation/connections', async (req, res) => {
     const actorUserId = await resolveRequestActorUserId(req);
     if (!actorUserId) {
@@ -601,6 +592,5 @@ export function createFederationRouter() {
     }
   });
 
->>>>>>> main
   return router;
 }
