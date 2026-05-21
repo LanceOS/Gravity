@@ -54,6 +54,9 @@ function createInviteToken() {
   return `fed_${randomUUID().replace(/-/g, '')}`;
 }
 
+let federationSyncTimer: NodeJS.Timeout | null = null;
+const inFlightFederationSyncs = new Set<string>();
+
 export async function ensureWorkspaceAdminAccess(workspaceId: string, userId: string) {
   const rows = await db
     .select({ role: workspaceMembers.role })
@@ -1174,6 +1177,54 @@ export async function syncFederatedConnection(input: {
       error: error instanceof Error ? error.message : 'Failed to apply federation outbox events.',
     };
   }
+}
+
+export async function runFederationSyncSweep() {
+  const connectionRows = await db
+    .select({ id: peerConnections.id })
+    .from(peerConnections)
+    .where(eq(peerConnections.status, 'active'));
+
+  await Promise.allSettled(
+    connectionRows.map(async ({ id }) => {
+      if (inFlightFederationSyncs.has(id)) {
+        return;
+      }
+
+      inFlightFederationSyncs.add(id);
+      try {
+        const result = await syncFederatedConnection({ connectionId: id, limit: 50 });
+        if (!result.ok) {
+          console.warn(`federation sync failed for connection ${id}: ${result.error}`);
+        }
+      } catch (error) {
+        console.warn(`federation sync crashed for connection ${id}:`, error);
+      } finally {
+        inFlightFederationSyncs.delete(id);
+      }
+    }),
+  );
+}
+
+export function startFederationSyncLoop() {
+  if (env.federationSyncIntervalMs <= 0 || federationSyncTimer) {
+    return;
+  }
+
+  void runFederationSyncSweep();
+  federationSyncTimer = setInterval(() => {
+    void runFederationSyncSweep();
+  }, env.federationSyncIntervalMs);
+  federationSyncTimer.unref();
+}
+
+export function stopFederationSyncLoop() {
+  if (!federationSyncTimer) {
+    return;
+  }
+
+  clearInterval(federationSyncTimer);
+  federationSyncTimer = null;
 }
 
 export async function connectToFederatedWorkspace(input: {
