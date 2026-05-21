@@ -133,11 +133,15 @@ describe('WorkspaceProjectPanel', () => {
     });
   });
 
-  it('opens the create overlay, sanitizes the payload, and closes after a successful project creation', async () => {
+  it('opens the create overlay only after clicking New Project, sanitizes the payload, and closes after a successful project creation', async () => {
     const user = userEvent.setup();
     const { props } = renderWorkspaceProjectPanel({ projects: [] });
 
     expect(screen.getByText('No projects in this workspace yet')).toBeInTheDocument();
+    expect(screen.queryByText('ProjectCreateOverlay')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'New Project' }));
+
     expect(screen.getByText('ProjectCreateOverlay')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Submit overlay project' }));

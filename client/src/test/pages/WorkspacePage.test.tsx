@@ -182,6 +182,8 @@ describe('WorkspacePage', () => {
     const { props } = renderWorkspacePage({ projects: [], tickets: [] });
 
     expect(screen.getByText('No projects in this workspace yet')).toBeInTheDocument();
+    expect(screen.queryByText('All Issues')).not.toBeInTheDocument();
+    expect(screen.queryByRole('tablist', { name: 'View mode' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Manage Projects' }));
     expect(props.onOpenProjectManager).toHaveBeenCalledTimes(1);
   });

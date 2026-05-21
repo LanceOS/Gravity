@@ -111,30 +111,32 @@ export function WorkspacePage({
 
   return (
     <div className="workspace-page">
-      <header className="workspace-page__header">
-        <div className="workspace-page__title-group">
-          <span className="workspace-page__title">{headerTitle}</span>
-        </div>
+      {projects.length > 0 ? (
+        <header className="workspace-page__header">
+          <div className="workspace-page__title-group">
+            <span className="workspace-page__title">{headerTitle}</span>
+          </div>
 
-        <div className="workspace-page__view-toggle" role="tablist" aria-label="View mode">
-          <button
-            type="button"
-            onClick={() => onSetView('board')}
-            className={`workspace-page__view-button ${activeView === 'board' ? 'workspace-page__view-button--active' : ''}`}
-          >
-            <Kanban size={12} />
-            <span>Board</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => onSetView('list')}
-            className={`workspace-page__view-button ${activeView === 'list' ? 'workspace-page__view-button--active' : ''}`}
-          >
-            <List size={12} />
-            <span>List</span>
-          </button>
-        </div>
-      </header>
+          <div className="workspace-page__view-toggle" role="tablist" aria-label="View mode">
+            <button
+              type="button"
+              onClick={() => onSetView('board')}
+              className={`workspace-page__view-button ${activeView === 'board' ? 'workspace-page__view-button--active' : ''}`}
+            >
+              <Kanban size={12} />
+              <span>Board</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onSetView('list')}
+              className={`workspace-page__view-button ${activeView === 'list' ? 'workspace-page__view-button--active' : ''}`}
+            >
+              <List size={12} />
+              <span>List</span>
+            </button>
+          </div>
+        </header>
+      ) : null}
 
       <div className="workspace-page__content">
         <div className={`workspace-page__issues ${activeTicket ? 'workspace-page__issues--hidden' : ''}`}>

@@ -4,10 +4,11 @@ import { ThemeToggle, Select } from '@library';
 
 interface SidebarHeaderProps {
   workspace: SidebarWorkspaceSection;
+  canOpenCreateTicket: boolean;
   onOpenCreateTicket: () => void;
 }
 
-export function SidebarHeader({ workspace, onOpenCreateTicket }: SidebarHeaderProps) {
+export function SidebarHeader({ workspace, canOpenCreateTicket, onOpenCreateTicket }: SidebarHeaderProps) {
   return (
     <>
       <div
@@ -41,18 +42,20 @@ export function SidebarHeader({ workspace, onOpenCreateTicket }: SidebarHeaderPr
         </div>
       </div>
 
-      <div style={{ padding: '12px 16px 8px 16px' }}>
-        <button
-          type="button"
-          onClick={onOpenCreateTicket}
-          className="btn btn-primary clickable"
-          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '8px' }}
-        >
-          <Sparkles size={14} />
-          <span>New Ticket</span>
-          <span style={{ fontSize: '10px', opacity: 0.6, marginLeft: 'auto', background: 'rgba(255,255,255,0.2)', padding: '1px 5px', borderRadius: '3px' }}>N</span>
-        </button>
-      </div>
+      {canOpenCreateTicket ? (
+        <div style={{ padding: '12px 16px 8px 16px' }}>
+          <button
+            type="button"
+            onClick={onOpenCreateTicket}
+            className="btn btn-primary clickable"
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '8px' }}
+          >
+            <Sparkles size={14} />
+            <span>New Ticket</span>
+            <span style={{ fontSize: '10px', opacity: 0.6, marginLeft: 'auto', background: 'rgba(255,255,255,0.2)', padding: '1px 5px', borderRadius: '3px' }}>N</span>
+          </button>
+        </div>
+      ) : null}
     </>
   );
 }

@@ -395,4 +395,21 @@ describe('AppShellPage', () => {
     await user.click(screen.getByRole('button', { name: 'Open project manager' }));
     expect(screen.getByText('WorkspaceProjectsPage')).toBeInTheDocument();
   });
+
+  it('does not open the create-ticket modal when the active workspace has no projects', async () => {
+    const user = userEvent.setup();
+
+    renderAppShell({
+      tickets: buildUseTickets({ projects: [] }),
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('WorkspaceLayout')).toBeInTheDocument();
+      expect(screen.getByText('WorkspacePage')).toBeInTheDocument();
+    });
+
+    await user.keyboard('n');
+
+    expect(screen.queryByText('CreateTicketModal')).not.toBeInTheDocument();
+  });
 });

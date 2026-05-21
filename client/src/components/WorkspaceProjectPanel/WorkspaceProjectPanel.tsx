@@ -19,7 +19,7 @@ export function WorkspaceProjectPanel({
   onCreateProject,
   onCreateDomain,
 }: WorkspaceProjectPanelProps) {
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(projects.length === 0);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [managedProjectId, setManagedProjectId] = useState('');
   const [domainName, setDomainName] = useState('');
   const [domainColor, setDomainColor] = useState('#3b82f6');
@@ -57,12 +57,6 @@ export function WorkspaceProjectPanel({
         : [],
     [domains, shouldShowDomains]
   );
-
-  useEffect(() => {
-    if (projects.length === 0) {
-      setIsCreateModalOpen(true);
-    }
-  }, [projects.length]);
 
   useEffect(() => {
     if (projects.length === 0) {
