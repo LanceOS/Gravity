@@ -271,6 +271,10 @@ export function AppShellPage() {
   }, [tickets, users, projects, createTicket, updateTicket, addComment]);
 
   const handleOpenCreateTicket = (initialStatus?: Ticket['status']) => {
+    if (activeWorkspaceProjects.length === 0) {
+      return;
+    }
+
     setCreateInitialStatus(initialStatus);
     setCreateParentId(undefined);
     setIsCreateModalOpen(true);
@@ -526,7 +530,7 @@ export function AppShellPage() {
 
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, []);
+  }, [activeWorkspaceProjects.length]);
 
   if (loading || workspacesLoading || !workspacesResolvedForCurrentUser) {
     return <LoadingPage />;

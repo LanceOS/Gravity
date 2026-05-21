@@ -7,7 +7,11 @@ export function Sidebar({ workspace, projects, tools, userMenu }: SidebarProps) 
 
   return (
     <aside style={sidebarShellStyle}>
-      <SidebarHeader workspace={workspace} onOpenCreateTicket={tools.onOpenCreateTicket} />
+      <SidebarHeader
+        workspace={workspace}
+        canOpenCreateTicket={projects.projects.length > 0}
+        onOpenCreateTicket={tools.onOpenCreateTicket}
+      />
 
       <div style={scrollAreaStyle}>
         <SidebarProjectsSection

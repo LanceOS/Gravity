@@ -141,6 +141,7 @@
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
+  min-width: 0;
 }
 
 .workspace-page__projects-title {
@@ -149,6 +150,12 @@
   font-weight: 800;
   letter-spacing: -0.02em;
   color: var(--text-heading);
+  /* Prevent very long workspace names from breaking layout */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .workspace-page__projects-count {
