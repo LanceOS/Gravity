@@ -181,6 +181,11 @@ export function Select({
     if (event.key === 'Escape' && isOpen) {
       event.preventDefault();
       closeMenu();
+      return;
+    }
+
+    if (event.key === 'Tab' && isOpen) {
+      closeMenu();
     }
   };
 
