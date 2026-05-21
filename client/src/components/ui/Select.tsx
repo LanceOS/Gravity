@@ -125,6 +125,10 @@ export function Select({
 
     const fallbackIndex = selectedIndex >= 0 && !options[selectedIndex]?.disabled ? selectedIndex : findNextEnabledIndex(-1, 1);
     const nextIndex = preferredIndex ?? fallbackIndex;
+    if (nextIndex < 0) {
+      return;
+    }
+
     setIsOpen(true);
     setActiveIndex(nextIndex);
   };
