@@ -66,24 +66,104 @@ type FederationSyncConnectionState = {
   lastAppliedCount: number;
 };
 
+type FederationSyncStateSeed = {
+  consecutiveFailures: number;
+  nextAttemptAt: Date | null;
+  lastAttemptAt: Date | null;
+  lastSuccessAt: Date | null;
+  lastError: string | null;
+  lastAppliedCount: number;
+};
+
 const federationSyncStates = new Map<string, FederationSyncConnectionState>();
 
-function getFederationSyncState(connectionId: string) {
+function getFederationSyncState(connectionId: string, seed?: FederationSyncStateSeed) {
   const existing = federationSyncStates.get(connectionId);
   if (existing) {
     return existing;
   }
 
   const state: FederationSyncConnectionState = {
-    consecutiveFailures: 0,
-    nextAttemptAtMs: 0,
-    lastAttemptAtMs: null,
-    lastSuccessAtMs: null,
-    lastError: null,
-    lastAppliedCount: 0,
+    consecutiveFailures: seed?.consecutiveFailures ?? 0,
+    nextAttemptAtMs: seed?.nextAttemptAt ? seed.nextAttemptAt.getTime() : 0,
+    lastAttemptAtMs: seed?.lastAttemptAt ? seed.lastAttemptAt.getTime() : null,
+    lastSuccessAtMs: seed?.lastSuccessAt ? seed.lastSuccessAt.getTime() : null,
+    lastError: seed?.lastError ?? null,
+    lastAppliedCount: seed?.lastAppliedCount ?? 0,
   };
   federationSyncStates.set(connectionId, state);
   return state;
+}
+
+function mapFederationSyncStateToRecord(state: FederationSyncConnectionState) {
+  return {
+    consecutiveFailures: state.consecutiveFailures,
+    nextAttemptAt: state.nextAttemptAtMs > 0 ? new Date(state.nextAttemptAtMs) : null,
+    lastAttemptAt: state.lastAttemptAtMs ? new Date(state.lastAttemptAtMs) : null,
+    lastSuccessAt: state.lastSuccessAtMs ? new Date(state.lastSuccessAtMs) : null,
+    lastError: state.lastError,
+    lastAppliedCount: state.lastAppliedCount,
+  };
+}
+
+async function persistFederationSyncState(connectionId: string, status: string, state: FederationSyncConnectionState) {
+  await db
+    .update(peerConnections)
+    .set({
+      status,
+      ...mapFederationSyncStateToRecord(state),
+    })
+    .where(eq(peerConnections.id, connectionId));
+}
+
+export async function recordFederationSyncFailure(connectionId: string, errorMessage: string) {
+  const rows = await db
+    .select({
+      status: peerConnections.status,
+      consecutiveFailures: peerConnections.consecutiveFailures,
+      nextAttemptAt: peerConnections.nextAttemptAt,
+      lastAttemptAt: peerConnections.lastAttemptAt,
+      lastSuccessAt: peerConnections.lastSuccessAt,
+      lastError: peerConnections.lastError,
+      lastAppliedCount: peerConnections.lastAppliedCount,
+    })
+    .from(peerConnections)
+    .where(eq(peerConnections.id, connectionId))
+    .limit(1);
+
+  const connection = rows[0];
+  if (!connection) {
+    return null;
+  }
+
+  const syncState = getFederationSyncState(connectionId, {
+    consecutiveFailures: connection.consecutiveFailures,
+    nextAttemptAt: connection.nextAttemptAt,
+    lastAttemptAt: connection.lastAttemptAt,
+    lastSuccessAt: connection.lastSuccessAt,
+    lastError: connection.lastError,
+    lastAppliedCount: connection.lastAppliedCount,
+  });
+  const failureRecordedAt = Date.now();
+
+  syncState.lastAttemptAtMs = failureRecordedAt;
+  syncState.consecutiveFailures += 1;
+  syncState.lastError = errorMessage;
+  syncState.lastAppliedCount = 0;
+
+  const exhaustedRetries = syncState.consecutiveFailures >= env.federationSyncFailureMaxRetries;
+  syncState.nextAttemptAtMs = exhaustedRetries ? 0 : failureRecordedAt + computeFederationSyncBackoffDelay(syncState.consecutiveFailures);
+
+  await persistFederationSyncState(connectionId, exhaustedRetries ? 'failed' : 'active', syncState);
+
+  if (exhaustedRetries) {
+    federationSyncStates.delete(connectionId);
+  }
+
+  return {
+    exhaustedRetries,
+    syncState,
+  };
 }
 
 function computeFederationSyncBackoffDelay(failureCount: number) {
@@ -387,6 +467,71 @@ export async function listWorkspacePeers(workspaceId: string) {
     .where(eq(workspacePeers.workspaceId, workspaceId));
 
   return rows;
+}
+
+export async function listFederatedConnectionsForUser(input: { userId: string; workspaceId?: string }) {
+  const whereClause = input.workspaceId
+    ? and(eq(workspaceMembers.userId, input.userId), eq(peerConnections.workspaceId, input.workspaceId))
+    : eq(workspaceMembers.userId, input.userId);
+
+  const rows = await db
+    .select({
+      id: peerConnections.id,
+      workspaceId: peerConnections.workspaceId,
+      workspaceName: workspaces.name,
+      hostUrl: peerConnections.hostUrl,
+      hostDisplayName: peerConnections.hostDisplayName,
+      hostPublicKey: peerConnections.hostPublicKey,
+      lastSyncedEventId: peerConnections.lastSyncedEventId,
+      status: peerConnections.status,
+      consecutiveFailures: peerConnections.consecutiveFailures,
+      nextAttemptAt: peerConnections.nextAttemptAt,
+      lastAttemptAt: peerConnections.lastAttemptAt,
+      lastSuccessAt: peerConnections.lastSuccessAt,
+      lastError: peerConnections.lastError,
+      lastAppliedCount: peerConnections.lastAppliedCount,
+      createdAt: peerConnections.createdAt,
+    })
+    .from(peerConnections)
+    .innerJoin(workspaceMembers, eq(workspaceMembers.workspaceId, peerConnections.workspaceId))
+    .innerJoin(workspaces, eq(workspaces.id, peerConnections.workspaceId))
+    .where(whereClause)
+    .orderBy(asc(peerConnections.createdAt));
+
+  return rows.map((row) => {
+    return {
+      id: row.id,
+      workspaceId: row.workspaceId,
+      workspaceName: row.workspaceName,
+      hostUrl: row.hostUrl,
+      hostDisplayName: row.hostDisplayName,
+      hostPublicKey: row.hostPublicKey,
+      lastSyncedEventId: row.lastSyncedEventId,
+      status: row.status,
+      createdAt: normalizeIsoDate(row.createdAt),
+      syncState: {
+        consecutiveFailures: row.consecutiveFailures,
+        nextAttemptAt: row.nextAttemptAt ? normalizeIsoDate(row.nextAttemptAt) : null,
+        lastAttemptAt: row.lastAttemptAt ? normalizeIsoDate(row.lastAttemptAt) : null,
+        lastSuccessAt: row.lastSuccessAt ? normalizeIsoDate(row.lastSuccessAt) : null,
+        lastError: row.lastError,
+        lastAppliedCount: row.lastAppliedCount,
+      },
+    };
+  });
+}
+
+export async function getFederatedConnectionById(connectionId: string) {
+  const rows = await db
+    .select({
+      id: peerConnections.id,
+      workspaceId: peerConnections.workspaceId,
+    })
+    .from(peerConnections)
+    .where(eq(peerConnections.id, connectionId))
+    .limit(1);
+
+  return rows[0] ?? null;
 }
 
 export async function getVerifiedWorkspacePeerByPublicKey(workspaceId: string, publicKey: string) {
@@ -922,6 +1067,7 @@ export async function syncFederatedConnection(input: {
   if (!connection) {
     return { ok: false as const, status: 404, error: 'Federation connection not found.' };
   }
+  const attemptStartedAt = new Date();
 
   const localNodeIdentity = await ensureLocalNodeIdentity();
   const privateKey = decryptNodePrivateKey(localNodeIdentity.encryptedPrivateKey);
@@ -1198,6 +1344,12 @@ export async function syncFederatedConnection(input: {
         .set({
           lastSyncedEventId,
           status: 'active',
+          consecutiveFailures: 0,
+          nextAttemptAt: null,
+          lastAttemptAt: attemptStartedAt,
+          lastSuccessAt: new Date(),
+          lastError: null,
+          lastAppliedCount: rawEvents.length,
         })
         .where(eq(peerConnections.id, connection.id));
 
@@ -1227,7 +1379,16 @@ export async function syncFederatedConnection(input: {
 
 export async function runFederationSyncSweep() {
   const connectionRows = await db
-    .select({ id: peerConnections.id })
+    .select({
+      id: peerConnections.id,
+      status: peerConnections.status,
+      consecutiveFailures: peerConnections.consecutiveFailures,
+      nextAttemptAt: peerConnections.nextAttemptAt,
+      lastAttemptAt: peerConnections.lastAttemptAt,
+      lastSuccessAt: peerConnections.lastSuccessAt,
+      lastError: peerConnections.lastError,
+      lastAppliedCount: peerConnections.lastAppliedCount,
+    })
     .from(peerConnections)
     .where(eq(peerConnections.status, 'active'));
 
@@ -1239,12 +1400,20 @@ export async function runFederationSyncSweep() {
   }
 
   await Promise.allSettled(
-    connectionRows.map(async ({ id }) => {
+    connectionRows.map(async (connection) => {
+      const { id } = connection;
       if (inFlightFederationSyncs.has(id)) {
         return;
       }
 
-      const syncState = getFederationSyncState(id);
+      const syncState = getFederationSyncState(id, {
+        consecutiveFailures: connection.consecutiveFailures,
+        nextAttemptAt: connection.nextAttemptAt,
+        lastAttemptAt: connection.lastAttemptAt,
+        lastSuccessAt: connection.lastSuccessAt,
+        lastError: connection.lastError,
+        lastAppliedCount: connection.lastAppliedCount,
+      });
       const now = Date.now();
       if (syncState.nextAttemptAtMs > now) {
         return;
@@ -1253,12 +1422,32 @@ export async function runFederationSyncSweep() {
       inFlightFederationSyncs.add(id);
       syncState.lastAttemptAtMs = now;
       try {
+        await persistFederationSyncState(id, connection.status, syncState);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown sync bookkeeping failure.';
+        console.warn(`federation sync bookkeeping failed for connection ${id}; skipping this sweep attempt: ${message}`);
+        inFlightFederationSyncs.delete(id);
+        return;
+      }
+
+      try {
         const result = await syncFederatedConnection({ connectionId: id, limit: 50 });
         if (!result.ok) {
           syncState.consecutiveFailures += 1;
-          syncState.nextAttemptAtMs = Date.now() + computeFederationSyncBackoffDelay(syncState.consecutiveFailures);
           syncState.lastError = result.error;
           syncState.lastAppliedCount = 0;
+          const exhaustedRetries = syncState.consecutiveFailures >= env.federationSyncFailureMaxRetries;
+          syncState.nextAttemptAtMs = exhaustedRetries ? 0 : Date.now() + computeFederationSyncBackoffDelay(syncState.consecutiveFailures);
+          await persistFederationSyncState(id, exhaustedRetries ? 'failed' : 'active', syncState);
+
+          if (exhaustedRetries) {
+            console.warn(
+              `federation sync failed for connection ${id}; marking failed after ${syncState.consecutiveFailures} attempts: ${result.error}`,
+            );
+            federationSyncStates.delete(id);
+            return;
+          }
+
           console.warn(
             `federation sync failed for connection ${id}; retrying in ${syncState.nextAttemptAtMs - Date.now()}ms: ${result.error}`,
           );
@@ -1280,9 +1469,20 @@ export async function runFederationSyncSweep() {
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown sync failure.';
         syncState.consecutiveFailures += 1;
-        syncState.nextAttemptAtMs = Date.now() + computeFederationSyncBackoffDelay(syncState.consecutiveFailures);
         syncState.lastError = message;
         syncState.lastAppliedCount = 0;
+        const exhaustedRetries = syncState.consecutiveFailures >= env.federationSyncFailureMaxRetries;
+        syncState.nextAttemptAtMs = exhaustedRetries ? 0 : Date.now() + computeFederationSyncBackoffDelay(syncState.consecutiveFailures);
+        await persistFederationSyncState(id, exhaustedRetries ? 'failed' : 'active', syncState);
+
+        if (exhaustedRetries) {
+          console.warn(
+            `federation sync crashed for connection ${id}; marking failed after ${syncState.consecutiveFailures} attempts: ${message}`,
+          );
+          federationSyncStates.delete(id);
+          return;
+        }
+
         console.warn(
           `federation sync crashed for connection ${id}; retrying in ${syncState.nextAttemptAtMs - Date.now()}ms: ${message}`,
         );
@@ -1299,7 +1499,7 @@ export function startFederationSyncLoop() {
   }
 
   console.info(
-    `federation sync loop started: interval=${env.federationSyncIntervalMs}ms baseBackoff=${env.federationSyncFailureBaseMs}ms maxBackoff=${env.federationSyncFailureMaxMs}ms`,
+    `federation sync loop started: interval=${env.federationSyncIntervalMs}ms baseBackoff=${env.federationSyncFailureBaseMs}ms maxBackoff=${env.federationSyncFailureMaxMs}ms maxRetries=${env.federationSyncFailureMaxRetries}`,
   );
   void runFederationSyncSweep();
   federationSyncTimer = setInterval(() => {

@@ -130,8 +130,21 @@ export async function initializeDatabase() {
       host_public_key TEXT NOT NULL,
       last_synced_event_id INTEGER NOT NULL DEFAULT 0,
       status TEXT NOT NULL DEFAULT 'active',
+      consecutive_failures INTEGER NOT NULL DEFAULT 0,
+      next_attempt_at TIMESTAMPTZ,
+      last_attempt_at TIMESTAMPTZ,
+      last_success_at TIMESTAMPTZ,
+      last_error TEXT,
+      last_applied_count INTEGER NOT NULL DEFAULT 0,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+    ALTER TABLE peer_connections ADD COLUMN IF NOT EXISTS consecutive_failures INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE peer_connections ADD COLUMN IF NOT EXISTS next_attempt_at TIMESTAMPTZ;
+    ALTER TABLE peer_connections ADD COLUMN IF NOT EXISTS last_attempt_at TIMESTAMPTZ;
+    ALTER TABLE peer_connections ADD COLUMN IF NOT EXISTS last_success_at TIMESTAMPTZ;
+    ALTER TABLE peer_connections ADD COLUMN IF NOT EXISTS last_error TEXT;
+    ALTER TABLE peer_connections ADD COLUMN IF NOT EXISTS last_applied_count INTEGER NOT NULL DEFAULT 0;
 
     CREATE TABLE IF NOT EXISTS federation_invites (
       id TEXT PRIMARY KEY,

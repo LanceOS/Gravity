@@ -140,6 +140,12 @@ export const peerConnections = pgTable('peer_connections', {
   hostPublicKey: text('host_public_key').notNull(),
   lastSyncedEventId: integer('last_synced_event_id').notNull().default(0),
   status: text('status').notNull().default('active'),
+  consecutiveFailures: integer('consecutive_failures').notNull().default(0),
+  nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }),
+  lastAttemptAt: timestamp('last_attempt_at', { withTimezone: true }),
+  lastSuccessAt: timestamp('last_success_at', { withTimezone: true }),
+  lastError: text('last_error'),
+  lastAppliedCount: integer('last_applied_count').notNull().default(0),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

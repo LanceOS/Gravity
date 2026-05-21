@@ -18,8 +18,11 @@ import {
   createFederationInvite,
   deleteFederatedTicket,
   ensureWorkspaceAdminAccess,
+  getFederatedConnectionById,
   getWorkspaceById,
+  listFederatedConnectionsForUser,
   listFederationOutboxEvents,
+  recordFederationSyncFailure,
   syncFederatedConnection,
   listWorkspacePeers,
   updateFederatedTicket,
@@ -66,6 +69,27 @@ export function createFederationRouter() {
       });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load local node identity.' });
+    }
+  });
+
+  router.get('/federation/connections', async (req, res) => {
+    const actorUserId = await resolveRequestActorUserId(req);
+    if (!actorUserId) {
+      res.status(401).json({ error: 'Unauthorized.' });
+      return;
+    }
+
+    const workspaceId = typeof req.query.workspaceId === 'string' ? req.query.workspaceId.trim() : '';
+
+    try {
+      const connections = await listFederatedConnectionsForUser({
+        userId: actorUserId,
+        workspaceId: workspaceId || undefined,
+      });
+
+      res.json(connections);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load federation connections.' });
     }
   });
 
@@ -516,15 +540,37 @@ export function createFederationRouter() {
   });
 
   router.post('/federation/connections/:connectionId/sync', async (req, res) => {
+    const actorUserId = await resolveRequestActorUserId(req);
+    if (!actorUserId) {
+      res.status(401).json({ error: 'Unauthorized.' });
+      return;
+    }
+
     const limitRaw = Number(req.body?.limit ?? req.query.limit ?? 50);
+
+    const connection = await getFederatedConnectionById(req.params.connectionId);
+    if (!connection) {
+      res.status(404).json({ error: 'Federation connection not found.' });
+      return;
+    }
+
+    const hasAccess = await ensureWorkspaceAdminAccess(connection.workspaceId, actorUserId);
+    if (!hasAccess) {
+      res.status(403).json({ error: 'Owner or admin access is required.' });
+      return;
+    }
 
     try {
       const result = await syncFederatedConnection({
-        connectionId: req.params.connectionId,
+        connectionId: connection.id,
         limit: Number.isFinite(limitRaw) ? limitRaw : 50,
       });
 
       if (!result.ok) {
+        await recordFederationSyncFailure(connection.id, result.error).catch((error: unknown) => {
+          const message = error instanceof Error ? error.message : 'Unknown federation retry bookkeeping failure.';
+          console.warn(`failed to record federation retry failure for connection ${connection.id}: ${message}`);
+        });
         res.status(result.status).json({ error: result.error });
         return;
       }

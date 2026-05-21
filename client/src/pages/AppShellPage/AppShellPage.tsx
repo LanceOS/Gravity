@@ -6,6 +6,7 @@ import { LocalAIChat } from '../../components/LocalAIChat';
 import { OnboardingModal } from '../../components/OnboardingModal';
 import type { SidebarProps } from '../../components/Sidebar';
 import { useTickets, type Ticket } from '../../context/TicketContext';
+import { useTheme } from '../../context/ThemeProvider';
 import { useAccountSettings } from '../../hooks/useAccountSettings';
 import { useWorkspaceDirectory } from '../../hooks/useWorkspaceDirectory';
 import { useWorkspaceSettings } from '../../hooks/useWorkspaceSettings';
@@ -18,7 +19,6 @@ import { SettingsPage } from '../SettingsPage/SettingsPage';
 import { WorkspaceDirectoryPage } from '../WorkspaceDirectoryPage/WorkspaceDirectoryPage';
 import { WorkspacePage } from '../WorkspacePage/WorkspacePage';
 import { WorkspaceProjectsPage } from '../WorkspaceProjectsPage/WorkspaceProjectsPage';
-import { useTheme } from '../../context/ThemeProvider';
 
 type AppSection = 'directory' | 'workspace' | 'settings' | 'account' | 'projects';
 
@@ -142,7 +142,6 @@ export function AppShellPage() {
     setView,
     setTheme,
   });
-
   const { setDensity, setTheme: setDsTheme } = useTheme();
 
   useEffect(() => {
@@ -150,7 +149,7 @@ export function AppShellPage() {
       setDensity(accountSettings.projectLayout === 'condensed' ? 'compact' : 'standard');
       setDsTheme(accountSettings.theme);
     }
-  }, [accountSettings?.projectLayout, accountSettings?.theme, setDensity, setDsTheme]);
+  }, [accountSettings, setDensity, setDsTheme]);
   const {
     settings,
     settingsLoading,
@@ -163,6 +162,10 @@ export function AppShellPage() {
     joinRequests: workspaceJoinRequests,
     inviteLoading: workspaceInviteLoading,
     inviteError: workspaceInviteError,
+    federationConnections,
+    connectionsLoading,
+    connectionsError,
+    retryingConnectionId,
     approveLoadingId,
     revokeLoadingId,
     updateSettings,
@@ -170,6 +173,7 @@ export function AppShellPage() {
     createInvite,
     revokeInvite,
     approveJoinRequest,
+    retryFederationConnection,
   } = useWorkspaceSettings({
     currentUser,
     activeWorkspaceId,
@@ -498,6 +502,9 @@ export function AppShellPage() {
   const handleCreateInvite = async (input: { email: string; expirationHours: number }) => Boolean(await createInvite(input));
   const handleRevokeInvite = async (inviteId: string) => Boolean(await revokeInvite(inviteId));
   const handleApproveJoinRequest = async (requestId: string) => Boolean(await approveJoinRequest(requestId));
+  const handleRetryConnection = async (connectionId: string) => {
+    await retryFederationConnection(connectionId);
+  };
 
   useEffect(() => {
     const handleGlobalKeyDown = (event: KeyboardEvent) => {
@@ -654,6 +661,10 @@ export function AppShellPage() {
           saveSuccess={settingsSaveSuccess}
           saveError={settingsSaveError}
           inviteError={workspaceInviteError}
+          federationConnections={federationConnections}
+          connectionsLoading={connectionsLoading}
+          connectionsError={connectionsError}
+          retryingConnectionId={retryingConnectionId}
           invitesLoading={workspaceInvitesLoading}
           inviteLoading={workspaceInviteLoading}
           invites={workspaceInvites}
@@ -668,6 +679,7 @@ export function AppShellPage() {
           onCreateInvite={handleCreateInvite}
           onRevokeInvite={handleRevokeInvite}
           onApproveJoinRequest={handleApproveJoinRequest}
+          onRetryConnection={handleRetryConnection}
         />
       ) : (
         <WorkspaceLayout
