@@ -262,15 +262,6 @@ export async function initializeDatabase() {
     ALTER TABLE peer_connections ADD COLUMN IF NOT EXISTS host_display_name TEXT NOT NULL DEFAULT '';
   `);
 
-  await pool.query(`
-    UPDATE peer_connections
-    SET workspace_id = COALESCE(workspace_id, '')
-    WHERE workspace_id IS NULL;
-
-    ALTER TABLE peer_connections
-    ALTER COLUMN workspace_id SET NOT NULL;
-  `);
-
   const { runMigrations } = await getMigrations(auth.options);
   await runMigrations();
 }
