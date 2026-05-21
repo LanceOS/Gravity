@@ -68,7 +68,14 @@ vi.mock('../../components/LocalAIChat', () => ({
 }));
 
 vi.mock('../../components/OnboardingModal', () => ({
-  OnboardingModal: () => <div>OnboardingModal</div>,
+  OnboardingModal: ({ onComplete }: { onComplete: () => void }) => (
+    <div>
+      <div>OnboardingModal</div>
+      <button type="button" onClick={onComplete}>
+        Complete onboarding
+      </button>
+    </div>
+  ),
 }));
 
 vi.mock('../../layouts/WorkspaceLayout/WorkspaceLayout', () => ({
@@ -315,6 +322,45 @@ describe('AppShellPage', () => {
     await waitFor(() => {
       expect(screen.getByText('WorkspaceDirectoryPage')).toBeInTheDocument();
     });
+  });
+
+  it('renders onboarding for incomplete tutorials and marks the current user complete when dismissed', async () => {
+    const user = userEvent.setup();
+    const tickets = buildUseTickets({
+      currentUser: makeCurrentUser({ tutorial_completed: 0 }),
+      setCurrentUser: vi.fn(),
+    });
+
+    renderAppShell({ tickets });
+
+    await waitFor(() => {
+      expect(screen.getByText('OnboardingModal')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Complete onboarding' }));
+    expect(tickets.setCurrentUser).toHaveBeenCalledWith({
+      ...tickets.currentUser,
+      tutorial_completed: 1,
+    });
+  });
+
+  it('ignores the create-ticket shortcut while typing in an input', async () => {
+    const user = userEvent.setup();
+
+    renderAppShell();
+
+    await waitFor(() => {
+      expect(screen.getByText('WorkspaceLayout')).toBeInTheDocument();
+    });
+
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    input.focus();
+
+    await user.keyboard('n');
+
+    expect(screen.queryByText('CreateTicketModal')).not.toBeInTheDocument();
+    input.remove();
   });
 
   it('renders workspace routes and switches between workspace, settings, account, and projects', async () => {
