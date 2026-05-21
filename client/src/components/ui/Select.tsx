@@ -243,7 +243,9 @@ export function Select({
     }
 
     if (event.key === 'Tab') {
+      triggerRef.current?.focus();
       closeMenu();
+      return;
     }
 
     setActiveIndex(index);
