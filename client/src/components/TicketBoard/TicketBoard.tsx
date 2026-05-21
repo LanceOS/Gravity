@@ -1,8 +1,7 @@
 import type { DragEvent } from 'react';
 import type { Ticket } from '../../context/TicketContext';
 import { BOARD_COLUMNS } from '../../utils/ticketView';
-import { Button } from '../ui/Button';
-import { Select } from '../ui/Select';
+import { Button, Select, DenseTextInput } from '@library';
 import { Plus } from 'lucide-react';
 import { TicketCard } from './components';
 import type { TicketBoardProps } from './types';
@@ -56,9 +55,7 @@ export const TicketBoard: React.FC<TicketBoardProps> = ({
         }}
       >
         {/* Search */}
-        <input 
-          type="text"
-          className="input"
+        <DenseTextInput 
           placeholder="Search board tickets..."
           value={filters.search}
           onChange={(e) => onFilterChange({ search: e.target.value })}
@@ -68,18 +65,18 @@ export const TicketBoard: React.FC<TicketBoardProps> = ({
         {/* Priority Filter */}
         <Select
           value={filters.priority}
-          onValueChange={(priority) => onFilterChange({ priority })}
+          onValueChange={(priority: string) => onFilterChange({ priority: priority as Ticket['priority'] | '' })}
           options={PRIORITY_FILTER_OPTIONS}
-          ariaLabel="Filter board by priority"
+          aria-label="Filter board by priority"
           style={{ width: '120px' }}
         />
 
         {/* Project Selector Filter */}
         <Select
           value={filters.projectId}
-          onValueChange={(projectId) => onFilterChange({ projectId })}
+          onValueChange={(projectId: string) => onFilterChange({ projectId })}
           options={projectOptions}
-          ariaLabel="Filter board by project"
+          aria-label="Filter board by project"
           style={{ width: '140px' }}
         />
 

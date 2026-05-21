@@ -18,6 +18,7 @@ import { SettingsPage } from '../SettingsPage/SettingsPage';
 import { WorkspaceDirectoryPage } from '../WorkspaceDirectoryPage/WorkspaceDirectoryPage';
 import { WorkspacePage } from '../WorkspacePage/WorkspacePage';
 import { WorkspaceProjectsPage } from '../WorkspaceProjectsPage/WorkspaceProjectsPage';
+import { useTheme } from '../../context/ThemeProvider';
 
 type AppSection = 'directory' | 'workspace' | 'settings' | 'account' | 'projects';
 
@@ -141,6 +142,15 @@ export function AppShellPage() {
     setView,
     setTheme,
   });
+
+  const { setDensity, setTheme: setDsTheme } = useTheme();
+
+  useEffect(() => {
+    if (accountSettings) {
+      setDensity(accountSettings.projectLayout === 'condensed' ? 'compact' : 'standard');
+      setDsTheme(accountSettings.theme);
+    }
+  }, [accountSettings.projectLayout, accountSettings.theme, setDensity, setDsTheme]);
   const {
     settings,
     settingsLoading,

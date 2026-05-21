@@ -1,6 +1,7 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { useTickets } from '../../context/TicketContext';
 import { Cpu, FileText, ListPlus, Loader2, Send, Sparkles, Wifi, WifiOff, X } from 'lucide-react';
+import { DenseTextInput } from '@library';
 import { FormattedMarkdown } from './components';
 import type { LocalAIChatProps, Message, QuickActionType } from './types';
 import { buildOllamaErrorMessage, buildQuickActionPrompt, getInitialMessages, getInitialModel, getInitialOllamaUrl } from './utils';
@@ -189,22 +190,18 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
 
         {/* Inputs */}
         <div style={{ display: 'flex', gap: '8px' }}>
-          <input 
-            type="text" 
-            className="input"
-            style={{ fontSize: '11px', padding: '4px 8px' }}
+          <DenseTextInput 
             placeholder="http://localhost:11434"
             value={ollamaUrl}
             onChange={(e) => setOllamaUrl(e.target.value)}
             onBlur={() => void checkOllamaStatus()}
+            style={{ fontSize: '11.5px' }}
           />
-          <input 
-            type="text" 
-            className="input"
-            style={{ fontSize: '11px', padding: '4px 8px', width: '100px' }}
+          <DenseTextInput 
             placeholder="llama3"
             value={model}
             onChange={(e) => setModel(e.target.value)}
+            style={{ fontSize: '11.5px', width: '100px' }}
           />
         </div>
         {!model && !isCheckingModel ? (
@@ -297,9 +294,7 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
           onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }}
           style={{ display: 'flex', gap: '6px' }}
         >
-          <input 
-            type="text" 
-            className="input"
+          <DenseTextInput 
             placeholder={activeTicket ? "Ask about this ticket..." : "Ask AI a question..."}
             value={chatInput}
             onChange={(e) => setChatInput(e.target.value)}

@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { Ticket } from '../../context/TicketContext';
-import { Button } from '../ui/Button';
-import { Select } from '../ui/Select';
-import { X, Sparkles, AlertCircle } from 'lucide-react';
+import { Button, Select, Modal, Alert, TextInput, Textarea } from '@library';
+import { AlertCircle } from 'lucide-react';
 import type { CreateTicketModalProps } from './types';
 import { PRIORITY_OPTIONS, STATUS_OPTIONS } from './utils';
 
@@ -83,254 +82,148 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
   const domainOptions = [{ value: '', label: 'No Domain' }, ...domains.map((domain) => ({ value: domain.id, label: domain.name }))];
   const cycleOptions = [{ value: '', label: 'No Cycle' }, ...cycles.map((cycle) => ({ value: cycle.id, label: cycle.name }))];
 
-  return (
-    <div 
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: 'rgba(0, 0, 0, 0.65)',
-        backdropFilter: 'blur(4px)',
-        zIndex: 500,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '16px'
-      }}
-      onClick={onClose}
-    >
-      <div 
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: '600px',
-          maxWidth: '100%',
-          background: 'var(--card-bg)',
-          border: '1px solid var(--border)',
-          borderRadius: '10px',
-          boxShadow: '0 20px 25px -5px rgba(0,0,0,0.3), 0 10px 10px -5px rgba(0,0,0,0.2)',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden'
-        }}
-      >
-        {/* Modal Header */}
-        <div 
-          style={{
-            padding: '14px 20px',
-            borderBottom: '1px solid var(--border)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}
-        >
-          <Sparkles size={16} color="var(--accent)" />
-          <span style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text-heading)' }}>
-            {parentTicket ? `Create Subtask for ${parentTicket.key}` : 'Create New Issue'}
-          </span>
+  const modalTitle = parentTicket ? `Create Subtask for ${parentTicket.key}` : 'Create New Issue';
 
-          <Button
-            onClick={onClose}
-            variant="ghost"
-            size="sm"
-            aria-label="Close create ticket modal"
-            style={{
-              marginLeft: 'auto',
-              color: 'var(--text-muted)',
-              minHeight: '28px',
-              width: '28px',
-              padding: 0,
-              border: 'none'
-            }}
-          >
-            <X size={16} />
-          </Button>
-        </div>
+  const modalFooter = (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--text-muted)' }}>
+        <AlertCircle size={12} />
+        <span>Press <kbd style={{ fontFamily: 'var(--mono)', border: '1px solid var(--border)', background: 'var(--sidebar-bg)', padding: '1px 3px', borderRadius: '3px' }}>Ctrl+Enter</kbd> to submit</span>
+      </div>
 
-        {/* Modal Body Form */}
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-
-          {formError && (
-            <div
-              style={{
-                margin: '16px 20px 0 20px',
-                padding: '10px 12px',
-                borderRadius: '8px',
-                border: '1px solid rgba(239, 68, 68, 0.2)',
-                background: 'rgba(239, 68, 68, 0.08)',
-                color: '#ef4444',
-                fontSize: '12px'
-              }}
-            >
-              {formError}
-            </div>
-          )}
-          
-          {/* Main Title & Description Inputs */}
-          <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            
-            {/* Title */}
-            <div>
-              <input 
-                type="text"
-                className="input"
-                style={{ 
-                  fontSize: '18px', 
-                  fontWeight: 500, 
-                  border: 'none', 
-                  borderBottom: '1px solid var(--border)', 
-                  borderRadius: 0, 
-                  padding: '8px 0',
-                  background: 'transparent'
-                }}
-                placeholder="Issue title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                autoFocus
-                required
-              />
-            </div>
-
-            {/* Description */}
-            <div>
-              <textarea 
-                className="input"
-                rows={5}
-                style={{ 
-                  border: 'none', 
-                  borderRadius: 0, 
-                  padding: '8px 0', 
-                  fontSize: '13px', 
-                  lineHeight: '1.5',
-                  resize: 'none',
-                  background: 'transparent'
-                }}
-                placeholder="Add description... (markdown supported)"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-            </div>
-
-          </div>
-
-          {/* Bottom Grid Selectors */}
-          <div 
-            style={{
-              padding: '16px 20px',
-              background: 'var(--sidebar-bg)',
-              borderTop: '1px solid var(--border)',
-              display: 'grid',
-              gridTemplateColumns: 'repeat(4, 1fr)',
-              gap: '12px'
-            }}
-          >
-            {/* Project */}
-            <div>
-              <span className="label">Project</span>
-              <Select
-                value={projectId}
-                onValueChange={setProjectId}
-                options={projectOptions}
-                ariaLabel="Select project"
-                disabled={!!parentId} // Sub-tasks lock to parent project
-              />
-            </div>
-
-            {/* Status */}
-            <div>
-              <span className="label">Status</span>
-              <Select
-                value={status}
-                onValueChange={(nextStatus) => setStatus(nextStatus as Ticket['status'])}
-                options={STATUS_OPTIONS}
-                ariaLabel="Select status"
-              />
-            </div>
-
-            {/* Priority */}
-            <div>
-              <span className="label">Priority</span>
-              <Select
-                value={priority}
-                onValueChange={(nextPriority) => setPriority(nextPriority as Ticket['priority'])}
-                options={PRIORITY_OPTIONS}
-                ariaLabel="Select priority"
-              />
-            </div>
-
-            {/* Assignee */}
-            <div>
-              <span className="label">Assignee</span>
-              <Select
-                value={assigneeId}
-                onValueChange={setAssigneeId}
-                options={assigneeOptions}
-                ariaLabel="Select assignee"
-              />
-            </div>
-
-            {/* Domain */}
-            <div>
-              <span className="label">Domain</span>
-              <Select
-                value={domainId}
-                onValueChange={setDomainId}
-                options={domainOptions}
-                ariaLabel="Select domain"
-              />
-            </div>
-
-            {/* Cycle */}
-            <div>
-              <span className="label">Cycle</span>
-              <Select
-                value={cycleId}
-                onValueChange={setCycleId}
-                options={cycleOptions}
-                ariaLabel="Select cycle"
-              />
-            </div>
-
-          </div>
-
-          {/* Footer Submit Button Panel */}
-          <div 
-            style={{
-              padding: '14px 20px',
-              borderTop: '1px solid var(--border)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              background: 'var(--card-bg)'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--text-muted)' }}>
-              <AlertCircle size={12} />
-              <span>Press <kbd style={{ fontFamily: 'var(--mono)', border: '1px solid var(--border)', background: 'var(--sidebar-bg)', padding: '1px 3px', borderRadius: '3px' }}>Ctrl+Enter</kbd> to submit</span>
-            </div>
-
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <Button
-                type="button" 
-                onClick={onClose} 
-              >
-                Cancel
-              </Button>
-              
-              <Button
-                type="submit" 
-                variant="primary"
-                style={{ padding: '6px 16px' }}
-              >
-                {parentTicket ? 'Create Subtask' : 'Create Issue'}
-              </Button>
-            </div>
-          </div>
-
-        </form>
-
+      <div style={{ display: 'flex', gap: '8px' }}>
+        <Button onClick={onClose}>
+          Cancel
+        </Button>
+        <Button onClick={() => void handleSubmit()} variant="primary" style={{ padding: '6px 16px' }}>
+          {parentTicket ? 'Create Subtask' : 'Create Issue'}
+        </Button>
       </div>
     </div>
   );
+
+  return (
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      title={modalTitle}
+      footer={modalFooter}
+      style={{ maxWidth: '600px', padding: 0 }}
+    >
+      <form onSubmit={(e) => { e.preventDefault(); void handleSubmit(); }} style={{ display: 'flex', flexDirection: 'column', margin: '-20px' }}>
+        {formError && (
+          <div style={{ padding: '20px 20px 0 20px' }}>
+            <Alert type="error">
+              {formError}
+            </Alert>
+          </div>
+        )}
+        
+        {/* Main Title & Description Inputs */}
+        <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          {/* Title */}
+          <div>
+            <TextInput 
+              placeholder="Issue title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              autoFocus
+              required
+            />
+          </div>
+
+          {/* Description */}
+          <div>
+            <Textarea 
+              rows={5}
+              placeholder="Add description... (markdown supported)"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </div>
+        </div>
+
+
+        {/* Bottom Grid Selectors */}
+        <div 
+          style={{
+            padding: '16px 20px',
+            background: 'var(--sidebar-bg)',
+            borderTop: '1px solid var(--border)',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(4, 1fr)',
+            gap: '12px'
+          }}
+        >
+          {/* Project */}
+          <div>
+            <span className="label" style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>Project</span>
+            <Select
+              value={projectId}
+              onValueChange={(nextProjectId: string) => setProjectId(nextProjectId)}
+              options={projectOptions}
+              aria-label="Select project"
+              disabled={!!parentId} // Sub-tasks lock to parent project
+            />
+          </div>
+
+          {/* Status */}
+          <div>
+            <span className="label" style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>Status</span>
+            <Select
+              value={status}
+              onValueChange={(nextStatus: string) => setStatus(nextStatus as Ticket['status'])}
+              options={STATUS_OPTIONS}
+              aria-label="Select status"
+            />
+          </div>
+
+          {/* Priority */}
+          <div>
+            <span className="label" style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>Priority</span>
+            <Select
+              value={priority}
+              onValueChange={(nextPriority: string) => setPriority(nextPriority as Ticket['priority'])}
+              options={PRIORITY_OPTIONS}
+              aria-label="Select priority"
+            />
+          </div>
+
+          {/* Assignee */}
+          <div>
+            <span className="label" style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>Assignee</span>
+            <Select
+              value={assigneeId}
+              onValueChange={(nextAssigneeId: string) => setAssigneeId(nextAssigneeId)}
+              options={assigneeOptions}
+              aria-label="Select assignee"
+            />
+          </div>
+
+          {/* Domain */}
+          <div>
+            <span className="label" style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>Domain</span>
+            <Select
+              value={domainId}
+              onValueChange={(nextDomainId: string) => setDomainId(nextDomainId)}
+              options={domainOptions}
+              aria-label="Select domain"
+            />
+          </div>
+
+          {/* Cycle */}
+          <div>
+            <span className="label" style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>Cycle</span>
+            <Select
+              value={cycleId}
+              onValueChange={(nextCycleId: string) => setCycleId(nextCycleId)}
+              options={cycleOptions}
+              aria-label="Select cycle"
+            />
+          </div>
+        </div>
+      </form>
+    </Modal>
+  );
 };
+

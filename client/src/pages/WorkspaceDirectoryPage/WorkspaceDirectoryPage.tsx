@@ -1,5 +1,15 @@
-import { useMemo, useState, type CSSProperties, type FormEvent } from 'react';
+import { useMemo, useState, type FormEvent } from 'react';
 import { ArrowRight, FolderPlus, Globe, KeyRound, LogOut, Server, Settings2, Users } from 'lucide-react';
+import {
+  Button,
+  TextInput,
+  Textarea,
+  Grid,
+  Stack,
+  Card,
+  Badge,
+  Alert
+} from '@library';
 import type { User } from '../../context/TicketContext';
 import type { CreateWorkspaceInput, ValidatePeerInviteInput, WorkspaceSummary } from '../../hooks/useWorkspaceDirectory';
 
@@ -80,526 +90,314 @@ export function WorkspaceDirectoryPage({
   };
 
   return (
-    <div style={pageStyle}>
-      <div style={shellStyle}>
-        <section style={heroStyle}>
-          <div style={heroBadgeStyle}>Workspace Directory</div>
-          <h1 style={heroTitleStyle}>Choose where this account works.</h1>
-          <p style={heroCopyStyle}>
-            Sign in once, then move between the workspaces you host or the workspaces you join from other machines.
-          </p>
+    <div
+      style={{
+        minHeight: '100vh',
+        padding: 'var(--space-8)',
+        background: 'radial-gradient(circle at top left, rgba(170, 59, 255, 0.08), transparent 30%), radial-gradient(circle at bottom right, rgba(16, 185, 129, 0.05), transparent 30%), var(--bg)',
+      }}
+    >
+      <Grid
+        columns="minmax(0, 1.15fr) minmax(340px, 1.15fr) minmax(340px, 0.95fr)"
+        gap="var(--space-6)"
+        style={{
+          maxWidth: '1480px',
+          margin: '0 auto',
+          alignItems: 'start',
+        }}
+      >
+        {/* Left Column: Hero & Profile Info */}
+        <Stack gap="var(--space-5)" style={{ position: 'sticky', top: 'var(--space-6)' }}>
+          <Card style={{ padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)' }}>
+            <Stack gap="var(--space-4)">
+              <div style={{ display: 'inline-flex', alignSelf: 'flex-start' }}>
+                <Badge variant="accent">Workspace Directory</Badge>
+              </div>
+              <h1 style={{ margin: 0, fontSize: '38px', fontWeight: 700, lineHeight: 1.05, color: 'var(--text-heading)', letterSpacing: '-0.02em' }}>
+                Choose where this account works.
+              </h1>
+              <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '14px', lineHeight: 1.6 }}>
+                Sign in once, then transition seamlessly between workspaces you host locally or validate peer invitations from remote nodes.
+              </p>
 
-          <div style={summaryGridStyle}>
-            <div style={summaryCardStyle}>
-              <FolderPlus size={18} color="var(--accent)" />
-              <span>{workspaces.length} connected workspaces</span>
-            </div>
-            <div style={summaryCardStyle}>
-              <Users size={18} color="var(--accent)" />
-              <span>{workspaces.reduce((sum, workspace) => sum + workspace.memberCount, 0)} total members visible</span>
-            </div>
-            <div style={summaryCardStyle}>
-              <Server size={18} color="var(--accent)" />
-              <span>Local account: {currentUser.email}</span>
-            </div>
+              <Stack gap="var(--space-3)" style={{ marginTop: 'var(--space-2)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--card-hover)', border: '1px solid var(--border)' }}>
+                  <FolderPlus size={18} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                  <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-heading)' }}>{workspaces.length} connected workspaces</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--card-hover)', border: '1px solid var(--border)' }}>
+                  <Users size={18} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                  <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-heading)' }}>{workspaces.reduce((sum, workspace) => sum + workspace.memberCount, 0)} total members visible</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--card-hover)', border: '1px solid var(--border)' }}>
+                  <Server size={18} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                  <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-heading)', wordBreak: 'break-all' }}>Local account: {currentUser.email}</span>
+                </div>
+              </Stack>
+
+              {errorMessage && (
+                <Alert type="error" style={{ marginTop: 'var(--space-2)' }}>
+                  {errorMessage}
+                </Alert>
+              )}
+              {successMessage && (
+                <Alert type="success" style={{ marginTop: 'var(--space-2)' }}>
+                  {successMessage}
+                </Alert>
+              )}
+
+              <Grid columns={2} gap="var(--space-3)" style={{ marginTop: 'var(--space-3)' }}>
+                <Button variant="default" size="sm" onClick={onOpenAccountPreferences} leftIcon={<Settings2 size={14} />}>
+                  Preferences
+                </Button>
+                <Button variant="ghost" size="sm" onClick={onSignOut} leftIcon={<LogOut size={14} />}>
+                  Sign Out
+                </Button>
+              </Grid>
+            </Stack>
+          </Card>
+        </Stack>
+
+        {/* Center Column: Available Workspaces */}
+        <Stack gap="var(--space-4)">
+          <div>
+            <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+              Available Workspaces
+            </span>
+            <h2 style={{ margin: '4px 0 0', fontSize: '22px', fontWeight: 600, color: 'var(--text-heading)' }}>
+              Connected and Hosted
+            </h2>
           </div>
 
-          {errorMessage ? <div style={errorStyle}>{errorMessage}</div> : null}
-          {successMessage ? <div style={successStyle}>{successMessage}</div> : null}
+          <Stack gap="var(--space-4)">
+            {loading && (
+              <div style={{ padding: 'var(--space-8)', textAlign: 'center', border: '1px dashed var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-muted)' }}>
+                Loading workspaces...
+              </div>
+            )}
 
-          <div style={heroActionsStyle}>
-            <button type="button" className="btn" style={accountButtonStyle} onClick={onOpenAccountPreferences}>
-              <Settings2 size={14} />
-              Account Preferences
-            </button>
+            {!loading && workspaceCards.length === 0 && (
+              <div style={{ padding: 'var(--space-8)', textAlign: 'center', border: '1px dashed var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-muted)', fontSize: '13px', lineHeight: 1.6 }}>
+                No approved workspaces yet. Create one or request access with an invite code.
+              </div>
+            )}
 
-            <button type="button" className="btn" style={signOutButtonStyle} onClick={onSignOut}>
-              <LogOut size={14} />
-              Sign Out
-            </button>
-          </div>
-        </section>
-
-        <section style={workspaceColumnStyle}>
-          <div style={sectionHeaderStyle}>
-            <div>
-              <div style={eyebrowStyle}>Available Workspaces</div>
-              <h2 style={sectionTitleStyle}>Connected and hosted workspaces</h2>
-            </div>
-          </div>
-
-          <div style={workspaceListStyle}>
-            {loading ? <div style={emptyCardStyle}>Loading workspaces...</div> : null}
-
-            {!loading && workspaceCards.length === 0 ? (
-              <div style={emptyCardStyle}>No approved workspaces yet. Create one below or request access with an invite.</div>
-            ) : null}
-
-            {!loading
-              ? workspaceCards.map((workspace) => (
-                  <article key={workspace.id} style={workspaceCardStyle(workspace.id === activeWorkspaceId)}>
-                    <div style={workspaceCardTopStyle}>
+            {!loading && workspaceCards.map((workspace) => {
+              const isActive = workspace.id === activeWorkspaceId;
+              return (
+                <Card
+                  key={workspace.id}
+                  style={{
+                    padding: 'var(--space-5)',
+                    borderRadius: 'var(--radius-lg)',
+                    border: isActive ? '1px solid rgba(170, 59, 255, 0.4)' : '1px solid var(--border)',
+                    boxShadow: isActive ? '0 0 16px rgba(170, 59, 255, 0.08)' : 'var(--shadow-sm)',
+                    background: isActive ? 'rgba(170, 59, 255, 0.03)' : 'var(--card-bg)',
+                    transition: 'all var(--transition-normal)',
+                  }}
+                >
+                  <Stack gap="var(--space-3)">
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
                       <div>
-                        <div style={workspaceNameStyle}>{workspace.name}</div>
-                        <div style={workspaceMetaStyle}>
+                        <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--text-heading)' }}>
+                          {workspace.name}
+                        </h3>
+                        <div style={{ marginTop: '4px', fontSize: '12px', color: 'var(--text-muted)' }}>
                           {workspace.projectCount} projects · {workspace.memberCount} members · {workspace.hostUrl || 'Local host'}
                         </div>
                       </div>
-
-                      <span style={workspaceRolePillStyle}>{workspace.memberRole || 'member'}</span>
+                      <Badge variant={workspace.memberRole === 'owner' ? 'accent' : 'default'}>
+                        {workspace.memberRole || 'member'}
+                      </Badge>
                     </div>
 
-                    <p style={workspaceDescriptionStyle}>{workspace.description || 'No workspace description yet.'}</p>
+                    <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '13px', lineHeight: 1.5 }}>
+                      {workspace.description || 'No workspace description provided.'}
+                    </p>
 
-                    <div style={workspaceActionsStyle}>
-                      <button type="button" className="btn btn-primary" onClick={() => onOpenWorkspace(workspace.id)}>
-                        <ArrowRight size={14} />
-                        Open Workspace
-                      </button>
-
-                      <button type="button" className="btn" onClick={() => onOpenSettings(workspace.id)}>
-                        <Settings2 size={14} />
+                    <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-1)' }}>
+                      <Button variant="primary" size="sm" onClick={() => onOpenWorkspace(workspace.id)} leftIcon={<ArrowRight size={14} />}>
+                        Open
+                      </Button>
+                      <Button variant="default" size="sm" onClick={() => onOpenSettings(workspace.id)} leftIcon={<Settings2 size={14} />}>
                         Settings
-                      </button>
+                      </Button>
                     </div>
-                  </article>
-                ))
-              : null}
-          </div>
-        </section>
+                  </Stack>
+                </Card>
+              );
+            })}
+          </Stack>
+        </Stack>
 
-        <section style={formsColumnStyle}>
-          <form onSubmit={handleCreateSubmit} style={panelStyle}>
-            <div style={panelHeaderStyle}>
-              <Globe size={18} color="var(--accent)" />
-              <div>
-                <h2 style={panelTitleStyle}>Create Workspace</h2>
-                <p style={panelCopyStyle}>A workspace can hold multiple projects and becomes the host boundary for invites.</p>
-              </div>
-            </div>
+        {/* Right Column: Actions / Forms Panel */}
+        <Stack gap="var(--space-5)" style={{ maxHeight: 'calc(100vh - var(--space-8))', overflowY: 'auto', paddingRight: '4px' }}>
+          {/* Create Workspace */}
+          <Card style={{ padding: 'var(--space-5)', borderRadius: 'var(--radius-lg)' }}>
+            <form onSubmit={handleCreateSubmit}>
+              <Stack gap="var(--space-4)">
+                <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-start' }}>
+                  <Globe size={18} style={{ color: 'var(--accent)', marginTop: '2px' }} />
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: 'var(--text-heading)' }}>Create Workspace</h3>
+                    <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '12px', lineHeight: 1.5 }}>
+                      Establish a new secure boundary for your projects, tickets, and peer validation.
+                    </p>
+                  </div>
+                </div>
 
-            <label style={fieldStyle}>
-              <span className="label">Workspace Name</span>
-              <input className="input" value={workspaceName} onChange={(event) => setWorkspaceName(event.target.value)} required />
-            </label>
+                <TextInput
+                  label="Workspace Name"
+                  value={workspaceName}
+                  onChange={(event) => setWorkspaceName(event.target.value)}
+                  placeholder="e.g. Acme Corp"
+                  required
+                />
 
-            <label style={fieldStyle}>
-              <span className="label">Workspace Key</span>
-              <input
-                className="input"
-                value={workspaceKey}
-                onChange={(event) => setWorkspaceKey(event.target.value.toUpperCase())}
-                placeholder="GRAV"
-                maxLength={12}
-                required
-              />
-            </label>
+                <TextInput
+                  label="Workspace Key"
+                  value={workspaceKey}
+                  onChange={(event) => setWorkspaceKey(event.target.value.toUpperCase())}
+                  placeholder="e.g. ACM"
+                  maxLength={12}
+                  required
+                />
 
-            <label style={fieldStyle}>
-              <span className="label">Private Access Key</span>
-              <input
-                className="input"
-                value={workspaceAccessKey}
-                onChange={(event) => setWorkspaceAccessKey(event.target.value.toUpperCase())}
-                placeholder="Optional - auto-generated if blank"
-              />
-            </label>
+                <TextInput
+                  label="Private Access Key"
+                  value={workspaceAccessKey}
+                  onChange={(event) => setWorkspaceAccessKey(event.target.value.toUpperCase())}
+                  placeholder="Optional (auto-generated if empty)"
+                />
 
-            <label style={fieldStyle}>
-              <span className="label">Description</span>
-              <textarea
-                className="input"
-                rows={3}
-                value={workspaceDescription}
-                onChange={(event) => setWorkspaceDescription(event.target.value)}
-                style={{ resize: 'vertical' }}
-              />
-            </label>
+                <Textarea
+                  label="Description"
+                  rows={3}
+                  value={workspaceDescription}
+                  onChange={(event) => setWorkspaceDescription(event.target.value)}
+                  placeholder="Briefly describe the purpose of this workspace..."
+                />
 
-            <button type="submit" className="btn btn-primary" disabled={pendingAction !== null}>
-              {pendingAction === 'create' ? 'Creating...' : 'Create Workspace'}
-            </button>
-          </form>
+                <Button type="submit" variant="primary" fullWidth loading={pendingAction === 'create'}>
+                  Create Workspace
+                </Button>
+              </Stack>
+            </form>
+          </Card>
 
-          <form onSubmit={handleJoinSubmit} style={panelStyle}>
-            <div style={panelHeaderStyle}>
-              <KeyRound size={18} color="var(--accent)" />
-              <div>
-                <h2 style={panelTitleStyle}>Request Access</h2>
-                <p style={panelCopyStyle}>Use an invite code from another workspace owner. Approval is required before you can connect.</p>
-              </div>
-            </div>
+          {/* Request Access */}
+          <Card style={{ padding: 'var(--space-5)', borderRadius: 'var(--radius-lg)' }}>
+            <form onSubmit={handleJoinSubmit}>
+              <Stack gap="var(--space-4)">
+                <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-start' }}>
+                  <KeyRound size={18} style={{ color: 'var(--accent)', marginTop: '2px' }} />
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: 'var(--text-heading)' }}>Request Access</h3>
+                    <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '12px', lineHeight: 1.5 }}>
+                      Enter an invite code provided by a workspace owner to request join approval.
+                    </p>
+                  </div>
+                </div>
 
-            <label style={fieldStyle}>
-              <span className="label">Invite Code</span>
-              <input
-                className="input"
-                value={inviteCode}
-                onChange={(event) => setInviteCode(event.target.value.toUpperCase())}
-                placeholder="WSP-GRAV-1234"
-                required
-              />
-            </label>
+                <TextInput
+                  label="Invite Code"
+                  value={inviteCode}
+                  onChange={(event) => setInviteCode(event.target.value.toUpperCase())}
+                  placeholder="WSP-GRAV-1234"
+                  required
+                />
 
-            <label style={fieldStyle}>
-              <span className="label">Message</span>
-              <textarea
-                className="input"
-                rows={3}
-                value={requestMessage}
-                onChange={(event) => setRequestMessage(event.target.value)}
-                placeholder="Optional note for the workspace owner"
-                style={{ resize: 'vertical' }}
-              />
-            </label>
+                <Textarea
+                  label="Message"
+                  rows={3}
+                  value={requestMessage}
+                  onChange={(event) => setRequestMessage(event.target.value)}
+                  placeholder="Optional note introducing yourself to the workspace owner..."
+                />
 
-            <button type="submit" className="btn" disabled={pendingAction !== null}>
-              {pendingAction === 'join' ? 'Sending...' : 'Send Join Request'}
-            </button>
-          </form>
+                <Button type="submit" variant="default" fullWidth loading={pendingAction === 'join'}>
+                  Send Join Request
+                </Button>
+              </Stack>
+            </form>
+          </Card>
 
-          <form onSubmit={handlePeerValidationSubmit} style={panelStyle}>
-            <div style={panelHeaderStyle}>
-              <KeyRound size={18} color="var(--accent)" />
-              <div>
-                <h2 style={panelTitleStyle}>Validate Peer Invite</h2>
-                <p style={panelCopyStyle}>Paste the guest validation link details from the host. This switches the client into the validated guest workspace profile.</p>
-              </div>
-            </div>
+          {/* Validate Peer Invite */}
+          <Card style={{ padding: 'var(--space-5)', borderRadius: 'var(--radius-lg)' }}>
+            <form onSubmit={handlePeerValidationSubmit}>
+              <Stack gap="var(--space-4)">
+                <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-start' }}>
+                  <KeyRound size={18} style={{ color: 'var(--accent)', marginTop: '2px' }} />
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: 'var(--text-heading)' }}>Validate Peer Invite</h3>
+                    <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '12px', lineHeight: 1.5 }}>
+                      Connect guest profiles to remote hosts securely.
+                    </p>
+                  </div>
+                </div>
 
-            <div style={validationHintStyle}>
-              <div style={validationHintTitleStyle}>What you need from the host</div>
-              <div style={validationHintCopyStyle}>1. The invite URL. 2. The validation code. 3. Your guest email. 4. A bcrypt-style password hash generated on your side.</div>
-            </div>
+                <div style={{ padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--card-hover)', border: '1px solid var(--border)', fontSize: '11px', lineHeight: 1.5, color: 'var(--text-muted)' }}>
+                  <div style={{ fontWeight: 600, color: 'var(--text-heading)', marginBottom: '4px' }}>Peer Handshake Requirements</div>
+                  Paste the host endpoint, guest credentials, and a client-side generated bcrypt password hash.
+                </div>
 
-            <label style={fieldStyle}>
-              <span className="label">Guest Email</span>
-              <input className="input" value={peerEmail} onChange={(event) => setPeerEmail(event.target.value)} placeholder="guest-user@peer.com" required />
-            </label>
+                <TextInput
+                  label="Guest Email"
+                  type="email"
+                  value={peerEmail}
+                  onChange={(event) => setPeerEmail(event.target.value)}
+                  placeholder="guest-user@peer.com"
+                  required
+                />
 
-            <label style={fieldStyle}>
-              <span className="label">Validation Code</span>
-              <input
-                className="input"
-                value={peerValidationCode}
-                onChange={(event) => setPeerValidationCode(event.target.value.toUpperCase())}
-                placeholder="GRAV-9821-X"
-                required
-              />
-            </label>
+                <TextInput
+                  label="Validation Code"
+                  value={peerValidationCode}
+                  onChange={(event) => setPeerValidationCode(event.target.value.toUpperCase())}
+                  placeholder="GRAV-9821-X"
+                  required
+                />
 
-            <label style={fieldStyle}>
-              <span className="label">Invite URL</span>
-              <input className="input" value={peerInviteUrl} onChange={(event) => setPeerInviteUrl(event.target.value)} placeholder="https://host-domain-or-ip.com/api/v1/workspaces/validate" required />
-            </label>
+                <TextInput
+                  label="Invite URL"
+                  value={peerInviteUrl}
+                  onChange={(event) => setPeerInviteUrl(event.target.value)}
+                  placeholder="https://host-domain-or-ip.com/api/v1/workspaces/validate"
+                  required
+                />
 
-            <div style={validationHintInlineStyle}>The invite URL should point at the host server’s `/api/v1/workspaces/validate` endpoint.</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '-8px' }}>
+                  Should point to the host server's validation endpoint.
+                </div>
 
-            <label style={fieldStyle}>
-              <span className="label">Guest Username</span>
-              <input className="input" value={peerUsername} onChange={(event) => setPeerUsername(event.target.value)} required />
-            </label>
+                <TextInput
+                  label="Guest Username"
+                  value={peerUsername}
+                  onChange={(event) => setPeerUsername(event.target.value)}
+                  required
+                />
 
-            <label style={fieldStyle}>
-              <span className="label">Password Hash</span>
-              <textarea
-                className="input"
-                rows={3}
-                value={peerPasswordHash}
-                onChange={(event) => setPeerPasswordHash(event.target.value)}
-                placeholder="$2b$12$SecureBcryptHashHere..."
-                style={{ resize: 'vertical' }}
-                required
-              />
-            </label>
+                <Textarea
+                  label="Password Hash"
+                  rows={3}
+                  value={peerPasswordHash}
+                  onChange={(event) => setPeerPasswordHash(event.target.value)}
+                  placeholder="$2b$12$SecureBcryptHashHere..."
+                  required
+                />
 
-            <div style={securityNoteStyle}>
-              The hash stays in the validation record so the host can verify this guest handoff without needing your raw password.
-            </div>
+                <div style={{ padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.15)', fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                  The hash stays in the validation record so the host can authenticate guest clients without exposing raw passwords.
+                </div>
 
-            <button type="submit" className="btn" disabled={pendingAction !== null}>
-              {pendingAction === 'validate' ? 'Validating...' : 'Validate Peer Invite'}
-            </button>
-          </form>
-        </section>
-      </div>
+                <Button type="submit" variant="default" fullWidth loading={pendingAction === 'validate'}>
+                  Validate Peer Invite
+                </Button>
+              </Stack>
+            </form>
+          </Card>
+        </Stack>
+      </Grid>
     </div>
   );
 }
-
-const pageStyle: CSSProperties = {
-  minHeight: '100vh',
-  padding: '32px',
-  background:
-    'radial-gradient(circle at top left, rgba(59, 130, 246, 0.12), transparent 26%), radial-gradient(circle at bottom right, rgba(16, 185, 129, 0.08), transparent 28%), var(--bg)',
-};
-
-const shellStyle: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1.1fr) minmax(320px, 1.1fr) minmax(320px, 0.95fr)',
-  gap: '24px',
-  maxWidth: '1480px',
-  margin: '0 auto',
-  alignItems: 'start',
-};
-
-const heroStyle: CSSProperties = {
-  padding: '28px',
-  borderRadius: '24px',
-  border: '1px solid var(--border)',
-  background: 'var(--card-bg)',
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '20px',
-};
-
-const heroBadgeStyle: CSSProperties = {
-  display: 'inline-flex',
-  alignSelf: 'flex-start',
-  padding: '6px 10px',
-  borderRadius: '999px',
-  border: '1px solid var(--accent-border)',
-  background: 'var(--accent-glow)',
-  color: 'var(--accent)',
-  fontSize: '11px',
-  fontWeight: 700,
-  letterSpacing: '0.06em',
-  textTransform: 'uppercase',
-};
-
-const heroTitleStyle: CSSProperties = {
-  margin: 0,
-  fontSize: '42px',
-  lineHeight: 1.02,
-  color: 'var(--text-heading)',
-};
-
-const heroCopyStyle: CSSProperties = {
-  margin: 0,
-  color: 'var(--text-muted)',
-  fontSize: '15px',
-  lineHeight: 1.7,
-  maxWidth: '42ch',
-};
-
-const summaryGridStyle: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(1, minmax(0, 1fr))',
-  gap: '12px',
-};
-
-const summaryCardStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '12px',
-  padding: '14px 16px',
-  borderRadius: '16px',
-  border: '1px solid var(--border)',
-  background: 'rgba(255, 255, 255, 0.03)',
-  color: 'var(--text-heading)',
-};
-
-const validationHintStyle: CSSProperties = {
-  display: 'grid',
-  gap: '6px',
-  padding: '12px 14px',
-  borderRadius: '14px',
-  border: '1px solid var(--border)',
-  background: 'rgba(255, 255, 255, 0.03)',
-};
-
-const validationHintTitleStyle: CSSProperties = {
-  fontSize: '12px',
-  fontWeight: 700,
-  color: 'var(--text-heading)',
-};
-
-const validationHintCopyStyle: CSSProperties = {
-  fontSize: '12px',
-  lineHeight: 1.6,
-  color: 'var(--text-muted)',
-};
-
-const validationHintInlineStyle: CSSProperties = {
-  marginTop: '-4px',
-  fontSize: '11px',
-  lineHeight: 1.5,
-  color: 'var(--text-muted)',
-};
-
-const securityNoteStyle: CSSProperties = {
-  padding: '10px 12px',
-  borderRadius: '12px',
-  border: '1px solid rgba(59, 130, 246, 0.18)',
-  background: 'rgba(59, 130, 246, 0.08)',
-  fontSize: '11px',
-  lineHeight: 1.6,
-  color: 'var(--text-muted)',
-};
-
-const sectionHeaderStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: '12px',
-};
-
-const sectionTitleStyle: CSSProperties = {
-  margin: '6px 0 0',
-  fontSize: '22px',
-  color: 'var(--text-heading)',
-};
-
-const eyebrowStyle: CSSProperties = {
-  fontSize: '10px',
-  fontWeight: 700,
-  letterSpacing: '0.08em',
-  textTransform: 'uppercase',
-  color: 'var(--text-muted)',
-};
-
-const workspaceColumnStyle: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '16px',
-};
-
-const workspaceListStyle: CSSProperties = {
-  display: 'grid',
-  gap: '14px',
-};
-
-const workspaceCardStyle = (isActive: boolean): CSSProperties => ({
-  padding: '22px',
-  borderRadius: '22px',
-  border: isActive ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid var(--border)',
-  background: isActive ? 'rgba(59, 130, 246, 0.08)' : 'var(--card-bg)',
-  display: 'grid',
-  gap: '14px',
-});
-
-const workspaceCardTopStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'flex-start',
-  justifyContent: 'space-between',
-  gap: '12px',
-};
-
-const workspaceNameStyle: CSSProperties = {
-  fontSize: '20px',
-  fontWeight: 600,
-  color: 'var(--text-heading)',
-};
-
-const workspaceMetaStyle: CSSProperties = {
-  marginTop: '6px',
-  fontSize: '12px',
-  color: 'var(--text-muted)',
-};
-
-const workspaceRolePillStyle: CSSProperties = {
-  padding: '5px 8px',
-  borderRadius: '999px',
-  background: 'rgba(255, 255, 255, 0.06)',
-  border: '1px solid var(--border)',
-  fontSize: '11px',
-  color: 'var(--text-heading)',
-  textTransform: 'capitalize',
-};
-
-const workspaceDescriptionStyle: CSSProperties = {
-  margin: 0,
-  color: 'var(--text-muted)',
-  fontSize: '14px',
-  lineHeight: 1.6,
-};
-
-const workspaceActionsStyle: CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: '10px',
-};
-
-const formsColumnStyle: CSSProperties = {
-  display: 'grid',
-  gap: '16px',
-  alignContent: 'start',
-  maxHeight: 'calc(100vh - 64px)',
-  overflowY: 'auto',
-  paddingRight: '8px',
-  minHeight: 0,
-};
-
-const panelStyle: CSSProperties = {
-  padding: '24px',
-  borderRadius: '22px',
-  border: '1px solid var(--border)',
-  background: 'var(--card-bg)',
-  display: 'grid',
-  gap: '14px',
-};
-
-const panelHeaderStyle: CSSProperties = {
-  display: 'flex',
-  gap: '12px',
-  alignItems: 'flex-start',
-};
-
-const panelTitleStyle: CSSProperties = {
-  margin: 0,
-  color: 'var(--text-heading)',
-  fontSize: '18px',
-};
-
-const panelCopyStyle: CSSProperties = {
-  margin: '6px 0 0',
-  color: 'var(--text-muted)',
-  fontSize: '13px',
-  lineHeight: 1.6,
-};
-
-const fieldStyle: CSSProperties = {
-  display: 'grid',
-  gap: '6px',
-};
-
-const errorStyle: CSSProperties = {
-  padding: '12px 14px',
-  borderRadius: '14px',
-  border: '1px solid rgba(239, 68, 68, 0.2)',
-  background: 'rgba(239, 68, 68, 0.08)',
-  color: '#ef4444',
-  fontSize: '13px',
-};
-
-const successStyle: CSSProperties = {
-  padding: '12px 14px',
-  borderRadius: '14px',
-  border: '1px solid rgba(16, 185, 129, 0.2)',
-  background: 'rgba(16, 185, 129, 0.08)',
-  color: '#10b981',
-  fontSize: '13px',
-};
-
-const emptyCardStyle: CSSProperties = {
-  padding: '20px',
-  borderRadius: '18px',
-  border: '1px dashed var(--border)',
-  background: 'rgba(255, 255, 255, 0.02)',
-  color: 'var(--text-muted)',
-  lineHeight: 1.6,
-};
-
-const signOutButtonStyle: CSSProperties = {
-  gap: '8px',
-};
-
-const heroActionsStyle: CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: '10px',
-};
-
-const accountButtonStyle: CSSProperties = {
-  gap: '8px',
-};

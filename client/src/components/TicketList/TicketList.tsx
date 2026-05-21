@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import type { Ticket } from '../../context/TicketContext';
-import { Button } from '../ui/Button';
-import { Select } from '../ui/Select';
+import { Button, Select, DenseTextInput } from '@library';
 import { Compass } from 'lucide-react';
 import { TicketRow } from './components';
 import type { TicketListProps } from './types';
@@ -42,9 +41,7 @@ export const TicketList: React.FC<TicketListProps> = ({
         }}
       >
         {/* Search */}
-        <input
-          type="text"
-          className="input"
+        <DenseTextInput
           placeholder="Filter tickets by title, body, or ID..."
           value={filters.search}
           onChange={(e) => onFilterChange({ search: e.target.value })}
@@ -54,26 +51,26 @@ export const TicketList: React.FC<TicketListProps> = ({
         {/* Priority Filter */}
         <Select
           value={filters.priority}
-          onValueChange={(priority) => onFilterChange({ priority })}
+          onValueChange={(priority: string) => onFilterChange({ priority: priority as Ticket['priority'] | '' })}
           options={PRIORITY_FILTER_OPTIONS}
-          ariaLabel="Filter list by priority"
+          aria-label="Filter list by priority"
           style={{ width: '120px' }}
         />
 
         {/* Status Filter */}
         <Select
           value={filters.status}
-          onValueChange={(status) => onFilterChange({ status })}
+          onValueChange={(status: string) => onFilterChange({ status: status as Ticket['status'] | '' })}
           options={STATUS_FILTER_OPTIONS}
-          ariaLabel="Filter list by status"
+          aria-label="Filter list by status"
           style={{ width: '120px' }}
         />
 
         <Select
           value={listSort}
-          onValueChange={(sort) => onListSortChange(sort as typeof listSort)}
+          onValueChange={(sort: string) => onListSortChange(sort as typeof listSort)}
           options={LIST_SORT_OPTIONS}
-          ariaLabel="Sort list tickets"
+          aria-label="Sort list tickets"
           style={{ width: '140px' }}
         />
 

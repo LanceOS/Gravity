@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
-import { FolderPlus, X } from 'lucide-react';
-import { Button } from '../../ui/Button';
+import { FolderPlus } from 'lucide-react';
+import { Button, TextInput, Textarea, Modal, Alert } from '@library';
 import type { ProjectCreateOverlayProps } from '../types';
 import { sanitizeProjectKey } from '../utils';
-import './ProjectCreateOverlay.css';
 
 export function ProjectCreateOverlay({
   loading,
@@ -22,7 +21,7 @@ export function ProjectCreateOverlay({
     }
   };
 
-  const handleSubmit = async (event?: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event?: React.FormEvent) => {
     event?.preventDefault();
     setFormError(null);
 
@@ -67,95 +66,68 @@ export function ProjectCreateOverlay({
 
   const feedbackMessage = formError || errorMessage;
 
-  return (
-    <div
-      className="project-create-overlay"
-      onClick={handleClose}
-    >
-      <div
-        className="project-create-overlay__card"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="project-create-overlay-title"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="project-create-overlay__header">
-          <div>
-            <div className="project-create-overlay__eyebrow">Workspace Projects</div>
-            <h3 id="project-create-overlay-title" className="project-create-overlay__title">New Project</h3>
-          </div>
+  const modalFooter = (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Ctrl/Cmd + Enter creates the project.</span>
 
-          <button
-            type="button"
-            className="project-create-overlay__close"
-            onClick={handleClose}
-            aria-label="Close create project overlay"
-            disabled={loading}
-          >
-            <X size={16} />
-          </button>
-        </div>
-
-        <form className="project-create-overlay__form" onSubmit={handleSubmit}>
-          {feedbackMessage ? (
-            <div className="project-create-overlay__feedback">
-              {feedbackMessage}
-            </div>
-          ) : null}
-
-          <div className="project-create-overlay__grid">
-            <label className="project-create-overlay__field">
-              <span className="workspace-page__project-label">Project Name</span>
-              <input
-                type="text"
-                className="workspace-page__project-input project-create-overlay__name-input"
-                placeholder="Core Platform"
-                value={projectName}
-                onChange={(event) => setProjectName(event.target.value)}
-                autoFocus
-                required
-              />
-            </label>
-
-            <label className="project-create-overlay__field">
-              <span className="workspace-page__project-label">Project Key</span>
-              <input
-                className="workspace-page__project-input workspace-page__project-input--key"
-                value={projectKey}
-                onChange={(event) => setProjectKey(sanitizeProjectKey(event.target.value))}
-                placeholder="CORE"
-                maxLength={8}
-                required
-              />
-            </label>
-
-            <label className="project-create-overlay__field project-create-overlay__field--description">
-              <span className="workspace-page__project-label">Description</span>
-              <textarea
-                className="workspace-page__project-input workspace-page__project-input--textarea project-create-overlay__description-input"
-                rows={4}
-                placeholder="Describe the focus of this project within the workspace."
-                value={projectDescription}
-                onChange={(event) => setProjectDescription(event.target.value)}
-              />
-            </label>
-          </div>
-
-          <div className="project-create-overlay__actions">
-            <span className="project-create-overlay__hint">Ctrl/Cmd + Enter creates the project.</span>
-
-            <div className="project-create-overlay__buttons">
-              <Button type="button" variant="ghost" onClick={handleClose} disabled={loading}>
-                Cancel
-              </Button>
-              <Button type="submit" variant="primary" disabled={loading}>
-                <FolderPlus size={14} />
-                <span>{loading ? 'Creating Project...' : 'Create Project'}</span>
-              </Button>
-            </div>
-          </div>
-        </form>
+      <div style={{ display: 'flex', gap: '8px' }}>
+        <Button type="button" onClick={handleClose} disabled={loading}>
+          Cancel
+        </Button>
+        <Button type="submit" variant="primary" disabled={loading} onClick={() => void handleSubmit()}>
+          <FolderPlus size={14} style={{ marginRight: '6px' }} />
+          <span>{loading ? 'Creating Project...' : 'Create Project'}</span>
+        </Button>
       </div>
     </div>
+  );
+
+  return (
+    <Modal
+      isOpen={true}
+      onClose={handleClose}
+      title="New Project"
+      footer={modalFooter}
+      style={{ maxWidth: '500px' }}
+    >
+      <form onSubmit={(e) => { e.preventDefault(); void handleSubmit(); }} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+        {feedbackMessage && (
+          <Alert type="error">
+            {feedbackMessage}
+          </Alert>
+        )}
+
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 'var(--space-4)' }}>
+          <TextInput
+            label="Project Name"
+            placeholder="Core Platform"
+            value={projectName}
+            onChange={(event) => setProjectName(event.target.value)}
+            autoFocus
+            required
+            disabled={loading}
+          />
+
+          <TextInput
+            label="Project Key"
+            value={projectKey}
+            onChange={(event) => setProjectKey(sanitizeProjectKey(event.target.value))}
+            placeholder="CORE"
+            maxLength={8}
+            required
+            disabled={loading}
+          />
+        </div>
+
+        <Textarea
+          label="Description"
+          placeholder="Describe the focus of this project within the workspace."
+          value={projectDescription}
+          onChange={(event) => setProjectDescription(event.target.value)}
+          rows={4}
+          disabled={loading}
+        />
+      </form>
+    </Modal>
   );
 }

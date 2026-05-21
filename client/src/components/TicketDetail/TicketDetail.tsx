@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import type { Ticket } from '../../context/TicketContext';
-import { Button } from '../ui/Button';
-import { Select } from '../ui/Select';
+import { Button, Select, DenseTextInput } from '@library';
 import { 
   CheckSquare, GitPullRequest, GitMerge, Send, Trash2,
   Plus, Edit3, Eye, ChevronLeft
@@ -428,9 +427,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
 
             {/* Post comment form */}
             <form onSubmit={handlePostComment} style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
-              <input 
-                type="text"
-                className="input"
+              <DenseTextInput 
                 placeholder="Post updates, links, or mention PRs..."
                 value={commentInput}
                 onChange={(e) => setCommentInput(e.target.value)}
@@ -468,9 +465,9 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             <span className="label">Status</span>
             <Select
               value={activeTicket.status}
-              onValueChange={(nextStatus) => onUpdateTicket(activeTicket.id, { status: nextStatus as Ticket['status'] })}
+              onValueChange={(nextStatus: string) => onUpdateTicket(activeTicket.id, { status: nextStatus as Ticket['status'] })}
               options={STATUS_OPTIONS}
-              ariaLabel="Select ticket status"
+              aria-label="Select ticket status"
             />
           </div>
 
@@ -479,9 +476,9 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             <span className="label">Priority</span>
             <Select
               value={activeTicket.priority}
-              onValueChange={(nextPriority) => onUpdateTicket(activeTicket.id, { priority: nextPriority as Ticket['priority'] })}
+              onValueChange={(nextPriority: string) => onUpdateTicket(activeTicket.id, { priority: nextPriority as Ticket['priority'] })}
               options={PRIORITY_OPTIONS}
-              ariaLabel="Select ticket priority"
+              aria-label="Select ticket priority"
             />
           </div>
 
@@ -490,9 +487,9 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             <span className="label">Assignee</span>
             <Select
               value={activeTicket.assigneeId || ''}
-              onValueChange={(nextAssigneeId) => onUpdateTicket(activeTicket.id, { assigneeId: nextAssigneeId || null })}
+              onValueChange={(nextAssigneeId: string) => onUpdateTicket(activeTicket.id, { assigneeId: nextAssigneeId || null })}
               options={assigneeOptions}
-              ariaLabel="Select ticket assignee"
+              aria-label="Select ticket assignee"
             />
           </div>
 
@@ -501,9 +498,9 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             <span className="label">Project</span>
             <Select
               value={activeTicket.projectId}
-              onValueChange={(nextProjectId) => onUpdateTicket(activeTicket.id, { projectId: nextProjectId })}
+              onValueChange={(nextProjectId: string) => onUpdateTicket(activeTicket.id, { projectId: nextProjectId })}
               options={projectOptions}
-              ariaLabel="Select ticket project"
+              aria-label="Select ticket project"
             />
           </div>
 
@@ -512,9 +509,9 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             <span className="label">Domain</span>
             <Select
               value={activeTicket.domainId || ''}
-              onValueChange={(nextDomainId) => onUpdateTicket(activeTicket.id, { domainId: nextDomainId || null })}
+              onValueChange={(nextDomainId: string) => onUpdateTicket(activeTicket.id, { domainId: nextDomainId || null })}
               options={domainOptions}
-              ariaLabel="Select ticket domain"
+              aria-label="Select ticket domain"
             />
           </div>
 
@@ -523,9 +520,9 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             <span className="label">Cycle / Milestone</span>
             <Select
               value={activeTicket.cycleId || ''}
-              onValueChange={(nextCycleId) => onUpdateTicket(activeTicket.id, { cycleId: nextCycleId || null })}
+              onValueChange={(nextCycleId: string) => onUpdateTicket(activeTicket.id, { cycleId: nextCycleId || null })}
               options={cycleOptions}
-              ariaLabel="Select ticket cycle"
+              aria-label="Select ticket cycle"
             />
           </div>
 

@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import type { OnboardingModalProps } from './types';
 import { getNextOnboardingStep, getPreviousOnboardingStep, LAST_ONBOARDING_STEP } from './utils';
+import { Button, Modal, Stack, Flex } from '@library';
 
 export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) => {
   const { currentUser } = useTickets();
@@ -43,149 +44,117 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
     }
   };
 
-  return (
-    <div style={overlayStyle}>
-      <div style={modalStyle} className="glass">
-        {step === 0 ? (
-          <div style={contentContainerStyle}>
+  const renderContent = () => {
+    if (step === 0) {
+      return (
+        <Stack gap="var(--space-4)" align="center" style={{ textAlign: 'center', padding: '10px 0' }}>
+          <div style={iconContainerStyle}>
+            <HelpCircle size={40} color="var(--accent)" />
+          </div>
+          <h2 style={titleStyle}>Welcome to Gravity, {currentUser?.name}!</h2>
+          <p style={descriptionStyle}>
+            Would you like a quick 1-minute tour of your new production-grade, multi-tenant project management workspace?
+          </p>
+          <Flex gap="var(--space-3)" style={{ width: '100%', marginTop: '12px' }}>
+            <Button variant="default" fullWidth onClick={handleSkip}>
+              No thanks, skip it
+            </Button>
+            <Button variant="primary" fullWidth onClick={() => setStep(1)} leftIcon={<Sparkles size={16} />}>
+              Let's do it!
+            </Button>
+          </Flex>
+        </Stack>
+      );
+    }
+
+    return (
+      <Stack gap="var(--space-4)" align="center" style={{ textAlign: 'center', padding: '10px 0' }}>
+        {/* Step Indicators */}
+        <Flex gap="var(--space-2)" justify="center" style={{ marginBottom: '8px' }}>
+          {[1, 2, 3, 4].map((i) => (
+            <div
+              key={i}
+              style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: 'var(--radius-full)',
+                backgroundColor: i === step ? 'var(--accent)' : i < step ? 'var(--text-heading)' : 'var(--border)',
+                transition: 'all var(--transition-fast)'
+              }}
+            />
+          ))}
+        </Flex>
+
+        {step === 1 && (
+          <Stack gap="var(--space-2)" align="center">
             <div style={iconContainerStyle}>
-              <HelpCircle size={40} color="var(--accent)" />
+              <Database size={40} color="var(--accent)" />
             </div>
-            <h2 style={titleStyle}>Welcome to Gravity, {currentUser?.name}!</h2>
+            <h3 style={stepTitleStyle}>Multi-Tenant Project Databases</h3>
             <p style={descriptionStyle}>
-              Would you like a quick 1-minute tour of your new production-grade, multi-tenant project management workspace?
+              Every workspace in Gravity runs on its own isolated PostgreSQL boundary. This keeps projects, tickets, and members scoped cleanly while supporting a production-grade multi-tenant architecture.
             </p>
-            <div style={buttonGroupStyle}>
-              <button onClick={handleSkip} className="clickable" style={skipButtonStyle}>
-                No thanks, skip it
-              </button>
-              <button onClick={() => setStep(1)} className="clickable" style={startButtonStyle}>
-                <Sparkles size={16} />
-                Let's do it!
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div style={contentContainerStyle}>
-            {/* Step Indicators */}
-            <div style={indicatorContainerStyle}>
-              {[1, 2, 3, 4].map((i) => (
-                <div
-                  key={i}
-                  style={{
-                    ...indicatorDotStyle,
-                    background: i === step ? 'var(--accent)' : i < step ? 'var(--text-heading)' : 'var(--border)',
-                  }}
-                />
-              ))}
-            </div>
-
-            {step === 1 && (
-              <>
-                <div style={iconContainerStyle}>
-                  <Database size={40} color="var(--accent)" />
-                </div>
-                <h3 style={stepTitleStyle}>Multi-Tenant Project Databases</h3>
-                <p style={descriptionStyle}>
-                  Every workspace in Gravity runs on its own isolated PostgreSQL boundary. This keeps projects, tickets, and members scoped cleanly while supporting a production-grade multi-tenant architecture.
-                </p>
-              </>
-            )}
-
-            {step === 2 && (
-              <>
-                <div style={iconContainerStyle}>
-                  <Layers size={40} color="var(--accent)" />
-                </div>
-                <h3 style={stepTitleStyle}>Cycles & Specialized Domains</h3>
-                <p style={descriptionStyle}>
-                  Organize your tickets into active sprint cycles and assign them to specialized technical domains like Frontend, Backend, DevOps, or Design. This ensures structured sorting and readability.
-                </p>
-              </>
-            )}
-
-            {step === 3 && (
-              <>
-                <div style={iconContainerStyle}>
-                  <Sparkles size={40} color="var(--accent)" />
-                </div>
-                <h3 style={stepTitleStyle}>Local Ollama AI Assistant</h3>
-                <p style={descriptionStyle}>
-                  Chat with a completely local Ollama language model directly in your sidebar! Ask it to summarize your backlog, write code snippets, or analyze open tickets without leaking any sensitive data.
-                </p>
-              </>
-            )}
-
-            {step === 4 && (
-              <>
-                <div style={iconContainerStyle}>
-                  <Terminal size={40} color="var(--accent)" />
-                </div>
-                <h3 style={stepTitleStyle}>MCP Agent Integrations</h3>
-                <p style={descriptionStyle}>
-                  Gravity features full Model Context Protocol (MCP) integrations! Using the built-in MCP simulator, AI agents like Copilot or web agents can read, create, and resolve tickets just like regular users.
-                </p>
-              </>
-            )}
-
-            <div style={navigationContainerStyle}>
-              <button onClick={handleBack} className="clickable" style={navButtonStyle}>
-                <ChevronLeft size={16} />
-                Back
-              </button>
-              
-              <button onClick={handleNext} className="clickable" style={{ ...navButtonStyle, background: 'var(--text-heading)', color: 'var(--bg)' }}>
-                {step === LAST_ONBOARDING_STEP ? (
-                  <>
-                    <Check size={16} />
-                    Finish Tour
-                  </>
-                ) : (
-                  <>
-                    Next
-                    <ChevronRight size={16} />
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
+          </Stack>
         )}
-      </div>
-    </div>
+
+        {step === 2 && (
+          <Stack gap="var(--space-2)" align="center">
+            <div style={iconContainerStyle}>
+              <Layers size={40} color="var(--accent)" />
+            </div>
+            <h3 style={stepTitleStyle}>Cycles & Specialized Domains</h3>
+            <p style={descriptionStyle}>
+              Organize your tickets into active sprint cycles and assign them to specialized technical domains like Frontend, Backend, DevOps, or Design. This ensures structured sorting and readability.
+            </p>
+          </Stack>
+        )}
+
+        {step === 3 && (
+          <Stack gap="var(--space-2)" align="center">
+            <div style={iconContainerStyle}>
+              <Sparkles size={40} color="var(--accent)" />
+            </div>
+            <h3 style={stepTitleStyle}>Local Ollama AI Assistant</h3>
+            <p style={descriptionStyle}>
+              Chat with a completely local Ollama language model directly in your sidebar! Ask it to summarize your backlog, write code snippets, or analyze open tickets without leaking any sensitive data.
+            </p>
+          </Stack>
+        )}
+
+        {step === 4 && (
+          <Stack gap="var(--space-2)" align="center">
+            <div style={iconContainerStyle}>
+              <Terminal size={40} color="var(--accent)" />
+            </div>
+            <h3 style={stepTitleStyle}>MCP Agent Integrations</h3>
+            <p style={descriptionStyle}>
+              Gravity features full Model Context Protocol (MCP) integrations! Using the built-in MCP simulator, AI agents like Copilot or web agents can read, create, and resolve tickets just like regular users.
+            </p>
+          </Stack>
+        )}
+
+        <Flex justify="space-between" align="center" style={{ width: '100%', marginTop: '20px' }}>
+          <Button variant="default" onClick={handleBack} leftIcon={<ChevronLeft size={16} />}>
+            Back
+          </Button>
+          
+          <Button 
+            variant="primary" 
+            onClick={handleNext}
+            rightIcon={step === LAST_ONBOARDING_STEP ? <Check size={16} /> : <ChevronRight size={16} />}
+          >
+            {step === LAST_ONBOARDING_STEP ? 'Finish Tour' : 'Next'}
+          </Button>
+        </Flex>
+      </Stack>
+    );
+  };
+
+  return (
+    <Modal isOpen={true} onClose={handleSkip} title={step === 0 ? "Welcome to Gravity" : `Workspace Tour - Step ${step}`}>
+      {renderContent()}
+    </Modal>
   );
-};
-
-const overlayStyle: React.CSSProperties = {
-  position: 'fixed',
-  top: 0,
-  left: 0,
-  right: 0,
-  bottom: 0,
-  background: 'rgba(0, 0, 0, 0.8)',
-  backdropFilter: 'blur(8px)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  zIndex: 1000,
-  fontFamily: 'var(--sans)'
-};
-
-const modalStyle: React.CSSProperties = {
-  width: '460px',
-  background: 'var(--card-bg)',
-  border: '1px solid var(--border)',
-  borderRadius: '16px',
-  boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-  padding: '40px',
-  overflow: 'hidden'
-};
-
-const contentContainerStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  textAlign: 'center',
-  gap: '16px'
 };
 
 const iconContainerStyle: React.CSSProperties = {
@@ -193,20 +162,25 @@ const iconContainerStyle: React.CSSProperties = {
   borderRadius: '16px',
   background: 'var(--accent-glow)',
   border: '1px solid var(--accent-border)',
-  marginBottom: '8px'
+  marginBottom: '8px',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center'
 };
 
 const titleStyle: React.CSSProperties = {
   fontSize: '22px',
   fontWeight: 600,
   color: 'var(--text-heading)',
-  letterSpacing: '-0.3px'
+  letterSpacing: '-0.3px',
+  margin: 0
 };
 
 const stepTitleStyle: React.CSSProperties = {
   fontSize: '18px',
   fontWeight: 600,
-  color: 'var(--text-heading)'
+  color: 'var(--text-heading)',
+  margin: 0
 };
 
 const descriptionStyle: React.CSSProperties = {
@@ -214,74 +188,5 @@ const descriptionStyle: React.CSSProperties = {
   color: 'var(--text-muted)',
   lineHeight: '1.6',
   maxWidth: '360px',
-  marginBottom: '8px'
-};
-
-const buttonGroupStyle: React.CSSProperties = {
-  display: 'flex',
-  width: '100%',
-  gap: '12px',
-  marginTop: '12px'
-};
-
-const startButtonStyle: React.CSSProperties = {
-  flex: 1,
-  padding: '10px',
-  background: 'var(--text-heading)',
-  border: 'none',
-  borderRadius: '8px',
-  color: 'var(--bg)',
-  fontSize: '13px',
-  fontWeight: 600,
-  cursor: 'pointer',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: '8px'
-};
-
-const skipButtonStyle: React.CSSProperties = {
-  flex: 1,
-  padding: '10px',
-  background: 'transparent',
-  border: '1px solid var(--border)',
-  borderRadius: '8px',
-  color: 'var(--text)',
-  fontSize: '13px',
-  fontWeight: 500,
-  cursor: 'pointer'
-};
-
-const indicatorContainerStyle: React.CSSProperties = {
-  display: 'flex',
-  gap: '6px',
-  marginBottom: '8px'
-};
-
-const indicatorDotStyle: React.CSSProperties = {
-  width: '6px',
-  height: '6px',
-  borderRadius: '50%',
-  transition: 'all 0.2s ease'
-};
-
-const navigationContainerStyle: React.CSSProperties = {
-  display: 'flex',
-  width: '100%',
-  justifyContent: 'space-between',
-  marginTop: '20px'
-};
-
-const navButtonStyle: React.CSSProperties = {
-  padding: '8px 16px',
-  background: 'var(--card-bg)',
-  border: '1px solid var(--border)',
-  borderRadius: '8px',
-  color: 'var(--text)',
-  fontSize: '12px',
-  fontWeight: 500,
-  cursor: 'pointer',
-  display: 'flex',
-  alignItems: 'center',
-  gap: '6px'
+  margin: '0 auto',
 };
