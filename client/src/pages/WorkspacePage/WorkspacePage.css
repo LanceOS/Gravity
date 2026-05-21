@@ -311,6 +311,8 @@
 .workspace-page__project-selection-list {
   display: grid;
   gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  align-items: stretch;
   overflow-y: auto;
   padding-right: 4px;
 }
@@ -328,8 +330,8 @@
   max-width: none;
   text-align: left;
   display: grid;
-  gap: 10px;
-  padding: 12px 14px;
+  gap: 0;
+  padding: 14px 16px;
   border-radius: 14px;
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.02);
@@ -341,6 +343,55 @@
 .workspace-page__project-strip-card--active {
   border-color: var(--accent-border);
   background: rgba(59, 130, 246, 0.08);
+}
+
+.workspace-page__project-strip-card-content {
+  display: grid;
+  gap: 14px;
+  min-height: 100%;
+}
+
+.workspace-page__project-strip-card-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(200px, 0.9fr);
+  gap: 16px;
+  align-items: end;
+}
+
+.workspace-page__project-strip-card-copy {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.workspace-page__project-card-facts {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.workspace-page__project-card-fact {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.workspace-page__project-card-fact-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.workspace-page__project-card-fact-value {
+  font-size: 12px;
+  line-height: 1.4;
+  font-weight: 600;
+  color: var(--text-heading);
 }
 
 .workspace-page__project-composer {
@@ -711,7 +762,9 @@
     justify-content: flex-start;
   }
 
-  .workspace-page__project-strip {
+  .workspace-page__project-selection-list,
+  .workspace-page__project-strip,
+  .workspace-page__project-strip-card-body {
     grid-template-columns: 1fr;
   }
 }
