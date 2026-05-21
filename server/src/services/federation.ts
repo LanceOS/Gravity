@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { and, asc, eq, gt, sql } from 'drizzle-orm';
 import { db } from '../db/index.js';
-import { federationInvites, identities, peerConnections, projects, syncOutbox, tickets, workspaceMembers, workspacePeers, workspaceSettings, workspaces } from '../db/schema.js';
+import { comments, federationInvites, identities, peerConnections, projects, syncOutbox, tickets, workspaceMembers, workspacePeers, workspaceSettings, workspaces } from '../db/schema.js';
 import { env } from '../env.js';
 import { decryptNodePrivateKey } from '../lib/crypto.js';
 import { createSignedFederationHeaders, normalizeFederationPublicKey } from '../lib/http-signatures.js';
@@ -601,6 +601,56 @@ export async function updateFederatedTicket(input: {
   };
 }
 
+export async function deleteFederatedTicket(input: {
+  workspaceId: string;
+  actorPublicKey: string;
+  ticketId: string;
+}) {
+  const verifiedPeer = await getVerifiedWorkspacePeerByPublicKey(input.workspaceId, input.actorPublicKey);
+  if (!verifiedPeer) {
+    return { ok: false as const, status: 403, error: 'Peer is not verified for this workspace.' };
+  }
+
+  const existing = await getFederatedTicketWithProject(input.workspaceId, input.ticketId);
+  if (!existing) {
+    return { ok: false as const, status: 404, error: 'Ticket not found for workspace.' };
+  }
+
+  const deletedTicket = mapTicketRecord(existing.ticket);
+  const result = await db.transaction(async (tx) => {
+    await tx.delete(comments).where(eq(comments.ticketId, input.ticketId));
+    await tx.delete(tickets).where(eq(tickets.parentId, input.ticketId));
+    await tx.delete(tickets).where(eq(tickets.id, input.ticketId));
+
+    const outboxRows = await tx
+      .insert(syncOutbox)
+      .values({
+        workspaceId: input.workspaceId,
+        actorPublicKey: input.actorPublicKey,
+        entityType: 'ticket',
+        entityId: input.ticketId,
+        action: 'delete',
+        payload: {
+          project: mapProjectReplica(existing.project),
+          ticket: deletedTicket,
+        },
+        createdAt: new Date(),
+      })
+      .returning();
+
+    return {
+      ticket: deletedTicket,
+      outboxEventId: outboxRows[0]?.eventId ?? null,
+    };
+  });
+
+  return {
+    ok: true as const,
+    ticket: result.ticket,
+    outboxEventId: result.outboxEventId,
+  };
+}
+
 export async function listFederationOutboxEvents(input: {
   workspaceId: string;
   actorPublicKey: string;
@@ -729,7 +779,7 @@ export async function syncFederatedConnection(input: {
         if (workspaceId !== connection.workspaceId) {
           throw new Error(`Received a federation event for unexpected workspace ${workspaceId}.`);
         }
-        if (entityType !== 'ticket' || (action !== 'create' && action !== 'update')) {
+        if (entityType !== 'ticket' || (action !== 'create' && action !== 'update' && action !== 'delete')) {
           throw new Error(`Unsupported federation event ${entityType}:${action}.`);
         }
         if (!payload) {
@@ -777,17 +827,32 @@ export async function syncFederatedConnection(input: {
         }
 
         const ticketId = asString(ticketPayload.id);
-        const ticketKey = asString(ticketPayload.key);
-        const ticketTitle = asString(ticketPayload.title);
         const projectId = asString(ticketPayload.projectId);
 
-        if (!ticketId || !ticketKey || !ticketTitle || !projectId) {
+        if (!ticketId || !projectId) {
           throw new Error(`Federation ticket event ${eventId} is missing required ticket fields.`);
         }
 
         const localProjectRows = await tx.select({ id: projects.id }).from(projects).where(eq(projects.id, projectId)).limit(1);
         if (!localProjectRows[0]) {
           throw new Error(`Missing local project replica ${projectId} for federation event ${eventId}.`);
+        }
+
+        if (action === 'delete') {
+          await tx.delete(comments).where(eq(comments.ticketId, ticketId));
+          await tx.delete(tickets).where(eq(tickets.parentId, ticketId));
+          await tx.delete(tickets).where(eq(tickets.id, ticketId));
+
+          changedProjectIds.add(projectId);
+          lastAppliedEventId = eventId;
+          continue;
+        }
+
+        const ticketKey = asString(ticketPayload.key);
+        const ticketTitle = asString(ticketPayload.title);
+
+        if (!ticketKey || !ticketTitle) {
+          throw new Error(`Federation ticket event ${eventId} is missing required ticket fields.`);
         }
 
         await tx

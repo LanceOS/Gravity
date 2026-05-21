@@ -15,6 +15,7 @@ import {
   connectToFederatedWorkspace,
   createFederatedTicket,
   createFederationInvite,
+  deleteFederatedTicket,
   ensureWorkspaceAdminAccess,
   getWorkspaceById,
   listFederationOutboxEvents,
@@ -353,6 +354,57 @@ export function createFederationRouter() {
       });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to update federated ticket.' });
+    }
+  });
+
+  router.delete('/federation/workspaces/:workspaceId/tickets/:ticketId', async (req, res) => {
+    const { workspaceId, ticketId } = req.params;
+
+    const signatureInput = resolveFederationSignature(req);
+    if (!signatureInput) {
+      res.status(401).json({ error: 'Federation signature headers are required.' });
+      return;
+    }
+
+    if (!isFederationTimestampFresh(signatureInput.timestamp)) {
+      res.status(401).json({ error: 'Federation signature timestamp is outside the accepted window.' });
+      return;
+    }
+
+    const isValidSignature = verifyFederationRequestSignature({
+      method: req.method,
+      path: req.originalUrl,
+      timestamp: signatureInput.timestamp,
+      body: req.body ?? {},
+      publicKey: signatureInput.publicKey,
+      signature: signatureInput.signature,
+    });
+    if (!isValidSignature) {
+      res.status(401).json({ error: 'Invalid federation signature.' });
+      return;
+    }
+
+    try {
+      const result = await deleteFederatedTicket({
+        workspaceId,
+        actorPublicKey: signatureInput.publicKey,
+        ticketId,
+      });
+
+      if (!result.ok) {
+        res.status(result.status).json({ error: result.error });
+        return;
+      }
+
+      broadcastEvent('tickets-updated', { projectId: result.ticket.projectId, tickets: await listTickets(result.ticket.projectId) });
+      res.json({
+        success: true,
+        ticketId: result.ticket.id,
+        projectId: result.ticket.projectId,
+        outboxEventId: result.outboxEventId,
+      });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to delete federated ticket.' });
     }
   });
 
