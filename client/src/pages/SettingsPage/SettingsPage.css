@@ -1,3 +1,5 @@
+/* Gravity Settings & Account Preferences Stylesheet - Premium Redesign */
+
 .settings-page {
   flex: 1;
   display: flex;
@@ -12,15 +14,17 @@
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  padding: 24px 28px 20px;
+  padding: 20px 28px;
   border-bottom: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.01);
+  background: var(--sidebar-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .settings-page__topbar-main {
   display: flex;
   align-items: flex-start;
-  gap: 20px;
+  gap: 16px;
 }
 
 .settings-page__back-button,
@@ -29,26 +33,33 @@
   appearance: none;
   -webkit-appearance: none;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   font: inherit;
-  transition: border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+  transition: all var(--transition-normal);
 }
 
 .settings-page__back-button {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 14px;
-  background: rgba(255, 255, 255, 0.04);
+  padding: 8px 14px;
+  background: var(--card-bg);
   color: var(--text);
   border: 1px solid var(--border);
+  font-weight: 600;
+  font-size: 12px;
 }
 
 .settings-page__back-button:hover {
   background: var(--card-hover);
   color: var(--text-heading);
   border-color: var(--border-focus);
+  transform: translateY(-1px);
+}
+
+.settings-page__back-button:active {
+  transform: scale(0.97) translateY(0);
 }
 
 .settings-page__back-button:focus-visible,
@@ -61,37 +72,47 @@
 
 .settings-page__page-title {
   margin: 0;
-  font-size: 24px;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
   color: var(--text-heading);
 }
 
 .settings-page__page-subtitle {
-  margin: 6px 0 0;
+  margin: 4px 0 0;
   color: var(--text-muted);
   font-size: 13px;
 }
 
 .settings-page__save-button {
-  padding: 11px 18px;
+  padding: 10px 18px;
   background: var(--accent-solid);
   color: var(--accent-foreground);
-  font-weight: 600;
-  min-width: 138px;
+  font-weight: 700;
+  font-size: 12.5px;
+  min-width: 120px;
   border: 1px solid var(--accent-solid);
+  box-shadow: 0 2px 8px var(--accent-glow);
 }
 
 .settings-page__save-button:hover {
   background: var(--accent-solid-hover);
   color: var(--accent-foreground);
   border-color: var(--accent-solid-hover);
+  box-shadow: 0 4px 14px var(--accent-glow);
+  transform: translateY(-1px);
+}
+
+.settings-page__save-button:active {
+  transform: scale(0.97) translateY(0);
 }
 
 .settings-page__save-button:disabled,
 .settings-page__secondary-button:disabled {
-  opacity: 0.6;
-  cursor: default;
-  transform: none;
-  box-shadow: none;
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
 }
 
 .settings-page__body {
@@ -104,7 +125,7 @@
 .settings-page__sidebar {
   padding: 24px;
   border-right: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(255, 255, 255, 0.01);
   display: flex;
   flex-direction: column;
   gap: 24px;
@@ -113,79 +134,94 @@
 .settings-page__profile-card {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   padding: 14px;
   border: 1px solid var(--border);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.02);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.015);
+  box-shadow: var(--shadow-sm);
+  transition: border-color var(--transition-normal);
+}
+
+.settings-page__profile-card:hover {
+  border-color: var(--accent-border);
 }
 
 .settings-page__avatar {
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   border: 1px solid var(--border);
+  object-fit: cover;
+  box-shadow: var(--shadow-sm);
 }
 
 .settings-page__profile-name {
   color: var(--text-heading);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 .settings-page__profile-email {
   color: var(--text-muted);
-  font-size: 12px;
-  margin-top: 4px;
+  font-size: 11.5px;
+  margin-top: 2px;
 }
 
 .settings-page__nav {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
+/* Redesigned preferences navigation items */
 .settings-page__nav-item {
   display: flex;
   gap: 12px;
   align-items: flex-start;
-  padding: 14px;
-  border-radius: 8px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
   border: 1px solid transparent;
   background: transparent;
   color: var(--text);
   cursor: pointer;
   text-align: left;
-  transition: border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+  transition: all var(--transition-spring);
 }
 
 .settings-page__nav-item:hover {
-  background: rgba(59, 130, 246, 0.04);
-  border-color: rgba(59, 130, 246, 0.12);
+  background: var(--card-hover);
+  border-color: var(--border);
   color: var(--text-heading);
 }
 
 .settings-page__nav-item--active {
-  background: rgba(59, 130, 246, 0.08);
-  border-color: rgba(59, 130, 246, 0.22);
-  color: var(--text-heading);
+  background: var(--accent-glow);
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+
+.settings-page__nav-item--active .settings-page__nav-label {
+  color: var(--accent);
 }
 
 .settings-page__nav-copy {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .settings-page__nav-label {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 12.5px;
+  font-weight: 700;
+  transition: color var(--transition-normal);
 }
 
 .settings-page__nav-description {
   font-size: 11px;
   color: var(--text-muted);
-  line-height: 1.5;
+  line-height: 1.4;
 }
 
 .settings-page__content {
@@ -194,24 +230,33 @@
   padding: 28px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 20px;
+  background: radial-gradient(circle at top right, rgba(6, 182, 212, 0.01) 0%, transparent 60%);
 }
 
 .settings-page__content-header,
 .settings-page__section-card {
   border: 1px solid var(--border);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.02);
+  border-radius: var(--radius-lg);
+  background: var(--card-bg);
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-normal);
+}
+
+.settings-page__content-header:hover,
+.settings-page__section-card:hover {
+  border-color: var(--accent-border);
+  box-shadow: var(--shadow-md);
 }
 
 .settings-page__content-header {
-  padding: 20px 22px;
+  padding: 20px 24px;
 }
 
 .settings-page__eyebrow,
 .settings-page__label {
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -219,23 +264,25 @@
 
 .settings-page__content-title,
 .settings-page__section-title {
-  margin: 8px 0 0;
+  margin: 6px 0 0;
+  font-size: 16px;
+  font-weight: 700;
   color: var(--text-heading);
 }
 
 .settings-page__content-subtitle,
 .settings-page__section-subtitle {
-  margin: 8px 0 0;
+  margin: 6px 0 0;
   color: var(--text-muted);
-  font-size: 13px;
-  line-height: 1.6;
+  font-size: 12.5px;
+  line-height: 1.5;
 }
 
 .settings-page__section-card {
-  padding: 22px;
+  padding: 24px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 20px;
 }
 
 .settings-page__section-header {
@@ -253,22 +300,31 @@
 .settings-page__field {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .settings-page__field--wide {
   grid-column: 1 / -1;
 }
 
+/* Beautiful Form controls with Focus highlights */
 .settings-page__control {
   width: 100%;
-  min-height: 42px;
-  border-radius: 6px;
+  min-height: 38px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--card-bg);
   color: var(--text-heading);
   padding: 0 12px;
   font: inherit;
+  font-size: 13px;
+  outline: none;
+  transition: all var(--transition-normal);
+}
+
+.settings-page__control:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
 }
 
 .settings-page__actions-row {
@@ -277,32 +333,40 @@
 }
 
 .settings-page__secondary-button {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--card-bg);
   color: var(--text-heading);
   border: 1px solid var(--border);
-  padding: 10px 14px;
+  padding: 8px 14px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
+  font-weight: 600;
+  font-size: 12px;
 }
 
 .settings-page__secondary-button:hover {
   background: var(--card-hover);
   color: var(--text-heading);
   border-color: var(--border-focus);
+  transform: translateY(-1px);
+}
+
+.settings-page__secondary-button:active {
+  transform: scale(0.97) translateY(0);
 }
 
 .settings-page__secondary-button--inline {
-  min-height: 42px;
+  min-height: 38px;
 }
 
+/* Stunning alert notifications and warnings */
 .settings-page__notice,
 .settings-page__warning-box {
-  border-radius: 6px;
-  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  padding: 12px 16px;
   font-size: 12px;
-  line-height: 1.6;
+  line-height: 1.5;
 }
 
 .settings-page__notice {
@@ -310,39 +374,41 @@
   align-items: center;
   gap: 8px;
   border: 1px solid rgba(148, 163, 184, 0.18);
-  background: rgba(148, 163, 184, 0.08);
+  background: rgba(148, 163, 184, 0.05);
   color: var(--text-muted);
 }
 
 .settings-page__notice--success {
-  background: rgba(16, 185, 129, 0.08);
-  border-color: rgba(16, 185, 129, 0.2);
+  background: rgba(16, 185, 129, 0.06);
+  border-color: rgba(16, 185, 129, 0.18);
   color: #10b981;
+  font-weight: 500;
 }
 
 .settings-page__notice--error {
-  background: rgba(239, 68, 68, 0.08);
-  border-color: rgba(239, 68, 68, 0.2);
+  background: rgba(239, 68, 68, 0.06);
+  border-color: rgba(239, 68, 68, 0.18);
   color: #ef4444;
+  font-weight: 500;
 }
 
 .settings-page__warning-box {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   border: 1px solid rgba(236, 72, 153, 0.12);
   background: rgba(236, 72, 153, 0.04);
   color: var(--text-muted);
 }
 
 .settings-page__spin {
-  animation: settings-page-spin 1s linear infinite;
+  animation: settings-page-spin 0.9s cubic-bezier(0.5, 0.1, 0.4, 0.9) infinite;
+  color: var(--accent);
 }
 
 @keyframes settings-page-spin {
   from {
     transform: rotate(0deg);
   }
-
   to {
     transform: rotate(360deg);
   }
@@ -361,6 +427,7 @@
   .settings-page__nav {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
   }
 }
 
@@ -368,6 +435,7 @@
   .settings-page__topbar {
     flex-direction: column;
     align-items: stretch;
+    gap: 12px;
   }
 
   .settings-page__topbar-main {
