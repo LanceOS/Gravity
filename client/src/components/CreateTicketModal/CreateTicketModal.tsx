@@ -110,7 +110,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
       footer={modalFooter}
       style={{ maxWidth: '600px', padding: 0 }}
     >
-      <form onSubmit={(e) => { e.preventDefault(); void handleSubmit(); }} style={{ display: 'flex', flexDirection: 'column', margin: '-20px' }}>
+      <form onSubmit={(e) => { e.preventDefault(); void handleSubmit(); }} style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
         {formError && (
           <div style={{ padding: '20px 20px 0 20px' }}>
             <Alert type="error">
