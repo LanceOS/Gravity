@@ -1,14 +1,11 @@
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
+
 **/node_modules
 **/dist
 **/.vite
 **/.tsbuildinfo
 .git
 *.log
-=======
->>>>>>> main
+
 # Version control
 .git
 .gitignore
