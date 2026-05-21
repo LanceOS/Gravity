@@ -52,17 +52,52 @@ export function ProjectCreateOverlay({
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        handleClose();
+        if (!loading) {
+          onClose();
+        }
       }
 
       if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
-        void handleSubmit();
+        setFormError(null);
+
+        if (!projectName.trim()) {
+          setFormError('Please enter a project name.');
+          return;
+        }
+
+        if (!projectKey.trim()) {
+          setFormError('Please enter a project key.');
+          return;
+        }
+
+        void (async () => {
+          try {
+            await onSubmitProject({
+              name: projectName.trim(),
+              key: projectKey.trim(),
+              description: projectDescription.trim(),
+            });
+            onClose();
+          } catch {
+            if (!errorMessage) {
+              setFormError('Failed to create the project.');
+            }
+          }
+        })();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [errorMessage, loading, projectDescription, projectKey, projectName]);
+  }, [
+    errorMessage,
+    loading,
+    onClose,
+    onSubmitProject,
+    projectDescription,
+    projectKey,
+    projectName,
+  ]);
 
   const feedbackMessage = formError || errorMessage;
 
