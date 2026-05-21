@@ -259,19 +259,9 @@ export async function initializeDatabase() {
     ALTER TABLE identities ADD COLUMN IF NOT EXISTS encrypted_private_key TEXT;
     ALTER TABLE identities ADD COLUMN IF NOT EXISTS is_local_owner BOOLEAN NOT NULL DEFAULT FALSE;
     ALTER TABLE peer_connections ADD COLUMN IF NOT EXISTS workspace_id TEXT;
-    DO $$
-    BEGIN
-      IF NOT EXISTS (
-        SELECT 1
-        FROM peer_connections
-        WHERE workspace_id IS NULL
-      ) THEN
-        ALTER TABLE peer_connections ALTER COLUMN workspace_id SET NOT NULL;
-      ELSE
-        RAISE NOTICE
-          'Skipping NOT NULL enforcement for peer_connections.workspace_id because legacy rows still contain NULL values.';
-      END IF;
-    END $$;
+    DELETE FROM peer_connections
+    WHERE workspace_id IS NULL;
+    ALTER TABLE peer_connections ALTER COLUMN workspace_id SET NOT NULL;
     ALTER TABLE peer_connections ADD COLUMN IF NOT EXISTS host_display_name TEXT NOT NULL DEFAULT '';
   `);
 
