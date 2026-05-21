@@ -98,11 +98,17 @@ export function Select({
     const spaceAbove = rect.top - viewportPadding;
     const openAbove = spaceBelow < 160 && spaceAbove > spaceBelow;
     const resolvedMaxHeight = Math.max(120, Math.min(maxMenuHeight, openAbove ? spaceAbove - 6 : spaceBelow - 6));
+    const availableWidth = Math.max(0, window.innerWidth - viewportPadding * 2);
+    const resolvedWidth = Math.min(rect.width, availableWidth);
+    const resolvedLeft = Math.min(
+      Math.max(viewportPadding, rect.left),
+      window.innerWidth - viewportPadding - resolvedWidth,
+    );
 
     setMenuPosition({
       top: openAbove ? Math.max(viewportPadding, rect.top - resolvedMaxHeight - 6) : rect.bottom + 6,
-      left: rect.left,
-      width: rect.width,
+      left: resolvedLeft,
+      width: resolvedWidth,
       maxHeight: resolvedMaxHeight,
     });
   };
