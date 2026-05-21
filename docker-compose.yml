@@ -1,13 +1,13 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: gravity_postgres
+    container_name: ${GRAVITY_POSTGRES_CONTAINER:-gravity_postgres}
     environment:
       POSTGRES_USER: gravity_user
       POSTGRES_PASSWORD: secure_dev_password_change_me_in_prod
       POSTGRES_DB: gravity_workspace
     ports:
-      - "35432:5432"
+      - "${GRAVITY_POSTGRES_PORT:-35432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -20,18 +20,18 @@ services:
     build:
       context: ./server
       dockerfile: Dockerfile
-    container_name: gravity_app_server
+    container_name: ${GRAVITY_BACKEND_CONTAINER:-gravity_app_server}
     environment:
       DATABASE_URL: postgresql://gravity_user:secure_dev_password_change_me_in_prod@postgres:5432/gravity_workspace
       BETTER_AUTH_SECRET: change-me-before-production
-      BETTER_AUTH_BASE_URL: http://localhost:38080
-      CORS_ORIGINS: http://localhost:33100
-      TRUSTED_ORIGINS: http://localhost:33100,http://localhost:38080
+      BETTER_AUTH_BASE_URL: ${GRAVITY_BACKEND_PUBLIC_URL:-http://localhost:38080}
+      CORS_ORIGINS: ${GRAVITY_FRONTEND_PUBLIC_URL:-http://localhost:33100}
+      TRUSTED_ORIGINS: ${GRAVITY_FRONTEND_PUBLIC_URL:-http://localhost:33100},${GRAVITY_BACKEND_PUBLIC_URL:-http://localhost:38080}
       OLLAMA_DEFAULT_ENDPOINT: http://host.docker.internal:11434
       NODE_ENV: production
       PORT: 8080
     ports:
-      - "38080:8080"
+      - "${GRAVITY_BACKEND_PORT:-38080}:8080"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -40,13 +40,13 @@ services:
 
   frontend:
     build:
-      context: ./client
-      dockerfile: Dockerfile
-    container_name: gravity_frontend
+      context: .
+      dockerfile: client/Dockerfile
+    container_name: ${GRAVITY_FRONTEND_CONTAINER:-gravity_frontend}
     environment:
       BACKEND_UPSTREAM: http://backend:8080
     ports:
-      - "33100:80"
+      - "${GRAVITY_FRONTEND_PORT:-33100}:80"
     depends_on:
       backend:
         condition: service_started
