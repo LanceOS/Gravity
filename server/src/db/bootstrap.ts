@@ -258,7 +258,9 @@ export async function initializeDatabase() {
     ALTER TABLE project_members ADD COLUMN IF NOT EXISTS provisioned_by_validation_id TEXT;
     ALTER TABLE identities ADD COLUMN IF NOT EXISTS encrypted_private_key TEXT;
     ALTER TABLE identities ADD COLUMN IF NOT EXISTS is_local_owner BOOLEAN NOT NULL DEFAULT FALSE;
-    ALTER TABLE peer_connections ADD COLUMN IF NOT EXISTS workspace_id TEXT;
+    ALTER TABLE peer_connections ADD COLUMN IF NOT EXISTS workspace_id TEXT NOT NULL DEFAULT '';
+    UPDATE peer_connections SET workspace_id = '' WHERE workspace_id IS NULL;
+    ALTER TABLE peer_connections ALTER COLUMN workspace_id SET NOT NULL;
     ALTER TABLE peer_connections ADD COLUMN IF NOT EXISTS host_display_name TEXT NOT NULL DEFAULT '';
   `);
 
