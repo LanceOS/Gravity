@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Kanban, List } from 'lucide-react';
-import { Button } from '../../components/ui/Button';
+import { Button } from '@library';
 import type { Comment, Cycle, Domain, Project, Ticket, User } from '../../context/TicketContext';
 import type { TicketFilters, TicketListSort } from '../../utils/ticketView';
 import { TicketBoard } from '../../components/TicketBoard';

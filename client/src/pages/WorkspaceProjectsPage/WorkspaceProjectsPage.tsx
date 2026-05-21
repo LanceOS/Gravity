@@ -1,5 +1,5 @@
 import { ArrowLeft } from 'lucide-react';
-import { Button } from '../../components/ui/Button';
+import { Button } from '@library';
 import { WorkspaceProjectPanel } from '../../components/WorkspaceProjectPanel';
 import type { Domain, Project } from '../../context/TicketContext';
 import '../WorkspacePage/WorkspacePage.css';

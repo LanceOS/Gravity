@@ -1,5 +1,18 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Check, Copy, Globe, Link2, Mail, Settings2, ShieldCheck, UserPlus, Users } from 'lucide-react';
+import {
+  Button,
+  TextInput,
+  Select,
+  Grid,
+  Stack,
+  Flex,
+  Card,
+  Badge,
+  Alert,
+  Divider,
+  Avatar
+} from '@library';
 import type { User } from '../../context/TicketContext';
 import type { WorkspaceSummary } from '../../hooks/useWorkspaceDirectory';
 import type {
@@ -9,14 +22,8 @@ import type {
   WorkspaceJoinRequest,
   WorkspaceMember,
 } from '../../hooks/useWorkspaceSettings';
-import './SettingsPage.css';
 
 type SettingsCategoryId = 'overview' | 'access' | 'members' | 'requests';
-
-interface StatusMessage {
-  success: boolean;
-  message: string;
-}
 
 interface SettingsPageProps {
   currentUser: User;
@@ -47,31 +54,15 @@ const COPY_FEEDBACK_STORAGE_KEY = 'gravity_peer_invite_copy_feedback';
 const COPY_FEEDBACK_DURATION_MS = 2200;
 
 function getInviteStateLabel(invite: WorkspaceInvite) {
-  if (invite.revokedAt) {
-    return 'Revoked';
-  }
-
-  if (invite.isUsed) {
-    return 'Validated';
-  }
-
+  if (invite.revokedAt) return 'Revoked';
+  if (invite.isUsed) return 'Validated';
   return 'Pending';
 }
 
-function getInviteStateStyle(invite: WorkspaceInvite) {
-  if (invite.revokedAt) {
-    return inviteStateRevokedStyle;
-  }
-
-  return invite.isUsed ? inviteStateUsedStyle : inviteStatePendingStyle;
-}
-
-function getInviteRevokeLabel(invite: WorkspaceInvite, revokeLoadingId: string | null) {
-  if (revokeLoadingId !== invite.id) {
-    return invite.isUsed ? 'Revoke Access' : 'Revoke Invite';
-  }
-
-  return invite.isUsed ? 'Revoking Access...' : 'Revoking...';
+function getInviteStateVariant(invite: WorkspaceInvite): 'accent' | 'success' | 'error' | 'warning' | 'default' {
+  if (invite.revokedAt) return 'error';
+  if (invite.isUsed) return 'success';
+  return 'accent';
 }
 
 const SETTINGS_CATEGORIES: Array<{
@@ -106,21 +97,6 @@ const SETTINGS_CATEGORIES: Array<{
   },
 ];
 
-function StatusNotice({ message, tone = 'neutral' }: { message: StatusMessage | { message: string } | null; tone?: 'neutral' | 'success' | 'error' }) {
-  if (!message) {
-    return null;
-  }
-
-  const icon = tone === 'success' ? <Check size={14} /> : tone === 'error' ? <ShieldCheck size={14} /> : null;
-
-  return (
-    <div className={`settings-page__notice settings-page__notice--${tone}`}>
-      {icon}
-      <span>{message.message}</span>
-    </div>
-  );
-}
-
 function OverviewSection({
   workspace,
   settings,
@@ -131,81 +107,74 @@ function OverviewSection({
   onChangeSettings: (updates: Partial<WorkspaceAdminSettings>) => void;
 }) {
   return (
-    <div className="settings-page__section-card">
-      <div className="settings-page__section-header">
-        <h2 className="settings-page__section-title">Workspace host configuration</h2>
-        <p className="settings-page__section-subtitle">This page now controls workspace administration only. Local user preferences and AI credentials are no longer edited here.</p>
-      </div>
+    <Card style={{ padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)' }}>
+      <Stack gap="var(--space-5)">
+        <div>
+          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--text-heading)' }}>Host Configuration</h2>
+          <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '12.5px', lineHeight: 1.5 }}>
+            Manage the remote configuration and identity of this workspace. These controls govern peer networking, host routing, and invitation schemes.
+          </p>
+        </div>
 
-      <div className="settings-page__grid">
-        <label className="settings-page__field">
-          <span className="settings-page__label">Workspace Name</span>
-          <input className="settings-page__control" value={workspace.name} disabled />
-        </label>
+        <Grid columns={2} gap="var(--space-4)">
+          <TextInput label="Workspace Name" value={workspace.name} disabled />
+          <TextInput label="Workspace Key" value={workspace.key} disabled />
+        </Grid>
 
-        <label className="settings-page__field">
-          <span className="settings-page__label">Workspace Key</span>
-          <input className="settings-page__control" value={workspace.key} disabled />
-        </label>
+        <TextInput
+          label="Host URL"
+          value={settings.hostUrl}
+          placeholder="http://localhost:5000"
+          onChange={(event) => onChangeSettings({ hostUrl: event.target.value })}
+        />
 
-        <label className="settings-page__field settings-page__field--wide">
-          <span className="settings-page__label">Host URL</span>
-          <input
-            className="settings-page__control"
-            value={settings.hostUrl}
-            placeholder="http://localhost:5000"
-            onChange={(event) => onChangeSettings({ hostUrl: event.target.value })}
-          />
-        </label>
-
-        <label className="settings-page__field">
-          <span className="settings-page__label">Join Policy</span>
-          <select
-            className="settings-page__control"
+        <Grid columns={2} gap="var(--space-4)">
+          <Select
+            label="Join Policy"
             value={settings.joinMode}
             onChange={(event) => onChangeSettings({ joinMode: event.target.value as WorkspaceAdminSettings['joinMode'] })}
-          >
-            <option value="approval_required">Owner Approval Required</option>
-            <option value="auto_join">Auto Join</option>
-          </select>
-        </label>
+            options={[
+              { value: 'approval_required', label: 'Owner Approval Required' },
+              { value: 'auto_join', label: 'Auto Join' }
+            ]}
+          />
 
-        <label className="settings-page__field">
-          <span className="settings-page__label">Private Workspace Access Key</span>
-          <input
-            className="settings-page__control"
+          <TextInput
+            label="Private Workspace Access Key"
             value={settings.workspaceKey}
             onChange={(event) => onChangeSettings({ workspaceKey: event.target.value.toUpperCase() })}
           />
-        </label>
-      </div>
+        </Grid>
 
-      <div style={metaGridStyle}>
-        <div style={metaCardStyle}>
-          <Globe size={16} color="var(--accent)" />
-          <div>
-            <div style={metaTitleStyle}>Projects</div>
-            <div style={metaCopyStyle}>{workspace.projectCount} child projects</div>
-          </div>
-        </div>
+        <Divider />
 
-        <div style={metaCardStyle}>
-          <Users size={16} color="var(--accent)" />
-          <div>
-            <div style={metaTitleStyle}>Members</div>
-            <div style={metaCopyStyle}>{workspace.memberCount} approved users</div>
+        <Grid columns={3} gap="var(--space-3)">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--card-hover)', border: '1px solid var(--border)' }}>
+            <Globe size={16} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+            <div>
+              <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)' }}>Projects</div>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-heading)', marginTop: '2px' }}>{workspace.projectCount} child projects</div>
+            </div>
           </div>
-        </div>
 
-        <div style={metaCardStyle}>
-          <UserPlus size={16} color="var(--accent)" />
-          <div>
-            <div style={metaTitleStyle}>Pending Requests</div>
-            <div style={metaCopyStyle}>{workspace.pendingJoinRequestCount} awaiting review</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--card-hover)', border: '1px solid var(--border)' }}>
+            <Users size={16} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+            <div>
+              <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)' }}>Members</div>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-heading)', marginTop: '2px' }}>{workspace.memberCount} approved users</div>
+            </div>
           </div>
-        </div>
-      </div>
-    </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--card-hover)', border: '1px solid var(--border)' }}>
+            <UserPlus size={16} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+            <div>
+              <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)' }}>Pending Reviews</div>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-heading)', marginTop: '2px' }}>{workspace.pendingJoinRequestCount} requests</div>
+            </div>
+          </div>
+        </Grid>
+      </Stack>
+    </Card>
   );
 }
 
@@ -310,176 +279,207 @@ function AccessSection({
   };
 
   return (
-    <div className="settings-page__section-card">
-      <div className="settings-page__section-header">
-        <h2 className="settings-page__section-title">Peer invites</h2>
-        <p className="settings-page__section-subtitle">Issue direct guest validation links for a specific email address. Each invite mints a one-time validation code and a scoped workspace access key.</p>
-      </div>
-
-      <div style={inviteGuideStyle}>
-        <Mail size={16} color="var(--accent)" />
+    <Card style={{ padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)' }}>
+      <Stack gap="var(--space-5)">
         <div>
-          <div style={listRowTitleStyle}>Host handoff</div>
-          <div style={listRowCopyStyle}>Create the invite here, then send the guest the invite URL, validation code, and hashing instructions through a secure channel.</div>
+          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--text-heading)' }}>Peer Invites</h2>
+          <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '12.5px', lineHeight: 1.5 }}>
+            Mint and issue direct guest credentials linked to remote peers. This configuration provides secure, cryptographically validated workspace entry codes.
+          </p>
         </div>
-      </div>
 
-      <div className="settings-page__grid">
-        <label className="settings-page__field settings-page__field--wide">
-          <span className="settings-page__label">Guest Email</span>
-          <input
-            className="settings-page__control"
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)', padding: 'var(--space-4)', borderRadius: 'var(--radius-md)', background: 'var(--card-hover)', border: '1px solid var(--border)' }}>
+          <Mail size={16} style={{ color: 'var(--accent)', flexShrink: 0, marginTop: '2px' }} />
+          <div>
+            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-heading)' }}>Host handoff workflow</div>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px', lineHeight: 1.5 }}>
+              Generate an invite link, then share the guest validation code, validation URL, and hashing credentials securely through your preferred channel.
+            </div>
+          </div>
+        </div>
+
+        <Grid columns="1.5fr 1fr" gap="var(--space-4)">
+          <TextInput
+            label="Guest Email"
             value={email}
             placeholder="guest-user@peer.com"
             onChange={(event) => setEmail(event.target.value)}
           />
-        </label>
 
-        <label className="settings-page__field">
-          <span className="settings-page__label">Expires In</span>
-          <input
-            className="settings-page__control"
+          <TextInput
+            label="Expires In (Hours)"
             type="number"
             min={1}
             value={expirationHours}
             onChange={(event) => setExpirationHours(event.target.value)}
           />
-        </label>
-      </div>
+        </Grid>
 
-      <div className="settings-page__actions-row">
-        <button type="button" className="settings-page__secondary-button" onClick={() => void handleCreateInvite()} disabled={inviteLoading || !email.trim()}>
-          {inviteLoading ? 'Creating...' : 'Create Invite'}
-        </button>
-      </div>
-
-      {latestInvite ? (
-        <div style={inviteSummaryStyle}>
-          <div style={inviteSummaryHeaderStyle}>
-            <div>
-              <div className="settings-page__eyebrow">Most Recent Invite</div>
-              <div style={listRowTitleStyle}>{latestInvite.email}</div>
-            </div>
-            <span style={getInviteStateStyle(latestInvite)}>
-              {getInviteStateLabel(latestInvite)}
-            </span>
-          </div>
-
-          <div style={detailGridStyle}>
-            <div style={detailCardStyle}>
-              <div style={detailLabelStyle}>Invite URL</div>
-              <div style={detailValueStyle}>{latestInvite.inviteUrl}</div>
-              <button type="button" className="settings-page__secondary-button" style={compactActionStyle} onClick={() => void handleCopy('invite-url', latestInvite.inviteUrl)}>
-                <Copy size={12} />
-                {copiedField === 'invite-url' ? 'Copied' : 'Copy URL'}
-              </button>
-            </div>
-
-            <div style={detailCardStyle}>
-              <div style={detailLabelStyle}>Validation Code</div>
-              <div style={detailValueStyle}>{latestInvite.validationCode}</div>
-              <button type="button" className="settings-page__secondary-button" style={compactActionStyle} onClick={() => void handleCopy('validation-code', latestInvite.validationCode)}>
-                <Copy size={12} />
-                {copiedField === 'validation-code' ? 'Copied' : 'Copy Code'}
-              </button>
-            </div>
-
-            <div style={detailCardStyle}>
-              <div style={detailLabelStyle}>Workspace Private Key</div>
-              <div style={detailValueStyle}>{latestInvite.workspacePrivateKey}</div>
-              <button type="button" className="settings-page__secondary-button" style={compactActionStyle} onClick={() => void handleCopy('workspace-key', latestInvite.workspacePrivateKey)}>
-                <Copy size={12} />
-                {copiedField === 'workspace-key' ? 'Copied' : 'Copy Key'}
-              </button>
-            </div>
-          </div>
-
-          <div style={inviteMetaRowStyle}>
-            <span>Expires {new Date(latestInvite.expiresAt).toLocaleString()}</span>
-            {latestInvite.revokedAt ? <span>Revoked {new Date(latestInvite.revokedAt).toLocaleString()}</span> : null}
-            {latestInvite.guestUsername ? <span>Validated by {latestInvite.guestUsername}</span> : <span>Awaiting guest validation</span>}
-          </div>
-
-          {!latestInvite.revokedAt ? (
-            <div style={inviteActionGroupStyle}>
-              <button
-                type="button"
-                className="settings-page__secondary-button"
-                style={{ ...compactActionStyle, ...dangerActionStyle }}
-                onClick={() => void handleRevokeInvite(latestInvite.id)}
-                disabled={revokeLoadingId === latestInvite.id}
-              >
-                {getInviteRevokeLabel(latestInvite, revokeLoadingId)}
-              </button>
-            </div>
-          ) : null}
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <Button variant="primary" onClick={() => void handleCreateInvite()} loading={inviteLoading} disabled={!email.trim()}>
+            Create Invite
+          </Button>
         </div>
-      ) : null}
 
-      {invitesLoading ? <StatusNotice message={{ message: 'Loading peer invites...' }} /> : null}
-      {!invitesLoading && invites.length === 0 ? <StatusNotice message={{ message: 'No peer invites exist yet for this workspace.' }} /> : null}
+        {latestInvite && (
+          <Stack gap="var(--space-3)" style={{ padding: 'var(--space-4)', borderRadius: 'var(--radius-md)', background: 'rgba(170, 59, 255, 0.02)', border: '1px solid rgba(170, 59, 255, 0.15)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifySelf: 'stretch', justifyContent: 'space-between' }}>
+              <div>
+                <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Most Recent Invite</span>
+                <h4 style={{ margin: '2px 0 0', fontSize: '14px', fontWeight: 600, color: 'var(--text-heading)' }}>{latestInvite.email}</h4>
+              </div>
+              <Badge variant={getInviteStateVariant(latestInvite)}>
+                {getInviteStateLabel(latestInvite)}
+              </Badge>
+            </div>
 
-      {invites.map((invite) => (
-        <div key={invite.id} style={listRowStyle}>
-          <div>
-            <div style={listRowTitleStyle}>{invite.email}</div>
-            <div style={listRowCopyStyle}>Validation Code: {invite.validationCode}</div>
-            <div style={listRowCopyStyle}>Invite URL: {invite.inviteUrl}</div>
-          </div>
+            <Grid columns={3} gap="var(--space-3)" style={{ marginTop: 'var(--space-2)' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--card-hover)', border: '1px solid var(--border)' }}>
+                <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Invite URL</span>
+                <span style={{ fontSize: '11px', color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{latestInvite.inviteUrl}</span>
+                <Button variant="default" size="xs" style={{ marginTop: 'auto' }} onClick={() => void handleCopy('invite-url', latestInvite.inviteUrl)}>
+                  {copiedField === 'invite-url' ? 'Copied' : 'Copy URL'}
+                </Button>
+              </div>
 
-          <div style={listRowMetaStyle}>
-            <span>{getInviteStateLabel(invite)}</span>
-            <span>Expires {new Date(invite.expiresAt).toLocaleString()}</span>
-            {invite.revokedAt ? <span>Revoked {new Date(invite.revokedAt).toLocaleString()}</span> : null}
-            {invite.guestUsername ? <span>Guest: {invite.guestUsername}</span> : null}
-            <div style={inviteActionGroupStyle}>
-              <button type="button" className="settings-page__secondary-button" style={compactActionStyle} onClick={() => void handleCopy(`invite-row-${invite.id}`, invite.inviteUrl)}>
-                <Copy size={12} />
-                {copiedField === `invite-row-${invite.id}` ? 'Copied URL' : 'Copy URL'}
-              </button>
-              {!invite.revokedAt ? (
-                <button
-                  type="button"
-                  className="settings-page__secondary-button"
-                  style={{ ...compactActionStyle, ...dangerActionStyle }}
-                  onClick={() => void handleRevokeInvite(invite.id)}
-                  disabled={revokeLoadingId === invite.id}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--card-hover)', border: '1px solid var(--border)' }}>
+                <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Validation Code</span>
+                <span style={{ fontSize: '11px', color: 'var(--text-heading)', fontFamily: 'monospace' }}>{latestInvite.validationCode}</span>
+                <Button variant="default" size="xs" style={{ marginTop: 'auto' }} onClick={() => void handleCopy('validation-code', latestInvite.validationCode)}>
+                  {copiedField === 'validation-code' ? 'Copied' : 'Copy Code'}
+                </Button>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--card-hover)', border: '1px solid var(--border)' }}>
+                <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Workspace Key</span>
+                <span style={{ fontSize: '11px', color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{latestInvite.workspacePrivateKey}</span>
+                <Button variant="default" size="xs" style={{ marginTop: 'auto' }} onClick={() => void handleCopy('workspace-key', latestInvite.workspacePrivateKey)}>
+                  {copiedField === 'workspace-key' ? 'Copied' : 'Copy Key'}
+                </Button>
+              </div>
+            </Grid>
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)', fontSize: '11px', color: 'var(--text-muted)', marginTop: 'var(--space-1)' }}>
+              <span>Expires {new Date(latestInvite.expiresAt).toLocaleString()}</span>
+              {latestInvite.revokedAt && <span>Revoked {new Date(latestInvite.revokedAt).toLocaleString()}</span>}
+              <span>{latestInvite.guestUsername ? `Validated by ${latestInvite.guestUsername}` : 'Awaiting peer validation'}</span>
+            </div>
+
+            {!latestInvite.revokedAt && (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'var(--space-2)' }}>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={() => void handleRevokeInvite(latestInvite.id)}
+                  disabled={revokeLoadingId === latestInvite.id}
                 >
-                  {getInviteRevokeLabel(invite, revokeLoadingId)}
-                </button>
-              ) : null}
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
+                  {revokeLoadingId === latestInvite.id ? 'Revoking...' : latestInvite.isUsed ? 'Revoke Access' : 'Revoke Invite'}
+                </Button>
+              </div>
+            )}
+          </Stack>
+        )}
+
+        {invitesLoading && <div style={{ color: 'var(--text-muted)', fontSize: '13px', textAlign: 'center', padding: 'var(--space-4)' }}>Loading peer invites...</div>}
+        {!invitesLoading && invites.length === 0 && <div style={{ color: 'var(--text-muted)', fontSize: '13px', textAlign: 'center', padding: 'var(--space-4)' }}>No peer invites exist yet for this workspace.</div>}
+
+        {invites.length > 0 && (
+          <Stack gap="var(--space-3)" style={{ marginTop: 'var(--space-2)' }}>
+            <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Historical Invites ({invites.length})</span>
+            {invites.map((invite) => (
+              <div
+                key={invite.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 'var(--space-4)',
+                  padding: 'var(--space-4)',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'var(--card-hover)',
+                  border: '1px solid var(--border)'
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-heading)' }}>{invite.email}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
+                    <span>Code: {invite.validationCode}</span>
+                    <span>Expires: {new Date(invite.expiresAt).toLocaleDateString()}</span>
+                    {invite.guestUsername && <span>Guest: {invite.guestUsername}</span>}
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+                  <Badge variant={getInviteStateVariant(invite)}>
+                    {getInviteStateLabel(invite)}
+                  </Badge>
+                  <Button variant="default" size="xs" onClick={() => void handleCopy(`invite-row-${invite.id}`, invite.inviteUrl)}>
+                    {copiedField === `invite-row-${invite.id}` ? 'Copied' : 'Copy'}
+                  </Button>
+                  {!invite.revokedAt && (
+                    <Button
+                      variant="danger"
+                      size="xs"
+                      onClick={() => void handleRevokeInvite(invite.id)}
+                      disabled={revokeLoadingId === invite.id}
+                    >
+                      {revokeLoadingId === invite.id ? 'Revoking...' : invite.isUsed ? 'Revoke' : 'Cancel'}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </Stack>
+        )}
+      </Stack>
+    </Card>
   );
 }
 
 function MembersSection({ members }: { members: WorkspaceMember[] }) {
   return (
-    <div className="settings-page__section-card">
-      <div className="settings-page__section-header">
-        <h2 className="settings-page__section-title">Approved members</h2>
-        <p className="settings-page__section-subtitle">Workspace membership is the top-level access boundary. Approved users can see the projects inside this workspace.</p>
-      </div>
-
-      {members.length === 0 ? <StatusNotice message={{ message: 'No members are assigned to this workspace yet.' }} /> : null}
-
-      {members.map((member) => (
-        <div key={member.id} style={memberRowStyle}>
-          <div style={memberIdentityStyle}>
-            <img src={member.avatar} alt={member.name} className="settings-page__avatar" />
-            <div>
-              <div style={listRowTitleStyle}>{member.name}</div>
-              <div style={listRowCopyStyle}>{member.email}</div>
-            </div>
-          </div>
-
-          <span style={workspaceRoleStyle}>{member.role}</span>
+    <Card style={{ padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)' }}>
+      <Stack gap="var(--space-5)">
+        <div>
+          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--text-heading)' }}>Approved Members</h2>
+          <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '12.5px', lineHeight: 1.5 }}>
+            Membership controls the access boundary. Users listed here are fully approved to access project tasks and collaborate inside this workspace.
+          </p>
         </div>
-      ))}
-    </div>
+
+        {members.length === 0 && <div style={{ color: 'var(--text-muted)', fontSize: '13px', textAlign: 'center', padding: 'var(--space-4)' }}>No members are assigned to this workspace yet.</div>}
+
+        <Stack gap="var(--space-3)">
+          {members.map((member) => (
+            <div
+              key={member.id}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 'var(--space-4)',
+                padding: 'var(--space-4)',
+                borderRadius: 'var(--radius-md)',
+                background: 'var(--card-hover)',
+                border: '1px solid var(--border)'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+                <Avatar src={member.avatar} name={member.name} size="md" />
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-heading)' }}>{member.name}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>{member.email}</div>
+                </div>
+              </div>
+
+              <Badge variant={member.role === 'owner' ? 'accent' : 'default'}>
+                {member.role}
+              </Badge>
+            </div>
+          ))}
+        </Stack>
+      </Stack>
+    </Card>
   );
 }
 
@@ -503,54 +503,91 @@ function RequestsSection({
   );
 
   return (
-    <div className="settings-page__section-card">
-      <div className="settings-page__section-header">
-        <h2 className="settings-page__section-title">Join requests</h2>
-        <p className="settings-page__section-subtitle">Every request stays pending until a workspace owner approves it.</p>
-      </div>
-
-      {pendingRequests.length === 0 ? <StatusNotice message={{ message: 'No pending join requests right now.' }} /> : null}
-
-      {pendingRequests.map((request) => (
-        <div key={request.id} style={memberRowStyle}>
-          <div style={memberIdentityStyle}>
-            <div style={requestAvatarStyle}>{request.requesterName.slice(0, 1).toUpperCase()}</div>
-            <div>
-              <div style={listRowTitleStyle}>{request.requesterName}</div>
-              <div style={listRowCopyStyle}>{request.requesterEmail}</div>
-              {request.message ? <div style={requestMessageStyle}>{request.message}</div> : null}
-            </div>
-          </div>
-
-          <button
-            type="button"
-            className="settings-page__secondary-button"
-            onClick={() => void onApproveJoinRequest(request.id)}
-            disabled={approveLoadingId === request.id}
-          >
-            {approveLoadingId === request.id ? 'Approving...' : 'Approve'}
-          </button>
+    <Card style={{ padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)' }}>
+      <Stack gap="var(--space-5)">
+        <div>
+          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--text-heading)' }}>Join Requests</h2>
+          <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '12.5px', lineHeight: 1.5 }}>
+            Manage pending inbound workspace access requests. Requests will remain in a pending state until reviewed and approved by an owner.
+          </p>
         </div>
-      ))}
 
-      {reviewedRequests.length > 0 ? (
-        <div style={reviewedListStyle}>
-          <div className="settings-page__eyebrow">Recently Reviewed</div>
-          {reviewedRequests.map((request) => (
-            <div key={request.id} style={listRowStyle}>
-              <div>
-                <div style={listRowTitleStyle}>{request.requesterName}</div>
-                <div style={listRowCopyStyle}>{request.status} · {request.reviewedByName || 'Unknown reviewer'}</div>
+        {pendingRequests.length === 0 && <div style={{ color: 'var(--text-muted)', fontSize: '13px', textAlign: 'center', padding: 'var(--space-4)' }}>No pending join requests at the moment.</div>}
+
+        <Stack gap="var(--space-3)">
+          {pendingRequests.map((request) => (
+            <div
+              key={request.id}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 'var(--space-4)',
+                padding: 'var(--space-4)',
+                borderRadius: 'var(--radius-md)',
+                background: 'var(--card-hover)',
+                border: '1px solid var(--border)'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '50%', display: 'grid', placeItems: 'center', background: 'var(--accent-glow)', border: '1px solid var(--accent-border)', color: 'var(--accent)', fontWeight: 700 }}>
+                  {request.requesterName.slice(0, 1).toUpperCase()}
+                </div>
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-heading)' }}>{request.requesterName}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>{request.requesterEmail}</div>
+                  {request.message && (
+                    <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--text-heading)', padding: 'var(--space-2)', borderRadius: 'var(--radius-sm)', background: 'var(--bg)', border: '1px solid var(--border)', fontStyle: 'italic' }}>
+                      "{request.message}"
+                    </div>
+                  )}
+                </div>
               </div>
 
-              <div style={listRowMetaStyle}>
-                <span>{new Date(request.createdAt).toLocaleDateString()}</span>
-              </div>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => void onApproveJoinRequest(request.id)}
+                disabled={approveLoadingId === request.id}
+              >
+                {approveLoadingId === request.id ? 'Approving...' : 'Approve'}
+              </Button>
             </div>
           ))}
-        </div>
-      ) : null}
-    </div>
+        </Stack>
+
+        {reviewedRequests.length > 0 && (
+          <Stack gap="var(--space-3)" style={{ marginTop: 'var(--space-4)' }}>
+            <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Recently Reviewed</span>
+            {reviewedRequests.map((request) => (
+              <div
+                key={request.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 'var(--space-4)',
+                  padding: 'var(--space-3) var(--space-4)',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'var(--card-hover)',
+                  border: '1px solid var(--border)',
+                  opacity: 0.75
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-heading)' }}>{request.requesterName}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                    {request.status} · Approved by {request.reviewedByName || 'Unknown owner'}
+                  </div>
+                </div>
+
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{new Date(request.createdAt).toLocaleDateString()}</span>
+              </div>
+            ))}
+          </Stack>
+        )}
+      </Stack>
+    </Card>
   );
 }
 
@@ -583,55 +620,94 @@ export function SettingsPage({
   const activeCategoryMeta = SETTINGS_CATEGORIES.find((category) => category.id === activeCategory) || SETTINGS_CATEGORIES[0];
 
   return (
-    <div className="settings-page">
-      <header className="settings-page__topbar">
-        <div className="settings-page__topbar-main">
-          <button type="button" className="settings-page__back-button" onClick={onBackToWorkspace}>
-            <ArrowLeft size={14} />
-            <span>Back to Workspace</span>
-          </button>
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg)' }}>
+      {/* Top Header Bar */}
+      <header
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: 'var(--space-4) var(--space-6)',
+          borderBottom: '1px solid var(--border)',
+          backgroundColor: 'var(--card-bg)',
+          position: 'sticky',
+          top: 0,
+          zIndex: 100
+        }}
+      >
+        <Flex align="center" gap="var(--space-4)">
+          <Button variant="ghost" size="sm" onClick={onBackToWorkspace} leftIcon={<ArrowLeft size={14} />}>
+            Workspace
+          </Button>
 
-          <button type="button" className="settings-page__back-button" onClick={onOpenDirectory}>
-            <Globe size={14} />
-            <span>View Workspaces</span>
-          </button>
+          <Button variant="ghost" size="sm" onClick={onOpenDirectory} leftIcon={<Globe size={14} />}>
+            Workspaces
+          </Button>
+
+          <Divider vertical style={{ height: '20px' }} />
 
           <div>
-            <h1 className="settings-page__page-title">Workspace Settings</h1>
-            <p className="settings-page__page-subtitle">{workspace.name} is managed here without the normal app sidebar. This surface is now dedicated to workspace administration.</p>
+            <h1 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: 'var(--text-heading)' }}>Workspace Settings</h1>
+            <p style={{ margin: 0, fontSize: '11px', color: 'var(--text-muted)' }}>Managing {workspace.name}</p>
           </div>
-        </div>
+        </Flex>
 
-        <button type="button" className="settings-page__save-button" onClick={onSaveSettings} disabled={saveLoading}>
-          {saveLoading ? 'Saving...' : saveSuccess ? 'Saved' : 'Save changes'}
-        </button>
+        <Button variant="accent" size="sm" onClick={onSaveSettings} loading={saveLoading}>
+          {saveSuccess ? 'Changes Saved' : 'Save Changes'}
+        </Button>
       </header>
 
-      <div className="settings-page__body">
-        <aside className="settings-page__sidebar">
-          <div className="settings-page__profile-card">
-            <img src={currentUser.avatar} alt={currentUser.name} className="settings-page__avatar" />
+      {/* Main Body Grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: '280px minmax(0, 1fr)', flexGrow: 1 }}>
+        {/* Left Sidebar Menu */}
+        <aside
+          style={{
+            borderRight: '1px solid var(--border)',
+            backgroundColor: 'var(--sidebar-bg)',
+            padding: 'var(--space-5)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 'var(--space-5)'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--card-bg)', border: '1px solid var(--border)' }}>
+            <Avatar src={currentUser.avatar} name={currentUser.name} size="md" />
             <div>
-              <div className="settings-page__profile-name">{currentUser.name}</div>
-              <div className="settings-page__profile-email">Managing {workspace.key}</div>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-heading)' }}>{currentUser.name}</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Managing {workspace.key}</div>
             </div>
           </div>
 
-          <nav className="settings-page__nav">
+          <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             {SETTINGS_CATEGORIES.map((category) => {
               const Icon = category.icon;
+              const isActive = activeCategory === category.id;
 
               return (
                 <button
                   key={category.id}
                   type="button"
-                  className={`settings-page__nav-item ${activeCategory === category.id ? 'settings-page__nav-item--active' : ''}`}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 'var(--space-3)',
+                    padding: 'var(--space-3) var(--space-4)',
+                    border: '1px solid transparent',
+                    borderRadius: 'var(--radius-md)',
+                    background: isActive ? 'var(--card-bg)' : 'transparent',
+                    borderColor: isActive ? 'var(--border)' : 'transparent',
+                    cursor: 'pointer',
+                    color: isActive ? 'var(--text-heading)' : 'var(--text-muted)',
+                    textAlign: 'left',
+                    transition: 'all var(--transition-fast)'
+                  }}
+                  className="clickable lib-focus-ring"
                   onClick={() => setActiveCategory(category.id)}
                 >
-                  <Icon size={16} />
-                  <div className="settings-page__nav-copy">
-                    <span className="settings-page__nav-label">{category.label}</span>
-                    <span className="settings-page__nav-description">{category.description}</span>
+                  <Icon size={16} style={{ color: isActive ? 'var(--accent)' : 'var(--text-muted)', flexShrink: 0 }} />
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 600 }}>{category.label}</span>
+                    <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.2 }}>{category.description}</span>
                   </div>
                 </button>
               );
@@ -639,267 +715,67 @@ export function SettingsPage({
           </nav>
         </aside>
 
-        <section className="settings-page__content">
-          <div className="settings-page__content-header">
+        {/* Right Content Pane */}
+        <section style={{ padding: 'var(--space-6)', overflowY: 'auto', maxHeight: 'calc(100vh - 64px)' }}>
+          <Stack gap="var(--space-5)" style={{ maxWidth: '800px', margin: '0 auto' }}>
             <div>
-              <div className="settings-page__eyebrow">Selected Category</div>
-              <h2 className="settings-page__content-title">{activeCategoryMeta.label}</h2>
-              <p className="settings-page__content-subtitle">{activeCategoryMeta.description}</p>
+              <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+                Settings Section
+              </span>
+              <h2 style={{ margin: '4px 0 0', fontSize: '24px', fontWeight: 700, color: 'var(--text-heading)', letterSpacing: '-0.02em' }}>
+                {activeCategoryMeta.label}
+              </h2>
+              <p style={{ margin: '6px 0 0', fontSize: '13.5px', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                {activeCategoryMeta.description}
+              </p>
             </div>
-          </div>
 
-          {settingsLoading ? <StatusNotice message={{ message: 'Loading workspace administration data...' }} /> : null}
-          {saveError ? <StatusNotice message={{ message: saveError }} tone="error" /> : null}
-          {inviteError ? <StatusNotice message={{ message: inviteError }} tone="error" /> : null}
+            {settingsLoading && (
+              <Alert type="info">
+                Loading workspace administration data...
+              </Alert>
+            )}
 
-          {activeCategory === 'overview' ? (
-            <OverviewSection workspace={workspace} settings={settings} onChangeSettings={onChangeSettings} />
-          ) : null}
+            {saveError && (
+              <Alert type="error">
+                {saveError}
+              </Alert>
+            )}
 
-          {activeCategory === 'access' ? (
-            <AccessSection
-              invites={invites}
-              invitesLoading={invitesLoading}
-              inviteLoading={inviteLoading}
-              revokeLoadingId={revokeLoadingId}
-              onCreateInvite={onCreateInvite}
-              onRevokeInvite={onRevokeInvite}
-            />
-          ) : null}
+            {inviteError && (
+              <Alert type="error">
+                {inviteError}
+              </Alert>
+            )}
 
-          {activeCategory === 'members' ? <MembersSection members={members} /> : null}
+            {activeCategory === 'overview' && (
+              <OverviewSection workspace={workspace} settings={settings} onChangeSettings={onChangeSettings} />
+            )}
 
-          {activeCategory === 'requests' ? (
-            <RequestsSection
-              joinRequests={joinRequests}
-              approveLoadingId={approveLoadingId}
-              onApproveJoinRequest={onApproveJoinRequest}
-            />
-          ) : null}
+            {activeCategory === 'access' && (
+              <AccessSection
+                invites={invites}
+                invitesLoading={invitesLoading}
+                inviteLoading={inviteLoading}
+                revokeLoadingId={revokeLoadingId}
+                onCreateInvite={onCreateInvite}
+                onRevokeInvite={onRevokeInvite}
+              />
+            )}
+
+            {activeCategory === 'members' && <MembersSection members={members} />}
+
+            {activeCategory === 'requests' && (
+              <RequestsSection
+                joinRequests={joinRequests}
+                approveLoadingId={approveLoadingId}
+                onApproveJoinRequest={onApproveJoinRequest}
+              />
+            )}
+          </Stack>
         </section>
       </div>
     </div>
   );
 }
 
-const metaGridStyle: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-  gap: '12px',
-};
-
-const inviteGuideStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'flex-start',
-  gap: '10px',
-  padding: '14px 16px',
-  marginBottom: '16px',
-  borderRadius: '14px',
-  border: '1px solid var(--border)',
-  background: 'rgba(255, 255, 255, 0.03)',
-};
-
-const inviteSummaryStyle: CSSProperties = {
-  display: 'grid',
-  gap: '14px',
-  padding: '16px',
-  marginBottom: '16px',
-  borderRadius: '16px',
-  border: '1px solid var(--accent-border)',
-  background: 'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))',
-};
-
-const inviteSummaryHeaderStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: '12px',
-};
-
-const inviteStatePendingStyle: CSSProperties = {
-  padding: '6px 10px',
-  borderRadius: '999px',
-  border: '1px solid rgba(245, 158, 11, 0.25)',
-  background: 'rgba(245, 158, 11, 0.12)',
-  color: '#fbbf24',
-  fontSize: '11px',
-  fontWeight: 700,
-  letterSpacing: '0.04em',
-  textTransform: 'uppercase',
-};
-
-const inviteStateUsedStyle: CSSProperties = {
-  ...inviteStatePendingStyle,
-  border: '1px solid rgba(16, 185, 129, 0.25)',
-  background: 'rgba(16, 185, 129, 0.12)',
-  color: '#34d399',
-};
-
-const inviteStateRevokedStyle: CSSProperties = {
-  ...inviteStatePendingStyle,
-  border: '1px solid rgba(248, 113, 113, 0.25)',
-  background: 'rgba(248, 113, 113, 0.12)',
-  color: '#fca5a5',
-};
-
-const detailGridStyle: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-  gap: '12px',
-};
-
-const detailCardStyle: CSSProperties = {
-  display: 'grid',
-  gap: '10px',
-  padding: '14px',
-  borderRadius: '14px',
-  border: '1px solid var(--border)',
-  background: 'rgba(10, 14, 24, 0.28)',
-};
-
-const detailLabelStyle: CSSProperties = {
-  fontSize: '11px',
-  fontWeight: 700,
-  letterSpacing: '0.05em',
-  textTransform: 'uppercase',
-  color: 'var(--text-muted)',
-};
-
-const detailValueStyle: CSSProperties = {
-  fontSize: '12px',
-  lineHeight: 1.6,
-  color: 'var(--text-heading)',
-  wordBreak: 'break-word',
-};
-
-const inviteMetaRowStyle: CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: '12px',
-  fontSize: '12px',
-  color: 'var(--text-muted)',
-};
-
-const compactActionStyle: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: '6px',
-  minHeight: '34px',
-  padding: '0 12px',
-};
-
-const inviteActionGroupStyle: CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  justifyContent: 'flex-end',
-  gap: '8px',
-};
-
-const dangerActionStyle: CSSProperties = {
-  borderColor: 'rgba(248, 113, 113, 0.2)',
-  color: '#fca5a5',
-};
-
-const metaCardStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '10px',
-  padding: '14px',
-  borderRadius: '14px',
-  border: '1px solid var(--border)',
-  background: 'rgba(255, 255, 255, 0.02)',
-};
-
-const metaTitleStyle: CSSProperties = {
-  fontSize: '12px',
-  fontWeight: 600,
-  color: 'var(--text-heading)',
-};
-
-const metaCopyStyle: CSSProperties = {
-  marginTop: '4px',
-  fontSize: '12px',
-  color: 'var(--text-muted)',
-};
-
-const listRowStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: '12px',
-  padding: '14px 16px',
-  borderRadius: '14px',
-  border: '1px solid var(--border)',
-  background: 'rgba(255, 255, 255, 0.02)',
-};
-
-const listRowTitleStyle: CSSProperties = {
-  fontSize: '14px',
-  fontWeight: 600,
-  color: 'var(--text-heading)',
-};
-
-const listRowCopyStyle: CSSProperties = {
-  marginTop: '4px',
-  fontSize: '12px',
-  color: 'var(--text-muted)',
-};
-
-const listRowMetaStyle: CSSProperties = {
-  display: 'grid',
-  justifyItems: 'end',
-  gap: '4px',
-  fontSize: '11px',
-  color: 'var(--text-muted)',
-};
-
-const memberRowStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: '16px',
-  padding: '14px 16px',
-  borderRadius: '14px',
-  border: '1px solid var(--border)',
-  background: 'rgba(255, 255, 255, 0.02)',
-};
-
-const memberIdentityStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '12px',
-};
-
-const workspaceRoleStyle: CSSProperties = {
-  padding: '6px 10px',
-  borderRadius: '999px',
-  background: 'rgba(59, 130, 246, 0.08)',
-  border: '1px solid rgba(59, 130, 246, 0.18)',
-  color: 'var(--text-heading)',
-  fontSize: '11px',
-  textTransform: 'capitalize',
-};
-
-const requestAvatarStyle: CSSProperties = {
-  width: '36px',
-  height: '36px',
-  borderRadius: '50%',
-  display: 'grid',
-  placeItems: 'center',
-  background: 'var(--accent-glow)',
-  border: '1px solid var(--accent-border)',
-  color: 'var(--accent)',
-  fontWeight: 700,
-};
-
-const requestMessageStyle: CSSProperties = {
-  marginTop: '6px',
-  fontSize: '12px',
-  color: 'var(--text)',
-};
-
-const reviewedListStyle: CSSProperties = {
-  display: 'grid',
-  gap: '10px',
-};

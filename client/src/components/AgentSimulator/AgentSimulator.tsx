@@ -3,6 +3,7 @@ import { useTickets } from '../../context/TicketContext';
 import { Terminal, X, Play, Loader2, Sparkles, AlertCircle, ArrowRight } from 'lucide-react';
 import type { AgentLogEntry, AgentSimulatorProps } from './types';
 import { delay, getInitialAgentLogs } from './utils';
+import { Button, Textarea } from '@library';
 
 export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
   const { fetchInitialData, projects, users } = useTickets();
@@ -215,8 +216,7 @@ export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
             <span>Click to run mock IDE Agent execution</span>
           </div>
 
-          <textarea
-            className="input"
+          <Textarea
             rows={3}
             style={{ 
               fontSize: '11px', 
@@ -231,33 +231,15 @@ export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
             disabled={isRunning}
           />
 
-          <button 
+          <Button 
             type="submit" 
-            className="btn btn-primary clickable"
-            style={{ 
-              padding: '8px', 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center', 
-              gap: '6px',
-              background: 'var(--accent)',
-              borderColor: 'var(--accent)',
-              color: '#fff'
-            }}
+            variant="primary"
+            fullWidth
             disabled={isRunning}
+            leftIcon={isRunning ? <Loader2 size={14} className="animate-spin" style={{ animation: 'spin 1s linear infinite' }} /> : <Play size={14} fill="currentColor" />}
           >
-            {isRunning ? (
-              <>
-                <Loader2 size={14} className="animate-spin" style={{ animation: 'spin 1s linear infinite' }} />
-                <span>Simulation Active...</span>
-              </>
-            ) : (
-              <>
-                <Play size={14} fill="currentColor" />
-                <span>Run MCP Agent</span>
-              </>
-            )}
-          </button>
+            {isRunning ? 'Simulation Active...' : 'Run MCP Agent'}
+          </Button>
 
         </form>
       </div>
@@ -265,3 +247,4 @@ export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
     </div>
   );
 };
+

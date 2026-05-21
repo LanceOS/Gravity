@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useTickets } from '../../context/TicketContext';
-import { Sparkles, Mail, Lock, User as UserIcon } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import { getAuthFailureMessage, isAuthSubmissionInvalid } from './utils';
+import { Button, TextInput, PasswordInput } from '@library';
 
 export const AuthScreen: React.FC = () => {
   const { signIn, signUp } = useTickets();
@@ -63,67 +64,42 @@ export const AuthScreen: React.FC = () => {
 
         <form onSubmit={handleSubmit} style={formStyle}>
           {isSignUp && (
-            <div style={formGroupStyle}>
-              <label style={labelStyle}>Full Name</label>
-              <div style={inputWrapperStyle}>
-                <UserIcon size={16} style={inputIconStyle} />
-                <input
-                  type="text"
-                  placeholder="John Doe"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  style={inputStyle}
-                  required
-                />
-              </div>
-            </div>
+            <TextInput
+              label="Full Name"
+              placeholder="John Doe"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+            />
           )}
 
-          <div style={formGroupStyle}>
-            <label style={labelStyle}>Email Address</label>
-            <div style={inputWrapperStyle}>
-              <Mail size={16} style={inputIconStyle} />
-              <input
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                style={inputStyle}
-                required
-              />
-            </div>
-          </div>
+          <TextInput
+            label="Email Address"
+            type="email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
 
-          <div style={formGroupStyle}>
-            <label style={labelStyle}>Password</label>
-            <div style={inputWrapperStyle}>
-              <Lock size={16} style={inputIconStyle} />
-              <input
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                style={inputStyle}
-                required
-              />
-            </div>
-          </div>
+          <PasswordInput
+            label="Password"
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
 
-          <button
+          <Button
             type="submit"
-            disabled={loading}
-            style={buttonStyle}
-            className="clickable"
+            loading={loading}
+            variant="primary"
+            fullWidth
+            leftIcon={loading ? undefined : <Sparkles size={16} />}
+            style={{ marginTop: '8px' }}
           >
-            {loading ? (
-              <span>Connecting...</span>
-            ) : (
-              <span style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
-                <Sparkles size={16} />
-                {isSignUp ? 'Create Account' : 'Sign In'}
-              </span>
-            )}
-          </button>
+            {isSignUp ? 'Create Account' : 'Sign In'}
+          </Button>
         </form>
 
         <div style={footerStyle}>
@@ -236,61 +212,6 @@ const formStyle: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   gap: '16px'
-};
-
-const formGroupStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '6px'
-};
-
-const labelStyle: React.CSSProperties = {
-  fontSize: '11px',
-  fontWeight: 600,
-  textTransform: 'uppercase',
-  color: '#71717a',
-  letterSpacing: '0.05em'
-};
-
-const inputWrapperStyle: React.CSSProperties = {
-  position: 'relative',
-  display: 'flex',
-  alignItems: 'center'
-};
-
-const inputIconStyle: React.CSSProperties = {
-  position: 'absolute',
-  left: '12px',
-  color: '#71717a',
-  pointerEvents: 'none'
-};
-
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '10px 12px 10px 38px',
-  background: '#121214',
-  border: '1px solid #1f2028',
-  borderRadius: '8px',
-  color: '#f4f4f5',
-  fontSize: '13px',
-  outline: 'none',
-  transition: 'all 0.15s ease'
-};
-
-const buttonStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '11px',
-  background: '#f4f4f5',
-  border: 'none',
-  borderRadius: '8px',
-  color: '#09090b',
-  fontSize: '13px',
-  fontWeight: 600,
-  cursor: 'pointer',
-  marginTop: '8px',
-  display: 'flex',
-  justifyContent: 'center',
-  alignItems: 'center'
 };
 
 const footerStyle: React.CSSProperties = {

@@ -1,5 +1,6 @@
 import { Sparkles } from 'lucide-react';
 import type { SidebarWorkspaceSection } from '../types';
+import { ThemeToggle } from '@library';
 
 interface SidebarHeaderProps {
   workspace: SidebarWorkspaceSection;
@@ -24,9 +25,13 @@ export function SidebarHeader({ workspace, onOpenCreateTicket }: SidebarHeaderPr
           <circle cx="12" cy="12" r="2" fill="var(--text-heading)" />
         </svg>
         <div style={{ flex: 1, minWidth: 0, display: 'grid', gap: '6px' }}>
-          <span style={{ fontWeight: 600, fontSize: '15px', color: 'var(--text-heading)', letterSpacing: '-0.3px' }}>Gravity</span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontWeight: 600, fontSize: '15px', color: 'var(--text-heading)', letterSpacing: '-0.3px' }}>Gravity</span>
+            <ThemeToggle />
+          </div>
 
           <select
+
             className="input"
             value={workspace.activeWorkspaceId}
             onChange={(event) => workspace.onSelectWorkspace(event.target.value)}

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { FolderPlus, LogOut, Sparkles, Ticket, Users } from 'lucide-react';
 import type { EmptyWorkspaceScreenProps } from './types';
 import { normalizeInviteCode, normalizeProjectKey } from './utils';
+import { TextInput, Textarea } from '@library';
 
 export const EmptyWorkspaceScreen: React.FC<EmptyWorkspaceScreenProps> = ({
   currentUser,
@@ -132,40 +133,31 @@ export const EmptyWorkspaceScreen: React.FC<EmptyWorkspaceScreenProps> = ({
           <form onSubmit={handleCreateSubmit} style={panelStyle}>
             <h2 style={panelTitleStyle}>Create Project</h2>
 
-            <label style={fieldStyle}>
-              <span className="label">Project Name</span>
-              <input
-                className="input"
-                value={projectName}
-                onChange={(event) => setProjectName(event.target.value)}
-                placeholder="Gravity Core"
-                required
-              />
-            </label>
+            <TextInput
+              label="Project Name"
+              value={projectName}
+              onChange={(event) => setProjectName(event.target.value)}
+              placeholder="Gravity Core"
+              required
+            />
 
-            <label style={fieldStyle}>
-              <span className="label">Project Key</span>
-              <input
-                className="input"
-                value={projectKey}
-                onChange={(event) => setProjectKey(normalizeProjectKey(event.target.value))}
-                placeholder="GRA"
-                maxLength={8}
-                required
-              />
-            </label>
+            <TextInput
+              label="Project Key"
+              value={projectKey}
+              onChange={(event) => setProjectKey(normalizeProjectKey(event.target.value))}
+              placeholder="GRA"
+              maxLength={8}
+              required
+            />
 
-            <label style={fieldStyle}>
-              <span className="label">Description</span>
-              <textarea
-                className="input"
-                rows={4}
-                value={projectDescription}
-                onChange={(event) => setProjectDescription(event.target.value)}
-                placeholder="Describe the project scope"
-                style={{ resize: 'vertical' }}
-              />
-            </label>
+            <Textarea
+              label="Description"
+              rows={4}
+              value={projectDescription}
+              onChange={(event) => setProjectDescription(event.target.value)}
+              placeholder="Describe the project scope"
+              style={{ resize: 'vertical' }}
+            />
 
             <button type="submit" className="btn btn-primary" disabled={pendingAction !== null}>
               {pendingAction === 'create' ? 'Creating...' : 'Create Project'}
@@ -175,16 +167,13 @@ export const EmptyWorkspaceScreen: React.FC<EmptyWorkspaceScreenProps> = ({
           <form onSubmit={handleJoinSubmit} style={panelStyle}>
             <h2 style={panelTitleStyle}>Join by Invite</h2>
 
-            <label style={fieldStyle}>
-              <span className="label">Invite Code</span>
-              <input
-                className="input"
-                value={inviteCode}
-                onChange={(event) => setInviteCode(normalizeInviteCode(event.target.value))}
-                placeholder="INV-GRA-1234"
-                required
-              />
-            </label>
+            <TextInput
+              label="Invite Code"
+              value={inviteCode}
+              onChange={(event) => setInviteCode(normalizeInviteCode(event.target.value))}
+              placeholder="INV-GRA-1234"
+              required
+            />
 
             <button type="submit" className="btn" disabled={pendingAction !== null}>
               {pendingAction === 'join' ? 'Joining...' : 'Join Project'}

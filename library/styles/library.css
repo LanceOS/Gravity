@@ -1,0 +1,158 @@
+@import url('./theme.css');
+
+/* Global Utilities & Primitive Styles */
+
+/* Screen reader only helper */
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+/* Scrollbars */
+.scroll-container {
+  overflow: auto;
+}
+.scroll-container::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.scroll-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scroll-container::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: var(--radius-full);
+}
+.scroll-container::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* Animations */
+@keyframes lib-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes lib-slide-in-right {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes lib-slide-in-bottom {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes lib-spinner-rotate {
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes lib-skeleton-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 0.35; }
+}
+
+.lib-animate-fade-in {
+  animation: lib-fade-in var(--transition-normal);
+}
+
+.lib-animate-slide-in-right {
+  animation: lib-slide-in-right var(--transition-normal);
+}
+
+.lib-spinner {
+  animation: lib-spinner-rotate 0.8s linear infinite;
+}
+
+.lib-skeleton-pulse {
+  animation: lib-skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+/* Layout primitives helpers */
+.lib-stack {
+  display: flex;
+  flex-direction: column;
+}
+
+.lib-flex-row {
+  display: flex;
+  flex-direction: row;
+}
+
+.lib-grid {
+  display: grid;
+}
+
+.lib-divider {
+  height: 1px;
+  background-color: var(--border);
+  width: 100%;
+  margin: var(--space-2) 0;
+}
+
+.lib-divider-vertical {
+  width: 1px;
+  background-color: var(--border);
+  height: 100%;
+  margin: 0 var(--space-2);
+}
+
+/* Overlay & Interactive elements style rules */
+.lib-focus-ring:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Form validation states styling matching accessible error announcement */
+.lib-field-error-msg {
+  color: var(--priority-high);
+  font-size: 11px;
+  margin-top: 4px;
+  display: block;
+}
+
+/* Virtual Grid styles */
+.lib-virtual-grid-viewport {
+  position: relative;
+  overflow: auto;
+  width: 100%;
+  height: 100%;
+}
+
+.lib-virtual-grid-canvas {
+  position: relative;
+  width: 100%;
+}
+
+.lib-virtual-grid-row {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  background-color: var(--card-bg);
+}
+
+.lib-virtual-grid-row:hover {
+  background-color: var(--card-hover);
+}
+
+.lib-virtual-grid-cell {
+  padding: 8px 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-right: 1px solid var(--border);
+}
+
+.lib-virtual-grid-cell:last-child {
+  border-right: none;
+}
