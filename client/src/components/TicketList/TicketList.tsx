@@ -89,6 +89,7 @@ export const TicketList: React.FC<TicketListProps> = ({
         <div style={{ display: 'flex', gap: '4px', background: 'var(--border)', padding: '2px', borderRadius: 'var(--radius-sm)', marginLeft: '12px' }}>
           <button
             type="button"
+            aria-pressed={viewType === 'grouped'}
             onClick={() => setViewType('grouped')}
             style={{
               padding: '4px 8px',
