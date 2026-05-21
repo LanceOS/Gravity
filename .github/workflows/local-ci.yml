@@ -3,6 +3,9 @@ name: Local CI
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   local-ci:
     runs-on: ubuntu-latest
