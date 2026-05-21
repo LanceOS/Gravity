@@ -1,6 +1,7 @@
 import { ArrowDown, ArrowRight, ArrowUp, Minus, ShieldAlert } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { Domain, Ticket } from '../../../context/TicketContext';
+import type { TicketListSort } from '../../../utils/ticketView';
 
 export const PRIORITY_FILTER_OPTIONS = [
   { value: '', label: 'Any Priority' },
@@ -19,6 +20,11 @@ export const STATUS_FILTER_OPTIONS = [
   { value: 'in_review', label: 'In Review' },
   { value: 'done', label: 'Done' },
   { value: 'canceled', label: 'Canceled' },
+];
+
+export const LIST_SORT_OPTIONS: Array<{ value: TicketListSort; label: string }> = [
+  { value: 'created', label: 'Created Order' },
+  { value: 'domain', label: 'Domain' },
 ];
 
 export function getPriorityIcon(priority: Ticket['priority']): ReactNode {

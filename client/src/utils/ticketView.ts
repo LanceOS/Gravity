@@ -10,6 +10,8 @@ export interface TicketFilters {
   search: string;
 }
 
+export type TicketListSort = 'created' | 'domain';
+
 export type TicketsByStatus = Record<Ticket['status'], Ticket[]>;
 
 export const BOARD_COLUMNS: Array<{ id: Ticket['status']; title: string; color: string }> = [
@@ -57,6 +59,43 @@ export function groupTicketsByStatus(tickets: Ticket[]): TicketsByStatus {
   });
 
   return groups;
+}
+
+export function sortTicketsForList(
+  tickets: Ticket[],
+  domainById: Record<string, Domain>,
+  sort: TicketListSort,
+): Ticket[] {
+  if (sort === 'created') {
+    return [...tickets];
+  }
+
+  return [...tickets].sort((first, second) => {
+    const firstDomain = first.domainId ? domainById[first.domainId] : undefined;
+    const secondDomain = second.domainId ? domainById[second.domainId] : undefined;
+
+    if (firstDomain && !secondDomain) {
+      return -1;
+    }
+
+    if (!firstDomain && secondDomain) {
+      return 1;
+    }
+
+    if (firstDomain && secondDomain) {
+      const domainComparison = firstDomain.name.localeCompare(secondDomain.name);
+      if (domainComparison !== 0) {
+        return domainComparison;
+      }
+    }
+
+    const createdComparison = first.createdAt.localeCompare(second.createdAt);
+    if (createdComparison !== 0) {
+      return createdComparison;
+    }
+
+    return first.key.localeCompare(second.key);
+  });
 }
 
 export function hasActiveTicketFilters(filters: TicketFilters): boolean {

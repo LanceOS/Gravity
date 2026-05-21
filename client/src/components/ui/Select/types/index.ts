@@ -9,7 +9,7 @@ export interface SelectOption {
 export interface SelectProps {
   value: string;
   onValueChange: (value: string) => void;
-  options: SelectOption[];
+  options: ReadonlyArray<SelectOption>;
   placeholder?: string;
   disabled?: boolean;
   ariaLabel?: string;

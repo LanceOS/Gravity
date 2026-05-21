@@ -4,18 +4,20 @@ import { Select } from '../ui/Select';
 import { Compass } from 'lucide-react';
 import { TicketRow } from './components';
 import type { TicketListProps } from './types';
-import { getAssigneeAvatar, getDomainTag, getPriorityIcon, getStatusLabel, PRIORITY_FILTER_OPTIONS, STATUS_FILTER_OPTIONS } from './utils';
+import { getAssigneeAvatar, getDomainTag, getPriorityIcon, getStatusLabel, LIST_SORT_OPTIONS, PRIORITY_FILTER_OPTIONS, STATUS_FILTER_OPTIONS } from './utils';
 
 export const TicketList: React.FC<TicketListProps> = ({
   filters,
   filteredCount,
   totalCount,
   groupedTickets,
+  listSort,
   domainById,
   userAvatarById,
   hasActiveFilters,
   onFilterChange,
   onClearFilters,
+  onListSortChange,
   onSelectTicket,
 }) => {
   return (
@@ -58,6 +60,14 @@ export const TicketList: React.FC<TicketListProps> = ({
           options={STATUS_FILTER_OPTIONS}
           ariaLabel="Filter list by status"
           style={{ width: '120px' }}
+        />
+
+        <Select
+          value={listSort}
+          onValueChange={(sort) => onListSortChange(sort as typeof listSort)}
+          options={LIST_SORT_OPTIONS}
+          ariaLabel="Sort list tickets"
+          style={{ width: '140px' }}
         />
 
         {/* Clear Filters Button */}

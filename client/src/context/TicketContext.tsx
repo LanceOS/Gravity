@@ -282,6 +282,7 @@ interface TicketContextType extends State {
   setActiveProjectId: (id: string) => void;
   fetchInitialData: (userId?: string) => Promise<void>;
   fetchProjectData: (projId: string) => Promise<void>;
+  createDomain: (domain: { name: string; color?: string; projectId?: string }) => Promise<Domain | null>;
   createTicket: (ticket: Omit<Ticket, 'id' | 'key' | 'prStatus' | 'prUrl' | 'createdAt' | 'updatedAt'>) => Promise<Ticket | null>;
   updateTicket: (id: string, updates: Partial<Ticket>) => Promise<void>;
   deleteTicket: (id: string) => Promise<void>;
@@ -646,6 +647,39 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [state.currentUser, fetchInitialData, setActiveProjectId]);
 
+  const createDomain = useCallback(async (domainInput: { name: string; color?: string; projectId?: string }) => {
+    const projectId = domainInput.projectId || activeProjectId;
+    if (!projectId) {
+      return null;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/domains`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Project-Id': projectId,
+        },
+        body: JSON.stringify({
+          name: domainInput.name,
+          color: domainInput.color || '#6B7280',
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create domain');
+      }
+
+      const domain = await response.json();
+      await fetchProjectData(projectId);
+      return domain;
+    } catch (error) {
+      console.error(error);
+      throw error;
+    }
+  }, [activeProjectId, fetchProjectData]);
+
   const joinProject = useCallback(async (inviteCode: string) => {
     if (!state.currentUser) {
       return null;
@@ -769,6 +803,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setActiveProjectId,
       fetchInitialData,
       fetchProjectData,
+      createDomain,
       createTicket,
       updateTicket,
       deleteTicket,
@@ -792,6 +827,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setActiveProjectId,
       fetchInitialData,
       fetchProjectData,
+      createDomain,
       createTicket,
       updateTicket,
       deleteTicket,
