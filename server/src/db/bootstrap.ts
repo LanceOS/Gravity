@@ -259,9 +259,6 @@ export async function initializeDatabase() {
     ALTER TABLE identities ADD COLUMN IF NOT EXISTS encrypted_private_key TEXT;
     ALTER TABLE identities ADD COLUMN IF NOT EXISTS is_local_owner BOOLEAN NOT NULL DEFAULT FALSE;
     ALTER TABLE peer_connections ADD COLUMN IF NOT EXISTS workspace_id TEXT;
-    DELETE FROM peer_connections
-    WHERE workspace_id IS NULL;
-    ALTER TABLE peer_connections ALTER COLUMN workspace_id SET NOT NULL;
     ALTER TABLE peer_connections ADD COLUMN IF NOT EXISTS host_display_name TEXT NOT NULL DEFAULT '';
   `);
 
