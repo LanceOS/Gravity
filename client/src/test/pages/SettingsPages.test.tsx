@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SettingsPage } from '../../pages/SettingsPage/SettingsPage.tsx';
 import { AccountPreferencesPage } from '../../pages/AccountPreferencesPage/AccountPreferencesPage.tsx';
+import type { WorkspaceSummary } from '../../hooks/useWorkspaceDirectory.ts';
 
 const currentUser = {
   id: 'user-1',
@@ -13,7 +14,7 @@ const currentUser = {
   tutorial_completed: 1,
 };
 
-const workspace = {
+const workspace: WorkspaceSummary = {
   id: 'workspace-1',
   name: 'Gravity',
   description: 'Primary workspace',
@@ -28,10 +29,12 @@ const workspace = {
 };
 
 function renderSettingsPage(overrides: Partial<Parameters<typeof SettingsPage>[0]> = {}) {
-  const props = {
+  const baseProps: Parameters<typeof SettingsPage>[0] = {
     currentUser,
     workspace,
     settings: {
+      workspaceId: workspace.id,
+      key: workspace.key,
       hostUrl: 'http://localhost:8080',
       joinMode: 'approval_required' as const,
       workspaceKey: 'PRIVATE',
@@ -55,9 +58,11 @@ function renderSettingsPage(overrides: Partial<Parameters<typeof SettingsPage>[0
         validationCode: 'GRAV-1234',
         workspacePrivateKey: 'PRIVATE',
         expiresAt: '2026-05-30T12:00:00.000Z',
+        usedAt: null,
         revokedAt: null,
         isUsed: false,
-        guestUsername: '',
+        guestUsername: null,
+        createdAt: '2026-05-20T08:00:00.000Z',
       },
     ],
     members: [
@@ -67,16 +72,21 @@ function renderSettingsPage(overrides: Partial<Parameters<typeof SettingsPage>[0
         email: 'casey@example.com',
         avatar: '',
         role: 'owner',
+        createdAt: '2026-05-01T09:00:00.000Z',
       },
     ],
     joinRequests: [
       {
         id: 'request-1',
+        requestingUserId: 'user-2',
         requesterName: 'Robin Quinn',
         requesterEmail: 'robin@example.com',
+        requesterAvatar: null,
         message: 'Requesting access for release support.',
         status: 'pending',
+        reviewedBy: null,
         reviewedByName: null,
+        reviewedAt: null,
         createdAt: '2026-05-20T09:00:00.000Z',
       },
     ],
@@ -90,8 +100,9 @@ function renderSettingsPage(overrides: Partial<Parameters<typeof SettingsPage>[0
     onRevokeInvite: vi.fn().mockResolvedValue(true),
     onApproveJoinRequest: vi.fn().mockResolvedValue(true),
     onRetryConnection: vi.fn().mockResolvedValue(undefined),
-    ...overrides,
   };
+
+  const props = { ...baseProps, ...overrides };
 
   return {
     ...render(<SettingsPage {...props} />),

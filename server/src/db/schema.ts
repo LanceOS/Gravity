@@ -271,11 +271,8 @@ export const schema = {
   workspaceConnections,
   identities,
   peerConnections,
-<<<<<<< HEAD
-=======
   federationInvites,
   workspacePeers,
->>>>>>> main
   syncOutbox,
   projects,
   projectMembers,
