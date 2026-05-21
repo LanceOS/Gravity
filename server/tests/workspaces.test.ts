@@ -1,0 +1,236 @@
+import { describe, expect, it } from 'vitest';
+import { api, seedUser, seedWorkspaceFixture } from './helpers/test-helpers.js';
+
+describe('workspaces routes', () => {
+  it('creates, lists, and updates workspaces with settings and members', async () => {
+    const owner = await seedUser({
+      id: 'workspace-owner',
+      name: 'Workspace Owner',
+      email: 'workspace-owner@example.com',
+      role: 'owner',
+      avatarUrl: 'https://example.com/workspace-owner.png',
+    });
+
+    const createResponse = await api().post('/api/v1/workspaces').send({
+      name: 'Gravity Core',
+      description: 'The main Gravity workspace.',
+      key: 'GRV',
+      ownerId: owner.id,
+      defaultProjectName: 'Gravity App',
+      defaultProjectKey: 'GRV',
+    });
+
+    expect(createResponse.status).toBe(201);
+    expect(createResponse.body.workspace).toMatchObject({
+      name: 'Gravity Core',
+      key: 'GRV',
+      memberRole: 'owner',
+      projectCount: 1,
+      memberCount: 1,
+    });
+
+    const workspaceId = createResponse.body.workspace.id;
+    const defaultProjectId = createResponse.body.workspace.defaultProjectId;
+
+    const listResponse = await api().get('/api/v1/workspaces').query({ userId: owner.id });
+    expect(listResponse.status).toBe(200);
+    expect(listResponse.body).toEqual([
+      expect.objectContaining({
+        id: workspaceId,
+        name: 'Gravity Core',
+        projectCount: 1,
+        memberCount: 1,
+      }),
+    ]);
+
+    const getResponse = await api().get(`/api/v1/workspaces/${workspaceId}`);
+    expect(getResponse.status).toBe(200);
+    expect(getResponse.body).toMatchObject({
+      id: workspaceId,
+      name: 'Gravity Core',
+      key: 'GRV',
+    });
+
+    const settingsResponse = await api().get(`/api/v1/workspaces/${workspaceId}/settings`);
+    expect(settingsResponse.status).toBe(200);
+    expect(settingsResponse.body).toMatchObject({
+      workspaceId,
+      joinMode: 'approval_required',
+      defaultProjectId,
+    });
+
+    const patchResponse = await api().patch(`/api/v1/workspaces/${workspaceId}/settings`).send({
+      hostUrl: 'http://gravity.test',
+      joinMode: 'auto_join',
+      workspaceKey: 'WS-GRV-999999',
+      defaultProjectId,
+    });
+
+    expect(patchResponse.status).toBe(200);
+    expect(patchResponse.body).toMatchObject({
+      workspaceId,
+      hostUrl: 'http://gravity.test',
+      joinMode: 'auto_join',
+      workspaceKey: 'WS-GRV-999999',
+      defaultProjectId,
+    });
+
+    const membersResponse = await api().get(`/api/v1/workspaces/${workspaceId}/members`);
+    expect(membersResponse.status).toBe(200);
+    expect(membersResponse.body).toEqual([
+      expect.objectContaining({
+        id: owner.id,
+        name: owner.name,
+        email: owner.email,
+        role: 'owner',
+      }),
+    ]);
+  });
+
+  it('creates invites, join requests, approvals, and workspace connections', async () => {
+    const { owner, workspace, project } = await seedWorkspaceFixture();
+
+    const inviteResponse = await api().post(`/api/v1/workspaces/${workspace.id}/invites`).send({
+      createdBy: owner.id,
+      label: 'Team Invite',
+    });
+
+    expect(inviteResponse.status).toBe(201);
+    expect(inviteResponse.body).toMatchObject({
+      workspaceId: workspace.id,
+      createdBy: owner.id,
+      label: 'Team Invite',
+    });
+
+    const applicant = await seedUser({
+      id: 'join-user',
+      name: 'Join Requester',
+      email: 'joiner@example.com',
+      role: 'member',
+      avatarUrl: 'https://example.com/joiner.png',
+    });
+
+    const joinRequestResponse = await api()
+      .post(`/api/v1/workspaces/invites/${inviteResponse.body.code}/join-requests`)
+      .send({ userId: applicant.id, message: 'Requesting access to the workspace.' });
+
+    expect(joinRequestResponse.status).toBe(201);
+    expect(joinRequestResponse.body).toMatchObject({
+      workspaceId: workspace.id,
+      requestingUserId: applicant.id,
+      status: 'pending',
+    });
+
+    const listInvitesResponse = await api().get(`/api/v1/workspaces/${workspace.id}/invites`);
+    expect(listInvitesResponse.status).toBe(200);
+    expect(listInvitesResponse.body).toEqual([
+      expect.objectContaining({
+        id: inviteResponse.body.id,
+        code: inviteResponse.body.code,
+        pendingJoinRequestCount: 1,
+      }),
+    ]);
+
+    const listJoinRequestsResponse = await api().get(`/api/v1/workspaces/${workspace.id}/join-requests`);
+    expect(listJoinRequestsResponse.status).toBe(200);
+    expect(listJoinRequestsResponse.body).toEqual([
+      expect.objectContaining({
+        id: joinRequestResponse.body.id,
+        requestingUserId: applicant.id,
+        status: 'pending',
+      }),
+    ]);
+
+    const approveResponse = await api()
+      .post(`/api/v1/workspaces/${workspace.id}/join-requests/${joinRequestResponse.body.id}/approve`)
+      .send({ reviewerUserId: owner.id });
+
+    expect(approveResponse.status).toBe(200);
+    expect(approveResponse.body).toMatchObject({
+      id: joinRequestResponse.body.id,
+      status: 'approved',
+      reviewedBy: owner.id,
+    });
+
+    const connectResponse = await api().post('/api/v1/workspaces/connect').send({
+      userId: applicant.id,
+      workspaceId: workspace.id,
+      workspaceKey: workspace.workspaceKey,
+    });
+
+    expect(connectResponse.status).toBe(200);
+    expect(connectResponse.body.workspace).toMatchObject({
+      id: workspace.id,
+      name: workspace.name,
+    });
+    expect(connectResponse.body.projects).toEqual([
+      expect.objectContaining({
+        id: project.id,
+        workspaceId: workspace.id,
+      }),
+    ]);
+  });
+
+  it('creates, validates, lists, and revokes peer invites', async () => {
+    const { owner, workspace } = await seedWorkspaceFixture();
+
+    const unauthorizedResponse = await api().get(`/api/v1/workspaces/${workspace.id}/peer-invites`);
+    expect(unauthorizedResponse.status).toBe(401);
+    expect(unauthorizedResponse.body).toEqual({ error: 'Unauthorized.' });
+
+    const createPeerInviteResponse = await api().post('/api/v1/workspaces/invites').set('x-user-id', owner.id).send({
+      workspaceId: workspace.id,
+      email: 'guest@example.com',
+      expirationHours: 12,
+    });
+
+    expect(createPeerInviteResponse.status).toBe(201);
+    expect(createPeerInviteResponse.body).toMatchObject({
+      email: 'guest@example.com',
+      workspace_private_key: expect.any(String),
+      validation_code: expect.any(String),
+    });
+
+    const listPeerInvitesResponse = await api()
+      .get(`/api/v1/workspaces/${workspace.id}/peer-invites`)
+      .set('x-user-id', owner.id);
+
+    expect(listPeerInvitesResponse.status).toBe(200);
+    expect(listPeerInvitesResponse.body).toEqual([
+      expect.objectContaining({
+        id: createPeerInviteResponse.body.id,
+        email: 'guest@example.com',
+      }),
+    ]);
+
+    const validateResponse = await api().post('/api/v1/workspaces/validate').send({
+      email: 'guest@example.com',
+      validation_code: createPeerInviteResponse.body.validation_code,
+      invite_url: createPeerInviteResponse.body.invite_url,
+      username: 'guest-user',
+      password_hash: 'hash-123',
+    });
+
+    expect(validateResponse.status).toBe(200);
+    expect(validateResponse.body).toMatchObject({
+      authorized: true,
+      workspace_private_key: createPeerInviteResponse.body.workspace_private_key,
+      guest_profile: {
+        username: 'guest-user',
+        role: 'guest_contributor',
+      },
+    });
+
+    const revokeResponse = await api()
+      .post(`/api/v1/workspaces/${workspace.id}/peer-invites/${createPeerInviteResponse.body.id}/revoke`)
+      .set('x-user-id', owner.id)
+      .send({});
+
+    expect(revokeResponse.status).toBe(200);
+    expect(revokeResponse.body).toMatchObject({
+      id: createPeerInviteResponse.body.id,
+      email: 'guest@example.com',
+      revoked_at: expect.any(String),
+    });
+  });
+});

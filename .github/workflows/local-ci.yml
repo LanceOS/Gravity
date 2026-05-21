@@ -1,0 +1,19 @@
+name: Local CI
+
+on:
+  workflow_dispatch:
+
+jobs:
+  local-ci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run local CI workflow
+        run: bash ./scripts/local-ci.sh
