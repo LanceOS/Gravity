@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { WorkspaceDirectoryPage } from '../../pages/WorkspaceDirectoryPage/WorkspaceDirectoryPage.tsx';
@@ -70,7 +70,7 @@ function renderWorkspaceDirectoryPage(overrides: Partial<Parameters<typeof Works
 
 describe('WorkspaceDirectoryPage', () => {
   it('renders workspace cards and top-level account actions', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: 0 });
     const { props } = renderWorkspaceDirectoryPage({
       errorMessage: 'Join code expired.',
       successMessage: 'Workspace created.',
@@ -101,14 +101,13 @@ describe('WorkspaceDirectoryPage', () => {
   });
 
   it('submits the create workspace form with derived defaults', async () => {
-    const user = userEvent.setup();
     const { props } = renderWorkspaceDirectoryPage();
 
-    await user.type(screen.getByLabelText('Workspace Name'), 'Acme Corp');
-    await user.type(screen.getByLabelText('Workspace Key'), 'acm');
-    await user.type(screen.getByLabelText('Private Access Key'), 'private');
-    await user.type(screen.getByLabelText('Description'), 'Internal product workspace');
-    await user.click(screen.getByRole('button', { name: 'Create Workspace' }));
+    fireEvent.change(screen.getByLabelText('Workspace Name'), { target: { value: 'Acme Corp' } });
+    fireEvent.change(screen.getByLabelText('Workspace Key'), { target: { value: 'acm' } });
+    fireEvent.change(screen.getByLabelText('Private Access Key'), { target: { value: 'private' } });
+    fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'Internal product workspace' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create Workspace' }));
 
     expect(props.onCreateWorkspace).toHaveBeenCalledWith({
       name: 'Acme Corp',
@@ -121,26 +120,24 @@ describe('WorkspaceDirectoryPage', () => {
   });
 
   it('submits join-request and peer-validation forms', async () => {
-    const user = userEvent.setup();
     const { props } = renderWorkspaceDirectoryPage();
 
-    await user.type(screen.getByLabelText('Invite Code'), 'wsp-grav-1234');
-    await user.type(screen.getByLabelText('Message'), 'Requesting access for QA coverage.');
-    await user.click(screen.getByRole('button', { name: 'Send Join Request' }));
+    fireEvent.change(screen.getByLabelText('Invite Code'), { target: { value: 'wsp-grav-1234' } });
+    fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Requesting access for QA coverage.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send Join Request' }));
 
     expect(props.onRequestJoin).toHaveBeenCalledWith('WSP-GRAV-1234', 'Requesting access for QA coverage.');
 
-    await user.type(screen.getByLabelText('Guest Email'), 'guest@example.com');
-    await user.type(screen.getByLabelText('Validation Code'), 'grav-4321-x');
-    await user.type(screen.getByLabelText('Invite URL'), 'https://peer.example.com/api/v1/workspaces/validate');
+    fireEvent.change(screen.getByLabelText('Guest Email'), { target: { value: 'guest@example.com' } });
+    fireEvent.change(screen.getByLabelText('Validation Code'), { target: { value: 'grav-4321-x' } });
+    fireEvent.change(screen.getByLabelText('Invite URL'), { target: { value: 'https://peer.example.com/api/v1/workspaces/validate' } });
 
     const usernameInput = screen.getByLabelText('Guest Username');
-    await user.clear(usernameInput);
-    await user.type(usernameInput, 'guest-user');
+    fireEvent.change(usernameInput, { target: { value: 'guest-user' } });
 
     const passwordHashInput = screen.getByLabelText('Password Hash');
-    await user.type(passwordHashInput, '$2b$12$abcdefghijklmnopqrstuvwxyz1234567890');
-    await user.click(screen.getByRole('button', { name: 'Validate Peer Invite' }));
+    fireEvent.change(passwordHashInput, { target: { value: '$2b$12$abcdefghijklmnopqrstuvwxyz1234567890' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Validate Peer Invite' }));
 
     expect(props.onValidatePeerInvite).toHaveBeenCalledWith({
       email: 'guest@example.com',

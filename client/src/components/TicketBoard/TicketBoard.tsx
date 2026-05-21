@@ -1,7 +1,7 @@
 import type { DragEvent } from 'react';
 import type { Ticket } from '../../context/TicketContext';
 import { BOARD_COLUMNS } from '../../utils/ticketView';
-import { Button, Select, DenseTextInput } from '@library';
+import { Button, Select, DenseTextInput, KanbanBoard, Flex } from '@library';
 import { Plus } from 'lucide-react';
 import { TicketCard } from './components';
 import type { TicketBoardProps } from './types';
@@ -28,29 +28,88 @@ export const TicketBoard: React.FC<TicketBoardProps> = ({
     event.dataTransfer.setData('text/plain', ticketId);
   };
 
-  const handleDragOver = (event: DragEvent) => {
-    event.preventDefault();
+  const renderColumnHeader = (columnId: string, title: string, count: number) => {
+    const col = BOARD_COLUMNS.find((c) => c.id === columnId);
+    return (
+      <Flex 
+        align="center" 
+        gap="8px"
+        style={{
+          padding: '16px 20px 8px 20px',
+          width: '100%',
+          boxSizing: 'border-box'
+        }}
+      >
+        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: col?.color }} />
+        <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-heading)' }}>
+          {title}
+        </span>
+        <span 
+          style={{ 
+            fontSize: '10px', 
+            color: 'var(--text-muted)', 
+            background: 'var(--sidebar-bg)', 
+            padding: '1px 6px', 
+            borderRadius: '4px',
+            marginLeft: '4px'
+          }}
+        >
+          {count}
+        </span>
+
+        <Button
+          onClick={() => onOpenCreateTicket(columnId as Ticket['status'])}
+          variant="ghost"
+          size="sm"
+          aria-label={`Create ticket in ${title}`}
+          style={{
+            marginLeft: 'auto',
+            color: 'var(--text-muted)',
+            width: '20px',
+            minHeight: '20px',
+            padding: 0,
+            border: 'none'
+          }}
+        >
+          <Plus size={14} />
+        </Button>
+      </Flex>
+    );
   };
 
-  const handleDrop = async (event: DragEvent, targetStatus: Ticket['status']) => {
-    event.preventDefault();
-    const ticketId = event.dataTransfer.getData('text/plain');
-    if (ticketId) {
-      onMoveTicket(ticketId, { status: targetStatus });
-    }
-  };
+  const formattedCards = BOARD_COLUMNS.flatMap((col) => {
+    const colTickets = ticketsByColumn[col.id] || [];
+    return colTickets.map((ticket) => {
+      const domainMeta = getDomainMeta(domainById, ticket.domainId);
+      return {
+        id: ticket.id,
+        status: ticket.status,
+        content: (
+          <TicketCard
+            ticket={ticket}
+            onClick={() => onSelectTicket(ticket)}
+            onDragStart={(e) => handleDragStart(e, ticket.id)}
+            priorityIcon={getPriorityIcon(ticket.priority)}
+            priorityColor={getPriorityColor(ticket.priority)}
+            domainColor={domainMeta.color}
+            domainName={domainMeta.name}
+            assigneeAvatar={getAssigneeAvatar(userAvatarById, ticket.assigneeId)}
+          />
+        ),
+      };
+    });
+  });
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', flex: 1, overflow: 'hidden' }}>
+    <Flex direction="column" style={{ height: '100%', flex: 1, overflow: 'hidden' }}>
       
       {/* Filtering Header Bar */}
-      <div 
+      <Flex 
+        align="center" 
+        gap="12px"
         style={{
           padding: '12px 24px',
           borderBottom: '1px solid var(--border)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
           background: 'var(--sidebar-bg)'
         }}
       >
@@ -94,132 +153,18 @@ export const TicketBoard: React.FC<TicketBoardProps> = ({
         <div style={{ marginLeft: 'auto', fontSize: '12px', color: 'var(--text-muted)' }}>
           Showing {filteredCount} of {totalCount} tickets
         </div>
+      </Flex>
+
+      {/* Kanban Board Container */}
+      <div style={{ flex: 1, overflowY: 'hidden', padding: '16px', background: 'var(--bg)' }}>
+        <KanbanBoard
+          columns={BOARD_COLUMNS}
+          cards={formattedCards}
+          onCardMove={(cardId, nextStatus) => onMoveTicket(cardId, { status: nextStatus as Ticket['status'] })}
+          renderColumnHeader={renderColumnHeader}
+        />
       </div>
 
-      {/* Kanban Board Layout Columns Container */}
-      <div 
-        style={{ 
-          flex: 1, 
-          display: 'flex', 
-          overflowX: 'auto', 
-          overflowY: 'hidden',
-          background: 'var(--bg)'
-        }}
-      >
-        {BOARD_COLUMNS.map(col => {
-          const colTickets = ticketsByColumn[col.id] || [];
-          return (
-            <div 
-              key={col.id} 
-              onDragOver={handleDragOver}
-              onDrop={(e) => handleDrop(e, col.id)}
-              className="board-column"
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                flexShrink: 0,
-                width: '300px',
-                borderRight: '1px solid var(--border)',
-                height: '100%'
-              }}
-            >
-              {/* Column Header */}
-              <div 
-                style={{
-                  padding: '16px 20px 8px 20px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  position: 'sticky',
-                  top: 0
-                }}
-              >
-                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: col.color }} />
-                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-heading)' }}>
-                  {col.title}
-                </span>
-                <span 
-                  style={{ 
-                    fontSize: '10px', 
-                    color: 'var(--text-muted)', 
-                    background: 'var(--sidebar-bg)', 
-                    padding: '1px 6px', 
-                    borderRadius: '4px',
-                    marginLeft: '4px'
-                  }}
-                >
-                  {colTickets.length}
-                </span>
-
-                <Button
-                  onClick={() => onOpenCreateTicket(col.id)}
-                  variant="ghost"
-                  size="sm"
-                  aria-label={`Create ticket in ${col.title}`}
-                  style={{
-                    marginLeft: 'auto',
-                    color: 'var(--text-muted)',
-                    width: '20px',
-                    minHeight: '20px',
-                    padding: 0,
-                    border: 'none'
-                  }}
-                >
-                  <Plus size={14} />
-                </Button>
-              </div>
-
-              {/* Cards scrolling list */}
-              <div 
-                style={{
-                  flex: 1,
-                  overflowY: 'auto',
-                  padding: '8px 12px 24px 12px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '8px'
-                }}
-              >
-                {colTickets.map((ticket) => {
-                  const domainMeta = getDomainMeta(domainById, ticket.domainId);
-
-                  return (
-                  <TicketCard
-                    key={ticket.id}
-                    ticket={ticket}
-                    onClick={() => onSelectTicket(ticket)}
-                    onDragStart={(e) => handleDragStart(e, ticket.id)}
-                    priorityIcon={getPriorityIcon(ticket.priority)}
-                    priorityColor={getPriorityColor(ticket.priority)}
-                    domainColor={domainMeta.color}
-                    domainName={domainMeta.name}
-                    assigneeAvatar={getAssigneeAvatar(userAvatarById, ticket.assigneeId)}
-                  />
-                  );
-                })}
-
-                {colTickets.length === 0 && (
-                  <div 
-                    style={{
-                      border: '1px dashed var(--border)',
-                      borderRadius: '6px',
-                      padding: '24px 12px',
-                      textAlign: 'center',
-                      fontSize: '12px',
-                      color: 'var(--text-muted)',
-                      opacity: 0.6
-                    }}
-                  >
-                    No tickets
-                  </div>
-                )}
-              </div>
-
-            </div>
-          );
-        })}
-      </div>
-
-    </div>
+    </Flex>
   );
 };

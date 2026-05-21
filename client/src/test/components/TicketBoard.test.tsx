@@ -43,6 +43,38 @@ vi.mock('@library', () => ({
       ))}
     </select>
   ),
+  Flex: ({ children, style, ...props }: any) => <div style={{ display: 'flex', ...style }} {...props}>{children}</div>,
+  KanbanBoard: ({ columns, cards, onCardMove, renderColumnHeader, style }: any) => (
+    <div style={{ display: 'flex', ...style }}>
+      {columns.map((col: any) => {
+        const colCards = cards.filter((c: any) => c.status === col.id);
+        return (
+          <div
+            key={col.id}
+            className="board-column"
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault();
+              const cardId = e.dataTransfer.getData('text/plain');
+              if (cardId && onCardMove) {
+                onCardMove(cardId, col.id);
+              }
+            }}
+          >
+            {renderColumnHeader ? renderColumnHeader(col.id, col.title, colCards.length) : <div>{col.title}</div>}
+            <div>
+              {colCards.map((card: any) => (
+                <div key={card.id}>
+                  {card.content}
+                </div>
+              ))}
+              {colCards.length === 0 && <div>No tickets</div>}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  ),
 }));
 
 vi.mock('../../components/TicketBoard/components', () => ({

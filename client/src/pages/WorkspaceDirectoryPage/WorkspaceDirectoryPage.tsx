@@ -98,7 +98,7 @@ export function WorkspaceDirectoryPage({
       }}
     >
       <Grid
-        columns="minmax(0, 1.15fr) minmax(340px, 1.15fr) minmax(340px, 0.95fr)"
+        columns="repeat(auto-fit, minmax(320px, 1fr))"
         gap="var(--space-6)"
         style={{
           maxWidth: '1480px',

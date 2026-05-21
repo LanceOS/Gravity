@@ -101,12 +101,12 @@ export function AvatarGroup({ children, max = 4, style }: AvatarGroupProps) {
 }
 
 // 3. Badge
-export interface BadgeProps {
+export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
   children: React.ReactNode;
   variant?: 'accent' | 'success' | 'error' | 'warning' | 'default';
   style?: React.CSSProperties;
 }
-export function Badge({ children, variant = 'default', style }: BadgeProps) {
+export function Badge({ children, variant = 'default', style, ...props }: BadgeProps) {
   const variantStyles = {
     default: { backgroundColor: 'var(--sidebar-bg)', color: 'var(--text-muted)' },
     accent: { backgroundColor: 'var(--accent-glow)', color: 'var(--accent)', borderColor: 'var(--accent-border)' },
@@ -128,6 +128,7 @@ export function Badge({ children, variant = 'default', style }: BadgeProps) {
         ...variantStyles[variant],
         ...style,
       }}
+      {...props}
     >
       {children}
     </span>
@@ -251,14 +252,15 @@ export function Carousel({ images, style }: CarouselProps) {
 }
 
 // 7. Card
-export interface CardProps {
+export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   title?: string;
   extra?: React.ReactNode;
   children: React.ReactNode;
   style?: React.CSSProperties;
   className?: string;
+  bodyStyle?: React.CSSProperties;
 }
-export function Card({ title, extra, children, style, className = '' }: CardProps) {
+export function Card({ title, extra, children, style, className = '', bodyStyle, ...props }: CardProps) {
   return (
     <div
       className={className}
@@ -271,6 +273,7 @@ export function Card({ title, extra, children, style, className = '' }: CardProp
         flexDirection: 'column',
         ...style,
       }}
+      {...props}
     >
       {(title || extra) && (
         <div
@@ -286,7 +289,7 @@ export function Card({ title, extra, children, style, className = '' }: CardProp
           {extra}
         </div>
       )}
-      <div style={{ padding: '16px', fontSize: '13px' }}>{children}</div>
+      <div style={{ padding: '16px', fontSize: '13px', ...bodyStyle }}>{children}</div>
     </div>
   );
 }
@@ -547,7 +550,7 @@ export function DataGrid<T>({ columns, data, rowHeight = 36, height = 360, style
 // 13. KanbanBoard
 export interface KanbanCard {
   id: string;
-  title: string;
+  title?: string;
   status: string;
   content: React.ReactNode;
 }
@@ -555,9 +558,10 @@ export interface KanbanBoardProps {
   columns: { id: string; title: string }[];
   cards: KanbanCard[];
   onCardMove?: (cardId: string, nextStatus: string) => void;
+  renderColumnHeader?: (columnId: string, title: string, count: number) => React.ReactNode;
   style?: React.CSSProperties;
 }
-export function KanbanBoard({ columns, cards, onCardMove, style }: KanbanBoardProps) {
+export function KanbanBoard({ columns, cards, onCardMove, renderColumnHeader, style }: KanbanBoardProps) {
   return (
     <div style={{ display: 'flex', gap: '16px', overflowX: 'auto', width: '100%', height: '100%', minHeight: '320px', ...style }}>
       {columns.map((col) => {
@@ -565,6 +569,14 @@ export function KanbanBoard({ columns, cards, onCardMove, style }: KanbanBoardPr
         return (
           <div
             key={col.id}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault();
+              const cardId = e.dataTransfer.getData('text/plain');
+              if (cardId && onCardMove) {
+                onCardMove(cardId, col.id);
+              }
+            }}
             style={{
               flex: 1,
               minWidth: '240px',
@@ -576,38 +588,62 @@ export function KanbanBoard({ columns, cards, onCardMove, style }: KanbanBoardPr
               gap: '12px',
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-heading)' }}>{col.title}</span>
-              <span
-                style={{
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  backgroundColor: 'var(--border)',
-                  color: 'var(--text-muted)',
-                  padding: '2px 6px',
-                  borderRadius: 'var(--radius-full)',
-                }}
-              >
-                {colCards.length}
-              </span>
-            </div>
+            {renderColumnHeader ? (
+              renderColumnHeader(col.id, col.title, colCards.length)
+            ) : (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-heading)' }}>{col.title}</span>
+                <span
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    backgroundColor: 'var(--border)',
+                    color: 'var(--text-muted)',
+                    padding: '2px 6px',
+                    borderRadius: 'var(--radius-full)',
+                  }}
+                >
+                  {colCards.length}
+                </span>
+              </div>
+            )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto', flexGrow: 1 }}>
               {colCards.map((card) => (
                 <div
                   key={card.id}
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData('text/plain', card.id);
+                  }}
                   style={{
-                    backgroundColor: 'var(--card-bg)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 'var(--radius-md)',
-                    padding: '12px',
-                    boxShadow: 'var(--shadow-sm)',
+                    backgroundColor: card.title ? 'var(--card-bg)' : 'transparent',
+                    border: card.title ? '1px solid var(--border)' : 'none',
+                    borderRadius: card.title ? 'var(--radius-md)' : '0',
+                    padding: card.title ? '12px' : '0',
+                    boxShadow: card.title ? 'var(--shadow-sm)' : 'none',
                     cursor: 'grab',
+                    transition: 'all var(--transition-normal)',
                   }}
                 >
-                  <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-heading)', marginBottom: '6px' }}>{card.title}</div>
+                  {card.title && <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-heading)', marginBottom: '6px' }}>{card.title}</div>}
                   <div>{card.content}</div>
                 </div>
               ))}
+              {colCards.length === 0 && (
+                <div
+                  style={{
+                    border: '1px dashed var(--border)',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '24px 12px',
+                    textAlign: 'center',
+                    fontSize: '12px',
+                    color: 'var(--text-muted)',
+                    opacity: 0.6,
+                  }}
+                >
+                  No tickets
+                </div>
+              )}
             </div>
           </div>
         );
