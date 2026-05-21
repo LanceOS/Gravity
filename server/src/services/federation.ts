@@ -772,17 +772,16 @@ export async function createFederatedTicket(input: {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
       result = await db.transaction(async (tx) => {
-        const existing = await tx.execute(sql`
-          SELECT key
+        const maxValueResult = await tx.execute(sql`
+          SELECT COALESCE(MAX(CAST(substring(key FROM '([0-9]+)$') AS integer)), 0) AS max_value
           FROM tickets
           WHERE project_id = ${input.ticket.projectId}
             AND key LIKE ${`${projectKeyPrefix}-%`}
         `);
 
-        const maxValue = (existing.rows as Array<{ key: string }>).reduce((highest, row) => {
-          const numeric = Number(row.key.split('-').pop() ?? 0);
-          return Number.isFinite(numeric) && numeric > highest ? numeric : highest;
-        }, 0);
+        const maxValueRow = (maxValueResult.rows as Array<{ max_value: number | string | null }>)[0];
+        const parsedMaxValue = Number(maxValueRow?.max_value ?? 0);
+        const maxValue = Number.isFinite(parsedMaxValue) ? parsedMaxValue : 0;
 
         const ticketRows = await tx
           .insert(tickets)
