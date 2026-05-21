@@ -136,6 +136,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
           <div>
             <Textarea 
               rows={5}
+              aria-label="Description"
               placeholder="Add description... (markdown supported)"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
