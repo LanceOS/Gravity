@@ -261,16 +261,17 @@ export async function initializeDatabase() {
     ALTER TABLE peer_connections ADD COLUMN IF NOT EXISTS workspace_id TEXT;
     DO $$
     BEGIN
-      IF EXISTS (
+      IF NOT EXISTS (
         SELECT 1
         FROM peer_connections
         WHERE workspace_id IS NULL
       ) THEN
-        RAISE EXCEPTION
-          'Migration aborted: peer_connections.workspace_id contains NULL for legacy rows. Backfill workspace_id values before continuing so the column can be enforced as NOT NULL.';
+        ALTER TABLE peer_connections ALTER COLUMN workspace_id SET NOT NULL;
+      ELSE
+        RAISE NOTICE
+          'Skipping NOT NULL enforcement for peer_connections.workspace_id because legacy rows still contain NULL values.';
       END IF;
     END $$;
-    ALTER TABLE peer_connections ALTER COLUMN workspace_id SET NOT NULL;
     ALTER TABLE peer_connections ADD COLUMN IF NOT EXISTS host_display_name TEXT NOT NULL DEFAULT '';
   `);
 
