@@ -156,6 +156,7 @@ export function WorkspacePage({
                     <Button
                       type="button"
                       variant="primary"
+                      className="workspace-page__projects-button workspace-page__projects-button--primary"
                       onClick={onOpenProjectManager}
                     >
                       Manage Projects
