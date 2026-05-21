@@ -1,5 +1,6 @@
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { GitMerge, GitPullRequest, Paperclip } from 'lucide-react';
+import { Card, Avatar, Badge, Flex } from '@library';
 import type { TicketCardProps } from '../types';
 
 function TicketCardImpl({
@@ -12,14 +13,19 @@ function TicketCardImpl({
   domainName,
   assigneeAvatar,
 }: TicketCardProps) {
+  const [isHovered, setIsHovered] = useState(false);
+
   return (
-    <div
+    <Card
+      className="clickable"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      onClick={onClick}
       draggable
       onDragStart={onDragStart}
-      onClick={onClick}
-      className="clickable"
+      bodyStyle={{ padding: 0 }}
       style={{
-        background: 'var(--card-bg)',
+        backgroundColor: isHovered ? 'var(--card-hover)' : 'var(--card-bg)',
         border: '1px solid var(--border)',
         borderLeft: `3px solid ${priorityColor}`,
         borderRadius: '6px',
@@ -28,32 +34,32 @@ function TicketCardImpl({
         flexDirection: 'column',
         gap: '10px',
         cursor: 'grab',
-        transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
-        boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+        transition: 'all var(--transition-normal)',
+        boxShadow: isHovered ? 'var(--shadow-md)' : 'var(--shadow-sm)',
+        borderColor: isHovered ? 'var(--accent-border)' : 'var(--border)',
+        transform: isHovered ? 'translateY(-1px)' : 'none',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <Flex align="center" justify="space-between">
         <span style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text-muted)' }}>
           {ticket.key}
         </span>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <Flex align="center" gap="6px">
           {ticket.parentId ? <Paperclip size={10} color="var(--text-muted)" /> : null}
 
           {ticket.prStatus !== 'none' ? (
-            <div
+            <Badge
+              variant={ticket.prStatus === 'merged' ? 'success' : 'accent'}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', border: 'none' }}
               title={`PR ${ticket.prStatus}`}
-              style={{
-                color: ticket.prStatus === 'merged' ? '#10b981' : '#3b82f6',
-                display: 'flex',
-                alignItems: 'center',
-              }}
             >
               {ticket.prStatus === 'merged' ? <GitMerge size={12} /> : <GitPullRequest size={12} />}
-            </div>
+              {ticket.prStatus === 'merged' ? 'Merged' : 'Active'}
+            </Badge>
           ) : null}
-        </div>
-      </div>
+        </Flex>
+      </Flex>
 
       <div
         style={{
@@ -71,9 +77,17 @@ function TicketCardImpl({
         {ticket.title}
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.01)', paddingTop: '8px', marginTop: '2px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div style={{ display: 'flex', alignItems: 'center' }}>{priorityIcon}</div>
+      <Flex
+        align="center"
+        justify="space-between"
+        style={{
+          borderTop: '1px solid rgba(255,255,255,0.01)',
+          paddingTop: '8px',
+          marginTop: '2px',
+        }}
+      >
+        <Flex align="center" gap="8px">
+          <Flex align="center">{priorityIcon}</Flex>
 
           {domainColor !== 'transparent' ? (
             <div
@@ -86,29 +100,15 @@ function TicketCardImpl({
               }}
             />
           ) : null}
-        </div>
+        </Flex>
 
-        <div
-          style={{
-            width: '18px',
-            height: '18px',
-            borderRadius: '50%',
-            background: 'var(--sidebar-bg)',
-            border: '1px solid var(--border)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            overflow: 'hidden',
-          }}
-        >
-          {assigneeAvatar ? (
-            <img src={assigneeAvatar} alt="" style={{ width: '100%', height: '100%' }} />
-          ) : (
-            <span style={{ fontSize: '8px', color: 'var(--text-muted)' }}>--</span>
-          )}
-        </div>
-      </div>
-    </div>
+        <Avatar
+          src={assigneeAvatar || undefined}
+          name={ticket.assigneeId ? 'User' : undefined}
+          size="sm"
+        />
+      </Flex>
+    </Card>
   );
 }
 
