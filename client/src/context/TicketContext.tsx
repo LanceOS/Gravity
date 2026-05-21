@@ -672,13 +672,13 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
 
       const domain = await response.json();
-      await fetchProjectData(projectId);
+      dispatch({ type: 'ADD_DOMAIN', payload: domain });
       return domain;
     } catch (error) {
       console.error(error);
       throw error;
     }
-  }, [activeProjectId, fetchProjectData]);
+  }, [activeProjectId]);
 
   const joinProject = useCallback(async (inviteCode: string) => {
     if (!state.currentUser) {
