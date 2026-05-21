@@ -7,6 +7,11 @@ export const auth = betterAuth({
   secret: env.betterAuthSecret,
   baseURL: env.betterAuthBaseUrl,
   trustedOrigins: env.trustedOrigins,
+  session: {
+    expiresIn: 60 * 60 * 24 * 30,
+    updateAge: 60 * 60 * 24,
+    freshAge: 60 * 60 * 24,
+  },
   emailAndPassword: {
     enabled: true,
   },

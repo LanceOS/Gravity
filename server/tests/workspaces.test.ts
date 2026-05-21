@@ -11,14 +11,17 @@ describe('workspaces routes', () => {
       avatarUrl: 'https://example.com/workspace-owner.png',
     });
 
-    const createResponse = await api().post('/api/v1/workspaces').send({
-      name: 'Gravity Core',
-      description: 'The main Gravity workspace.',
-      key: 'GRV',
-      ownerId: owner.id,
-      defaultProjectName: 'Gravity App',
-      defaultProjectKey: 'GRV',
-    });
+    const createResponse = await api()
+      .post('/api/v1/workspaces')
+      .set('x-user-id', owner.id)
+      .send({
+        name: 'Gravity Core',
+        description: 'The main Gravity workspace.',
+        key: 'GRV',
+        ownerId: owner.id,
+        defaultProjectName: 'Gravity App',
+        defaultProjectKey: 'GRV',
+      });
 
     expect(createResponse.status).toBe(201);
     expect(createResponse.body.workspace).toMatchObject({
@@ -32,7 +35,7 @@ describe('workspaces routes', () => {
     const workspaceId = createResponse.body.workspace.id;
     const defaultProjectId = createResponse.body.workspace.defaultProjectId;
 
-    const listResponse = await api().get('/api/v1/workspaces').query({ userId: owner.id });
+    const listResponse = await api().get('/api/v1/workspaces').set('x-user-id', owner.id).query({ userId: owner.id });
     expect(listResponse.status).toBe(200);
     expect(listResponse.body).toEqual([
       expect.objectContaining({
@@ -83,6 +86,66 @@ describe('workspaces routes', () => {
         name: owner.name,
         email: owner.email,
         role: 'owner',
+      }),
+    ]);
+  });
+
+  it('rejects mismatched actor identifiers when creating or listing workspaces', async () => {
+    const owner = await seedUser({
+      id: 'workspace-owner-authz',
+      name: 'Workspace Owner Authz',
+      email: 'workspace-owner-authz@example.com',
+      role: 'owner',
+      avatarUrl: 'https://example.com/workspace-owner-authz.png',
+    });
+    const otherUser = await seedUser({
+      id: 'workspace-other-user',
+      name: 'Workspace Other User',
+      email: 'workspace-other-user@example.com',
+      role: 'member',
+      avatarUrl: 'https://example.com/workspace-other-user.png',
+    });
+
+    const createResponse = await api()
+      .post('/api/v1/workspaces')
+      .set('x-user-id', owner.id)
+      .send({
+        name: 'Gravity Core Authz',
+        description: 'The main Gravity workspace.',
+        key: 'GRVAUTH',
+        ownerId: otherUser.id,
+      });
+
+    expect(createResponse.status).toBe(403);
+    expect(createResponse.body).toEqual({ error: 'Forbidden.' });
+
+    const authorizedCreateResponse = await api()
+      .post('/api/v1/workspaces')
+      .set('x-user-id', owner.id)
+      .send({
+        name: 'Gravity Core Authorized',
+        description: 'The main Gravity workspace.',
+        key: 'AUTHZFIX',
+        ownerId: owner.id,
+      });
+
+    expect(authorizedCreateResponse.status).toBe(201);
+    const workspaceId = authorizedCreateResponse.body.workspace.id;
+
+    const listResponse = await api()
+      .get('/api/v1/workspaces')
+      .set('x-user-id', owner.id)
+      .query({ userId: otherUser.id });
+
+    expect(listResponse.status).toBe(403);
+    expect(listResponse.body).toEqual({ error: 'Forbidden.' });
+
+    const authorizedListResponse = await api().get('/api/v1/workspaces').set('x-user-id', owner.id);
+    expect(authorizedListResponse.status).toBe(200);
+    expect(authorizedListResponse.body).toEqual([
+      expect.objectContaining({
+        id: workspaceId,
+        memberRole: 'owner',
       }),
     ]);
   });

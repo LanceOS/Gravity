@@ -103,9 +103,20 @@ export function createWorkspacesRouter() {
   const router = Router();
 
   router.get('/workspaces', async (req, res) => {
+    const actorUserId = await resolveRequestActorUserId(req);
+    if (!actorUserId) {
+      res.status(401).json({ error: 'Unauthorized.' });
+      return;
+    }
+
     try {
-      const userId = typeof req.query.userId === 'string' ? req.query.userId : undefined;
-      const workspaceList = await listWorkspaceSummaries(userId);
+      const requestedUserId = typeof req.query.userId === 'string' ? req.query.userId : undefined;
+      if (requestedUserId && requestedUserId !== actorUserId) {
+        res.status(403).json({ error: 'Forbidden.' });
+        return;
+      }
+
+      const workspaceList = await listWorkspaceSummaries(actorUserId);
       res.json(workspaceList);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load workspaces.' });
@@ -113,13 +124,25 @@ export function createWorkspacesRouter() {
   });
 
   router.post('/workspaces', async (req, res) => {
+    const actorUserId = await resolveRequestActorUserId(req);
+    if (!actorUserId) {
+      res.status(401).json({ error: 'Unauthorized.' });
+      return;
+    }
+
     const { name, description, key, workspaceKey, ownerId, defaultProjectName, defaultProjectKey } = req.body ?? {};
-    if (!name || !key || !ownerId) {
-      res.status(400).json({ error: 'Workspace name, key, and ownerId are required.' });
+    if (!name || !key) {
+      res.status(400).json({ error: 'Workspace name and key are required.' });
+      return;
+    }
+
+    if (typeof ownerId === 'string' && ownerId !== actorUserId) {
+      res.status(403).json({ error: 'Forbidden.' });
       return;
     }
 
     try {
+      const effectiveOwnerId = actorUserId;
       const workspaceId = createId('w');
       const projectId = createId('p');
       const normalizedWorkspaceKey = normalizeEntityKey(key);
@@ -140,7 +163,7 @@ export function createWorkspacesRouter() {
           workspaceKey: resolvedWorkspaceAccessKey,
           defaultProjectId: projectId,
           hostUrl: '',
-          createdBy: ownerId,
+          createdBy: effectiveOwnerId,
           createdAt: new Date(),
         });
 
@@ -154,7 +177,7 @@ export function createWorkspacesRouter() {
 
         await tx.insert(workspaceMembers).values({
           workspaceId,
-          userId: ownerId,
+          userId: effectiveOwnerId,
           role: 'owner',
           createdAt: new Date(),
         });
@@ -167,14 +190,14 @@ export function createWorkspacesRouter() {
           key: resolvedProjectKey,
           status: 'active',
           inviteCode: createProjectInviteCode(resolvedProjectKey),
-          createdBy: ownerId,
+          createdBy: effectiveOwnerId,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
       });
 
-      await ensureProjectMembership(projectId, ownerId, 'owner');
-      const workspace = await getWorkspaceSummary(workspaceId, ownerId);
+      await ensureProjectMembership(projectId, effectiveOwnerId, 'owner');
+      const workspace = await getWorkspaceSummary(workspaceId, effectiveOwnerId);
       res.status(201).json({ workspace });
     } catch (error) {
       const mapped = mapProjectCreationError(error, normalizeEntityKey(defaultProjectKey || key));

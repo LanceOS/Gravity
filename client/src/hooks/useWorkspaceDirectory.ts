@@ -59,8 +59,14 @@ export function useWorkspaceDirectory({ currentUser, setCurrentUser }: UseWorksp
     setError(null);
 
     try {
-      const response = await fetch(`/api/v1/workspaces?userId=${encodeURIComponent(currentUser.id)}`);
+      const response = await fetch('/api/v1/workspaces');
       const data = await response.json();
+
+      if (response.status === 401) {
+        setCurrentUser(null);
+        setWorkspaces([]);
+        return [];
+      }
 
       if (!response.ok) {
         throw new Error(data.error || 'Failed to load workspaces.');
