@@ -1,50 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import type { Comment, Cycle, Domain, Project, Ticket, User } from '../context/TicketContext';
-import { Button } from './ui/Button';
-import { Select } from './ui/Select';
+import React, { useState } from 'react';
+import type { Ticket } from '../../context/TicketContext';
+import { Button } from '../ui/Button';
+import { Select } from '../ui/Select';
 import { 
-  X, CheckSquare, GitPullRequest, GitMerge, Send, Trash2, 
-  Plus, Edit3, Eye, Calendar, User as UserIcon, Folder, Tag, AlertCircle, ChevronLeft
+  CheckSquare, GitPullRequest, GitMerge, Send, Trash2,
+  Plus, Edit3, Eye, ChevronLeft
 } from 'lucide-react';
-
-const STATUS_OPTIONS = [
-  { value: 'backlog', label: '📁 Backlog' },
-  { value: 'todo', label: '📋 Todo' },
-  { value: 'in_progress', label: '⚡ In Progress' },
-  { value: 'in_review', label: '🔍 In Review' },
-  { value: 'done', label: '✅ Done' },
-  { value: 'canceled', label: '❌ Canceled' },
-];
-
-const PRIORITY_OPTIONS = [
-  { value: 'no_priority', label: '➖ No Priority' },
-  { value: 'low', label: '🔵 Low' },
-  { value: 'medium', label: '🟡 Medium' },
-  { value: 'high', label: '🔴 High' },
-  { value: 'urgent', label: '💖 Urgent' },
-];
-
-interface TicketDetailProps {
-  activeTicket: Ticket;
-  comments: Comment[];
-  subtasks: Ticket[];
-  completedSubtasks: number;
-  subtaskProgressPercent: number;
-  activeAssignee: User | null;
-  activeProject: Project | null;
-  activeDomain: Domain | null;
-  activeCycle: Cycle | null;
-  users: User[];
-  projects: Project[];
-  domains: Domain[];
-  cycles: Cycle[];
-  onSelectTicket: (ticket: Ticket | null) => void;
-  onUpdateTicket: (id: string, updates: Partial<Ticket>) => Promise<void>;
-  onDeleteTicket: (ticketId: string) => Promise<void>;
-  onAddComment: (ticketId: string, body: string) => Promise<void>;
-  onClose: () => void;
-  onOpenCreateSubtask: (parentId: string) => void;
-}
+import { MarkdownContent } from './components';
+import type { TicketDetailProps } from './types';
+import { PRIORITY_OPTIONS, STATUS_OPTIONS } from './utils';
 
 export const TicketDetail: React.FC<TicketDetailProps> = ({
   activeTicket,
@@ -52,10 +16,6 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
   subtasks,
   completedSubtasks,
   subtaskProgressPercent,
-  activeAssignee,
-  activeProject,
-  activeDomain,
-  activeCycle,
   users,
   projects,
   domains,
@@ -77,17 +37,6 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
 
   const [commentInput, setCommentInput] = useState('');
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
-
-  // Sync state when active ticket changes
-  useEffect(() => {
-    setTitleValue(activeTicket.title);
-    setDescValue(activeTicket.description || '');
-    setIsEditingTitle(false);
-    setIsEditingDesc(false);
-    setDescTab('preview');
-    setCommentInput('');
-    setIsDeleteConfirmOpen(false);
-  }, [activeTicket]);
 
   const handleTitleBlur = () => {
     setIsEditingTitle(false);
@@ -315,7 +264,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                     background: 'var(--card-bg)'
                   }}
                 >
-                  {descValue ? <MarkdownMock text={descValue} /> : <span style={{ color: 'var(--text-muted)' }}>Nothing to preview</span>}
+                  {descValue ? <MarkdownContent text={descValue} /> : <span style={{ color: 'var(--text-muted)' }}>Nothing to preview</span>}
                 </div>
               )
             ) : (
@@ -350,7 +299,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                   <span>Edit description</span>
                 </span>
                 {activeTicket.description ? (
-                  <MarkdownMock text={activeTicket.description} />
+                  <MarkdownContent text={activeTicket.description} />
                 ) : (
                   <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No description provided. Click to add details...</span>
                 )}
@@ -443,7 +392,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
 
             {/* Comments List */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {comments.map((comment: Comment) => (
+              {comments.map((comment) => (
                 <div key={comment.id} style={{ display: 'flex', gap: '12px' }}>
                   <img 
                     src={comment.userAvatar || 'https://api.dicebear.com/7.x/bottts/svg?seed=guest'} 
@@ -470,7 +419,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                         lineHeight: '1.5'
                       }}
                     >
-                      <MarkdownMock text={comment.body} />
+                      <MarkdownContent text={comment.body} />
                     </div>
                   </div>
                 </div>
@@ -694,80 +643,4 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
       )}
     </>
   );
-};
-
-// Extremely simple sub-renderer that parses basic markdown formatting like bold, code, links and linebreaks
-const MarkdownMock: React.FC<{ text: string }> = ({ text }) => {
-  if (!text) return null;
-  
-  const lines = text.split('\n');
-  return (
-    <>
-      {lines.map((line, idx) => {
-        // Headers
-        if (line.startsWith('# ')) {
-          return <h2 key={idx} style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-heading)', margin: '12px 0 6px' }}>{line.replace('# ', '')}</h2>;
-        }
-        if (line.startsWith('## ')) {
-          return <h3 key={idx} style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-heading)', margin: '10px 0 4px' }}>{line.replace('## ', '')}</h3>;
-        }
-
-        // Bullet point lists
-        if (line.trim().startsWith('* ') || line.trim().startsWith('- ')) {
-          const content = line.replace(/^\s*[\*\-]\s+/, '');
-          return <li key={idx} style={{ marginLeft: '12px', fontSize: '13px', margin: '2px 0' }}><FormattedText text={content} /></li>;
-        }
-
-        return (
-          <p key={idx} style={{ minHeight: '18px', margin: '4px 0' }}>
-            <FormattedText text={line} />
-          </p>
-        );
-      })}
-    </>
-  );
-};
-
-const FormattedText: React.FC<{ text: string }> = ({ text }) => {
-  // Simple regex parser for **bold**, `code`, and [link](url)
-  const parts: React.ReactNode[] = [];
-  let remaining = text;
-  let keyIdx = 0;
-
-  while (remaining.length > 0) {
-    const boldMatch = remaining.match(/\*\*([^*]+)\*\*/);
-    const codeMatch = remaining.match(/`([^`]+)`/);
-    const linkMatch = remaining.match(/\[([^\]]+)\]\(([^)]+)\)/);
-
-    const matches = [
-      boldMatch ? { index: boldMatch.index!, length: boldMatch[0].length, type: 'bold', text: boldMatch[1], raw: boldMatch[0] } : null,
-      codeMatch ? { index: codeMatch.index!, length: codeMatch[0].length, type: 'code', text: codeMatch[1], raw: codeMatch[0] } : null,
-      linkMatch ? { index: linkMatch.index!, length: linkMatch[0].length, type: 'link', text: linkMatch[1], url: linkMatch[2], raw: linkMatch[0] } : null
-    ].filter((m): m is Exclude<typeof m, null> => m !== null && m.index !== undefined);
-
-    if (matches.length === 0) {
-      parts.push(<span key={keyIdx++}>{remaining}</span>);
-      break;
-    }
-
-    // Sort to find the first match
-    matches.sort((a, b) => a.index - b.index);
-    const first = matches[0];
-
-    if (first.index > 0) {
-      parts.push(<span key={keyIdx++}>{remaining.substring(0, first.index)}</span>);
-    }
-
-    if (first.type === 'bold') {
-      parts.push(<strong key={keyIdx++} style={{ color: 'var(--text-heading)', fontWeight: 600 }}>{first.text}</strong>);
-    } else if (first.type === 'code') {
-      parts.push(<code key={keyIdx++} style={{ background: 'var(--sidebar-bg)', padding: '1px 4px', borderRadius: '4px', fontSize: '11px', fontFamily: 'var(--mono)', color: 'var(--text-heading)' }}>{first.text}</code>);
-    } else if (first.type === 'link') {
-      parts.push(<a key={keyIdx++} href={(first as any).url} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none' }} className="clickable">{(first as any).text}</a>);
-    }
-
-    remaining = remaining.substring(first.index + first.length);
-  }
-
-  return <>{parts}</>;
 };

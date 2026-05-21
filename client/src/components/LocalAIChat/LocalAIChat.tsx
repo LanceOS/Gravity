@@ -1,34 +1,21 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useTickets, Ticket } from '../context/TicketContext';
-import { X, Sparkles, Send, Cpu, Wifi, WifiOff, FileText, ListPlus, Loader2, ArrowRight } from 'lucide-react';
-
-interface LocalAIChatProps {
-  onClose: () => void;
-  initialOllamaUrl: string;
-  initialModel: string;
-}
-
-interface Message {
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-}
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
+import { useTickets } from '../../context/TicketContext';
+import { Cpu, FileText, ListPlus, Loader2, Send, Sparkles, Wifi, WifiOff, X } from 'lucide-react';
+import { FormattedMarkdown } from './components';
+import type { LocalAIChatProps, Message, QuickActionType } from './types';
+import { buildOllamaErrorMessage, buildQuickActionPrompt, getInitialMessages, getInitialModel, getInitialOllamaUrl } from './utils';
 
 export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllamaUrl, initialModel }) => {
-  const { activeTicket, tickets, projects, users } = useTickets();
+  const { activeTicket, projects, users } = useTickets();
 
   // Settings
-  const [ollamaUrl, setOllamaUrl] = useState(() => initialOllamaUrl || 'http://localhost:11434');
-  const [model, setModel] = useState(() => initialModel || '');
+  const [ollamaUrl, setOllamaUrl] = useState(() => getInitialOllamaUrl(initialOllamaUrl));
+  const [model, setModel] = useState(() => getInitialModel(initialModel));
   const [isCheckingModel, setIsCheckingModel] = useState(false);
   const [modelStatus, setModelStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
 
   // Chat state
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: 'assistant',
-      content: "Hello! I am your **Gravity AI Assistant**. I can read the context of your active tickets to help you write descriptions, summarize comments, outline implementation checklists, or draft pull requests.\n\nType a question or select a **Quick Action** below to get started!"
-    }
-  ]);
+  const [messages, setMessages] = useState<Message[]>(getInitialMessages);
   const [chatInput, setChatInput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -39,28 +26,21 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isGenerating]);
 
-  useEffect(() => {
-    setOllamaUrl(initialOllamaUrl || 'http://localhost:11434');
-  }, [initialOllamaUrl]);
+  const checkOllamaStatus = useEffectEvent(async (urlToTest = ollamaUrl, announceLoading = true) => {
+    if (announceLoading) {
+      setIsCheckingModel(true);
+      setModelStatus('checking');
+    }
 
-  useEffect(() => {
-    setModel(initialModel || '');
-  }, [initialModel]);
-
-  // Check Ollama status on mount
-  const checkOllamaStatus = async (urlToTest = ollamaUrl) => {
-    setIsCheckingModel(true);
-    setModelStatus('checking');
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 2000);
-      
+
       const response = await fetch(`${urlToTest}/api/tags`, { signal: controller.signal });
       clearTimeout(timeoutId);
-      
+
       if (response.ok) {
         const data = await response.json();
-        // Set model name to first available model if it exists
         if (data.models && data.models.length > 0 && !model) {
           setModel(data.models[0].name);
         }
@@ -68,15 +48,15 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
       } else {
         setModelStatus('disconnected');
       }
-    } catch (e) {
+    } catch {
       setModelStatus('disconnected');
     } finally {
       setIsCheckingModel(false);
     }
-  };
+  });
 
   useEffect(() => {
-    checkOllamaStatus();
+    void checkOllamaStatus(getInitialOllamaUrl(initialOllamaUrl), false);
   }, []);
 
   const handleSendMessage = async (customText?: string) => {
@@ -108,19 +88,16 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
       const aiResponse = data.message?.content || 'Sorry, I got an empty response from local Ollama.';
       
       setMessages([...newMessages, { role: 'assistant', content: aiResponse }]);
-    } catch (e: any) {
-      console.error(e);
-      setMessages([...newMessages, { 
-        role: 'system', 
-        content: `❌ **Failed to contact local Ollama**\n\n* **Error details**: ${e.message}\n* **Troubleshooting**:\n  1. Verify Ollama is running in your terminal (\`ollama serve\` or check your desktop application).\n  2. Check if model \`${model}\` is installed. Run \`ollama pull ${model}\` to download it.\n  3. Verify the Ollama API port is open on \`${ollamaUrl}\`.` 
-      }]);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown local Ollama error.';
+      console.error(error);
+      setMessages([...newMessages, buildOllamaErrorMessage(model, ollamaUrl, message)]);
     } finally {
       setIsGenerating(false);
     }
   };
 
-  // Quick Action triggers
-  const handleQuickAction = (actionType: 'analyze' | 'subtasks' | 'release') => {
+  const handleQuickAction = (actionType: QuickActionType) => {
     if (!activeTicket) {
       setMessages((currentMessages) => [
         ...currentMessages,
@@ -132,19 +109,7 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
       return;
     }
 
-    let prompt = '';
-    const assigneeName = activeTicket.assigneeId ? users.find(u => u.id === activeTicket.assigneeId)?.name : 'Unassigned';
-    const projectName = projects.find(p => p.id === activeTicket.projectId)?.name || 'General';
-
-    if (actionType === 'analyze') {
-      prompt = `Review this ticket context:\nKey: ${activeTicket.key}\nTitle: ${activeTicket.title}\nDescription: ${activeTicket.description || 'No description'}\nAssignee: ${assigneeName}\nProject: ${projectName}\nStatus: ${activeTicket.status}\nPriority: ${activeTicket.priority}\n\nTask: Provide a detailed architectural analysis of this ticket, identify any immediate design patterns that should be applied, mention any potential code decoupling points, and list any risks or dependencies. Keep it concise.`;
-    } else if (actionType === 'subtasks') {
-      prompt = `Review this ticket context:\nKey: ${activeTicket.key}\nTitle: ${activeTicket.title}\nDescription: ${activeTicket.description || 'No description'}\n\nTask: Generate an action-oriented technical checklist of 3-5 sub-tasks. Present them in standard markdown bullet points. Under each bullet point, write a 1-sentence engineering instruction.`;
-    } else if (actionType === 'release') {
-      prompt = `Review this ticket context:\nKey: ${activeTicket.key}\nTitle: ${activeTicket.title}\nDescription: ${activeTicket.description || 'No description'}\nProject: ${projectName}\nPR status: ${activeTicket.prStatus}\n\nTask: Write a professional, punchy Release Note for this ticket as if it were being shipped to production. Summarize what it changes, and why it benefits developers or users.`;
-    }
-
-    handleSendMessage(prompt);
+    handleSendMessage(buildQuickActionPrompt(actionType, { activeTicket, projects, users }));
   };
 
   return (
@@ -206,7 +171,7 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
             Ollama Endpoint Status:
           </span>
           <span 
-            onClick={() => checkOllamaStatus()}
+            onClick={() => void checkOllamaStatus()}
             className="clickable"
             style={{
               marginLeft: 'auto',
@@ -231,7 +196,7 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
             placeholder="http://localhost:11434"
             value={ollamaUrl}
             onChange={(e) => setOllamaUrl(e.target.value)}
-            onBlur={() => checkOllamaStatus()}
+            onBlur={() => void checkOllamaStatus()}
           />
           <input 
             type="text" 
@@ -351,80 +316,4 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
 
     </div>
   );
-};
-
-// Markdown text sub-renderer for Ollama responses
-const FormattedMarkdown: React.FC<{ text: string }> = ({ text }) => {
-  if (!text) return null;
-  const paragraphs = text.split('\n\n');
-  return (
-    <>
-      {paragraphs.map((p, pIdx) => {
-        const lines = p.split('\n');
-        return (
-          <div key={pIdx} style={{ marginBottom: pIdx < paragraphs.length - 1 ? '10px' : 0 }}>
-            {lines.map((line, lIdx) => {
-              if (line.startsWith('* ') || line.startsWith('- ')) {
-                return (
-                  <li key={lIdx} style={{ marginLeft: '12px', listStyleType: 'disc', margin: '2px 0' }}>
-                    <TextInlineParser text={line.replace(/^[\*\-]\s+/, '')} />
-                  </li>
-                );
-              }
-              if (line.match(/^\d+\.\s+/)) {
-                return (
-                  <li key={lIdx} style={{ marginLeft: '12px', listStyleType: 'decimal', margin: '2px 0' }}>
-                    <TextInlineParser text={line.replace(/^\d+\.\s+/, '')} />
-                  </li>
-                );
-              }
-              return (
-                <div key={lIdx}>
-                  <TextInlineParser text={line} />
-                </div>
-              );
-            })}
-          </div>
-        );
-      })}
-    </>
-  );
-};
-
-const TextInlineParser: React.FC<{ text: string }> = ({ text }) => {
-  const parts: React.ReactNode[] = [];
-  let remaining = text;
-  let keyIdx = 0;
-
-  while (remaining.length > 0) {
-    const boldMatch = remaining.match(/\*\*([^*]+)\*\*/);
-    const codeMatch = remaining.match(/`([^`]+)`/);
-
-    const matches = [
-      boldMatch ? { index: boldMatch.index!, length: boldMatch[0].length, type: 'bold', text: boldMatch[1] } : null,
-      codeMatch ? { index: codeMatch.index!, length: codeMatch[0].length, type: 'code', text: codeMatch[1] } : null
-    ].filter((m): m is Exclude<typeof m, null> => m !== null && m.index !== undefined);
-
-    if (matches.length === 0) {
-      parts.push(<span key={keyIdx++}>{remaining}</span>);
-      break;
-    }
-
-    matches.sort((a, b) => a.index - b.index);
-    const first = matches[0];
-
-    if (first.index > 0) {
-      parts.push(<span key={keyIdx++}>{remaining.substring(0, first.index)}</span>);
-    }
-
-    if (first.type === 'bold') {
-      parts.push(<strong key={keyIdx++} style={{ color: 'var(--text-heading)', fontWeight: 600 }}>{first.text}</strong>);
-    } else if (first.type === 'code') {
-      parts.push(<code key={keyIdx++} style={{ background: 'rgba(255,255,255,0.05)', padding: '1px 3px', borderRadius: '3px', fontSize: '11px', fontFamily: 'var(--mono)', color: 'var(--accent)' }}>{first.text}</code>);
-    }
-
-    remaining = remaining.substring(first.index + first.length);
-  }
-
-  return <>{parts}</>;
 };

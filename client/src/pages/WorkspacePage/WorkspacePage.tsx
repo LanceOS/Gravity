@@ -25,7 +25,6 @@ interface WorkspacePageProps {
   projects: Project[];
   tickets: Ticket[];
   users: User[];
-  activeProjectId: string;
   onAddComment: (ticketId: string, body: string) => Promise<void>;
   onDeleteTicket: (ticketId: string) => Promise<void>;
   onOpenCreateSubtask: (parentId: string) => void;
@@ -48,7 +47,6 @@ export function WorkspacePage({
   projects,
   tickets,
   users,
-  activeProjectId,
   onAddComment,
   onDeleteTicket,
   onOpenCreateSubtask,
@@ -74,18 +72,6 @@ export function WorkspacePage({
     () => Object.fromEntries(domains.map((domain) => [domain.id, domain])),
     [domains]
   );
-  const projectById = useMemo(
-    () => Object.fromEntries(projects.map((project) => [project.id, project])),
-    [projects]
-  );
-  const cycleById = useMemo(
-    () => Object.fromEntries(cycles.map((cycle) => [cycle.id, cycle])),
-    [cycles]
-  );
-  const userById = useMemo(
-    () => Object.fromEntries(users.map((user) => [user.id, user])),
-    [users]
-  );
   const detailSubtasks = useMemo(
     () => (activeTicket ? tickets.filter((ticket) => ticket.parentId === activeTicket.id) : []),
     [tickets, activeTicket]
@@ -98,11 +84,6 @@ export function WorkspacePage({
     () => (detailSubtasks.length > 0 ? (completedDetailSubtasks / detailSubtasks.length) * 100 : 0),
     [detailSubtasks, completedDetailSubtasks]
   );
-  const activeAssignee = activeTicket?.assigneeId ? userById[activeTicket.assigneeId] || null : null;
-  const activeProject = activeTicket ? projectById[activeTicket.projectId] || null : null;
-  const activeDomain = activeTicket?.domainId ? domainById[activeTicket.domainId] || null : null;
-  const activeCycle = activeTicket?.cycleId ? cycleById[activeTicket.cycleId] || null : null;
-
   const handleClearFilters = () => {
     onSetFilters({
       search: '',
@@ -200,15 +181,12 @@ export function WorkspacePage({
         {activeTicket ? (
           <div className="workspace-page__detail">
             <TicketDetail
+              key={activeTicket.id}
               activeTicket={activeTicket}
               comments={comments}
               subtasks={detailSubtasks}
               completedSubtasks={completedDetailSubtasks}
               subtaskProgressPercent={detailSubtaskProgressPercent}
-              activeAssignee={activeAssignee}
-              activeProject={activeProject}
-              activeDomain={activeDomain}
-              activeCycle={activeCycle}
               users={users}
               projects={projects}
               domains={domains}

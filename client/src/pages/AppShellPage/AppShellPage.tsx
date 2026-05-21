@@ -627,33 +627,45 @@ export function AppShellPage() {
   }
 
   const sidebarProps: SidebarProps = {
-    workspaces: workspaces.map((workspace) => ({ id: workspace.id, name: workspace.name })),
-    projects: activeWorkspaceProjects,
-    domains,
-    cycles,
-    currentUser,
-    activeWorkspaceId,
-    activeProjectId,
-    filters,
-    myIssuesCount,
-    activeProjectTicketCount: openTickets.length,
-    domainCounts,
-    cycleCounts,
-    activeArea: activeSection === 'projects' ? 'projects' : 'workspace',
-    onSelectWorkspace: handleSelectWorkspace,
-    onOpenWorkspaceDirectory: () => setActiveSection('directory'),
-    onSelectProject: handleSelectProject,
-    onShowProjectIssues: handleShowProjectIssues,
-    onShowMyIssues: handleShowMyIssues,
-    onSelectCycle: handleSelectCycle,
-    onSelectDomain: handleSelectDomain,
-    onOpenAccountPreferences: handleOpenAccountPreferences,
-    onSignOut: signOut,
-    onOpenOllama: () => setIsOllamaOpen((previous) => !previous),
-    onOpenSimulator: () => setIsSimulatorOpen((previous) => !previous),
-    onOpenCreateTicket: () => handleOpenCreateTicket(),
-    onOpenProjectManager: handleOpenProjectManager,
-    onOpenSettings: handleOpenSettings,
+    workspace: {
+      workspaces: workspaces.map((workspace) => ({ id: workspace.id, name: workspace.name })),
+      activeWorkspaceId,
+      onSelectWorkspace: handleSelectWorkspace,
+      onOpenWorkspaceDirectory: () => setActiveSection('directory'),
+    },
+    projects: {
+      projects: activeWorkspaceProjects,
+      domains,
+      cycles,
+      currentUser,
+      activeProjectId,
+      filters,
+      counts: {
+        myIssues: myIssuesCount,
+        activeProjectIssues: openTickets.length,
+        domains: domainCounts,
+        cycles: cycleCounts,
+      },
+      onSelectProject: handleSelectProject,
+      onShowProjectIssues: handleShowProjectIssues,
+      onShowMyIssues: handleShowMyIssues,
+      onSelectCycle: handleSelectCycle,
+      onSelectDomain: handleSelectDomain,
+    },
+    tools: {
+      onOpenOllama: () => setIsOllamaOpen((previous) => !previous),
+      onOpenSimulator: () => setIsSimulatorOpen((previous) => !previous),
+      onOpenCreateTicket: () => handleOpenCreateTicket(),
+    },
+    userMenu: {
+      currentUser,
+      activeArea: activeSection === 'projects' ? 'projects' : 'workspace',
+      onOpenWorkspaceDirectory: () => setActiveSection('directory'),
+      onOpenAccountPreferences: handleOpenAccountPreferences,
+      onOpenProjectManager: handleOpenProjectManager,
+      onOpenSettings: handleOpenSettings,
+      onSignOut: signOut,
+    },
   };
 
   return (
@@ -728,7 +740,6 @@ export function AppShellPage() {
               projects={activeWorkspaceProjects}
               tickets={tickets}
               users={users}
-              activeProjectId={activeProjectId}
               onAddComment={addComment}
               onDeleteTicket={handleDeleteTicket}
               onOpenCreateSubtask={handleOpenCreateSubtask}
