@@ -330,7 +330,7 @@ export function Select({
 
                 return (
                   <button
-                    key={`${option.value}-${index}`}
+                    key={option.value}
                     ref={(node) => {
                       optionRefs.current[index] = node;
                     }}
