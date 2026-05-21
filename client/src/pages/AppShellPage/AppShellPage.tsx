@@ -11,6 +11,7 @@ import { useWorkspaceDirectory } from '../../hooks/useWorkspaceDirectory';
 import { useWorkspaceSettings } from '../../hooks/useWorkspaceSettings';
 import { WorkspaceLayout } from '../../layouts/WorkspaceLayout/WorkspaceLayout';
 import { AccountPreferencesPage } from '../AccountPreferencesPage/AccountPreferencesPage';
+import type { TicketListSort } from '../../utils/ticketView';
 import { registerWebMCPTools } from '../../utils/webmcp';
 import { LoadingPage } from '../LoadingPage/LoadingPage';
 import { SettingsPage } from '../SettingsPage/SettingsPage';
@@ -31,6 +32,7 @@ export function AppShellPage() {
     activeView,
     addComment,
     comments,
+    createDomain,
     createProject,
     createTicket,
     currentUser,
@@ -62,11 +64,14 @@ export function AppShellPage() {
   const [isSimulatorOpen, setIsSimulatorOpen] = useState(false);
   const [createInitialStatus, setCreateInitialStatus] = useState<Ticket['status'] | undefined>(undefined);
   const [createParentId, setCreateParentId] = useState<string | undefined>(undefined);
+  const [listSort, setListSort] = useState<TicketListSort>('created');
   const [projectCreateLoading, setProjectCreateLoading] = useState(false);
   const [projectCreateError, setProjectCreateError] = useState<string | null>(null);
   const [projectManageLoading, setProjectManageLoading] = useState(false);
   const [projectManageError, setProjectManageError] = useState<string | null>(null);
   const [defaultProjectLoading, setDefaultProjectLoading] = useState(false);
+  const [domainCreateLoading, setDomainCreateLoading] = useState(false);
+  const [domainCreateError, setDomainCreateError] = useState<string | null>(null);
 
   const {
     workspaces,
@@ -235,7 +240,8 @@ export function AppShellPage() {
   useEffect(() => {
     setProjectCreateError(null);
     setProjectManageError(null);
-  }, [activeWorkspaceId]);
+    setDomainCreateError(null);
+  }, [activeWorkspaceId, activeProjectId]);
 
   useEffect(() => {
     const controller = registerWebMCPTools({
@@ -457,6 +463,32 @@ export function AppShellPage() {
       throw error;
     } finally {
       setDefaultProjectLoading(false);
+    }
+  };
+
+  const handleCreateDomain = async (domainInput: { name: string; color: string }) => {
+    if (!activeProjectId) {
+      return;
+    }
+
+    setDomainCreateLoading(true);
+    setDomainCreateError(null);
+
+    try {
+      const domain = await createDomain({
+        ...domainInput,
+        projectId: activeProjectId,
+      });
+
+      if (!domain) {
+        throw new Error('Failed to create domain for this project.');
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to create domain for this project.';
+      setDomainCreateError(message);
+      throw error;
+    } finally {
+      setDomainCreateLoading(false);
     }
   };
 
@@ -717,13 +749,17 @@ export function AppShellPage() {
               projects={activeWorkspaceProjects}
               activeProjectId={activeProjectId}
               defaultProjectId={activeWorkspace.defaultProjectId}
+              domains={domains}
               projectCreateLoading={projectCreateLoading}
               projectCreateError={projectCreateError}
               projectManageLoading={projectManageLoading}
               projectManageError={projectManageError}
               defaultProjectLoading={defaultProjectLoading}
+              domainCreateLoading={domainCreateLoading}
+              domainCreateError={domainCreateError}
               onBackToWorkspace={() => setActiveSection('workspace')}
               onCreateProject={handleCreateProject}
+              onCreateDomain={handleCreateDomain}
               onSelectProject={handleSelectProjectForManagement}
               onSetDefaultProject={handleSetDefaultProject}
               onUpdateProjectInfo={handleUpdateProjectInfo}
@@ -737,6 +773,7 @@ export function AppShellPage() {
               cycles={cycles}
               domains={domains}
               filters={filters}
+              listSort={listSort}
               projects={activeWorkspaceProjects}
               tickets={tickets}
               users={users}
@@ -747,6 +784,7 @@ export function AppShellPage() {
               onOpenProjectManager={handleOpenProjectManager}
               onSelectTicket={setActiveTicket}
               onSetFilters={setFilters}
+              onSetListSort={setListSort}
               onSetView={setView}
               onUpdateTicket={updateTicket}
             />

@@ -1,7 +1,7 @@
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { WorkspaceProjectPanel } from '../../components/WorkspaceProjectPanel';
-import type { Project } from '../../context/TicketContext';
+import type { Domain, Project } from '../../context/TicketContext';
 import '../WorkspacePage/WorkspacePage.css';
 import './WorkspaceProjectsPage.css';
 
@@ -10,13 +10,17 @@ interface WorkspaceProjectsPageProps {
   projects: Project[];
   activeProjectId: string;
   defaultProjectId: string | null;
+  domains: Domain[];
   projectCreateLoading: boolean;
   projectCreateError: string | null;
   projectManageLoading: boolean;
   projectManageError: string | null;
   defaultProjectLoading: boolean;
+  domainCreateLoading: boolean;
+  domainCreateError: string | null;
   onBackToWorkspace: () => void;
   onCreateProject: (project: { name: string; description: string; key: string }) => Promise<void>;
+  onCreateDomain: (domain: { name: string; color: string }) => Promise<void>;
   onSelectProject: (projectId: string) => void;
   onSetDefaultProject: (projectId: string) => Promise<void>;
   onUpdateProjectInfo: (projectId: string, updates: { name: string; description: string; status: Project['status'] }) => Promise<void>;
@@ -27,13 +31,17 @@ export function WorkspaceProjectsPage({
   projects,
   activeProjectId,
   defaultProjectId,
+  domains,
   projectCreateLoading,
   projectCreateError,
   projectManageLoading,
   projectManageError,
   defaultProjectLoading,
+  domainCreateLoading,
+  domainCreateError,
   onBackToWorkspace,
   onCreateProject,
+  onCreateDomain,
   onSelectProject,
   onSetDefaultProject,
   onUpdateProjectInfo,
@@ -58,23 +66,25 @@ export function WorkspaceProjectsPage({
       </header>
 
       <div className="workspace-projects-page__content">
-        <div className="workspace-projects-page__panel-shell">
-          <WorkspaceProjectPanel
-            workspaceName={workspaceName}
-            projects={projects}
-            activeProjectId={activeProjectId}
-            defaultProjectId={defaultProjectId}
-            projectCreateLoading={projectCreateLoading}
-            projectCreateError={projectCreateError}
-            projectManageLoading={projectManageLoading}
-            projectManageError={projectManageError}
-            defaultProjectLoading={defaultProjectLoading}
-            onSelectProject={onSelectProject}
-            onCreateProject={onCreateProject}
-            onUpdateProject={onUpdateProjectInfo}
-            onSetDefaultProject={onSetDefaultProject}
-          />
-        </div>
+        <WorkspaceProjectPanel
+          workspaceName={workspaceName}
+          projects={projects}
+          activeProjectId={activeProjectId}
+          defaultProjectId={defaultProjectId}
+          domains={domains}
+          projectCreateLoading={projectCreateLoading}
+          projectCreateError={projectCreateError}
+          projectManageLoading={projectManageLoading}
+          projectManageError={projectManageError}
+          defaultProjectLoading={defaultProjectLoading}
+          domainCreateLoading={domainCreateLoading}
+          domainCreateError={domainCreateError}
+          onSelectProject={onSelectProject}
+          onCreateProject={onCreateProject}
+          onCreateDomain={onCreateDomain}
+          onUpdateProject={onUpdateProjectInfo}
+          onSetDefaultProject={onSetDefaultProject}
+        />
       </div>
     </div>
   );

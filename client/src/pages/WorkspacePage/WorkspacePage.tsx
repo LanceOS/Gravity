@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Kanban, List } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import type { Comment, Cycle, Domain, Project, Ticket, User } from '../../context/TicketContext';
-import type { TicketFilters } from '../../utils/ticketView';
+import type { TicketFilters, TicketListSort } from '../../utils/ticketView';
 import { TicketBoard } from '../../components/TicketBoard';
 import { TicketList } from '../../components/TicketList';
 import { TicketDetail } from '../../components/TicketDetail';
@@ -11,6 +11,7 @@ import {
   getWorkspaceHeaderTitle,
   groupTicketsByStatus,
   hasActiveTicketFilters,
+  sortTicketsForList,
 } from '../../utils/ticketView';
 import './WorkspacePage.css';
 
@@ -22,6 +23,7 @@ interface WorkspacePageProps {
   cycles: Cycle[];
   domains: Domain[];
   filters: TicketFilters;
+  listSort: TicketListSort;
   projects: Project[];
   tickets: Ticket[];
   users: User[];
@@ -32,6 +34,7 @@ interface WorkspacePageProps {
   onOpenProjectManager: () => void;
   onSelectTicket: (ticket: Ticket | null) => void;
   onSetFilters: (filters: Partial<TicketFilters>) => void;
+  onSetListSort: (sort: TicketListSort) => void;
   onSetView: (view: 'board' | 'list') => void;
   onUpdateTicket: (id: string, updates: Partial<Ticket>) => Promise<void>;
 }
@@ -44,6 +47,7 @@ export function WorkspacePage({
   cycles,
   domains,
   filters,
+  listSort,
   projects,
   tickets,
   users,
@@ -54,11 +58,11 @@ export function WorkspacePage({
   onOpenProjectManager,
   onSelectTicket,
   onSetFilters,
+  onSetListSort,
   onSetView,
   onUpdateTicket,
 }: WorkspacePageProps) {
   const filteredTickets = useMemo(() => filterTickets(tickets, filters), [tickets, filters]);
-  const groupedTickets = useMemo(() => groupTicketsByStatus(filteredTickets), [filteredTickets]);
   const hasFiltersApplied = useMemo(() => hasActiveTicketFilters(filters), [filters]);
   const headerTitle = useMemo(
     () => getWorkspaceHeaderTitle(filters, currentUser, projects, domains, cycles),
@@ -72,6 +76,12 @@ export function WorkspacePage({
     () => Object.fromEntries(domains.map((domain) => [domain.id, domain])),
     [domains]
   );
+  const groupedTickets = useMemo(() => groupTicketsByStatus(filteredTickets), [filteredTickets]);
+  const listSortedTickets = useMemo(
+    () => sortTicketsForList(filteredTickets, domainById, listSort),
+    [filteredTickets, domainById, listSort]
+  );
+  const listGroupedTickets = useMemo(() => groupTicketsByStatus(listSortedTickets), [listSortedTickets]);
   const detailSubtasks = useMemo(
     () => (activeTicket ? tickets.filter((ticket) => ticket.parentId === activeTicket.id) : []),
     [tickets, activeTicket]
@@ -165,12 +175,14 @@ export function WorkspacePage({
                   filters={filters}
                   filteredCount={filteredTickets.length}
                   totalCount={tickets.length}
-                  groupedTickets={groupedTickets}
+                  groupedTickets={listGroupedTickets}
+                  listSort={listSort}
                   domainById={domainById}
                   userAvatarById={userAvatarById}
                   hasActiveFilters={hasFiltersApplied}
                   onFilterChange={onSetFilters}
                   onClearFilters={handleClearFilters}
+                  onListSortChange={onSetListSort}
                   onSelectTicket={(ticket) => onSelectTicket(ticket)}
                 />
               )}
