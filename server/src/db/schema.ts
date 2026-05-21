@@ -1,4 +1,4 @@
-import { boolean, integer, pgTable, primaryKey, text, timestamp } from 'drizzle-orm/pg-core';
+import { boolean, integer, jsonb, pgTable, primaryKey, serial, text, timestamp } from 'drizzle-orm/pg-core';
 
 export const authUsers = pgTable('user', {
   id: text('id').primaryKey(),
@@ -123,6 +123,35 @@ export const workspaceConnections = pgTable('workspace_connections', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const identities = pgTable('identities', {
+  id: text('id').primaryKey(),
+  displayName: text('display_name').notNull(),
+  publicKey: text('public_key').notNull().unique(),
+  encryptedPrivateKey: text('encrypted_private_key'),
+  isLocalOwner: boolean('is_local_owner').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const peerConnections = pgTable('peer_connections', {
+  id: text('id').primaryKey(),
+  hostUrl: text('host_url').notNull(),
+  hostPublicKey: text('host_public_key').notNull(),
+  lastSyncedEventId: integer('last_synced_event_id').notNull().default(0),
+  status: text('status').notNull().default('active'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const syncOutbox = pgTable('sync_outbox', {
+  eventId: serial('event_id').primaryKey(),
+  workspaceId: text('workspace_id').notNull(),
+  actorPublicKey: text('actor_public_key').notNull(),
+  entityType: text('entity_type').notNull(),
+  entityId: text('entity_id').notNull(),
+  action: text('action').notNull(),
+  payload: jsonb('payload').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const projects = pgTable('projects', {
   id: text('id').primaryKey(),
   workspaceId: text('workspace_id').notNull(),
@@ -205,6 +234,9 @@ export const schema = {
   workspaceInvites,
   workspaceJoinRequests,
   workspaceConnections,
+  identities,
+  peerConnections,
+  syncOutbox,
   projects,
   projectMembers,
   domains,

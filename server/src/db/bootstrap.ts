@@ -113,6 +113,35 @@ export async function initializeDatabase() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
+    CREATE TABLE IF NOT EXISTS identities (
+      id TEXT PRIMARY KEY,
+      display_name TEXT NOT NULL,
+      public_key TEXT NOT NULL UNIQUE,
+      encrypted_private_key TEXT,
+      is_local_owner BOOLEAN NOT NULL DEFAULT FALSE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS peer_connections (
+      id TEXT PRIMARY KEY,
+      host_url TEXT NOT NULL,
+      host_public_key TEXT NOT NULL,
+      last_synced_event_id INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'active',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS sync_outbox (
+      event_id SERIAL PRIMARY KEY,
+      workspace_id TEXT NOT NULL,
+      actor_public_key TEXT NOT NULL,
+      entity_type TEXT NOT NULL,
+      entity_id TEXT NOT NULL,
+      action TEXT NOT NULL,
+      payload JSONB NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
     CREATE TABLE IF NOT EXISTS projects (
       id TEXT PRIMARY KEY,
       workspace_id TEXT NOT NULL,
@@ -190,6 +219,8 @@ export async function initializeDatabase() {
     ALTER TABLE validations ADD COLUMN IF NOT EXISTS revoked_at TIMESTAMPTZ;
     ALTER TABLE workspace_members ADD COLUMN IF NOT EXISTS provisioned_by_validation_id TEXT;
     ALTER TABLE project_members ADD COLUMN IF NOT EXISTS provisioned_by_validation_id TEXT;
+    ALTER TABLE identities ADD COLUMN IF NOT EXISTS encrypted_private_key TEXT;
+    ALTER TABLE identities ADD COLUMN IF NOT EXISTS is_local_owner BOOLEAN NOT NULL DEFAULT FALSE;
   `);
 
   const { runMigrations } = await getMigrations(auth.options);
