@@ -575,8 +575,6 @@ export function createFederationRouter() {
         return;
       }
 
-      federationSyncStates.delete(connection.id);
-
       for (const projectId of result.changedProjectIds) {
         broadcastEvent('tickets-updated', { projectId, tickets: await listTickets(projectId) });
       }
