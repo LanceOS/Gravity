@@ -42,7 +42,17 @@ export function signFederationRequest(input: FederationSignatureInput & { privat
 
 export function verifyFederationRequestSignature(input: FederationSignatureInput & { publicKey: string; signature: string }) {
   const payload = buildFederationSigningPayload(input);
-  return verify(null, Buffer.from(payload, 'utf8'), normalizeFederationPublicKey(input.publicKey), Buffer.from(input.signature, 'base64'));
+
+  try {
+    return verify(
+      null,
+      Buffer.from(payload, 'utf8'),
+      normalizeFederationPublicKey(input.publicKey),
+      Buffer.from(input.signature, 'base64'),
+    );
+  } catch {
+    return false;
+  }
 }
 
 export function isFederationTimestampFresh(timestamp: string, toleranceMs = 5 * 60 * 1000) {
