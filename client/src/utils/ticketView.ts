@@ -67,7 +67,7 @@ export function sortTicketsForList(
   sort: TicketListSort,
 ): Ticket[] {
   if (sort === 'created') {
-    return tickets;
+    return [...tickets];
   }
 
   return [...tickets].sort((first, second) => {
