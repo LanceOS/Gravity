@@ -124,7 +124,12 @@ export function Select({
     }
 
     const fallbackIndex = selectedIndex >= 0 && !options[selectedIndex]?.disabled ? selectedIndex : findNextEnabledIndex(-1, 1);
-    const nextIndex = preferredIndex ?? fallbackIndex;
+    const preferredIsEnabled =
+      preferredIndex !== undefined &&
+      preferredIndex >= 0 &&
+      preferredIndex < options.length &&
+      !options[preferredIndex]?.disabled;
+    const nextIndex = preferredIsEnabled ? preferredIndex : fallbackIndex;
     if (nextIndex < 0) {
       return;
     }
@@ -190,6 +195,11 @@ export function Select({
 
     if (event.key === 'Escape' && isOpen) {
       event.preventDefault();
+      closeMenu();
+      return;
+    }
+
+    if (event.key === 'Tab' && isOpen) {
       closeMenu();
     }
   };
@@ -287,12 +297,13 @@ export function Select({
       return;
     }
 
-    const nextIndex = activeIndex >= 0 ? activeIndex : selectedIndex >= 0 ? selectedIndex : findNextEnabledIndex(-1, 1);
+    const hasValidActiveIndex = activeIndex >= 0 && activeIndex < options.length;
+    const nextIndex = hasValidActiveIndex ? activeIndex : selectedIndex >= 0 ? selectedIndex : findNextEnabledIndex(-1, 1);
     if (nextIndex >= 0) {
       setActiveIndex(nextIndex);
       focusOption(nextIndex);
     }
-  }, [activeIndex, isOpen, selectedIndex]);
+  }, [activeIndex, isOpen, options.length, selectedIndex]);
 
   return (
     <div className={joinClassNames('select-root', className)} style={style}>
