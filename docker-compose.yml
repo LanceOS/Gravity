@@ -40,8 +40,8 @@ services:
 
   frontend:
     build:
-      context: ./client
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: client/Dockerfile
     container_name: gravity_frontend
     environment:
       BACKEND_UPSTREAM: http://backend:8080
