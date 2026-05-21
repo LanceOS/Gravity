@@ -20,6 +20,7 @@ import {
   listFederationOutboxEvents,
   syncFederatedConnection,
   listWorkspacePeers,
+  updateFederatedTicket,
 } from '../services/federation.js';
 import { listTickets } from '../services/tickets.js';
 
@@ -285,6 +286,73 @@ export function createFederationRouter() {
       });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create federated ticket.' });
+    }
+  });
+
+  router.patch('/federation/workspaces/:workspaceId/tickets/:ticketId', async (req, res) => {
+    const { workspaceId, ticketId } = req.params;
+    const title = typeof req.body?.title === 'string' ? req.body.title.trim() : undefined;
+
+    if (title !== undefined && !title) {
+      res.status(400).json({ error: 'title cannot be empty.' });
+      return;
+    }
+
+    const signatureInput = resolveFederationSignature(req);
+    if (!signatureInput) {
+      res.status(401).json({ error: 'Federation signature headers are required.' });
+      return;
+    }
+
+    if (!isFederationTimestampFresh(signatureInput.timestamp)) {
+      res.status(401).json({ error: 'Federation signature timestamp is outside the accepted window.' });
+      return;
+    }
+
+    const isValidSignature = verifyFederationRequestSignature({
+      method: req.method,
+      path: req.originalUrl,
+      timestamp: signatureInput.timestamp,
+      body: req.body ?? {},
+      publicKey: signatureInput.publicKey,
+      signature: signatureInput.signature,
+    });
+    if (!isValidSignature) {
+      res.status(401).json({ error: 'Invalid federation signature.' });
+      return;
+    }
+
+    try {
+      const result = await updateFederatedTicket({
+        workspaceId,
+        actorPublicKey: signatureInput.publicKey,
+        ticketId,
+        updates: {
+          ...(title !== undefined ? { title } : {}),
+          ...(typeof req.body?.description === 'string' ? { description: req.body.description } : {}),
+          ...(typeof req.body?.status === 'string' ? { status: req.body.status } : {}),
+          ...(typeof req.body?.priority === 'string' ? { priority: req.body.priority } : {}),
+          ...(typeof req.body?.assigneeId === 'string' || req.body?.assigneeId === null ? { assigneeId: req.body.assigneeId } : {}),
+          ...(typeof req.body?.domainId === 'string' || req.body?.domainId === null ? { domainId: req.body.domainId } : {}),
+          ...(typeof req.body?.cycleId === 'string' || req.body?.cycleId === null ? { cycleId: req.body.cycleId } : {}),
+          ...(typeof req.body?.parentId === 'string' || req.body?.parentId === null ? { parentId: req.body.parentId } : {}),
+          ...(typeof req.body?.prStatus === 'string' ? { prStatus: req.body.prStatus } : {}),
+          ...(typeof req.body?.prUrl === 'string' || req.body?.prUrl === null ? { prUrl: req.body.prUrl } : {}),
+        },
+      });
+
+      if (!result.ok) {
+        res.status(result.status).json({ error: result.error });
+        return;
+      }
+
+      broadcastEvent('tickets-updated', { projectId: result.ticket.projectId, tickets: await listTickets(result.ticket.projectId) });
+      res.json({
+        ticket: result.ticket,
+        outboxEventId: result.outboxEventId,
+      });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to update federated ticket.' });
     }
   });
 

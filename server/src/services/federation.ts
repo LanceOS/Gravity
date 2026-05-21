@@ -5,7 +5,6 @@ import { federationInvites, identities, peerConnections, projects, syncOutbox, t
 import { env } from '../env.js';
 import { decryptNodePrivateKey } from '../lib/crypto.js';
 import { createSignedFederationHeaders, normalizeFederationPublicKey } from '../lib/http-signatures.js';
-import { normalizeFederationPublicKey } from '../lib/http-signatures.js';
 import { createId, normalizeEntityKey, normalizeIsoDate } from '../lib/platform.js';
 import { ensureLocalNodeIdentity } from '../lib/node-identity.js';
 
@@ -384,6 +383,74 @@ function mapTicketRecord(record: typeof tickets.$inferSelect) {
   };
 }
 
+type FederatedTicketUpdate = Partial<{
+  title: string;
+  description: string;
+  status: string;
+  priority: string;
+  assigneeId: string | null;
+  domainId: string | null;
+  cycleId: string | null;
+  parentId: string | null;
+  prStatus: string;
+  prUrl: string | null;
+}>;
+
+async function getWorkspaceProjectRecordForFederation(workspaceId: string, projectId: string) {
+  const projectRows = await db
+    .select({
+      id: projects.id,
+      workspaceId: projects.workspaceId,
+      name: projects.name,
+      description: projects.description,
+      key: projects.key,
+      status: projects.status,
+      inviteCode: projects.inviteCode,
+      createdBy: projects.createdBy,
+      createdAt: projects.createdAt,
+      updatedAt: projects.updatedAt,
+    })
+    .from(projects)
+    .where(eq(projects.id, projectId))
+    .limit(1);
+  const project = projectRows[0];
+  if (!project || project.workspaceId !== workspaceId) {
+    return null;
+  }
+
+  return project;
+}
+
+async function getFederatedTicketWithProject(workspaceId: string, ticketId: string) {
+  const ticketRows = await db.select().from(tickets).where(eq(tickets.id, ticketId)).limit(1);
+  const ticket = ticketRows[0];
+  if (!ticket) {
+    return null;
+  }
+
+  const project = await getWorkspaceProjectRecordForFederation(workspaceId, ticket.projectId);
+  if (!project) {
+    return null;
+  }
+
+  return { ticket, project };
+}
+
+function buildFederatedTicketUpdatePayload(updates: FederatedTicketUpdate) {
+  return {
+    ...(updates.title !== undefined ? { title: updates.title } : {}),
+    ...(updates.description !== undefined ? { description: updates.description } : {}),
+    ...(updates.status !== undefined ? { status: updates.status } : {}),
+    ...(updates.priority !== undefined ? { priority: updates.priority } : {}),
+    ...(updates.assigneeId !== undefined ? { assigneeId: updates.assigneeId } : {}),
+    ...(updates.domainId !== undefined ? { domainId: updates.domainId } : {}),
+    ...(updates.cycleId !== undefined ? { cycleId: updates.cycleId } : {}),
+    ...(updates.parentId !== undefined ? { parentId: updates.parentId } : {}),
+    ...(updates.prStatus !== undefined ? { prStatus: updates.prStatus } : {}),
+    ...(updates.prUrl !== undefined ? { prUrl: updates.prUrl } : {}),
+  };
+}
+
 export async function createFederatedTicket(input: {
   workspaceId: string;
   actorPublicKey: string;
@@ -404,23 +471,7 @@ export async function createFederatedTicket(input: {
     return { ok: false as const, status: 403, error: 'Peer is not verified for this workspace.' };
   }
 
-  const projectRows = await db
-    .select({
-      id: projects.id,
-      workspaceId: projects.workspaceId,
-      name: projects.name,
-      description: projects.description,
-      key: projects.key,
-      status: projects.status,
-      inviteCode: projects.inviteCode,
-      createdBy: projects.createdBy,
-      createdAt: projects.createdAt,
-      updatedAt: projects.updatedAt,
-    })
-    .from(projects)
-    .where(eq(projects.id, input.ticket.projectId))
-    .limit(1);
-  const project = projectRows[0];
+  const project = await getWorkspaceProjectRecordForFederation(input.workspaceId, input.ticket.projectId);
   if (!project || project.workspaceId !== input.workspaceId) {
     return { ok: false as const, status: 404, error: 'Project not found for workspace.' };
   }
@@ -478,6 +529,67 @@ export async function createFederatedTicket(input: {
 
     return {
       ticket: mapTicketRecord(createdTicket),
+      outboxEventId: outboxRows[0]?.eventId ?? null,
+    };
+  });
+
+  return {
+    ok: true as const,
+    ticket: result.ticket,
+    outboxEventId: result.outboxEventId,
+  };
+}
+
+export async function updateFederatedTicket(input: {
+  workspaceId: string;
+  actorPublicKey: string;
+  ticketId: string;
+  updates: FederatedTicketUpdate;
+}) {
+  const verifiedPeer = await getVerifiedWorkspacePeerByPublicKey(input.workspaceId, input.actorPublicKey);
+  if (!verifiedPeer) {
+    return { ok: false as const, status: 403, error: 'Peer is not verified for this workspace.' };
+  }
+
+  const existing = await getFederatedTicketWithProject(input.workspaceId, input.ticketId);
+  if (!existing) {
+    return { ok: false as const, status: 404, error: 'Ticket not found for workspace.' };
+  }
+
+  const updatePayload = buildFederatedTicketUpdatePayload(input.updates);
+  if (Object.keys(updatePayload).length === 0) {
+    return { ok: false as const, status: 400, error: 'At least one updatable ticket field is required.' };
+  }
+
+  const result = await db.transaction(async (tx) => {
+    const updatedTicketRows = await tx
+      .update(tickets)
+      .set({
+        ...updatePayload,
+        updatedAt: new Date(),
+      })
+      .where(eq(tickets.id, input.ticketId))
+      .returning();
+
+    const updatedTicket = updatedTicketRows[0];
+    const outboxRows = await tx
+      .insert(syncOutbox)
+      .values({
+        workspaceId: input.workspaceId,
+        actorPublicKey: input.actorPublicKey,
+        entityType: 'ticket',
+        entityId: updatedTicket.id,
+        action: 'update',
+        payload: {
+          project: mapProjectReplica(existing.project),
+          ticket: mapTicketRecord(updatedTicket),
+        },
+        createdAt: new Date(),
+      })
+      .returning();
+
+    return {
+      ticket: mapTicketRecord(updatedTicket),
       outboxEventId: outboxRows[0]?.eventId ?? null,
     };
   });
@@ -617,7 +729,7 @@ export async function syncFederatedConnection(input: {
         if (workspaceId !== connection.workspaceId) {
           throw new Error(`Received a federation event for unexpected workspace ${workspaceId}.`);
         }
-        if (entityType !== 'ticket' || action !== 'create') {
+        if (entityType !== 'ticket' || (action !== 'create' && action !== 'update')) {
           throw new Error(`Unsupported federation event ${entityType}:${action}.`);
         }
         if (!payload) {
