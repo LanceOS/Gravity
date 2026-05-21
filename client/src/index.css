@@ -555,7 +555,7 @@ button.tool-submit-active {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  animation: lib-fade-in var(--transition-fast) ease-out;
+  animation: lib-fade-in var(--transition-fast);
 }
 
 .dropdown-item {
