@@ -43,9 +43,9 @@ export function ProjectCreateOverlay({
         description: projectDescription.trim(),
       });
     } catch {
-      if (!errorMessage) {
-        setFormError('Failed to create the project.');
-      }
+      // Server-side submission errors are surfaced via the parent-provided
+      // errorMessage prop. Keep formError reserved for client-side validation
+      // so a generic fallback here does not mask a later, more specific error.
     }
   };
 
