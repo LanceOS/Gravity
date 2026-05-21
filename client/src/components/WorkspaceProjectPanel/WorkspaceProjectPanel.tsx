@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Loader2, Plus } from 'lucide-react';
+import { Button, TextInput } from '@library';
 import { ProjectCreateOverlay, ProjectSelectionRail } from './components';
 import type { WorkspaceProjectPanelProps } from './types';
 import { PROJECT_STATUS_LABELS, sanitizeProjectKey } from './utils';
@@ -210,19 +211,16 @@ export function WorkspaceProjectPanel({
           </div>
 
           <form className="workspace-page__domain-form" onSubmit={handleCreateDomain}>
-            <label className="workspace-page__project-field">
-              <span className="workspace-page__project-label">Domain Name</span>
-              <input
-                className="workspace-page__project-input"
-                value={domainName}
-                onChange={(event) => setDomainName(event.target.value)}
-                placeholder="Frontend Platform"
-                disabled={domainCreateLoading}
-                required
-              />
-            </label>
+            <TextInput
+              label="Domain Name"
+              value={domainName}
+              onChange={(event) => setDomainName(event.target.value)}
+              placeholder="Frontend Platform"
+              disabled={domainCreateLoading}
+              required
+            />
 
-            <label className="workspace-page__project-field workspace-page__project-field--compact">
+            <div className="workspace-page__project-field workspace-page__project-field--compact">
               <span className="workspace-page__project-label">Color</span>
               <input
                 type="color"
@@ -230,14 +228,20 @@ export function WorkspaceProjectPanel({
                 value={domainColor}
                 onChange={(event) => setDomainColor(event.target.value)}
                 disabled={domainCreateLoading}
+                style={{ height: '36px', padding: '2px', cursor: 'pointer' }}
               />
-            </label>
+            </div>
 
             <div className="workspace-page__project-form-actions workspace-page__project-form-actions--inline">
-              <button type="submit" className="workspace-page__projects-button workspace-page__projects-button--primary" disabled={domainCreateLoading}>
-                {domainCreateLoading ? <Loader2 size={14} className="workspace-page__spin" /> : null}
-                <span>{domainCreateLoading ? 'Creating Domain...' : 'Create Domain'}</span>
-              </button>
+              <Button
+                type="submit"
+                variant="primary"
+                loading={domainCreateLoading}
+                disabled={domainCreateLoading || !domainName.trim()}
+                style={{ minHeight: '36px' }}
+              >
+                Create Domain
+              </Button>
             </div>
           </form>
         </section>

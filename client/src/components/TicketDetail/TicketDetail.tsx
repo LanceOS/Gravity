@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { Ticket } from '../../context/TicketContext';
-import { Button, Select, DenseTextInput } from '@library';
+import { Button, Select, TextInput, Textarea } from '@library';
 import { 
   CheckSquare, GitPullRequest, GitMerge, Send, Trash2,
   Plus, Edit3, Eye, ChevronLeft
@@ -242,8 +242,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
 
             {isEditingDesc ? (
               descTab === 'write' ? (
-                <textarea 
-                  className="input"
+                <Textarea 
                   rows={8}
                   style={{ fontFamily: 'var(--mono)', fontSize: '13px', lineHeight: '1.6', resize: 'vertical' }}
                   value={descValue}
@@ -426,8 +425,8 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             </div>
 
             {/* Post comment form */}
-            <form onSubmit={handlePostComment} style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
-              <DenseTextInput 
+            <form onSubmit={handlePostComment} style={{ display: 'flex', gap: '10px', marginTop: '12px', width: '100%' }}>
+              <TextInput 
                 placeholder="Post updates, links, or mention PRs..."
                 value={commentInput}
                 onChange={(e) => setCommentInput(e.target.value)}

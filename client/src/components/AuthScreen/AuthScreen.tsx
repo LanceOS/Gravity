@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useTickets } from '../../context/TicketContext';
-import { Sparkles } from 'lucide-react';
+import { LogIn } from 'lucide-react';
 import { getAuthFailureMessage, isAuthSubmissionInvalid } from './utils';
 import { Button, TextInput, PasswordInput } from '@library';
 
@@ -42,10 +42,6 @@ export const AuthScreen: React.FC = () => {
 
   return (
     <div style={containerStyle}>
-      {/* Background ambient glow circles */}
-      <div style={glowCircle1} />
-      <div style={glowCircle2} />
-
       <div style={cardStyle} className="glass">
         {/* Logo/Icon */}
         <div style={headerStyle}>
@@ -95,7 +91,7 @@ export const AuthScreen: React.FC = () => {
             loading={loading}
             variant="primary"
             fullWidth
-            leftIcon={loading ? undefined : <Sparkles size={16} />}
+            leftIcon={loading ? undefined : <LogIn size={16} />}
             style={{ marginTop: '8px' }}
           >
             {isSignUp ? 'Create Account' : 'Sign In'}
@@ -125,45 +121,20 @@ const containerStyle: React.CSSProperties = {
   justifyContent: 'center',
   width: '100vw',
   height: '100vh',
-  background: '#09090b',
+  background: 'var(--bg)',
   overflow: 'hidden',
   position: 'relative',
   fontFamily: 'var(--sans)'
 };
 
-const glowCircle1: React.CSSProperties = {
-  position: 'absolute',
-  top: '20%',
-  left: '30%',
-  width: '400px',
-  height: '400px',
-  borderRadius: '50%',
-  background: 'radial-gradient(circle, rgba(192, 132, 252, 0.08) 0%, rgba(0,0,0,0) 70%)',
-  transform: 'translate(-50%, -50%)',
-  zIndex: 1,
-  pointerEvents: 'none'
-};
-
-const glowCircle2: React.CSSProperties = {
-  position: 'absolute',
-  bottom: '20%',
-  right: '30%',
-  width: '500px',
-  height: '500px',
-  borderRadius: '50%',
-  background: 'radial-gradient(circle, rgba(59, 130, 246, 0.05) 0%, rgba(0,0,0,0) 70%)',
-  transform: 'translate(50%, 50%)',
-  zIndex: 1,
-  pointerEvents: 'none'
-};
-
 const cardStyle: React.CSSProperties = {
   width: '400px',
   padding: '40px',
-  borderRadius: '16px',
-  border: '1px solid #1f2028',
+  borderRadius: '8px',
+  border: '1px solid var(--border)',
+  background: 'var(--card-bg)',
   zIndex: 10,
-  boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.4)',
+  boxShadow: 'var(--shadow-lg)',
   display: 'flex',
   flexDirection: 'column',
   gap: '24px'
@@ -179,29 +150,29 @@ const headerStyle: React.CSSProperties = {
 
 const logoContainerStyle: React.CSSProperties = {
   padding: '12px',
-  borderRadius: '12px',
-  background: 'rgba(255, 255, 255, 0.02)',
-  border: '1px solid #1f2028',
+  borderRadius: '8px',
+  background: 'var(--sidebar-bg)',
+  border: '1px solid var(--border)',
   marginBottom: '8px'
 };
 
 const titleStyle: React.CSSProperties = {
   fontSize: '24px',
   fontWeight: 600,
-  color: '#f4f4f5',
+  color: 'var(--text-heading)',
   letterSpacing: '-0.5px'
 };
 
 const subtitleStyle: React.CSSProperties = {
   fontSize: '13px',
-  color: '#71717a',
+  color: 'var(--text-muted)',
   lineHeight: '1.4'
 };
 
 const errorStyle: React.CSSProperties = {
   padding: '10px 14px',
-  background: 'rgba(239, 68, 68, 0.1)',
-  border: '1px solid rgba(239, 68, 68, 0.2)',
+  background: 'rgba(239, 68, 68, 0.08)',
+  border: '1px solid rgba(239, 68, 68, 0.18)',
   borderRadius: '6px',
   color: '#ef4444',
   fontSize: '12px',
@@ -222,8 +193,9 @@ const footerStyle: React.CSSProperties = {
 const toggleButtonStyle: React.CSSProperties = {
   background: 'none',
   border: 'none',
-  color: '#c084fc',
+  color: 'var(--accent)',
   fontSize: '12px',
   cursor: 'pointer',
-  outline: 'none'
+  outline: 'none',
+  transition: 'color var(--transition-fast)'
 };
