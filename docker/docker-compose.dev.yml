@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Override the frontend service for local development: run Vite inside a container
   frontend:
@@ -12,9 +10,9 @@ services:
       - NODE_ENV=development
       - BACKEND_UPSTREAM=http://backend:8080
     volumes:
-      - ./client:/app/client:cached
-      - ./library:/app/library:cached
-      - ./client/node_modules:/app/client/node_modules:delegated
+      - ../client:/app/client:cached
+      - ../library:/app/library:cached
+      - ../client/node_modules:/app/client/node_modules:delegated
     ports:
       - "33101:5173"
     # Use host-installed node_modules (mounted) and run Vite dev server so file changes

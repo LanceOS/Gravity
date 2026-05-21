@@ -1,0 +1,25 @@
+services:
+  backend:
+    develop:
+      watch:
+        - action: rebuild
+          path: ../server
+          ignore:
+            - node_modules/
+            - dist/
+            - coverage/
+            - tests/
+
+  frontend:
+    develop:
+      watch:
+        - action: rebuild
+          path: ../client
+          ignore:
+            - node_modules/
+            - dist/
+            - coverage/
+            - src/test/
+            - tests/
+        - action: rebuild
+          path: ../library

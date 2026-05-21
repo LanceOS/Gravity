@@ -385,6 +385,11 @@ export function Select({
   disabled,
   ...props
 }: SelectProps) {
+  const { name, ...triggerProps } = props;
+  const buttonProps = triggerProps as unknown as Omit<
+    React.ButtonHTMLAttributes<HTMLButtonElement>,
+    'onClick' | 'onKeyDown' | 'value' | 'defaultValue' | 'type'
+  >;
   const generatedId = React.useId();
   const selectId = id || generatedId;
   const labelId = `${selectId}-label`;
@@ -557,13 +562,13 @@ export function Select({
           onClick={handleTriggerClick}
           onKeyDown={handleTriggerKeyDown}
           disabled={disabled}
-          {...props}
+          {...buttonProps}
         >
           <span className={labelClassName}>{labelText}</span>
           <ChevronDown size={14} className="select-trigger__icon" aria-hidden="true" />
         </button>
 
-        {props.name ? <input type="hidden" name={props.name} value={selectedValue} disabled={disabled} readOnly /> : null}
+        {name ? <input type="hidden" name={name} value={selectedValue} disabled={disabled} readOnly /> : null}
 
         {isOpen && (
           <div

@@ -765,7 +765,7 @@ export async function createFederatedTicket(input: {
   let result:
     | {
         ticket: ReturnType<typeof mapTicketRecord>;
-        outboxEventId: string | null;
+        outboxEventId: number | null;
       }
     | null = null;
 

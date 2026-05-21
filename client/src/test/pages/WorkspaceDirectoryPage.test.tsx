@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { WorkspaceDirectoryPage } from '../../pages/WorkspaceDirectoryPage/WorkspaceDirectoryPage.tsx';
+import type { WorkspaceSummary } from '../../hooks/useWorkspaceDirectory.ts';
 
 const currentUser = {
   id: 'user-1',
@@ -12,7 +13,7 @@ const currentUser = {
   tutorial_completed: 1,
 };
 
-const workspaces = [
+const workspaces: WorkspaceSummary[] = [
   {
     id: 'workspace-1',
     name: 'Gravity',
@@ -42,7 +43,7 @@ const workspaces = [
 ];
 
 function renderWorkspaceDirectoryPage(overrides: Partial<Parameters<typeof WorkspaceDirectoryPage>[0]> = {}) {
-  const props = {
+  const baseProps: Parameters<typeof WorkspaceDirectoryPage>[0] = {
     currentUser,
     workspaces,
     loading: false,
@@ -57,8 +58,9 @@ function renderWorkspaceDirectoryPage(overrides: Partial<Parameters<typeof Works
     onOpenSettings: vi.fn(),
     onOpenAccountPreferences: vi.fn(),
     onSignOut: vi.fn(),
-    ...overrides,
   };
+
+  const props = { ...baseProps, ...overrides };
 
   return {
     ...render(<WorkspaceDirectoryPage {...props} />),

@@ -5,6 +5,12 @@ This document defines the absolute directory layout, file naming conventions, an
 ```
 gravity/
 ├── .github/                      # CI/CD pipelines, linting actions, and PR templates
+├── docker/                       # Compose files and Dockerfiles for local/dev deployments
+│   ├── docker-compose.yml        # Base multi-container orchestration (frontend + backend + postgres)
+│   ├── docker-compose.dev.yml    # Vite/HMR overrides for local frontend development
+│   ├── docker-compose.watch.yml  # Rebuild-on-change overrides for backend/frontend containers
+│   ├── frontend.Dockerfile       # Production nginx frontend image
+│   └── backend.Dockerfile        # Production API image
 ├── backend/                      # Node.js + Express/Fastify Core Service
 │   ├── src/
 │   │   ├── config/               # Environment variables and dynamic database pools
@@ -16,7 +22,6 @@ gravity/
 │   │   ├── services/             # Dynamic business logic engines (Ollama, Anthropic, Handshakes)
 │   │   ├── utils/                # Cryptographic helpers and validation utilities
 │   │   └── index.ts              # Server bootstrapper
-│   ├── docker/                   # Dockerfiles for multi-architecture deployments
 │   ├── tests/                    # Integration, unit, and mock connection suites
 │   └── package.json
 ├── frontend/                     # React + Tailwind + Vite Web Shell
@@ -36,7 +41,7 @@ gravity/
 │   ├── tailwind.config.js
 │   ├── vite.config.ts
 │   └── package.json
-└── docker-compose.yml            # Multi-container orchestration (App + Postgres + Migrator)
+└── README.md
 ```
 
 ## 2. Naming & Case Conventions

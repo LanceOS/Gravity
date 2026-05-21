@@ -1,3 +1,5 @@
+name: gravitycopy
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -18,8 +20,8 @@ services:
 
   backend:
     build:
-      context: ./server
-      dockerfile: Dockerfile
+      context: ../server
+      dockerfile: ../docker/backend.Dockerfile
     container_name: ${GRAVITY_BACKEND_CONTAINER:-gravity_app_server}
     environment:
       DATABASE_URL: postgresql://gravity_user:secure_dev_password_change_me_in_prod@postgres:5432/gravity_workspace
@@ -40,8 +42,8 @@ services:
 
   frontend:
     build:
-      context: .
-      dockerfile: client/Dockerfile
+      context: ..
+      dockerfile: docker/frontend.Dockerfile
     container_name: ${GRAVITY_FRONTEND_CONTAINER:-gravity_frontend}
     environment:
       BACKEND_UPSTREAM: http://backend:8080

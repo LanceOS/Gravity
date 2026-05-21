@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { WorkspacePage } from '../../pages/WorkspacePage/WorkspacePage.tsx';
+import type { Cycle, Domain, Project, Ticket } from '../../context/TicketContext.tsx';
 
 type TicketBoardMockProps = {
   filteredCount: number;
@@ -57,7 +58,7 @@ const currentUser = {
   tutorial_completed: 1,
 };
 
-const project = {
+const project: Project = {
   id: 'project-1',
   name: 'Gravity Core',
   key: 'GRA',
@@ -66,22 +67,21 @@ const project = {
   workspaceId: 'workspace-1',
 };
 
-const domain = {
+const domain: Domain = {
   id: 'domain-1',
-  projectId: 'project-1',
   name: 'Platform',
   color: '#3b82f6',
 };
 
-const cycle = {
+const cycle: Cycle = {
   id: 'cycle-1',
-  projectId: 'project-1',
   name: 'Sprint 1',
-  startsAt: '2026-05-01T00:00:00.000Z',
-  endsAt: '2026-05-15T00:00:00.000Z',
+  startDate: '2026-05-01T00:00:00.000Z',
+  endDate: '2026-05-15T00:00:00.000Z',
+  completed: 0,
 };
 
-const ticket = {
+const ticket: Ticket = {
   id: 'ticket-1',
   key: 'GRA-1',
   title: 'Fix billing edge case',
@@ -93,11 +93,13 @@ const ticket = {
   cycleId: 'cycle-1',
   assigneeId: 'user-1',
   parentId: null,
+  prStatus: 'none',
+  prUrl: null,
   createdAt: '2026-05-01T10:00:00.000Z',
   updatedAt: '2026-05-01T10:00:00.000Z',
 };
 
-const doneTicket = {
+const doneTicket: Ticket = {
   id: 'ticket-2',
   key: 'GRA-2',
   title: 'Polish onboarding copy',
@@ -109,11 +111,13 @@ const doneTicket = {
   cycleId: null,
   assigneeId: null,
   parentId: null,
+  prStatus: 'none',
+  prUrl: null,
   createdAt: '2026-05-02T10:00:00.000Z',
   updatedAt: '2026-05-02T10:00:00.000Z',
 };
 
-const subtaskOpen = {
+const subtaskOpen: Ticket = {
   ...ticket,
   id: 'ticket-3',
   key: 'GRA-3',
@@ -122,7 +126,7 @@ const subtaskOpen = {
   status: 'todo',
 };
 
-const subtaskDone = {
+const subtaskDone: Ticket = {
   ...ticket,
   id: 'ticket-4',
   key: 'GRA-4',
@@ -132,7 +136,7 @@ const subtaskDone = {
 };
 
 function renderWorkspacePage(overrides: Partial<Parameters<typeof WorkspacePage>[0]> = {}) {
-  const props = {
+  const baseProps: Parameters<typeof WorkspacePage>[0] = {
     activeTicket: null,
     activeView: 'board' as const,
     comments: [],
@@ -152,8 +156,8 @@ function renderWorkspacePage(overrides: Partial<Parameters<typeof WorkspacePage>
     projects: [project],
     tickets: [ticket, doneTicket, subtaskOpen, subtaskDone],
     users: [currentUser],
-    onAddComment: vi.fn(),
-    onDeleteTicket: vi.fn(),
+    onAddComment: vi.fn().mockResolvedValue(undefined),
+    onDeleteTicket: vi.fn().mockResolvedValue(undefined),
     onOpenCreateSubtask: vi.fn(),
     onOpenCreateTicket: vi.fn(),
     onOpenProjectManager: vi.fn(),
@@ -161,9 +165,10 @@ function renderWorkspacePage(overrides: Partial<Parameters<typeof WorkspacePage>
     onSetFilters: vi.fn(),
     onSetListSort: vi.fn(),
     onSetView: vi.fn(),
-    onUpdateTicket: vi.fn(),
-    ...overrides,
+    onUpdateTicket: vi.fn().mockResolvedValue(undefined),
   };
+
+  const props = { ...baseProps, ...overrides };
 
   return {
     ...render(<WorkspacePage {...props} />),

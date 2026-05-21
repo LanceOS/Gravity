@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { WorkspaceProjectsPage } from '../../pages/WorkspaceProjectsPage/WorkspaceProjectsPage.tsx';
+import type { Project } from '../../context/TicketContext.tsx';
 
 type WorkspaceProjectPanelMockProps = {
   workspaceName: string;
@@ -9,7 +10,7 @@ type WorkspaceProjectPanelMockProps = {
   defaultProjectId: string | null;
   onSelectProject: (projectId: string) => void;
   onCreateProject: (project: { name: string; description: string; key: string }) => void | Promise<void>;
-  onCreateDomain: (domain: { name: string; color: string }) => void | Promise<void>;
+  onCreateDomain: (domain: { projectId: string; name: string; color: string }) => void | Promise<void>;
 };
 
 vi.mock('../../components/WorkspaceProjectPanel', () => ({
@@ -38,26 +39,31 @@ vi.mock('../../components/WorkspaceProjectPanel', () => ({
       >
         Create project
       </button>
-      <button type="button" onClick={() => onCreateDomain({ name: 'Platform', color: '#3b82f6' })}>
+      <button
+        type="button"
+        onClick={() => onCreateDomain({ projectId: activeProjectId ?? 'project-1', name: 'Platform', color: '#3b82f6' })}
+      >
         Create domain
       </button>
     </div>
   ),
 }));
 
+const projects: Project[] = [
+  {
+    id: 'project-1',
+    name: 'Gravity Core',
+    key: 'GRA',
+    description: 'Primary project',
+    status: 'active',
+    workspaceId: 'workspace-1',
+  },
+];
+
 function renderWorkspaceProjectsPage(overrides: Partial<Parameters<typeof WorkspaceProjectsPage>[0]> = {}) {
-  const props = {
+  const baseProps: Parameters<typeof WorkspaceProjectsPage>[0] = {
     workspaceName: 'Gravity',
-    projects: [
-      {
-        id: 'project-1',
-        name: 'Gravity Core',
-        key: 'GRA',
-        description: 'Primary project',
-        status: 'active',
-        workspaceId: 'workspace-1',
-      },
-    ],
+    projects,
     activeProjectId: 'project-1',
     defaultProjectId: 'project-1',
     domains: [],
@@ -69,8 +75,9 @@ function renderWorkspaceProjectsPage(overrides: Partial<Parameters<typeof Worksp
     onCreateProject: vi.fn().mockResolvedValue(undefined),
     onCreateDomain: vi.fn().mockResolvedValue(undefined),
     onSelectProject: vi.fn(),
-    ...overrides,
   };
+
+  const props = { ...baseProps, ...overrides };
 
   return {
     ...render(<WorkspaceProjectsPage {...props} />),
@@ -101,6 +108,7 @@ describe('WorkspaceProjectsPage', () => {
 
     await user.click(screen.getByRole('button', { name: 'Create domain' }));
     expect(props.onCreateDomain).toHaveBeenCalledWith({
+      projectId: 'project-1',
       name: 'Platform',
       color: '#3b82f6',
     });

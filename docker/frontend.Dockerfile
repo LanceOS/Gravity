@@ -7,10 +7,6 @@ RUN npm ci
 
 COPY client ./
 COPY library ../library
-<<<<<<< HEAD
-
-=======
->>>>>>> main
 RUN npm run build
 
 FROM nginx:1.27-alpine AS runner
