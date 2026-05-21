@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  # Override the frontend service for local development: run Vite inside a container
+  frontend:
+    image: node:20-slim
+    container_name: gravity_frontend_dev
+    working_dir: /app/client
+    # Run the process as the host user so mounted files are accessible inside
+    user: "1000:1000"
+    environment:
+      - NODE_ENV=development
+      - BACKEND_UPSTREAM=http://backend:8080
+    volumes:
+      - ./client:/app/client:cached
+      - ./library:/app/library:cached
+      - ./client/node_modules:/app/client/node_modules:delegated
+    ports:
+      - "33101:5173"
+    # Use host-installed node_modules (mounted) and run Vite dev server so file changes
+    # in the workspace are picked up immediately by the containerized dev server.
+    command: sh -c "cd /app/client && npm run dev -- --host 0.0.0.0 --port 5173"
+    depends_on:
+      - backend
