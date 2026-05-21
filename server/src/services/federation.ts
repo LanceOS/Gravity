@@ -1,11 +1,55 @@
 import { randomUUID } from 'node:crypto';
 import { and, asc, eq, gt, sql } from 'drizzle-orm';
 import { db } from '../db/index.js';
-import { federationInvites, identities, peerConnections, projects, syncOutbox, tickets, workspaceMembers, workspacePeers, workspaces } from '../db/schema.js';
+import { federationInvites, identities, peerConnections, projects, syncOutbox, tickets, workspaceMembers, workspacePeers, workspaceSettings, workspaces } from '../db/schema.js';
 import { env } from '../env.js';
+import { decryptNodePrivateKey } from '../lib/crypto.js';
+import { createSignedFederationHeaders, normalizeFederationPublicKey } from '../lib/http-signatures.js';
 import { normalizeFederationPublicKey } from '../lib/http-signatures.js';
 import { createId, normalizeEntityKey, normalizeIsoDate } from '../lib/platform.js';
 import { ensureLocalNodeIdentity } from '../lib/node-identity.js';
+
+type FederatedWorkspaceReplica = {
+  id: string;
+  name: string;
+  description: string;
+  key: string;
+  workspaceKey: string;
+  defaultProjectId: string | null;
+  hostUrl: string;
+  createdBy: string;
+  createdAt: string;
+};
+
+type FederatedProjectReplica = {
+  id: string;
+  workspaceId: string;
+  name: string;
+  description: string;
+  key: string;
+  status: string;
+  inviteCode: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+function asString(value: unknown, fallback = '') {
+  return typeof value === 'string' ? value : fallback;
+}
+
+function asNullableString(value: unknown) {
+  return typeof value === 'string' ? value : value === null ? null : undefined;
+}
+
+function parseFederationDate(value: unknown, fallback = new Date()) {
+  const parsed = typeof value === 'string' || value instanceof Date ? new Date(value) : fallback;
+  return Number.isNaN(parsed.getTime()) ? fallback : parsed;
+}
 
 function createInviteToken() {
   return `fed_${randomUUID().replace(/-/g, '')}`;
@@ -25,6 +69,122 @@ export async function ensureWorkspaceAdminAccess(workspaceId: string, userId: st
 export async function getWorkspaceById(workspaceId: string) {
   const rows = await db.select().from(workspaces).where(eq(workspaces.id, workspaceId)).limit(1);
   return rows[0] ?? null;
+}
+
+function mapWorkspaceReplica(record: typeof workspaces.$inferSelect): FederatedWorkspaceReplica {
+  return {
+    id: record.id,
+    name: record.name,
+    description: record.description,
+    key: record.key,
+    workspaceKey: record.workspaceKey,
+    defaultProjectId: record.defaultProjectId,
+    hostUrl: record.hostUrl,
+    createdBy: record.createdBy,
+    createdAt: normalizeIsoDate(record.createdAt),
+  };
+}
+
+function mapProjectReplica(record: typeof projects.$inferSelect): FederatedProjectReplica {
+  return {
+    id: record.id,
+    workspaceId: record.workspaceId,
+    name: record.name,
+    description: record.description,
+    key: record.key,
+    status: record.status,
+    inviteCode: record.inviteCode,
+    createdBy: record.createdBy,
+    createdAt: normalizeIsoDate(record.createdAt),
+    updatedAt: normalizeIsoDate(record.updatedAt),
+  };
+}
+
+export async function listWorkspaceProjectsForFederation(workspaceId: string) {
+  const rows = await db.select().from(projects).where(eq(projects.workspaceId, workspaceId)).orderBy(asc(projects.createdAt));
+  return rows.map(mapProjectReplica);
+}
+
+async function ensureFederatedWorkspaceReplica(input: {
+  workspace: FederatedWorkspaceReplica;
+  projects: FederatedProjectReplica[];
+}) {
+  await db.transaction(async (tx) => {
+    await tx
+      .insert(workspaces)
+      .values({
+        id: input.workspace.id,
+        name: input.workspace.name,
+        description: input.workspace.description,
+        key: input.workspace.key,
+        workspaceKey: input.workspace.workspaceKey,
+        defaultProjectId: input.workspace.defaultProjectId,
+        hostUrl: input.workspace.hostUrl,
+        createdBy: input.workspace.createdBy,
+        createdAt: parseFederationDate(input.workspace.createdAt),
+      })
+      .onConflictDoUpdate({
+        target: workspaces.id,
+        set: {
+          name: input.workspace.name,
+          description: input.workspace.description,
+          key: input.workspace.key,
+          workspaceKey: input.workspace.workspaceKey,
+          defaultProjectId: input.workspace.defaultProjectId,
+          hostUrl: input.workspace.hostUrl,
+          createdBy: input.workspace.createdBy,
+          createdAt: parseFederationDate(input.workspace.createdAt),
+        },
+      });
+
+    await tx
+      .insert(workspaceSettings)
+      .values({
+        workspaceId: input.workspace.id,
+        hostUrl: input.workspace.hostUrl,
+        joinMode: 'approval_required',
+        createdAt: parseFederationDate(input.workspace.createdAt),
+        updatedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: workspaceSettings.workspaceId,
+        set: {
+          hostUrl: input.workspace.hostUrl,
+          updatedAt: new Date(),
+        },
+      });
+
+    for (const project of input.projects) {
+      await tx
+        .insert(projects)
+        .values({
+          id: project.id,
+          workspaceId: project.workspaceId,
+          name: project.name,
+          description: project.description,
+          key: project.key,
+          status: project.status,
+          inviteCode: project.inviteCode,
+          createdBy: project.createdBy,
+          createdAt: parseFederationDate(project.createdAt),
+          updatedAt: parseFederationDate(project.updatedAt),
+        })
+        .onConflictDoUpdate({
+          target: projects.id,
+          set: {
+            workspaceId: project.workspaceId,
+            name: project.name,
+            description: project.description,
+            key: project.key,
+            status: project.status,
+            inviteCode: project.inviteCode,
+            createdBy: project.createdBy,
+            createdAt: parseFederationDate(project.createdAt),
+            updatedAt: parseFederationDate(project.updatedAt),
+          },
+        });
+    }
+  });
 }
 
 export async function createFederationInvite(input: {
@@ -117,6 +277,7 @@ export async function acceptFederationHandshake(input: {
   if (!workspace) {
     return { ok: false as const, status: 404, error: 'Workspace not found for federation invite.' };
   }
+  const workspaceProjects = await listWorkspaceProjectsForFederation(workspace.id);
 
   const guestIdentity = await upsertRemoteIdentity({
     publicKey: input.guestPublicKey,
@@ -156,6 +317,7 @@ export async function acceptFederationHandshake(input: {
   return {
     ok: true as const,
     workspace,
+    workspaceProjects,
     localNodeIdentity,
     guestIdentity,
   };
@@ -243,7 +405,18 @@ export async function createFederatedTicket(input: {
   }
 
   const projectRows = await db
-    .select({ id: projects.id, key: projects.key, workspaceId: projects.workspaceId })
+    .select({
+      id: projects.id,
+      workspaceId: projects.workspaceId,
+      name: projects.name,
+      description: projects.description,
+      key: projects.key,
+      status: projects.status,
+      inviteCode: projects.inviteCode,
+      createdBy: projects.createdBy,
+      createdAt: projects.createdAt,
+      updatedAt: projects.updatedAt,
+    })
     .from(projects)
     .where(eq(projects.id, input.ticket.projectId))
     .limit(1);
@@ -296,6 +469,7 @@ export async function createFederatedTicket(input: {
         entityId: createdTicket.id,
         action: 'create',
         payload: {
+          project: mapProjectReplica(project),
           ticket: mapTicketRecord(createdTicket),
         },
         createdAt: new Date(),
@@ -363,6 +537,223 @@ export async function listFederationOutboxEvents(input: {
   };
 }
 
+export async function syncFederatedConnection(input: {
+  connectionId: string;
+  limit?: number;
+}) {
+  const connectionRows = await db.select().from(peerConnections).where(eq(peerConnections.id, input.connectionId)).limit(1);
+  const connection = connectionRows[0];
+  if (!connection) {
+    return { ok: false as const, status: 404, error: 'Federation connection not found.' };
+  }
+
+  const localNodeIdentity = await ensureLocalNodeIdentity();
+  const privateKey = decryptNodePrivateKey(localNodeIdentity.encryptedPrivateKey);
+  if (!privateKey) {
+    return { ok: false as const, status: 500, error: 'Local node private key is unavailable.' };
+  }
+
+  const limit = Number.isFinite(input.limit) ? Math.min(Math.max(1, input.limit ?? 50), 100) : 50;
+  const outboxPath = `/api/v1/federation/workspaces/${connection.workspaceId}/outbox?sinceEventId=${connection.lastSyncedEventId}&limit=${limit}`;
+  const timestamp = new Date().toISOString();
+
+  let response: Response;
+  try {
+    response = await fetch(`${connection.hostUrl}${outboxPath}`, {
+      method: 'GET',
+      headers: createSignedFederationHeaders({
+        publicKey: localNodeIdentity.publicKey,
+        privateKey,
+        method: 'GET',
+        path: outboxPath,
+        timestamp,
+        body: {},
+      }),
+    });
+  } catch (error) {
+    return {
+      ok: false as const,
+      status: 502,
+      error: error instanceof Error ? error.message : 'Failed to reach the host node.',
+    };
+  }
+
+  let data: Record<string, unknown> = {};
+  try {
+    data = (await response.json()) as Record<string, unknown>;
+  } catch {
+    data = {};
+  }
+
+  if (!response.ok) {
+    return {
+      ok: false as const,
+      status: response.status,
+      error: typeof data.error === 'string' ? data.error : 'Failed to fetch federation outbox events.',
+    };
+  }
+
+  const rawEvents = Array.isArray(data.events) ? data.events : [];
+
+  try {
+    const result = await db.transaction(async (tx) => {
+      const changedProjectIds = new Set<string>();
+      let lastAppliedEventId = connection.lastSyncedEventId;
+
+      for (const rawEvent of rawEvents) {
+        if (!isRecord(rawEvent)) {
+          throw new Error('Received a malformed federation event payload.');
+        }
+
+        const eventId = Number(rawEvent.eventId ?? 0);
+        const workspaceId = asString(rawEvent.workspaceId);
+        const entityType = asString(rawEvent.entityType);
+        const action = asString(rawEvent.action);
+        const payload = isRecord(rawEvent.payload) ? rawEvent.payload : null;
+
+        if (!Number.isFinite(eventId) || eventId <= 0) {
+          throw new Error('Received a federation event without a valid eventId.');
+        }
+        if (workspaceId !== connection.workspaceId) {
+          throw new Error(`Received a federation event for unexpected workspace ${workspaceId}.`);
+        }
+        if (entityType !== 'ticket' || action !== 'create') {
+          throw new Error(`Unsupported federation event ${entityType}:${action}.`);
+        }
+        if (!payload) {
+          throw new Error(`Federation event ${eventId} is missing a payload.`);
+        }
+
+        const projectPayload = isRecord(payload.project) ? payload.project : null;
+        if (projectPayload) {
+          const projectId = asString(projectPayload.id);
+          if (projectId) {
+            await tx
+              .insert(projects)
+              .values({
+                id: projectId,
+                workspaceId: asString(projectPayload.workspaceId, connection.workspaceId),
+                name: asString(projectPayload.name, 'Federated Project'),
+                description: asString(projectPayload.description),
+                key: asString(projectPayload.key),
+                status: asString(projectPayload.status, 'active'),
+                inviteCode: asString(projectPayload.inviteCode, `fed-${projectId}`),
+                createdBy: asString(projectPayload.createdBy, 'federated-host'),
+                createdAt: parseFederationDate(projectPayload.createdAt),
+                updatedAt: parseFederationDate(projectPayload.updatedAt),
+              })
+              .onConflictDoUpdate({
+                target: projects.id,
+                set: {
+                  workspaceId: asString(projectPayload.workspaceId, connection.workspaceId),
+                  name: asString(projectPayload.name, 'Federated Project'),
+                  description: asString(projectPayload.description),
+                  key: asString(projectPayload.key),
+                  status: asString(projectPayload.status, 'active'),
+                  inviteCode: asString(projectPayload.inviteCode, `fed-${projectId}`),
+                  createdBy: asString(projectPayload.createdBy, 'federated-host'),
+                  createdAt: parseFederationDate(projectPayload.createdAt),
+                  updatedAt: parseFederationDate(projectPayload.updatedAt),
+                },
+              });
+          }
+        }
+
+        const ticketPayload = isRecord(payload.ticket) ? payload.ticket : null;
+        if (!ticketPayload) {
+          throw new Error(`Federation ticket event ${eventId} is missing ticket data.`);
+        }
+
+        const ticketId = asString(ticketPayload.id);
+        const ticketKey = asString(ticketPayload.key);
+        const ticketTitle = asString(ticketPayload.title);
+        const projectId = asString(ticketPayload.projectId);
+
+        if (!ticketId || !ticketKey || !ticketTitle || !projectId) {
+          throw new Error(`Federation ticket event ${eventId} is missing required ticket fields.`);
+        }
+
+        const localProjectRows = await tx.select({ id: projects.id }).from(projects).where(eq(projects.id, projectId)).limit(1);
+        if (!localProjectRows[0]) {
+          throw new Error(`Missing local project replica ${projectId} for federation event ${eventId}.`);
+        }
+
+        await tx
+          .insert(tickets)
+          .values({
+            id: ticketId,
+            key: ticketKey,
+            title: ticketTitle,
+            description: asString(ticketPayload.description),
+            status: asString(ticketPayload.status, 'todo'),
+            priority: asString(ticketPayload.priority, 'no_priority'),
+            assigneeId: asNullableString(ticketPayload.assigneeId) ?? null,
+            projectId,
+            domainId: asNullableString(ticketPayload.domainId) ?? null,
+            cycleId: asNullableString(ticketPayload.cycleId) ?? null,
+            parentId: asNullableString(ticketPayload.parentId) ?? null,
+            prStatus: asString(ticketPayload.prStatus, 'none'),
+            prUrl: asNullableString(ticketPayload.prUrl) ?? null,
+            createdAt: parseFederationDate(ticketPayload.createdAt),
+            updatedAt: parseFederationDate(ticketPayload.updatedAt),
+          })
+          .onConflictDoUpdate({
+            target: tickets.id,
+            set: {
+              key: ticketKey,
+              title: ticketTitle,
+              description: asString(ticketPayload.description),
+              status: asString(ticketPayload.status, 'todo'),
+              priority: asString(ticketPayload.priority, 'no_priority'),
+              assigneeId: asNullableString(ticketPayload.assigneeId) ?? null,
+              projectId,
+              domainId: asNullableString(ticketPayload.domainId) ?? null,
+              cycleId: asNullableString(ticketPayload.cycleId) ?? null,
+              parentId: asNullableString(ticketPayload.parentId) ?? null,
+              prStatus: asString(ticketPayload.prStatus, 'none'),
+              prUrl: asNullableString(ticketPayload.prUrl) ?? null,
+              createdAt: parseFederationDate(ticketPayload.createdAt),
+              updatedAt: parseFederationDate(ticketPayload.updatedAt),
+            },
+          });
+
+        changedProjectIds.add(projectId);
+        lastAppliedEventId = eventId;
+      }
+
+      const responseLastEventId = Number(data.lastEventId ?? lastAppliedEventId);
+      const lastSyncedEventId = Number.isFinite(responseLastEventId) ? Math.max(lastAppliedEventId, responseLastEventId) : lastAppliedEventId;
+
+      await tx
+        .update(peerConnections)
+        .set({
+          lastSyncedEventId,
+          status: 'active',
+        })
+        .where(eq(peerConnections.id, connection.id));
+
+      return {
+        appliedCount: rawEvents.length,
+        lastSyncedEventId,
+        changedProjectIds: [...changedProjectIds],
+      };
+    });
+
+    return {
+      ok: true as const,
+      appliedCount: result.appliedCount,
+      lastSyncedEventId: result.lastSyncedEventId,
+      changedProjectIds: result.changedProjectIds,
+    };
+  } catch (error) {
+    return {
+      ok: false as const,
+      status: 500,
+      error: error instanceof Error ? error.message : 'Failed to apply federation outbox events.',
+    };
+  }
+}
+
 export async function connectToFederatedWorkspace(input: {
   hostUrl: string;
   inviteToken: string;
@@ -395,6 +786,43 @@ export async function connectToFederatedWorkspace(input: {
     };
   }
 
+  const workspaceRecord = isRecord(data.workspace) ? data.workspace : null;
+  const workspaceReplica: FederatedWorkspaceReplica = {
+    id: asString(workspaceRecord?.id ?? data.workspaceId),
+    name: asString(workspaceRecord?.name ?? data.workspaceName, 'Federated Workspace'),
+    description: asString(workspaceRecord?.description),
+    key: normalizeEntityKey(asString(workspaceRecord?.key ?? data.workspaceId, 'FEDERATED')),
+    workspaceKey: asString(workspaceRecord?.workspaceKey, `fed_${asString(workspaceRecord?.id ?? data.workspaceId, 'workspace')}`),
+    defaultProjectId:
+      typeof workspaceRecord?.defaultProjectId === 'string' ? workspaceRecord.defaultProjectId : workspaceRecord?.defaultProjectId === null ? null : null,
+    hostUrl: asString(workspaceRecord?.hostUrl, hostUrl),
+    createdBy: asString(workspaceRecord?.createdBy, 'federated-host'),
+    createdAt: asString(workspaceRecord?.createdAt, new Date().toISOString()),
+  };
+  if (!workspaceReplica.id) {
+    return { ok: false as const, status: 502, error: 'Host handshake did not return a workspace identifier.' };
+  }
+
+  const workspaceProjects = Array.isArray(data.projects)
+    ? data.projects.filter(isRecord).map((project) => ({
+        id: asString(project.id),
+        workspaceId: asString(project.workspaceId, workspaceReplica.id),
+        name: asString(project.name, 'Federated Project'),
+        description: asString(project.description),
+        key: asString(project.key),
+        status: asString(project.status, 'active'),
+        inviteCode: asString(project.inviteCode, `fed-${asString(project.id)}`),
+        createdBy: asString(project.createdBy, 'federated-host'),
+        createdAt: asString(project.createdAt, new Date().toISOString()),
+        updatedAt: asString(project.updatedAt, new Date().toISOString()),
+      }))
+    : [];
+
+  await ensureFederatedWorkspaceReplica({
+    workspace: workspaceReplica,
+    projects: workspaceProjects.filter((project) => project.id),
+  });
+
   const hostIdentity = await upsertRemoteIdentity({
     publicKey: String(data.hostPublicKey ?? ''),
     displayName: String(data.hostDisplayName ?? ''),
@@ -404,7 +832,7 @@ export async function connectToFederatedWorkspace(input: {
     .insert(peerConnections)
     .values({
       id: createId('pcn'),
-      workspaceId: String(data.workspaceId ?? ''),
+      workspaceId: workspaceReplica.id,
       hostUrl,
       hostDisplayName: hostIdentity.displayName,
       hostPublicKey: hostIdentity.publicKey,

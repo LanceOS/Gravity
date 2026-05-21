@@ -18,6 +18,7 @@ import {
   ensureWorkspaceAdminAccess,
   getWorkspaceById,
   listFederationOutboxEvents,
+  syncFederatedConnection,
   listWorkspacePeers,
 } from '../services/federation.js';
 import { listTickets } from '../services/tickets.js';
@@ -162,13 +163,27 @@ export function createFederationRouter() {
         return;
       }
 
+      const resolvedHostUrl = result.workspace.hostUrl?.trim() || `${req.protocol}://${req.get('host') ?? 'localhost'}`;
+
       res.status(201).json({
         accepted: true,
         workspaceId: result.workspace.id,
         workspaceName: result.workspace.name,
         hostPublicKey: result.localNodeIdentity.publicKey,
         hostDisplayName: result.localNodeIdentity.displayName,
-        hostUrl: result.workspace.hostUrl || '',
+        hostUrl: resolvedHostUrl,
+        workspace: {
+          id: result.workspace.id,
+          name: result.workspace.name,
+          description: result.workspace.description,
+          key: result.workspace.key,
+          workspaceKey: result.workspace.workspaceKey,
+          defaultProjectId: result.workspace.defaultProjectId,
+          hostUrl: resolvedHostUrl,
+          createdBy: result.workspace.createdBy,
+          createdAt: result.workspace.createdAt,
+        },
+        projects: result.workspaceProjects,
       });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to accept federation handshake.' });
@@ -320,6 +335,33 @@ export function createFederationRouter() {
       });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load federation outbox events.' });
+    }
+  });
+
+  router.post('/federation/connections/:connectionId/sync', async (req, res) => {
+    const limitRaw = Number(req.body?.limit ?? req.query.limit ?? 50);
+
+    try {
+      const result = await syncFederatedConnection({
+        connectionId: req.params.connectionId,
+        limit: Number.isFinite(limitRaw) ? limitRaw : 50,
+      });
+
+      if (!result.ok) {
+        res.status(result.status).json({ error: result.error });
+        return;
+      }
+
+      for (const projectId of result.changedProjectIds) {
+        broadcastEvent('tickets-updated', { projectId, tickets: await listTickets(projectId) });
+      }
+
+      res.json({
+        appliedCount: result.appliedCount,
+        lastSyncedEventId: result.lastSyncedEventId,
+      });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to synchronize the federation connection.' });
     }
   });
 
