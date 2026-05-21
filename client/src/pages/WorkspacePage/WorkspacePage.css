@@ -815,7 +815,7 @@
   border-left: 1px solid var(--border);
   background: var(--card-bg);
   box-shadow: -10px 0 30px -10px rgba(0, 0, 0, 0.15);
-  animation: lib-fade-in var(--transition-spring) ease-out;
+  animation: lib-fade-in var(--transition-spring);
 }
 
 .workspace-page__spin {
