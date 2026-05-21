@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { User } from '../context/TicketContext';
 import {
+  DEFAULT_WORKSPACE_SETTINGS,
   getProviderOption,
   normalizeWorkspaceSettings,
   type WorkspaceSettings,
@@ -38,6 +39,7 @@ export function useAccountSettings({
   const [tutorialResult, setTutorialResult] = useState<StatusMessage | null>(null);
   const [ollamaModels, setOllamaModels] = useState<string[]>([]);
   const [ollamaModelsLoading, setOllamaModelsLoading] = useState(false);
+  const [settingsHydrated, setSettingsHydrated] = useState(false);
 
   useEffect(() => {
     if (!saveSuccess) {
@@ -49,17 +51,26 @@ export function useAccountSettings({
   }, [saveSuccess]);
 
   useEffect(() => {
+    if (currentUser) {
+      return;
+    }
+
+    setSettings(normalizeWorkspaceSettings(null, activeView, theme));
+    setSaveError(null);
+    setTestResult(null);
+    setTutorialResult(null);
+    setOllamaModels([]);
+    setSettingsHydrated(false);
+  }, [currentUser, activeView, theme]);
+
+  useEffect(() => {
     if (!currentUser) {
-      setSettings(normalizeWorkspaceSettings(null, activeView, theme));
-      setSaveError(null);
-      setTestResult(null);
-      setTutorialResult(null);
-      setOllamaModels([]);
       return;
     }
 
     let cancelled = false;
     setSettingsLoading(true);
+  setSettingsHydrated(false);
 
     fetch(`/api/v1/settings/${currentUser.id}`)
       .then(async (response) => {
@@ -71,7 +82,14 @@ export function useAccountSettings({
       })
       .then((data) => {
         if (!cancelled) {
-          setSettings(normalizeWorkspaceSettings(data, activeView, theme));
+          const normalized = normalizeWorkspaceSettings(
+            data,
+            DEFAULT_WORKSPACE_SETTINGS.defaultView,
+            DEFAULT_WORKSPACE_SETTINGS.theme
+          );
+          setSettings(normalized);
+          setTheme(normalized.theme);
+          setView(normalized.defaultView);
         }
       })
       .catch((error: Error) => {
@@ -82,13 +100,14 @@ export function useAccountSettings({
       .finally(() => {
         if (!cancelled) {
           setSettingsLoading(false);
+          setSettingsHydrated(true);
         }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [currentUser, activeView, theme]);
+  }, [currentUser, setTheme, setView]);
 
   const refreshOllamaModels = useCallback(async (endpoint?: string) => {
     const ollamaUrl = (endpoint ?? settings.ollamaEndpoint).trim();
@@ -129,12 +148,12 @@ export function useAccountSettings({
   }, [settings.ollamaEndpoint]);
 
   useEffect(() => {
-    if (!currentUser) {
+    if (!currentUser || !settingsHydrated) {
       return;
     }
 
     void refreshOllamaModels(settings.ollamaEndpoint);
-  }, [currentUser, settings.ollamaEndpoint, refreshOllamaModels]);
+  }, [currentUser, settings.ollamaEndpoint, settingsHydrated, refreshOllamaModels]);
 
   const updateSettings = useCallback((updates: Partial<WorkspaceSettings>) => {
     setSettings((current) => ({ ...current, ...updates }));
@@ -176,7 +195,11 @@ export function useAccountSettings({
         throw new Error(data.error || 'Failed to save account settings.');
       }
 
-      const normalized = normalizeWorkspaceSettings(data, activeView, theme);
+      const normalized = normalizeWorkspaceSettings(
+        data,
+        DEFAULT_WORKSPACE_SETTINGS.defaultView,
+        DEFAULT_WORKSPACE_SETTINGS.theme
+      );
       setSettings(normalized);
       setTheme(normalized.theme);
       setView(normalized.defaultView);
@@ -187,7 +210,7 @@ export function useAccountSettings({
     } finally {
       setSaveLoading(false);
     }
-  }, [currentUser, settings, ollamaModels, activeView, theme, setTheme, setView]);
+  }, [currentUser, settings, ollamaModels, setTheme, setView]);
 
   const testApiKey = useCallback(async () => {
     const provider = getProviderOption(settings.aiProvider);

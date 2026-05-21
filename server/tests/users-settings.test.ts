@@ -29,7 +29,7 @@ describe('users and settings routes', () => {
   it('returns and updates user settings', async () => {
     const user = await seedUser();
 
-    const getResponse = await api().get(`/api/v1/settings/${user.id}`);
+    const getResponse = await api().get(`/api/v1/settings/${user.id}`).set('x-user-id', user.id);
     expect(getResponse.status).toBe(200);
     expect(getResponse.body).toMatchObject({
       userId: user.id,
@@ -42,15 +42,18 @@ describe('users and settings routes', () => {
       apiKey: '',
     });
 
-    const patchResponse = await api().patch(`/api/v1/settings/${user.id}`).send({
-      defaultView: 'list',
-      ollamaModel: 'llama3.2',
-      ollamaEndpoint: 'http://ollama.internal:11434',
-      theme: 'light',
-      apiKey: 'sk-test-123',
-      aiProvider: 'anthropic',
-      projectLayout: 'kanban',
-    });
+    const patchResponse = await api()
+      .patch(`/api/v1/settings/${user.id}`)
+      .set('x-user-id', user.id)
+      .send({
+        defaultView: 'list',
+        ollamaModel: 'llama3.2',
+        ollamaEndpoint: 'http://ollama.internal:11434',
+        theme: 'light',
+        apiKey: 'sk-test-123',
+        aiProvider: 'anthropic',
+        projectLayout: 'condensed',
+      });
 
     expect(patchResponse.status).toBe(200);
     expect(patchResponse.body).toMatchObject({
@@ -61,7 +64,36 @@ describe('users and settings routes', () => {
       theme: 'light',
       apiKey: 'sk-test-123',
       aiProvider: 'anthropic',
-      projectLayout: 'kanban',
+      projectLayout: 'condensed',
     });
+  });
+
+  it('rejects cross-user and invalid settings updates', async () => {
+    const user = await seedUser({
+      id: 'settings-user',
+      email: 'settings-user@example.com',
+    });
+    const otherUser = await seedUser({
+      id: 'settings-other-user',
+      email: 'settings-other-user@example.com',
+    });
+
+    const forbiddenGetResponse = await api().get(`/api/v1/settings/${user.id}`).set('x-user-id', otherUser.id);
+    expect(forbiddenGetResponse.status).toBe(403);
+    expect(forbiddenGetResponse.body).toEqual({ error: 'Forbidden.' });
+
+    const forbiddenPatchResponse = await api()
+      .patch(`/api/v1/settings/${user.id}`)
+      .set('x-user-id', otherUser.id)
+      .send({ theme: 'light' });
+    expect(forbiddenPatchResponse.status).toBe(403);
+    expect(forbiddenPatchResponse.body).toEqual({ error: 'Forbidden.' });
+
+    const invalidPatchResponse = await api()
+      .patch(`/api/v1/settings/${user.id}`)
+      .set('x-user-id', user.id)
+      .send({ projectLayout: 'kanban' });
+    expect(invalidPatchResponse.status).toBe(400);
+    expect(invalidPatchResponse.body).toEqual({ error: 'Invalid projectLayout.' });
   });
 });

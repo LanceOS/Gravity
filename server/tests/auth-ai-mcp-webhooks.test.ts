@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
+import request from 'supertest';
+import { createApp } from '../src/app.js';
 import {
   api,
   jsonResponse,
@@ -14,7 +16,9 @@ function parseMcpResult(response: { body: { result?: { content?: Array<{ text?: 
 
 describe('auth, AI, MCP, webhooks, and realtime routes', () => {
   it('supports auth compatibility sign-up, sign-in, and session checks', async () => {
-    const signUpResponse = await api().post('/api/auth/sign-up').send({
+    const agent = request.agent(createApp());
+
+    const signUpResponse = await agent.post('/api/auth/sign-up').send({
       name: 'Ada Lovelace',
       email: 'ada@example.com',
       password: 'super-secret-password',
@@ -26,8 +30,30 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
       email: 'ada@example.com',
       tutorial_completed: 0,
     });
+    expect(signUpResponse.headers['set-cookie']).toEqual(
+      expect.arrayContaining([expect.stringMatching(/Max-Age=2592000/i)]),
+    );
 
-    const signInResponse = await api().post('/api/auth/sign-in').send({
+    const signUpSessionResponse = await agent.get('/api/auth/session');
+    expect(signUpSessionResponse.status).toBe(200);
+    expect(signUpSessionResponse.body.user).toMatchObject({
+      name: 'Ada Lovelace',
+      email: 'ada@example.com',
+      tutorial_completed: 0,
+    });
+    expect(signUpSessionResponse.body.session).toEqual(expect.objectContaining({
+      userId: signUpResponse.body.user.id,
+    }));
+
+    const signOutResponse = await agent.post('/api/auth/sign-out').send({});
+    expect(signOutResponse.status).toBe(200);
+    expect(signOutResponse.body).toEqual({ success: true });
+
+    const signedOutSessionResponse = await agent.get('/api/auth/session');
+    expect(signedOutSessionResponse.status).toBe(401);
+    expect(signedOutSessionResponse.body).toEqual({ error: 'Unauthorized' });
+
+    const signInResponse = await agent.post('/api/auth/sign-in').send({
       email: 'ada@example.com',
       password: 'super-secret-password',
     });
@@ -37,10 +63,19 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
       name: 'Ada Lovelace',
       email: 'ada@example.com',
     });
+    expect(signInResponse.headers['set-cookie']).toEqual(
+      expect.arrayContaining([expect.stringMatching(/Max-Age=2592000/i)]),
+    );
 
-    const sessionResponse = await api().get('/api/auth/session');
-    expect(sessionResponse.status).toBe(401);
-    expect(sessionResponse.body).toEqual({ error: 'Unauthorized' });
+    const sessionResponse = await agent.get('/api/auth/session');
+    expect(sessionResponse.status).toBe(200);
+    expect(sessionResponse.body.user).toMatchObject({
+      name: 'Ada Lovelace',
+      email: 'ada@example.com',
+    });
+    expect(sessionResponse.body.session).toEqual(expect.objectContaining({
+      userId: signUpResponse.body.user.id,
+    }));
   });
 
   it('proxies AI endpoints through fetch-backed providers', async () => {

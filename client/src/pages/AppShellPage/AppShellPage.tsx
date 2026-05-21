@@ -528,12 +528,12 @@ export function AppShellPage() {
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, []);
 
-  if (!currentUser) {
-    return <AuthScreen />;
-  }
-
   if (loading || workspacesLoading || !workspacesResolvedForCurrentUser) {
     return <LoadingPage />;
+  }
+
+  if (!currentUser) {
+    return <AuthScreen />;
   }
 
   if (currentUser && !workspaceReady) {

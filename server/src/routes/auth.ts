@@ -1,10 +1,98 @@
-import express, { Router } from 'express';
+import express, { Router, type Request, type Response } from 'express';
+import { setResponse } from 'better-call/node';
 import { fromNodeHeaders } from 'better-auth/node';
 import { auth } from '../auth.js';
+import { env } from '../env.js';
 import { ensureUserDefaults, getUserById } from '../lib/platform.js';
 
 function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
+}
+
+type JsonRecord = Record<string, unknown>;
+
+async function readJsonPayload(response: Response) {
+  const rawBody = await response.text();
+  if (!rawBody) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(rawBody) as unknown;
+    return typeof parsed === 'object' && parsed !== null ? (parsed as JsonRecord) : { value: parsed };
+  } catch {
+    return { message: rawBody };
+  }
+}
+
+function extractAuthMessage(payload: JsonRecord | null, fallback: string) {
+  const error = payload?.error;
+  if (typeof error === 'string' && error.trim().length > 0) {
+    return error;
+  }
+
+  const message = payload?.message;
+  if (typeof message === 'string' && message.trim().length > 0) {
+    return message;
+  }
+
+  return fallback;
+}
+
+function extractAuthUserId(payload: JsonRecord | null) {
+  const user = payload?.user;
+  if (!user || typeof user !== 'object') {
+    return null;
+  }
+
+  const userId = (user as JsonRecord).id;
+  return typeof userId === 'string' && userId.trim().length > 0 ? userId : null;
+}
+
+function createForwardedAuthHeaders(req: Request) {
+  const headers = fromNodeHeaders(req.headers);
+  const baseUrl = new URL(env.betterAuthBaseUrl);
+
+  headers.set('host', baseUrl.host);
+  headers.set('origin', baseUrl.origin);
+  headers.set('referer', `${baseUrl.origin}/`);
+  headers.delete('content-length');
+
+  return headers;
+}
+
+function buildAuthUrl(authPath: string) {
+  const normalizedPath = authPath.startsWith('/') ? authPath : `/${authPath}`;
+  return new URL(`/api/auth${normalizedPath}`, env.betterAuthBaseUrl).toString();
+}
+
+async function forwardAuthRequest(req: Request, authPath: string) {
+  const method = req.method.toUpperCase();
+  const headers = createForwardedAuthHeaders(req);
+  const requestInit: RequestInit = {
+    method,
+    headers,
+  };
+
+  if (method !== 'GET' && method !== 'HEAD' && req.body !== undefined) {
+    headers.set('content-type', headers.get('content-type') || 'application/json');
+    requestInit.body = JSON.stringify(req.body);
+  }
+
+  return auth.handler(new Request(buildAuthUrl(authPath), requestInit));
+}
+
+async function sendCompatibilityJson(
+  res: Response,
+  sourceHeaders: Headers,
+  status: number,
+  payload: Record<string, unknown>,
+) {
+  const headers = new Headers(sourceHeaders);
+  headers.set('content-type', 'application/json');
+  headers.delete('content-length');
+
+  await setResponse(res, new Response(JSON.stringify(payload), { status, headers }));
 }
 
 export function createAuthCompatibilityRouter() {
@@ -19,17 +107,29 @@ export function createAuthCompatibilityRouter() {
     }
 
     try {
-      const result = (await auth.api.signUpEmail({
-        body: { name, email, password },
-      })) as { user: { id: string } };
+      const authResponse = await forwardAuthRequest(req, '/sign-up/email');
+      const authPayload = await readJsonPayload(authResponse);
+      if (!authResponse.ok) {
+        await sendCompatibilityJson(res, authResponse.headers, authResponse.status, {
+          error: extractAuthMessage(authPayload, 'Registration failed.'),
+        });
+        return;
+      }
 
-      await ensureUserDefaults(result.user.id);
-      const user = await getUserById(result.user.id);
-      res.json({ user });
+      const userId = extractAuthUserId(authPayload);
+      if (!userId) {
+        await sendCompatibilityJson(res, authResponse.headers, 502, {
+          error: 'Registration succeeded but no user record was returned.',
+        });
+        return;
+      }
+
+      await ensureUserDefaults(userId);
+      const user = await getUserById(userId);
+      await sendCompatibilityJson(res, authResponse.headers, authResponse.status, { user });
     } catch (error) {
       const message = getErrorMessage(error, 'Registration failed.');
-      const status = /already|exist|duplicate/i.test(message) ? 400 : 500;
-      res.status(status).json({ error: message });
+      res.status(500).json({ error: message });
     }
   });
 
@@ -41,32 +141,75 @@ export function createAuthCompatibilityRouter() {
     }
 
     try {
-      const result = (await auth.api.signInEmail({
-        body: { email, password },
-      })) as { user: { id: string } };
+      const authResponse = await forwardAuthRequest(req, '/sign-in/email');
+      const authPayload = await readJsonPayload(authResponse);
+      if (!authResponse.ok) {
+        await sendCompatibilityJson(res, authResponse.headers, authResponse.status, {
+          error: extractAuthMessage(authPayload, 'Sign in failed.'),
+        });
+        return;
+      }
 
-      await ensureUserDefaults(result.user.id);
-      const user = await getUserById(result.user.id);
-      res.json({ user });
+      const userId = extractAuthUserId(authPayload);
+      if (!userId) {
+        await sendCompatibilityJson(res, authResponse.headers, 502, {
+          error: 'Sign in succeeded but no user record was returned.',
+        });
+        return;
+      }
+
+      await ensureUserDefaults(userId);
+      const user = await getUserById(userId);
+      await sendCompatibilityJson(res, authResponse.headers, authResponse.status, { user });
     } catch (error) {
       const message = getErrorMessage(error, 'Sign in failed.');
-      const status = /invalid|incorrect|not found|unauthorized/i.test(message) ? 401 : 500;
-      res.status(status).json({ error: message });
+      res.status(500).json({ error: message });
     }
   });
 
   router.get('/session', async (req, res) => {
     try {
-      const session = await auth.api.getSession({ headers: fromNodeHeaders(req.headers) });
-      if (!session) {
-        res.status(401).json({ error: 'Unauthorized' });
+      const authResponse = await forwardAuthRequest(req, '/get-session');
+      const authPayload = await readJsonPayload(authResponse);
+      if (!authResponse.ok) {
+        await sendCompatibilityJson(res, authResponse.headers, authResponse.status, {
+          error: extractAuthMessage(authPayload, 'Unauthorized'),
+        });
         return;
       }
 
-      const user = await getUserById(session.user.id);
-      res.json({ user, session: session.session });
+      const userId = extractAuthUserId(authPayload);
+      if (!userId) {
+        await sendCompatibilityJson(res, authResponse.headers, 401, { error: 'Unauthorized' });
+        return;
+      }
+
+      const user = await getUserById(userId);
+      await sendCompatibilityJson(res, authResponse.headers, authResponse.status, {
+        user,
+        session: authPayload?.session ?? null,
+      });
     } catch (error) {
       res.status(500).json({ error: getErrorMessage(error, 'Failed to resolve session.') });
+    }
+  });
+
+  router.post('/sign-out', async (req, res) => {
+    try {
+      const authResponse = await forwardAuthRequest(req, '/sign-out');
+      const authPayload = await readJsonPayload(authResponse);
+      if (!authResponse.ok) {
+        await sendCompatibilityJson(res, authResponse.headers, authResponse.status, {
+          error: extractAuthMessage(authPayload, 'Sign out failed.'),
+        });
+        return;
+      }
+
+      await sendCompatibilityJson(res, authResponse.headers, authResponse.status, {
+        success: authPayload?.success === true,
+      });
+    } catch (error) {
+      res.status(500).json({ error: getErrorMessage(error, 'Sign out failed.') });
     }
   });
 

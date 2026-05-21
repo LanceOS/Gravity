@@ -169,20 +169,22 @@ function readStoredUser(): User | null {
   }
 }
 
-const initialState: State = {
-  tickets: [],
-  projects: [],
-  domains: [],
-  cycles: [],
-  users: [],
-  comments: [],
-  activeTicket: null,
-  activeView: 'board',
-  filters: initialFilters,
-  currentUser: readStoredUser(),
-  theme: 'dark',
-  loading: false,
-};
+function createInitialState(): State {
+  return {
+    tickets: [],
+    projects: [],
+    domains: [],
+    cycles: [],
+    users: [],
+    comments: [],
+    activeTicket: null,
+    activeView: 'board',
+    filters: initialFilters,
+    currentUser: readStoredUser(),
+    theme: 'dark',
+    loading: true,
+  };
+}
 
 // API Base URL
 const API_URL = '/api/v1';
@@ -304,8 +306,9 @@ interface TicketContextType extends State {
 const TicketContext = createContext<TicketContextType | undefined>(undefined);
 
 export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [state, dispatch] = useReducer(ticketReducer, initialState);
+  const [state, dispatch] = useReducer(ticketReducer, undefined, createInitialState);
   const [activeProjectId, setActiveProjectIdState] = React.useState<string>('');
+  const [authResolved, setAuthResolved] = React.useState(false);
 
   const setActiveProjectId = useCallback((id: string) => {
     setActiveProjectIdState(id);
@@ -374,6 +377,57 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [activeProjectId, fetchProjectData]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const cachedUser = readStoredUser();
+
+    fetch(`${AUTH_API_URL}/session`, { credentials: 'same-origin' })
+      .then(async (response) => {
+        const data = await response.json().catch(() => null);
+        if (cancelled) {
+          return;
+        }
+
+        if (response.ok && data && typeof data === 'object' && 'user' in data && data.user) {
+          dispatch({ type: 'SET_USER', payload: data.user as User });
+          return;
+        }
+
+        if (response.status === 401 || response.status === 403) {
+          dispatch({ type: 'SET_USER', payload: null });
+          return;
+        }
+
+        if (cachedUser) {
+          dispatch({ type: 'SET_USER', payload: cachedUser });
+          return;
+        }
+
+        dispatch({ type: 'SET_USER', payload: null });
+      })
+      .catch((error) => {
+        console.error('Failed to restore session:', error);
+        if (!cancelled) {
+          if (cachedUser) {
+            dispatch({ type: 'SET_USER', payload: cachedUser });
+            return;
+          }
+
+          dispatch({ type: 'SET_USER', payload: null });
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setAuthResolved(true);
+          dispatch({ type: 'SET_LOADING', payload: false });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Set default active project once projects are loaded
   useEffect(() => {
     if (!state.currentUser) {
@@ -390,6 +444,10 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [state.currentUser, state.projects, activeProjectId, setActiveProjectId]);
 
   useEffect(() => {
+    if (!authResolved) {
+      return;
+    }
+
     if (!state.currentUser) {
       fetchInitialData();
       setActiveProjectIdState('');
@@ -399,7 +457,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     fetchInitialData(state.currentUser.id);
-  }, [state.currentUser, fetchInitialData]);
+  }, [authResolved, state.currentUser, fetchInitialData]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -414,27 +472,12 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     window.localStorage.removeItem(CURRENT_USER_STORAGE_KEY);
   }, [state.currentUser]);
 
-  // Sync user settings (default view and theme) when user logs in
-  useEffect(() => {
-    if (state.currentUser) {
-      fetch(`${API_URL}/settings/${state.currentUser.id}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data) {
-            if (data.theme) {
-              dispatch({ type: 'SET_THEME_RAW', payload: data.theme });
-            }
-            if (data.defaultView) {
-              dispatch({ type: 'SET_VIEW', payload: data.defaultView });
-            }
-          }
-        })
-        .catch(err => console.error('Failed to load settings on login:', err));
-    }
-  }, [state.currentUser]);
-
   // 2. SSE subscription for real-time live synchronization
   useEffect(() => {
+    if (typeof EventSource === 'undefined') {
+      return;
+    }
+
     const eventSource = new EventSource(`${API_URL}/events/subscribe`);
 
     eventSource.onmessage = (event) => {
@@ -731,6 +774,7 @@ async function handleResponseJson(response: Response, fallbackError: string) {
     try {
       const response = await fetch(`${AUTH_API_URL}/sign-in`, {
         method: 'POST',
+        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
@@ -748,6 +792,7 @@ async function handleResponseJson(response: Response, fallbackError: string) {
     try {
       const response = await fetch(`${AUTH_API_URL}/sign-up`, {
         method: 'POST',
+        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email, password }),
       });
@@ -762,6 +807,15 @@ async function handleResponseJson(response: Response, fallbackError: string) {
   }, []);
 
   const signOut = useCallback(() => {
+    void fetch(`${AUTH_API_URL}/sign-out`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    }).catch((error) => {
+      console.error('Failed to clear server session:', error);
+    });
+
     dispatch({ type: 'SET_USER', payload: null });
     setActiveProjectIdState('');
   }, []);
