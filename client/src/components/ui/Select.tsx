@@ -55,12 +55,12 @@ export function Select({
   const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
-  const [menuPosition, setMenuPosition] = useState<MenuPosition>({
-    top: 0,
-    left: 0,
+  const [menuPosition, setMenuPosition] = useState<MenuPosition>(() => ({
+    top: -9999,
+    left: -9999,
     width: 0,
     maxHeight: maxMenuHeight,
-  });
+  }));
 
   const selectedIndex = useMemo(() => options.findIndex((option) => option.value === value), [options, value]);
   const selectedOption = selectedIndex >= 0 ? options[selectedIndex] : null;
