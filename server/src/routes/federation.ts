@@ -17,6 +17,7 @@ import {
   createFederationInvite,
   ensureWorkspaceAdminAccess,
   getWorkspaceById,
+  listFederationOutboxEvents,
   listWorkspacePeers,
 } from '../services/federation.js';
 import { listTickets } from '../services/tickets.js';
@@ -269,6 +270,56 @@ export function createFederationRouter() {
       });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create federated ticket.' });
+    }
+  });
+
+  router.get('/federation/workspaces/:workspaceId/outbox', async (req, res) => {
+    const { workspaceId } = req.params;
+    const signatureInput = resolveFederationSignature(req);
+    if (!signatureInput) {
+      res.status(401).json({ error: 'Federation signature headers are required.' });
+      return;
+    }
+
+    if (!isFederationTimestampFresh(signatureInput.timestamp)) {
+      res.status(401).json({ error: 'Federation signature timestamp is outside the accepted window.' });
+      return;
+    }
+
+    const isValidSignature = verifyFederationRequestSignature({
+      method: req.method,
+      path: req.originalUrl,
+      timestamp: signatureInput.timestamp,
+      body: req.body ?? {},
+      publicKey: signatureInput.publicKey,
+      signature: signatureInput.signature,
+    });
+    if (!isValidSignature) {
+      res.status(401).json({ error: 'Invalid federation signature.' });
+      return;
+    }
+
+    try {
+      const sinceEventIdRaw = Number(req.query.sinceEventId ?? req.query.since_event_id ?? 0);
+      const limitRaw = Number(req.query.limit ?? 50);
+      const result = await listFederationOutboxEvents({
+        workspaceId,
+        actorPublicKey: signatureInput.publicKey,
+        sinceEventId: Number.isFinite(sinceEventIdRaw) ? sinceEventIdRaw : 0,
+        limit: Number.isFinite(limitRaw) ? limitRaw : 50,
+      });
+
+      if (!result.ok) {
+        res.status(result.status).json({ error: result.error });
+        return;
+      }
+
+      res.json({
+        events: result.events,
+        lastEventId: result.lastEventId,
+      });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load federation outbox events.' });
     }
   });
 

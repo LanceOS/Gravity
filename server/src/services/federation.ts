@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, sql } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import { federationInvites, identities, peerConnections, projects, syncOutbox, tickets, workspaceMembers, workspacePeers, workspaces } from '../db/schema.js';
 import { env } from '../env.js';
@@ -312,6 +312,54 @@ export async function createFederatedTicket(input: {
     ok: true as const,
     ticket: result.ticket,
     outboxEventId: result.outboxEventId,
+  };
+}
+
+export async function listFederationOutboxEvents(input: {
+  workspaceId: string;
+  actorPublicKey: string;
+  sinceEventId?: number;
+  limit?: number;
+}) {
+  const verifiedPeer = await getVerifiedWorkspacePeerByPublicKey(input.workspaceId, input.actorPublicKey);
+  if (!verifiedPeer) {
+    return { ok: false as const, status: 403, error: 'Peer is not verified for this workspace.' };
+  }
+
+  const sinceEventId = Number.isFinite(input.sinceEventId) ? Math.max(0, input.sinceEventId ?? 0) : 0;
+  const limit = Number.isFinite(input.limit) ? Math.min(Math.max(1, input.limit ?? 50), 100) : 50;
+
+  const rows = await db
+    .select({
+      eventId: syncOutbox.eventId,
+      workspaceId: syncOutbox.workspaceId,
+      actorPublicKey: syncOutbox.actorPublicKey,
+      entityType: syncOutbox.entityType,
+      entityId: syncOutbox.entityId,
+      action: syncOutbox.action,
+      payload: syncOutbox.payload,
+      createdAt: syncOutbox.createdAt,
+    })
+    .from(syncOutbox)
+    .where(and(eq(syncOutbox.workspaceId, input.workspaceId), gt(syncOutbox.eventId, sinceEventId)))
+    .orderBy(asc(syncOutbox.eventId))
+    .limit(limit);
+
+  const events = rows.map((row) => ({
+    eventId: row.eventId,
+    workspaceId: row.workspaceId,
+    actorPublicKey: row.actorPublicKey,
+    entityType: row.entityType,
+    entityId: row.entityId,
+    action: row.action,
+    payload: row.payload,
+    createdAt: normalizeIsoDate(row.createdAt),
+  }));
+
+  return {
+    ok: true as const,
+    events,
+    lastEventId: events.at(-1)?.eventId ?? sinceEventId,
   };
 }
 
