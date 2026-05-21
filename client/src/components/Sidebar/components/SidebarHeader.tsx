@@ -1,6 +1,6 @@
 import { Sparkles } from 'lucide-react';
 import type { SidebarWorkspaceSection } from '../types';
-import { ThemeToggle } from '@library';
+import { ThemeToggle, Select } from '@library';
 
 interface SidebarHeaderProps {
   workspace: SidebarWorkspaceSection;
@@ -30,24 +30,14 @@ export function SidebarHeader({ workspace, onOpenCreateTicket }: SidebarHeaderPr
             <ThemeToggle />
           </div>
 
-          <select
-
-            className="input"
+          <Select
             value={workspace.activeWorkspaceId}
-            onChange={(event) => workspace.onSelectWorkspace(event.target.value)}
-            style={{
-              width: '100%',
-              minHeight: '34px',
-              padding: '0 10px',
-              fontSize: '12px',
-            }}
-          >
-            {workspace.workspaces.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name}
-              </option>
-            ))}
-          </select>
+            onValueChange={(val: string) => workspace.onSelectWorkspace(val)}
+            options={workspace.workspaces.map((item) => ({ value: item.id, label: item.name }))}
+            aria-label="Select workspace"
+            className="input"
+            style={{ width: '100%', minHeight: '34px', padding: '0 10px', fontSize: '12px' }}
+          />
         </div>
       </div>
 
