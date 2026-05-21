@@ -175,7 +175,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 return (
                   <div key={project.id} style={{ display: 'grid', gap: '4px' }}>
                     <div
-                      className="clickable"
+                      className="clickable sidebar-menu-item"
                       onClick={() => toggleProject(project.id)}
                       style={menuItemStyle(isActiveProject)}
                     >
@@ -189,7 +189,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         <div style={sectionLabelStyle}>Views</div>
 
                         <div
-                          className="clickable"
+                          className="clickable sidebar-menu-item"
                           onClick={onShowProjectIssues}
                           style={nestedMenuItemStyle(filters.projectId === activeProjectId && !filters.assigneeId && !filters.domainId && !filters.cycleId)}
                         >
@@ -199,7 +199,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         </div>
 
                         <div
-                          className="clickable"
+                          className="clickable sidebar-menu-item"
                           onClick={onShowMyIssues}
                           style={nestedMenuItemStyle(filters.projectId === activeProjectId && filters.assigneeId === currentUser.id && !filters.domainId && !filters.cycleId)}
                         >
@@ -212,7 +212,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         {cycles.map((cycle) => (
                           <div
                             key={cycle.id}
-                            className="clickable"
+                            className="clickable sidebar-menu-item"
                             onClick={() => onSelectCycle(cycle.id)}
                             style={nestedMenuItemStyle(filters.cycleId === cycle.id)}
                           >
@@ -226,7 +226,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         {domains.map((domain) => (
                           <div
                             key={domain.id}
-                            className="clickable"
+                            className="clickable sidebar-menu-item"
                             onClick={() => onSelectDomain(domain.id)}
                             style={nestedMenuItemStyle(filters.domainId === domain.id)}
                           >
@@ -342,7 +342,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 setShowUserDropdown(false);
                 onOpenWorkspaceDirectory();
               }}
-              className="clickable"
+              className="clickable sidebar-dropdown-item"
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -363,7 +363,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 setShowUserDropdown(false);
                 onOpenAccountPreferences();
               }}
-              className="clickable"
+              className="clickable sidebar-dropdown-item"
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -386,7 +386,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 setShowUserDropdown(false);
                 onOpenProjectManager();
               }}
-              className="clickable"
+              className="clickable sidebar-dropdown-item"
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -409,7 +409,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 setShowUserDropdown(false);
                 onOpenSettings();
               }}
-              className="clickable"
+              className="clickable sidebar-dropdown-item"
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -432,7 +432,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 setShowUserDropdown(false);
                 onSignOut();
               }}
-              className="clickable"
+              className="clickable sidebar-dropdown-item"
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -466,7 +466,8 @@ const menuItemStyle = (isActive: boolean): React.CSSProperties => ({
   fontSize: '13px',
   color: isActive ? 'var(--text-heading)' : 'var(--text)',
   background: isActive ? 'var(--border)' : 'transparent',
-  fontWeight: isActive ? 500 : 400,
+  fontWeight: 500,
+  transition: 'none',
   cursor: 'pointer'
 });
 
