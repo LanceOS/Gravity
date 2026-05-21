@@ -1,4 +1,5 @@
 import { ArrowLeft } from 'lucide-react';
+import { Button } from '../../components/ui/Button';
 import { WorkspaceProjectPanel } from '../../components/WorkspaceProjectPanel';
 import type { Project } from '../../context/TicketContext';
 import '../WorkspacePage/WorkspacePage.css';
@@ -45,14 +46,13 @@ export function WorkspaceProjectsPage({
         </div>
 
         <div className="workspace-projects-page__actions">
-          <button
+          <Button
             type="button"
-            className="workspace-page__projects-button"
             onClick={onBackToWorkspace}
           >
             <ArrowLeft size={14} />
             <span>Back to Workspace</span>
-          </button>
+          </Button>
         </div>
       </header>
 

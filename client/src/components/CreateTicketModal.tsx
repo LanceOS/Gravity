@@ -1,6 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import type { Cycle, Domain, Project, Ticket, User } from '../context/TicketContext';
+import { Button } from './ui/Button';
+import { Select } from './ui/Select';
 import { X, Sparkles, AlertCircle } from 'lucide-react';
+
+const STATUS_OPTIONS = [
+  { value: 'backlog', label: '📁 Backlog' },
+  { value: 'todo', label: '📋 Todo' },
+  { value: 'in_progress', label: '⚡ In Progress' },
+  { value: 'in_review', label: '🔍 In Review' },
+  { value: 'done', label: '✅ Done' },
+  { value: 'canceled', label: '❌ Canceled' },
+];
+
+const PRIORITY_OPTIONS = [
+  { value: 'no_priority', label: '➖ No Priority' },
+  { value: 'low', label: '🔵 Low' },
+  { value: 'medium', label: '🟡 Medium' },
+  { value: 'high', label: '🔴 High' },
+  { value: 'urgent', label: '💖 Urgent' },
+];
 
 interface CreateTicketModalProps {
   onClose: () => void;
@@ -97,6 +116,11 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
     }
   };
 
+  const projectOptions = projects.map((project) => ({ value: project.id, label: project.name }));
+  const assigneeOptions = [{ value: '', label: 'Unassigned' }, ...users.map((user) => ({ value: user.id, label: user.name }))];
+  const domainOptions = [{ value: '', label: 'No Domain' }, ...domains.map((domain) => ({ value: domain.id, label: domain.name }))];
+  const cycleOptions = [{ value: '', label: 'No Cycle' }, ...cycles.map((cycle) => ({ value: cycle.id, label: cycle.name }))];
+
   return (
     <div 
       style={{
@@ -144,22 +168,22 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
             {parentTicket ? `Create Subtask for ${parentTicket.key}` : 'Create New Issue'}
           </span>
 
-          <button 
+          <Button
             onClick={onClose}
-            className="clickable"
+            variant="ghost"
+            size="sm"
+            aria-label="Close create ticket modal"
             style={{
               marginLeft: 'auto',
-              border: 'none',
-              background: 'transparent',
               color: 'var(--text-muted)',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
+              minHeight: '28px',
+              width: '28px',
+              padding: 0,
+              border: 'none'
             }}
           >
             <X size={16} />
-          </button>
+          </Button>
         </div>
 
         {/* Modal Body Form */}
@@ -242,94 +266,68 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
             {/* Project */}
             <div>
               <span className="label">Project</span>
-              <select 
-                className="input"
+              <Select
                 value={projectId}
-                onChange={(e) => setProjectId(e.target.value)}
+                onValueChange={setProjectId}
+                options={projectOptions}
+                ariaLabel="Select project"
                 disabled={!!parentId} // Sub-tasks lock to parent project
-              >
-                {projects.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
+              />
             </div>
 
             {/* Status */}
             <div>
               <span className="label">Status</span>
-              <select 
-                className="input"
+              <Select
                 value={status}
-                onChange={(e) => setStatus(e.target.value as Ticket['status'])}
-              >
-                <option value="backlog">📁 Backlog</option>
-                <option value="todo">📋 Todo</option>
-                <option value="in_progress">⚡ In Progress</option>
-                <option value="in_review">🔍 In Review</option>
-                <option value="done">✅ Done</option>
-                <option value="canceled">❌ Canceled</option>
-              </select>
+                onValueChange={(nextStatus) => setStatus(nextStatus as Ticket['status'])}
+                options={STATUS_OPTIONS}
+                ariaLabel="Select status"
+              />
             </div>
 
             {/* Priority */}
             <div>
               <span className="label">Priority</span>
-              <select 
-                className="input"
+              <Select
                 value={priority}
-                onChange={(e) => setPriority(e.target.value as Ticket['priority'])}
-              >
-                <option value="no_priority">➖ No Priority</option>
-                <option value="low">🔵 Low</option>
-                <option value="medium">🟡 Medium</option>
-                <option value="high">🔴 High</option>
-                <option value="urgent">💖 Urgent</option>
-              </select>
+                onValueChange={(nextPriority) => setPriority(nextPriority as Ticket['priority'])}
+                options={PRIORITY_OPTIONS}
+                ariaLabel="Select priority"
+              />
             </div>
 
             {/* Assignee */}
             <div>
               <span className="label">Assignee</span>
-              <select 
-                className="input"
+              <Select
                 value={assigneeId}
-                onChange={(e) => setAssigneeId(e.target.value)}
-              >
-                <option value="">Unassigned</option>
-                {users.map(u => (
-                  <option key={u.id} value={u.id}>{u.name}</option>
-                ))}
-              </select>
+                onValueChange={setAssigneeId}
+                options={assigneeOptions}
+                ariaLabel="Select assignee"
+              />
             </div>
 
             {/* Domain */}
             <div>
               <span className="label">Domain</span>
-              <select 
-                className="input"
+              <Select
                 value={domainId}
-                onChange={(e) => setDomainId(e.target.value)}
-              >
-                <option value="">No Domain</option>
-                {domains.map(d => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
-                ))}
-              </select>
+                onValueChange={setDomainId}
+                options={domainOptions}
+                ariaLabel="Select domain"
+              />
             </div>
 
             {/* Cycle */}
             <div>
               <span className="label">Cycle</span>
-              <select 
-                className="input"
+              <Select
                 value={cycleId}
-                onChange={(e) => setCycleId(e.target.value)}
-              >
-                <option value="">No Cycle</option>
-                {cycles.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
+                onValueChange={setCycleId}
+                options={cycleOptions}
+                ariaLabel="Select cycle"
+              />
             </div>
 
           </div>
@@ -351,21 +349,20 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
             </div>
 
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button 
+              <Button
                 type="button" 
                 onClick={onClose} 
-                className="btn clickable"
               >
                 Cancel
-              </button>
+              </Button>
               
-              <button 
+              <Button
                 type="submit" 
-                className="btn btn-primary clickable"
+                variant="primary"
                 style={{ padding: '6px 16px' }}
               >
                 {parentTicket ? 'Create Subtask' : 'Create Issue'}
-              </button>
+              </Button>
             </div>
           </div>
 

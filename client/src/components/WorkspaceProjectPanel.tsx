@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { FolderPlus, Loader2, Plus } from 'lucide-react';
 import type { Project } from '../context/TicketContext';
+import { Select } from './ui/Select';
 
 interface WorkspaceProjectPanelProps {
   workspaceName: string;
@@ -23,6 +24,12 @@ const PROJECT_STATUS_LABELS: Record<Project['status'], string> = {
   active: 'Active',
   completed: 'Archived',
 };
+
+const PROJECT_LIFECYCLE_OPTIONS = [
+  { value: 'planned', label: 'Planned' },
+  { value: 'active', label: 'Active' },
+  { value: 'completed', label: 'Archived' },
+];
 
 export function WorkspaceProjectPanel({
   workspaceName,
@@ -282,16 +289,14 @@ export function WorkspaceProjectPanel({
 
             <label className="workspace-page__project-field workspace-page__project-field--compact">
               <span className="workspace-page__project-label">Lifecycle</span>
-              <select
-                className="workspace-page__project-input"
+              <Select
                 value={managedStatus}
-                onChange={(event) => setManagedStatus(event.target.value as Project['status'])}
+                onValueChange={(nextStatus) => setManagedStatus(nextStatus as Project['status'])}
+                options={PROJECT_LIFECYCLE_OPTIONS}
+                ariaLabel="Select project lifecycle"
                 disabled={projectManageLoading}
-              >
-                <option value="planned">Planned</option>
-                <option value="active">Active</option>
-                <option value="completed">Archived</option>
-              </select>
+                triggerClassName="workspace-page__project-input"
+              />
             </label>
 
             <label className="workspace-page__project-field workspace-page__project-field--wide">

@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { Kanban, List } from 'lucide-react';
+import { Button } from '../../components/ui/Button';
 import type { Comment, Cycle, Domain, Project, Ticket, User } from '../../context/TicketContext';
 import type { TicketFilters } from '../../utils/ticketView';
 import { TicketBoard } from '../../components/TicketBoard';
@@ -152,13 +153,13 @@ export function WorkspacePage({
                     Open Manage Projects to create the first project for this workspace. Once a project exists, tickets, domains, and cycles will become available here.
                   </p>
                   <div className="workspace-page__empty-state-actions">
-                    <button
+                    <Button
                       type="button"
-                      className="workspace-page__projects-button workspace-page__projects-button--primary"
+                      variant="primary"
                       onClick={onOpenProjectManager}
                     >
                       Manage Projects
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ) : activeView === 'board' ? (
