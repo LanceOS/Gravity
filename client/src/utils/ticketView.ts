@@ -89,7 +89,7 @@ export function sortTicketsForList(
       }
     }
 
-    const createdComparison = new Date(first.createdAt).getTime() - new Date(second.createdAt).getTime();
+    const createdComparison = first.createdAt.localeCompare(second.createdAt);
     if (createdComparison !== 0) {
       return createdComparison;
     }
