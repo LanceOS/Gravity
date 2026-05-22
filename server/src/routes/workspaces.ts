@@ -161,7 +161,6 @@ export function createWorkspacesRouter() {
           description: description ?? '',
           key: normalizedWorkspaceKey,
           workspaceKey: resolvedWorkspaceAccessKey,
-          defaultProjectId: projectId,
           hostUrl: '',
           createdBy: effectiveOwnerId,
           createdAt: new Date(),
@@ -194,6 +193,11 @@ export function createWorkspacesRouter() {
           createdAt: new Date(),
           updatedAt: new Date(),
         });
+
+        await tx
+          .update(workspaces)
+          .set({ defaultProjectId: projectId })
+          .where(eq(workspaces.id, workspaceId));
       });
 
       await ensureProjectMembership(projectId, effectiveOwnerId, 'owner');

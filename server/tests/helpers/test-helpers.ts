@@ -155,7 +155,6 @@ export async function seedWorkspaceFixture(seed: WorkspaceFixtureSeed = {}) {
     description: workspace.description,
     key: workspace.key,
     workspaceKey: workspace.workspaceKey,
-    defaultProjectId: project.id,
     hostUrl: workspace.hostUrl,
     createdBy: owner.id,
     createdAt: new Date(),
@@ -189,6 +188,11 @@ export async function seedWorkspaceFixture(seed: WorkspaceFixtureSeed = {}) {
     createdAt: new Date(),
     updatedAt: new Date(),
   });
+
+  await db
+    .update(workspaces)
+    .set({ defaultProjectId: project.id })
+    .where(eq(workspaces.id, workspace.id));
 
   await db.insert(projectMembers).values({
     projectId: project.id,
