@@ -5,14 +5,30 @@ import { api, jsonResponse } from './helpers/test-helpers.js';
  * Builds a mock fetch that fails the first call (simulating localhost unreachable)
  * and succeeds on a subsequent call (simulating Docker host fallback).
  */
-function localFailDockerSuccessMock(models: Array<{ name: string }>) {
+/**
+ * Builds a mock fetch that succeeds on the first call to host.docker.internal.
+ */
+function dockerSuccessMock(models: Array<{ name: string }>) {
   return vi
     .fn()
-    // 1st call: resolveOllamaUrl probes localhost → connection refused
-    .mockRejectedValueOnce(new TypeError('fetch failed'))
-    // 2nd call: resolveOllamaUrl probes host.docker.internal → success
+    // 1st call: resolveOllamaUrl probes host.docker.internal → success
     .mockResolvedValueOnce(jsonResponse({ models }))
-    // 3rd call: actual fetchOllamaModels (after URL resolved to docker host)
+    // 2nd call: actual fetchOllamaModels (after URL resolved to docker host)
+    .mockResolvedValueOnce(jsonResponse({ models }));
+}
+
+/**
+ * Builds a mock fetch that fails on the first call to host.docker.internal,
+ * but succeeds on the local address.
+ */
+function dockerFailLocalSuccessMock(models: Array<{ name: string }>) {
+  return vi
+    .fn()
+    // 1st call: resolveOllamaUrl probes host.docker.internal → connection refused
+    .mockRejectedValueOnce(new TypeError('fetch failed'))
+    // 2nd call: resolveOllamaUrl probes local → success
+    .mockResolvedValueOnce(jsonResponse({ models }))
+    // 3rd call: actual fetchOllamaModels (after URL resolved to local host)
     .mockResolvedValueOnce(jsonResponse({ models }));
 }
 
@@ -83,7 +99,7 @@ describe('Ollama connection & AI proxy routes', () => {
       expect(res.status).toBe(200);
       expect(res.body.connected).toBe(true);
       const calledUrl = String(fetchMock.mock.calls[0][0]);
-      expect(calledUrl).toMatch(/localhost:11434/);
+      expect(calledUrl).toMatch(/(host\.docker\.internal|localhost):11434/);
     });
   });
 
@@ -168,8 +184,8 @@ describe('Ollama connection & AI proxy routes', () => {
   // ─── Docker / localhost fallback ────────────────────────────────────────────
 
   describe('GET /api/v1/ai/ollama/models — Docker host fallback', () => {
-    it('falls back to host.docker.internal when localhost connection fails', async () => {
-      const fetchMock = localFailDockerSuccessMock([{ name: 'llama3' }]);
+    it('uses host.docker.internal first when it is reachable', async () => {
+      const fetchMock = dockerSuccessMock([{ name: 'llama3' }]);
       vi.stubGlobal('fetch', fetchMock);
 
       const res = await api()
@@ -180,13 +196,13 @@ describe('Ollama connection & AI proxy routes', () => {
       expect(res.body.connected).toBe(true);
       expect(res.body.models).toContain('llama3');
 
-      // At least one call should have used host.docker.internal
+      // The first call should have been to host.docker.internal
       const calledUrls = fetchMock.mock.calls.map((call) => String(call[0]));
-      expect(calledUrls.some((url) => url.includes('host.docker.internal'))).toBe(true);
+      expect(calledUrls[0]).toContain('host.docker.internal');
     });
 
-    it('falls back to host.docker.internal when 127.0.0.1 connection fails', async () => {
-      const fetchMock = localFailDockerSuccessMock([{ name: 'phi3' }]);
+    it('falls back to local loopback when host.docker.internal fails', async () => {
+      const fetchMock = dockerFailLocalSuccessMock([{ name: 'phi3' }]);
       vi.stubGlobal('fetch', fetchMock);
 
       const res = await api()
@@ -194,9 +210,13 @@ describe('Ollama connection & AI proxy routes', () => {
         .query({ ollamaUrl: 'http://127.0.0.1:11434' });
 
       expect(res.status).toBe(200);
-      // Connected via fallback
+      expect(res.body.connected).toBe(true);
+      expect(res.body.models).toContain('phi3');
+
+      // The first call should be to host.docker.internal, the second to 127.0.0.1
       const calledUrls = fetchMock.mock.calls.map((call) => String(call[0]));
-      expect(calledUrls.some((url) => url.includes('host.docker.internal'))).toBe(true);
+      expect(calledUrls[0]).toContain('host.docker.internal');
+      expect(calledUrls[1]).toContain('127.0.0.1');
     });
 
     it('does NOT attempt Docker fallback for non-localhost URLs', async () => {

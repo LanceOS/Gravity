@@ -99,16 +99,26 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
     }
   });
 
+  // Synchronize state with hydrated/updated props from parent/settings
+  useEffect(() => {
+    if (!isThirdParty) {
+      const activeUrl = getInitialOllamaUrl(initialOllamaUrl);
+      setOllamaUrl(activeUrl);
+      void checkOllamaStatus(activeUrl, false);
+    }
+  }, [initialOllamaUrl, isThirdParty]);
+
   useEffect(() => {
     if (isThirdParty) {
-      if (!model || !cloudModelsList.includes(model)) {
-        setModel(cloudModelsList[0]);
-      }
+      const defaultCloudModel = cloudModelsList.includes(initialModel) ? initialModel : cloudModelsList[0];
+      setModel(defaultCloudModel);
       setModelStatus('connected');
     } else {
-      void checkOllamaStatus(getInitialOllamaUrl(initialOllamaUrl), false);
+      if (initialModel) {
+        setModel(initialModel);
+      }
     }
-  }, [isThirdParty, settings.aiProvider]);
+  }, [isThirdParty, settings.aiProvider, initialModel]);
 
   const handleSendMessage = async (customText?: string) => {
     const textToSend = customText || chatInput;

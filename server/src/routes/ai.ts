@@ -84,9 +84,9 @@ async function testProviderApiKey(provider: string, apiKey: string) {
 }
 
 /**
- * Attempts to connect to the given Ollama URL. If the URL uses localhost/127.0.0.1
- * and the connection fails, it automatically retries with host.docker.internal
- * to support Docker-hosted server environments transparently.
+ * Attempts to connect to the given Ollama URL. If the URL uses localhost/127.0.0.1/0.0.0.0,
+ * it attempts connection with host.docker.internal first to support Docker-hosted server
+ * environments transparently and instantly, falling back to localhost/loopback if needed.
  */
 async function resolveOllamaUrl(rawUrl: string): Promise<string> {
   const normalized = normalizeOllamaUrl(rawUrl);
@@ -97,17 +97,7 @@ async function resolveOllamaUrl(rawUrl: string): Promise<string> {
     return normalized;
   }
 
-  // Try original URL first
-  try {
-    const response = await fetchWithTimeout(`${normalized}/api/tags`, { method: 'GET' }, 3000);
-    if (response.ok) {
-      return normalized;
-    }
-  } catch {
-    // Fall through to docker internal fallback
-  }
-
-  // Attempt Docker-internal host fallback
+  // Attempt Docker-internal host fallback first
   const dockerFallback = normalized.replace(
     /^(https?:\/\/)(?:localhost|127\.0\.0\.1|0\.0\.0\.0)/i,
     '$1host.docker.internal',
@@ -117,6 +107,16 @@ async function resolveOllamaUrl(rawUrl: string): Promise<string> {
     const response = await fetchWithTimeout(`${dockerFallback}/api/tags`, { method: 'GET' }, 3000);
     if (response.ok) {
       return dockerFallback;
+    }
+  } catch {
+    // Fall through to original URL check
+  }
+
+  // Try original URL next
+  try {
+    const response = await fetchWithTimeout(`${normalized}/api/tags`, { method: 'GET' }, 3000);
+    if (response.ok) {
+      return normalized;
     }
   } catch {
     // Both failed — return original so the caller surfaces the correct URL in errors
