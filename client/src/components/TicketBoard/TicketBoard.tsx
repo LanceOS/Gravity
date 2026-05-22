@@ -31,8 +31,8 @@ export const TicketBoard: React.FC<TicketBoardProps> = ({
   const renderColumnHeader = (columnId: string, title: string, count: number) => {
     const col = BOARD_COLUMNS.find((c) => c.id === columnId);
     return (
-      <Flex 
-        align="center" 
+      <Flex
+        align="center"
         gap="8px"
         style={{
           padding: '16px 20px 8px 20px',
@@ -44,12 +44,12 @@ export const TicketBoard: React.FC<TicketBoardProps> = ({
         <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-heading)' }}>
           {title}
         </span>
-        <span 
-          style={{ 
-            fontSize: '10px', 
-            color: 'var(--text-muted)', 
-            background: 'var(--sidebar-bg)', 
-            padding: '1px 6px', 
+        <span
+          style={{
+            fontSize: '10px',
+            color: 'var(--text-muted)',
+            background: 'var(--sidebar-bg)',
+            padding: '1px 6px',
             borderRadius: '4px',
             marginLeft: '4px'
           }}
@@ -102,10 +102,10 @@ export const TicketBoard: React.FC<TicketBoardProps> = ({
 
   return (
     <Flex direction="column" style={{ height: '100%', flex: 1, overflow: 'hidden' }}>
-      
+
       {/* Filtering Header Bar */}
-      <Flex 
-        align="center" 
+      <Flex
+        align="center"
         gap="12px"
         style={{
           padding: '12px 24px',
@@ -114,11 +114,10 @@ export const TicketBoard: React.FC<TicketBoardProps> = ({
         }}
       >
         {/* Search */}
-        <DenseTextInput 
+        <DenseTextInput
           placeholder="Search board tickets..."
           value={filters.search}
           onChange={(e) => onFilterChange({ search: e.target.value })}
-          style={{ maxWidth: '300px' }}
         />
 
         {/* Priority Filter */}
@@ -127,7 +126,6 @@ export const TicketBoard: React.FC<TicketBoardProps> = ({
           onValueChange={(priority: string) => onFilterChange({ priority: priority as Ticket['priority'] | '' })}
           options={PRIORITY_FILTER_OPTIONS}
           aria-label="Filter board by priority"
-          style={{ width: '120px' }}
         />
 
         {/* Project Selector Filter */}
@@ -136,7 +134,6 @@ export const TicketBoard: React.FC<TicketBoardProps> = ({
           onValueChange={(projectId: string) => onFilterChange({ projectId })}
           options={projectOptions}
           aria-label="Filter board by project"
-          style={{ width: '140px' }}
         />
 
         {/* Clear Filters Button */}

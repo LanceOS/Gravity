@@ -54,7 +54,7 @@ export const TicketList: React.FC<TicketListProps> = ({
           onValueChange={(priority: string) => onFilterChange({ priority: priority as Ticket['priority'] | '' })}
           options={PRIORITY_FILTER_OPTIONS}
           aria-label="Filter list by priority"
-          style={{ width: '120px' }}
+
         />
 
         {/* Status Filter */}
@@ -63,7 +63,7 @@ export const TicketList: React.FC<TicketListProps> = ({
           onValueChange={(status: string) => onFilterChange({ status: status as Ticket['status'] | '' })}
           options={STATUS_FILTER_OPTIONS}
           aria-label="Filter list by status"
-          style={{ width: '120px' }}
+
         />
 
         <Select
@@ -71,7 +71,7 @@ export const TicketList: React.FC<TicketListProps> = ({
           onValueChange={(sort: string) => onListSortChange(sort as typeof listSort)}
           options={LIST_SORT_OPTIONS}
           aria-label="Sort list tickets"
-          style={{ width: '140px' }}
+
         />
 
         {/* Clear Filters Button */}

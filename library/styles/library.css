@@ -46,47 +46,55 @@
 
 /* Animations with Modern Easing */
 @keyframes lib-fade-in {
-  from { 
-    opacity: 0; 
+  from {
+    opacity: 0;
     transform: translateY(4px);
   }
-  to { 
-    opacity: 1; 
+
+  to {
+    opacity: 1;
     transform: translateY(0);
   }
 }
 
 @keyframes lib-slide-in-right {
-  from { 
-    transform: translateX(100%); 
+  from {
+    transform: translateX(100%);
   }
-  to { 
-    transform: translateX(0); 
+
+  to {
+    transform: translateX(0);
   }
 }
 
 @keyframes lib-slide-in-bottom {
-  from { 
+  from {
     transform: translateY(16px);
     opacity: 0;
   }
-  to { 
-    transform: translateY(0); 
+
+  to {
+    transform: translateY(0);
     opacity: 1;
   }
 }
 
 @keyframes lib-spinner-rotate {
-  100% { transform: rotate(360deg); }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes lib-skeleton-pulse {
-  0%, 100% { 
-    opacity: 0.65; 
+
+  0%,
+  100% {
+    opacity: 0.65;
     background-color: var(--border);
   }
-  50% { 
-    opacity: 0.25; 
+
+  50% {
+    opacity: 0.25;
     background-color: var(--card-hover);
   }
 }
@@ -224,7 +232,6 @@
 .select-menu {
   position: fixed;
   z-index: 1400;
-  min-width: 180px;
   padding: 6px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border);
