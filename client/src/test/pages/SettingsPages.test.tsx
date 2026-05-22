@@ -121,6 +121,7 @@ function renderAccountPreferencesPage(overrides: Partial<Parameters<typeof Accou
       apiKey: '',
       ollamaEndpoint: 'http://localhost:11434',
       ollamaModel: 'llama3',
+      agentIntegration: 'ollama' as const,
     },
     settingsLoading: false,
     saveLoading: false,

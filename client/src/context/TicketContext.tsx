@@ -317,7 +317,7 @@ interface TicketContextType extends State {
   resetFilters: () => void;
 }
 
-const TicketContext = createContext<TicketContextType | undefined>(undefined);
+export const TicketContext = createContext<TicketContextType | undefined>(undefined);
 
 export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(ticketReducer, undefined, createInitialState);
