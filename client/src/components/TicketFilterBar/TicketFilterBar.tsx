@@ -34,7 +34,7 @@ type TicketFilterBarFilters = {
   search: string;
   priority: Ticket['priority'] | '';
   status: Ticket['status'] | '';
-  projectId: string;
+  projectId?: string;
 };
 
 export interface TicketFilterBarProps {
