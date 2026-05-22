@@ -147,8 +147,6 @@ describe('Gravity Client End-to-End User Journey', () => {
       expect(dbState.projects[0].name).toBe('Gravity Core');
     });
 
-    console.log('DEBUG - dbState.projects:', JSON.stringify(dbState.projects));
-    console.log('DEBUG - dbState.workspaces:', JSON.stringify(dbState.workspaces));
 
     // ==========================================
     // PHASE 5: Ticket Creation Flow
