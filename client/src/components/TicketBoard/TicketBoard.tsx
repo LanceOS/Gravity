@@ -4,8 +4,9 @@ import { BOARD_COLUMNS } from '../../utils/ticketView';
 import { Button, Select, DenseTextInput, KanbanBoard, Flex } from '@library';
 import { Plus } from 'lucide-react';
 import { TicketCard } from './components';
+import { TicketFilterBar } from '../TicketFilterBar';
 import type { TicketBoardProps } from './types';
-import { getAssigneeAvatar, getBoardProjectOptions, getDomainMeta, getPriorityColor, getPriorityIcon, PRIORITY_FILTER_OPTIONS } from './utils';
+import { getAssigneeAvatar, getDomainMeta, getPriorityColor, getPriorityIcon, PRIORITY_FILTER_OPTIONS } from './utils';
 
 export const TicketBoard: React.FC<TicketBoardProps> = ({
   projects,
@@ -22,8 +23,6 @@ export const TicketBoard: React.FC<TicketBoardProps> = ({
   onSelectTicket,
   onOpenCreateTicket,
 }) => {
-  const projectOptions = getBoardProjectOptions(projects);
-
   const handleDragStart = (event: DragEvent, ticketId: string) => {
     event.dataTransfer.setData('text/plain', ticketId);
   };
@@ -104,53 +103,14 @@ export const TicketBoard: React.FC<TicketBoardProps> = ({
     <Flex direction="column" style={{ height: '100%', flex: 1, overflow: 'hidden' }}>
 
       {/* Filtering Header Bar */}
-      <Flex
-        align="center"
-        gap="12px"
-        style={{
-          padding: '12px 24px',
-          borderBottom: '1px solid var(--border)',
-          background: 'var(--sidebar-bg)'
-        }}
-      >
-        {/* Search */}
-        <DenseTextInput
-          placeholder="Search board tickets..."
-          value={filters.search}
-          onChange={(e) => onFilterChange({ search: e.target.value })}
-        />
-
-        {/* Priority Filter */}
-        <Select
-          value={filters.priority}
-          onValueChange={(priority: string) => onFilterChange({ priority: priority as Ticket['priority'] | '' })}
-          options={PRIORITY_FILTER_OPTIONS}
-          aria-label="Filter board by priority"
-        />
-
-        {/* Project Selector Filter */}
-        <Select
-          value={filters.projectId}
-          onValueChange={(projectId: string) => onFilterChange({ projectId })}
-          options={projectOptions}
-          aria-label="Filter board by project"
-        />
-
-        {/* Clear Filters Button */}
-        {hasActiveFilters && (
-          <Button
-            onClick={onClearFilters}
-            variant="accent"
-            size="sm"
-          >
-            Clear Filters
-          </Button>
-        )}
-
-        <div style={{ marginLeft: 'auto', fontSize: '12px', color: 'var(--text-muted)' }}>
-          Showing {filteredCount} of {totalCount} tickets
-        </div>
-      </Flex>
+      <TicketFilterBar
+        filters={filters as any}
+        onFilterChange={onFilterChange}
+        hasActiveFilters={hasActiveFilters}
+        onClearFilters={onClearFilters}
+        filteredCount={filteredCount}
+        totalCount={totalCount}
+      />
 
       {/* Kanban Board Container */}
       <div style={{ flex: 1, overflowY: 'hidden', padding: '16px', background: 'var(--bg)' }}>
