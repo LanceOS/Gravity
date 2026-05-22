@@ -92,7 +92,7 @@ async function resolveOllamaUrl(rawUrl: string): Promise<string> {
   const normalized = normalizeOllamaUrl(rawUrl);
 
   // Only attempt fallback for localhost/loopback addresses
-  const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)(:|$)/i.test(normalized);
+  const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)(:|$)/i.test(normalized);
   if (!isLocalhost) {
     return normalized;
   }
@@ -109,7 +109,7 @@ async function resolveOllamaUrl(rawUrl: string): Promise<string> {
 
   // Attempt Docker-internal host fallback
   const dockerFallback = normalized.replace(
-    /^(https?:\/\/)(?:localhost|127\.0\.0\.1)/i,
+    /^(https?:\/\/)(?:localhost|127\.0\.0\.1|0\.0\.0\.0)/i,
     '$1host.docker.internal',
   );
 
@@ -158,15 +158,6 @@ export function createAiRouter() {
       : message;
   }
 
-  router.get('/ollama/models', async (req, res) => {
-    const rawUrl = typeof req.query.ollamaUrl === 'string' ? req.query.ollamaUrl : 'http://localhost:11434';
-    try {
-      const models = await fetchOllamaModels(rawUrl);
-      res.json({ models, connected: true });
-    } catch (error) {
-      res.json({ models: [], connected: false, error: normalizeOllamaErrorMessage(error) });
-    }
-  });
 
   router.get('/ai/ollama/models', async (req, res) => {
     const rawUrl = typeof req.query.ollamaUrl === 'string' ? req.query.ollamaUrl : 'http://localhost:11434';

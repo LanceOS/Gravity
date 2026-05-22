@@ -81,8 +81,7 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
   it('proxies AI endpoints through fetch-backed providers', async () => {
     const fetchMock = vi
       .fn()
-      // GET /ollama/models — Ollama tags (non-localhost, no probe step)
-      .mockResolvedValueOnce(jsonResponse({ models: [{ name: 'llama3' }] }))
+
       // GET /ai/ollama/models — Ollama tags (non-localhost, no probe step)
       .mockResolvedValueOnce(jsonResponse({ models: [{ name: 'codellama' }] }))
       // POST /ai/test-key — OpenAI models list
@@ -98,9 +97,7 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
 
     vi.stubGlobal('fetch', fetchMock);
 
-    const legacyModelsResponse = await api().get('/api/v1/ollama/models').query({ ollamaUrl: 'http://ollama.test' });
-    expect(legacyModelsResponse.status).toBe(200);
-    expect(legacyModelsResponse.body).toMatchObject({ connected: true, models: ['llama3'] });
+
 
     const modelsResponse = await api().get('/api/v1/ai/ollama/models').query({ ollamaUrl: 'http://ollama.test' });
     expect(modelsResponse.status).toBe(200);
@@ -127,7 +124,7 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
       model: 'llama3',
       messages: [{ role: 'user', content: 'Hello there' }],
     });
-    const calledUrl = String(fetchMock.mock.calls[4][0]);
+    const calledUrl = String(fetchMock.mock.calls[3][0]);
     const pathPart = calledUrl.replace(/^https?:\/\/[^/]+/, '');
     expect(pathPart).not.toContain('//');
     expect(chatResponse.status).toBe(200);

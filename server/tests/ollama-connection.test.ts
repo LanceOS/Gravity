@@ -218,34 +218,7 @@ describe('Ollama connection & AI proxy routes', () => {
     });
   });
 
-  // ─── Legacy /ollama/models route ───────────────────────────────────────────
 
-  describe('GET /api/v1/ollama/models — legacy route', () => {
-    it('returns the same structured { models, connected } format as the new route', async () => {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockResolvedValue(jsonResponse({ models: [{ name: 'gemma' }] })),
-      );
-
-      const res = await api()
-        .get('/api/v1/ollama/models')
-        .query({ ollamaUrl: 'http://ollama.test:11434' });
-
-      expect(res.status).toBe(200);
-      expect(res.body).toMatchObject({ connected: true, models: ['gemma'] });
-    });
-
-    it('returns connected:false when the connection fails', async () => {
-      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('fetch failed')));
-
-      const res = await api()
-        .get('/api/v1/ollama/models')
-        .query({ ollamaUrl: 'http://ollama.test:11434' });
-
-      expect(res.status).toBe(200);
-      expect(res.body).toMatchObject({ connected: false, models: [] });
-    });
-  });
 
   // ─── Chat proxy: Ollama ─────────────────────────────────────────────────────
 
