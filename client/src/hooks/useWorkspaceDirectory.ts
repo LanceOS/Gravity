@@ -59,7 +59,11 @@ export function useWorkspaceDirectory({ currentUser, setCurrentUser }: UseWorksp
     setError(null);
 
     try {
-      const response = await fetch('/api/v1/workspaces');
+      const response = await fetch('/api/v1/workspaces', {
+        headers: {
+          'X-User-Id': currentUser.id,
+        },
+      });
       const data = await response.json();
 
       if (response.status === 401) {
@@ -110,7 +114,10 @@ export function useWorkspaceDirectory({ currentUser, setCurrentUser }: UseWorksp
     try {
       const response = await fetch('/api/v1/workspaces', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Id': currentUser.id,
+        },
         body: JSON.stringify({
           ...input,
           ownerId: currentUser.id,
