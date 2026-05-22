@@ -1,9 +1,15 @@
 import React, { useMemo, useContext } from 'react';
 import { TicketContext, type Ticket } from '../../context/TicketContext';
 import { ContextMenu, type ContextMenuItem } from '@library';
-import { 
-  Check, User, Folder, Tag, AlertCircle, 
-  Layers, CheckSquare, Trash2, Calendar
+import {
+  Check,
+  User,
+  Folder,
+  Tag,
+  AlertCircle,
+  CheckSquare,
+  Trash2,
+  Calendar,
 } from 'lucide-react';
 import { STATUS_OPTIONS, PRIORITY_OPTIONS } from '../TicketDetail/utils';
 import { getPriorityIcon } from '../TicketBoard/utils';
