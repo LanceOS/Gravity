@@ -27,7 +27,7 @@ export const TicketList: React.FC<TicketListProps> = ({
 
       {/* Filtering Header Bar */}
       <TicketFilterBar
-        filters={filters as any}
+        filters={filters}
         onFilterChange={onFilterChange}
         hasActiveFilters={hasActiveFilters}
         onClearFilters={onClearFilters}
