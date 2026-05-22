@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: secure_dev_password_change_me_in_prod
       POSTGRES_DB: gravity_workspace
     ports:
-      - "${GRAVITY_POSTGRES_PORT:-35432}:5432"
+      - "${GRAVITY_POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -21,19 +21,19 @@ services:
   backend:
     build:
       context: ../server
-      dockerfile: ../docker/backend.Dockerfile
+      dockerfile: Dockerfile
     container_name: ${GRAVITY_BACKEND_CONTAINER:-gravity_app_server}
     environment:
       DATABASE_URL: postgresql://gravity_user:secure_dev_password_change_me_in_prod@postgres:5432/gravity_workspace
       BETTER_AUTH_SECRET: change-me-before-production
-      BETTER_AUTH_BASE_URL: ${GRAVITY_BACKEND_PUBLIC_URL:-http://localhost:38080}
-      CORS_ORIGINS: ${GRAVITY_FRONTEND_PUBLIC_URL:-http://localhost:33100}
-      TRUSTED_ORIGINS: ${GRAVITY_FRONTEND_PUBLIC_URL:-http://localhost:33100},${GRAVITY_BACKEND_PUBLIC_URL:-http://localhost:38080}
+      BETTER_AUTH_BASE_URL: ${GRAVITY_BACKEND_PUBLIC_URL:-http://localhost:8080}
+      CORS_ORIGINS: ${GRAVITY_FRONTEND_PUBLIC_URL:-http://localhost:5173}
+      TRUSTED_ORIGINS: ${GRAVITY_FRONTEND_PUBLIC_URL:-http://localhost:5173},${GRAVITY_BACKEND_PUBLIC_URL:-http://localhost:8080}
       OLLAMA_DEFAULT_ENDPOINT: http://host.docker.internal:11434
       NODE_ENV: production
       PORT: 8080
     ports:
-      - "${GRAVITY_BACKEND_PORT:-38080}:8080"
+      - "${GRAVITY_BACKEND_PORT:-8080}:8080"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -43,12 +43,12 @@ services:
   frontend:
     build:
       context: ..
-      dockerfile: docker/frontend.Dockerfile
+      dockerfile: client/Dockerfile
     container_name: ${GRAVITY_FRONTEND_CONTAINER:-gravity_frontend}
     environment:
       BACKEND_UPSTREAM: http://backend:8080
     ports:
-      - "${GRAVITY_FRONTEND_PORT:-33100}:80"
+      - "${GRAVITY_FRONTEND_PORT:-5173}:5173"
     depends_on:
       backend:
         condition: service_started

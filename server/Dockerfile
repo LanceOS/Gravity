@@ -21,6 +21,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
 COPY --from=builder /app/dist ./dist
+COPY .env ./.env
 COPY .env.example ./.env.example
 
 EXPOSE 8080

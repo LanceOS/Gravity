@@ -16,4 +16,4 @@ ENV BACKEND_UPSTREAM=http://backend:8080
 COPY client/nginx.template.conf /etc/nginx/templates/default.conf.template
 COPY --from=builder /app/client/dist /usr/share/nginx/html
 
-EXPOSE 80
+EXPOSE 5173

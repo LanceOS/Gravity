@@ -4,12 +4,12 @@ services:
   frontend:
     build:
       context: ..
-      dockerfile: docker/frontend.Dockerfile
+      dockerfile: client/Dockerfile
     container_name: gravity-client
     restart: unless-stopped
     ports:
-      - "33101:80"
+      - "5173:5173"
     environment:
-      - BACKEND_UPSTREAM=http://host.docker.internal:38080
+      - BACKEND_UPSTREAM=http://host.docker.internal:8080
     extra_hosts:
       - "host.docker.internal:host-gateway"
