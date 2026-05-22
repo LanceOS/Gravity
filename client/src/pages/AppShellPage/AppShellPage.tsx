@@ -790,9 +790,9 @@ export function AppShellPage() {
           boxShadow: '0 4px 16px var(--accent-glow)',
           zIndex: 999,
           cursor: 'pointer',
-          outline: 'none',
           transition: 'transform 0.2s ease, background-color 0.2s ease',
         }}
+        aria-label={isOllamaOpen ? 'Close AI Assistant' : 'Open AI Assistant'}
         title="Toggle AI Assistant"
       >
         {isOllamaOpen ? <X size={20} /> : <MessageSquare size={20} />}
