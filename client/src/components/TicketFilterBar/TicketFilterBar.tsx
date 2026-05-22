@@ -1,7 +1,33 @@
 import React from 'react';
 import type { Ticket } from '../../context/TicketContext';
 import { Button, Select, DenseTextInput } from '@library';
-import { LIST_SORT_OPTIONS, PRIORITY_FILTER_OPTIONS, STATUS_FILTER_OPTIONS } from '../TicketList/utils';
+
+const PRIORITY_FILTER_OPTIONS = [
+  { label: 'All priorities', value: '' },
+  { label: 'Low', value: 'low' },
+  { label: 'Medium', value: 'medium' },
+  { label: 'High', value: 'high' },
+  { label: 'Urgent', value: 'urgent' },
+];
+
+const STATUS_FILTER_OPTIONS = [
+  { label: 'All statuses', value: '' },
+  { label: 'Backlog', value: 'backlog' },
+  { label: 'Todo', value: 'todo' },
+  { label: 'In Progress', value: 'in_progress' },
+  { label: 'In Review', value: 'in_review' },
+  { label: 'Done', value: 'done' },
+  { label: 'Canceled', value: 'canceled' },
+];
+
+const LIST_SORT_OPTIONS = [
+  { label: 'Newest first', value: 'newest' },
+  { label: 'Oldest first', value: 'oldest' },
+  { label: 'Priority: high to low', value: 'priority_desc' },
+  { label: 'Priority: low to high', value: 'priority_asc' },
+  { label: 'Updated recently', value: 'updated_desc' },
+  { label: 'Least recently updated', value: 'updated_asc' },
+];
 
 type TicketFilterBarFilters = {
   search: string;
