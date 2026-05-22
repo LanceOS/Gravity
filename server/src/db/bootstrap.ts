@@ -253,9 +253,8 @@ export async function initializeDatabase() {
 
   await pool.query(
     `
-    ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS ollama_endpoint TEXT NOT NULL DEFAULT $1;
-  `,
-    [env.ollamaDefaultEndpoint]
+    ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS ollama_endpoint TEXT NOT NULL DEFAULT '${env.ollamaDefaultEndpoint.replace(/'/g, "''")}';
+  `
   );
 
   await pool.query(`
