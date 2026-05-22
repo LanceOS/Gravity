@@ -2,10 +2,6 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { api, jsonResponse } from './helpers/test-helpers.js';
 
 /**
- * Builds a mock fetch that fails the first call (simulating localhost unreachable)
- * and succeeds on a subsequent call (simulating Docker host fallback).
- */
-/**
  * Builds a mock fetch that succeeds on the first call to host.docker.internal.
  */
 function dockerSuccessMock(models: Array<{ name: string }>) {
