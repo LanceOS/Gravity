@@ -98,9 +98,23 @@ async function sendCompatibilityJson(
   status: number,
   payload: Record<string, unknown>,
 ) {
-  const headers = new Headers(sourceHeaders);
+  // Build the response headers manually to avoid the Headers constructor
+  // merging multiple Set-Cookie values into one comma-joined string, which
+  // would corrupt the cookies before better-call's setResponse can split them.
+  const headers = new Headers();
   headers.set('content-type', 'application/json');
-  headers.delete('content-length');
+
+  for (const [key, value] of sourceHeaders as Iterable<[string, string]>) {
+    const lowerKey = key.toLowerCase();
+    if (lowerKey === 'content-type' || lowerKey === 'content-length') {
+      continue;
+    }
+    if (lowerKey === 'set-cookie') {
+      headers.append(key, value);
+    } else {
+      headers.set(key, value);
+    }
+  }
 
   await setResponse(res, new Response(JSON.stringify(payload), { status, headers }));
 }
