@@ -3,20 +3,22 @@ import type { Ticket } from '../../context/TicketContext';
 import { Button, Select, DenseTextInput } from '@library';
 import { LIST_SORT_OPTIONS, PRIORITY_FILTER_OPTIONS, STATUS_FILTER_OPTIONS } from '../TicketList/utils';
 
+type TicketFilterBarFilters = {
+  search: string;
+  priority: Ticket['priority'] | '';
+  status: Ticket['status'] | '';
+  projectId: string;
+};
+
 export interface TicketFilterBarProps {
-  filters: {
-    search: string;
-    priority: string;
-    status: string;
-    projectId: string;
-  };
-  onFilterChange: (filters: Partial<any>) => void;
+  filters: TicketFilterBarFilters;
+  onFilterChange: (filters: Partial<TicketFilterBarFilters>) => void;
   hasActiveFilters: boolean;
   onClearFilters: () => void;
   filteredCount: number;
   totalCount: number;
   listSort?: string;
-  onListSortChange?: (sort: any) => void;
+  onListSortChange?: (sort: string) => void;
 }
 
 export const TicketFilterBar: React.FC<TicketFilterBarProps> = ({
