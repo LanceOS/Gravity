@@ -31,7 +31,7 @@ export function SidebarProjectsSection({
       </div>
 
       {!projectsCollapsed ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '4px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '4px', maxHeight: 'calc(100vh - 220px)', overflowY: 'auto', paddingRight: '4px' }}>
           {section.projects.map((project) => {
             const isActiveProject = project.id === section.activeProjectId;
             const isCollapsed = getProjectCollapsedState(collapsedProjects, project.id, section.activeProjectId);

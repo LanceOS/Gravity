@@ -192,13 +192,22 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
   return (
     <div 
       style={{
-        width: '320px',
-        borderLeft: '1px solid var(--border)',
-        background: 'var(--sidebar-bg)',
+        position: 'fixed',
+        bottom: '84px',
+        right: '24px',
+        width: '360px',
+        height: '580px',
+        maxHeight: 'calc(100vh - 140px)',
+        background: 'rgba(26, 26, 26, 0.85)',
+        border: '1px solid var(--border)',
+        borderRadius: '16px',
+        boxShadow: '0 12px 40px rgba(0, 0, 0, 0.25)',
         display: 'flex',
         flexDirection: 'column',
-        height: '100%',
-        flexShrink: 0
+        zIndex: 1000,
+        overflow: 'hidden',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
       }}
     >
       {/* Header */}
