@@ -217,7 +217,7 @@ export function Textarea({ label, error, className = '', id, style, ...props }: 
 }
 
 // 3. PasswordInput
-export interface PasswordInputProps extends TextInputProps {}
+export interface PasswordInputProps extends TextInputProps { }
 export function PasswordInput({ className = '', ...props }: PasswordInputProps) {
   const [show, setShow] = React.useState(false);
 
@@ -278,7 +278,7 @@ export function NumberInput({ label, error, onNumberChange, className = '', ...p
 }
 
 // 5. SearchInput
-export interface SearchInputProps extends TextInputProps {}
+export interface SearchInputProps extends TextInputProps { }
 export function SearchInput({ className = '', ...props }: SearchInputProps) {
   return (
     <div style={{ position: 'relative', width: '100%' }}>
@@ -880,8 +880,8 @@ export function Autocomplete({ label, value, onValueChange, options, placeholder
                     index === activeIndex
                       ? 'var(--card-hover)'
                       : opt.value === value
-                      ? 'var(--accent-glow)'
-                      : 'transparent',
+                        ? 'var(--accent-glow)'
+                        : 'transparent',
                   color: 'var(--text-heading)',
                   cursor: 'pointer',
                   fontSize: '13px',
@@ -1982,12 +1982,12 @@ export const DenseTextInput = React.forwardRef<HTMLInputElement, DenseTextInputP
     const inputId = id || `dense-input-${Math.random().toString(36).substr(2, 9)}`;
 
     return (
-      <div 
-        style={{ 
-          display: 'flex', 
-          flexDirection: 'column', 
-          gap: '2px', 
-          width: '100%' 
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '2px',
+          width: '100%'
         }}
       >
         {label && (
@@ -2040,9 +2040,10 @@ export const DenseTextInput = React.forwardRef<HTMLInputElement, DenseTextInputP
             {error}
           </span>
         )}
-        
+
         {/* Dynamic focus and validation stylings loaded securely at compile-time */}
-        <style dangerouslySetInnerHTML={{ __html: `
+        <style dangerouslySetInnerHTML={{
+          __html: `
           .dense-input-element:focus {
             border-color: var(--accent) !important;
             box-shadow: 0 0 0 2px var(--accent-glow) !important;

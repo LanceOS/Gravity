@@ -126,14 +126,14 @@
 
 .lib-divider {
   height: 1px;
-  background: linear-gradient(90deg, var(--border) 0%, rgba(255, 255, 255, 0) 100%);
+  background: var(--border);
   width: 100%;
   margin: var(--space-2) 0;
 }
 
 .lib-divider-vertical {
   width: 1px;
-  background: linear-gradient(180deg, var(--border) 0%, rgba(255, 255, 255, 0) 100%);
+  background: var(--border);
   height: 100%;
   margin: 0 var(--space-2);
 }

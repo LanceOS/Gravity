@@ -30,6 +30,18 @@ interface WorkspaceDirectoryPageProps {
   onSignOut: () => void;
 }
 
+const visuallyHiddenStyle: React.CSSProperties = {
+  position: 'absolute',
+  width: '1px',
+  height: '1px',
+  padding: 0,
+  margin: '-1px',
+  overflow: 'hidden',
+  clip: 'rect(0, 0, 0, 0)',
+  whiteSpace: 'nowrap',
+  border: 0,
+};
+
 export function WorkspaceDirectoryPage({
   currentUser,
   workspaces,
@@ -57,6 +69,8 @@ export function WorkspaceDirectoryPage({
   const [peerInviteUrl, setPeerInviteUrl] = useState('');
   const [peerUsername, setPeerUsername] = useState(`${currentUser.name}Guest`);
   const [peerPasswordHash, setPeerPasswordHash] = useState('');
+
+  const [activeTab, setActiveTab] = useState<'create' | 'join' | 'validate'>('create');
 
   const workspaceCards = useMemo(() => workspaces.slice().sort((left, right) => left.name.localeCompare(right.name)), [workspaces]);
 
@@ -93,311 +107,397 @@ export function WorkspaceDirectoryPage({
     <div
       style={{
         minHeight: '100vh',
-        padding: 'var(--space-8)',
+        padding: 'var(--space-8) var(--space-6)',
         background: 'var(--bg)',
+        overflowY: 'auto',
       }}
     >
-      <Grid
-        columns="repeat(auto-fit, minmax(320px, 1fr))"
-        gap="var(--space-6)"
+      <div
+        className="workspace-directory-grid"
         style={{
-          maxWidth: '1480px',
+          maxWidth: '1280px',
           margin: '0 auto',
-          alignItems: 'start',
         }}
       >
-        {/* Left Column: Hero & Profile Info */}
-        <Stack gap="var(--space-5)" style={{ position: 'sticky', top: 'var(--space-6)' }}>
-          <Card style={{ padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)' }}>
-            <Stack gap="var(--space-4)">
-              <div style={{ display: 'inline-flex', alignSelf: 'flex-start' }}>
-                <Badge variant="accent">Workspace Directory</Badge>
-              </div>
-              <h1 style={{ margin: 0, fontSize: '38px', fontWeight: 700, lineHeight: 1.05, color: 'var(--text-heading)', letterSpacing: '-0.02em' }}>
-                Choose where this account works.
+        {/* Left Column: Header, Stats, and Directory Table */}
+        <Stack gap="var(--space-5)">
+          {/* Elegant Page Header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: 'var(--space-4)', marginBottom: 'var(--space-1)' }}>
+            <div>
+              <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 700, color: 'var(--text-heading)', letterSpacing: '-0.02em' }}>
+                Workspace Directory
               </h1>
-              <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '14px', lineHeight: 1.6 }}>
-                Sign in once, then transition seamlessly between workspaces you host locally or validate peer invitations from remote nodes.
+              <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '13px' }}>
+                Choose where this account works.
               </p>
-
-              <Stack gap="var(--space-3)" style={{ marginTop: 'var(--space-2)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--card-hover)', border: '1px solid var(--border)' }}>
-                  <FolderPlus size={18} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-                  <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-heading)' }}>{workspaces.length} connected workspaces</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--card-hover)', border: '1px solid var(--border)' }}>
-                  <Users size={18} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-                  <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-heading)' }}>{workspaces.reduce((sum, workspace) => sum + workspace.memberCount, 0)} total members visible</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--card-hover)', border: '1px solid var(--border)' }}>
-                  <Server size={18} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-                  <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-heading)', wordBreak: 'break-all' }}>Local account: {currentUser.email}</span>
-                </div>
-              </Stack>
-
-              {errorMessage && (
-                <Alert type="error" style={{ marginTop: 'var(--space-2)' }}>
-                  {errorMessage}
-                </Alert>
-              )}
-              {successMessage && (
-                <Alert type="success" style={{ marginTop: 'var(--space-2)' }}>
-                  {successMessage}
-                </Alert>
-              )}
-
-              <Grid columns={2} gap="var(--space-3)" style={{ marginTop: 'var(--space-3)' }}>
-                <Button variant="default" size="sm" onClick={onOpenAccountPreferences} leftIcon={<Settings2 size={14} />}>
-                  Preferences
-                </Button>
-                <Button variant="ghost" size="sm" onClick={onSignOut} leftIcon={<LogOut size={14} />}>
-                  Sign Out
-                </Button>
-              </Grid>
-            </Stack>
-          </Card>
-        </Stack>
-
-        {/* Center Column: Available Workspaces */}
-        <Stack gap="var(--space-4)">
-          <div>
-            <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
-              Available Workspaces
-            </span>
-            <h2 style={{ margin: '4px 0 0', fontSize: '22px', fontWeight: 600, color: 'var(--text-heading)' }}>
-              Connected and Hosted
-            </h2>
+              <p style={{ margin: '2px 0 0', color: 'var(--text-muted)', fontSize: '12px' }}>
+                Transition seamlessly between connected workspaces or peer-invitations.
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+              <Button variant="default" size="sm" onClick={onOpenAccountPreferences} leftIcon={<Settings2 size={14} />}>
+                Preferences
+              </Button>
+              <Button variant="ghost" size="sm" onClick={onSignOut} leftIcon={<LogOut size={14} />}>
+                Sign Out
+              </Button>
+            </div>
           </div>
 
-          <Stack gap="var(--space-4)">
+          {/* Compact Horizontal Statistics Bar */}
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 'var(--space-6)',
+              padding: 'var(--space-3) var(--space-4)',
+              background: 'var(--sidebar-bg)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-sm)',
+              fontSize: '12px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+              <FolderPlus size={15} style={{ color: 'var(--text-muted)' }} />
+              <span style={{ fontWeight: 600, color: 'var(--text-heading)' }}>{workspaces.length}</span>
+              <span style={{ color: 'var(--text-muted)' }}>Workspaces</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+              <Users size={15} style={{ color: 'var(--text-muted)' }} />
+              <span style={{ fontWeight: 600, color: 'var(--text-heading)' }}>{workspaces.reduce((sum, w) => sum + w.memberCount, 0)}</span>
+              <span style={{ color: 'var(--text-muted)' }}>Members</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+              <Server size={15} style={{ color: 'var(--text-muted)' }} />
+              <span style={{ color: 'var(--text-muted)' }}>Local Account:</span>
+              <span style={{ fontWeight: 600, color: 'var(--text-heading)' }}>{currentUser.email}</span>
+            </div>
+          </div>
+
+          {/* High-density Workspaces Directory */}
+          <Stack gap="var(--space-3)">
+            <div>
+              <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+                Available Boundaries
+              </span>
+              <h2 style={{ margin: '2px 0 0', fontSize: '16px', fontWeight: 600, color: 'var(--text-heading)' }}>
+                Connected and Hosted Workspaces
+              </h2>
+            </div>
+
             {loading && (
-              <div style={{ padding: 'var(--space-8)', textAlign: 'center', border: '1px dashed var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-muted)' }}>
+              <div style={{ padding: 'var(--space-8)', textAlign: 'center', border: '1px dashed var(--border)', borderRadius: 'var(--radius-sm)', color: 'var(--text-muted)' }}>
                 Loading workspaces...
               </div>
             )}
 
             {!loading && workspaceCards.length === 0 && (
-              <div style={{ padding: 'var(--space-8)', textAlign: 'center', border: '1px dashed var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-muted)', fontSize: '13px', lineHeight: 1.6 }}>
+              <div style={{ padding: 'var(--space-8)', textAlign: 'center', border: '1px dashed var(--border)', borderRadius: 'var(--radius-sm)', color: 'var(--text-muted)', fontSize: '13px' }}>
                 No approved workspaces yet. Create one or request access with an invite code.
               </div>
             )}
 
-            {!loading && workspaceCards.map((workspace) => {
-              const isActive = workspace.id === activeWorkspaceId;
-              return (
-                <Card
-                  key={workspace.id}
+            {!loading && workspaceCards.length > 0 && (
+              <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', overflow: 'hidden', background: 'var(--card-bg)' }}>
+                {/* Table Header */}
+                <div
                   style={{
-                    padding: 'var(--space-5)',
-                    borderRadius: 'var(--radius-lg)',
-                    border: isActive ? '1px solid var(--accent)' : '1px solid var(--border)',
-                    boxShadow: isActive ? '0 0 16px var(--accent-glow)' : 'var(--shadow-sm)',
-                    background: isActive ? 'var(--accent-glow)' : 'var(--card-bg)',
-                    transition: 'all var(--transition-normal)',
+                    display: 'grid',
+                    gridTemplateColumns: '1.8fr 1fr 1.2fr 90px 130px',
+                    padding: '8px 16px',
+                    background: 'var(--sidebar-bg)',
+                    borderBottom: '1px solid var(--border)',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    color: 'var(--text-muted)',
+                    letterSpacing: '0.05em',
                   }}
                 >
-                  <Stack gap="var(--space-3)">
-                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
+                  <div>Workspace</div>
+                  <div>Details</div>
+                  <div>Endpoint</div>
+                  <div>Role</div>
+                  <div style={{ textAlign: 'right' }}>Actions</div>
+                </div>
+                {/* Table Rows */}
+                {workspaceCards.map((workspace) => {
+                  const isActive = workspace.id === activeWorkspaceId;
+                  return (
+                    <div
+                      key={workspace.id}
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1.8fr 1fr 1.2fr 90px 130px',
+                        alignItems: 'center',
+                        padding: '10px 16px',
+                        borderBottom: '1px solid var(--border)',
+                        background: isActive ? 'var(--accent-glow)' : 'transparent',
+                        transition: 'background var(--transition-normal)',
+                      }}
+                    >
                       <div>
-                        <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--text-heading)' }}>
-                          {workspace.name}
-                        </h3>
-                        <div style={{ marginTop: '4px', fontSize: '12px', color: 'var(--text-muted)' }}>
-                          {workspace.projectCount} projects · {workspace.memberCount} members · {workspace.hostUrl || 'Local host'}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                          <span style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--text-heading)' }}>
+                            {workspace.name}
+                          </span>
+                          {isActive && <Badge variant="accent">Active</Badge>}
                         </div>
+                        {workspace.description && (
+                          <div
+                            style={{
+                              fontSize: '11.5px',
+                              color: 'var(--text-muted)',
+                              marginTop: '2px',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              maxWidth: '320px',
+                            }}
+                          >
+                            {workspace.description}
+                          </div>
+                        )}
                       </div>
-                      <Badge variant={workspace.memberRole === 'owner' ? 'accent' : 'default'}>
-                        {workspace.memberRole || 'member'}
-                      </Badge>
+                      <div style={{ fontSize: '12px', color: 'var(--text)' }}>
+                        {workspace.projectCount} {workspace.projectCount === 1 ? 'project' : 'projects'} · {workspace.memberCount} {workspace.memberCount === 1 ? 'member' : 'members'}
+                      </div>
+                      <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', fontFamily: 'var(--mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {workspace.hostUrl || 'Local Host'}
+                      </div>
+                      <div>
+                        <Badge variant={workspace.memberRole === 'owner' ? 'accent' : 'default'}>
+                          {workspace.memberRole || 'member'}
+                        </Badge>
+                      </div>
+                      <div style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end' }}>
+                        <Button variant="primary" size="sm" onClick={() => onOpenWorkspace(workspace.id)} leftIcon={<ArrowRight size={13} />} style={{ minHeight: '26px', padding: '2px 8px' }}>
+                          Open
+                        </Button>
+                        <Button aria-label="Settings" variant="default" size="sm" onClick={() => onOpenSettings(workspace.id)} style={{ minHeight: '26px', padding: '2px 6px' }}>
+                          <Settings2 size={13} />
+                        </Button>
+                      </div>
                     </div>
-
-                    <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '13px', lineHeight: 1.5 }}>
-                      {workspace.description || 'No workspace description provided.'}
-                    </p>
-
-                    <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-1)' }}>
-                      <Button variant="primary" size="sm" onClick={() => onOpenWorkspace(workspace.id)} leftIcon={<ArrowRight size={14} />}>
-                        Open
-                      </Button>
-                      <Button variant="default" size="sm" onClick={() => onOpenSettings(workspace.id)} leftIcon={<Settings2 size={14} />}>
-                        Settings
-                      </Button>
-                    </div>
-                  </Stack>
-                </Card>
-              );
-            })}
+                  );
+                })}
+              </div>
+            )}
           </Stack>
         </Stack>
 
-        {/* Right Column: Actions / Forms Panel */}
-        <Stack gap="var(--space-5)" style={{ maxHeight: 'calc(100vh - var(--space-8))', overflowY: 'auto', paddingRight: '4px' }}>
-          {/* Create Workspace */}
-          <Card style={{ padding: 'var(--space-5)', borderRadius: 'var(--radius-lg)' }}>
-            <form onSubmit={handleCreateSubmit}>
-              <Stack gap="var(--space-4)">
-                <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-start' }}>
-                  <Globe size={18} style={{ color: 'var(--accent)', marginTop: '2px' }} />
-                  <div>
-                    <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: 'var(--text-heading)' }}>Create Workspace</h3>
-                    <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '12px', lineHeight: 1.5 }}>
-                      Establish a new secure boundary for your projects, tickets, and peer validation.
-                    </p>
+        {/* Right Column: Unified Tabbed Action Panel */}
+        <div style={{ position: 'sticky', top: 'var(--space-8)' }}>
+          <Card style={{ padding: 'var(--space-5)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: 'var(--card-bg)' }}>
+            <Stack gap="var(--space-4)">
+              {/* Sleek Underline Tab Headers */}
+              <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', paddingBottom: '0.1px', marginBottom: 'var(--space-2)' }}>
+                <button
+                  onClick={() => setActiveTab('create')}
+                  style={{
+                    flex: 1,
+                    background: 'none',
+                    border: 'none',
+                    padding: '8px 2px',
+                    fontSize: '11.5px',
+                    fontWeight: 600,
+                    color: activeTab === 'create' ? 'var(--text-heading)' : 'var(--text-muted)',
+                    borderBottom: activeTab === 'create' ? '2px solid var(--text-heading)' : '2px solid transparent',
+                    cursor: 'pointer',
+                    transition: 'all var(--transition-fast)',
+                  }}
+                >
+                  Create
+                </button>
+                <button
+                  onClick={() => setActiveTab('join')}
+                  style={{
+                    flex: 1,
+                    background: 'none',
+                    border: 'none',
+                    padding: '8px 2px',
+                    fontSize: '11.5px',
+                    fontWeight: 600,
+                    color: activeTab === 'join' ? 'var(--text-heading)' : 'var(--text-muted)',
+                    borderBottom: activeTab === 'join' ? '2px solid var(--text-heading)' : '2px solid transparent',
+                    cursor: 'pointer',
+                    transition: 'all var(--transition-fast)',
+                  }}
+                >
+                  Join Code
+                </button>
+                <button
+                  onClick={() => setActiveTab('validate')}
+                  style={{
+                    flex: 1,
+                    background: 'none',
+                    border: 'none',
+                    padding: '8px 2px',
+                    fontSize: '11.5px',
+                    fontWeight: 600,
+                    color: activeTab === 'validate' ? 'var(--text-heading)' : 'var(--text-muted)',
+                    borderBottom: activeTab === 'validate' ? '2px solid var(--text-heading)' : '2px solid transparent',
+                    cursor: 'pointer',
+                    transition: 'all var(--transition-fast)',
+                  }}
+                >
+                  Peer Invite
+                </button>
+              </div>
+
+              {/* Status Alert Panels */}
+              {errorMessage && (
+                <Alert type="error" style={{ marginBottom: 'var(--space-2)' }}>
+                  {errorMessage}
+                </Alert>
+              )}
+              {successMessage && (
+                <Alert type="success" style={{ marginBottom: 'var(--space-2)' }}>
+                  {successMessage}
+                </Alert>
+              )}
+
+              {/* Form Content Blocks */}
+              <form onSubmit={handleCreateSubmit} style={activeTab === 'create' ? {} : visuallyHiddenStyle}>
+                <Stack gap="var(--space-3)">
+                  <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', marginBottom: 'var(--space-1)' }}>
+                    <Globe size={16} style={{ color: 'var(--text-muted)' }} />
+                    <h3 style={{ margin: 0, fontSize: '13.5px', fontWeight: 600, color: 'var(--text-heading)' }}>Establish Boundary</h3>
                   </div>
-                </div>
+                  <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '11.5px', lineHeight: 1.4 }}>
+                    Create a local cryptographic boundary to run private, secure projects.
+                  </p>
 
-                <TextInput
-                  label="Workspace Name"
-                  value={workspaceName}
-                  onChange={(event) => setWorkspaceName(event.target.value)}
-                  placeholder="e.g. Acme Corp"
-                  required
-                />
+                  <TextInput
+                    label="Workspace Name"
+                    value={workspaceName}
+                    onChange={(event) => setWorkspaceName(event.target.value)}
+                    placeholder="e.g. Acme Corp"
+                    required
+                  />
 
-                <TextInput
-                  label="Workspace Key"
-                  value={workspaceKey}
-                  onChange={(event) => setWorkspaceKey(event.target.value.toUpperCase())}
-                  placeholder="e.g. ACM"
-                  maxLength={12}
-                  required
-                />
+                  <TextInput
+                    label="Workspace Key"
+                    value={workspaceKey}
+                    onChange={(event) => setWorkspaceKey(event.target.value.toUpperCase())}
+                    placeholder="e.g. ACM"
+                    maxLength={12}
+                    required
+                  />
 
-                <TextInput
-                  label="Private Access Key"
-                  value={workspaceAccessKey}
-                  onChange={(event) => setWorkspaceAccessKey(event.target.value.toUpperCase())}
-                  placeholder="Optional (auto-generated if empty)"
-                />
+                  <TextInput
+                    label="Private Access Key"
+                    value={workspaceAccessKey}
+                    onChange={(event) => setWorkspaceAccessKey(event.target.value.toUpperCase())}
+                    placeholder="Optional (auto-generated)"
+                  />
 
-                <Textarea
-                  label="Description"
-                  rows={3}
-                  value={workspaceDescription}
-                  onChange={(event) => setWorkspaceDescription(event.target.value)}
-                  placeholder="Briefly describe the purpose of this workspace..."
-                />
+                  <Textarea
+                    label="Description"
+                    rows={3}
+                    value={workspaceDescription}
+                    onChange={(event) => setWorkspaceDescription(event.target.value)}
+                    placeholder="Purpose of this workspace..."
+                  />
 
-                <Button type="submit" variant="primary" fullWidth loading={pendingAction === 'create'}>
-                  Create Workspace
-                </Button>
-              </Stack>
-            </form>
-          </Card>
+                  <Button type="submit" variant="primary" fullWidth loading={pendingAction === 'create'} style={{ marginTop: 'var(--space-2)' }}>
+                    Create Workspace
+                  </Button>
+                </Stack>
+              </form>
 
-          {/* Request Access */}
-          <Card style={{ padding: 'var(--space-5)', borderRadius: 'var(--radius-lg)' }}>
-            <form onSubmit={handleJoinSubmit}>
-              <Stack gap="var(--space-4)">
-                <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-start' }}>
-                  <KeyRound size={18} style={{ color: 'var(--accent)', marginTop: '2px' }} />
-                  <div>
-                    <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: 'var(--text-heading)' }}>Request Access</h3>
-                    <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '12px', lineHeight: 1.5 }}>
-                      Enter an invite code provided by a workspace owner to request join approval.
-                    </p>
+              <form onSubmit={handleJoinSubmit} style={activeTab === 'join' ? {} : visuallyHiddenStyle}>
+                <Stack gap="var(--space-3)">
+                  <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', marginBottom: 'var(--space-1)' }}>
+                    <KeyRound size={16} style={{ color: 'var(--text-muted)' }} />
+                    <h3 style={{ margin: 0, fontSize: '13.5px', fontWeight: 600, color: 'var(--text-heading)' }}>Request Access</h3>
                   </div>
-                </div>
+                  <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '11.5px', lineHeight: 1.4 }}>
+                    Enter a valid invite code to request peer authorization on the workspace.
+                  </p>
 
-                <TextInput
-                  label="Invite Code"
-                  value={inviteCode}
-                  onChange={(event) => setInviteCode(event.target.value.toUpperCase())}
-                  placeholder="WSP-GRAV-1234"
-                  required
-                />
+                  <TextInput
+                    label="Invite Code"
+                    value={inviteCode}
+                    onChange={(event) => setInviteCode(event.target.value.toUpperCase())}
+                    placeholder="WSP-GRAV-1234"
+                    required
+                  />
 
-                <Textarea
-                  label="Message"
-                  rows={3}
-                  value={requestMessage}
-                  onChange={(event) => setRequestMessage(event.target.value)}
-                  placeholder="Optional note introducing yourself to the workspace owner..."
-                />
+                  <Textarea
+                    label="Message"
+                    rows={3}
+                    value={requestMessage}
+                    onChange={(event) => setRequestMessage(event.target.value)}
+                    placeholder="Brief note to workspace owner..."
+                  />
 
-                <Button type="submit" variant="default" fullWidth loading={pendingAction === 'join'}>
-                  Send Join Request
-                </Button>
-              </Stack>
-            </form>
-          </Card>
+                  <Button type="submit" variant="primary" fullWidth loading={pendingAction === 'join'} style={{ marginTop: 'var(--space-2)' }}>
+                    Send Join Request
+                  </Button>
+                </Stack>
+              </form>
 
-          {/* Validate Peer Invite */}
-          <Card style={{ padding: 'var(--space-5)', borderRadius: 'var(--radius-lg)' }}>
-            <form onSubmit={handlePeerValidationSubmit}>
-              <Stack gap="var(--space-4)">
-                <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-start' }}>
-                  <KeyRound size={18} style={{ color: 'var(--accent)', marginTop: '2px' }} />
-                  <div>
-                    <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: 'var(--text-heading)' }}>Validate Peer Invite</h3>
-                    <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '12px', lineHeight: 1.5 }}>
-                      Connect guest profiles to remote hosts securely.
-                    </p>
+              <form onSubmit={handlePeerValidationSubmit} style={activeTab === 'validate' ? {} : visuallyHiddenStyle}>
+                <Stack gap="var(--space-3)">
+                  <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', marginBottom: 'var(--space-1)' }}>
+                    <KeyRound size={16} style={{ color: 'var(--text-muted)' }} />
+                    <h3 style={{ margin: 0, fontSize: '13.5px', fontWeight: 600, color: 'var(--text-heading)' }}>Validate Peer Invite</h3>
                   </div>
-                </div>
+                  <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '11.5px', lineHeight: 1.4 }}>
+                    Perform a secure handshake to validate a peer's invite URL and credentials.
+                  </p>
 
-                <div style={{ padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--card-hover)', border: '1px solid var(--border)', fontSize: '11px', lineHeight: 1.5, color: 'var(--text-muted)' }}>
-                  <div style={{ fontWeight: 600, color: 'var(--text-heading)', marginBottom: '4px' }}>Peer Handshake Requirements</div>
-                  Paste the host endpoint, guest credentials, and a client-side generated bcrypt password hash.
-                </div>
+                  <TextInput
+                    label="Guest Email"
+                    type="email"
+                    value={peerEmail}
+                    onChange={(event) => setPeerEmail(event.target.value)}
+                    placeholder="guest-user@peer.com"
+                    required
+                  />
 
-                <TextInput
-                  label="Guest Email"
-                  type="email"
-                  value={peerEmail}
-                  onChange={(event) => setPeerEmail(event.target.value)}
-                  placeholder="guest-user@peer.com"
-                  required
-                />
+                  <TextInput
+                    label="Validation Code"
+                    value={peerValidationCode}
+                    onChange={(event) => setPeerValidationCode(event.target.value.toUpperCase())}
+                    placeholder="GRAV-9821-X"
+                    required
+                  />
 
-                <TextInput
-                  label="Validation Code"
-                  value={peerValidationCode}
-                  onChange={(event) => setPeerValidationCode(event.target.value.toUpperCase())}
-                  placeholder="GRAV-9821-X"
-                  required
-                />
+                  <TextInput
+                    label="Invite URL"
+                    value={peerInviteUrl}
+                    onChange={(event) => setPeerInviteUrl(event.target.value)}
+                    placeholder="https://peer-host.com/api/v1/validate"
+                    required
+                  />
 
-                <TextInput
-                  label="Invite URL"
-                  value={peerInviteUrl}
-                  onChange={(event) => setPeerInviteUrl(event.target.value)}
-                  placeholder="https://host-domain-or-ip.com/api/v1/workspaces/validate"
-                  required
-                />
+                  <TextInput
+                    label="Guest Username"
+                    value={peerUsername}
+                    onChange={(event) => setPeerUsername(event.target.value)}
+                    required
+                  />
 
-                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '-8px' }}>
-                  Should point to the host server's validation endpoint.
-                </div>
+                  <Textarea
+                    label="Password Hash"
+                    rows={3}
+                    value={peerPasswordHash}
+                    onChange={(event) => setPeerPasswordHash(event.target.value)}
+                    placeholder="$2b$12$SecureBcryptHash..."
+                    required
+                  />
 
-                <TextInput
-                  label="Guest Username"
-                  value={peerUsername}
-                  onChange={(event) => setPeerUsername(event.target.value)}
-                  required
-                />
-
-                <Textarea
-                  label="Password Hash"
-                  rows={3}
-                  value={peerPasswordHash}
-                  onChange={(event) => setPeerPasswordHash(event.target.value)}
-                  placeholder="$2b$12$SecureBcryptHashHere..."
-                  required
-                />
-
-                <div style={{ padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.15)', fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                  The hash stays in the validation record so the host can authenticate guest clients without exposing raw passwords.
-                </div>
-
-                <Button type="submit" variant="default" fullWidth loading={pendingAction === 'validate'}>
-                  Validate Peer Invite
-                </Button>
-              </Stack>
-            </form>
+                  <Button type="submit" variant="primary" fullWidth loading={pendingAction === 'validate'} style={{ marginTop: 'var(--space-2)' }}>
+                    Validate Peer Invite
+                  </Button>
+                </Stack>
+              </form>
+            </Stack>
           </Card>
-        </Stack>
-      </Grid>
+        </div>
+      </div>
     </div>
   );
 }
