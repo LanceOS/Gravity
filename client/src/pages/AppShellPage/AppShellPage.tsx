@@ -32,6 +32,8 @@ export function AppShellPage() {
     activeTicket,
     activeView,
     addComment,
+    updateComment,
+    deleteComment,
     comments,
     createDomain,
     createProject,
@@ -731,6 +733,8 @@ export function AppShellPage() {
               tickets={tickets}
               users={users}
               onAddComment={addComment}
+              onUpdateComment={updateComment}
+              onDeleteComment={deleteComment}
               onDeleteTicket={handleDeleteTicket}
               onOpenCreateSubtask={handleOpenCreateSubtask}
               onOpenCreateTicket={handleOpenCreateTicket}

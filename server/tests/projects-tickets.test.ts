@@ -252,4 +252,54 @@ describe('projects and tickets routes', () => {
     expect(deleteResponse.status).toBe(200);
     expect(deleteResponse.body).toEqual({ success: true });
   });
+
+  it('handles comment editing and deletion via PATCH and DELETE', async () => {
+    const { owner, project } = await seedWorkspaceFixture();
+    const ticket = await seedTicket(project.id, {
+      id: 'ticket-1',
+      title: 'Comment overhaul task',
+      description: 'Testing comment updates and deletion',
+      priority: 'low',
+    });
+
+    const createCommentResponse = await api().post(`/api/v1/tickets/${ticket.id}/comments`).send({
+      userId: owner.id,
+      body: 'Initial comment body',
+    });
+    expect(createCommentResponse.status).toBe(201);
+    const commentId = createCommentResponse.body.id;
+
+    // PATCH comment successfully
+    const patchResponse = await api()
+      .patch(`/api/v1/tickets/${ticket.id}/comments/${commentId}`)
+      .send({ body: 'Updated comment body' });
+    expect(patchResponse.status).toBe(200);
+    expect(patchResponse.body).toMatchObject({
+      id: commentId,
+      body: 'Updated comment body',
+    });
+
+    // PATCH comment with empty body
+    const patchEmptyResponse = await api()
+      .patch(`/api/v1/tickets/${ticket.id}/comments/${commentId}`)
+      .send({ body: '' });
+    expect(patchEmptyResponse.status).toBe(400);
+
+    // PATCH comment for non-existent comment
+    const patchNonExistentResponse = await api()
+      .patch(`/api/v1/tickets/${ticket.id}/comments/non-existent-comment`)
+      .send({ body: 'Some body' });
+    expect(patchNonExistentResponse.status).toBe(404);
+
+    // DELETE comment successfully
+    const deleteResponse = await api()
+      .delete(`/api/v1/tickets/${ticket.id}/comments/${commentId}`);
+    expect(deleteResponse.status).toBe(200);
+    expect(deleteResponse.body).toEqual({ success: true });
+
+    // DELETE comment for non-existent comment
+    const deleteNonExistentResponse = await api()
+      .delete(`/api/v1/tickets/${ticket.id}/comments/non-existent-comment`);
+    expect(deleteNonExistentResponse.status).toBe(404);
+  });
 });

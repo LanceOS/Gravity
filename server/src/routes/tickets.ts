@@ -14,6 +14,8 @@ import {
   listComments,
   listTickets,
   updateTicketRecord,
+  updateCommentRecord,
+  deleteCommentRecord,
 } from '../services/tickets.js';
 
 function mapCycle(cycle: typeof cycles.$inferSelect) {
@@ -212,6 +214,72 @@ export function createTicketsRouter() {
       res.status(201).json(comment);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to add comment.' });
+    }
+  });
+
+  router.patch('/tickets/:ticketId/comments/:commentId', optionalWorkspaceAccess, async (req, res: Response<unknown, WorkspaceAccessLocals>) => {
+    const ticketId = normalizeRouteParam(req.params.ticketId);
+    const commentId = normalizeRouteParam(req.params.commentId);
+    const workspaceAccess = getWorkspaceAccess(res);
+    const body = typeof req.body?.body === 'string' ? req.body.body : '';
+
+    if (!body) {
+      res.status(400).json({ error: 'Comment body is required.' });
+      return;
+    }
+
+    try {
+      if (workspaceAccess) {
+        const accessResult = await ensureWorkspaceCanAccessTicket(ticketId, workspaceAccess.workspaceId);
+        if (!accessResult.allowed) {
+          res.status(accessResult.reason === 'not_found' ? 404 : 403).json({
+            error: accessResult.reason === 'not_found' ? 'Ticket not found.' : 'Workspace access does not permit this ticket.',
+          });
+          return;
+        }
+      }
+
+      const comment = await updateCommentRecord(commentId, ticketId, body);
+      if (!comment) {
+        res.status(404).json({ error: 'Comment not found.' });
+        return;
+      }
+
+      const allComments = await listComments(ticketId);
+      broadcastEvent('comments-updated', { ticketId, comments: allComments });
+      res.json(comment);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to update comment.' });
+    }
+  });
+
+  router.delete('/tickets/:ticketId/comments/:commentId', optionalWorkspaceAccess, async (req, res: Response<unknown, WorkspaceAccessLocals>) => {
+    const ticketId = normalizeRouteParam(req.params.ticketId);
+    const commentId = normalizeRouteParam(req.params.commentId);
+    const workspaceAccess = getWorkspaceAccess(res);
+
+    try {
+      if (workspaceAccess) {
+        const accessResult = await ensureWorkspaceCanAccessTicket(ticketId, workspaceAccess.workspaceId);
+        if (!accessResult.allowed) {
+          res.status(accessResult.reason === 'not_found' ? 404 : 403).json({
+            error: accessResult.reason === 'not_found' ? 'Ticket not found.' : 'Workspace access does not permit this ticket.',
+          });
+          return;
+        }
+      }
+
+      const deleted = await deleteCommentRecord(commentId, ticketId);
+      if (!deleted) {
+        res.status(404).json({ error: 'Comment not found.' });
+        return;
+      }
+
+      const allComments = await listComments(ticketId);
+      broadcastEvent('comments-updated', { ticketId, comments: allComments });
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to delete comment.' });
     }
   });
 

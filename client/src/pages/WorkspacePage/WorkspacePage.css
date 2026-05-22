@@ -88,7 +88,7 @@
 .workspace-page__issues {
   flex: 1;
   overflow: hidden;
-  background: radial-gradient(circle at bottom right, rgba(139, 92, 246, 0.01) 0%, transparent 70%);
+  background: var(--bg);
 }
 
 .workspace-page__issues-shell {

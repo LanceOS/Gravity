@@ -54,6 +54,7 @@ vi.mock('@library', () => ({
   ),
   TextInput: ({ value, onChange, ...props }: MockTextInputProps) => <input value={value} onChange={onChange} {...props} />,
   Textarea: ({ value, onChange, ...props }: MockTextareaProps) => <textarea value={value} onChange={onChange} {...props} />,
+  ClickAwayListener: ({ children }: { children: ReactNode }) => children,
 }));
 
 vi.mock('../../components/TicketDetail/components', () => ({
@@ -189,6 +190,8 @@ function renderTicketDetail(overrides: Partial<Parameters<typeof TicketDetail>[0
     onUpdateTicket: vi.fn().mockResolvedValue(undefined),
     onDeleteTicket: vi.fn().mockResolvedValue(undefined),
     onAddComment: vi.fn().mockResolvedValue(undefined),
+    onUpdateComment: vi.fn().mockResolvedValue(undefined),
+    onDeleteComment: vi.fn().mockResolvedValue(undefined),
     onClose: vi.fn(),
     onOpenCreateSubtask: vi.fn(),
     ...overrides,
@@ -217,12 +220,11 @@ describe('TicketDetail', () => {
       expect(props.onUpdateTicket).toHaveBeenCalledWith('ticket-1', { title: 'Stabilize sync retries' });
     });
 
-    await user.click(screen.getByRole('button', { name: 'Edit Description' }));
-    await user.click(screen.getByRole('button', { name: /Write/i }));
+    await user.click(screen.getByText('Retry the event stream after disconnects.'));
     const descriptionInput = screen.getByPlaceholderText('Describe your issue using markdown...');
     await user.clear(descriptionInput);
     await user.type(descriptionInput, 'Add retry backoff and better logging.');
-    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await user.tab();
     await waitFor(() => {
       expect(props.onUpdateTicket).toHaveBeenCalledWith('ticket-1', {
         description: 'Add retry backoff and better logging.',
@@ -274,6 +276,81 @@ describe('TicketDetail', () => {
     await user.click(screen.getAllByRole('button', { name: 'Delete Ticket' })[1]);
     await waitFor(() => {
       expect(props.onDeleteTicket).toHaveBeenCalledWith('ticket-1');
+    });
+  });
+
+  it('displays the ticket key in the right sidebar and handles comment actions dropdown/inline editing/deletion', async () => {
+    const user = userEvent.setup();
+    const { props } = renderTicketDetail();
+
+    // Verify Ticket Key Display in attributes panel
+    const sidebarKeyTitle = screen.getByText('Ticket Key');
+    expect(sidebarKeyTitle).toBeInTheDocument();
+    
+    const sidebarKeyVal = screen.getAllByText('GRA-101')[1]; // first is in top header, second in right sidebar
+    expect(sidebarKeyVal).toBeInTheDocument();
+
+    // Verify Comment Options dropdown trigger exists
+    const commentOptionsBtn = screen.getByRole('button', { name: 'Comment options' });
+    expect(commentOptionsBtn).toBeInTheDocument();
+
+    // Dropdown is not visible before opening
+    expect(screen.queryByRole('button', { name: 'Grab Link' })).not.toBeInTheDocument();
+    
+    // Open dropdown
+    await user.click(commentOptionsBtn);
+    expect(screen.getByRole('button', { name: 'Grab Link' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Copy Markdown' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Edit Comment' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete Comment' })).toBeInTheDocument();
+
+    // Click Grab Link — dropdown closes
+    const writeTextSpy = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
+    await user.click(screen.getByRole('button', { name: 'Grab Link' }));
+    expect(writeTextSpy).toHaveBeenCalledWith(expect.stringContaining('#comment-comment-1'));
+    expect(screen.queryByRole('button', { name: 'Grab Link' })).not.toBeInTheDocument();
+
+    // Open dropdown again to test copy markdown
+    await user.click(commentOptionsBtn);
+    await user.click(screen.getByRole('button', { name: 'Copy Markdown' }));
+    expect(writeTextSpy).toHaveBeenCalledWith('PR is ready for review.');
+    expect(screen.queryByRole('button', { name: 'Copy Markdown' })).not.toBeInTheDocument();
+
+    // Open dropdown again to test inline editing
+    await user.click(commentOptionsBtn);
+    await user.click(screen.getByRole('button', { name: 'Edit Comment' }));
+    
+    // Dropdown closes; inline edit textarea shown with the comment body
+    expect(screen.queryByRole('button', { name: 'Edit Comment' })).not.toBeInTheDocument();
+    const commentEditInput = screen.getByDisplayValue('PR is ready for review.');
+    await user.clear(commentEditInput);
+    await user.type(commentEditInput, 'PR is approved now.');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    
+    await waitFor(() => {
+      expect(props.onUpdateComment).toHaveBeenCalledWith('ticket-1', 'comment-1', 'PR is approved now.');
+    });
+
+    // Open dropdown again to test deletion flow — should show confirmation overlay, not window.confirm
+    await user.click(commentOptionsBtn);
+    await user.click(screen.getByRole('button', { name: 'Delete Comment' }));
+
+    // Overlay should appear with title and action buttons
+    expect(screen.getByText('Delete this comment?')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+
+    // Confirm deletion via the overlay button (there are now two "Delete Comment" buttons rendered,
+    // the second one is inside the overlay)
+    const deleteButtons = screen.getAllByRole('button', { name: 'Delete Comment' });
+    await user.click(deleteButtons[deleteButtons.length - 1]);
+
+    await waitFor(() => {
+      expect(props.onDeleteComment).toHaveBeenCalledWith('ticket-1', 'comment-1');
+    });
+
+    // Overlay should close after confirmation
+    await waitFor(() => {
+      expect(screen.queryByText('Delete this comment?')).not.toBeInTheDocument();
     });
   });
 });

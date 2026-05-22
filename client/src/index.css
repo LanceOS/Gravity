@@ -28,30 +28,30 @@
 }
 
 :root {
-  /* HSL Color variables - Solar Frost (Light Mode) */
-  --bg: #f9f9fc;
-  --sidebar-bg: rgba(242, 242, 249, 0.85);
+  /* HSL Color variables - Crisp White Scale (Light Mode Default) */
+  --bg: #ffffff;
+  --sidebar-bg: #f5f5f7;
   --card-bg: #ffffff;
-  --card-hover: rgba(238, 238, 252, 0.7);
-  --border: rgba(99, 102, 241, 0.08);
-  --border-focus: rgba(99, 102, 241, 0.55);
-  --text: #48446c;
-  --text-heading: #110c3b;
-  --text-muted: #7f7c9e;
+  --card-hover: #f5f5f7;
+  --border: #e5e5ea;
+  --border-focus: #8e8e93;
+  --text: #1c1c1e;
+  --text-heading: #000000;
+  --text-muted: #8e8e93;
   
-  --accent: #6366f1;
-  --accent-solid: #4f46e5;
-  --accent-solid-hover: #4338ca;
+  --accent: #000000;
+  --accent-solid: #000000;
+  --accent-solid-hover: #1c1c1e;
   --accent-foreground: #ffffff;
-  --accent-glow: rgba(99, 102, 241, 0.08);
-  --accent-border: rgba(99, 102, 241, 0.25);
-  --sidebar-hover-overlay: rgba(99, 102, 241, 0.04);
+  --accent-glow: rgba(0, 0, 0, 0.05);
+  --accent-border: #d1d1d6;
+  --sidebar-hover-overlay: rgba(0, 0, 0, 0.04);
   
-  --priority-no: #8b88a8;
-  --priority-low: #3b82f6;
-  --priority-medium: #f59e0b;
-  --priority-high: #ef4444;
-  --priority-urgent: #ec4899;
+  --priority-no: #8e8e93;
+  --priority-low: #aeaeb2;
+  --priority-medium: #636366;
+  --priority-high: #3a3a3c;
+  --priority-urgent: #1c1c1e;
 
   --sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
@@ -64,25 +64,25 @@
   color-scheme: light dark;
 }
 
-/* Dark Mode Palette override - Nebula Obsidian */
+/* Dark Mode Palette Override - Crisp Gray Scale */
 .dark-theme {
-  --bg: #030308;
-  --sidebar-bg: rgba(8, 8, 18, 0.75);
-  --card-bg: rgba(18, 18, 30, 0.45);
-  --card-hover: rgba(30, 26, 56, 0.55);
-  --border: rgba(139, 92, 246, 0.14);
-  --border-focus: rgba(6, 182, 212, 0.85);
-  --text: #b6b2db;
+  --bg: #121212;
+  --sidebar-bg: #1a1a1a;
+  --card-bg: #1c1c1e;
+  --card-hover: #2c2c2e;
+  --border: #2c2c2e;
+  --border-focus: #636366;
+  --text: #e5e5ea;
   --text-heading: #ffffff;
-  --text-muted: #6e6a98;
+  --text-muted: #8e8e93;
   
-  --accent: #8b5cf6;
-  --accent-solid: #7c3aed;
-  --accent-solid-hover: #6d28d9;
-  --accent-foreground: #ffffff;
-  --accent-glow: rgba(139, 92, 246, 0.12);
-  --accent-border: rgba(139, 92, 246, 0.3);
-  --sidebar-hover-overlay: rgba(139, 92, 246, 0.04);
+  --accent: #ffffff;
+  --accent-solid: #ffffff;
+  --accent-solid-hover: #e5e5ea;
+  --accent-foreground: #121212;
+  --accent-glow: rgba(255, 255, 255, 0.1);
+  --accent-border: #48484a;
+  --sidebar-hover-overlay: rgba(255, 255, 255, 0.05);
 }
 
 * {
@@ -458,4 +458,18 @@ button.tool-submit-active {
   border-radius: var(--radius-xs);
   font-size: 11.5px;
   color: var(--accent);
+}
+
+/* Compact B2B Workspace Directory Grid Layout */
+.workspace-directory-grid {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: var(--space-6);
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .workspace-directory-grid {
+    grid-template-columns: 1fr;
+  }
 }
