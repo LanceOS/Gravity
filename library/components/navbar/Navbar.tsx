@@ -1,7 +1,7 @@
 import React from 'react';
 import { ChevronRight } from 'lucide-react';
-import { Portal } from '../utilities/Portal';
-import { ClickAwayListener } from '../utilities/ClickAwayListener';
+import { Portal } from '../../utilities';
+import { ClickAwayListener } from '../../utilities';
 
 export interface NavbarProps {
   brand: React.ReactNode;

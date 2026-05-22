@@ -1,7 +1,7 @@
 import React from 'react';
 import { ChevronRight } from 'lucide-react';
-import { Portal } from '../utilities/Portal';
-import { ClickAwayListener } from '../utilities/ClickAwayListener';
+import { Portal } from '../../utilities';
+import { ClickAwayListener } from '../../utilities';
 
 export interface SidebarProps {
   children: React.ReactNode;

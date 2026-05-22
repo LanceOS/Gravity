@@ -1,8 +1,8 @@
 import React from 'react';
 import { X, AlertCircle, Info, CheckCircle2, AlertTriangle } from 'lucide-react';
-import { Portal } from '../utilities/Portal';
-import { FocusTrap } from '../utilities/FocusTrap';
-import { ClickAwayListener } from '../utilities/ClickAwayListener';
+import { Portal } from '../../utilities';
+import { FocusTrap } from '../../utilities';
+import { ClickAwayListener } from '../../utilities';
 
 export interface DrawerProps {
   isOpen: boolean;

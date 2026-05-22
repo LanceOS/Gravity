@@ -1,6 +1,75 @@
 import React from 'react';
 import { Eye, EyeOff, Search, Calendar, Clock, Star, Upload, User, ChevronDown, Check } from 'lucide-react';
-import { ClickAwayListener } from '../utilities/ClickAwayListener';
+import { ClickAwayListener } from '../../utilities';
+import { cn } from '../../utilities';
+
+export interface SelectOption {
+  value: string;
+  label: string;
+  disabled?: boolean;
+}
+
+function normalizeSelectValue(value: React.SelectHTMLAttributes<HTMLSelectElement>['value']) {
+  if (Array.isArray(value)) {
+    return value[0] ?? '';
+  }
+
+  if (value === undefined || value === null) {
+    return '';
+  }
+
+  return String(value);
+}
+
+function getFirstEnabledSelectIndex(options: readonly SelectOption[]) {
+  return options.findIndex((option) => !option.disabled);
+}
+
+function getLastEnabledSelectIndex(options: readonly SelectOption[]) {
+  for (let index = options.length - 1; index >= 0; index -= 1) {
+    if (!options[index]?.disabled) {
+      return index;
+    }
+  }
+
+  return -1;
+}
+
+function getAdjacentEnabledSelectIndex(options: readonly SelectOption[], currentIndex: number, direction: 1 | -1) {
+  if (options.length === 0) {
+    return -1;
+  }
+
+  if (currentIndex < 0) {
+    return direction === 1 ? getFirstEnabledSelectIndex(options) : getLastEnabledSelectIndex(options);
+  }
+
+  for (let step = 1; step <= options.length; step += 1) {
+    const nextIndex = (currentIndex + step * direction + options.length) % options.length;
+    if (!options[nextIndex]?.disabled) {
+      return nextIndex;
+    }
+  }
+
+  return currentIndex;
+}
+
+function createSelectChangeEvent(nextValue: string) {
+  return {
+    target: { value: nextValue },
+    currentTarget: { value: nextValue },
+  } as React.ChangeEvent<HTMLSelectElement>;
+}
+
+export interface SelectProps extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>, 'onChange'> {
+  label?: string;
+  error?: string;
+  options: readonly SelectOption[];
+  placeholder?: string;
+  onValueChange?: (value: string) => void;
+  onChange?: React.ChangeEventHandler<HTMLSelectElement>;
+}
+
 
 export interface SelectProps extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>, 'onChange'> {
   label?: string;
