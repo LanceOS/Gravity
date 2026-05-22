@@ -1987,7 +1987,6 @@ export const DenseTextInput = React.forwardRef<HTMLInputElement, DenseTextInputP
           display: 'flex',
           flexDirection: 'column',
           gap: '2px',
-          width: '100%'
         }}
       >
         {label && (
@@ -2011,6 +2010,7 @@ export const DenseTextInput = React.forwardRef<HTMLInputElement, DenseTextInputP
             ref={ref}
             style={{
               width: '100%',
+              height: 'var(--input-height, 36px)',
               backgroundColor: 'var(--card-bg)',
               border: `1px solid ${error ? 'var(--priority-high)' : 'var(--border)'}`,
               borderRadius: 'var(--radius-xs)',
