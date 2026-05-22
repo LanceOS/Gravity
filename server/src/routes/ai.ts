@@ -270,6 +270,13 @@ export function createAiRouter() {
             return true;
           });
 
+          if (filteredMessages.length === 0) {
+            res.status(400).json({
+              error: 'Anthropic requests require at least one non-system message.',
+            });
+            return;
+          }
+
           const response = await fetchWithTimeout(
             'https://api.anthropic.com/v1/messages',
             {
