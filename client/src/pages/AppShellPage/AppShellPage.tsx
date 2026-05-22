@@ -643,6 +643,8 @@ export function AppShellPage() {
       onOpenOllama: () => setIsOllamaOpen((previous) => !previous),
       onOpenSimulator: () => setIsSimulatorOpen((previous) => !previous),
       onOpenCreateTicket: () => handleOpenCreateTicket(),
+      agentIntegration: accountSettings.agentIntegration,
+      aiProvider: accountSettings.aiProvider,
     },
     userMenu: {
       currentUser,
@@ -697,6 +699,7 @@ export function AppShellPage() {
                   onClose={() => setIsOllamaOpen(false)}
                   initialOllamaUrl={accountSettings.ollamaEndpoint}
                   initialModel={accountSettings.ollamaModel || ollamaModels[0] || ''}
+                  settings={accountSettings}
                 />
               ) : null}
               {isSimulatorOpen ? <AgentSimulator onClose={() => setIsSimulatorOpen(false)} /> : null}

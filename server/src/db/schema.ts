@@ -25,6 +25,7 @@ export const userSettings = pgTable('user_settings', {
   ollamaEndpoint: text('ollama_endpoint').notNull().default('http://host.docker.internal:11434'),
   preferredOllamaModel: text('preferred_ollama_model'),
   aiProvider: text('ai_provider').notNull().default('openai'),
+  agentIntegration: text('agent_integration').notNull().default('ollama'),
   projectLayout: text('project_layout').notNull().default('standard'),
   encryptedApiKey: text('encrypted_api_key'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

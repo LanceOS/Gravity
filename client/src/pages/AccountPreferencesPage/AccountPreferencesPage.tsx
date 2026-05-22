@@ -120,7 +120,7 @@ function GeneralSettingsSection({
           </p>
         </div>
 
-        <Grid columns={3} gap="var(--space-4)">
+        <Grid columns={2} gap="var(--space-4)">
           <Select
             label="Default View Mode"
             value={settings.defaultView}
@@ -148,6 +148,16 @@ function GeneralSettingsSection({
             options={[
               { value: 'standard', label: 'Standard (Relaxed)' },
               { value: 'condensed', label: 'Condensed (High Density)' }
+            ]}
+          />
+
+          <Select
+            label="Active Agent Integration"
+            value={settings.agentIntegration}
+            onChange={(event) => onChangeSettings({ agentIntegration: event.target.value as WorkspaceSettings['agentIntegration'] })}
+            options={[
+              { value: 'ollama', label: 'Local Ollama' },
+              { value: 'third_party', label: 'Cloud AI Provider' }
             ]}
           />
         </Grid>

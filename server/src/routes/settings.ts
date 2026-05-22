@@ -9,6 +9,7 @@ import { resolveRequestActorUserId } from '../lib/request-auth.js';
 const DEFAULT_VIEWS = new Set(['board', 'list']);
 const THEMES = new Set(['dark', 'light']);
 const AI_PROVIDERS = new Set(['openai', 'anthropic', 'gemini', 'deepseek']);
+const AGENT_INTEGRATIONS = new Set(['ollama', 'third_party']);
 const PROJECT_LAYOUTS = new Set(['standard', 'condensed']);
 
 function toSettingsResponse(settings: Awaited<ReturnType<typeof getUserSettingsRecord>>) {
@@ -20,6 +21,7 @@ function toSettingsResponse(settings: Awaited<ReturnType<typeof getUserSettingsR
     theme: settings.theme,
     apiKey: decryptSecret(settings.encryptedApiKey),
     aiProvider: settings.aiProvider,
+    agentIntegration: settings.agentIntegration,
     projectLayout: settings.projectLayout,
   };
 }
@@ -102,6 +104,12 @@ export function createSettingsRouter() {
         return;
       }
 
+      const agentIntegration = getOptionalEnumValue(req.body, 'agentIntegration', AGENT_INTEGRATIONS);
+      if (!agentIntegration.ok) {
+        res.status(400).json({ error: agentIntegration.error });
+        return;
+      }
+
       const current = await getUserSettingsRecord(userId);
       const merged = {
         ...current,
@@ -112,6 +120,7 @@ export function createSettingsRouter() {
           typeof req.body?.ollamaEndpoint === 'string' ? req.body.ollamaEndpoint : current.ollamaEndpoint,
         theme: theme.value ?? current.theme,
         aiProvider: aiProvider.value ?? current.aiProvider,
+        agentIntegration: agentIntegration.value ?? current.agentIntegration,
         projectLayout: projectLayout.value ?? current.projectLayout,
         encryptedApiKey:
           typeof req.body?.apiKey === 'string'
@@ -127,6 +136,7 @@ export function createSettingsRouter() {
           ollamaEndpoint: merged.ollamaEndpoint,
           theme: merged.theme,
           aiProvider: merged.aiProvider,
+          agentIntegration: merged.agentIntegration,
           projectLayout: merged.projectLayout,
           encryptedApiKey: merged.encryptedApiKey,
           updatedAt: new Date(),

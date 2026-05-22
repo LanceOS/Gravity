@@ -172,7 +172,8 @@ export function createAiRouter() {
   });
 
   router.post('/ai/chat', async (req, res) => {
-    const ollamaUrl = normalizeOllamaUrl(typeof req.body?.ollamaUrl === 'string' ? req.body.ollamaUrl : 'http://host.docker.internal:11434');
+    const provider = typeof req.body?.provider === 'string' ? req.body.provider.toLowerCase() : 'ollama';
+    const apiKey = typeof req.body?.apiKey === 'string' ? req.body.apiKey.trim() : '';
     const model = typeof req.body?.model === 'string' ? req.body.model : '';
     const messages = Array.isArray(req.body?.messages) ? req.body.messages : [];
 
@@ -180,6 +181,135 @@ export function createAiRouter() {
       res.status(400).json({ error: 'model and messages are required.' });
       return;
     }
+
+    if (provider !== 'ollama') {
+      if (!apiKey) {
+        res.status(400).json({ error: 'API key is required for cloud providers.' });
+        return;
+      }
+
+      try {
+        let content = '';
+
+        if (provider === 'openai' || provider === 'deepseek') {
+          const baseUrl = provider === 'deepseek' ? 'https://api.deepseek.com' : 'https://api.openai.com';
+          const response = await fetchWithTimeout(
+            `${baseUrl}/v1/chat/completions`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`,
+              },
+              body: JSON.stringify({
+                model,
+                messages,
+                stream: false,
+              }),
+            },
+            60000,
+          );
+
+          if (!response.ok) {
+            throw new Error(await readErrorMessage(response, `Failed to contact ${provider}.`));
+          }
+
+          const data = await response.json() as any;
+          content = data.choices?.[0]?.message?.content || '';
+        } else if (provider === 'anthropic') {
+          let system: string | undefined = undefined;
+          const filteredMessages = messages.filter((msg: any) => {
+            if (msg.role === 'system') {
+              system = (system ? system + '\n' : '') + msg.content;
+              return false;
+            }
+            return true;
+          });
+
+          const response = await fetchWithTimeout(
+            'https://api.anthropic.com/v1/messages',
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': apiKey,
+                'anthropic-version': '2023-06-01',
+              },
+              body: JSON.stringify({
+                model,
+                messages: filteredMessages,
+                max_tokens: 4096,
+                system,
+                stream: false,
+              }),
+            },
+            60000,
+          );
+
+          if (!response.ok) {
+            throw new Error(await readErrorMessage(response, 'Failed to contact Anthropic.'));
+          }
+
+          const data = await response.json() as any;
+          content = data.content?.[0]?.text || '';
+        } else if (provider === 'gemini') {
+          let systemText = '';
+          const contents = [];
+          for (const msg of messages) {
+            if (msg.role === 'system') {
+              systemText = (systemText ? systemText + '\n' : '') + msg.content;
+            } else {
+              contents.push({
+                role: msg.role === 'assistant' ? 'model' : 'user',
+                parts: [{ text: msg.content }],
+              });
+            }
+          }
+
+          const response = await fetchWithTimeout(
+            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                contents,
+                ...(systemText ? {
+                  systemInstruction: {
+                    parts: [{ text: systemText }],
+                  },
+                } : {}),
+              }),
+            },
+            60000,
+          );
+
+          if (!response.ok) {
+            throw new Error(await readErrorMessage(response, 'Failed to contact Gemini.'));
+          }
+
+          const data = await response.json() as any;
+          content = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        } else {
+          res.status(400).json({ error: `Unsupported provider: ${provider}` });
+          return;
+        }
+
+        res.json({
+          message: {
+            role: 'assistant',
+            content,
+          },
+        });
+      } catch (error) {
+        res.status(502).json({ error: error instanceof Error ? error.message : `Connection to ${provider} failed.` });
+      }
+      return;
+    }
+
+    // Default Ollama behavior
+    const ollamaUrl = normalizeOllamaUrl(typeof req.body?.ollamaUrl === 'string' ? req.body.ollamaUrl : 'http://host.docker.internal:11434');
 
     try {
       const response = await fetchWithTimeout(

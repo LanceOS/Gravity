@@ -40,6 +40,7 @@ type RawSettingsRow = {
   ollamaEndpoint: string;
   preferredOllamaModel: string | null;
   aiProvider: string;
+  agentIntegration: string;
   projectLayout: string;
   encryptedApiKey: string | null;
 };
@@ -106,6 +107,7 @@ export async function ensureUserDefaults(userId: string) {
       defaultView: 'board',
       ollamaEndpoint: env.ollamaDefaultEndpoint,
       aiProvider: 'openai',
+      agentIntegration: 'ollama',
       projectLayout: 'standard',
       tutorialCompleted: false,
     })
@@ -193,6 +195,7 @@ export async function getUserSettingsRecord(userId: string): Promise<RawSettings
     ollamaEndpoint: row?.ollamaEndpoint ?? env.ollamaDefaultEndpoint,
     preferredOllamaModel: row?.preferredOllamaModel ?? null,
     aiProvider: row?.aiProvider ?? 'openai',
+    agentIntegration: row?.agentIntegration ?? 'ollama',
     projectLayout: row?.projectLayout ?? 'standard',
     encryptedApiKey: row?.encryptedApiKey ?? null,
   };

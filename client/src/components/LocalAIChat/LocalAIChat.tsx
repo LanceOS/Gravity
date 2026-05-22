@@ -6,14 +6,41 @@ import { FormattedMarkdown } from './components';
 import type { LocalAIChatProps, Message, QuickActionType } from './types';
 import { buildOllamaErrorMessage, buildQuickActionPrompt, getInitialMessages, getInitialModel, getInitialOllamaUrl } from './utils';
 
-export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllamaUrl, initialModel }) => {
+const CLOUD_MODELS: Record<string, string[]> = {
+  openai: ['gpt-4o-mini', 'gpt-4o'],
+  anthropic: ['claude-3-5-sonnet', 'claude-3-haiku'],
+  gemini: ['gemini-1.5-flash', 'gemini-1.5-pro'],
+  deepseek: ['deepseek-chat'],
+};
+
+export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllamaUrl, initialModel, settings }) => {
   const { activeTicket, projects, users } = useTickets();
+
+  const isThirdParty = settings.agentIntegration === 'third_party';
+
+  const getProviderName = (provider?: string) => {
+    switch (provider) {
+      case 'openai': return 'OpenAI';
+      case 'anthropic': return 'Anthropic';
+      case 'gemini': return 'Gemini';
+      case 'deepseek': return 'DeepSeek';
+      default: return 'Cloud';
+    }
+  };
+
+  const cloudModelsList = CLOUD_MODELS[settings.aiProvider] || ['gpt-4o-mini'];
 
   // Settings
   const [ollamaUrl, setOllamaUrl] = useState(() => getInitialOllamaUrl(initialOllamaUrl));
-  const [model, setModel] = useState(() => getInitialModel(initialModel));
+  const [model, setModel] = useState(() => {
+    if (isThirdParty) {
+      return cloudModelsList.includes(initialModel) ? initialModel : cloudModelsList[0];
+    }
+    return getInitialModel(initialModel);
+  });
   const [isCheckingModel, setIsCheckingModel] = useState(false);
   const [modelStatus, setModelStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
+  const [detectedModels, setDetectedModels] = useState<string[]>([]);
 
   // Chat state
   const [messages, setMessages] = useState<Message[]>(getInitialMessages);
@@ -28,37 +55,57 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
   }, [messages, isGenerating]);
 
   const checkOllamaStatus = useEffectEvent(async (urlToTest = ollamaUrl, announceLoading = true) => {
+    if (isThirdParty) {
+      setModelStatus('connected');
+      return;
+    }
+
     if (announceLoading) {
       setIsCheckingModel(true);
       setModelStatus('checking');
     }
 
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2000);
-
-      const response = await fetch(`${urlToTest}/api/tags`, { signal: controller.signal });
-      clearTimeout(timeoutId);
+      const response = await fetch(`/api/v1/ai/ollama/models?ollamaUrl=${encodeURIComponent(urlToTest)}`);
 
       if (response.ok) {
         const data = await response.json();
-        if (data.models && data.models.length > 0 && !model) {
-          setModel(data.models[0].name);
+        const rawModels = Array.isArray(data)
+          ? data
+          : Array.isArray(data.models)
+            ? data.models
+            : [];
+        const nextModels = rawModels.filter((m: unknown): m is string => typeof m === 'string' && m.length > 0);
+
+        setDetectedModels(nextModels);
+        if (nextModels.length > 0) {
+          if (!model || !nextModels.includes(model)) {
+            setModel(nextModels[0]);
+          }
         }
         setModelStatus('connected');
       } else {
         setModelStatus('disconnected');
+        setDetectedModels([]);
       }
     } catch {
       setModelStatus('disconnected');
+      setDetectedModels([]);
     } finally {
       setIsCheckingModel(false);
     }
   });
 
   useEffect(() => {
-    void checkOllamaStatus(getInitialOllamaUrl(initialOllamaUrl), false);
-  }, []);
+    if (isThirdParty) {
+      if (!model || !cloudModelsList.includes(model)) {
+        setModel(cloudModelsList[0]);
+      }
+      setModelStatus('connected');
+    } else {
+      void checkOllamaStatus(getInitialOllamaUrl(initialOllamaUrl), false);
+    }
+  }, [isThirdParty, settings.aiProvider]);
 
   const handleSendMessage = async (customText?: string) => {
     const textToSend = customText || chatInput;
@@ -70,29 +117,45 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
     setIsGenerating(true);
 
     try {
+      const payload: Record<string, any> = {
+        model,
+        messages: newMessages.map(m => ({ role: m.role, content: m.content })),
+        provider: isThirdParty ? settings.aiProvider : 'ollama',
+      };
+
+      if (isThirdParty) {
+        payload.apiKey = settings.apiKey;
+      } else {
+        payload.ollamaUrl = ollamaUrl;
+      }
+
       const response = await fetch('/api/v1/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ollamaUrl,
-          model,
-          messages: newMessages.map(m => ({ role: m.role, content: m.content }))
-        })
+        body: JSON.stringify(payload)
       });
+
+      const providerLabel = isThirdParty ? getProviderName(settings.aiProvider) : 'Ollama';
 
       if (!response.ok) {
         const err = await response.json();
-        throw new Error(err.error || 'Server error proxying to Ollama.');
+        throw new Error(err.error || `Server error proxying to ${providerLabel}.`);
       }
 
       const data = await response.json();
-      const aiResponse = data.message?.content || 'Sorry, I got an empty response from local Ollama.';
-      
+      const aiResponse = data.message?.content || `Sorry, I got an empty response from ${providerLabel}.`;
+
       setMessages([...newMessages, { role: 'assistant', content: aiResponse }]);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown local Ollama error.';
+      const providerLabel = isThirdParty ? getProviderName(settings.aiProvider) : 'Ollama';
+      const message = error instanceof Error ? error.message : `Unknown ${providerLabel} error.`;
       console.error(error);
-      setMessages([...newMessages, buildOllamaErrorMessage(model, ollamaUrl, message)]);
+
+      const errorContent = isThirdParty
+        ? `### ⚠️ Connection Error\n\nFailed to contact the **${providerLabel}** API.\n\n**Details:**\n> ${message}\n\nPlease check your internet connection and verify that your API key is correctly configured in your **Account Preferences**.`
+        : buildOllamaErrorMessage(model, ollamaUrl, message).content;
+
+      setMessages([...newMessages, { role: 'system', content: errorContent }]);
     } finally {
       setIsGenerating(false);
     }
@@ -137,7 +200,7 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
       >
         <Cpu size={16} color="var(--accent)" />
         <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-heading)' }}>
-          Local AI Assistant
+          {isThirdParty ? `${getProviderName(settings.aiProvider)} Assistant` : 'Local AI Assistant'}
         </span>
 
         <button 
@@ -169,18 +232,19 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
         {/* Connection status */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '11px' }}>
           <span style={{ color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-            Ollama Endpoint Status:
+            {isThirdParty ? 'Cloud Provider Status:' : 'Ollama Endpoint Status:'}
           </span>
           <span 
-            onClick={() => void checkOllamaStatus()}
-            className="clickable"
+            onClick={() => !isThirdParty && void checkOllamaStatus()}
+            className={isThirdParty ? "" : "clickable"}
             style={{
               marginLeft: 'auto',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '4px',
               fontWeight: 600,
-              color: modelStatus === 'connected' ? '#10b981' : modelStatus === 'checking' ? 'var(--priority-medium)' : '#ef4444'
+              color: modelStatus === 'connected' ? '#10b981' : modelStatus === 'checking' ? 'var(--priority-medium)' : '#ef4444',
+              cursor: isThirdParty ? 'default' : 'pointer'
             }}
           >
             {modelStatus === 'connected' ? <Wifi size={12} /> : <WifiOff size={12} />}
@@ -189,24 +253,59 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
         </div>
 
         {/* Inputs */}
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <DenseTextInput 
-            placeholder="http://localhost:11434"
-            value={ollamaUrl}
-            onChange={(e) => setOllamaUrl(e.target.value)}
-            onBlur={() => void checkOllamaStatus()}
-            style={{ fontSize: '11.5px' }}
-          />
-          <DenseTextInput 
-            placeholder="llama3"
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {!isThirdParty ? (
+            <DenseTextInput 
+              placeholder="http://localhost:11434"
+              value={ollamaUrl}
+              onChange={(e) => setOllamaUrl(e.target.value)}
+              onBlur={() => void checkOllamaStatus()}
+              style={{ fontSize: '11.5px', flex: 1 }}
+            />
+          ) : null}
+          
+          <select
             value={model}
             onChange={(e) => setModel(e.target.value)}
-            style={{ fontSize: '11.5px', width: '100px' }}
-          />
+            disabled={!isThirdParty && (isCheckingModel || detectedModels.length === 0)}
+            style={{
+              fontSize: '11.5px',
+              height: '32px',
+              borderRadius: '6px',
+              border: '1px solid var(--border)',
+              background: 'var(--card-bg)',
+              color: 'var(--text)',
+              padding: '0 8px',
+              outline: 'none',
+              cursor: 'pointer',
+              flex: isThirdParty ? 1 : '0 0 120px',
+              maxWidth: '100%',
+              transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
+            }}
+            className="clickable"
+          >
+            {isThirdParty ? (
+              cloudModelsList.map((m) => (
+                <option key={m} value={m} style={{ background: 'var(--card-bg)', color: 'var(--text)' }}>
+                  {m}
+                </option>
+              ))
+            ) : detectedModels.length > 0 ? (
+              detectedModels.map((m) => (
+                <option key={m} value={m} style={{ background: 'var(--card-bg)', color: 'var(--text)' }}>
+                  {m}
+                </option>
+              ))
+            ) : (
+              <option value="" style={{ background: 'var(--card-bg)', color: 'var(--text-muted)' }}>
+                {isCheckingModel ? 'Checking...' : 'No models'}
+              </option>
+            )}
+          </select>
         </div>
-        {!model && !isCheckingModel ? (
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-            No saved model selected yet. Pick one in Account Preferences or enter a model here for this session.
+        {!model && !isCheckingModel && !isThirdParty ? (
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+            No models detected. Ensure Ollama is running and has models installed.
           </div>
         ) : null}
       </div>
