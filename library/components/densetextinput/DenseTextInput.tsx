@@ -18,7 +18,7 @@ export const DenseTextInput = React.forwardRef<HTMLInputElement, DenseTextInputP
           display: 'flex',
           flexDirection: 'column',
           gap: '2px',
-          width: 'fit-content',
+          width: '100%',
           ...style
         }}
       >
