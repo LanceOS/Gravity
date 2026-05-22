@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AgentSimulator } from '../../components/AgentSimulator';
+import { MessageSquare, X } from 'lucide-react';
+
 import { AuthScreen } from '../../components/AuthScreen';
 import { CreateTicketModal } from '../../components/CreateTicketModal';
 import { LocalAIChat } from '../../components/LocalAIChat';
@@ -64,7 +65,7 @@ export function AppShellPage() {
   const [workspaceReady, setWorkspaceReady] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isOllamaOpen, setIsOllamaOpen] = useState(false);
-  const [isSimulatorOpen, setIsSimulatorOpen] = useState(false);
+
   const [createInitialStatus, setCreateInitialStatus] = useState<Ticket['status'] | undefined>(undefined);
   const [createParentId, setCreateParentId] = useState<string | undefined>(undefined);
   const [listSort, setListSort] = useState<TicketListSort>('created');
@@ -641,8 +642,10 @@ export function AppShellPage() {
     },
     tools: {
       onOpenOllama: () => setIsOllamaOpen((previous) => !previous),
-      onOpenSimulator: () => setIsSimulatorOpen((previous) => !previous),
+      onOpenSimulator: () => {},
       onOpenCreateTicket: () => handleOpenCreateTicket(),
+      agentIntegration: accountSettings.agentIntegration,
+      aiProvider: accountSettings.aiProvider,
     },
     userMenu: {
       currentUser,
@@ -697,9 +700,10 @@ export function AppShellPage() {
                   onClose={() => setIsOllamaOpen(false)}
                   initialOllamaUrl={accountSettings.ollamaEndpoint}
                   initialModel={accountSettings.ollamaModel || ollamaModels[0] || ''}
+                  settings={accountSettings}
                 />
               ) : null}
-              {isSimulatorOpen ? <AgentSimulator onClose={() => setIsSimulatorOpen(false)} /> : null}
+
             </>
           }
         >
@@ -765,6 +769,34 @@ export function AppShellPage() {
       ) : null}
 
       {onboarding}
+
+      {/* Floating Chat Trigger Button */}
+      <button
+        onClick={() => setIsOllamaOpen((prev) => !prev)}
+        className="clickable"
+        style={{
+          position: 'fixed',
+          bottom: '24px',
+          right: '24px',
+          width: '48px',
+          height: '48px',
+          borderRadius: '50%',
+          background: 'var(--accent-solid)',
+          color: 'var(--accent-foreground)',
+          border: '1px solid var(--border-focus)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 4px 16px var(--accent-glow)',
+          zIndex: 999,
+          cursor: 'pointer',
+          transition: 'transform 0.2s ease, background-color 0.2s ease',
+        }}
+        aria-label={isOllamaOpen ? 'Close AI Assistant' : 'Open AI Assistant'}
+        title="Toggle AI Assistant"
+      >
+        {isOllamaOpen ? <X size={20} /> : <MessageSquare size={20} />}
+      </button>
     </>
   );
 }

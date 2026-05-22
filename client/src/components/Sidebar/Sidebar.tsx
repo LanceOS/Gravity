@@ -21,8 +21,6 @@ export function Sidebar({ workspace, projects, tools, userMenu }: SidebarProps) 
           onToggleProjectsCollapsed={sidebarState.toggleProjectsCollapsed}
           onToggleProject={sidebarState.toggleProject}
         />
-
-        <SidebarAgentTools tools={tools} />
       </div>
 
       <SidebarUserMenu

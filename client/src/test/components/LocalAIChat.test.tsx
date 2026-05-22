@@ -79,11 +79,23 @@ const users = [
   },
 ];
 
+const mockSettings = {
+  defaultView: 'board' as const,
+  theme: 'dark' as const,
+  ollamaModel: '',
+  ollamaEndpoint: 'http://localhost:11434',
+  projectLayout: 'standard' as const,
+  apiKey: '',
+  aiProvider: 'openai' as const,
+  agentIntegration: 'ollama' as const,
+};
+
 function renderLocalAIChat(overrides: Partial<Parameters<typeof LocalAIChat>[0]> = {}, ticketContextOverrides = {}) {
   const props = {
     onClose: vi.fn(),
     initialOllamaUrl: '',
     initialModel: '',
+    settings: mockSettings,
     ...overrides,
   };
 
@@ -114,7 +126,7 @@ describe('LocalAIChat', () => {
   it('checks the initial Ollama status, fills the default model, and sends a typed chat message', async () => {
     const user = userEvent.setup();
     mocks.fetch
-      .mockResolvedValueOnce(createJsonResponse({ models: [{ name: 'llama3' }] }))
+      .mockResolvedValueOnce(createJsonResponse({ models: ['llama3'], connected: true }))
       .mockResolvedValueOnce(createJsonResponse({ message: { content: 'AI says hello' } }));
 
     renderLocalAIChat();
@@ -125,8 +137,7 @@ describe('LocalAIChat', () => {
 
     expect(mocks.fetch).toHaveBeenNthCalledWith(
       1,
-      'http://localhost:11434/api/tags',
-      expect.objectContaining({ signal: expect.any(AbortSignal) })
+      '/api/v1/ai/ollama/models?ollamaUrl=http%3A%2F%2Flocalhost%3A11434'
     );
     expect(screen.getByDisplayValue('llama3')).toBeInTheDocument();
 
@@ -163,7 +174,7 @@ describe('LocalAIChat', () => {
     const user = userEvent.setup();
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     mocks.fetch
-      .mockResolvedValueOnce(createJsonResponse({ models: [{ name: 'codellama' }] }))
+      .mockResolvedValueOnce(createJsonResponse({ models: ['codellama'], connected: true }))
       .mockResolvedValueOnce(createJsonResponse({ error: 'chat exploded' }, false));
 
     renderLocalAIChat(

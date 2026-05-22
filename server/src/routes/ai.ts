@@ -83,21 +83,64 @@ async function testProviderApiKey(provider: string, apiKey: string) {
   }
 }
 
-async function fetchOllamaModels(rawUrl?: string) {
-  const ollamaUrl = normalizeOllamaUrl(rawUrl || 'http://host.docker.internal:11434');
+/**
+ * Attempts to connect to the given Ollama URL. If the URL uses localhost/127.0.0.1/0.0.0.0,
+ * it attempts connection with host.docker.internal first to support Docker-hosted server
+ * environments transparently and instantly, falling back to localhost/loopback if needed.
+ */
+async function resolveOllamaUrl(rawUrl: string): Promise<string> {
+  const normalized = normalizeOllamaUrl(rawUrl);
+
+  // Only attempt fallback for localhost/loopback addresses
+  const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)(:|$)/i.test(normalized);
+  if (!isLocalhost) {
+    return normalized;
+  }
+
+  // Attempt Docker-internal host fallback first
+  const dockerFallback = normalized.replace(
+    /^(https?:\/\/)(?:localhost|127\.0\.0\.1|0\.0\.0\.0)/i,
+    '$1host.docker.internal',
+  );
 
   try {
-    const response = await fetchWithTimeout(`${ollamaUrl}/api/tags`, { method: 'GET' }, 5000);
-    if (!response.ok) {
-      throw new Error(await readErrorMessage(response, 'Failed to query Ollama models.'));
+    const response = await fetchWithTimeout(`${dockerFallback}/api/tags`, { method: 'GET' }, 3000);
+    if (response.ok) {
+      return dockerFallback;
     }
-
-    const data = (await response.json()) as { models?: Array<{ name?: string }> };
-    return (data.models ?? []).map((model) => model.name).filter((name): name is string => Boolean(name));
   } catch {
-    return [];
+    // Fall through to original URL check
   }
+
+  // Try original URL next
+  try {
+    const response = await fetchWithTimeout(`${normalized}/api/tags`, { method: 'GET' }, 3000);
+    if (response.ok) {
+      return normalized;
+    }
+  } catch {
+    // Both failed — return original so the caller surfaces the correct URL in errors
+  }
+
+  return normalized;
 }
+
+/**
+ * Fetches the list of models from Ollama. Throws on connection failure or non-OK response.
+ * Returns an array of model name strings on success.
+ */
+async function fetchOllamaModels(rawUrl: string): Promise<string[]> {
+  const ollamaUrl = await resolveOllamaUrl(rawUrl);
+
+  const response = await fetchWithTimeout(`${ollamaUrl}/api/tags`, { method: 'GET' }, 5000);
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, 'Ollama returned a non-OK response.'));
+  }
+
+  const data = (await response.json()) as { models?: Array<{ name?: string }> };
+  return (data.models ?? []).map((model) => model.name).filter((name): name is string => Boolean(name));
+}
+
 
 async function measureProviderConnection(provider: string, apiKey: string) {
   const startedAt = Date.now();
@@ -115,14 +158,15 @@ export function createAiRouter() {
       : message;
   }
 
-  router.get('/ollama/models', async (req, res) => {
-    const rawUrl = typeof req.query.ollamaUrl === 'string' ? req.query.ollamaUrl : undefined;
-    res.json(await fetchOllamaModels(rawUrl));
-  });
 
   router.get('/ai/ollama/models', async (req, res) => {
-    const rawUrl = typeof req.query.ollamaUrl === 'string' ? req.query.ollamaUrl : undefined;
-    res.json(await fetchOllamaModels(rawUrl));
+    const rawUrl = typeof req.query.ollamaUrl === 'string' ? req.query.ollamaUrl : 'http://localhost:11434';
+    try {
+      const models = await fetchOllamaModels(rawUrl);
+      res.json({ models, connected: true });
+    } catch (error) {
+      res.json({ models: [], connected: false, error: normalizeOllamaErrorMessage(error) });
+    }
   });
 
   router.post('/ai/test-key', async (req, res) => {
@@ -172,7 +216,8 @@ export function createAiRouter() {
   });
 
   router.post('/ai/chat', async (req, res) => {
-    const ollamaUrl = normalizeOllamaUrl(typeof req.body?.ollamaUrl === 'string' ? req.body.ollamaUrl : 'http://host.docker.internal:11434');
+    const provider = typeof req.body?.provider === 'string' ? req.body.provider.toLowerCase() : 'ollama';
+    const apiKey = typeof req.body?.apiKey === 'string' ? req.body.apiKey.trim() : '';
     const model = typeof req.body?.model === 'string' ? req.body.model : '';
     const messages = Array.isArray(req.body?.messages) ? req.body.messages : [];
 
@@ -180,6 +225,144 @@ export function createAiRouter() {
       res.status(400).json({ error: 'model and messages are required.' });
       return;
     }
+
+    if (provider !== 'ollama') {
+      if (!apiKey) {
+        res.status(400).json({ error: 'API key is required for cloud providers.' });
+        return;
+      }
+
+      try {
+        let content = '';
+
+        if (provider === 'openai' || provider === 'deepseek') {
+          const baseUrl = provider === 'deepseek' ? 'https://api.deepseek.com' : 'https://api.openai.com';
+          const response = await fetchWithTimeout(
+            `${baseUrl}/v1/chat/completions`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`,
+              },
+              body: JSON.stringify({
+                model,
+                messages,
+                stream: false,
+              }),
+            },
+            60000,
+          );
+
+          if (!response.ok) {
+            throw new Error(await readErrorMessage(response, `Failed to contact ${provider}.`));
+          }
+
+          const data = await response.json() as any;
+          content = data.choices?.[0]?.message?.content || '';
+        } else if (provider === 'anthropic') {
+          let system: string | undefined = undefined;
+          const filteredMessages = messages.filter((msg: any) => {
+            if (msg.role === 'system') {
+              system = (system ? system + '\n' : '') + msg.content;
+              return false;
+            }
+            return true;
+          });
+
+          if (filteredMessages.length === 0) {
+            res.status(400).json({
+              error: 'Anthropic requests require at least one non-system message.',
+            });
+            return;
+          }
+
+          const response = await fetchWithTimeout(
+            'https://api.anthropic.com/v1/messages',
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': apiKey,
+                'anthropic-version': '2023-06-01',
+              },
+              body: JSON.stringify({
+                model,
+                messages: filteredMessages,
+                max_tokens: 4096,
+                system,
+                stream: false,
+              }),
+            },
+            60000,
+          );
+
+          if (!response.ok) {
+            throw new Error(await readErrorMessage(response, 'Failed to contact Anthropic.'));
+          }
+
+          const data = await response.json() as any;
+          content = data.content?.[0]?.text || '';
+        } else if (provider === 'gemini') {
+          let systemText = '';
+          const contents = [];
+          for (const msg of messages) {
+            if (msg.role === 'system') {
+              systemText = (systemText ? systemText + '\n' : '') + msg.content;
+            } else {
+              contents.push({
+                role: msg.role === 'assistant' ? 'model' : 'user',
+                parts: [{ text: msg.content }],
+              });
+            }
+          }
+
+          const response = await fetchWithTimeout(
+            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-goog-api-key': apiKey,
+              },
+              body: JSON.stringify({
+                contents,
+                ...(systemText ? {
+                  systemInstruction: {
+                    parts: [{ text: systemText }],
+                  },
+                } : {}),
+              }),
+            },
+            60000,
+          );
+
+          if (!response.ok) {
+            throw new Error(await readErrorMessage(response, 'Failed to contact Gemini.'));
+          }
+
+          const data = await response.json() as any;
+          content = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        } else {
+          res.status(400).json({ error: `Unsupported provider: ${provider}` });
+          return;
+        }
+
+        res.json({
+          message: {
+            role: 'assistant',
+            content,
+          },
+        });
+      } catch (error) {
+        res.status(502).json({ error: error instanceof Error ? error.message : `Connection to ${provider} failed.` });
+      }
+      return;
+    }
+
+    // Default Ollama behavior
+    const rawOllamaUrl = typeof req.body?.ollamaUrl === 'string' ? req.body.ollamaUrl : 'http://localhost:11434';
+    const ollamaUrl = await resolveOllamaUrl(rawOllamaUrl);
 
     try {
       const response = await fetchWithTimeout(

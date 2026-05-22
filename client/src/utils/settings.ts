@@ -1,4 +1,5 @@
 export type AIProvider = 'openai' | 'anthropic' | 'gemini' | 'deepseek';
+export type AgentIntegration = 'ollama' | 'third_party';
 
 export interface WorkspaceSettings {
   defaultView: 'board' | 'list';
@@ -8,6 +9,7 @@ export interface WorkspaceSettings {
   projectLayout: 'standard' | 'condensed';
   apiKey: string;
   aiProvider: AIProvider;
+  agentIntegration: AgentIntegration;
 }
 
 export interface ProviderOption {
@@ -52,6 +54,7 @@ export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
   projectLayout: 'standard',
   apiKey: '',
   aiProvider: 'openai',
+  agentIntegration: 'ollama',
 };
 
 export const isAIProvider = (value: unknown): value is AIProvider =>
@@ -75,4 +78,5 @@ export const normalizeWorkspaceSettings = (
   projectLayout: raw?.projectLayout === 'condensed' ? 'condensed' : 'standard',
   apiKey: typeof raw?.apiKey === 'string' ? raw.apiKey : DEFAULT_WORKSPACE_SETTINGS.apiKey,
   aiProvider: isAIProvider(raw?.aiProvider) ? raw.aiProvider : DEFAULT_WORKSPACE_SETTINGS.aiProvider,
+  agentIntegration: raw?.agentIntegration === 'third_party' ? 'third_party' : 'ollama',
 });

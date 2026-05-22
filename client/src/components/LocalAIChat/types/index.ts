@@ -1,9 +1,11 @@
 import type { Project, Ticket, User } from '../../../context/TicketContext';
+import type { WorkspaceSettings } from '../../../utils/settings';
 
 export interface LocalAIChatProps {
   onClose: () => void;
   initialOllamaUrl: string;
   initialModel: string;
+  settings: WorkspaceSettings;
 }
 
 export interface Message {
