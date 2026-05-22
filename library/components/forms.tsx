@@ -416,7 +416,7 @@ export function Select({
     }
 
     const triggerRect = triggerRef.current.getBoundingClientRect();
-    const estimatedMenuWidth = Math.max(triggerRect.width, 180);
+    const estimatedMenuWidth = triggerRect.width;
     const spaceBelow = window.innerHeight - triggerRect.bottom;
     const spaceAbove = triggerRect.top;
     const openAbove = spaceBelow < 220 && spaceAbove > spaceBelow;
@@ -428,7 +428,7 @@ export function Select({
       left: `${left}px`,
       top: openAbove ? `${Math.max(8, triggerRect.top - 4)}px` : `${triggerRect.bottom + 4}px`,
       transform: openAbove ? 'translateY(-100%)' : 'none',
-      minWidth: `${Math.max(triggerRect.width, 180)}px`,
+      minWidth: `${triggerRect.width}px`,
       maxWidth: 'calc(100vw - 16px)',
       maxHeight: '240px',
     });

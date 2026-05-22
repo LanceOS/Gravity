@@ -264,7 +264,7 @@ export function ContextMenu({ children, items }: ContextMenuProps) {
                 borderRadius: 'var(--radius-md)',
                 boxShadow: 'var(--shadow-lg)',
                 padding: '4px',
-                minWidth: '140px',
+                minWidth: 'max-content',
               }}
             >
               {items.map((item, idx) => (
@@ -320,7 +320,7 @@ export function DropdownMenu({ trigger, children }: DropdownMenuProps) {
               borderRadius: 'var(--radius-md)',
               boxShadow: 'var(--shadow-md)',
               padding: '4px',
-              minWidth: '140px',
+              minWidth: 'max-content',
               marginTop: '4px',
               display: 'flex',
               flexDirection: 'column',
