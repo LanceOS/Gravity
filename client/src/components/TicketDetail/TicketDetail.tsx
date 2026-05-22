@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import type { Ticket } from '../../context/TicketContext';
 import { Button, Select, TextInput, Textarea } from '@library';
+import { ClickAwayListener } from '@library';
 import { 
   CheckSquare, GitPullRequest, GitMerge, Send, Trash2,
-  Plus, Edit3, Eye, ChevronLeft
+  Plus, Edit3, ChevronLeft, MoreHorizontal, Link, FileText
 } from 'lucide-react';
 import { MarkdownContent } from './components';
 import type { TicketDetailProps } from './types';
@@ -23,6 +24,8 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
   onUpdateTicket,
   onDeleteTicket,
   onAddComment,
+  onUpdateComment,
+  onDeleteComment,
   onClose,
   onOpenCreateSubtask,
 }) => {
@@ -32,10 +35,16 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
   
   const [isEditingDesc, setIsEditingDesc] = useState(false);
   const [descValue, setDescValue] = useState(activeTicket.description || '');
-  const [descTab, setDescTab] = useState<'write' | 'preview'>('preview');
 
   const [commentInput, setCommentInput] = useState('');
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+
+  const [openMenuCommentId, setOpenMenuCommentId] = useState<string | null>(null);
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editingCommentBody, setEditingCommentBody] = useState<string>('');
+  const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
+
+  const closeCommentMenu = useCallback(() => setOpenMenuCommentId(null), []);
 
   const handleTitleBlur = () => {
     setIsEditingTitle(false);
@@ -44,9 +53,11 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
     }
   };
 
-  const handleDescSave = () => {
+  const handleDescBlur = () => {
     setIsEditingDesc(false);
-    onUpdateTicket(activeTicket.id, { description: descValue });
+    if (descValue !== (activeTicket.description || '')) {
+      onUpdateTicket(activeTicket.id, { description: descValue });
+    }
   };
 
   const handlePostComment = (e: React.FormEvent) => {
@@ -191,80 +202,20 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
 
           {/* Description Area */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', borderBottom: '1px solid var(--border)', paddingBottom: '6px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: '6px' }}>
               <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Description</span>
-              
-              {isEditingDesc ? (
-                <div style={{ marginLeft: 'auto', display: 'flex', gap: '4px' }}>
-                  <Button
-                    onClick={() => setDescTab('write')}
-                    variant={descTab === 'write' ? 'accent' : 'ghost'}
-                    size="sm"
-                    style={{ padding: '2px 8px', fontSize: '10px' }}
-                  >
-                    <Edit3 size={10} style={{ marginRight: '4px' }} /> Write
-                  </Button>
-                  <Button
-                    onClick={() => setDescTab('preview')}
-                    variant={descTab === 'preview' ? 'accent' : 'ghost'}
-                    size="sm"
-                    style={{ padding: '2px 8px', fontSize: '10px' }}
-                  >
-                    <Eye size={10} style={{ marginRight: '4px' }} /> Preview
-                  </Button>
-                  <Button
-                    onClick={handleDescSave}
-                    variant="primary"
-                    size="sm"
-                    style={{ padding: '2px 8px', fontSize: '10px', marginLeft: '8px' }}
-                  >
-                    Save
-                  </Button>
-                  <Button
-                    onClick={() => { setIsEditingDesc(false); setDescValue(activeTicket.description || ''); }}
-                    size="sm"
-                    style={{ padding: '2px 8px', fontSize: '10px' }}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              ) : (
-                <Button
-                  onClick={() => setIsEditingDesc(true)}
-                  variant="ghost"
-                  size="sm"
-                  style={{ marginLeft: 'auto', padding: '2px 8px', fontSize: '11px' }}
-                >
-                  Edit Description
-                </Button>
-              )}
             </div>
 
             {isEditingDesc ? (
-              descTab === 'write' ? (
-                <Textarea 
-                  rows={8}
-                  style={{ fontFamily: 'var(--mono)', fontSize: '13px', lineHeight: '1.6', resize: 'vertical' }}
-                  value={descValue}
-                  onChange={(e) => setDescValue(e.target.value)}
-                  placeholder="Describe your issue using markdown..."
-                  autoFocus
-                />
-              ) : (
-                <div 
-                  className="markdown-content"
-                  style={{ 
-                    border: '1px solid var(--border)', 
-                    borderRadius: '6px', 
-                    padding: '12px', 
-                    minHeight: '160px',
-                    fontSize: '13px',
-                    background: 'var(--card-bg)'
-                  }}
-                >
-                  {descValue ? <MarkdownContent text={descValue} /> : <span style={{ color: 'var(--text-muted)' }}>Nothing to preview</span>}
-                </div>
-              )
+              <Textarea 
+                rows={8}
+                style={{ fontFamily: 'var(--mono)', fontSize: '13px', lineHeight: '1.6', resize: 'vertical' }}
+                value={descValue}
+                onChange={(e) => setDescValue(e.target.value)}
+                placeholder="Describe your issue using markdown..."
+                onBlur={handleDescBlur}
+                autoFocus
+              />
             ) : (
               <div 
                 onClick={() => setIsEditingDesc(true)}
@@ -276,7 +227,8 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                   fontSize: '13px', 
                   lineHeight: '1.6', 
                   minHeight: '60px', 
-                  paddingRight: '104px'
+                  paddingRight: '104px',
+                  position: 'relative'
                 }}
               >
                 <span
@@ -294,7 +246,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                   }}
                 >
                   <Edit3 size={12} />
-                  <span>Edit description</span>
+                  <span>Edit</span>
                 </span>
                 {activeTicket.description ? (
                   <MarkdownContent text={activeTicket.description} />
@@ -391,7 +343,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             {/* Comments List */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {comments.map((comment) => (
-                <div key={comment.id} style={{ display: 'flex', gap: '12px' }}>
+                <div key={comment.id} id={`comment-${comment.id}`} style={{ display: 'flex', gap: '12px' }}>
                   <img 
                     src={comment.userAvatar || 'https://api.dicebear.com/7.x/bottts/svg?seed=guest'} 
                     alt={comment.userName} 
@@ -399,25 +351,203 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                   />
                   
                   <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
-                      <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-heading)' }}>{comment.userName || 'Member'}</span>
-                      <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
-                        {new Date(comment.createdAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                      </span>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-heading)' }}>{comment.userName || 'Member'}</span>
+                        <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                          {new Date(comment.createdAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+
+                      {/* Comment options dropdown */}
+                      <ClickAwayListener onClickAway={closeCommentMenu} active={openMenuCommentId === comment.id}>
+                        <div style={{ position: 'relative' }}>
+                          <button
+                            type="button"
+                            onClick={() => setOpenMenuCommentId(openMenuCommentId === comment.id ? null : comment.id)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: openMenuCommentId === comment.id ? 'var(--text)' : 'var(--text-muted)',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              padding: '4px',
+                              borderRadius: 'var(--radius-xs)',
+                              transition: 'color var(--transition-fast), background var(--transition-fast)'
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text)'; e.currentTarget.style.background = 'var(--card-hover)'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.color = openMenuCommentId === comment.id ? 'var(--text)' : 'var(--text-muted)'; e.currentTarget.style.background = 'none'; }}
+                            aria-label="Comment options"
+                          >
+                            <MoreHorizontal size={14} />
+                          </button>
+
+                          {openMenuCommentId === comment.id && (
+                            <div
+                              style={{
+                                position: 'absolute',
+                                top: 'calc(100% + 4px)',
+                                right: 0,
+                                zIndex: 200,
+                                minWidth: '172px',
+                                background: 'var(--card-bg)',
+                                border: '1px solid var(--border)',
+                                borderRadius: 'var(--radius-sm)',
+                                boxShadow: 'var(--shadow-lg)',
+                                padding: '4px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '1px',
+                              }}
+                            >
+                              {/* Edit */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingCommentId(comment.id);
+                                  setEditingCommentBody(comment.body);
+                                  setOpenMenuCommentId(null);
+                                }}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: '8px',
+                                  width: '100%', padding: '7px 10px',
+                                  background: 'none', border: 'none',
+                                  borderRadius: 'var(--radius-xs)',
+                                  color: 'var(--text)', cursor: 'pointer',
+                                  textAlign: 'left', fontSize: '12px',
+                                  transition: 'background var(--transition-fast)',
+                                }}
+                                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--card-hover)'; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+                              >
+                                <Edit3 size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                                <span>Edit Comment</span>
+                              </button>
+
+                              {/* Copy Link */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const url = `${window.location.origin}${window.location.pathname}#comment-${comment.id}`;
+                                  navigator.clipboard.writeText(url);
+                                  setOpenMenuCommentId(null);
+                                }}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: '8px',
+                                  width: '100%', padding: '7px 10px',
+                                  background: 'none', border: 'none',
+                                  borderRadius: 'var(--radius-xs)',
+                                  color: 'var(--text)', cursor: 'pointer',
+                                  textAlign: 'left', fontSize: '12px',
+                                  transition: 'background var(--transition-fast)',
+                                }}
+                                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--card-hover)'; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+                              >
+                                <Link size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                                <span>Grab Link</span>
+                              </button>
+
+                              {/* Copy Markdown */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(comment.body);
+                                  setOpenMenuCommentId(null);
+                                }}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: '8px',
+                                  width: '100%', padding: '7px 10px',
+                                  background: 'none', border: 'none',
+                                  borderRadius: 'var(--radius-xs)',
+                                  color: 'var(--text)', cursor: 'pointer',
+                                  textAlign: 'left', fontSize: '12px',
+                                  transition: 'background var(--transition-fast)',
+                                }}
+                                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--card-hover)'; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+                              >
+                                <FileText size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                                <span>Copy Markdown</span>
+                              </button>
+
+                              {/* Divider */}
+                              <div style={{ height: '1px', background: 'var(--border)', margin: '3px 6px' }} />
+
+                              {/* Delete */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setDeletingCommentId(comment.id);
+                                  setOpenMenuCommentId(null);
+                                }}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: '8px',
+                                  width: '100%', padding: '7px 10px',
+                                  background: 'none', border: 'none',
+                                  borderRadius: 'var(--radius-xs)',
+                                  color: 'var(--danger)', cursor: 'pointer',
+                                  textAlign: 'left', fontSize: '12px',
+                                  transition: 'background var(--transition-fast)',
+                                }}
+                                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--danger-subtle)'; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+                              >
+                                <Trash2 size={13} style={{ flexShrink: 0 }} />
+                                <span>Delete Comment</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </ClickAwayListener>
                     </div>
                     
                     <div 
                       style={{ 
                         fontSize: '13px', 
                         color: 'var(--text)', 
-                        background: 'rgba(255,255,255,0.01)', 
+                        background: 'var(--card-bg)', 
                         border: '1px solid var(--border)',
                         borderRadius: '6px',
                         padding: '10px 14px',
                         lineHeight: '1.5'
                       }}
                     >
-                      <MarkdownContent text={comment.body} />
+                      {editingCommentId === comment.id ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
+                          <Textarea
+                            rows={3}
+                            value={editingCommentBody}
+                            onChange={(e) => setEditingCommentBody(e.target.value)}
+                            style={{ fontSize: '13px', lineHeight: '1.5', fontFamily: 'inherit' }}
+                            autoFocus
+                          />
+                          <div style={{ display: 'flex', gap: '6px', alignSelf: 'flex-end' }}>
+                            <Button
+                              onClick={async () => {
+                                if (editingCommentBody.trim()) {
+                                  await onUpdateComment(activeTicket.id, comment.id, editingCommentBody.trim());
+                                  setEditingCommentId(null);
+                                }
+                              }}
+                              variant="primary"
+                              size="sm"
+                              style={{ padding: '2px 8px', fontSize: '11px' }}
+                            >
+                              Save
+                            </Button>
+                            <Button
+                              onClick={() => setEditingCommentId(null)}
+                              size="sm"
+                              style={{ padding: '2px 8px', fontSize: '11px' }}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <MarkdownContent text={comment.body} />
+                      )}
                     </div>
                   </div>
                 </div>
@@ -458,6 +588,15 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             overflowY: 'auto'
           }}
         >
+          {/* Ticket Key Display */}
+          <div style={{ borderBottom: '1px solid var(--border)', paddingBottom: '12px', marginBottom: '4px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+              Ticket Key
+            </span>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: '18px', fontWeight: 700, color: 'var(--accent)' }}>
+              {activeTicket.key}
+            </span>
+          </div>
           
           {/* Status */}
           <div>
@@ -601,42 +740,88 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             style={{
               width: '360px',
               background: 'var(--card-bg)',
-              border: '1px solid var(--border)',
-              borderRadius: '12px',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)',
-              padding: '20px',
+              border: '1px solid var(--danger-border)',
+              borderRadius: 'var(--radius-md)',
+              boxShadow: 'var(--shadow-xl)',
+              overflow: 'hidden',
               display: 'flex',
               flexDirection: 'column',
-              gap: '16px',
             }}
           >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-heading)' }}>
+            {/* Danger zone header stripe */}
+            <div style={{ background: 'var(--danger-subtle)', borderBottom: '1px solid var(--danger-border)', padding: '16px 20px 14px' }}>
+              <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-heading)', display: 'block', marginBottom: '4px' }}>
                 Delete {activeTicket.key}?
               </span>
               <span style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
-                This removes the ticket and its related activity from the current project. This action cannot be undone.
+                This removes the ticket and all its activity. This action cannot be undone.
               </span>
             </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-              <Button
-                onClick={() => setIsDeleteConfirmOpen(false)}
-                size="sm"
-              >
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', padding: '14px 20px' }}>
+              <Button onClick={() => setIsDeleteConfirmOpen(false)} size="sm">
                 Cancel
               </Button>
-              <Button
-                onClick={() => void confirmDelete()}
-                variant="danger"
-                size="sm"
-              >
+              <Button onClick={() => void confirmDelete()} variant="danger" size="sm">
                 Delete Ticket
               </Button>
             </div>
           </div>
         </div>
       )}
+
+      {deletingCommentId && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.55)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 950,
+          }}
+        >
+          <div
+            style={{
+              width: '360px',
+              background: 'var(--card-bg)',
+              border: '1px solid var(--danger-border)',
+              borderRadius: 'var(--radius-md)',
+              boxShadow: 'var(--shadow-xl)',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            {/* Danger zone header stripe */}
+            <div style={{ background: 'var(--danger-subtle)', borderBottom: '1px solid var(--danger-border)', padding: '16px 20px 14px' }}>
+              <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-heading)', display: 'block', marginBottom: '4px' }}>
+                Delete this comment?
+              </span>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+                This will permanently remove the comment from the activity thread.
+              </span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', padding: '14px 20px' }}>
+              <Button onClick={() => setDeletingCommentId(null)} size="sm">
+                Cancel
+              </Button>
+              <Button
+                onClick={async () => {
+                  await onDeleteComment(activeTicket.id, deletingCommentId);
+                  setDeletingCommentId(null);
+                }}
+                variant="danger"
+                size="sm"
+              >
+                Delete Comment
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+
     </>
   );
 };

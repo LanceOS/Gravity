@@ -225,6 +225,31 @@ export async function addCommentRecord(ticketId: string, userId: string, body: s
   return allComments[allComments.length - 1] ?? null;
 }
 
+export async function updateCommentRecord(commentId: string, ticketId: string, body: string) {
+  await db
+    .update(comments)
+    .set({ body })
+    .where(and(eq(comments.id, commentId), eq(comments.ticketId, ticketId)));
+
+  const allComments = await listComments(ticketId);
+  return allComments.find((c) => c.id === commentId) ?? null;
+}
+
+export async function deleteCommentRecord(commentId: string, ticketId: string) {
+  const rows = await db
+    .select()
+    .from(comments)
+    .where(and(eq(comments.id, commentId), eq(comments.ticketId, ticketId)))
+    .limit(1);
+
+  if (rows.length === 0) {
+    return false;
+  }
+
+  await db.delete(comments).where(eq(comments.id, commentId));
+  return true;
+}
+
 export async function resolveTicketFromKeyPrefix(ticketKey: string) {
   const prefix = ticketKey.split('-')[0] ?? '';
   const project = await getProjectByKeyPrefix(prefix);

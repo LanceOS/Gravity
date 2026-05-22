@@ -63,11 +63,11 @@ export function Button({
     hoverBg = 'rgba(170, 59, 255, 0.2)';
     activeBg = 'rgba(170, 59, 255, 0.25)';
   } else if (variant === 'danger') {
-    bg = 'var(--priority-high)';
-    color = '#ffffff';
-    border = '1px solid var(--priority-high)';
-    hoverBg = '#dc2626';
-    activeBg = '#b91c1c';
+    bg = 'var(--danger)';
+    color = 'var(--danger-foreground)';
+    border = '1px solid var(--danger)';
+    hoverBg = 'var(--danger-hover)';
+    activeBg = 'var(--danger-hover)';
   } else if (variant === 'ghost') {
     bg = 'transparent';
     color = 'var(--text)';

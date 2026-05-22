@@ -28,6 +28,8 @@ interface WorkspacePageProps {
   tickets: Ticket[];
   users: User[];
   onAddComment: (ticketId: string, body: string) => Promise<void>;
+  onUpdateComment: (ticketId: string, commentId: string, body: string) => Promise<void>;
+  onDeleteComment: (ticketId: string, commentId: string) => Promise<void>;
   onDeleteTicket: (ticketId: string) => Promise<void>;
   onOpenCreateSubtask: (parentId: string) => void;
   onOpenCreateTicket: (initialStatus?: Ticket['status']) => void;
@@ -52,6 +54,8 @@ export function WorkspacePage({
   tickets,
   users,
   onAddComment,
+  onUpdateComment,
+  onDeleteComment,
   onDeleteTicket,
   onOpenCreateSubtask,
   onOpenCreateTicket,
@@ -212,6 +216,8 @@ export function WorkspacePage({
               onUpdateTicket={onUpdateTicket}
               onDeleteTicket={onDeleteTicket}
               onAddComment={onAddComment}
+              onUpdateComment={onUpdateComment}
+              onDeleteComment={onDeleteComment}
               onClose={() => onSelectTicket(null)}
               onOpenCreateSubtask={onOpenCreateSubtask}
             />

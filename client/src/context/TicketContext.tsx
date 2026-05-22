@@ -121,7 +121,9 @@ type Action =
   | { type: 'SET_THEME_RAW'; payload: 'dark' | 'light' }
   | { type: 'ADD_COMMENT'; payload: Comment }
   | { type: 'REPLACE_COMMENT'; payload: { optimisticId: string; comment: Comment } }
-  | { type: 'OPTIMISTIC_TICKET_UPDATE'; payload: { id: string; updates: Partial<Ticket> } };
+  | { type: 'OPTIMISTIC_TICKET_UPDATE'; payload: { id: string; updates: Partial<Ticket> } }
+  | { type: 'UPDATE_COMMENT_RAW'; payload: { commentId: string; body: string } }
+  | { type: 'DELETE_COMMENT_RAW'; payload: { commentId: string } };
 
 const initialFilters = {
   status: '',
@@ -274,6 +276,16 @@ function ticketReducer(state: State, action: Action): State {
         activeTicket: nextActive,
       };
     }
+    case 'UPDATE_COMMENT_RAW':
+      return {
+        ...state,
+        comments: state.comments.map(c => c.id === action.payload.commentId ? { ...c, body: action.payload.body } : c),
+      };
+    case 'DELETE_COMMENT_RAW':
+      return {
+        ...state,
+        comments: state.comments.filter(c => c.id !== action.payload.commentId),
+      };
     default:
       return state;
   }
@@ -289,6 +301,8 @@ interface TicketContextType extends State {
   updateTicket: (id: string, updates: Partial<Ticket>) => Promise<void>;
   deleteTicket: (id: string) => Promise<void>;
   addComment: (ticketId: string, body: string) => Promise<void>;
+  updateComment: (ticketId: string, commentId: string, body: string) => Promise<void>;
+  deleteComment: (ticketId: string, commentId: string) => Promise<void>;
   createProject: (project: CreateProjectInput) => Promise<Project | null>;
   joinProject: (inviteCode: string) => Promise<Project | null>;
   signIn: (email: string, password?: string) => Promise<boolean>;
@@ -659,6 +673,46 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [state.currentUser, fetchCommentsForTicket, activeProjectId]);
 
+  const updateComment = useCallback(async (ticketId: string, commentId: string, body: string) => {
+    if (!activeProjectId) return;
+    const originalComments = [...state.comments];
+    dispatch({ type: 'UPDATE_COMMENT_RAW', payload: { commentId, body } });
+
+    try {
+      const response = await fetch(`${API_URL}/tickets/${ticketId}/comments/${commentId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Project-Id': activeProjectId,
+        },
+        body: JSON.stringify({ body }),
+      });
+      if (!response.ok) throw new Error('Failed to update comment');
+    } catch (e) {
+      console.error('Failed to update comment, rolling back:', e);
+      dispatch({ type: 'SET_COMMENTS_RAW', payload: originalComments });
+    }
+  }, [state.comments, activeProjectId]);
+
+  const deleteComment = useCallback(async (ticketId: string, commentId: string) => {
+    if (!activeProjectId) return;
+    const originalComments = [...state.comments];
+    dispatch({ type: 'DELETE_COMMENT_RAW', payload: { commentId } });
+
+    try {
+      const response = await fetch(`${API_URL}/tickets/${ticketId}/comments/${commentId}`, {
+        method: 'DELETE',
+        headers: {
+          'X-Project-Id': activeProjectId,
+        },
+      });
+      if (!response.ok) throw new Error('Failed to delete comment');
+    } catch (e) {
+      console.error('Failed to delete comment, rolling back:', e);
+      dispatch({ type: 'SET_COMMENTS_RAW', payload: originalComments });
+    }
+  }, [state.comments, activeProjectId]);
+
 // Reusable helper to safely parse HTTP responses and return descriptive errors for network failures
 async function handleResponseJson(response: Response, fallbackError: string) {
   let text = '';
@@ -871,6 +925,8 @@ async function handleResponseJson(response: Response, fallbackError: string) {
       updateTicket,
       deleteTicket,
       addComment,
+      updateComment,
+      deleteComment,
       createProject,
       joinProject,
       signIn,
@@ -895,6 +951,8 @@ async function handleResponseJson(response: Response, fallbackError: string) {
       updateTicket,
       deleteTicket,
       addComment,
+      updateComment,
+      deleteComment,
       createProject,
       joinProject,
       signIn,

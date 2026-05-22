@@ -14,6 +14,8 @@ export interface TicketDetailProps {
   onUpdateTicket: (id: string, updates: Partial<Ticket>) => Promise<void>;
   onDeleteTicket: (ticketId: string) => Promise<void>;
   onAddComment: (ticketId: string, body: string) => Promise<void>;
+  onUpdateComment: (ticketId: string, commentId: string, body: string) => Promise<void>;
+  onDeleteComment: (ticketId: string, commentId: string) => Promise<void>;
   onClose: () => void;
   onOpenCreateSubtask: (parentId: string) => void;
 }
