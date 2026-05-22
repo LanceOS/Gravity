@@ -114,7 +114,7 @@ globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
         user: dbState.currentUser,
       });
     }
-    return jsonResponse(200, null);
+    return jsonResponse(401, { error: 'Unauthorized' });
   }
 
   if (url === '/api/auth/sign-up') {
