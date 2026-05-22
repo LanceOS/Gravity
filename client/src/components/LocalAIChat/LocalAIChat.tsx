@@ -69,21 +69,24 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
       const response = await fetch(`/api/v1/ai/ollama/models?ollamaUrl=${encodeURIComponent(urlToTest)}`);
 
       if (response.ok) {
-        const data = await response.json();
-        const rawModels = Array.isArray(data)
-          ? data
-          : Array.isArray(data.models)
-            ? data.models
-            : [];
-        const nextModels = rawModels.filter((m: unknown): m is string => typeof m === 'string' && m.length > 0);
+        const data = await response.json() as { models?: string[]; connected?: boolean; error?: string };
+        const nextModels = Array.isArray(data.models) 
+          ? data.models.filter((m): m is string => typeof m === 'string' && m.length > 0)
+          : [];
 
         setDetectedModels(nextModels);
-        if (nextModels.length > 0) {
+        if (data.connected && nextModels.length > 0) {
           if (!model || !nextModels.includes(model)) {
             setModel(nextModels[0]);
           }
+          setModelStatus('connected');
+        } else if (data.connected && nextModels.length === 0) {
+          // Connected but no models installed
+          setModelStatus('connected');
+        } else {
+          setModelStatus('disconnected');
+          setDetectedModels([]);
         }
-        setModelStatus('connected');
       } else {
         setModelStatus('disconnected');
         setDetectedModels([]);

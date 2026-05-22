@@ -125,6 +125,7 @@ export function useAccountSettings({
         throw new Error(data.error || 'Failed to detect Ollama models.');
       }
 
+      // Handle both the legacy raw-array format and the new { models, connected } format
       const rawModels = Array.isArray(data)
         ? data
         : Array.isArray(data.models)

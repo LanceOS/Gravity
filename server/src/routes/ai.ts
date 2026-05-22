@@ -83,21 +83,64 @@ async function testProviderApiKey(provider: string, apiKey: string) {
   }
 }
 
-async function fetchOllamaModels(rawUrl?: string) {
-  const ollamaUrl = normalizeOllamaUrl(rawUrl || 'http://host.docker.internal:11434');
+/**
+ * Attempts to connect to the given Ollama URL. If the URL uses localhost/127.0.0.1
+ * and the connection fails, it automatically retries with host.docker.internal
+ * to support Docker-hosted server environments transparently.
+ */
+async function resolveOllamaUrl(rawUrl: string): Promise<string> {
+  const normalized = normalizeOllamaUrl(rawUrl);
+
+  // Only attempt fallback for localhost/loopback addresses
+  const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)(:|$)/i.test(normalized);
+  if (!isLocalhost) {
+    return normalized;
+  }
+
+  // Try original URL first
+  try {
+    const response = await fetchWithTimeout(`${normalized}/api/tags`, { method: 'GET' }, 3000);
+    if (response.ok) {
+      return normalized;
+    }
+  } catch {
+    // Fall through to docker internal fallback
+  }
+
+  // Attempt Docker-internal host fallback
+  const dockerFallback = normalized.replace(
+    /^(https?:\/\/)(?:localhost|127\.0\.0\.1)/i,
+    '$1host.docker.internal',
+  );
 
   try {
-    const response = await fetchWithTimeout(`${ollamaUrl}/api/tags`, { method: 'GET' }, 5000);
-    if (!response.ok) {
-      throw new Error(await readErrorMessage(response, 'Failed to query Ollama models.'));
+    const response = await fetchWithTimeout(`${dockerFallback}/api/tags`, { method: 'GET' }, 3000);
+    if (response.ok) {
+      return dockerFallback;
     }
-
-    const data = (await response.json()) as { models?: Array<{ name?: string }> };
-    return (data.models ?? []).map((model) => model.name).filter((name): name is string => Boolean(name));
   } catch {
-    return [];
+    // Both failed — return original so the caller surfaces the correct URL in errors
   }
+
+  return normalized;
 }
+
+/**
+ * Fetches the list of models from Ollama. Throws on connection failure or non-OK response.
+ * Returns an array of model name strings on success.
+ */
+async function fetchOllamaModels(rawUrl: string): Promise<string[]> {
+  const ollamaUrl = await resolveOllamaUrl(rawUrl);
+
+  const response = await fetchWithTimeout(`${ollamaUrl}/api/tags`, { method: 'GET' }, 5000);
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, 'Ollama returned a non-OK response.'));
+  }
+
+  const data = (await response.json()) as { models?: Array<{ name?: string }> };
+  return (data.models ?? []).map((model) => model.name).filter((name): name is string => Boolean(name));
+}
+
 
 async function measureProviderConnection(provider: string, apiKey: string) {
   const startedAt = Date.now();
@@ -116,13 +159,23 @@ export function createAiRouter() {
   }
 
   router.get('/ollama/models', async (req, res) => {
-    const rawUrl = typeof req.query.ollamaUrl === 'string' ? req.query.ollamaUrl : undefined;
-    res.json(await fetchOllamaModels(rawUrl));
+    const rawUrl = typeof req.query.ollamaUrl === 'string' ? req.query.ollamaUrl : 'http://localhost:11434';
+    try {
+      const models = await fetchOllamaModels(rawUrl);
+      res.json({ models, connected: true });
+    } catch (error) {
+      res.json({ models: [], connected: false, error: normalizeOllamaErrorMessage(error) });
+    }
   });
 
   router.get('/ai/ollama/models', async (req, res) => {
-    const rawUrl = typeof req.query.ollamaUrl === 'string' ? req.query.ollamaUrl : undefined;
-    res.json(await fetchOllamaModels(rawUrl));
+    const rawUrl = typeof req.query.ollamaUrl === 'string' ? req.query.ollamaUrl : 'http://localhost:11434';
+    try {
+      const models = await fetchOllamaModels(rawUrl);
+      res.json({ models, connected: true });
+    } catch (error) {
+      res.json({ models: [], connected: false, error: normalizeOllamaErrorMessage(error) });
+    }
   });
 
   router.post('/ai/test-key', async (req, res) => {
@@ -309,7 +362,8 @@ export function createAiRouter() {
     }
 
     // Default Ollama behavior
-    const ollamaUrl = normalizeOllamaUrl(typeof req.body?.ollamaUrl === 'string' ? req.body.ollamaUrl : 'http://host.docker.internal:11434');
+    const rawOllamaUrl = typeof req.body?.ollamaUrl === 'string' ? req.body.ollamaUrl : 'http://localhost:11434';
+    const ollamaUrl = await resolveOllamaUrl(rawOllamaUrl);
 
     try {
       const response = await fetchWithTimeout(
