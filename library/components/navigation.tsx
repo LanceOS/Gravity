@@ -229,9 +229,9 @@ export function MegaMenu({ trigger, columns }: MegaMenuProps) {
 }
 
 // 7. ContextMenu (Right click trigger)
-export interface ContextMenuItem {
+export interface ContextMenuItem { icon?: React.ReactNode; danger?: boolean; children?: ContextMenuItem[];
   label: string;
-  onClick: () => void;
+  onClick?: () => void;
 }
 export interface ContextMenuProps {
   children: React.ReactNode;
@@ -271,7 +271,7 @@ export function ContextMenu({ children, items }: ContextMenuProps) {
                 <div
                   key={idx}
                   onClick={() => {
-                    item.onClick();
+                    item.onClick?.();
                     setIsOpen(false);
                   }}
                   className="clickable"

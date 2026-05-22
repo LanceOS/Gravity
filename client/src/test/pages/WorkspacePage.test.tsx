@@ -166,6 +166,8 @@ function renderWorkspacePage(overrides: Partial<Parameters<typeof WorkspacePage>
     onSetListSort: vi.fn(),
     onSetView: vi.fn(),
     onUpdateTicket: vi.fn().mockResolvedValue(undefined),
+    onUpdateComment: vi.fn().mockResolvedValue(undefined),
+    onDeleteComment: vi.fn().mockResolvedValue(undefined),
   };
 
   const props = { ...baseProps, ...overrides };
