@@ -772,6 +772,8 @@ export function AppShellPage() {
 
       {/* Floating Chat Trigger Button */}
       <button
+        type="button"
+        aria-label={isOllamaOpen ? 'Close AI Assistant' : 'Open AI Assistant'}
         onClick={() => setIsOllamaOpen((prev) => !prev)}
         className="clickable"
         style={{
