@@ -1,6 +1,5 @@
 import React from 'react';
 import type { Ticket } from '../../context/TicketContext';
-import { Button, Select, DenseTextInput } from '@library';
 import { Compass } from 'lucide-react';
 import { TicketRow } from './components';
 import { TicketFilterBar } from '../TicketFilterBar';
