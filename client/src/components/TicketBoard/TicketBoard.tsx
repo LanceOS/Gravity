@@ -112,6 +112,41 @@ export const TicketBoard: React.FC<TicketBoardProps> = ({
         totalCount={totalCount}
       />
 
+      {projects.length > 0 && (
+        <Flex
+          align="center"
+          gap="8px"
+          style={{
+            padding: '0 16px 16px 16px',
+            background: 'var(--bg)',
+          }}
+        >
+          <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 500 }}>
+            Project
+          </span>
+          <select
+            aria-label="Filter board by project"
+            value={((filters as any).projectId as string | undefined) ?? ''}
+            onChange={(event) => onFilterChange('projectId', event.target.value || undefined)}
+            style={{
+              minWidth: '180px',
+              padding: '6px 10px',
+              borderRadius: '6px',
+              border: '1px solid var(--border-subtle)',
+              background: 'var(--surface)',
+              color: 'var(--text)',
+            }}
+          >
+            <option value="">All projects</option>
+            {projects.map((project) => (
+              <option key={(project as any).id} value={(project as any).id}>
+                {(project as any).name}
+              </option>
+            ))}
+          </select>
+        </Flex>
+      )}
+
       {/* Kanban Board Container */}
       <div style={{ flex: 1, overflowY: 'hidden', padding: '16px', background: 'var(--bg)' }}>
         <KanbanBoard
