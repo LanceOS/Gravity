@@ -4,6 +4,7 @@ import { Button, Select, DenseTextInput } from '@library';
 
 const PRIORITY_FILTER_OPTIONS = [
   { label: 'All priorities', value: '' },
+  { label: 'No Priority', value: 'no_priority' },
   { label: 'Low', value: 'low' },
   { label: 'Medium', value: 'medium' },
   { label: 'High', value: 'high' },
