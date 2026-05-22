@@ -45,7 +45,7 @@ export const TicketFilterBar: React.FC<TicketFilterBarProps> = ({
         placeholder="Filter tickets by title, body, or ID..."
         value={filters.search}
         onChange={(e) => onFilterChange({ search: e.target.value })}
-        style={{ maxWidth: '300px' }}
+        style={{ flex: 1, width: '100%', maxWidth: '300px' }}
       />
 
       {/* Priority Filter */}
