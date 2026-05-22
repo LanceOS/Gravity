@@ -1,4 +1,4 @@
-import express, { Router, type Request, type Response } from 'express';
+import express, { Router, type Request, type Response as ExpressResponse } from 'express';
 import { setResponse } from 'better-call/node';
 import { fromNodeHeaders } from 'better-auth/node';
 import { auth } from '../auth.js';
@@ -11,7 +11,17 @@ function getErrorMessage(error: unknown, fallback: string) {
 
 type JsonRecord = Record<string, unknown>;
 
-async function readJsonPayload(response: Response) {
+type AuthPayload = JsonRecord & {
+  error?: unknown;
+  message?: unknown;
+  user?: unknown;
+  session?: unknown;
+  success?: unknown;
+};
+
+type FetchResponse = globalThis.Response;
+
+async function readJsonPayload(response: FetchResponse): Promise<AuthPayload | null> {
   const rawBody = await response.text();
   if (!rawBody) {
     return null;
@@ -19,13 +29,13 @@ async function readJsonPayload(response: Response) {
 
   try {
     const parsed = JSON.parse(rawBody) as unknown;
-    return typeof parsed === 'object' && parsed !== null ? (parsed as JsonRecord) : { value: parsed };
+    return typeof parsed === 'object' && parsed !== null ? (parsed as AuthPayload) : { value: parsed } as AuthPayload;
   } catch {
-    return { message: rawBody };
+    return { message: rawBody } as AuthPayload;
   }
 }
 
-function extractAuthMessage(payload: JsonRecord | null, fallback: string) {
+function extractAuthMessage(payload: AuthPayload | null, fallback: string) {
   const error = payload?.error;
   if (typeof error === 'string' && error.trim().length > 0) {
     return error;
@@ -39,7 +49,7 @@ function extractAuthMessage(payload: JsonRecord | null, fallback: string) {
   return fallback;
 }
 
-function extractAuthUserId(payload: JsonRecord | null) {
+function extractAuthUserId(payload: AuthPayload | null) {
   const user = payload?.user;
   if (!user || typeof user !== 'object') {
     return null;
@@ -83,7 +93,7 @@ async function forwardAuthRequest(req: Request, authPath: string) {
 }
 
 async function sendCompatibilityJson(
-  res: Response,
+  res: ExpressResponse,
   sourceHeaders: Headers,
   status: number,
   payload: Record<string, unknown>,

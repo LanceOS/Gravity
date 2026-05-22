@@ -9,10 +9,7 @@ const envSchema = z.object({
   FEDERATION_SYNC_FAILURE_BASE_MS: z.coerce.number().int().positive().default(5000),
   FEDERATION_SYNC_FAILURE_MAX_MS: z.coerce.number().int().positive().default(60000),
   FEDERATION_SYNC_FAILURE_MAX_RETRIES: z.coerce.number().int().positive().default(5),
-  DATABASE_URL: z
-    .string()
-    .min(1)
-    .default('postgresql://gravity_user:secure_dev_password_change_me_in_prod@localhost:5432/gravity_workspace'),
+  DATABASE_URL: z.string().min(1),
   BETTER_AUTH_SECRET: z.string().min(1).default('change-me-before-production'),
   NODE_IDENTITY_MASTER_KEY: z.string().min(1).default('change-me-node-identity-master-key-before-production'),
   NODE_DISPLAY_NAME: z.string().optional(),

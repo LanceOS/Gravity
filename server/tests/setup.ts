@@ -2,8 +2,8 @@ process.env.DATABASE_URL = 'pgmem://gravity';
 process.env.NODE_ENV = 'test';
 process.env.BETTER_AUTH_SECRET = 'test-secret-1234567890';
 process.env.BETTER_AUTH_BASE_URL = 'http://localhost:8080';
-process.env.CORS_ORIGINS = 'http://localhost:33100';
-process.env.TRUSTED_ORIGINS = 'http://localhost:33100,http://localhost:8080';
+process.env.CORS_ORIGINS = 'http://localhost:5173';
+process.env.TRUSTED_ORIGINS = 'http://localhost:5173,http://localhost:8080';
 process.env.OLLAMA_DEFAULT_ENDPOINT = 'http://localhost:11434';
 
 const { afterEach, beforeAll, beforeEach, vi } = await import('vitest');

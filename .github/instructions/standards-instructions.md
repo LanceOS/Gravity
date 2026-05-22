@@ -5,12 +5,14 @@ This document defines the absolute directory layout, file naming conventions, an
 ```
 gravity/
 ├── .github/                      # CI/CD pipelines, linting actions, and PR templates
-├── docker/                       # Compose files and Dockerfiles for local/dev deployments
+├── docker/                       # Compose files for local/dev deployments
 │   ├── docker-compose.yml        # Base multi-container orchestration (frontend + backend + postgres)
 │   ├── docker-compose.dev.yml    # Vite/HMR overrides for local frontend development
-│   ├── docker-compose.watch.yml  # Rebuild-on-change overrides for backend/frontend containers
-│   ├── frontend.Dockerfile       # Production nginx frontend image
-│   └── backend.Dockerfile        # Production API image
+│   └── docker-compose.watch.yml  # Rebuild-on-change overrides for backend/frontend containers
+├── client/
+│   └── Dockerfile                # Production nginx frontend image
+└── server/
+  └── Dockerfile                # Production API image
 ├── backend/                      # Node.js + Express/Fastify Core Service
 │   ├── src/
 │   │   ├── config/               # Environment variables and dynamic database pools

@@ -14,12 +14,14 @@ To prevent monolithic file bloat, the workspace utilizes a strict Page-and-Featu
 
 ```
 gravity/
-├── docker/                         # Compose files and Dockerfiles
+├── docker/                         # Compose files
 │   ├── docker-compose.yml          # Base multi-container orchestration (App + Postgres)
 │   ├── docker-compose.dev.yml      # Dev override for the Vite frontend container
 │   ├── docker-compose.watch.yml    # Rebuild-on-change override for backend/frontend containers
-│   ├── frontend.Dockerfile         # Frontend image definition
-│   └── backend.Dockerfile          # Backend image definition
+├── client/
+│   └── Dockerfile                  # Frontend image definition
+└── server/
+  └── Dockerfile                  # Backend image definition
 ├── package.json
 ├── src/
 │   ├── main.tsx                    # System bootstrapping

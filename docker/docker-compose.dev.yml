@@ -14,7 +14,7 @@ services:
       - ../library:/app/library:cached
       - ../client/node_modules:/app/client/node_modules:delegated
     ports:
-      - "33101:5173"
+      - "5173:5173"
     # Use host-installed node_modules (mounted) and run Vite dev server so file changes
     # in the workspace are picked up immediately by the containerized dev server.
     # Start a lightweight local forwarder on localhost:5000 so an existing Vite proxy
@@ -49,8 +49,8 @@ services:
       - backend
 
   # Override backend origin allowlists for local development so requests from the
-  # Vite dev server exposed on localhost:33101 are accepted.
+  # Vite dev server exposed on localhost:5173 are accepted.
   backend:
     environment:
-      CORS_ORIGINS: http://localhost:33100,http://localhost:33101
-      TRUSTED_ORIGINS: http://localhost:33100,http://localhost:33101
+      CORS_ORIGINS: http://localhost:5173
+      TRUSTED_ORIGINS: http://localhost:5173

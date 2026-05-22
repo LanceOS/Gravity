@@ -1,6 +1,13 @@
 import { defineConfig } from 'drizzle-kit';
+import dotenv from 'dotenv';
 
-const databaseUrl = process.env.DATABASE_URL ?? 'postgresql://gravity_user:secure_dev_password_change_me_in_prod@localhost:5432/gravity_workspace';
+dotenv.config();
+
+const databaseUrl = process.env.DATABASE_URL;
+
+if (!databaseUrl) {
+  throw new Error('DATABASE_URL is required to run drizzle-kit.');
+}
 
 export default defineConfig({
   schema: './src/db/schema.ts',
