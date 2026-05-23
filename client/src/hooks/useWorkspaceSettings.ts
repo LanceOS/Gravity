@@ -482,6 +482,8 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
     }
   }, [activeWorkspaceId, currentUser]);
 
+  const clearDeleteError = useCallback(() => setDeleteError(null), []);
+
   return {
     settings,
     settingsLoading,
@@ -510,5 +512,6 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
     retryFederationConnection,
     refreshWorkspaceAdmin,
     deleteWorkspace,
+    clearDeleteError,
   };
 }

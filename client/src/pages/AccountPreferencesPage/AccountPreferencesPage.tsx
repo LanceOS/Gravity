@@ -63,31 +63,31 @@ const SETTINGS_CATEGORIES: Array<{
   description: string;
   icon: typeof SlidersHorizontal;
 }> = [
-  {
-    id: 'general',
-    label: 'General',
-    description: 'Theme, default view, and board density for your local account.',
-    icon: Settings2,
-  },
-  {
-    id: 'providers',
-    label: 'Cloud AI',
-    description: 'Provider selection and API credentials for your account.',
-    icon: WandSparkles,
-  },
-  {
-    id: 'ollama',
-    label: 'Ollama',
-    description: 'Local endpoint and installed model detection.',
-    icon: Cpu,
-  },
-  {
-    id: 'onboarding',
-    label: 'Onboarding',
-    description: 'Replay the product tour and guided setup for this account.',
-    icon: Bot,
-  },
-];
+    {
+      id: 'general',
+      label: 'General',
+      description: 'Theme, default view, and board density for your local account.',
+      icon: Settings2,
+    },
+    {
+      id: 'providers',
+      label: 'Cloud AI',
+      description: 'Provider selection and API credentials for your account.',
+      icon: WandSparkles,
+    },
+    {
+      id: 'ollama',
+      label: 'Ollama',
+      description: 'Local endpoint and installed model detection.',
+      icon: Cpu,
+    },
+    {
+      id: 'onboarding',
+      label: 'Onboarding',
+      description: 'Replay the product tour and guided setup for this account.',
+      icon: Bot,
+    },
+  ];
 
 function StatusNotice({ message, tone = 'neutral' }: { message: StatusMessage | { message: string } | null; tone?: 'neutral' | 'success' | 'error' }) {
   if (!message) {

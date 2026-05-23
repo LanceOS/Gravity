@@ -180,6 +180,7 @@ export function AppShellPage() {
     deleteWorkspace,
     deleteLoading,
     deleteError,
+    clearDeleteError,
   } = useWorkspaceSettings({
     currentUser,
     activeWorkspaceId,
@@ -704,6 +705,7 @@ export function AppShellPage() {
           onApproveJoinRequest={handleApproveJoinRequest}
           onRetryConnection={handleRetryConnection}
           onDeleteWorkspace={handleDeleteWorkspace}
+          onClearDeleteError={clearDeleteError}
         />
       ) : (
         <WorkspaceLayout

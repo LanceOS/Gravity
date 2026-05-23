@@ -57,6 +57,7 @@ interface SettingsPageProps {
   deleteLoading?: boolean;
   deleteError?: string | null;
   onDeleteWorkspace?: () => Promise<void>;
+  onClearDeleteError?: () => void;
 }
 
 const COPY_FEEDBACK_STORAGE_KEY = 'gravity_peer_invite_copy_feedback';
@@ -133,6 +134,7 @@ function OverviewSection({
   deleteError,
   onChangeSettings,
   onDeleteWorkspace,
+  onClearDeleteError,
 }: {
   workspace: WorkspaceSummary;
   settings: WorkspaceAdminSettings;
@@ -140,6 +142,7 @@ function OverviewSection({
   deleteError?: string | null;
   onChangeSettings: (updates: Partial<WorkspaceAdminSettings>) => void;
   onDeleteWorkspace?: () => Promise<void>;
+  onClearDeleteError?: () => void;
 }) {
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
 
@@ -230,13 +233,22 @@ function OverviewSection({
               <TextInput
                 label={`Type "${workspace.name}" to confirm`}
                 value={deleteConfirmation}
-                onChange={(e) => setDeleteConfirmation(e.target.value)}
+                onChange={(e) => {
+                  setDeleteConfirmation(e.target.value);
+                  if (deleteError && onClearDeleteError) {
+                    onClearDeleteError();
+                  }
+                }}
                 placeholder={workspace.name}
               />
             </div>
             <Button
               variant="danger"
-              disabled={deleteConfirmation !== workspace.name || deleteLoading}
+              disabled={
+                (deleteConfirmation.trim() !== workspace.name.trim() &&
+                 deleteConfirmation.trim() !== `"${workspace.name.trim()}"`) ||
+                deleteLoading
+              }
               loading={deleteLoading}
               onClick={() => onDeleteWorkspace && onDeleteWorkspace()}
             >
@@ -811,6 +823,7 @@ export function SettingsPage({
   deleteLoading,
   deleteError,
   onDeleteWorkspace,
+  onClearDeleteError,
 }: SettingsPageProps) {
   const [activeCategory, setActiveCategory] = useState<SettingsCategoryId>('overview');
 
@@ -954,6 +967,7 @@ export function SettingsPage({
                   deleteError={deleteError}
                   onChangeSettings={onChangeSettings}
                   onDeleteWorkspace={onDeleteWorkspace}
+                  onClearDeleteError={onClearDeleteError}
                 />
                 <FederationConnectionsSection
                   federationConnections={federationConnections}
