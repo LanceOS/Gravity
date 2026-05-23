@@ -111,7 +111,6 @@ export const TicketBoard: React.FC<TicketBoardProps> = ({
         filteredCount={filteredCount}
         totalCount={totalCount}
         domains={Object.values(domainById)}
-        projects={projects}
       />
 
 
