@@ -1,13 +1,6 @@
-import { handleMcpRequest } from './src/mcp.js';
-
-export async function runScratchRequest(workspaceId, actorUserId) {
-  return handleMcpRequest({
-    jsonrpc: '2.0',
-    id: 5,
-    method: 'tools/call',
-    params: {
-      name: 'list_workspace_members',
-      arguments: { workspaceId },
-    },
-  }, workspaceId, actorUserId);
+// Scratch/debug utility removed from the production server tree.
+// If this behavior is still needed for local experimentation, move it to a
+// documented development-only script outside production code paths.
+export async function runScratchRequest() {
+  throw new Error('runScratchRequest has been removed from production code.');
 }
