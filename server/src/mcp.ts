@@ -290,7 +290,8 @@ export async function executeTool(name: string, args: Record<string, unknown>, c
     }
     const userId = actorUserId; // Enforce actor user id
     const body = String(args.body ?? '');
-    if (!userId || !body) throw new Error('userId and body are required for create_comment.');
+    if (!userId) throw new Error('Authenticated user is required for create_comment.');
+    if (!body) throw new Error('body is required for create_comment.');
     const comment = await addCommentRecord(ticket.id, userId, body);
     return { comment };
   }
