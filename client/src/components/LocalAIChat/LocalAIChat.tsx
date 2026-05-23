@@ -13,7 +13,7 @@ const CLOUD_MODELS: Record<string, string[]> = {
   deepseek: ['deepseek-chat'],
 };
 
-export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllamaUrl, initialModel, settings }) => {
+export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllamaUrl, initialModel, settings, workspaceId }) => {
   const { activeTicket, projects, users } = useTickets();
 
   const isThirdParty = settings.agentIntegration === 'third_party';
@@ -48,14 +48,17 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
   useEffect(() => {
     fetch('/api/v1/mcp/sse', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        ...(workspaceId ? { 'X-Workspace-Id': workspaceId } : {})
+      },
       body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' })
     }).then(res => res.json()).then(data => {
       if (data.result?.tools) {
         setMcpTools(data.result.tools);
       }
     }).catch(console.error);
-  }, []);
+  }, [workspaceId]);
 
   // Chat state
   const [messages, setMessages] = useState<Message[]>(getInitialMessages);
@@ -196,7 +199,10 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
           try {
             const toolResponse = await fetch('/api/v1/mcp/sse', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { 
+                'Content-Type': 'application/json',
+                ...(workspaceId ? { 'X-Workspace-Id': workspaceId } : {})
+              },
               body: JSON.stringify({
                 jsonrpc: '2.0',
                 id: Date.now(),

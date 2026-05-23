@@ -6,6 +6,7 @@ export interface LocalAIChatProps {
   initialOllamaUrl: string;
   initialModel: string;
   settings: WorkspaceSettings;
+  workspaceId?: string;
 }
 
 export interface Message {

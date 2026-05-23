@@ -1,7 +1,7 @@
 import { and, asc, eq } from 'drizzle-orm';
 import { Router } from 'express';
 import { db } from './db/index.js';
-import { authUsers, projects, userProfiles, workspaceMemberActivity, workspaceMembers } from './db/schema.js';
+import { authUsers, projects, userProfiles, workspaceMemberActivity, workspaceMembers, workspaceSettings } from './db/schema.js';
 import { addCommentRecord, createTicketRecord, deleteCommentRecord, getTicketByKey, getTicketDetailsByKey, listComments, listTickets, updateTicketRecord } from './services/tickets.js';
 
 export const mcpToolsList = [
@@ -239,7 +239,7 @@ export async function executeTool(name: string, args: Record<string, unknown>) {
   throw new Error(`Unknown tool: ${name}`);
 }
 
-export async function handleMcpRequest(request: unknown) {
+export async function handleMcpRequest(request: unknown, workspaceId?: string) {
   const payload = request as {
     method?: string;
     params?: { name?: string; arguments?: Record<string, unknown> };
@@ -259,16 +259,44 @@ export async function handleMcpRequest(request: unknown) {
   }
 
   if (payload.method === 'tools/list') {
+    let activeTools = mcpToolsList;
+    if (workspaceId) {
+      const [settings] = await db
+        .select({ disabledMcpTools: workspaceSettings.disabledMcpTools })
+        .from(workspaceSettings)
+        .where(eq(workspaceSettings.workspaceId, workspaceId))
+        .limit(1);
+      if (settings && Array.isArray(settings.disabledMcpTools)) {
+        const disabled = settings.disabledMcpTools as string[];
+        activeTools = mcpToolsList.filter((tool) => !disabled.includes(tool.name));
+      }
+    }
+
     return {
       jsonrpc: '2.0',
       id: payload.id ?? null,
-      result: { tools: mcpToolsList },
+      result: { tools: activeTools },
     };
   }
 
   if (payload.method === 'tools/call') {
     try {
-      const result = await executeTool(payload.params?.name ?? '', payload.params?.arguments ?? {});
+      const toolName = payload.params?.name ?? '';
+      if (workspaceId) {
+        const [settings] = await db
+          .select({ disabledMcpTools: workspaceSettings.disabledMcpTools })
+          .from(workspaceSettings)
+          .where(eq(workspaceSettings.workspaceId, workspaceId))
+          .limit(1);
+        if (settings && Array.isArray(settings.disabledMcpTools)) {
+          const disabled = settings.disabledMcpTools as string[];
+          if (disabled.includes(toolName)) {
+            throw new Error(`MCP tool "${toolName}" is disabled in this workspace.`);
+          }
+        }
+      }
+
+      const result = await executeTool(toolName, payload.params?.arguments ?? {});
       return {
         jsonrpc: '2.0',
         id: payload.id ?? null,
@@ -302,7 +330,8 @@ export function createMcpRouter() {
   const router = Router();
 
   router.post('/mcp/sse', async (req, res) => {
-    const response = await handleMcpRequest(req.body);
+    const workspaceId = req.header('x-workspace-id') || req.header('X-Workspace-Id') || undefined;
+    const response = await handleMcpRequest(req.body, workspaceId);
     res.json(response);
   });
 

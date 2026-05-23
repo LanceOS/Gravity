@@ -11,7 +11,8 @@ import {
   Badge,
   Alert,
   Divider,
-  Avatar
+  Avatar,
+  Switch
 } from '@library';
 import type { User } from '../../context/TicketContext';
 import type { WorkspaceSummary } from '../../hooks/useWorkspaceDirectory';
@@ -24,7 +25,7 @@ import type {
   WorkspaceMember,
 } from '../../hooks/useWorkspaceSettings';
 
-type SettingsCategoryId = 'overview' | 'access' | 'members' | 'requests';
+type SettingsCategoryId = 'overview' | 'access' | 'members' | 'requests' | 'mcp_tools';
 
 interface SettingsPageProps {
   currentUser: User;
@@ -86,6 +87,12 @@ const SETTINGS_CATEGORIES: Array<{
     label: 'Overview',
     description: 'Workspace identity, host location, and join policy.',
     icon: Settings2,
+  },
+  {
+    id: 'mcp_tools',
+    label: 'MCP Tools',
+    description: 'Enable or disable AI agent tools for this workspace.',
+    icon: ShieldCheck,
   },
   {
     id: 'access',
@@ -842,6 +849,150 @@ function RequestsSection({
   );
 }
 
+interface McpToolMetadata {
+  name: string;
+  label: string;
+  description: string;
+}
+
+const MCP_TOOLS_METADATA: McpToolMetadata[] = [
+  {
+    name: 'list_tickets',
+    label: 'List Tickets',
+    description: 'Allows reading the list of tasks and tickets in the workspace, with optional status or project filters.',
+  },
+  {
+    name: 'list_workspace_members',
+    label: 'List Workspace Members',
+    description: 'Allows reading the list of members in this workspace, including their roles and active times.',
+  },
+  {
+    name: 'get_ticket_details',
+    label: 'Get Ticket Details',
+    description: 'Allows reading complete details, description, and status of any ticket via its unique key.',
+  },
+  {
+    name: 'create_ticket',
+    label: 'Create Ticket',
+    description: 'Allows creating new tickets and sub-tasks under existing tickets in the workspace.',
+  },
+  {
+    name: 'update_ticket',
+    label: 'Update Ticket',
+    description: 'Allows updating description, title, priority, cycle, domain, and status of existing tickets.',
+  },
+  {
+    name: 'manage_comments',
+    label: 'Manage Comments',
+    description: 'Allows creating new comments, reading comment threads, and deleting comments on any ticket.',
+  },
+];
+
+function McpToolsSection({
+  workspace,
+  settings,
+  onChangeSettings,
+}: {
+  workspace: WorkspaceSummary;
+  settings: WorkspaceAdminSettings;
+  onChangeSettings: (updates: Partial<WorkspaceAdminSettings>) => void;
+}) {
+  const isOwner = workspace.memberRole === 'owner';
+  const disabledTools = settings.disabledMcpTools || [];
+
+  return (
+    <Card style={{ padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)' }}>
+      <Stack gap="var(--space-5)">
+        <div>
+          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--text-heading)' }}>MCP Agent Tools</h2>
+          <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '12.5px', lineHeight: 1.5 }}>
+            Configure which model-context-protocol (MCP) tools AI assistants are allowed to use within this workspace. Disabling tools prevents any AI assistant or agent from calling them on behalf of users.
+          </p>
+        </div>
+
+        {!isOwner && (
+          <Alert type="info">
+            Only workspace owners can enable or disable MCP agent tools.
+          </Alert>
+        )}
+
+        <Stack gap="var(--space-3)">
+          {MCP_TOOLS_METADATA.map((tool) => {
+            const isEnabled = !disabledTools.includes(tool.name);
+
+            const handleToggle = (checked: boolean) => {
+              let nextDisabled = [...disabledTools];
+              if (checked) {
+                // Enable: remove from disabled list
+                nextDisabled = nextDisabled.filter((name) => name !== tool.name);
+              } else {
+                // Disable: add to disabled list
+                if (!nextDisabled.includes(tool.name)) {
+                  nextDisabled.push(tool.name);
+                }
+              }
+              onChangeSettings({ disabledMcpTools: nextDisabled });
+            };
+
+            return (
+              <div
+                key={tool.name}
+                data-testid={`mcp-tool-row-${tool.name}`}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 'var(--space-4)',
+                  padding: 'var(--space-4)',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'var(--card-hover)',
+                  border: '1px solid var(--border)',
+                  transition: 'border-color 0.2s ease',
+                }}
+              >
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                    <div
+                      style={{
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        background: isEnabled ? 'var(--success)' : 'var(--error)',
+                        boxShadow: isEnabled
+                          ? '0 0 8px var(--success-glow)'
+                          : '0 0 8px var(--error-glow)',
+                        flexShrink: 0,
+                      }}
+                    />
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-heading)' }}>
+                      {tool.label}
+                    </span>
+                    <Badge variant="default" style={{ fontSize: '9px', fontFamily: 'monospace' }}>
+                      {tool.name}
+                    </Badge>
+                  </div>
+                  <span style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                    {tool.description}
+                  </span>
+                </div>
+
+                <div style={{ flexShrink: 0 }}>
+                  <Switch
+                    label={isEnabled ? 'Enabled' : 'Disabled'}
+                    checked={isEnabled}
+                    onCheckedChange={handleToggle}
+                    disabled={!isOwner}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </Stack>
+      </Stack>
+    </Card>
+  );
+}
+
 export function SettingsPage({
   currentUser,
   workspace,
@@ -1050,6 +1201,14 @@ export function SettingsPage({
                 joinRequests={joinRequests}
                 approveLoadingId={approveLoadingId}
                 onApproveJoinRequest={onApproveJoinRequest}
+              />
+            )}
+
+            {activeCategory === 'mcp_tools' && (
+              <McpToolsSection
+                workspace={workspace}
+                settings={settings}
+                onChangeSettings={onChangeSettings}
               />
             )}
           </Stack>

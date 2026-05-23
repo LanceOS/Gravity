@@ -8,6 +8,7 @@ export interface WorkspaceAdminSettings {
   hostUrl: string;
   joinMode: WorkspaceJoinMode;
   workspaceKey: string;
+  disabledMcpTools: string[];
 }
 
 export interface WorkspaceMember {
@@ -91,6 +92,7 @@ const defaultSettings = (workspaceId: string): WorkspaceAdminSettings => ({
   hostUrl: '',
   joinMode: 'approval_required',
   workspaceKey: '',
+  disabledMcpTools: [],
 });
 
 function normalizeWorkspaceInvite(invite: Record<string, unknown>): WorkspaceInvite {
@@ -221,6 +223,7 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
         hostUrl: settingsData.hostUrl || '',
         joinMode: settingsData.joinMode === 'auto_join' ? 'auto_join' : 'approval_required',
         workspaceKey: settingsData.workspaceKey || '',
+        disabledMcpTools: Array.isArray(settingsData.disabledMcpTools) ? settingsData.disabledMcpTools : [],
       });
       setMembers(Array.isArray(membersData) ? membersData : []);
       setInvites(Array.isArray(invitesData) ? invitesData.map((invite) => normalizeWorkspaceInvite(invite as Record<string, unknown>)) : []);
@@ -299,6 +302,7 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
           hostUrl: settings.hostUrl,
           joinMode: settings.joinMode,
           workspaceKey: settings.workspaceKey,
+          disabledMcpTools: settings.disabledMcpTools || [],
         }),
       });
       const data = await response.json();
@@ -313,6 +317,7 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
         hostUrl: data.hostUrl || '',
         joinMode: data.joinMode === 'auto_join' ? 'auto_join' : 'approval_required',
         workspaceKey: data.workspaceKey || settings.workspaceKey,
+        disabledMcpTools: Array.isArray(data.disabledMcpTools) ? data.disabledMcpTools : settings.disabledMcpTools || [],
       });
       setSaveSuccess(true);
     } catch (error) {

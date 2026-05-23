@@ -95,6 +95,7 @@ export const workspaceSettings = pgTable('workspace_settings', {
   workspaceId: text('workspace_id').primaryKey(),
   hostUrl: text('host_url').notNull().default(''),
   joinMode: text('join_mode').notNull().default('approval_required'),
+  disabledMcpTools: jsonb('disabled_mcp_tools').$type<string[]>().notNull().default([]),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

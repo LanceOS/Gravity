@@ -1,11 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../src/app.js';
+import { db } from '../src/db/index.js';
+import { workspaceMembers } from '../src/db/schema.js';
 import {
   api,
   jsonResponse,
   readSseChunk,
   seedTicket,
+  seedUser,
   seedWorkspaceFixture,
 } from './helpers/test-helpers.js';
 
@@ -432,5 +435,104 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
     expect(String(response.headers['content-type'])).toContain('text/event-stream');
     expect(response.chunk).toContain('Connected to Gravity live stream');
     expect(response.chunk).toContain('"type":"init"');
+  });
+
+  it('enforces MCP tool disablement and strict workspace owner authorization', async () => {
+    const { owner, workspace, project } = await seedWorkspaceFixture();
+    const collaborator = await seedUser({
+      id: 'collab-user-1',
+      name: 'Collaborator',
+      email: 'collab@example.com',
+      role: 'member',
+    });
+
+    // Seed collaborator as a regular member in workspace
+    await db.insert(workspaceMembers).values({
+      workspaceId: workspace.id,
+      userId: collaborator.id,
+      role: 'member',
+      createdAt: new Date(),
+    });
+
+    // 1. Unauthenticated PATCH settings is blocked
+    const unauthPatch = await api()
+      .patch(`/api/v1/workspaces/${workspace.id}/settings`)
+      .send({ disabledMcpTools: ['list_tickets', 'create_ticket'] });
+    expect(unauthPatch.status).toBe(401);
+
+    // 2. Non-owner (collaborator) PATCH settings is blocked
+    const nonOwnerPatch = await api()
+      .patch(`/api/v1/workspaces/${workspace.id}/settings`)
+      .set('x-user-id', collaborator.id)
+      .send({ disabledMcpTools: ['list_tickets', 'create_ticket'] });
+    expect(nonOwnerPatch.status).toBe(403);
+    expect(nonOwnerPatch.body.error).toContain('Only workspace owners');
+
+    // 3. Owner PATCH settings succeeds
+    const ownerPatch = await api()
+      .patch(`/api/v1/workspaces/${workspace.id}/settings`)
+      .set('x-user-id', owner.id)
+      .send({ disabledMcpTools: ['list_tickets', 'create_ticket'] });
+    expect(ownerPatch.status).toBe(200);
+    expect(ownerPatch.body.disabledMcpTools).toEqual(['list_tickets', 'create_ticket']);
+
+    // 4. GET settings returns disabled list correctly
+    const getSettings = await api()
+      .get(`/api/v1/workspaces/${workspace.id}/settings`)
+      .set('x-user-id', owner.id);
+    expect(getSettings.status).toBe(200);
+    expect(getSettings.body.disabledMcpTools).toEqual(['list_tickets', 'create_ticket']);
+
+    // 5. tools/list filters out disabled tools when X-Workspace-Id header is sent
+    const listFiltered = await api()
+      .post('/api/v1/mcp/sse')
+      .set('X-Workspace-Id', workspace.id)
+      .send({
+        jsonrpc: '2.0',
+        id: 10,
+        method: 'tools/list',
+      });
+    expect(listFiltered.status).toBe(200);
+    const filteredTools = listFiltered.body.result.tools as Array<{ name: string }>;
+    expect(filteredTools.some(t => t.name === 'list_tickets')).toBe(false);
+    expect(filteredTools.some(t => t.name === 'create_ticket')).toBe(false);
+    expect(filteredTools.some(t => t.name === 'get_ticket_details')).toBe(true);
+
+    // 6. tools/call blocks calling disabled tools
+    const callDisabled = await api()
+      .post('/api/v1/mcp/sse')
+      .set('X-Workspace-Id', workspace.id)
+      .send({
+        jsonrpc: '2.0',
+        id: 11,
+        method: 'tools/call',
+        params: {
+          name: 'create_ticket',
+          arguments: {
+            title: 'Malicious Ticket',
+            projectId: project.id,
+          },
+        },
+      });
+    expect(callDisabled.status).toBe(200);
+    expect(callDisabled.body.error.message).toContain('disabled in this workspace');
+
+    // 7. tools/call allows calling enabled tools
+    const callEnabled = await api()
+      .post('/api/v1/mcp/sse')
+      .set('X-Workspace-Id', workspace.id)
+      .send({
+        jsonrpc: '2.0',
+        id: 12,
+        method: 'tools/call',
+        params: {
+          name: 'get_ticket_details',
+          arguments: {
+            ticketKey: 'NONEXISTENT-TICKET',
+          },
+        },
+      });
+    expect(callEnabled.status).toBe(200);
+    expect(callEnabled.body.error.message).toContain('NONEXISTENT-TICKET not found');
   });
 });

@@ -743,6 +743,7 @@ export function AppShellPage() {
                   initialOllamaUrl={accountSettings.ollamaEndpoint}
                   initialModel={accountSettings.ollamaModel || ollamaModels[0] || ''}
                   settings={accountSettings}
+                  workspaceId={activeWorkspaceId}
                 />
               ) : null}
 

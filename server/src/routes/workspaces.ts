@@ -79,6 +79,7 @@ async function loadWorkspaceSettingsPayload(workspaceId: string) {
       joinMode: workspaceSettings.joinMode,
       workspaceKey: workspaces.workspaceKey,
       defaultProjectId: workspaces.defaultProjectId,
+      disabledMcpTools: workspaceSettings.disabledMcpTools,
     })
     .from(workspaces)
     .leftJoin(workspaceSettings, eq(workspaceSettings.workspaceId, workspaces.id))
@@ -97,6 +98,7 @@ async function loadWorkspaceSettingsPayload(workspaceId: string) {
     joinMode: settings.joinMode === 'auto_join' ? 'auto_join' : 'approval_required',
     workspaceKey: settings.workspaceKey,
     defaultProjectId: settings.defaultProjectId,
+    disabledMcpTools: settings.disabledMcpTools || [],
   };
 }
 
@@ -314,11 +316,29 @@ export function createWorkspacesRouter() {
         return;
       }
 
-      // Record activity if active user resolved
       const actorUserId = await resolveRequestActorUserId(req);
-      if (actorUserId) {
-        await recordWorkspaceActivity(workspaceId, actorUserId);
+      if (!actorUserId) {
+        res.status(401).json({ error: 'Authentication required.' });
+        return;
       }
+
+      const membershipRows = await db
+        .select({ role: workspaceMembers.role })
+        .from(workspaceMembers)
+        .where(
+          and(
+            eq(workspaceMembers.workspaceId, workspaceId),
+            eq(workspaceMembers.userId, actorUserId)
+          )
+        )
+        .limit(1);
+      const membership = membershipRows[0];
+      if (!membership || membership.role !== 'owner') {
+        res.status(403).json({ error: 'Only workspace owners can modify workspace settings.' });
+        return;
+      }
+
+      await recordWorkspaceActivity(workspaceId, actorUserId);
 
       const nextHostUrl = typeof req.body?.hostUrl === 'string' ? req.body.hostUrl : currentWorkspace.hostUrl;
       const nextJoinMode = req.body?.joinMode === 'auto_join' ? 'auto_join' : req.body?.joinMode === 'approval_required' ? 'approval_required' : null;
@@ -332,6 +352,7 @@ export function createWorkspacesRouter() {
           : req.body?.defaultProjectId === null
             ? null
             : currentWorkspace.defaultProjectId;
+      const nextDisabledMcpTools = Array.isArray(req.body?.disabledMcpTools) ? (req.body.disabledMcpTools as string[]) : undefined;
 
       await db.transaction(async (tx) => {
         await tx
@@ -348,6 +369,7 @@ export function createWorkspacesRouter() {
           .set({
             hostUrl: nextHostUrl,
             ...(nextJoinMode ? { joinMode: nextJoinMode } : {}),
+            ...(nextDisabledMcpTools !== undefined ? { disabledMcpTools: nextDisabledMcpTools } : {}),
             updatedAt: new Date(),
           })
           .where(eq(workspaceSettings.workspaceId, workspaceId));
