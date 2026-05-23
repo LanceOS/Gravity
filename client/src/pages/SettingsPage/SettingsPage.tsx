@@ -262,9 +262,9 @@ function DangerZoneSection({
           </div>
           <Button
             variant="danger"
-            disabled={deleteConfirmation !== workspace.name || deleteLoading}
+            disabled={!onDeleteWorkspace || deleteConfirmation !== workspace.name || deleteLoading}
             loading={deleteLoading}
-            onClick={() => onDeleteWorkspace && onDeleteWorkspace()}
+            onClick={() => onDeleteWorkspace?.()}
           >
             Delete Workspace
           </Button>
