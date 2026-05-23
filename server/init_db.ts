@@ -1,4 +1,4 @@
-import { initializeDatabase } from './src/db/bootstrap.ts';
+import { initializeDatabase } from './src/db/bootstrap.js';
 
 async function main() {
   try {
