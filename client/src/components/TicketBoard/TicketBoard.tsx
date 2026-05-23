@@ -139,8 +139,8 @@ export const TicketBoard: React.FC<TicketBoardProps> = ({
           >
             <option value="">All projects</option>
             {projects.map((project) => (
-              <option key={(project as any).id} value={(project as any).id}>
-                {(project as any).name}
+              <option key={project.id} value={project.id}>
+                {project.name}
               </option>
             ))}
           </select>
