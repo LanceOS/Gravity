@@ -259,27 +259,64 @@ describe('LocalAIChat', () => {
       expect(screen.getByText('You have 1 ticket')).toBeInTheDocument();
     });
 
-    // Check fetch calls
-    const toolsListReq = mocks.fetch.mock.calls[0];
-    expect(toolsListReq[0]).toBe('/api/v1/mcp/sse');
-    expect(JSON.parse(toolsListReq[1].body)).toMatchObject({ method: 'tools/list' });
+    // Check fetch calls without assuming a fixed startup call order
+    const toolsListReq = mocks.fetch.mock.calls.find(([url, init]) => {
+      if (url !== '/api/v1/mcp/sse' || !init?.body) {
+        return false;
+      }
 
-    const firstChatReq = mocks.fetch.mock.calls[2];
-    expect(firstChatReq[0]).toBe('/api/v1/ai/chat');
-    expect(JSON.parse(firstChatReq[1].body)).toMatchObject({
+      return JSON.parse(init.body as string).method === 'tools/list';
+    });
+    expect(toolsListReq).toBeDefined();
+    expect(toolsListReq?.[0]).toBe('/api/v1/mcp/sse');
+    expect(JSON.parse(toolsListReq?.[1].body as string)).toMatchObject({ method: 'tools/list' });
+
+    const firstChatReq = mocks.fetch.mock.calls.find(([url, init]) => {
+      if (url !== '/api/v1/ai/chat' || !init?.body) {
+        return false;
+      }
+
+      const body = JSON.parse(init.body as string);
+      return Array.isArray(body.tools) && body.tools.some((tool: { name?: string }) => tool.name === 'list_tickets');
+    });
+    expect(firstChatReq).toBeDefined();
+    expect(firstChatReq?.[0]).toBe('/api/v1/ai/chat');
+    expect(JSON.parse(firstChatReq?.[1].body as string)).toMatchObject({
       tools: [{ name: 'list_tickets' }]
     });
 
-    const toolCallReq = mocks.fetch.mock.calls[3];
-    expect(toolCallReq[0]).toBe('/api/v1/mcp/sse');
-    expect(JSON.parse(toolCallReq[1].body)).toMatchObject({
+    const toolCallReq = mocks.fetch.mock.calls.find(([url, init]) => {
+      if (url !== '/api/v1/mcp/sse' || !init?.body) {
+        return false;
+      }
+
+      const body = JSON.parse(init.body as string);
+      return body.method === 'tools/call' && body.params?.name === 'list_tickets';
+    });
+    expect(toolCallReq).toBeDefined();
+    expect(toolCallReq?.[0]).toBe('/api/v1/mcp/sse');
+    expect(JSON.parse(toolCallReq?.[1].body as string)).toMatchObject({
       method: 'tools/call',
       params: { name: 'list_tickets', arguments: {} }
     });
 
-    const secondChatReq = mocks.fetch.mock.calls[4];
-    expect(secondChatReq[0]).toBe('/api/v1/ai/chat');
-    expect(JSON.parse(secondChatReq[1].body).messages.at(-1)).toMatchObject({
+    const secondChatReq = mocks.fetch.mock.calls.find(([url, init]) => {
+      if (url !== '/api/v1/ai/chat' || !init?.body) {
+        return false;
+      }
+
+      const body = JSON.parse(init.body as string);
+      return body.messages?.some?.(
+        (message: { role?: string; tool_call_id?: string; name?: string; content?: string }) =>
+          message.role === 'tool' &&
+          message.tool_call_id === 'call_1' &&
+          message.name === 'list_tickets' &&
+          message.content === 'Found 1 ticket'
+      );
+    });
+    expect(secondChatReq).toBeDefined();
+    expect(secondChatReq?.[0]).toBe('/api/v1/ai/chat');
+    expect(JSON.parse(secondChatReq?.[1].body as string).messages.at(-1)).toMatchObject({
       role: 'tool',
       tool_call_id: 'call_1',
       name: 'list_tickets',
