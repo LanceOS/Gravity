@@ -234,7 +234,11 @@ export function createWorkspacesRouter() {
       res.status(201).json({ workspace });
     } catch (error) {
       const normalizedDefaultProjectKey =
-        typeof defaultProjectKey === 'string' ? normalizeEntityKey(defaultProjectKey) : undefined;
+        typeof defaultProjectKey === 'string' && defaultProjectKey.trim().length > 0
+          ? normalizeEntityKey(defaultProjectKey)
+          : typeof defaultProjectName === 'string' && defaultProjectName.trim().length > 0
+            ? normalizeEntityKey(defaultProjectName)
+            : normalizeEntityKey(key);
       const mappedProjectCreationError = mapProjectCreationError(error, normalizedDefaultProjectKey);
 
       res.status(mappedProjectCreationError.status).json({ error: mappedProjectCreationError.message });
