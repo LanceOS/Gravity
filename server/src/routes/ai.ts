@@ -233,7 +233,15 @@ function mapMessagesForGemini(messages: any[]) {
       const parts: any[] = [];
       if (m.content) parts.push({ text: m.content });
       for (const tc of m.tool_calls) {
-        parts.push({ functionCall: { name: tc.name, args: typeof tc.arguments === 'string' ? JSON.parse(tc.arguments) : tc.arguments } });
+        let args = tc.arguments;
+        if (typeof tc.arguments === 'string') {
+          try {
+            args = JSON.parse(tc.arguments);
+          } catch {
+            args = tc.arguments;
+          }
+        }
+        parts.push({ functionCall: { name: tc.name, args } });
       }
       result.push({ role: 'model', parts });
     } else {
