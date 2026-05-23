@@ -179,7 +179,7 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
     });
     expect(openaiChatResponse.status).toBe(200);
     expect(openaiChatResponse.body.message.tool_calls[0].name).toBe('list_tickets');
-    
+
     // Check OpenAI tool request format
     const openaiRequest = JSON.parse(fetchMock.mock.calls[0][1].body as string);
     expect(openaiRequest.tools[0].type).toBe('function');
@@ -324,9 +324,8 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
       id: 7,
       method: 'tools/call',
       params: {
-        name: 'manage_comments',
+        name: 'create_comment',
         arguments: {
-          action: 'create',
           ticketKey: existingTicket.key,
           userId: owner.id,
           body: 'Comment created through MCP.',
@@ -343,9 +342,8 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
       id: 71,
       method: 'tools/call',
       params: {
-        name: 'manage_comments',
+        name: 'read_comments',
         arguments: {
-          action: 'read',
           ticketKey: existingTicket.key,
         },
       },
@@ -359,9 +357,8 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
       id: 72,
       method: 'tools/call',
       params: {
-        name: 'manage_comments',
+        name: 'delete_comment',
         arguments: {
-          action: 'remove',
           ticketKey: existingTicket.key,
           commentId: commentData.comment.id,
         },

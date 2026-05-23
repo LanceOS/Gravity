@@ -882,9 +882,19 @@ const MCP_TOOLS_METADATA: McpToolMetadata[] = [
     description: 'Allows updating description, title, priority, cycle, domain, and status of existing tickets.',
   },
   {
-    name: 'manage_comments',
-    label: 'Manage Comments',
-    description: 'Allows creating new comments, reading comment threads, and deleting comments on any ticket.',
+    name: 'create_comment',
+    label: 'Create Comment',
+    description: 'Allows creating new comments on an existing ticket.',
+  },
+  {
+    name: 'read_comments',
+    label: 'Read Comments',
+    description: 'Allows reading all comment threads on a specific ticket.',
+  },
+  {
+    name: 'delete_comment',
+    label: 'Delete Comment',
+    description: 'Allows deleting a specific comment on a ticket.',
   },
 ];
 

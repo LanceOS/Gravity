@@ -81,18 +81,39 @@ export const mcpToolsList = [
     },
   },
   {
-    name: 'manage_comments',
-    description: 'Manage comments on an existing ticket. Actions include create, read, and remove.',
+    name: 'create_comment',
+    description: 'Create a new comment on an existing ticket.',
     inputSchema: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['create', 'read', 'remove'] },
         ticketKey: { type: 'string' },
-        commentId: { type: 'string' },
         userId: { type: 'string' },
         body: { type: 'string' },
       },
-      required: ['action', 'ticketKey'],
+      required: ['ticketKey', 'userId', 'body'],
+    },
+  },
+  {
+    name: 'read_comments',
+    description: 'Read all comment threads on a specific ticket.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ticketKey: { type: 'string' },
+      },
+      required: ['ticketKey'],
+    },
+  },
+  {
+    name: 'delete_comment',
+    description: 'Delete a specific comment on a ticket.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ticketKey: { type: 'string' },
+        commentId: { type: 'string' },
+      },
+      required: ['ticketKey', 'commentId'],
     },
   },
 ];
@@ -205,35 +226,39 @@ export async function executeTool(name: string, args: Record<string, unknown>) {
     return { ticket: updated };
   }
 
-  if (name === 'manage_comments') {
-    const action = String(args.action ?? '');
+  if (name === 'create_comment') {
     const ticketKey = String(args.ticketKey ?? '').toUpperCase();
     const ticket = await getTicketByKey(ticketKey);
     if (!ticket) {
       throw new Error(`Ticket ${ticketKey} not found.`);
     }
+    const userId = String(args.userId ?? '');
+    const body = String(args.body ?? '');
+    if (!userId || !body) throw new Error('userId and body are required for create_comment.');
+    const comment = await addCommentRecord(ticket.id, userId, body);
+    return { comment };
+  }
 
-    if (action === 'create') {
-      const userId = String(args.userId ?? '');
-      const body = String(args.body ?? '');
-      if (!userId || !body) throw new Error('userId and body are required for create action.');
-      const comment = await addCommentRecord(ticket.id, userId, body);
-      return { comment };
+  if (name === 'read_comments') {
+    const ticketKey = String(args.ticketKey ?? '').toUpperCase();
+    const ticket = await getTicketByKey(ticketKey);
+    if (!ticket) {
+      throw new Error(`Ticket ${ticketKey} not found.`);
     }
+    const comments = await listComments(ticket.id);
+    return { comments };
+  }
 
-    if (action === 'read') {
-      const comments = await listComments(ticket.id);
-      return { comments };
+  if (name === 'delete_comment') {
+    const ticketKey = String(args.ticketKey ?? '').toUpperCase();
+    const ticket = await getTicketByKey(ticketKey);
+    if (!ticket) {
+      throw new Error(`Ticket ${ticketKey} not found.`);
     }
-
-    if (action === 'remove') {
-      const commentId = String(args.commentId ?? '');
-      if (!commentId) throw new Error('commentId is required for remove action.');
-      const success = await deleteCommentRecord(commentId, ticket.id);
-      return { success };
-    }
-
-    throw new Error(`Unknown action for manage_comments: ${action}`);
+    const commentId = String(args.commentId ?? '');
+    if (!commentId) throw new Error('commentId is required for delete_comment.');
+    const success = await deleteCommentRecord(commentId, ticket.id);
+    return { success };
   }
 
   throw new Error(`Unknown tool: ${name}`);
