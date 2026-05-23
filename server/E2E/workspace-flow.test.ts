@@ -50,8 +50,8 @@ describe('Server Workspaces Flow E2E', () => {
       .post('/api/v1/projects')
       .set('x-user-id', ownerId)
       .send({
-        name: 'Remote Ops Core',
-        key: 'ROPS',
+        name: 'Remote Ops Extra',
+        key: 'ROPS2',
         ownerId,
         workspaceId,
       });
@@ -89,6 +89,15 @@ describe('Server Workspaces Flow E2E', () => {
     expect(resCreateInvite.status).toBe(201);
     expect(resCreateInvite.body.code).toBeDefined();
     const inviteCode = resCreateInvite.body.code;
+
+    // 5b. GET /api/v1/workspaces/:id/invites to list the workspace invitations
+    const resListInvites = await request(app)
+      .get(`/api/v1/workspaces/${workspaceId}/invites`)
+      .set('x-user-id', ownerId);
+
+    expect(resListInvites.status).toBe(200);
+    expect(Array.isArray(resListInvites.body)).toBe(true);
+    expect(resListInvites.body.some((inv: any) => inv.code === inviteCode)).toBe(true);
 
     // 6. POST /api/v1/workspaces/invites/:code/join-requests to request to join
     const resJoinRequest = await request(app)
@@ -145,7 +154,7 @@ describe('Server Workspaces Flow E2E', () => {
 
     expect(resConnectWorkspace.status).toBe(200);
     expect(Array.isArray(resConnectWorkspace.body.projects)).toBe(true);
-    expect(resConnectWorkspace.body.projects.length).toBe(1);
+    expect(resConnectWorkspace.body.projects.length).toBe(2);
 
     // 11. GET /api/v1/projects to see collaborator projects listing
     const resCollaboratorProjects = await request(app)
@@ -153,7 +162,7 @@ describe('Server Workspaces Flow E2E', () => {
       .set('x-user-id', collaboratorId);
 
     expect(resCollaboratorProjects.status).toBe(200);
-    expect(resCollaboratorProjects.body.length).toBe(1);
+    expect(resCollaboratorProjects.body.length).toBe(2);
 
     // 12. PATCH /api/v1/workspaces/:id/settings to rotate workspace settings/key
     const resUpdateSettings = await request(app)
