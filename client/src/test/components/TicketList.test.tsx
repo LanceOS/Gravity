@@ -164,74 +164,11 @@ describe('TicketList', () => {
       },
     });
 
-    expect(screen.getByText('1 of 2 tickets')).toBeInTheDocument();
     expect(screen.getByText('BACKLOG')).toBeInTheDocument();
     expect(screen.getByText('DONE')).toBeInTheDocument();
-
-    fireEvent.change(screen.getByPlaceholderText('Filter tickets by title, body, or ID...'), {
-      target: { value: 'toolbar' },
-    });
-    expect(props.onFilterChange).toHaveBeenCalledWith({ search: 'toolbar' });
-
-    await user.selectOptions(screen.getByLabelText('Filter list by priority'), 'urgent');
-    expect(props.onFilterChange).toHaveBeenCalledWith({ priority: 'urgent' });
-
-    await user.selectOptions(screen.getByLabelText('Filter list by status'), 'done');
-    expect(props.onFilterChange).toHaveBeenCalledWith({ status: 'done' });
-
-    await user.selectOptions(screen.getByLabelText('Sort list tickets'), 'domain');
-    expect(props.onListSortChange).toHaveBeenCalledWith('domain');
-
-    await user.click(screen.getByRole('button', { name: 'Clear Filters' }));
-    expect(props.onClearFilters).toHaveBeenCalledTimes(1);
 
     await user.click(screen.getByRole('button', { name: 'TicketRow GRA-1 avatar-1.png' }));
     expect(props.onSelectTicket).toHaveBeenCalledWith(backlogTicket);
   });
 
-  it('switches to grid mode and shows the empty state when no tickets match', async () => {
-    const user = userEvent.setup();
-    const { props, rerender } = renderTicketList();
-
-    await user.click(screen.getByRole('button', { name: 'Interactive Grid' }));
-    expect(screen.getByText('DenseGridController 2')).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Select first grid ticket' }));
-    expect(props.onSelectTicket).toHaveBeenCalledWith(backlogTicket);
-
-    rerender(
-      <TicketList
-        filters={{
-          search: '',
-          priority: '',
-          status: '',
-          projectId: '',
-          domainId: '',
-          cycleId: '',
-          assigneeId: '',
-        }}
-        filteredCount={0}
-        totalCount={0}
-        groupedTickets={{
-          backlog: [],
-          todo: [],
-          in_progress: [],
-          in_review: [],
-          done: [],
-          canceled: [],
-        }}
-        listSort="created"
-        domainById={{}}
-        userAvatarById={{}}
-        hasActiveFilters={false}
-        onFilterChange={props.onFilterChange}
-        onClearFilters={props.onClearFilters}
-        onListSortChange={props.onListSortChange}
-        onSelectTicket={props.onSelectTicket}
-      />
-    );
-
-    await user.click(screen.getByRole('button', { name: 'Interactive Grid' }));
-    expect(screen.getByText('No tickets match your active filters.')).toBeInTheDocument();
-  });
 });

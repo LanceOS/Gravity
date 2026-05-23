@@ -2,7 +2,7 @@ import React from 'react';
 import type { Ticket } from '../../context/TicketContext';
 import { Compass } from 'lucide-react';
 import { TicketRow } from './components';
-import { TicketFilterBar } from '../TicketFilterBar';
+
 import type { TicketListProps } from './types';
 import { getAssigneeAvatar, getDomainTag, getPriorityIcon, getStatusLabel } from './utils';
 
@@ -24,19 +24,6 @@ export const TicketList: React.FC<TicketListProps> = ({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', flex: 1, overflow: 'hidden' }}>
-
-      {/* Filtering Header Bar */}
-      <TicketFilterBar
-        filters={filters}
-        onFilterChange={onFilterChange}
-        hasActiveFilters={hasActiveFilters}
-        onClearFilters={onClearFilters}
-        filteredCount={filteredCount}
-        totalCount={totalCount}
-        listSort={listSort}
-        onListSortChange={onListSortChange}
-        domains={Object.values(domainById)}
-      />
 
       {/* Main Rows Scrolling Container */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px' }}>

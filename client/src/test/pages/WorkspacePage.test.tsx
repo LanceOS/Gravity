@@ -27,13 +27,18 @@ type TicketDetailMockProps = {
 };
 
 vi.mock('../../components/TicketBoard', () => ({
-  TicketBoard: ({ filteredCount, totalCount, hasActiveFilters, onClearFilters }: TicketBoardMockProps) => (
+  TicketBoard: ({ filteredCount, totalCount, hasActiveFilters }: TicketBoardMockProps) => (
     <div>
       <div>{`TicketBoard ${filteredCount}/${totalCount} ${hasActiveFilters ? 'filtered' : 'unfiltered'}`}</div>
-      <button type="button" onClick={onClearFilters}>
-        Clear board filters
-      </button>
     </div>
+  ),
+}));
+
+vi.mock('../../components/TicketFilterBar', () => ({
+  TicketFilterBar: ({ onClearFilters }: { onClearFilters: () => void }) => (
+    <button type="button" onClick={onClearFilters}>
+      Clear board filters
+    </button>
   ),
 }));
 
@@ -216,7 +221,7 @@ describe('WorkspacePage', () => {
       search: '',
       priority: '',
       status: '',
-      projectId: '',
+      projectId: 'project-1',
       domainId: '',
       cycleId: '',
       assigneeId: '',

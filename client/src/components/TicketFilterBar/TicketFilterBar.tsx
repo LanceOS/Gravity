@@ -1,5 +1,5 @@
 import React from 'react';
-import type { Ticket } from '../../context/TicketContext';
+import type { Domain, Ticket } from '../../context/TicketContext';
 import { Button, Select, DenseTextInput } from '@library';
 import {
   PRIORITY_FILTER_OPTIONS,
@@ -41,12 +41,10 @@ export const TicketFilterBar: React.FC<TicketFilterBarProps> = ({
   return (
     <div
       style={{
-        padding: '12px 24px',
-        borderBottom: '1px solid var(--border)',
         display: 'flex',
         alignItems: 'center',
         gap: '12px',
-        background: 'var(--sidebar-bg)'
+        width: '100%',
       }}
     >
       {/* Search */}

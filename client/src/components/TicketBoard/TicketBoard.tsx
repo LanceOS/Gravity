@@ -4,7 +4,7 @@ import { BOARD_COLUMNS } from '../../utils/ticketView';
 import { Button, KanbanBoard, Flex } from '@library';
 import { Plus } from 'lucide-react';
 import { TicketCard } from './components';
-import { TicketFilterBar } from '../TicketFilterBar';
+
 import type { TicketBoardProps } from './types';
 import { getAssigneeAvatar, getDomainMeta, getPriorityColor, getPriorityIcon } from './utils';
 
@@ -101,19 +101,6 @@ export const TicketBoard: React.FC<TicketBoardProps> = ({
 
   return (
     <Flex direction="column" style={{ height: '100%', flex: 1, overflow: 'hidden' }}>
-
-      {/* Filtering Header Bar */}
-      <TicketFilterBar
-        filters={filters as any}
-        onFilterChange={onFilterChange}
-        hasActiveFilters={hasActiveFilters}
-        onClearFilters={onClearFilters}
-        filteredCount={filteredCount}
-        totalCount={totalCount}
-        domains={Object.values(domainById)}
-      />
-
-
 
       {/* Kanban Board Container */}
       <div style={{ flex: 1, overflowY: 'hidden', padding: '16px', background: 'var(--bg)' }}>

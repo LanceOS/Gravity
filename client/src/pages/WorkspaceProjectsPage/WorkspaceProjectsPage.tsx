@@ -1,6 +1,7 @@
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@library';
 import { WorkspaceProjectPanel } from '../../components/WorkspaceProjectPanel';
+import { WorkspaceHeader } from '../../components/WorkspaceHeader';
 import type { Domain, Project } from '../../context/TicketContext';
 import '../WorkspacePage/WorkspacePage.css';
 import './WorkspaceProjectsPage.css';
@@ -38,23 +39,23 @@ export function WorkspaceProjectsPage({
 }: WorkspaceProjectsPageProps) {
   return (
     <div className="workspace-page workspace-projects-page">
-      <header className="workspace-page__header">
-        <div className="workspace-page__title-group">
-          <span className="workspace-page__title">Manage Projects</span>
-        </div>
+      <WorkspaceHeader>
+        <WorkspaceHeader.Top>
+          <WorkspaceHeader.Title>Manage Projects</WorkspaceHeader.Title>
 
-        <div className="workspace-projects-page__actions">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={onBackToWorkspace}
-          >
-            <ArrowLeft size={14} />
-            <span>Back to Workspace</span>
-          </Button>
-        </div>
-      </header>
+          <div className="workspace-projects-page__actions">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={onBackToWorkspace}
+            >
+              <ArrowLeft size={14} />
+              <span>Back to Workspace</span>
+            </Button>
+          </div>
+        </WorkspaceHeader.Top>
+      </WorkspaceHeader>
 
       <div className="workspace-projects-page__content">
         <WorkspaceProjectPanel

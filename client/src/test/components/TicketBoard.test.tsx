@@ -203,23 +203,6 @@ describe('TicketBoard', () => {
       },
     });
 
-    expect(screen.getByDisplayValue('sync')).toBeInTheDocument();
-    expect(screen.getByText('Showing 1 of 2 tickets')).toBeInTheDocument();
-
-    fireEvent.change(screen.getByPlaceholderText('Search board tickets...'), {
-      target: { value: 'critical' },
-    });
-    expect(props.onFilterChange).toHaveBeenCalledWith({ search: 'critical' });
-
-    await user.selectOptions(screen.getByLabelText('Filter board by priority'), 'urgent');
-    expect(props.onFilterChange).toHaveBeenCalledWith({ priority: 'urgent' });
-
-    await user.selectOptions(screen.getByLabelText('Filter board by project'), 'project-2');
-    expect(props.onFilterChange).toHaveBeenCalledWith({ projectId: 'project-2' });
-
-    await user.click(screen.getByRole('button', { name: 'Clear Filters' }));
-    expect(props.onClearFilters).toHaveBeenCalledTimes(1);
-
     await user.click(screen.getByRole('button', { name: 'Create ticket in Done' }));
     expect(props.onOpenCreateTicket).toHaveBeenCalledWith('done');
   });
