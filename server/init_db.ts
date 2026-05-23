@@ -1,14 +1,20 @@
 import { initializeDatabase } from './src/db/bootstrap.js';
 
-async function main() {
+export async function main() {
   try {
     await initializeDatabase();
     console.log('Database initialized');
-    process.exit(0);
+    process.exitCode = 0;
   } catch (err) {
     console.error('Failed to initialize database', err);
-    process.exit(1);
+    process.exitCode = 1;
   }
 }
 
-main();
+const isDirectExecution =
+  typeof process.argv[1] === 'string' &&
+  new URL(import.meta.url).pathname === process.argv[1];
+
+if (isDirectExecution) {
+  void main();
+}
