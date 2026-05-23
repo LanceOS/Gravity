@@ -137,6 +137,7 @@ export function Select({
       left: `${left}px`,
       top: openAbove ? `${Math.max(8, triggerRect.top - 4)}px` : `${triggerRect.bottom + 4}px`,
       transform: openAbove ? 'translateY(-100%)' : 'none',
+      width: 'max-content',
       minWidth: `${triggerRect.width}px`,
       maxWidth: 'calc(100vw - 16px)',
       maxHeight: '240px',
@@ -249,7 +250,7 @@ export function Select({
 
   return (
     <ClickAwayListener onClickAway={closeMenu}>
-      <div className="select-root" style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%', ...style }}>
+      <div className="select-root" style={{ display: 'flex', flexDirection: 'column', gap: '4px', ...style }}>
         {label && (
           <label id={labelId} htmlFor={selectId} className="label" style={{ color: 'var(--text-heading)', fontWeight: 500 }}>
             {label}

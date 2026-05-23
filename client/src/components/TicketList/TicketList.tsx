@@ -35,6 +35,7 @@ export const TicketList: React.FC<TicketListProps> = ({
         totalCount={totalCount}
         listSort={listSort}
         onListSortChange={onListSortChange}
+        domains={Object.values(domainById)}
       />
 
       {/* Main Rows Scrolling Container */}
@@ -67,7 +68,7 @@ export const TicketList: React.FC<TicketListProps> = ({
                 </div>
 
                 {/* Rows List */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', background: 'var(--border)', borderRadius: '6px', overflow: 'hidden' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {ticketsInGroup.map(ticket => (
                     <TicketRow
                       key={ticket.id}

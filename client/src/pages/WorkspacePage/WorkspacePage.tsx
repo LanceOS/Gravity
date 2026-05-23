@@ -106,8 +106,8 @@ export function WorkspacePage({
       search: '',
       priority: '',
       status: '',
-      projectId: '',
       domainId: '',
+      projectId: '',
       cycleId: '',
       assigneeId: '',
     });

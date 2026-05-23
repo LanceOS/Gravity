@@ -10,7 +10,7 @@ export interface TicketFilters {
   search: string;
 }
 
-export type TicketListSort = 'created' | 'domain';
+export type TicketListSort = 'created' | 'domain' | 'newest' | 'oldest' | 'priority_desc' | 'priority_asc' | 'updated_desc' | 'updated_asc';
 
 export type TicketsByStatus = Record<Ticket['status'], Ticket[]>;
 
@@ -70,28 +70,45 @@ export function sortTicketsForList(
     return [...tickets];
   }
 
+  const priorityWeights = { urgent: 4, high: 3, medium: 2, low: 1, no_priority: 0 };
+
   return [...tickets].sort((first, second) => {
-    const firstDomain = first.domainId ? domainById[first.domainId] : undefined;
-    const secondDomain = second.domainId ? domainById[second.domainId] : undefined;
+    if (sort === 'domain') {
+      const firstDomain = first.domainId ? domainById[first.domainId] : undefined;
+      const secondDomain = second.domainId ? domainById[second.domainId] : undefined;
 
-    if (firstDomain && !secondDomain) {
-      return -1;
-    }
-
-    if (!firstDomain && secondDomain) {
-      return 1;
-    }
-
-    if (firstDomain && secondDomain) {
-      const domainComparison = firstDomain.name.localeCompare(secondDomain.name);
-      if (domainComparison !== 0) {
-        return domainComparison;
+      if (firstDomain && !secondDomain) return -1;
+      if (!firstDomain && secondDomain) return 1;
+      if (firstDomain && secondDomain) {
+        const domainComparison = firstDomain.name.localeCompare(secondDomain.name);
+        if (domainComparison !== 0) return domainComparison;
       }
+      return first.createdAt.localeCompare(second.createdAt);
     }
 
-    const createdComparison = first.createdAt.localeCompare(second.createdAt);
-    if (createdComparison !== 0) {
-      return createdComparison;
+    if (sort === 'newest') {
+      return second.createdAt.localeCompare(first.createdAt);
+    }
+    if (sort === 'oldest') {
+      return first.createdAt.localeCompare(second.createdAt);
+    }
+
+    if (sort === 'priority_desc') {
+      const diff = priorityWeights[second.priority] - priorityWeights[first.priority];
+      if (diff !== 0) return diff;
+      return second.createdAt.localeCompare(first.createdAt);
+    }
+    if (sort === 'priority_asc') {
+      const diff = priorityWeights[first.priority] - priorityWeights[second.priority];
+      if (diff !== 0) return diff;
+      return first.createdAt.localeCompare(second.createdAt);
+    }
+
+    if (sort === 'updated_desc') {
+      return (second.updatedAt || second.createdAt).localeCompare(first.updatedAt || first.createdAt);
+    }
+    if (sort === 'updated_asc') {
+      return (first.updatedAt || first.createdAt).localeCompare(second.updatedAt || second.createdAt);
     }
 
     return first.key.localeCompare(second.key);
