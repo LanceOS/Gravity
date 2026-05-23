@@ -155,7 +155,7 @@ textarea {
 
 .clickable:not(button):not(.btn):hover,
 button.clickable:not(.btn):hover {
-  background-color: var(--card-hover) !important;
+  background-color: var(--card-hover);
 }
 
 .sidebar-menu-item:hover,
