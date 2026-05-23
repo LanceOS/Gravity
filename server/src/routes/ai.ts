@@ -541,8 +541,8 @@ export function createAiRouter() {
       let tool_calls: any[] | undefined = undefined;
       
       if (data.message?.tool_calls) {
-        tool_calls = data.message.tool_calls.map((tc: any) => ({
-          id: tc.function?.name + '_' + Math.random().toString(36).substr(2, 9),
+        tool_calls = data.message.tool_calls.map((tc: any, index: number) => ({
+          id: tc.id ?? `${tc.function?.name ?? 'tool'}_${index}`,
           name: tc.function?.name,
           arguments: tc.function?.arguments,
         }));
