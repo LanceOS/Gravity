@@ -11,8 +11,8 @@ type TicketFilterBarFilters = {
   search: string;
   priority: Ticket['priority'] | '';
   status: Ticket['status'] | '';
-  projectId?: string;
-  domainId?: string;
+  projectId: string;
+  domainId: string;
 };
 
 export interface TicketFilterBarProps {
