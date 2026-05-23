@@ -214,9 +214,20 @@ function mapMessagesForGemini(messages: any[]) {
     if (m.role === 'system') continue;
 
     if (m.role === 'tool') {
+      let contentObj;
+      if (typeof m.content === 'string') {
+        try {
+          contentObj = JSON.parse(m.content);
+        } catch {
+          contentObj = { text: m.content };
+        }
+      } else {
+        contentObj = m.content;
+      }
+      
       result.push({
         role: 'user',
-        parts: [{ functionResponse: { name: m.name, response: { name: m.name, content: typeof m.content === 'string' ? JSON.parse(m.content) : m.content } } }]
+        parts: [{ functionResponse: { name: m.name, response: { name: m.name, content: contentObj } } }]
       });
     } else if (m.role === 'assistant' && m.tool_calls?.length) {
       const parts: any[] = [];

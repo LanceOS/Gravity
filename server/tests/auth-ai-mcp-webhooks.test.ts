@@ -227,11 +227,14 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
       assigneeId: owner.id,
     });
 
-    const initializeResponse = await api().post('/api/v1/mcp/sse').send({
-      jsonrpc: '2.0',
-      id: 1,
-      method: 'initialize',
-    });
+    const initializeResponse = await api().post('/api/v1/mcp/sse')
+      .set('x-user-id', owner.id)
+      .set('X-Workspace-Id', workspace.id)
+      .send({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'initialize',
+      });
 
     expect(initializeResponse.status).toBe(200);
     expect(initializeResponse.body.result).toMatchObject({
@@ -239,29 +242,35 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
       serverInfo: { name: 'gravity-mcp-server' },
     });
 
-    const toolsResponse = await api().post('/api/v1/mcp/sse').send({
-      jsonrpc: '2.0',
-      id: 2,
-      method: 'tools/list',
-    });
+    const toolsResponse = await api().post('/api/v1/mcp/sse')
+      .set('x-user-id', owner.id)
+      .set('X-Workspace-Id', workspace.id)
+      .send({
+        jsonrpc: '2.0',
+        id: 2,
+        method: 'tools/list',
+      });
 
     expect(toolsResponse.status).toBe(200);
     expect(toolsResponse.body.result.tools).toEqual(
       expect.arrayContaining([expect.objectContaining({ name: 'list_tickets' })]),
     );
 
-    const createTicketResponse = await api().post('/api/v1/mcp/sse').send({
-      jsonrpc: '2.0',
-      id: 3,
-      method: 'tools/call',
-      params: {
-        name: 'create_ticket',
-        arguments: {
-          title: 'Create ticket through MCP',
-          projectId: project.id,
+    const createTicketResponse = await api().post('/api/v1/mcp/sse')
+      .set('x-user-id', owner.id)
+      .set('X-Workspace-Id', workspace.id)
+      .send({
+        jsonrpc: '2.0',
+        id: 3,
+        method: 'tools/call',
+        params: {
+          name: 'create_ticket',
+          arguments: {
+            title: 'Create ticket through MCP',
+            projectId: project.id,
+          },
         },
-      },
-    });
+      });
 
     expect(createTicketResponse.status).toBe(200);
     expect(parseMcpResult(createTicketResponse)).toMatchObject({
@@ -271,15 +280,18 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
       }),
     });
 
-    const listTicketsResponse = await api().post('/api/v1/mcp/sse').send({
-      jsonrpc: '2.0',
-      id: 4,
-      method: 'tools/call',
-      params: {
-        name: 'list_tickets',
-        arguments: { projectId: project.id },
-      },
-    });
+    const listTicketsResponse = await api().post('/api/v1/mcp/sse')
+      .set('x-user-id', owner.id)
+      .set('X-Workspace-Id', workspace.id)
+      .send({
+        jsonrpc: '2.0',
+        id: 4,
+        method: 'tools/call',
+        params: {
+          name: 'list_tickets',
+          arguments: { projectId: project.id },
+        },
+      });
 
     expect(listTicketsResponse.status).toBe(200);
     const ticketList = parseMcpResult(listTicketsResponse) as Array<{ key: string; title: string }>;
@@ -290,110 +302,131 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
       ]),
     );
 
-    const detailsResponse = await api().post('/api/v1/mcp/sse').send({
-      jsonrpc: '2.0',
-      id: 5,
-      method: 'tools/call',
-      params: {
-        name: 'get_ticket_details',
-        arguments: { ticketKey: existingTicket.key },
-      },
-    });
+    const detailsResponse = await api().post('/api/v1/mcp/sse')
+      .set('x-user-id', owner.id)
+      .set('X-Workspace-Id', workspace.id)
+      .send({
+        jsonrpc: '2.0',
+        id: 5,
+        method: 'tools/call',
+        params: {
+          name: 'get_ticket_details',
+          arguments: { ticketKey: existingTicket.key },
+        },
+      });
 
     expect(detailsResponse.status).toBe(200);
     expect(detailsResponse.body.result.content[0].text).toContain(existingTicket.title);
 
-    const updateResponse = await api().post('/api/v1/mcp/sse').send({
-      jsonrpc: '2.0',
-      id: 6,
-      method: 'tools/call',
-      params: {
-        name: 'update_ticket',
-        arguments: {
-          ticketKey: existingTicket.key,
-          status: 'in_review',
+    const updateResponse = await api().post('/api/v1/mcp/sse')
+      .set('x-user-id', owner.id)
+      .set('X-Workspace-Id', workspace.id)
+      .send({
+        jsonrpc: '2.0',
+        id: 6,
+        method: 'tools/call',
+        params: {
+          name: 'update_ticket',
+          arguments: {
+            ticketKey: existingTicket.key,
+            status: 'in_review',
+          },
         },
-      },
-    });
+      });
 
     expect(updateResponse.status).toBe(200);
     expect(updateResponse.body.result.content[0].text).toContain('in_review');
 
-    const addCommentResponse = await api().post('/api/v1/mcp/sse').send({
-      jsonrpc: '2.0',
-      id: 7,
-      method: 'tools/call',
-      params: {
-        name: 'create_comment',
-        arguments: {
-          ticketKey: existingTicket.key,
-          userId: owner.id,
-          body: 'Comment created through MCP.',
+    const addCommentResponse = await api().post('/api/v1/mcp/sse')
+      .set('x-user-id', owner.id)
+      .set('X-Workspace-Id', workspace.id)
+      .send({
+        jsonrpc: '2.0',
+        id: 7,
+        method: 'tools/call',
+        params: {
+          name: 'create_comment',
+          arguments: {
+            ticketKey: existingTicket.key,
+            userId: owner.id,
+            body: 'Comment created through MCP.',
+          },
         },
-      },
-    });
+      });
 
     expect(addCommentResponse.status).toBe(200);
     expect(addCommentResponse.body.result.content[0].text).toContain('Comment created through MCP.');
     const commentData = parseMcpResult(addCommentResponse) as { comment: { id: string } };
 
-    const readCommentsResponse = await api().post('/api/v1/mcp/sse').send({
-      jsonrpc: '2.0',
-      id: 71,
-      method: 'tools/call',
-      params: {
-        name: 'read_comments',
-        arguments: {
-          ticketKey: existingTicket.key,
+    const readCommentsResponse = await api().post('/api/v1/mcp/sse')
+      .set('x-user-id', owner.id)
+      .set('X-Workspace-Id', workspace.id)
+      .send({
+        jsonrpc: '2.0',
+        id: 71,
+        method: 'tools/call',
+        params: {
+          name: 'read_comments',
+          arguments: {
+            ticketKey: existingTicket.key,
+          },
         },
-      },
-    });
+      });
 
     expect(readCommentsResponse.status).toBe(200);
     expect(readCommentsResponse.body.result.content[0].text).toContain('Comment created through MCP.');
 
-    const updateCommentResponse = await api().post('/api/v1/mcp/sse').send({
-      jsonrpc: '2.0',
-      id: 715,
-      method: 'tools/call',
-      params: {
-        name: 'update_comment',
-        arguments: {
-          ticketKey: existingTicket.key,
-          commentId: commentData.comment.id,
-          body: 'Comment updated through MCP!',
+    const updateCommentResponse = await api().post('/api/v1/mcp/sse')
+      .set('x-user-id', owner.id)
+      .set('X-Workspace-Id', workspace.id)
+      .send({
+        jsonrpc: '2.0',
+        id: 715,
+        method: 'tools/call',
+        params: {
+          name: 'update_comment',
+          arguments: {
+            ticketKey: existingTicket.key,
+            commentId: commentData.comment.id,
+            body: 'Comment updated through MCP!',
+          },
         },
-      },
-    });
+      });
 
     expect(updateCommentResponse.status).toBe(200);
     expect(updateCommentResponse.body.result.content[0].text).toContain('Comment updated through MCP!');
 
-    const removeCommentResponse = await api().post('/api/v1/mcp/sse').send({
-      jsonrpc: '2.0',
-      id: 72,
-      method: 'tools/call',
-      params: {
-        name: 'delete_comment',
-        arguments: {
-          ticketKey: existingTicket.key,
-          commentId: commentData.comment.id,
+    const removeCommentResponse = await api().post('/api/v1/mcp/sse')
+      .set('x-user-id', owner.id)
+      .set('X-Workspace-Id', workspace.id)
+      .send({
+        jsonrpc: '2.0',
+        id: 72,
+        method: 'tools/call',
+        params: {
+          name: 'delete_comment',
+          arguments: {
+            ticketKey: existingTicket.key,
+            commentId: commentData.comment.id,
+          },
         },
-      },
-    });
+      });
 
     expect(removeCommentResponse.status).toBe(200);
     expect(removeCommentResponse.body.result.content[0].text).toContain('"success": true');
 
-    const listMembersResponse = await api().post('/api/v1/mcp/sse').send({
-      jsonrpc: '2.0',
-      id: 8,
-      method: 'tools/call',
-      params: {
-        name: 'list_workspace_members',
-        arguments: { workspaceId: workspace.id },
-      },
-    });
+    const listMembersResponse = await api().post('/api/v1/mcp/sse')
+      .set('x-user-id', owner.id)
+      .set('X-Workspace-Id', workspace.id)
+      .send({
+        jsonrpc: '2.0',
+        id: 8,
+        method: 'tools/call',
+        params: {
+          name: 'list_workspace_members',
+          arguments: { workspaceId: workspace.id },
+        },
+      });
 
     expect(listMembersResponse.status).toBe(200);
     const membersList = parseMcpResult(listMembersResponse) as Array<{ id: string; role: string; lastActiveAt: string | null }>;
@@ -500,6 +533,7 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
     // 5. tools/list filters out disabled tools when X-Workspace-Id header is sent
     const listFiltered = await api()
       .post('/api/v1/mcp/sse')
+      .set('x-user-id', owner.id)
       .set('X-Workspace-Id', workspace.id)
       .send({
         jsonrpc: '2.0',
@@ -515,6 +549,7 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
     // 6. tools/call blocks calling disabled tools
     const callDisabled = await api()
       .post('/api/v1/mcp/sse')
+      .set('x-user-id', owner.id)
       .set('X-Workspace-Id', workspace.id)
       .send({
         jsonrpc: '2.0',
@@ -534,6 +569,7 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
     // 7. tools/call allows calling enabled tools
     const callEnabled = await api()
       .post('/api/v1/mcp/sse')
+      .set('x-user-id', owner.id)
       .set('X-Workspace-Id', workspace.id)
       .send({
         jsonrpc: '2.0',

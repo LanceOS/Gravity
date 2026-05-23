@@ -2,6 +2,7 @@ import { and, asc, eq } from 'drizzle-orm';
 import { Router } from 'express';
 import { db } from './db/index.js';
 import { authUsers, projects, userProfiles, workspaceMemberActivity, workspaceMembers, workspaceSettings } from './db/schema.js';
+import { resolveRequestActorUserId } from './lib/request-auth.js';
 import { addCommentRecord, createTicketRecord, deleteCommentRecord, getTicketByKey, getTicketDetailsByKey, listComments, listTickets, updateTicketRecord, updateCommentRecord } from './services/tickets.js';
 
 export const mcpToolsList = [
@@ -131,12 +132,17 @@ export const mcpToolsList = [
   },
 ];
 
-export async function executeTool(name: string, args: Record<string, unknown>) {
+export async function executeTool(name: string, args: Record<string, unknown>, contextWorkspaceId: string, actorUserId: string) {
   if (name === 'list_tickets') {
     const explicitProjectId = typeof args.projectId === 'string' ? args.projectId : undefined;
-    const projectIds = explicitProjectId
-      ? [explicitProjectId]
-      : (await db.select({ id: projects.id }).from(projects)).map((project) => project.id);
+    const validProjects = await db.select({ id: projects.id }).from(projects).where(eq(projects.workspaceId, contextWorkspaceId));
+    const validProjectIds = validProjects.map((p) => p.id);
+    
+    if (explicitProjectId && !validProjectIds.includes(explicitProjectId)) {
+      throw new Error('Unauthorized or workspace mismatch');
+    }
+    
+    const projectIds = explicitProjectId ? [explicitProjectId] : validProjectIds;
 
     const ticketsByProject = await Promise.all(
       projectIds.map((projectId) =>
@@ -157,6 +163,9 @@ export async function executeTool(name: string, args: Record<string, unknown>) {
     const workspaceId = String(args.workspaceId ?? '');
     if (!workspaceId) {
       throw new Error('workspaceId is required.');
+    }
+    if (workspaceId !== contextWorkspaceId) {
+      throw new Error('Unauthorized or workspace mismatch');
     }
 
     const members = await db
@@ -193,7 +202,15 @@ export async function executeTool(name: string, args: Record<string, unknown>) {
   }
 
   if (name === 'get_ticket_details') {
-    const ticketKey = String(args.ticketKey ?? '');
+    const ticketKey = String(args.ticketKey ?? '').toUpperCase();
+    const ticket = await getTicketByKey(ticketKey);
+    if (!ticket) {
+      throw new Error(`Ticket ${ticketKey} not found.`);
+    }
+    const [project] = await db.select({ workspaceId: projects.workspaceId }).from(projects).where(eq(projects.id, ticket.projectId)).limit(1);
+    if (!project || project.workspaceId !== contextWorkspaceId) {
+      throw new Error('Unauthorized or workspace mismatch');
+    }
     const details = await getTicketDetailsByKey(ticketKey);
     if (!details) {
       throw new Error(`Ticket ${ticketKey} not found.`);
@@ -202,12 +219,17 @@ export async function executeTool(name: string, args: Record<string, unknown>) {
   }
 
   if (name === 'create_ticket') {
+    const projectId = String(args.projectId ?? '');
+    const [project] = await db.select({ workspaceId: projects.workspaceId }).from(projects).where(eq(projects.id, projectId)).limit(1);
+    if (!project || project.workspaceId !== contextWorkspaceId) {
+      throw new Error('Unauthorized or workspace mismatch');
+    }
     const ticket = await createTicketRecord({
       title: String(args.title ?? ''),
       description: typeof args.description === 'string' ? args.description : '',
       status: typeof args.status === 'string' ? args.status : 'todo',
       priority: typeof args.priority === 'string' ? args.priority : 'no_priority',
-      projectId: String(args.projectId ?? ''),
+      projectId,
       domainId: typeof args.domainId === 'string' ? args.domainId : null,
       cycleId: typeof args.cycleId === 'string' ? args.cycleId : null,
       assigneeId: typeof args.assigneeId === 'string' ? args.assigneeId : null,
@@ -221,6 +243,10 @@ export async function executeTool(name: string, args: Record<string, unknown>) {
     const ticket = await getTicketByKey(ticketKey);
     if (!ticket) {
       throw new Error(`Ticket ${ticketKey} not found.`);
+    }
+    const [project] = await db.select({ workspaceId: projects.workspaceId }).from(projects).where(eq(projects.id, ticket.projectId)).limit(1);
+    if (!project || project.workspaceId !== contextWorkspaceId) {
+      throw new Error('Unauthorized or workspace mismatch');
     }
 
     const updated = await updateTicketRecord(ticket.id, {
@@ -245,7 +271,11 @@ export async function executeTool(name: string, args: Record<string, unknown>) {
     if (!ticket) {
       throw new Error(`Ticket ${ticketKey} not found.`);
     }
-    const userId = String(args.userId ?? '');
+    const [project] = await db.select({ workspaceId: projects.workspaceId }).from(projects).where(eq(projects.id, ticket.projectId)).limit(1);
+    if (!project || project.workspaceId !== contextWorkspaceId) {
+      throw new Error('Unauthorized or workspace mismatch');
+    }
+    const userId = actorUserId; // Enforce actor user id
     const body = String(args.body ?? '');
     if (!userId || !body) throw new Error('userId and body are required for create_comment.');
     const comment = await addCommentRecord(ticket.id, userId, body);
@@ -258,6 +288,10 @@ export async function executeTool(name: string, args: Record<string, unknown>) {
     if (!ticket) {
       throw new Error(`Ticket ${ticketKey} not found.`);
     }
+    const [project] = await db.select({ workspaceId: projects.workspaceId }).from(projects).where(eq(projects.id, ticket.projectId)).limit(1);
+    if (!project || project.workspaceId !== contextWorkspaceId) {
+      throw new Error('Unauthorized or workspace mismatch');
+    }
     const comments = await listComments(ticket.id);
     return { comments };
   }
@@ -267,6 +301,10 @@ export async function executeTool(name: string, args: Record<string, unknown>) {
     const ticket = await getTicketByKey(ticketKey);
     if (!ticket) {
       throw new Error(`Ticket ${ticketKey} not found.`);
+    }
+    const [project] = await db.select({ workspaceId: projects.workspaceId }).from(projects).where(eq(projects.id, ticket.projectId)).limit(1);
+    if (!project || project.workspaceId !== contextWorkspaceId) {
+      throw new Error('Unauthorized or workspace mismatch');
     }
     const commentId = String(args.commentId ?? '');
     if (!commentId) throw new Error('commentId is required for delete_comment.');
@@ -280,6 +318,10 @@ export async function executeTool(name: string, args: Record<string, unknown>) {
     if (!ticket) {
       throw new Error(`Ticket ${ticketKey} not found.`);
     }
+    const [project] = await db.select({ workspaceId: projects.workspaceId }).from(projects).where(eq(projects.id, ticket.projectId)).limit(1);
+    if (!project || project.workspaceId !== contextWorkspaceId) {
+      throw new Error('Unauthorized or workspace mismatch');
+    }
     const commentId = String(args.commentId ?? '');
     const body = String(args.body ?? '');
     if (!commentId || !body) throw new Error('commentId and body are required for update_comment.');
@@ -290,7 +332,7 @@ export async function executeTool(name: string, args: Record<string, unknown>) {
   throw new Error(`Unknown tool: ${name}`);
 }
 
-export async function handleMcpRequest(request: unknown, workspaceId?: string) {
+export async function handleMcpRequest(request: unknown, workspaceId: string, actorUserId: string) {
   const payload = request as {
     method?: string;
     params?: { name?: string; arguments?: Record<string, unknown> };
@@ -347,7 +389,7 @@ export async function handleMcpRequest(request: unknown, workspaceId?: string) {
         }
       }
 
-      const result = await executeTool(toolName, payload.params?.arguments ?? {});
+      const result = await executeTool(toolName, payload.params?.arguments ?? {}, workspaceId, actorUserId);
       return {
         jsonrpc: '2.0',
         id: payload.id ?? null,
@@ -381,8 +423,34 @@ export function createMcpRouter() {
   const router = Router();
 
   router.post('/mcp/sse', async (req, res) => {
-    const workspaceId = req.header('x-workspace-id') || req.header('X-Workspace-Id') || undefined;
-    const response = await handleMcpRequest(req.body, workspaceId);
+    const actorUserId = await resolveRequestActorUserId(req);
+    if (!actorUserId) {
+      res.status(401).json({ error: 'Authentication required.' });
+      return;
+    }
+    const workspaceId = req.header('x-workspace-id') || req.header('X-Workspace-Id');
+    if (!workspaceId) {
+      res.status(400).json({ error: 'X-Workspace-Id header is required.' });
+      return;
+    }
+
+    const membershipRows = await db
+      .select({ role: workspaceMembers.role })
+      .from(workspaceMembers)
+      .where(
+        and(
+          eq(workspaceMembers.workspaceId, workspaceId),
+          eq(workspaceMembers.userId, actorUserId)
+        )
+      )
+      .limit(1);
+
+    if (membershipRows.length === 0) {
+      res.status(403).json({ error: 'Unauthorized workspace access.' });
+      return;
+    }
+
+    const response = await handleMcpRequest(req.body, workspaceId, actorUserId);
     res.json(response);
   });
 
