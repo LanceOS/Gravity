@@ -82,6 +82,19 @@ export const mcpToolsList = [
     },
   },
   {
+    name: 'add_comment',
+    description: 'Create a new comment on an existing ticket.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ticketKey: { type: 'string' },
+        userId: { type: 'string' },
+        body: { type: 'string' },
+      },
+      required: ['ticketKey', 'userId', 'body'],
+    },
+  },
+  {
     name: 'create_comment',
     description: 'Create a new comment on an existing ticket.',
     inputSchema: {
