@@ -19,7 +19,7 @@
     --space-base-multiplier: 0.75;
     --table-row-height: 28px;
     --input-padding-y: 4px;
-    
+
     /* Performance snappy animations */
     --transition-fast: 100ms cubic-bezier(0.16, 1, 0.3, 1);
     --transition-normal: 200ms cubic-bezier(0.16, 1, 0.3, 1);
@@ -38,7 +38,7 @@
   --text: #1c1c1e;
   --text-heading: #000000;
   --text-muted: #8e8e93;
-  
+
   --accent: #000000;
   --accent-solid: #000000;
   --accent-solid-hover: #1c1c1e;
@@ -46,7 +46,7 @@
   --accent-glow: rgba(0, 0, 0, 0.05);
   --accent-border: #d1d1d6;
   --sidebar-hover-overlay: rgba(0, 0, 0, 0.04);
-  
+
   --priority-no: #8e8e93;
   --priority-low: #aeaeb2;
   --priority-medium: #636366;
@@ -57,7 +57,8 @@
   --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
   font-family: var(--sans);
-  font-size: 13px; /* Slightly more compact & professional */
+  font-size: 13px;
+  /* Slightly more compact & professional */
   line-height: 1.5;
   color: var(--text);
   background-color: var(--bg);
@@ -75,7 +76,7 @@
   --text: #e5e5ea;
   --text-heading: #ffffff;
   --text-muted: #8e8e93;
-  
+
   --accent: #ffffff;
   --accent-solid: #ffffff;
   --accent-solid-hover: #e5e5ea;
@@ -93,7 +94,8 @@
 
 body {
   margin: 0;
-  overflow: hidden; /* We handle scrolling inside components */
+  overflow: hidden;
+  /* We handle scrolling inside components */
   background: var(--bg);
   color: var(--text);
   font-family: var(--sans);
@@ -123,14 +125,17 @@ textarea {
   width: 6px;
   height: 6px;
 }
+
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
 ::-webkit-scrollbar-thumb {
   background: var(--border);
   border-radius: var(--radius-full);
   transition: background-color var(--transition-normal);
 }
+
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-muted);
 }
@@ -147,10 +152,10 @@ textarea {
   cursor: pointer;
   transition: all var(--transition-normal);
 }
+
 .clickable:not(button):not(.btn):hover,
 button.clickable:not(.btn):hover {
-  background-color: var(--card-hover);
-  transform: translateY(-1px);
+  background-color: var(--card-hover) !important;
 }
 
 .sidebar-menu-item:hover,
@@ -366,26 +371,50 @@ button.clickable:not(.btn):hover {
   border-color: var(--border-focus);
 }
 
-.priority-urgent { color: var(--priority-urgent) !important; }
-.priority-high { color: var(--priority-high) !important; }
-.priority-medium { color: var(--priority-medium) !important; }
-.priority-low { color: var(--priority-low) !important; }
-.priority-no { color: var(--priority-no) !important; }
+.priority-urgent {
+  color: var(--priority-urgent) !important;
+}
+
+.priority-high {
+  color: var(--priority-high) !important;
+}
+
+.priority-medium {
+  color: var(--priority-medium) !important;
+}
+
+.priority-low {
+  color: var(--priority-low) !important;
+}
+
+.priority-no {
+  color: var(--priority-no) !important;
+}
 
 /* Custom Form styles for WebMCP declarative agents */
 form.tool-form-active {
   outline: 2px dashed var(--accent);
   background-color: var(--accent-glow) !important;
 }
+
 button.tool-submit-active {
   outline: 2px dashed var(--priority-high);
   animation: pulse 2s infinite;
 }
 
 @keyframes pulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.03); opacity: 0.85; }
-  100% { transform: scale(1); }
+  0% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.03);
+    opacity: 0.85;
+  }
+
+  100% {
+    transform: scale(1);
+  }
 }
 
 /* Kanban Columns - Highly Refined Glass Columns */
@@ -399,6 +428,7 @@ button.tool-submit-active {
   border-right: 1px solid var(--border);
   height: 100%;
 }
+
 .board-column:last-child {
   border-right: none;
 }
@@ -443,13 +473,17 @@ button.tool-submit-active {
   margin-bottom: 8px;
   line-height: 1.6;
 }
-.markdown-content ul, .markdown-content ol {
+
+.markdown-content ul,
+.markdown-content ol {
   margin-left: 20px;
   margin-bottom: 12px;
 }
+
 .markdown-content li {
   margin-bottom: 4px;
 }
+
 .markdown-content code {
   font-family: var(--mono);
   background: var(--card-hover);

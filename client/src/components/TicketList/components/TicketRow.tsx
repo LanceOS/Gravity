@@ -13,7 +13,9 @@ function TicketRowImpl({ ticket, onClick, priorityIcon, assigneeAvatar, domainTa
         gap: '12px',
         padding: '10px 16px',
         background: 'var(--card-bg)',
-        transition: 'background 0.15s ease',
+        border: '1px solid var(--border)',
+        borderRadius: '6px',
+        transition: 'background 0.15s ease, border-color 0.15s ease',
         cursor: 'pointer',
       }}
     >

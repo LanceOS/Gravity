@@ -25,6 +25,12 @@ export const STATUS_FILTER_OPTIONS = [
 export const LIST_SORT_OPTIONS: Array<{ value: TicketListSort; label: string }> = [
   { value: 'created', label: 'Created Order' },
   { value: 'domain', label: 'Domain' },
+  { value: 'newest', label: 'Newest first' },
+  { value: 'oldest', label: 'Oldest first' },
+  { value: 'priority_desc', label: 'Priority: high to low' },
+  { value: 'priority_asc', label: 'Priority: low to high' },
+  { value: 'updated_desc', label: 'Updated recently' },
+  { value: 'updated_asc', label: 'Least recently updated' },
 ];
 
 export function getPriorityIcon(priority: Ticket['priority']): ReactNode {

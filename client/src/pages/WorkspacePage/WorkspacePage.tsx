@@ -106,10 +106,7 @@ export function WorkspacePage({
       search: '',
       priority: '',
       status: '',
-      projectId: '',
       domainId: '',
-      cycleId: '',
-      assigneeId: '',
     });
   };
 

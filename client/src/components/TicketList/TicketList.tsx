@@ -1,10 +1,11 @@
 import React from 'react';
 import type { Ticket } from '../../context/TicketContext';
+import { Button, Select, DenseTextInput } from '@library';
 import { Compass } from 'lucide-react';
 import { TicketRow } from './components';
 import { TicketFilterBar } from '../TicketFilterBar';
 import type { TicketListProps } from './types';
-import { getAssigneeAvatar, getDomainTag, getPriorityIcon, getStatusLabel } from './utils';
+import { getAssigneeAvatar, getDomainTag, getPriorityIcon, getStatusLabel, LIST_SORT_OPTIONS, PRIORITY_FILTER_OPTIONS, STATUS_FILTER_OPTIONS } from './utils';
 
 export const TicketList: React.FC<TicketListProps> = ({
   filters,
@@ -27,7 +28,7 @@ export const TicketList: React.FC<TicketListProps> = ({
 
       {/* Filtering Header Bar */}
       <TicketFilterBar
-        filters={filters}
+        filters={filters as any}
         onFilterChange={onFilterChange}
         hasActiveFilters={hasActiveFilters}
         onClearFilters={onClearFilters}
@@ -35,6 +36,7 @@ export const TicketList: React.FC<TicketListProps> = ({
         totalCount={totalCount}
         listSort={listSort}
         onListSortChange={onListSortChange}
+        domains={Object.values(domainById)}
       />
 
       {/* Main Rows Scrolling Container */}
@@ -67,7 +69,7 @@ export const TicketList: React.FC<TicketListProps> = ({
                 </div>
 
                 {/* Rows List */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', background: 'var(--border)', borderRadius: '6px', overflow: 'hidden' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {ticketsInGroup.map(ticket => (
                     <TicketRow
                       key={ticket.id}
