@@ -382,11 +382,24 @@ export function createAiRouter() {
           const data = await response.json() as any;
           const msg = data.choices?.[0]?.message;
           if (msg?.tool_calls) {
-            tool_calls = msg.tool_calls.map((tc: any) => ({
-              id: tc.id,
-              name: tc.function.name,
-              arguments: JSON.parse(tc.function.arguments),
-            }));
+            tool_calls = msg.tool_calls.map((tc: any) => {
+              const rawArguments = tc.function.arguments;
+              let parsedArguments = rawArguments;
+
+              if (typeof rawArguments === 'string' && rawArguments !== '') {
+                try {
+                  parsedArguments = JSON.parse(rawArguments);
+                } catch {
+                  parsedArguments = rawArguments;
+                }
+              }
+
+              return {
+                id: tc.id,
+                name: tc.function.name,
+                arguments: parsedArguments,
+              };
+            });
           }
           content = msg?.content || '';
         } else if (provider === 'anthropic') {
