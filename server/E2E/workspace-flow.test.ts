@@ -43,8 +43,21 @@ describe('Server Workspaces Flow E2E', () => {
     expect(resCreateWorkspace.body.workspace).toBeDefined();
     
     const workspaceId = resCreateWorkspace.body.workspace.id;
-    const defaultProjectId = resCreateWorkspace.body.workspace.defaultProjectId;
     expect(workspaceId).toBeDefined();
+
+    // 2b. POST /api/v1/projects to create a project manually
+    const resCreateProject = await request(app)
+      .post('/api/v1/projects')
+      .set('x-user-id', ownerId)
+      .send({
+        name: 'Remote Ops Core',
+        key: 'ROPS',
+        ownerId,
+        workspaceId,
+      });
+
+    expect(resCreateProject.status).toBe(201);
+    const defaultProjectId = resCreateProject.body.id;
     expect(defaultProjectId).toBeDefined();
 
     // 3. GET /api/v1/workspaces to verify owner workspace listing
@@ -373,5 +386,21 @@ describe('Server Workspaces Flow E2E', () => {
         (invite: any) => invite.id === secondInviteId && typeof invite.revoked_at === 'string'
       )
     ).toBe(true);
+
+    // 33. DELETE /api/v1/workspaces/:workspaceId to delete the workspace
+    const resDeleteWorkspace = await request(app)
+      .delete(`/api/v1/workspaces/${workspaceId}`)
+      .set('x-user-id', ownerId);
+
+    expect(resDeleteWorkspace.status).toBe(200);
+    expect(resDeleteWorkspace.body.success).toBe(true);
+
+    // 34. GET /api/v1/workspaces?userId=:ownerId to verify workspace is gone
+    const resFinalWorkspaces = await request(app)
+      .get(`/api/v1/workspaces?userId=${encodeURIComponent(ownerId)}`)
+      .set('x-user-id', ownerId);
+
+    expect(resFinalWorkspaces.status).toBe(200);
+    expect(resFinalWorkspaces.body.some((ws: any) => ws.id === workspaceId)).toBe(false);
   });
 });

@@ -217,7 +217,7 @@ function OverviewSection({
         <Divider />
 
         <div style={{ border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: 'var(--radius-md)', padding: 'var(--space-4)', background: 'rgba(239, 68, 68, 0.05)' }}>
-          <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: 'var(--priority-high)' }}>Danger Zone</h3>
+          <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: '#FFF' }}>Danger Zone</h3>
           <p style={{ margin: '4px 0 var(--space-4)', color: 'var(--text-muted)', fontSize: '12.5px', lineHeight: 1.5 }}>
             Deleting a workspace is permanent and cannot be undone. All projects, tickets, comments, and members within this workspace will be deleted.
           </p>
@@ -239,16 +239,11 @@ function OverviewSection({
                     onClearDeleteError();
                   }
                 }}
-                placeholder={workspace.name}
               />
             </div>
             <Button
               variant="danger"
-              disabled={
-                (deleteConfirmation.trim() !== workspace.name.trim() &&
-                 deleteConfirmation.trim() !== `"${workspace.name.trim()}"`) ||
-                deleteLoading
-              }
+              disabled={deleteConfirmation !== workspace.name || deleteLoading}
               loading={deleteLoading}
               onClick={() => onDeleteWorkspace && onDeleteWorkspace()}
             >
