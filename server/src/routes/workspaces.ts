@@ -423,9 +423,9 @@ export function createWorkspacesRouter() {
   router.post('/workspaces/:workspaceId/members/:userId/activity', async (req, res) => {
     try {
       const { workspaceId, userId } = req.params;
-      const actorUserId = resolveRequestActorUserId(req);
+      const actorUserId = await resolveRequestActorUserId(req);
 
-      if (!actorUserId) {
+      if (typeof actorUserId !== 'string' || actorUserId.length === 0) {
         res.status(401).json({ error: 'Authentication required.' });
         return;
       }
