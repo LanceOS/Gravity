@@ -130,19 +130,11 @@ function getFederationConnectionStatus(connection: FederationConnection) {
 function OverviewSection({
   workspace,
   settings,
-  deleteLoading,
-  deleteError,
   onChangeSettings,
-  onDeleteWorkspace,
-  onClearDeleteError,
 }: {
   workspace: WorkspaceSummary;
   settings: WorkspaceAdminSettings;
-  deleteLoading?: boolean;
-  deleteError?: string | null;
   onChangeSettings: (updates: Partial<WorkspaceAdminSettings>) => void;
-  onDeleteWorkspace?: () => Promise<void>;
-  onClearDeleteError?: () => void;
 }) {
   return (
     <Card style={{ padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)' }}>
