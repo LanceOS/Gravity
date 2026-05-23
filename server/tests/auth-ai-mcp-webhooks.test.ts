@@ -145,7 +145,7 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
     });
   });
   it('handles MCP initialization, tool listing, and tool execution', async () => {
-    const { owner, project } = await seedWorkspaceFixture();
+    const { owner, project, workspace } = await seedWorkspaceFixture();
     const existingTicket = await seedTicket(project.id, {
       id: 'ticket-mcp-1',
       key: `${project.key}-1`,
@@ -261,6 +261,25 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
 
     expect(addCommentResponse.status).toBe(200);
     expect(addCommentResponse.body.result.content[0].text).toContain('Comment created through MCP.');
+
+    const listMembersResponse = await api().post('/api/v1/mcp/sse').send({
+      jsonrpc: '2.0',
+      id: 8,
+      method: 'tools/call',
+      params: {
+        name: 'list_workspace_members',
+        arguments: { workspaceId: workspace.id },
+      },
+    });
+
+    expect(listMembersResponse.status).toBe(200);
+    const membersList = parseMcpResult(listMembersResponse) as Array<{ id: string; role: string; lastActiveAt: string | null }>;
+    expect(membersList).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: owner.id, role: expect.any(String) }),
+      ]),
+    );
+    expect(membersList[0]).toHaveProperty('lastActiveAt');
   });
 
   it('updates tickets from GitHub pull request webhooks', async () => {

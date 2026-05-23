@@ -131,10 +131,18 @@ async function executeTool(name: string, args: Record<string, unknown>) {
         avatarUrl: userProfiles.avatarUrl,
         role: workspaceMembers.role,
         createdAt: workspaceMembers.createdAt,
+        lastActiveAt: workspaceMemberActivity.lastActiveAt,
       })
       .from(workspaceMembers)
       .innerJoin(authUsers, eq(authUsers.id, workspaceMembers.userId))
       .leftJoin(userProfiles, eq(userProfiles.userId, workspaceMembers.userId))
+      .leftJoin(
+        workspaceMemberActivity,
+        and(
+          eq(workspaceMemberActivity.userId, workspaceMembers.userId),
+          eq(workspaceMemberActivity.workspaceId, workspaceMembers.workspaceId)
+        )
+      )
       .where(eq(workspaceMembers.workspaceId, workspaceId))
       .orderBy(asc(workspaceMembers.createdAt));
 
@@ -144,6 +152,7 @@ async function executeTool(name: string, args: Record<string, unknown>) {
       avatar: m.avatarUrl || m.image || '',
       role: m.role,
       createdAt: m.createdAt.toISOString(),
+      lastActiveAt: m.lastActiveAt?.toISOString() || null,
     }));
   }
 
