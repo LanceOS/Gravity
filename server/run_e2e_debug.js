@@ -28,7 +28,7 @@ async function run() {
       method: 'tools/call',
       params: {
         name: 'list_workspace_members',
-        arguments: {},
+        arguments: { workspaceId: project.workspaceId },
       },
     });
   console.log('List members response status:', listMembersResponse.status);
