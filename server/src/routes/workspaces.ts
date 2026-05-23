@@ -1088,23 +1088,38 @@ export function createWorkspacesRouter() {
       }
 
       await db.transaction(async (tx) => {
-        const workspaceProjects = await tx.select({ id: projects.id }).from(projects).where(eq(projects.workspaceId, workspaceId));
-        const projectIds = workspaceProjects.map((p) => p.id);
+        await tx.delete(comments).where(sql`${comments.ticketId} in (
+          select ${tickets.id}
+          from ${tickets}
+          inner join ${projects} on ${tickets.projectId} = ${projects.id}
+          where ${projects.workspaceId} = ${workspaceId}
+        )`);
 
-        if (projectIds.length > 0) {
-          const projectTickets = await tx.select({ id: tickets.id }).from(tickets).where(inArray(tickets.projectId, projectIds));
-          const ticketIds = projectTickets.map((t) => t.id);
+        await tx.delete(tickets).where(sql`${tickets.projectId} in (
+          select ${projects.id}
+          from ${projects}
+          where ${projects.workspaceId} = ${workspaceId}
+        )`);
 
-          if (ticketIds.length > 0) {
-            await tx.delete(comments).where(inArray(comments.ticketId, ticketIds));
-          }
+        await tx.delete(cycles).where(sql`${cycles.projectId} in (
+          select ${projects.id}
+          from ${projects}
+          where ${projects.workspaceId} = ${workspaceId}
+        )`);
 
-          await tx.delete(tickets).where(inArray(tickets.projectId, projectIds));
-          await tx.delete(cycles).where(inArray(cycles.projectId, projectIds));
-          await tx.delete(domains).where(inArray(domains.projectId, projectIds));
-          await tx.delete(projectMembers).where(inArray(projectMembers.projectId, projectIds));
-          await tx.delete(projects).where(inArray(projects.id, projectIds));
-        }
+        await tx.delete(domains).where(sql`${domains.projectId} in (
+          select ${projects.id}
+          from ${projects}
+          where ${projects.workspaceId} = ${workspaceId}
+        )`);
+
+        await tx.delete(projectMembers).where(sql`${projectMembers.projectId} in (
+          select ${projects.id}
+          from ${projects}
+          where ${projects.workspaceId} = ${workspaceId}
+        )`);
+
+        await tx.delete(projects).where(eq(projects.workspaceId, workspaceId));
 
         await tx.delete(syncOutbox).where(eq(syncOutbox.workspaceId, workspaceId));
         await tx.delete(workspacePeers).where(eq(workspacePeers.workspaceId, workspaceId));
