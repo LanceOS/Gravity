@@ -212,7 +212,7 @@ async function run() {
       hostUrl: 'http://localhost:5002',
       joinMode: 'approval_required',
       workspaceKey: 'ROPS-SECRET-2',
-    });
+    }, { 'X-User-Id': ownerId });
     assert(updateSettings.response.ok, 'Workspace settings update should succeed.');
     assert(updateSettings.data.workspaceKey === 'ROPS-SECRET-2', 'Workspace settings update should persist the new workspace key.');
 

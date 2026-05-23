@@ -1,8 +1,9 @@
 import { and, asc, eq } from 'drizzle-orm';
 import { Router } from 'express';
 import { db } from './db/index.js';
-import { authUsers, projects, userProfiles, workspaceMemberActivity, workspaceMembers } from './db/schema.js';
-import { addCommentRecord, createTicketRecord, getTicketByKey, getTicketDetailsByKey, listTickets, updateTicketRecord } from './services/tickets.js';
+import { authUsers, projects, userProfiles, workspaceMemberActivity, workspaceMembers, workspaceSettings } from './db/schema.js';
+import { resolveRequestActorUserId } from './lib/request-auth.js';
+import { addCommentRecord, createTicketRecord, deleteCommentRecord, getTicketByKey, getTicketDetailsByKey, listComments, listTickets, updateTicketRecord, updateCommentRecord } from './services/tickets.js';
 
 export const mcpToolsList = [
   {
@@ -82,7 +83,7 @@ export const mcpToolsList = [
   },
   {
     name: 'add_comment',
-    description: 'Post a comment on an existing ticket.',
+    description: 'Create a new comment on an existing ticket.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -93,14 +94,68 @@ export const mcpToolsList = [
       required: ['ticketKey', 'userId', 'body'],
     },
   },
+  {
+    name: 'create_comment',
+    description: 'Create a new comment on an existing ticket.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ticketKey: { type: 'string' },
+        userId: { type: 'string' },
+        body: { type: 'string' },
+      },
+      required: ['ticketKey', 'userId', 'body'],
+    },
+  },
+  {
+    name: 'read_comments',
+    description: 'Read all comment threads on a specific ticket.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ticketKey: { type: 'string' },
+      },
+      required: ['ticketKey'],
+    },
+  },
+  {
+    name: 'delete_comment',
+    description: 'Delete a specific comment on a ticket.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ticketKey: { type: 'string' },
+        commentId: { type: 'string' },
+      },
+      required: ['ticketKey', 'commentId'],
+    },
+  },
+  {
+    name: 'update_comment',
+    description: 'Update the text body of a specific comment on a ticket.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ticketKey: { type: 'string' },
+        commentId: { type: 'string' },
+        body: { type: 'string' },
+      },
+      required: ['ticketKey', 'commentId', 'body'],
+    },
+  },
 ];
 
-async function executeTool(name: string, args: Record<string, unknown>) {
+export async function executeTool(name: string, args: Record<string, unknown>, contextWorkspaceId: string, actorUserId: string) {
   if (name === 'list_tickets') {
     const explicitProjectId = typeof args.projectId === 'string' ? args.projectId : undefined;
-    const projectIds = explicitProjectId
-      ? [explicitProjectId]
-      : (await db.select({ id: projects.id }).from(projects)).map((project) => project.id);
+    const validProjects = await db.select({ id: projects.id }).from(projects).where(eq(projects.workspaceId, contextWorkspaceId));
+    const validProjectIds = validProjects.map((p) => p.id);
+    
+    if (explicitProjectId && !validProjectIds.includes(explicitProjectId)) {
+      throw new Error('Unauthorized or workspace mismatch');
+    }
+    
+    const projectIds = explicitProjectId ? [explicitProjectId] : validProjectIds;
 
     const ticketsByProject = await Promise.all(
       projectIds.map((projectId) =>
@@ -122,6 +177,9 @@ async function executeTool(name: string, args: Record<string, unknown>) {
     if (!workspaceId) {
       throw new Error('workspaceId is required.');
     }
+    if (workspaceId !== contextWorkspaceId) {
+      throw new Error('Unauthorized or workspace mismatch');
+    }
 
     const members = await db
       .select({
@@ -131,10 +189,18 @@ async function executeTool(name: string, args: Record<string, unknown>) {
         avatarUrl: userProfiles.avatarUrl,
         role: workspaceMembers.role,
         createdAt: workspaceMembers.createdAt,
+        lastActiveAt: workspaceMemberActivity.lastActiveAt,
       })
       .from(workspaceMembers)
       .innerJoin(authUsers, eq(authUsers.id, workspaceMembers.userId))
       .leftJoin(userProfiles, eq(userProfiles.userId, workspaceMembers.userId))
+      .leftJoin(
+        workspaceMemberActivity,
+        and(
+          eq(workspaceMemberActivity.userId, workspaceMembers.userId),
+          eq(workspaceMemberActivity.workspaceId, workspaceMembers.workspaceId)
+        )
+      )
       .where(eq(workspaceMembers.workspaceId, workspaceId))
       .orderBy(asc(workspaceMembers.createdAt));
 
@@ -144,11 +210,20 @@ async function executeTool(name: string, args: Record<string, unknown>) {
       avatar: m.avatarUrl || m.image || '',
       role: m.role,
       createdAt: m.createdAt.toISOString(),
+      lastActiveAt: m.lastActiveAt?.toISOString() || null,
     }));
   }
 
   if (name === 'get_ticket_details') {
-    const ticketKey = String(args.ticketKey ?? '');
+    const ticketKey = String(args.ticketKey ?? '').toUpperCase();
+    const ticket = await getTicketByKey(ticketKey);
+    if (!ticket) {
+      throw new Error(`Ticket ${ticketKey} not found.`);
+    }
+    const [project] = await db.select({ workspaceId: projects.workspaceId }).from(projects).where(eq(projects.id, ticket.projectId)).limit(1);
+    if (!project || project.workspaceId !== contextWorkspaceId) {
+      throw new Error('Unauthorized or workspace mismatch');
+    }
     const details = await getTicketDetailsByKey(ticketKey);
     if (!details) {
       throw new Error(`Ticket ${ticketKey} not found.`);
@@ -157,12 +232,17 @@ async function executeTool(name: string, args: Record<string, unknown>) {
   }
 
   if (name === 'create_ticket') {
+    const projectId = String(args.projectId ?? '');
+    const [project] = await db.select({ workspaceId: projects.workspaceId }).from(projects).where(eq(projects.id, projectId)).limit(1);
+    if (!project || project.workspaceId !== contextWorkspaceId) {
+      throw new Error('Unauthorized or workspace mismatch');
+    }
     const ticket = await createTicketRecord({
       title: String(args.title ?? ''),
       description: typeof args.description === 'string' ? args.description : '',
       status: typeof args.status === 'string' ? args.status : 'todo',
       priority: typeof args.priority === 'string' ? args.priority : 'no_priority',
-      projectId: String(args.projectId ?? ''),
+      projectId,
       domainId: typeof args.domainId === 'string' ? args.domainId : null,
       cycleId: typeof args.cycleId === 'string' ? args.cycleId : null,
       assigneeId: typeof args.assigneeId === 'string' ? args.assigneeId : null,
@@ -176,6 +256,10 @@ async function executeTool(name: string, args: Record<string, unknown>) {
     const ticket = await getTicketByKey(ticketKey);
     if (!ticket) {
       throw new Error(`Ticket ${ticketKey} not found.`);
+    }
+    const [project] = await db.select({ workspaceId: projects.workspaceId }).from(projects).where(eq(projects.id, ticket.projectId)).limit(1);
+    if (!project || project.workspaceId !== contextWorkspaceId) {
+      throw new Error('Unauthorized or workspace mismatch');
     }
 
     const updated = await updateTicketRecord(ticket.id, {
@@ -194,21 +278,75 @@ async function executeTool(name: string, args: Record<string, unknown>) {
     return { ticket: updated };
   }
 
-  if (name === 'add_comment') {
+  if (name === 'create_comment') {
     const ticketKey = String(args.ticketKey ?? '').toUpperCase();
     const ticket = await getTicketByKey(ticketKey);
     if (!ticket) {
       throw new Error(`Ticket ${ticketKey} not found.`);
     }
+    const [project] = await db.select({ workspaceId: projects.workspaceId }).from(projects).where(eq(projects.id, ticket.projectId)).limit(1);
+    if (!project || project.workspaceId !== contextWorkspaceId) {
+      throw new Error('Unauthorized or workspace mismatch');
+    }
+    const userId = actorUserId; // Enforce actor user id
+    const body = String(args.body ?? '');
+    if (!userId) throw new Error('Authenticated user is required for create_comment.');
+    if (!body) throw new Error('body is required for create_comment.');
+    const comment = await addCommentRecord(ticket.id, userId, body);
+    return { comment };
+  }
 
-    const comment = await addCommentRecord(ticket.id, String(args.userId ?? ''), String(args.body ?? ''));
+  if (name === 'read_comments') {
+    const ticketKey = String(args.ticketKey ?? '').toUpperCase();
+    const ticket = await getTicketByKey(ticketKey);
+    if (!ticket) {
+      throw new Error(`Ticket ${ticketKey} not found.`);
+    }
+    const [project] = await db.select({ workspaceId: projects.workspaceId }).from(projects).where(eq(projects.id, ticket.projectId)).limit(1);
+    if (!project || project.workspaceId !== contextWorkspaceId) {
+      throw new Error('Unauthorized or workspace mismatch');
+    }
+    const comments = await listComments(ticket.id);
+    return { comments };
+  }
+
+  if (name === 'delete_comment') {
+    const ticketKey = String(args.ticketKey ?? '').toUpperCase();
+    const ticket = await getTicketByKey(ticketKey);
+    if (!ticket) {
+      throw new Error(`Ticket ${ticketKey} not found.`);
+    }
+    const [project] = await db.select({ workspaceId: projects.workspaceId }).from(projects).where(eq(projects.id, ticket.projectId)).limit(1);
+    if (!project || project.workspaceId !== contextWorkspaceId) {
+      throw new Error('Unauthorized or workspace mismatch');
+    }
+    const commentId = String(args.commentId ?? '');
+    if (!commentId) throw new Error('commentId is required for delete_comment.');
+    const success = await deleteCommentRecord(commentId, ticket.id);
+    return { success };
+  }
+
+  if (name === 'update_comment') {
+    const ticketKey = String(args.ticketKey ?? '').toUpperCase();
+    const ticket = await getTicketByKey(ticketKey);
+    if (!ticket) {
+      throw new Error(`Ticket ${ticketKey} not found.`);
+    }
+    const [project] = await db.select({ workspaceId: projects.workspaceId }).from(projects).where(eq(projects.id, ticket.projectId)).limit(1);
+    if (!project || project.workspaceId !== contextWorkspaceId) {
+      throw new Error('Unauthorized or workspace mismatch');
+    }
+    const commentId = String(args.commentId ?? '');
+    const body = String(args.body ?? '');
+    if (!commentId || !body) throw new Error('commentId and body are required for update_comment.');
+    const comment = await updateCommentRecord(commentId, ticket.id, body);
     return { comment };
   }
 
   throw new Error(`Unknown tool: ${name}`);
 }
 
-export async function handleMcpRequest(request: unknown) {
+export async function handleMcpRequest(request: unknown, workspaceId = '', actorUserId = '') {
   const payload = request as {
     method?: string;
     params?: { name?: string; arguments?: Record<string, unknown> };
@@ -228,16 +366,44 @@ export async function handleMcpRequest(request: unknown) {
   }
 
   if (payload.method === 'tools/list') {
+    let activeTools = mcpToolsList;
+    if (workspaceId) {
+      const [settings] = await db
+        .select({ disabledMcpTools: workspaceSettings.disabledMcpTools })
+        .from(workspaceSettings)
+        .where(eq(workspaceSettings.workspaceId, workspaceId))
+        .limit(1);
+      if (settings && Array.isArray(settings.disabledMcpTools)) {
+        const disabled = settings.disabledMcpTools as string[];
+        activeTools = mcpToolsList.filter((tool) => !disabled.includes(tool.name));
+      }
+    }
+
     return {
       jsonrpc: '2.0',
       id: payload.id ?? null,
-      result: { tools: mcpToolsList },
+      result: { tools: activeTools },
     };
   }
 
   if (payload.method === 'tools/call') {
     try {
-      const result = await executeTool(payload.params?.name ?? '', payload.params?.arguments ?? {});
+      const toolName = payload.params?.name ?? '';
+      if (workspaceId) {
+        const [settings] = await db
+          .select({ disabledMcpTools: workspaceSettings.disabledMcpTools })
+          .from(workspaceSettings)
+          .where(eq(workspaceSettings.workspaceId, workspaceId))
+          .limit(1);
+        if (settings && Array.isArray(settings.disabledMcpTools)) {
+          const disabled = settings.disabledMcpTools as string[];
+          if (disabled.includes(toolName)) {
+            throw new Error(`MCP tool "${toolName}" is disabled in this workspace.`);
+          }
+        }
+      }
+
+      const result = await executeTool(toolName, payload.params?.arguments ?? {}, workspaceId, actorUserId);
       return {
         jsonrpc: '2.0',
         id: payload.id ?? null,
@@ -271,7 +437,39 @@ export function createMcpRouter() {
   const router = Router();
 
   router.post('/mcp/sse', async (req, res) => {
-    const response = await handleMcpRequest(req.body);
+    const actorUserId = await resolveRequestActorUserId(req);
+    if (!actorUserId) {
+      res.status(401).json({ error: 'Authentication required.' });
+      return;
+    }
+    const headerWorkspaceId = req.header('x-workspace-id') || req.header('X-Workspace-Id');
+    const bodyWorkspaceId =
+      typeof req.body?.params?.workspaceId === 'string' && req.body.params.workspaceId.trim().length > 0
+        ? req.body.params.workspaceId.trim()
+        : undefined;
+    const workspaceId = headerWorkspaceId || bodyWorkspaceId;
+    if (!workspaceId) {
+      res.status(400).json({ error: 'X-Workspace-Id header or params.workspaceId is required.' });
+      return;
+    }
+
+    const membershipRows = await db
+      .select({ role: workspaceMembers.role })
+      .from(workspaceMembers)
+      .where(
+        and(
+          eq(workspaceMembers.workspaceId, workspaceId),
+          eq(workspaceMembers.userId, actorUserId)
+        )
+      )
+      .limit(1);
+
+    if (membershipRows.length === 0) {
+      res.status(403).json({ error: 'Unauthorized workspace access.' });
+      return;
+    }
+
+    const response = await handleMcpRequest(req.body, workspaceId, actorUserId);
     res.json(response);
   });
 

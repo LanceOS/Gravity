@@ -13,7 +13,7 @@ const CLOUD_MODELS: Record<string, string[]> = {
   deepseek: ['deepseek-chat'],
 };
 
-export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllamaUrl, initialModel, settings }) => {
+export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllamaUrl, initialModel, settings, workspaceId }) => {
   const { activeTicket, projects, users } = useTickets();
 
   const isThirdParty = settings.agentIntegration === 'third_party';
@@ -41,6 +41,28 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
   const [isCheckingModel, setIsCheckingModel] = useState(false);
   const [modelStatus, setModelStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
   const [detectedModels, setDetectedModels] = useState<string[]>([]);
+
+  // MCP Tools
+  const [mcpTools, setMcpTools] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!workspaceId) {
+      return;
+    }
+
+    fetch('/api/v1/mcp/sse', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Workspace-Id': workspaceId
+      },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' })
+    }).then(res => res.json()).then(data => {
+      if (data.result?.tools) {
+        setMcpTools(data.result.tools);
+      }
+    }).catch(console.error);
+  }, [workspaceId]);
 
   // Chat state
   const [messages, setMessages] = useState<Message[]>(getInitialMessages);
@@ -120,20 +142,26 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
     }
   }, [isThirdParty, settings.aiProvider, initialModel]);
 
-  const handleSendMessage = async (customText?: string) => {
+  const handleSendMessage = async (customText?: string, autoRunMessages?: Message[]) => {
     const textToSend = customText || chatInput;
-    if (!textToSend.trim() || isGenerating) return;
+    if (!autoRunMessages && (!textToSend.trim() || isGenerating)) return;
 
-    const newMessages: Message[] = [...messages, { role: 'user', content: textToSend }];
+    const newMessages: Message[] = autoRunMessages || [...messages, { role: 'user', content: textToSend }];
     setMessages(newMessages);
     setChatInput('');
-    setIsGenerating(true);
+    if (!autoRunMessages) setIsGenerating(true);
 
     try {
       const payload: Record<string, any> = {
         model,
-        messages: newMessages.map(m => ({ role: m.role, content: m.content })),
+        messages: newMessages.map(m => ({ 
+          role: m.role, 
+          content: m.content,
+          ...(m.tool_calls ? { tool_calls: m.tool_calls } : {}),
+          ...(m.tool_call_id ? { tool_call_id: m.tool_call_id, name: m.name } : {})
+        })),
         provider: isThirdParty ? settings.aiProvider : 'ollama',
+        ...(mcpTools.length > 0 ? { tools: mcpTools } : {})
       };
 
       if (isThirdParty) {
@@ -156,9 +184,62 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
       }
 
       const data = await response.json();
-      const aiResponse = data.message?.content || `Sorry, I got an empty response from ${providerLabel}.`;
+      const aiResponse = data.message?.content || '';
+      const toolCalls = data.message?.tool_calls;
 
-      setMessages([...newMessages, { role: 'assistant', content: aiResponse }]);
+      const assistantMessage: Message = { 
+        role: 'assistant', 
+        content: aiResponse,
+        ...(toolCalls ? { tool_calls: toolCalls } : {})
+      };
+      
+      const nextMessages = [...newMessages, assistantMessage];
+      setMessages(nextMessages);
+
+      if (toolCalls && toolCalls.length > 0) {
+        // Execute tools
+        const toolMessages: Message[] = [];
+        for (const tc of toolCalls) {
+          try {
+            const toolResponse = await fetch('/api/v1/mcp/sse', {
+              method: 'POST',
+              headers: { 
+                'Content-Type': 'application/json',
+                ...(workspaceId ? { 'X-Workspace-Id': workspaceId } : {})
+              },
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                id: Date.now(),
+                method: 'tools/call',
+                params: {
+                  name: tc.name,
+                  arguments: typeof tc.arguments === 'string' ? JSON.parse(tc.arguments) : tc.arguments
+                }
+              })
+            });
+            const toolData = await toolResponse.json();
+            const toolResult = toolData.result?.content?.[0]?.text || JSON.stringify(toolData);
+            toolMessages.push({
+              role: 'tool',
+              tool_call_id: tc.id,
+              name: tc.name,
+              content: toolResult
+            });
+          } catch (e: any) {
+            toolMessages.push({
+              role: 'tool',
+              tool_call_id: tc.id,
+              name: tc.name,
+              content: `Error: ${e.message}`
+            });
+          }
+        }
+        
+        // Auto-continue chat with tool results
+        await handleSendMessage('', [...nextMessages, ...toolMessages]);
+      } else if (!aiResponse) {
+        setMessages([...newMessages, { role: 'system', content: `Sorry, I got an empty response from ${providerLabel}.` }]);
+      }
     } catch (error) {
       const providerLabel = isThirdParty ? getProviderName(settings.aiProvider) : 'Ollama';
       const message = error instanceof Error ? error.message : `Unknown ${providerLabel} error.`;
@@ -170,7 +251,9 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
 
       setMessages([...newMessages, { role: 'system', content: errorContent }]);
     } finally {
-      setIsGenerating(false);
+      if (!autoRunMessages) {
+        setIsGenerating(false);
+      }
     }
   };
 
@@ -342,16 +425,28 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
               flexDirection: 'column',
               alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
               maxWidth: '85%',
-              background: m.role === 'user' ? 'var(--border)' : m.role === 'system' ? 'rgba(239, 68, 68, 0.05)' : 'var(--card-bg)',
-              border: `1px solid ${m.role === 'user' ? 'var(--border-focus)' : m.role === 'system' ? '#ef444430' : 'var(--border)'}`,
+              background: m.role === 'user' ? 'var(--border)' : m.role === 'system' ? 'rgba(239, 68, 68, 0.05)' : m.role === 'tool' ? 'var(--sidebar-bg)' : 'var(--card-bg)',
+              border: `1px solid ${m.role === 'user' ? 'var(--border-focus)' : m.role === 'system' ? '#ef444430' : m.role === 'tool' ? 'var(--border)' : 'var(--border)'}`,
               borderRadius: '8px',
               padding: '10px 12px',
               fontSize: '12px',
               lineHeight: '1.5',
-              color: m.role === 'user' ? 'var(--text-heading)' : 'var(--text)'
+              color: m.role === 'user' ? 'var(--text-heading)' : 'var(--text)',
+              opacity: m.role === 'tool' ? 0.7 : 1
             }}
           >
-            <FormattedMarkdown text={m.content} />
+            {m.role === 'tool' && (
+              <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Cpu size={10} /> Tool Execution: {m.name}
+              </div>
+            )}
+            {m.content && <FormattedMarkdown text={m.content} />}
+            {m.tool_calls && m.tool_calls.map((tc, tcIdx) => (
+              <div key={tcIdx} style={{ marginTop: m.content ? '8px' : '0', padding: '6px', background: 'var(--sidebar-bg)', borderRadius: '4px', fontSize: '10px', color: 'var(--text-muted)', border: '1px dashed var(--border)' }}>
+                <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}><Sparkles size={10} /> Calling tool: {tc.name}</div>
+                <div style={{ fontFamily: 'var(--mono)', marginTop: '4px', opacity: 0.8 }}>{typeof tc.arguments === 'string' ? tc.arguments : JSON.stringify(tc.arguments, null, 2)}</div>
+              </div>
+            ))}
           </div>
         ))}
 

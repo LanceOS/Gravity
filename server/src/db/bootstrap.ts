@@ -77,6 +77,7 @@ export async function initializeDatabase() {
       workspace_id TEXT PRIMARY KEY,
       host_url TEXT NOT NULL DEFAULT '',
       join_mode TEXT NOT NULL DEFAULT 'approval_required',
+      disabled_mcp_tools JSONB NOT NULL DEFAULT '[]'::jsonb,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
@@ -288,6 +289,7 @@ export async function initializeDatabase() {
     UPDATE peer_connections SET workspace_id = '' WHERE workspace_id IS NULL;
     ALTER TABLE peer_connections ALTER COLUMN workspace_id SET NOT NULL;
     ALTER TABLE peer_connections ADD COLUMN IF NOT EXISTS host_display_name TEXT NOT NULL DEFAULT '';
+    ALTER TABLE workspace_settings ADD COLUMN IF NOT EXISTS disabled_mcp_tools JSONB NOT NULL DEFAULT '[]'::jsonb;
 
     CREATE INDEX IF NOT EXISTS validations_email_code_url_idx ON validations (email, validation_code, invite_url);
     CREATE INDEX IF NOT EXISTS workspace_members_user_id_idx ON workspace_members (user_id);

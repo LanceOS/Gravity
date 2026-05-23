@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SettingsPage } from '../../pages/SettingsPage/SettingsPage.tsx';
@@ -247,6 +247,78 @@ describe('SettingsPage', () => {
     expect(screen.getByText('Robin Quinn')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Approve' }));
     expect(props.onApproveJoinRequest).toHaveBeenCalledWith('request-1');
+  });
+
+  it('handles MCP Tools disablement switches for owners', async () => {
+    const user = userEvent.setup();
+
+    // Test: Owner user
+    const { props } = renderSettingsPage({
+      workspace: { ...workspace, memberRole: 'owner' },
+      settings: {
+        workspaceId: workspace.id,
+        key: workspace.key,
+        hostUrl: 'http://localhost:8080',
+        joinMode: 'approval_required' as const,
+        workspaceKey: 'PRIVATE',
+        disabledMcpTools: ['list_tickets'],
+      },
+    });
+
+    await user.click(screen.getByRole('button', { name: /MCP Tools/i }));
+    expect(screen.getByText('MCP Agent Tools')).toBeInTheDocument();
+    
+    // Switch for list_tickets (should be disabled/unchecked as it is in disabledMcpTools)
+    const listTicketsRow = screen.getByTestId('mcp-tool-row-list_tickets');
+    const listTicketsSwitch = within(listTicketsRow).getByRole('switch');
+    expect(listTicketsSwitch).toBeInTheDocument();
+    expect(listTicketsSwitch).toHaveAttribute('aria-checked', 'false');
+
+    // Switch for create_ticket (should be enabled/checked as it is not in disabledMcpTools)
+    const createTicketRow = screen.getByTestId('mcp-tool-row-create_ticket');
+    const createTicketSwitch = within(createTicketRow).getByRole('switch');
+    expect(createTicketSwitch).toBeInTheDocument();
+    expect(createTicketSwitch).toHaveAttribute('aria-checked', 'true');
+
+    // Toggle create_ticket (disabling it: adding to disabledMcpTools)
+    await user.click(createTicketSwitch);
+    expect(props.onChangeSettings).toHaveBeenCalledWith({
+      disabledMcpTools: ['list_tickets', 'create_ticket'],
+    });
+
+    // Toggle list_tickets (enabling it: removing from disabledMcpTools)
+    await user.click(listTicketsSwitch);
+    expect(props.onChangeSettings).toHaveBeenCalledWith({
+      disabledMcpTools: [],
+    });
+  });
+
+  it('blocks non-owners from toggling MCP Tools', async () => {
+    const user = userEvent.setup();
+
+    // Test: Non-owner user (read-only view)
+    renderSettingsPage({
+      workspace: { ...workspace, memberRole: 'member' },
+      settings: {
+        workspaceId: workspace.id,
+        key: workspace.key,
+        hostUrl: 'http://localhost:8080',
+        joinMode: 'approval_required' as const,
+        workspaceKey: 'PRIVATE',
+        disabledMcpTools: ['list_tickets'],
+      },
+    });
+
+    // Navigate to the MCP Tools category tab first!
+    await user.click(screen.getByRole('button', { name: /MCP Tools/i }));
+
+    // Alert showing only owners can modify should be visible
+    expect(screen.getByText('Only workspace owners can enable or disable MCP agent tools.')).toBeInTheDocument();
+
+    // Switches should be disabled
+    const readOnlyRow = screen.getAllByTestId(/mcp-tool-row-/)[0];
+    const readOnlySwitch = within(readOnlyRow).getByRole('switch');
+    expect(readOnlySwitch).toBeDisabled();
   });
 });
 

@@ -6,11 +6,19 @@ export interface LocalAIChatProps {
   initialOllamaUrl: string;
   initialModel: string;
   settings: WorkspaceSettings;
+  workspaceId?: string;
 }
 
 export interface Message {
-  role: 'user' | 'assistant' | 'system';
+  role: 'user' | 'assistant' | 'system' | 'tool';
   content: string;
+  tool_calls?: Array<{
+    id: string;
+    name: string;
+    arguments: Record<string, unknown> | string;
+  }>;
+  tool_call_id?: string;
+  name?: string;
 }
 
 export type QuickActionType = 'analyze' | 'subtasks' | 'release';
