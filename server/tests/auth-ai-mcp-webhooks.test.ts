@@ -11,7 +11,7 @@ import {
 
 function parseMcpResult(response: { body: { result?: { content?: Array<{ text?: string }> } } }) {
   const text = response.body.result?.content?.[0]?.text;
-  return JSON.parse(text ?? '{}') as Record<string, unknown>;
+  return JSON.parse(text ?? '{}') as unknown;
 }
 
 describe('auth, AI, MCP, webhooks, and realtime routes', () => {
@@ -250,8 +250,9 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
       id: 7,
       method: 'tools/call',
       params: {
-        name: 'add_comment',
+        name: 'manage_comments',
         arguments: {
+          action: 'create',
           ticketKey: existingTicket.key,
           userId: owner.id,
           body: 'Comment created through MCP.',
@@ -261,6 +262,40 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
 
     expect(addCommentResponse.status).toBe(200);
     expect(addCommentResponse.body.result.content[0].text).toContain('Comment created through MCP.');
+    const commentData = parseMcpResult(addCommentResponse) as { comment: { id: string } };
+
+    const readCommentsResponse = await api().post('/api/v1/mcp/sse').send({
+      jsonrpc: '2.0',
+      id: 71,
+      method: 'tools/call',
+      params: {
+        name: 'manage_comments',
+        arguments: {
+          action: 'read',
+          ticketKey: existingTicket.key,
+        },
+      },
+    });
+
+    expect(readCommentsResponse.status).toBe(200);
+    expect(readCommentsResponse.body.result.content[0].text).toContain('Comment created through MCP.');
+
+    const removeCommentResponse = await api().post('/api/v1/mcp/sse').send({
+      jsonrpc: '2.0',
+      id: 72,
+      method: 'tools/call',
+      params: {
+        name: 'manage_comments',
+        arguments: {
+          action: 'remove',
+          ticketKey: existingTicket.key,
+          commentId: commentData.comment.id,
+        },
+      },
+    });
+
+    expect(removeCommentResponse.status).toBe(200);
+    expect(removeCommentResponse.body.result.content[0].text).toContain('"success": true');
 
     const listMembersResponse = await api().post('/api/v1/mcp/sse').send({
       jsonrpc: '2.0',

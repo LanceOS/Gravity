@@ -2,7 +2,7 @@ import { and, asc, eq } from 'drizzle-orm';
 import { Router } from 'express';
 import { db } from './db/index.js';
 import { authUsers, projects, userProfiles, workspaceMemberActivity, workspaceMembers } from './db/schema.js';
-import { addCommentRecord, createTicketRecord, getTicketByKey, getTicketDetailsByKey, listTickets, updateTicketRecord } from './services/tickets.js';
+import { addCommentRecord, createTicketRecord, deleteCommentRecord, getTicketByKey, getTicketDetailsByKey, listComments, listTickets, updateTicketRecord } from './services/tickets.js';
 
 export const mcpToolsList = [
   {
@@ -81,16 +81,18 @@ export const mcpToolsList = [
     },
   },
   {
-    name: 'add_comment',
-    description: 'Post a comment on an existing ticket.',
+    name: 'manage_comments',
+    description: 'Manage comments on an existing ticket. Actions include create, read, and remove.',
     inputSchema: {
       type: 'object',
       properties: {
+        action: { type: 'string', enum: ['create', 'read', 'remove'] },
         ticketKey: { type: 'string' },
+        commentId: { type: 'string' },
         userId: { type: 'string' },
         body: { type: 'string' },
       },
-      required: ['ticketKey', 'userId', 'body'],
+      required: ['action', 'ticketKey'],
     },
   },
 ];
@@ -203,15 +205,35 @@ async function executeTool(name: string, args: Record<string, unknown>) {
     return { ticket: updated };
   }
 
-  if (name === 'add_comment') {
+  if (name === 'manage_comments') {
+    const action = String(args.action ?? '');
     const ticketKey = String(args.ticketKey ?? '').toUpperCase();
     const ticket = await getTicketByKey(ticketKey);
     if (!ticket) {
       throw new Error(`Ticket ${ticketKey} not found.`);
     }
 
-    const comment = await addCommentRecord(ticket.id, String(args.userId ?? ''), String(args.body ?? ''));
-    return { comment };
+    if (action === 'create') {
+      const userId = String(args.userId ?? '');
+      const body = String(args.body ?? '');
+      if (!userId || !body) throw new Error('userId and body are required for create action.');
+      const comment = await addCommentRecord(ticket.id, userId, body);
+      return { comment };
+    }
+
+    if (action === 'read') {
+      const comments = await listComments(ticket.id);
+      return { comments };
+    }
+
+    if (action === 'remove') {
+      const commentId = String(args.commentId ?? '');
+      if (!commentId) throw new Error('commentId is required for remove action.');
+      const success = await deleteCommentRecord(commentId, ticket.id);
+      return { success };
+    }
+
+    throw new Error(`Unknown action for manage_comments: ${action}`);
   }
 
   throw new Error(`Unknown tool: ${name}`);
