@@ -1,7 +1,7 @@
 import type { DragEvent } from 'react';
 import type { Ticket } from '../../context/TicketContext';
 import { BOARD_COLUMNS } from '../../utils/ticketView';
-import { Button, Select, DenseTextInput, KanbanBoard, Flex } from '@library';
+import { Button, KanbanBoard, Flex } from '@library';
 import { Plus } from 'lucide-react';
 import { TicketCard } from './components';
 import { TicketFilterBar } from '../TicketFilterBar';
