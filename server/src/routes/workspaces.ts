@@ -350,9 +350,23 @@ export function createWorkspacesRouter() {
     try {
       const workspaceId = req.params.workspaceId;
       const actorUserId = await resolveRequestActorUserId(req);
-      if (actorUserId) {
-        await recordWorkspaceActivity(workspaceId, actorUserId);
+      if (!actorUserId) {
+        res.status(401).json({ error: 'Authentication required.' });
+        return;
       }
+
+      const membershipRows = await db
+        .select({ userId: workspaceMembers.userId })
+        .from(workspaceMembers)
+        .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, actorUserId)))
+        .limit(1);
+
+      if (!membershipRows[0]) {
+        res.status(403).json({ error: 'Workspace membership required.' });
+        return;
+      }
+
+      await recordWorkspaceActivity(workspaceId, actorUserId);
 
       const members = await db
         .select({
