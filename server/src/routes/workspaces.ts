@@ -233,7 +233,21 @@ export function createWorkspacesRouter() {
       const workspace = await getWorkspaceSummary(workspaceId, effectiveOwnerId);
       res.status(201).json({ workspace });
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create workspace.' });
+      const mappedProjectCreationError = mapProjectCreationError(error);
+      if (mappedProjectCreationError) {
+        if (mappedProjectCreationError.type === 'key_conflict' && typeof defaultProjectKey === 'string') {
+          const normalizedDefaultProjectKey = normalizeEntityKey(defaultProjectKey);
+          if (normalizedDefaultProjectKey && (await projectKeyExists(normalizedDefaultProjectKey))) {
+            res.status(409).json({ error: buildProjectKeyConflictMessage(normalizedDefaultProjectKey) });
+            return;
+          }
+        }
+
+        res.status(mappedProjectCreationError.status).json({ error: mappedProjectCreationError.message });
+        return;
+      }
+
+      res.status(500).json({ error: 'Failed to create workspace.' });
     }
   });
 
