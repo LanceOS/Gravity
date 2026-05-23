@@ -277,10 +277,23 @@ export function createWorkspacesRouter() {
         return;
       }
 
-      // Record activity if active user resolved
+      // Record activity only for authenticated workspace members
       const actorUserId = await resolveRequestActorUserId(req);
       if (actorUserId) {
-        await recordWorkspaceActivity(workspaceId, actorUserId);
+        const [membership] = await db
+          .select({ userId: workspaceMembers.userId })
+          .from(workspaceMembers)
+          .where(
+            and(
+              eq(workspaceMembers.workspaceId, workspaceId),
+              eq(workspaceMembers.userId, actorUserId),
+            ),
+          )
+          .limit(1);
+
+        if (membership) {
+          await recordWorkspaceActivity(workspaceId, actorUserId);
+        }
       }
 
       res.json(settings);
