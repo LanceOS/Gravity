@@ -4,13 +4,21 @@ import { Router } from 'express';
 import { db } from '../db/index.js';
 import {
   authUsers,
+  comments,
+  cycles,
+  domains,
+  federationInvites,
+  peerConnections,
   projectMembers,
   projects,
+  syncOutbox,
+  tickets,
   userProfiles,
   validations,
   workspaceInvites,
   workspaceJoinRequests,
   workspaceMembers,
+  workspacePeers,
   workspaces,
   workspaceSettings,
 } from '../db/schema.js';
@@ -144,15 +152,8 @@ export function createWorkspacesRouter() {
     try {
       const effectiveOwnerId = actorUserId;
       const workspaceId = createId('w');
-      const projectId = createId('p');
       const normalizedWorkspaceKey = normalizeEntityKey(key);
       const resolvedWorkspaceAccessKey = workspaceKey?.trim() || createWorkspaceAccessKey(normalizedWorkspaceKey);
-      const resolvedProjectKey = normalizeEntityKey(defaultProjectKey || key);
-
-      if (await projectKeyExists(resolvedProjectKey)) {
-        res.status(409).json({ error: buildProjectKeyConflictMessage(resolvedProjectKey) });
-        return;
-      }
 
       await db.transaction(async (tx) => {
         await tx.insert(workspaces).values({
@@ -180,32 +181,12 @@ export function createWorkspacesRouter() {
           role: 'owner',
           createdAt: new Date(),
         });
-
-        await tx.insert(projects).values({
-          id: projectId,
-          workspaceId,
-          name: defaultProjectName?.trim() || name,
-          description: description ?? '',
-          key: resolvedProjectKey,
-          status: 'active',
-          inviteCode: createProjectInviteCode(resolvedProjectKey),
-          createdBy: effectiveOwnerId,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
-
-        await tx
-          .update(workspaces)
-          .set({ defaultProjectId: projectId })
-          .where(eq(workspaces.id, workspaceId));
       });
 
-      await ensureProjectMembership(projectId, effectiveOwnerId, 'owner');
       const workspace = await getWorkspaceSummary(workspaceId, effectiveOwnerId);
       res.status(201).json({ workspace });
     } catch (error) {
-      const mapped = mapProjectCreationError(error, normalizeEntityKey(defaultProjectKey || key));
-      res.status(mapped.status).json({ error: mapped.message });
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create workspace.' });
     }
   });
 
@@ -876,6 +857,66 @@ export function createWorkspacesRouter() {
       });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to connect workspace.' });
+    }
+  });
+
+  router.delete('/workspaces/:workspaceId', async (req, res) => {
+    const actorUserId = await resolveRequestActorUserId(req);
+    if (!actorUserId) {
+      res.status(401).json({ error: 'Unauthorized.' });
+      return;
+    }
+
+    const { workspaceId } = req.params;
+
+    try {
+      const membershipRows = await db
+        .select()
+        .from(workspaceMembers)
+        .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, actorUserId)))
+        .limit(1);
+      const membership = membershipRows[0];
+      
+      if (!membership || membership.role !== 'owner') {
+        res.status(403).json({ error: 'Only a workspace owner can delete the workspace.' });
+        return;
+      }
+
+      await db.transaction(async (tx) => {
+        const workspaceProjects = await tx.select({ id: projects.id }).from(projects).where(eq(projects.workspaceId, workspaceId));
+        const projectIds = workspaceProjects.map((p) => p.id);
+
+        if (projectIds.length > 0) {
+          const projectTickets = await tx.select({ id: tickets.id }).from(tickets).where(inArray(tickets.projectId, projectIds));
+          const ticketIds = projectTickets.map((t) => t.id);
+
+          if (ticketIds.length > 0) {
+            await tx.delete(comments).where(inArray(comments.ticketId, ticketIds));
+          }
+
+          await tx.delete(tickets).where(inArray(tickets.projectId, projectIds));
+          await tx.delete(cycles).where(inArray(cycles.projectId, projectIds));
+          await tx.delete(domains).where(inArray(domains.projectId, projectIds));
+          await tx.delete(projectMembers).where(inArray(projectMembers.projectId, projectIds));
+          await tx.delete(projects).where(inArray(projects.id, projectIds));
+        }
+
+        await tx.delete(syncOutbox).where(eq(syncOutbox.workspaceId, workspaceId));
+        await tx.delete(workspacePeers).where(eq(workspacePeers.workspaceId, workspaceId));
+        await tx.delete(federationInvites).where(eq(federationInvites.workspaceId, workspaceId));
+        await tx.delete(peerConnections).where(eq(peerConnections.workspaceId, workspaceId));
+        await tx.delete(workspaceJoinRequests).where(eq(workspaceJoinRequests.workspaceId, workspaceId));
+        await tx.delete(workspaceInvites).where(eq(workspaceInvites.workspaceId, workspaceId));
+        await tx.delete(validations).where(eq(validations.workspaceId, workspaceId));
+        await tx.delete(workspaceSettings).where(eq(workspaceSettings.workspaceId, workspaceId));
+        await tx.delete(workspaceMembers).where(eq(workspaceMembers.workspaceId, workspaceId));
+        
+        await tx.delete(workspaces).where(eq(workspaces.id, workspaceId));
+      });
+
+      res.status(200).json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to delete workspace.' });
     }
   });
 
