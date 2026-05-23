@@ -488,8 +488,8 @@ export function createAiRouter() {
 
           content = textParts.map((p: any) => p.text).join('\n');
           if (toolCallParts.length > 0) {
-            tool_calls = toolCallParts.map((tc: any) => ({
-              id: tc.functionCall.name + '_' + Math.random().toString(36).substr(2, 9),
+            tool_calls = toolCallParts.map((tc: any, index: number) => ({
+              id: tc.functionCall.id ?? tc.functionCall.callId ?? `${tc.functionCall.name}_${index}`,
               name: tc.functionCall.name,
               arguments: tc.functionCall.args,
             }));
