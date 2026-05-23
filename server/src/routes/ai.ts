@@ -141,6 +141,97 @@ async function fetchOllamaModels(rawUrl: string): Promise<string[]> {
   return (data.models ?? []).map((model) => model.name).filter((name): name is string => Boolean(name));
 }
 
+// Formatters for tools
+function formatToolsForOpenAI(tools: any[]) {
+  return tools.map((t) => ({
+    type: 'function',
+    function: { name: t.name, description: t.description, parameters: t.inputSchema },
+  }));
+}
+
+function formatToolsForAnthropic(tools: any[]) {
+  return tools.map((t) => ({
+    name: t.name,
+    description: t.description,
+    input_schema: t.inputSchema,
+  }));
+}
+
+function formatToolsForGemini(tools: any[]) {
+  return [{
+    functionDeclarations: tools.map((t) => ({
+      name: t.name,
+      description: t.description,
+      parameters: t.inputSchema,
+    })),
+  }];
+}
+
+// Formatters for messages
+function mapMessagesForOpenAI(messages: any[]) {
+  return messages.map(m => {
+    if (m.role === 'tool') {
+      return { role: 'tool', tool_call_id: m.tool_call_id, content: m.content };
+    }
+    if (m.role === 'assistant' && m.tool_calls) {
+      return { role: 'assistant', content: m.content || null, tool_calls: m.tool_calls.map((tc: any) => ({
+        id: tc.id,
+        type: 'function',
+        function: { name: tc.name, arguments: typeof tc.arguments === 'string' ? tc.arguments : JSON.stringify(tc.arguments) }
+      })) };
+    }
+    return { role: m.role, content: m.content };
+  });
+}
+
+function mapMessagesForAnthropic(messages: any[]) {
+  const result: any[] = [];
+  for (const m of messages) {
+    if (m.role === 'system') continue;
+    
+    if (m.role === 'tool') {
+      result.push({
+        role: 'user',
+        content: [{ type: 'tool_result', tool_use_id: m.tool_call_id, content: m.content }]
+      });
+    } else if (m.role === 'assistant' && m.tool_calls?.length) {
+      const content: any[] = [];
+      if (m.content) content.push({ type: 'text', text: m.content });
+      for (const tc of m.tool_calls) {
+        content.push({ type: 'tool_use', id: tc.id, name: tc.name, input: typeof tc.arguments === 'string' ? JSON.parse(tc.arguments) : tc.arguments });
+      }
+      result.push({ role: 'assistant', content });
+    } else {
+      result.push({ role: m.role, content: m.content });
+    }
+  }
+  return result;
+}
+
+function mapMessagesForGemini(messages: any[]) {
+  const result: any[] = [];
+  for (const m of messages) {
+    if (m.role === 'system') continue;
+
+    if (m.role === 'tool') {
+      result.push({
+        role: 'user',
+        parts: [{ functionResponse: { name: m.name, response: { name: m.name, content: typeof m.content === 'string' ? JSON.parse(m.content) : m.content } } }]
+      });
+    } else if (m.role === 'assistant' && m.tool_calls?.length) {
+      const parts: any[] = [];
+      if (m.content) parts.push({ text: m.content });
+      for (const tc of m.tool_calls) {
+        parts.push({ functionCall: { name: tc.name, args: typeof tc.arguments === 'string' ? JSON.parse(tc.arguments) : tc.arguments } });
+      }
+      result.push({ role: 'model', parts });
+    } else {
+      result.push({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] });
+    }
+  }
+  return result;
+}
+
 
 async function measureProviderConnection(provider: string, apiKey: string) {
   const startedAt = Date.now();
@@ -220,6 +311,7 @@ export function createAiRouter() {
     const apiKey = typeof req.body?.apiKey === 'string' ? req.body.apiKey.trim() : '';
     const model = typeof req.body?.model === 'string' ? req.body.model : '';
     const messages = Array.isArray(req.body?.messages) ? req.body.messages : [];
+    const tools = Array.isArray(req.body?.tools) && req.body.tools.length > 0 ? req.body.tools : undefined;
 
     if (!model || messages.length === 0) {
       res.status(400).json({ error: 'model and messages are required.' });
@@ -234,6 +326,7 @@ export function createAiRouter() {
 
       try {
         let content = '';
+        let tool_calls: any[] | undefined = undefined;
 
         if (provider === 'openai' || provider === 'deepseek') {
           const baseUrl = provider === 'deepseek' ? 'https://api.deepseek.com' : 'https://api.openai.com';
@@ -247,8 +340,9 @@ export function createAiRouter() {
               },
               body: JSON.stringify({
                 model,
-                messages,
+                messages: mapMessagesForOpenAI(messages),
                 stream: false,
+                ...(tools ? { tools: formatToolsForOpenAI(tools) } : {})
               }),
             },
             60000,
@@ -259,22 +353,21 @@ export function createAiRouter() {
           }
 
           const data = await response.json() as any;
-          content = data.choices?.[0]?.message?.content || '';
+          const msg = data.choices?.[0]?.message;
+          if (msg?.tool_calls) {
+            tool_calls = msg.tool_calls.map((tc: any) => ({
+              id: tc.id,
+              name: tc.function.name,
+              arguments: JSON.parse(tc.function.arguments),
+            }));
+          }
+          content = msg?.content || '';
         } else if (provider === 'anthropic') {
           let system: string | undefined = undefined;
-          const filteredMessages = messages.filter((msg: any) => {
+          for (const msg of messages) {
             if (msg.role === 'system') {
               system = (system ? system + '\n' : '') + msg.content;
-              return false;
             }
-            return true;
-          });
-
-          if (filteredMessages.length === 0) {
-            res.status(400).json({
-              error: 'Anthropic requests require at least one non-system message.',
-            });
-            return;
           }
 
           const response = await fetchWithTimeout(
@@ -288,10 +381,11 @@ export function createAiRouter() {
               },
               body: JSON.stringify({
                 model,
-                messages: filteredMessages,
+                messages: mapMessagesForAnthropic(messages),
                 max_tokens: 4096,
-                system,
+                ...(system ? { system } : {}),
                 stream: false,
+                ...(tools ? { tools: formatToolsForAnthropic(tools) } : {})
               }),
             },
             60000,
@@ -302,18 +396,22 @@ export function createAiRouter() {
           }
 
           const data = await response.json() as any;
-          content = data.content?.[0]?.text || '';
+          const textBlocks = data.content?.filter((b: any) => b.type === 'text') || [];
+          const toolBlocks = data.content?.filter((b: any) => b.type === 'tool_use') || [];
+          
+          content = textBlocks.map((b: any) => b.text).join('\n');
+          if (toolBlocks.length > 0) {
+            tool_calls = toolBlocks.map((tc: any) => ({
+              id: tc.id,
+              name: tc.name,
+              arguments: tc.input,
+            }));
+          }
         } else if (provider === 'gemini') {
           let systemText = '';
-          const contents = [];
           for (const msg of messages) {
             if (msg.role === 'system') {
               systemText = (systemText ? systemText + '\n' : '') + msg.content;
-            } else {
-              contents.push({
-                role: msg.role === 'assistant' ? 'model' : 'user',
-                parts: [{ text: msg.content }],
-              });
             }
           }
 
@@ -326,12 +424,13 @@ export function createAiRouter() {
                 'x-goog-api-key': apiKey,
               },
               body: JSON.stringify({
-                contents,
+                contents: mapMessagesForGemini(messages),
                 ...(systemText ? {
                   systemInstruction: {
                     parts: [{ text: systemText }],
                   },
                 } : {}),
+                ...(tools ? { tools: formatToolsForGemini(tools) } : {})
               }),
             },
             60000,
@@ -342,7 +441,19 @@ export function createAiRouter() {
           }
 
           const data = await response.json() as any;
-          content = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          const parts = data.candidates?.[0]?.content?.parts || [];
+          
+          const textParts = parts.filter((p: any) => p.text);
+          const toolCallParts = parts.filter((p: any) => p.functionCall);
+
+          content = textParts.map((p: any) => p.text).join('\n');
+          if (toolCallParts.length > 0) {
+            tool_calls = toolCallParts.map((tc: any) => ({
+              id: tc.functionCall.name + '_' + Math.random().toString(36).substr(2, 9),
+              name: tc.functionCall.name,
+              arguments: tc.functionCall.args,
+            }));
+          }
         } else {
           res.status(400).json({ error: `Unsupported provider: ${provider}` });
           return;
@@ -352,6 +463,7 @@ export function createAiRouter() {
           message: {
             role: 'assistant',
             content,
+            ...(tool_calls ? { tool_calls } : {})
           },
         });
       } catch (error) {
@@ -370,7 +482,12 @@ export function createAiRouter() {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model, messages, stream: false }),
+          body: JSON.stringify({
+            model,
+            messages: mapMessagesForOpenAI(messages),
+            stream: false,
+            ...(tools ? { tools: formatToolsForOpenAI(tools) } : {})
+          }),
         },
         60000,
       );
@@ -379,7 +496,25 @@ export function createAiRouter() {
         throw new Error(await readErrorMessage(response, 'Failed to proxy request to Ollama.'));
       }
 
-      res.json(await response.json());
+      const data = await response.json() as any;
+      let content = data.message?.content || '';
+      let tool_calls: any[] | undefined = undefined;
+      
+      if (data.message?.tool_calls) {
+        tool_calls = data.message.tool_calls.map((tc: any) => ({
+          id: tc.function?.name + '_' + Math.random().toString(36).substr(2, 9),
+          name: tc.function?.name,
+          arguments: tc.function?.arguments,
+        }));
+      }
+
+      res.json({
+        message: {
+          role: 'assistant',
+          content,
+          ...(tool_calls ? { tool_calls } : {})
+        }
+      });
     } catch (error) {
       res.status(502).json({ error: normalizeOllamaErrorMessage(error) });
     }

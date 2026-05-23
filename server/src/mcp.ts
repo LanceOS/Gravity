@@ -97,7 +97,7 @@ export const mcpToolsList = [
   },
 ];
 
-async function executeTool(name: string, args: Record<string, unknown>) {
+export async function executeTool(name: string, args: Record<string, unknown>) {
   if (name === 'list_tickets') {
     const explicitProjectId = typeof args.projectId === 'string' ? args.projectId : undefined;
     const projectIds = explicitProjectId
