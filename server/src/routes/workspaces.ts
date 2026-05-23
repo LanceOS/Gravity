@@ -38,7 +38,7 @@ import {
   listWorkspaceSummaries,
   normalizeEntityKey,
 } from '../lib/platform.js';
-import { buildProjectKeyConflictMessage, mapProjectCreationError, projectKeyExists } from '../lib/project-creation.js';
+import { mapProjectCreationError } from '../lib/project-creation.js';
 import { resolveRequestActorUserId } from '../lib/request-auth.js';
 
 async function recordWorkspaceActivity(workspaceId: string, userId: string) {
