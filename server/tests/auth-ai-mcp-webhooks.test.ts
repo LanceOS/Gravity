@@ -144,6 +144,77 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
       message: { role: 'assistant', content: 'Hello from GPT' },
     });
   });
+
+  it('formats tools correctly for ai providers', async () => {
+    const fetchMock = vi
+      .fn()
+      // OpenAI chat completions (with tool call)
+      .mockResolvedValueOnce(
+        jsonResponse({ choices: [{ message: { role: 'assistant', tool_calls: [{ id: 'call_123', type: 'function', function: { name: 'list_tickets', arguments: '{}' } }] } }] }),
+      )
+      // Anthropic messages
+      .mockResolvedValueOnce(
+        jsonResponse({ content: [{ type: 'tool_use', id: 'call_123', name: 'list_tickets', input: {} }] }),
+      )
+      // Gemini generateContent
+      .mockResolvedValueOnce(
+        jsonResponse({ candidates: [{ content: { parts: [{ functionCall: { name: 'list_tickets', args: {} } }] } }] }),
+      );
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const tools = [{ name: 'list_tickets', description: 'Lists tickets', inputSchema: { type: 'object' } }];
+    const messages = [{ role: 'user', content: 'hello' }];
+
+    // OpenAI proxy
+    const openaiChatResponse = await api().post('/api/v1/ai/chat').send({
+      provider: 'openai',
+      apiKey: 'sk-test',
+      model: 'gpt-4o-mini',
+      messages,
+      tools,
+    });
+    expect(openaiChatResponse.status).toBe(200);
+    expect(openaiChatResponse.body.message.tool_calls[0].name).toBe('list_tickets');
+    
+    // Check OpenAI tool request format
+    const openaiRequest = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    expect(openaiRequest.tools[0].type).toBe('function');
+    expect(openaiRequest.tools[0].function.name).toBe('list_tickets');
+
+    // Anthropic proxy
+    const anthropicChatResponse = await api().post('/api/v1/ai/chat').send({
+      provider: 'anthropic',
+      apiKey: 'sk-test',
+      model: 'claude-3-haiku-20240307',
+      messages,
+      tools,
+    });
+    expect(anthropicChatResponse.status).toBe(200);
+    expect(anthropicChatResponse.body.message.tool_calls[0].name).toBe('list_tickets');
+
+    // Check Anthropic tool request format
+    const anthropicRequest = JSON.parse(fetchMock.mock.calls[1][1].body as string);
+    expect(anthropicRequest.tools[0].name).toBe('list_tickets');
+    expect(anthropicRequest.tools[0].input_schema.type).toBe('object');
+
+    // Gemini proxy
+    const geminiChatResponse = await api().post('/api/v1/ai/chat').send({
+      provider: 'gemini',
+      apiKey: 'sk-test',
+      model: 'gemini-1.5-flash',
+      messages,
+      tools,
+    });
+    expect(geminiChatResponse.status).toBe(200);
+    expect(geminiChatResponse.body.message.tool_calls[0].name).toBe('list_tickets');
+
+    // Check Gemini tool request format
+    const geminiRequest = JSON.parse(fetchMock.mock.calls[2][1].body as string);
+    expect(geminiRequest.tools[0].functionDeclarations[0].name).toBe('list_tickets');
+
+    vi.unstubAllGlobals();
+  });
   it('handles MCP initialization, tool listing, and tool execution', async () => {
     const { owner, project, workspace } = await seedWorkspaceFixture();
     const existingTicket = await seedTicket(project.id, {
