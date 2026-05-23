@@ -10,3 +10,5 @@ export async function main() {
     process.exitCode = 1;
   }
 }
+
+void main();
