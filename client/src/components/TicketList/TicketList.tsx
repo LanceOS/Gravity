@@ -4,7 +4,7 @@ import { Compass } from 'lucide-react';
 import { TicketRow } from './components';
 import { TicketFilterBar } from '../TicketFilterBar';
 import type { TicketListProps } from './types';
-import { getAssigneeAvatar, getDomainTag, getPriorityIcon, getStatusLabel, LIST_SORT_OPTIONS, PRIORITY_FILTER_OPTIONS, STATUS_FILTER_OPTIONS } from './utils';
+import { getAssigneeAvatar, getDomainTag, getPriorityIcon, getStatusLabel } from './utils';
 
 export const TicketList: React.FC<TicketListProps> = ({
   filters,
