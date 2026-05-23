@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { MessageSquare, X } from 'lucide-react';
 
 import { AuthScreen } from '../../components/AuthScreen';
@@ -177,6 +177,11 @@ export function AppShellPage() {
     revokeInvite,
     approveJoinRequest,
     retryFederationConnection,
+    deleteWorkspace,
+    deleteLoading,
+    deleteError,
+    clearDeleteError,
+    updateMemberActivity,
   } = useWorkspaceSettings({
     currentUser,
     activeWorkspaceId,
@@ -230,6 +235,30 @@ export function AppShellPage() {
 
     window.localStorage.setItem(storageKey, activeWorkspaceId);
   }, [currentUser, activeWorkspaceId]);
+
+  useEffect(() => {
+    if (!activeWorkspaceId || !currentUser) {
+      return;
+    }
+
+    // Record user activity in the selected workspace
+    fetch(`/api/v1/workspaces/${activeWorkspaceId}/members/${currentUser.id}/activity`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-User-Id': currentUser.id,
+      },
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.lastActiveAt) {
+          updateMemberActivity(currentUser.id, data.lastActiveAt);
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to log workspace activity:', err);
+      });
+  }, [activeWorkspaceId, currentUser, updateMemberActivity]);
 
   useEffect(() => {
     if (!activeWorkspaceId) {
@@ -513,6 +542,15 @@ export function AppShellPage() {
     await retryFederationConnection(connectionId);
   };
 
+  const handleDeleteWorkspace = useCallback(async () => {
+    const success = await deleteWorkspace();
+    if (success) {
+      setActiveWorkspaceId('');
+      setActiveSection('directory');
+      await refreshWorkspaces();
+    }
+  }, [deleteWorkspace, refreshWorkspaces]);
+
   useEffect(() => {
     const handleGlobalKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement;
@@ -642,7 +680,7 @@ export function AppShellPage() {
     },
     tools: {
       onOpenOllama: () => setIsOllamaOpen((previous) => !previous),
-      onOpenSimulator: () => {},
+      onOpenSimulator: () => { },
       onOpenCreateTicket: () => handleOpenCreateTicket(),
       agentIntegration: accountSettings.agentIntegration,
       aiProvider: accountSettings.aiProvider,
@@ -681,6 +719,8 @@ export function AppShellPage() {
           joinRequests={workspaceJoinRequests}
           approveLoadingId={approveLoadingId}
           revokeLoadingId={revokeLoadingId}
+          deleteLoading={deleteLoading}
+          deleteError={deleteError}
           onBackToWorkspace={() => setActiveSection('workspace')}
           onOpenDirectory={() => setActiveSection('directory')}
           onChangeSettings={updateSettings}
@@ -689,6 +729,8 @@ export function AppShellPage() {
           onRevokeInvite={handleRevokeInvite}
           onApproveJoinRequest={handleApproveJoinRequest}
           onRetryConnection={handleRetryConnection}
+          onDeleteWorkspace={handleDeleteWorkspace}
+          onClearDeleteError={clearDeleteError}
         />
       ) : (
         <WorkspaceLayout
@@ -794,7 +836,7 @@ export function AppShellPage() {
           cursor: 'pointer',
           transition: 'transform 0.2s ease, background-color 0.2s ease',
         }}
-        
+
         title="Toggle AI Assistant"
       >
         {isOllamaOpen ? <X size={20} /> : <MessageSquare size={20} />}

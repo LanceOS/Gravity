@@ -79,6 +79,18 @@ export const workspaceMembers = pgTable(
   }),
 );
 
+export const workspaceMemberActivity = pgTable(
+  'workspace_member_activity',
+  {
+    workspaceId: text('workspace_id').notNull(),
+    userId: text('user_id').notNull(),
+    lastActiveAt: timestamp('last_active_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.workspaceId, table.userId] }),
+  }),
+);
+
 export const workspaceSettings = pgTable('workspace_settings', {
   workspaceId: text('workspace_id').primaryKey(),
   hostUrl: text('host_url').notNull().default(''),
@@ -290,6 +302,7 @@ export const schema = {
   validations,
   workspaces,
   workspaceMembers,
+  workspaceMemberActivity,
   workspaceSettings,
   workspaceInvites,
   workspaceJoinRequests,

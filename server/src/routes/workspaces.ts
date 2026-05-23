@@ -4,13 +4,22 @@ import { Router } from 'express';
 import { db } from '../db/index.js';
 import {
   authUsers,
+  comments,
+  cycles,
+  domains,
+  federationInvites,
+  peerConnections,
   projectMembers,
   projects,
+  syncOutbox,
+  tickets,
   userProfiles,
   validations,
   workspaceInvites,
   workspaceJoinRequests,
   workspaceMembers,
+  workspaceMemberActivity,
+  workspacePeers,
   workspaces,
   workspaceSettings,
 } from '../db/schema.js';
@@ -29,8 +38,28 @@ import {
   listWorkspaceSummaries,
   normalizeEntityKey,
 } from '../lib/platform.js';
-import { buildProjectKeyConflictMessage, mapProjectCreationError, projectKeyExists } from '../lib/project-creation.js';
+import { mapProjectCreationError } from '../lib/project-creation.js';
 import { resolveRequestActorUserId } from '../lib/request-auth.js';
+
+async function recordWorkspaceActivity(workspaceId: string, userId: string) {
+  try {
+    await db
+      .insert(workspaceMemberActivity)
+      .values({
+        workspaceId,
+        userId,
+        lastActiveAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: [workspaceMemberActivity.workspaceId, workspaceMemberActivity.userId],
+        set: {
+          lastActiveAt: new Date(),
+        },
+      });
+  } catch (error) {
+    console.error(`Failed to record workspace activity for user ${userId} in workspace ${workspaceId}:`, error);
+  }
+}
 
 function createValidationCode() {
   return `GRAV-${Math.floor(1000 + Math.random() * 9000)}-${randomUUID().slice(0, 1).toUpperCase()}`;
@@ -144,15 +173,10 @@ export function createWorkspacesRouter() {
     try {
       const effectiveOwnerId = actorUserId;
       const workspaceId = createId('w');
-      const projectId = createId('p');
       const normalizedWorkspaceKey = normalizeEntityKey(key);
       const resolvedWorkspaceAccessKey = workspaceKey?.trim() || createWorkspaceAccessKey(normalizedWorkspaceKey);
-      const resolvedProjectKey = normalizeEntityKey(defaultProjectKey || key);
 
-      if (await projectKeyExists(resolvedProjectKey)) {
-        res.status(409).json({ error: buildProjectKeyConflictMessage(resolvedProjectKey) });
-        return;
-      }
+      const defaultProjectId = defaultProjectName ? createId('p') : null;
 
       await db.transaction(async (tx) => {
         await tx.insert(workspaces).values({
@@ -162,6 +186,7 @@ export function createWorkspacesRouter() {
           key: normalizedWorkspaceKey,
           workspaceKey: resolvedWorkspaceAccessKey,
           hostUrl: '',
+          defaultProjectId,
           createdBy: effectiveOwnerId,
           createdAt: new Date(),
         });
@@ -181,40 +206,58 @@ export function createWorkspacesRouter() {
           createdAt: new Date(),
         });
 
-        await tx.insert(projects).values({
-          id: projectId,
-          workspaceId,
-          name: defaultProjectName?.trim() || name,
-          description: description ?? '',
-          key: resolvedProjectKey,
-          status: 'active',
-          inviteCode: createProjectInviteCode(resolvedProjectKey),
-          createdBy: effectiveOwnerId,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
+        if (defaultProjectId && defaultProjectName) {
+          const normalizedProjectKey = normalizeEntityKey(defaultProjectKey || defaultProjectName.slice(0, 3).toUpperCase());
+          await tx.insert(projects).values({
+            id: defaultProjectId,
+            workspaceId,
+            name: defaultProjectName,
+            description: '',
+            key: normalizedProjectKey,
+            status: 'active',
+            inviteCode: createProjectInviteCode(normalizedProjectKey),
+            createdBy: effectiveOwnerId,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
 
-        await tx
-          .update(workspaces)
-          .set({ defaultProjectId: projectId })
-          .where(eq(workspaces.id, workspaceId));
+          await tx.insert(projectMembers).values({
+            projectId: defaultProjectId,
+            userId: effectiveOwnerId,
+            role: 'owner',
+            createdAt: new Date(),
+          });
+        }
       });
 
-      await ensureProjectMembership(projectId, effectiveOwnerId, 'owner');
       const workspace = await getWorkspaceSummary(workspaceId, effectiveOwnerId);
       res.status(201).json({ workspace });
     } catch (error) {
-      const mapped = mapProjectCreationError(error, normalizeEntityKey(defaultProjectKey || key));
-      res.status(mapped.status).json({ error: mapped.message });
+      const normalizedDefaultProjectKey =
+        typeof defaultProjectKey === 'string' && defaultProjectKey.trim().length > 0
+          ? normalizeEntityKey(defaultProjectKey)
+          : typeof defaultProjectName === 'string' && defaultProjectName.trim().length > 0
+            ? normalizeEntityKey(defaultProjectName)
+            : normalizeEntityKey(key);
+      const mappedProjectCreationError = mapProjectCreationError(error, normalizedDefaultProjectKey);
+
+      res.status(mappedProjectCreationError.status).json({ error: mappedProjectCreationError.message });
     }
   });
 
   router.get('/workspaces/:workspaceId', async (req, res) => {
     try {
-      const workspace = await getWorkspaceSummary(req.params.workspaceId);
+      const workspaceId = req.params.workspaceId;
+      const workspace = await getWorkspaceSummary(workspaceId);
       if (!workspace) {
         res.status(404).json({ error: 'Workspace not found.' });
         return;
+      }
+
+      // Record activity if active user resolved
+      const actorUserId = await resolveRequestActorUserId(req);
+      if (actorUserId) {
+        await recordWorkspaceActivity(workspaceId, actorUserId);
       }
 
       res.json(workspace);
@@ -234,6 +277,25 @@ export function createWorkspacesRouter() {
         return;
       }
 
+      // Record activity only for authenticated workspace members
+      const actorUserId = await resolveRequestActorUserId(req);
+      if (actorUserId) {
+        const [membership] = await db
+          .select({ userId: workspaceMembers.userId })
+          .from(workspaceMembers)
+          .where(
+            and(
+              eq(workspaceMembers.workspaceId, workspaceId),
+              eq(workspaceMembers.userId, actorUserId),
+            ),
+          )
+          .limit(1);
+
+        if (membership) {
+          await recordWorkspaceActivity(workspaceId, actorUserId);
+        }
+      }
+
       res.json(settings);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load workspace settings.' });
@@ -250,6 +312,12 @@ export function createWorkspacesRouter() {
       if (!currentWorkspace) {
         res.status(404).json({ error: 'Workspace not found.' });
         return;
+      }
+
+      // Record activity if active user resolved
+      const actorUserId = await resolveRequestActorUserId(req);
+      if (actorUserId) {
+        await recordWorkspaceActivity(workspaceId, actorUserId);
       }
 
       const nextHostUrl = typeof req.body?.hostUrl === 'string' ? req.body.hostUrl : currentWorkspace.hostUrl;
@@ -293,6 +361,26 @@ export function createWorkspacesRouter() {
 
   router.get('/workspaces/:workspaceId/members', async (req, res) => {
     try {
+      const workspaceId = req.params.workspaceId;
+      const actorUserId = await resolveRequestActorUserId(req);
+      if (!actorUserId) {
+        res.status(401).json({ error: 'Authentication required.' });
+        return;
+      }
+
+      const membershipRows = await db
+        .select({ userId: workspaceMembers.userId })
+        .from(workspaceMembers)
+        .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, actorUserId)))
+        .limit(1);
+
+      if (!membershipRows[0]) {
+        res.status(403).json({ error: 'Workspace membership required.' });
+        return;
+      }
+
+      await recordWorkspaceActivity(workspaceId, actorUserId);
+
       const members = await db
         .select({
           id: authUsers.id,
@@ -302,10 +390,18 @@ export function createWorkspacesRouter() {
           avatarUrl: userProfiles.avatarUrl,
           role: workspaceMembers.role,
           createdAt: workspaceMembers.createdAt,
+          lastActiveAt: workspaceMemberActivity.lastActiveAt,
         })
         .from(workspaceMembers)
         .innerJoin(authUsers, eq(authUsers.id, workspaceMembers.userId))
         .leftJoin(userProfiles, eq(userProfiles.userId, workspaceMembers.userId))
+        .leftJoin(
+          workspaceMemberActivity,
+          and(
+            eq(workspaceMemberActivity.workspaceId, workspaceMembers.workspaceId),
+            eq(workspaceMemberActivity.userId, workspaceMembers.userId)
+          )
+        )
         .where(eq(workspaceMembers.workspaceId, req.params.workspaceId))
         .orderBy(asc(workspaceMembers.createdAt));
 
@@ -317,10 +413,111 @@ export function createWorkspacesRouter() {
           avatar: member.avatarUrl || member.image || '',
           role: member.role,
           createdAt: member.createdAt,
+          lastActiveAt: member.lastActiveAt ? member.lastActiveAt.toISOString() : null,
         })),
       );
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load workspace members.' });
+    }
+  });
+
+  router.get('/workspaces/:workspaceId/members/:userId/activity', async (req, res) => {
+    try {
+      const { workspaceId, userId } = req.params;
+      const rows = await db
+        .select()
+        .from(workspaceMemberActivity)
+        .where(
+          and(
+            eq(workspaceMemberActivity.workspaceId, workspaceId),
+            eq(workspaceMemberActivity.userId, userId)
+          )
+        )
+        .limit(1);
+
+      const activity = rows[0];
+      if (!activity) {
+        res.json({ workspaceId, userId, lastActiveAt: null });
+        return;
+      }
+
+      res.json({
+        workspaceId: activity.workspaceId,
+        userId: activity.userId,
+        lastActiveAt: activity.lastActiveAt.toISOString(),
+      });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to get workspace activity.' });
+    }
+  });
+
+  router.post('/workspaces/:workspaceId/members/:userId/activity', async (req, res) => {
+    try {
+      const { workspaceId, userId } = req.params;
+      const actorUserId = await resolveRequestActorUserId(req);
+
+      if (typeof actorUserId !== 'string' || actorUserId.length === 0) {
+        res.status(401).json({ error: 'Authentication required.' });
+        return;
+      }
+
+      const memberships = await db
+        .select({
+          userId: workspaceMembers.userId,
+          role: workspaceMembers.role,
+        })
+        .from(workspaceMembers)
+        .where(
+          and(
+            eq(workspaceMembers.workspaceId, workspaceId),
+            inArray(workspaceMembers.userId, [actorUserId, userId])
+          )
+        );
+
+      const actorMembership = memberships.find((membership) => membership.userId === actorUserId);
+      const targetMembership = memberships.find((membership) => membership.userId === userId);
+
+      if (!targetMembership) {
+        res.status(404).json({ error: 'User is not a member of this workspace.' });
+        return;
+      }
+
+      if (!actorMembership) {
+        res.status(403).json({ error: 'You are not a member of this workspace.' });
+        return;
+      }
+
+      const canRecordForTarget =
+        actorUserId === userId ||
+        actorMembership.role === 'owner' ||
+        actorMembership.role === 'admin';
+
+      if (!canRecordForTarget) {
+        res.status(403).json({ error: 'You are not allowed to record activity for this user.' });
+        return;
+      }
+
+      await recordWorkspaceActivity(workspaceId, userId);
+
+      const rows = await db
+        .select()
+        .from(workspaceMemberActivity)
+        .where(
+          and(
+            eq(workspaceMemberActivity.workspaceId, workspaceId),
+            eq(workspaceMemberActivity.userId, userId)
+          )
+        )
+        .limit(1);
+
+      res.json({
+        success: true,
+        workspaceId,
+        userId,
+        lastActiveAt: rows[0]?.lastActiveAt ? rows[0].lastActiveAt.toISOString() : new Date().toISOString(),
+      });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to record workspace activity.' });
     }
   });
 
@@ -388,6 +585,8 @@ export function createWorkspacesRouter() {
         res.status(403).json({ error: 'Owner or admin access is required.' });
         return;
       }
+
+      await recordWorkspaceActivity(req.params.workspaceId, actorUserId);
 
       const inviteRows = await db
         .select()
@@ -876,6 +1075,82 @@ export function createWorkspacesRouter() {
       });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to connect workspace.' });
+    }
+  });
+
+  router.delete('/workspaces/:workspaceId', async (req, res) => {
+    const actorUserId = await resolveRequestActorUserId(req);
+    if (!actorUserId) {
+      res.status(401).json({ error: 'Unauthorized.' });
+      return;
+    }
+
+    const { workspaceId } = req.params;
+
+    try {
+      const membershipRows = await db
+        .select()
+        .from(workspaceMembers)
+        .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, actorUserId)))
+        .limit(1);
+      const membership = membershipRows[0];
+      
+      if (!membership || membership.role !== 'owner') {
+        res.status(403).json({ error: 'Only a workspace owner can delete the workspace.' });
+        return;
+      }
+
+      await db.transaction(async (tx) => {
+        await tx.delete(comments).where(sql`${comments.ticketId} in (
+          select ${tickets.id}
+          from ${tickets}
+          inner join ${projects} on ${tickets.projectId} = ${projects.id}
+          where ${projects.workspaceId} = ${workspaceId}
+        )`);
+
+        await tx.delete(tickets).where(sql`${tickets.projectId} in (
+          select ${projects.id}
+          from ${projects}
+          where ${projects.workspaceId} = ${workspaceId}
+        )`);
+
+        await tx.delete(cycles).where(sql`${cycles.projectId} in (
+          select ${projects.id}
+          from ${projects}
+          where ${projects.workspaceId} = ${workspaceId}
+        )`);
+
+        await tx.delete(domains).where(sql`${domains.projectId} in (
+          select ${projects.id}
+          from ${projects}
+          where ${projects.workspaceId} = ${workspaceId}
+        )`);
+
+        await tx.delete(projectMembers).where(sql`${projectMembers.projectId} in (
+          select ${projects.id}
+          from ${projects}
+          where ${projects.workspaceId} = ${workspaceId}
+        )`);
+
+        await tx.delete(projects).where(eq(projects.workspaceId, workspaceId));
+
+        await tx.delete(syncOutbox).where(eq(syncOutbox.workspaceId, workspaceId));
+        await tx.delete(workspacePeers).where(eq(workspacePeers.workspaceId, workspaceId));
+        await tx.delete(federationInvites).where(eq(federationInvites.workspaceId, workspaceId));
+        await tx.delete(peerConnections).where(eq(peerConnections.workspaceId, workspaceId));
+        await tx.delete(workspaceJoinRequests).where(eq(workspaceJoinRequests.workspaceId, workspaceId));
+        await tx.delete(workspaceInvites).where(eq(workspaceInvites.workspaceId, workspaceId));
+        await tx.delete(validations).where(eq(validations.workspaceId, workspaceId));
+        await tx.delete(workspaceSettings).where(eq(workspaceSettings.workspaceId, workspaceId));
+        await tx.delete(workspaceMembers).where(eq(workspaceMembers.workspaceId, workspaceId));
+        await tx.delete(workspaceMemberActivity).where(eq(workspaceMemberActivity.workspaceId, workspaceId));
+        
+        await tx.delete(workspaces).where(eq(workspaces.id, workspaceId));
+      });
+
+      res.status(200).json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to delete workspace.' });
     }
   });
 

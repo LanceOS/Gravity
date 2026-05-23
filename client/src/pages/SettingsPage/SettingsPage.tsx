@@ -54,6 +54,10 @@ interface SettingsPageProps {
   onRevokeInvite: (inviteId: string) => Promise<boolean>;
   onApproveJoinRequest: (requestId: string) => Promise<boolean>;
   onRetryConnection: (connectionId: string) => Promise<void>;
+  deleteLoading?: boolean;
+  deleteError?: string | null;
+  onDeleteWorkspace?: () => Promise<void>;
+  onClearDeleteError?: () => void;
 }
 
 const COPY_FEEDBACK_STORAGE_KEY = 'gravity_peer_invite_copy_feedback';
@@ -199,6 +203,64 @@ function OverviewSection({
             </div>
           </div>
         </Grid>
+      </Stack>
+    </Card>
+  );
+}
+
+function DangerZoneSection({
+  workspace,
+  deleteLoading,
+  deleteError,
+  onDeleteWorkspace,
+  onClearDeleteError,
+}: {
+  workspace: WorkspaceSummary;
+  deleteLoading?: boolean;
+  deleteError?: string | null;
+  onDeleteWorkspace?: () => Promise<void>;
+  onClearDeleteError?: () => void;
+}) {
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+
+  return (
+    <Card style={{ padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)', border: '1px solid rgba(239, 68, 68, 0.3)', background: 'rgba(239, 68, 68, 0.05)' }}>
+      <Stack gap="var(--space-5)">
+        <div>
+          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: '#FFF' }}>Danger Zone</h2>
+          <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '12.5px', lineHeight: 1.5 }}>
+            Deleting a workspace is permanent and cannot be undone. All projects, tickets, comments, and members within this workspace will be deleted.
+          </p>
+        </div>
+        
+        {deleteError && (
+          <Alert type="error">
+            {deleteError}
+          </Alert>
+        )}
+
+        <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-end' }}>
+          <div style={{ flex: 1 }}>
+            <TextInput
+              label={`Type "${workspace.name}" to confirm`}
+              value={deleteConfirmation}
+              onChange={(e) => {
+                setDeleteConfirmation(e.target.value);
+                if (deleteError && onClearDeleteError) {
+                  onClearDeleteError();
+                }
+              }}
+            />
+          </div>
+          <Button
+            variant="danger"
+            disabled={!onDeleteWorkspace || deleteConfirmation !== workspace.name || deleteLoading}
+            loading={deleteLoading}
+            onClick={() => onDeleteWorkspace?.()}
+          >
+            Delete Workspace
+          </Button>
+        </div>
       </Stack>
     </Card>
   );
@@ -580,6 +642,48 @@ function AccessSection({
   );
 }
 
+function formatLastActive(isoString?: string | null): string {
+  if (!isoString) {
+    return 'Never';
+  }
+
+  try {
+    const activeDate = new Date(isoString);
+    if (isNaN(activeDate.getTime())) {
+      return 'Never';
+    }
+
+    const today = new Date();
+    const isSameDay =
+      activeDate.getDate() === today.getDate() &&
+      activeDate.getMonth() === today.getMonth() &&
+      activeDate.getFullYear() === today.getFullYear();
+
+    if (isSameDay) {
+      return 'Today';
+    }
+
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const isYesterday =
+      activeDate.getDate() === yesterday.getDate() &&
+      activeDate.getMonth() === yesterday.getMonth() &&
+      activeDate.getFullYear() === yesterday.getFullYear();
+
+    if (isYesterday) {
+      return 'Yesterday';
+    }
+
+    return activeDate.toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  } catch {
+    return 'Never';
+  }
+}
+
 function MembersSection({ members }: { members: WorkspaceMember[] }) {
   return (
     <Card style={{ padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)' }}>
@@ -613,6 +717,9 @@ function MembersSection({ members }: { members: WorkspaceMember[] }) {
                 <div>
                   <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-heading)' }}>{member.name}</div>
                   <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>{member.email}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', fontStyle: 'italic' }}>
+                    Last active: {formatLastActive(member.lastActiveAt)}
+                  </div>
                 </div>
               </div>
 
@@ -763,6 +870,10 @@ export function SettingsPage({
   onRevokeInvite,
   onApproveJoinRequest,
   onRetryConnection,
+  deleteLoading,
+  deleteError,
+  onDeleteWorkspace,
+  onClearDeleteError,
 }: SettingsPageProps) {
   const [activeCategory, setActiveCategory] = useState<SettingsCategoryId>('overview');
 
@@ -899,13 +1010,24 @@ export function SettingsPage({
 
             {activeCategory === 'overview' && (
               <>
-                <OverviewSection workspace={workspace} settings={settings} onChangeSettings={onChangeSettings} />
+                <OverviewSection
+                  workspace={workspace}
+                  settings={settings}
+                  onChangeSettings={onChangeSettings}
+                />
                 <FederationConnectionsSection
                   federationConnections={federationConnections}
                   connectionsLoading={connectionsLoading}
                   connectionsError={connectionsError}
                   retryingConnectionId={retryingConnectionId}
                   onRetryConnection={onRetryConnection}
+                />
+                <DangerZoneSection
+                  workspace={workspace}
+                  deleteLoading={deleteLoading}
+                  deleteError={deleteError}
+                  onDeleteWorkspace={onDeleteWorkspace}
+                  onClearDeleteError={onClearDeleteError}
                 />
               </>
             )}

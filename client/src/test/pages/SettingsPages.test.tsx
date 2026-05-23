@@ -73,6 +73,34 @@ function renderSettingsPage(overrides: Partial<Parameters<typeof SettingsPage>[0
         avatar: '',
         role: 'owner',
         createdAt: '2026-05-01T09:00:00.000Z',
+        lastActiveAt: new Date().toISOString(), // Today
+      },
+      {
+        id: 'member-2',
+        name: 'Robin Quinn',
+        email: 'robin@example.com',
+        avatar: '',
+        role: 'developer',
+        createdAt: '2026-05-02T09:00:00.000Z',
+        lastActiveAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), // Yesterday
+      },
+      {
+        id: 'member-3',
+        name: 'Jamie Doe',
+        email: 'jamie@example.com',
+        avatar: '',
+        role: 'developer',
+        createdAt: '2026-05-03T09:00:00.000Z',
+        lastActiveAt: '2026-05-20T12:00:00.000Z', // Specific older date
+      },
+      {
+        id: 'member-4',
+        name: 'Morgan Lee',
+        email: 'morgan@example.com',
+        avatar: '',
+        role: 'developer',
+        createdAt: '2026-05-04T09:00:00.000Z',
+        lastActiveAt: null, // Never active
       },
     ],
     joinRequests: [
@@ -210,6 +238,10 @@ describe('SettingsPage', () => {
     await user.click(screen.getByRole('button', { name: /Members/i }));
     expect(screen.getByText('Approved Members')).toBeInTheDocument();
     expect(screen.getByText('casey@example.com')).toBeInTheDocument();
+    expect(screen.getByText('Last active: Today')).toBeInTheDocument();
+    expect(screen.getByText('Last active: Yesterday')).toBeInTheDocument();
+    expect(screen.getByText('Last active: Never')).toBeInTheDocument();
+    expect(screen.getAllByText(/Last active:/)).toHaveLength(4);
 
     await user.click(screen.getByRole('button', { name: /Join Requests/i }));
     expect(screen.getByText('Robin Quinn')).toBeInTheDocument();
