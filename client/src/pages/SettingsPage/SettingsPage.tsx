@@ -54,6 +54,9 @@ interface SettingsPageProps {
   onRevokeInvite: (inviteId: string) => Promise<boolean>;
   onApproveJoinRequest: (requestId: string) => Promise<boolean>;
   onRetryConnection: (connectionId: string) => Promise<void>;
+  deleteLoading?: boolean;
+  deleteError?: string | null;
+  onDeleteWorkspace?: () => Promise<void>;
 }
 
 const COPY_FEEDBACK_STORAGE_KEY = 'gravity_peer_invite_copy_feedback';
@@ -126,12 +129,20 @@ function getFederationConnectionStatus(connection: FederationConnection) {
 function OverviewSection({
   workspace,
   settings,
+  deleteLoading,
+  deleteError,
   onChangeSettings,
+  onDeleteWorkspace,
 }: {
   workspace: WorkspaceSummary;
   settings: WorkspaceAdminSettings;
+  deleteLoading?: boolean;
+  deleteError?: string | null;
   onChangeSettings: (updates: Partial<WorkspaceAdminSettings>) => void;
+  onDeleteWorkspace?: () => Promise<void>;
 }) {
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+
   return (
     <Card style={{ padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)' }}>
       <Stack gap="var(--space-5)">
@@ -199,6 +210,40 @@ function OverviewSection({
             </div>
           </div>
         </Grid>
+
+        <Divider />
+
+        <div style={{ border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: 'var(--radius-md)', padding: 'var(--space-4)', background: 'rgba(239, 68, 68, 0.05)' }}>
+          <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: 'var(--priority-high)' }}>Danger Zone</h3>
+          <p style={{ margin: '4px 0 var(--space-4)', color: 'var(--text-muted)', fontSize: '12.5px', lineHeight: 1.5 }}>
+            Deleting a workspace is permanent and cannot be undone. All projects, tickets, comments, and members within this workspace will be deleted.
+          </p>
+          
+          {deleteError && (
+            <Alert type="error" style={{ marginBottom: 'var(--space-4)' }}>
+              {deleteError}
+            </Alert>
+          )}
+
+          <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-end' }}>
+            <div style={{ flex: 1 }}>
+              <TextInput
+                label={`Type "${workspace.name}" to confirm`}
+                value={deleteConfirmation}
+                onChange={(e) => setDeleteConfirmation(e.target.value)}
+                placeholder={workspace.name}
+              />
+            </div>
+            <Button
+              variant="danger"
+              disabled={deleteConfirmation !== workspace.name || deleteLoading}
+              loading={deleteLoading}
+              onClick={() => onDeleteWorkspace && onDeleteWorkspace()}
+            >
+              Delete Workspace
+            </Button>
+          </div>
+        </div>
       </Stack>
     </Card>
   );
@@ -763,6 +808,9 @@ export function SettingsPage({
   onRevokeInvite,
   onApproveJoinRequest,
   onRetryConnection,
+  deleteLoading,
+  deleteError,
+  onDeleteWorkspace,
 }: SettingsPageProps) {
   const [activeCategory, setActiveCategory] = useState<SettingsCategoryId>('overview');
 
@@ -899,7 +947,14 @@ export function SettingsPage({
 
             {activeCategory === 'overview' && (
               <>
-                <OverviewSection workspace={workspace} settings={settings} onChangeSettings={onChangeSettings} />
+                <OverviewSection
+                  workspace={workspace}
+                  settings={settings}
+                  deleteLoading={deleteLoading}
+                  deleteError={deleteError}
+                  onChangeSettings={onChangeSettings}
+                  onDeleteWorkspace={onDeleteWorkspace}
+                />
                 <FederationConnectionsSection
                   federationConnections={federationConnections}
                   connectionsLoading={connectionsLoading}

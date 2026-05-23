@@ -153,6 +153,8 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
   const [retryingConnectionId, setRetryingConnectionId] = useState<string | null>(null);
   const [approveLoadingId, setApproveLoadingId] = useState<string | null>(null);
   const [revokeLoadingId, setRevokeLoadingId] = useState<string | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const refreshWorkspaceAdmin = useCallback(async () => {
     if (!currentUser || !activeWorkspaceId) {
@@ -162,6 +164,7 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
       setJoinRequests([]);
       setFederationConnections([]);
       setConnectionsError(null);
+      setDeleteError(null);
       return;
     }
 
@@ -450,6 +453,35 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
     }
   }, [activeWorkspaceId, currentUser, refreshWorkspaceAdmin]);
 
+  const deleteWorkspace = useCallback(async () => {
+    if (!currentUser || !activeWorkspaceId) {
+      return false;
+    }
+
+    setDeleteLoading(true);
+    setDeleteError(null);
+
+    try {
+      const response = await fetch(`/api/v1/workspaces/${activeWorkspaceId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to delete workspace.');
+      }
+
+      return true;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to delete workspace.';
+      setDeleteError(message);
+      return false;
+    } finally {
+      setDeleteLoading(false);
+    }
+  }, [activeWorkspaceId, currentUser]);
+
   return {
     settings,
     settingsLoading,
@@ -468,6 +500,8 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
     retryingConnectionId,
     approveLoadingId,
     revokeLoadingId,
+    deleteLoading,
+    deleteError,
     updateSettings,
     saveSettings,
     createInvite,
@@ -475,5 +509,6 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
     approveJoinRequest,
     retryFederationConnection,
     refreshWorkspaceAdmin,
+    deleteWorkspace,
   };
 }
