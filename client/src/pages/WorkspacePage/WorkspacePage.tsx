@@ -107,6 +107,9 @@ export function WorkspacePage({
       priority: '',
       status: '',
       domainId: '',
+      projectId: '',
+      cycleId: '',
+      assigneeId: '',
     });
   };
 
