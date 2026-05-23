@@ -120,7 +120,10 @@ export function hasActiveTicketFilters(filters: TicketFilters): boolean {
     filters.search ||
       filters.priority ||
       filters.status ||
-      filters.domainId
+      filters.projectId ||
+      filters.domainId ||
+      filters.cycleId ||
+      filters.assigneeId
   );
 }
 
