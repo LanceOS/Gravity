@@ -103,13 +103,11 @@ export function WorkspacePage({
   );
   const handleClearFilters = () => {
     onSetFilters({
+      ...filters,
       search: '',
       priority: '',
       status: '',
       domainId: '',
-      projectId: '',
-      cycleId: '',
-      assigneeId: '',
     });
   };
 
