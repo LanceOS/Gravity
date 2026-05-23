@@ -433,8 +433,51 @@ export function createWorkspacesRouter() {
   router.post('/workspaces/:workspaceId/members/:userId/activity', async (req, res) => {
     try {
       const { workspaceId, userId } = req.params;
+      const actorUserId = resolveRequestActorUserId(req);
+
+      if (!actorUserId) {
+        res.status(401).json({ error: 'Authentication required.' });
+        return;
+      }
+
+      const memberships = await db
+        .select({
+          userId: workspaceMembers.userId,
+          role: workspaceMembers.role,
+        })
+        .from(workspaceMembers)
+        .where(
+          and(
+            eq(workspaceMembers.workspaceId, workspaceId),
+            inArray(workspaceMembers.userId, [actorUserId, userId])
+          )
+        );
+
+      const actorMembership = memberships.find((membership) => membership.userId === actorUserId);
+      const targetMembership = memberships.find((membership) => membership.userId === userId);
+
+      if (!targetMembership) {
+        res.status(404).json({ error: 'User is not a member of this workspace.' });
+        return;
+      }
+
+      if (!actorMembership) {
+        res.status(403).json({ error: 'You are not a member of this workspace.' });
+        return;
+      }
+
+      const canRecordForTarget =
+        actorUserId === userId ||
+        actorMembership.role === 'owner' ||
+        actorMembership.role === 'admin';
+
+      if (!canRecordForTarget) {
+        res.status(403).json({ error: 'You are not allowed to record activity for this user.' });
+        return;
+      }
+
       await recordWorkspaceActivity(workspaceId, userId);
-      
+
       const rows = await db
         .select()
         .from(workspaceMemberActivity)
