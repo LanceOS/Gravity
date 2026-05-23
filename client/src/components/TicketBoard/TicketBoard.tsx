@@ -6,7 +6,7 @@ import { Plus } from 'lucide-react';
 import { TicketCard } from './components';
 import { TicketFilterBar } from '../TicketFilterBar';
 import type { TicketBoardProps } from './types';
-import { getAssigneeAvatar, getDomainMeta, getPriorityColor, getPriorityIcon, PRIORITY_FILTER_OPTIONS } from './utils';
+import { getAssigneeAvatar, getDomainMeta, getPriorityColor, getPriorityIcon } from './utils';
 
 export const TicketBoard: React.FC<TicketBoardProps> = ({
   projects,
