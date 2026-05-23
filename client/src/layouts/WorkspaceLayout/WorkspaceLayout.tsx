@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Sidebar, type SidebarProps } from '../../components/Sidebar';
+import { DashboardLayout } from '../../components/DashboardLayout/DashboardLayout';
 import './WorkspaceLayout.css';
 
 interface WorkspaceLayoutProps {
@@ -10,10 +11,10 @@ interface WorkspaceLayoutProps {
 
 export function WorkspaceLayout({ sidebarProps, children, rightPanels }: WorkspaceLayoutProps) {
   return (
-    <div className="workspace-layout">
+    <DashboardLayout>
       <Sidebar {...sidebarProps} />
-      <main className="workspace-layout__main">{children}</main>
+      <DashboardLayout.Main>{children}</DashboardLayout.Main>
       {rightPanels}
-    </div>
+    </DashboardLayout>
   );
 }
