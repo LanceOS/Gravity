@@ -127,34 +127,23 @@ async function executeTool(name: string, args: Record<string, unknown>) {
       .select({
         id: authUsers.id,
         name: authUsers.name,
-        email: authUsers.email,
         image: authUsers.image,
         avatarUrl: userProfiles.avatarUrl,
         role: workspaceMembers.role,
         createdAt: workspaceMembers.createdAt,
-        lastActiveAt: workspaceMemberActivity.lastActiveAt,
       })
       .from(workspaceMembers)
       .innerJoin(authUsers, eq(authUsers.id, workspaceMembers.userId))
       .leftJoin(userProfiles, eq(userProfiles.userId, workspaceMembers.userId))
-      .leftJoin(
-        workspaceMemberActivity,
-        and(
-          eq(workspaceMemberActivity.workspaceId, workspaceMembers.workspaceId),
-          eq(workspaceMemberActivity.userId, workspaceMembers.userId)
-        )
-      )
       .where(eq(workspaceMembers.workspaceId, workspaceId))
       .orderBy(asc(workspaceMembers.createdAt));
 
     return members.map((m) => ({
       id: m.id,
       name: m.name,
-      email: m.email,
       avatar: m.avatarUrl || m.image || '',
       role: m.role,
       createdAt: m.createdAt.toISOString(),
-      lastActiveAt: m.lastActiveAt ? m.lastActiveAt.toISOString() : null,
     }));
   }
 
