@@ -1013,11 +1013,7 @@ export function SettingsPage({
                 <OverviewSection
                   workspace={workspace}
                   settings={settings}
-                  deleteLoading={deleteLoading}
-                  deleteError={deleteError}
                   onChangeSettings={onChangeSettings}
-                  onDeleteWorkspace={onDeleteWorkspace}
-                  onClearDeleteError={onClearDeleteError}
                 />
                 <FederationConnectionsSection
                   federationConnections={federationConnections}
