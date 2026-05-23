@@ -352,7 +352,16 @@ export function createWorkspacesRouter() {
           : req.body?.defaultProjectId === null
             ? null
             : currentWorkspace.defaultProjectId;
-      const nextDisabledMcpTools = Array.isArray(req.body?.disabledMcpTools) ? (req.body.disabledMcpTools as string[]) : undefined;
+      const nextDisabledMcpTools = Array.isArray(req.body?.disabledMcpTools)
+        ? Array.from(
+            new Set(
+              req.body.disabledMcpTools
+                .filter((tool): tool is string => typeof tool === 'string')
+                .map((tool) => tool.trim())
+                .filter((tool) => tool.length > 0)
+            )
+          )
+        : undefined;
 
       await db.transaction(async (tx) => {
         await tx
