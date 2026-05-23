@@ -127,7 +127,7 @@ export const TicketBoard: React.FC<TicketBoardProps> = ({
           <select
             aria-label="Filter board by project"
             value={((filters as any).projectId as string | undefined) ?? ''}
-            onChange={(event) => onFilterChange({ projectId: event.target.value || undefined })}
+            onChange={(event) => onFilterChange({ projectId: event.target.value })}
             style={{
               minWidth: '180px',
               padding: '6px 10px',
