@@ -882,6 +882,32 @@ export function SettingsPage({
 
   return (
     <DashboardLayout>
+      <DashboardLayout.Header
+        leftContent={
+          <Flex align="center" gap="var(--space-4)">
+            <Button variant="ghost" size="sm" onClick={onBackToWorkspace} leftIcon={<ArrowLeft size={14} />}>
+              Workspace
+            </Button>
+
+            <Button variant="ghost" size="sm" onClick={onOpenDirectory} leftIcon={<Globe size={14} />}>
+              Workspaces
+            </Button>
+
+            <Divider vertical style={{ height: '20px' }} />
+
+            <div>
+              <h1 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: 'var(--text-heading)' }}>Workspace Settings</h1>
+              <p style={{ margin: 0, fontSize: '11px', color: 'var(--text-muted)' }}>Managing {workspace.name}</p>
+            </div>
+          </Flex>
+        }
+        rightContent={
+          <Button variant="accent" size="sm" onClick={onSaveSettings} loading={saveLoading}>
+            {saveSuccess ? 'Changes Saved' : 'Save Changes'}
+          </Button>
+        }
+      />
+
       <DashboardLayout.Sidebar>
         <div style={{ padding: 'var(--space-5)', display: 'flex', flexDirection: 'column', gap: 'var(--space-5)', height: '100%', overflowY: 'auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--card-bg)', border: '1px solid var(--border)' }}>
@@ -931,32 +957,6 @@ export function SettingsPage({
       </DashboardLayout.Sidebar>
 
       <DashboardLayout.Main>
-        <DashboardLayout.Header
-          leftContent={
-            <Flex align="center" gap="var(--space-4)">
-              <Button variant="ghost" size="sm" onClick={onBackToWorkspace} leftIcon={<ArrowLeft size={14} />}>
-                Workspace
-              </Button>
-
-              <Button variant="ghost" size="sm" onClick={onOpenDirectory} leftIcon={<Globe size={14} />}>
-                Workspaces
-              </Button>
-
-              <Divider vertical style={{ height: '20px' }} />
-
-              <div>
-                <h1 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: 'var(--text-heading)' }}>Workspace Settings</h1>
-                <p style={{ margin: 0, fontSize: '11px', color: 'var(--text-muted)' }}>Managing {workspace.name}</p>
-              </div>
-            </Flex>
-          }
-          rightContent={
-            <Button variant="accent" size="sm" onClick={onSaveSettings} loading={saveLoading}>
-              {saveSuccess ? 'Changes Saved' : 'Save Changes'}
-            </Button>
-          }
-        />
-
         <DashboardLayout.Content>
           <div style={{ padding: 'var(--space-6) var(--space-6) var(--space-8) var(--space-6)', maxWidth: '800px', margin: '0 auto' }}>
             <Stack gap="var(--space-5)">
