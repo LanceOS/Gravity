@@ -198,7 +198,15 @@ function mapMessagesForAnthropic(messages: any[]) {
       const content: any[] = [];
       if (m.content) content.push({ type: 'text', text: m.content });
       for (const tc of m.tool_calls) {
-        content.push({ type: 'tool_use', id: tc.id, name: tc.name, input: typeof tc.arguments === 'string' ? JSON.parse(tc.arguments) : tc.arguments });
+        let input = tc.arguments;
+        if (typeof tc.arguments === 'string') {
+          try {
+            input = JSON.parse(tc.arguments);
+          } catch {
+            input = tc.arguments;
+          }
+        }
+        content.push({ type: 'tool_use', id: tc.id, name: tc.name, input });
       }
       result.push({ role: 'assistant', content });
     } else {
