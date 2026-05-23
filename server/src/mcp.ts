@@ -441,9 +441,14 @@ export function createMcpRouter() {
       res.status(401).json({ error: 'Authentication required.' });
       return;
     }
-    const workspaceId = req.header('x-workspace-id') || req.header('X-Workspace-Id');
+    const headerWorkspaceId = req.header('x-workspace-id') || req.header('X-Workspace-Id');
+    const bodyWorkspaceId =
+      typeof req.body?.params?.workspaceId === 'string' && req.body.params.workspaceId.trim().length > 0
+        ? req.body.params.workspaceId.trim()
+        : undefined;
+    const workspaceId = headerWorkspaceId || bodyWorkspaceId;
     if (!workspaceId) {
-      res.status(400).json({ error: 'X-Workspace-Id header is required.' });
+      res.status(400).json({ error: 'X-Workspace-Id header or params.workspaceId is required.' });
       return;
     }
 
