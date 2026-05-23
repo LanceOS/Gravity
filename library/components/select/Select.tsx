@@ -250,7 +250,7 @@ export function Select({
 
   return (
     <ClickAwayListener onClickAway={closeMenu}>
-      <div className="select-root" style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: 'fit-content', ...style }}>
+      <div className="select-root" style={{ display: 'flex', flexDirection: 'column', gap: '4px', ...style }}>
         {label && (
           <label id={labelId} htmlFor={selectId} className="label" style={{ color: 'var(--text-heading)', fontWeight: 500 }}>
             {label}
