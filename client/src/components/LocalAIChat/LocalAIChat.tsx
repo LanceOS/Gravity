@@ -46,11 +46,15 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
   const [mcpTools, setMcpTools] = useState<any[]>([]);
 
   useEffect(() => {
+    if (!workspaceId) {
+      return;
+    }
+
     fetch('/api/v1/mcp/sse', {
       method: 'POST',
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
-        ...(workspaceId ? { 'X-Workspace-Id': workspaceId } : {})
+        'X-Workspace-Id': workspaceId
       },
       body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' })
     }).then(res => res.json()).then(data => {
