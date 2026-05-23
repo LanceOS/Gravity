@@ -1,10 +1,10 @@
 import React from 'react';
 import type { Ticket } from '../../context/TicketContext';
-import { Button, Select, DenseTextInput } from '@library';
 import { Compass } from 'lucide-react';
 import { TicketRow } from './components';
+import { TicketFilterBar } from '../TicketFilterBar';
 import type { TicketListProps } from './types';
-import { getAssigneeAvatar, getDomainTag, getPriorityIcon, getStatusLabel, LIST_SORT_OPTIONS, PRIORITY_FILTER_OPTIONS, STATUS_FILTER_OPTIONS } from './utils';
+import { getAssigneeAvatar, getDomainTag, getPriorityIcon, getStatusLabel } from './utils';
 
 export const TicketList: React.FC<TicketListProps> = ({
   filters,
@@ -26,67 +26,16 @@ export const TicketList: React.FC<TicketListProps> = ({
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', flex: 1, overflow: 'hidden' }}>
 
       {/* Filtering Header Bar */}
-      <div
-        style={{
-          padding: '12px 24px',
-          borderBottom: '1px solid var(--border)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          background: 'var(--sidebar-bg)'
-        }}
-      >
-        {/* Search */}
-        <DenseTextInput
-          placeholder="Filter tickets by title, body, or ID..."
-          value={filters.search}
-          onChange={(e) => onFilterChange({ search: e.target.value })}
-          style={{ maxWidth: '300px' }}
-        />
-
-        {/* Priority Filter */}
-        <Select
-          value={filters.priority}
-          onValueChange={(priority: string) => onFilterChange({ priority: priority as Ticket['priority'] | '' })}
-          options={PRIORITY_FILTER_OPTIONS}
-          aria-label="Filter list by priority"
-          style={{ width: 'fit-content' }}
-        />
-
-        {/* Status Filter */}
-        <Select
-          value={filters.status}
-          onValueChange={(status: string) => onFilterChange({ status: status as Ticket['status'] | '' })}
-          options={STATUS_FILTER_OPTIONS}
-          aria-label="Filter list by status"
-          style={{ width: 'fit-content' }}
-        />
-
-        <Select
-          value={listSort}
-          onValueChange={(sort: string) => onListSortChange(sort as typeof listSort)}
-          options={LIST_SORT_OPTIONS}
-          aria-label="Sort list tickets"
-          style={{ width: 'fit-content' }}
-        />
-
-        {/* Clear Filters Button */}
-        {hasActiveFilters && (
-          <Button
-            onClick={onClearFilters}
-            variant="accent"
-            size="sm"
-          >
-            Clear Filters
-          </Button>
-        )}
-
-
-
-        <div style={{ marginLeft: 'auto', fontSize: '12px', color: 'var(--text-muted)' }}>
-          {filteredCount} of {totalCount} tickets
-        </div>
-      </div>
+      <TicketFilterBar
+        filters={filters}
+        onFilterChange={onFilterChange}
+        hasActiveFilters={hasActiveFilters}
+        onClearFilters={onClearFilters}
+        filteredCount={filteredCount}
+        totalCount={totalCount}
+        listSort={listSort}
+        onListSortChange={onListSortChange}
+      />
 
       {/* Main Rows Scrolling Container */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px' }}>

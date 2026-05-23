@@ -16,9 +16,6 @@ export const PRIORITY_FILTER_OPTIONS = PRIORITY_FILTER_VALUES.map(([value, label
   label,
 }));
 
-export function getBoardProjectOptions(projects: Project[]) {
-  return [{ value: '', label: 'Any Project' }, ...projects.map((project) => ({ value: project.id, label: project.name }))];
-}
 
 export function getPriorityIcon(priority: Ticket['priority']): ReactNode {
   switch (priority) {

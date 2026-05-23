@@ -8,16 +8,18 @@ export interface DenseTextInputProps extends React.InputHTMLAttributes<HTMLInput
 }
 
 export const DenseTextInput = React.forwardRef<HTMLInputElement, DenseTextInputProps>(
-  ({ label, error, style, id, ...props }, ref) => {
+  ({ label, error, style, className, id, ...props }, ref) => {
     const inputId = id || `dense-input-${Math.random().toString(36).substr(2, 9)}`;
 
     return (
       <div
+        className={className}
         style={{
           display: 'flex',
           flexDirection: 'column',
           gap: '2px',
-          width: '100%'
+          width: '100%',
+          ...style
         }}
       >
         {label && (
@@ -41,6 +43,7 @@ export const DenseTextInput = React.forwardRef<HTMLInputElement, DenseTextInputP
             ref={ref}
             style={{
               width: '100%',
+              height: '36px',
               backgroundColor: 'var(--card-bg)',
               border: `1px solid ${error ? 'var(--priority-high)' : 'var(--border)'}`,
               borderRadius: 'var(--radius-xs)',
@@ -52,8 +55,7 @@ export const DenseTextInput = React.forwardRef<HTMLInputElement, DenseTextInputP
               fontSize: '12px',
               color: 'var(--text-heading)',
               outline: 'none',
-              transition: 'border-color var(--transition-fast, 0.1s ease), box-shadow var(--transition-fast, 0.1s ease)',
-              ...style
+              transition: 'border-color var(--transition-fast, 0.1s ease), box-shadow var(--transition-fast, 0.1s ease)'
             }}
             className="dense-input-element"
             {...props}
