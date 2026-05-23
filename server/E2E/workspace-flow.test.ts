@@ -57,8 +57,8 @@ describe('Server Workspaces Flow E2E', () => {
       });
 
     expect(resCreateProject.status).toBe(201);
-    const defaultProjectId = resCreateProject.body.id;
-    expect(defaultProjectId).toBeDefined();
+    const extraProjectId = resCreateProject.body.id;
+    expect(extraProjectId).toBeDefined();
 
     // 3. GET /api/v1/workspaces to verify owner workspace listing
     const resOwnerWorkspaces = await request(app)
