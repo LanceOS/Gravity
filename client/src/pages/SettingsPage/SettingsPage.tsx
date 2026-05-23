@@ -855,46 +855,66 @@ interface McpToolMetadata {
   description: string;
 }
 
-const MCP_TOOLS_METADATA: McpToolMetadata[] = [
+const MCP_TOOL_GROUPS: { title: string; tools: McpToolMetadata[] }[] = [
   {
-    name: 'list_tickets',
-    label: 'List Tickets',
-    description: 'Allows reading the list of tasks and tickets in the workspace, with optional status or project filters.',
+    title: 'Ticket Tools',
+    tools: [
+      {
+        name: 'list_tickets',
+        label: 'List Tickets',
+        description: 'Allows reading the list of tasks and tickets in the workspace, with optional status or project filters.',
+      },
+      {
+        name: 'get_ticket_details',
+        label: 'Get Ticket Details',
+        description: 'Allows reading complete details, description, and status of any ticket via its unique key.',
+      },
+      {
+        name: 'create_ticket',
+        label: 'Create Ticket',
+        description: 'Allows creating new tickets and sub-tasks under existing tickets in the workspace.',
+      },
+      {
+        name: 'update_ticket',
+        label: 'Update Ticket',
+        description: 'Allows updating description, title, priority, cycle, domain, and status of existing tickets.',
+      },
+    ],
   },
   {
-    name: 'list_workspace_members',
-    label: 'List Workspace Members',
-    description: 'Allows reading the list of members in this workspace, including their roles and active times.',
+    title: 'Member Tools',
+    tools: [
+      {
+        name: 'list_workspace_members',
+        label: 'List Workspace Members',
+        description: 'Allows reading the list of members in this workspace, including their roles and active times.',
+      },
+    ],
   },
   {
-    name: 'get_ticket_details',
-    label: 'Get Ticket Details',
-    description: 'Allows reading complete details, description, and status of any ticket via its unique key.',
-  },
-  {
-    name: 'create_ticket',
-    label: 'Create Ticket',
-    description: 'Allows creating new tickets and sub-tasks under existing tickets in the workspace.',
-  },
-  {
-    name: 'update_ticket',
-    label: 'Update Ticket',
-    description: 'Allows updating description, title, priority, cycle, domain, and status of existing tickets.',
-  },
-  {
-    name: 'create_comment',
-    label: 'Create Comment',
-    description: 'Allows creating new comments on an existing ticket.',
-  },
-  {
-    name: 'read_comments',
-    label: 'Read Comments',
-    description: 'Allows reading all comment threads on a specific ticket.',
-  },
-  {
-    name: 'delete_comment',
-    label: 'Delete Comment',
-    description: 'Allows deleting a specific comment on a ticket.',
+    title: 'Comment Tools',
+    tools: [
+      {
+        name: 'create_comment',
+        label: 'Create Comment',
+        description: 'Allows creating new comments on an existing ticket.',
+      },
+      {
+        name: 'read_comments',
+        label: 'Read Comments',
+        description: 'Allows reading all comment threads on a specific ticket.',
+      },
+      {
+        name: 'update_comment',
+        label: 'Update Comment',
+        description: 'Allows updating the text body of a specific comment on a ticket.',
+      },
+      {
+        name: 'delete_comment',
+        label: 'Delete Comment',
+        description: 'Allows deleting a specific comment on a ticket.',
+      },
+    ],
   },
 ];
 
@@ -926,74 +946,81 @@ function McpToolsSection({
           </Alert>
         )}
 
-        <Stack gap="var(--space-3)">
-          {MCP_TOOLS_METADATA.map((tool) => {
-            const isEnabled = !disabledTools.includes(tool.name);
+        <Stack gap="var(--space-6)">
+          {MCP_TOOL_GROUPS.map((group) => (
+            <div key={group.title}>
+              <h3 style={{ margin: '0 0 var(--space-4) 0', fontSize: '16px', fontWeight: 600, color: '#ffffff' }}>
+                {group.title}
+              </h3>
+              <Stack gap="var(--space-3)">
+                {group.tools.map((tool) => {
+                  const isEnabled = !disabledTools.includes(tool.name);
 
-            const handleToggle = (checked: boolean) => {
-              let nextDisabled = [...disabledTools];
-              if (checked) {
-                // Enable: remove from disabled list
-                nextDisabled = nextDisabled.filter((name) => name !== tool.name);
-              } else {
-                // Disable: add to disabled list
-                if (!nextDisabled.includes(tool.name)) {
-                  nextDisabled.push(tool.name);
-                }
-              }
-              onChangeSettings({ disabledMcpTools: nextDisabled });
-            };
+                  const handleToggle = (checked: boolean) => {
+                    let nextDisabled = [...disabledTools];
+                    if (checked) {
+                      nextDisabled = nextDisabled.filter((name) => name !== tool.name);
+                    } else {
+                      if (!nextDisabled.includes(tool.name)) {
+                        nextDisabled.push(tool.name);
+                      }
+                    }
+                    onChangeSettings({ disabledMcpTools: nextDisabled });
+                  };
 
-            return (
-              <div
-                key={tool.name}
-                data-testid={`mcp-tool-row-${tool.name}`}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 'var(--space-4)',
-                  padding: 'var(--space-4)',
-                  borderRadius: 'var(--radius-md)',
-                  background: 'var(--card-hover)',
-                  border: '1px solid var(--border)',
-                  transition: 'border-color 0.2s ease',
-                }}
-              >
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+                  return (
                     <div
+                      key={tool.name}
+                      data-testid={`mcp-tool-row-${tool.name}`}
                       style={{
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        background: isEnabled ? 'var(--success)' : 'var(--error)',
-                        boxShadow: isEnabled
-                          ? '0 0 8px var(--success-glow)'
-                          : '0 0 8px var(--error-glow)',
-                        flexShrink: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 'var(--space-4)',
+                        padding: 'var(--space-4)',
+                        borderRadius: 'var(--radius-md)',
+                        background: 'var(--card-hover)',
+                        border: '1px solid var(--border)',
+                        transition: 'border-color 0.2s ease',
                       }}
-                    />
-                    <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-heading)' }}>
-                      {tool.label}
-                    </span>
-                  </div>
-                  <span style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.4, paddingLeft: 'calc(8px + var(--space-3))' }}>
-                    {tool.description}
-                  </span>
-                </div>
+                    >
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+                          <div
+                            style={{
+                              width: '8px',
+                              height: '8px',
+                              borderRadius: '50%',
+                              background: isEnabled ? 'var(--success)' : 'var(--error)',
+                              boxShadow: isEnabled
+                                ? '0 0 8px var(--success-glow)'
+                                : '0 0 8px var(--error-glow)',
+                              flexShrink: 0,
+                            }}
+                          />
+                          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-heading)' }}>
+                            {tool.label}
+                          </span>
+                        </div>
+                        <span style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.4, paddingLeft: 'calc(8px + var(--space-3))' }}>
+                          {tool.description}
+                        </span>
+                      </div>
 
-                <div style={{ flexShrink: 0 }}>
-                  <Switch
-                    label={isEnabled ? 'Enabled' : 'Disabled'}
-                    checked={isEnabled}
-                    onCheckedChange={handleToggle}
-                    disabled={!isOwner}
-                  />
-                </div>
-              </div>
-            );
-          })}
+                      <div style={{ flexShrink: 0 }}>
+                        <Switch
+                          label={isEnabled ? 'Enabled' : 'Disabled'}
+                          checked={isEnabled}
+                          onCheckedChange={handleToggle}
+                          disabled={!isOwner}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </Stack>
+            </div>
+          ))}
         </Stack>
       </Stack>
     </Card>

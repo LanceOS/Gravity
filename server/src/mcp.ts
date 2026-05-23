@@ -2,7 +2,7 @@ import { and, asc, eq } from 'drizzle-orm';
 import { Router } from 'express';
 import { db } from './db/index.js';
 import { authUsers, projects, userProfiles, workspaceMemberActivity, workspaceMembers, workspaceSettings } from './db/schema.js';
-import { addCommentRecord, createTicketRecord, deleteCommentRecord, getTicketByKey, getTicketDetailsByKey, listComments, listTickets, updateTicketRecord } from './services/tickets.js';
+import { addCommentRecord, createTicketRecord, deleteCommentRecord, getTicketByKey, getTicketDetailsByKey, listComments, listTickets, updateTicketRecord, updateCommentRecord } from './services/tickets.js';
 
 export const mcpToolsList = [
   {
@@ -114,6 +114,19 @@ export const mcpToolsList = [
         commentId: { type: 'string' },
       },
       required: ['ticketKey', 'commentId'],
+    },
+  },
+  {
+    name: 'update_comment',
+    description: 'Update the text body of a specific comment on a ticket.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ticketKey: { type: 'string' },
+        commentId: { type: 'string' },
+        body: { type: 'string' },
+      },
+      required: ['ticketKey', 'commentId', 'body'],
     },
   },
 ];
@@ -259,6 +272,19 @@ export async function executeTool(name: string, args: Record<string, unknown>) {
     if (!commentId) throw new Error('commentId is required for delete_comment.');
     const success = await deleteCommentRecord(commentId, ticket.id);
     return { success };
+  }
+
+  if (name === 'update_comment') {
+    const ticketKey = String(args.ticketKey ?? '').toUpperCase();
+    const ticket = await getTicketByKey(ticketKey);
+    if (!ticket) {
+      throw new Error(`Ticket ${ticketKey} not found.`);
+    }
+    const commentId = String(args.commentId ?? '');
+    const body = String(args.body ?? '');
+    if (!commentId || !body) throw new Error('commentId and body are required for update_comment.');
+    const comment = await updateCommentRecord(commentId, ticket.id, body);
+    return { comment };
   }
 
   throw new Error(`Unknown tool: ${name}`);

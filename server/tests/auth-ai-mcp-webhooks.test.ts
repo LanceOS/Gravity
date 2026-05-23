@@ -352,6 +352,23 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
     expect(readCommentsResponse.status).toBe(200);
     expect(readCommentsResponse.body.result.content[0].text).toContain('Comment created through MCP.');
 
+    const updateCommentResponse = await api().post('/api/v1/mcp/sse').send({
+      jsonrpc: '2.0',
+      id: 715,
+      method: 'tools/call',
+      params: {
+        name: 'update_comment',
+        arguments: {
+          ticketKey: existingTicket.key,
+          commentId: commentData.comment.id,
+          body: 'Comment updated through MCP!',
+        },
+      },
+    });
+
+    expect(updateCommentResponse.status).toBe(200);
+    expect(updateCommentResponse.body.result.content[0].text).toContain('Comment updated through MCP!');
+
     const removeCommentResponse = await api().post('/api/v1/mcp/sse').send({
       jsonrpc: '2.0',
       id: 72,
