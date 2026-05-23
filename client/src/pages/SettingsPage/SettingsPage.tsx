@@ -949,7 +949,7 @@ function McpToolsSection({
         <Stack gap="var(--space-6)">
           {MCP_TOOL_GROUPS.map((group) => (
             <div key={group.title}>
-              <h3 style={{ margin: '0 0 var(--space-4) 0', fontSize: '16px', fontWeight: 600, color: '#ffffff' }}>
+              <h3 style={{ margin: '0 0 var(--space-4) 0', fontSize: '16px', fontWeight: 600, color: 'var(--text-heading)' }}>
                 {group.title}
               </h3>
               <Stack gap="var(--space-3)">
