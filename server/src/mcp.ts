@@ -332,7 +332,7 @@ export async function executeTool(name: string, args: Record<string, unknown>, c
   throw new Error(`Unknown tool: ${name}`);
 }
 
-export async function handleMcpRequest(request: unknown, workspaceId: string, actorUserId: string) {
+export async function handleMcpRequest(request: unknown, workspaceId = '', actorUserId = '') {
   const payload = request as {
     method?: string;
     params?: { name?: string; arguments?: Record<string, unknown> };
