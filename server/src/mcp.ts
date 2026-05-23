@@ -1,6 +1,7 @@
+import { and, asc, eq } from 'drizzle-orm';
 import { Router } from 'express';
 import { db } from './db/index.js';
-import { projects } from './db/schema.js';
+import { authUsers, projects, userProfiles, workspaceMemberActivity, workspaceMembers } from './db/schema.js';
 import { addCommentRecord, createTicketRecord, getTicketByKey, getTicketDetailsByKey, listTickets, updateTicketRecord } from './services/tickets.js';
 
 export const mcpToolsList = [
@@ -17,6 +18,17 @@ export const mcpToolsList = [
         assigneeId: { type: 'string' },
         cycleId: { type: 'string' },
       },
+    },
+  },
+  {
+    name: 'list_workspace_members',
+    description: 'Retrieve a list of members in a workspace, including their roles and last active times.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workspaceId: { type: 'string' },
+      },
+      required: ['workspaceId'],
     },
   },
   {
@@ -103,6 +115,47 @@ async function executeTool(name: string, args: Record<string, unknown>) {
     );
 
     return ticketsByProject.flat();
+  }
+
+  if (name === 'list_workspace_members') {
+    const workspaceId = String(args.workspaceId ?? '');
+    if (!workspaceId) {
+      throw new Error('workspaceId is required.');
+    }
+
+    const members = await db
+      .select({
+        id: authUsers.id,
+        name: authUsers.name,
+        email: authUsers.email,
+        image: authUsers.image,
+        avatarUrl: userProfiles.avatarUrl,
+        role: workspaceMembers.role,
+        createdAt: workspaceMembers.createdAt,
+        lastActiveAt: workspaceMemberActivity.lastActiveAt,
+      })
+      .from(workspaceMembers)
+      .innerJoin(authUsers, eq(authUsers.id, workspaceMembers.userId))
+      .leftJoin(userProfiles, eq(userProfiles.userId, workspaceMembers.userId))
+      .leftJoin(
+        workspaceMemberActivity,
+        and(
+          eq(workspaceMemberActivity.workspaceId, workspaceMembers.workspaceId),
+          eq(workspaceMemberActivity.userId, workspaceMembers.userId)
+        )
+      )
+      .where(eq(workspaceMembers.workspaceId, workspaceId))
+      .orderBy(asc(workspaceMembers.createdAt));
+
+    return members.map((m) => ({
+      id: m.id,
+      name: m.name,
+      email: m.email,
+      avatar: m.avatarUrl || m.image || '',
+      role: m.role,
+      createdAt: m.createdAt.toISOString(),
+      lastActiveAt: m.lastActiveAt ? m.lastActiveAt.toISOString() : null,
+    }));
   }
 
   if (name === 'get_ticket_details') {
