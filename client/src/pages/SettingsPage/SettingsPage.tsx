@@ -951,7 +951,7 @@ function McpToolsSection({
                 }}
               >
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
                     <div
                       style={{
                         width: '8px',
@@ -967,11 +967,8 @@ function McpToolsSection({
                     <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-heading)' }}>
                       {tool.label}
                     </span>
-                    <Badge variant="default" style={{ fontSize: '9px', fontFamily: 'monospace' }}>
-                      {tool.name}
-                    </Badge>
                   </div>
-                  <span style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                  <span style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.4, paddingLeft: 'calc(8px + var(--space-3))' }}>
                     {tool.description}
                   </span>
                 </div>
