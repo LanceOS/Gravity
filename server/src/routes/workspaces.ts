@@ -18,6 +18,7 @@ import {
   workspaceInvites,
   workspaceJoinRequests,
   workspaceMembers,
+  workspaceMemberActivity,
   workspacePeers,
   workspaces,
   workspaceSettings,
@@ -39,6 +40,26 @@ import {
 } from '../lib/platform.js';
 import { buildProjectKeyConflictMessage, mapProjectCreationError, projectKeyExists } from '../lib/project-creation.js';
 import { resolveRequestActorUserId } from '../lib/request-auth.js';
+
+async function recordWorkspaceActivity(workspaceId: string, userId: string) {
+  try {
+    await db
+      .insert(workspaceMemberActivity)
+      .values({
+        workspaceId,
+        userId,
+        lastActiveAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: [workspaceMemberActivity.workspaceId, workspaceMemberActivity.userId],
+        set: {
+          lastActiveAt: new Date(),
+        },
+      });
+  } catch (error) {
+    console.error(`Failed to record workspace activity for user ${userId} in workspace ${workspaceId}:`, error);
+  }
+}
 
 function createValidationCode() {
   return `GRAV-${Math.floor(1000 + Math.random() * 9000)}-${randomUUID().slice(0, 1).toUpperCase()}`;
@@ -155,6 +176,8 @@ export function createWorkspacesRouter() {
       const normalizedWorkspaceKey = normalizeEntityKey(key);
       const resolvedWorkspaceAccessKey = workspaceKey?.trim() || createWorkspaceAccessKey(normalizedWorkspaceKey);
 
+      const defaultProjectId = defaultProjectName ? createId('p') : null;
+
       await db.transaction(async (tx) => {
         await tx.insert(workspaces).values({
           id: workspaceId,
@@ -163,6 +186,7 @@ export function createWorkspacesRouter() {
           key: normalizedWorkspaceKey,
           workspaceKey: resolvedWorkspaceAccessKey,
           hostUrl: '',
+          defaultProjectId,
           createdBy: effectiveOwnerId,
           createdAt: new Date(),
         });
@@ -181,6 +205,29 @@ export function createWorkspacesRouter() {
           role: 'owner',
           createdAt: new Date(),
         });
+
+        if (defaultProjectId && defaultProjectName) {
+          const normalizedProjectKey = normalizeEntityKey(defaultProjectKey || defaultProjectName.slice(0, 3).toUpperCase());
+          await tx.insert(projects).values({
+            id: defaultProjectId,
+            workspaceId,
+            name: defaultProjectName,
+            description: '',
+            key: normalizedProjectKey,
+            status: 'active',
+            inviteCode: createProjectInviteCode(normalizedProjectKey),
+            createdBy: effectiveOwnerId,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+
+          await tx.insert(projectMembers).values({
+            projectId: defaultProjectId,
+            userId: effectiveOwnerId,
+            role: 'owner',
+            createdAt: new Date(),
+          });
+        }
       });
 
       const workspace = await getWorkspaceSummary(workspaceId, effectiveOwnerId);
@@ -192,10 +239,17 @@ export function createWorkspacesRouter() {
 
   router.get('/workspaces/:workspaceId', async (req, res) => {
     try {
-      const workspace = await getWorkspaceSummary(req.params.workspaceId);
+      const workspaceId = req.params.workspaceId;
+      const workspace = await getWorkspaceSummary(workspaceId);
       if (!workspace) {
         res.status(404).json({ error: 'Workspace not found.' });
         return;
+      }
+
+      // Record activity if active user resolved
+      const actorUserId = await resolveRequestActorUserId(req);
+      if (actorUserId) {
+        await recordWorkspaceActivity(workspaceId, actorUserId);
       }
 
       res.json(workspace);
@@ -215,6 +269,12 @@ export function createWorkspacesRouter() {
         return;
       }
 
+      // Record activity if active user resolved
+      const actorUserId = await resolveRequestActorUserId(req);
+      if (actorUserId) {
+        await recordWorkspaceActivity(workspaceId, actorUserId);
+      }
+
       res.json(settings);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load workspace settings.' });
@@ -231,6 +291,12 @@ export function createWorkspacesRouter() {
       if (!currentWorkspace) {
         res.status(404).json({ error: 'Workspace not found.' });
         return;
+      }
+
+      // Record activity if active user resolved
+      const actorUserId = await resolveRequestActorUserId(req);
+      if (actorUserId) {
+        await recordWorkspaceActivity(workspaceId, actorUserId);
       }
 
       const nextHostUrl = typeof req.body?.hostUrl === 'string' ? req.body.hostUrl : currentWorkspace.hostUrl;
@@ -274,6 +340,12 @@ export function createWorkspacesRouter() {
 
   router.get('/workspaces/:workspaceId/members', async (req, res) => {
     try {
+      const workspaceId = req.params.workspaceId;
+      const actorUserId = await resolveRequestActorUserId(req);
+      if (actorUserId) {
+        await recordWorkspaceActivity(workspaceId, actorUserId);
+      }
+
       const members = await db
         .select({
           id: authUsers.id,
@@ -283,10 +355,18 @@ export function createWorkspacesRouter() {
           avatarUrl: userProfiles.avatarUrl,
           role: workspaceMembers.role,
           createdAt: workspaceMembers.createdAt,
+          lastActiveAt: workspaceMemberActivity.lastActiveAt,
         })
         .from(workspaceMembers)
         .innerJoin(authUsers, eq(authUsers.id, workspaceMembers.userId))
         .leftJoin(userProfiles, eq(userProfiles.userId, workspaceMembers.userId))
+        .leftJoin(
+          workspaceMemberActivity,
+          and(
+            eq(workspaceMemberActivity.workspaceId, workspaceMembers.workspaceId),
+            eq(workspaceMemberActivity.userId, workspaceMembers.userId)
+          )
+        )
         .where(eq(workspaceMembers.workspaceId, req.params.workspaceId))
         .orderBy(asc(workspaceMembers.createdAt));
 
@@ -298,10 +378,68 @@ export function createWorkspacesRouter() {
           avatar: member.avatarUrl || member.image || '',
           role: member.role,
           createdAt: member.createdAt,
+          lastActiveAt: member.lastActiveAt ? member.lastActiveAt.toISOString() : null,
         })),
       );
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load workspace members.' });
+    }
+  });
+
+  router.get('/workspaces/:workspaceId/members/:userId/activity', async (req, res) => {
+    try {
+      const { workspaceId, userId } = req.params;
+      const rows = await db
+        .select()
+        .from(workspaceMemberActivity)
+        .where(
+          and(
+            eq(workspaceMemberActivity.workspaceId, workspaceId),
+            eq(workspaceMemberActivity.userId, userId)
+          )
+        )
+        .limit(1);
+
+      const activity = rows[0];
+      if (!activity) {
+        res.json({ workspaceId, userId, lastActiveAt: null });
+        return;
+      }
+
+      res.json({
+        workspaceId: activity.workspaceId,
+        userId: activity.userId,
+        lastActiveAt: activity.lastActiveAt.toISOString(),
+      });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to get workspace activity.' });
+    }
+  });
+
+  router.post('/workspaces/:workspaceId/members/:userId/activity', async (req, res) => {
+    try {
+      const { workspaceId, userId } = req.params;
+      await recordWorkspaceActivity(workspaceId, userId);
+      
+      const rows = await db
+        .select()
+        .from(workspaceMemberActivity)
+        .where(
+          and(
+            eq(workspaceMemberActivity.workspaceId, workspaceId),
+            eq(workspaceMemberActivity.userId, userId)
+          )
+        )
+        .limit(1);
+
+      res.json({
+        success: true,
+        workspaceId,
+        userId,
+        lastActiveAt: rows[0]?.lastActiveAt ? rows[0].lastActiveAt.toISOString() : new Date().toISOString(),
+      });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to record workspace activity.' });
     }
   });
 
@@ -369,6 +507,8 @@ export function createWorkspacesRouter() {
         res.status(403).json({ error: 'Owner or admin access is required.' });
         return;
       }
+
+      await recordWorkspaceActivity(req.params.workspaceId, actorUserId);
 
       const inviteRows = await db
         .select()
@@ -910,6 +1050,7 @@ export function createWorkspacesRouter() {
         await tx.delete(validations).where(eq(validations.workspaceId, workspaceId));
         await tx.delete(workspaceSettings).where(eq(workspaceSettings.workspaceId, workspaceId));
         await tx.delete(workspaceMembers).where(eq(workspaceMembers.workspaceId, workspaceId));
+        await tx.delete(workspaceMemberActivity).where(eq(workspaceMemberActivity.workspaceId, workspaceId));
         
         await tx.delete(workspaces).where(eq(workspaces.id, workspaceId));
       });

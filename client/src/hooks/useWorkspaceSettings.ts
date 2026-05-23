@@ -17,6 +17,7 @@ export interface WorkspaceMember {
   avatar: string;
   role: string;
   createdAt: string;
+  lastActiveAt?: string | null;
 }
 
 export interface WorkspaceInvite {
@@ -177,12 +178,18 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
 
     try {
       const [settingsResponse, membersResponse, invitesResponse, joinRequestsResponse] = await Promise.all([
-        fetch(`/api/v1/workspaces/${activeWorkspaceId}/settings`),
-        fetch(`/api/v1/workspaces/${activeWorkspaceId}/members`),
+        fetch(`/api/v1/workspaces/${activeWorkspaceId}/settings`, {
+          headers: { 'X-User-Id': currentUser.id },
+        }),
+        fetch(`/api/v1/workspaces/${activeWorkspaceId}/members`, {
+          headers: { 'X-User-Id': currentUser.id },
+        }),
         fetch(`/api/v1/workspaces/${activeWorkspaceId}/peer-invites`, {
           headers: { 'X-User-Id': currentUser.id },
         }),
-        fetch(`/api/v1/workspaces/${activeWorkspaceId}/join-requests`),
+        fetch(`/api/v1/workspaces/${activeWorkspaceId}/join-requests`, {
+          headers: { 'X-User-Id': currentUser.id },
+        }),
       ]);
 
       const [settingsData, membersData, invitesData, joinRequestsData] = await Promise.all([
@@ -284,7 +291,10 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
     try {
       const response = await fetch(`/api/v1/workspaces/${activeWorkspaceId}/settings`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Id': currentUser.id,
+        },
         body: JSON.stringify({
           hostUrl: settings.hostUrl,
           joinMode: settings.joinMode,
@@ -464,7 +474,10 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
     try {
       const response = await fetch(`/api/v1/workspaces/${activeWorkspaceId}`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Id': currentUser.id,
+        },
       });
       const data = await response.json();
 
@@ -483,6 +496,14 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
   }, [activeWorkspaceId, currentUser]);
 
   const clearDeleteError = useCallback(() => setDeleteError(null), []);
+
+  const updateMemberActivity = useCallback((userId: string, lastActiveAt: string) => {
+    setMembers((current) =>
+      current.map((member) =>
+        member.id === userId ? { ...member, lastActiveAt } : member
+      )
+    );
+  }, []);
 
   return {
     settings,
@@ -513,5 +534,6 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
     refreshWorkspaceAdmin,
     deleteWorkspace,
     clearDeleteError,
+    updateMemberActivity,
   };
 }

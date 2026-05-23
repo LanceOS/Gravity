@@ -181,6 +181,7 @@ export function AppShellPage() {
     deleteLoading,
     deleteError,
     clearDeleteError,
+    updateMemberActivity,
   } = useWorkspaceSettings({
     currentUser,
     activeWorkspaceId,
@@ -234,6 +235,30 @@ export function AppShellPage() {
 
     window.localStorage.setItem(storageKey, activeWorkspaceId);
   }, [currentUser, activeWorkspaceId]);
+
+  useEffect(() => {
+    if (!activeWorkspaceId || !currentUser) {
+      return;
+    }
+
+    // Record user activity in the selected workspace
+    fetch(`/api/v1/workspaces/${activeWorkspaceId}/members/${currentUser.id}/activity`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-User-Id': currentUser.id,
+      },
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.lastActiveAt) {
+          updateMemberActivity(currentUser.id, data.lastActiveAt);
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to log workspace activity:', err);
+      });
+  }, [activeWorkspaceId, currentUser, updateMemberActivity]);
 
   useEffect(() => {
     if (!activeWorkspaceId) {

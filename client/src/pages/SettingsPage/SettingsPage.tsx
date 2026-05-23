@@ -650,6 +650,48 @@ function AccessSection({
   );
 }
 
+function formatLastActive(isoString?: string | null): string {
+  if (!isoString) {
+    return 'Never';
+  }
+
+  try {
+    const activeDate = new Date(isoString);
+    if (isNaN(activeDate.getTime())) {
+      return 'Never';
+    }
+
+    const today = new Date();
+    const isSameDay =
+      activeDate.getDate() === today.getDate() &&
+      activeDate.getMonth() === today.getMonth() &&
+      activeDate.getFullYear() === today.getFullYear();
+
+    if (isSameDay) {
+      return 'Today';
+    }
+
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const isYesterday =
+      activeDate.getDate() === yesterday.getDate() &&
+      activeDate.getMonth() === yesterday.getMonth() &&
+      activeDate.getFullYear() === yesterday.getFullYear();
+
+    if (isYesterday) {
+      return 'Yesterday';
+    }
+
+    return activeDate.toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  } catch {
+    return 'Never';
+  }
+}
+
 function MembersSection({ members }: { members: WorkspaceMember[] }) {
   return (
     <Card style={{ padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)' }}>
@@ -683,6 +725,9 @@ function MembersSection({ members }: { members: WorkspaceMember[] }) {
                 <div>
                   <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-heading)' }}>{member.name}</div>
                   <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>{member.email}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', fontStyle: 'italic' }}>
+                    Last active: {formatLastActive(member.lastActiveAt)}
+                  </div>
                 </div>
               </div>
 
