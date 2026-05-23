@@ -10,11 +10,3 @@ export async function main() {
     process.exitCode = 1;
   }
 }
-
-const isDirectExecution =
-  typeof process.argv[1] === 'string' &&
-  new URL(import.meta.url).pathname === process.argv[1];
-
-if (isDirectExecution) {
-  void main();
-}
