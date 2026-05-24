@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Sidebar, type SidebarProps } from '../../components/Sidebar';
 import { DashboardLayout } from '../../components/DashboardLayout/DashboardLayout';
 import { ThemeToggle, Select } from '@library';
+import './WorkspaceLayout.css';
 
 interface WorkspaceLayoutProps {
   sidebarProps: SidebarProps;
