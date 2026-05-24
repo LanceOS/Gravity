@@ -167,6 +167,29 @@ describe('TicketList', () => {
     expect(screen.getByText('BACKLOG')).toBeInTheDocument();
     expect(screen.getByText('DONE')).toBeInTheDocument();
 
+    fireEvent.change(screen.getByDisplayValue('sync'), {
+      target: { value: 'ship' },
+    });
+    expect(props.onFilterChange).toHaveBeenCalled();
+
+    fireEvent.change(screen.getByDisplayValue('high'), {
+      target: { value: 'low' },
+    });
+    expect(props.onFilterChange).toHaveBeenCalledTimes(2);
+
+    fireEvent.change(screen.getByDisplayValue('backlog'), {
+      target: { value: 'done' },
+    });
+    expect(props.onFilterChange).toHaveBeenCalledTimes(3);
+
+    fireEvent.change(screen.getByDisplayValue('created'), {
+      target: { value: 'updated' },
+    });
+    expect(props.onListSortChange).toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: /clear filters/i }));
+    expect(props.onClearFilters).toHaveBeenCalled();
+
     await user.click(screen.getByRole('button', { name: 'TicketRow GRA-1 avatar-1.png' }));
     expect(props.onSelectTicket).toHaveBeenCalledWith(backlogTicket);
   });
