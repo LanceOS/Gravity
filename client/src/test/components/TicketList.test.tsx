@@ -194,4 +194,25 @@ describe('TicketList', () => {
     expect(props.onSelectTicket).toHaveBeenCalledWith(backlogTicket);
   });
 
+  it('switches to interactive grid mode and shows the empty state when there are no tickets', async () => {
+    const user = userEvent.setup();
+
+    renderTicketList({
+      filteredCount: 0,
+      totalCount: 0,
+      groupedTickets: {
+        backlog: [],
+        todo: [],
+        in_progress: [],
+        in_review: [],
+        done: [],
+        canceled: [],
+      },
+    });
+
+    await user.click(screen.getByRole('button', { name: /interactive grid/i }));
+
+    expect(screen.getByText(/no tickets/i)).toBeInTheDocument();
+  });
+
 });
