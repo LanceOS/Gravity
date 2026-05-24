@@ -14,6 +14,7 @@ import {
   Avatar,
   Switch
 } from '@library';
+import { DashboardLayout } from '../../components/DashboardLayout/DashboardLayout';
 import type { User } from '../../context/TicketContext';
 import type { WorkspaceSummary } from '../../hooks/useWorkspaceDirectory';
 import type {
@@ -1065,56 +1066,35 @@ export function SettingsPage({
   const activeCategoryMeta = SETTINGS_CATEGORIES.find((category) => category.id === activeCategory) || SETTINGS_CATEGORIES[0];
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg)' }}>
-      {/* Top Header Bar */}
-      <header
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: 'var(--space-4) var(--space-6)',
-          borderBottom: '1px solid var(--border)',
-          backgroundColor: 'var(--card-bg)',
-          position: 'sticky',
-          top: 0,
-          zIndex: 100
-        }}
-      >
-        <Flex align="center" gap="var(--space-4)">
-          <Button variant="ghost" size="sm" onClick={onBackToWorkspace} leftIcon={<ArrowLeft size={14} />}>
-            Workspace
+    <DashboardLayout>
+      <DashboardLayout.Header
+        leftContent={
+          <Flex align="center" gap="var(--space-4)">
+            <Button variant="ghost" size="sm" onClick={onBackToWorkspace} leftIcon={<ArrowLeft size={14} />}>
+              Workspace
+            </Button>
+
+            <Button variant="ghost" size="sm" onClick={onOpenDirectory} leftIcon={<Globe size={14} />}>
+              Workspaces
+            </Button>
+
+            <Divider vertical style={{ height: '20px' }} />
+
+            <div>
+              <h1 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: 'var(--text-heading)' }}>Workspace Settings</h1>
+              <p style={{ margin: 0, fontSize: '11px', color: 'var(--text-muted)' }}>Managing {workspace.name}</p>
+            </div>
+          </Flex>
+        }
+        rightContent={
+          <Button variant="accent" size="sm" onClick={onSaveSettings} loading={saveLoading}>
+            {saveSuccess ? 'Changes Saved' : 'Save Changes'}
           </Button>
+        }
+      />
 
-          <Button variant="ghost" size="sm" onClick={onOpenDirectory} leftIcon={<Globe size={14} />}>
-            Workspaces
-          </Button>
-
-          <Divider vertical style={{ height: '20px' }} />
-
-          <div>
-            <h1 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: 'var(--text-heading)' }}>Workspace Settings</h1>
-            <p style={{ margin: 0, fontSize: '11px', color: 'var(--text-muted)' }}>Managing {workspace.name}</p>
-          </div>
-        </Flex>
-
-        <Button variant="accent" size="sm" onClick={onSaveSettings} loading={saveLoading}>
-          {saveSuccess ? 'Changes Saved' : 'Save Changes'}
-        </Button>
-      </header>
-
-      {/* Main Body Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '280px minmax(0, 1fr)', flexGrow: 1 }}>
-        {/* Left Sidebar Menu */}
-        <aside
-          style={{
-            borderRight: '1px solid var(--border)',
-            backgroundColor: 'var(--sidebar-bg)',
-            padding: 'var(--space-5)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 'var(--space-5)'
-          }}
-        >
+      <DashboardLayout.Sidebar>
+        <div style={{ padding: 'var(--space-5)', display: 'flex', flexDirection: 'column', gap: 'var(--space-5)', height: '100%', overflowY: 'auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--card-bg)', border: '1px solid var(--border)' }}>
             <Avatar src={currentUser.avatar} name={currentUser.name} size="md" />
             <div>
@@ -1158,97 +1138,99 @@ export function SettingsPage({
               );
             })}
           </nav>
-        </aside>
+        </div>
+      </DashboardLayout.Sidebar>
 
-        {/* Right Content Pane */}
-        <section style={{ padding: 'var(--space-6)', overflowY: 'auto', maxHeight: 'calc(100vh - 64px)' }}>
-          <Stack gap="var(--space-5)" style={{ maxWidth: '800px', margin: '0 auto' }}>
-            <div>
-              <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
-                Settings Section
-              </span>
-              <h2 style={{ margin: '4px 0 0', fontSize: '24px', fontWeight: 700, color: 'var(--text-heading)', letterSpacing: '-0.02em' }}>
-                {activeCategoryMeta.label}
-              </h2>
-              <p style={{ margin: '6px 0 0', fontSize: '13.5px', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                {activeCategoryMeta.description}
-              </p>
-            </div>
+      <DashboardLayout.Main>
+        <DashboardLayout.Content>
+          <div style={{ padding: 'var(--space-6) var(--space-6) var(--space-8) var(--space-6)', maxWidth: '800px', margin: '0 auto' }}>
+            <Stack gap="var(--space-5)">
+              <div>
+                <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+                  Settings Section
+                </span>
+                <h2 style={{ margin: '4px 0 0', fontSize: '24px', fontWeight: 700, color: 'var(--text-heading)', letterSpacing: '-0.02em' }}>
+                  {activeCategoryMeta.label}
+                </h2>
+                <p style={{ margin: '6px 0 0', fontSize: '13.5px', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                  {activeCategoryMeta.description}
+                </p>
+              </div>
 
-            {settingsLoading && (
-              <Alert type="info">
-                Loading workspace administration data...
-              </Alert>
-            )}
+              {settingsLoading && (
+                <Alert type="info">
+                  Loading workspace administration data...
+                </Alert>
+              )}
 
-            {saveError && (
-              <Alert type="error">
-                {saveError}
-              </Alert>
-            )}
+              {saveError && (
+                <Alert type="error">
+                  {saveError}
+                </Alert>
+              )}
 
-            {inviteError && (
-              <Alert type="error">
-                {inviteError}
-              </Alert>
-            )}
+              {inviteError && (
+                <Alert type="error">
+                  {inviteError}
+                </Alert>
+              )}
 
-            {activeCategory === 'overview' && (
-              <>
-                <OverviewSection
+              {activeCategory === 'overview' && (
+                <>
+                  <OverviewSection
+                    workspace={workspace}
+                    settings={settings}
+                    onChangeSettings={onChangeSettings}
+                  />
+                  <FederationConnectionsSection
+                    federationConnections={federationConnections}
+                    connectionsLoading={connectionsLoading}
+                    connectionsError={connectionsError}
+                    retryingConnectionId={retryingConnectionId}
+                    onRetryConnection={onRetryConnection}
+                  />
+                  <DangerZoneSection
+                    workspace={workspace}
+                    deleteLoading={deleteLoading}
+                    deleteError={deleteError}
+                    onDeleteWorkspace={onDeleteWorkspace}
+                    onClearDeleteError={onClearDeleteError}
+                  />
+                </>
+              )}
+
+              {activeCategory === 'access' && (
+                <AccessSection
+                  invites={invites}
+                  invitesLoading={invitesLoading}
+                  inviteLoading={inviteLoading}
+                  revokeLoadingId={revokeLoadingId}
+                  onCreateInvite={onCreateInvite}
+                  onRevokeInvite={onRevokeInvite}
+                />
+              )}
+
+              {activeCategory === 'members' && <MembersSection members={members} />}
+
+              {activeCategory === 'requests' && (
+                <RequestsSection
+                  joinRequests={joinRequests}
+                  approveLoadingId={approveLoadingId}
+                  onApproveJoinRequest={onApproveJoinRequest}
+                />
+              )}
+
+              {activeCategory === 'mcp_tools' && (
+                <McpToolsSection
                   workspace={workspace}
                   settings={settings}
                   onChangeSettings={onChangeSettings}
                 />
-                <FederationConnectionsSection
-                  federationConnections={federationConnections}
-                  connectionsLoading={connectionsLoading}
-                  connectionsError={connectionsError}
-                  retryingConnectionId={retryingConnectionId}
-                  onRetryConnection={onRetryConnection}
-                />
-                <DangerZoneSection
-                  workspace={workspace}
-                  deleteLoading={deleteLoading}
-                  deleteError={deleteError}
-                  onDeleteWorkspace={onDeleteWorkspace}
-                  onClearDeleteError={onClearDeleteError}
-                />
-              </>
-            )}
-
-            {activeCategory === 'access' && (
-              <AccessSection
-                invites={invites}
-                invitesLoading={invitesLoading}
-                inviteLoading={inviteLoading}
-                revokeLoadingId={revokeLoadingId}
-                onCreateInvite={onCreateInvite}
-                onRevokeInvite={onRevokeInvite}
-              />
-            )}
-
-            {activeCategory === 'members' && <MembersSection members={members} />}
-
-            {activeCategory === 'requests' && (
-              <RequestsSection
-                joinRequests={joinRequests}
-                approveLoadingId={approveLoadingId}
-                onApproveJoinRequest={onApproveJoinRequest}
-              />
-            )}
-
-            {activeCategory === 'mcp_tools' && (
-              <McpToolsSection
-                workspace={workspace}
-                settings={settings}
-                onChangeSettings={onChangeSettings}
-              />
-            )}
-          </Stack>
-        </section>
-      </div>
-    </div>
+              )}
+            </Stack>
+          </div>
+        </DashboardLayout.Content>
+      </DashboardLayout.Main>
+    </DashboardLayout>
   );
 }
-

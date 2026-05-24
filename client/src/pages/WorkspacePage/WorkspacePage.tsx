@@ -1,5 +1,4 @@
 import { useMemo } from 'react';
-import { Kanban, List } from 'lucide-react';
 import { Button } from '@library';
 import type { Comment, Cycle, Domain, Project, Ticket, User } from '../../context/TicketContext';
 import type { TicketFilters, TicketListSort } from '../../utils/ticketView';
@@ -13,6 +12,8 @@ import {
   hasActiveTicketFilters,
   sortTicketsForList,
 } from '../../utils/ticketView';
+import { TicketFilterBar } from '../../components/TicketFilterBar';
+import { WorkspaceHeader } from '../../components/WorkspaceHeader';
 import './WorkspacePage.css';
 
 interface WorkspacePageProps {
@@ -114,30 +115,29 @@ export function WorkspacePage({
   return (
     <div className="workspace-page">
       {projects.length > 0 ? (
-        <header className="workspace-page__header">
-          <div className="workspace-page__title-group">
-            <span className="workspace-page__title">{headerTitle}</span>
-          </div>
-
-          <div className="workspace-page__view-toggle" role="tablist" aria-label="View mode">
-            <button
-              type="button"
-              onClick={() => onSetView('board')}
-              className={`workspace-page__view-button ${activeView === 'board' ? 'workspace-page__view-button--active' : ''}`}
-            >
-              <Kanban size={12} />
-              <span>Board</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => onSetView('list')}
-              className={`workspace-page__view-button ${activeView === 'list' ? 'workspace-page__view-button--active' : ''}`}
-            >
-              <List size={12} />
-              <span>List</span>
-            </button>
-          </div>
-        </header>
+        <WorkspaceHeader>
+          <WorkspaceHeader.Top>
+            <WorkspaceHeader.Title>{headerTitle}</WorkspaceHeader.Title>
+            <WorkspaceHeader.ViewToggle
+              activeView={activeView}
+              onSetView={onSetView}
+            />
+          </WorkspaceHeader.Top>
+          
+          <WorkspaceHeader.Bottom>
+            <TicketFilterBar
+              filters={filters}
+              onFilterChange={onSetFilters}
+              hasActiveFilters={hasFiltersApplied}
+              onClearFilters={handleClearFilters}
+              filteredCount={filteredTickets.length}
+              totalCount={tickets.length}
+              listSort={activeView === 'list' ? listSort : undefined}
+              onListSortChange={activeView === 'list' ? onSetListSort : undefined}
+              domains={Object.values(domainById)}
+            />
+          </WorkspaceHeader.Bottom>
+        </WorkspaceHeader>
       ) : null}
 
       <div className="workspace-page__content">

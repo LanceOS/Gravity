@@ -1,0 +1,75 @@
+/* Gravity WorkspaceHeader Premium Redesign Stylesheet */
+
+.workspace-header {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px 24px;
+  background: var(--sidebar-bg); /* Clean solid background to avoid backdrop-filter viewport-containing-block issue for Select dropdowns */
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.workspace-header__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.workspace-header__title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.workspace-header__title {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text-heading);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.workspace-header__view-toggle {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--border);
+  padding: 3px;
+  border-radius: var(--radius-full);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.workspace-header__view-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  padding: 5px 12px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  background: transparent;
+  color: var(--text-muted);
+  transition: all var(--transition-normal);
+}
+
+.workspace-header__view-button:hover {
+  color: var(--text-heading);
+}
+
+.workspace-header__view-button--active {
+  background: var(--card-bg);
+  color: var(--accent);
+  box-shadow: var(--shadow-sm);
+}
+
+.workspace-header__bottom {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
