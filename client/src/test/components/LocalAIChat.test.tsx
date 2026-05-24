@@ -125,9 +125,12 @@ describe('LocalAIChat', () => {
 
   it('checks the initial Ollama status, fills the default model, and sends a typed chat message', async () => {
     const user = userEvent.setup();
-    mocks.fetch
-      .mockResolvedValueOnce(createJsonResponse({ models: ['llama3'], connected: true }))
-      .mockResolvedValueOnce(createJsonResponse({ message: { content: 'AI says hello' } }));
+    mocks.fetch.mockImplementation((url: string) => {
+      if (url === '/api/v1/mcp/sse') return Promise.resolve(createJsonResponse({ result: { tools: [] } }));
+      if (url.includes('ollama/models')) return Promise.resolve(createJsonResponse({ models: ['llama3'], connected: true }));
+      if (url === '/api/v1/ai/chat') return Promise.resolve(createJsonResponse({ message: { content: 'AI says hello' } }));
+      return Promise.resolve(createJsonResponse({}));
+    });
 
     renderLocalAIChat();
 
@@ -135,10 +138,10 @@ describe('LocalAIChat', () => {
       expect(screen.getByText('Active')).toBeInTheDocument();
     });
 
-    expect(mocks.fetch).toHaveBeenNthCalledWith(
-      1,
-      '/api/v1/ai/ollama/models?ollamaUrl=http%3A%2F%2Flocalhost%3A11434'
-    );
+    // Check if ollama models was called
+    const modelsCall = mocks.fetch.mock.calls.find(call => call[0].includes('ollama/models'));
+    expect(modelsCall).toBeDefined();
+    
     expect(screen.getByDisplayValue('llama3')).toBeInTheDocument();
 
     const chatInput = screen.getByPlaceholderText('Ask AI a question...');
@@ -152,14 +155,14 @@ describe('LocalAIChat', () => {
       expect(screen.getByText('AI says hello')).toBeInTheDocument();
     });
 
-    const chatRequest = mocks.fetch.mock.calls[1];
-    expect(chatRequest[0]).toBe('/api/v1/ai/chat');
-    expect(chatRequest[1]).toMatchObject({
+    const chatRequest = mocks.fetch.mock.calls.find(call => call[0] === '/api/v1/ai/chat');
+    expect(chatRequest).toBeDefined();
+    expect(chatRequest![1]).toMatchObject({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
     });
 
-    expect(JSON.parse(chatRequest[1]?.body as string)).toMatchObject({
+    expect(JSON.parse(chatRequest![1]?.body as string)).toMatchObject({
       ollamaUrl: 'http://localhost:11434',
       model: 'llama3',
       messages: expect.arrayContaining([
@@ -173,9 +176,13 @@ describe('LocalAIChat', () => {
   it('sends a quick-action prompt from the active ticket context and surfaces Ollama errors', async () => {
     const user = userEvent.setup();
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    mocks.fetch
-      .mockResolvedValueOnce(createJsonResponse({ models: ['codellama'], connected: true }))
-      .mockResolvedValueOnce(createJsonResponse({ error: 'chat exploded' }, false));
+    
+    mocks.fetch.mockImplementation((url: string) => {
+      if (url === '/api/v1/mcp/sse') return Promise.resolve(createJsonResponse({ result: { tools: [] } }));
+      if (url.includes('ollama/models')) return Promise.resolve(createJsonResponse({ models: ['codellama'], connected: true }));
+      if (url === '/api/v1/ai/chat') return Promise.resolve(createJsonResponse({ error: 'chat exploded' }, false));
+      return Promise.resolve(createJsonResponse({}));
+    });
 
     renderLocalAIChat(
       {
@@ -195,10 +202,10 @@ describe('LocalAIChat', () => {
       expect(screen.getByText(/Failed to contact local Ollama/i)).toBeInTheDocument();
     });
 
-    const quickActionRequest = mocks.fetch.mock.calls[1];
-    expect(quickActionRequest[0]).toBe('/api/v1/ai/chat');
+    const quickActionRequest = mocks.fetch.mock.calls.find(call => call[0] === '/api/v1/ai/chat');
+    expect(quickActionRequest).toBeDefined();
 
-    const payload = JSON.parse(quickActionRequest[1]?.body as string);
+    const payload = JSON.parse(quickActionRequest![1]?.body as string);
     expect(payload).toMatchObject({
       ollamaUrl: 'http://ollama.internal:11434',
       model: 'codellama',
@@ -209,5 +216,111 @@ describe('LocalAIChat', () => {
     expect(screen.getByText(/chat exploded/i)).toBeInTheDocument();
 
     consoleErrorSpy.mockRestore();
+  });
+
+  it('fetches MCP tools on mount and executes them automatically', async () => {
+    const user = userEvent.setup();
+    mocks.fetch
+      // 1. tools list
+      .mockResolvedValueOnce(createJsonResponse({ result: { tools: [{ name: 'list_tickets' }] } }))
+      // 2. ollama models
+      .mockResolvedValueOnce(createJsonResponse({ models: ['llama3'], connected: true }))
+      // 3. chat request (returns tool call)
+      .mockResolvedValueOnce(createJsonResponse({ 
+        message: { 
+          role: 'assistant', 
+          content: '',
+          tool_calls: [{ id: 'call_1', name: 'list_tickets', arguments: '{}' }] 
+        } 
+      }))
+      // 4. tool execution via mcp
+      .mockResolvedValueOnce(createJsonResponse({
+        result: { content: [{ text: 'Found 1 ticket' }] }
+      }))
+      // 5. auto-followup chat request
+      .mockResolvedValueOnce(createJsonResponse({
+        message: { role: 'assistant', content: 'You have 1 ticket' }
+      }));
+
+    renderLocalAIChat();
+
+    await waitFor(() => {
+      expect(screen.getByText('Active')).toBeInTheDocument();
+    });
+
+    const chatInput = screen.getByPlaceholderText('Ask AI a question...');
+    await user.type(chatInput, 'List my tickets');
+    
+    const chatForm = chatInput.closest('form');
+    fireEvent.submit(chatForm as HTMLFormElement);
+
+    await waitFor(() => {
+      expect(screen.getByText('Tool Execution: list_tickets')).toBeInTheDocument();
+      expect(screen.getByText('You have 1 ticket')).toBeInTheDocument();
+    });
+
+    // Check fetch calls without assuming a fixed startup call order
+    const toolsListReq = mocks.fetch.mock.calls.find(([url, init]) => {
+      if (url !== '/api/v1/mcp/sse' || !init?.body) {
+        return false;
+      }
+
+      return JSON.parse(init.body as string).method === 'tools/list';
+    });
+    expect(toolsListReq).toBeDefined();
+    expect(toolsListReq?.[0]).toBe('/api/v1/mcp/sse');
+    expect(JSON.parse(toolsListReq?.[1].body as string)).toMatchObject({ method: 'tools/list' });
+
+    const firstChatReq = mocks.fetch.mock.calls.find(([url, init]) => {
+      if (url !== '/api/v1/ai/chat' || !init?.body) {
+        return false;
+      }
+
+      const body = JSON.parse(init.body as string);
+      return Array.isArray(body.tools) && body.tools.some((tool: { name?: string }) => tool.name === 'list_tickets');
+    });
+    expect(firstChatReq).toBeDefined();
+    expect(firstChatReq?.[0]).toBe('/api/v1/ai/chat');
+    expect(JSON.parse(firstChatReq?.[1].body as string)).toMatchObject({
+      tools: [{ name: 'list_tickets' }]
+    });
+
+    const toolCallReq = mocks.fetch.mock.calls.find(([url, init]) => {
+      if (url !== '/api/v1/mcp/sse' || !init?.body) {
+        return false;
+      }
+
+      const body = JSON.parse(init.body as string);
+      return body.method === 'tools/call' && body.params?.name === 'list_tickets';
+    });
+    expect(toolCallReq).toBeDefined();
+    expect(toolCallReq?.[0]).toBe('/api/v1/mcp/sse');
+    expect(JSON.parse(toolCallReq?.[1].body as string)).toMatchObject({
+      method: 'tools/call',
+      params: { name: 'list_tickets', arguments: {} }
+    });
+
+    const secondChatReq = mocks.fetch.mock.calls.find(([url, init]) => {
+      if (url !== '/api/v1/ai/chat' || !init?.body) {
+        return false;
+      }
+
+      const body = JSON.parse(init.body as string);
+      return body.messages?.some?.(
+        (message: { role?: string; tool_call_id?: string; name?: string; content?: string }) =>
+          message.role === 'tool' &&
+          message.tool_call_id === 'call_1' &&
+          message.name === 'list_tickets' &&
+          message.content === 'Found 1 ticket'
+      );
+    });
+    expect(secondChatReq).toBeDefined();
+    expect(secondChatReq?.[0]).toBe('/api/v1/ai/chat');
+    expect(JSON.parse(secondChatReq?.[1].body as string).messages.at(-1)).toMatchObject({
+      role: 'tool',
+      tool_call_id: 'call_1',
+      name: 'list_tickets',
+      content: 'Found 1 ticket'
+    });
   });
 });

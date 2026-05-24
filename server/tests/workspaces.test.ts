@@ -62,12 +62,15 @@ describe('workspaces routes', () => {
       defaultProjectId,
     });
 
-    const patchResponse = await api().patch(`/api/v1/workspaces/${workspaceId}/settings`).send({
-      hostUrl: 'http://gravity.test',
-      joinMode: 'auto_join',
-      workspaceKey: 'WS-GRV-999999',
-      defaultProjectId,
-    });
+    const patchResponse = await api()
+      .patch(`/api/v1/workspaces/${workspaceId}/settings`)
+      .set('x-user-id', owner.id)
+      .send({
+        hostUrl: 'http://gravity.test',
+        joinMode: 'auto_join',
+        workspaceKey: 'WS-GRV-999999',
+        defaultProjectId,
+      });
 
     expect(patchResponse.status).toBe(200);
     expect(patchResponse.body).toMatchObject({
@@ -78,7 +81,9 @@ describe('workspaces routes', () => {
       defaultProjectId,
     });
 
-    const membersResponse = await api().get(`/api/v1/workspaces/${workspaceId}/members`);
+    const membersResponse = await api()
+      .get(`/api/v1/workspaces/${workspaceId}/members`)
+      .set('x-user-id', owner.id);
     expect(membersResponse.status).toBe(200);
     expect(membersResponse.body).toEqual([
       expect.objectContaining({
