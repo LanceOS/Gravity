@@ -203,6 +203,27 @@ describe('TicketBoard', () => {
       },
     });
 
+    expect(screen.getByText('1 of 2 tickets')).toBeInTheDocument();
+
+    const searchInput = screen.getByRole('textbox');
+    await user.clear(searchInput);
+    await user.type(searchInput, 'sync issue');
+    expect(props.onFilterChange).toHaveBeenCalledWith('search', 's');
+    expect(props.onFilterChange).toHaveBeenCalledWith('search', 'sync issue');
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Priority' }), {
+      target: { value: 'medium' },
+    });
+    expect(props.onFilterChange).toHaveBeenCalledWith('priority', 'medium');
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Project' }), {
+      target: { value: 'project-2' },
+    });
+    expect(props.onFilterChange).toHaveBeenCalledWith('projectId', 'project-2');
+
+    await user.click(screen.getByRole('button', { name: 'Clear filters' }));
+    expect(props.onClearFilters).toHaveBeenCalledTimes(1);
+
     await user.click(screen.getByRole('button', { name: 'Create ticket in Done' }));
     expect(props.onOpenCreateTicket).toHaveBeenCalledWith('done');
   });
