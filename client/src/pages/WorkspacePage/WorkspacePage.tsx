@@ -126,7 +126,7 @@ export function WorkspacePage({
           
           <WorkspaceHeader.Bottom>
             <TicketFilterBar
-              filters={filters as any}
+              filters={filters}
               onFilterChange={onSetFilters}
               hasActiveFilters={hasFiltersApplied}
               onClearFilters={handleClearFilters}
