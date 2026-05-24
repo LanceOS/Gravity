@@ -35,11 +35,18 @@ vi.mock('../../components/TicketBoard', () => ({
 }));
 
 vi.mock('../../components/TicketFilterBar', () => ({
-  TicketFilterBar: ({ onClearFilters }: { onClearFilters: () => void }) => (
-    <button type="button" onClick={onClearFilters}>
-      Clear board filters
-    </button>
-  ),
+  TicketFilterBar: ({
+    hasActiveFilters,
+    onClearFilters,
+  }: {
+    hasActiveFilters: boolean;
+    onClearFilters: () => void;
+  }) =>
+    hasActiveFilters ? (
+      <button type="button" onClick={onClearFilters}>
+        Clear board filters
+      </button>
+    ) : null,
 }));
 
 vi.mock('../../components/TicketList', () => ({
