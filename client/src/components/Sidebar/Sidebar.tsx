@@ -18,7 +18,7 @@ export function Sidebar({ workspace, projects, tools, userMenu }: SidebarProps) 
           >
             <Sparkles size={14} />
             <span>New Ticket</span>
-            <span style={{ fontSize: '10px', opacity: 0.6, marginLeft: 'auto', background: 'rgba(255,255,255,0.2)', padding: '1px 5px', borderRadius: '3px' }}>N</span>
+            <span aria-hidden="true" style={{ fontSize: '10px', opacity: 0.6, marginLeft: 'auto', background: 'rgba(255,255,255,0.2)', padding: '1px 5px', borderRadius: '3px' }}>N</span>
           </button>
         </div>
       ) : null}
