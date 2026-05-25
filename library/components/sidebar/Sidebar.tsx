@@ -156,6 +156,7 @@ export function SidebarItem({
         setIsHovered(false);
         onMouseLeave?.(e);
       }}
+      type="button"
       {...props}
     >
       {leftIcon && <span style={{ display: 'flex', alignItems: 'center' }}>{leftIcon}</span>}
