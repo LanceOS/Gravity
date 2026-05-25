@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import type { Ticket } from '../../context/TicketContext';
 import { Button, Select, TextInput, Textarea } from '@library';
-import { ClickAwayListener } from '@library';
+import { ClickAwayListener, Portal } from '@library';
 import { 
   CheckSquare, GitPullRequest, GitMerge, Send, Trash2,
   Plus, Edit3, ChevronLeft, MoreHorizontal, Link, FileText
@@ -725,100 +725,106 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
       </div>
 
       {isDeleteConfirmOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0, 0, 0, 0.55)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 950,
-          }}
-        >
+        <Portal>
           <div
             style={{
-              width: '360px',
-              background: 'var(--card-bg)',
-              border: '1px solid var(--danger-border)',
-              borderRadius: 'var(--radius-md)',
-              boxShadow: 'var(--shadow-xl)',
-              overflow: 'hidden',
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0, 0, 0, 0.55)',
               display: 'flex',
-              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 950,
             }}
+            className="lib-animate-fade-in"
           >
-            {/* Danger zone header stripe */}
-            <div style={{ background: 'var(--danger-subtle)', borderBottom: '1px solid var(--danger-border)', padding: '16px 20px 14px' }}>
-              <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-heading)', display: 'block', marginBottom: '4px' }}>
-                Delete {activeTicket.key}?
-              </span>
-              <span style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
-                This removes the ticket and all its activity. This action cannot be undone.
-              </span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', padding: '14px 20px' }}>
-              <Button onClick={() => setIsDeleteConfirmOpen(false)} size="sm">
-                Cancel
-              </Button>
-              <Button onClick={() => void confirmDelete()} variant="danger" size="sm">
-                Delete Ticket
-              </Button>
+            <div
+              style={{
+                width: '360px',
+                background: 'var(--card-bg)',
+                border: '1px solid var(--danger-border)',
+                borderRadius: 'var(--radius-md)',
+                boxShadow: 'var(--shadow-xl)',
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column',
+              }}
+            >
+              {/* Danger zone header stripe */}
+              <div style={{ background: 'var(--danger-subtle)', borderBottom: '1px solid var(--danger-border)', padding: '16px 20px 14px' }}>
+                <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-heading)', display: 'block', marginBottom: '4px' }}>
+                  Delete {activeTicket.key}?
+                </span>
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+                  This removes the ticket and all its activity. This action cannot be undone.
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', padding: '14px 20px' }}>
+                <Button onClick={() => setIsDeleteConfirmOpen(false)} size="sm">
+                  Cancel
+                </Button>
+                <Button onClick={() => void confirmDelete()} variant="danger" size="sm">
+                  Delete Ticket
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
+        </Portal>
       )}
 
       {deletingCommentId && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0, 0, 0, 0.55)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 950,
-          }}
-        >
+        <Portal>
           <div
             style={{
-              width: '360px',
-              background: 'var(--card-bg)',
-              border: '1px solid var(--danger-border)',
-              borderRadius: 'var(--radius-md)',
-              boxShadow: 'var(--shadow-xl)',
-              overflow: 'hidden',
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0, 0, 0, 0.55)',
               display: 'flex',
-              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 950,
             }}
+            className="lib-animate-fade-in"
           >
-            {/* Danger zone header stripe */}
-            <div style={{ background: 'var(--danger-subtle)', borderBottom: '1px solid var(--danger-border)', padding: '16px 20px 14px' }}>
-              <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-heading)', display: 'block', marginBottom: '4px' }}>
-                Delete this comment?
-              </span>
-              <span style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
-                This will permanently remove the comment from the activity thread.
-              </span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', padding: '14px 20px' }}>
-              <Button onClick={() => setDeletingCommentId(null)} size="sm">
-                Cancel
-              </Button>
-              <Button
-                onClick={async () => {
-                  await onDeleteComment(activeTicket.id, deletingCommentId);
-                  setDeletingCommentId(null);
-                }}
-                variant="danger"
-                size="sm"
-              >
-                Delete Comment
-              </Button>
+            <div
+              style={{
+                width: '360px',
+                background: 'var(--card-bg)',
+                border: '1px solid var(--danger-border)',
+                borderRadius: 'var(--radius-md)',
+                boxShadow: 'var(--shadow-xl)',
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column',
+              }}
+            >
+              {/* Danger zone header stripe */}
+              <div style={{ background: 'var(--danger-subtle)', borderBottom: '1px solid var(--danger-border)', padding: '16px 20px 14px' }}>
+                <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-heading)', display: 'block', marginBottom: '4px' }}>
+                  Delete this comment?
+                </span>
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+                  This will permanently remove the comment from the activity thread.
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', padding: '14px 20px' }}>
+                <Button onClick={() => setDeletingCommentId(null)} size="sm">
+                  Cancel
+                </Button>
+                <Button
+                  onClick={async () => {
+                    await onDeleteComment(activeTicket.id, deletingCommentId);
+                    setDeletingCommentId(null);
+                  }}
+                  variant="danger"
+                  size="sm"
+                >
+                  Delete Comment
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
+        </Portal>
       )}
 
 
