@@ -2,6 +2,15 @@ import React from 'react';
 import { ChevronRight } from 'lucide-react';
 import { Portal } from '../../utilities';
 import { ClickAwayListener } from '../../utilities';
+import { Link } from '../link';
+
+export interface MegaMenuColumn {
+  title: string;
+  links: Array<{
+    label: string;
+    href: string;
+  }>;
+}
 
 export interface MegaMenuProps {
   trigger: React.ReactNode;
