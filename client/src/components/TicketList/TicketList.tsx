@@ -4,7 +4,7 @@ import { Compass } from 'lucide-react';
 import { TicketRow } from './components';
 
 import type { TicketListProps } from './types';
-import { getAssigneeAvatar, getDomainTag, getPriorityIcon, getStatusLabel } from './utils';
+import { getAssigneeAvatar, getDomainTag, getPriorityIcon, getStatusLabel, getStatusColor } from './utils';
 
 export const TicketList: React.FC<TicketListProps> = ({
   filters,
@@ -48,6 +48,16 @@ export const TicketList: React.FC<TicketListProps> = ({
                     paddingBottom: '4px'
                   }}
                 >
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      backgroundColor: getStatusColor(status as Ticket['status']),
+                      flexShrink: 0
+                    }}
+                  />
                   <span>{getStatusLabel(status as Ticket['status'])}</span>
                   <span style={{ background: 'var(--border)', padding: '1px 5px', borderRadius: '4px', fontSize: '10px' }}>
                     {ticketsInGroup.length}

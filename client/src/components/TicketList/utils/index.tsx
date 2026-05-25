@@ -52,6 +52,8 @@ export function getStatusLabel(status: Ticket['status']) {
   return status.replace('_', ' ').toUpperCase();
 }
 
+export { STATUS_COLOR_MAP, getStatusColor } from '../../TicketDetail/utils';
+
 export function getAssigneeAvatar(userAvatarById: Record<string, string>, assigneeId: string | null) {
   if (!assigneeId) {
     return null;

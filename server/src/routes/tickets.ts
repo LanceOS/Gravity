@@ -1,7 +1,7 @@
 import { and, asc, eq } from 'drizzle-orm';
 import { type Response, Router } from 'express';
 import { db } from '../db/index.js';
-import { cycles, domains, projects, tickets } from '../db/schema.js';
+import { cycles, domains, projects, tickets, workspaceMembers } from '../db/schema.js';
 import { broadcastEvent } from '../realtime.js';
 import { createId, getProjectIdFromRequest, normalizeIsoDate } from '../lib/platform.js';
 import { getWorkspaceAccess, optionalWorkspaceAccess, type WorkspaceAccessLocals } from '../lib/workspace-access.js';
@@ -99,6 +99,82 @@ export function createTicketsRouter() {
       res.status(201).json(created);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create ticket.' });
+    }
+  });
+
+  router.get('/tickets/key/:ticketKey', optionalWorkspaceAccess, async (req, res: Response<unknown, WorkspaceAccessLocals>) => {
+    try {
+      const ticketKey = normalizeRouteParam(req.params.ticketKey).trim().toUpperCase();
+      const ticketRows = await db
+        .select({
+          id: tickets.id,
+          key: tickets.key,
+          title: tickets.title,
+          status: tickets.status,
+          projectId: tickets.projectId,
+        })
+        .from(tickets)
+        .where(eq(tickets.key, ticketKey))
+        .limit(1);
+      const ticket = ticketRows[0];
+      if (!ticket) {
+        res.status(404).json({ error: 'Ticket not found.' });
+        return;
+      }
+
+      // 1. Resolve workspace access from custom middleware (guest token)
+      const workspaceAccess = getWorkspaceAccess(res);
+      if (workspaceAccess) {
+        const projectRows = await db
+          .select({ workspaceId: projects.workspaceId })
+          .from(projects)
+          .where(eq(projects.id, ticket.projectId))
+          .limit(1);
+        const project = projectRows[0];
+        if (!project) {
+          res.status(404).json({ error: 'Ticket not found.' });
+          return;
+        }
+        if (project.workspaceId !== workspaceAccess.workspaceId) {
+          res.status(403).json({ error: 'Workspace access does not permit this ticket.' });
+          return;
+        }
+      } else {
+        // 2. Fall back to X-User-Id header or query param if available (standard user verification)
+        const userId = typeof req.headers['x-user-id'] === 'string' ? req.headers['x-user-id'] : typeof req.query.userId === 'string' ? req.query.userId : undefined;
+        if (userId) {
+          // Get the ticket's workspace ID
+          const projectRows = await db
+            .select({ workspaceId: projects.workspaceId })
+            .from(projects)
+            .where(eq(projects.id, ticket.projectId))
+            .limit(1);
+          const project = projectRows[0];
+          if (!project) {
+            res.status(404).json({ error: 'Ticket project not found.' });
+            return;
+          }
+
+          // Check if the user is a member of the workspace
+          const memberRows = await db
+            .select()
+            .from(workspaceMembers)
+            .where(and(
+              eq(workspaceMembers.workspaceId, project.workspaceId),
+              eq(workspaceMembers.userId, userId)
+            ))
+            .limit(1);
+
+          if (memberRows.length === 0) {
+            res.status(403).json({ error: 'Access denied: not a member of the workspace.' });
+            return;
+          }
+        }
+      }
+
+      res.json(ticket);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load ticket.' });
     }
   });
 
