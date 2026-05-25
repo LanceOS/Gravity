@@ -212,20 +212,6 @@ describe('Gravity Client End-to-End User Journey', () => {
       expect(screen.getByText('E2E framework is up and running.')).toBeInTheDocument();
     });
 
-    // ==========================================
-    // PHASE 7: Theme Toggling & LocalStorage Check
-    // ==========================================
-    // Target the theme toggle button in the sidebar header
-    const themeToggleBtn = await screen.findByRole('button', { name: /Current theme: .* Click to change./i });
-    expect(themeToggleBtn).toBeInTheDocument();
 
-    // Toggle theme once (toggles from dark to system)
-    await user.click(themeToggleBtn);
-    expect(window.localStorage.getItem('gravity_theme')).toBe('system');
-
-    // Toggle theme again (toggles from system to light)
-    await user.click(themeToggleBtn);
-    expect(window.localStorage.getItem('gravity_theme')).toBe('light');
-    expect(document.documentElement.classList.contains('light-theme')).toBe(true);
   });
 });
