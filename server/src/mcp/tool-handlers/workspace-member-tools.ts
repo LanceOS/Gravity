@@ -8,6 +8,10 @@ import {
 } from '../../db/schema.js';
 import { ToolExecutionContext } from './types.js';
 
+/**
+ * Workspace-member MCP handlers. These APIs only expose members from the same
+ * workspace already authorized by the transport context.
+ */
 export class WorkspaceMemberTools {
   async listWorkspaceMembers(args: Record<string, unknown>, context: ToolExecutionContext) {
     const workspaceId = String(args.workspaceId ?? '');

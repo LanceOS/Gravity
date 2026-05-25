@@ -3,6 +3,10 @@ import { db } from '../db/index.js';
 import { workspaceMembers } from '../db/schema.js';
 import { McpContext } from './types.js';
 
+/**
+ * Enforces the shared workspace membership check used by non-HTTP MCP entry
+ * points and any handler path that has not already validated access.
+ */
 export async function assertMcpWorkspaceAccess(context: McpContext) {
   if (!context.workspaceId) {
     throw new Error('workspaceId is required.');
@@ -12,6 +16,7 @@ export async function assertMcpWorkspaceAccess(context: McpContext) {
     throw new Error('Authenticated user is required.');
   }
 
+  // Workspace membership is the source of truth for MCP tool access.
   const membershipRows = await db
     .select({ role: workspaceMembers.role })
     .from(workspaceMembers)

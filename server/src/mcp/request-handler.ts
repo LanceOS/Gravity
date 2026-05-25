@@ -6,11 +6,19 @@ import { mcpToolsList } from './tools.js';
 import { McpRequestPayload } from './types.js';
 import { getDisabledTools } from './workspace-tools.js';
 
+/**
+ * Lets transports skip the membership query when they already performed the
+ * same access check earlier in the request pipeline.
+ */
 type McpRequestHandlerOptions = {
   accessChecked?: boolean;
 };
 
 export class McpRequestHandler {
+  /**
+   * Handles the JSON-RPC portion of the MCP protocol after the transport has
+   * supplied any trusted workspace or actor context.
+   */
   async handle(
     request: unknown,
     workspaceId = '',
@@ -23,6 +31,7 @@ export class McpRequestHandler {
 
     try {
       if (payload.method === 'initialize') {
+        // Initialization is transport-agnostic and does not require workspace access.
         return {
           jsonrpc: '2.0',
           id: payload.id ?? null,
@@ -35,6 +44,7 @@ export class McpRequestHandler {
       }
 
       if (payload.method === 'tools/list') {
+        // HTTP may have already checked membership; stdio and direct callers rely on the handler.
         if (!accessChecked) {
           await assertMcpWorkspaceAccess(context);
         }
@@ -49,6 +59,7 @@ export class McpRequestHandler {
       }
 
       if (payload.method === 'tools/call') {
+        // Tool execution always uses the trusted context resolved above.
         if (!accessChecked) {
           await assertMcpWorkspaceAccess(context);
         }
@@ -87,6 +98,9 @@ export class McpRequestHandler {
 
 const defaultRequestHandler = new McpRequestHandler();
 
+/**
+ * Convenience wrapper for the default request handler used by both transports.
+ */
 export async function handleMcpRequest(
   request: unknown,
   workspaceId = '',

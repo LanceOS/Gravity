@@ -9,6 +9,10 @@ function normalizeConfigValue(value?: string) {
   return value?.trim() ?? '';
 }
 
+/**
+ * Resolves the fixed trusted context for the stdio server and fails fast when
+ * either required environment variable is missing.
+ */
 export function getMcpStdioContext(config: McpStdioConfig): McpContext {
   const workspaceId = normalizeConfigValue(config.mcpStdioWorkspaceId);
   const actorUserId = normalizeConfigValue(config.mcpStdioActorUserId);

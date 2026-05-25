@@ -2,6 +2,10 @@ import { ticketTools } from './ticket-tools.js';
 import { ToolHandler } from './types.js';
 import { workspaceMemberTools } from './workspace-member-tools.js';
 
+/**
+ * Central registry used by the executor. Legacy aliases stay here so the MCP
+ * schema and runtime behavior remain backward compatible.
+ */
 export const toolHandlers: Record<string, ToolHandler> = {
   list_tickets: (args, context) => ticketTools.listTickets(args, context),
   list_workspace_members: (args, context) => workspaceMemberTools.listWorkspaceMembers(args, context),

@@ -15,6 +15,10 @@ import {
 } from '../../services/tickets.js';
 import { ToolExecutionContext } from './types.js';
 
+/**
+ * Ticket-focused MCP handlers. Each method re-checks that the target project or
+ * ticket belongs to the caller's trusted workspace before touching ticket data.
+ */
 export class TicketTools {
   async listTickets(args: Record<string, unknown>, context: ToolExecutionContext) {
     const explicitProjectId = typeof args.projectId === 'string' ? args.projectId : undefined;
@@ -37,6 +41,7 @@ export class TicketTools {
       cycleId: typeof args.cycleId === 'string' ? args.cycleId : undefined,
     };
 
+    // A single-project query can use the narrower service path; otherwise list the whole workspace.
     if (explicitProjectId) {
       return listTickets(explicitProjectId, filters);
     }
@@ -110,6 +115,7 @@ export class TicketTools {
 
   async createComment(args: Record<string, unknown>, context: ToolExecutionContext) {
     const ticket = await this.getTicketInWorkspace(args, context.workspaceId);
+    // Comment authorship always comes from the trusted actor context, not request args.
     const userId = context.actorUserId;
     const body = String(args.body ?? '');
 
@@ -156,6 +162,10 @@ export class TicketTools {
     return { comment };
   }
 
+  /**
+   * Resolves a ticket by key and rejects cross-workspace access before the
+   * caller can read or mutate related ticket data.
+   */
   private async getTicketInWorkspace(args: Record<string, unknown>, workspaceId: string) {
     const ticketKey = String(args.ticketKey ?? '').toUpperCase();
     const ticket = await getTicketByKey(ticketKey);
@@ -168,6 +178,10 @@ export class TicketTools {
     return ticket;
   }
 
+  /**
+   * Verifies that the project anchor for a ticket-scoped action belongs to the
+   * same workspace already authorized by the transport.
+   */
   private async assertProjectInWorkspace(projectId: string, workspaceId: string) {
     const [project] = await db
       .select({ workspaceId: projects.workspaceId })

@@ -6,12 +6,17 @@ import { resolveRequestActorUserId } from '../lib/request-auth.js';
 import { handleMcpRequest } from './request-handler.js';
 import { createMcpErrorResponse } from './responses.js';
 
+/**
+ * Builds the HTTP MCP transport. Request authentication and workspace guard
+ * failures stay HTTP-native here before control passes to the JSON-RPC handler.
+ */
 export class McpRouterFactory {
   create() {
     const router = Router();
 
     router.post('/mcp/sse', async (req: Request, res: Response) => {
       try {
+        // Transport-level auth and workspace validation use plain HTTP semantics.
         const actorUserId = await resolveRequestActorUserId(req);
         if (!actorUserId) {
           res.status(401).json({ error: 'Authentication required.' });
@@ -45,6 +50,7 @@ export class McpRouterFactory {
         });
         res.json(response);
       } catch (error) {
+        // Once inside JSON-RPC handling, unexpected failures are returned as MCP errors.
         res.status(200).json(
           createMcpErrorResponse(
             req.body?.id ?? null,
@@ -61,6 +67,9 @@ export class McpRouterFactory {
 
 const defaultRouterFactory = new McpRouterFactory();
 
+/**
+ * Creates the default HTTP router instance used by the API server.
+ */
 export function createMcpRouter() {
   return defaultRouterFactory.create();
 }

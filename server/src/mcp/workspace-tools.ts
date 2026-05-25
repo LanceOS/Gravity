@@ -2,6 +2,10 @@ import { eq } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import { workspaceSettings } from '../db/schema.js';
 
+/**
+ * Loads workspace-level tool disablement so tool discovery and execution share
+ * the same feature flag source.
+ */
 export async function getDisabledTools(workspaceId: string): Promise<string[]> {
   if (!workspaceId) {
     return [];
