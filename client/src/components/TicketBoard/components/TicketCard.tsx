@@ -25,7 +25,7 @@ function TicketCardImpl({
       onDragStart={onDragStart}
       bodyStyle={{ padding: 0 }}
       style={{
-        backgroundColor: isHovered ? 'var(--color-base100)' : 'var(--color-surface-card)',
+        backgroundColor: isHovered ? 'var(--color-surface-overlay)' : 'var(--color-surface-card)',
         border: '1px solid var(--color-border-default)',
         borderLeft: `3px solid ${priorityColor}`,
         borderRadius: '6px',
