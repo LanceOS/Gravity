@@ -97,7 +97,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
           flexDirection: 'column',
           height: '100%',
           flex: 1,
-          background: 'var(--bg)',
+          background: 'var(--color-surface-app)',
           overflow: 'hidden'
         }}
       >
@@ -105,11 +105,11 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
       <div 
         style={{
           padding: '12px 24px',
-          borderBottom: '1px solid var(--border)',
+          borderBottom: '1px solid var(--color-border-default)',
           display: 'flex',
           alignItems: 'center',
           gap: '12px',
-          background: 'var(--sidebar-bg)'
+          background: 'var(--color-base50)'
         }}
       >
         <Button
@@ -117,7 +117,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
           variant="ghost"
           size="sm"
           style={{
-            color: 'var(--text)',
+            color: 'var(--color-text-secondary)',
             padding: '4px 6px',
             border: 'none',
             minHeight: '28px',
@@ -128,9 +128,9 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
           <span>Back</span>
         </Button>
 
-        <span style={{ color: 'var(--text-muted)' }}>/</span>
+        <span style={{ color: 'var(--color-text-disabled)' }}>/</span>
         
-        <span style={{ fontFamily: 'var(--mono)', fontSize: '13px', fontWeight: 600, color: 'var(--text-heading)' }}>
+        <span style={{ fontFamily: 'var(--mono)', fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
           {activeTicket.key}
         </span>
 
@@ -183,7 +183,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                     style={{
                       fontSize: '22px',
                       fontWeight: 600,
-                      color: 'var(--text-heading)',
+                      color: 'var(--color-text-primary)',
                       margin: 0,
                       flex: 1,
                       minWidth: 0
@@ -202,8 +202,8 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
 
           {/* Description Area */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: '6px' }}>
-              <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Description</span>
+            <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--color-border-default)', paddingBottom: '6px' }}>
+              <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase' }}>Description</span>
             </div>
 
             {isEditingDesc ? (
@@ -251,7 +251,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                 {activeTicket.description ? (
                   <MarkdownContent text={activeTicket.description} />
                 ) : (
-                  <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No description provided. Click to add details...</span>
+                  <span style={{ color: 'var(--color-text-disabled)', fontStyle: 'italic' }}>No description provided. Click to add details...</span>
                 )}
               </div>
             )}
@@ -259,8 +259,8 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
 
           {/* Sub-tickets / Checklist Section */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: '6px' }}>
-              <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+            <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--color-border-default)', paddingBottom: '6px' }}>
+              <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase' }}>
                 Sub-tasks Checklist
               </span>
               
@@ -280,16 +280,16 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                 
                 {/* Progress bar */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ flex: 1, height: '4px', background: 'var(--border)', borderRadius: '2px', overflow: 'hidden' }}>
-                    <div style={{ width: `${subtaskProgressPercent}%`, height: '100%', background: 'var(--accent)', transition: 'width 0.2s ease' }} />
+                  <div style={{ flex: 1, height: '4px', background: 'var(--color-border-default)', borderRadius: '2px', overflow: 'hidden' }}>
+                    <div style={{ width: `${subtaskProgressPercent}%`, height: '100%', background: 'var(--color-primary)', transition: 'width 0.2s ease' }} />
                   </div>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--color-text-disabled)', whiteSpace: 'nowrap' }}>
                     {completedSubtasks} of {subtasks.length} ({Math.round(subtaskProgressPercent)}%)
                   </span>
                 </div>
 
                 {/* Subtask rows */}
-                <div style={{ display: 'flex', flexDirection: 'column', border: '1px solid var(--border)', borderRadius: '6px', overflow: 'hidden' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', border: '1px solid var(--color-border-default)', borderRadius: '6px', overflow: 'hidden' }}>
                   {subtasks.map(sub => (
                     <div 
                       key={sub.id} 
@@ -300,13 +300,13 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                         alignItems: 'center', 
                         gap: '12px', 
                         padding: '8px 12px', 
-                        background: 'var(--card-bg)',
-                        borderBottom: '1px solid var(--border)'
+                        background: 'var(--color-surface-card)',
+                        borderBottom: '1px solid var(--color-border-default)'
                       }}
                     >
-                      <CheckSquare size={14} color={sub.status === 'done' ? 'var(--accent)' : 'var(--text-muted)'} />
-                      <span style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text-muted)' }}>{sub.key}</span>
-                      <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-heading)', textDecoration: sub.status === 'done' ? 'line-through' : 'none' }}>{sub.title}</span>
+                      <CheckSquare size={14} color={sub.status === 'done' ? 'var(--color-primary)' : 'var(--color-text-disabled)'} />
+                      <span style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--color-text-disabled)' }}>{sub.key}</span>
+                      <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--color-text-primary)', textDecoration: sub.status === 'done' ? 'line-through' : 'none' }}>{sub.title}</span>
                       
                       <span 
                         style={{ 
@@ -314,8 +314,8 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                           fontSize: '10px', 
                           padding: '1px 5px', 
                           borderRadius: '4px', 
-                          background: 'var(--border)', 
-                          color: 'var(--text-heading)' 
+                          background: 'var(--color-border-default)', 
+                          color: 'var(--color-text-primary)' 
                         }}
                       >
                         {sub.status.replace('_', ' ')}
@@ -326,7 +326,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
 
               </div>
             ) : (
-              <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic', padding: '8px 4px' }}>
+              <div style={{ fontSize: '12px', color: 'var(--color-text-disabled)', fontStyle: 'italic', padding: '8px 4px' }}>
                 No sub-tasks defined. Break complex tasks down to improve trackability.
               </div>
             )}
@@ -334,8 +334,8 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
 
           {/* Comments Section */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
-            <div style={{ borderBottom: '1px solid var(--border)', paddingBottom: '6px' }}>
-              <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+            <div style={{ borderBottom: '1px solid var(--color-border-default)', paddingBottom: '6px' }}>
+              <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase' }}>
                 Activity Thread ({comments.length})
               </span>
             </div>
@@ -347,14 +347,14 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                   <img 
                     src={comment.userAvatar || 'https://api.dicebear.com/7.x/bottts/svg?seed=guest'} 
                     alt={comment.userName} 
-                    style={{ width: '24px', height: '24px', borderRadius: '50%', border: '1px solid var(--border)' }}
+                    style={{ width: '24px', height: '24px', borderRadius: '50%', border: '1px solid var(--color-border-default)' }}
                   />
                   
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-heading)' }}>{comment.userName || 'Member'}</span>
-                        <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                        <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-primary)' }}>{comment.userName || 'Member'}</span>
+                        <span style={{ fontSize: '10px', color: 'var(--color-text-disabled)' }}>
                           {new Date(comment.createdAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
@@ -368,15 +368,15 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                             style={{
                               background: 'none',
                               border: 'none',
-                              color: openMenuCommentId === comment.id ? 'var(--text)' : 'var(--text-muted)',
+                              color: openMenuCommentId === comment.id ? 'var(--color-text-secondary)' : 'var(--color-text-disabled)',
                               cursor: 'pointer',
                               display: 'flex',
                               padding: '4px',
                               borderRadius: 'var(--radius-xs)',
                               transition: 'color var(--transition-fast), background var(--transition-fast)'
                             }}
-                            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text)'; e.currentTarget.style.background = 'var(--card-hover)'; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.color = openMenuCommentId === comment.id ? 'var(--text)' : 'var(--text-muted)'; e.currentTarget.style.background = 'none'; }}
+                            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-secondary)'; e.currentTarget.style.background = 'var(--color-base100)'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.color = openMenuCommentId === comment.id ? 'var(--color-text-secondary)' : 'var(--color-text-disabled)'; e.currentTarget.style.background = 'none'; }}
                             aria-label="Comment options"
                           >
                             <MoreHorizontal size={14} />
@@ -390,8 +390,8 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                                 right: 0,
                                 zIndex: 200,
                                 minWidth: '172px',
-                                background: 'var(--card-bg)',
-                                border: '1px solid var(--border)',
+                                background: 'var(--color-surface-card)',
+                                border: '1px solid var(--color-border-default)',
                                 borderRadius: 'var(--radius-sm)',
                                 boxShadow: 'var(--shadow-lg)',
                                 padding: '4px',
@@ -413,14 +413,14 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                                   width: '100%', padding: '7px 10px',
                                   background: 'none', border: 'none',
                                   borderRadius: 'var(--radius-xs)',
-                                  color: 'var(--text)', cursor: 'pointer',
+                                  color: 'var(--color-text-secondary)', cursor: 'pointer',
                                   textAlign: 'left', fontSize: '12px',
                                   transition: 'background var(--transition-fast)',
                                 }}
-                                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--card-hover)'; }}
+                                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-base100)'; }}
                                 onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
                               >
-                                <Edit3 size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                                <Edit3 size={13} style={{ color: 'var(--color-text-disabled)', flexShrink: 0 }} />
                                 <span>Edit Comment</span>
                               </button>
 
@@ -437,14 +437,14 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                                   width: '100%', padding: '7px 10px',
                                   background: 'none', border: 'none',
                                   borderRadius: 'var(--radius-xs)',
-                                  color: 'var(--text)', cursor: 'pointer',
+                                  color: 'var(--color-text-secondary)', cursor: 'pointer',
                                   textAlign: 'left', fontSize: '12px',
                                   transition: 'background var(--transition-fast)',
                                 }}
-                                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--card-hover)'; }}
+                                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-base100)'; }}
                                 onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
                               >
-                                <Link size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                                <Link size={13} style={{ color: 'var(--color-text-disabled)', flexShrink: 0 }} />
                                 <span>Grab Link</span>
                               </button>
 
@@ -460,19 +460,19 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                                   width: '100%', padding: '7px 10px',
                                   background: 'none', border: 'none',
                                   borderRadius: 'var(--radius-xs)',
-                                  color: 'var(--text)', cursor: 'pointer',
+                                  color: 'var(--color-text-secondary)', cursor: 'pointer',
                                   textAlign: 'left', fontSize: '12px',
                                   transition: 'background var(--transition-fast)',
                                 }}
-                                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--card-hover)'; }}
+                                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-base100)'; }}
                                 onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
                               >
-                                <FileText size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                                <FileText size={13} style={{ color: 'var(--color-text-disabled)', flexShrink: 0 }} />
                                 <span>Copy Markdown</span>
                               </button>
 
                               {/* Divider */}
-                              <div style={{ height: '1px', background: 'var(--border)', margin: '3px 6px' }} />
+                              <div style={{ height: '1px', background: 'var(--color-border-default)', margin: '3px 6px' }} />
 
                               {/* Delete */}
                               <button
@@ -486,11 +486,11 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                                   width: '100%', padding: '7px 10px',
                                   background: 'none', border: 'none',
                                   borderRadius: 'var(--radius-xs)',
-                                  color: 'var(--danger)', cursor: 'pointer',
+                                  color: 'var(--color-error)', cursor: 'pointer',
                                   textAlign: 'left', fontSize: '12px',
                                   transition: 'background var(--transition-fast)',
                                 }}
-                                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--danger-subtle)'; }}
+                                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-bg-error)'; }}
                                 onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
                               >
                                 <Trash2 size={13} style={{ flexShrink: 0 }} />
@@ -505,9 +505,9 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                     <div 
                       style={{ 
                         fontSize: '13px', 
-                        color: 'var(--text)', 
-                        background: 'var(--card-bg)', 
-                        border: '1px solid var(--border)',
+                        color: 'var(--color-text-secondary)', 
+                        background: 'var(--color-surface-card)', 
+                        border: '1px solid var(--color-border-default)',
                         borderRadius: '6px',
                         padding: '10px 14px',
                         lineHeight: '1.5'
@@ -579,21 +579,21 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
         <div 
           style={{
             width: '280px',
-            borderLeft: '1px solid var(--border)',
+            borderLeft: '1px solid var(--color-border-default)',
             padding: '24px 20px',
             display: 'flex',
             flexDirection: 'column',
             gap: '20px',
-            background: 'var(--sidebar-bg)',
+            background: 'var(--color-base50)',
             overflowY: 'auto'
           }}
         >
           {/* Ticket Key Display */}
-          <div style={{ borderBottom: '1px solid var(--border)', paddingBottom: '12px', marginBottom: '4px' }}>
-            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+          <div style={{ borderBottom: '1px solid var(--color-border-default)', paddingBottom: '12px', marginBottom: '4px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
               Ticket Key
             </span>
-            <span style={{ fontFamily: 'var(--mono)', fontSize: '18px', fontWeight: 700, color: 'var(--accent)' }}>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: '18px', fontWeight: 700, color: 'var(--color-primary)' }}>
               {activeTicket.key}
             </span>
           </div>
@@ -665,7 +665,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
           </div>
 
           {/* GitHub PR Integration badge indicator */}
-          <div style={{ borderTop: '1px solid var(--border)', paddingTop: '16px', marginTop: '8px' }}>
+          <div style={{ borderTop: '1px solid var(--color-border-default)', paddingTop: '16px', marginTop: '8px' }}>
             <span className="label" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               <GitPullRequest size={12} />
               <span>GitHub Connection</span>
@@ -696,7 +696,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                   {activeTicket.prStatus === 'merged' ? <GitMerge size={14} /> : <GitPullRequest size={14} />}
                   <span>PR Status: {activeTicket.prStatus.toUpperCase()}</span>
                 </a>
-                <span style={{ fontSize: '10px', color: 'var(--text-muted)', textAlign: 'center' }}>
+                <span style={{ fontSize: '10px', color: 'var(--color-text-disabled)', textAlign: 'center' }}>
                   Auto-updated via webhook hooks
                 </span>
               </div>
@@ -704,9 +704,9 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
               <div 
                 style={{ 
                   fontSize: '11px', 
-                  color: 'var(--text-muted)', 
+                  color: 'var(--color-text-disabled)', 
                   background: 'rgba(255,255,255,0.01)', 
-                  border: '1px dashed var(--border)',
+                  border: '1px dashed var(--color-border-default)',
                   borderRadius: '6px',
                   padding: '10px',
                   marginTop: '6px',
@@ -741,8 +741,8 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             <div
               style={{
                 width: '360px',
-                background: 'var(--card-bg)',
-                border: '1px solid var(--danger-border)',
+                background: 'var(--color-surface-card)',
+                border: '1px solid var(--color-border-error)',
                 borderRadius: 'var(--radius-md)',
                 boxShadow: 'var(--shadow-xl)',
                 overflow: 'hidden',
@@ -751,11 +751,11 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
               }}
             >
               {/* Danger zone header stripe */}
-              <div style={{ background: 'var(--danger-subtle)', borderBottom: '1px solid var(--danger-border)', padding: '16px 20px 14px' }}>
-                <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-heading)', display: 'block', marginBottom: '4px' }}>
+              <div style={{ background: 'var(--color-bg-error)', borderBottom: '1px solid var(--color-border-error)', padding: '16px 20px 14px' }}>
+                <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-text-primary)', display: 'block', marginBottom: '4px' }}>
                   Delete {activeTicket.key}?
                 </span>
-                <span style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+                <span style={{ fontSize: '12px', color: 'var(--color-text-disabled)', lineHeight: '1.5' }}>
                   This removes the ticket and all its activity. This action cannot be undone.
                 </span>
               </div>
@@ -789,8 +789,8 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             <div
               style={{
                 width: '360px',
-                background: 'var(--card-bg)',
-                border: '1px solid var(--danger-border)',
+                background: 'var(--color-surface-card)',
+                border: '1px solid var(--color-border-error)',
                 borderRadius: 'var(--radius-md)',
                 boxShadow: 'var(--shadow-xl)',
                 overflow: 'hidden',
@@ -799,11 +799,11 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
               }}
             >
               {/* Danger zone header stripe */}
-              <div style={{ background: 'var(--danger-subtle)', borderBottom: '1px solid var(--danger-border)', padding: '16px 20px 14px' }}>
-                <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-heading)', display: 'block', marginBottom: '4px' }}>
+              <div style={{ background: 'var(--color-bg-error)', borderBottom: '1px solid var(--color-border-error)', padding: '16px 20px 14px' }}>
+                <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-text-primary)', display: 'block', marginBottom: '4px' }}>
                   Delete this comment?
                 </span>
-                <span style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+                <span style={{ fontSize: '12px', color: 'var(--color-text-disabled)', lineHeight: '1.5' }}>
                   This will permanently remove the comment from the activity thread.
                 </span>
               </div>

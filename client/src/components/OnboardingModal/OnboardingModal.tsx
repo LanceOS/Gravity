@@ -49,7 +49,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
       return (
         <Stack gap="var(--space-4)" align="center" style={{ textAlign: 'center', padding: '10px 0' }}>
           <div style={iconContainerStyle}>
-            <HelpCircle size={40} color="var(--accent)" />
+            <HelpCircle size={40} color="var(--color-primary)" />
           </div>
           <h2 style={titleStyle}>Welcome to Gravity, {currentUser?.name}!</h2>
           <p style={descriptionStyle}>
@@ -78,7 +78,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
                 width: '8px',
                 height: '8px',
                 borderRadius: 'var(--radius-full)',
-                backgroundColor: i === step ? 'var(--accent)' : i < step ? 'var(--text-heading)' : 'var(--border)',
+                backgroundColor: i === step ? 'var(--color-primary)' : i < step ? 'var(--color-text-primary)' : 'var(--color-border-default)',
                 transition: 'all var(--transition-fast)'
               }}
             />
@@ -88,7 +88,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
         {step === 1 && (
           <Stack gap="var(--space-2)" align="center">
             <div style={iconContainerStyle}>
-              <Database size={40} color="var(--accent)" />
+              <Database size={40} color="var(--color-primary)" />
             </div>
             <h3 style={stepTitleStyle}>Multi-Tenant Project Databases</h3>
             <p style={descriptionStyle}>
@@ -100,7 +100,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
         {step === 2 && (
           <Stack gap="var(--space-2)" align="center">
             <div style={iconContainerStyle}>
-              <Layers size={40} color="var(--accent)" />
+              <Layers size={40} color="var(--color-primary)" />
             </div>
             <h3 style={stepTitleStyle}>Cycles & Specialized Domains</h3>
             <p style={descriptionStyle}>
@@ -112,7 +112,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
         {step === 3 && (
           <Stack gap="var(--space-2)" align="center">
             <div style={iconContainerStyle}>
-              <Sparkles size={40} color="var(--accent)" />
+              <Sparkles size={40} color="var(--color-primary)" />
             </div>
             <h3 style={stepTitleStyle}>Local Ollama AI Assistant</h3>
             <p style={descriptionStyle}>
@@ -124,7 +124,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
         {step === 4 && (
           <Stack gap="var(--space-2)" align="center">
             <div style={iconContainerStyle}>
-              <Terminal size={40} color="var(--accent)" />
+              <Terminal size={40} color="var(--color-primary)" />
             </div>
             <h3 style={stepTitleStyle}>MCP Agent Integrations</h3>
             <p style={descriptionStyle}>
@@ -160,8 +160,8 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
 const iconContainerStyle: React.CSSProperties = {
   padding: '16px',
   borderRadius: '16px',
-  background: 'var(--accent-glow)',
-  border: '1px solid var(--accent-border)',
+  background: 'var(--color-state-selected-bg)',
+  border: '1px solid var(--color-border-focus)',
   marginBottom: '8px',
   display: 'inline-flex',
   alignItems: 'center',
@@ -171,7 +171,7 @@ const iconContainerStyle: React.CSSProperties = {
 const titleStyle: React.CSSProperties = {
   fontSize: '22px',
   fontWeight: 600,
-  color: 'var(--text-heading)',
+  color: 'var(--color-text-primary)',
   letterSpacing: '-0.3px',
   margin: 0
 };
@@ -179,13 +179,13 @@ const titleStyle: React.CSSProperties = {
 const stepTitleStyle: React.CSSProperties = {
   fontSize: '18px',
   fontWeight: 600,
-  color: 'var(--text-heading)',
+  color: 'var(--color-text-primary)',
   margin: 0
 };
 
 const descriptionStyle: React.CSSProperties = {
   fontSize: '13px',
-  color: 'var(--text-muted)',
+  color: 'var(--color-text-disabled)',
   lineHeight: '1.6',
   maxWidth: '360px',
   margin: '0 auto',

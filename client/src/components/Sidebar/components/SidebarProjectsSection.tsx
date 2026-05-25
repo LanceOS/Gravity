@@ -24,7 +24,7 @@ export function SidebarProjectsSection({
     <div style={{ marginTop: '16px' }}>
       <div
         onClick={onToggleProjectsCollapsed}
-        style={{ display: 'flex', alignItems: 'center', color: 'var(--text-muted)', fontSize: '11px', fontWeight: 600, padding: '6px 8px', textTransform: 'uppercase', cursor: 'pointer' }}
+        style={{ display: 'flex', alignItems: 'center', color: 'var(--color-text-disabled)', fontSize: '11px', fontWeight: 600, padding: '6px 8px', textTransform: 'uppercase', cursor: 'pointer' }}
       >
         {projectsCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
         <span style={{ marginLeft: '4px' }}>Projects</span>
@@ -49,7 +49,7 @@ export function SidebarProjectsSection({
                 </div>
 
                 {isActiveProject && !isCollapsed ? (
-                  <div style={{ marginLeft: '14px', paddingLeft: '10px', borderLeft: '1px solid var(--border)', display: 'grid', gap: '8px' }}>
+                  <div style={{ marginLeft: '14px', paddingLeft: '10px', borderLeft: '1px solid var(--color-border-default)', display: 'grid', gap: '8px' }}>
                     <div style={sectionLabelStyle}>Views</div>
 
                     <div
@@ -80,7 +80,7 @@ export function SidebarProjectsSection({
                         onClick={() => section.onSelectCycle(cycle.id)}
                         style={nestedMenuItemStyle(section.filters.cycleId === cycle.id)}
                       >
-                        <CheckCircle size={13} color={cycle.completed ? 'var(--text-muted)' : 'var(--accent)'} />
+                        <CheckCircle size={13} color={cycle.completed ? 'var(--color-text-disabled)' : 'var(--color-primary)'} />
                         <span style={{ textDecoration: cycle.completed ? 'line-through' : 'none' }}>{cycle.name}</span>
                         <span style={countBadgeStyle()}>{section.counts.cycles[cycle.id] || 0}</span>
                       </div>

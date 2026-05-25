@@ -24,9 +24,9 @@ export function SidebarAgentTools({ tools }: SidebarAgentToolsProps) {
     : 'Ollama AI Assistant';
 
   return (
-    <div style={{ marginTop: '24px', padding: '8px', background: 'rgba(255,255,255,0.02)', borderRadius: '6px', border: '1px solid var(--border)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '6px' }}>
-        <Cpu size={12} color="var(--accent)" />
+    <div style={{ marginTop: '24px', padding: '8px', background: 'rgba(255,255,255,0.02)', borderRadius: '6px', border: '1px solid var(--color-border-default)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase', marginBottom: '6px' }}>
+        <Cpu size={12} color="var(--color-primary)" />
         <span>Agent Integrations</span>
       </div>
 
@@ -36,7 +36,7 @@ export function SidebarAgentTools({ tools }: SidebarAgentToolsProps) {
         className="clickable"
         style={agentButtonStyle()}
       >
-        <Sparkles size={12} color="var(--accent)" />
+        <Sparkles size={12} color="var(--color-primary)" />
         <span>{assistantLabel}</span>
       </button>
 

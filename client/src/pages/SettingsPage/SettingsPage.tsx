@@ -148,8 +148,8 @@ function OverviewSection({
     <Card style={{ padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)' }}>
       <Stack gap="var(--space-5)">
         <div>
-          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--text-heading)' }}>Host Configuration</h2>
-          <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '12.5px', lineHeight: 1.5 }}>
+          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Host Configuration</h2>
+          <p style={{ margin: '4px 0 0', color: 'var(--color-text-disabled)', fontSize: '12.5px', lineHeight: 1.5 }}>
             Manage the remote configuration and identity of this workspace. These controls govern peer networking, host routing, and invitation schemes.
           </p>
         </div>
@@ -187,27 +187,27 @@ function OverviewSection({
         <Divider />
 
         <Grid columns={3} gap="var(--space-3)">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--card-hover)', border: '1px solid var(--border)' }}>
-            <Globe size={16} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--color-base100)', border: '1px solid var(--color-border-default)' }}>
+            <Globe size={16} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />
             <div>
-              <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)' }}>Projects</div>
-              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-heading)', marginTop: '2px' }}>{workspace.projectCount} child projects</div>
+              <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)' }}>Projects</div>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-primary)', marginTop: '2px' }}>{workspace.projectCount} child projects</div>
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--card-hover)', border: '1px solid var(--border)' }}>
-            <Users size={16} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--color-base100)', border: '1px solid var(--color-border-default)' }}>
+            <Users size={16} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />
             <div>
-              <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)' }}>Members</div>
-              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-heading)', marginTop: '2px' }}>{workspace.memberCount} approved users</div>
+              <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)' }}>Members</div>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-primary)', marginTop: '2px' }}>{workspace.memberCount} approved users</div>
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--card-hover)', border: '1px solid var(--border)' }}>
-            <UserPlus size={16} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--color-base100)', border: '1px solid var(--color-border-default)' }}>
+            <UserPlus size={16} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />
             <div>
-              <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)' }}>Pending Reviews</div>
-              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-heading)', marginTop: '2px' }}>{workspace.pendingJoinRequestCount} requests</div>
+              <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)' }}>Pending Reviews</div>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-primary)', marginTop: '2px' }}>{workspace.pendingJoinRequestCount} requests</div>
             </div>
           </div>
         </Grid>
@@ -236,7 +236,7 @@ function DangerZoneSection({
       <Stack gap="var(--space-5)">
         <div>
           <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: '#FFF' }}>Danger Zone</h2>
-          <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '12.5px', lineHeight: 1.5 }}>
+          <p style={{ margin: '4px 0 0', color: 'var(--color-text-disabled)', fontSize: '12.5px', lineHeight: 1.5 }}>
             Deleting a workspace is permanent and cannot be undone. All projects, tickets, comments, and members within this workspace will be deleted.
           </p>
         </div>
@@ -291,13 +291,13 @@ function FederationConnectionsSection({
     <Card style={{ padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)' }}>
       <Stack gap="var(--space-5)">
         <div>
-          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--text-heading)' }}>Federation Connections</h2>
-          <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '12.5px', lineHeight: 1.5 }}>
+          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Federation Connections</h2>
+          <p style={{ margin: '4px 0 0', color: 'var(--color-text-disabled)', fontSize: '12.5px', lineHeight: 1.5 }}>
             Review guest-side host links, sync cursors, and retry health for this workspace.
           </p>
         </div>
 
-        {connectionsLoading && <div style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Loading federation connections...</div>}
+        {connectionsLoading && <div style={{ color: 'var(--color-text-disabled)', fontSize: '13px' }}>Loading federation connections...</div>}
 
         {connectionsError && (
           <Alert type="warning">
@@ -306,7 +306,7 @@ function FederationConnectionsSection({
         )}
 
         {!connectionsLoading && federationConnections.length === 0 && !connectionsError && (
-          <div style={{ color: 'var(--text-muted)', fontSize: '13px', textAlign: 'center', padding: 'var(--space-4)' }}>
+          <div style={{ color: 'var(--color-text-disabled)', fontSize: '13px', textAlign: 'center', padding: 'var(--space-4)' }}>
             No guest federation connections exist for this workspace yet.
           </div>
         )}
@@ -324,40 +324,40 @@ function FederationConnectionsSection({
                   gap: 'var(--space-4)',
                   padding: 'var(--space-4)',
                   borderRadius: 'var(--radius-md)',
-                  background: 'var(--card-hover)',
-                  border: '1px solid var(--border)'
+                  background: 'var(--color-base100)',
+                  border: '1px solid var(--color-border-default)'
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 'var(--space-4)' }}>
                   <div>
-                    <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-heading)' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
                       {connection.hostDisplayName || connection.workspaceName || 'Federated Host'}
                     </div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px', wordBreak: 'break-word' }}>{connection.hostUrl}</div>
+                    <div style={{ fontSize: '12px', color: 'var(--color-text-disabled)', marginTop: '4px', wordBreak: 'break-word' }}>{connection.hostUrl}</div>
                   </div>
                   <Badge variant={status.variant}>{status.label}</Badge>
                 </div>
 
                 <Grid columns={3} gap="var(--space-3)">
-                  <div style={{ padding: 'var(--space-3)', borderRadius: 'var(--radius-sm)', background: 'var(--bg)', border: '1px solid var(--border)' }}>
-                    <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Last Success</div>
-                    <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--text-heading)', lineHeight: 1.4 }}>
+                  <div style={{ padding: 'var(--space-3)', borderRadius: 'var(--radius-sm)', background: 'var(--color-surface-app)', border: '1px solid var(--color-border-default)' }}>
+                    <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-disabled)' }}>Last Success</div>
+                    <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--color-text-primary)', lineHeight: 1.4 }}>
                       {formatConnectionTimestamp(connection.syncState.lastSuccessAt)}
                     </div>
                   </div>
 
-                  <div style={{ padding: 'var(--space-3)', borderRadius: 'var(--radius-sm)', background: 'var(--bg)', border: '1px solid var(--border)' }}>
-                    <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Sync Cursor</div>
-                    <div style={{ marginTop: '6px', fontSize: '16px', fontWeight: 700, color: 'var(--text-heading)' }}>{connection.lastSyncedEventId}</div>
+                  <div style={{ padding: 'var(--space-3)', borderRadius: 'var(--radius-sm)', background: 'var(--color-surface-app)', border: '1px solid var(--color-border-default)' }}>
+                    <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-disabled)' }}>Sync Cursor</div>
+                    <div style={{ marginTop: '6px', fontSize: '16px', fontWeight: 700, color: 'var(--color-text-primary)' }}>{connection.lastSyncedEventId}</div>
                   </div>
 
-                  <div style={{ padding: 'var(--space-3)', borderRadius: 'var(--radius-sm)', background: 'var(--bg)', border: '1px solid var(--border)' }}>
-                    <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Retries</div>
-                    <div style={{ marginTop: '6px', fontSize: '16px', fontWeight: 700, color: 'var(--text-heading)' }}>{connection.syncState.consecutiveFailures}</div>
+                  <div style={{ padding: 'var(--space-3)', borderRadius: 'var(--radius-sm)', background: 'var(--color-surface-app)', border: '1px solid var(--color-border-default)' }}>
+                    <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-disabled)' }}>Retries</div>
+                    <div style={{ marginTop: '6px', fontSize: '16px', fontWeight: 700, color: 'var(--color-text-primary)' }}>{connection.syncState.consecutiveFailures}</div>
                   </div>
                 </Grid>
 
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)', fontSize: '11px', color: 'var(--text-muted)' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)', fontSize: '11px', color: 'var(--color-text-disabled)' }}>
                   <span>Last attempt: {formatConnectionTimestamp(connection.syncState.lastAttemptAt)}</span>
                   <span>Created: {formatConnectionTimestamp(connection.createdAt)}</span>
                   {connection.syncState.nextAttemptAt && <span>Next retry: {formatConnectionTimestamp(connection.syncState.nextAttemptAt)}</span>}
@@ -365,7 +365,7 @@ function FederationConnectionsSection({
                 </div>
 
                 {connection.syncState.lastError && (
-                  <div style={{ padding: 'var(--space-3)', borderRadius: 'var(--radius-sm)', background: 'rgba(255, 184, 0, 0.08)', border: '1px solid rgba(255, 184, 0, 0.2)', color: 'var(--text-heading)', fontSize: '12px', lineHeight: 1.5 }}>
+                  <div style={{ padding: 'var(--space-3)', borderRadius: 'var(--radius-sm)', background: 'rgba(255, 184, 0, 0.08)', border: '1px solid rgba(255, 184, 0, 0.2)', color: 'var(--color-text-primary)', fontSize: '12px', lineHeight: 1.5 }}>
                     {connection.syncState.lastError}
                   </div>
                 )}
@@ -496,17 +496,17 @@ function AccessSection({
     <Card style={{ padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)' }}>
       <Stack gap="var(--space-5)">
         <div>
-          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--text-heading)' }}>Peer Invites</h2>
-          <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '12.5px', lineHeight: 1.5 }}>
+          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Peer Invites</h2>
+          <p style={{ margin: '4px 0 0', color: 'var(--color-text-disabled)', fontSize: '12.5px', lineHeight: 1.5 }}>
             Mint and issue direct guest credentials linked to remote peers. This configuration provides secure, cryptographically validated workspace entry codes.
           </p>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)', padding: 'var(--space-4)', borderRadius: 'var(--radius-md)', background: 'var(--card-hover)', border: '1px solid var(--border)' }}>
-          <Mail size={16} style={{ color: 'var(--accent)', flexShrink: 0, marginTop: '2px' }} />
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)', padding: 'var(--space-4)', borderRadius: 'var(--radius-md)', background: 'var(--color-base100)', border: '1px solid var(--color-border-default)' }}>
+          <Mail size={16} style={{ color: 'var(--color-primary)', flexShrink: 0, marginTop: '2px' }} />
           <div>
-            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-heading)' }}>Host handoff workflow</div>
-            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px', lineHeight: 1.5 }}>
+            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Host handoff workflow</div>
+            <div style={{ fontSize: '12px', color: 'var(--color-text-disabled)', marginTop: '4px', lineHeight: 1.5 }}>
               Generate an invite link, then share the guest validation code, validation URL, and hashing credentials securely through your preferred channel.
             </div>
           </div>
@@ -539,8 +539,8 @@ function AccessSection({
           <Stack gap="var(--space-3)" style={{ padding: 'var(--space-4)', borderRadius: 'var(--radius-md)', background: 'rgba(170, 59, 255, 0.02)', border: '1px solid rgba(170, 59, 255, 0.15)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifySelf: 'stretch', justifyContent: 'space-between' }}>
               <div>
-                <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Most Recent Invite</span>
-                <h4 style={{ margin: '2px 0 0', fontSize: '14px', fontWeight: 600, color: 'var(--text-heading)' }}>{latestInvite.email}</h4>
+                <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--color-text-disabled)' }}>Most Recent Invite</span>
+                <h4 style={{ margin: '2px 0 0', fontSize: '14px', fontWeight: 600, color: 'var(--color-text-primary)' }}>{latestInvite.email}</h4>
               </div>
               <Badge variant={getInviteStateVariant(latestInvite)}>
                 {getInviteStateLabel(latestInvite)}
@@ -548,32 +548,32 @@ function AccessSection({
             </div>
 
             <Grid columns={3} gap="var(--space-3)" style={{ marginTop: 'var(--space-2)' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--card-hover)', border: '1px solid var(--border)' }}>
-                <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Invite URL</span>
-                <span style={{ fontSize: '11px', color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{latestInvite.inviteUrl}</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--color-base100)', border: '1px solid var(--color-border-default)' }}>
+                <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase' }}>Invite URL</span>
+                <span style={{ fontSize: '11px', color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{latestInvite.inviteUrl}</span>
                 <Button variant="default" size="xs" style={{ marginTop: 'auto' }} onClick={() => void handleCopy('invite-url', latestInvite.inviteUrl)}>
                   {copiedField === 'invite-url' ? 'Copied' : 'Copy URL'}
                 </Button>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--card-hover)', border: '1px solid var(--border)' }}>
-                <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Validation Code</span>
-                <span style={{ fontSize: '11px', color: 'var(--text-heading)', fontFamily: 'monospace' }}>{latestInvite.validationCode}</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--color-base100)', border: '1px solid var(--color-border-default)' }}>
+                <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase' }}>Validation Code</span>
+                <span style={{ fontSize: '11px', color: 'var(--color-text-primary)', fontFamily: 'monospace' }}>{latestInvite.validationCode}</span>
                 <Button variant="default" size="xs" style={{ marginTop: 'auto' }} onClick={() => void handleCopy('validation-code', latestInvite.validationCode)}>
                   {copiedField === 'validation-code' ? 'Copied' : 'Copy Code'}
                 </Button>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--card-hover)', border: '1px solid var(--border)' }}>
-                <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Workspace Key</span>
-                <span style={{ fontSize: '11px', color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{latestInvite.workspacePrivateKey}</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--color-base100)', border: '1px solid var(--color-border-default)' }}>
+                <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase' }}>Workspace Key</span>
+                <span style={{ fontSize: '11px', color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{latestInvite.workspacePrivateKey}</span>
                 <Button variant="default" size="xs" style={{ marginTop: 'auto' }} onClick={() => void handleCopy('workspace-key', latestInvite.workspacePrivateKey)}>
                   {copiedField === 'workspace-key' ? 'Copied' : 'Copy Key'}
                 </Button>
               </div>
             </Grid>
 
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)', fontSize: '11px', color: 'var(--text-muted)', marginTop: 'var(--space-1)' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)', fontSize: '11px', color: 'var(--color-text-disabled)', marginTop: 'var(--space-1)' }}>
               <span>Expires {new Date(latestInvite.expiresAt).toLocaleString()}</span>
               {latestInvite.revokedAt && <span>Revoked {new Date(latestInvite.revokedAt).toLocaleString()}</span>}
               <span>{latestInvite.guestUsername ? `Validated by ${latestInvite.guestUsername}` : 'Awaiting peer validation'}</span>
@@ -594,12 +594,12 @@ function AccessSection({
           </Stack>
         )}
 
-        {invitesLoading && <div style={{ color: 'var(--text-muted)', fontSize: '13px', textAlign: 'center', padding: 'var(--space-4)' }}>Loading peer invites...</div>}
-        {!invitesLoading && invites.length === 0 && <div style={{ color: 'var(--text-muted)', fontSize: '13px', textAlign: 'center', padding: 'var(--space-4)' }}>No peer invites exist yet for this workspace.</div>}
+        {invitesLoading && <div style={{ color: 'var(--color-text-disabled)', fontSize: '13px', textAlign: 'center', padding: 'var(--space-4)' }}>Loading peer invites...</div>}
+        {!invitesLoading && invites.length === 0 && <div style={{ color: 'var(--color-text-disabled)', fontSize: '13px', textAlign: 'center', padding: 'var(--space-4)' }}>No peer invites exist yet for this workspace.</div>}
 
         {invites.length > 0 && (
           <Stack gap="var(--space-3)" style={{ marginTop: 'var(--space-2)' }}>
-            <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Historical Invites ({invites.length})</span>
+            <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--color-text-disabled)' }}>Historical Invites ({invites.length})</span>
             {invites.map((invite) => (
               <div
                 key={invite.id}
@@ -610,13 +610,13 @@ function AccessSection({
                   gap: 'var(--space-4)',
                   padding: 'var(--space-4)',
                   borderRadius: 'var(--radius-md)',
-                  background: 'var(--card-hover)',
-                  border: '1px solid var(--border)'
+                  background: 'var(--color-base100)',
+                  border: '1px solid var(--color-border-default)'
                 }}
               >
                 <div>
-                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-heading)' }}>{invite.email}</div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>{invite.email}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--color-text-disabled)', marginTop: '4px', display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
                     <span>Code: {invite.validationCode}</span>
                     <span>Expires: {new Date(invite.expiresAt).toLocaleDateString()}</span>
                     {invite.guestUsername && <span>Guest: {invite.guestUsername}</span>}
@@ -697,13 +697,13 @@ function MembersSection({ members }: { members: WorkspaceMember[] }) {
     <Card style={{ padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)' }}>
       <Stack gap="var(--space-5)">
         <div>
-          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--text-heading)' }}>Approved Members</h2>
-          <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '12.5px', lineHeight: 1.5 }}>
+          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Approved Members</h2>
+          <p style={{ margin: '4px 0 0', color: 'var(--color-text-disabled)', fontSize: '12.5px', lineHeight: 1.5 }}>
             Membership controls the access boundary. Users listed here are fully approved to access project tasks and collaborate inside this workspace.
           </p>
         </div>
 
-        {members.length === 0 && <div style={{ color: 'var(--text-muted)', fontSize: '13px', textAlign: 'center', padding: 'var(--space-4)' }}>No members are assigned to this workspace yet.</div>}
+        {members.length === 0 && <div style={{ color: 'var(--color-text-disabled)', fontSize: '13px', textAlign: 'center', padding: 'var(--space-4)' }}>No members are assigned to this workspace yet.</div>}
 
         <Stack gap="var(--space-3)">
           {members.map((member) => (
@@ -716,16 +716,16 @@ function MembersSection({ members }: { members: WorkspaceMember[] }) {
                 gap: 'var(--space-4)',
                 padding: 'var(--space-4)',
                 borderRadius: 'var(--radius-md)',
-                background: 'var(--card-hover)',
-                border: '1px solid var(--border)'
+                background: 'var(--color-base100)',
+                border: '1px solid var(--color-border-default)'
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
                 <Avatar src={member.avatar} name={member.name} size="md" />
                 <div>
-                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-heading)' }}>{member.name}</div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>{member.email}</div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', fontStyle: 'italic' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>{member.name}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--color-text-disabled)', marginTop: '2px' }}>{member.email}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--color-text-disabled)', marginTop: '4px', fontStyle: 'italic' }}>
                     Last active: {formatLastActive(member.lastActiveAt)}
                   </div>
                 </div>
@@ -765,13 +765,13 @@ function RequestsSection({
     <Card style={{ padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)' }}>
       <Stack gap="var(--space-5)">
         <div>
-          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--text-heading)' }}>Join Requests</h2>
-          <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '12.5px', lineHeight: 1.5 }}>
+          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Join Requests</h2>
+          <p style={{ margin: '4px 0 0', color: 'var(--color-text-disabled)', fontSize: '12.5px', lineHeight: 1.5 }}>
             Manage pending inbound workspace access requests. Requests will remain in a pending state until reviewed and approved by an owner.
           </p>
         </div>
 
-        {pendingRequests.length === 0 && <div style={{ color: 'var(--text-muted)', fontSize: '13px', textAlign: 'center', padding: 'var(--space-4)' }}>No pending join requests at the moment.</div>}
+        {pendingRequests.length === 0 && <div style={{ color: 'var(--color-text-disabled)', fontSize: '13px', textAlign: 'center', padding: 'var(--space-4)' }}>No pending join requests at the moment.</div>}
 
         <Stack gap="var(--space-3)">
           {pendingRequests.map((request) => (
@@ -784,19 +784,19 @@ function RequestsSection({
                 gap: 'var(--space-4)',
                 padding: 'var(--space-4)',
                 borderRadius: 'var(--radius-md)',
-                background: 'var(--card-hover)',
-                border: '1px solid var(--border)'
+                background: 'var(--color-base100)',
+                border: '1px solid var(--color-border-default)'
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-                <div style={{ width: '36px', height: '36px', borderRadius: '50%', display: 'grid', placeItems: 'center', background: 'var(--accent-glow)', border: '1px solid var(--accent-border)', color: 'var(--accent)', fontWeight: 700 }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '50%', display: 'grid', placeItems: 'center', background: 'var(--color-state-selected-bg)', border: '1px solid var(--color-border-focus)', color: 'var(--color-primary)', fontWeight: 700 }}>
                   {request.requesterName.slice(0, 1).toUpperCase()}
                 </div>
                 <div>
-                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-heading)' }}>{request.requesterName}</div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>{request.requesterEmail}</div>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>{request.requesterName}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--color-text-disabled)', marginTop: '2px' }}>{request.requesterEmail}</div>
                   {request.message && (
-                    <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--text-heading)', padding: 'var(--space-2)', borderRadius: 'var(--radius-sm)', background: 'var(--bg)', border: '1px solid var(--border)', fontStyle: 'italic' }}>
+                    <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--color-text-primary)', padding: 'var(--space-2)', borderRadius: 'var(--radius-sm)', background: 'var(--color-surface-app)', border: '1px solid var(--color-border-default)', fontStyle: 'italic' }}>
                       "{request.message}"
                     </div>
                   )}
@@ -817,7 +817,7 @@ function RequestsSection({
 
         {reviewedRequests.length > 0 && (
           <Stack gap="var(--space-3)" style={{ marginTop: 'var(--space-4)' }}>
-            <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Recently Reviewed</span>
+            <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--color-text-disabled)' }}>Recently Reviewed</span>
             {reviewedRequests.map((request) => (
               <div
                 key={request.id}
@@ -828,19 +828,19 @@ function RequestsSection({
                   gap: 'var(--space-4)',
                   padding: 'var(--space-3) var(--space-4)',
                   borderRadius: 'var(--radius-md)',
-                  background: 'var(--card-hover)',
-                  border: '1px solid var(--border)',
+                  background: 'var(--color-base100)',
+                  border: '1px solid var(--color-border-default)',
                   opacity: 0.75
                 }}
               >
                 <div>
-                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-heading)' }}>{request.requesterName}</div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>{request.requesterName}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--color-text-disabled)', marginTop: '2px' }}>
                     {request.status} · Approved by {request.reviewedByName || 'Unknown owner'}
                   </div>
                 </div>
 
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{new Date(request.createdAt).toLocaleDateString()}</span>
+                <span style={{ fontSize: '11px', color: 'var(--color-text-disabled)' }}>{new Date(request.createdAt).toLocaleDateString()}</span>
               </div>
             ))}
           </Stack>
@@ -935,8 +935,8 @@ function McpToolsSection({
     <Card style={{ padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)' }}>
       <Stack gap="var(--space-5)">
         <div>
-          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--text-heading)' }}>MCP Agent Tools</h2>
-          <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '12.5px', lineHeight: 1.5 }}>
+          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--color-text-primary)' }}>MCP Agent Tools</h2>
+          <p style={{ margin: '4px 0 0', color: 'var(--color-text-disabled)', fontSize: '12.5px', lineHeight: 1.5 }}>
             Configure which model-context-protocol (MCP) tools AI assistants are allowed to use within this workspace. Disabling tools prevents any AI assistant or agent from calling them on behalf of users.
           </p>
         </div>
@@ -950,7 +950,7 @@ function McpToolsSection({
         <Stack gap="var(--space-6)">
           {MCP_TOOL_GROUPS.map((group) => (
             <div key={group.title}>
-              <h3 style={{ margin: '0 0 var(--space-4) 0', fontSize: '16px', fontWeight: 600, color: 'var(--text-heading)' }}>
+              <h3 style={{ margin: '0 0 var(--space-4) 0', fontSize: '16px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
                 {group.title}
               </h3>
               <Stack gap="var(--space-3)">
@@ -980,8 +980,8 @@ function McpToolsSection({
                         gap: 'var(--space-4)',
                         padding: 'var(--space-4)',
                         borderRadius: 'var(--radius-md)',
-                        background: 'var(--card-hover)',
-                        border: '1px solid var(--border)',
+                        background: 'var(--color-base100)',
+                        border: '1px solid var(--color-border-default)',
                         transition: 'border-color 0.2s ease',
                       }}
                     >
@@ -999,11 +999,11 @@ function McpToolsSection({
                               flexShrink: 0,
                             }}
                           />
-                          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-heading)' }}>
+                          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
                             {tool.label}
                           </span>
                         </div>
-                        <span style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.4, paddingLeft: 'calc(8px + var(--space-3))' }}>
+                        <span style={{ fontSize: '12px', color: 'var(--color-text-disabled)', lineHeight: 1.4, paddingLeft: 'calc(8px + var(--space-3))' }}>
                           {tool.description}
                         </span>
                       </div>
@@ -1081,8 +1081,8 @@ export function SettingsPage({
             <Divider vertical style={{ height: '20px' }} />
 
             <div>
-              <h1 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: 'var(--text-heading)' }}>Workspace Settings</h1>
-              <p style={{ margin: 0, fontSize: '11px', color: 'var(--text-muted)' }}>Managing {workspace.name}</p>
+              <h1 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: 'var(--color-text-primary)' }}>Workspace Settings</h1>
+              <p style={{ margin: 0, fontSize: '11px', color: 'var(--color-text-disabled)' }}>Managing {workspace.name}</p>
             </div>
           </Flex>
         }
@@ -1095,11 +1095,11 @@ export function SettingsPage({
 
       <DashboardLayout.Sidebar>
         <div style={{ padding: 'var(--space-5)', display: 'flex', flexDirection: 'column', gap: 'var(--space-5)', height: '100%', overflowY: 'auto' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--card-bg)', border: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--color-surface-card)', border: '1px solid var(--color-border-default)' }}>
             <Avatar src={currentUser.avatar} name={currentUser.name} size="md" />
             <div>
-              <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-heading)' }}>{currentUser.name}</div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Managing {workspace.key}</div>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>{currentUser.name}</div>
+              <div style={{ fontSize: '11px', color: 'var(--color-text-disabled)' }}>Managing {workspace.key}</div>
             </div>
           </div>
 
@@ -1119,20 +1119,20 @@ export function SettingsPage({
                     padding: 'var(--space-3) var(--space-4)',
                     border: '1px solid transparent',
                     borderRadius: 'var(--radius-md)',
-                    background: isActive ? 'var(--card-bg)' : 'transparent',
-                    borderColor: isActive ? 'var(--border)' : 'transparent',
+                    background: isActive ? 'var(--color-surface-card)' : 'transparent',
+                    borderColor: isActive ? 'var(--color-border-default)' : 'transparent',
                     cursor: 'pointer',
-                    color: isActive ? 'var(--text-heading)' : 'var(--text-muted)',
+                    color: isActive ? 'var(--color-text-primary)' : 'var(--color-text-disabled)',
                     textAlign: 'left',
                     transition: 'all var(--transition-fast)'
                   }}
                   className="clickable lib-focus-ring"
                   onClick={() => setActiveCategory(category.id)}
                 >
-                  <Icon size={16} style={{ color: isActive ? 'var(--accent)' : 'var(--text-muted)', flexShrink: 0 }} />
+                  <Icon size={16} style={{ color: isActive ? 'var(--color-primary)' : 'var(--color-text-disabled)', flexShrink: 0 }} />
                   <div style={{ display: 'flex', flexDirection: 'column' }}>
                     <span style={{ fontSize: '13px', fontWeight: 600 }}>{category.label}</span>
-                    <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.2 }}>{category.description}</span>
+                    <span style={{ fontSize: '10px', color: 'var(--color-text-disabled)', marginTop: '2px', lineHeight: 1.2 }}>{category.description}</span>
                   </div>
                 </button>
               );
@@ -1146,13 +1146,13 @@ export function SettingsPage({
           <div style={{ padding: 'var(--space-6) var(--space-6) var(--space-8) var(--space-6)', maxWidth: '800px', margin: '0 auto' }}>
             <Stack gap="var(--space-5)">
               <div>
-                <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+                <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-text-disabled)' }}>
                   Settings Section
                 </span>
-                <h2 style={{ margin: '4px 0 0', fontSize: '24px', fontWeight: 700, color: 'var(--text-heading)', letterSpacing: '-0.02em' }}>
+                <h2 style={{ margin: '4px 0 0', fontSize: '24px', fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '-0.02em' }}>
                   {activeCategoryMeta.label}
                 </h2>
-                <p style={{ margin: '6px 0 0', fontSize: '13.5px', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                <p style={{ margin: '6px 0 0', fontSize: '13.5px', color: 'var(--color-text-disabled)', lineHeight: 1.5 }}>
                   {activeCategoryMeta.description}
                 </p>
               </div>

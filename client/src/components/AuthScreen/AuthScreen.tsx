@@ -47,9 +47,9 @@ export const AuthScreen: React.FC = () => {
         <div style={headerStyle}>
           <div style={logoContainerStyle}>
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="12" cy="12" r="10" stroke="var(--text-heading)" strokeWidth="2.5" />
-              <circle cx="12" cy="12" r="6" stroke="var(--accent)" strokeWidth="2" strokeDasharray="4 2" />
-              <circle cx="12" cy="12" r="2" fill="var(--text-heading)" />
+              <circle cx="12" cy="12" r="10" stroke="var(--color-text-primary)" strokeWidth="2.5" />
+              <circle cx="12" cy="12" r="6" stroke="var(--color-primary)" strokeWidth="2" strokeDasharray="4 2" />
+              <circle cx="12" cy="12" r="2" fill="var(--color-text-primary)" />
             </svg>
           </div>
           <h1 style={titleStyle}>Gravity</h1>
@@ -121,7 +121,7 @@ const containerStyle: React.CSSProperties = {
   justifyContent: 'center',
   width: '100vw',
   height: '100vh',
-  background: 'var(--bg)',
+  background: 'var(--color-surface-app)',
   overflow: 'hidden',
   position: 'relative',
   fontFamily: 'var(--sans)'
@@ -131,8 +131,8 @@ const cardStyle: React.CSSProperties = {
   width: '400px',
   padding: '40px',
   borderRadius: '8px',
-  border: '1px solid var(--border)',
-  background: 'var(--card-bg)',
+  border: '1px solid var(--color-border-default)',
+  background: 'var(--color-surface-card)',
   zIndex: 10,
   boxShadow: 'var(--shadow-lg)',
   display: 'flex',
@@ -151,21 +151,21 @@ const headerStyle: React.CSSProperties = {
 const logoContainerStyle: React.CSSProperties = {
   padding: '12px',
   borderRadius: '8px',
-  background: 'var(--sidebar-bg)',
-  border: '1px solid var(--border)',
+  background: 'var(--color-base50)',
+  border: '1px solid var(--color-border-default)',
   marginBottom: '8px'
 };
 
 const titleStyle: React.CSSProperties = {
   fontSize: '24px',
   fontWeight: 600,
-  color: 'var(--text-heading)',
+  color: 'var(--color-text-primary)',
   letterSpacing: '-0.5px'
 };
 
 const subtitleStyle: React.CSSProperties = {
   fontSize: '13px',
-  color: 'var(--text-muted)',
+  color: 'var(--color-text-disabled)',
   lineHeight: '1.4'
 };
 
@@ -193,7 +193,7 @@ const footerStyle: React.CSSProperties = {
 const toggleButtonStyle: React.CSSProperties = {
   background: 'none',
   border: 'none',
-  color: 'var(--accent)',
+  color: 'var(--color-primary)',
   fontSize: '12px',
   cursor: 'pointer',
   outline: 'none',

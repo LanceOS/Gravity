@@ -2,8 +2,8 @@
   display: grid;
   place-items: center;
   min-height: 100vh;
-  background: var(--bg);
-  color: var(--text);
+  background: var(--color-surface-app);
+  color: var(--color-text-secondary);
 }
 
 .loading-page__panel {
@@ -12,10 +12,10 @@
 
 .loading-page__title {
   font-size: 24px;
-  color: var(--text-heading);
+  color: var(--color-text-primary);
   margin-bottom: 8px;
 }
 
 .loading-page__subtitle {
-  color: var(--text-muted);
+  color: var(--color-text-disabled);
 }

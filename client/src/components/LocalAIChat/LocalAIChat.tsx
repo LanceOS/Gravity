@@ -282,7 +282,7 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
         height: '580px',
         maxHeight: 'calc(100vh - 140px)',
         background: 'rgba(26, 26, 26, 0.85)',
-        border: '1px solid var(--border)',
+        border: '1px solid var(--color-border-default)',
         borderRadius: '16px',
         boxShadow: '0 12px 40px rgba(0, 0, 0, 0.25)',
         display: 'flex',
@@ -297,14 +297,14 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
       <div 
         style={{
           padding: '14px 16px',
-          borderBottom: '1px solid var(--border)',
+          borderBottom: '1px solid var(--color-border-default)',
           display: 'flex',
           alignItems: 'center',
           gap: '8px'
         }}
       >
-        <Cpu size={16} color="var(--accent)" />
-        <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-heading)' }}>
+        <Cpu size={16} color="var(--color-primary)" />
+        <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--color-text-primary)' }}>
           {isThirdParty ? `${getProviderName(settings.aiProvider)} Assistant` : 'Local AI Assistant'}
         </span>
 
@@ -315,7 +315,7 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
             marginLeft: 'auto',
             border: 'none',
             background: 'transparent',
-            color: 'var(--text-muted)',
+            color: 'var(--color-text-disabled)',
             cursor: 'pointer'
           }}
         >
@@ -327,7 +327,7 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
       <div 
         style={{
           padding: '12px 16px',
-          borderBottom: '1px solid var(--border)',
+          borderBottom: '1px solid var(--color-border-default)',
           background: 'rgba(255,255,255,0.01)',
           display: 'flex',
           flexDirection: 'column',
@@ -336,7 +336,7 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
       >
         {/* Connection status */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '11px' }}>
-          <span style={{ color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+          <span style={{ color: 'var(--color-text-disabled)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
             {isThirdParty ? 'Cloud Provider Status:' : 'Ollama Endpoint Status:'}
           </span>
           <span 
@@ -348,7 +348,7 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
               alignItems: 'center',
               gap: '4px',
               fontWeight: 600,
-              color: modelStatus === 'connected' ? '#10b981' : modelStatus === 'checking' ? 'var(--priority-medium)' : '#ef4444',
+              color: modelStatus === 'connected' ? '#10b981' : modelStatus === 'checking' ? 'var(--color-text-secondary)' : '#ef4444',
               cursor: isThirdParty ? 'default' : 'pointer'
             }}
           >
@@ -377,9 +377,9 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
               fontSize: '11.5px',
               height: '32px',
               borderRadius: '6px',
-              border: '1px solid var(--border)',
-              background: 'var(--card-bg)',
-              color: 'var(--text)',
+              border: '1px solid var(--color-border-default)',
+              background: 'var(--color-surface-card)',
+              color: 'var(--color-text-secondary)',
               padding: '0 8px',
               outline: 'none',
               cursor: 'pointer',
@@ -391,25 +391,25 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
           >
             {isThirdParty ? (
               cloudModelsList.map((m) => (
-                <option key={m} value={m} style={{ background: 'var(--card-bg)', color: 'var(--text)' }}>
+                <option key={m} value={m} style={{ background: 'var(--color-surface-card)', color: 'var(--color-text-secondary)' }}>
                   {m}
                 </option>
               ))
             ) : detectedModels.length > 0 ? (
               detectedModels.map((m) => (
-                <option key={m} value={m} style={{ background: 'var(--card-bg)', color: 'var(--text)' }}>
+                <option key={m} value={m} style={{ background: 'var(--color-surface-card)', color: 'var(--color-text-secondary)' }}>
                   {m}
                 </option>
               ))
             ) : (
-              <option value="" style={{ background: 'var(--card-bg)', color: 'var(--text-muted)' }}>
+              <option value="" style={{ background: 'var(--color-surface-card)', color: 'var(--color-text-disabled)' }}>
                 {isCheckingModel ? 'Checking...' : 'No models'}
               </option>
             )}
           </select>
         </div>
         {!model && !isCheckingModel && !isThirdParty ? (
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+          <div style={{ fontSize: '11px', color: 'var(--color-text-disabled)', lineHeight: 1.4 }}>
             No models detected. Ensure Ollama is running and has models installed.
           </div>
         ) : null}
@@ -425,24 +425,24 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
               flexDirection: 'column',
               alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
               maxWidth: '85%',
-              background: m.role === 'user' ? 'var(--border)' : m.role === 'system' ? 'rgba(239, 68, 68, 0.05)' : m.role === 'tool' ? 'var(--sidebar-bg)' : 'var(--card-bg)',
-              border: `1px solid ${m.role === 'user' ? 'var(--border-focus)' : m.role === 'system' ? '#ef444430' : m.role === 'tool' ? 'var(--border)' : 'var(--border)'}`,
+              background: m.role === 'user' ? 'var(--color-border-default)' : m.role === 'system' ? 'rgba(239, 68, 68, 0.05)' : m.role === 'tool' ? 'var(--color-base50)' : 'var(--color-surface-card)',
+              border: `1px solid ${m.role === 'user' ? 'var(--color-border-focus)' : m.role === 'system' ? '#ef444430' : m.role === 'tool' ? 'var(--color-border-default)' : 'var(--color-border-default)'}`,
               borderRadius: '8px',
               padding: '10px 12px',
               fontSize: '12px',
               lineHeight: '1.5',
-              color: m.role === 'user' ? 'var(--text-heading)' : 'var(--text)',
+              color: m.role === 'user' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
               opacity: m.role === 'tool' ? 0.7 : 1
             }}
           >
             {m.role === 'tool' && (
-              <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <div style={{ fontSize: '10px', color: 'var(--color-text-disabled)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <Cpu size={10} /> Tool Execution: {m.name}
               </div>
             )}
             {m.content && <FormattedMarkdown text={m.content} />}
             {m.tool_calls && m.tool_calls.map((tc, tcIdx) => (
-              <div key={tcIdx} style={{ marginTop: m.content ? '8px' : '0', padding: '6px', background: 'var(--sidebar-bg)', borderRadius: '4px', fontSize: '10px', color: 'var(--text-muted)', border: '1px dashed var(--border)' }}>
+              <div key={tcIdx} style={{ marginTop: m.content ? '8px' : '0', padding: '6px', background: 'var(--color-base50)', borderRadius: '4px', fontSize: '10px', color: 'var(--color-text-disabled)', border: '1px dashed var(--color-border-default)' }}>
                 <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}><Sparkles size={10} /> Calling tool: {tc.name}</div>
                 <div style={{ fontFamily: 'var(--mono)', marginTop: '4px', opacity: 0.8 }}>{typeof tc.arguments === 'string' ? tc.arguments : JSON.stringify(tc.arguments, null, 2)}</div>
               </div>
@@ -457,12 +457,12 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
               alignItems: 'center',
               gap: '6px',
               alignSelf: 'flex-start',
-              background: 'var(--card-bg)',
-              border: '1px solid var(--border)',
+              background: 'var(--color-surface-card)',
+              border: '1px solid var(--color-border-default)',
               borderRadius: '8px',
               padding: '10px 12px',
               fontSize: '11px',
-              color: 'var(--text-muted)'
+              color: 'var(--color-text-disabled)'
             }}
           >
             <Loader2 size={12} className="animate-spin" style={{ animation: 'spin 1s linear infinite' }} />
@@ -474,7 +474,7 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
 
       {/* Quick Prompt Triggers */}
       {activeTicket && (
-        <div style={{ padding: '8px 12px', display: 'flex', gap: '6px', overflowX: 'auto', borderTop: '1px solid var(--border)', background: 'rgba(255,255,255,0.01)' }}>
+        <div style={{ padding: '8px 12px', display: 'flex', gap: '6px', overflowX: 'auto', borderTop: '1px solid var(--color-border-default)', background: 'rgba(255,255,255,0.01)' }}>
           <button 
             onClick={() => handleQuickAction('analyze')}
             className="btn clickable"
@@ -505,7 +505,7 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
       )}
 
       {/* Input bar */}
-      <div style={{ padding: '12px', borderTop: '1px solid var(--border)' }}>
+      <div style={{ padding: '12px', borderTop: '1px solid var(--color-border-default)' }}>
         <form 
           onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }}
           style={{ display: 'flex', gap: '6px' }}

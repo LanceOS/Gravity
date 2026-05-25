@@ -2,37 +2,6 @@
 
 :root {
   /* --- NEW GRANULAR COLOR PALETTE SYSTEM (LIGHT MODE DEFAULT) --- */
-  /* --- BACKWARD COMPATIBILITY LEGACY ALIASES --- */
-  --bg: var(--color-surface-app);
-  --sidebar-bg: var(--color-base50);
-  --card-bg: var(--color-surface-card);
-  --card-hover: var(--color-base100);
-  --border: var(--color-border-default);
-  --border-focus: var(--color-border-focus);
-  --text: var(--color-text-secondary);
-  --text-heading: var(--color-text-primary);
-  --text-muted: var(--color-text-disabled);
-  
-  --accent: var(--color-primary);
-  --accent-solid: var(--color-primary);
-  --accent-solid-hover: var(--color-primary-hover);
-  --accent-foreground: var(--color-text-on-accent);
-  --accent-glow: var(--color-state-selected-bg);
-  --accent-border: var(--color-border-focus);
-  --sidebar-hover-overlay: var(--color-state-hover-overlay);
-  
-  --priority-no: var(--color-text-disabled);
-  --priority-low: var(--color-base400);
-  --priority-medium: var(--color-text-secondary);
-  --priority-high: var(--color-text-primary);
-  --priority-urgent: var(--color-primary);
-
-  --danger: var(--color-error);
-  --danger-hover: var(--color-error-dark);
-  --danger-subtle: var(--color-bg-error);
-  --danger-border: var(--color-border-error);
-  --danger-foreground: var(--color-text-inverse);
-
   /* --- GEOMETRY & TYPOGRAPHY PRIMITIVES --- */
   --sans: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --mono: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
@@ -40,8 +9,8 @@
   font-family: var(--sans);
   font-size: 13px;
   line-height: 1.5;
-  color: var(--text);
-  background-color: var(--bg);
+  color: var(--color-text-secondary);
+  background-color: var(--color-surface-app);
   color-scheme: light dark;
 
   /* Spacing Grid system */

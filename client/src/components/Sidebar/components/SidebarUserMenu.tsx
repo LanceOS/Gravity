@@ -22,7 +22,7 @@ export function SidebarUserMenu({
     <div
       ref={profileRef}
       style={{
-        borderTop: '1px solid var(--border)',
+        borderTop: '1px solid var(--color-border-default)',
         padding: '12px 16px',
         position: 'relative',
       }}
@@ -42,17 +42,17 @@ export function SidebarUserMenu({
         <img
           src={userMenu.currentUser.avatar || 'https://api.dicebear.com/7.x/bottts/svg?seed=guest'}
           alt={userMenu.currentUser.name}
-          style={{ width: '28px', height: '28px', borderRadius: '50%', border: '1px solid var(--border)' }}
+          style={{ width: '28px', height: '28px', borderRadius: '50%', border: '1px solid var(--color-border-default)' }}
         />
         <div style={{ overflow: 'hidden' }}>
-          <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-heading)', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+          <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-primary)', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
             {userMenu.currentUser.name}
           </div>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
+          <div style={{ fontSize: '11px', color: 'var(--color-text-disabled)', textTransform: 'capitalize' }}>
             {userMenu.currentUser.role || 'User'}
           </div>
         </div>
-        <ChevronDown size={14} style={{ marginLeft: 'auto', color: 'var(--text-muted)' }} />
+        <ChevronDown size={14} style={{ marginLeft: 'auto', color: 'var(--color-text-disabled)' }} />
       </div>
 
       {showUserDropdown ? (
@@ -62,8 +62,8 @@ export function SidebarUserMenu({
             bottom: '100%',
             left: '16px',
             right: '16px',
-            background: 'var(--card-bg)',
-            border: '1px solid var(--border)',
+            background: 'var(--color-surface-card)',
+            border: '1px solid var(--color-border-default)',
             borderRadius: '8px',
             boxShadow: '0 -10px 15px -3px rgba(0,0,0,0.1), 0 -4px 6px -2px rgba(0,0,0,0.05)',
             padding: '6px',
@@ -74,7 +74,7 @@ export function SidebarUserMenu({
             marginBottom: '6px',
           }}
         >
-          <div style={{ padding: '6px 10px', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', borderBottom: '1px solid var(--border)', marginBottom: '4px' }}>
+          <div style={{ padding: '6px 10px', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase', borderBottom: '1px solid var(--color-border-default)', marginBottom: '4px' }}>
             Account & Settings
           </div>
 
@@ -86,7 +86,7 @@ export function SidebarUserMenu({
             className="clickable"
             style={dropdownItemStyle(userMenu.activeArea)}
           >
-            <FolderTree size={14} color="var(--accent)" />
+            <FolderTree size={14} color="var(--color-primary)" />
             <span>Workspaces</span>
           </div>
 
@@ -98,7 +98,7 @@ export function SidebarUserMenu({
             className="clickable"
             style={dropdownItemStyle(userMenu.activeArea, 'account')}
           >
-            <Sliders size={14} color="var(--accent)" />
+            <Sliders size={14} color="var(--color-primary)" />
             <span>Account Preferences</span>
           </div>
 
@@ -110,7 +110,7 @@ export function SidebarUserMenu({
             className="clickable"
             style={dropdownItemStyle(userMenu.activeArea, 'projects')}
           >
-            <FolderTree size={14} color="var(--accent)" />
+            <FolderTree size={14} color="var(--color-primary)" />
             <span>Manage Projects</span>
           </div>
 
@@ -122,7 +122,7 @@ export function SidebarUserMenu({
             className="clickable"
             style={dropdownItemStyle(userMenu.activeArea, 'settings')}
           >
-            <Settings2 size={14} color="var(--accent)" />
+            <Settings2 size={14} color="var(--color-primary)" />
             <span>Workspace Settings</span>
           </div>
 
@@ -140,9 +140,9 @@ export function SidebarUserMenu({
               borderRadius: '4px',
               cursor: 'pointer',
               fontSize: '12px',
-              borderTop: '1px solid var(--border)',
+              borderTop: '1px solid var(--color-border-default)',
               marginTop: '4px',
-              color: 'var(--accent)',
+              color: 'var(--color-primary)',
             }}
           >
             <LogOut size={14} />

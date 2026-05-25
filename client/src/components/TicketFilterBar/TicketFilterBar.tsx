@@ -109,7 +109,7 @@ export const TicketFilterBar: React.FC<TicketFilterBarProps> = ({
         </Button>
       )}
 
-      <div style={{ marginLeft: 'auto', fontSize: '12px', color: 'var(--text-muted)' }}>
+      <div style={{ marginLeft: 'auto', fontSize: '12px', color: 'var(--color-text-disabled)' }}>
         {filteredCount} of {totalCount} tickets
       </div>
     </div>

@@ -121,8 +121,8 @@ export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
     <div 
       style={{
         width: '340px',
-        borderLeft: '1px solid var(--border)',
-        background: 'var(--bg)', // Theme-aware terminal background
+        borderLeft: '1px solid var(--color-border-default)',
+        background: 'var(--color-surface-app)', // Theme-aware terminal background
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
@@ -133,15 +133,15 @@ export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
       <div 
         style={{
           padding: '14px 16px',
-          borderBottom: '1px solid var(--border)',
+          borderBottom: '1px solid var(--color-border-default)',
           display: 'flex',
           alignItems: 'center',
           gap: '8px',
-          background: 'var(--sidebar-bg)'
+          background: 'var(--color-base50)'
         }}
       >
-        <Terminal size={16} color="var(--accent)" />
-        <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-heading)' }}>
+        <Terminal size={16} color="var(--color-primary)" />
+        <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--color-text-primary)' }}>
           MCP Agent Terminal
         </span>
 
@@ -152,7 +152,7 @@ export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
             marginLeft: 'auto',
             border: 'none',
             background: 'transparent',
-            color: 'var(--text-muted)',
+            color: 'var(--color-text-disabled)',
             cursor: 'pointer'
           }}
         >
@@ -169,7 +169,7 @@ export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
           fontFamily: 'var(--mono)',
           fontSize: '11px',
           lineHeight: '1.6',
-          color: 'var(--text)', // Theme-aware terminal text color
+          color: 'var(--color-text-secondary)', // Theme-aware terminal text color
           display: 'flex',
           flexDirection: 'column',
           gap: '12px'
@@ -205,13 +205,13 @@ export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
       <div 
         style={{
           padding: '12px',
-          borderTop: '1px solid var(--border)',
-          background: 'var(--sidebar-bg)'
+          borderTop: '1px solid var(--color-border-default)',
+          background: 'var(--color-base50)'
         }}
       >
         <form onSubmit={handleRunSimulation} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', color: 'var(--text-muted)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', color: 'var(--color-text-disabled)' }}>
             <AlertCircle size={10} />
             <span>Click to run mock IDE Agent execution</span>
           </div>
@@ -221,8 +221,8 @@ export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
             style={{ 
               fontSize: '11px', 
               fontFamily: 'var(--mono)', 
-              background: 'var(--card-bg)', // Theme-aware input background
-              color: 'var(--text-heading)',
+              background: 'var(--color-surface-card)', // Theme-aware input background
+              color: 'var(--color-text-primary)',
               resize: 'none'
             }}
             value={prompt}

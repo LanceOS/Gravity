@@ -39,11 +39,11 @@ export const DenseGridController: React.FC<DenseGridControllerProps> = ({
 
   const getPriorityColor = (p: Ticket['priority']) => {
     switch (p) {
-      case 'urgent': return 'var(--priority-urgent)';
-      case 'high': return 'var(--priority-high)';
-      case 'medium': return 'var(--priority-medium)';
-      case 'low': return 'var(--priority-low)';
-      default: return 'var(--priority-no)';
+      case 'urgent': return 'var(--color-primary)';
+      case 'high': return 'var(--color-text-primary)';
+      case 'medium': return 'var(--color-text-secondary)';
+      case 'low': return 'var(--color-base400)';
+      default: return 'var(--color-text-disabled)';
     }
   };
 
@@ -59,7 +59,7 @@ export const DenseGridController: React.FC<DenseGridControllerProps> = ({
         gap: '8px', 
         height: '100%',
         minHeight: '400px',
-        backgroundColor: 'var(--card-bg)'
+        backgroundColor: 'var(--color-surface-card)'
       }}
     >
       {/* Search and Metadata Top Bar */}
@@ -69,7 +69,7 @@ export const DenseGridController: React.FC<DenseGridControllerProps> = ({
           alignItems: 'center', 
           gap: '12px',
           padding: '4px 8px',
-          borderBottom: '1px solid var(--border)'
+          borderBottom: '1px solid var(--color-border-default)'
         }}
       >
         <div style={{ flex: 1, maxWidth: '280px' }}>
@@ -83,12 +83,12 @@ export const DenseGridController: React.FC<DenseGridControllerProps> = ({
         </div>
         
         {isPending && (
-          <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+          <span style={{ fontSize: '10px', color: 'var(--color-text-disabled)' }}>
             Re-rendering pipeline...
           </span>
         )}
         
-        <div style={{ marginLeft: 'auto', fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--mono)' }}>
+        <div style={{ marginLeft: 'auto', fontSize: '11px', color: 'var(--color-text-disabled)', fontFamily: 'var(--mono)' }}>
           {filteredTickets.length} of {tickets.length} virtual rows
         </div>
       </div>
@@ -97,13 +97,13 @@ export const DenseGridController: React.FC<DenseGridControllerProps> = ({
       <div
         style={{
           display: 'flex',
-          backgroundColor: 'var(--sidebar-bg)',
-          borderBottom: '1px solid var(--border)',
+          backgroundColor: 'var(--color-base50)',
+          borderBottom: '1px solid var(--color-border-default)',
           height: '26px',
           alignItems: 'center',
           fontWeight: 600,
           fontSize: '10px',
-          color: 'var(--text-muted)',
+          color: 'var(--color-text-disabled)',
           textTransform: 'uppercase',
           letterSpacing: '0.05em',
           padding: '0 8px',
@@ -140,8 +140,8 @@ export const DenseGridController: React.FC<DenseGridControllerProps> = ({
                     display: 'flex',
                     alignItems: 'center',
                     padding: '0 8px',
-                    borderBottom: '1px solid var(--border)',
-                    backgroundColor: 'var(--card-bg)',
+                    borderBottom: '1px solid var(--color-border-default)',
+                    backgroundColor: 'var(--color-surface-card)',
                     fontFamily: 'var(--mono)',
                     fontSize: '11px',
                     cursor: 'pointer',
@@ -157,7 +157,7 @@ export const DenseGridController: React.FC<DenseGridControllerProps> = ({
                   className="dense-table-row"
                 >
                   {/* ID Column */}
-                  <span style={{ width: '70px', padding: '0 8px', color: 'var(--text-muted)' }}>
+                  <span style={{ width: '70px', padding: '0 8px', color: 'var(--color-text-disabled)' }}>
                     {t.key}
                   </span>
 
@@ -170,7 +170,7 @@ export const DenseGridController: React.FC<DenseGridControllerProps> = ({
                       overflow: 'hidden', 
                       textOverflow: 'ellipsis', 
                       whiteSpace: 'nowrap', 
-                      color: 'var(--text-heading)',
+                      color: 'var(--color-text-primary)',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '6px'
@@ -218,10 +218,10 @@ export const DenseGridController: React.FC<DenseGridControllerProps> = ({
                       style={{
                         fontSize: '9px',
                         padding: '1px 6px',
-                        background: 'var(--sidebar-bg)',
-                        border: '1px solid var(--border)',
+                        background: 'var(--color-base50)',
+                        border: '1px solid var(--color-border-default)',
                         borderRadius: '4px',
-                        color: 'var(--text)',
+                        color: 'var(--color-text-secondary)',
                         textTransform: 'capitalize'
                       }}
                     >
@@ -237,15 +237,15 @@ export const DenseGridController: React.FC<DenseGridControllerProps> = ({
                           width: '16px',
                           height: '16px',
                           borderRadius: '50%',
-                          background: 'var(--sidebar-bg)',
-                          border: '1px solid var(--border)',
+                          background: 'var(--color-base50)',
+                          border: '1px solid var(--color-border-default)',
                           overflow: 'hidden',
                         }}
                       >
                         <img src={avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       </div>
                     ) : (
-                      <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>--</span>
+                      <span style={{ fontSize: '10px', color: 'var(--color-text-disabled)' }}>--</span>
                     )}
                   </span>
                 </div>
@@ -253,7 +253,7 @@ export const DenseGridController: React.FC<DenseGridControllerProps> = ({
             }}
           />
         ) : (
-          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
+          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--color-text-disabled)', fontSize: '12px' }}>
             No tickets match your filter criteria.
           </div>
         )}

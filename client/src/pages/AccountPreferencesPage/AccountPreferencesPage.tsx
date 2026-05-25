@@ -115,8 +115,8 @@ function GeneralSettingsSection({
     <Card style={{ padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)' }}>
       <Stack gap="var(--space-5)">
         <div>
-          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--text-heading)' }}>Local account preferences</h2>
-          <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '12.5px', lineHeight: 1.5 }}>
+          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Local account preferences</h2>
+          <p style={{ margin: '4px 0 0', color: 'var(--color-text-disabled)', fontSize: '12.5px', lineHeight: 1.5 }}>
             These settings apply to your signed-in Gravity account on this device, not to the shared workspace.
           </p>
         </div>
@@ -186,8 +186,8 @@ function CloudProviderSection({
     <Card style={{ padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)' }}>
       <Stack gap="var(--space-5)">
         <div>
-          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--text-heading)' }}>Cloud AI provider</h2>
-          <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '12.5px', lineHeight: 1.5 }}>
+          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Cloud AI provider</h2>
+          <p style={{ margin: '4px 0 0', color: 'var(--color-text-disabled)', fontSize: '12.5px', lineHeight: 1.5 }}>
             These credentials stay with your local account and are not part of shared workspace settings.
           </p>
         </div>
@@ -264,8 +264,8 @@ function OllamaSettingsSection({
     <Card style={{ padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)' }}>
       <Stack gap="var(--space-5)">
         <div>
-          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--text-heading)' }}>Local Ollama assistant</h2>
-          <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '12.5px', lineHeight: 1.5 }}>
+          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Local Ollama assistant</h2>
+          <p style={{ margin: '4px 0 0', color: 'var(--color-text-disabled)', fontSize: '12.5px', lineHeight: 1.5 }}>
             Models are auto-detected from your Ollama instance and stored as a local account preference.
           </p>
         </div>
@@ -319,8 +319,8 @@ function OnboardingSection({
     <Card style={{ padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)' }}>
       <Stack gap="var(--space-5)">
         <div>
-          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--text-heading)' }}>Onboarding and guidance</h2>
-          <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '12.5px', lineHeight: 1.5 }}>
+          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Onboarding and guidance</h2>
+          <p style={{ margin: '4px 0 0', color: 'var(--color-text-disabled)', fontSize: '12.5px', lineHeight: 1.5 }}>
             Replay the product tour the next time you reload or sign in with this account.
           </p>
         </div>
@@ -379,8 +379,8 @@ export function AccountPreferencesPage({
             <Divider vertical style={{ height: '20px' }} />
 
             <div>
-              <h1 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: 'var(--text-heading)' }}>Account Preferences</h1>
-              <p style={{ margin: 0, fontSize: '11px', color: 'var(--text-muted)' }}>Configure your local user environment</p>
+              <h1 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: 'var(--color-text-primary)' }}>Account Preferences</h1>
+              <p style={{ margin: 0, fontSize: '11px', color: 'var(--color-text-disabled)' }}>Configure your local user environment</p>
             </div>
           </Flex>
         }
@@ -393,11 +393,11 @@ export function AccountPreferencesPage({
 
       <DashboardLayout.Sidebar>
         <div style={{ padding: 'var(--space-5)', display: 'flex', flexDirection: 'column', gap: 'var(--space-5)', height: '100%', overflowY: 'auto' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--card-bg)', border: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--color-surface-card)', border: '1px solid var(--color-border-default)' }}>
             <Avatar src={currentUser.avatar} name={currentUser.name} size="md" />
             <div>
-              <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-heading)' }}>{currentUser.name}</div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{currentUser.email}</div>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>{currentUser.name}</div>
+              <div style={{ fontSize: '11px', color: 'var(--color-text-disabled)' }}>{currentUser.email}</div>
             </div>
           </div>
 
@@ -417,20 +417,20 @@ export function AccountPreferencesPage({
                     padding: 'var(--space-3) var(--space-4)',
                     border: '1px solid transparent',
                     borderRadius: 'var(--radius-md)',
-                    background: isActive ? 'var(--card-bg)' : 'transparent',
-                    borderColor: isActive ? 'var(--border)' : 'transparent',
+                    background: isActive ? 'var(--color-surface-card)' : 'transparent',
+                    borderColor: isActive ? 'var(--color-border-default)' : 'transparent',
                     cursor: 'pointer',
-                    color: isActive ? 'var(--text-heading)' : 'var(--text-muted)',
+                    color: isActive ? 'var(--color-text-primary)' : 'var(--color-text-disabled)',
                     textAlign: 'left',
                     transition: 'all var(--transition-fast)'
                   }}
                   className="clickable lib-focus-ring"
                   onClick={() => setActiveCategory(category.id)}
                 >
-                  <Icon size={16} style={{ color: isActive ? 'var(--accent)' : 'var(--text-muted)', flexShrink: 0 }} />
+                  <Icon size={16} style={{ color: isActive ? 'var(--color-primary)' : 'var(--color-text-disabled)', flexShrink: 0 }} />
                   <div style={{ display: 'flex', flexDirection: 'column' }}>
                     <span style={{ fontSize: '13px', fontWeight: 600 }}>{category.label}</span>
-                    <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.2 }}>{category.description}</span>
+                    <span style={{ fontSize: '10px', color: 'var(--color-text-disabled)', marginTop: '2px', lineHeight: 1.2 }}>{category.description}</span>
                   </div>
                 </button>
               );
@@ -444,13 +444,13 @@ export function AccountPreferencesPage({
           <div style={{ padding: 'var(--space-6) var(--space-6) var(--space-8) var(--space-6)', maxWidth: '800px', margin: '0 auto' }}>
             <Stack gap="var(--space-5)">
               <div>
-                <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+                <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-text-disabled)' }}>
                   Account Settings
                 </span>
-                <h2 style={{ margin: '4px 0 0', fontSize: '24px', fontWeight: 700, color: 'var(--text-heading)', letterSpacing: '-0.02em' }}>
+                <h2 style={{ margin: '4px 0 0', fontSize: '24px', fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '-0.02em' }}>
                   {activeCategoryMeta.label}
                 </h2>
-                <p style={{ margin: '6px 0 0', fontSize: '13.5px', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                <p style={{ margin: '6px 0 0', fontSize: '13.5px', color: 'var(--color-text-disabled)', lineHeight: 1.5 }}>
                   {activeCategoryMeta.description}
                 </p>
               </div>

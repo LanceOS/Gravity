@@ -41,11 +41,11 @@ function TextInlineParser({ text }: MarkdownTextProps) {
     if (firstMatch.type === 'bold') {
       const key = keyIndex;
       keyIndex += 1;
-      parts.push(<strong key={key} style={{ color: 'var(--text-heading)', fontWeight: 600 }}>{firstMatch.text}</strong>);
+      parts.push(<strong key={key} style={{ color: 'var(--color-text-primary)', fontWeight: 600 }}>{firstMatch.text}</strong>);
     } else {
       const key = keyIndex;
       keyIndex += 1;
-      parts.push(<code key={key} style={{ background: 'rgba(255,255,255,0.05)', padding: '1px 3px', borderRadius: '3px', fontSize: '11px', fontFamily: 'var(--mono)', color: 'var(--accent)' }}>{firstMatch.text}</code>);
+      parts.push(<code key={key} style={{ background: 'rgba(255,255,255,0.05)', padding: '1px 3px', borderRadius: '3px', fontSize: '11px', fontFamily: 'var(--mono)', color: 'var(--color-primary)' }}>{firstMatch.text}</code>);
     }
 
     remaining = remaining.substring(firstMatch.index + firstMatch.length);

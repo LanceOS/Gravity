@@ -23,7 +23,7 @@ export function ListItem({ children, icon, onClick, selected = false, style, cla
         padding: 'var(--space-2) var(--space-3)',
         borderRadius: 'var(--radius-sm)',
         cursor: onClick ? 'pointer' : 'default',
-        backgroundColor: selected ? 'var(--accent-dim)' : 'transparent',
+        backgroundColor: selected ? 'var(--color-state-selected-bg)' : 'transparent',
         color: selected ? 'var(--color-primary)' : 'var(--color-text-primary)',
         transition: 'background-color var(--transition-fast), color var(--transition-fast)',
         userSelect: 'none',

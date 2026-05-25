@@ -5,7 +5,7 @@
   flex-direction: column;
   gap: 16px;
   padding: 16px 24px;
-  background: var(--sidebar-bg); /* Clean solid background to avoid backdrop-filter viewport-containing-block issue for Select dropdowns */
+  background: var(--color-base50); /* Clean solid background to avoid backdrop-filter viewport-containing-block issue for Select dropdowns */
   flex-shrink: 0;
   z-index: 10;
 }
@@ -27,7 +27,7 @@
   font-size: 14px;
   font-weight: 700;
   letter-spacing: -0.01em;
-  color: var(--text-heading);
+  color: var(--color-text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -37,7 +37,7 @@
   display: flex;
   align-items: center;
   gap: 2px;
-  background: var(--border);
+  background: var(--color-border-default);
   padding: 3px;
   border-radius: var(--radius-full);
   box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
@@ -54,17 +54,17 @@
   font-weight: 600;
   cursor: pointer;
   background: transparent;
-  color: var(--text-muted);
+  color: var(--color-text-disabled);
   transition: all var(--transition-normal);
 }
 
 .workspace-header__view-button:hover {
-  color: var(--text-heading);
+  color: var(--color-text-primary);
 }
 
 .workspace-header__view-button--active {
-  background: var(--card-bg);
-  color: var(--accent);
+  background: var(--color-surface-card);
+  color: var(--color-primary);
   box-shadow: var(--shadow-sm);
 }
 

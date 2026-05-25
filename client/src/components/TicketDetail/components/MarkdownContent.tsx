@@ -46,12 +46,12 @@ export function TicketLink({ ticketKey }: { ticketKey: string }) {
         type="button"
         onClick={handleClick}
         style={{
-          background: 'var(--card-bg)',
-          border: '1px solid var(--border)',
+          background: 'var(--color-surface-card)',
+          border: '1px solid var(--color-border-default)',
           borderRadius: '4px',
           padding: '2px 6px',
           margin: '0 2px',
-          color: 'var(--text-heading)',
+          color: 'var(--color-text-primary)',
           fontFamily: 'var(--mono)',
           fontSize: '0.9em',
           fontWeight: 600,
@@ -158,15 +158,15 @@ function FormattedText({ text }: MarkdownTextProps) {
     if (firstMatch.type === 'bold') {
       const key = keyIndex;
       keyIndex += 1;
-      parts.push(<strong key={key} style={{ color: 'var(--text-heading)', fontWeight: 600 }}>{firstMatch.text}</strong>);
+      parts.push(<strong key={key} style={{ color: 'var(--color-text-primary)', fontWeight: 600 }}>{firstMatch.text}</strong>);
     } else if (firstMatch.type === 'code') {
       const key = keyIndex;
       keyIndex += 1;
-      parts.push(<code key={key} style={{ background: 'var(--sidebar-bg)', padding: '1px 4px', borderRadius: '4px', fontSize: '11px', fontFamily: 'var(--mono)', color: 'var(--text-heading)' }}>{firstMatch.text}</code>);
+      parts.push(<code key={key} style={{ background: 'var(--color-base50)', padding: '1px 4px', borderRadius: '4px', fontSize: '11px', fontFamily: 'var(--mono)', color: 'var(--color-text-primary)' }}>{firstMatch.text}</code>);
     } else if (firstMatch.type === 'link') {
       const key = keyIndex;
       keyIndex += 1;
-      parts.push(<a key={key} href={firstMatch.url} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none' }} className="clickable">{firstMatch.text}</a>);
+      parts.push(<a key={key} href={firstMatch.url} target="_blank" rel="noreferrer" style={{ color: 'var(--color-primary)', textDecoration: 'none' }} className="clickable">{firstMatch.text}</a>);
     } else if (firstMatch.type === 'ticket') {
       const key = keyIndex;
       keyIndex += 1;
@@ -200,11 +200,11 @@ export function MarkdownContent({ text }: MarkdownTextProps) {
     <>
       {text.split('\n').map((line, lineIndex) => {
         if (line.startsWith('# ')) {
-          return <h2 key={lineIndex} style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-heading)', margin: '12px 0 6px' }}>{line.replace('# ', '')}</h2>;
+          return <h2 key={lineIndex} style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text-primary)', margin: '12px 0 6px' }}>{line.replace('# ', '')}</h2>;
         }
 
         if (line.startsWith('## ')) {
-          return <h3 key={lineIndex} style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-heading)', margin: '10px 0 4px' }}>{line.replace('## ', '')}</h3>;
+          return <h3 key={lineIndex} style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-primary)', margin: '10px 0 4px' }}>{line.replace('## ', '')}</h3>;
         }
 
         if (line.trim().startsWith('* ') || line.trim().startsWith('- ')) {

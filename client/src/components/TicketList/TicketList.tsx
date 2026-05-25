@@ -41,10 +41,10 @@ export const TicketList: React.FC<TicketListProps> = ({
                     gap: '8px',
                     fontSize: '11px',
                     fontWeight: 600,
-                    color: 'var(--text-muted)',
+                    color: 'var(--color-text-disabled)',
                     textTransform: 'uppercase',
                     marginBottom: '8px',
-                    borderBottom: '1px solid var(--border)',
+                    borderBottom: '1px solid var(--color-border-default)',
                     paddingBottom: '4px'
                   }}
                 >
@@ -59,7 +59,7 @@ export const TicketList: React.FC<TicketListProps> = ({
                     }}
                   />
                   <span>{getStatusLabel(status as Ticket['status'])}</span>
-                  <span style={{ background: 'var(--border)', padding: '1px 5px', borderRadius: '4px', fontSize: '10px' }}>
+                  <span style={{ background: 'var(--color-border-default)', padding: '1px 5px', borderRadius: '4px', fontSize: '10px' }}>
                     {ticketsInGroup.length}
                   </span>
                 </div>
@@ -83,8 +83,8 @@ export const TicketList: React.FC<TicketListProps> = ({
           })}
 
           {filteredCount === 0 && (
-            <div style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)' }}>
-              <Compass size={48} style={{ strokeWidth: 1, marginBottom: '12px', color: 'var(--border-focus)' }} />
+            <div style={{ padding: '48px', textAlign: 'center', color: 'var(--color-text-disabled)' }}>
+              <Compass size={48} style={{ strokeWidth: 1, marginBottom: '12px', color: 'var(--color-border-focus)' }} />
               <div>No tickets match your active filters.</div>
             </div>
           )}

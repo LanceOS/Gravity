@@ -23,7 +23,7 @@
 .workspace-page__issues {
   flex: 1;
   overflow: hidden;
-  background: var(--bg);
+  background: var(--color-surface-app);
 }
 
 .workspace-page__issues-shell {
@@ -55,7 +55,7 @@
   justify-content: space-between;
   gap: 20px;
   padding-bottom: 8px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--color-border-default);
 }
 
 .workspace-page__projects-title-block {
@@ -68,7 +68,7 @@
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--accent);
+  color: var(--color-primary);
 }
 
 .workspace-page__projects-title-row {
@@ -84,7 +84,7 @@
   font-size: 22px;
   font-weight: 800;
   letter-spacing: -0.02em;
-  color: var(--text-heading);
+  color: var(--color-text-primary);
   /* Prevent very long workspace names from breaking layout */
   overflow: hidden;
   text-overflow: ellipsis;
@@ -96,11 +96,11 @@
 .workspace-page__projects-count {
   padding: 3px 8px;
   border-radius: var(--radius-full);
-  border: 1px solid var(--accent-border);
-  background: var(--accent-glow);
+  border: 1px solid var(--color-border-focus);
+  background: var(--color-state-selected-bg);
   font-size: 11px;
   font-weight: 700;
-  color: var(--accent);
+  color: var(--color-primary);
 }
 
 .workspace-page__projects-subtitle {
@@ -108,7 +108,7 @@
   max-width: 720px;
   font-size: 13px;
   line-height: 1.6;
-  color: var(--text-muted);
+  color: var(--color-text-disabled);
 }
 
 .workspace-page__projects-actions {
@@ -126,9 +126,9 @@
   min-height: 34px;
   padding: 0 14px;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--card-bg);
-  color: var(--text-heading);
+  border: 1px solid var(--color-border-default);
+  background: var(--color-surface-card);
+  color: var(--color-text-primary);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -136,15 +136,15 @@
 }
 
 .workspace-page__projects-button:hover {
-  border-color: var(--border-focus);
+  border-color: var(--color-border-focus);
   transform: translateY(-1px);
 }
 
 .workspace-page__projects-button--primary,
 .workspace-page__projects-button--active {
-  border-color: var(--accent-border);
-  background: var(--accent-glow);
-  color: var(--accent);
+  border-color: var(--color-border-focus);
+  background: var(--color-state-selected-bg);
+  color: var(--color-primary);
 }
 
 .workspace-page__project-feedback {
@@ -166,9 +166,9 @@
 .workspace-page__project-manager,
 .workspace-page__project-domains,
 .workspace-page__project-empty-shell {
-  border: 1px solid var(--border);
+  border: 1px solid var(--color-border-default);
   border-radius: var(--radius-lg);
-  background: var(--card-bg);
+  background: var(--color-surface-card);
   box-shadow: var(--shadow-sm);
   transition: box-shadow var(--transition-normal), border-color var(--transition-normal);
 }
@@ -199,7 +199,7 @@
   font-size: 20px;
   font-weight: 800;
   letter-spacing: -0.02em;
-  color: var(--text-heading);
+  color: var(--color-text-primary);
 }
 
 .workspace-page__current-project-badges {
@@ -228,9 +228,9 @@
   min-height: 28px;
   padding: 0 12px;
   border-radius: var(--radius-xs);
-  border: 1px solid var(--border);
-  background: var(--card-hover);
-  color: var(--text-muted);
+  border: 1px solid var(--color-border-default);
+  background: var(--color-base100);
+  color: var(--color-text-disabled);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.02em;
@@ -240,7 +240,7 @@
   margin: 0;
   font-size: 12.5px;
   line-height: 1.5;
-  color: var(--text-muted);
+  color: var(--color-text-disabled);
   text-align: right;
 }
 
@@ -261,7 +261,7 @@
   margin: 0;
   font-size: 16px;
   font-weight: 700;
-  color: var(--text-heading);
+  color: var(--color-text-primary);
 }
 
 .workspace-page__project-browser-copy {
@@ -269,7 +269,7 @@
   max-width: 340px;
   font-size: 12px;
   line-height: 1.45;
-  color: var(--text-muted);
+  color: var(--color-text-disabled);
   text-align: right;
 }
 
@@ -304,9 +304,9 @@
   gap: 0;
   padding: 16px 20px;
   border-radius: var(--radius-md);
-  border: 1px solid var(--border);
+  border: 1px solid var(--color-border-default);
   background: rgba(255, 255, 255, 0.015);
-  color: var(--text);
+  color: var(--color-text-secondary);
   cursor: pointer;
   transition: all var(--transition-spring);
   box-shadow: var(--shadow-sm);
@@ -315,9 +315,9 @@
 }
 
 .workspace-page__project-strip-card--active {
-  border-color: var(--accent);
-  background: var(--accent-glow);
-  box-shadow: 0 4px 20px var(--accent-glow);
+  border-color: var(--color-primary);
+  background: var(--color-state-selected-bg);
+  box-shadow: 0 4px 20px var(--color-state-selected-bg);
 }
 
 .workspace-page__project-strip-card::before {
@@ -327,7 +327,7 @@
   left: 0;
   width: 4px;
   height: 100%;
-  background: var(--accent);
+  background: var(--color-primary);
   opacity: 0;
   transition: opacity var(--transition-normal);
 }
@@ -366,8 +366,8 @@
   gap: 3px;
   padding: 8px 12px;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--card-hover);
+  border: 1px solid var(--color-border-default);
+  background: var(--color-base100);
   transition: border-color var(--transition-normal);
 }
 
@@ -376,14 +376,14 @@
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--color-text-disabled);
 }
 
 .workspace-page__project-card-fact-value {
   font-size: 12px;
   line-height: 1.4;
   font-weight: 700;
-  color: var(--text-heading);
+  color: var(--color-text-primary);
 }
 
 /* Form Styles and Composer */
@@ -392,7 +392,7 @@
   gap: 16px;
   padding: 20px;
   border-radius: var(--radius-lg);
-  border: 1px solid var(--border);
+  border: 1px solid var(--color-border-default);
   background: rgba(255, 255, 255, 0.015);
 }
 
@@ -421,7 +421,7 @@
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--color-text-disabled);
 }
 
 .workspace-page__project-input {
@@ -429,16 +429,16 @@
   min-width: 0;
   padding: 8px 12px;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--card-bg);
-  color: var(--text-heading);
+  border: 1px solid var(--color-border-default);
+  background: var(--color-surface-card);
+  color: var(--color-text-primary);
   font: inherit;
   transition: all var(--transition-normal);
 }
 
 .workspace-page__project-input:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-glow);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-state-selected-bg);
 }
 
 .workspace-page__project-input--key {
@@ -472,18 +472,18 @@
   gap: 12px;
   padding: 18px;
   border-radius: var(--radius-md);
-  border: 1px solid var(--border);
+  border: 1px solid var(--color-border-default);
   background: rgba(255, 255, 255, 0.015);
-  color: var(--text);
+  color: var(--color-text-secondary);
   cursor: pointer;
   transition: all var(--transition-spring);
   box-shadow: var(--shadow-sm);
 }
 
 .workspace-page__project-card--active {
-  border-color: var(--accent);
-  background: var(--accent-glow);
-  box-shadow: 0 4px 20px var(--accent-glow);
+  border-color: var(--color-primary);
+  background: var(--color-state-selected-bg);
+  box-shadow: 0 4px 20px var(--color-state-selected-bg);
 }
 
 .workspace-page__project-card-head {
@@ -504,9 +504,9 @@
 .workspace-page__project-badge {
   padding: 3px 8px;
   border-radius: var(--radius-xs);
-  border: 1px solid var(--accent-border);
-  background: var(--accent-glow);
-  color: var(--accent);
+  border: 1px solid var(--color-border-focus);
+  background: var(--color-state-selected-bg);
+  color: var(--color-primary);
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -517,7 +517,7 @@
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.12em;
-  color: var(--accent);
+  color: var(--color-primary);
 }
 
 .workspace-page__project-status {
@@ -541,13 +541,13 @@
 
 .workspace-page__project-status--completed {
   background: rgba(148, 163, 184, 0.14);
-  color: var(--text-muted);
+  color: var(--color-text-disabled);
 }
 
 .workspace-page__project-name {
   font-size: 15px;
   font-weight: 800;
-  color: var(--text-heading);
+  color: var(--color-text-primary);
   letter-spacing: -0.01em;
 }
 
@@ -555,7 +555,7 @@
   margin: 0;
   font-size: 12px;
   line-height: 1.5;
-  color: var(--text-muted);
+  color: var(--color-text-disabled);
   display: -webkit-box;
   overflow: hidden;
   -webkit-box-orient: vertical;
@@ -568,7 +568,7 @@
   justify-content: space-between;
   gap: 10px;
   padding-top: 10px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--color-border-default);
 }
 
 .workspace-page__project-meta-label {
@@ -576,13 +576,13 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--text-muted);
+  color: var(--color-text-disabled);
 }
 
 .workspace-page__project-meta-value {
   font-size: 13px;
   font-weight: 800;
-  color: var(--text-heading);
+  color: var(--color-text-primary);
 }
 
 .workspace-page__project-manager {
@@ -618,16 +618,16 @@
   min-height: 28px;
   padding: 0 12px;
   border-radius: var(--radius-xs);
-  border: 1px solid var(--border);
-  background: var(--card-hover);
-  color: var(--text-heading);
+  border: 1px solid var(--color-border-default);
+  background: var(--color-base100);
+  color: var(--color-text-primary);
   font-size: 11.5px;
   font-weight: 600;
   transition: all var(--transition-normal);
 }
 
 .workspace-page__domain-chip:hover {
-  border-color: var(--border-focus);
+  border-color: var(--color-border-focus);
 }
 
 .workspace-page__domain-chip-swatch {
@@ -641,7 +641,7 @@
 .workspace-page__domain-empty {
   font-size: 12px;
   line-height: 1.5;
-  color: var(--text-muted);
+  color: var(--color-text-disabled);
 }
 
 .workspace-page__domain-form {
@@ -657,8 +657,8 @@
   height: 34px;
   padding: 3px;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--card-bg);
+  border: 1px solid var(--color-border-default);
+  background: var(--color-surface-card);
   cursor: pointer;
 }
 
@@ -677,7 +677,7 @@
   margin: 0;
   font-size: 16px;
   font-weight: 700;
-  color: var(--text-heading);
+  color: var(--color-text-primary);
 }
 
 .workspace-page__project-manager-actions {
@@ -700,13 +700,13 @@
   gap: 16px;
   padding: 48px;
   text-align: center;
-  color: var(--text-muted);
+  color: var(--color-text-disabled);
 }
 
 .workspace-page__empty-state-title {
   font-size: 22px;
   font-weight: 800;
-  color: var(--text-heading);
+  color: var(--color-text-primary);
   letter-spacing: -0.02em;
 }
 
@@ -728,15 +728,15 @@
   min-width: 0;
   overflow: hidden;
   position: relative;
-  border-left: 1px solid var(--border);
-  background: var(--card-bg);
+  border-left: 1px solid var(--color-border-default);
+  background: var(--color-surface-card);
   box-shadow: -10px 0 30px -10px rgba(0, 0, 0, 0.15);
   animation: lib-fade-in var(--transition-spring);
 }
 
 .workspace-page__spin {
   animation: workspace-page-spin 0.9s cubic-bezier(0.5, 0.1, 0.4, 0.9) infinite;
-  color: var(--accent);
+  color: var(--color-primary);
 }
 
 @keyframes workspace-page-spin {
