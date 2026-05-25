@@ -1,6 +1,7 @@
 import React from 'react';
 import { Eye, EyeOff, Search, Calendar, Clock, Star, Upload, User, ChevronDown, Check } from 'lucide-react';
 import { ClickAwayListener } from '../../utilities';
+import { getDaysInMonth, getFirstDayOfMonth } from '../../utilities/dateHelpers';
 
 export interface DateRangePickerProps {
   value: [Date | undefined, Date | undefined];

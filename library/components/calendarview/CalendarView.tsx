@@ -1,5 +1,6 @@
 import React from 'react';
 import { User, ChevronLeft, ChevronRight, Folder, File, ChevronDown } from 'lucide-react';
+import { getDaysInMonth, getFirstDayOfMonth } from '../../utilities/dateHelpers';
 
 export interface CalendarViewProps {
   currentDate?: Date;
