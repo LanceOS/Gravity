@@ -94,7 +94,7 @@ interface State {
     search: string;
   };
   currentUser: User | null;
-  theme: 'dark' | 'light' | 'coal-black';
+  theme: 'dark' | 'light' | 'coal-black' | 'coffee';
   loading: boolean;
 }
 
@@ -118,7 +118,7 @@ type Action =
   | { type: 'SET_FILTERS'; payload: Partial<State['filters']> }
   | { type: 'SET_USER'; payload: User | null }
   | { type: 'TOGGLE_THEME' }
-  | { type: 'SET_THEME_RAW'; payload: 'dark' | 'light' | 'coal-black' }
+  | { type: 'SET_THEME_RAW'; payload: 'dark' | 'light' | 'coal-black' | 'coffee' }
   | { type: 'ADD_COMMENT'; payload: Comment }
   | { type: 'REPLACE_COMMENT'; payload: { optimisticId: string; comment: Comment } }
   | { type: 'OPTIMISTIC_TICKET_UPDATE'; payload: { id: string; updates: Partial<Ticket> } }
@@ -310,7 +310,7 @@ interface TicketContextType extends State {
   signOut: () => void;
   setCurrentUser: (user: User | null) => void;
   toggleTheme: () => void;
-  setTheme: (theme: 'dark' | 'light' | 'coal-black') => void;
+  setTheme: (theme: 'dark' | 'light' | 'coal-black' | 'coffee') => void;
   setActiveTicket: (ticket: Ticket | null) => void;
   setView: (view: 'list' | 'board') => void;
   setFilters: (filters: Partial<State['filters']>) => void;
@@ -883,7 +883,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     dispatch({ type: 'TOGGLE_THEME' });
   }, []);
 
-  const setTheme = useCallback((theme: 'dark' | 'light' | 'coal-black') => {
+  const setTheme = useCallback((theme: 'dark' | 'light' | 'coal-black' | 'coffee') => {
     dispatch({ type: 'SET_THEME_RAW', payload: theme });
   }, []);
 

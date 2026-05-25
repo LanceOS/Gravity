@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useLayoutEffect } from 'react';
 import { applyResolvedTheme, getStoredThemePreference, resolveThemePreference, THEME_STORAGE_KEY } from '@library/utilities/themeEngine';
 
-export type ThemeMode = 'dark' | 'light' | 'coal-black';
+export type ThemeMode = 'dark' | 'light' | 'coal-black' | 'coffee';
 export type DensityScale = 'compact' | 'standard';
 
 interface ThemeContextType {

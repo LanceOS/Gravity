@@ -1,6 +1,7 @@
 import lightTheme from '../themes/light.json';
 import noirTheme from '../themes/noir.json';
 import coalBlackTheme from '../themes/coal-black.json';
+import coffeeTheme from '../themes/coffee.json';
 
 export const KNOWN_THEME_COLOR_KEYS = [
   'primary',
@@ -84,15 +85,15 @@ export type ThemeValidationResult = {
   unknown: string[];
 };
 
-export type ThemePreference = 'light' | 'dark' | 'coal-black' | 'system';
-export type ResolvedThemeMode = 'light' | 'dark' | 'coal-black';
+export type ThemePreference = 'light' | 'dark' | 'coal-black' | 'coffee' | 'system';
+export type ResolvedThemeMode = 'light' | 'dark' | 'coal-black' | 'coffee';
 
 export const THEME_STORAGE_KEY = 'gravity_theme';
 
 const knownThemeColorKeySet = new Set<string>(KNOWN_THEME_COLOR_KEYS);
 
 export const normalizeThemePreference = (value: string | null | undefined): ThemePreference => {
-  if (value === 'light' || value === 'dark' || value === 'coal-black' || value === 'system') {
+  if (value === 'light' || value === 'dark' || value === 'coal-black' || value === 'coffee' || value === 'system') {
     return value;
   }
 
@@ -193,7 +194,7 @@ export const applyResolvedTheme = (resolvedTheme: ResolvedThemeMode) => {
 
   const root = document.documentElement;
 
-  root.classList.remove('dark-theme', 'light-theme', 'noir-theme', 'coal-black-theme');
+  root.classList.remove('dark-theme', 'light-theme', 'noir-theme', 'coal-black-theme', 'coffee-theme');
   root.removeAttribute('data-theme');
 
   if (resolvedTheme === 'dark') {
@@ -204,6 +205,10 @@ export const applyResolvedTheme = (resolvedTheme: ResolvedThemeMode) => {
     root.classList.add('coal-black-theme', 'dark-theme');
     root.setAttribute('data-theme', 'coal-black');
     applyThemeConfig(coalBlackTheme);
+  } else if (resolvedTheme === 'coffee') {
+    root.classList.add('coffee-theme');
+    root.setAttribute('data-theme', 'coffee');
+    applyThemeConfig(coffeeTheme);
   } else {
     root.classList.add('light-theme');
     root.setAttribute('data-theme', 'light');
