@@ -1,31 +1,16 @@
 import { and, eq } from 'drizzle-orm';
-import { Router } from 'express';
+import { type Request, type Response, Router } from 'express';
 import { db } from '../db/index.js';
 import { workspaceMembers } from '../db/schema.js';
 import { resolveRequestActorUserId } from '../lib/request-auth.js';
 import { handleMcpRequest } from './request-handler.js';
 import { createMcpErrorResponse } from './responses.js';
 
-type McpRouteRequest = {
-  header: (name: string) => string | undefined;
-  body?: {
-    id?: string | number | null;
-    params?: {
-      workspaceId?: string;
-    };
-  };
-};
-
-type McpRouteResponse = {
-  status: (code: number) => McpRouteResponse;
-  json: (body: unknown) => void;
-};
-
 export class McpRouterFactory {
   create() {
     const router = Router();
 
-    router.post('/mcp/sse', async (req: McpRouteRequest, res: McpRouteResponse) => {
+    router.post('/mcp/sse', async (req: Request, res: Response) => {
       try {
         const actorUserId = await resolveRequestActorUserId(req);
         if (!actorUserId) {
@@ -55,7 +40,9 @@ export class McpRouterFactory {
           return;
         }
 
-        const response = await handleMcpRequest(req.body, workspaceId, actorUserId);
+        const response = await handleMcpRequest(req.body, workspaceId, actorUserId, {
+          accessChecked: true,
+        });
         res.json(response);
       } catch (error) {
         res.status(200).json(

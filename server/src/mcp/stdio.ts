@@ -2,9 +2,12 @@ import readline from 'node:readline';
 import { initializeDatabase } from '../db/bootstrap.js';
 import { env } from '../env.js';
 import { handleMcpRequest } from './request-handler.js';
+import { getMcpStdioContext } from './stdio-config.js';
 
 export class McpStdioServer {
   async start() {
+    const context = getMcpStdioContext(env);
+
     await initializeDatabase();
 
     const rl = readline.createInterface({
@@ -22,11 +25,7 @@ export class McpStdioServer {
 
       try {
         const request = JSON.parse(line);
-        const response = await handleMcpRequest(
-          request,
-          env.mcpStdioWorkspaceId ?? '',
-          env.mcpStdioActorUserId ?? '',
-        );
+        const response = await handleMcpRequest(request, context.workspaceId, context.actorUserId);
         console.log(JSON.stringify(response));
       } catch (error) {
         console.error(error instanceof Error ? error.message : error);

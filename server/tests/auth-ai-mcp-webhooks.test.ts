@@ -505,6 +505,55 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
     expect(earlierIndex).toBeLessThan(laterIndex);
   });
 
+  it('keeps MCP route guard failures as HTTP-native errors', async () => {
+    const { owner, workspace } = await seedWorkspaceFixture();
+    const stranger = await seedUser({
+      id: 'mcp-stranger-1',
+      name: 'Mcp Stranger',
+      email: 'mcp-stranger@example.com',
+      role: 'member',
+    });
+
+    const unauthenticatedResponse = await api()
+      .post('/api/v1/mcp/sse')
+      .set('X-Workspace-Id', workspace.id)
+      .send({
+        jsonrpc: '2.0',
+        id: 501,
+        method: 'tools/list',
+      });
+
+    expect(unauthenticatedResponse.status).toBe(401);
+    expect(unauthenticatedResponse.body).toEqual({ error: 'Authentication required.' });
+
+    const missingWorkspaceResponse = await api()
+      .post('/api/v1/mcp/sse')
+      .set('x-user-id', owner.id)
+      .send({
+        jsonrpc: '2.0',
+        id: 502,
+        method: 'tools/list',
+      });
+
+    expect(missingWorkspaceResponse.status).toBe(400);
+    expect(missingWorkspaceResponse.body).toEqual({
+      error: 'X-Workspace-Id header or params.workspaceId is required.',
+    });
+
+    const unauthorizedWorkspaceResponse = await api()
+      .post('/api/v1/mcp/sse')
+      .set('x-user-id', stranger.id)
+      .set('X-Workspace-Id', workspace.id)
+      .send({
+        jsonrpc: '2.0',
+        id: 503,
+        method: 'tools/list',
+      });
+
+    expect(unauthorizedWorkspaceResponse.status).toBe(403);
+    expect(unauthorizedWorkspaceResponse.body).toEqual({ error: 'Unauthorized workspace access.' });
+  });
+
   it('updates tickets from GitHub pull request webhooks', async () => {
     const { owner, project } = await seedWorkspaceFixture();
     const ticket = await seedTicket(project.id, {

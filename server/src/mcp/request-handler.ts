@@ -6,10 +6,20 @@ import { mcpToolsList } from './tools.js';
 import { McpRequestPayload } from './types.js';
 import { getDisabledTools } from './workspace-tools.js';
 
+type McpRequestHandlerOptions = {
+  accessChecked?: boolean;
+};
+
 export class McpRequestHandler {
-  async handle(request: unknown, workspaceId = '', actorUserId = '') {
+  async handle(
+    request: unknown,
+    workspaceId = '',
+    actorUserId = '',
+    options: McpRequestHandlerOptions = {},
+  ) {
     const payload = request as McpRequestPayload;
     const context = resolveMcpContext(payload, { workspaceId, actorUserId });
+    const accessChecked = options.accessChecked === true;
 
     try {
       if (payload.method === 'initialize') {
@@ -25,7 +35,9 @@ export class McpRequestHandler {
       }
 
       if (payload.method === 'tools/list') {
-        await assertMcpWorkspaceAccess(context);
+        if (!accessChecked) {
+          await assertMcpWorkspaceAccess(context);
+        }
         const disabledTools = await getDisabledTools(context.workspaceId);
         const activeTools = mcpToolsList.filter((tool) => !disabledTools.includes(tool.name));
 
@@ -37,7 +49,9 @@ export class McpRequestHandler {
       }
 
       if (payload.method === 'tools/call') {
-        await assertMcpWorkspaceAccess(context);
+        if (!accessChecked) {
+          await assertMcpWorkspaceAccess(context);
+        }
         const toolName = payload.params?.name ?? '';
         const disabledTools = await getDisabledTools(context.workspaceId);
 
@@ -73,6 +87,11 @@ export class McpRequestHandler {
 
 const defaultRequestHandler = new McpRequestHandler();
 
-export async function handleMcpRequest(request: unknown, workspaceId = '', actorUserId = '') {
-  return defaultRequestHandler.handle(request, workspaceId, actorUserId);
+export async function handleMcpRequest(
+  request: unknown,
+  workspaceId = '',
+  actorUserId = '',
+  options: McpRequestHandlerOptions = {},
+) {
+  return defaultRequestHandler.handle(request, workspaceId, actorUserId, options);
 }

@@ -35,4 +35,35 @@ describe('McpRequestHandler', () => {
       },
     });
   });
+
+  it('skips the duplicate access check when the caller already validated access', async () => {
+    const accessSpy = vi.spyOn(accessModule, 'assertMcpWorkspaceAccess');
+    vi.spyOn(workspaceToolsModule, 'getDisabledTools').mockResolvedValueOnce([]);
+
+    const handler = new McpRequestHandler();
+    const response = await handler.handle(
+      {
+        jsonrpc: '2.0',
+        id: 2,
+        method: 'tools/list',
+        params: {
+          workspaceId: 'workspace-1',
+        },
+      } as never,
+      'workspace-1',
+      'user-1',
+      {
+        accessChecked: true,
+      },
+    );
+
+    expect(accessSpy).not.toHaveBeenCalled();
+    expect(response).toMatchObject({
+      jsonrpc: '2.0',
+      id: 2,
+      result: {
+        tools: expect.any(Array),
+      },
+    });
+  });
 });
