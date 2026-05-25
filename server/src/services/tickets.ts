@@ -1,4 +1,4 @@
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, inArray } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import { authUsers, comments, tickets, userProfiles } from '../db/schema.js';
 import { createId, getProjectByKeyPrefix, nextTicketKey, normalizeIsoDate } from '../lib/platform.js';
@@ -12,6 +12,28 @@ export type TicketFilters = {
   assigneeId?: string;
   cycleId?: string;
 };
+
+function buildTicketFilterConditions(projectIds: string[], filters: TicketFilters = {}) {
+  const conditions = [inArray(tickets.projectId, projectIds)];
+
+  if (filters.status) {
+    conditions.push(eq(tickets.status, filters.status));
+  }
+  if (filters.priority) {
+    conditions.push(eq(tickets.priority, filters.priority));
+  }
+  if (filters.domainId) {
+    conditions.push(eq(tickets.domainId, filters.domainId));
+  }
+  if (filters.assigneeId) {
+    conditions.push(eq(tickets.assigneeId, filters.assigneeId));
+  }
+  if (filters.cycleId) {
+    conditions.push(eq(tickets.cycleId, filters.cycleId));
+  }
+
+  return conditions;
+}
 
 function mapTicket(record: TicketRecord) {
   return {
@@ -34,25 +56,24 @@ function mapTicket(record: TicketRecord) {
 }
 
 export async function listTickets(projectId: string, filters: TicketFilters = {}) {
-  const conditions = [eq(tickets.projectId, projectId)];
+  const rows = await db
+    .select()
+    .from(tickets)
+    .where(and(...buildTicketFilterConditions([projectId], filters)))
+    .orderBy(asc(tickets.createdAt));
+  return rows.map(mapTicket);
+}
 
-  if (filters.status) {
-    conditions.push(eq(tickets.status, filters.status));
-  }
-  if (filters.priority) {
-    conditions.push(eq(tickets.priority, filters.priority));
-  }
-  if (filters.domainId) {
-    conditions.push(eq(tickets.domainId, filters.domainId));
-  }
-  if (filters.assigneeId) {
-    conditions.push(eq(tickets.assigneeId, filters.assigneeId));
-  }
-  if (filters.cycleId) {
-    conditions.push(eq(tickets.cycleId, filters.cycleId));
+export async function listWorkspaceTickets(projectIds: string[], filters: TicketFilters = {}) {
+  if (projectIds.length === 0) {
+    return [];
   }
 
-  const rows = await db.select().from(tickets).where(and(...conditions)).orderBy(asc(tickets.createdAt));
+  const rows = await db
+    .select()
+    .from(tickets)
+    .where(and(...buildTicketFilterConditions(projectIds, filters)))
+    .orderBy(asc(tickets.createdAt));
   return rows.map(mapTicket);
 }
 

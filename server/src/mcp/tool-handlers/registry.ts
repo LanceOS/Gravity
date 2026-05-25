@@ -8,6 +8,7 @@ export const toolHandlers: Record<string, ToolHandler> = {
   get_ticket_details: (args, context) => ticketTools.getTicketDetails(args, context),
   create_ticket: (args, context) => ticketTools.createTicket(args, context),
   update_ticket: (args, context) => ticketTools.updateTicket(args, context),
+  add_comment: (args, context) => ticketTools.createComment(args, context),
   create_comment: (args, context) => ticketTools.createComment(args, context),
   read_comments: (args, context) => ticketTools.readComments(args, context),
   delete_comment: (args, context) => ticketTools.deleteComment(args, context),

@@ -9,6 +9,7 @@ import {
   getTicketDetailsByKey,
   listComments,
   listTickets,
+  listWorkspaceTickets,
   updateCommentRecord,
   updateTicketRecord,
 } from '../../services/tickets.js';
@@ -28,20 +29,19 @@ export class TicketTools {
     }
 
     const projectIds = explicitProjectId ? [explicitProjectId] : validProjectIds;
+    const filters = {
+      status: typeof args.status === 'string' ? args.status : undefined,
+      priority: typeof args.priority === 'string' ? args.priority : undefined,
+      domainId: typeof args.domainId === 'string' ? args.domainId : undefined,
+      assigneeId: typeof args.assigneeId === 'string' ? args.assigneeId : undefined,
+      cycleId: typeof args.cycleId === 'string' ? args.cycleId : undefined,
+    };
 
-    const ticketsByProject = await Promise.all(
-      projectIds.map((projectId) =>
-        listTickets(projectId, {
-          status: typeof args.status === 'string' ? args.status : undefined,
-          priority: typeof args.priority === 'string' ? args.priority : undefined,
-          domainId: typeof args.domainId === 'string' ? args.domainId : undefined,
-          assigneeId: typeof args.assigneeId === 'string' ? args.assigneeId : undefined,
-          cycleId: typeof args.cycleId === 'string' ? args.cycleId : undefined,
-        }),
-      ),
-    );
+    if (explicitProjectId) {
+      return listTickets(explicitProjectId, filters);
+    }
 
-    return ticketsByProject.flat();
+    return listWorkspaceTickets(projectIds, filters);
   }
 
   async getTicketDetails(args: Record<string, unknown>, context: ToolExecutionContext) {

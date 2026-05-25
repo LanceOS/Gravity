@@ -1,4 +1,5 @@
 import { executeTool } from './tool-executor.js';
+import { resolveMcpContext } from './request-context.js';
 import { mcpToolsList } from './tools.js';
 import { McpRequestPayload } from './types.js';
 import { getDisabledTools } from './workspace-tools.js';
@@ -6,6 +7,7 @@ import { getDisabledTools } from './workspace-tools.js';
 export class McpRequestHandler {
   async handle(request: unknown, workspaceId = '', actorUserId = '') {
     const payload = request as McpRequestPayload;
+    const context = resolveMcpContext(payload, { workspaceId, actorUserId });
 
     if (payload.method === 'initialize') {
       return {
@@ -20,7 +22,7 @@ export class McpRequestHandler {
     }
 
     if (payload.method === 'tools/list') {
-      const disabledTools = await getDisabledTools(workspaceId);
+      const disabledTools = await getDisabledTools(context.workspaceId);
       const activeTools = mcpToolsList.filter((tool) => !disabledTools.includes(tool.name));
 
       return {
@@ -33,7 +35,7 @@ export class McpRequestHandler {
     if (payload.method === 'tools/call') {
       try {
         const toolName = payload.params?.name ?? '';
-        const disabledTools = await getDisabledTools(workspaceId);
+        const disabledTools = await getDisabledTools(context.workspaceId);
 
         if (disabledTools.includes(toolName)) {
           throw new Error(`MCP tool "${toolName}" is disabled in this workspace.`);
@@ -42,8 +44,8 @@ export class McpRequestHandler {
         const result = await executeTool(
           toolName,
           payload.params?.arguments ?? {},
-          workspaceId,
-          actorUserId,
+          context.workspaceId,
+          context.actorUserId,
         );
         return {
           jsonrpc: '2.0',

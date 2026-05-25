@@ -83,10 +83,9 @@ export const mcpToolsList: McpToolDefinition[] = [
       type: 'object',
       properties: {
         ticketKey: { type: 'string' },
-        userId: { type: 'string' },
         body: { type: 'string' },
       },
-      required: ['ticketKey', 'userId', 'body'],
+      required: ['ticketKey', 'body'],
     },
   },
   {
@@ -96,10 +95,9 @@ export const mcpToolsList: McpToolDefinition[] = [
       type: 'object',
       properties: {
         ticketKey: { type: 'string' },
-        userId: { type: 'string' },
         body: { type: 'string' },
       },
-      required: ['ticketKey', 'userId', 'body'],
+      required: ['ticketKey', 'body'],
     },
   },
   {
