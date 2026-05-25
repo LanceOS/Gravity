@@ -157,11 +157,12 @@ export function SidebarItem({
         onMouseLeave?.(e);
       }}
       {...props}
+      type="button"
     >
       {leftIcon && <span style={{ display: 'flex', alignItems: 'center' }}>{leftIcon}</span>}
-      <span style={{ flex: 1, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+      <div style={{ flex: 1, minWidth: 0, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
         {children}
-      </span>
+      </div>
       {rightElement && <span>{rightElement}</span>}
     </button>
   );

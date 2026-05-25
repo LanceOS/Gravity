@@ -38,6 +38,8 @@ export function SidebarProjectsSection({
               padding: 0,
               font: 'inherit',
               color: 'inherit',
+              width: '100%',
+              textAlign: 'left',
             }}
           >
             {projectsCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}

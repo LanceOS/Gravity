@@ -71,7 +71,7 @@ export function SidebarUserMenu({
           opacity: showUserDropdown ? 1 : 0,
           visibility: showUserDropdown ? 'visible' : 'hidden',
           transform: showUserDropdown ? 'translateY(0)' : 'translateY(8px)',
-          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+          transition: 'opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
           pointerEvents: showUserDropdown ? 'auto' : 'none',
         }}
       >
