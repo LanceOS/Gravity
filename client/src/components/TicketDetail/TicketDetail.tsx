@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { MarkdownContent } from './components';
 import type { TicketDetailProps } from './types';
-import { PRIORITY_OPTIONS, STATUS_OPTIONS, getStatusColor } from './utils';
+import { PRIORITY_OPTIONS, STATUS_OPTIONS } from './utils';
 
 export const TicketDetail: React.FC<TicketDetailProps> = ({
   activeTicket,
