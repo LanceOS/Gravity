@@ -253,7 +253,7 @@ describe('projects and tickets routes', () => {
     expect(deleteResponse.body).toEqual({ success: true });
   });
 
-  it('resolves a ticket details by its key prefix/key and validates access', async () => {
+  it('resolves ticket details by its key prefix/key and validates access', async () => {
     const { owner, workspace, project } = await seedWorkspaceFixture();
     const ticket = await seedTicket(project.id, {
       id: 'ticket-99',
