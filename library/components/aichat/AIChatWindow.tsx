@@ -180,9 +180,9 @@ export function AIChatWindow({
           />
           <button
             type="submit"
+            aria-label="Send message"
             className="btn btn-primary clickable"
             style={{ width: '32px', height: '32px', padding: 0 }}
-          >
             <Send size={12} />
           </button>
         </form>
