@@ -89,15 +89,9 @@ When a peer clicks the invitation link or inputs the code, they submit a request
 The host owner reviews pending join requests.
 
 1.  **Retrieve Pending Requests**: `GET /api/v1/workspaces/:workspaceId/join-requests`
-2.  **Approve Request**: `POST /api/v1/workspaces/:workspaceId/join-requests/:requestId/approve`
-    ```json
-    {
-      "reviewerUserId": "owner-user-uuid"
-    }
-    ```
+2.  **Approve Request**: `POST /api/v1/workspaces/:workspaceId/join-requests/:requestId/approve` (authenticated as an owner/admin)
 
-Once approved, the status transitions to `approved`, and the peer is officially added to the workspace membership table (`workspace_users`).
-
+Once approved, the status transitions to `approved`, and the peer is officially added to the workspace membership table (`workspace_members`).
 ### Step 5: Collaboration Access
 Once approved, the collaborator has full API access to projects, members list, and ticket flows associated with the workspace:
 *   Listing workspace members: `GET /api/v1/workspaces/:workspaceId/members`
