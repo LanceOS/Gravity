@@ -604,10 +604,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             <Select
               value={activeTicket.status}
               onValueChange={(nextStatus: string) => onUpdateTicket(activeTicket.id, { status: nextStatus as Ticket['status'] })}
-              options={STATUS_OPTIONS.map(opt => ({
-                value: opt.value,
-                label: opt.label
-              }))}
+              options={STATUS_OPTIONS}
               aria-label="Select ticket status"
             />
           </div>
