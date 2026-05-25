@@ -31,17 +31,6 @@ export class TicketTools {
    */
   async listTickets(args: Record<string, unknown>, context: ToolExecutionContext) {
     const explicitProjectId = typeof args.projectId === 'string' ? args.projectId : undefined;
-    const validProjects = await db
-      .select({ id: projects.id })
-      .from(projects)
-      .where(eq(projects.workspaceId, context.workspaceId));
-    const validProjectIds = validProjects.map((project) => project.id);
-
-    if (explicitProjectId && !validProjectIds.includes(explicitProjectId)) {
-      throw new Error('Unauthorized or workspace mismatch');
-    }
-
-    const projectIds = explicitProjectId ? [explicitProjectId] : validProjectIds;
     const filters = {
       status: typeof args.status === 'string' ? args.status : undefined,
       priority: typeof args.priority === 'string' ? args.priority : undefined,
@@ -52,8 +41,15 @@ export class TicketTools {
 
     // A single-project query can use the narrower service path; otherwise list the whole workspace.
     if (explicitProjectId) {
+      await this.assertProjectInWorkspace(explicitProjectId, context.workspaceId);
       return listTickets(explicitProjectId, filters);
     }
+
+    const validProjects = await db
+      .select({ id: projects.id })
+      .from(projects)
+      .where(eq(projects.workspaceId, context.workspaceId));
+    const projectIds = validProjects.map((project) => project.id);
 
     return listWorkspaceTickets(projectIds, filters);
   }
