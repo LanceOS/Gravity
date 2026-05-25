@@ -161,11 +161,11 @@ export class TicketTools {
     const body = String(args.body ?? '');
 
     if (!userId) {
-      throw new Error('Authenticated user is required for create_comment.');
+      throw new Error('Authenticated user is required to add a comment.');
     }
 
     if (!body) {
-      throw new Error('body is required for create_comment.');
+      throw new Error('body is required to add a comment.');
     }
 
     const comment = await addCommentRecord(ticket.id, userId, body);
