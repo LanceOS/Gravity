@@ -31,7 +31,8 @@ export const DenseTextInput = React.forwardRef<HTMLInputElement, DenseTextInputP
         <input
           id={inputId}
           ref={ref}
-          className={cn('input input--dense', error ? 'input--error' : undefined)}
+          className={cn('input input--dense', error ? 'input--error' : undefined, className)}
+          style={style}
           aria-invalid={error ? 'true' : undefined}
           aria-errormessage={error ? errorId : undefined}
           {...props}
