@@ -61,9 +61,10 @@ export function AIChatMessageBubble({ message: m }: AIChatMessageBubbleProps) {
       )}
       {m.content && <FormattedMarkdown text={m.content} />}
       {m.tool_calls &&
-        m.tool_calls.map((tc, tcIdx) => (
+        m.tool_calls.map((tc) => (
           <div
-            key={tcIdx}
+            key={tc.id}
+            style={{
             style={{
               marginTop: m.content ? '8px' : '0',
               padding: '6px',
