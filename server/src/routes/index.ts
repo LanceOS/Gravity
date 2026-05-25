@@ -7,7 +7,7 @@ import { createSettingsRouter } from './settings.js';
 import { createTicketsRouter } from './tickets.js';
 import { createUsersRouter } from './users.js';
 import { createWorkspacesRouter } from './workspaces.js';
-import { createMcpRouter } from '../mcp.js';
+import { createMcpRouter } from '../mcp/index.js';
 import { createWebhookRouter } from '../webhooks.js';
 import { subscribeToEvents } from '../realtime.js';
 

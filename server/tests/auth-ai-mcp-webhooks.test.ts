@@ -1,8 +1,9 @@
+import { eq } from 'drizzle-orm';
 import { describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../src/app.js';
 import { db } from '../src/db/index.js';
-import { workspaceMembers } from '../src/db/schema.js';
+import { projects, tickets, workspaceMembers } from '../src/db/schema.js';
 import {
   api,
   jsonResponse,
@@ -255,6 +256,14 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
     expect(toolsResponse.body.result.tools).toEqual(
       expect.arrayContaining([expect.objectContaining({ name: 'list_tickets' })]),
     );
+    expect(toolsResponse.body.result.tools).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: 'add_comment',
+          inputSchema: expect.objectContaining({ required: ['ticketKey', 'body'] }),
+        }),
+      ]),
+    );
 
     const createTicketResponse = await api().post('/api/v1/mcp/sse')
       .set('x-user-id', owner.id)
@@ -345,10 +354,9 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
         id: 7,
         method: 'tools/call',
         params: {
-          name: 'create_comment',
+          name: 'add_comment',
           arguments: {
             ticketKey: existingTicket.key,
-            userId: owner.id,
             body: 'Comment created through MCP.',
           },
         },
@@ -436,6 +444,114 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
       ]),
     );
     expect(membersList[0]).toHaveProperty('lastActiveAt');
+  });
+
+  it('lists workspace tickets in global createdAt order across projects', async () => {
+    const { owner, workspace, project } = await seedWorkspaceFixture();
+
+    await db.insert(projects).values({
+      id: 'project-2',
+      workspaceId: workspace.id,
+      name: 'Secondary Project',
+      description: 'Secondary delivery project',
+      key: 'SEC',
+      status: 'active',
+      inviteCode: 'INV-SEC-0002ABCD',
+      createdBy: owner.id,
+      createdAt: new Date('2025-01-01T00:00:00.000Z'),
+      updatedAt: new Date('2025-01-01T00:00:00.000Z'),
+    });
+
+    const laterTicket = await seedTicket(project.id, {
+      id: 'ticket-later',
+      key: `${project.key}-2`,
+      title: 'Later primary-project ticket',
+    });
+    await db
+      .update(tickets)
+      .set({ createdAt: new Date('2025-01-02T00:00:00.000Z') })
+      .where(eq(tickets.id, laterTicket.id));
+
+    const earlierTicket = await seedTicket('project-2', {
+      id: 'ticket-earlier',
+      key: 'SEC-1',
+      title: 'Earlier secondary-project ticket',
+    });
+    await db
+      .update(tickets)
+      .set({ createdAt: new Date('2025-01-01T00:00:00.000Z') })
+      .where(eq(tickets.id, earlierTicket.id));
+
+    const listTicketsResponse = await api().post('/api/v1/mcp/sse')
+      .set('x-user-id', owner.id)
+      .set('X-Workspace-Id', workspace.id)
+      .send({
+        jsonrpc: '2.0',
+        id: 401,
+        method: 'tools/call',
+        params: {
+          name: 'list_tickets',
+          arguments: {},
+        },
+      });
+
+    expect(listTicketsResponse.status).toBe(200);
+    const ticketList = parseMcpResult(listTicketsResponse) as Array<{ key: string }>;
+    const earlierIndex = ticketList.findIndex((ticket) => ticket.key === earlierTicket.key);
+    const laterIndex = ticketList.findIndex((ticket) => ticket.key === laterTicket.key);
+
+    expect(earlierIndex).toBeGreaterThanOrEqual(0);
+    expect(laterIndex).toBeGreaterThanOrEqual(0);
+    expect(earlierIndex).toBeLessThan(laterIndex);
+  });
+
+  it('keeps MCP route guard failures as HTTP-native errors', async () => {
+    const { owner, workspace } = await seedWorkspaceFixture();
+    const stranger = await seedUser({
+      id: 'mcp-stranger-1',
+      name: 'Mcp Stranger',
+      email: 'mcp-stranger@example.com',
+      role: 'member',
+    });
+
+    const unauthenticatedResponse = await api()
+      .post('/api/v1/mcp/sse')
+      .set('X-Workspace-Id', workspace.id)
+      .send({
+        jsonrpc: '2.0',
+        id: 501,
+        method: 'tools/list',
+      });
+
+    expect(unauthenticatedResponse.status).toBe(401);
+    expect(unauthenticatedResponse.body).toEqual({ error: 'Authentication required.' });
+
+    const missingWorkspaceResponse = await api()
+      .post('/api/v1/mcp/sse')
+      .set('x-user-id', owner.id)
+      .send({
+        jsonrpc: '2.0',
+        id: 502,
+        method: 'tools/list',
+      });
+
+    expect(missingWorkspaceResponse.status).toBe(400);
+    expect(missingWorkspaceResponse.body).toEqual({
+      error: 'X-Workspace-Id header or params.workspaceId is required.',
+    });
+
+    const unauthorizedWorkspaceResponse = await api()
+      .post('/api/v1/mcp/sse')
+      .set('x-user-id', stranger.id)
+      .set('X-Workspace-Id', workspace.id)
+      .send({
+        jsonrpc: '2.0',
+        id: 503,
+        method: 'tools/list',
+      });
+
+    expect(unauthorizedWorkspaceResponse.status).toBe(403);
+    expect(unauthorizedWorkspaceResponse.body).toEqual({ error: 'Unauthorized workspace access.' });
   });
 
   it('updates tickets from GitHub pull request webhooks', async () => {
