@@ -68,7 +68,7 @@ export function ProjectCreateOverlay({
 
   const modalFooter = (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Ctrl/Cmd + Enter creates the project.</span>
+      <span style={{ fontSize: '11px', color: 'var(--color-text-disabled)' }}>Ctrl/Cmd + Enter creates the project.</span>
 
       <div style={{ display: 'flex', gap: '8px' }}>
         <Button type="button" onClick={handleClose} disabled={loading}>

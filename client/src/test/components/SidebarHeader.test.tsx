@@ -1,36 +1,50 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { SidebarHeader } from '../../components/Sidebar/components/SidebarHeader.tsx';
+import { Sidebar } from '../../components/Sidebar';
 
-vi.mock('@library', () => ({
-  ThemeToggle: () => <div>ThemeToggle</div>,
-  Select: ({ value, onValueChange, options, ...props }: {
-    value: string;
-    onValueChange: (value: string) => void;
-    options: Array<{ value: string; label: string }>;
-  }) => (
-    <select value={value} onChange={(event) => onValueChange(event.target.value)} {...props}>
-      {options.map((option) => (
-        <option key={option.value} value={option.value}>
-          {option.label}
-        </option>
-      ))}
-    </select>
-  ),
+vi.mock('../../components/Sidebar/components', () => ({
+  SidebarProjectsSection: () => <div data-testid="sidebar-projects-section" />,
+  SidebarUserMenu: () => <div data-testid="sidebar-user-menu" />,
+  SidebarAgentTools: () => <div data-testid="sidebar-agent-tools" />,
 }));
 
-describe('SidebarHeader', () => {
-  it('hides the New Ticket button when the workspace has no projects', () => {
+describe('Sidebar', () => {
+  it('hides the New Ticket button when there are no projects', () => {
     render(
-      <SidebarHeader
+      <Sidebar
         workspace={{
           workspaces: [{ id: 'workspace-1', name: 'Gravity' }],
           activeWorkspaceId: 'workspace-1',
           onSelectWorkspace: vi.fn(),
           onOpenWorkspaceDirectory: vi.fn(),
         }}
-        canOpenCreateTicket={false}
-        onOpenCreateTicket={vi.fn()}
+        projects={{
+          projects: [],
+          domains: [],
+          cycles: [],
+          currentUser: { id: 'user-1', name: 'Test User' } as never,
+          activeProjectId: '',
+          filters: {} as never,
+          counts: { myIssues: 0, activeProjectIssues: 0, domains: {}, cycles: {} },
+          onSelectProject: vi.fn(),
+          onShowProjectIssues: vi.fn(),
+          onShowMyIssues: vi.fn(),
+          onSelectCycle: vi.fn(),
+          onSelectDomain: vi.fn(),
+        }}
+        tools={{
+          onOpenOllama: vi.fn(),
+          onOpenSimulator: vi.fn(),
+          onOpenCreateTicket: vi.fn(),
+        }}
+        userMenu={{
+          currentUser: { id: 'user-1', name: 'Test User' } as never,
+          onOpenWorkspaceDirectory: vi.fn(),
+          onOpenAccountPreferences: vi.fn(),
+          onOpenProjectManager: vi.fn(),
+          onOpenSettings: vi.fn(),
+          onSignOut: vi.fn(),
+        }}
       />
     );
 

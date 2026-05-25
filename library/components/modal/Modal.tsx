@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, AlertCircle, Info, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { X } from 'lucide-react';
 import { Portal } from '../../utilities';
 import { FocusTrap } from '../../utilities';
 import { ClickAwayListener } from '../../utilities';
@@ -37,7 +37,7 @@ export function Modal({ isOpen, onClose, title, children, footer, style }: Modal
             right: 0,
             bottom: 0,
             left: 0,
-            backgroundColor: 'rgba(9, 9, 11, 0.7)',
+            backgroundColor: 'var(--color-overlay-scrim)',
             backdropFilter: 'blur(4px)',
             zIndex: 1500,
             display: 'flex',
@@ -55,7 +55,7 @@ export function Modal({ isOpen, onClose, title, children, footer, style }: Modal
               style={{
                 width: '100%',
                 maxWidth: '500px',
-                backgroundColor: 'var(--color-surface-card)',
+                backgroundColor: 'var(--color-surface-overlay)',
                 border: '1px solid var(--color-border-default)',
                 borderRadius: 'var(--radius-lg)',
                 boxShadow: 'var(--shadow-xl)',
@@ -101,7 +101,7 @@ export function Modal({ isOpen, onClose, title, children, footer, style }: Modal
                     display: 'flex',
                     justifyContent: 'flex-end',
                     gap: '8px',
-                    backgroundColor: 'var(--color-base50)',
+                    backgroundColor: 'var(--color-surface-overlay)',
                     borderBottomLeftRadius: 'var(--radius-lg)',
                     borderBottomRightRadius: 'var(--radius-lg)',
                   }}

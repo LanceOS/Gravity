@@ -1,14 +1,51 @@
 import React from 'react';
-import { X, AlertCircle, Info, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { X } from 'lucide-react';
 import { Portal } from '../../utilities';
-import { FocusTrap } from '../../utilities';
-import { ClickAwayListener } from '../../utilities';
 
 export interface ToastItem {
   id: string;
   message: string;
   type?: 'success' | 'error' | 'info' | 'warning';
 }
+
+type ToastListener = (toasts: ToastItem[]) => void;
+
+let toastListeners: ToastListener[] = [];
+let toastsGlobalStack: ToastItem[] = [];
+
+function emitToasts() {
+  toastListeners.forEach((listener) => listener(toastsGlobalStack));
+}
+
+function dismissToast(id: string) {
+  toastsGlobalStack = toastsGlobalStack.filter((item) => item.id !== id);
+  emitToasts();
+}
+
+export const toast = {
+  show(message: string, type: ToastItem['type'] = 'info', duration = 4000) {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const nextToast: ToastItem = { id, message, type };
+
+    toastsGlobalStack = [...toastsGlobalStack, nextToast];
+    emitToasts();
+
+    if (duration > 0) {
+      setTimeout(() => {
+        dismissToast(id);
+      }, duration);
+    }
+
+    return id;
+  },
+  dismiss(id: string) {
+    dismissToast(id);
+  },
+  clear() {
+    toastsGlobalStack = [];
+    emitToasts();
+  },
+};
 
 export function NotificationCenter() {
   const [toasts, setToasts] = React.useState<ToastItem[]>([]);
@@ -65,8 +102,7 @@ export function NotificationCenter() {
               <button
                 type="button"
                 onClick={() => {
-                  toastsGlobalStack = toastsGlobalStack.filter((item) => item.id !== t.id);
-                  toastListeners.forEach((listener) => listener(toastsGlobalStack));
+                  dismissToast(t.id);
                 }}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--color-text-disabled)' }}
               >

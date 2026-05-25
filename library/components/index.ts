@@ -1,4 +1,5 @@
 export * from './accordion';
+export * from './aichat';
 export * from './affix';
 export * from './alert';
 export * from './aspectratio';

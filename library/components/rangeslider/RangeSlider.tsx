@@ -1,6 +1,4 @@
 import React from 'react';
-import { Eye, EyeOff, Search, Calendar, Clock, Star, Upload, User, ChevronDown, Check } from 'lucide-react';
-import { ClickAwayListener } from '../../utilities';
 
 export interface RangeSliderProps {
   min: number;
@@ -95,7 +93,7 @@ export function RangeSlider({ min, max, value, onChange, label }: RangeSliderPro
             width: '16px',
             height: '16px',
             borderRadius: '50%',
-            backgroundColor: '#ffffff',
+            backgroundColor: 'var(--color-surface-overlay)',
             border: '2px solid var(--color-primary)',
             cursor: 'pointer',
             boxShadow: 'var(--shadow-sm)',
@@ -113,7 +111,7 @@ export function RangeSlider({ min, max, value, onChange, label }: RangeSliderPro
             width: '16px',
             height: '16px',
             borderRadius: '50%',
-            backgroundColor: '#ffffff',
+            backgroundColor: 'var(--color-surface-overlay)',
             border: '2px solid var(--color-primary)',
             cursor: 'pointer',
             boxShadow: 'var(--shadow-sm)',

@@ -16,11 +16,11 @@ export function WorkspaceLayout({ sidebarProps, children, rightPanels }: Workspa
       <DashboardLayout.Header>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="12" cy="12" r="10" stroke="var(--text-heading)" strokeWidth="2" />
-            <circle cx="12" cy="12" r="6" stroke="var(--accent)" strokeWidth="2" strokeDasharray="4 2" />
-            <circle cx="12" cy="12" r="2" fill="var(--text-heading)" />
+            <circle cx="12" cy="12" r="10" stroke="var(--color-text-primary)" strokeWidth="2" />
+            <circle cx="12" cy="12" r="6" stroke="var(--color-primary)" strokeWidth="2" strokeDasharray="4 2" />
+            <circle cx="12" cy="12" r="2" fill="var(--color-text-primary)" />
           </svg>
-          <span style={{ fontWeight: 600, fontSize: '15px', color: 'var(--text-heading)', letterSpacing: '-0.3px' }}>Gravity</span>
+          <span style={{ fontWeight: 600, fontSize: '15px', color: 'var(--color-text-primary)', letterSpacing: '-0.3px' }}>Gravity</span>
         </div>
         
         <div style={{ width: '240px', marginLeft: '16px' }}>

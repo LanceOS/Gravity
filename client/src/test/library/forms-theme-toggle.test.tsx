@@ -245,12 +245,17 @@ describe('library forms and theme toggle', () => {
     await user.click(screen.getByRole('button', { name: 'Save draft' }));
     expect(screen.getByText('Button clicks: 1')).toBeInTheDocument();
 
-    expect(screen.getByLabelText('Project name')).toHaveValue('Gravity');
-    expect(screen.getByText('Required')).toBeInTheDocument();
+    const projectNameInput = screen.getByLabelText('Project name');
+    expect(projectNameInput).toHaveValue('Gravity');
+    expect(projectNameInput).toHaveClass('input');
+    expect(projectNameInput).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByText('Required')).toHaveClass('lib-field-error-msg');
     expect(screen.getByText('Too short')).toBeInTheDocument();
     expect(screen.getByLabelText('Notes')).toHaveValue('Initial note');
     expect(screen.getByLabelText('Search tickets')).toHaveValue('onboarding');
-    expect(screen.getByLabelText('Dense label')).toHaveValue('dense');
+    const denseInput = screen.getByLabelText('Dense label');
+    expect(denseInput).toHaveValue('dense');
+    expect(denseInput).toHaveClass('input', 'input--dense');
 
     const passwordInput = screen.getByLabelText('Workspace password');
     expect(passwordInput).toHaveAttribute('type', 'password');
@@ -383,12 +388,16 @@ describe('library forms and theme toggle', () => {
     window.localStorage.removeItem('gravity_theme');
     document.documentElement.className = '';
     document.documentElement.removeAttribute('data-theme');
+    document.documentElement.style.removeProperty('--color-surface-elevated');
+    document.documentElement.style.removeProperty('--color-overlay-scrim');
 
     render(<ThemeToggle />);
 
     const toggle = screen.getByRole('button');
     expect(toggle).toHaveAttribute('title', 'Theme: system');
     expect(document.documentElement).toHaveAttribute('data-theme', 'light');
+    expect(document.documentElement.style.getPropertyValue('--color-surface-elevated')).toBe('rgba(255, 255, 255, 0.92)');
+    expect(document.documentElement.style.getPropertyValue('--color-overlay-scrim')).toBe('rgba(9, 9, 11, 0.7)');
 
     await user.click(toggle);
     expect(toggle).toHaveAttribute('title', 'Theme: light');
@@ -397,6 +406,8 @@ describe('library forms and theme toggle', () => {
     await user.click(toggle);
     expect(toggle).toHaveAttribute('title', 'Theme: dark');
     expect(document.documentElement).toHaveAttribute('data-theme', 'dark');
+    expect(document.documentElement.style.getPropertyValue('--color-surface-elevated')).toBe('rgba(44, 44, 46, 0.9)');
+    expect(document.documentElement.style.getPropertyValue('--color-overlay-scrim')).toBe('rgba(9, 9, 11, 0.7)');
 
     await user.click(toggle);
     expect(toggle).toHaveAttribute('title', 'Theme: system');

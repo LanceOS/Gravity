@@ -25,8 +25,8 @@ function TicketCardImpl({
       onDragStart={onDragStart}
       bodyStyle={{ padding: 0 }}
       style={{
-        backgroundColor: isHovered ? 'var(--card-hover)' : 'var(--card-bg)',
-        border: '1px solid var(--border)',
+        backgroundColor: isHovered ? 'var(--color-surface-overlay)' : 'var(--color-surface-card)',
+        border: '1px solid var(--color-border-default)',
         borderLeft: `3px solid ${priorityColor}`,
         borderRadius: '6px',
         padding: '12px',
@@ -35,18 +35,16 @@ function TicketCardImpl({
         gap: '10px',
         cursor: 'grab',
         transition: 'all var(--transition-normal)',
-        boxShadow: isHovered ? 'var(--shadow-md)' : 'var(--shadow-sm)',
-        borderColor: isHovered ? 'var(--accent-border)' : 'var(--border)',
-        transform: isHovered ? 'translateY(-1px)' : 'none',
+        borderColor: isHovered ? 'var(--color-border-focus)' : 'var(--color-border-default)',
       }}
     >
       <Flex align="center" justify="space-between">
-        <span style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text-muted)' }}>
+        <span style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--color-text-disabled)' }}>
           {ticket.key}
         </span>
 
         <Flex align="center" gap="6px">
-          {ticket.parentId ? <Paperclip size={10} color="var(--text-muted)" /> : null}
+          {ticket.parentId ? <Paperclip size={10} color="var(--color-text-disabled)" /> : null}
 
           {ticket.prStatus !== 'none' ? (
             <Badge
@@ -65,7 +63,7 @@ function TicketCardImpl({
         style={{
           fontSize: '13px',
           fontWeight: 500,
-          color: 'var(--text-heading)',
+          color: 'var(--color-text-primary)',
           lineHeight: '1.4',
           wordBreak: 'break-word',
           display: '-webkit-box',

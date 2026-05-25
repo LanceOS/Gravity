@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useLayoutEffect } from 'react';
+import { applyResolvedTheme, getStoredThemePreference, resolveThemePreference, THEME_STORAGE_KEY } from '@library/utilities/themeEngine';
 
 export type ThemeMode = 'dark' | 'light';
 export type DensityScale = 'compact' | 'standard';
@@ -16,9 +17,7 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [theme, setThemeState] = useState<ThemeMode>(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('ds-theme') as ThemeMode;
-      if (saved === 'dark' || saved === 'light') return saved;
-      return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+      return resolveThemePreference(getStoredThemePreference());
     }
     return 'dark';
   });
@@ -33,7 +32,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   useLayoutEffect(() => {
     const root = document.documentElement;
-    root.setAttribute('data-theme', theme);
+    applyResolvedTheme(theme);
     root.setAttribute('data-density', density);
     
     // Inject dynamic CSS spacing variables based on density scaling
@@ -48,19 +47,21 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, [theme, density]);
 
-  const setTheme = (newTheme: ThemeMode) => {
+  const setTheme = React.useCallback((newTheme: ThemeMode) => {
     setThemeState(newTheme);
-    localStorage.setItem('ds-theme', newTheme);
-  };
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(THEME_STORAGE_KEY, newTheme);
+    }
+  }, []);
 
-  const setDensity = (newDensity: DensityScale) => {
+  const setDensity = React.useCallback((newDensity: DensityScale) => {
     setDensityState(newDensity);
     localStorage.setItem('ds-density', newDensity);
-  };
+  }, []);
 
-  const toggleTheme = () => {
+  const toggleTheme = React.useCallback(() => {
     setTheme(theme === 'dark' ? 'light' : 'dark');
-  };
+  }, [theme, setTheme]);
 
   return (
     <ThemeContext.Provider value={{ theme, density, setTheme, setDensity, toggleTheme }}>

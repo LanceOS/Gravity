@@ -1,6 +1,4 @@
 import React from 'react';
-import { Eye, EyeOff, Search, Calendar, Clock, Star, Upload, User, ChevronDown, Check } from 'lucide-react';
-import { ClickAwayListener } from '../../utilities';
 
 export interface CheckboxProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label: string;

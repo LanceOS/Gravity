@@ -28,7 +28,7 @@ export function KanbanBoard({ columns, cards, onCardMove, renderColumnHeader, st
             style={{
               flex: 1,
               minWidth: '240px',
-              backgroundColor: 'var(--color-base50)',
+              backgroundColor: 'var(--color-base100)',
               borderRadius: 'var(--radius-md)',
               padding: '12px',
               display: 'flex',

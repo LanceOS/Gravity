@@ -40,14 +40,14 @@ export const TicketBoard: React.FC<TicketBoardProps> = ({
         }}
       >
         <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: col?.color }} />
-        <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-heading)' }}>
+        <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
           {title}
         </span>
         <span
           style={{
             fontSize: '10px',
-            color: 'var(--text-muted)',
-            background: 'var(--sidebar-bg)',
+            color: 'var(--color-text-disabled)',
+            background: 'var(--color-base50)',
             padding: '1px 6px',
             borderRadius: '4px',
             marginLeft: '4px'
@@ -63,7 +63,7 @@ export const TicketBoard: React.FC<TicketBoardProps> = ({
           aria-label={`Create ticket in ${title}`}
           style={{
             marginLeft: 'auto',
-            color: 'var(--text-muted)',
+            color: 'var(--color-text-disabled)',
             width: '20px',
             minHeight: '20px',
             padding: 0,
@@ -103,7 +103,7 @@ export const TicketBoard: React.FC<TicketBoardProps> = ({
     <Flex direction="column" style={{ height: '100%', flex: 1, overflow: 'hidden' }}>
 
       {/* Kanban Board Container */}
-      <div style={{ flex: 1, overflowY: 'hidden', padding: '16px', background: 'var(--bg)' }}>
+      <div style={{ flex: 1, overflowY: 'hidden', padding: '16px', background: 'var(--color-surface-app)' }}>
         <KanbanBoard
           columns={BOARD_COLUMNS}
           cards={formattedCards}

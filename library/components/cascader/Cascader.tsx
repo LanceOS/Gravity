@@ -1,5 +1,5 @@
 import React from 'react';
-import { Eye, EyeOff, Search, Calendar, Clock, Star, Upload, User, ChevronDown, Check } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { ClickAwayListener } from '../../utilities';
 
 export interface CascaderOption {
@@ -76,6 +76,9 @@ export function Cascader({ options, value, onChange, placeholder = 'Select path'
                   overflowY: 'auto',
                   padding: '4px',
                   minWidth: '120px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '2px',
                 }}
               >
                 {col.map((opt) => (

@@ -1,8 +1,5 @@
 import React from 'react';
-import { X, AlertCircle, Info, CheckCircle2, AlertTriangle } from 'lucide-react';
-import { Portal } from '../../utilities';
-import { FocusTrap } from '../../utilities';
-import { ClickAwayListener } from '../../utilities';
+import { AlertCircle, Info, CheckCircle2, AlertTriangle } from 'lucide-react';
 
 export interface AlertProps {
   type?: 'success' | 'error' | 'info' | 'warning';
@@ -13,17 +10,24 @@ export interface AlertProps {
 
 export function Alert({ type = 'info', title, children, style }: AlertProps) {
   const typeIcons = {
-    success: <CheckCircle2 size={16} style={{ color: 'var(--color-base400)' }} />,
-    error: <AlertCircle size={16} style={{ color: 'var(--color-text-primary)' }} />,
-    warning: <AlertTriangle size={16} style={{ color: 'var(--color-text-secondary)' }} />,
-    info: <Info size={16} style={{ color: 'var(--color-primary)' }} />,
+    success: <CheckCircle2 size={16} style={{ color: 'var(--color-text-success)' }} />,
+    error: <AlertCircle size={16} style={{ color: 'var(--color-text-error)' }} />,
+    warning: <AlertTriangle size={16} style={{ color: 'var(--color-text-warning)' }} />,
+    info: <Info size={16} style={{ color: 'var(--color-text-info)' }} />,
   };
 
   const bgColors = {
-    success: 'rgba(59, 130, 246, 0.05)',
-    error: 'rgba(239, 68, 68, 0.05)',
-    warning: 'rgba(245, 158, 11, 0.05)',
-    info: 'var(--color-state-selected-bg)',
+    success: 'var(--color-bg-success)',
+    error: 'var(--color-bg-error)',
+    warning: 'var(--color-bg-warning)',
+    info: 'var(--color-bg-info)',
+  };
+
+  const borderColors = {
+    success: 'var(--color-success)',
+    error: 'var(--color-border-error)',
+    warning: 'var(--color-warning)',
+    info: 'var(--color-info)',
   };
 
   return (
@@ -34,7 +38,7 @@ export function Alert({ type = 'info', title, children, style }: AlertProps) {
         gap: '12px',
         padding: '12px 16px',
         backgroundColor: bgColors[type],
-        border: '1px solid var(--color-border-default)',
+        border: `1px solid ${borderColors[type]}`,
         borderRadius: 'var(--radius-md)',
         fontSize: '13px',
         ...style,

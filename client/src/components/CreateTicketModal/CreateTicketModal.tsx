@@ -86,9 +86,9 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
 
   const modalFooter = (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--text-muted)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--color-text-disabled)' }}>
         <AlertCircle size={12} />
-        <span>Press <kbd style={{ fontFamily: 'var(--mono)', border: '1px solid var(--border)', background: 'var(--sidebar-bg)', padding: '1px 3px', borderRadius: '3px' }}>Ctrl+Enter</kbd> to submit</span>
+        <span>Press <kbd style={{ fontFamily: 'var(--mono)', border: '1px solid var(--color-border-default)', background: 'var(--color-base50)', padding: '1px 3px', borderRadius: '3px' }}>Ctrl+Enter</kbd> to submit</span>
       </div>
 
       <div style={{ display: 'flex', gap: '8px' }}>
@@ -149,8 +149,8 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
         <div 
           style={{
             padding: '16px 20px',
-            background: 'var(--sidebar-bg)',
-            borderTop: '1px solid var(--border)',
+            background: 'var(--color-base50)',
+            borderTop: '1px solid var(--color-border-default)',
             display: 'grid',
             gridTemplateColumns: 'repeat(4, 1fr)',
             gap: '12px'
@@ -158,7 +158,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
         >
           {/* Project */}
           <div>
-            <span className="label" style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>Project</span>
+            <span className="label" style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-disabled)', marginBottom: '4px' }}>Project</span>
             <Select
               value={projectId}
               onValueChange={(nextProjectId: string) => setProjectId(nextProjectId)}
@@ -170,7 +170,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
 
           {/* Status */}
           <div>
-            <span className="label" style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>Status</span>
+            <span className="label" style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-disabled)', marginBottom: '4px' }}>Status</span>
             <Select
               value={status}
               onValueChange={(nextStatus: string) => setStatus(nextStatus as Ticket['status'])}
@@ -181,7 +181,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
 
           {/* Priority */}
           <div>
-            <span className="label" style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>Priority</span>
+            <span className="label" style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-disabled)', marginBottom: '4px' }}>Priority</span>
             <Select
               value={priority}
               onValueChange={(nextPriority: string) => setPriority(nextPriority as Ticket['priority'])}
@@ -192,7 +192,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
 
           {/* Assignee */}
           <div>
-            <span className="label" style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>Assignee</span>
+            <span className="label" style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-disabled)', marginBottom: '4px' }}>Assignee</span>
             <Select
               value={assigneeId}
               onValueChange={(nextAssigneeId: string) => setAssigneeId(nextAssigneeId)}
@@ -203,7 +203,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
 
           {/* Domain */}
           <div>
-            <span className="label" style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>Domain</span>
+            <span className="label" style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-disabled)', marginBottom: '4px' }}>Domain</span>
             <Select
               value={domainId}
               onValueChange={(nextDomainId: string) => setDomainId(nextDomainId)}
@@ -214,7 +214,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
 
           {/* Cycle */}
           <div>
-            <span className="label" style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>Cycle</span>
+            <span className="label" style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-disabled)', marginBottom: '4px' }}>Cycle</span>
             <Select
               value={cycleId}
               onValueChange={(nextCycleId: string) => setCycleId(nextCycleId)}

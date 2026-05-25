@@ -108,7 +108,7 @@ export function WorkspaceDirectoryPage({
       style={{
         minHeight: '100vh',
         padding: 'var(--space-8) var(--space-6)',
-        background: 'var(--bg)',
+        background: 'var(--color-surface-app)',
         overflowY: 'auto',
       }}
     >
@@ -122,15 +122,15 @@ export function WorkspaceDirectoryPage({
         {/* Left Column: Header, Stats, and Directory Table */}
         <Stack gap="var(--space-5)">
           {/* Elegant Page Header */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: 'var(--space-4)', marginBottom: 'var(--space-1)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border-default)', paddingBottom: 'var(--space-4)', marginBottom: 'var(--space-1)' }}>
             <div>
-              <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 700, color: 'var(--text-heading)', letterSpacing: '-0.02em' }}>
+              <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '-0.02em' }}>
                 Workspace Directory
               </h1>
-              <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '13px' }}>
+              <p style={{ margin: '4px 0 0', color: 'var(--color-text-disabled)', fontSize: '13px' }}>
                 Choose where this account works.
               </p>
-              <p style={{ margin: '2px 0 0', color: 'var(--text-muted)', fontSize: '12px' }}>
+              <p style={{ margin: '2px 0 0', color: 'var(--color-text-disabled)', fontSize: '12px' }}>
                 Transition seamlessly between connected workspaces or peer-invitations.
               </p>
             </div>
@@ -151,66 +151,66 @@ export function WorkspaceDirectoryPage({
               flexWrap: 'wrap',
               gap: 'var(--space-6)',
               padding: 'var(--space-3) var(--space-4)',
-              background: 'var(--sidebar-bg)',
-              border: '1px solid var(--border)',
+              background: 'var(--color-base50)',
+              border: '1px solid var(--color-border-default)',
               borderRadius: 'var(--radius-sm)',
               fontSize: '12px',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-              <FolderPlus size={15} style={{ color: 'var(--text-muted)' }} />
-              <span style={{ fontWeight: 600, color: 'var(--text-heading)' }}>{workspaces.length}</span>
-              <span style={{ color: 'var(--text-muted)' }}>Workspaces</span>
+              <FolderPlus size={15} style={{ color: 'var(--color-text-disabled)' }} />
+              <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{workspaces.length}</span>
+              <span style={{ color: 'var(--color-text-disabled)' }}>Workspaces</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-              <Users size={15} style={{ color: 'var(--text-muted)' }} />
-              <span style={{ fontWeight: 600, color: 'var(--text-heading)' }}>{workspaces.reduce((sum, w) => sum + w.memberCount, 0)}</span>
-              <span style={{ color: 'var(--text-muted)' }}>Members</span>
+              <Users size={15} style={{ color: 'var(--color-text-disabled)' }} />
+              <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{workspaces.reduce((sum, w) => sum + w.memberCount, 0)}</span>
+              <span style={{ color: 'var(--color-text-disabled)' }}>Members</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-              <Server size={15} style={{ color: 'var(--text-muted)' }} />
-              <span style={{ color: 'var(--text-muted)' }}>Local Account:</span>
-              <span style={{ fontWeight: 600, color: 'var(--text-heading)' }}>{currentUser.email}</span>
+              <Server size={15} style={{ color: 'var(--color-text-disabled)' }} />
+              <span style={{ color: 'var(--color-text-disabled)' }}>Local Account:</span>
+              <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{currentUser.email}</span>
             </div>
           </div>
 
           {/* High-density Workspaces Directory */}
           <Stack gap="var(--space-3)">
             <div>
-              <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+              <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-text-disabled)' }}>
                 Available Boundaries
               </span>
-              <h2 style={{ margin: '2px 0 0', fontSize: '16px', fontWeight: 600, color: 'var(--text-heading)' }}>
+              <h2 style={{ margin: '2px 0 0', fontSize: '16px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
                 Connected and Hosted Workspaces
               </h2>
             </div>
 
             {loading && (
-              <div style={{ padding: 'var(--space-8)', textAlign: 'center', border: '1px dashed var(--border)', borderRadius: 'var(--radius-sm)', color: 'var(--text-muted)' }}>
+              <div style={{ padding: 'var(--space-8)', textAlign: 'center', border: '1px dashed var(--color-border-default)', borderRadius: 'var(--radius-sm)', color: 'var(--color-text-disabled)' }}>
                 Loading workspaces...
               </div>
             )}
 
             {!loading && workspaceCards.length === 0 && (
-              <div style={{ padding: 'var(--space-8)', textAlign: 'center', border: '1px dashed var(--border)', borderRadius: 'var(--radius-sm)', color: 'var(--text-muted)', fontSize: '13px' }}>
+              <div style={{ padding: 'var(--space-8)', textAlign: 'center', border: '1px dashed var(--color-border-default)', borderRadius: 'var(--radius-sm)', color: 'var(--color-text-disabled)', fontSize: '13px' }}>
                 No approved workspaces yet. Create one or request access with an invite code.
               </div>
             )}
 
             {!loading && workspaceCards.length > 0 && (
-              <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', overflow: 'hidden', background: 'var(--card-bg)' }}>
+              <div style={{ border: '1px solid var(--color-border-default)', borderRadius: 'var(--radius-sm)', overflow: 'hidden', background: 'var(--color-surface-card)' }}>
                 {/* Table Header */}
                 <div
                   style={{
                     display: 'grid',
                     gridTemplateColumns: '1.8fr 1fr 1.2fr 90px 130px',
                     padding: '8px 16px',
-                    background: 'var(--sidebar-bg)',
-                    borderBottom: '1px solid var(--border)',
+                    background: 'var(--color-base50)',
+                    borderBottom: '1px solid var(--color-border-default)',
                     fontSize: '11px',
                     fontWeight: 700,
                     textTransform: 'uppercase',
-                    color: 'var(--text-muted)',
+                    color: 'var(--color-text-disabled)',
                     letterSpacing: '0.05em',
                   }}
                 >
@@ -231,14 +231,14 @@ export function WorkspaceDirectoryPage({
                         gridTemplateColumns: '1.8fr 1fr 1.2fr 90px 130px',
                         alignItems: 'center',
                         padding: '10px 16px',
-                        borderBottom: '1px solid var(--border)',
-                        background: isActive ? 'var(--accent-glow)' : 'transparent',
+                        borderBottom: '1px solid var(--color-border-default)',
+                        background: isActive ? 'var(--color-state-selected-bg)' : 'transparent',
                         transition: 'background var(--transition-normal)',
                       }}
                     >
                       <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                          <span style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--text-heading)' }}>
+                          <span style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
                             {workspace.name}
                           </span>
                           {isActive && <Badge variant="accent">Active</Badge>}
@@ -247,7 +247,7 @@ export function WorkspaceDirectoryPage({
                           <div
                             style={{
                               fontSize: '11.5px',
-                              color: 'var(--text-muted)',
+                              color: 'var(--color-text-disabled)',
                               marginTop: '2px',
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
@@ -259,10 +259,10 @@ export function WorkspaceDirectoryPage({
                           </div>
                         )}
                       </div>
-                      <div style={{ fontSize: '12px', color: 'var(--text)' }}>
+                      <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
                         {workspace.projectCount} {workspace.projectCount === 1 ? 'project' : 'projects'} · {workspace.memberCount} {workspace.memberCount === 1 ? 'member' : 'members'}
                       </div>
-                      <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', fontFamily: 'var(--mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <div style={{ fontSize: '11.5px', color: 'var(--color-text-disabled)', fontFamily: 'var(--mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {workspace.hostUrl || 'Local Host'}
                       </div>
                       <div>
@@ -288,10 +288,10 @@ export function WorkspaceDirectoryPage({
 
         {/* Right Column: Unified Tabbed Action Panel */}
         <div style={{ position: 'sticky', top: 'var(--space-8)' }}>
-          <Card style={{ padding: 'var(--space-5)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: 'var(--card-bg)' }}>
+          <Card style={{ padding: 'var(--space-5)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border-default)', background: 'var(--color-surface-card)' }}>
             <Stack gap="var(--space-4)">
               {/* Sleek Underline Tab Headers */}
-              <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', paddingBottom: '0.1px', marginBottom: 'var(--space-2)' }}>
+              <div style={{ display: 'flex', borderBottom: '1px solid var(--color-border-default)', paddingBottom: '0.1px', marginBottom: 'var(--space-2)' }}>
                 <button
                   onClick={() => setActiveTab('create')}
                   style={{
@@ -301,8 +301,8 @@ export function WorkspaceDirectoryPage({
                     padding: '8px 2px',
                     fontSize: '11.5px',
                     fontWeight: 600,
-                    color: activeTab === 'create' ? 'var(--text-heading)' : 'var(--text-muted)',
-                    borderBottom: activeTab === 'create' ? '2px solid var(--text-heading)' : '2px solid transparent',
+                    color: activeTab === 'create' ? 'var(--color-text-primary)' : 'var(--color-text-disabled)',
+                    borderBottom: activeTab === 'create' ? '2px solid var(--color-text-primary)' : '2px solid transparent',
                     cursor: 'pointer',
                     transition: 'all var(--transition-fast)',
                   }}
@@ -318,8 +318,8 @@ export function WorkspaceDirectoryPage({
                     padding: '8px 2px',
                     fontSize: '11.5px',
                     fontWeight: 600,
-                    color: activeTab === 'join' ? 'var(--text-heading)' : 'var(--text-muted)',
-                    borderBottom: activeTab === 'join' ? '2px solid var(--text-heading)' : '2px solid transparent',
+                    color: activeTab === 'join' ? 'var(--color-text-primary)' : 'var(--color-text-disabled)',
+                    borderBottom: activeTab === 'join' ? '2px solid var(--color-text-primary)' : '2px solid transparent',
                     cursor: 'pointer',
                     transition: 'all var(--transition-fast)',
                   }}
@@ -335,8 +335,8 @@ export function WorkspaceDirectoryPage({
                     padding: '8px 2px',
                     fontSize: '11.5px',
                     fontWeight: 600,
-                    color: activeTab === 'validate' ? 'var(--text-heading)' : 'var(--text-muted)',
-                    borderBottom: activeTab === 'validate' ? '2px solid var(--text-heading)' : '2px solid transparent',
+                    color: activeTab === 'validate' ? 'var(--color-text-primary)' : 'var(--color-text-disabled)',
+                    borderBottom: activeTab === 'validate' ? '2px solid var(--color-text-primary)' : '2px solid transparent',
                     cursor: 'pointer',
                     transition: 'all var(--transition-fast)',
                   }}
@@ -361,10 +361,10 @@ export function WorkspaceDirectoryPage({
               <form onSubmit={handleCreateSubmit} style={activeTab === 'create' ? {} : visuallyHiddenStyle}>
                 <Stack gap="var(--space-3)">
                   <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', marginBottom: 'var(--space-1)' }}>
-                    <Globe size={16} style={{ color: 'var(--text-muted)' }} />
-                    <h3 style={{ margin: 0, fontSize: '13.5px', fontWeight: 600, color: 'var(--text-heading)' }}>Establish Boundary</h3>
+                    <Globe size={16} style={{ color: 'var(--color-text-disabled)' }} />
+                    <h3 style={{ margin: 0, fontSize: '13.5px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Establish Boundary</h3>
                   </div>
-                  <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '11.5px', lineHeight: 1.4 }}>
+                  <p style={{ margin: 0, color: 'var(--color-text-disabled)', fontSize: '11.5px', lineHeight: 1.4 }}>
                     Create a local cryptographic boundary to run private, secure projects.
                   </p>
 
@@ -409,10 +409,10 @@ export function WorkspaceDirectoryPage({
               <form onSubmit={handleJoinSubmit} style={activeTab === 'join' ? {} : visuallyHiddenStyle}>
                 <Stack gap="var(--space-3)">
                   <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', marginBottom: 'var(--space-1)' }}>
-                    <KeyRound size={16} style={{ color: 'var(--text-muted)' }} />
-                    <h3 style={{ margin: 0, fontSize: '13.5px', fontWeight: 600, color: 'var(--text-heading)' }}>Request Access</h3>
+                    <KeyRound size={16} style={{ color: 'var(--color-text-disabled)' }} />
+                    <h3 style={{ margin: 0, fontSize: '13.5px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Request Access</h3>
                   </div>
-                  <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '11.5px', lineHeight: 1.4 }}>
+                  <p style={{ margin: 0, color: 'var(--color-text-disabled)', fontSize: '11.5px', lineHeight: 1.4 }}>
                     Enter a valid invite code to request peer authorization on the workspace.
                   </p>
 
@@ -441,10 +441,10 @@ export function WorkspaceDirectoryPage({
               <form onSubmit={handlePeerValidationSubmit} style={activeTab === 'validate' ? {} : visuallyHiddenStyle}>
                 <Stack gap="var(--space-3)">
                   <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', marginBottom: 'var(--space-1)' }}>
-                    <KeyRound size={16} style={{ color: 'var(--text-muted)' }} />
-                    <h3 style={{ margin: 0, fontSize: '13.5px', fontWeight: 600, color: 'var(--text-heading)' }}>Validate Peer Invite</h3>
+                    <KeyRound size={16} style={{ color: 'var(--color-text-disabled)' }} />
+                    <h3 style={{ margin: 0, fontSize: '13.5px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Validate Peer Invite</h3>
                   </div>
-                  <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '11.5px', lineHeight: 1.4 }}>
+                  <p style={{ margin: 0, color: 'var(--color-text-disabled)', fontSize: '11.5px', lineHeight: 1.4 }}>
                     Perform a secure handshake to validate a peer's invite URL and credentials.
                   </p>
 

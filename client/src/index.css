@@ -60,8 +60,8 @@
   font-size: 13px;
   /* Slightly more compact & professional */
   line-height: 1.5;
-  color: var(--text);
-  background-color: var(--bg);
+  color: var(--color-text-secondary);
+  background-color: var(--color-surface-app);
   color-scheme: light dark;
 }
 
@@ -96,8 +96,8 @@ body {
   margin: 0;
   overflow: hidden;
   /* We handle scrolling inside components */
-  background: var(--bg);
-  color: var(--text);
+  background: var(--color-surface-app);
+  color: var(--color-text-secondary);
   font-family: var(--sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -115,8 +115,8 @@ textarea {
   display: flex;
   height: 100vh;
   width: 100vw;
-  background: var(--bg);
-  color: var(--text);
+  background: var(--color-surface-app);
+  color: var(--color-text-secondary);
   overflow: hidden;
 }
 
@@ -131,13 +131,13 @@ textarea {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--border);
+  background: var(--color-border-default);
   border-radius: var(--radius-full);
   transition: background-color var(--transition-normal);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--text-muted);
+  background: var(--color-text-disabled);
 }
 
 /* Premium Glassmorphic Filters & Hover Micro-interactions */
@@ -155,13 +155,13 @@ textarea {
 
 .clickable:not(button):not(.btn):hover,
 button.clickable:not(.btn):hover {
-  background-color: var(--card-hover);
+  background-color: var(--color-base100);
 }
 
 .sidebar-menu-item:hover,
 .sidebar-dropdown-item:hover {
-  box-shadow: inset 0 0 0 999px var(--sidebar-hover-overlay);
-  background-color: var(--card-hover) !important;
+  box-shadow: inset 0 0 0 999px var(--color-state-hover-overlay);
+  background-color: var(--color-base100) !important;
 }
 
 /* Buttons with Micro-interactions */
@@ -177,9 +177,9 @@ button.clickable:not(.btn):hover {
   font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
-  border: 1px solid var(--border);
-  background: var(--card-bg);
-  color: var(--text-heading);
+  border: 1px solid var(--color-border-default);
+  background: var(--color-surface-card);
+  color: var(--color-text-primary);
   font-family: inherit;
   transition: all var(--transition-normal);
   outline: none;
@@ -188,9 +188,9 @@ button.clickable:not(.btn):hover {
 }
 
 .btn:hover {
-  background: var(--card-hover);
-  border-color: var(--border-focus);
-  color: var(--text-heading);
+  background: var(--color-base100);
+  border-color: var(--color-border-focus);
+  color: var(--color-text-primary);
   transform: translateY(-1px);
   box-shadow: var(--shadow-sm);
 }
@@ -200,8 +200,8 @@ button.clickable:not(.btn):hover {
 }
 
 .btn:focus-visible {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-glow);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-state-selected-bg);
 }
 
 .btn:disabled {
@@ -234,52 +234,52 @@ button.clickable:not(.btn):hover {
 }
 
 .btn-primary {
-  background: var(--accent-solid);
-  color: var(--accent-foreground);
-  border-color: var(--accent-solid);
-  box-shadow: 0 2px 10px var(--accent-glow);
+  background: var(--color-primary);
+  color: var(--color-text-on-accent);
+  border-color: var(--color-primary);
+  box-shadow: 0 2px 10px var(--color-state-selected-bg);
 }
 
 .btn-primary:hover {
-  background: var(--accent-solid-hover);
-  color: var(--accent-foreground);
-  border-color: var(--accent-solid-hover);
-  box-shadow: 0 4px 16px var(--accent-glow);
+  background: var(--color-primary-hover);
+  color: var(--color-text-on-accent);
+  border-color: var(--color-primary-hover);
+  box-shadow: 0 4px 16px var(--color-state-selected-bg);
 }
 
 .btn-ghost {
   background: transparent;
-  color: var(--text);
+  color: var(--color-text-secondary);
   border-color: transparent;
 }
 
 .btn-ghost:hover {
-  background: var(--card-hover);
-  color: var(--text-heading);
-  border-color: var(--border);
+  background: var(--color-base100);
+  color: var(--color-text-primary);
+  border-color: var(--color-border-default);
 }
 
 .btn-accent {
-  background: var(--accent-glow);
-  color: var(--accent);
-  border-color: var(--accent-border);
+  background: var(--color-state-selected-bg);
+  color: var(--color-primary);
+  border-color: var(--color-border-focus);
 }
 
 .btn-accent:hover {
-  background: color-mix(in srgb, var(--accent-glow) 60%, var(--accent) 40%);
-  color: var(--accent);
-  border-color: var(--accent);
+  background: color-mix(in srgb, var(--color-state-selected-bg) 60%, var(--color-primary) 40%);
+  color: var(--color-primary);
+  border-color: var(--color-primary);
 }
 
 .btn-danger {
   background: rgba(239, 68, 68, 0.06);
-  color: var(--priority-high);
+  color: var(--color-text-primary);
   border-color: rgba(239, 68, 68, 0.15);
 }
 
 .btn-danger:hover {
   background: rgba(239, 68, 68, 0.12);
-  color: var(--priority-high);
+  color: var(--color-text-primary);
   border-color: rgba(239, 68, 68, 0.3);
 }
 
@@ -288,9 +288,9 @@ button.clickable:not(.btn):hover {
   width: 100%;
   padding: 8px 12px;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--card-bg);
-  color: var(--text-heading);
+  border: 1px solid var(--color-border-default);
+  background: var(--color-surface-card);
+  color: var(--color-text-primary);
   font-family: inherit;
   font-size: 13px;
   outline: none;
@@ -298,13 +298,13 @@ button.clickable:not(.btn):hover {
 }
 
 .input:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-glow);
-  background-color: var(--card-bg);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-state-selected-bg);
+  background-color: var(--color-surface-card);
 }
 
 .input::placeholder {
-  color: var(--text-muted);
+  color: var(--color-text-disabled);
   opacity: 0.8;
 }
 
@@ -318,14 +318,14 @@ button.clickable:not(.btn):hover {
 
 .editable-display:hover,
 .editable-display:focus-visible {
-  background: var(--card-hover);
-  border-color: var(--border);
+  background: var(--color-base100);
+  border-color: var(--color-border-default);
   outline: none;
 }
 
 .editable-display__hint {
   opacity: 0;
-  color: var(--text-muted);
+  color: var(--color-text-disabled);
   transition: opacity var(--transition-normal);
 }
 
@@ -348,7 +348,7 @@ button.clickable:not(.btn):hover {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--text-muted);
+  color: var(--color-text-disabled);
   margin-bottom: 6px;
 }
 
@@ -361,44 +361,44 @@ button.clickable:not(.btn):hover {
   border-radius: var(--radius-xs);
   font-size: 11px;
   font-weight: 600;
-  border: 1px solid var(--border);
-  background: var(--card-hover);
-  color: var(--text);
+  border: 1px solid var(--color-border-default);
+  background: var(--color-base100);
+  color: var(--color-text-secondary);
   transition: all var(--transition-normal);
 }
 
 .badge:hover {
-  border-color: var(--border-focus);
+  border-color: var(--color-border-focus);
 }
 
 .priority-urgent {
-  color: var(--priority-urgent) !important;
+  color: var(--color-primary) !important;
 }
 
 .priority-high {
-  color: var(--priority-high) !important;
+  color: var(--color-text-primary) !important;
 }
 
 .priority-medium {
-  color: var(--priority-medium) !important;
+  color: var(--color-text-secondary) !important;
 }
 
 .priority-low {
-  color: var(--priority-low) !important;
+  color: var(--color-base400) !important;
 }
 
 .priority-no {
-  color: var(--priority-no) !important;
+  color: var(--color-text-disabled) !important;
 }
 
 /* Custom Form styles for WebMCP declarative agents */
 form.tool-form-active {
-  outline: 2px dashed var(--accent);
-  background-color: var(--accent-glow) !important;
+  outline: 2px dashed var(--color-primary);
+  background-color: var(--color-state-selected-bg) !important;
 }
 
 button.tool-submit-active {
-  outline: 2px dashed var(--priority-high);
+  outline: 2px dashed var(--color-text-primary);
   animation: pulse 2s infinite;
 }
 
@@ -425,7 +425,7 @@ button.tool-submit-active {
   min-width: 290px;
   max-width: 320px;
   background: transparent;
-  border-right: 1px solid var(--border);
+  border-right: 1px solid var(--color-border-default);
   height: 100%;
 }
 
@@ -437,8 +437,8 @@ button.tool-submit-active {
 .dropdown-menu {
   position: absolute;
   z-index: 100;
-  background: var(--card-bg);
-  border: 1px solid var(--border);
+  background: var(--color-surface-card);
+  border: 1px solid var(--color-border-default);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-lg);
   backdrop-filter: blur(16px);
@@ -459,13 +459,13 @@ button.tool-submit-active {
   border-radius: var(--radius-sm);
   font-size: 12.5px;
   cursor: pointer;
-  color: var(--text);
+  color: var(--color-text-secondary);
   transition: all var(--transition-fast);
 }
 
 .dropdown-item:hover {
-  background: var(--card-hover);
-  color: var(--text-heading);
+  background: var(--color-base100);
+  color: var(--color-text-primary);
 }
 
 /* Markdown preview wrapper */
@@ -486,12 +486,12 @@ button.tool-submit-active {
 
 .markdown-content code {
   font-family: var(--mono);
-  background: var(--card-hover);
-  border: 1px solid var(--border);
+  background: var(--color-base100);
+  border: 1px solid var(--color-border-default);
   padding: 2px 5px;
   border-radius: var(--radius-xs);
   font-size: 11.5px;
-  color: var(--accent);
+  color: var(--color-primary);
 }
 
 /* Compact B2B Workspace Directory Grid Layout */

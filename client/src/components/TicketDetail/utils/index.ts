@@ -17,7 +17,7 @@ export const STATUS_COLOR_MAP: Record<string, string> = {
 };
 
 export const getStatusColor = (status: string) =>
-  STATUS_COLOR_MAP[status] ?? 'var(--text-muted)';
+  STATUS_COLOR_MAP[status] ?? 'var(--color-text-disabled)';
 
 export const PRIORITY_OPTIONS = [
   { value: 'no_priority', label: 'No Priority' },

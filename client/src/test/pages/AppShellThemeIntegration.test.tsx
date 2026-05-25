@@ -1,0 +1,295 @@
+import type { ReactNode } from 'react';
+import { render, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ThemeProvider } from '../../context/ThemeProvider';
+import { AppShellPage } from '../../pages/AppShellPage/AppShellPage.tsx';
+
+const mocks = vi.hoisted(() => ({
+  useTickets: vi.fn(),
+  useWorkspaceDirectory: vi.fn(),
+  useAccountSettings: vi.fn(),
+  useWorkspaceSettings: vi.fn(),
+  registerWebMCPTools: vi.fn(() => null),
+}));
+
+vi.mock('../../context/TicketContext', () => ({
+  useTickets: mocks.useTickets,
+}));
+
+vi.mock('../../hooks/useWorkspaceDirectory', () => ({
+  useWorkspaceDirectory: mocks.useWorkspaceDirectory,
+}));
+
+vi.mock('../../hooks/useAccountSettings', () => ({
+  useAccountSettings: mocks.useAccountSettings,
+}));
+
+vi.mock('../../hooks/useWorkspaceSettings', () => ({
+  useWorkspaceSettings: mocks.useWorkspaceSettings,
+}));
+
+vi.mock('../../utils/webmcp', () => ({
+  registerWebMCPTools: mocks.registerWebMCPTools,
+}));
+
+vi.mock('../../components/AuthScreen', () => ({
+  AuthScreen: () => <div>AuthScreen</div>,
+}));
+
+vi.mock('../../components/CreateTicketModal', () => ({
+  CreateTicketModal: () => <div>CreateTicketModal</div>,
+}));
+
+vi.mock('../../components/LocalAIChat', () => ({
+  LocalAIChat: () => <div>LocalAIChat</div>,
+}));
+
+vi.mock('../../components/OnboardingModal', () => ({
+  OnboardingModal: () => <div>OnboardingModal</div>,
+}));
+
+vi.mock('../../layouts/WorkspaceLayout/WorkspaceLayout', () => ({
+  WorkspaceLayout: ({ children, rightPanels }: { children?: ReactNode; rightPanels?: ReactNode }) => (
+    <div>
+      <div>WorkspaceLayout</div>
+      {children}
+      {rightPanels}
+    </div>
+  ),
+}));
+
+vi.mock('../../pages/LoadingPage/LoadingPage', () => ({
+  LoadingPage: () => <div>LoadingPage</div>,
+}));
+
+vi.mock('../../pages/WorkspaceDirectoryPage/WorkspaceDirectoryPage', () => ({
+  WorkspaceDirectoryPage: () => <div>WorkspaceDirectoryPage</div>,
+}));
+
+vi.mock('../../pages/WorkspacePage/WorkspacePage', () => ({
+  WorkspacePage: () => <div>WorkspacePage</div>,
+}));
+
+vi.mock('../../pages/WorkspaceProjectsPage/WorkspaceProjectsPage', () => ({
+  WorkspaceProjectsPage: () => <div>WorkspaceProjectsPage</div>,
+}));
+
+vi.mock('../../pages/SettingsPage/SettingsPage', () => ({
+  SettingsPage: () => <div>SettingsPage</div>,
+}));
+
+vi.mock('../../pages/AccountPreferencesPage/AccountPreferencesPage', () => ({
+  AccountPreferencesPage: () => <div>AccountPreferencesPage</div>,
+}));
+
+function makeCurrentUser() {
+  return {
+    id: 'user-1',
+    name: 'Casey Carter',
+    email: 'casey@example.com',
+    avatar: '',
+    role: 'owner',
+    tutorial_completed: 1,
+  };
+}
+
+function buildUseTickets(overrides: Partial<Record<string, unknown>> = {}) {
+  const currentUser = makeCurrentUser();
+
+  return {
+    activeProjectId: 'project-1',
+    activeTicket: null,
+    activeView: 'board',
+    addComment: vi.fn(),
+    updateComment: vi.fn(),
+    deleteComment: vi.fn(),
+    comments: [],
+    createDomain: vi.fn(),
+    createProject: vi.fn(),
+    createTicket: vi.fn(),
+    currentUser,
+    cycles: [],
+    deleteTicket: vi.fn(),
+    domains: [],
+    fetchInitialData: vi.fn(),
+    filters: {
+      search: '',
+      priority: '',
+      status: '',
+      projectId: '',
+      domainId: '',
+      cycleId: '',
+      assigneeId: '',
+    },
+    loading: false,
+    projects: [
+      {
+        id: 'project-1',
+        name: 'Gravity Core',
+        key: 'GRA',
+        description: 'Primary project',
+        status: 'active',
+        workspaceId: 'workspace-1',
+      },
+    ],
+    setActiveProjectId: vi.fn(),
+    setActiveTicket: vi.fn(),
+    setCurrentUser: vi.fn(),
+    setFilters: vi.fn(),
+    setTheme: vi.fn(),
+    setView: vi.fn(),
+    signOut: vi.fn(),
+    theme: 'dark',
+    tickets: [],
+    updateTicket: vi.fn(),
+    users: [currentUser],
+    ...overrides,
+  };
+}
+
+function buildWorkspaceDirectory(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    workspaces: [
+      {
+        id: 'workspace-1',
+        name: 'Gravity',
+        description: 'Main workspace',
+        key: 'GRA',
+        defaultProjectId: 'project-1',
+        hostUrl: 'http://localhost:8080',
+        joinMode: 'approval_required',
+        projectCount: 1,
+        memberCount: 1,
+        pendingJoinRequestCount: 0,
+        memberRole: 'owner',
+      },
+    ],
+    loading: false,
+    resolvedUserId: 'user-1',
+    pendingAction: null,
+    error: null,
+    successMessage: null,
+    refreshWorkspaces: vi.fn(),
+    createWorkspace: vi.fn(),
+    requestJoinByInvite: vi.fn(),
+    validatePeerInvite: vi.fn(),
+    ...overrides,
+  };
+}
+
+function buildAccountSettings(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    settings: {
+      defaultView: 'board',
+      theme: 'light',
+      projectLayout: 'condensed',
+      aiProvider: 'openai',
+      apiKey: '',
+      ollamaEndpoint: 'http://localhost:11434',
+      ollamaModel: 'llama3',
+      agentIntegration: 'ollama',
+    },
+    settingsLoading: false,
+    saveLoading: false,
+    saveSuccess: false,
+    saveError: null,
+    testing: false,
+    testResult: null,
+    tutorialResult: null,
+    ollamaModels: ['llama3'],
+    ollamaModelsLoading: false,
+    updateSettings: vi.fn(),
+    saveSettings: vi.fn(),
+    testApiKey: vi.fn(),
+    resetTutorial: vi.fn(),
+    refreshOllamaModels: vi.fn(),
+    ...overrides,
+  };
+}
+
+function buildWorkspaceSettings(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    settings: {
+      hostUrl: 'http://localhost:8080',
+      joinMode: 'approval_required',
+      workspaceKey: 'ACCESS',
+    },
+    settingsLoading: false,
+    saveLoading: false,
+    saveSuccess: false,
+    saveError: null,
+    members: [],
+    invites: [],
+    invitesLoading: false,
+    joinRequests: [],
+    inviteLoading: false,
+    inviteError: null,
+    federationConnections: [],
+    connectionsLoading: false,
+    connectionsError: null,
+    retryingConnectionId: null,
+    approveLoadingId: null,
+    revokeLoadingId: null,
+    updateSettings: vi.fn(),
+    saveSettings: vi.fn(),
+    createInvite: vi.fn(),
+    revokeInvite: vi.fn(),
+    approveJoinRequest: vi.fn(),
+    retryFederationConnection: vi.fn(),
+    deleteWorkspace: vi.fn(),
+    deleteLoading: false,
+    deleteError: null,
+    clearDeleteError: vi.fn(),
+    updateMemberActivity: vi.fn(),
+    ...overrides,
+  };
+}
+
+function renderAppShell() {
+  mocks.useTickets.mockReturnValue(buildUseTickets());
+  mocks.useWorkspaceDirectory.mockReturnValue(buildWorkspaceDirectory());
+  mocks.useAccountSettings.mockReturnValue(buildAccountSettings());
+  mocks.useWorkspaceSettings.mockReturnValue(buildWorkspaceSettings());
+
+  return render(
+    <ThemeProvider>
+      <AppShellPage />
+    </ThemeProvider>
+  );
+}
+
+describe('AppShellPage theme integration', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.localStorage.clear();
+    window.localStorage.setItem('gravity_theme', 'dark');
+    document.documentElement.className = '';
+    document.documentElement.removeAttribute('data-theme');
+    document.documentElement.removeAttribute('data-density');
+    document.documentElement.style.cssText = '';
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        json: async () => ({ success: true, lastActiveAt: '2026-05-25T12:00:00.000Z' }),
+      })
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('applies account theme settings to root tokens, density, and storage', async () => {
+    renderAppShell();
+
+    await waitFor(() => {
+      expect(document.documentElement).toHaveAttribute('data-theme', 'light');
+      expect(document.documentElement).toHaveAttribute('data-density', 'compact');
+      expect(document.documentElement.style.getPropertyValue('--color-surface-elevated')).toBe('rgba(255, 255, 255, 0.92)');
+      expect(document.documentElement.style.getPropertyValue('--color-overlay-scrim')).toBe('rgba(9, 9, 11, 0.7)');
+      expect(document.documentElement.style.getPropertyValue('--space-base-multiplier')).toBe('0.75');
+      expect(window.localStorage.getItem('gravity_theme')).toBe('light');
+    });
+  });
+});

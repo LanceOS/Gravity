@@ -1,6 +1,4 @@
 import React from 'react';
-import { Eye, EyeOff, Search, Calendar, Clock, Star, Upload, User, ChevronDown, Check } from 'lucide-react';
-import { ClickAwayListener } from '../../utilities';
 import { cn } from '../../utilities';
 
 export interface SwitchProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -21,17 +19,17 @@ export function Switch({ label, checked, onCheckedChange, style, className = '',
         aria-checked={checked}
         aria-label={label}
         onClick={() => onCheckedChange(!checked)}
-        className={cn('clickable', className)}
+        className={cn('clickable lib-focus-ring', className)}
         style={{
           width: '36px',
           height: '20px',
           borderRadius: 'var(--radius-full)',
-          backgroundColor: checked ? 'var(--color-primary)' : 'var(--color-border-default)',
-          border: '1px solid var(--color-border-default)',
+          backgroundColor: checked ? 'var(--color-primary)' : 'var(--color-surface-disabled)',
+          border: `1px solid ${checked ? 'var(--color-primary)' : 'var(--color-border-default)'}`,
           position: 'relative',
           padding: 0,
           cursor: 'pointer',
-          transition: 'background-color var(--transition-normal)',
+          transition: 'background-color var(--transition-normal), border-color var(--transition-normal)',
         }}
         {...props}
       >
@@ -41,7 +39,7 @@ export function Switch({ label, checked, onCheckedChange, style, className = '',
             width: '14px',
             height: '14px',
             borderRadius: '50%',
-            backgroundColor: '#ffffff',
+            backgroundColor: 'var(--color-surface-overlay)',
             boxShadow: 'var(--shadow-sm)',
             position: 'absolute',
             top: '2px',

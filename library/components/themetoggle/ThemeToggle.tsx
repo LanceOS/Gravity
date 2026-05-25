@@ -1,41 +1,16 @@
 import React from 'react';
 import { Sun, Moon, Laptop } from 'lucide-react';
-import { applyThemeConfig } from '../../utilities/themeEngine';
-import lightTheme from '../../themes/light.json';
-import darkTheme from '../../themes/dark.json';
+import { applyThemePreference, getStoredThemePreference, THEME_STORAGE_KEY } from '../../utilities/themeEngine';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 
 export function ThemeToggle() {
   const [theme, setTheme] = React.useState<ThemeMode>(() => {
-    if (typeof window !== 'undefined') {
-      return (window.localStorage.getItem('gravity_theme') as ThemeMode) || 'system';
-    }
-    return 'system';
+    return getStoredThemePreference();
   });
 
   const applyTheme = (targetTheme: ThemeMode) => {
-    const root = document.documentElement;
-    root.classList.remove('dark-theme', 'light-theme');
-    root.removeAttribute('data-theme');
-
-    let resolvedTheme: 'dark' | 'light' = 'light';
-    if (targetTheme === 'system') {
-      const systemIsDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      resolvedTheme = systemIsDark ? 'dark' : 'light';
-    } else {
-      resolvedTheme = targetTheme;
-    }
-
-    if (resolvedTheme === 'dark') {
-      root.classList.add('dark-theme');
-      root.setAttribute('data-theme', 'dark');
-      applyThemeConfig(darkTheme);
-    } else {
-      root.classList.add('light-theme');
-      root.setAttribute('data-theme', 'light');
-      applyThemeConfig(lightTheme);
-    }
+    applyThemePreference(targetTheme, { persist: false });
   };
 
   React.useEffect(() => {
@@ -55,7 +30,7 @@ export function ThemeToggle() {
     const nextIndex = (currentIndex + 1) % modes.length;
     const nextTheme = modes[nextIndex];
     setTheme(nextTheme);
-    window.localStorage.setItem('gravity_theme', nextTheme);
+    window.localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
   };
 
   return (

@@ -1,27 +1,32 @@
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { GitMerge, GitPullRequest, Paperclip } from 'lucide-react';
 import type { TicketRowProps } from '../types';
 
 function TicketRowImpl({ ticket, onClick, priorityIcon, assigneeAvatar, domainTag }: TicketRowProps) {
+  const [isHovered, setIsHovered] = useState(false);
+
   return (
     <div
       onClick={onClick}
       className="clickable"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       style={{
         display: 'flex',
         alignItems: 'center',
         gap: '12px',
         padding: '10px 16px',
-        background: 'var(--card-bg)',
-        border: '1px solid var(--border)',
+        background: isHovered ? 'var(--color-surface-overlay)' : 'var(--color-surface-card)',
+        border: '1px solid',
+        borderColor: isHovered ? 'var(--color-border-focus)' : 'var(--color-border-default)',
         borderRadius: '6px',
-        transition: 'background 0.15s ease, border-color 0.15s ease',
+        transition: 'all 0.15s ease',
         cursor: 'pointer',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>{priorityIcon}</div>
 
-      <span style={{ fontFamily: 'var(--mono)', fontSize: '12px', color: 'var(--text-muted)', width: '60px', flexShrink: 0 }}>
+      <span style={{ fontFamily: 'var(--mono)', fontSize: '12px', color: 'var(--color-text-disabled)', width: '60px', flexShrink: 0 }}>
         {ticket.key}
       </span>
 
@@ -29,7 +34,7 @@ function TicketRowImpl({ ticket, onClick, priorityIcon, assigneeAvatar, domainTa
         style={{
           fontSize: '13px',
           fontWeight: 500,
-          color: 'var(--text-heading)',
+          color: 'var(--color-text-primary)',
           flex: 1,
           whiteSpace: 'nowrap',
           overflow: 'hidden',
@@ -73,8 +78,8 @@ function TicketRowImpl({ ticket, onClick, priorityIcon, assigneeAvatar, domainTa
             alignItems: 'center',
             gap: '2px',
             fontSize: '11px',
-            color: 'var(--text-muted)',
-            background: 'var(--sidebar-bg)',
+            color: 'var(--color-text-disabled)',
+            background: 'var(--color-base50)',
             padding: '2px 6px',
             borderRadius: '4px',
             flexShrink: 0,
@@ -85,15 +90,15 @@ function TicketRowImpl({ ticket, onClick, priorityIcon, assigneeAvatar, domainTa
         </span>
       ) : null}
 
-      <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'var(--sidebar-bg)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
+      <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'var(--color-base50)', border: '1px solid var(--color-border-default)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
         {assigneeAvatar ? (
           <img src={assigneeAvatar} alt="" style={{ width: '100%', height: '100%' }} />
         ) : (
-          <span style={{ fontSize: '9px', color: 'var(--text-muted)', fontWeight: 500 }}>--</span>
+          <span style={{ fontSize: '9px', color: 'var(--color-text-disabled)', fontWeight: 500 }}>--</span>
         )}
       </div>
 
-      <span style={{ fontSize: '11px', color: 'var(--text-muted)', width: '70px', textAlign: 'right', flexShrink: 0 }}>
+      <span style={{ fontSize: '11px', color: 'var(--color-text-disabled)', width: '70px', textAlign: 'right', flexShrink: 0 }}>
         {new Date(ticket.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
       </span>
     </div>

@@ -39,8 +39,8 @@ export const EmptyWorkspaceScreen: React.FC<EmptyWorkspaceScreenProps> = ({
         alignItems: 'center',
         justifyContent: 'center',
         padding: '32px',
-        background: 'var(--bg)',
-        color: 'var(--text)',
+        background: 'var(--color-surface-app)',
+        color: 'var(--color-text-secondary)',
       }}
     >
       <div
@@ -55,9 +55,9 @@ export const EmptyWorkspaceScreen: React.FC<EmptyWorkspaceScreenProps> = ({
         <section
           style={{
             padding: '36px',
-            border: '1px solid var(--border)',
+            border: '1px solid var(--color-border-default)',
             borderRadius: '8px',
-            background: 'var(--card-bg)',
+            background: 'var(--color-surface-card)',
             display: 'flex',
             flexDirection: 'column',
             gap: '20px',
@@ -71,18 +71,18 @@ export const EmptyWorkspaceScreen: React.FC<EmptyWorkspaceScreenProps> = ({
                 borderRadius: '8px',
                 display: 'grid',
                 placeItems: 'center',
-                background: 'var(--accent-glow)',
-                border: '1px solid var(--accent-border)',
+                background: 'var(--color-state-selected-bg)',
+                border: '1px solid var(--color-border-focus)',
               }}
             >
-              <Sparkles size={24} color="var(--accent)" />
+              <Sparkles size={24} color="var(--color-primary)" />
             </div>
 
             <div>
-              <h1 style={{ fontSize: '30px', lineHeight: 1.1, color: 'var(--text-heading)' }}>
+              <h1 style={{ fontSize: '30px', lineHeight: 1.1, color: 'var(--color-text-primary)' }}>
                 Welcome, {currentUser.name}
               </h1>
-              <p style={{ marginTop: '6px', color: 'var(--text-muted)', fontSize: '14px' }}>
+              <p style={{ marginTop: '6px', color: 'var(--color-text-disabled)', fontSize: '14px' }}>
                 Your workspace is empty. Create your first project or join an existing one by invite.
               </p>
             </div>
@@ -90,15 +90,15 @@ export const EmptyWorkspaceScreen: React.FC<EmptyWorkspaceScreenProps> = ({
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '12px' }}>
             <div style={infoCardStyle}>
-              <FolderPlus size={18} color="var(--accent)" />
+              <FolderPlus size={18} color="var(--color-primary)" />
               <span>Create the first project space</span>
             </div>
             <div style={infoCardStyle}>
-              <Users size={18} color="var(--accent)" />
+              <Users size={18} color="var(--color-primary)" />
               <span>Join teammates by invite code</span>
             </div>
             <div style={infoCardStyle}>
-              <Ticket size={18} color="var(--accent)" />
+              <Ticket size={18} color="var(--color-primary)" />
               <span>Add tickets after the project exists</span>
             </div>
           </div>
@@ -188,27 +188,27 @@ export const EmptyWorkspaceScreen: React.FC<EmptyWorkspaceScreenProps> = ({
 const infoCardStyle: React.CSSProperties = {
   padding: '14px',
   borderRadius: '8px',
-  border: '1px solid var(--border)',
-  background: 'var(--sidebar-bg)',
+  border: '1px solid var(--color-border-default)',
+  background: 'var(--color-base50)',
   display: 'flex',
   flexDirection: 'column',
   gap: '10px',
   fontSize: '13px',
-  color: 'var(--text-heading)',
+  color: 'var(--color-text-primary)',
 };
 
 const panelStyle: React.CSSProperties = {
   padding: '24px',
   borderRadius: '8px',
-  border: '1px solid var(--border)',
-  background: 'var(--card-bg)',
+  border: '1px solid var(--color-border-default)',
+  background: 'var(--color-surface-card)',
   display: 'grid',
   gap: '14px',
 };
 
 const panelTitleStyle: React.CSSProperties = {
   fontSize: '18px',
-  color: 'var(--text-heading)',
+  color: 'var(--color-text-primary)',
 };
 
 const fieldStyle: React.CSSProperties = {
