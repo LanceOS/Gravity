@@ -61,7 +61,6 @@ To invite peers, the owner generates an invitation. This creates a secure, uniqu
 *   **Payload**:
     ```json
     {
-      "createdBy": "owner-user-uuid",
       "label": "Engineering Team Invitation"
     }
     ```
