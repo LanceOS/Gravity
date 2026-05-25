@@ -77,8 +77,7 @@ export function AppShellPage() {
       setTimeout(() => {
         setIsOllamaOpen(false);
         setIsOllamaClosing(false);
-      }, 250); // Matches CSS transition duration roughly
-    } else {
+      }, 300); // Matches AIChatWindow animation duration (0.3s)
       setIsOllamaOpen(true);
     }
   };
