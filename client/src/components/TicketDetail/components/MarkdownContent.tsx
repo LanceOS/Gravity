@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import type { MarkdownTextProps } from '../types';
 import { useTickets } from '../../../context/TicketContext';
 import { useTicketByKey } from '../../../hooks/useTicketByKey';
