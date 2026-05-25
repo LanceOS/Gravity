@@ -3,7 +3,7 @@ export type AgentIntegration = 'ollama' | 'third_party';
 
 export interface WorkspaceSettings {
   defaultView: 'board' | 'list';
-  theme: 'dark' | 'light' | 'coal-black' | 'coffee';
+  theme: 'dark' | 'light' | 'coal-black' | 'coffee' | 'marble-blue';
   ollamaModel: string;
   ollamaEndpoint: string;
   projectLayout: 'standard' | 'condensed';
@@ -66,10 +66,10 @@ export const getProviderOption = (provider: AIProvider): ProviderOption =>
 export const normalizeWorkspaceSettings = (
   raw: Partial<WorkspaceSettings> | null | undefined,
   activeView: 'board' | 'list',
-  theme: 'dark' | 'light' | 'coal-black' | 'coffee'
+  theme: 'dark' | 'light' | 'coal-black' | 'coffee' | 'marble-blue'
 ): WorkspaceSettings => ({
   defaultView: raw?.defaultView === 'list' || raw?.defaultView === 'board' ? raw.defaultView : activeView,
-  theme: raw?.theme === 'light' || raw?.theme === 'dark' || raw?.theme === 'coal-black' || raw?.theme === 'coffee' ? raw.theme : theme,
+  theme: raw?.theme === 'light' || raw?.theme === 'dark' || raw?.theme === 'coal-black' || raw?.theme === 'coffee' || raw?.theme === 'marble-blue' ? raw.theme : theme,
   ollamaModel: typeof raw?.ollamaModel === 'string' ? raw.ollamaModel : DEFAULT_WORKSPACE_SETTINGS.ollamaModel,
   ollamaEndpoint:
     typeof raw?.ollamaEndpoint === 'string' && raw.ollamaEndpoint.trim().length > 0
