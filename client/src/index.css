@@ -507,14 +507,3 @@ button.tool-submit-active {
     grid-template-columns: 1fr;
   }
 }
-
-@keyframes fadeInSlideUp {
-  from {
-    opacity: 0;
-    transform: translate(-50%, 4px);
-  }
-  to {
-    opacity: 1;
-    transform: translate(-50%, 0);
-  }
-}
