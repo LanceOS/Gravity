@@ -107,7 +107,7 @@ type MarkdownMatch =
  * @returns {JSX.Element} A React fragment containing the parsed and formatted text nodes.
  */
 function FormattedText({ text }: MarkdownTextProps) {
-  const { tickets, projects, setActiveTicket, setActiveProjectId } = useTickets();
+  const { projects } = useTickets();
   const parts: React.ReactNode[] = [];
   let remaining = text;
   let keyIndex = 0;
