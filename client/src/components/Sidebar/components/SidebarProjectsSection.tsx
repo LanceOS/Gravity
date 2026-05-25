@@ -25,13 +25,24 @@ export function SidebarProjectsSection({
     <div style={{ marginTop: '4px' }}>
       <SidebarGroup
         label={
-          <div
+          <button
+            type="button"
             onClick={onToggleProjectsCollapsed}
-            style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}
+            aria-expanded={!projectsCollapsed}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              cursor: 'pointer',
+              background: 'none',
+              border: 'none',
+              padding: 0,
+              width: '100%',
+              textAlign: 'left',
+            }}
           >
             {projectsCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
             <span style={{ marginLeft: '4px' }}>Projects</span>
-          </div>
+          </button>
         }
       >
         {!projectsCollapsed && (
