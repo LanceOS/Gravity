@@ -79,6 +79,19 @@ export class TicketTools {
   }
 
   /**
+   * @description Loads fully resolved ticket details (status, priority, assignee, project, domain, cycle)
+   * after confirming the ticket belongs to the authorized workspace.
+   * @param args Tool arguments containing the ticket key.
+   * @param context Trusted tool execution context.
+   * @return The fully resolved ticket details payload.
+   * @throws When the ticket does not exist or belongs to another workspace.
+   */
+  async readTicketDetails(args: Record<string, unknown>, context: ToolExecutionContext) {
+    // Both call getTicketDetailsByKey under the hood, which has been enhanced to resolve all required nested objects.
+    return this.getTicketDetails(args, context);
+  }
+
+  /**
    * @description Creates a ticket inside a project already verified to belong
    * to the authorized workspace.
    * @param args Tool arguments for the new ticket.

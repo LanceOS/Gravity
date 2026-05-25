@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import { db } from '../db/index.js';
-import { authUsers, comments, tickets, userProfiles } from '../db/schema.js';
+import { authUsers, comments, tickets, userProfiles, projects, domains, cycles } from '../db/schema.js';
 import { createId, getProjectByKeyPrefix, nextTicketKey, normalizeIsoDate } from '../lib/platform.js';
 
 type TicketRecord = typeof tickets.$inferSelect;
@@ -48,6 +48,7 @@ function mapTicket(record: TicketRecord) {
     domainId: record.domainId,
     cycleId: record.cycleId,
     parentId: record.parentId,
+    isSubtask: record.parentId !== null,
     prStatus: record.prStatus,
     prUrl: record.prUrl,
     createdAt: normalizeIsoDate(record.createdAt),
@@ -134,10 +135,91 @@ export async function getTicketDetails(ticketId: string, projectId?: string) {
     db.select().from(tickets).where(eq(tickets.parentId, ticket.id)),
   ]);
 
+  // Fetch assignee details if assigneeId is set
+  let assignee = null;
+  if (ticket.assigneeId) {
+    const [userRow] = await db
+      .select({
+        id: authUsers.id,
+        name: authUsers.name,
+        email: authUsers.email,
+        avatarUrl: userProfiles.avatarUrl,
+        image: authUsers.image,
+      })
+      .from(authUsers)
+      .leftJoin(userProfiles, eq(userProfiles.userId, authUsers.id))
+      .where(eq(authUsers.id, ticket.assigneeId))
+      .limit(1);
+
+    if (userRow) {
+      assignee = {
+        id: userRow.id,
+        name: userRow.name,
+        email: userRow.email,
+        avatarUrl: userRow.avatarUrl ?? userRow.image ?? '',
+      };
+    }
+  }
+
+  // Fetch project details
+  const [projectRow] = await db
+    .select()
+    .from(projects)
+    .where(eq(projects.id, ticket.projectId))
+    .limit(1);
+  const project = projectRow
+    ? {
+        id: projectRow.id,
+        name: projectRow.name,
+        key: projectRow.key,
+        description: projectRow.description,
+      }
+    : null;
+
+  // Fetch domain details if domainId is set
+  let domain = null;
+  if (ticket.domainId) {
+    const [domainRow] = await db
+      .select()
+      .from(domains)
+      .where(eq(domains.id, ticket.domainId))
+      .limit(1);
+    if (domainRow) {
+      domain = {
+        id: domainRow.id,
+        name: domainRow.name,
+        color: domainRow.color,
+      };
+    }
+  }
+
+  // Fetch cycle details if cycleId is set
+  let cycle = null;
+  if (ticket.cycleId) {
+    const [cycleRow] = await db
+      .select()
+      .from(cycles)
+      .where(eq(cycles.id, ticket.cycleId))
+      .limit(1);
+    if (cycleRow) {
+      cycle = {
+        id: cycleRow.id,
+        name: cycleRow.name,
+        startDate: normalizeIsoDate(cycleRow.startDate),
+        endDate: normalizeIsoDate(cycleRow.endDate),
+        completed: cycleRow.completed ? 1 : 0,
+      };
+    }
+  }
+
   return {
     ...ticket,
     comments: ticketComments,
     subtasks: subtasks.map(mapTicket),
+    assignee,
+    project,
+    domain,
+    cycle,
   };
 }
 

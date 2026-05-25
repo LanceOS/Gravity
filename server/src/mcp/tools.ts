@@ -42,6 +42,15 @@ export const mcpToolsList: McpToolDefinition[] = [
     },
   },
   {
+    name: 'read_ticket_details',
+    description: 'Retrieve fully resolved details of a ticket including status, priority, assignee, project, domain, and cycle.',
+    inputSchema: {
+      type: 'object',
+      properties: { ticketKey: { type: 'string' } },
+      required: ['ticketKey'],
+    },
+  },
+  {
     name: 'create_ticket',
     description: 'Create a new ticket or sub-ticket in the workspace.',
     inputSchema: {
