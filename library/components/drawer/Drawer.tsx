@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, AlertCircle, Info, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { X } from 'lucide-react';
 import { Portal } from '../../utilities';
 import { FocusTrap } from '../../utilities';
 import { ClickAwayListener } from '../../utilities';
@@ -36,7 +36,7 @@ export function Drawer({ isOpen, onClose, title, children, style }: DrawerProps)
             right: 0,
             bottom: 0,
             left: 0,
-            backgroundColor: 'rgba(9, 9, 11, 0.5)',
+            backgroundColor: 'var(--color-overlay-scrim)',
             zIndex: 1500,
             display: 'flex',
             justifyContent: 'flex-end',
@@ -51,7 +51,7 @@ export function Drawer({ isOpen, onClose, title, children, style }: DrawerProps)
                 width: '100%',
                 maxWidth: '400px',
                 height: '100%',
-                backgroundColor: 'var(--color-surface-card)',
+                backgroundColor: 'var(--color-surface-overlay)',
                 borderLeft: '1px solid var(--color-border-default)',
                 boxShadow: 'var(--shadow-xl)',
                 display: 'flex',

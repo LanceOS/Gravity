@@ -80,6 +80,7 @@ export function AIChatWindow({
 
         {onClose && (
           <button
+            type="button"
             onClick={onClose}
             className="clickable"
             style={{
