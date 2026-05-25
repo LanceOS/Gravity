@@ -78,8 +78,10 @@ export function AppShellPage() {
         setIsOllamaOpen(false);
         setIsOllamaClosing(false);
       }, 300); // Matches AIChatWindow animation duration (0.3s)
-      setIsOllamaOpen(true);
+      return;
     }
+
+    setIsOllamaOpen(true);
   };
 
   const [createInitialStatus, setCreateInitialStatus] = useState<Ticket['status'] | undefined>(undefined);
