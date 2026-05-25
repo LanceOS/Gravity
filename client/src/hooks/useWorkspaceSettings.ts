@@ -73,7 +73,7 @@ function normalizeWorkspaceInvite(invite: Record<string, unknown>): WorkspaceInv
     label: String(invite.label ?? ''),
     expiresAt: invite.expiresAt ? String(invite.expiresAt) : null,
     revokedAt: invite.revokedAt ? String(invite.revokedAt) : null,
-    maxUses: invite.maxUses ? Number(invite.maxUses) : null,
+    maxUses: invite.maxUses === null || invite.maxUses === undefined ? null : Number(invite.maxUses),
     useCount: Number(invite.useCount ?? 0),
     createdAt: String(invite.createdAt ?? ''),
     createdByName: String(invite.createdByName ?? ''),
