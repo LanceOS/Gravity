@@ -58,8 +58,18 @@ export class McpRequestHandler {
           await assertMcpWorkspaceAccess(context);
         }
         const disabledTools = await getDisabledTools(context.workspaceId);
-        const activeTools = mcpToolsList.filter((tool) => !disabledTools.includes(tool.name));
-
+        const activeTools = mcpToolsList.filter((tool) => {
+          if (disabledTools.includes(tool.name)) {
+            return false;
+          }
+          if (tool.name === 'add_comment' && disabledTools.includes('create_comment')) {
+            return false;
+          }
+          if (tool.name === 'create_comment' && disabledTools.includes('add_comment')) {
+            return false;
+          }
+          return true;
+        });
         return {
           jsonrpc: '2.0',
           id: payload.id ?? null,
