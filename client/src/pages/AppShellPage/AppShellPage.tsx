@@ -68,6 +68,10 @@ export function AppShellPage() {
   const [isOllamaClosing, setIsOllamaClosing] = useState(false);
 
   const handleToggleOllama = () => {
+    if (isOllamaClosing) {
+      return;
+    }
+
     if (isOllamaOpen) {
       setIsOllamaClosing(true);
       setTimeout(() => {
