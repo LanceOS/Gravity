@@ -1,7 +1,4 @@
 import React from 'react';
-import { ChevronRight } from 'lucide-react';
-import { Portal } from '../../utilities';
-import { ClickAwayListener } from '../../utilities';
 import { cn } from '../../utilities';
 
 export interface LinkProps extends React.AnchorHTMLAttributes<HTMLAnchorElement> {

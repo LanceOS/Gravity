@@ -1,8 +1,6 @@
 import React from 'react';
-import { X, AlertCircle, Info, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { X } from 'lucide-react';
 import { Portal } from '../../utilities';
-import { FocusTrap } from '../../utilities';
-import { ClickAwayListener } from '../../utilities';
 
 export interface ToastItem {
   id: string;

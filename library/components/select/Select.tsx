@@ -1,5 +1,5 @@
 import React from 'react';
-import { Eye, EyeOff, Search, Calendar, Clock, Star, Upload, User, ChevronDown, Check } from 'lucide-react';
+import { ChevronDown, Check } from 'lucide-react';
 import { ClickAwayListener } from '../../utilities';
 import { cn } from '../../utilities';
 
@@ -60,16 +60,6 @@ function createSelectChangeEvent(nextValue: string) {
     currentTarget: { value: nextValue },
   } as React.ChangeEvent<HTMLSelectElement>;
 }
-
-export interface SelectProps extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>, 'onChange'> {
-  label?: string;
-  error?: string;
-  options: readonly SelectOption[];
-  placeholder?: string;
-  onValueChange?: (value: string) => void;
-  onChange?: React.ChangeEventHandler<HTMLSelectElement>;
-}
-
 
 export interface SelectProps extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>, 'onChange'> {
   label?: string;

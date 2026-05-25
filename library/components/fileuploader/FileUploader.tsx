@@ -1,6 +1,5 @@
 import React from 'react';
-import { Eye, EyeOff, Search, Calendar, Clock, Star, Upload, User, ChevronDown, Check } from 'lucide-react';
-import { ClickAwayListener } from '../../utilities';
+import { Upload } from 'lucide-react';
 
 export interface FileUploaderProps {
   onFileSelect: (files: FileList) => void;
