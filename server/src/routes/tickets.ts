@@ -11,7 +11,6 @@ import {
   getTicketById,
   deleteTicketRecord,
   getTicketDetails,
-  getTicketDetailsByKey,
   listComments,
   listTickets,
   updateTicketRecord,
