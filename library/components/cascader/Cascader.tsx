@@ -76,6 +76,9 @@ export function Cascader({ options, value, onChange, placeholder = 'Select path'
                   overflowY: 'auto',
                   padding: '4px',
                   minWidth: '120px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '2px',
                 }}
               >
                 {col.map((opt) => (

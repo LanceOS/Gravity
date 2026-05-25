@@ -337,6 +337,7 @@
   animation: lib-fade-in var(--transition-fast);
   display: flex;
   flex-direction: column;
+  gap: 2px;
 }
 
 .select-option {

@@ -96,6 +96,9 @@ export function TreeSelect({ nodes, value, onChange, placeholder = 'Select node'
               maxHeight: '200px',
               overflowY: 'auto',
               padding: '6px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '2px',
             }}
           >
             {nodes.map((node) => renderNode(node))}
