@@ -4,7 +4,7 @@ import { SidebarProjectsSection, SidebarUserMenu } from './components';
 import type { SidebarProps } from './types';
 import { useSidebarState } from './utils';
 
-export function Sidebar({ workspace, projects, tools, userMenu }: SidebarProps) {
+export function Sidebar({ projects, tools, userMenu }: SidebarProps) {
   const sidebarState = useSidebarState(projects.activeProjectId, projects.onSelectProject);
 
   return (
