@@ -1,6 +1,5 @@
 import React from 'react';
-import { Eye, EyeOff, Search, Calendar, Clock, Star, Upload, User, ChevronDown, Check } from 'lucide-react';
-import { ClickAwayListener } from '../../utilities';
+import { cn } from '../../utilities';
 
 export interface DenseTextInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -9,7 +8,9 @@ export interface DenseTextInputProps extends React.InputHTMLAttributes<HTMLInput
 
 export const DenseTextInput = React.forwardRef<HTMLInputElement, DenseTextInputProps>(
   ({ label, error, style, className, id, ...props }, ref) => {
-    const inputId = id || `dense-input-${Math.random().toString(36).substr(2, 9)}`;
+    const generatedId = React.useId();
+    const inputId = id || generatedId;
+    const errorId = `${inputId}-error`;
 
     return (
       <div
@@ -23,77 +24,23 @@ export const DenseTextInput = React.forwardRef<HTMLInputElement, DenseTextInputP
         }}
       >
         {label && (
-          <label
-            htmlFor={inputId}
-            style={{
-              fontSize: '10px',
-              fontWeight: 600,
-              color: 'var(--color-text-disabled)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.03em',
-              userSelect: 'none'
-            }}
-          >
+          <label htmlFor={inputId} className="label label--dense">
             {label}
           </label>
         )}
-        <div style={{ position: 'relative' }}>
-          <input
-            id={inputId}
-            ref={ref}
-            style={{
-              width: '100%',
-              height: '36px',
-              backgroundColor: 'var(--color-surface-card)',
-              border: `1px solid ${error ? 'var(--color-text-primary)' : 'var(--color-border-default)'}`,
-              borderRadius: 'var(--radius-xs)',
-              paddingTop: 'var(--input-padding-y, 2px)',
-              paddingBottom: 'var(--input-padding-y, 2px)',
-              paddingLeft: 'var(--space-2, 8px)',
-              paddingRight: 'var(--space-2, 8px)',
-              fontFamily: 'var(--sans)',
-              fontSize: '12px',
-              color: 'var(--color-text-primary)',
-              outline: 'none',
-              transition: 'border-color var(--transition-fast, 0.1s ease), box-shadow var(--transition-fast, 0.1s ease)'
-            }}
-            className="dense-input-element"
-            {...props}
-          />
-        </div>
+        <input
+          id={inputId}
+          ref={ref}
+          className={cn('input input--dense', error ? 'input--error' : undefined)}
+          aria-invalid={error ? 'true' : undefined}
+          aria-errormessage={error ? errorId : undefined}
+          {...props}
+        />
         {error && (
-          <span
-            style={{
-              fontSize: '10px',
-              color: 'var(--color-text-primary)',
-              fontWeight: 500
-            }}
-          >
+          <span id={errorId} className="lib-field-error-msg lib-field-error-msg--dense" role="alert">
             {error}
           </span>
         )}
-
-        {/* Dynamic focus and validation stylings loaded securely at compile-time */}
-        <style dangerouslySetInnerHTML={{
-          __html: `
-          .dense-input-element:focus {
-            border-color: var(--color-primary) !important;
-            box-shadow: 0 0 0 2px var(--color-state-selected-bg) !important;
-          }
-          .dense-input-element:disabled {
-            background-color: var(--color-base50) !important;
-            color: var(--color-text-disabled) !important;
-            cursor: not-allowed;
-            opacity: 0.6;
-          }
-          .dense-input-element:-webkit-autofill,
-          .dense-input-element:-webkit-autofill:hover, 
-          .dense-input-element:-webkit-autofill:focus {
-            -webkit-text-fill-color: var(--color-text-primary) !important;
-            -webkit-box-shadow: 0 0 0px 1000px var(--color-surface-card) inset !important;
-            transition: background-color 5000s ease-in-out 0s;
-          }
-        `}} />
       </div>
     );
   }

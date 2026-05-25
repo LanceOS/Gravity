@@ -41,16 +41,12 @@ export function PinInput({ length = 4, value, onChange, label }: PinInputProps) 
               inputsRef.current[i] = el;
             }}
             type="text"
-            className="input"
+            className="input input--pin"
             value={value[i] || ''}
             onChange={(e) => handleChange(e.target.value, i)}
             onKeyDown={(e) => handleKeyDown(e, i)}
             style={{
-              width: '40px',
               height: '40px',
-              textAlign: 'center',
-              fontSize: '16px',
-              fontWeight: 600,
             }}
           />
         ))}
