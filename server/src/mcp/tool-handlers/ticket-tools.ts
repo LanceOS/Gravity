@@ -15,6 +15,15 @@ import {
 } from '../../services/tickets.js';
 import { ToolExecutionContext } from './types.js';
 
+function parseDateArg(value: unknown, fieldName: string): Date | undefined {
+  if (typeof value !== 'string') return undefined;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) {
+    throw new Error(`Invalid date format provided for ${fieldName}: ${value}`);
+  }
+  return d;
+}
+
 /**
  * @description Ticket-focused MCP handlers. Each method re-checks that the
  * target project or ticket belongs to the caller's trusted workspace before
@@ -113,8 +122,8 @@ export class TicketTools {
       cycleId: typeof args.cycleId === 'string' ? args.cycleId : null,
       assigneeId: typeof args.assigneeId === 'string' ? args.assigneeId : null,
       parentId: typeof args.parentId === 'string' ? args.parentId : null,
-      createdAt: typeof args.createdAt === 'string' ? new Date(args.createdAt) : undefined,
-      updatedAt: typeof args.updatedAt === 'string' ? new Date(args.updatedAt) : undefined,
+      createdAt: parseDateArg(args.createdAt, 'createdAt'),
+      updatedAt: parseDateArg(args.updatedAt, 'updatedAt'),
     });
 
     return { ticket };
@@ -137,6 +146,9 @@ export class TicketTools {
 
     await this.assertProjectInWorkspace(ticket.projectId, context.workspaceId);
 
+    const createdAt = parseDateArg(args.createdAt, 'createdAt');
+    const updatedAt = parseDateArg(args.updatedAt, 'updatedAt');
+
     const updated = await updateTicketRecord(
       ticket.id,
       {
@@ -150,8 +162,8 @@ export class TicketTools {
         ...(typeof args.parentId === 'string' ? { parentId: args.parentId } : {}),
         ...(typeof args.prStatus === 'string' ? { prStatus: args.prStatus } : {}),
         ...(typeof args.prUrl === 'string' ? { prUrl: args.prUrl } : {}),
-        ...(typeof args.createdAt === 'string' ? { createdAt: new Date(args.createdAt) } : {}),
-        ...(typeof args.updatedAt === 'string' ? { updatedAt: new Date(args.updatedAt) } : {}),
+        ...(createdAt ? { createdAt } : {}),
+        ...(updatedAt ? { updatedAt } : {}),
       },
       ticket.projectId,
     );
@@ -181,7 +193,7 @@ export class TicketTools {
       throw new Error('body is required to add a comment.');
     }
 
-    const createdAt = typeof args.createdAt === 'string' ? new Date(args.createdAt) : undefined;
+    const createdAt = parseDateArg(args.createdAt, 'createdAt');
     const comment = await addCommentRecord(ticket.id, userId, body, createdAt);
     return { comment };
   }
