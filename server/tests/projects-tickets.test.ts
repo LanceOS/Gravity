@@ -253,8 +253,8 @@ describe('projects and tickets routes', () => {
     expect(deleteResponse.body).toEqual({ success: true });
   });
 
-  it('resolves a ticket details by its key prefix/key', async () => {
-    const { project } = await seedWorkspaceFixture();
+  it('resolves a ticket details by its key prefix/key and validates access', async () => {
+    const { owner, workspace, project } = await seedWorkspaceFixture();
     const ticket = await seedTicket(project.id, {
       id: 'ticket-99',
       title: 'Auto-link test ticket',
@@ -264,7 +264,10 @@ describe('projects and tickets routes', () => {
 
     expect(ticket.key).toBeDefined();
 
-    const response = await api().get(`/api/v1/tickets/key/${ticket.key}`);
+    // 1. Authorized request with X-User-Id header (user is workspace member)
+    const response = await api()
+      .get(`/api/v1/tickets/key/${ticket.key}`)
+      .set('x-user-id', owner.id);
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({
       id: ticket.id,
@@ -272,7 +275,46 @@ describe('projects and tickets routes', () => {
       title: 'Auto-link test ticket',
     });
 
-    const notFoundResponse = await api().get('/api/v1/tickets/key/NONEXIST-999');
+    // 2. Unauthorized request with X-User-Id header (user is not workspace member)
+    const otherUser = await seedUser({
+      id: 'user-unauthorized',
+      name: 'Non Member',
+      email: 'nonmember@example.com',
+      role: 'developer',
+      avatarUrl: 'https://example.com/nonmember.png',
+    });
+    const unauthorizedResponse = await api()
+      .get(`/api/v1/tickets/key/${ticket.key}`)
+      .set('x-user-id', otherUser.id);
+    expect(unauthorizedResponse.status).toBe(403);
+
+    // 3. Authorized request using guest workspace access key
+    const validation = await seedValidationAccess({
+      workspaceId: workspace.id,
+      guestUserId: otherUser.id,
+      email: otherUser.email,
+      workspacePrivateKey: 'sec_wsp_auto_link_key',
+    });
+    const guestResponse = await api()
+      .get(`/api/v1/tickets/key/${ticket.key}`)
+      .set('x-workspace-key', validation.workspacePrivateKey);
+    expect(guestResponse.status).toBe(200);
+    expect(guestResponse.body).toMatchObject({
+      id: ticket.id,
+      key: ticket.key,
+      title: 'Auto-link test ticket',
+    });
+
+    // 4. Unauthorized request using an invalid workspace access key
+    const badGuestResponse = await api()
+      .get(`/api/v1/tickets/key/${ticket.key}`)
+      .set('x-workspace-key', 'bad_private_key');
+    expect(badGuestResponse.status).toBe(401);
+
+    // 5. Non-existent ticket key resolves to 404
+    const notFoundResponse = await api()
+      .get('/api/v1/tickets/key/NONEXIST-999')
+      .set('x-user-id', owner.id);
     expect(notFoundResponse.status).toBe(404);
   });
 

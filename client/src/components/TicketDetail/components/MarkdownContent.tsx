@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import type { MarkdownTextProps } from '../types';
 import { useTickets } from '../../../context/TicketContext';
+import { useTicketByKey } from '../../../hooks/useTicketByKey';
 
 /**
  * @description A component that renders an interactive ticket link for a given ticket key.
@@ -12,68 +13,24 @@ import { useTickets } from '../../../context/TicketContext';
  */
 export function TicketLink({ ticketKey }: { ticketKey: string }) {
   const { tickets, setActiveTicket, setActiveProjectId } = useTickets();
-  const [ticketInfo, setTicketInfo] = useState<any | null>(null);
-  const [loading, setLoading] = useState(false);
-
   const normalizedKey = ticketKey.toUpperCase();
   const localTicket = tickets.find(t => t.key.toUpperCase() === normalizedKey);
-
-  useEffect(() => {
-    if (localTicket) {
-      setTicketInfo(localTicket);
-      return;
-    }
-
-    let active = true;
-    setLoading(true);
-    fetch(`/api/v1/tickets/key/${normalizedKey}`)
-      .then(res => {
-        if (res.ok) return res.json();
-        throw new Error('Not found');
-      })
-      .then(data => {
-        if (active) {
-          setTicketInfo(data);
-        }
-      })
-      .catch(() => {
-        if (active) setTicketInfo(null);
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [normalizedKey, localTicket]);
+  const { ticketInfo } = useTicketByKey(normalizedKey);
 
   /**
    * @description Handles the click event on the ticket link button. 
    * It prevents the default action and sets the active ticket and project in the global context.
    * @param {React.MouseEvent} e - The mouse event triggered by clicking the button.
-   * @returns {Promise<void>} A promise that resolves when the navigation is complete.
+   * @returns {void}
    */
-  const handleClick = async (e: React.MouseEvent) => {
+  const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
-    if (localTicket) {
-      setActiveTicket(localTicket);
-    } else {
-      if (ticketInfo) {
-        setActiveProjectId(ticketInfo.projectId);
-        setActiveTicket(ticketInfo);
-      } else {
-        try {
-          const res = await fetch(`/api/v1/tickets/key/${normalizedKey}`);
-          if (res.ok) {
-            const data = await res.json();
-            setActiveProjectId(data.projectId);
-            setActiveTicket(data);
-          }
-        } catch (err) {
-          console.error('Failed to navigate to ticket:', err);
-        }
+    const resolvedTicket = localTicket || ticketInfo;
+    if (resolvedTicket) {
+      if (resolvedTicket.projectId) {
+        setActiveProjectId(resolvedTicket.projectId);
       }
+      setActiveTicket(resolvedTicket);
     }
   };
 
@@ -155,13 +112,15 @@ function FormattedText({ text }: MarkdownTextProps) {
   let remaining = text;
   let keyIndex = 0;
 
-  // Dynamically generate the regex using the actual workspace project keys to be highly precise
-  const projectKeys = projects?.map(p => p.key).filter(Boolean) || [];
-  const projectKeysRegexPart = projectKeys.length > 0 
-    ? projectKeys.map(key => key.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')).join('|')
-    : '[A-Z0-9]+';
-  
-  const ticketRegex = new RegExp(`\\b(${projectKeysRegexPart})-\\d+\\b`, 'i');
+  // Memoize regex compilation to avoid recompilation on every render/line
+  const ticketRegex = useMemo(() => {
+    const projectKeys = projects?.map(p => p.key).filter(Boolean) || [];
+    const projectKeysRegexPart = projectKeys.length > 0 
+      ? projectKeys.map(key => key.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')).join('|')
+      : '[A-Z0-9]+';
+    
+    return new RegExp(`\\b(${projectKeysRegexPart})-\\d+\\b`, 'i');
+  }, [projects]);
 
   while (remaining.length > 0) {
     const boldMatch = remaining.match(/\*\*([^*]+)\*\*/);
@@ -212,10 +171,14 @@ function FormattedText({ text }: MarkdownTextProps) {
       const key = keyIndex;
       keyIndex += 1;
       parts.push(<a key={key} href={firstMatch.url} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none' }} className="clickable">{firstMatch.text}</a>);
-    } else {
+    } else if (firstMatch.type === 'ticket') {
       const key = keyIndex;
       keyIndex += 1;
       parts.push(<TicketLink key={key} ticketKey={firstMatch.text} />);
+    } else {
+      const key = keyIndex;
+      keyIndex += 1;
+      parts.push(<span key={key}>{firstMatch.text}</span>);
     }
 
     remaining = remaining.substring(firstMatch.index + firstMatch.length);
