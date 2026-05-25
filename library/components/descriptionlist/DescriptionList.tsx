@@ -1,6 +1,11 @@
 import React from 'react';
 import { User, ChevronLeft, ChevronRight, Folder, File, ChevronDown } from 'lucide-react';
 
+export interface DescriptionItem {
+  key: React.ReactNode;
+  value: React.ReactNode;
+}
+
 export interface DescriptionListProps {
   items: DescriptionItem[];
   style?: React.CSSProperties;

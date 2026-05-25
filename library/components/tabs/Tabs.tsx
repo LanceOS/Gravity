@@ -1,5 +1,11 @@
 import React from 'react';
 
+export interface TabItem {
+  id: string;
+  label: React.ReactNode;
+  content: React.ReactNode;
+}
+
 export interface TabsProps {
   items: TabItem[];
   defaultTab?: string;

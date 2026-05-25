@@ -1,5 +1,10 @@
 import React from 'react';
 
+export interface RadioOption {
+  label: string;
+  value: string;
+}
+
 export interface RadioGroupProps {
   label: string;
   name: string;

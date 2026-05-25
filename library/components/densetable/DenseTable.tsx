@@ -1,6 +1,14 @@
 import React from 'react';
 import { User, ChevronLeft, ChevronRight, Folder, File, ChevronDown } from 'lucide-react';
 
+export interface DenseColumnDefinition<T> {
+  key: string;
+  header: string;
+  width?: number | string;
+  align?: 'left' | 'center' | 'right';
+  render: (row: T) => React.ReactNode;
+}
+
 export interface DenseTableProps<T> {
   columns: DenseColumnDefinition<T>[];
   data: T[];

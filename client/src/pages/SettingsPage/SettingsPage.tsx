@@ -19,7 +19,6 @@ import type { User } from '../../context/TicketContext';
 import type { WorkspaceSummary } from '../../hooks/useWorkspaceDirectory';
 import type {
   CreateWorkspaceInviteInput,
-  FederationConnection,
   WorkspaceAdminSettings,
   WorkspaceInvite,
   WorkspaceJoinRequest,
@@ -37,10 +36,6 @@ interface SettingsPageProps {
   saveSuccess: boolean;
   saveError: string | null;
   inviteError: string | null;
-  federationConnections: FederationConnection[];
-  connectionsLoading: boolean;
-  connectionsError: string | null;
-  retryingConnectionId: string | null;
   invitesLoading: boolean;
   inviteLoading: boolean;
   invites: WorkspaceInvite[];
@@ -55,7 +50,6 @@ interface SettingsPageProps {
   onCreateInvite: (input: CreateWorkspaceInviteInput) => Promise<boolean>;
   onRevokeInvite: (inviteId: string) => Promise<boolean>;
   onApproveJoinRequest: (requestId: string) => Promise<boolean>;
-  onRetryConnection: (connectionId: string) => Promise<void>;
   deleteLoading?: boolean;
   deleteError?: string | null;
   onDeleteWorkspace?: () => Promise<void>;
@@ -67,14 +61,13 @@ const COPY_FEEDBACK_DURATION_MS = 2200;
 
 function getInviteStateLabel(invite: WorkspaceInvite) {
   if (invite.revokedAt) return 'Revoked';
-  if (invite.isUsed) return 'Validated';
-  return 'Pending';
+  if (invite.revokedAt) return 'Revoked';
+  return 'Active';
 }
 
 function getInviteStateVariant(invite: WorkspaceInvite): 'accent' | 'success' | 'error' | 'warning' | 'default' {
   if (invite.revokedAt) return 'error';
-  if (invite.isUsed) return 'success';
-  return 'accent';
+  return 'success';
 }
 
 const SETTINGS_CATEGORIES: Array<{
@@ -114,26 +107,6 @@ const SETTINGS_CATEGORIES: Array<{
     icon: UserPlus,
   },
 ];
-
-function formatConnectionTimestamp(value: string | null) {
-  return value ? new Date(value).toLocaleString() : 'Not yet recorded';
-}
-
-function getFederationConnectionStatus(connection: FederationConnection) {
-  if (connection.status === 'failed') {
-    return { label: 'Failed', variant: 'error' as const };
-  }
-
-  if (connection.syncState.consecutiveFailures > 0) {
-    return { label: 'Retrying', variant: 'warning' as const };
-  }
-
-  if (connection.lastSyncedEventId > 0) {
-    return { label: 'Synced', variant: 'success' as const };
-  }
-
-  return { label: 'Connected', variant: 'accent' as const };
-}
 
 function OverviewSection({
   workspace,
@@ -274,124 +247,6 @@ function DangerZoneSection({
   );
 }
 
-function FederationConnectionsSection({
-  federationConnections,
-  connectionsLoading,
-  connectionsError,
-  retryingConnectionId,
-  onRetryConnection,
-}: {
-  federationConnections: FederationConnection[];
-  connectionsLoading: boolean;
-  connectionsError: string | null;
-  retryingConnectionId: string | null;
-  onRetryConnection: (connectionId: string) => Promise<void>;
-}) {
-  return (
-    <Card style={{ padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)' }}>
-      <Stack gap="var(--space-5)">
-        <div>
-          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Federation Connections</h2>
-          <p style={{ margin: '4px 0 0', color: 'var(--color-text-disabled)', fontSize: '12.5px', lineHeight: 1.5 }}>
-            Review guest-side host links, sync cursors, and retry health for this workspace.
-          </p>
-        </div>
-
-        {connectionsLoading && <div style={{ color: 'var(--color-text-disabled)', fontSize: '13px' }}>Loading federation connections...</div>}
-
-        {connectionsError && (
-          <Alert type="warning">
-            {connectionsError}
-          </Alert>
-        )}
-
-        {!connectionsLoading && federationConnections.length === 0 && !connectionsError && (
-          <div style={{ color: 'var(--color-text-disabled)', fontSize: '13px', textAlign: 'center', padding: 'var(--space-4)' }}>
-            No guest federation connections exist for this workspace yet.
-          </div>
-        )}
-
-        <Stack gap="var(--space-3)">
-          {federationConnections.map((connection) => {
-            const status = getFederationConnectionStatus(connection);
-
-            return (
-              <div
-                key={connection.id}
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 'var(--space-4)',
-                  padding: 'var(--space-4)',
-                  borderRadius: 'var(--radius-md)',
-                  background: 'var(--color-base100)',
-                  border: '1px solid var(--color-border-default)'
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 'var(--space-4)' }}>
-                  <div>
-                    <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
-                      {connection.hostDisplayName || connection.workspaceName || 'Federated Host'}
-                    </div>
-                    <div style={{ fontSize: '12px', color: 'var(--color-text-disabled)', marginTop: '4px', wordBreak: 'break-word' }}>{connection.hostUrl}</div>
-                  </div>
-                  <Badge variant={status.variant}>{status.label}</Badge>
-                </div>
-
-                <Grid columns={3} gap="var(--space-3)">
-                  <div style={{ padding: 'var(--space-3)', borderRadius: 'var(--radius-sm)', background: 'var(--color-surface-app)', border: '1px solid var(--color-border-default)' }}>
-                    <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-disabled)' }}>Last Success</div>
-                    <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--color-text-primary)', lineHeight: 1.4 }}>
-                      {formatConnectionTimestamp(connection.syncState.lastSuccessAt)}
-                    </div>
-                  </div>
-
-                  <div style={{ padding: 'var(--space-3)', borderRadius: 'var(--radius-sm)', background: 'var(--color-surface-app)', border: '1px solid var(--color-border-default)' }}>
-                    <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-disabled)' }}>Sync Cursor</div>
-                    <div style={{ marginTop: '6px', fontSize: '16px', fontWeight: 700, color: 'var(--color-text-primary)' }}>{connection.lastSyncedEventId}</div>
-                  </div>
-
-                  <div style={{ padding: 'var(--space-3)', borderRadius: 'var(--radius-sm)', background: 'var(--color-surface-app)', border: '1px solid var(--color-border-default)' }}>
-                    <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-disabled)' }}>Retries</div>
-                    <div style={{ marginTop: '6px', fontSize: '16px', fontWeight: 700, color: 'var(--color-text-primary)' }}>{connection.syncState.consecutiveFailures}</div>
-                  </div>
-                </Grid>
-
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)', fontSize: '11px', color: 'var(--color-text-disabled)' }}>
-                  <span>Last attempt: {formatConnectionTimestamp(connection.syncState.lastAttemptAt)}</span>
-                  <span>Created: {formatConnectionTimestamp(connection.createdAt)}</span>
-                  {connection.syncState.nextAttemptAt && <span>Next retry: {formatConnectionTimestamp(connection.syncState.nextAttemptAt)}</span>}
-                  <span>Applied last sweep: {connection.syncState.lastAppliedCount}</span>
-                </div>
-
-                {connection.syncState.lastError && (
-                  <div style={{ padding: 'var(--space-3)', borderRadius: 'var(--radius-sm)', background: 'rgba(255, 184, 0, 0.08)', border: '1px solid rgba(255, 184, 0, 0.2)', color: 'var(--color-text-primary)', fontSize: '12px', lineHeight: 1.5 }}>
-                    {connection.syncState.lastError}
-                  </div>
-                )}
-
-                {(connection.status === 'failed' || connection.syncState.consecutiveFailures > 0) && (
-                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={() => void onRetryConnection(connection.id)}
-                      loading={retryingConnectionId === connection.id}
-                      disabled={retryingConnectionId !== null && retryingConnectionId !== connection.id}
-                    >
-                      {retryingConnectionId === connection.id ? 'Retrying...' : 'Retry Sync'}
-                    </Button>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </Stack>
-      </Stack>
-    </Card>
-  );
-}
-
 function AccessSection({
   invites,
   invitesLoading,
@@ -408,8 +263,7 @@ function AccessSection({
   onRevokeInvite: (inviteId: string) => Promise<boolean>;
 }) {
   const latestInvite = invites[0] ?? null;
-  const [email, setEmail] = useState('');
-  const [expirationHours, setExpirationHours] = useState('24');
+  const [label, setLabel] = useState('');
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   const scheduleCopyFeedbackReset = (key: string, expiresAt: number) => {
@@ -479,12 +333,10 @@ function AccessSection({
 
   const handleCreateInvite = async () => {
     const success = await onCreateInvite({
-      email,
-      expirationHours: Number(expirationHours) || 24,
+      label,
     });
     if (success) {
-      setEmail('');
-      setExpirationHours('24');
+      setLabel('');
     }
   };
 
@@ -492,45 +344,40 @@ function AccessSection({
     await onRevokeInvite(inviteId);
   };
 
+  const getInviteLink = (code: string) => {
+    return `${window.location.origin}/?invite=${code}`;
+  };
+
   return (
     <Card style={{ padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)' }}>
       <Stack gap="var(--space-5)">
         <div>
-          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Peer Invites</h2>
+          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Workspace Invites</h2>
           <p style={{ margin: '4px 0 0', color: 'var(--color-text-disabled)', fontSize: '12.5px', lineHeight: 1.5 }}>
-            Mint and issue direct guest credentials linked to remote peers. This configuration provides secure, cryptographically validated workspace entry codes.
+            Create secure, shareable invitation links for users to request access or join this workspace.
           </p>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)', padding: 'var(--space-4)', borderRadius: 'var(--radius-md)', background: 'var(--color-base100)', border: '1px solid var(--color-border-default)' }}>
           <Mail size={16} style={{ color: 'var(--color-primary)', flexShrink: 0, marginTop: '2px' }} />
           <div>
-            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Host handoff workflow</div>
+            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Invitation Link Process</div>
             <div style={{ fontSize: '12px', color: 'var(--color-text-disabled)', marginTop: '4px', lineHeight: 1.5 }}>
-              Generate an invite link, then share the guest validation code, validation URL, and hashing credentials securely through your preferred channel.
+              Share the invitation URL. Visited guest users can immediately send a join request, which you can approve in the "Join Requests" tab.
             </div>
           </div>
         </div>
 
-        <Grid columns="1.5fr 1fr" gap="var(--space-4)">
-          <TextInput
-            label="Guest Email"
-            value={email}
-            placeholder="guest-user@peer.com"
-            onChange={(event) => setEmail(event.target.value)}
-          />
-
-          <TextInput
-            label="Expires In (Hours)"
-            type="number"
-            min={1}
-            value={expirationHours}
-            onChange={(event) => setExpirationHours(event.target.value)}
-          />
-        </Grid>
-
-        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <Button variant="primary" onClick={() => void handleCreateInvite()} loading={inviteLoading} disabled={!email.trim()}>
+        <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-end' }}>
+          <div style={{ flex: 1 }}>
+            <TextInput
+              label="Invite Label"
+              value={label}
+              placeholder="e.g. Engineering Team, External Audit"
+              onChange={(event) => setLabel(event.target.value)}
+            />
+          </div>
+          <Button variant="primary" onClick={() => void handleCreateInvite()} loading={inviteLoading} disabled={!label.trim()}>
             Create Invite
           </Button>
         </div>
@@ -540,43 +387,30 @@ function AccessSection({
             <div style={{ display: 'flex', alignItems: 'center', justifySelf: 'stretch', justifyContent: 'space-between' }}>
               <div>
                 <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--color-text-disabled)' }}>Most Recent Invite</span>
-                <h4 style={{ margin: '2px 0 0', fontSize: '14px', fontWeight: 600, color: 'var(--color-text-primary)' }}>{latestInvite.email}</h4>
+                <h4 style={{ margin: '2px 0 0', fontSize: '14px', fontWeight: 600, color: 'var(--color-text-primary)' }}>{latestInvite.label || 'No Label'}</h4>
               </div>
               <Badge variant={getInviteStateVariant(latestInvite)}>
                 {getInviteStateLabel(latestInvite)}
               </Badge>
             </div>
 
-            <Grid columns={3} gap="var(--space-3)" style={{ marginTop: 'var(--space-2)' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--color-base100)', border: '1px solid var(--color-border-default)' }}>
-                <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase' }}>Invite URL</span>
-                <span style={{ fontSize: '11px', color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{latestInvite.inviteUrl}</span>
-                <Button variant="default" size="xs" style={{ marginTop: 'auto' }} onClick={() => void handleCopy('invite-url', latestInvite.inviteUrl)}>
-                  {copiedField === 'invite-url' ? 'Copied' : 'Copy URL'}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--color-base100)', border: '1px solid var(--color-border-default)' }}>
+              <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase' }}>Invite URL</span>
+              <span style={{ fontSize: '12px', color: 'var(--color-text-primary)', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{getInviteLink(latestInvite.code)}</span>
+              <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-1)' }}>
+                <Button variant="default" size="xs" onClick={() => void handleCopy('invite-url', getInviteLink(latestInvite.code))}>
+                  {copiedField === 'invite-url' ? 'Copied URL' : 'Copy Invite URL'}
+                </Button>
+                <Button variant="default" size="xs" onClick={() => void handleCopy('invite-code', latestInvite.code)}>
+                  {copiedField === 'invite-code' ? 'Copied Code' : 'Copy Code Only'}
                 </Button>
               </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--color-base100)', border: '1px solid var(--color-border-default)' }}>
-                <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase' }}>Validation Code</span>
-                <span style={{ fontSize: '11px', color: 'var(--color-text-primary)', fontFamily: 'monospace' }}>{latestInvite.validationCode}</span>
-                <Button variant="default" size="xs" style={{ marginTop: 'auto' }} onClick={() => void handleCopy('validation-code', latestInvite.validationCode)}>
-                  {copiedField === 'validation-code' ? 'Copied' : 'Copy Code'}
-                </Button>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--color-base100)', border: '1px solid var(--color-border-default)' }}>
-                <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase' }}>Workspace Key</span>
-                <span style={{ fontSize: '11px', color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{latestInvite.workspacePrivateKey}</span>
-                <Button variant="default" size="xs" style={{ marginTop: 'auto' }} onClick={() => void handleCopy('workspace-key', latestInvite.workspacePrivateKey)}>
-                  {copiedField === 'workspace-key' ? 'Copied' : 'Copy Key'}
-                </Button>
-              </div>
-            </Grid>
+            </div>
 
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)', fontSize: '11px', color: 'var(--color-text-disabled)', marginTop: 'var(--space-1)' }}>
-              <span>Expires {new Date(latestInvite.expiresAt).toLocaleString()}</span>
+              <span>Created by {latestInvite.createdByName}</span>
+              <span>Used {latestInvite.useCount} times</span>
               {latestInvite.revokedAt && <span>Revoked {new Date(latestInvite.revokedAt).toLocaleString()}</span>}
-              <span>{latestInvite.guestUsername ? `Validated by ${latestInvite.guestUsername}` : 'Awaiting peer validation'}</span>
             </div>
 
             {!latestInvite.revokedAt && (
@@ -587,15 +421,15 @@ function AccessSection({
                   onClick={() => void handleRevokeInvite(latestInvite.id)}
                   disabled={revokeLoadingId === latestInvite.id}
                 >
-                  {revokeLoadingId === latestInvite.id ? 'Revoking...' : latestInvite.isUsed ? 'Revoke Access' : 'Revoke Invite'}
+                  {revokeLoadingId === latestInvite.id ? 'Revoking...' : 'Revoke Invite'}
                 </Button>
               </div>
             )}
           </Stack>
         )}
 
-        {invitesLoading && <div style={{ color: 'var(--color-text-disabled)', fontSize: '13px', textAlign: 'center', padding: 'var(--space-4)' }}>Loading peer invites...</div>}
-        {!invitesLoading && invites.length === 0 && <div style={{ color: 'var(--color-text-disabled)', fontSize: '13px', textAlign: 'center', padding: 'var(--space-4)' }}>No peer invites exist yet for this workspace.</div>}
+        {invitesLoading && <div style={{ color: 'var(--color-text-disabled)', fontSize: '13px', textAlign: 'center', padding: 'var(--space-4)' }}>Loading invites...</div>}
+        {!invitesLoading && invites.length === 0 && <div style={{ color: 'var(--color-text-disabled)', fontSize: '13px', textAlign: 'center', padding: 'var(--space-4)' }}>No invites exist yet for this workspace.</div>}
 
         {invites.length > 0 && (
           <Stack gap="var(--space-3)" style={{ marginTop: 'var(--space-2)' }}>
@@ -615,11 +449,11 @@ function AccessSection({
                 }}
               >
                 <div>
-                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>{invite.email}</div>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>{invite.label || 'No Label'}</div>
                   <div style={{ fontSize: '11px', color: 'var(--color-text-disabled)', marginTop: '4px', display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
-                    <span>Code: {invite.validationCode}</span>
-                    <span>Expires: {new Date(invite.expiresAt).toLocaleDateString()}</span>
-                    {invite.guestUsername && <span>Guest: {invite.guestUsername}</span>}
+                    <span>Code: {invite.code}</span>
+                    <span>Used: {invite.useCount}</span>
+                    <span>Created by: {invite.createdByName}</span>
                   </div>
                 </div>
 
@@ -627,8 +461,8 @@ function AccessSection({
                   <Badge variant={getInviteStateVariant(invite)}>
                     {getInviteStateLabel(invite)}
                   </Badge>
-                  <Button variant="default" size="xs" onClick={() => void handleCopy(`invite-row-${invite.id}`, invite.inviteUrl)}>
-                    {copiedField === `invite-row-${invite.id}` ? 'Copied' : 'Copy'}
+                  <Button variant="default" size="xs" onClick={() => void handleCopy(`invite-row-${invite.id}`, getInviteLink(invite.code))}>
+                    {copiedField === `invite-row-${invite.id}` ? 'Copied' : 'Copy Link'}
                   </Button>
                   {!invite.revokedAt && (
                     <Button
@@ -637,7 +471,7 @@ function AccessSection({
                       onClick={() => void handleRevokeInvite(invite.id)}
                       disabled={revokeLoadingId === invite.id}
                     >
-                      {revokeLoadingId === invite.id ? 'Revoking...' : invite.isUsed ? 'Revoke' : 'Cancel'}
+                      {revokeLoadingId === invite.id ? 'Revoking...' : 'Revoke'}
                     </Button>
                   )}
                 </div>
@@ -1037,10 +871,6 @@ export function SettingsPage({
   saveSuccess,
   saveError,
   inviteError,
-  federationConnections,
-  connectionsLoading,
-  connectionsError,
-  retryingConnectionId,
   invitesLoading,
   inviteLoading,
   invites,
@@ -1055,7 +885,6 @@ export function SettingsPage({
   onCreateInvite,
   onRevokeInvite,
   onApproveJoinRequest,
-  onRetryConnection,
   deleteLoading,
   deleteError,
   onDeleteWorkspace,
@@ -1181,13 +1010,6 @@ export function SettingsPage({
                     workspace={workspace}
                     settings={settings}
                     onChangeSettings={onChangeSettings}
-                  />
-                  <FederationConnectionsSection
-                    federationConnections={federationConnections}
-                    connectionsLoading={connectionsLoading}
-                    connectionsError={connectionsError}
-                    retryingConnectionId={retryingConnectionId}
-                    onRetryConnection={onRetryConnection}
                   />
                   <DangerZoneSection
                     workspace={workspace}

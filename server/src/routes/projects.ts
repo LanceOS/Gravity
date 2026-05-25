@@ -1,5 +1,5 @@
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
-import { type Response, Router } from 'express';
+import { Router } from 'express';
 import { db } from '../db/index.js';
 import { cycles, domains, projectMembers, projects, workspaceMembers, workspaces, workspaceSettings } from '../db/schema.js';
 import {
@@ -13,7 +13,7 @@ import {
   normalizeIsoDate,
 } from '../lib/platform.js';
 import { buildProjectKeyConflictMessage, mapProjectCreationError, projectKeyExists } from '../lib/project-creation.js';
-import { getWorkspaceAccess, optionalWorkspaceAccess, type WorkspaceAccessLocals } from '../lib/workspace-access.js';
+import { resolveRequestActorUserId } from '../lib/request-auth.js';
 
 function mapProject(project: typeof projects.$inferSelect) {
   return {
@@ -44,11 +44,22 @@ function mapCycle(cycle: typeof cycles.$inferSelect) {
 export function createProjectsRouter() {
   const router = Router();
 
-  router.get('/projects', optionalWorkspaceAccess, async (req, res: Response<unknown, WorkspaceAccessLocals>) => {
+  router.get('/projects', async (req, res) => {
     try {
-      const workspaceAccess = getWorkspaceAccess(res);
-      const userId = workspaceAccess?.userId ?? (typeof req.query.userId === 'string' ? req.query.userId : undefined);
-      const workspaceId = workspaceAccess?.workspaceId ?? (typeof req.query.workspaceId === 'string' ? req.query.workspaceId : undefined);
+      const actorUserId = await resolveRequestActorUserId(req);
+      if (!actorUserId) {
+        res.status(401).json({ error: 'Authentication required.' });
+        return;
+      }
+
+      const requestedUserId = typeof req.query.userId === 'string' ? req.query.userId : undefined;
+      if (requestedUserId && requestedUserId !== actorUserId) {
+        res.status(403).json({ error: 'Forbidden.' });
+        return;
+      }
+
+      const userId = actorUserId;
+      const workspaceId = typeof req.query.workspaceId === 'string' ? req.query.workspaceId : undefined;
 
       let projectRows: Array<{
         id: string;

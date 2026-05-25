@@ -1,6 +1,12 @@
 import React from 'react';
 import { User, ChevronLeft, ChevronRight, Folder, File, ChevronDown } from 'lucide-react';
 
+export interface AccordionItem {
+  id: string;
+  title: string;
+  content: React.ReactNode;
+}
+
 export interface AccordionProps {
   items: AccordionItem[];
   style?: React.CSSProperties;

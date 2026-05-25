@@ -12,7 +12,6 @@ import {
   projects,
   tickets,
   userProfiles,
-  validations,
   workspaceInvites,
   workspaceMembers,
   workspaces,
@@ -47,18 +46,6 @@ type WorkspaceFixtureSeed = {
     status: string;
     inviteCode: string;
   }>;
-};
-
-type ValidationSeed = {
-  id?: string;
-  workspaceId: string;
-  guestUserId: string;
-  email: string;
-  workspacePrivateKey?: string;
-  inviteUrl?: string;
-  validationCode?: string;
-  isUsed?: boolean;
-  issuedByUserId?: string | null;
 };
 
 function quoteIdentifier(value: string) {
@@ -333,28 +320,6 @@ export async function seedWorkspaceInvite(
   return invite;
 }
 
-export async function seedValidationAccess(seed: ValidationSeed) {
-  const validation = {
-    id: seed.id ?? 'validation-1',
-    workspaceId: seed.workspaceId,
-    issuedByUserId: seed.issuedByUserId ?? null,
-    email: seed.email,
-    inviteUrl: seed.inviteUrl ?? 'http://localhost:8080/api/v1/workspaces/validate',
-    validationCode: seed.validationCode ?? 'GRAV-1001-A',
-    workspacePrivateKey: seed.workspacePrivateKey ?? 'sec_wsp_fixture',
-    guestUserId: seed.guestUserId,
-    guestUsername: 'guest-user',
-    guestPasswordHash: 'hash-123',
-    isUsed: seed.isUsed ?? true,
-    expiresAt: new Date(Date.now() + 60 * 60 * 1000),
-    usedAt: new Date(),
-    revokedAt: null,
-    createdAt: new Date(),
-  };
-
-  await db.insert(validations).values(validation);
-  return validation;
-}
 
 export function jsonResponse(body: unknown, init: ResponseInit = {}) {
   return new Response(JSON.stringify(body), {

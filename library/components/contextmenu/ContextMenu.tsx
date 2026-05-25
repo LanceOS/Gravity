@@ -3,6 +3,14 @@ import { ChevronRight } from 'lucide-react';
 import { Portal } from '../../utilities';
 import { ClickAwayListener } from '../../utilities';
 
+export interface ContextMenuItem {
+  label: string;
+  icon?: React.ReactNode;
+  onClick?: () => void;
+  danger?: boolean;
+  children?: ContextMenuItem[];
+}
+
 export interface ContextMenuProps {
   children: React.ReactNode;
   items: ContextMenuItem[];

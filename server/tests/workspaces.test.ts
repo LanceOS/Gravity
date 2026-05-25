@@ -158,10 +158,12 @@ describe('workspaces routes', () => {
   it('creates invites, join requests, approvals, and workspace connections', async () => {
     const { owner, workspace, project } = await seedWorkspaceFixture();
 
-    const inviteResponse = await api().post(`/api/v1/workspaces/${workspace.id}/invites`).send({
-      createdBy: owner.id,
-      label: 'Team Invite',
-    });
+    const inviteResponse = await api()
+      .post(`/api/v1/workspaces/${workspace.id}/invites`)
+      .set('x-user-id', owner.id)
+      .send({
+        label: 'Team Invite',
+      });
 
     expect(inviteResponse.status).toBe(201);
     expect(inviteResponse.body).toMatchObject({
@@ -199,7 +201,9 @@ describe('workspaces routes', () => {
       }),
     ]);
 
-    const listJoinRequestsResponse = await api().get(`/api/v1/workspaces/${workspace.id}/join-requests`);
+    const listJoinRequestsResponse = await api()
+      .get(`/api/v1/workspaces/${workspace.id}/join-requests`)
+      .set('x-user-id', owner.id);
     expect(listJoinRequestsResponse.status).toBe(200);
     expect(listJoinRequestsResponse.body).toEqual([
       expect.objectContaining({
@@ -211,7 +215,8 @@ describe('workspaces routes', () => {
 
     const approveResponse = await api()
       .post(`/api/v1/workspaces/${workspace.id}/join-requests/${joinRequestResponse.body.id}/approve`)
-      .send({ reviewerUserId: owner.id });
+      .set('x-user-id', owner.id)
+      .send({});
 
     expect(approveResponse.status).toBe(200);
     expect(approveResponse.body).toMatchObject({
@@ -220,85 +225,5 @@ describe('workspaces routes', () => {
       reviewedBy: owner.id,
     });
 
-    const connectResponse = await api().post('/api/v1/workspaces/connect').send({
-      userId: applicant.id,
-      workspaceId: workspace.id,
-      workspaceKey: workspace.workspaceKey,
-    });
-
-    expect(connectResponse.status).toBe(200);
-    expect(connectResponse.body.workspace).toMatchObject({
-      id: workspace.id,
-      name: workspace.name,
-    });
-    expect(connectResponse.body.projects).toEqual([
-      expect.objectContaining({
-        id: project.id,
-        workspaceId: workspace.id,
-      }),
-    ]);
-  });
-
-  it('creates, validates, lists, and revokes peer invites', async () => {
-    const { owner, workspace } = await seedWorkspaceFixture();
-
-    const unauthorizedResponse = await api().get(`/api/v1/workspaces/${workspace.id}/peer-invites`);
-    expect(unauthorizedResponse.status).toBe(401);
-    expect(unauthorizedResponse.body).toEqual({ error: 'Unauthorized.' });
-
-    const createPeerInviteResponse = await api().post('/api/v1/workspaces/invites').set('x-user-id', owner.id).send({
-      workspaceId: workspace.id,
-      email: 'guest@example.com',
-      expirationHours: 12,
-    });
-
-    expect(createPeerInviteResponse.status).toBe(201);
-    expect(createPeerInviteResponse.body).toMatchObject({
-      email: 'guest@example.com',
-      workspace_private_key: expect.any(String),
-      validation_code: expect.any(String),
-    });
-
-    const listPeerInvitesResponse = await api()
-      .get(`/api/v1/workspaces/${workspace.id}/peer-invites`)
-      .set('x-user-id', owner.id);
-
-    expect(listPeerInvitesResponse.status).toBe(200);
-    expect(listPeerInvitesResponse.body).toEqual([
-      expect.objectContaining({
-        id: createPeerInviteResponse.body.id,
-        email: 'guest@example.com',
-      }),
-    ]);
-
-    const validateResponse = await api().post('/api/v1/workspaces/validate').send({
-      email: 'guest@example.com',
-      validation_code: createPeerInviteResponse.body.validation_code,
-      invite_url: createPeerInviteResponse.body.invite_url,
-      username: 'guest-user',
-      password_hash: 'hash-123',
-    });
-
-    expect(validateResponse.status).toBe(200);
-    expect(validateResponse.body).toMatchObject({
-      authorized: true,
-      workspace_private_key: createPeerInviteResponse.body.workspace_private_key,
-      guest_profile: {
-        username: 'guest-user',
-        role: 'guest_contributor',
-      },
-    });
-
-    const revokeResponse = await api()
-      .post(`/api/v1/workspaces/${workspace.id}/peer-invites/${createPeerInviteResponse.body.id}/revoke`)
-      .set('x-user-id', owner.id)
-      .send({});
-
-    expect(revokeResponse.status).toBe(200);
-    expect(revokeResponse.body).toMatchObject({
-      id: createPeerInviteResponse.body.id,
-      email: 'guest@example.com',
-      revoked_at: expect.any(String),
-    });
   });
 });

@@ -26,13 +26,7 @@ export interface CreateWorkspaceInput {
   defaultProjectKey?: string;
 }
 
-export interface ValidatePeerInviteInput {
-  email: string;
-  validationCode: string;
-  inviteUrl: string;
-  username: string;
-  passwordHash: string;
-}
+
 
 interface UseWorkspaceDirectoryOptions {
   currentUser: User | null;
@@ -43,7 +37,7 @@ export function useWorkspaceDirectory({ currentUser, setCurrentUser }: UseWorksp
   const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [resolvedUserId, setResolvedUserId] = useState<string | null>(null);
-  const [pendingAction, setPendingAction] = useState<'create' | 'join' | 'validate' | null>(null);
+  const [pendingAction, setPendingAction] = useState<'create' | 'join' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -176,47 +170,7 @@ export function useWorkspaceDirectory({ currentUser, setCurrentUser }: UseWorksp
     }
   }, [currentUser]);
 
-  const validatePeerInvite = useCallback(async (input: ValidatePeerInviteInput) => {
-    setPendingAction('validate');
-    setError(null);
-    setSuccessMessage(null);
 
-    try {
-      const response = await fetch(input.inviteUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: input.email,
-          validation_code: input.validationCode,
-          invite_url: input.inviteUrl,
-          username: input.username,
-          password_hash: input.passwordHash,
-        }),
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to validate the peer invite.');
-      }
-
-      setCurrentUser({
-        id: data.guest_profile.id,
-        name: data.guest_profile.username,
-        email: input.email,
-        avatar: '',
-        role: data.guest_profile.role || 'guest_contributor',
-        tutorial_completed: 0,
-      });
-      setSuccessMessage('Peer invite validated. Switched into the guest workspace profile.');
-      return true;
-    } catch (validationError) {
-      const messageText = validationError instanceof Error ? validationError.message : 'Failed to validate the peer invite.';
-      setError(messageText);
-      return false;
-    } finally {
-      setPendingAction(null);
-    }
-  }, [setCurrentUser]);
 
   return {
     workspaces,
@@ -228,6 +182,5 @@ export function useWorkspaceDirectory({ currentUser, setCurrentUser }: UseWorksp
     refreshWorkspaces,
     createWorkspace,
     requestJoinByInvite,
-    validatePeerInvite,
   };
 }

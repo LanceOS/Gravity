@@ -53,7 +53,6 @@ function renderWorkspaceDirectoryPage(overrides: Partial<Parameters<typeof Works
     successMessage: null,
     onCreateWorkspace: vi.fn().mockResolvedValue(undefined),
     onRequestJoin: vi.fn().mockResolvedValue(undefined),
-    onValidatePeerInvite: vi.fn().mockResolvedValue(undefined),
     onOpenWorkspace: vi.fn(),
     onOpenSettings: vi.fn(),
     onOpenAccountPreferences: vi.fn(),
@@ -119,7 +118,7 @@ describe('WorkspaceDirectoryPage', () => {
     });
   });
 
-  it('submits join-request and peer-validation forms', async () => {
+  it('submits join-request forms', async () => {
     const { props } = renderWorkspaceDirectoryPage();
 
     fireEvent.change(screen.getByLabelText('Invite Code'), { target: { value: 'wsp-grav-1234' } });
@@ -127,25 +126,6 @@ describe('WorkspaceDirectoryPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Send Join Request' }));
 
     expect(props.onRequestJoin).toHaveBeenCalledWith('WSP-GRAV-1234', 'Requesting access for QA coverage.');
-
-    fireEvent.change(screen.getByLabelText('Guest Email'), { target: { value: 'guest@example.com' } });
-    fireEvent.change(screen.getByLabelText('Validation Code'), { target: { value: 'grav-4321-x' } });
-    fireEvent.change(screen.getByLabelText('Invite URL'), { target: { value: 'https://peer.example.com/api/v1/workspaces/validate' } });
-
-    const usernameInput = screen.getByLabelText('Guest Username');
-    fireEvent.change(usernameInput, { target: { value: 'guest-user' } });
-
-    const passwordHashInput = screen.getByLabelText('Password Hash');
-    fireEvent.change(passwordHashInput, { target: { value: '$2b$12$abcdefghijklmnopqrstuvwxyz1234567890' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Validate Peer Invite' }));
-
-    expect(props.onValidatePeerInvite).toHaveBeenCalledWith({
-      email: 'guest@example.com',
-      validationCode: 'GRAV-4321-X',
-      inviteUrl: 'https://peer.example.com/api/v1/workspaces/validate',
-      username: 'guest-user',
-      passwordHash: '$2b$12$abcdefghijklmnopqrstuvwxyz1234567890',
-    });
   });
 
   it('shows the loading and empty-state messages when no workspaces are available', () => {
@@ -163,7 +143,6 @@ describe('WorkspaceDirectoryPage', () => {
         successMessage={null}
         onCreateWorkspace={vi.fn()}
         onRequestJoin={vi.fn()}
-        onValidatePeerInvite={vi.fn()}
         onOpenWorkspace={vi.fn()}
         onOpenSettings={vi.fn()}
         onOpenAccountPreferences={vi.fn()}

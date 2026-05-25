@@ -2,10 +2,10 @@
 
 ## 1. Executive Summary & Design Philosophy
 
-Gravity is a self-hostable, federated, peer-to-peer productivity application. Unlike traditional centralized SaaS platforms, Gravity operates on a **Distributed Multi-Tenant (Workspace-as-a-Server)** paradigm:
+Gravity is a self-hostable, centralized productivity application. Unlike traditional multi-tenant SaaS platforms, Gravity operates on a **Single-Host Workspace** paradigm:
 
-* **The Workspace Boundary:** Each self-hosted instance (running on PostgreSQL) represents an isolated security and data boundary containing projects, domains, cycles, and local accounts.
-* **Federated Identity:** Users can run local projects natively, or connect seamlessly to other hosts' workspaces by acting as verified guest nodes through a dynamic host-to-guest REST validation loop.
+* **The Workspace Boundary:** Each self-hosted instance (running on PostgreSQL) represents an isolated security and data boundary containing workspaces, projects, domains, cycles, and local accounts.
+* **Centralized Identity:** Users access the workspace via the host's URL. Authentication and authorization are handled via session-based user actors within the host. Access to specific workspaces is granted through invitation links containing a unique invite code.
 * **Strict Logic Decoupling:** Components and pages are strictly presentation layers. State orchestration and network actions are completely isolated within custom React hooks and utility layers.
 
 ## 2. Directory Structure (Clean, Modular Separation)
@@ -61,7 +61,7 @@ gravity/
 
 ## 3. Database Schema Blueprint (PostgreSQL via Drizzle ORM)
 
-This schema provides strong relational constraints, models multi-project scoping under a single workspace, and handles cryptographic peer validation.
+This schema provides strong relational constraints, models multi-project scoping under workspaces, and handles standard user membership and invitation validation.
 
 ```
 import { pgTable, uuid, text, timestamp, boolean, pgEnum } from 'drizzle-orm/pg-core';
@@ -107,16 +107,23 @@ export const userAiCredentials = pgTable('user_ai_credentials', {
 });
 
 // -------------------------------------------------------------------------
-// Peer-to-Peer Checkpoints
+// Workspace Membership & Invitations
 // -------------------------------------------------------------------------
-export const validations = pgTable('validations', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  email: text('email').notNull(),                       // Intended guest's email
-  inviteUrl: text('invite_url').notNull(),               // Originating registration link
-  validationCode: text('validation_code').notNull(),     // Alphanumeric challenge code
-  workspacePrivateKey: text('workspace_private_key').notNull(), // Unique session key generated for guest
-  isUsed: boolean('is_used').default(false).notNull(),
-  expiresAt: timestamp('expires_at').notNull(),
+export const workspaceMembers = pgTable('workspace_members', {
+  workspaceId: text('workspace_id').notNull(),
+  userId: text('user_id').notNull(),
+  role: text('role').notNull().default('member'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const workspaceInvites = pgTable('workspace_invites', {
+  id: text('id').primaryKey(),
+  workspaceId: text('workspace_id').notNull(),
+  code: text('code').notNull().unique(),
+  createdBy: text('created_by').notNull(),
+  expiresAt: timestamp('expires_at'),
+  maxUses: integer('max_uses'),
+  useCount: integer('use_count').notNull().default(0),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
@@ -165,88 +172,60 @@ export const comments = pgTable('comments', {
 });
 ```
 
-## 4. Federated Peer-to-Peer Network Handshake
+## 4. Single-Host Invitation & Joining Flow
 
-When a user wants to connect to another project workspace hosted on a peer's machine, the interaction runs directly over REST to the target server using the following cryptographic handshakes:
+When a user wants to access a workspace hosted on the server, they must be authenticated and use an invitation link to gain access:
 
-### The Exchange Protocol
+### The Join Protocol
 
-Let $H$ represent the Host Machine, and $G$ represent the Guest Client.
-
-
-1. **Invite Generation (**$H$**):**
-   * Host generates a unique validation mapping in the database:
-
-     $$\\text{Validation} \\leftarrow {E_{\\text{guest}}, C_{\\text{code}}, U_{\\text{invite_url}}, K_{\\text{private}}}$$
-   * Host shares the $U_{\\text{invite_url}}$ and $C_{\\text{code}}$ securely with Guest.
-2. **Validation Request (**$G \\rightarrow H$**):**
-   * Guest navigates to $U_{\\text{invite_url}}$, typing in $E_{\\text{guest}}$, $C_{\\text{code}}$, along with their profile variables ($U_{\\text{username}}$, $P_{\\text{pwd}}$).
-   * Guest client POSTs this packet to the endpoint verified in the URL.
-3. **Database Handshake (Atomic Transaction on** $H$**):**
+1. **Invite Generation:**
+   * A workspace admin generates an invitation link which creates an entry in `workspace_invites`.
+   * The invite contains a unique `code` parameter.
+2. **Joining the Workspace:**
+   * User navigates to the host URL with the invitation code (e.g., `https://host.com/join/CODE123`).
+   * The client validates the code with the backend.
+   * If the user is unauthenticated, they are prompted to log in or sign up on the host.
+3. **Database Handshake (Join Fulfillment):**
 
    ```
    import { db } from './index';
-   import { validations, workspaceUsers } from './schema';
-   import { and, eq, gt } from 'drizzle-orm';
+   import { workspaceInvites, workspaceMembers } from './schema';
+   import { eq, sql } from 'drizzle-orm';
    
-   export async function processInboundGuest(payload: {
-     email: string;
-     code: string;
-     inviteUrl: string;
-     username: string;
-     passwordHash: string;
-   }) {
+   export async function processJoinWorkspace(userId: string, code: string) {
      return await db.transaction(async (tx) => {
        // Validate match
-       const [validRecord] = await tx
+       const [invite] = await tx
          .select()
-         .from(validations)
-         .where(
-           and(
-             eq(validations.email, payload.email),
-             eq(validations.validationCode, payload.code),
-             eq(validations.inviteUrl, payload.inviteUrl),
-             eq(validations.isUsed, false),
-             gt(validations.expiresAt, new Date())
-           )
-         );
+         .from(workspaceInvites)
+         .where(eq(workspaceInvites.code, code));
    
-       if (!validRecord) {
-         throw new Error("Invalid or expired validation link credentials.");
+       if (!invite) {
+         throw new Error("Invalid or expired invitation.");
        }
    
-       // Provision Guest User Profile
-       const [newUser] = await tx
-         .insert(workspaceUsers)
-         .values({
-           email: payload.email,
-           username: payload.username,
-           passwordHash: payload.passwordHash,
-           role: 'guest_contributor',
-         })
-         .returning();
-   
-       // Burn validation entry
+       // Provision Membership
        await tx
-         .update(validations)
-         .set({ isUsed: true })
-         .where(eq(validations.id, validRecord.id));
+         .insert(workspaceMembers)
+         .values({
+           workspaceId: invite.workspaceId,
+           userId: userId,
+           role: 'member',
+         });
    
-       // Return authorization signature to client
-       return {
-         authorized: true,
-         secretKey: validRecord.workspacePrivateKey,
-         profile: { id: newUser.id, name: newUser.username },
-       };
+       // Update use count
+       await tx
+         .update(workspaceInvites)
+         .set({ useCount: sql`${workspaceInvites.useCount} + 1` })
+         .where(eq(workspaceInvites.id, invite.id));
+   
+       return { joined: true, workspaceId: invite.workspaceId };
      });
    }
    ```
 4. **Connection Maintenance:**
-   * The guest saves the secret key inside their browser's local, encrypted index database.
-   * Every network transaction going forward includes this payload in the header:
-
-     `X-Workspace-Key: <workspacePrivateKey>`
-   * When switching workspaces, the guest updates their global base client URL, and uses the corresponding key from their catalog.
+   * The user logs in via standard session-based authentication (e.g., Better Auth).
+   * Server validates access to resources by cross-referencing the user's ID with `workspaceMembers` mapping.
 
 ## 5. Polymorphic AI Integration Engine
 

@@ -11,19 +11,18 @@ import {
   Alert
 } from '@library';
 import type { User } from '../../context/TicketContext';
-import type { CreateWorkspaceInput, ValidatePeerInviteInput, WorkspaceSummary } from '../../hooks/useWorkspaceDirectory';
+import type { CreateWorkspaceInput, WorkspaceSummary } from '../../hooks/useWorkspaceDirectory';
 
 interface WorkspaceDirectoryPageProps {
   currentUser: User;
   workspaces: WorkspaceSummary[];
   loading: boolean;
   activeWorkspaceId: string;
-  pendingAction: 'create' | 'join' | 'validate' | null;
+  pendingAction: 'create' | 'join' | null;
   errorMessage: string | null;
   successMessage: string | null;
   onCreateWorkspace: (input: CreateWorkspaceInput) => Promise<void>;
   onRequestJoin: (inviteCode: string, message?: string) => Promise<void>;
-  onValidatePeerInvite: (input: ValidatePeerInviteInput) => Promise<void>;
   onOpenWorkspace: (workspaceId: string) => void;
   onOpenSettings: (workspaceId: string) => void;
   onOpenAccountPreferences: () => void;
@@ -52,7 +51,6 @@ export function WorkspaceDirectoryPage({
   successMessage,
   onCreateWorkspace,
   onRequestJoin,
-  onValidatePeerInvite,
   onOpenWorkspace,
   onOpenSettings,
   onOpenAccountPreferences,
@@ -64,13 +62,8 @@ export function WorkspaceDirectoryPage({
   const [workspaceAccessKey, setWorkspaceAccessKey] = useState('');
   const [inviteCode, setInviteCode] = useState('');
   const [requestMessage, setRequestMessage] = useState('');
-  const [peerEmail, setPeerEmail] = useState('');
-  const [peerValidationCode, setPeerValidationCode] = useState('');
-  const [peerInviteUrl, setPeerInviteUrl] = useState('');
-  const [peerUsername, setPeerUsername] = useState(`${currentUser.name}Guest`);
-  const [peerPasswordHash, setPeerPasswordHash] = useState('');
 
-  const [activeTab, setActiveTab] = useState<'create' | 'join' | 'validate'>('create');
+  const [activeTab, setActiveTab] = useState<'create' | 'join'>('create');
 
   const workspaceCards = useMemo(() => workspaces.slice().sort((left, right) => left.name.localeCompare(right.name)), [workspaces]);
 
@@ -82,7 +75,7 @@ export function WorkspaceDirectoryPage({
       description: workspaceDescription,
       key: workspaceKey,
       workspaceKey: workspaceAccessKey,
-      defaultProjectName: workspaceName,
+      defaultProjectName: `${workspaceName} Core`,
       defaultProjectKey: workspaceKey,
     });
   };
@@ -90,17 +83,6 @@ export function WorkspaceDirectoryPage({
   const handleJoinSubmit = async (event: FormEvent) => {
     event.preventDefault();
     await onRequestJoin(inviteCode, requestMessage);
-  };
-
-  const handlePeerValidationSubmit = async (event: FormEvent) => {
-    event.preventDefault();
-    await onValidatePeerInvite({
-      email: peerEmail,
-      validationCode: peerValidationCode,
-      inviteUrl: peerInviteUrl,
-      username: peerUsername,
-      passwordHash: peerPasswordHash,
-    });
   };
 
   return (
@@ -326,23 +308,6 @@ export function WorkspaceDirectoryPage({
                 >
                   Join Code
                 </button>
-                <button
-                  onClick={() => setActiveTab('validate')}
-                  style={{
-                    flex: 1,
-                    background: 'none',
-                    border: 'none',
-                    padding: '8px 2px',
-                    fontSize: '11.5px',
-                    fontWeight: 600,
-                    color: activeTab === 'validate' ? 'var(--color-text-primary)' : 'var(--color-text-disabled)',
-                    borderBottom: activeTab === 'validate' ? '2px solid var(--color-text-primary)' : '2px solid transparent',
-                    cursor: 'pointer',
-                    transition: 'all var(--transition-fast)',
-                  }}
-                >
-                  Peer Invite
-                </button>
               </div>
 
               {/* Status Alert Panels */}
@@ -438,62 +403,6 @@ export function WorkspaceDirectoryPage({
                 </Stack>
               </form>
 
-              <form onSubmit={handlePeerValidationSubmit} style={activeTab === 'validate' ? {} : visuallyHiddenStyle}>
-                <Stack gap="var(--space-3)">
-                  <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', marginBottom: 'var(--space-1)' }}>
-                    <KeyRound size={16} style={{ color: 'var(--color-text-disabled)' }} />
-                    <h3 style={{ margin: 0, fontSize: '13.5px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Validate Peer Invite</h3>
-                  </div>
-                  <p style={{ margin: 0, color: 'var(--color-text-disabled)', fontSize: '11.5px', lineHeight: 1.4 }}>
-                    Perform a secure handshake to validate a peer's invite URL and credentials.
-                  </p>
-
-                  <TextInput
-                    label="Guest Email"
-                    type="email"
-                    value={peerEmail}
-                    onChange={(event) => setPeerEmail(event.target.value)}
-                    placeholder="guest-user@peer.com"
-                    required
-                  />
-
-                  <TextInput
-                    label="Validation Code"
-                    value={peerValidationCode}
-                    onChange={(event) => setPeerValidationCode(event.target.value.toUpperCase())}
-                    placeholder="GRAV-9821-X"
-                    required
-                  />
-
-                  <TextInput
-                    label="Invite URL"
-                    value={peerInviteUrl}
-                    onChange={(event) => setPeerInviteUrl(event.target.value)}
-                    placeholder="https://peer-host.com/api/v1/validate"
-                    required
-                  />
-
-                  <TextInput
-                    label="Guest Username"
-                    value={peerUsername}
-                    onChange={(event) => setPeerUsername(event.target.value)}
-                    required
-                  />
-
-                  <Textarea
-                    label="Password Hash"
-                    rows={3}
-                    value={peerPasswordHash}
-                    onChange={(event) => setPeerPasswordHash(event.target.value)}
-                    placeholder="$2b$12$SecureBcryptHash..."
-                    required
-                  />
-
-                  <Button type="submit" variant="primary" fullWidth loading={pendingAction === 'validate'} style={{ marginTop: 'var(--space-2)' }}>
-                    Validate Peer Invite
-                  </Button>
-                </Stack>
-              </form>
             </Stack>
           </Card>
         </div>
