@@ -56,7 +56,7 @@ export function AIChatWindow({
         boxShadow: 'var(--shadow-xl)',
         display: 'flex',
         flexDirection: 'column',
-        zIndex: 1000,
+        zIndex: 900,
         overflow: 'hidden',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',

@@ -35,7 +35,6 @@ function TicketCardImpl({
         gap: '10px',
         cursor: 'grab',
         transition: 'all var(--transition-normal)',
-        boxShadow: isHovered ? 'var(--shadow-md)' : 'var(--shadow-sm)',
         borderColor: isHovered ? 'var(--color-border-focus)' : 'var(--color-border-default)',
       }}
     >

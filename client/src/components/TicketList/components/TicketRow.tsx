@@ -1,21 +1,26 @@
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { GitMerge, GitPullRequest, Paperclip } from 'lucide-react';
 import type { TicketRowProps } from '../types';
 
 function TicketRowImpl({ ticket, onClick, priorityIcon, assigneeAvatar, domainTag }: TicketRowProps) {
+  const [isHovered, setIsHovered] = useState(false);
+
   return (
     <div
       onClick={onClick}
       className="clickable"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       style={{
         display: 'flex',
         alignItems: 'center',
         gap: '12px',
         padding: '10px 16px',
-        background: 'var(--color-surface-card)',
-        border: '1px solid var(--color-border-default)',
+        background: isHovered ? 'var(--color-surface-overlay)' : 'var(--color-surface-card)',
+        border: '1px solid',
+        borderColor: isHovered ? 'var(--color-border-focus)' : 'var(--color-border-default)',
         borderRadius: '6px',
-        transition: 'background 0.15s ease, border-color 0.15s ease',
+        transition: 'all 0.15s ease',
         cursor: 'pointer',
       }}
     >
