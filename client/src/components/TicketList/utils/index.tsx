@@ -52,18 +52,7 @@ export function getStatusLabel(status: Ticket['status']) {
   return status.replace('_', ' ').toUpperCase();
 }
 
-export const STATUS_COLOR_MAP: Record<string, string> = {
-  backlog: '#9CA3AF',
-  todo: '#3B82F6',
-  in_progress: '#F59E0B',
-  in_review: '#8B5CF6',
-  done: '#10B981',
-  canceled: '#EF4444',
-};
-
-export function getStatusColor(status: string) {
-  return STATUS_COLOR_MAP[status] ?? 'var(--text-muted)';
-}
+export { STATUS_COLOR_MAP, getStatusColor } from '../../TicketDetail/utils';
 
 export function getAssigneeAvatar(userAvatarById: Record<string, string>, assigneeId: string | null) {
   if (!assigneeId) {
