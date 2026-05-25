@@ -775,8 +775,8 @@ export function createWorkspacesRouter() {
           requesterAvatar: user.avatar || null,
           message: 'Already a member',
           status: 'approved',
-          reviewedBy: userId,
-          reviewedAt: new Date().toISOString(),
+          reviewedBy: null,
+          reviewedAt: null,
           createdAt: new Date().toISOString(),
         });
         return;
