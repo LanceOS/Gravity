@@ -66,14 +66,16 @@ export function TicketLink({ ticketKey }: { ticketKey: string }) {
         title={ticketInfo ? `View ${normalizedKey}` : `View ${normalizedKey} (Loading...)`}
       >
         {ticketInfo && (
-          <span 
-            style={{ 
-              width: '8px', 
-              height: '8px', 
-              borderRadius: '50%', 
+          <span
+            aria-hidden="true"
+            role="presentation"
+            style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
               backgroundColor: getStatusColor(ticketInfo.status),
               flexShrink: 0
-            }} 
+            }}
           />
         )}
         <span>{normalizedKey}{ticketInfo ? `: ${ticketInfo.title}` : ''}</span>
