@@ -1,7 +1,4 @@
 import React from 'react';
-import { ChevronRight } from 'lucide-react';
-import { Portal } from '../../utilities';
-import { ClickAwayListener } from '../../utilities';
 
 export interface StepperProps {
   steps: string[];
@@ -24,7 +21,7 @@ export function Stepper({ steps, activeStep, style }: StepperProps) {
                   height: '24px',
                   borderRadius: '50%',
                   backgroundColor: isCompleted || isActive ? 'var(--color-primary)' : 'var(--color-border-default)',
-                  color: isCompleted || isActive ? '#ffffff' : 'var(--color-text-disabled)',
+                  color: isCompleted || isActive ? 'var(--color-text-on-accent)' : 'var(--color-text-disabled)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
