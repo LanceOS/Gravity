@@ -11,6 +11,7 @@ import {
   getTicketById,
   deleteTicketRecord,
   getTicketDetails,
+  getTicketDetailsByKey,
   listComments,
   listTickets,
   updateTicketRecord,
@@ -99,6 +100,20 @@ export function createTicketsRouter() {
       res.status(201).json(created);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create ticket.' });
+    }
+  });
+
+  router.get('/tickets/key/:ticketKey', async (req, res) => {
+    try {
+      const ticketKey = normalizeRouteParam(req.params.ticketKey);
+      const ticket = await getTicketDetailsByKey(ticketKey);
+      if (!ticket) {
+        res.status(404).json({ error: 'Ticket not found.' });
+        return;
+      }
+      res.json(ticket);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load ticket.' });
     }
   });
 

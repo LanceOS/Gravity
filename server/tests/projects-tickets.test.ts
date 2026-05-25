@@ -253,6 +253,29 @@ describe('projects and tickets routes', () => {
     expect(deleteResponse.body).toEqual({ success: true });
   });
 
+  it('resolves a ticket details by its key prefix/key', async () => {
+    const { project } = await seedWorkspaceFixture();
+    const ticket = await seedTicket(project.id, {
+      id: 'ticket-99',
+      title: 'Auto-link test ticket',
+      description: 'Resolving key-based requests.',
+      priority: 'low',
+    });
+
+    expect(ticket.key).toBeDefined();
+
+    const response = await api().get(`/api/v1/tickets/key/${ticket.key}`);
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      id: ticket.id,
+      key: ticket.key,
+      title: 'Auto-link test ticket',
+    });
+
+    const notFoundResponse = await api().get('/api/v1/tickets/key/NONEXIST-999');
+    expect(notFoundResponse.status).toBe(404);
+  });
+
   it('handles comment editing and deletion via PATCH and DELETE', async () => {
     const { owner, project } = await seedWorkspaceFixture();
     const ticket = await seedTicket(project.id, {
