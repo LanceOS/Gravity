@@ -5,7 +5,8 @@ import { cn } from '../../utilities';
 
 export interface SelectOption {
   value: string;
-  label: React.ReactNode;
+  label: string;
+  renderLabel?: React.ReactNode;
   disabled?: boolean;
 }
 
