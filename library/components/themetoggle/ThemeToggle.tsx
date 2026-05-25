@@ -2,9 +2,9 @@ import React from 'react';
 import { Sun, Moon, Laptop } from 'lucide-react';
 import { applyThemeConfig } from '../../utilities/themeEngine';
 import lightTheme from '../../themes/light.json';
-import darkTheme from '../../themes/dark.json';
+import noirTheme from '../../themes/noir.json';
 
-export type ThemeMode = 'light' | 'dark' | 'system';
+export type ThemeMode = 'light' | 'noir' | 'system';
 
 export function ThemeToggle() {
   const [theme, setTheme] = React.useState<ThemeMode>(() => {
@@ -16,21 +16,21 @@ export function ThemeToggle() {
 
   const applyTheme = (targetTheme: ThemeMode) => {
     const root = document.documentElement;
-    root.classList.remove('dark-theme', 'light-theme');
+    root.classList.remove('dark-theme', 'light-theme', 'noir-theme');
     root.removeAttribute('data-theme');
 
-    let resolvedTheme: 'dark' | 'light' = 'light';
+    let resolvedTheme: 'noir' | 'light' = 'light';
     if (targetTheme === 'system') {
       const systemIsDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      resolvedTheme = systemIsDark ? 'dark' : 'light';
+      resolvedTheme = systemIsDark ? 'noir' : 'light';
     } else {
       resolvedTheme = targetTheme;
     }
 
-    if (resolvedTheme === 'dark') {
-      root.classList.add('dark-theme');
-      root.setAttribute('data-theme', 'dark');
-      applyThemeConfig(darkTheme);
+    if (resolvedTheme === 'noir') {
+      root.classList.add('noir-theme', 'dark-theme');
+      root.setAttribute('data-theme', 'noir');
+      applyThemeConfig(noirTheme);
     } else {
       root.classList.add('light-theme');
       root.setAttribute('data-theme', 'light');
@@ -50,7 +50,7 @@ export function ThemeToggle() {
   }, [theme]);
 
   const toggleTheme = () => {
-    const modes: ThemeMode[] = ['light', 'dark', 'system'];
+    const modes: ThemeMode[] = ['light', 'noir', 'system'];
     const currentIndex = modes.indexOf(theme);
     const nextIndex = (currentIndex + 1) % modes.length;
     const nextTheme = modes[nextIndex];
@@ -78,7 +78,7 @@ export function ThemeToggle() {
       }}
     >
       {theme === 'light' && <Sun size={15} style={{ color: 'var(--color-text-secondary)' }} />}
-      {theme === 'dark' && <Moon size={15} style={{ color: 'var(--color-primary)' }} />}
+      {theme === 'noir' && <Moon size={15} style={{ color: 'var(--color-primary)' }} />}
       {theme === 'system' && <Laptop size={15} style={{ color: 'var(--color-text-disabled)' }} />}
     </button>
   );
