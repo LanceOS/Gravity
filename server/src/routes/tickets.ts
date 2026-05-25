@@ -106,7 +106,18 @@ export function createTicketsRouter() {
   router.get('/tickets/key/:ticketKey', optionalWorkspaceAccess, async (req, res: Response<unknown, WorkspaceAccessLocals>) => {
     try {
       const ticketKey = normalizeRouteParam(req.params.ticketKey);
-      const ticket = await getTicketDetailsByKey(ticketKey);
+      const ticketRows = await db
+        .select({
+          id: tickets.id,
+          key: tickets.key,
+          title: tickets.title,
+          status: tickets.status,
+          projectId: tickets.projectId,
+        })
+        .from(tickets)
+        .where(eq(tickets.key, ticketKey))
+        .limit(1);
+      const ticket = ticketRows[0];
       if (!ticket) {
         res.status(404).json({ error: 'Ticket not found.' });
         return;
