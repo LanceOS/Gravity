@@ -1,4 +1,5 @@
-import type { MarkdownTextProps } from '../types';
+import React from 'react';
+import type { MarkdownTextProps } from './types';
 
 type InlineMatch =
   | { index: number; length: number; type: 'bold'; text: string }
@@ -45,7 +46,7 @@ function TextInlineParser({ text }: MarkdownTextProps) {
     } else {
       const key = keyIndex;
       keyIndex += 1;
-      parts.push(<code key={key} style={{ background: 'rgba(255,255,255,0.05)', padding: '1px 3px', borderRadius: '3px', fontSize: '11px', fontFamily: 'var(--mono)', color: 'var(--color-primary)' }}>{firstMatch.text}</code>);
+      parts.push(<code key={key} style={{ background: 'var(--color-base100)', padding: '1px 3px', borderRadius: '3px', fontSize: '11px', fontFamily: 'var(--mono)', color: 'var(--color-primary)' }}>{firstMatch.text}</code>);
     }
 
     remaining = remaining.substring(firstMatch.index + firstMatch.length);
