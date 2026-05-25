@@ -48,14 +48,15 @@ export const TicketList: React.FC<TicketListProps> = ({
                     paddingBottom: '4px'
                   }}
                 >
-                  <span 
-                    style={{ 
-                      width: '8px', 
-                      height: '8px', 
-                      borderRadius: '50%', 
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
                       backgroundColor: getStatusColor(status),
                       flexShrink: 0
-                    }} 
+                    }}
                   />
                   <span>{getStatusLabel(status as Ticket['status'])}</span>
                   <span style={{ background: 'var(--border)', padding: '1px 5px', borderRadius: '4px', fontSize: '10px' }}>
