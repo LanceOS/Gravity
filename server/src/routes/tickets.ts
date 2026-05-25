@@ -104,7 +104,7 @@ export function createTicketsRouter() {
 
   router.get('/tickets/key/:ticketKey', optionalWorkspaceAccess, async (req, res: Response<unknown, WorkspaceAccessLocals>) => {
     try {
-      const ticketKey = normalizeRouteParam(req.params.ticketKey);
+      const ticketKey = normalizeRouteParam(req.params.ticketKey).trim().toUpperCase();
       const ticketRows = await db
         .select({
           id: tickets.id,
