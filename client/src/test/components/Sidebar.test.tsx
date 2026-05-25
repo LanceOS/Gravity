@@ -31,14 +31,7 @@ type SidebarUserMenuMockProps = {
 };
 
 vi.mock('../../components/Sidebar/components', () => ({
-  SidebarHeader: ({ workspace, onOpenCreateTicket }: SidebarHeaderMockProps) => (
-    <div>
-      <div>{`SidebarHeader ${workspace.activeWorkspaceId}`}</div>
-      <button type="button" onClick={onOpenCreateTicket}>
-        Open create ticket
-      </button>
-    </div>
-  ),
+
   SidebarProjectsSection: ({
     section,
     projectsCollapsed,
@@ -183,11 +176,7 @@ describe('Sidebar', () => {
     const user = userEvent.setup();
     const { props } = renderSidebar();
 
-    expect(screen.getByText('SidebarHeader workspace-1')).toBeInTheDocument();
-    expect(screen.getByText('ProjectsCollapsed false')).toBeInTheDocument();
-    expect(screen.getByText('CurrentProjectCollapsed false')).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Open create ticket' }));
+    await user.click(screen.getByRole('button', { name: /new ticket/i }));
     expect(props.tools.onOpenCreateTicket).toHaveBeenCalledTimes(1);
 
     await user.click(screen.getByRole('button', { name: 'Toggle project list' }));

@@ -22,8 +22,6 @@ export function SidebarUserMenu({
     <div
       ref={profileRef}
       style={{
-        borderTop: '1px solid var(--color-border-default)',
-        padding: '12px 16px',
         position: 'relative',
       }}
     >
@@ -60,8 +58,8 @@ export function SidebarUserMenu({
           style={{
             position: 'absolute',
             bottom: '100%',
-            left: '16px',
-            right: '16px',
+            left: '0',
+            right: '0',
             background: 'var(--color-surface-card)',
             border: '1px solid var(--color-border-default)',
             borderRadius: '8px',

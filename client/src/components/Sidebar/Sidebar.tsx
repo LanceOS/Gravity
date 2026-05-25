@@ -1,15 +1,16 @@
 import { Sparkles } from 'lucide-react';
+import { Sidebar as LibSidebar, SidebarHeader, SidebarContent, SidebarFooter } from '@library';
 import { SidebarAgentTools, SidebarProjectsSection, SidebarUserMenu } from './components';
 import type { SidebarProps } from './types';
-import { scrollAreaStyle, sidebarShellStyle, useSidebarState } from './utils';
+import { useSidebarState } from './utils';
 
 export function Sidebar({ workspace, projects, tools, userMenu }: SidebarProps) {
   const sidebarState = useSidebarState(projects.activeProjectId, projects.onSelectProject);
 
   return (
-    <aside style={sidebarShellStyle}>
+    <LibSidebar>
       {projects.projects.length > 0 ? (
-        <div style={{ padding: '16px 16px 8px 16px' }}>
+        <SidebarHeader>
           <button
             type="button"
             onClick={tools.onOpenCreateTicket}
@@ -20,10 +21,10 @@ export function Sidebar({ workspace, projects, tools, userMenu }: SidebarProps) 
             <span>New Ticket</span>
             <span aria-hidden="true" style={{ fontSize: '10px', opacity: 0.6, marginLeft: 'auto', background: 'rgba(255,255,255,0.2)', padding: '1px 5px', borderRadius: '3px' }}>N</span>
           </button>
-        </div>
+        </SidebarHeader>
       ) : null}
 
-      <div style={scrollAreaStyle}>
+      <SidebarContent>
         <SidebarProjectsSection
           section={projects}
           projectsCollapsed={sidebarState.projectsCollapsed}
@@ -31,15 +32,17 @@ export function Sidebar({ workspace, projects, tools, userMenu }: SidebarProps) 
           onToggleProjectsCollapsed={sidebarState.toggleProjectsCollapsed}
           onToggleProject={sidebarState.toggleProject}
         />
-      </div>
+      </SidebarContent>
 
-      <SidebarUserMenu
-        userMenu={userMenu}
-        showUserDropdown={sidebarState.showUserDropdown}
-        onToggleUserDropdown={sidebarState.toggleUserDropdown}
-        onCloseUserDropdown={sidebarState.closeUserDropdown}
-        profileRef={sidebarState.profileRef}
-      />
-    </aside>
+      <SidebarFooter>
+        <SidebarUserMenu
+          userMenu={userMenu}
+          showUserDropdown={sidebarState.showUserDropdown}
+          onToggleUserDropdown={sidebarState.toggleUserDropdown}
+          onCloseUserDropdown={sidebarState.closeUserDropdown}
+          profileRef={sidebarState.profileRef}
+        />
+      </SidebarFooter>
+    </LibSidebar>
   );
 }
