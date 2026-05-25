@@ -106,10 +106,15 @@ function FormattedText({ text }: MarkdownTextProps) {
   // Memoize regex compilation to avoid recompilation on every render/line
   const ticketRegex = useMemo(() => {
     const projectKeys = projects?.map(p => p.key).filter(Boolean) || [];
-    const projectKeysRegexPart = projectKeys.length > 0 
-      ? projectKeys.map(key => key.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')).join('|')
-      : '[A-Z0-9]+';
-    
+
+    if (projectKeys.length === 0) {
+      return /$^/i;
+    }
+
+    const projectKeysRegexPart = projectKeys
+      .map(key => key.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'))
+      .join('|');
+
     return new RegExp(`\\b(${projectKeysRegexPart})-\\d+\\b`, 'i');
   }, [projects]);
 
