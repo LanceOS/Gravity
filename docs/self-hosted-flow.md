@@ -66,7 +66,7 @@ To invite peers, the owner generates an invitation. This creates a secure, uniqu
     ```
 *   **Response**: Returns a unique `code` (e.g., `inv_abc123xyz`). The invite URL distributed to users will look like:
     ```
-    http://<host-ip-or-domain>/join/inv_abc123xyz
+    http://<host-ip-or-domain>/?invite=inv_abc123xyz
     ```
 
 > [!TIP]
