@@ -137,8 +137,8 @@ function GeneralSettingsSection({
             value={settings.theme}
             onChange={(event) => onChangeSettings({ theme: event.target.value as WorkspaceSettings['theme'] })}
             options={[
-              { value: 'dark', label: 'Dark Slate' },
-              { value: 'light', label: 'Light Slate' }
+              { value: 'dark', label: 'Noir' },
+              { value: 'light', label: 'White Paper' }
             ]}
           />
 
