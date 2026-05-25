@@ -65,7 +65,6 @@ export function AIChatMessageBubble({ message: m }: AIChatMessageBubbleProps) {
           <div
             key={tc.id}
             style={{
-            style={{
               marginTop: m.content ? '8px' : '0',
               padding: '6px',
               background: 'var(--color-base50)',
