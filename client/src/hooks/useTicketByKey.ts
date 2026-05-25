@@ -83,10 +83,9 @@ export function useTicketByKey(ticketKey: string) {
           resolvedCache[normalizedKey] = data;
           return data;
         })
-        .catch(err => {
-          // Evict from active fetchCache so it can be retried on next hook mount
+        .finally(() => {
+          // Evict settled requests from the in-flight cache; successful results live in resolvedCache.
           delete fetchCache[normalizedKey];
-          throw err;
         });
     }
 
