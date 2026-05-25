@@ -887,16 +887,6 @@ async function handleResponseJson(response: Response, fallbackError: string) {
     dispatch({ type: 'SET_THEME_RAW', payload: theme });
   }, []);
 
-  // Apply theme to document element
-  useEffect(() => {
-    const root = document.documentElement;
-    if (state.theme === 'dark') {
-      root.classList.add('dark-theme');
-    } else {
-      root.classList.remove('dark-theme');
-    }
-  }, [state.theme]);
-
   const setActiveTicket = useCallback((ticket: Ticket | null) => {
     dispatch({ type: 'SET_ACTIVE_TICKET', payload: ticket });
   }, []);

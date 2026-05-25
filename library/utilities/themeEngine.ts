@@ -1,3 +1,6 @@
+import lightTheme from '../themes/light.json';
+import noirTheme from '../themes/noir.json';
+
 export const KNOWN_THEME_COLOR_KEYS = [
   'primary',
   'primaryHover',
@@ -80,7 +83,44 @@ export type ThemeValidationResult = {
   unknown: string[];
 };
 
+export type ThemePreference = 'light' | 'dark' | 'system';
+export type ResolvedThemeMode = 'light' | 'dark';
+
+export const THEME_STORAGE_KEY = 'gravity_theme';
+
 const knownThemeColorKeySet = new Set<string>(KNOWN_THEME_COLOR_KEYS);
+
+export const normalizeThemePreference = (value: string | null | undefined): ThemePreference => {
+  if (value === 'light' || value === 'dark' || value === 'system') {
+    return value;
+  }
+
+  if (value === 'noir') {
+    return 'dark';
+  }
+
+  return 'system';
+};
+
+export const getStoredThemePreference = (): ThemePreference => {
+  if (typeof window === 'undefined') {
+    return 'system';
+  }
+
+  return normalizeThemePreference(window.localStorage.getItem(THEME_STORAGE_KEY));
+};
+
+export const resolveThemePreference = (preference: ThemePreference): ResolvedThemeMode => {
+  if (preference !== 'system') {
+    return preference;
+  }
+
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return 'light';
+  }
+
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+};
 
 const shouldWarnOnThemeIssues = () => {
   if (typeof window === 'undefined') {
@@ -143,4 +183,37 @@ export const applyThemeConfig = (theme: ThemeConfig) => {
       root.style.removeProperty(`--color-${toKebabCase(key)}`);
     }
   });
+};
+
+export const applyResolvedTheme = (resolvedTheme: ResolvedThemeMode) => {
+  if (typeof document === 'undefined') {
+    return resolvedTheme;
+  }
+
+  const root = document.documentElement;
+
+  root.classList.remove('dark-theme', 'light-theme', 'noir-theme');
+  root.removeAttribute('data-theme');
+
+  if (resolvedTheme === 'dark') {
+    root.classList.add('noir-theme', 'dark-theme');
+    root.setAttribute('data-theme', 'dark');
+    applyThemeConfig(noirTheme);
+  } else {
+    root.classList.add('light-theme');
+    root.setAttribute('data-theme', 'light');
+    applyThemeConfig(lightTheme);
+  }
+
+  return resolvedTheme;
+};
+
+export const applyThemePreference = (preference: ThemePreference, options?: { persist?: boolean }) => {
+  const resolvedTheme = applyResolvedTheme(resolveThemePreference(preference));
+
+  if (options?.persist !== false && typeof window !== 'undefined') {
+    window.localStorage.setItem(THEME_STORAGE_KEY, preference);
+  }
+
+  return resolvedTheme;
 };
