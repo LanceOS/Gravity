@@ -207,7 +207,7 @@ export const applyResolvedTheme = (resolvedTheme: ResolvedThemeMode) => {
     root.setAttribute('data-theme', 'coal-black');
     applyThemeConfig(coalBlackTheme);
   } else if (resolvedTheme === 'coffee') {
-    root.classList.add('coffee-theme');
+    root.classList.add('coffee-theme', 'dark-theme');
     root.setAttribute('data-theme', 'coffee');
     applyThemeConfig(coffeeTheme);
   } else if (resolvedTheme === 'marble-blue') {
