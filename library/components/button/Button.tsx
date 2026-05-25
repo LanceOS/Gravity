@@ -1,6 +1,4 @@
 import React from 'react';
-import { Eye, EyeOff, Search, Calendar, Clock, Star, Upload, User, ChevronDown, Check } from 'lucide-react';
-import { ClickAwayListener } from '../../utilities';
 import { cn } from '../../utilities';
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -56,11 +54,11 @@ export function Button({
     bg = 'var(--color-state-selected-bg)';
     color = 'var(--color-primary)';
     border = '1px solid var(--color-border-focus)';
-    hoverBg = 'rgba(170, 59, 255, 0.2)';
-    activeBg = 'rgba(170, 59, 255, 0.25)';
+    hoverBg = 'var(--color-primary-light)';
+    activeBg = 'var(--color-primary-light)';
   } else if (variant === 'danger') {
     bg = 'var(--color-error)';
-    color = '#FFFFFF';
+    color = 'var(--color-text-on-accent)';
     border = '1px solid var(--color-error)';
     hoverBg = 'var(--color-error-dark)';
     activeBg = 'var(--color-error-dark)';
