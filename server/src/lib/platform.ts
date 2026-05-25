@@ -226,7 +226,37 @@ export async function addWorkspaceMembersToProject(workspaceId: string, projectI
   `);
 }
 
-export async function listWorkspaceSummaries(userId?: string) {
+export type CountRow = {
+  workspaceId: string;
+  count: number;
+};
+
+export type WorkspaceRow = {
+  id: string;
+  name: string;
+  description: string | null;
+  key: string;
+  defaultProjectId: string | null;
+  workspaceHostUrl: string | null;
+  settingsHostUrl: string | null;
+  joinMode: string | null;
+};
+
+export type WorkspaceSummary = {
+  id: string;
+  name: string;
+  description: string;
+  key: string;
+  defaultProjectId: string | null;
+  hostUrl: string;
+  joinMode: 'auto_join' | 'approval_required';
+  projectCount: number;
+  memberCount: number;
+  pendingJoinRequestCount: number;
+  memberRole?: string;
+};
+
+export async function listWorkspaceSummaries(userId?: string): Promise<WorkspaceSummary[]> {
   const memberRoleByWorkspace = new Map<string, string>();
   let accessibleWorkspaceIds: string[] | null = null;
 
@@ -244,7 +274,7 @@ export async function listWorkspaceSummaries(userId?: string) {
     }
 
     accessibleWorkspaceIds = membershipRows.map((membership) => membership.workspaceId);
-    if (accessibleWorkspaceIds.length === 0) {
+    if (!accessibleWorkspaceIds || accessibleWorkspaceIds.length === 0) {
       return [];
     }
   }
@@ -263,7 +293,7 @@ export async function listWorkspaceSummaries(userId?: string) {
     .from(workspaces)
     .leftJoin(workspaceSettings, eq(workspaceSettings.workspaceId, workspaces.id));
 
-  const workspaceRows = accessibleWorkspaceIds
+  const workspaceRows: WorkspaceRow[] = accessibleWorkspaceIds
     ? await workspaceQuery.where(inArray(workspaces.id, accessibleWorkspaceIds)).orderBy(asc(workspaces.createdAt))
     : await workspaceQuery.orderBy(asc(workspaces.createdAt));
   if (workspaceRows.length === 0) {
@@ -299,13 +329,13 @@ export async function listWorkspaceSummaries(userId?: string) {
       .groupBy(workspaceJoinRequests.workspaceId),
   ]);
 
-  const projectCountByWorkspace = new Map(projectCountRows.map((row) => [row.workspaceId, Number(row.count ?? 0)]));
-  const memberCountByWorkspace = new Map(memberCountRows.map((row) => [row.workspaceId, Number(row.count ?? 0)]));
-  const pendingJoinRequestCountByWorkspace = new Map(
+  const projectCountByWorkspace: Map<string, number> = new Map(projectCountRows.map((row) => [row.workspaceId, Number(row.count ?? 0)]));
+  const memberCountByWorkspace: Map<string, number> = new Map(memberCountRows.map((row) => [row.workspaceId, Number(row.count ?? 0)]));
+  const pendingJoinRequestCountByWorkspace: Map<string, number> = new Map(
     pendingJoinRequestCountRows.map((row) => [row.workspaceId, Number(row.count ?? 0)]),
   );
 
-  return workspaceRows.map((workspace) => ({
+  return workspaceRows.map((workspace): WorkspaceSummary => ({
     id: workspace.id,
     name: workspace.name,
     description: workspace.description ?? '',
