@@ -54,7 +54,7 @@ export const TicketList: React.FC<TicketListProps> = ({
                       width: '8px',
                       height: '8px',
                       borderRadius: '50%',
-                      backgroundColor: getStatusColor(status),
+                      backgroundColor: getStatusColor(status as Ticket['status']),
                       flexShrink: 0
                     }}
                   />
