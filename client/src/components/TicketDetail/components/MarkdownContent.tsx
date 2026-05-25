@@ -19,19 +19,24 @@ export function TicketLink({ ticketKey }: { ticketKey: string }) {
   const { ticketInfo } = useTicketByKey(normalizedKey);
 
   /**
-   * @description Handles the click event on the ticket link button. 
-   * It prevents the default action and sets the active ticket and project in the global context.
+   * @description Handles the click event on the ticket link button.
+   * It prevents the default action and updates the active project context. Only
+   * fully-hydrated tickets from the local ticket list are passed to
+   * `setActiveTicket`; partial ticket data from `useTicketByKey` is used only
+   * to locate the target project.
    * @param {React.MouseEvent} e - The mouse event triggered by clicking the button.
    * @returns {void}
    */
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
-    const resolvedTicket = localTicket || ticketInfo;
-    if (resolvedTicket) {
-      if (resolvedTicket.projectId) {
-        setActiveProjectId(resolvedTicket.projectId);
-      }
-      setActiveTicket(resolvedTicket);
+
+    const resolvedProjectId = localTicket?.projectId || ticketInfo?.projectId;
+    if (resolvedProjectId) {
+      setActiveProjectId(resolvedProjectId);
+    }
+
+    if (localTicket) {
+      setActiveTicket(localTicket);
     }
   };
 
