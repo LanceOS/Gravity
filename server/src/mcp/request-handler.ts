@@ -85,7 +85,10 @@ export class McpRequestHandler {
         const toolName = payload.params?.name ?? '';
         const disabledTools = await getDisabledTools(context.workspaceId);
 
-        if (disabledTools.includes(toolName)) {
+        const disablementAlias =
+          toolName === 'create_comment' ? 'add_comment' : toolName === 'add_comment' ? 'create_comment' : null;
+
+        if (disabledTools.includes(toolName) || (disablementAlias && disabledTools.includes(disablementAlias))) {
           throw new Error(`MCP tool "${toolName}" is disabled in this workspace.`);
         }
 
