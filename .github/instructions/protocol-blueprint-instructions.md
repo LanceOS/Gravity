@@ -31,7 +31,7 @@ All endpoints utilize the `/api/v1` namespace prefix. Requests containing writin
 
 #### 2. Process Join Request via Invite
 
-* **Method:** `POST /api/v1/workspaces/join`
+* **Method:** `POST /api/v1/workspaces/invites/:inviteCode/join-requests`
 * **Authentication:** Requires an active user session.
 * **Payload Shape:**
 
