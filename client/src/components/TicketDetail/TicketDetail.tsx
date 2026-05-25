@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { MarkdownContent } from './components';
 import type { TicketDetailProps } from './types';
-import { PRIORITY_OPTIONS, STATUS_OPTIONS } from './utils';
+import { PRIORITY_OPTIONS, STATUS_OPTIONS, getStatusColor } from './utils';
 
 export const TicketDetail: React.FC<TicketDetailProps> = ({
   activeTicket,
@@ -604,7 +604,15 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             <Select
               value={activeTicket.status}
               onValueChange={(nextStatus: string) => onUpdateTicket(activeTicket.id, { status: nextStatus as Ticket['status'] })}
-              options={STATUS_OPTIONS}
+              options={STATUS_OPTIONS.map(opt => ({
+                value: opt.value,
+                label: (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: getStatusColor(opt.value) }} />
+                    <span>{opt.label}</span>
+                  </div>
+                )
+              }))}
               aria-label="Select ticket status"
             />
           </div>

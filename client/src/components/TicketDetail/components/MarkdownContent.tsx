@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import type { MarkdownTextProps } from '../types';
 import { useTickets } from '../../../context/TicketContext';
 import { useTicketByKey } from '../../../hooks/useTicketByKey';
+import { getStatusColor } from '../utils';
 
 /**
  * @description A component that renders an interactive ticket link for a given ticket key.
@@ -34,22 +35,7 @@ export function TicketLink({ ticketKey }: { ticketKey: string }) {
     }
   };
 
-  /**
-   * @description Maps a given ticket status to its corresponding brand color.
-   * @param {string} status - The current status of the ticket (e.g., 'todo', 'in_progress', 'done').
-   * @returns {string} The hex color code or CSS variable associated with the status.
-   */
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'backlog': return '#9CA3AF';
-      case 'todo': return '#3B82F6';
-      case 'in_progress': return '#F59E0B';
-      case 'in_review': return '#8B5CF6';
-      case 'done': return '#10B981';
-      case 'canceled': return '#EF4444';
-      default: return 'var(--text-muted)';
-    }
-  };
+
 
   return (
     <span style={{ display: 'inline-block' }}>
