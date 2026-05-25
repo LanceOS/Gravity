@@ -54,3 +54,26 @@
   --shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.3), 0 4px 8px rgba(0, 0, 0, 0.2);
   --shadow-xl: 0 20px 36px rgba(0, 0, 0, 0.35), 0 8px 16px rgba(0, 0, 0, 0.25);
 }
+
+/* AI Chat Animations */
+@keyframes aiChatSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes aiChatSlideDown {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+}

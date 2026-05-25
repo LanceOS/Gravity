@@ -65,6 +65,19 @@ export function AppShellPage() {
   const [workspaceReady, setWorkspaceReady] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isOllamaOpen, setIsOllamaOpen] = useState(false);
+  const [isOllamaClosing, setIsOllamaClosing] = useState(false);
+
+  const handleToggleOllama = () => {
+    if (isOllamaOpen) {
+      setIsOllamaClosing(true);
+      setTimeout(() => {
+        setIsOllamaOpen(false);
+        setIsOllamaClosing(false);
+      }, 250); // Matches CSS transition duration roughly
+    } else {
+      setIsOllamaOpen(true);
+    }
+  };
 
   const [createInitialStatus, setCreateInitialStatus] = useState<Ticket['status'] | undefined>(undefined);
   const [createParentId, setCreateParentId] = useState<string | undefined>(undefined);
@@ -679,7 +692,7 @@ export function AppShellPage() {
       onSelectDomain: handleSelectDomain,
     },
     tools: {
-      onOpenOllama: () => setIsOllamaOpen((previous) => !previous),
+      onOpenOllama: handleToggleOllama,
       onOpenSimulator: () => { },
       onOpenCreateTicket: () => handleOpenCreateTicket(),
       agentIntegration: accountSettings.agentIntegration,
@@ -737,13 +750,14 @@ export function AppShellPage() {
           sidebarProps={sidebarProps}
           rightPanels={
             <>
-              {isOllamaOpen ? (
+              {isOllamaOpen || isOllamaClosing ? (
                 <LocalAIChat
-                  onClose={() => setIsOllamaOpen(false)}
+                  onClose={handleToggleOllama}
                   initialOllamaUrl={accountSettings.ollamaEndpoint}
                   initialModel={accountSettings.ollamaModel || ollamaModels[0] || ''}
                   settings={accountSettings}
                   workspaceId={activeWorkspaceId}
+                  isClosing={isOllamaClosing}
                 />
               ) : null}
 
@@ -816,31 +830,33 @@ export function AppShellPage() {
       {/* Floating Chat Trigger Button */}
       <button
         type="button"
-        aria-label={isOllamaOpen ? 'Close AI Assistant' : 'Open AI Assistant'}
-        onClick={() => setIsOllamaOpen((prev) => !prev)}
+        aria-label={isOllamaOpen ? 'Close AI Assistant' : 'Ask Agent'}
+        onClick={handleToggleOllama}
         className="clickable"
         style={{
           position: 'fixed',
           bottom: '24px',
           right: '24px',
-          width: '48px',
-          height: '48px',
-          borderRadius: '50%',
+          height: '40px',
+          padding: '0 16px',
+          borderRadius: '20px',
           background: 'var(--color-primary)',
           color: 'var(--color-text-on-accent)',
           border: '1px solid var(--color-border-focus)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
+          gap: '8px',
           boxShadow: '0 4px 16px var(--color-state-selected-bg)',
           zIndex: 999,
           cursor: 'pointer',
-          transition: 'transform 0.2s ease, background-color 0.2s ease',
+          fontWeight: 500,
+          fontSize: '13px',
         }}
-
         title="Toggle AI Assistant"
       >
-        {isOllamaOpen ? <X size={20} /> : <MessageSquare size={20} />}
+        {isOllamaOpen ? <X size={16} /> : <MessageSquare size={16} />}
+        {isOllamaOpen ? 'Close' : 'Ask Agent'}
       </button>
     </>
   );

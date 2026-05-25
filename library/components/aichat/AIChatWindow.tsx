@@ -13,6 +13,7 @@ export interface AIChatWindowProps {
   settingsPanel?: React.ReactNode;
   quickActions?: React.ReactNode;
   placeholder?: string;
+  isClosing?: boolean;
 }
 
 export function AIChatWindow({
@@ -24,6 +25,7 @@ export function AIChatWindow({
   settingsPanel,
   quickActions,
   placeholder = 'Ask AI a question...',
+  isClosing = false,
 }: AIChatWindowProps) {
   const [chatInput, setChatInput] = useState('');
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -58,6 +60,7 @@ export function AIChatWindow({
         overflow: 'hidden',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
+        animation: isClosing ? 'aiChatSlideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards' : 'aiChatSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
       }}
     >
       {/* Header */}

@@ -12,7 +12,7 @@ const CLOUD_MODELS: Record<string, string[]> = {
   deepseek: ['deepseek-chat'],
 };
 
-export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllamaUrl, initialModel, settings, workspaceId }) => {
+export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllamaUrl, initialModel, settings, workspaceId, isClosing }) => {
   const { activeTicket, projects, users } = useTickets();
 
   const isThirdParty = settings.agentIntegration === 'third_party';
@@ -263,6 +263,7 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
 
   return (
     <AIChatWindow
+      isClosing={isClosing}
       title={isThirdParty ? `${getProviderName(settings.aiProvider)} Assistant` : 'Local AI Assistant'}
       onClose={onClose}
       messages={messages}
