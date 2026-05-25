@@ -12,25 +12,25 @@ export function CalendarView({ currentDate = new Date(), events = [], style }: C
   const firstDay = getFirstDayOfMonth(currentDate.getFullYear(), currentDate.getMonth());
 
   return (
-    <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', ...style }}>
+    <div style={{ border: '1px solid var(--color-border-default)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', ...style }}>
       {/* Header */}
-      <div style={{ padding: '12px 16px', backgroundColor: 'var(--sidebar-bg)', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'center' }}>
-        <span style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text-heading)' }}>
+      <div style={{ padding: '12px 16px', backgroundColor: 'var(--color-base50)', borderBottom: '1px solid var(--color-border-default)', display: 'flex', justifyContent: 'center' }}>
+        <span style={{ fontWeight: 600, fontSize: '14px', color: 'var(--color-text-primary)' }}>
           {currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
         </span>
       </div>
       {/* Week Header */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: '1px solid var(--border)', textAlign: 'center', backgroundColor: 'var(--card-bg)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: '1px solid var(--color-border-default)', textAlign: 'center', backgroundColor: 'var(--color-surface-card)' }}>
         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
-          <div key={d} style={{ padding: '6px', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)' }}>
+          <div key={d} style={{ padding: '6px', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)' }}>
             {d}
           </div>
         ))}
       </div>
       {/* Days Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', backgroundColor: 'var(--border)', gap: '1px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', backgroundColor: 'var(--color-border-default)', gap: '1px' }}>
         {Array.from({ length: firstDay }).map((_, i) => (
-          <div key={`empty-${i}`} style={{ backgroundColor: 'var(--card-bg)', minHeight: '60px' }} />
+          <div key={`empty-${i}`} style={{ backgroundColor: 'var(--color-surface-card)', minHeight: '60px' }} />
         ))}
         {Array.from({ length: daysInMonth }).map((_, i) => {
           const day = i + 1;
@@ -46,7 +46,7 @@ export function CalendarView({ currentDate = new Date(), events = [], style }: C
             <div
               key={day}
               style={{
-                backgroundColor: 'var(--card-bg)',
+                backgroundColor: 'var(--color-surface-card)',
                 minHeight: '60px',
                 padding: '6px',
                 display: 'flex',
@@ -54,7 +54,7 @@ export function CalendarView({ currentDate = new Date(), events = [], style }: C
                 gap: '4px',
               }}
             >
-              <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-heading)' }}>{day}</span>
+              <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-primary)' }}>{day}</span>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', overflowY: 'auto' }}>
                 {dayEvents.map((evt, eIdx) => (
                   <div
@@ -63,8 +63,8 @@ export function CalendarView({ currentDate = new Date(), events = [], style }: C
                       fontSize: '9px',
                       padding: '1px 4px',
                       borderRadius: 'var(--radius-xs)',
-                      backgroundColor: evt.color || 'var(--accent-glow)',
-                      color: 'var(--text-heading)',
+                      backgroundColor: evt.color || 'var(--color-state-selected-bg)',
+                      color: 'var(--color-text-primary)',
                       whiteSpace: 'nowrap',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',

@@ -15,8 +15,8 @@ export function Card({ title, extra, children, style, className = '', bodyStyle,
     <div
       className={className}
       style={{
-        backgroundColor: 'var(--card-bg)',
-        border: '1px solid var(--border)',
+        backgroundColor: 'var(--color-surface-card)',
+        border: '1px solid var(--color-border-default)',
         borderRadius: 'var(--radius-md)',
         boxShadow: 'var(--shadow-sm)',
         display: 'flex',
@@ -29,13 +29,13 @@ export function Card({ title, extra, children, style, className = '', bodyStyle,
         <div
           style={{
             padding: '12px 16px',
-            borderBottom: '1px solid var(--border)',
+            borderBottom: '1px solid var(--color-border-default)',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
           }}
         >
-          {title && <h4 style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: 'var(--text-heading)' }}>{title}</h4>}
+          {title && <h4 style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>{title}</h4>}
           {extra}
         </div>
       )}

@@ -28,7 +28,7 @@ export const DenseTextInput = React.forwardRef<HTMLInputElement, DenseTextInputP
             style={{
               fontSize: '10px',
               fontWeight: 600,
-              color: 'var(--text-muted)',
+              color: 'var(--color-text-disabled)',
               textTransform: 'uppercase',
               letterSpacing: '0.03em',
               userSelect: 'none'
@@ -44,8 +44,8 @@ export const DenseTextInput = React.forwardRef<HTMLInputElement, DenseTextInputP
             style={{
               width: '100%',
               height: '36px',
-              backgroundColor: 'var(--card-bg)',
-              border: `1px solid ${error ? 'var(--priority-high)' : 'var(--border)'}`,
+              backgroundColor: 'var(--color-surface-card)',
+              border: `1px solid ${error ? 'var(--color-text-primary)' : 'var(--color-border-default)'}`,
               borderRadius: 'var(--radius-xs)',
               paddingTop: 'var(--input-padding-y, 2px)',
               paddingBottom: 'var(--input-padding-y, 2px)',
@@ -53,7 +53,7 @@ export const DenseTextInput = React.forwardRef<HTMLInputElement, DenseTextInputP
               paddingRight: 'var(--space-2, 8px)',
               fontFamily: 'var(--sans)',
               fontSize: '12px',
-              color: 'var(--text-heading)',
+              color: 'var(--color-text-primary)',
               outline: 'none',
               transition: 'border-color var(--transition-fast, 0.1s ease), box-shadow var(--transition-fast, 0.1s ease)'
             }}
@@ -65,7 +65,7 @@ export const DenseTextInput = React.forwardRef<HTMLInputElement, DenseTextInputP
           <span
             style={{
               fontSize: '10px',
-              color: 'var(--priority-high)',
+              color: 'var(--color-text-primary)',
               fontWeight: 500
             }}
           >
@@ -77,20 +77,20 @@ export const DenseTextInput = React.forwardRef<HTMLInputElement, DenseTextInputP
         <style dangerouslySetInnerHTML={{
           __html: `
           .dense-input-element:focus {
-            border-color: var(--accent) !important;
-            box-shadow: 0 0 0 2px var(--accent-glow) !important;
+            border-color: var(--color-primary) !important;
+            box-shadow: 0 0 0 2px var(--color-state-selected-bg) !important;
           }
           .dense-input-element:disabled {
-            background-color: var(--sidebar-bg) !important;
-            color: var(--text-muted) !important;
+            background-color: var(--color-base50) !important;
+            color: var(--color-text-disabled) !important;
             cursor: not-allowed;
             opacity: 0.6;
           }
           .dense-input-element:-webkit-autofill,
           .dense-input-element:-webkit-autofill:hover, 
           .dense-input-element:-webkit-autofill:focus {
-            -webkit-text-fill-color: var(--text-heading) !important;
-            -webkit-box-shadow: 0 0 0px 1000px var(--card-bg) inset !important;
+            -webkit-text-fill-color: var(--color-text-primary) !important;
+            -webkit-box-shadow: 0 0 0px 1000px var(--color-surface-card) inset !important;
             transition: background-color 5000s ease-in-out 0s;
           }
         `}} />

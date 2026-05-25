@@ -67,7 +67,7 @@ export function DenseVirtualList<T>({
         position: 'relative',
         outline: 'none',
         backgroundColor: 'transparent',
-        border: '1px solid var(--border)',
+        border: '1px solid var(--color-border-default)',
         borderRadius: 'var(--radius-sm)'
       }}
       role="grid"

@@ -20,7 +20,7 @@ export function Carousel({ images, style }: CarouselProps) {
         height: '200px',
         overflow: 'hidden',
         borderRadius: 'var(--radius-lg)',
-        border: '1px solid var(--border)',
+        border: '1px solid var(--color-border-default)',
         ...style,
       }}
     >

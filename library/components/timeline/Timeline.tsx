@@ -17,7 +17,7 @@ export function Timeline({ events, style }: TimelineProps) {
           top: '4px',
           bottom: '4px',
           width: '2px',
-          backgroundColor: 'var(--border)',
+          backgroundColor: 'var(--color-border-default)',
         }}
       />
       {events.map((evt, idx) => (
@@ -31,13 +31,13 @@ export function Timeline({ events, style }: TimelineProps) {
               width: '10px',
               height: '10px',
               borderRadius: '50%',
-              backgroundColor: 'var(--accent-solid)',
-              border: '2px solid var(--card-bg)',
+              backgroundColor: 'var(--color-primary)',
+              border: '2px solid var(--color-surface-card)',
             }}
           />
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 500 }}>{evt.time}</div>
-          <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-heading)' }}>{evt.title}</div>
-          {evt.description && <div style={{ fontSize: '12px', color: 'var(--text)' }}>{evt.description}</div>}
+          <div style={{ fontSize: '11px', color: 'var(--color-text-disabled)', fontWeight: 500 }}>{evt.time}</div>
+          <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-primary)' }}>{evt.title}</div>
+          {evt.description && <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>{evt.description}</div>}
         </div>
       ))}
     </div>

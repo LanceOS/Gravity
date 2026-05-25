@@ -26,8 +26,8 @@ export function Tooltip({ content, children, style }: TooltipProps) {
             role="tooltip"
             style={{
               position: 'absolute',
-              backgroundColor: 'var(--text-heading)',
-              color: 'var(--bg)',
+              backgroundColor: 'var(--color-text-primary)',
+              color: 'var(--color-surface-app)',
               padding: '4px 8px',
               borderRadius: 'var(--radius-xs)',
               fontSize: '11px',

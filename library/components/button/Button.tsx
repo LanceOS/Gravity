@@ -40,39 +40,39 @@ export function Button({
     lg: '14px',
   }[size];
 
-  let bg = 'var(--card-bg)';
-  let color = 'var(--text)';
-  let border = '1px solid var(--border)';
-  let hoverBg = 'var(--card-hover)';
-  let activeBg = 'var(--border)';
+  let bg = 'var(--color-surface-card)';
+  let color = 'var(--color-text-secondary)';
+  let border = '1px solid var(--color-border-default)';
+  let hoverBg = 'var(--color-base100)';
+  let activeBg = 'var(--color-border-default)';
 
   if (variant === 'primary' || variant === 'accent') {
-    bg = 'var(--accent-solid)';
-    color = 'var(--accent-foreground)';
-    border = '1px solid var(--accent-solid)';
-    hoverBg = 'var(--accent-solid-hover)';
-    activeBg = 'var(--accent-solid-hover)';
+    bg = 'var(--color-primary)';
+    color = 'var(--color-text-on-accent)';
+    border = '1px solid var(--color-primary)';
+    hoverBg = 'var(--color-primary-hover)';
+    activeBg = 'var(--color-primary-hover)';
   } else if (variant === 'secondary') {
-    bg = 'var(--accent-glow)';
-    color = 'var(--accent)';
-    border = '1px solid var(--accent-border)';
+    bg = 'var(--color-state-selected-bg)';
+    color = 'var(--color-primary)';
+    border = '1px solid var(--color-border-focus)';
     hoverBg = 'rgba(170, 59, 255, 0.2)';
     activeBg = 'rgba(170, 59, 255, 0.25)';
   } else if (variant === 'danger') {
-    bg = 'var(--danger)';
-    color = 'var(--danger-foreground)';
-    border = '1px solid var(--danger)';
-    hoverBg = 'var(--danger-hover)';
-    activeBg = 'var(--danger-hover)';
+    bg = 'var(--color-error)';
+    color = 'var(--color-text-inverse)';
+    border = '1px solid var(--color-error)';
+    hoverBg = 'var(--color-error-dark)';
+    activeBg = 'var(--color-error-dark)';
   } else if (variant === 'ghost') {
     bg = 'transparent';
-    color = 'var(--text)';
+    color = 'var(--color-text-secondary)';
     border = '1px solid transparent';
-    hoverBg = 'var(--card-hover)';
-    activeBg = 'var(--border)';
+    hoverBg = 'var(--color-base100)';
+    activeBg = 'var(--color-border-default)';
   } else if (variant === 'link') {
     bg = 'transparent';
-    color = 'var(--accent)';
+    color = 'var(--color-primary)';
     border = '1px solid transparent';
     hoverBg = 'transparent';
     activeBg = 'transparent';

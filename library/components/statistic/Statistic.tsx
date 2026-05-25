@@ -13,8 +13,8 @@ export function Statistic({ title, value, suffix, style }: StatisticProps) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', ...style }}>
       <div className="label">{title}</div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
-        <span style={{ fontSize: '20px', fontWeight: 600, color: 'var(--text-heading)' }}>{value}</span>
-        {suffix && <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{suffix}</span>}
+        <span style={{ fontSize: '20px', fontWeight: 600, color: 'var(--color-text-primary)' }}>{value}</span>
+        {suffix && <span style={{ fontSize: '12px', color: 'var(--color-text-disabled)' }}>{suffix}</span>}
       </div>
     </div>
   );

@@ -41,11 +41,11 @@ export function FileUploader({ onFileSelect, label }: FileUploaderProps) {
         onClick={() => inputRef.current?.click()}
         className="clickable"
         style={{
-          border: '2px dashed var(--border)',
+          border: '2px dashed var(--color-border-default)',
           borderRadius: 'var(--radius-lg)',
           padding: '24px',
           textAlign: 'center',
-          backgroundColor: isDragActive ? 'var(--accent-glow)' : 'var(--card-bg)',
+          backgroundColor: isDragActive ? 'var(--color-state-selected-bg)' : 'var(--color-surface-card)',
           cursor: 'pointer',
           transition: 'background-color var(--transition-normal), border-color var(--transition-normal)',
         }}
@@ -57,7 +57,7 @@ export function FileUploader({ onFileSelect, label }: FileUploaderProps) {
           onChange={(e) => e.target.files && onFileSelect(e.target.files)}
           style={{ display: 'none' }}
         />
-        <Upload size={24} style={{ color: 'var(--text-muted)', marginBottom: '8px' }} />
+        <Upload size={24} style={{ color: 'var(--color-text-disabled)', marginBottom: '8px' }} />
         <p style={{ fontSize: '13px', margin: 0 }}>Drag and drop files here, or click to upload</p>
       </div>
     </div>

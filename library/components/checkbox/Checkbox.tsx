@@ -21,7 +21,7 @@ export function Checkbox({ label, error, className = '', style, ...props }: Chec
           cursor: 'pointer',
           userSelect: 'none',
           fontSize: '13px',
-          color: 'var(--text)',
+          color: 'var(--color-text-secondary)',
         }}
       >
         <input
@@ -30,7 +30,7 @@ export function Checkbox({ label, error, className = '', style, ...props }: Chec
           className={className}
           style={{
             cursor: 'pointer',
-            accentColor: 'var(--accent-solid)',
+            accentColor: 'var(--color-primary)',
             width: '15px',
             height: '15px',
           }}

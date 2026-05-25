@@ -35,12 +35,12 @@ export function TransferList({ leftItems, rightItems, onChange, label }: Transfe
         <div
           style={{
             flex: 1,
-            border: '1px solid var(--border)',
+            border: '1px solid var(--color-border-default)',
             borderRadius: 'var(--radius-md)',
             height: '160px',
             overflowY: 'auto',
             padding: '6px',
-            backgroundColor: 'var(--card-bg)',
+            backgroundColor: 'var(--color-surface-card)',
           }}
         >
           {leftItems.map((item) => (
@@ -79,12 +79,12 @@ export function TransferList({ leftItems, rightItems, onChange, label }: Transfe
         <div
           style={{
             flex: 1,
-            border: '1px solid var(--border)',
+            border: '1px solid var(--color-border-default)',
             borderRadius: 'var(--radius-md)',
             height: '160px',
             overflowY: 'auto',
             padding: '6px',
-            backgroundColor: 'var(--card-bg)',
+            backgroundColor: 'var(--color-surface-card)',
           }}
         >
           {rightItems.map((item) => (

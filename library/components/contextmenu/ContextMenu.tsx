@@ -30,8 +30,8 @@ export function ContextMenu({ children, items }: ContextMenuProps) {
                 top: `${pos.y}px`,
                 left: `${pos.x}px`,
                 zIndex: 2000,
-                backgroundColor: 'var(--card-bg)',
-                border: '1px solid var(--border)',
+                backgroundColor: 'var(--color-surface-card)',
+                border: '1px solid var(--color-border-default)',
                 borderRadius: 'var(--radius-md)',
                 boxShadow: 'var(--shadow-lg)',
                 padding: '4px',
@@ -51,7 +51,7 @@ export function ContextMenu({ children, items }: ContextMenuProps) {
                     borderRadius: 'var(--radius-sm)',
                     fontSize: '13px',
                     cursor: 'pointer',
-                    color: 'var(--text-heading)',
+                    color: 'var(--color-text-primary)',
                   }}
                 >
                   {item.label}

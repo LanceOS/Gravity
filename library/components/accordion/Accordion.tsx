@@ -18,7 +18,7 @@ export function Accordion({ items, style }: AccordionProps) {
       {items.map((item) => {
         const isOpen = !!openIds[item.id];
         return (
-          <div key={item.id} style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
+          <div key={item.id} style={{ border: '1px solid var(--color-border-default)', borderRadius: 'var(--radius-md)' }}>
             <button
               type="button"
               onClick={() => toggle(item.id)}
@@ -35,14 +35,14 @@ export function Accordion({ items, style }: AccordionProps) {
                 textAlign: 'left',
                 fontSize: '13px',
                 fontWeight: 500,
-                color: 'var(--text-heading)',
+                color: 'var(--color-text-primary)',
               }}
             >
               <span>{item.title}</span>
               <span>{isOpen ? '▲' : '▼'}</span>
             </button>
             {isOpen && (
-              <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)', fontSize: '13px', color: 'var(--text)' }}>
+              <div style={{ padding: '12px 16px', borderTop: '1px solid var(--color-border-default)', fontSize: '13px', color: 'var(--color-text-secondary)' }}>
                 {item.content}
               </div>
             )}

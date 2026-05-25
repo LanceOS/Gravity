@@ -51,7 +51,7 @@ export function SplitPane({ left, right, initialWidth = 240, style, className = 
         style={{
           width: '4px',
           cursor: 'col-resize',
-          backgroundColor: 'var(--border)',
+          backgroundColor: 'var(--color-border-default)',
           transition: 'background-color var(--transition-fast)',
         }}
       />

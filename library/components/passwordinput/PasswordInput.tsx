@@ -28,7 +28,7 @@ export function PasswordInput({ className = '', ...props }: PasswordInputProps) 
           background: 'none',
           border: 'none',
           cursor: 'pointer',
-          color: 'var(--text-muted)',
+          color: 'var(--color-text-disabled)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',

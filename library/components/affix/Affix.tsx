@@ -16,7 +16,7 @@ export function Affix({ offsetTop = 0, children, style }: AffixProps) {
         position: 'sticky',
         top: `${offsetTop}px`,
         zIndex: 100,
-        backgroundColor: 'var(--card-bg)',
+        backgroundColor: 'var(--color-surface-card)',
         width: '100%',
         ...style,
       }}

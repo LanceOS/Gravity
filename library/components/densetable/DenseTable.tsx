@@ -53,9 +53,9 @@ export function DenseTable<T>({
       style={{
         overflowX: 'auto',
         width: '100%',
-        border: '1px solid var(--border)',
+        border: '1px solid var(--color-border-default)',
         borderRadius: 'var(--radius-sm)',
-        backgroundColor: 'var(--card-bg)'
+        backgroundColor: 'var(--color-surface-card)'
       }}
     >
       <table
@@ -72,8 +72,8 @@ export function DenseTable<T>({
         <thead>
           <tr
             style={{
-              backgroundColor: 'var(--sidebar-bg)',
-              borderBottom: '1px solid var(--border)',
+              backgroundColor: 'var(--color-base50)',
+              borderBottom: '1px solid var(--color-border-default)',
               height: 'var(--table-row-height, 26px)'
             }}
           >
@@ -83,7 +83,7 @@ export function DenseTable<T>({
                 style={{
                   padding: '2px var(--space-2, 8px)',
                   fontWeight: 600,
-                  color: 'var(--text-muted)',
+                  color: 'var(--color-text-disabled)',
                   width: col.width,
                   textAlign: col.align || 'left',
                   textTransform: 'uppercase',
@@ -108,10 +108,10 @@ export function DenseTable<T>({
                 tabIndex={0}
                 onClick={() => onRowClick?.(row)}
                 style={{
-                  borderBottom: '1px solid var(--border)',
+                  borderBottom: '1px solid var(--color-border-default)',
                   height: 'var(--table-row-height, 26px)',
                   cursor: onRowClick ? 'pointer' : 'default',
-                  backgroundColor: isSelected ? 'var(--accent-glow)' : 'transparent',
+                  backgroundColor: isSelected ? 'var(--color-state-selected-bg)' : 'transparent',
                   outline: 'none',
                   transition: 'background-color var(--transition-fast, 0.1s ease)'
                 }}
@@ -124,8 +124,8 @@ export function DenseTable<T>({
                       padding: '0 var(--space-2, 8px)',
                       textAlign: col.align || 'left',
                       color: isSelected 
-                        ? 'var(--text-heading)' 
-                        : 'var(--text)',
+                        ? 'var(--color-text-primary)' 
+                        : 'var(--color-text-secondary)',
                       whiteSpace: 'nowrap',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis'

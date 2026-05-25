@@ -70,8 +70,8 @@ export function DateRangePicker({ value, onChange, label }: DateRangePickerProps
               left: 0,
               zIndex: 1000,
               padding: '12px',
-              backgroundColor: 'var(--card-bg)',
-              border: '1px solid var(--border)',
+              backgroundColor: 'var(--color-surface-card)',
+              border: '1px solid var(--color-border-default)',
               borderRadius: 'var(--radius-md)',
               boxShadow: 'var(--shadow-md)',
               marginTop: '4px',
@@ -91,7 +91,7 @@ export function DateRangePicker({ value, onChange, label }: DateRangePickerProps
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', textAlign: 'center' }}>
               {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((d) => (
-                <span key={d} style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text-muted)' }}>
+                <span key={d} style={{ fontSize: '11px', fontWeight: 500, color: 'var(--color-text-disabled)' }}>
                   {d}
                 </span>
               ))}
@@ -113,8 +113,8 @@ export function DateRangePicker({ value, onChange, label }: DateRangePickerProps
                     className="clickable"
                     style={{
                       border: 'none',
-                      background: isStart || isEnd ? 'var(--accent-solid)' : inRange ? 'var(--accent-glow)' : 'transparent',
-                      color: isStart || isEnd ? '#ffffff' : 'var(--text-heading)',
+                      background: isStart || isEnd ? 'var(--color-primary)' : inRange ? 'var(--color-state-selected-bg)' : 'transparent',
+                      color: isStart || isEnd ? '#ffffff' : 'var(--color-text-primary)',
                       borderRadius: 'var(--radius-xs)',
                       padding: '4px',
                       cursor: 'pointer',

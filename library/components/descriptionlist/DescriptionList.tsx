@@ -20,8 +20,8 @@ export function DescriptionList({ items, style }: DescriptionListProps) {
     >
       {items.map((item, idx) => (
         <React.Fragment key={idx}>
-          <dt style={{ color: 'var(--text-muted)', fontWeight: 500 }}>{item.key}</dt>
-          <dd style={{ margin: 0, color: 'var(--text-heading)' }}>{item.value}</dd>
+          <dt style={{ color: 'var(--color-text-disabled)', fontWeight: 500 }}>{item.key}</dt>
+          <dd style={{ margin: 0, color: 'var(--color-text-primary)' }}>{item.value}</dd>
         </React.Fragment>
       ))}
     </dl>

@@ -39,7 +39,7 @@ export function TreeView({ nodes, onNodeClick, style }: TreeViewProps) {
             borderRadius: 'var(--radius-sm)',
             cursor: 'pointer',
             fontSize: '13px',
-            color: 'var(--text-heading)',
+            color: 'var(--color-text-primary)',
           }}
         >
           {isFolder ? (
@@ -47,19 +47,19 @@ export function TreeView({ nodes, onNodeClick, style }: TreeViewProps) {
               <button
                 type="button"
                 onClick={(e) => toggleExpand(node.id, e)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--text-muted)', display: 'flex', alignItems: 'center' }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--color-text-disabled)', display: 'flex', alignItems: 'center' }}
               >
                 <ChevronDown size={14} style={{ transform: isExpanded ? 'none' : 'rotate(-90deg)', transition: 'transform var(--transition-fast)' }} />
               </button>
-              <Folder size={14} style={{ color: 'var(--accent)' }} />
+              <Folder size={14} style={{ color: 'var(--color-primary)' }} />
             </div>
           ) : (
-            <File size={14} style={{ color: 'var(--text-muted)' }} />
+            <File size={14} style={{ color: 'var(--color-text-disabled)' }} />
           )}
           <span>{node.label}</span>
         </div>
         {isFolder && isExpanded && node.children && (
-          <div style={{ paddingLeft: '16px', display: 'flex', flexDirection: 'column', borderLeft: '1px solid var(--border)', marginLeft: '12px' }}>
+          <div style={{ paddingLeft: '16px', display: 'flex', flexDirection: 'column', borderLeft: '1px solid var(--color-border-default)', marginLeft: '12px' }}>
             {node.children.map((child) => renderNode(child))}
           </div>
         )}

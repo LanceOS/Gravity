@@ -19,7 +19,7 @@
 .scroll-container {
   overflow: auto;
   scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
+  scrollbar-color: var(--color-border-default) transparent;
   transition: scrollbar-color var(--transition-normal);
 }
 
@@ -33,7 +33,7 @@
 }
 
 .scroll-container::-webkit-scrollbar-thumb {
-  background: var(--border);
+  background: var(--color-border-default);
   border-radius: var(--radius-full);
   border: 1px solid transparent;
   background-clip: padding-box;
@@ -41,7 +41,7 @@
 }
 
 .scroll-container::-webkit-scrollbar-thumb:hover {
-  background: var(--text-muted);
+  background: var(--color-text-disabled);
 }
 
 /* Animations with Modern Easing */
@@ -90,12 +90,12 @@
   0%,
   100% {
     opacity: 0.65;
-    background-color: var(--border);
+    background-color: var(--color-border-default);
   }
 
   50% {
     opacity: 0.25;
-    background-color: var(--card-hover);
+    background-color: var(--color-base100);
   }
 }
 
@@ -109,7 +109,7 @@
 
 .lib-spinner {
   animation: lib-spinner-rotate 0.9s cubic-bezier(0.5, 0.1, 0.4, 0.9) infinite;
-  color: var(--accent);
+  color: var(--color-primary);
 }
 
 .lib-skeleton-pulse {
@@ -134,14 +134,14 @@
 
 .lib-divider {
   height: 1px;
-  background: var(--border);
+  background: var(--color-border-default);
   width: 100%;
   margin: var(--space-2) 0;
 }
 
 .lib-divider-vertical {
   width: 1px;
-  background: var(--border);
+  background: var(--color-border-default);
   height: 100%;
   margin: 0 var(--space-2);
 }
@@ -153,13 +153,13 @@
 
 .lib-focus-ring:focus-visible {
   outline: none;
-  border-color: var(--accent) !important;
-  box-shadow: 0 0 0 3px var(--accent-glow) !important;
+  border-color: var(--color-primary) !important;
+  box-shadow: 0 0 0 3px var(--color-state-selected-bg) !important;
 }
 
 /* Form validation states styling matching accessible error announcement */
 .lib-field-error-msg {
-  color: var(--priority-high);
+  color: var(--color-text-primary);
   font-size: 11px;
   font-weight: 500;
   margin-top: 5px;
@@ -178,9 +178,9 @@
   min-height: 36px;
   padding: 8px 12px;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--card-bg);
-  color: var(--text-heading);
+  border: 1px solid var(--color-border-default);
+  background: var(--color-surface-card);
+  color: var(--color-text-primary);
   font: inherit;
   text-align: left;
   display: inline-flex;
@@ -192,15 +192,15 @@
 }
 
 .select-trigger:hover {
-  border-color: var(--accent-border);
-  background: var(--card-hover);
+  border-color: var(--color-border-focus);
+  background: var(--color-base100);
 }
 
 .select-trigger:focus-visible,
 .select-trigger[data-open='true'] {
   outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-glow);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-state-selected-bg);
 }
 
 .select-trigger:disabled {
@@ -215,18 +215,18 @@
 }
 
 .select-trigger__value--placeholder {
-  color: var(--text-muted);
+  color: var(--color-text-disabled);
 }
 
 .select-trigger__icon {
-  color: var(--text-muted);
+  color: var(--color-text-disabled);
   flex-shrink: 0;
   transition: transform var(--transition-normal), color var(--transition-normal);
 }
 
 .select-trigger[data-open='true'] .select-trigger__icon {
   transform: rotate(180deg);
-  color: var(--text-heading);
+  color: var(--color-text-primary);
 }
 
 .select-menu {
@@ -234,8 +234,8 @@
   z-index: 1400;
   padding: 6px;
   border-radius: var(--radius-md);
-  border: 1px solid var(--border);
-  background: var(--card-bg);
+  border: 1px solid var(--color-border-default);
+  background: var(--color-surface-card);
   box-shadow: var(--shadow-lg);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
@@ -249,7 +249,7 @@
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--text);
+  color: var(--color-text-secondary);
   font: inherit;
   display: inline-flex;
   align-items: center;
@@ -263,14 +263,14 @@
 
 .select-option:hover,
 .select-option[data-active='true'] {
-  background: var(--card-hover);
-  color: var(--text-heading);
+  background: var(--color-base100);
+  color: var(--color-text-primary);
 }
 
 .select-option[data-selected='true'] {
-  background: var(--accent-glow);
-  border-color: var(--accent-border);
-  color: var(--accent);
+  background: var(--color-state-selected-bg);
+  border-color: var(--color-border-focus);
+  color: var(--color-primary);
   font-weight: 500;
 }
 
@@ -306,13 +306,13 @@
   width: 100%;
   display: flex;
   align-items: center;
-  border-bottom: 1px solid var(--border);
-  background-color: var(--card-bg);
+  border-bottom: 1px solid var(--color-border-default);
+  background-color: var(--color-surface-card);
   transition: background-color var(--transition-fast), transform var(--transition-fast);
 }
 
 .lib-virtual-grid-row:hover {
-  background-color: var(--card-hover);
+  background-color: var(--color-base100);
   z-index: 2;
 }
 
@@ -321,9 +321,9 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  border-right: 1px solid var(--border);
+  border-right: 1px solid var(--color-border-default);
   font-size: 12.5px;
-  color: var(--text);
+  color: var(--color-text-secondary);
 }
 
 .lib-virtual-grid-cell:last-child {

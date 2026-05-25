@@ -44,7 +44,7 @@ export function TreeSelect({ nodes, value, onChange, placeholder = 'Select node'
             padding: '6px 8px',
             paddingLeft: `${depth * 14 + 8}px`,
             borderRadius: 'var(--radius-sm)',
-            backgroundColor: value === node.value ? 'var(--accent-glow)' : 'transparent',
+            backgroundColor: value === node.value ? 'var(--color-state-selected-bg)' : 'transparent',
             cursor: 'pointer',
             fontSize: '13px',
           }}
@@ -58,7 +58,7 @@ export function TreeSelect({ nodes, value, onChange, placeholder = 'Select node'
                 border: 'none',
                 cursor: 'pointer',
                 padding: 0,
-                color: 'var(--text-muted)',
+                color: 'var(--color-text-disabled)',
                 fontSize: '10px',
               }}
             >
@@ -88,8 +88,8 @@ export function TreeSelect({ nodes, value, onChange, placeholder = 'Select node'
               left: 0,
               right: 0,
               zIndex: 1000,
-              backgroundColor: 'var(--card-bg)',
-              border: '1px solid var(--border)',
+              backgroundColor: 'var(--color-surface-card)',
+              border: '1px solid var(--color-border-default)',
               borderRadius: 'var(--radius-md)',
               boxShadow: 'var(--shadow-md)',
               marginTop: '4px',

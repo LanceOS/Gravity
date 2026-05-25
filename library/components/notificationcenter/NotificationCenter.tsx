@@ -37,10 +37,10 @@ export function NotificationCenter() {
       >
         {toasts.map((t) => {
           const typeColors = {
-            success: 'var(--priority-low)',
-            error: 'var(--priority-high)',
-            warning: 'var(--priority-medium)',
-            info: 'var(--text-heading)',
+            success: 'var(--color-base400)',
+            error: 'var(--color-text-primary)',
+            warning: 'var(--color-text-secondary)',
+            info: 'var(--color-text-primary)',
           };
           return (
             <div
@@ -48,8 +48,8 @@ export function NotificationCenter() {
               style={{
                 padding: '12px 16px',
                 borderRadius: 'var(--radius-md)',
-                backgroundColor: 'var(--card-bg)',
-                border: '1px solid var(--border)',
+                backgroundColor: 'var(--color-surface-card)',
+                border: '1px solid var(--color-border-default)',
                 borderLeft: `4px solid ${typeColors[t.type || 'info']}`,
                 boxShadow: 'var(--shadow-md)',
                 display: 'flex',
@@ -57,7 +57,7 @@ export function NotificationCenter() {
                 justifyContent: 'space-between',
                 gap: '12px',
                 fontSize: '13px',
-                color: 'var(--text-heading)',
+                color: 'var(--color-text-primary)',
               }}
               className="lib-animate-fade-in"
             >
@@ -68,7 +68,7 @@ export function NotificationCenter() {
                   toastsGlobalStack = toastsGlobalStack.filter((item) => item.id !== t.id);
                   toastListeners.forEach((listener) => listener(toastsGlobalStack));
                 }}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--text-muted)' }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--color-text-disabled)' }}
               >
                 <X size={14} />
               </button>

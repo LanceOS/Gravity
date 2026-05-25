@@ -16,10 +16,10 @@ export function Tag({ label, onClose, style }: TagProps) {
         gap: '6px',
         padding: '2px 8px',
         borderRadius: 'var(--radius-sm)',
-        backgroundColor: 'var(--sidebar-bg)',
-        border: '1px solid var(--border)',
+        backgroundColor: 'var(--color-base50)',
+        border: '1px solid var(--color-border-default)',
         fontSize: '12px',
-        color: 'var(--text)',
+        color: 'var(--color-text-secondary)',
         ...style,
       }}
     >
@@ -33,7 +33,7 @@ export function Tag({ label, onClose, style }: TagProps) {
             border: 'none',
             cursor: 'pointer',
             padding: 0,
-            color: 'var(--text-muted)',
+            color: 'var(--color-text-disabled)',
             fontSize: '10px',
             display: 'flex',
             alignItems: 'center',

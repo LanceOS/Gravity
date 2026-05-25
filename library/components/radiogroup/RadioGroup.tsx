@@ -24,7 +24,7 @@ export function RadioGroup({ label, name, options, value, onChange, style }: Rad
         ...style,
       }}
     >
-      <legend className="label" style={{ padding: 0, marginBottom: '4px', color: 'var(--text-heading)' }}>
+      <legend className="label" style={{ padding: 0, marginBottom: '4px', color: 'var(--color-text-primary)' }}>
         {label}
       </legend>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -40,7 +40,7 @@ export function RadioGroup({ label, name, options, value, onChange, style }: Rad
                 gap: '8px',
                 cursor: 'pointer',
                 fontSize: '13px',
-                color: 'var(--text)',
+                color: 'var(--color-text-secondary)',
               }}
             >
               <input
@@ -50,7 +50,7 @@ export function RadioGroup({ label, name, options, value, onChange, style }: Rad
                 value={opt.value}
                 checked={value === opt.value}
                 onChange={() => onChange?.(opt.value)}
-                style={{ accentColor: 'var(--accent-solid)' }}
+                style={{ accentColor: 'var(--color-primary)' }}
               />
               <span>{opt.label}</span>
             </label>

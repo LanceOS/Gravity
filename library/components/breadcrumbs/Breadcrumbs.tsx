@@ -16,7 +16,7 @@ export function Breadcrumbs({ items, style }: BreadcrumbsProps) {
         return (
           <React.Fragment key={idx}>
             {item.href && !isLast ? (
-              <a href={item.href} style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+              <a href={item.href} style={{ fontSize: '13px', color: 'var(--color-text-disabled)' }}>
                 {item.label}
               </a>
             ) : (
@@ -24,13 +24,13 @@ export function Breadcrumbs({ items, style }: BreadcrumbsProps) {
                 style={{
                   fontSize: '13px',
                   fontWeight: isLast ? 500 : 400,
-                  color: isLast ? 'var(--text-heading)' : 'var(--text-muted)',
+                  color: isLast ? 'var(--color-text-primary)' : 'var(--color-text-disabled)',
                 }}
               >
                 {item.label}
               </span>
             )}
-            {!isLast && <ChevronRight size={13} style={{ color: 'var(--text-muted)' }} />}
+            {!isLast && <ChevronRight size={13} style={{ color: 'var(--color-text-disabled)' }} />}
           </React.Fragment>
         );
       })}

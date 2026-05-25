@@ -38,8 +38,8 @@ export function TimePicker({ value, onChange, label }: TimePickerProps) {
               left: 0,
               right: 0,
               zIndex: 1000,
-              backgroundColor: 'var(--card-bg)',
-              border: '1px solid var(--border)',
+              backgroundColor: 'var(--color-surface-card)',
+              border: '1px solid var(--color-border-default)',
               borderRadius: 'var(--radius-md)',
               boxShadow: 'var(--shadow-md)',
               marginTop: '4px',
@@ -59,7 +59,7 @@ export function TimePicker({ value, onChange, label }: TimePickerProps) {
                 style={{
                   padding: '6px 8px',
                   borderRadius: 'var(--radius-sm)',
-                  backgroundColor: value === time ? 'var(--card-hover)' : 'transparent',
+                  backgroundColor: value === time ? 'var(--color-base100)' : 'transparent',
                   cursor: 'pointer',
                   fontSize: '13px',
                 }}

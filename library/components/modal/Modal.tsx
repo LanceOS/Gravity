@@ -55,8 +55,8 @@ export function Modal({ isOpen, onClose, title, children, footer, style }: Modal
               style={{
                 width: '100%',
                 maxWidth: '500px',
-                backgroundColor: 'var(--card-bg)',
-                border: '1px solid var(--border)',
+                backgroundColor: 'var(--color-surface-card)',
+                border: '1px solid var(--color-border-default)',
                 borderRadius: 'var(--radius-lg)',
                 boxShadow: 'var(--shadow-xl)',
                 display: 'flex',
@@ -72,11 +72,11 @@ export function Modal({ isOpen, onClose, title, children, footer, style }: Modal
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   padding: '16px 20px',
-                  borderBottom: '1px solid var(--border)',
+                  borderBottom: '1px solid var(--color-border-default)',
                 }}
               >
                 {title && (
-                  <h2 id="modal-title" style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: 'var(--text-heading)' }}>
+                  <h2 id="modal-title" style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
                     {title}
                   </h2>
                 )}
@@ -97,11 +97,11 @@ export function Modal({ isOpen, onClose, title, children, footer, style }: Modal
                 <div
                   style={{
                     padding: '12px 20px',
-                    borderTop: '1px solid var(--border)',
+                    borderTop: '1px solid var(--color-border-default)',
                     display: 'flex',
                     justifyContent: 'flex-end',
                     gap: '8px',
-                    backgroundColor: 'var(--sidebar-bg)',
+                    backgroundColor: 'var(--color-base50)',
                     borderBottomLeftRadius: 'var(--radius-lg)',
                     borderBottomRightRadius: 'var(--radius-lg)',
                   }}

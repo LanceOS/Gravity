@@ -51,8 +51,8 @@ export function Drawer({ isOpen, onClose, title, children, style }: DrawerProps)
                 width: '100%',
                 maxWidth: '400px',
                 height: '100%',
-                backgroundColor: 'var(--card-bg)',
-                borderLeft: '1px solid var(--border)',
+                backgroundColor: 'var(--color-surface-card)',
+                borderLeft: '1px solid var(--color-border-default)',
                 boxShadow: 'var(--shadow-xl)',
                 display: 'flex',
                 flexDirection: 'column',
@@ -66,11 +66,11 @@ export function Drawer({ isOpen, onClose, title, children, style }: DrawerProps)
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   padding: '16px 20px',
-                  borderBottom: '1px solid var(--border)',
+                  borderBottom: '1px solid var(--color-border-default)',
                 }}
               >
                 {title && (
-                  <h2 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: 'var(--text-heading)' }}>
+                  <h2 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
                     {title}
                   </h2>
                 )}

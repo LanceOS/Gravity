@@ -17,7 +17,7 @@ export function ProgressBar({ value, max = 100, label, style }: ProgressBarProps
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%', ...style }}>
       {label && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-muted)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--color-text-disabled)' }}>
           <span>{label}</span>
           <span>{Math.round(percent)}%</span>
         </div>
@@ -31,7 +31,7 @@ export function ProgressBar({ value, max = 100, label, style }: ProgressBarProps
           appearance: 'none',
           borderRadius: 'var(--radius-full)',
           overflow: 'hidden',
-          backgroundColor: 'var(--border)',
+          backgroundColor: 'var(--color-border-default)',
           border: 'none',
         }}
       />

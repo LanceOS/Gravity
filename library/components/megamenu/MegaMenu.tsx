@@ -24,8 +24,8 @@ export function MegaMenu({ trigger, columns }: MegaMenuProps) {
               top: '100%',
               left: 0,
               zIndex: 1000,
-              backgroundColor: 'var(--card-bg)',
-              border: '1px solid var(--border)',
+              backgroundColor: 'var(--color-surface-card)',
+              border: '1px solid var(--color-border-default)',
               borderRadius: 'var(--radius-lg)',
               boxShadow: 'var(--shadow-lg)',
               padding: '20px',
@@ -37,11 +37,11 @@ export function MegaMenu({ trigger, columns }: MegaMenuProps) {
           >
             {columns.map((col, idx) => (
               <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '120px' }}>
-                <div style={{ fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+                <div style={{ fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-text-disabled)' }}>
                   {col.title}
                 </div>
                 {col.links.map((link, lIdx) => (
-                  <Link key={lIdx} href={link.href} style={{ fontSize: '13px', color: 'var(--text)' }}>
+                  <Link key={lIdx} href={link.href} style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
                     {link.label}
                   </Link>
                 ))}

@@ -27,10 +27,10 @@ export function AvatarUpload({ src, onChange, label }: AvatarUploadProps) {
           width: '80px',
           height: '80px',
           borderRadius: 'var(--radius-full)',
-          border: '1px solid var(--border)',
+          border: '1px solid var(--color-border-default)',
           position: 'relative',
           overflow: 'hidden',
-          backgroundColor: 'var(--sidebar-bg)',
+          backgroundColor: 'var(--color-base50)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -41,7 +41,7 @@ export function AvatarUpload({ src, onChange, label }: AvatarUploadProps) {
         {src ? (
           <img src={src} alt="Avatar Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         ) : (
-          <User size={32} style={{ color: 'var(--text-muted)' }} />
+          <User size={32} style={{ color: 'var(--color-text-disabled)' }} />
         )}
       </div>
     </div>

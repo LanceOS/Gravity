@@ -32,11 +32,11 @@ export function Rating({ max = 5, value, onChange, label }: RatingProps) {
                 border: 'none',
                 cursor: 'pointer',
                 padding: 0,
-                color: isActive ? 'var(--priority-medium)' : 'var(--border)',
+                color: isActive ? 'var(--color-text-secondary)' : 'var(--color-border-default)',
                 transition: 'color var(--transition-fast)',
               }}
             >
-              <Star size={18} fill={isActive ? 'var(--priority-medium)' : 'none'} />
+              <Star size={18} fill={isActive ? 'var(--color-text-secondary)' : 'none'} />
             </button>
           );
         })}

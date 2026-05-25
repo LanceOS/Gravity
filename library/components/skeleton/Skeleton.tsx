@@ -26,7 +26,7 @@ export function Skeleton({ variant = 'rect', width = '100%', height = '16px', st
         width: typeof width === 'number' ? `${width}px` : width,
         height: typeof height === 'number' ? `${height}px` : height,
         borderRadius: radiusMap[variant],
-        backgroundColor: 'var(--border)',
+        backgroundColor: 'var(--color-border-default)',
         ...style,
       }}
     />

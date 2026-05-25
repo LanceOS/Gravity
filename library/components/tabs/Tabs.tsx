@@ -20,7 +20,7 @@ export function Tabs({ items, defaultTab, style }: TabsProps) {
         aria-label="Tabs navigation"
         style={{
           display: 'flex',
-          borderBottom: '1px solid var(--border)',
+          borderBottom: '1px solid var(--color-border-default)',
           gap: '16px',
           marginBottom: '12px',
         }}
@@ -42,9 +42,9 @@ export function Tabs({ items, defaultTab, style }: TabsProps) {
                 padding: '8px 4px',
                 fontSize: '13px',
                 fontWeight: isSelected ? 500 : 400,
-                color: isSelected ? 'var(--accent-solid)' : 'var(--text-muted)',
+                color: isSelected ? 'var(--color-primary)' : 'var(--color-text-disabled)',
                 cursor: 'pointer',
-                borderBottom: isSelected ? '2px solid var(--accent-solid)' : '2px solid transparent',
+                borderBottom: isSelected ? '2px solid var(--color-primary)' : '2px solid transparent',
                 transition: 'color var(--transition-fast), border-bottom-color var(--transition-fast)',
               }}
             >

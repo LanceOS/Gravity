@@ -73,8 +73,8 @@ export function Autocomplete({ label, value, onValueChange, options, placeholder
               left: 0,
               right: 0,
               zIndex: 1000,
-              backgroundColor: 'var(--card-bg)',
-              border: '1px solid var(--border)',
+              backgroundColor: 'var(--color-surface-card)',
+              border: '1px solid var(--color-border-default)',
               borderRadius: 'var(--radius-md)',
               boxShadow: 'var(--shadow-md)',
               maxHeight: '160px',
@@ -100,11 +100,11 @@ export function Autocomplete({ label, value, onValueChange, options, placeholder
                   borderRadius: 'var(--radius-sm)',
                   backgroundColor:
                     index === activeIndex
-                      ? 'var(--card-hover)'
+                      ? 'var(--color-base100)'
                       : opt.value === value
-                        ? 'var(--accent-glow)'
+                        ? 'var(--color-state-selected-bg)'
                         : 'transparent',
-                  color: 'var(--text-heading)',
+                  color: 'var(--color-text-primary)',
                   cursor: 'pointer',
                   fontSize: '13px',
                 }}

@@ -31,8 +31,8 @@ export function Popconfirm({ title, onConfirm, children, style }: PopconfirmProp
               bottom: '100%',
               left: '50%',
               transform: 'translateX(-50%)',
-              backgroundColor: 'var(--card-bg)',
-              border: '1px solid var(--border)',
+              backgroundColor: 'var(--color-surface-card)',
+              border: '1px solid var(--color-border-default)',
               borderRadius: 'var(--radius-md)',
               boxShadow: 'var(--shadow-md)',
               padding: '10px 12px',
@@ -45,7 +45,7 @@ export function Popconfirm({ title, onConfirm, children, style }: PopconfirmProp
               ...style,
             }}
           >
-            <div style={{ fontSize: '12px', color: 'var(--text-heading)', fontWeight: 500 }}>{title}</div>
+            <div style={{ fontSize: '12px', color: 'var(--color-text-primary)', fontWeight: 500 }}>{title}</div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px' }}>
               <button
                 type="button"

@@ -28,7 +28,7 @@ export function KanbanBoard({ columns, cards, onCardMove, renderColumnHeader, st
             style={{
               flex: 1,
               minWidth: '240px',
-              backgroundColor: 'var(--sidebar-bg)',
+              backgroundColor: 'var(--color-base50)',
               borderRadius: 'var(--radius-md)',
               padding: '12px',
               display: 'flex',
@@ -40,13 +40,13 @@ export function KanbanBoard({ columns, cards, onCardMove, renderColumnHeader, st
               renderColumnHeader(col.id, col.title, colCards.length)
             ) : (
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-heading)' }}>{col.title}</span>
+                <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--color-text-primary)' }}>{col.title}</span>
                 <span
                   style={{
                     fontSize: '11px',
                     fontWeight: 600,
-                    backgroundColor: 'var(--border)',
-                    color: 'var(--text-muted)',
+                    backgroundColor: 'var(--color-border-default)',
+                    color: 'var(--color-text-disabled)',
                     padding: '2px 6px',
                     borderRadius: 'var(--radius-full)',
                   }}
@@ -64,8 +64,8 @@ export function KanbanBoard({ columns, cards, onCardMove, renderColumnHeader, st
                     e.dataTransfer.setData('text/plain', card.id);
                   }}
                   style={{
-                    backgroundColor: card.title ? 'var(--card-bg)' : 'transparent',
-                    border: card.title ? '1px solid var(--border)' : 'none',
+                    backgroundColor: card.title ? 'var(--color-surface-card)' : 'transparent',
+                    border: card.title ? '1px solid var(--color-border-default)' : 'none',
                     borderRadius: card.title ? 'var(--radius-md)' : '0',
                     padding: card.title ? '12px' : '0',
                     boxShadow: card.title ? 'var(--shadow-sm)' : 'none',
@@ -73,19 +73,19 @@ export function KanbanBoard({ columns, cards, onCardMove, renderColumnHeader, st
                     transition: 'all var(--transition-normal)',
                   }}
                 >
-                  {card.title && <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-heading)', marginBottom: '6px' }}>{card.title}</div>}
+                  {card.title && <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: '6px' }}>{card.title}</div>}
                   <div>{card.content}</div>
                 </div>
               ))}
               {colCards.length === 0 && (
                 <div
                   style={{
-                    border: '1px dashed var(--border)',
+                    border: '1px dashed var(--color-border-default)',
                     borderRadius: 'var(--radius-md)',
                     padding: '24px 12px',
                     textAlign: 'center',
                     fontSize: '12px',
-                    color: 'var(--text-muted)',
+                    color: 'var(--color-text-disabled)',
                     opacity: 0.6,
                   }}
                 >

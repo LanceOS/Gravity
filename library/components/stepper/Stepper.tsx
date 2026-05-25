@@ -23,8 +23,8 @@ export function Stepper({ steps, activeStep, style }: StepperProps) {
                   width: '24px',
                   height: '24px',
                   borderRadius: '50%',
-                  backgroundColor: isCompleted || isActive ? 'var(--accent-solid)' : 'var(--border)',
-                  color: isCompleted || isActive ? '#ffffff' : 'var(--text-muted)',
+                  backgroundColor: isCompleted || isActive ? 'var(--color-primary)' : 'var(--color-border-default)',
+                  color: isCompleted || isActive ? '#ffffff' : 'var(--color-text-disabled)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -37,7 +37,7 @@ export function Stepper({ steps, activeStep, style }: StepperProps) {
               <span
                 style={{
                   fontSize: '13px',
-                  color: isActive ? 'var(--text-heading)' : 'var(--text-muted)',
+                  color: isActive ? 'var(--color-text-primary)' : 'var(--color-text-disabled)',
                   fontWeight: isActive ? 500 : 400,
                 }}
               >
@@ -48,7 +48,7 @@ export function Stepper({ steps, activeStep, style }: StepperProps) {
               <div
                 style={{
                   height: '2px',
-                  backgroundColor: isCompleted ? 'var(--accent-solid)' : 'var(--border)',
+                  backgroundColor: isCompleted ? 'var(--color-primary)' : 'var(--color-border-default)',
                   flexGrow: 1,
                   margin: '0 12px',
                 }}

@@ -14,8 +14,8 @@ export function Sidebar({ children, style }: SidebarProps) {
       style={{
         width: '240px',
         height: '100%',
-        backgroundColor: 'var(--sidebar-bg)',
-        borderRight: '1px solid var(--border)',
+        backgroundColor: 'var(--color-base50)',
+        borderRight: '1px solid var(--color-border-default)',
         display: 'flex',
         flexDirection: 'column',
         padding: '12px',

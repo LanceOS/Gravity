@@ -18,14 +18,14 @@ export function Navbar({ brand, actions, children, style }: NavbarProps) {
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '12px 24px',
-        backgroundColor: 'var(--card-bg)',
-        borderBottom: '1px solid var(--border)',
+        backgroundColor: 'var(--color-surface-card)',
+        borderBottom: '1px solid var(--color-border-default)',
         width: '100%',
         ...style,
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-        <div style={{ fontWeight: 600, fontSize: '15px', color: 'var(--text-heading)' }}>{brand}</div>
+        <div style={{ fontWeight: 600, fontSize: '15px', color: 'var(--color-text-primary)' }}>{brand}</div>
         <nav style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>{children}</nav>
       </div>
       {actions && <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>{actions}</div>}

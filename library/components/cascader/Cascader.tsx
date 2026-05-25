@@ -59,8 +59,8 @@ export function Cascader({ options, value, onChange, placeholder = 'Select path'
               left: 0,
               zIndex: 1000,
               display: 'flex',
-              backgroundColor: 'var(--card-bg)',
-              border: '1px solid var(--border)',
+              backgroundColor: 'var(--color-surface-card)',
+              border: '1px solid var(--color-border-default)',
               borderRadius: 'var(--radius-md)',
               boxShadow: 'var(--shadow-md)',
               marginTop: '4px',
@@ -71,7 +71,7 @@ export function Cascader({ options, value, onChange, placeholder = 'Select path'
               <div
                 key={colIndex}
                 style={{
-                  borderRight: colIndex < activeColumns.length - 1 ? '1px solid var(--border)' : 'none',
+                  borderRight: colIndex < activeColumns.length - 1 ? '1px solid var(--color-border-default)' : 'none',
                   maxHeight: '160px',
                   overflowY: 'auto',
                   padding: '4px',
@@ -86,7 +86,7 @@ export function Cascader({ options, value, onChange, placeholder = 'Select path'
                     style={{
                       padding: '6px 8px',
                       borderRadius: 'var(--radius-sm)',
-                      backgroundColor: selectedPath[colIndex] === opt.value ? 'var(--card-hover)' : 'transparent',
+                      backgroundColor: selectedPath[colIndex] === opt.value ? 'var(--color-base100)' : 'transparent',
                       cursor: 'pointer',
                       fontSize: '13px',
                     }}

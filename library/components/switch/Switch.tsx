@@ -26,8 +26,8 @@ export function Switch({ label, checked, onCheckedChange, style, className = '',
           width: '36px',
           height: '20px',
           borderRadius: 'var(--radius-full)',
-          backgroundColor: checked ? 'var(--accent-solid)' : 'var(--border)',
-          border: '1px solid var(--border)',
+          backgroundColor: checked ? 'var(--color-primary)' : 'var(--color-border-default)',
+          border: '1px solid var(--color-border-default)',
           position: 'relative',
           padding: 0,
           cursor: 'pointer',
@@ -50,7 +50,7 @@ export function Switch({ label, checked, onCheckedChange, style, className = '',
           }}
         />
       </button>
-      <label htmlFor={switchId} style={{ fontSize: '13px', cursor: 'pointer', color: 'var(--text)' }}>
+      <label htmlFor={switchId} style={{ fontSize: '13px', cursor: 'pointer', color: 'var(--color-text-secondary)' }}>
         {label}
       </label>
     </div>

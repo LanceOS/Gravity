@@ -21,14 +21,14 @@ export function EmptyState({ title, description, action, style }: EmptyStateProp
         justifyContent: 'center',
         padding: '40px 20px',
         textAlign: 'center',
-        border: '1px dashed var(--border)',
+        border: '1px dashed var(--color-border-default)',
         borderRadius: 'var(--radius-lg)',
-        backgroundColor: 'var(--card-bg)',
+        backgroundColor: 'var(--color-surface-card)',
         ...style,
       }}
     >
-      <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-heading)', margin: '0 0 4px 0' }}>{title}</h3>
-      <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '320px', margin: '0 0 16px 0' }}>
+      <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-primary)', margin: '0 0 4px 0' }}>{title}</h3>
+      <p style={{ fontSize: '13px', color: 'var(--color-text-disabled)', maxWidth: '320px', margin: '0 0 16px 0' }}>
         {description}
       </p>
       {action}

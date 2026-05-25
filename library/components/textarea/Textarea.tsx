@@ -16,7 +16,7 @@ export function Textarea({ label, error, className = '', id, style, ...props }: 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%', ...style }}>
       {label && (
-        <label htmlFor={inputId} className="label" style={{ color: 'var(--text-heading)', fontWeight: 500 }}>
+        <label htmlFor={inputId} className="label" style={{ color: 'var(--color-text-primary)', fontWeight: 500 }}>
           {label}
         </label>
       )}

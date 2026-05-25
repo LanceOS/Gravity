@@ -27,14 +27,14 @@ export function AvatarGroup({ children, max = 4, style }: AvatarGroupProps) {
             width: '28px',
             height: '28px',
             borderRadius: 'var(--radius-full)',
-            backgroundColor: 'var(--sidebar-bg)',
-            border: '1px solid var(--border)',
+            backgroundColor: 'var(--color-base50)',
+            border: '1px solid var(--color-border-default)',
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
             fontSize: '10px',
             fontWeight: 600,
-            color: 'var(--text-muted)',
+            color: 'var(--color-text-disabled)',
           }}
         >
           +{extraCount}

@@ -13,7 +13,7 @@ export function Link({ children, className = '', style, ...props }: LinkProps) {
     <a
       className={cn('clickable', className)}
       style={{
-        color: 'var(--accent-solid)',
+        color: 'var(--color-primary)',
         textDecoration: 'none',
         transition: 'color var(--transition-fast)',
         ...style,

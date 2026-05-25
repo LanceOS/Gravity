@@ -42,7 +42,7 @@ export function Scrollspy({ targets, children, style }: ScrollspyProps) {
             style={{
               fontSize: '13px',
               textDecoration: 'none',
-              color: activeId === tgt ? 'var(--accent-solid)' : 'var(--text-muted)',
+              color: activeId === tgt ? 'var(--color-primary)' : 'var(--color-text-disabled)',
               fontWeight: activeId === tgt ? 500 : 400,
             }}
           >

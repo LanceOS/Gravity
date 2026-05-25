@@ -32,9 +32,9 @@ export function Pagination({ current, total, onChange, style }: PaginationProps)
             className="btn btn-sm clickable"
             style={{
               minWidth: '32px',
-              backgroundColor: isCurrent ? 'var(--accent-solid)' : 'var(--card-bg)',
-              color: isCurrent ? '#ffffff' : 'var(--text-heading)',
-              borderColor: isCurrent ? 'var(--accent-solid)' : 'var(--border)',
+              backgroundColor: isCurrent ? 'var(--color-primary)' : 'var(--color-surface-card)',
+              color: isCurrent ? '#ffffff' : 'var(--color-text-primary)',
+              borderColor: isCurrent ? 'var(--color-primary)' : 'var(--color-border-default)',
             }}
           >
             {page}

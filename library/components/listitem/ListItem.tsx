@@ -24,7 +24,7 @@ export function ListItem({ children, icon, onClick, selected = false, style, cla
         borderRadius: 'var(--radius-sm)',
         cursor: onClick ? 'pointer' : 'default',
         backgroundColor: selected ? 'var(--accent-dim)' : 'transparent',
-        color: selected ? 'var(--accent)' : 'var(--text-heading)',
+        color: selected ? 'var(--color-primary)' : 'var(--color-text-primary)',
         transition: 'background-color var(--transition-fast), color var(--transition-fast)',
         userSelect: 'none',
         ...style

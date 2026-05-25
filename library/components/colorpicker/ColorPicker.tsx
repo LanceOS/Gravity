@@ -25,7 +25,7 @@ export function ColorPicker({ value, onChange, label }: ColorPickerProps) {
             height: '36px',
             borderRadius: 'var(--radius-md)',
             backgroundColor: value,
-            border: '1px solid var(--border)',
+            border: '1px solid var(--color-border-default)',
             cursor: 'pointer',
           }}
           aria-label={`Select color. Current: ${value}`}
@@ -38,8 +38,8 @@ export function ColorPicker({ value, onChange, label }: ColorPickerProps) {
               left: 0,
               zIndex: 1000,
               padding: '8px',
-              backgroundColor: 'var(--card-bg)',
-              border: '1px solid var(--border)',
+              backgroundColor: 'var(--color-surface-card)',
+              border: '1px solid var(--color-border-default)',
               borderRadius: 'var(--radius-md)',
               boxShadow: 'var(--shadow-md)',
               marginTop: '4px',
@@ -62,7 +62,7 @@ export function ColorPicker({ value, onChange, label }: ColorPickerProps) {
                   height: '24px',
                   borderRadius: 'var(--radius-xs)',
                   backgroundColor: color,
-                  border: '1px solid var(--border)',
+                  border: '1px solid var(--color-border-default)',
                   cursor: 'pointer',
                 }}
               />

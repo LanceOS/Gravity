@@ -65,7 +65,7 @@ export function RangeSlider({ min, max, value, onChange, label }: RangeSliderPro
         style={{
           height: '6px',
           borderRadius: 'var(--radius-full)',
-          backgroundColor: 'var(--border)',
+          backgroundColor: 'var(--color-border-default)',
           position: 'relative',
           width: '100%',
           marginTop: '6px',
@@ -79,7 +79,7 @@ export function RangeSlider({ min, max, value, onChange, label }: RangeSliderPro
             right: `${100 - rightPercent}%`,
             top: 0,
             bottom: 0,
-            backgroundColor: 'var(--accent-solid)',
+            backgroundColor: 'var(--color-primary)',
             borderRadius: 'var(--radius-full)',
           }}
         />
@@ -96,7 +96,7 @@ export function RangeSlider({ min, max, value, onChange, label }: RangeSliderPro
             height: '16px',
             borderRadius: '50%',
             backgroundColor: '#ffffff',
-            border: '2px solid var(--accent-solid)',
+            border: '2px solid var(--color-primary)',
             cursor: 'pointer',
             boxShadow: 'var(--shadow-sm)',
           }}
@@ -114,7 +114,7 @@ export function RangeSlider({ min, max, value, onChange, label }: RangeSliderPro
             height: '16px',
             borderRadius: '50%',
             backgroundColor: '#ffffff',
-            border: '2px solid var(--accent-solid)',
+            border: '2px solid var(--color-primary)',
             cursor: 'pointer',
             boxShadow: 'var(--shadow-sm)',
           }}

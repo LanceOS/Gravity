@@ -68,13 +68,13 @@ export function ThemeToggle() {
         minHeight: '32px',
         width: '32px',
         borderRadius: 'var(--radius-sm)',
-        border: '1px solid var(--border)',
+        border: '1px solid var(--color-border-default)',
         cursor: 'pointer',
       }}
     >
-      {theme === 'light' && <Sun size={15} style={{ color: 'var(--priority-medium)' }} />}
-      {theme === 'dark' && <Moon size={15} style={{ color: 'var(--accent)' }} />}
-      {theme === 'system' && <Laptop size={15} style={{ color: 'var(--text-muted)' }} />}
+      {theme === 'light' && <Sun size={15} style={{ color: 'var(--color-text-secondary)' }} />}
+      {theme === 'dark' && <Moon size={15} style={{ color: 'var(--color-primary)' }} />}
+      {theme === 'system' && <Laptop size={15} style={{ color: 'var(--color-text-disabled)' }} />}
     </button>
   );
 }

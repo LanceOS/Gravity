@@ -43,9 +43,9 @@ export function DataGrid<T>({ columns, data, rowHeight = 36, height = 360, style
         position: 'relative',
         overflow: 'auto',
         height: `${height}px`,
-        border: '1px solid var(--border)',
+        border: '1px solid var(--color-border-default)',
         borderRadius: 'var(--radius-md)',
-        backgroundColor: 'var(--card-bg)',
+        backgroundColor: 'var(--color-surface-card)',
         width: '100%',
         ...style,
       }}
@@ -58,14 +58,14 @@ export function DataGrid<T>({ columns, data, rowHeight = 36, height = 360, style
           left: 0,
           right: 0,
           zIndex: 10,
-          backgroundColor: 'var(--sidebar-bg)',
-          borderBottom: '1px solid var(--border)',
+          backgroundColor: 'var(--color-base50)',
+          borderBottom: '1px solid var(--color-border-default)',
           display: 'flex',
           height: `${rowHeight}px`,
           alignItems: 'center',
           fontWeight: 500,
           fontSize: '13px',
-          color: 'var(--text-muted)',
+          color: 'var(--color-text-disabled)',
         }}
       >
         {columns.map((col, idx) => (
@@ -88,13 +88,13 @@ export function DataGrid<T>({ columns, data, rowHeight = 36, height = 360, style
               height: `${rowHeight}px`,
               display: 'flex',
               alignItems: 'center',
-              borderBottom: '1px solid var(--border)',
-              backgroundColor: 'var(--card-bg)',
+              borderBottom: '1px solid var(--color-border-default)',
+              backgroundColor: 'var(--color-surface-card)',
               fontSize: '13px',
             }}
           >
             {columns.map((col, cIdx) => (
-              <div key={cIdx} style={{ flex: 1, padding: '0 12px', width: col.width, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-heading)' }}>
+              <div key={cIdx} style={{ flex: 1, padding: '0 12px', width: col.width, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--color-text-primary)' }}>
                 {col.render ? col.render(row.item) : (row.item[col.key as keyof T] as any)}
               </div>
             ))}

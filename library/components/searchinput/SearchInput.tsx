@@ -14,7 +14,7 @@ export function SearchInput({ className = '', ...props }: SearchInputProps) {
           position: 'absolute',
           left: '10px',
           bottom: '10px',
-          color: 'var(--text-muted)',
+          color: 'var(--color-text-disabled)',
           display: 'flex',
           alignItems: 'center',
         }}
