@@ -40,8 +40,6 @@ export function TicketLink({ ticketKey }: { ticketKey: string }) {
     }
   };
 
-
-
   return (
     <span style={{ display: 'inline-block' }}>
       <button
