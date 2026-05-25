@@ -1,5 +1,5 @@
 /**
- * Subset of the MCP JSON-RPC payload used by this server.
+ * @description Subset of the MCP JSON-RPC payload used by this server.
  */
 export type McpRequestPayload = {
   method?: string;
@@ -12,7 +12,7 @@ export type McpRequestPayload = {
 };
 
 /**
- * Trusted execution context forwarded to MCP handlers.
+ * @description Trusted execution context forwarded to MCP handlers.
  */
 export type McpContext = {
   workspaceId: string;
@@ -20,7 +20,7 @@ export type McpContext = {
 };
 
 /**
- * Tool metadata exposed to MCP clients during discovery.
+ * @description Tool metadata exposed to MCP clients during discovery.
  */
 export type McpToolDefinition = {
   name: string;

@@ -3,8 +3,10 @@ import { db } from '../db/index.js';
 import { workspaceSettings } from '../db/schema.js';
 
 /**
- * Loads workspace-level tool disablement so tool discovery and execution share
- * the same feature flag source.
+ * @description Loads workspace-level tool disablement so tool discovery and
+ * execution share the same feature flag source.
+ * @param workspaceId Workspace whose MCP tool settings should be loaded.
+ * @return The list of MCP tool names disabled for the workspace.
  */
 export async function getDisabledTools(workspaceId: string): Promise<string[]> {
   if (!workspaceId) {

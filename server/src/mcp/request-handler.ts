@@ -7,17 +7,26 @@ import { McpRequestPayload } from './types.js';
 import { getDisabledTools } from './workspace-tools.js';
 
 /**
- * Lets transports skip the membership query when they already performed the
- * same access check earlier in the request pipeline.
+ * @description Lets transports skip the membership query when they already
+ * performed the same access check earlier in the request pipeline.
  */
 type McpRequestHandlerOptions = {
   accessChecked?: boolean;
 };
 
+/**
+ * @description Processes MCP JSON-RPC requests after the transport has already
+ * established any trusted workspace and actor context.
+ */
 export class McpRequestHandler {
   /**
-   * Handles the JSON-RPC portion of the MCP protocol after the transport has
-   * supplied any trusted workspace or actor context.
+   * @description Handles the JSON-RPC portion of the MCP protocol after the
+   * transport has supplied any trusted workspace or actor context.
+   * @param request Incoming JSON-RPC request payload.
+   * @param workspaceId Trusted workspace id from the transport.
+   * @param actorUserId Trusted actor id from the transport.
+   * @param options Handler execution options.
+   * @return The JSON-RPC response payload for the requested MCP method.
    */
   async handle(
     request: unknown,
@@ -99,7 +108,13 @@ export class McpRequestHandler {
 const defaultRequestHandler = new McpRequestHandler();
 
 /**
- * Convenience wrapper for the default request handler used by both transports.
+ * @description Convenience wrapper for the default request handler used by both
+ * transports.
+ * @param request Incoming JSON-RPC request payload.
+ * @param workspaceId Trusted workspace id from the transport.
+ * @param actorUserId Trusted actor id from the transport.
+ * @param options Handler execution options.
+ * @return The JSON-RPC response payload produced by the default handler.
  */
 export async function handleMcpRequest(
   request: unknown,

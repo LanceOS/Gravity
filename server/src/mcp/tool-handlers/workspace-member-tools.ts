@@ -9,10 +9,18 @@ import {
 import { ToolExecutionContext } from './types.js';
 
 /**
- * Workspace-member MCP handlers. These APIs only expose members from the same
- * workspace already authorized by the transport context.
+ * @description Workspace-member MCP handlers. These APIs only expose members
+ * from the same workspace already authorized by the transport context.
  */
 export class WorkspaceMemberTools {
+  /**
+   * @description Lists members for the authorized workspace and returns a
+   * transport-friendly response shape.
+   * @param args Tool arguments containing the workspace id.
+   * @param context Trusted tool execution context.
+   * @return The normalized workspace member list.
+   * @throws When the workspace id is missing or does not match the authorized context.
+   */
   async listWorkspaceMembers(args: Record<string, unknown>, context: ToolExecutionContext) {
     const workspaceId = String(args.workspaceId ?? '');
     if (!workspaceId) {

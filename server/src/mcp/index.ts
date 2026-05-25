@@ -1,6 +1,6 @@
 /**
- * Barrel exports for the MCP module so transports, routes, and tests can share
- * a single import surface.
+ * @description Barrel exports for the MCP module so transports, routes, and
+ * tests can share a single import surface.
  */
 export { createMcpRouter, McpRouterFactory } from './router.js';
 export { assertMcpWorkspaceAccess } from './access.js';

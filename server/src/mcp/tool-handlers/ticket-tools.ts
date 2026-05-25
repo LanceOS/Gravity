@@ -16,10 +16,19 @@ import {
 import { ToolExecutionContext } from './types.js';
 
 /**
- * Ticket-focused MCP handlers. Each method re-checks that the target project or
- * ticket belongs to the caller's trusted workspace before touching ticket data.
+ * @description Ticket-focused MCP handlers. Each method re-checks that the
+ * target project or ticket belongs to the caller's trusted workspace before
+ * touching ticket data.
  */
 export class TicketTools {
+  /**
+   * @description Lists tickets for a single authorized project or for every
+   * project in the caller's workspace.
+   * @param args Filter arguments from the MCP tool payload.
+   * @param context Trusted tool execution context.
+   * @return The matching ticket list for the requested workspace scope.
+   * @throws When a requested project falls outside the authorized workspace.
+   */
   async listTickets(args: Record<string, unknown>, context: ToolExecutionContext) {
     const explicitProjectId = typeof args.projectId === 'string' ? args.projectId : undefined;
     const validProjects = await db
@@ -49,6 +58,14 @@ export class TicketTools {
     return listWorkspaceTickets(projectIds, filters);
   }
 
+  /**
+   * @description Loads full ticket details after confirming the ticket belongs
+   * to the authorized workspace.
+   * @param args Tool arguments containing the ticket key.
+   * @param context Trusted tool execution context.
+   * @return The expanded ticket details payload.
+   * @throws When the ticket does not exist or belongs to another workspace.
+   */
   async getTicketDetails(args: Record<string, unknown>, context: ToolExecutionContext) {
     const ticketKey = String(args.ticketKey ?? '').toUpperCase();
     const ticket = await getTicketByKey(ticketKey);
@@ -65,6 +82,14 @@ export class TicketTools {
     return details;
   }
 
+  /**
+   * @description Creates a ticket inside a project already verified to belong
+   * to the authorized workspace.
+   * @param args Tool arguments for the new ticket.
+   * @param context Trusted tool execution context.
+   * @return The newly created ticket wrapper.
+   * @throws When the target project is outside the authorized workspace.
+   */
   async createTicket(args: Record<string, unknown>, context: ToolExecutionContext) {
     const projectId = String(args.projectId ?? '');
     await this.assertProjectInWorkspace(projectId, context.workspaceId);
@@ -84,6 +109,14 @@ export class TicketTools {
     return { ticket };
   }
 
+  /**
+   * @description Updates a ticket after validating that its project belongs to
+   * the authorized workspace.
+   * @param args Tool arguments containing the ticket key and patch values.
+   * @param context Trusted tool execution context.
+   * @return The updated ticket wrapper.
+   * @throws When the ticket does not exist or belongs to another workspace.
+   */
   async updateTicket(args: Record<string, unknown>, context: ToolExecutionContext) {
     const ticketKey = String(args.ticketKey ?? '').toUpperCase();
     const ticket = await getTicketByKey(ticketKey);
@@ -113,6 +146,14 @@ export class TicketTools {
     return { ticket: updated };
   }
 
+  /**
+   * @description Creates a ticket comment using the trusted actor identity from
+   * the execution context.
+   * @param args Tool arguments containing the ticket key and comment body.
+   * @param context Trusted tool execution context.
+   * @return The newly created comment wrapper.
+   * @throws When the ticket is unavailable, the actor is missing, or the body is empty.
+   */
   async createComment(args: Record<string, unknown>, context: ToolExecutionContext) {
     const ticket = await this.getTicketInWorkspace(args, context.workspaceId);
     // Comment authorship always comes from the trusted actor context, not request args.
@@ -131,12 +172,27 @@ export class TicketTools {
     return { comment };
   }
 
+  /**
+   * @description Reads all comments for a ticket already verified to belong to
+   * the authorized workspace.
+   * @param args Tool arguments containing the ticket key.
+   * @param context Trusted tool execution context.
+   * @return The comment collection wrapper.
+   * @throws When the ticket does not exist or belongs to another workspace.
+   */
   async readComments(args: Record<string, unknown>, context: ToolExecutionContext) {
     const ticket = await this.getTicketInWorkspace(args, context.workspaceId);
     const comments = await listComments(ticket.id);
     return { comments };
   }
 
+  /**
+   * @description Deletes a ticket comment after validating the ticket scope.
+   * @param args Tool arguments containing the ticket key and comment id.
+   * @param context Trusted tool execution context.
+   * @return The deletion success wrapper.
+   * @throws When the ticket is unavailable, outside the workspace, or the comment id is missing.
+   */
   async deleteComment(args: Record<string, unknown>, context: ToolExecutionContext) {
     const ticket = await this.getTicketInWorkspace(args, context.workspaceId);
     const commentId = String(args.commentId ?? '');
@@ -149,6 +205,13 @@ export class TicketTools {
     return { success };
   }
 
+  /**
+   * @description Updates a ticket comment after validating the ticket scope.
+   * @param args Tool arguments containing the ticket key, comment id, and body.
+   * @param context Trusted tool execution context.
+   * @return The updated comment wrapper.
+   * @throws When the ticket is unavailable, outside the workspace, or required fields are missing.
+   */
   async updateComment(args: Record<string, unknown>, context: ToolExecutionContext) {
     const ticket = await this.getTicketInWorkspace(args, context.workspaceId);
     const commentId = String(args.commentId ?? '');
@@ -163,8 +226,12 @@ export class TicketTools {
   }
 
   /**
-   * Resolves a ticket by key and rejects cross-workspace access before the
-   * caller can read or mutate related ticket data.
+   * @description Resolves a ticket by key and rejects cross-workspace access
+   * before the caller can read or mutate related ticket data.
+   * @param args Tool arguments containing the ticket key.
+   * @param workspaceId Authorized workspace id.
+   * @return The resolved ticket record.
+   * @throws When the ticket does not exist or belongs to another workspace.
    */
   private async getTicketInWorkspace(args: Record<string, unknown>, workspaceId: string) {
     const ticketKey = String(args.ticketKey ?? '').toUpperCase();
@@ -179,8 +246,12 @@ export class TicketTools {
   }
 
   /**
-   * Verifies that the project anchor for a ticket-scoped action belongs to the
-   * same workspace already authorized by the transport.
+   * @description Verifies that the project anchor for a ticket-scoped action
+   * belongs to the same workspace already authorized by the transport.
+   * @param projectId Project id tied to the ticket action.
+   * @param workspaceId Authorized workspace id.
+   * @return Resolves when the project belongs to the authorized workspace.
+   * @throws When the project does not exist or belongs to another workspace.
    */
   private async assertProjectInWorkspace(projectId: string, workspaceId: string) {
     const [project] = await db

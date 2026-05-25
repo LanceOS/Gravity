@@ -7,10 +7,15 @@ import { handleMcpRequest } from './request-handler.js';
 import { createMcpErrorResponse } from './responses.js';
 
 /**
- * Builds the HTTP MCP transport. Request authentication and workspace guard
- * failures stay HTTP-native here before control passes to the JSON-RPC handler.
+ * @description Builds the HTTP MCP transport. Request authentication and
+ * workspace guard failures stay HTTP-native here before control passes to the
+ * JSON-RPC handler.
  */
 export class McpRouterFactory {
+  /**
+   * @description Creates the Express router that serves the MCP HTTP endpoint.
+   * @return The configured MCP router instance.
+   */
   create() {
     const router = Router();
 
@@ -68,7 +73,8 @@ export class McpRouterFactory {
 const defaultRouterFactory = new McpRouterFactory();
 
 /**
- * Creates the default HTTP router instance used by the API server.
+ * @description Creates the default HTTP router instance used by the API server.
+ * @return The configured MCP router instance.
  */
 export function createMcpRouter() {
   return defaultRouterFactory.create();

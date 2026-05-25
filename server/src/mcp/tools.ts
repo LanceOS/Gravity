@@ -1,8 +1,9 @@
 import { McpToolDefinition } from './types.js';
 
 /**
- * Canonical tool metadata returned by MCP tools/list. Keep this aligned with
- * the executable registry so clients never see tools that cannot be dispatched.
+ * @description Canonical tool metadata returned by MCP tools/list. Keep this
+ * aligned with the executable registry so clients never see tools that cannot
+ * be dispatched.
  */
 export const mcpToolsList: McpToolDefinition[] = [
   {

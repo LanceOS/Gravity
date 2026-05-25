@@ -5,9 +5,12 @@ function normalizeContextValue(value: unknown) {
 }
 
 /**
- * Builds the handler context from request data plus transport-provided fallback
- * values. The actor identity only comes from the trusted transport fallback,
- * never from request payload fields.
+ * @description Builds the handler context from request data plus
+ * transport-provided fallback values. The actor identity only comes from the
+ * trusted transport fallback, never from request payload fields.
+ * @param payload Incoming MCP request payload.
+ * @param fallback Trusted context supplied by the transport.
+ * @return The normalized MCP execution context used by handlers.
  */
 export function resolveMcpContext(
   payload: McpRequestPayload,

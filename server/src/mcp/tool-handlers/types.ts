@@ -1,5 +1,5 @@
 /**
- * Trusted execution context shared by all tool handlers.
+ * @description Trusted execution context shared by all tool handlers.
  */
 export type ToolExecutionContext = {
   workspaceId: string;
@@ -7,7 +7,7 @@ export type ToolExecutionContext = {
 };
 
 /**
- * Function signature every MCP tool implementation must satisfy.
+ * @description Function signature every MCP tool implementation must satisfy.
  */
 export type ToolHandler = (
   args: Record<string, unknown>,

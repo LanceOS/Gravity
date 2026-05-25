@@ -5,10 +5,15 @@ import { handleMcpRequest } from './request-handler.js';
 import { getMcpStdioContext } from './stdio-config.js';
 
 /**
- * Runs the MCP server over stdio using a single trusted workspace and actor
- * identity resolved at startup.
+ * @description Runs the MCP server over stdio using a single trusted workspace
+ * and actor identity resolved at startup.
  */
 export class McpStdioServer {
+  /**
+   * @description Starts the stdio transport and listens for one JSON-RPC
+   * request per input line.
+   * @return Resolves once the stdio listener has been installed.
+   */
   async start() {
     // Stdio never trusts per-request identity, so startup fails if the env is incomplete.
     const context = getMcpStdioContext(env);
@@ -48,7 +53,9 @@ export class McpStdioServer {
 }
 
 /**
- * Starts the standalone stdio entry point used by local MCP clients.
+ * @description Starts the standalone stdio entry point used by local MCP
+ * clients.
+ * @return Resolves once the stdio server has started.
  */
 async function main() {
   const server = new McpStdioServer();
