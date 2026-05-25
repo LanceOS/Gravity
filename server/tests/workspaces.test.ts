@@ -158,10 +158,12 @@ describe('workspaces routes', () => {
   it('creates invites, join requests, approvals, and workspace connections', async () => {
     const { owner, workspace, project } = await seedWorkspaceFixture();
 
-    const inviteResponse = await api().post(`/api/v1/workspaces/${workspace.id}/invites`).send({
-      createdBy: owner.id,
-      label: 'Team Invite',
-    });
+    const inviteResponse = await api()
+      .post(`/api/v1/workspaces/${workspace.id}/invites`)
+      .set('x-user-id', owner.id)
+      .send({
+        label: 'Team Invite',
+      });
 
     expect(inviteResponse.status).toBe(201);
     expect(inviteResponse.body).toMatchObject({
@@ -199,7 +201,9 @@ describe('workspaces routes', () => {
       }),
     ]);
 
-    const listJoinRequestsResponse = await api().get(`/api/v1/workspaces/${workspace.id}/join-requests`);
+    const listJoinRequestsResponse = await api()
+      .get(`/api/v1/workspaces/${workspace.id}/join-requests`)
+      .set('x-user-id', owner.id);
     expect(listJoinRequestsResponse.status).toBe(200);
     expect(listJoinRequestsResponse.body).toEqual([
       expect.objectContaining({
@@ -211,7 +215,8 @@ describe('workspaces routes', () => {
 
     const approveResponse = await api()
       .post(`/api/v1/workspaces/${workspace.id}/join-requests/${joinRequestResponse.body.id}/approve`)
-      .send({ reviewerUserId: owner.id });
+      .set('x-user-id', owner.id)
+      .send({});
 
     expect(approveResponse.status).toBe(200);
     expect(approveResponse.body).toMatchObject({

@@ -129,6 +129,8 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
         }),
       ]);
 
+      const joinRequestsForbidden = joinRequestsResponse.status === 403;
+
       const [settingsData, membersData, invitesData, joinRequestsData] = await Promise.all([
         settingsResponse.json(),
         membersResponse.json(),
@@ -148,7 +150,7 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
         throw new Error(invitesData.error || 'Failed to load workspace invites.');
       }
 
-      if (!joinRequestsResponse.ok) {
+      if (!joinRequestsResponse.ok && !joinRequestsForbidden) {
         throw new Error(joinRequestsData.error || 'Failed to load workspace join requests.');
       }
 
@@ -162,7 +164,7 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
       });
       setMembers(Array.isArray(membersData) ? membersData : []);
       setInvites(Array.isArray(invitesData) ? invitesData.map((invite) => normalizeWorkspaceInvite(invite as Record<string, unknown>)) : []);
-      setJoinRequests(Array.isArray(joinRequestsData) ? joinRequestsData : []);
+      setJoinRequests(!joinRequestsForbidden && Array.isArray(joinRequestsData) ? joinRequestsData : []);
     } catch (refreshError) {
       const message = refreshError instanceof Error ? refreshError.message : 'Failed to load workspace administration data.';
       setSaveError(message);
@@ -321,8 +323,10 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
     try {
       const response = await fetch(`/api/v1/workspaces/${activeWorkspaceId}/join-requests/${requestId}/approve`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reviewerUserId: currentUser.id }),
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Id': currentUser.id,
+        },
       });
       const data = await response.json();
 
