@@ -1,49 +1,6 @@
 import type { CSSProperties } from 'react';
 import type { SidebarActiveArea } from '../types';
 
-export const sidebarShellStyle: CSSProperties = {
-  width: '240px',
-  background: 'var(--color-base50)',
-  borderRight: '1px solid var(--color-border-default)',
-  display: 'flex',
-  flexDirection: 'column',
-  height: '100%',
-  flexShrink: 0,
-};
-
-export const scrollAreaStyle: CSSProperties = {
-  flex: 1,
-  overflowY: 'auto',
-  padding: '12px 8px',
-};
-
-export const menuItemStyle = (isActive: boolean): CSSProperties => ({
-  display: 'flex',
-  alignItems: 'center',
-  gap: '10px',
-  padding: '6px 10px',
-  borderRadius: '6px',
-  fontSize: '13px',
-  color: isActive ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-  background: isActive ? 'var(--color-border-default)' : 'transparent',
-  fontWeight: isActive ? 500 : 400,
-  cursor: 'pointer',
-});
-
-export const nestedMenuItemStyle = (isActive: boolean): CSSProperties => ({
-  ...menuItemStyle(isActive),
-  fontSize: '12px',
-  padding: '5px 8px',
-});
-
-export const sectionLabelStyle: CSSProperties = {
-  fontSize: '10px',
-  fontWeight: 600,
-  color: 'var(--color-text-disabled)',
-  textTransform: 'uppercase',
-  letterSpacing: '0.04em',
-  padding: '4px 8px 0 8px',
-};
 
 export const countBadgeStyle = (): CSSProperties => ({
   marginLeft: 'auto',
