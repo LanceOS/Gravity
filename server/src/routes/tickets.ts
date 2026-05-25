@@ -125,11 +125,18 @@ export function createTicketsRouter() {
       // 1. Resolve workspace access from custom middleware (guest token)
       const workspaceAccess = getWorkspaceAccess(res);
       if (workspaceAccess) {
-        const accessResult = await ensureWorkspaceCanAccessTicket(ticket.id, workspaceAccess.workspaceId);
-        if (!accessResult.allowed) {
-          res.status(accessResult.reason === 'not_found' ? 404 : 403).json({
-            error: accessResult.reason === 'not_found' ? 'Ticket not found.' : 'Workspace access does not permit this ticket.',
-          });
+        const projectRows = await db
+          .select({ workspaceId: projects.workspaceId })
+          .from(projects)
+          .where(eq(projects.id, ticket.projectId))
+          .limit(1);
+        const project = projectRows[0];
+        if (!project) {
+          res.status(404).json({ error: 'Ticket not found.' });
+          return;
+        }
+        if (project.workspaceId !== workspaceAccess.workspaceId) {
+          res.status(403).json({ error: 'Workspace access does not permit this ticket.' });
           return;
         }
       } else {
