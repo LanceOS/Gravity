@@ -1,6 +1,6 @@
 import { Sparkles } from 'lucide-react';
 import { Sidebar as LibSidebar, SidebarHeader, SidebarContent, SidebarFooter } from '@library';
-import { SidebarAgentTools, SidebarProjectsSection, SidebarUserMenu } from './components';
+import { SidebarProjectsSection, SidebarUserMenu } from './components';
 import type { SidebarProps } from './types';
 import { useSidebarState } from './utils';
 
