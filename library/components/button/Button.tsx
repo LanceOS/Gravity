@@ -60,7 +60,7 @@ export function Button({
     activeBg = 'rgba(170, 59, 255, 0.25)';
   } else if (variant === 'danger') {
     bg = 'var(--color-error)';
-    color = 'var(--color-text-inverse)';
+    color = '#FFFFFF';
     border = '1px solid var(--color-error)';
     hoverBg = 'var(--color-error-dark)';
     activeBg = 'var(--color-error-dark)';
