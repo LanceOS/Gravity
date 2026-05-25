@@ -4,12 +4,19 @@ import { applyThemeConfig } from '../../utilities/themeEngine';
 import lightTheme from '../../themes/light.json';
 import noirTheme from '../../themes/noir.json';
 
-export type ThemeMode = 'light' | 'noir' | 'system';
+export type ThemeMode = 'light' | 'dark' | 'system';
 
 export function ThemeToggle() {
   const [theme, setTheme] = React.useState<ThemeMode>(() => {
     if (typeof window !== 'undefined') {
-      return (window.localStorage.getItem('gravity_theme') as ThemeMode) || 'system';
+      const savedTheme = window.localStorage.getItem('gravity_theme');
+      if (savedTheme === 'noir') {
+        return 'dark';
+      }
+      if (savedTheme === 'light' || savedTheme === 'dark' || savedTheme === 'system') {
+        return savedTheme;
+      }
+      return 'system';
     }
     return 'system';
   });
@@ -19,17 +26,17 @@ export function ThemeToggle() {
     root.classList.remove('dark-theme', 'light-theme', 'noir-theme');
     root.removeAttribute('data-theme');
 
-    let resolvedTheme: 'noir' | 'light' = 'light';
+    let resolvedTheme: 'dark' | 'light' = 'light';
     if (targetTheme === 'system') {
       const systemIsDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      resolvedTheme = systemIsDark ? 'noir' : 'light';
+      resolvedTheme = systemIsDark ? 'dark' : 'light';
     } else {
       resolvedTheme = targetTheme;
     }
 
-    if (resolvedTheme === 'noir') {
+    if (resolvedTheme === 'dark') {
       root.classList.add('noir-theme', 'dark-theme');
-      root.setAttribute('data-theme', 'noir');
+      root.setAttribute('data-theme', 'dark');
       applyThemeConfig(noirTheme);
     } else {
       root.classList.add('light-theme');
@@ -50,7 +57,7 @@ export function ThemeToggle() {
   }, [theme]);
 
   const toggleTheme = () => {
-    const modes: ThemeMode[] = ['light', 'noir', 'system'];
+    const modes: ThemeMode[] = ['light', 'dark', 'system'];
     const currentIndex = modes.indexOf(theme);
     const nextIndex = (currentIndex + 1) % modes.length;
     const nextTheme = modes[nextIndex];
@@ -78,7 +85,7 @@ export function ThemeToggle() {
       }}
     >
       {theme === 'light' && <Sun size={15} style={{ color: 'var(--color-text-secondary)' }} />}
-      {theme === 'noir' && <Moon size={15} style={{ color: 'var(--color-primary)' }} />}
+      {theme === 'dark' && <Moon size={15} style={{ color: 'var(--color-primary)' }} />}
       {theme === 'system' && <Laptop size={15} style={{ color: 'var(--color-text-disabled)' }} />}
     </button>
   );

@@ -383,12 +383,16 @@ describe('library forms and theme toggle', () => {
     window.localStorage.removeItem('gravity_theme');
     document.documentElement.className = '';
     document.documentElement.removeAttribute('data-theme');
+    document.documentElement.style.removeProperty('--color-surface-elevated');
+    document.documentElement.style.removeProperty('--color-overlay-scrim');
 
     render(<ThemeToggle />);
 
     const toggle = screen.getByRole('button');
     expect(toggle).toHaveAttribute('title', 'Theme: system');
     expect(document.documentElement).toHaveAttribute('data-theme', 'light');
+    expect(document.documentElement.style.getPropertyValue('--color-surface-elevated')).toBe('rgba(255, 255, 255, 0.92)');
+    expect(document.documentElement.style.getPropertyValue('--color-overlay-scrim')).toBe('rgba(9, 9, 11, 0.7)');
 
     await user.click(toggle);
     expect(toggle).toHaveAttribute('title', 'Theme: light');
@@ -397,6 +401,8 @@ describe('library forms and theme toggle', () => {
     await user.click(toggle);
     expect(toggle).toHaveAttribute('title', 'Theme: dark');
     expect(document.documentElement).toHaveAttribute('data-theme', 'dark');
+    expect(document.documentElement.style.getPropertyValue('--color-surface-elevated')).toBe('rgba(44, 44, 46, 0.9)');
+    expect(document.documentElement.style.getPropertyValue('--color-overlay-scrim')).toBe('rgba(9, 9, 11, 0.7)');
 
     await user.click(toggle);
     expect(toggle).toHaveAttribute('title', 'Theme: system');

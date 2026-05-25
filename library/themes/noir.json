@@ -47,6 +47,7 @@
     "textCode": "#D1D1D6",
     "surfaceApp": "#18181A",
     "surfaceCard": "#222224",
+    "surfaceElevated": "rgba(44, 44, 46, 0.9)",
     "surfaceOverlay": "#2C2C2E",
     "surfaceInput": "#18181A",
     "surfaceCode": "#18181A",
@@ -64,6 +65,7 @@
     "statePressedOverlay": "rgba(255,255,255,0.1)",
     "stateFocusRing": "#636366",
     "stateSelectedBg": "rgba(255, 255, 255, 0.08)",
+    "overlayScrim": "rgba(9, 9, 11, 0.7)",
     "white": "#FFFFFF",
     "black": "#000000"
   }

@@ -9,11 +9,11 @@ import noirTheme from '@library/themes/noir.json'
 
 // Apply initial theme early to prevent FOUC
 const initialTheme = localStorage.getItem('gravity_theme') || 'system';
-const isDark = initialTheme === 'noir' || (initialTheme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+const isDark = (initialTheme === 'dark' || initialTheme === 'noir') || (initialTheme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
 applyThemeConfig(isDark ? noirTheme : lightTheme);
 if (isDark) {
   document.documentElement.classList.add('noir-theme', 'dark-theme');
-  document.documentElement.setAttribute('data-theme', 'noir');
+  document.documentElement.setAttribute('data-theme', 'dark');
 } else {
   document.documentElement.classList.add('light-theme');
   document.documentElement.setAttribute('data-theme', 'light');
