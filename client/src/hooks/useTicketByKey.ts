@@ -20,10 +20,17 @@ export function useTicketByKey(ticketKey: string) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
-  const normalizedKey = ticketKey.toUpperCase();
+  const normalizedKey = ticketKey.trim().toUpperCase();
   const localTicket = tickets.find(t => t.key.toUpperCase() === normalizedKey);
 
   useEffect(() => {
+    if (!normalizedKey) {
+      setTicketInfo(null);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
     // 1. Resolve from local state immediately if available
     if (localTicket) {
       setTicketInfo(localTicket);
