@@ -122,8 +122,11 @@ export function createTicketsRouter() {
         return;
       }
 
-      const actorUserId = await resolveRequestActorUserId(req);
-      const userId = actorUserId ?? (typeof req.headers['x-user-id'] === 'string' ? req.headers['x-user-id'] : typeof req.query.userId === 'string' ? req.query.userId : undefined);
+      const userId = await resolveRequestActorUserId(req);
+      if (!userId) {
+        res.status(401).json({ error: 'Authentication required.' });
+        return;
+      }
       if (userId) {
         // Get the ticket's workspace ID
         const projectRows = await db
