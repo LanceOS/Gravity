@@ -52,6 +52,18 @@ export function getStatusLabel(status: Ticket['status']) {
   return status.replace('_', ' ').toUpperCase();
 }
 
+export function getStatusColor(status: string) {
+  switch (status) {
+    case 'backlog': return '#9CA3AF';
+    case 'todo': return '#3B82F6';
+    case 'in_progress': return '#F59E0B';
+    case 'in_review': return '#8B5CF6';
+    case 'done': return '#10B981';
+    case 'canceled': return '#EF4444';
+    default: return 'var(--text-muted)';
+  }
+}
+
 export function getAssigneeAvatar(userAvatarById: Record<string, string>, assigneeId: string | null) {
   if (!assigneeId) {
     return null;
