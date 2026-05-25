@@ -113,6 +113,8 @@ export class TicketTools {
       cycleId: typeof args.cycleId === 'string' ? args.cycleId : null,
       assigneeId: typeof args.assigneeId === 'string' ? args.assigneeId : null,
       parentId: typeof args.parentId === 'string' ? args.parentId : null,
+      createdAt: typeof args.createdAt === 'string' ? new Date(args.createdAt) : undefined,
+      updatedAt: typeof args.updatedAt === 'string' ? new Date(args.updatedAt) : undefined,
     });
 
     return { ticket };
@@ -148,6 +150,8 @@ export class TicketTools {
         ...(typeof args.parentId === 'string' ? { parentId: args.parentId } : {}),
         ...(typeof args.prStatus === 'string' ? { prStatus: args.prStatus } : {}),
         ...(typeof args.prUrl === 'string' ? { prUrl: args.prUrl } : {}),
+        ...(typeof args.createdAt === 'string' ? { createdAt: new Date(args.createdAt) } : {}),
+        ...(typeof args.updatedAt === 'string' ? { updatedAt: new Date(args.updatedAt) } : {}),
       },
       ticket.projectId,
     );
@@ -177,7 +181,8 @@ export class TicketTools {
       throw new Error('body is required to add a comment.');
     }
 
-    const comment = await addCommentRecord(ticket.id, userId, body);
+    const createdAt = typeof args.createdAt === 'string' ? new Date(args.createdAt) : undefined;
+    const comment = await addCommentRecord(ticket.id, userId, body, createdAt);
     return { comment };
   }
 

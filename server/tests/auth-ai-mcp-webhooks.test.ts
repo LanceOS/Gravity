@@ -460,6 +460,29 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
     expect(removeCommentResponse.status).toBe(200);
     expect(removeCommentResponse.body.result.content[0].text).toContain('"success": true');
 
+    const createWithTimestampsResponse = await api().post('/api/v1/mcp/sse')
+      .set('x-user-id', owner.id)
+      .set('X-Workspace-Id', workspace.id)
+      .send({
+        jsonrpc: '2.0',
+        id: 75,
+        method: 'tools/call',
+        params: {
+          name: 'create_ticket',
+          arguments: {
+            title: 'Migrated Ticket',
+            projectId: project.id,
+            createdAt: '2023-01-01T12:00:00Z',
+            updatedAt: '2023-01-02T12:00:00Z',
+          },
+        },
+      });
+
+    expect(createWithTimestampsResponse.status).toBe(200);
+    const migratedTicket = parseMcpResult(createWithTimestampsResponse) as { ticket: { createdAt: string; updatedAt: string } };
+    expect(migratedTicket.ticket.createdAt).toBe(new Date('2023-01-01T12:00:00Z').toISOString());
+    expect(migratedTicket.ticket.updatedAt).toBe(new Date('2023-01-02T12:00:00Z').toISOString());
+
     const listMembersResponse = await api().post('/api/v1/mcp/sse')
       .set('x-user-id', owner.id)
       .set('X-Workspace-Id', workspace.id)

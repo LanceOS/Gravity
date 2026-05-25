@@ -238,6 +238,8 @@ export async function createTicketRecord(input: {
   cycleId?: string | null;
   assigneeId?: string | null;
   parentId?: string | null;
+  createdAt?: Date;
+  updatedAt?: Date;
 }) {
   const key = await nextTicketKey(input.projectId);
   const rows = await db
@@ -256,8 +258,8 @@ export async function createTicketRecord(input: {
       parentId: input.parentId ?? null,
       prStatus: 'none',
       prUrl: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: input.createdAt ?? new Date(),
+      updatedAt: input.updatedAt ?? input.createdAt ?? new Date(),
     })
     .returning();
 
@@ -277,6 +279,8 @@ export async function updateTicketRecord(
     parentId: string | null;
     prStatus: string;
     prUrl: string | null;
+    createdAt: Date;
+    updatedAt: Date;
   }>,
   projectId?: string,
 ) {
@@ -291,7 +295,8 @@ export async function updateTicketRecord(
     ...(updates.parentId !== undefined ? { parentId: updates.parentId } : {}),
     ...(updates.prStatus !== undefined ? { prStatus: updates.prStatus } : {}),
     ...(updates.prUrl !== undefined ? { prUrl: updates.prUrl } : {}),
-    updatedAt: new Date(),
+    ...(updates.createdAt !== undefined ? { createdAt: updates.createdAt } : {}),
+    updatedAt: updates.updatedAt ?? new Date(),
   };
 
   const rows = await db
@@ -315,13 +320,13 @@ export async function deleteTicketRecord(ticketId: string, projectId?: string) {
   return true;
 }
 
-export async function addCommentRecord(ticketId: string, userId: string, body: string) {
+export async function addCommentRecord(ticketId: string, userId: string, body: string, createdAt?: Date) {
   await db.insert(comments).values({
     id: createId('co'),
     ticketId,
     userId,
     body,
-    createdAt: new Date(),
+    createdAt: createdAt ?? new Date(),
   });
 
   const allComments = await listComments(ticketId);

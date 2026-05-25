@@ -65,6 +65,8 @@ export const mcpToolsList: McpToolDefinition[] = [
         cycleId: { type: 'string' },
         assigneeId: { type: 'string' },
         parentId: { type: 'string' },
+        createdAt: { type: 'string', description: 'Optional ISO date string to manually set the creation time.' },
+        updatedAt: { type: 'string', description: 'Optional ISO date string to manually set the update time.' },
       },
       required: ['title', 'projectId'],
     },
@@ -86,6 +88,8 @@ export const mcpToolsList: McpToolDefinition[] = [
         parentId: { type: 'string' },
         prStatus: { type: 'string' },
         prUrl: { type: 'string' },
+        createdAt: { type: 'string', description: 'Optional ISO date string to manually set the creation time.' },
+        updatedAt: { type: 'string', description: 'Optional ISO date string to manually set the update time.' },
       },
       required: ['ticketKey'],
     },
@@ -98,6 +102,7 @@ export const mcpToolsList: McpToolDefinition[] = [
       properties: {
         ticketKey: { type: 'string' },
         body: { type: 'string' },
+        createdAt: { type: 'string', description: 'Optional ISO date string to manually set the creation time.' },
       },
       required: ['ticketKey', 'body'],
     },
@@ -110,6 +115,7 @@ export const mcpToolsList: McpToolDefinition[] = [
       properties: {
         ticketKey: { type: 'string' },
         body: { type: 'string' },
+        createdAt: { type: 'string', description: 'Optional ISO date string to manually set the creation time.' },
       },
       required: ['ticketKey', 'body'],
     },
