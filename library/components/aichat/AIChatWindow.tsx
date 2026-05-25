@@ -81,6 +81,7 @@ export function AIChatWindow({
         {onClose && (
           <button
             type="button"
+            aria-label="Close chat"
             onClick={onClose}
             className="clickable"
             style={{
