@@ -37,7 +37,6 @@ function TicketCardImpl({
         transition: 'all var(--transition-normal)',
         boxShadow: isHovered ? 'var(--shadow-md)' : 'var(--shadow-sm)',
         borderColor: isHovered ? 'var(--color-border-focus)' : 'var(--color-border-default)',
-        transform: isHovered ? 'translateY(-1px)' : 'none',
       }}
     >
       <Flex align="center" justify="space-between">
