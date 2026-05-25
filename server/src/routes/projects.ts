@@ -47,7 +47,18 @@ export function createProjectsRouter() {
   router.get('/projects', async (req, res) => {
     try {
       const actorUserId = await resolveRequestActorUserId(req);
-      const userId = actorUserId ?? (typeof req.query.userId === 'string' ? req.query.userId : undefined);
+      if (!actorUserId) {
+        res.status(401).json({ error: 'Authentication required.' });
+        return;
+      }
+
+      const requestedUserId = typeof req.query.userId === 'string' ? req.query.userId : undefined;
+      if (requestedUserId && requestedUserId !== actorUserId) {
+        res.status(403).json({ error: 'Forbidden.' });
+        return;
+      }
+
+      const userId = actorUserId;
       const workspaceId = typeof req.query.workspaceId === 'string' ? req.query.workspaceId : undefined;
 
       let projectRows: Array<{
