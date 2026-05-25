@@ -606,12 +606,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
               onValueChange={(nextStatus: string) => onUpdateTicket(activeTicket.id, { status: nextStatus as Ticket['status'] })}
               options={STATUS_OPTIONS.map(opt => ({
                 value: opt.value,
-                label: (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: getStatusColor(opt.value) }} />
-                    <span>{opt.label}</span>
-                  </div>
-                )
+                label: opt.label
               }))}
               aria-label="Select ticket status"
             />
