@@ -1,7 +1,6 @@
 import React from 'react';
 import { Calendar } from 'lucide-react';
-import { ClickAwayListener } from '../../utilities';
-import { getDaysInMonth, getFirstDayOfMonth } from '../../utilities/dateHelpers';
+import { ClickAwayListener, getDaysInMonth, getFirstDayOfMonth } from '../../utilities';
 
 export interface DatePickerProps {
   value?: Date;
