@@ -54,9 +54,30 @@ export function useTicketByKey(ticketKey: string) {
       }
 
       fetchCache[normalizedKey] = fetch(`/api/v1/tickets/key/${normalizedKey}`, { headers })
-        .then(res => {
+        .then(async res => {
           if (res.ok) return res.json();
-          throw new Error('Ticket not found');
+
+          let serverError: string | undefined;
+          try {
+            const errorBody = await res.json();
+            if (errorBody && typeof errorBody.error === 'string') {
+              serverError = errorBody.error;
+            }
+          } catch {
+            // Ignore JSON parsing failures and fall back to status-based messages.
+          }
+
+          if (res.status === 401) {
+            throw new Error(serverError || 'Unauthorized');
+          }
+          if (res.status === 403) {
+            throw new Error(serverError || 'Forbidden');
+          }
+          if (res.status === 404) {
+            throw new Error(serverError || 'Ticket not found');
+          }
+
+          throw new Error(serverError || `Request failed with status ${res.status}`);
         })
         .then(data => {
           resolvedCache[normalizedKey] = data;
