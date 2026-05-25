@@ -28,7 +28,7 @@ export class McpRouterFactory {
           return;
         }
 
-        const headerWorkspaceId = req.header('x-workspace-id') || req.header('X-Workspace-Id');
+        const headerWorkspaceId = (req.header('x-workspace-id') || req.header('X-Workspace-Id'))?.trim();
         const bodyWorkspaceId =
           typeof req.body?.params?.workspaceId === 'string' && req.body.params.workspaceId.trim().length > 0
             ? req.body.params.workspaceId.trim()
