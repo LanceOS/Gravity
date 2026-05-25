@@ -140,6 +140,7 @@ function GeneralSettingsSection({
               { value: 'dark', label: 'Noir' },
               { value: 'coal-black', label: 'Coal Black' },
               { value: 'coffee', label: 'Coffee' },
+              { value: 'marble-blue', label: 'Marble Blue' },
               { value: 'light', label: 'White Paper' }
             ]}
           />
