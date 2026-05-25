@@ -1,5 +1,8 @@
 import React from 'react';
 import { Sun, Moon, Laptop } from 'lucide-react';
+import { applyThemeConfig } from '../../utilities/themeEngine';
+import lightTheme from '../../themes/light.json';
+import darkTheme from '../../themes/dark.json';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 
@@ -27,9 +30,11 @@ export function ThemeToggle() {
     if (resolvedTheme === 'dark') {
       root.classList.add('dark-theme');
       root.setAttribute('data-theme', 'dark');
+      applyThemeConfig(darkTheme);
     } else {
       root.classList.add('light-theme');
       root.setAttribute('data-theme', 'light');
+      applyThemeConfig(lightTheme);
     }
   };
 
