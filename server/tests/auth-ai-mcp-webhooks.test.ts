@@ -326,6 +326,43 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
 
     expect(detailsResponse.status).toBe(200);
     expect(detailsResponse.body.result.content[0].text).toContain(existingTicket.title);
+    
+    // Assert resolved fields inside get_ticket_details response
+    const detailsJson = JSON.parse(detailsResponse.body.result.content[0].text);
+    expect(detailsJson.assignee).toMatchObject({
+      id: owner.id,
+      name: owner.name,
+    });
+    expect(detailsJson.project).toMatchObject({
+      id: project.id,
+      name: project.name,
+    });
+
+    const readDetailsResponse = await api().post('/api/v1/mcp/sse')
+      .set('x-user-id', owner.id)
+      .set('X-Workspace-Id', workspace.id)
+      .send({
+        jsonrpc: '2.0',
+        id: 51,
+        method: 'tools/call',
+        params: {
+          name: 'read_ticket_details',
+          arguments: { ticketKey: existingTicket.key },
+        },
+      });
+
+    expect(readDetailsResponse.status).toBe(200);
+    expect(readDetailsResponse.body.result.content[0].text).toContain(existingTicket.title);
+    
+    const readDetailsJson = JSON.parse(readDetailsResponse.body.result.content[0].text);
+    expect(readDetailsJson.assignee).toMatchObject({
+      id: owner.id,
+      name: owner.name,
+    });
+    expect(readDetailsJson.project).toMatchObject({
+      id: project.id,
+      name: project.name,
+    });
 
     const updateResponse = await api().post('/api/v1/mcp/sse')
       .set('x-user-id', owner.id)
@@ -661,6 +698,7 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
     expect(filteredTools.some(t => t.name === 'list_tickets')).toBe(false);
     expect(filteredTools.some(t => t.name === 'create_ticket')).toBe(false);
     expect(filteredTools.some(t => t.name === 'get_ticket_details')).toBe(true);
+    expect(filteredTools.some(t => t.name === 'read_ticket_details')).toBe(true);
 
     // 6. tools/call blocks calling disabled tools
     const callDisabled = await api()

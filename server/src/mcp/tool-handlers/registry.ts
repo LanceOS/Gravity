@@ -10,6 +10,7 @@ export const toolHandlers: Record<string, ToolHandler> = {
   list_tickets: (args, context) => ticketTools.listTickets(args, context),
   list_workspace_members: (args, context) => workspaceMemberTools.listWorkspaceMembers(args, context),
   get_ticket_details: (args, context) => ticketTools.getTicketDetails(args, context),
+  read_ticket_details: (args, context) => ticketTools.readTicketDetails(args, context),
   create_ticket: (args, context) => ticketTools.createTicket(args, context),
   update_ticket: (args, context) => ticketTools.updateTicket(args, context),
   add_comment: (args, context) => ticketTools.createComment(args, context),
