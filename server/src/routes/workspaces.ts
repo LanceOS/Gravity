@@ -597,9 +597,11 @@ export function createWorkspacesRouter() {
 
   router.post('/workspaces/:workspaceId/invites', async (req, res) => {
     const { workspaceId } = req.params;
-    const { createdBy, label } = req.body ?? {};
-    if (!createdBy) {
-      res.status(400).json({ error: 'createdBy is required.' });
+    const { label } = req.body ?? {};
+
+    const actorUserId = await resolveRequestActorUserId(req);
+    if (!actorUserId) {
+      res.status(401).json({ error: 'Authentication required.' });
       return;
     }
 
@@ -611,11 +613,27 @@ export function createWorkspacesRouter() {
         return;
       }
 
+      const membershipRows = await db
+        .select({ role: workspaceMembers.role })
+        .from(workspaceMembers)
+        .where(
+          and(
+            eq(workspaceMembers.workspaceId, workspaceId),
+            eq(workspaceMembers.userId, actorUserId)
+          )
+        )
+        .limit(1);
+      const membership = membershipRows[0];
+      if (!membership || !['owner', 'admin'].includes(membership.role)) {
+        res.status(403).json({ error: 'Owner or admin access is required.' });
+        return;
+      }
+
       const invite = {
         id: createId('wsi'),
         workspaceId,
         code: createWorkspaceInviteCode(workspace.key),
-        createdBy,
+        createdBy: actorUserId,
         label: label ?? '',
       };
 
@@ -811,7 +829,30 @@ export function createWorkspacesRouter() {
   });
 
   router.get('/workspaces/:workspaceId/join-requests', async (req, res) => {
+    const { workspaceId } = req.params;
+    const actorUserId = await resolveRequestActorUserId(req);
+    if (!actorUserId) {
+      res.status(401).json({ error: 'Authentication required.' });
+      return;
+    }
+
     try {
+      const membershipRows = await db
+        .select({ role: workspaceMembers.role })
+        .from(workspaceMembers)
+        .where(
+          and(
+            eq(workspaceMembers.workspaceId, workspaceId),
+            eq(workspaceMembers.userId, actorUserId)
+          )
+        )
+        .limit(1);
+      const membership = membershipRows[0];
+      if (!membership || !['owner', 'admin'].includes(membership.role)) {
+        res.status(403).json({ error: 'Owner or admin access is required.' });
+        return;
+      }
+
       const joinRequests = await db
         .select({
           id: workspaceJoinRequests.id,
@@ -828,7 +869,7 @@ export function createWorkspacesRouter() {
         })
         .from(workspaceJoinRequests)
         .leftJoin(authUsers, eq(authUsers.id, workspaceJoinRequests.reviewedBy))
-        .where(eq(workspaceJoinRequests.workspaceId, req.params.workspaceId))
+        .where(eq(workspaceJoinRequests.workspaceId, workspaceId))
         .orderBy(desc(workspaceJoinRequests.createdAt));
 
       res.json(joinRequests);
@@ -839,13 +880,29 @@ export function createWorkspacesRouter() {
 
   router.post('/workspaces/:workspaceId/join-requests/:requestId/approve', async (req, res) => {
     const { workspaceId, requestId } = req.params;
-    const { reviewerUserId } = req.body ?? {};
-    if (!reviewerUserId) {
-      res.status(400).json({ error: 'reviewerUserId is required.' });
+    const actorUserId = await resolveRequestActorUserId(req);
+    if (!actorUserId) {
+      res.status(401).json({ error: 'Authentication required.' });
       return;
     }
 
     try {
+      const membershipRows = await db
+        .select({ role: workspaceMembers.role })
+        .from(workspaceMembers)
+        .where(
+          and(
+            eq(workspaceMembers.workspaceId, workspaceId),
+            eq(workspaceMembers.userId, actorUserId)
+          )
+        )
+        .limit(1);
+      const membership = membershipRows[0];
+      if (!membership || !['owner', 'admin'].includes(membership.role)) {
+        res.status(403).json({ error: 'Owner or admin access is required.' });
+        return;
+      }
+
       const rows = await db.select().from(workspaceJoinRequests).where(and(eq(workspaceJoinRequests.id, requestId), eq(workspaceJoinRequests.workspaceId, workspaceId))).limit(1);
       const request = rows[0];
       if (!request) {
@@ -855,7 +912,7 @@ export function createWorkspacesRouter() {
 
       await db
         .update(workspaceJoinRequests)
-        .set({ status: 'approved', reviewedBy: reviewerUserId, reviewedAt: new Date() })
+        .set({ status: 'approved', reviewedBy: actorUserId, reviewedAt: new Date() })
         .where(eq(workspaceJoinRequests.id, requestId));
 
       if (request.requestingUserId) {
@@ -866,7 +923,7 @@ export function createWorkspacesRouter() {
       res.json({
         id: requestId,
         status: 'approved',
-        reviewedBy: reviewerUserId,
+        reviewedBy: actorUserId,
         reviewedAt: new Date().toISOString(),
       });
     } catch (error) {

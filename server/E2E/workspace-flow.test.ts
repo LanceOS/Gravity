@@ -78,6 +78,19 @@ describe('Server Workspaces Flow E2E', () => {
     expect(resWorkspaceSettings.body.workspaceKey).toBe('ROPS-SECRET');
 
     // 5. POST /api/v1/workspaces/:id/invites to create an invitation
+    // Security check: Unauthenticated should fail
+    const resCreateInviteUnauth = await request(app)
+      .post(`/api/v1/workspaces/${workspaceId}/invites`)
+      .send({ label: 'Unauthorized invite' });
+    expect(resCreateInviteUnauth.status).toBe(401);
+
+    // Security check: Non-owner/non-member collaborator should fail
+    const resCreateInviteCollab = await request(app)
+      .post(`/api/v1/workspaces/${workspaceId}/invites`)
+      .set('x-user-id', collaboratorId)
+      .send({ label: 'Forbidden invite' });
+    expect(resCreateInviteCollab.status).toBe(403);
+
     const resCreateInvite = await request(app)
       .post(`/api/v1/workspaces/${workspaceId}/invites`)
       .set('x-user-id', ownerId)
@@ -114,6 +127,17 @@ describe('Server Workspaces Flow E2E', () => {
     expect(joinRequestId).toBeDefined();
 
     // 7. GET /api/v1/workspaces/:id/join-requests to list pending requests
+    // Security check: Unauthenticated should fail
+    const resPendingRequestsUnauth = await request(app)
+      .get(`/api/v1/workspaces/${workspaceId}/join-requests`);
+    expect(resPendingRequestsUnauth.status).toBe(401);
+
+    // Security check: Collaborator (not approved owner/admin yet) should fail
+    const resPendingRequestsCollab = await request(app)
+      .get(`/api/v1/workspaces/${workspaceId}/join-requests`)
+      .set('x-user-id', collaboratorId);
+    expect(resPendingRequestsCollab.status).toBe(403);
+
     const resPendingRequests = await request(app)
       .get(`/api/v1/workspaces/${workspaceId}/join-requests`)
       .set('x-user-id', ownerId);
@@ -123,6 +147,19 @@ describe('Server Workspaces Flow E2E', () => {
     expect(resPendingRequests.body.some((req: any) => req.id === joinRequestId)).toBe(true);
 
     // 8. POST /api/v1/workspaces/:id/join-requests/:id/approve to approve the request
+    // Security check: Unauthenticated should fail
+    const resApproveRequestUnauth = await request(app)
+      .post(`/api/v1/workspaces/${workspaceId}/join-requests/${joinRequestId}/approve`)
+      .send({ reviewerUserId: ownerId });
+    expect(resApproveRequestUnauth.status).toBe(401);
+
+    // Security check: Collaborator (not owner/admin) should fail
+    const resApproveRequestCollab = await request(app)
+      .post(`/api/v1/workspaces/${workspaceId}/join-requests/${joinRequestId}/approve`)
+      .set('x-user-id', collaboratorId)
+      .send({ reviewerUserId: collaboratorId });
+    expect(resApproveRequestCollab.status).toBe(403);
+
     const resApproveRequest = await request(app)
       .post(`/api/v1/workspaces/${workspaceId}/join-requests/${joinRequestId}/approve`)
       .set('x-user-id', ownerId)

@@ -1,20 +1,20 @@
-This blueprint defines the REST API surface, cryptographic payloads, and state transfer rules required to support both local workspace management and secure peer-to-peer workspace sharing.
+This blueprint defines the REST API surface and state transfer rules required to support centralized workspace management and invitation links.
 
 ## 1. REST Endpoint Specifications (Version 1)
 
 All endpoints utilize the `/api/v1` namespace prefix. Requests containing writing or updating actions must return a payload structure mapped below.
 
-### A. Central Tenant & Guest Handshakes
+### A. Invitations and Workspace Joining
 
-#### 1. Generate Peer Invite Link
+#### 1. Generate Invite Link
 
-* **Method:** `POST /api/v1/workspaces/invites`
-* **Authentication:** Requires `Owner` or `Admin` authorization header.
+* **Method:** `POST /api/v1/workspaces/:workspaceId/invites`
+* **Authentication:** Requires `Owner` or `Admin` active session on the host.
 * **Payload Shape:**
 
 ```
 {
-  "email": "guest-user@peer.com",
+  "max_uses": 10,
   "expiration_hours": 24
 }
 ```
@@ -23,25 +23,21 @@ All endpoints utilize the `/api/v1` namespace prefix. Requests containing writin
 
 ```
 {
-  "invite_url": "https://host-domain-or-ip.com/api/v1/workspaces/validate",
-  "validation_code": "GRAV-9821-X",
+  "invite_url": "https://host-domain-or-ip.com/join/GRAV-9821-X",
+  "code": "GRAV-9821-X",
   "expires_at": "2026-05-21T18:30:00Z"
 }
 ```
 
-#### 2. Process Inbound Guest Validation
+#### 2. Process Join Request via Invite
 
-* **Method:** `POST /api/v1/workspaces/validate`
-* **Authentication:** Public (Uses body variables to match verification tables).
+* **Method:** `POST /api/v1/workspaces/join`
+* **Authentication:** Requires an active user session.
 * **Payload Shape:**
 
 ```
 {
-  "email": "guest-user@peer.com",
-  "validation_code": "GRAV-9821-X",
-  "invite_url": "https://host-domain-or-ip.com/api/v1/workspaces/validate",
-  "username": "GuestExpert",
-  "password_hash": "$2b$12$SecureBcryptHashHere..."
+  "code": "GRAV-9821-X"
 }
 ```
 
@@ -49,21 +45,15 @@ All endpoints utilize the `/api/v1` namespace prefix. Requests containing writin
 
 ```
 {
-  "authorized": true,
-  "workspace_private_key": "sec_wsp_g8s3k2x91...",
-  "guest_profile": {
-    "id": "e4b5d2c1-8f3a-4a2b-9c8d-7e6f5a4b3c2d",
-    "username": "GuestExpert",
-    "role": "guest_contributor"
-  }
+  "joined": true,
+  "workspaceId": "wsp_1234567890",
+  "role": "member"
 }
 ```
 
 ## 2. Scoped Workspace Operations
 
-Once verified, the guest client configures all downstream requests to target the Host Server's base IP, passing the unique header signature:
-
-`X-Workspace-Key: sec_wsp_g8s3k2x91...`
+Once a user joins a workspace, the server validates their access to workspace resources using standard session-based authentication cross-referenced with the `workspaceMembers` table.
 
 ### A. Querying Scoped Projects (Dynamic Workspace Hydration)
 
