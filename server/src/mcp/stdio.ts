@@ -1,5 +1,6 @@
 import readline from 'node:readline';
 import { initializeDatabase } from '../db/bootstrap.js';
+import { env } from '../env.js';
 import { handleMcpRequest } from './request-handler.js';
 
 export class McpStdioServer {
@@ -14,14 +15,18 @@ export class McpStdioServer {
 
     console.error('Gravity MCP Stdio Server running...');
 
-    rl.on('line', async (line) => {
+    rl.on('line', async (line: string) => {
       if (!line.trim()) {
         return;
       }
 
       try {
         const request = JSON.parse(line);
-        const response = await handleMcpRequest(request);
+        const response = await handleMcpRequest(
+          request,
+          env.mcpStdioWorkspaceId ?? '',
+          env.mcpStdioActorUserId ?? '',
+        );
         console.log(JSON.stringify(response));
       } catch (error) {
         console.error(error instanceof Error ? error.message : error);

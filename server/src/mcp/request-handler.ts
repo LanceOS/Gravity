@@ -1,5 +1,7 @@
+import { assertMcpWorkspaceAccess } from './access.js';
 import { executeTool } from './tool-executor.js';
 import { resolveMcpContext } from './request-context.js';
+import { createMcpErrorResponse } from './responses.js';
 import { mcpToolsList } from './tools.js';
 import { McpRequestPayload } from './types.js';
 import { getDisabledTools } from './workspace-tools.js';
@@ -9,31 +11,33 @@ export class McpRequestHandler {
     const payload = request as McpRequestPayload;
     const context = resolveMcpContext(payload, { workspaceId, actorUserId });
 
-    if (payload.method === 'initialize') {
-      return {
-        jsonrpc: '2.0',
-        id: payload.id ?? null,
-        result: {
-          protocolVersion: '2024-11-05',
-          capabilities: { tools: {} },
-          serverInfo: { name: 'gravity-mcp-server', version: '2.0.0' },
-        },
-      };
-    }
+    try {
+      if (payload.method === 'initialize') {
+        return {
+          jsonrpc: '2.0',
+          id: payload.id ?? null,
+          result: {
+            protocolVersion: '2024-11-05',
+            capabilities: { tools: {} },
+            serverInfo: { name: 'gravity-mcp-server', version: '2.0.0' },
+          },
+        };
+      }
 
-    if (payload.method === 'tools/list') {
-      const disabledTools = await getDisabledTools(context.workspaceId);
-      const activeTools = mcpToolsList.filter((tool) => !disabledTools.includes(tool.name));
+      if (payload.method === 'tools/list') {
+        await assertMcpWorkspaceAccess(context);
+        const disabledTools = await getDisabledTools(context.workspaceId);
+        const activeTools = mcpToolsList.filter((tool) => !disabledTools.includes(tool.name));
 
-      return {
-        jsonrpc: '2.0',
-        id: payload.id ?? null,
-        result: { tools: activeTools },
-      };
-    }
+        return {
+          jsonrpc: '2.0',
+          id: payload.id ?? null,
+          result: { tools: activeTools },
+        };
+      }
 
-    if (payload.method === 'tools/call') {
-      try {
+      if (payload.method === 'tools/call') {
+        await assertMcpWorkspaceAccess(context);
         const toolName = payload.params?.name ?? '';
         const disabledTools = await getDisabledTools(context.workspaceId);
 
@@ -54,26 +58,16 @@ export class McpRequestHandler {
             content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
           },
         };
-      } catch (error) {
-        return {
-          jsonrpc: '2.0',
-          id: payload.id ?? null,
-          error: {
-            code: -32603,
-            message: error instanceof Error ? error.message : 'Internal error executing tool',
-          },
-        };
       }
-    }
 
-    return {
-      jsonrpc: '2.0',
-      id: payload.id ?? null,
-      error: {
-        code: -32601,
-        message: `Method not found: ${payload.method ?? 'unknown'}`,
-      },
-    };
+      return createMcpErrorResponse(payload.id, -32601, `Method not found: ${payload.method ?? 'unknown'}`);
+    } catch (error) {
+      return createMcpErrorResponse(
+        payload.id,
+        -32603,
+        error instanceof Error ? error.message : 'Internal error executing tool',
+      );
+    }
   }
 }
 

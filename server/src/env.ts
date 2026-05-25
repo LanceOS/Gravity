@@ -17,6 +17,8 @@ const envSchema = z.object({
   CORS_ORIGINS: z.string().optional(),
   TRUSTED_ORIGINS: z.string().optional(),
   OLLAMA_DEFAULT_ENDPOINT: z.string().url().optional(),
+  MCP_STDIO_WORKSPACE_ID: z.string().optional(),
+  MCP_STDIO_ACTOR_USER_ID: z.string().optional(),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
 });
 
@@ -51,5 +53,7 @@ export const env = {
   ollamaDefaultEndpoint:
     parsed.OLLAMA_DEFAULT_ENDPOINT ??
     (parsed.NODE_ENV === 'test' ? 'http://localhost:11434' : 'http://host.docker.internal:11434'),
+  mcpStdioWorkspaceId: parsed.MCP_STDIO_WORKSPACE_ID?.trim() || undefined,
+  mcpStdioActorUserId: parsed.MCP_STDIO_ACTOR_USER_ID?.trim() || undefined,
   nodeEnv: parsed.NODE_ENV,
 };

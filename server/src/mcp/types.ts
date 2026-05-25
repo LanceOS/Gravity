@@ -4,7 +4,6 @@ export type McpRequestPayload = {
     name?: string;
     arguments?: Record<string, unknown>;
     workspaceId?: string;
-    actorUserId?: string;
   };
   id?: string | number | null;
 };

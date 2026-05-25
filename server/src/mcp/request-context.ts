@@ -9,10 +9,9 @@ export function resolveMcpContext(
   fallback: Partial<McpContext> = {},
 ): McpContext {
   const requestWorkspaceId = normalizeContextValue(payload.params?.workspaceId);
-  const requestActorUserId = normalizeContextValue(payload.params?.actorUserId);
 
   return {
     workspaceId: normalizeContextValue(fallback.workspaceId) || requestWorkspaceId,
-    actorUserId: normalizeContextValue(fallback.actorUserId) || requestActorUserId,
+    actorUserId: normalizeContextValue(fallback.actorUserId),
   };
 }
