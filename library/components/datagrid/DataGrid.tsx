@@ -1,6 +1,14 @@
 import React from 'react';
 import { User, ChevronLeft, ChevronRight, Folder, File, ChevronDown } from 'lucide-react';
 
+export interface ColumnConfig<T> {
+  key: keyof T | string;
+  title?: string;
+  header?: string;
+  width?: number | string;
+  render?: (item: T) => React.ReactNode;
+}
+
 export interface DataGridProps<T> {
   columns: ColumnConfig<T>[];
   data: T[];

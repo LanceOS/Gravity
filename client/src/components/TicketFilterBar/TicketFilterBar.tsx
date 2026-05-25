@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Domain, Ticket } from '../../context/TicketContext';
+import type { TicketFilters, TicketListSort } from '../../utils/ticketView';
 import { Button, Select, DenseTextInput } from '@library';
 import {
   PRIORITY_FILTER_OPTIONS,
@@ -7,23 +8,15 @@ import {
   LIST_SORT_OPTIONS,
 } from '../TicketList/utils';
 
-type TicketFilterBarFilters = {
-  search: string;
-  priority: Ticket['priority'] | '';
-  status: Ticket['status'] | '';
-  projectId: string;
-  domainId: string;
-};
-
 export interface TicketFilterBarProps {
-  filters: TicketFilterBarFilters;
-  onFilterChange: (filters: Partial<TicketFilterBarFilters>) => void;
+  filters: TicketFilters;
+  onFilterChange: (filters: Partial<TicketFilters>) => void;
   hasActiveFilters: boolean;
   onClearFilters: () => void;
   filteredCount: number;
   totalCount: number;
-  listSort?: string;
-  onListSortChange?: (sort: string) => void;
+  listSort?: TicketListSort;
+  onListSortChange?: (sort: TicketListSort) => void;
   domains?: Domain[];
 }
 
@@ -91,7 +84,7 @@ export const TicketFilterBar: React.FC<TicketFilterBarProps> = ({
       {listSort !== undefined && onListSortChange !== undefined && (
         <Select
           value={listSort}
-          onValueChange={(sort: string) => onListSortChange(sort)}
+          onValueChange={(sort: string) => onListSortChange(sort as TicketListSort)}
           options={LIST_SORT_OPTIONS}
           aria-label="Sort list tickets"
           style={{ width: 'fit-content' }}

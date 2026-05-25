@@ -171,10 +171,6 @@ function FormattedText({ text }: MarkdownTextProps) {
       const key = keyIndex;
       keyIndex += 1;
       parts.push(<TicketLink key={key} ticketKey={firstMatch.text} />);
-    } else {
-      const key = keyIndex;
-      keyIndex += 1;
-      parts.push(<span key={key}>{firstMatch.text}</span>);
     }
 
     remaining = remaining.substring(firstMatch.index + firstMatch.length);

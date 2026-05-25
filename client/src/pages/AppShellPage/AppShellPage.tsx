@@ -119,7 +119,6 @@ export function AppShellPage() {
     refreshWorkspaces,
     createWorkspace,
     requestJoinByInvite,
-    validatePeerInvite,
   } = useWorkspaceDirectory({ currentUser, setCurrentUser });
   const workspacesResolvedForCurrentUser = !currentUser || workspacesResolvedUserId === currentUser.id;
 
@@ -200,10 +199,6 @@ export function AppShellPage() {
     joinRequests: workspaceJoinRequests,
     inviteLoading: workspaceInviteLoading,
     inviteError: workspaceInviteError,
-    federationConnections,
-    connectionsLoading,
-    connectionsError,
-    retryingConnectionId,
     approveLoadingId,
     revokeLoadingId,
     updateSettings,
@@ -211,7 +206,6 @@ export function AppShellPage() {
     createInvite,
     revokeInvite,
     approveJoinRequest,
-    retryFederationConnection,
     deleteWorkspace,
     deleteLoading,
     deleteError,
@@ -270,6 +264,38 @@ export function AppShellPage() {
 
     window.localStorage.setItem(storageKey, activeWorkspaceId);
   }, [currentUser, activeWorkspaceId]);
+
+  // Invite query parameter listener
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const urlParams = new URLSearchParams(window.location.search);
+    const invite = urlParams.get('invite');
+    if (invite) {
+      window.localStorage.setItem('gravity_pending_invite', invite);
+      // Clean up the URL
+      const newUrl = window.location.origin + window.location.pathname;
+      window.history.replaceState({}, document.title, newUrl);
+    }
+  }, []);
+
+  // Handle pending invite auto-join
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!currentUser) return;
+
+    const pendingInvite = window.localStorage.getItem('gravity_pending_invite');
+    if (pendingInvite) {
+      window.localStorage.removeItem('gravity_pending_invite');
+      
+      const runAutoJoin = async () => {
+        const success = await requestJoinByInvite(pendingInvite);
+        if (success) {
+          await refreshWorkspaces();
+        }
+      };
+      void runAutoJoin();
+    }
+  }, [currentUser, requestJoinByInvite, refreshWorkspaces]);
 
   useEffect(() => {
     if (!activeWorkspaceId || !currentUser) {
@@ -396,21 +422,7 @@ export function AppShellPage() {
     setActiveSection('directory');
   };
 
-  const handleValidatePeerInvite = async (input: {
-    email: string;
-    validationCode: string;
-    inviteUrl: string;
-    username: string;
-    passwordHash: string;
-  }) => {
-    const success = await validatePeerInvite(input);
-    if (success) {
-      setActiveWorkspaceId('');
-      setActiveProjectId('');
-      setActiveTicket(null);
-      setActiveSection('directory');
-    }
-  };
+
 
   const handleSelectWorkspace = (workspaceId: string) => {
     const workspace = workspaces.find((candidate) => candidate.id === workspaceId) || null;
@@ -570,12 +582,9 @@ export function AppShellPage() {
     setActiveSection('projects');
   };
 
-  const handleCreateInvite = async (input: { email: string; expirationHours: number }) => Boolean(await createInvite(input));
+  const handleCreateInvite = async (input: { label: string }) => Boolean(await createInvite(input));
   const handleRevokeInvite = async (inviteId: string) => Boolean(await revokeInvite(inviteId));
   const handleApproveJoinRequest = async (requestId: string) => Boolean(await approveJoinRequest(requestId));
-  const handleRetryConnection = async (connectionId: string) => {
-    await retryFederationConnection(connectionId);
-  };
 
   const handleDeleteWorkspace = useCallback(async () => {
     const success = await deleteWorkspace();
@@ -669,7 +678,6 @@ export function AppShellPage() {
           successMessage={workspaceDirectorySuccess}
           onCreateWorkspace={handleCreateWorkspace}
           onRequestJoin={handleRequestJoin}
-          onValidatePeerInvite={handleValidatePeerInvite}
           onOpenWorkspace={handleSelectWorkspace}
           onOpenSettings={(workspaceId) => {
             setActiveWorkspaceId(workspaceId);
@@ -743,10 +751,6 @@ export function AppShellPage() {
           saveSuccess={settingsSaveSuccess}
           saveError={settingsSaveError}
           inviteError={workspaceInviteError}
-          federationConnections={federationConnections}
-          connectionsLoading={connectionsLoading}
-          connectionsError={connectionsError}
-          retryingConnectionId={retryingConnectionId}
           invitesLoading={workspaceInvitesLoading}
           inviteLoading={workspaceInviteLoading}
           invites={workspaceInvites}
@@ -763,7 +767,6 @@ export function AppShellPage() {
           onCreateInvite={handleCreateInvite}
           onRevokeInvite={handleRevokeInvite}
           onApproveJoinRequest={handleApproveJoinRequest}
-          onRetryConnection={handleRetryConnection}
           onDeleteWorkspace={handleDeleteWorkspace}
           onClearDeleteError={clearDeleteError}
         />

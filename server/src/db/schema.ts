@@ -32,25 +32,7 @@ export const userSettings = pgTable('user_settings', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const validations = pgTable('validations', {
-  id: text('id').primaryKey(),
-  workspaceId: text('workspace_id'),
-  issuedByUserId: text('issued_by_user_id'),
-  email: text('email').notNull(),
-  inviteUrl: text('invite_url').notNull(),
-  validationCode: text('validation_code').notNull(),
-  workspacePrivateKey: text('workspace_private_key').notNull(),
-  guestUserId: text('guest_user_id'),
-  guestUsername: text('guest_username'),
-  guestPasswordHash: text('guest_password_hash'),
-  isUsed: boolean('is_used').notNull().default(false),
-  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
-  usedAt: timestamp('used_at', { withTimezone: true }),
-  revokedAt: timestamp('revoked_at', { withTimezone: true }),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-}, (table) => ({
-  emailCodeUrlIdx: index('validations_email_code_url_idx').on(table.email, table.validationCode, table.inviteUrl),
-}));
+
 
 export const workspaces = pgTable('workspaces', {
   id: text('id').primaryKey(),
@@ -128,86 +110,7 @@ export const workspaceJoinRequests = pgTable('workspace_join_requests', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const workspaceConnections = pgTable('workspace_connections', {
-  id: text('id').primaryKey(),
-  userId: text('user_id').notNull(),
-  label: text('label').notNull(),
-  hostUrl: text('host_url').notNull(),
-  remoteWorkspaceId: text('remote_workspace_id'),
-  remoteWorkspaceKeyHint: text('remote_workspace_key_hint').notNull().default(''),
-  status: text('status').notNull().default('saved'),
-  lastConnectedAt: timestamp('last_connected_at', { withTimezone: true }),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
 
-export const identities = pgTable('identities', {
-  id: text('id').primaryKey(),
-  displayName: text('display_name').notNull(),
-  publicKey: text('public_key').notNull().unique(),
-  encryptedPrivateKey: text('encrypted_private_key'),
-  isLocalOwner: boolean('is_local_owner').notNull().default(false),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
-
-export const peerConnections = pgTable('peer_connections', {
-  id: text('id').primaryKey(),
-  workspaceId: text('workspace_id').notNull(),
-  hostUrl: text('host_url').notNull(),
-  hostDisplayName: text('host_display_name').notNull().default(''),
-  hostPublicKey: text('host_public_key').notNull(),
-  lastSyncedEventId: integer('last_synced_event_id').notNull().default(0),
-  status: text('status').notNull().default('active'),
-  consecutiveFailures: integer('consecutive_failures').notNull().default(0),
-  nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }),
-  lastAttemptAt: timestamp('last_attempt_at', { withTimezone: true }),
-  lastSuccessAt: timestamp('last_success_at', { withTimezone: true }),
-  lastError: text('last_error'),
-  lastAppliedCount: integer('last_applied_count').notNull().default(0),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-}, (table) => ({
-  workspaceIdIdx: index('peer_connections_workspace_id_idx').on(table.workspaceId),
-}));
-
-export const federationInvites = pgTable('federation_invites', {
-  id: text('id').primaryKey(),
-  workspaceId: text('workspace_id').notNull(),
-  issuedByUserId: text('issued_by_user_id').notNull(),
-  inviteToken: text('invite_token').notNull().unique(),
-  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
-  revokedAt: timestamp('revoked_at', { withTimezone: true }),
-  acceptedAt: timestamp('accepted_at', { withTimezone: true }),
-  acceptedByPublicKey: text('accepted_by_public_key'),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
-
-export const workspacePeers = pgTable(
-  'workspace_peers',
-  {
-    workspaceId: text('workspace_id').notNull(),
-    identityId: text('identity_id').notNull(),
-    invitedByUserId: text('invited_by_user_id').notNull(),
-    peerHostUrl: text('peer_host_url').notNull().default(''),
-    status: text('status').notNull().default('verified'),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  },
-  (table) => ({
-    pk: primaryKey({ columns: [table.workspaceId, table.identityId] }),
-    identityIdIdx: index('workspace_peers_identity_id_idx').on(table.identityId),
-  }),
-);
-
-export const syncOutbox = pgTable('sync_outbox', {
-  eventId: serial('event_id').primaryKey(),
-  workspaceId: text('workspace_id').notNull(),
-  actorPublicKey: text('actor_public_key').notNull(),
-  entityType: text('entity_type').notNull(),
-  entityId: text('entity_id').notNull(),
-  action: text('action').notNull(),
-  payload: jsonb('payload').notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-}, (table) => ({
-  workspaceIdIdx: index('sync_outbox_workspace_id_idx').on(table.workspaceId),
-}));
 
 export const projects = pgTable('projects', {
   id: text('id').primaryKey(),
@@ -300,19 +203,12 @@ export const schema = {
   authUsers,
   userProfiles,
   userSettings,
-  validations,
   workspaces,
   workspaceMembers,
   workspaceMemberActivity,
   workspaceSettings,
   workspaceInvites,
   workspaceJoinRequests,
-  workspaceConnections,
-  identities,
-  peerConnections,
-  federationInvites,
-  workspacePeers,
-  syncOutbox,
   projects,
   projectMembers,
   domains,

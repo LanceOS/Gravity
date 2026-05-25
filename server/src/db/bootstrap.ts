@@ -27,23 +27,7 @@ export async function initializeDatabase() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
-    CREATE TABLE IF NOT EXISTS validations (
-      id TEXT PRIMARY KEY,
-      workspace_id TEXT,
-      issued_by_user_id TEXT,
-      email TEXT NOT NULL,
-      invite_url TEXT NOT NULL,
-      validation_code TEXT NOT NULL,
-      workspace_private_key TEXT NOT NULL,
-      guest_user_id TEXT,
-      guest_username TEXT,
-      guest_password_hash TEXT,
-      is_used BOOLEAN NOT NULL DEFAULT FALSE,
-      expires_at TIMESTAMPTZ NOT NULL,
-      used_at TIMESTAMPTZ,
-      revoked_at TIMESTAMPTZ,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
+
 
     CREATE TABLE IF NOT EXISTS workspaces (
       id TEXT PRIMARY KEY,
@@ -110,83 +94,9 @@ export async function initializeDatabase() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
-    CREATE TABLE IF NOT EXISTS workspace_connections (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL,
-      label TEXT NOT NULL,
-      host_url TEXT NOT NULL,
-      remote_workspace_id TEXT,
-      remote_workspace_key_hint TEXT NOT NULL DEFAULT '',
-      status TEXT NOT NULL DEFAULT 'saved',
-      last_connected_at TIMESTAMPTZ,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
 
-    CREATE TABLE IF NOT EXISTS identities (
-      id TEXT PRIMARY KEY,
-      display_name TEXT NOT NULL,
-      public_key TEXT NOT NULL UNIQUE,
-      encrypted_private_key TEXT,
-      is_local_owner BOOLEAN NOT NULL DEFAULT FALSE,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
 
-    CREATE TABLE IF NOT EXISTS peer_connections (
-      id TEXT PRIMARY KEY,
-      workspace_id TEXT NOT NULL,
-      host_url TEXT NOT NULL,
-      host_display_name TEXT NOT NULL DEFAULT '',
-      host_public_key TEXT NOT NULL,
-      last_synced_event_id INTEGER NOT NULL DEFAULT 0,
-      status TEXT NOT NULL DEFAULT 'active',
-      consecutive_failures INTEGER NOT NULL DEFAULT 0,
-      next_attempt_at TIMESTAMPTZ,
-      last_attempt_at TIMESTAMPTZ,
-      last_success_at TIMESTAMPTZ,
-      last_error TEXT,
-      last_applied_count INTEGER NOT NULL DEFAULT 0,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
 
-    ALTER TABLE peer_connections ADD COLUMN IF NOT EXISTS consecutive_failures INTEGER NOT NULL DEFAULT 0;
-    ALTER TABLE peer_connections ADD COLUMN IF NOT EXISTS next_attempt_at TIMESTAMPTZ;
-    ALTER TABLE peer_connections ADD COLUMN IF NOT EXISTS last_attempt_at TIMESTAMPTZ;
-    ALTER TABLE peer_connections ADD COLUMN IF NOT EXISTS last_success_at TIMESTAMPTZ;
-    ALTER TABLE peer_connections ADD COLUMN IF NOT EXISTS last_error TEXT;
-    ALTER TABLE peer_connections ADD COLUMN IF NOT EXISTS last_applied_count INTEGER NOT NULL DEFAULT 0;
-
-    CREATE TABLE IF NOT EXISTS federation_invites (
-      id TEXT PRIMARY KEY,
-      workspace_id TEXT NOT NULL,
-      issued_by_user_id TEXT NOT NULL,
-      invite_token TEXT NOT NULL UNIQUE,
-      expires_at TIMESTAMPTZ NOT NULL,
-      revoked_at TIMESTAMPTZ,
-      accepted_at TIMESTAMPTZ,
-      accepted_by_public_key TEXT,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-
-    CREATE TABLE IF NOT EXISTS workspace_peers (
-      workspace_id TEXT NOT NULL,
-      identity_id TEXT NOT NULL,
-      invited_by_user_id TEXT NOT NULL,
-      peer_host_url TEXT NOT NULL DEFAULT '',
-      status TEXT NOT NULL DEFAULT 'verified',
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      PRIMARY KEY (workspace_id, identity_id)
-    );
-
-    CREATE TABLE IF NOT EXISTS sync_outbox (
-      event_id SERIAL PRIMARY KEY,
-      workspace_id TEXT NOT NULL,
-      actor_public_key TEXT NOT NULL,
-      entity_type TEXT NOT NULL,
-      entity_id TEXT NOT NULL,
-      action TEXT NOT NULL,
-      payload JSONB NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
 
     CREATE TABLE IF NOT EXISTS projects (
       id TEXT PRIMARY KEY,
@@ -274,28 +184,10 @@ export async function initializeDatabase() {
     ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
     ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
 
-    ALTER TABLE validations ADD COLUMN IF NOT EXISTS workspace_id TEXT;
-    ALTER TABLE validations ADD COLUMN IF NOT EXISTS issued_by_user_id TEXT;
-    ALTER TABLE validations ADD COLUMN IF NOT EXISTS guest_user_id TEXT;
-    ALTER TABLE validations ADD COLUMN IF NOT EXISTS guest_username TEXT;
-    ALTER TABLE validations ADD COLUMN IF NOT EXISTS guest_password_hash TEXT;
-    ALTER TABLE validations ADD COLUMN IF NOT EXISTS used_at TIMESTAMPTZ;
-    ALTER TABLE validations ADD COLUMN IF NOT EXISTS revoked_at TIMESTAMPTZ;
-    ALTER TABLE workspace_members ADD COLUMN IF NOT EXISTS provisioned_by_validation_id TEXT;
-    ALTER TABLE project_members ADD COLUMN IF NOT EXISTS provisioned_by_validation_id TEXT;
-    ALTER TABLE identities ADD COLUMN IF NOT EXISTS encrypted_private_key TEXT;
-    ALTER TABLE identities ADD COLUMN IF NOT EXISTS is_local_owner BOOLEAN NOT NULL DEFAULT FALSE;
-    ALTER TABLE peer_connections ADD COLUMN IF NOT EXISTS workspace_id TEXT NOT NULL DEFAULT '';
-    UPDATE peer_connections SET workspace_id = '' WHERE workspace_id IS NULL;
-    ALTER TABLE peer_connections ALTER COLUMN workspace_id SET NOT NULL;
-    ALTER TABLE peer_connections ADD COLUMN IF NOT EXISTS host_display_name TEXT NOT NULL DEFAULT '';
+
     ALTER TABLE workspace_settings ADD COLUMN IF NOT EXISTS disabled_mcp_tools JSONB NOT NULL DEFAULT '[]'::jsonb;
 
-    CREATE INDEX IF NOT EXISTS validations_email_code_url_idx ON validations (email, validation_code, invite_url);
-    CREATE INDEX IF NOT EXISTS workspace_members_user_id_idx ON workspace_members (user_id);
-    CREATE INDEX IF NOT EXISTS peer_connections_workspace_id_idx ON peer_connections (workspace_id);
-    CREATE INDEX IF NOT EXISTS workspace_peers_identity_id_idx ON workspace_peers (identity_id);
-    CREATE INDEX IF NOT EXISTS sync_outbox_workspace_id_idx ON sync_outbox (workspace_id);
+
     CREATE INDEX IF NOT EXISTS projects_workspace_id_idx ON projects (workspace_id);
     CREATE INDEX IF NOT EXISTS project_members_user_id_idx ON project_members (user_id);
     CREATE INDEX IF NOT EXISTS domains_project_id_idx ON domains (project_id);

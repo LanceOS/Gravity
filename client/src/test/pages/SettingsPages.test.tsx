@@ -38,6 +38,7 @@ function renderSettingsPage(overrides: Partial<Parameters<typeof SettingsPage>[0
       hostUrl: 'http://localhost:8080',
       joinMode: 'approval_required' as const,
       workspaceKey: 'PRIVATE',
+      disabledMcpTools: [],
     },
     settingsLoading: false,
     saveLoading: false,
@@ -46,23 +47,18 @@ function renderSettingsPage(overrides: Partial<Parameters<typeof SettingsPage>[0
     inviteError: null,
     invitesLoading: false,
     inviteLoading: false,
-    federationConnections: [],
-    connectionsLoading: false,
-    connectionsError: null,
-    retryingConnectionId: null,
     invites: [
       {
         id: 'invite-1',
-        email: 'guest@example.com',
-        inviteUrl: 'https://peer.example.com/invite/abc',
-        validationCode: 'GRAV-1234',
-        workspacePrivateKey: 'PRIVATE',
-        expiresAt: '2026-05-30T12:00:00.000Z',
-        usedAt: null,
+        code: 'WSP-GRAV-1234',
+        label: 'Engineering Team',
+        expiresAt: null,
         revokedAt: null,
-        isUsed: false,
-        guestUsername: null,
+        maxUses: null,
+        useCount: 0,
         createdAt: '2026-05-20T08:00:00.000Z',
+        createdByName: 'Casey Carter',
+        pendingJoinRequestCount: 0,
       },
     ],
     members: [
@@ -127,7 +123,6 @@ function renderSettingsPage(overrides: Partial<Parameters<typeof SettingsPage>[0
     onCreateInvite: vi.fn().mockResolvedValue(true),
     onRevokeInvite: vi.fn().mockResolvedValue(true),
     onApproveJoinRequest: vi.fn().mockResolvedValue(true),
-    onRetryConnection: vi.fn().mockResolvedValue(undefined),
   };
 
   const props = { ...baseProps, ...overrides };
@@ -222,17 +217,14 @@ describe('SettingsPage', () => {
     const { props } = renderSettingsPage();
 
     await user.click(screen.getByRole('button', { name: /Invites/i }));
-    expect(screen.getByText('Peer Invites')).toBeInTheDocument();
+    expect(screen.getByText('Workspace Invites')).toBeInTheDocument();
     expect(screen.getByText('Most Recent Invite')).toBeInTheDocument();
 
-    await user.clear(screen.getByLabelText('Guest Email'));
-    await user.type(screen.getByLabelText('Guest Email'), 'new-guest@example.com');
-    await user.clear(screen.getByLabelText('Expires In (Hours)'));
-    await user.type(screen.getByLabelText('Expires In (Hours)'), '48');
+    await user.clear(screen.getByLabelText('Invite Label'));
+    await user.type(screen.getByLabelText('Invite Label'), 'Engineering Team');
     await user.click(screen.getByRole('button', { name: 'Create Invite' }));
     expect(props.onCreateInvite).toHaveBeenCalledWith({
-      email: 'new-guest@example.com',
-      expirationHours: 48,
+      label: 'Engineering Team',
     });
 
     await user.click(screen.getByRole('button', { name: /Members/i }));

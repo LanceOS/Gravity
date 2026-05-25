@@ -4,7 +4,7 @@ import { db } from '../db/index.js';
 import { cycles, domains, projects, tickets, workspaceMembers } from '../db/schema.js';
 import { broadcastEvent } from '../realtime.js';
 import { createId, getProjectIdFromRequest, normalizeIsoDate } from '../lib/platform.js';
-import { getWorkspaceAccess, optionalWorkspaceAccess, type WorkspaceAccessLocals } from '../lib/workspace-access.js';
+import { resolveRequestActorUserId } from '../lib/request-auth.js';
 import {
   addCommentRecord,
   createTicketRecord,
@@ -102,7 +102,7 @@ export function createTicketsRouter() {
     }
   });
 
-  router.get('/tickets/key/:ticketKey', optionalWorkspaceAccess, async (req, res: Response<unknown, WorkspaceAccessLocals>) => {
+  router.get('/tickets/key/:ticketKey', async (req, res) => {
     try {
       const ticketKey = normalizeRouteParam(req.params.ticketKey).trim().toUpperCase();
       const ticketRows = await db
@@ -122,9 +122,10 @@ export function createTicketsRouter() {
         return;
       }
 
-      // 1. Resolve workspace access from custom middleware (guest token)
-      const workspaceAccess = getWorkspaceAccess(res);
-      if (workspaceAccess) {
+      const actorUserId = await resolveRequestActorUserId(req);
+      const userId = actorUserId ?? (typeof req.headers['x-user-id'] === 'string' ? req.headers['x-user-id'] : typeof req.query.userId === 'string' ? req.query.userId : undefined);
+      if (userId) {
+        // Get the ticket's workspace ID
         const projectRows = await db
           .select({ workspaceId: projects.workspaceId })
           .from(projects)
@@ -132,43 +133,23 @@ export function createTicketsRouter() {
           .limit(1);
         const project = projectRows[0];
         if (!project) {
-          res.status(404).json({ error: 'Ticket not found.' });
+          res.status(404).json({ error: 'Ticket project not found.' });
           return;
         }
-        if (project.workspaceId !== workspaceAccess.workspaceId) {
-          res.status(403).json({ error: 'Workspace access does not permit this ticket.' });
+
+        // Check if the user is a member of the workspace
+        const memberRows = await db
+          .select()
+          .from(workspaceMembers)
+          .where(and(
+            eq(workspaceMembers.workspaceId, project.workspaceId),
+            eq(workspaceMembers.userId, userId)
+          ))
+          .limit(1);
+
+        if (memberRows.length === 0) {
+          res.status(403).json({ error: 'Access denied: not a member of the workspace.' });
           return;
-        }
-      } else {
-        // 2. Fall back to X-User-Id header or query param if available (standard user verification)
-        const userId = typeof req.headers['x-user-id'] === 'string' ? req.headers['x-user-id'] : typeof req.query.userId === 'string' ? req.query.userId : undefined;
-        if (userId) {
-          // Get the ticket's workspace ID
-          const projectRows = await db
-            .select({ workspaceId: projects.workspaceId })
-            .from(projects)
-            .where(eq(projects.id, ticket.projectId))
-            .limit(1);
-          const project = projectRows[0];
-          if (!project) {
-            res.status(404).json({ error: 'Ticket project not found.' });
-            return;
-          }
-
-          // Check if the user is a member of the workspace
-          const memberRows = await db
-            .select()
-            .from(workspaceMembers)
-            .where(and(
-              eq(workspaceMembers.workspaceId, project.workspaceId),
-              eq(workspaceMembers.userId, userId)
-            ))
-            .limit(1);
-
-          if (memberRows.length === 0) {
-            res.status(403).json({ error: 'Access denied: not a member of the workspace.' });
-            return;
-          }
         }
       }
 
@@ -237,30 +218,19 @@ export function createTicketsRouter() {
     }
   });
 
-  router.get('/tickets/:ticketId/comments', optionalWorkspaceAccess, async (req, res: Response<unknown, WorkspaceAccessLocals>) => {
+  router.get('/tickets/:ticketId/comments', async (req, res) => {
     try {
       const ticketId = normalizeRouteParam(req.params.ticketId);
-      const workspaceAccess = getWorkspaceAccess(res);
-      if (workspaceAccess) {
-        const accessResult = await ensureWorkspaceCanAccessTicket(ticketId, workspaceAccess.workspaceId);
-        if (!accessResult.allowed) {
-          res.status(accessResult.reason === 'not_found' ? 404 : 403).json({
-            error: accessResult.reason === 'not_found' ? 'Ticket not found.' : 'Workspace access does not permit this ticket.',
-          });
-          return;
-        }
-      }
-
       res.json(await listComments(ticketId));
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load comments.' });
     }
   });
 
-  router.post('/tickets/:ticketId/comments', optionalWorkspaceAccess, async (req, res: Response<unknown, WorkspaceAccessLocals>) => {
+  router.post('/tickets/:ticketId/comments', async (req, res) => {
     const ticketId = normalizeRouteParam(req.params.ticketId);
-    const workspaceAccess = getWorkspaceAccess(res);
-    const userId = workspaceAccess?.userId ?? (typeof req.body?.userId === 'string' ? req.body.userId : '');
+    const actorUserId = await resolveRequestActorUserId(req);
+    const userId = actorUserId ?? (typeof req.body?.userId === 'string' ? req.body.userId : '');
     const body =
       typeof req.body?.content === 'string'
         ? req.body.content
@@ -274,15 +244,6 @@ export function createTicketsRouter() {
     }
 
     try {
-      if (workspaceAccess) {
-        const accessResult = await ensureWorkspaceCanAccessTicket(ticketId, workspaceAccess.workspaceId);
-        if (!accessResult.allowed) {
-          res.status(accessResult.reason === 'not_found' ? 404 : 403).json({
-            error: accessResult.reason === 'not_found' ? 'Ticket not found.' : 'Workspace access does not permit this ticket.',
-          });
-          return;
-        }
-      }
 
       const comment = await addCommentRecord(ticketId, userId, body);
       const allComments = await listComments(ticketId);
@@ -293,10 +254,9 @@ export function createTicketsRouter() {
     }
   });
 
-  router.patch('/tickets/:ticketId/comments/:commentId', optionalWorkspaceAccess, async (req, res: Response<unknown, WorkspaceAccessLocals>) => {
+  router.patch('/tickets/:ticketId/comments/:commentId', async (req, res) => {
     const ticketId = normalizeRouteParam(req.params.ticketId);
     const commentId = normalizeRouteParam(req.params.commentId);
-    const workspaceAccess = getWorkspaceAccess(res);
     const body = typeof req.body?.body === 'string' ? req.body.body : '';
 
     if (!body) {
@@ -305,15 +265,6 @@ export function createTicketsRouter() {
     }
 
     try {
-      if (workspaceAccess) {
-        const accessResult = await ensureWorkspaceCanAccessTicket(ticketId, workspaceAccess.workspaceId);
-        if (!accessResult.allowed) {
-          res.status(accessResult.reason === 'not_found' ? 404 : 403).json({
-            error: accessResult.reason === 'not_found' ? 'Ticket not found.' : 'Workspace access does not permit this ticket.',
-          });
-          return;
-        }
-      }
 
       const comment = await updateCommentRecord(commentId, ticketId, body);
       if (!comment) {
@@ -329,21 +280,11 @@ export function createTicketsRouter() {
     }
   });
 
-  router.delete('/tickets/:ticketId/comments/:commentId', optionalWorkspaceAccess, async (req, res: Response<unknown, WorkspaceAccessLocals>) => {
+  router.delete('/tickets/:ticketId/comments/:commentId', async (req, res) => {
     const ticketId = normalizeRouteParam(req.params.ticketId);
     const commentId = normalizeRouteParam(req.params.commentId);
-    const workspaceAccess = getWorkspaceAccess(res);
 
     try {
-      if (workspaceAccess) {
-        const accessResult = await ensureWorkspaceCanAccessTicket(ticketId, workspaceAccess.workspaceId);
-        if (!accessResult.allowed) {
-          res.status(accessResult.reason === 'not_found' ? 404 : 403).json({
-            error: accessResult.reason === 'not_found' ? 'Ticket not found.' : 'Workspace access does not permit this ticket.',
-          });
-          return;
-        }
-      }
 
       const deleted = await deleteCommentRecord(commentId, ticketId);
       if (!deleted) {

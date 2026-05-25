@@ -1,6 +1,12 @@
 import React from 'react';
 import { User, ChevronLeft, ChevronRight, Folder, File, ChevronDown } from 'lucide-react';
 
+export interface TimelineEvent {
+  time: React.ReactNode;
+  title: React.ReactNode;
+  description?: React.ReactNode;
+}
+
 export interface TimelineProps {
   events: TimelineEvent[];
   style?: React.CSSProperties;

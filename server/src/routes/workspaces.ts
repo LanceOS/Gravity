@@ -7,19 +7,14 @@ import {
   comments,
   cycles,
   domains,
-  federationInvites,
-  peerConnections,
   projectMembers,
   projects,
-  syncOutbox,
   tickets,
   userProfiles,
-  validations,
   workspaceInvites,
   workspaceJoinRequests,
   workspaceMembers,
   workspaceMemberActivity,
-  workspacePeers,
   workspaces,
   workspaceSettings,
 } from '../db/schema.js';
@@ -352,13 +347,13 @@ export function createWorkspacesRouter() {
           : req.body?.defaultProjectId === null
             ? null
             : currentWorkspace.defaultProjectId;
-      const nextDisabledMcpTools = Array.isArray(req.body?.disabledMcpTools)
+      const nextDisabledMcpTools: string[] | undefined = Array.isArray(req.body?.disabledMcpTools)
         ? Array.from(
             new Set(
               req.body.disabledMcpTools
-                .filter((tool): tool is string => typeof tool === 'string')
-                .map((tool) => tool.trim())
-                .filter((tool) => tool.length > 0)
+                .filter((tool: unknown): tool is string => typeof tool === 'string')
+                .map((tool: string) => tool.trim())
+                .filter((tool: string) => tool.length > 0)
             )
           )
         : undefined;
@@ -598,41 +593,7 @@ export function createWorkspacesRouter() {
     }
   });
 
-  router.get('/workspaces/:workspaceId/peer-invites', async (req, res) => {
-    const actorUserId = await resolveRequestActorUserId(req);
-    if (!actorUserId) {
-      res.status(401).json({ error: 'Unauthorized.' });
-      return;
-    }
 
-    try {
-      const membershipRows = await db
-        .select()
-        .from(workspaceMembers)
-        .where(and(eq(workspaceMembers.workspaceId, req.params.workspaceId), eq(workspaceMembers.userId, actorUserId)))
-        .limit(1);
-      const membership = membershipRows[0];
-      if (!membership || !['owner', 'admin'].includes(membership.role)) {
-        res.status(403).json({ error: 'Owner or admin access is required.' });
-        return;
-      }
-
-      await recordWorkspaceActivity(req.params.workspaceId, actorUserId);
-
-      const inviteRows = await db
-        .select()
-        .from(validations)
-        .where(eq(validations.workspaceId, req.params.workspaceId));
-
-      res.json(
-        inviteRows
-          .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
-          .map((invite) => mapPeerInvite(invite)),
-      );
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load peer invites.' });
-    }
-  });
 
   router.post('/workspaces/:workspaceId/invites', async (req, res) => {
     const { workspaceId } = req.params;
@@ -680,76 +641,7 @@ export function createWorkspacesRouter() {
     }
   });
 
-  router.post('/workspaces/invites', async (req, res) => {
-    const workspaceId =
-      typeof req.body?.workspace_id === 'string'
-        ? req.body.workspace_id
-        : typeof req.body?.workspaceId === 'string'
-          ? req.body.workspaceId
-          : '';
-    const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
-    const expirationHoursRaw = Number(req.body?.expiration_hours ?? req.body?.expirationHours ?? 24);
-    const expirationHours = Number.isFinite(expirationHoursRaw) && expirationHoursRaw > 0 ? expirationHoursRaw : 24;
-
-    if (!workspaceId || !email) {
-      res.status(400).json({ error: 'workspace_id and email are required.' });
-      return;
-    }
-
-    const actorUserId = await resolveRequestActorUserId(req);
-    if (!actorUserId) {
-      res.status(401).json({ error: 'Unauthorized.' });
-      return;
-    }
-
-    try {
-      const workspaceRows = await db.select().from(workspaces).where(eq(workspaces.id, workspaceId)).limit(1);
-      const workspace = workspaceRows[0];
-      if (!workspace) {
-        res.status(404).json({ error: 'Workspace not found.' });
-        return;
-      }
-
-      const membershipRows = await db
-        .select()
-        .from(workspaceMembers)
-        .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, actorUserId)))
-        .limit(1);
-      const membership = membershipRows[0];
-      if (!membership || !['owner', 'admin'].includes(membership.role)) {
-        res.status(403).json({ error: 'Owner or admin access is required.' });
-        return;
-      }
-
-      const baseUrl = workspace.hostUrl?.trim() || `${req.protocol}://${req.get('host') ?? 'localhost'}`;
-      const inviteUrl = new URL('/api/v1/workspaces/validate', baseUrl).toString();
-      const validation = {
-        id: createId('val'),
-        workspaceId,
-        issuedByUserId: actorUserId,
-        email,
-        inviteUrl,
-        validationCode: createValidationCode(),
-        workspacePrivateKey: createWorkspacePrivateKey(),
-        guestUserId: null,
-        guestUsername: null,
-        guestPasswordHash: null,
-        isUsed: false,
-        expiresAt: new Date(Date.now() + expirationHours * 60 * 60 * 1000),
-        usedAt: null,
-        revokedAt: null,
-        createdAt: new Date(),
-      };
-
-      await db.insert(validations).values(validation);
-
-      res.status(201).json(mapPeerInvite(validation));
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create peer invite.' });
-    }
-  });
-
-  router.post('/workspaces/:workspaceId/peer-invites/:inviteId/revoke', async (req, res) => {
+  router.post('/workspaces/:workspaceId/invites/:inviteId/revoke', async (req, res) => {
     const { workspaceId, inviteId } = req.params;
     const actorUserId = await resolveRequestActorUserId(req);
     if (!actorUserId) {
@@ -771,144 +663,30 @@ export function createWorkspacesRouter() {
 
       const inviteRows = await db
         .select()
-        .from(validations)
-        .where(and(eq(validations.id, inviteId), eq(validations.workspaceId, workspaceId)))
+        .from(workspaceInvites)
+        .where(and(eq(workspaceInvites.id, inviteId), eq(workspaceInvites.workspaceId, workspaceId)))
         .limit(1);
       const invite = inviteRows[0];
 
       if (!invite) {
-        res.status(404).json({ error: 'Peer invite not found.' });
+        res.status(404).json({ error: 'Invite not found.' });
         return;
       }
 
       if (invite.revokedAt) {
-        res.json(mapPeerInvite(invite));
+        res.json(invite);
         return;
       }
 
       const revokedAt = new Date();
-      await db.transaction(async (tx) => {
-        await tx.update(validations).set({ revokedAt }).where(eq(validations.id, invite.id));
-
-        if (invite.guestUserId) {
-          await tx
-            .delete(projectMembers)
-            .where(eq(projectMembers.provisionedByValidationId, invite.id));
-
-          await tx
-            .delete(workspaceMembers)
-            .where(eq(workspaceMembers.provisionedByValidationId, invite.id));
-        }
-      });
-
-      res.json(mapPeerInvite({ ...invite, revokedAt }));
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to revoke peer invite.' });
-    }
-  });
-
-  router.post('/workspaces/validate', async (req, res) => {
-    const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
-    const validationCode = typeof req.body?.validation_code === 'string' ? req.body.validation_code.trim() : '';
-    const inviteUrl = typeof req.body?.invite_url === 'string' ? req.body.invite_url.trim() : '';
-    const username = typeof req.body?.username === 'string' ? req.body.username.trim() : '';
-    const passwordHash = typeof req.body?.password_hash === 'string' ? req.body.password_hash.trim() : '';
-
-    if (!email || !validationCode || !inviteUrl || !username || !passwordHash) {
-      res.status(400).json({ error: 'email, validation_code, invite_url, username, and password_hash are required.' });
-      return;
-    }
-
-    try {
-      const validationRows = await db
-        .select()
-        .from(validations)
-        .where(
-          and(
-            eq(validations.email, email),
-            eq(validations.validationCode, validationCode),
-            eq(validations.inviteUrl, inviteUrl),
-          ),
-        )
-        .limit(1);
-      const validation = validationRows[0];
-
-      if (!validation || !validation.workspaceId) {
-        res.status(401).json({ error: 'Invalid validation request.' });
-        return;
-      }
-
-      if (validation.revokedAt) {
-        res.status(400).json({ error: 'This validation has been revoked.' });
-        return;
-      }
-
-      if (validation.isUsed || (validation.usedAt && new Date(validation.usedAt).getTime() <= Date.now())) {
-        res.status(400).json({ error: 'This validation has already been used.' });
-        return;
-      }
-
-      if (new Date(validation.expiresAt).getTime() < Date.now()) {
-        res.status(400).json({ error: 'This validation has expired.' });
-        return;
-      }
-
-      const existingUsers = await db.select().from(authUsers).where(eq(authUsers.email, email)).limit(1);
-      const existingUser = existingUsers[0];
-      const guestUserId = existingUser?.id ?? createId('u');
-
-      if (existingUser) {
-        await db
-          .update(authUsers)
-          .set({
-            name: username,
-            updatedAt: new Date(),
-          })
-          .where(eq(authUsers.id, guestUserId));
-      } else {
-        await db.insert(authUsers).values({
-          id: guestUserId,
-          name: username,
-          email,
-          emailVerified: false,
-          image: null,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
-      }
-
-      await ensureUserDefaults(guestUserId);
-  await ensureWorkspaceMembership(validation.workspaceId, guestUserId, 'member', validation.id);
-  await addUserToWorkspaceProjects(validation.workspaceId, guestUserId, 'developer', validation.id);
-
       await db
-        .update(validations)
-        .set({
-          guestUserId,
-          guestUsername: username,
-          guestPasswordHash: passwordHash,
-          isUsed: true,
-          usedAt: new Date(),
-        })
-        .where(eq(validations.id, validation.id));
+        .update(workspaceInvites)
+        .set({ revokedAt })
+        .where(eq(workspaceInvites.id, invite.id));
 
-      const guestProfile = await getUserById(guestUserId);
-      if (!guestProfile) {
-        res.status(500).json({ error: 'Failed to provision guest profile.' });
-        return;
-      }
-
-      res.json({
-        authorized: true,
-        workspace_private_key: validation.workspacePrivateKey,
-        guest_profile: {
-          id: guestProfile.id,
-          username: guestProfile.name,
-          role: guestProfile.role,
-        },
-      });
+      res.json({ ...invite, revokedAt });
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to validate workspace invite.' });
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to revoke invite.' });
     }
   });
 
@@ -960,8 +738,33 @@ export function createWorkspacesRouter() {
         return;
       }
 
-      const requestId = createId('wsr');
       const workspaceId = String(invite.workspaceId);
+
+      // Check if user is already a member of the workspace
+      const existingMembership = await db
+        .select()
+        .from(workspaceMembers)
+        .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, userId)))
+        .limit(1);
+
+      if (existingMembership[0]) {
+        res.status(200).json({
+          id: '',
+          workspaceId,
+          requestingUserId: userId,
+          requesterName: user.name,
+          requesterEmail: user.email,
+          requesterAvatar: user.avatar || null,
+          message: 'Already a member',
+          status: 'approved',
+          reviewedBy: userId,
+          reviewedAt: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+        });
+        return;
+      }
+
+      const requestId = createId('wsr');
       const autoJoin = invite.joinMode === 'auto_join';
 
       await db.insert(workspaceJoinRequests).values({
@@ -1071,43 +874,7 @@ export function createWorkspacesRouter() {
     }
   });
 
-  router.post('/workspaces/connect', async (req, res) => {
-    const { userId, workspaceId, workspaceKey } = req.body ?? {};
-    if (!userId || !workspaceId || !workspaceKey) {
-      res.status(400).json({ error: 'userId, workspaceId, and workspaceKey are required.' });
-      return;
-    }
 
-    try {
-      const workspaceRows = await db.select().from(workspaces).where(eq(workspaces.id, workspaceId)).limit(1);
-      const workspace = workspaceRows[0];
-      if (!workspace || workspace.workspaceKey !== workspaceKey) {
-        res.status(401).json({ error: 'Invalid workspace credentials.' });
-        return;
-      }
-
-      const membershipRows = await db.select().from(workspaceMembers).where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, userId))).limit(1);
-      if (!membershipRows[0]) {
-        res.status(403).json({ error: 'User is not a member of this workspace.' });
-        return;
-      }
-
-      const workspaceProjects = await db.select().from(projects).where(eq(projects.workspaceId, workspaceId));
-      res.json({
-        workspace: await getWorkspaceSummary(workspaceId, userId),
-        projects: workspaceProjects.map((project) => ({
-          id: project.id,
-          name: project.name,
-          description: project.description,
-          key: project.key,
-          status: project.status,
-          workspaceId: project.workspaceId,
-        })),
-      });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to connect workspace.' });
-    }
-  });
 
   router.delete('/workspaces/:workspaceId', async (req, res) => {
     const actorUserId = await resolveRequestActorUserId(req);
@@ -1165,13 +932,8 @@ export function createWorkspacesRouter() {
 
         await tx.delete(projects).where(eq(projects.workspaceId, workspaceId));
 
-        await tx.delete(syncOutbox).where(eq(syncOutbox.workspaceId, workspaceId));
-        await tx.delete(workspacePeers).where(eq(workspacePeers.workspaceId, workspaceId));
-        await tx.delete(federationInvites).where(eq(federationInvites.workspaceId, workspaceId));
-        await tx.delete(peerConnections).where(eq(peerConnections.workspaceId, workspaceId));
         await tx.delete(workspaceJoinRequests).where(eq(workspaceJoinRequests.workspaceId, workspaceId));
         await tx.delete(workspaceInvites).where(eq(workspaceInvites.workspaceId, workspaceId));
-        await tx.delete(validations).where(eq(validations.workspaceId, workspaceId));
         await tx.delete(workspaceSettings).where(eq(workspaceSettings.workspaceId, workspaceId));
         await tx.delete(workspaceMembers).where(eq(workspaceMembers.workspaceId, workspaceId));
         await tx.delete(workspaceMemberActivity).where(eq(workspaceMemberActivity.workspaceId, workspaceId));

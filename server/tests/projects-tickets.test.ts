@@ -5,18 +5,10 @@ import {
   seedDomain,
   seedTicket,
   seedUser,
-  seedValidationAccess,
   seedWorkspaceFixture,
 } from './helpers/test-helpers.js';
 
 describe('projects and tickets routes', () => {
-  it('rejects invalid workspace access keys when listing projects', async () => {
-    const response = await api().get('/api/v1/projects').set('x-workspace-key', 'invalid-key');
-
-    expect(response.status).toBe(401);
-    expect(response.body).toEqual({ error: 'Invalid workspace access key.' });
-  });
-
   it('lists, creates, updates, and shares projects', async () => {
     const { owner, workspace, project } = await seedWorkspaceFixture();
     const domain = await seedDomain(project.id, { id: 'domain-1', name: 'Frontend', color: '#2563EB' });
@@ -211,39 +203,11 @@ describe('projects and tickets routes', () => {
       body: 'First pass ready.',
     });
 
-    const guest = await seedUser({
-      id: 'guest-1',
-      name: 'Guest Reviewer',
-      email: 'guest@example.com',
-      role: 'guest_contributor',
-      avatarUrl: 'https://example.com/guest.png',
-    });
-
-    const validation = await seedValidationAccess({
-      workspaceId: workspace.id,
-      guestUserId: guest.id,
-      email: guest.email,
-      workspacePrivateKey: 'sec_wsp_ticket_access',
-    });
-
-    const guestCommentResponse = await api()
-      .post(`/api/v1/tickets/${createTicketResponse.body.id}/comments`)
-      .set('x-workspace-key', validation.workspacePrivateKey)
-      .send({ body: 'Reviewed through peer access.' });
-
-    expect(guestCommentResponse.status).toBe(201);
-    expect(guestCommentResponse.body).toMatchObject({
-      ticketId: createTicketResponse.body.id,
-      userId: guest.id,
-      body: 'Reviewed through peer access.',
-    });
-
     const listCommentsResponse = await api()
-      .get(`/api/v1/tickets/${createTicketResponse.body.id}/comments`)
-      .set('x-workspace-key', validation.workspacePrivateKey);
+      .get(`/api/v1/tickets/${createTicketResponse.body.id}/comments`);
 
     expect(listCommentsResponse.status).toBe(200);
-    expect(listCommentsResponse.body).toHaveLength(2);
+    expect(listCommentsResponse.body).toHaveLength(1);
 
     const deleteResponse = await api()
       .delete(`/api/v1/tickets/${createTicketResponse.body.id}`)
@@ -288,28 +252,7 @@ describe('projects and tickets routes', () => {
       .set('x-user-id', otherUser.id);
     expect(unauthorizedResponse.status).toBe(403);
 
-    // 3. Authorized request using guest workspace access key
-    const validation = await seedValidationAccess({
-      workspaceId: workspace.id,
-      guestUserId: otherUser.id,
-      email: otherUser.email,
-      workspacePrivateKey: 'sec_wsp_auto_link_key',
-    });
-    const guestResponse = await api()
-      .get(`/api/v1/tickets/key/${ticket.key}`)
-      .set('x-workspace-key', validation.workspacePrivateKey);
-    expect(guestResponse.status).toBe(200);
-    expect(guestResponse.body).toMatchObject({
-      id: ticket.id,
-      key: ticket.key,
-      title: 'Auto-link test ticket',
-    });
 
-    // 4. Unauthorized request using an invalid workspace access key
-    const badGuestResponse = await api()
-      .get(`/api/v1/tickets/key/${ticket.key}`)
-      .set('x-workspace-key', 'bad_private_key');
-    expect(badGuestResponse.status).toBe(401);
 
     // 5. Non-existent ticket key resolves to 404
     const notFoundResponse = await api()

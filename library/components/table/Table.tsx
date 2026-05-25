@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, ChevronLeft, ChevronRight, Folder, File, ChevronDown } from 'lucide-react';
+import { type ColumnConfig } from '../datagrid';
 
 export interface TableProps<T> {
   columns: ColumnConfig<T>[];

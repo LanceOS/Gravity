@@ -1,6 +1,13 @@
 import React from 'react';
 import { User, ChevronLeft, ChevronRight, Folder, File, ChevronDown } from 'lucide-react';
 
+export interface KanbanCard {
+  id: string;
+  status: string;
+  title?: string;
+  content: React.ReactNode;
+}
+
 export interface KanbanBoardProps {
   columns: { id: string; title: string }[];
   cards: KanbanCard[];
