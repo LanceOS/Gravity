@@ -179,6 +179,8 @@ function FormattedText({ text }: MarkdownTextProps) {
   return <>{parts}</>;
 }
 
+import { CheckSquare, Square } from 'lucide-react';
+
 /**
  * @description A lightweight markdown renderer component. It splits the input text by lines and parses
  * basic markdown elements like headers (h2, h3), unordered lists, and paragraphs.
@@ -192,71 +194,116 @@ export function MarkdownContent({ text }: MarkdownTextProps) {
     return null;
   }
 
-  return (
-    <>
-      {text.split('\n').map((line, lineIndex) => {
-        // Headers (1-6 hashes)
-        const headingMatch = line.match(/^(#{1,6})\s+(.*)$/);
-        if (headingMatch) {
-          const level = headingMatch[1].length;
-          const content = headingMatch[2];
-          const Tag = `h${Math.min(level + 1, 6)}` as keyof JSX.IntrinsicElements;
-          
-          const fontSizes = { 1: '16px', 2: '14px', 3: '13px', 4: '12px', 5: '12px', 6: '12px' };
-          const fontSize = fontSizes[level as keyof typeof fontSizes] || '16px';
-          const margin = level === 1 ? '12px 0 6px' : '10px 0 4px';
-          
-          return React.createElement(Tag, {
-            key: lineIndex,
-            style: { fontSize, fontWeight: 600, color: 'var(--color-text-primary)', margin }
-          }, <FormattedText text={content} />);
-        }
+  const lines = text.split('\n');
+  const elements: React.ReactNode[] = [];
 
-        // Blockquotes
-        if (line.trim().startsWith('> ')) {
-          const content = line.replace(/^\s*>\s+/, '');
-          return (
-            <blockquote key={lineIndex} style={{ borderLeft: '3px solid var(--color-border-default)', paddingLeft: '12px', margin: '8px 0', color: 'var(--color-text-secondary)' }}>
-              <FormattedText text={content} />
-            </blockquote>
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // Headers (1-6 hashes)
+    const headingMatch = line.match(/^(#{1,6})\s+(.*)$/);
+    if (headingMatch) {
+      const level = headingMatch[1].length;
+      const content = headingMatch[2];
+      const Tag = `h${Math.min(level + 1, 6)}` as keyof JSX.IntrinsicElements;
+      
+      const fontSizes = { 1: '16px', 2: '14px', 3: '13px', 4: '12px', 5: '12px', 6: '12px' };
+      const fontSize = fontSizes[level as keyof typeof fontSizes] || '16px';
+      const margin = level === 1 ? '12px 0 6px' : '10px 0 4px';
+      
+      elements.push(
+        React.createElement(Tag, {
+          key: i,
+          style: { fontSize, fontWeight: 600, color: 'var(--color-text-primary)', margin }
+        }, <FormattedText text={content} />)
+      );
+      continue;
+    }
+
+    // Blockquotes
+    if (line.trim().startsWith('> ')) {
+      const content = line.replace(/^\s*>\s+/, '');
+      elements.push(
+        <blockquote key={i} style={{ borderLeft: '3px solid var(--color-border-default)', paddingLeft: '12px', margin: '8px 0', color: 'var(--color-text-secondary)' }}>
+          <FormattedText text={content} />
+        </blockquote>
+      );
+      continue;
+    }
+
+    // Unordered lists and Task lists
+    if (line.trim().startsWith('* ') || line.trim().startsWith('- ')) {
+      const listItems: React.ReactNode[] = [];
+      let isTask = false;
+      
+      while (i < lines.length && (lines[i].trim().startsWith('* ') || lines[i].trim().startsWith('- '))) {
+        const currentLine = lines[i];
+        const content = currentLine.replace(/^\s*[*-]\s+/, '');
+        
+        // Task list check
+        const taskMatch = content.match(/^\[([ xX])\]\s+(.*)$/);
+        if (taskMatch) {
+          isTask = true;
+          const isChecked = taskMatch[1].toLowerCase() === 'x';
+          listItems.push(
+            <li key={i} style={{ listStyle: 'none', display: 'flex', alignItems: 'flex-start', gap: '8px', margin: '4px 0' }}>
+              {isChecked ? (
+                <CheckSquare size={16} color="var(--color-text-primary)" style={{ marginTop: '2px', flexShrink: 0 }} />
+              ) : (
+                <Square size={16} color="var(--color-text-disabled)" style={{ marginTop: '2px', flexShrink: 0 }} />
+              )}
+              <span><FormattedText text={taskMatch[2]} /></span>
+            </li>
           );
-        }
-
-        // Unordered lists and Task lists
-        if (line.trim().startsWith('* ') || line.trim().startsWith('- ')) {
-          const content = line.replace(/^\s*[*-]\s+/, '');
-          
-          // Task list check
-          const taskMatch = content.match(/^\[([ xX])\]\s+(.*)$/);
-          if (taskMatch) {
-            const isChecked = taskMatch[1].toLowerCase() === 'x';
-            return (
-              <li key={lineIndex} style={{ marginLeft: '12px', fontSize: '13px', margin: '2px 0', listStyle: 'none', display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
-                <input type="checkbox" checked={isChecked} readOnly style={{ marginTop: '2px' }} />
-                <span><FormattedText text={taskMatch[2]} /></span>
-              </li>
-            );
-          }
-          
-          return <li key={lineIndex} style={{ marginLeft: '12px', fontSize: '13px', margin: '2px 0' }}><FormattedText text={content} /></li>;
-        }
-
-        // Numbered lists
-        const numberedMatch = line.trim().match(/^(\d+)\.\s+(.*)$/);
-        if (numberedMatch) {
-          return (
-            <li key={lineIndex} style={{ marginLeft: '12px', fontSize: '13px', margin: '2px 0', listStyleType: 'decimal' }}>
-              <FormattedText text={numberedMatch[2]} />
+        } else {
+          listItems.push(
+            <li key={i} style={{ margin: '2px 0', fontSize: '13px' }}>
+              <FormattedText text={content} />
             </li>
           );
         }
+        i++;
+      }
+      i--; // step back since outer loop will increment
+      
+      elements.push(
+        <ul key={`ul-${i}`} style={{ marginLeft: isTask ? '0' : '20px', paddingLeft: isTask ? '0' : '8px', marginBottom: '12px' }}>
+          {listItems}
+        </ul>
+      );
+      continue;
+    }
 
-        return (
-          <p key={lineIndex} style={{ minHeight: '18px', margin: '4px 0' }}>
-            <FormattedText text={line} />
-          </p>
+    // Numbered lists
+    const numberedMatch = line.trim().match(/^(\d+)\.\s+(.*)$/);
+    if (numberedMatch) {
+      const listItems: React.ReactNode[] = [];
+      while (i < lines.length && lines[i].trim().match(/^(\d+)\.\s+(.*)$/)) {
+        const m = lines[i].trim().match(/^(\d+)\.\s+(.*)$/);
+        listItems.push(
+          <li key={i} style={{ margin: '2px 0', fontSize: '13px' }}>
+            <FormattedText text={m![2]} />
+          </li>
         );
-      })}
-    </>
-  );
+        i++;
+      }
+      i--; // step back
+      
+      elements.push(
+        <ol key={`ol-${i}`} style={{ marginLeft: '24px', paddingLeft: '8px', marginBottom: '12px' }}>
+          {listItems}
+        </ol>
+      );
+      continue;
+    }
+
+    // Paragraphs
+    elements.push(
+      <p key={i} style={{ minHeight: '18px', margin: '4px 0' }}>
+        <FormattedText text={line} />
+      </p>
+    );
+  }
+
+  return <div className="markdown-content">{elements}</div>;
 }

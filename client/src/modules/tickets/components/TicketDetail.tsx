@@ -159,21 +159,36 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
           {/* Title Area */}
           <div>
             {isEditingTitle ? (
-              <Textarea 
-                className="input"
-                style={{ fontSize: '22px', fontWeight: 600, padding: '6px 10px', minHeight: '38px' }}
-                value={titleValue}
-                onChange={(e) => setTitleValue(e.target.value)}
-                onBlur={handleTitleBlur}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleTitleBlur();
-                  }
-                }}
-                autoGrow
-                autoFocus
-              />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <Textarea 
+                  className="input"
+                  style={{ fontSize: '22px', fontWeight: 600, padding: '6px 10px', minHeight: '38px' }}
+                  value={titleValue}
+                  onChange={(e) => setTitleValue(e.target.value)}
+                  onBlur={handleTitleBlur}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === 'Escape') {
+                      e.preventDefault();
+                      handleTitleBlur();
+                    }
+                  }}
+                  autoGrow
+                  autoFocus
+                />
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <Button
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      handleTitleBlur();
+                    }}
+                    variant="primary"
+                    size="sm"
+                    style={{ padding: '4px 12px', fontSize: '12px' }}
+                  >
+                    Save
+                  </Button>
+                </div>
+              </div>
             ) : (
               <div
                 onClick={() => setIsEditingTitle(true)}
@@ -212,15 +227,36 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             </div>
 
             {isEditingDesc ? (
-              <Textarea 
-                style={{ fontFamily: 'var(--mono)', fontSize: '13px', lineHeight: '1.6' }}
-                value={descValue}
-                onChange={(e) => setDescValue(e.target.value)}
-                placeholder="Describe your issue using markdown..."
-                onBlur={handleDescBlur}
-                autoGrow
-                autoFocus
-              />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <Textarea 
+                  style={{ fontFamily: 'var(--mono)', fontSize: '13px', lineHeight: '1.6' }}
+                  value={descValue}
+                  onChange={(e) => setDescValue(e.target.value)}
+                  placeholder="Describe your issue using markdown..."
+                  onBlur={handleDescBlur}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') {
+                      e.preventDefault();
+                      handleDescBlur();
+                    }
+                  }}
+                  autoGrow
+                  autoFocus
+                />
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <Button
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      handleDescBlur();
+                    }}
+                    variant="primary"
+                    size="sm"
+                    style={{ padding: '4px 12px', fontSize: '12px' }}
+                  >
+                    Save
+                  </Button>
+                </div>
+              </div>
             ) : (
               <div 
                 onClick={() => setIsEditingDesc(true)}
