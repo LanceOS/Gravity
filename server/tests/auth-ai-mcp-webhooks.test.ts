@@ -1,17 +1,36 @@
 import { eq } from 'drizzle-orm';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../src/app.js';
 import { db } from '../src/db/index.js';
 import { projects, tickets, workspaceMembers } from '../src/db/schema.js';
 import {
-  api,
+  api as baseApi,
   jsonResponse,
   readSseChunk,
   seedTicket,
   seedUser,
   seedWorkspaceFixture,
 } from './helpers/test-helpers.js';
+import { credentialManager } from '../src/lib/kms/index.js';
+
+// Custom API wrapper that automatically passes the test user ID header to authenticate AI requests.
+function api() {
+  const client = baseApi();
+  const wrap = (url: string, reqBuilder: any) => {
+    if (url.includes('/ai/')) {
+      return reqBuilder.set('x-user-id', 'mock-user-id');
+    }
+    return reqBuilder;
+  };
+
+  return {
+    get: (url: string) => wrap(url, client.get(url)),
+    post: (url: string) => wrap(url, client.post(url)),
+    patch: (url: string) => wrap(url, client.patch(url)),
+    delete: (url: string) => wrap(url, client.delete(url)),
+  };
+}
 
 function parseMcpResult(response: { body: { result?: { content?: Array<{ text?: string }> } } }) {
   const text = response.body.result?.content?.[0]?.text;
@@ -19,6 +38,14 @@ function parseMcpResult(response: { body: { result?: { content?: Array<{ text?: 
 }
 
 describe('auth, AI, MCP, webhooks, and realtime routes', () => {
+  beforeEach(async () => {
+    try {
+      await seedUser({ id: 'mock-user-id', email: 'mockuser@example.com' });
+      await credentialManager.StoreCredential('mock-user-id', 'sk-test');
+    } catch {
+      // ignore
+    }
+  });
   it('supports auth compatibility sign-up, sign-in, and session checks', async () => {
     const agent = request.agent(createApp());
 

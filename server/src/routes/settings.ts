@@ -1,10 +1,12 @@
 import { Router } from 'express';
 import { eq } from 'drizzle-orm';
 import { db } from '../db/index.js';
-import { userSettings } from '../db/schema.js';
+import { userSettings, userExternalCredentials } from '../db/schema.js';
 import { decryptSecret, encryptSecret } from '../lib/crypto.js';
+import { credentialManager } from '../lib/kms/index.js';
 import { getUserSettingsRecord } from '../lib/platform.js';
 import { resolveRequestActorUserId } from '../lib/request-auth.js';
+import { validateOllamaUrl } from '../lib/ai/utils.js';
 
 const DEFAULT_VIEWS = new Set(['board', 'list']);
 const THEMES = new Set(['dark', 'coal-black', 'coffee', 'marble-blue']);
@@ -12,14 +14,14 @@ const AI_PROVIDERS = new Set(['openai', 'anthropic', 'gemini', 'deepseek']);
 const AGENT_INTEGRATIONS = new Set(['ollama', 'third_party']);
 const PROJECT_LAYOUTS = new Set(['standard', 'condensed']);
 
-function toSettingsResponse(settings: Awaited<ReturnType<typeof getUserSettingsRecord>>) {
+function toSettingsResponse(settings: Awaited<ReturnType<typeof getUserSettingsRecord>>, apiKey: string) {
   return {
     userId: settings.userId,
     defaultView: settings.defaultView,
     ollamaModel: settings.preferredOllamaModel ?? '',
     ollamaEndpoint: settings.ollamaEndpoint,
     theme: settings.theme,
-    apiKey: decryptSecret(settings.encryptedApiKey),
+    apiKey,
     aiProvider: settings.aiProvider,
     agentIntegration: settings.agentIntegration,
     projectLayout: settings.projectLayout,
@@ -60,9 +62,18 @@ export function createSettingsRouter() {
 
     try {
       const settings = await getUserSettingsRecord(req.params.userId);
-      res.json(toSettingsResponse(settings));
+      const [record] = await db
+        .select({ userId: userExternalCredentials.userId })
+        .from(userExternalCredentials)
+        .where(eq(userExternalCredentials.userId, req.params.userId))
+        .limit(1);
+
+      const apiKeyPlaceholder = record ? '••••••••••••' : '';
+      res.json(toSettingsResponse(settings, apiKeyPlaceholder));
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load settings.' });
+      const message = error instanceof Error ? error.message : 'Failed to load settings.';
+      const sanitized = message.includes('Security Exception') ? 'External credentials configuration error.' : message;
+      res.status(500).json({ error: sanitized });
     }
   });
 
@@ -110,42 +121,98 @@ export function createSettingsRouter() {
         return;
       }
 
+      const ollamaEndpoint = typeof req.body?.ollamaEndpoint === 'string' ? req.body.ollamaEndpoint : undefined;
+      if (ollamaEndpoint) {
+        try {
+          validateOllamaUrl(ollamaEndpoint);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Invalid ollamaEndpoint.';
+          const sanitized = message.includes('Security Exception') ? 'External credentials configuration error.' : message;
+          res.status(400).json({ error: sanitized });
+          return;
+        }
+      }
+
       const current = await getUserSettingsRecord(userId);
-      const merged = {
-        ...current,
-        defaultView: defaultView.value ?? current.defaultView,
-        preferredOllamaModel:
-          typeof req.body?.ollamaModel === 'string' ? req.body.ollamaModel : current.preferredOllamaModel,
-        ollamaEndpoint:
-          typeof req.body?.ollamaEndpoint === 'string' ? req.body.ollamaEndpoint : current.ollamaEndpoint,
-        theme: theme.value ?? current.theme,
-        aiProvider: aiProvider.value ?? current.aiProvider,
-        agentIntegration: agentIntegration.value ?? current.agentIntegration,
-        projectLayout: projectLayout.value ?? current.projectLayout,
-        encryptedApiKey:
-          typeof req.body?.apiKey === 'string'
-            ? encryptSecret(req.body.apiKey.trim())
-            : current.encryptedApiKey,
-      };
+      
+      let apiKeyPlaceholder = '';
 
-      await db
-        .update(userSettings)
-        .set({
-          defaultView: merged.defaultView,
-          preferredOllamaModel: merged.preferredOllamaModel,
-          ollamaEndpoint: merged.ollamaEndpoint,
-          theme: merged.theme,
-          aiProvider: merged.aiProvider,
-          agentIntegration: merged.agentIntegration,
-          projectLayout: merged.projectLayout,
-          encryptedApiKey: merged.encryptedApiKey,
-          updatedAt: new Date(),
-        })
-        .where(eq(userSettings.userId, userId));
+      // Hoist check to run exactly once and determine if a key exists
+      const [existingCredential] = await db
+        .select({ userId: userExternalCredentials.userId })
+        .from(userExternalCredentials)
+        .where(eq(userExternalCredentials.userId, userId))
+        .limit(1);
 
-      res.json(toSettingsResponse(merged));
+      const hasExistingCredential = Boolean(existingCredential);
+
+      // Determine the intended credential action from the explicit keyAction discriminator.
+      // Accepted values: 'update' (store new key), 'clear' (delete key), 'keep' (no change).
+      // Omitting keyAction defaults to 'keep', preserving backward-compatibility.
+      const keyAction = typeof req.body?.keyAction === 'string' ? req.body.keyAction : 'keep';
+      if (!['update', 'clear', 'keep'].includes(keyAction)) {
+        res.status(400).json({ error: 'Invalid keyAction. Must be one of: update, clear, keep.' });
+        return;
+      }
+
+      if (keyAction === 'update') {
+        const rawKey = typeof req.body?.apiKey === 'string' ? req.body.apiKey.trim() : '';
+        if (!rawKey) {
+          res.status(400).json({ error: 'apiKey is required when keyAction is "update".' });
+          return;
+        }
+      }
+
+      // Perform all database modifications in a single atomic transaction block
+      const merged = await db.transaction(async (tx) => {
+        if (keyAction === 'clear') {
+          await tx.delete(userExternalCredentials).where(eq(userExternalCredentials.userId, userId));
+          apiKeyPlaceholder = '';
+        } else if (keyAction === 'update') {
+          const rawKey = (req.body.apiKey as string).trim();
+          await credentialManager.StoreCredential(userId, rawKey, tx);
+          apiKeyPlaceholder = '••••••••••••';
+        } else {
+          // 'keep': leave credentials unchanged
+          apiKeyPlaceholder = hasExistingCredential ? '••••••••••••' : '';
+        }
+
+        const nextSettings = {
+          ...current,
+          defaultView: defaultView.value ?? current.defaultView,
+          preferredOllamaModel:
+            typeof req.body?.ollamaModel === 'string' ? req.body.ollamaModel : current.preferredOllamaModel,
+          ollamaEndpoint: ollamaEndpoint ?? current.ollamaEndpoint,
+          theme: theme.value ?? current.theme,
+          aiProvider: aiProvider.value ?? current.aiProvider,
+          agentIntegration: agentIntegration.value ?? current.agentIntegration,
+          projectLayout: projectLayout.value ?? current.projectLayout,
+        };
+
+        // Only update the userSettings row — credentials are managed exclusively
+        // via userExternalCredentials. The legacy encryptedApiKey column is left untouched.
+        await tx
+          .update(userSettings)
+          .set({
+            defaultView: nextSettings.defaultView,
+            preferredOllamaModel: nextSettings.preferredOllamaModel,
+            ollamaEndpoint: nextSettings.ollamaEndpoint,
+            theme: nextSettings.theme,
+            aiProvider: nextSettings.aiProvider,
+            agentIntegration: nextSettings.agentIntegration,
+            projectLayout: nextSettings.projectLayout,
+            updatedAt: new Date(),
+          })
+          .where(eq(userSettings.userId, userId));
+
+        return nextSettings;
+      });
+
+      res.json(toSettingsResponse(merged, apiKeyPlaceholder));
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to update settings.' });
+      const message = error instanceof Error ? error.message : 'Failed to update settings.';
+      const sanitized = message.includes('Security Exception') ? 'External credentials configuration error.' : message;
+      res.status(500).json({ error: sanitized });
     }
   });
 
