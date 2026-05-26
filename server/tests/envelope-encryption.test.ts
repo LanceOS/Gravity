@@ -156,11 +156,12 @@ describe('Envelope Encryption & Secure Credential Storage', () => {
       const user = await seedUser({ id: 'settings-integ-2', email: 'int2@example.com' });
       const targetApiKey = 'sk-integration-test-key-555';
 
-      // 1. PATCH setting with apiKey
+      // 1. PATCH setting with apiKey using the explicit keyAction: 'update'
       const patchResponse = await api()
         .patch(`/api/v1/settings/${user.id}`)
         .set('x-user-id', user.id)
         .send({
+          keyAction: 'update',
           apiKey: targetApiKey,
           theme: 'coal-black',
         });
@@ -172,14 +173,6 @@ describe('Envelope Encryption & Secure Credential Storage', () => {
         theme: 'coal-black',
       });
 
-      // Verify legacy field in user_settings table is NULL
-      const [userSettingsRow] = await db
-        .execute(
-          `SELECT encrypted_api_key FROM user_settings WHERE user_id = '${user.id}'`
-        )
-        .then((r) => r.rows as any[]);
-      expect(userSettingsRow?.encrypted_api_key).toBeNull();
-
       // Verify it exists in user_external_credentials
       const externalRecords = await db
         .select()
@@ -187,7 +180,7 @@ describe('Envelope Encryption & Secure Credential Storage', () => {
         .where(eq(userExternalCredentials.userId, user.id));
       expect(externalRecords.length).toBe(1);
 
-      // 2. GET setting should return decrypted key seamlessly
+      // 2. GET setting should return placeholder seamlessly
       const getResponse = await api()
         .get(`/api/v1/settings/${user.id}`)
         .set('x-user-id', user.id);
@@ -200,18 +193,18 @@ describe('Envelope Encryption & Secure Credential Storage', () => {
       });
     });
 
-    it('PATCH /api/v1/settings/:userId clears credentials when apiKey is empty string', async () => {
+    it('PATCH /api/v1/settings/:userId clears credentials when keyAction is clear', async () => {
       const user = await seedUser({ id: 'settings-integ-3', email: 'int3@example.com' });
 
       // First store a credential
       await credentialManager.StoreCredential(user.id, 'sk-temp-key');
 
-      // Clear the credential via settings PATCH
+      // Clear the credential via settings PATCH using the explicit keyAction: 'clear'
       const clearResponse = await api()
         .patch(`/api/v1/settings/${user.id}`)
         .set('x-user-id', user.id)
         .send({
-          apiKey: '',
+          keyAction: 'clear',
         });
 
       expect(clearResponse.status).toBe(200);

@@ -146,20 +146,34 @@ export function createSettingsRouter() {
 
       const hasExistingCredential = Boolean(existingCredential);
 
+      // Determine the intended credential action from the explicit keyAction discriminator.
+      // Accepted values: 'update' (store new key), 'clear' (delete key), 'keep' (no change).
+      // Omitting keyAction defaults to 'keep', preserving backward-compatibility.
+      const keyAction = typeof req.body?.keyAction === 'string' ? req.body.keyAction : 'keep';
+      if (!['update', 'clear', 'keep'].includes(keyAction)) {
+        res.status(400).json({ error: 'Invalid keyAction. Must be one of: update, clear, keep.' });
+        return;
+      }
+
+      if (keyAction === 'update') {
+        const rawKey = typeof req.body?.apiKey === 'string' ? req.body.apiKey.trim() : '';
+        if (!rawKey) {
+          res.status(400).json({ error: 'apiKey is required when keyAction is "update".' });
+          return;
+        }
+      }
+
       // Perform all database modifications in a single atomic transaction block
       const merged = await db.transaction(async (tx) => {
-        if (typeof req.body?.apiKey === 'string') {
-          const trimmed = req.body.apiKey.trim();
-          if (trimmed === '') {
-            await tx.delete(userExternalCredentials).where(eq(userExternalCredentials.userId, userId));
-            apiKeyPlaceholder = '';
-          } else if (trimmed === '••••••••••••') {
-            apiKeyPlaceholder = hasExistingCredential ? '••••••••••••' : '';
-          } else {
-            await credentialManager.StoreCredential(userId, trimmed, tx);
-            apiKeyPlaceholder = '••••••••••••';
-          }
+        if (keyAction === 'clear') {
+          await tx.delete(userExternalCredentials).where(eq(userExternalCredentials.userId, userId));
+          apiKeyPlaceholder = '';
+        } else if (keyAction === 'update') {
+          const rawKey = (req.body.apiKey as string).trim();
+          await credentialManager.StoreCredential(userId, rawKey, tx);
+          apiKeyPlaceholder = '••••••••••••';
         } else {
+          // 'keep': leave credentials unchanged
           apiKeyPlaceholder = hasExistingCredential ? '••••••••••••' : '';
         }
 
@@ -175,6 +189,8 @@ export function createSettingsRouter() {
           projectLayout: projectLayout.value ?? current.projectLayout,
         };
 
+        // Only update the userSettings row — credentials are managed exclusively
+        // via userExternalCredentials. The legacy encryptedApiKey column is left untouched.
         await tx
           .update(userSettings)
           .set({
@@ -185,10 +201,6 @@ export function createSettingsRouter() {
             aiProvider: nextSettings.aiProvider,
             agentIntegration: nextSettings.agentIntegration,
             projectLayout: nextSettings.projectLayout,
-            encryptedApiKey:
-              typeof req.body?.apiKey === 'string' && req.body.apiKey.trim() !== '••••••••••••'
-                ? null
-                : current.encryptedApiKey,
             updatedAt: new Date(),
           })
           .where(eq(userSettings.userId, userId));

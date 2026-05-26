@@ -36,17 +36,17 @@ export function createAiRouter() {
     }
 
     const provider = typeof req.body?.provider === 'string' ? req.body.provider : 'openai';
-    const apiKey = typeof req.body?.apiKey === 'string' ? req.body.apiKey.trim() : '';
+    const apiKey = typeof req.body?.apiKey === 'string' ? req.body.apiKey.trim() : undefined;
 
-    const keyToUse = apiKey === '••••••••••••' ? undefined : apiKey;
-
-    if (!keyToUse && apiKey !== '••••••••••••') {
-      res.status(400).json({ error: 'API key is required.' });
+    // If no apiKey is provided, delegate to the stored credential via testConnection.
+    // If apiKey is provided, use it directly as a live validation.
+    if (apiKey !== undefined && !apiKey) {
+      res.status(400).json({ error: 'API key must not be empty.' });
       return;
     }
 
     try {
-      await aiService.testConnection(actorUserId, provider, { apiKey: keyToUse });
+      await aiService.testConnection(actorUserId, provider, { apiKey });
       res.json({ message: `${provider} API key validated successfully.` });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Connection test failed.';

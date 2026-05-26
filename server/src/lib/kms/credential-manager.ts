@@ -126,8 +126,9 @@ export class CredentialManager {
     let plaintextDEK: Buffer | null = null;
     let decryptedKeyBuffer: Buffer | null = null;
 
+    // Decrypt the key material in an isolated try/catch.
+    // Any error here is a cryptographic failure and is rethrown as a Security Exception.
     let decryptedAPIKeyString: string;
-
     try {
       // 2. Call DecryptDataKey to unwrap the DEK
       plaintextDEK = this.kmsProvider.DecryptDataKey(record.encryptedDek);
@@ -146,10 +147,13 @@ export class CredentialManager {
       );
     }
 
-    // Run the callback outside the decryption try/catch so non-crypto errors aren't mislabeled.
-    return await executionCallback(decryptedAPIKeyString);
+    // 4. Run the callback in a separate try/finally so that:
+    //    a) Non-crypto callback errors are never mislabeled as Security Exceptions.
+    //    b) Plaintext secrets are always zeroized regardless of callback success or failure.
+    try {
+      return await executionCallback(decryptedAPIKeyString);
     } finally {
-      // 5. Ensure plaintext secrets are securely wiped from memory inside a finally block
+      // 5. Ensure plaintext secrets are securely wiped from memory
       if (plaintextDEK) {
         this.secureWipeBuffer(plaintextDEK);
       }

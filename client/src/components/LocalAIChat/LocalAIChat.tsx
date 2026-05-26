@@ -133,7 +133,10 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
     }
   }, [isThirdParty, settings.aiProvider, initialModel]);
 
-  const handleSendMessage = async (textToSend: string, autoRunMessages?: Message[]) => {
+  /** Maximum number of consecutive tool call round-trips to prevent infinite agentic loops. */
+  const MAX_TOOL_CALL_DEPTH = 10;
+
+  const handleSendMessage = async (textToSend: string, autoRunMessages?: Message[], toolCallDepth = 0) => {
     if (!autoRunMessages && (!textToSend.trim() || isGenerating)) return;
 
     const newMessages: Message[] = autoRunMessages || [...messages, { role: 'user', content: textToSend }];
@@ -222,19 +225,44 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
           }
         }
 
-        // Auto-continue chat with tool results
-        await handleSendMessage('', [...nextMessages, ...toolMessages]);
+        // Auto-continue chat with tool results, but guard against unbounded recursion.
+        if (toolCallDepth >= MAX_TOOL_CALL_DEPTH) {
+          setMessages([...nextMessages, ...toolMessages, {
+            role: 'system',
+            content: `⚠️ **Agentic loop stopped** — the assistant made more than ${MAX_TOOL_CALL_DEPTH} consecutive tool calls. Please review the conversation and try a more specific prompt.`
+          }]);
+        } else {
+          await handleSendMessage('', [...nextMessages, ...toolMessages], toolCallDepth + 1);
+        }
+
       } else if (!aiResponse) {
         setMessages([...newMessages, { role: 'system', content: `Sorry, I got an empty response from ${providerLabel}.` }]);
       }
     } catch (error) {
       const providerLabel = isThirdParty ? getProviderName(settings.aiProvider) : 'Ollama';
-      const message = error instanceof Error ? error.message : `Unknown ${providerLabel} error.`;
       console.error(error);
 
-      const errorContent = isThirdParty
-        ? `### ⚠️ Connection Error\n\nFailed to contact the **${providerLabel}** API.\n\n**Details:**\n> ${message}\n\nPlease check your internet connection and verify that your API key is correctly configured in your **Account Preferences**.`
-        : buildOllamaErrorMessage(model, ollamaUrl, message).content;
+      let errorContent: string;
+      if (isThirdParty) {
+        // Map HTTP status codes to safe, user-friendly messages.
+        // The raw server error is intentionally not surfaced to avoid leaking
+        // sensitive details (URLs, partial IDs, stack traces) into the chat UI.
+        const statusCode = error instanceof Error && 'status' in error ? (error as any).status : undefined;
+        let detail: string;
+        if (statusCode === 401 || statusCode === 403) {
+          detail = 'Your API key appears to be invalid or lacks the required permissions. Please update it in **Account Preferences**.';
+        } else if (statusCode === 429) {
+          detail = 'The provider is rate-limiting your requests. Please wait a moment and try again.';
+        } else if (statusCode === 402) {
+          detail = 'Your provider account may have insufficient credits. Please check your billing settings.';
+        } else {
+          detail = 'Please check your internet connection and verify that your API key is correctly configured in **Account Preferences**.';
+        }
+        errorContent = `### ⚠️ Connection Error\n\nFailed to contact the **${providerLabel}** API.\n\n${detail}`;
+      } else {
+        const message = error instanceof Error ? error.message : `Unknown ${providerLabel} error.`;
+        errorContent = buildOllamaErrorMessage(model, ollamaUrl, message).content;
+      }
 
       setMessages([...newMessages, { role: 'system', content: errorContent }]);
     } finally {
@@ -243,6 +271,7 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
       }
     }
   };
+
 
   const handleQuickAction = (actionType: QuickActionType) => {
     if (!activeTicket) {

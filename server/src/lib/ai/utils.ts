@@ -42,6 +42,31 @@ export function validateOllamaUrl(urlStr: string): void {
       throw new Error('Security Exception: Outbound requests to loopback addresses are prohibited in production.');
     }
 
+    // Check for IPv4-mapped IPv6 addresses (::ffff:<ipv4>).
+    // Node.js's URL parser strips brackets, so [::ffff:127.0.0.1] becomes '::ffff:127.0.0.1'.
+    // We extract the embedded IPv4 portion and run it through the same RFC-1918 / loopback checks.
+    if (hostname.startsWith('::ffff:')) {
+      const embedded = hostname.slice('::ffff:'.length);
+      if (
+        embedded.startsWith('127.') ||
+        embedded === '127.0.0.1' ||
+        embedded === '0.0.0.0' ||
+        embedded.startsWith('10.') ||
+        embedded.startsWith('192.168.') ||
+        embedded.startsWith('169.254.')
+      ) {
+        throw new Error('Security Exception: Outbound requests to private/loopback addresses via IPv4-mapped IPv6 are prohibited in production.');
+      }
+      // Cover 172.16.0.0/12
+      if (embedded.startsWith('172.')) {
+        const parts = embedded.split('.');
+        const second = parseInt(parts[1], 10);
+        if (second >= 16 && second <= 31) {
+          throw new Error('Security Exception: Outbound requests to private networks via IPv4-mapped IPv6 are prohibited in production.');
+        }
+      }
+    }
+
     // Check for link-local IPv4/IPv6
     if (hostname.startsWith('169.254.') || hostname.startsWith('fe80:')) {
       throw new Error('Security Exception: Outbound requests to link-local addresses are prohibited in production.');
@@ -71,6 +96,7 @@ export function validateOllamaUrl(urlStr: string): void {
     }
   }
 }
+
 
 /**
  * Performs an HTTP fetch request with a specified timeout and exponential backoff retry.
