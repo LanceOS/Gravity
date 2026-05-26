@@ -237,9 +237,9 @@ export function createAiRouter() {
     }
 
     if (messages.length > 0 && messages[0].role === 'system') {
-      messages[0] = { ...messages[0], content: messages[0].content + '\n\n' + JSON.stringify(systemPrompt, null, 2) };
+      messages[0] = { ...messages[0], content: messages[0].content + '\n\n' + systemPrompt };
     } else {
-      messages = [{ role: 'system', content: JSON.stringify(systemPrompt, null, 2) }, ...messages];
+      messages = [{ role: 'system', content: systemPrompt }, ...messages];
     }
 
     try {
