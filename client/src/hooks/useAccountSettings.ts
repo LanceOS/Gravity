@@ -296,7 +296,7 @@ export function useAccountSettings({
     }
   }, [currentUser]);
 
-  const baselineSettings = originalSettings ?? normalizeWorkspaceSettings(DEFAULT_WORKSPACE_SETTINGS);
+  const baselineSettings = originalSettings ?? normalizeWorkspaceSettings(null, activeView, theme);
   const hasChanges = !shallowEqual(settings, baselineSettings);
 
   return {
