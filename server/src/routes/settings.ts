@@ -185,7 +185,10 @@ export function createSettingsRouter() {
             aiProvider: nextSettings.aiProvider,
             agentIntegration: nextSettings.agentIntegration,
             projectLayout: nextSettings.projectLayout,
-            encryptedApiKey: null,
+            encryptedApiKey:
+              typeof req.body?.apiKey === 'string' && req.body.apiKey.trim() !== '••••••••••••'
+                ? null
+                : current.encryptedApiKey,
             updatedAt: new Date(),
           })
           .where(eq(userSettings.userId, userId));
