@@ -1,7 +1,6 @@
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@library';
-import { WorkspaceProjectPanel } from '../../components/WorkspaceProjectPanel';
-import { WorkspaceHeader } from '../../components/WorkspaceHeader';
+import { WorkspaceProjectPanel, WorkspaceHeader } from '../../modules/workspaces';
 import type { Domain, Project } from '../../context/TicketContext';
 import '../WorkspacePage/WorkspacePage.css';
 import './WorkspaceProjectsPage.css';

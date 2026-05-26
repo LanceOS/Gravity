@@ -1,5 +1,5 @@
 import { TicketProvider } from './context/TicketContext.tsx';
-import { ThemeProvider } from './context/ThemeProvider.tsx';
+import { ThemeProvider } from './modules/settings';
 import { AppShellPage } from './pages/AppShellPage/AppShellPage.tsx';
 
 export default function App() {

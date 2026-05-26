@@ -1,19 +1,16 @@
 import { useMemo } from 'react';
 import { Button } from '@library';
 import type { Comment, Cycle, Domain, Project, Ticket, User } from '../../context/TicketContext';
-import type { TicketFilters, TicketListSort } from '../../utils/ticketView';
-import { TicketBoard } from '../../components/TicketBoard';
-import { TicketList } from '../../components/TicketList';
-import { TicketDetail } from '../../components/TicketDetail';
+import type { TicketFilters, TicketListSort } from '../../modules/tickets/utils/ticketView';
+import { TicketBoard, TicketList, TicketDetail, TicketFilterBar } from '../../modules/tickets';
 import {
   filterTickets,
   getWorkspaceHeaderTitle,
   groupTicketsByStatus,
   hasActiveTicketFilters,
   sortTicketsForList,
-} from '../../utils/ticketView';
-import { TicketFilterBar } from '../../components/TicketFilterBar';
-import { WorkspaceHeader } from '../../components/WorkspaceHeader';
+} from '../../modules/tickets/utils/ticketView';
+import { WorkspaceHeader } from '../../modules/workspaces';
 import './WorkspacePage.css';
 
 interface WorkspacePageProps {

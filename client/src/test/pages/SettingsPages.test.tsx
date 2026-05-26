@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { SettingsPage } from '../../pages/SettingsPage/SettingsPage.tsx';
+import { SettingsScreen as SettingsPage } from '../../modules/settings';
 import { AccountPreferencesPage } from '../../pages/AccountPreferencesPage/AccountPreferencesPage.tsx';
 import type { WorkspaceSummary } from '../../hooks/useWorkspaceDirectory.ts';
 
@@ -162,6 +162,7 @@ function renderAccountPreferencesPage(overrides: Partial<Parameters<typeof Accou
     onResetTutorial: vi.fn(),
     onSaveSettings: vi.fn(),
     onTestApiKey: vi.fn(),
+    hasChanges: true,
     ...overrides,
   };
 

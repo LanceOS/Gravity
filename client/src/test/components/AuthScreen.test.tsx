@@ -7,7 +7,7 @@ import type {
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { AuthScreen } from '../../components/AuthScreen/AuthScreen.tsx';
+import { AuthScreen } from '../../modules/auth';
 
 const mockUseTickets = vi.hoisted(() => ({
   signIn: vi.fn(),

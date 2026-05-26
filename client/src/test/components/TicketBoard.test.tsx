@@ -2,8 +2,8 @@ import type { ButtonHTMLAttributes, ChangeEvent, CSSProperties, DragEvent, React
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { TicketBoard } from '../../components/TicketBoard/TicketBoard.tsx';
-import type { TicketCardProps } from '../../components/TicketBoard/types';
+import { TicketBoard } from '../../modules/tickets/components/TicketBoard';
+import type { TicketCardProps } from '../../modules/tickets/types/TicketBoard';
 
 type MockButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   children?: ReactNode;
@@ -77,7 +77,7 @@ vi.mock('@library', () => ({
   ),
 }));
 
-vi.mock('../../components/TicketBoard/components', () => ({
+vi.mock('../../modules/tickets/components/TicketCard', () => ({
   TicketCard: ({ ticket, onClick, onDragStart, domainName, assigneeAvatar }: TicketCardProps) => (
     <button type="button" draggable onClick={onClick} onDragStart={onDragStart}>
       {`Card ${ticket.key} ${domainName || 'No domain'} ${assigneeAvatar || 'No avatar'}`}

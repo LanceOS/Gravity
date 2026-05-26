@@ -2,7 +2,7 @@ import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { OnboardingModal } from '../../components/OnboardingModal/OnboardingModal.tsx';
+import { OnboardingModal } from '../../modules/onboarding';
 
 const mocks = vi.hoisted(() => ({
   useTickets: vi.fn(),

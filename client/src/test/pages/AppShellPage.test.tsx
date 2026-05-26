@@ -40,34 +40,34 @@ vi.mock('../../hooks/useWorkspaceSettings', () => ({
   useWorkspaceSettings: mocks.useWorkspaceSettings,
 }));
 
-vi.mock('../../context/ThemeProvider', () => ({
+vi.mock('../../modules/settings', () => ({
   useTheme: () => ({
     setDensity: vi.fn(),
     setTheme: vi.fn(),
   }),
+  SettingsScreen: () => <div>SettingsPage</div>,
 }));
 
 vi.mock('../../utils/webmcp', () => ({
   registerWebMCPTools: mocks.registerWebMCPTools,
 }));
 
-vi.mock('../../components/AgentSimulator', () => ({
+vi.mock('../../modules/ai', () => ({
   AgentSimulator: () => <div>AgentSimulator</div>,
-}));
-
-vi.mock('../../components/AuthScreen', () => ({
-  AuthScreen: () => <div>AuthScreen</div>,
-}));
-
-vi.mock('../../components/CreateTicketModal', () => ({
-  CreateTicketModal: () => <div>CreateTicketModal</div>,
-}));
-
-vi.mock('../../components/LocalAIChat', () => ({
   LocalAIChat: () => <div>LocalAIChat</div>,
 }));
 
-vi.mock('../../components/OnboardingModal', () => ({
+vi.mock('../../modules/auth', () => ({
+  AuthScreen: () => <div>AuthScreen</div>,
+}));
+
+vi.mock('../../modules/tickets', () => ({
+  CreateTicketModal: () => <div>CreateTicketModal</div>,
+}));
+
+
+
+vi.mock('../../modules/onboarding', () => ({
   OnboardingModal: ({ onComplete }: { onComplete: () => void }) => (
     <div>
       <div>OnboardingModal</div>
@@ -113,9 +113,7 @@ vi.mock('../../pages/WorkspaceProjectsPage/WorkspaceProjectsPage', () => ({
   WorkspaceProjectsPage: () => <div>WorkspaceProjectsPage</div>,
 }));
 
-vi.mock('../../pages/SettingsPage/SettingsPage', () => ({
-  SettingsPage: () => <div>SettingsPage</div>,
-}));
+
 
 vi.mock('../../pages/AccountPreferencesPage/AccountPreferencesPage', () => ({
   AccountPreferencesPage: () => <div>AccountPreferencesPage</div>,

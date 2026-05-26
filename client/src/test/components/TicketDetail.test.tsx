@@ -8,7 +8,7 @@ import type {
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { TicketDetail } from '../../components/TicketDetail/TicketDetail.tsx';
+import { TicketDetail } from '../../modules/tickets/components/TicketDetail';
 
 type MockButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   children?: ReactNode;
@@ -58,7 +58,7 @@ vi.mock('@library', () => ({
   Portal: ({ children }: { children: ReactNode }) => <div data-testid="portal">{children}</div>,
 }));
 
-vi.mock('../../components/TicketDetail/components', () => ({
+vi.mock('../../modules/tickets/components/MarkdownContent', () => ({
   MarkdownContent: ({ text }: { text: string }) => <div>{text}</div>,
 }));
 

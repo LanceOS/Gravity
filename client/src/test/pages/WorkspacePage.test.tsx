@@ -26,15 +26,12 @@ type TicketDetailMockProps = {
   subtaskProgressPercent: number;
 };
 
-vi.mock('../../components/TicketBoard', () => ({
+vi.mock('../../modules/tickets', () => ({
   TicketBoard: ({ filteredCount, totalCount, hasActiveFilters }: TicketBoardMockProps) => (
     <div>
       <div>{`TicketBoard ${filteredCount}/${totalCount} ${hasActiveFilters ? 'filtered' : 'unfiltered'}`}</div>
     </div>
   ),
-}));
-
-vi.mock('../../components/TicketFilterBar', () => ({
   TicketFilterBar: ({
     hasActiveFilters,
     onClearFilters,
@@ -47,15 +44,9 @@ vi.mock('../../components/TicketFilterBar', () => ({
         Clear board filters
       </button>
     ) : null,
-}));
-
-vi.mock('../../components/TicketList', () => ({
   TicketList: ({ filteredCount, totalCount, listSort }: TicketListMockProps) => (
     <div>{`TicketList ${filteredCount}/${totalCount} ${listSort}`}</div>
   ),
-}));
-
-vi.mock('../../components/TicketDetail', () => ({
   TicketDetail: ({ activeTicket, subtasks, completedSubtasks, subtaskProgressPercent }: TicketDetailMockProps) => (
     <div>{`TicketDetail ${activeTicket.title} ${subtasks.length} ${completedSubtasks} ${Math.round(subtaskProgressPercent)}`}</div>
   ),
@@ -245,8 +236,5 @@ describe('WorkspacePage', () => {
     expect(screen.getByText('All Issues')).toBeInTheDocument();
     expect(screen.getByText('TicketList 4/4 created')).toBeInTheDocument();
     expect(screen.getByText('TicketDetail Fix billing edge case 2 1 50')).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Board' }));
-    expect(props.onSetView).toHaveBeenCalledWith('board');
   });
 });

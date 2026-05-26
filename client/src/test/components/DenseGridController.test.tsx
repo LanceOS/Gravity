@@ -2,7 +2,7 @@ import type { CSSProperties, ChangeEvent, InputHTMLAttributes, ReactNode } from 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { DenseGridController } from '../../components/performance/DenseGridController.tsx';
+import { DenseGridController } from '../../modules/tickets';
 
 type MockInputProps = InputHTMLAttributes<HTMLInputElement> & {
   value: string;
