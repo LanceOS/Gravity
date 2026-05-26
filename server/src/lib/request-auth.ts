@@ -1,6 +1,7 @@
 import type { Request } from 'express';
 import { fromNodeHeaders } from 'better-auth/node';
 import { auth } from '../auth.js';
+import { env } from '../env.js';
 
 function parseAuthorizationUserId(value?: string | null) {
   if (!value) {
@@ -21,9 +22,12 @@ function parseAuthorizationUserId(value?: string | null) {
 }
 
 export async function resolveRequestActorUserId(req: Request) {
-  const headerUserId = req.header('x-user-id')?.trim() || parseAuthorizationUserId(req.header('authorization'));
-  if (headerUserId) {
-    return headerUserId;
+  // Only allow header-based testing/development shortcuts outside of production
+  if (env.nodeEnv !== 'production') {
+    const headerUserId = req.header('x-user-id')?.trim() || parseAuthorizationUserId(req.header('authorization'));
+    if (headerUserId) {
+      return headerUserId;
+    }
   }
 
   try {

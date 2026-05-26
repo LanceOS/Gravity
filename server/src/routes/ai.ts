@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { aiService } from '../lib/ai/index.js';
 import { resolveRequestActorUserId } from '../lib/request-auth.js';
+import { validateOllamaUrl } from '../lib/ai/utils.js';
 
 export function createAiRouter() {
   const router = Router();
@@ -14,6 +15,7 @@ export function createAiRouter() {
 
     const rawUrl = typeof req.query.ollamaUrl === 'string' ? req.query.ollamaUrl : 'http://localhost:11434';
     try {
+      validateOllamaUrl(rawUrl);
       const models = await aiService.getOllamaProvider().fetchOllamaModels(rawUrl);
       res.json({ models, connected: true });
     } catch (error) {
@@ -43,10 +45,12 @@ export function createAiRouter() {
     }
 
     try {
-      await aiService.testConnection(actorUserId, provider, keyToUse);
+      await aiService.testConnection(actorUserId, provider, { apiKey: keyToUse });
       res.json({ message: `${provider} API key validated successfully.` });
     } catch (error) {
-      res.status(400).json({ error: error instanceof Error ? error.message : 'Connection test failed.' });
+      const message = error instanceof Error ? error.message : 'Connection test failed.';
+      const sanitized = message.includes('Security Exception') ? 'External credentials configuration error.' : message;
+      res.status(400).json({ error: sanitized });
     }
   });
 
@@ -66,9 +70,13 @@ export function createAiRouter() {
           : undefined;
 
     const keyToUse = apiKeyValue === '••••••••••••' ? undefined : apiKeyValue;
+    const ollamaUrl = typeof req.body?.ollamaUrl === 'string' ? req.body.ollamaUrl.trim() : undefined;
 
     try {
-      const latency = await aiService.testConnection(actorUserId, provider, keyToUse);
+      if (ollamaUrl) {
+        validateOllamaUrl(ollamaUrl);
+      }
+      const latency = await aiService.testConnection(actorUserId, provider, { apiKey: keyToUse, ollamaUrl });
       res.json({
         connected: true,
         latency_ms: latency,
@@ -76,10 +84,12 @@ export function createAiRouter() {
         error: null,
       });
     } catch (error) {
+      const message = error instanceof Error ? error.message : 'Connection test failed.';
+      const sanitized = message.includes('Security Exception') ? 'External credentials configuration error.' : message;
       res.status(400).json({
         connected: false,
         latency_ms: null,
-        error: error instanceof Error ? error.message : 'Connection test failed.',
+        error: sanitized,
       });
     }
   });
@@ -103,6 +113,8 @@ export function createAiRouter() {
 
     try {
       const rawOllamaUrl = typeof req.body?.ollamaUrl === 'string' ? req.body.ollamaUrl : 'http://localhost:11434';
+      validateOllamaUrl(rawOllamaUrl);
+
       const result = await aiService.chat(actorUserId, provider, {
         model,
         messages,
@@ -122,6 +134,11 @@ export function createAiRouter() {
       
       if (message.includes('Unsupported provider')) {
         res.status(400).json({ error: message });
+        return;
+      }
+
+      if (message.includes('Security Exception')) {
+        res.status(502).json({ error: 'External credentials configuration error.' });
         return;
       }
 

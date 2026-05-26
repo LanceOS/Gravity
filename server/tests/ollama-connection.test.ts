@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { api as baseApi, jsonResponse, seedUser } from './helpers/test-helpers.js';
 import { credentialManager } from '../src/lib/kms/index.js';
+import { aiService } from '../src/lib/ai/index.js';
 
 // Custom API wrapper that automatically passes the test user ID header to authenticate all requests.
 function api() {
@@ -43,6 +44,7 @@ function dockerFailLocalSuccessMock(models: Array<{ name: string }>) {
 describe('Ollama connection & AI proxy routes', () => {
   beforeEach(async () => {
     vi.restoreAllMocks();
+    aiService.getOllamaProvider().clearCache();
     try {
       await seedUser({ id: 'mock-user-id' });
       await credentialManager.StoreCredential('mock-user-id', 'sk-test-key');

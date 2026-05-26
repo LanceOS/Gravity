@@ -36,6 +36,7 @@ export class GeminiProvider implements IAiProvider {
         }),
       },
       60000,
+      3, // 3 retries with exponential backoff for chat
     );
 
     if (!response.ok) {
@@ -65,11 +66,17 @@ export class GeminiProvider implements IAiProvider {
     };
   }
 
-  async testConnection(apiKey: string): Promise<void> {
+  async testConnection(options?: string | { apiKey?: string; ollamaUrl?: string }): Promise<void> {
+    const apiKey = typeof options === 'string' ? options : options?.apiKey;
+    if (!apiKey) {
+      throw new Error('API key is required.');
+    }
+
     const response = await fetchWithTimeout(
       `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`,
       { method: 'GET' },
       10000,
+      3, // 3 retries with exponential backoff for connection test
     );
 
     if (!response.ok) {

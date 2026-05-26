@@ -3,7 +3,7 @@ import { fetchWithTimeout, readErrorMessage } from './utils.js';
 
 export class AnthropicProvider implements IAiProvider {
   async chat(options: ChatOptions): Promise<{ content: string; toolCalls?: any[] }> {
-    const { model, messages, tools, apiKey } = options;
+    const { model, messages, tools, apiKey, maxTokens } = options;
     if (!apiKey) {
       throw new Error('API key is required for cloud providers.');
     }
@@ -27,13 +27,14 @@ export class AnthropicProvider implements IAiProvider {
         body: JSON.stringify({
           model,
           messages: this.mapMessages(messages),
-          max_tokens: 4096,
+          max_tokens: maxTokens ?? 4096,
           ...(system ? { system } : {}),
           stream: false,
           ...(tools ? { tools: this.formatTools(tools) } : {}),
         }),
       },
       60000,
+      3, // 3 retries with exponential backoff for chat
     );
 
     if (!response.ok) {
@@ -61,14 +62,19 @@ export class AnthropicProvider implements IAiProvider {
     };
   }
 
-  async testConnection(apiKey: string): Promise<void> {
+  async testConnection(options?: string | { apiKey?: string; ollamaUrl?: string }): Promise<void> {
+    const apiKey = typeof options === 'string' ? options : options?.apiKey;
+    if (!apiKey) {
+      throw new Error('API key is required.');
+    }
+
     const response = await fetchWithTimeout('https://api.anthropic.com/v1/models', {
       method: 'GET',
       headers: {
         'x-api-key': apiKey,
         'anthropic-version': '2023-06-01',
       },
-    });
+    }, 10000, 3); // 3 retries with exponential backoff for connection test
 
     if (!response.ok) {
       throw new Error(await readErrorMessage(response, 'Anthropic API key test failed.'));

@@ -55,28 +55,32 @@ export class AiService {
   }
 
   /**
-   * Tests the connection of the specified provider, using either a newly provided
-   * API key or loading and decrypting the saved credential.
+   * Tests the connection of the specified provider, using either newly provided
+   * parameters (apiKey or ollamaUrl) or loading and decrypting the saved credentials.
    */
-  async testConnection(userId: string, provider: string, apiKeyValue?: string): Promise<number> {
+  async testConnection(
+    userId: string,
+    provider: string,
+    options?: { apiKey?: string; ollamaUrl?: string },
+  ): Promise<number> {
     const startedAt = Date.now();
     const lower = provider.toLowerCase();
 
     if (lower === 'ollama') {
       const ollamaUrl = (this.providers.ollama as OllamaProvider);
-      await ollamaUrl.testConnection(apiKeyValue || 'http://localhost:11434');
+      await ollamaUrl.testConnection({ ollamaUrl: options?.ollamaUrl || 'http://localhost:11434' });
       return Date.now() - startedAt;
     }
 
     const providerInst = this.getProvider(provider);
 
-    if (apiKeyValue) {
+    if (options?.apiKey) {
       // Test the newly typed unsaved API Key
-      await providerInst.testConnection(apiKeyValue);
+      await providerInst.testConnection({ apiKey: options.apiKey });
     } else {
       // Test the saved key inside our envelope-encrypted db
       await this.credentialManager.ExecuteWithCredential(userId, async (decryptedKey) => {
-        await providerInst.testConnection(decryptedKey);
+        await providerInst.testConnection({ apiKey: decryptedKey });
       });
     }
 

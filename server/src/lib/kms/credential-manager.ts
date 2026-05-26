@@ -31,7 +31,7 @@ export class CredentialManager {
    * @return {Promise<void>} Resolves when the credential has been safely stored.
    * @throws {Error} If required parameters are missing.
    */
-  async StoreCredential(userId: string, plaintextAPIKey: string): Promise<void> {
+  async StoreCredential(userId: string, plaintextAPIKey: string, dbClient: typeof db = db): Promise<void> {
     if (!userId) {
       throw new Error('User ID is required to store credentials.');
     }
@@ -60,8 +60,8 @@ export class CredentialManager {
       ]);
       authTag = cipher.getAuthTag();
 
-      // 5. Save/Upsert the credential record to the database
-      await db
+      // 5. Save/Upsert the credential record to the database using the injected dbClient
+      await dbClient
         .insert(userExternalCredentials)
         .values({
           userId,

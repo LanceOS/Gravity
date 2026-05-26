@@ -12,9 +12,10 @@ export interface ChatOptions {
   tools?: any[];
   apiKey?: string;
   ollamaUrl?: string;
+  maxTokens?: number;
 }
 
 export interface IAiProvider {
   chat(options: ChatOptions): Promise<{ content: string; toolCalls?: any[] }>;
-  testConnection(apiKey: string): Promise<void>;
+  testConnection(options?: string | { apiKey?: string; ollamaUrl?: string }): Promise<void>;
 }

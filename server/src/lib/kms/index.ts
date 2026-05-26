@@ -5,7 +5,9 @@ import { IKMSProvider } from './types.js';
 
 let kmsProvider: IKMSProvider;
 
-if (env.nodeEnv === 'production') {
+if (env.nodeEnv === 'development' || env.nodeEnv === 'test') {
+  kmsProvider = new LocalEnvKmsProvider();
+} else {
   // =========================================================================
   // PRODUCTION SECURE SECRET STORAGE CONFIGURATION (TODO)
   // =========================================================================
@@ -20,9 +22,6 @@ if (env.nodeEnv === 'production') {
     'Production Configuration Failure: CloudKmsProvider is not yet implemented. ' +
     'Please implement and register CloudKmsProvider before deploying to production.'
   );
-} else {
-  // development or test environments
-  kmsProvider = new LocalEnvKmsProvider();
 }
 
 export const credentialManager = new CredentialManager(kmsProvider);
