@@ -265,9 +265,16 @@ export function Select({
           disabled={disabled}
           {...buttonProps}
         >
-          <span className={labelClassName} style={{ display: 'flex', alignItems: 'center' }}>
-            {selectedOption?.color && <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: selectedOption.color, marginRight: '8px', flexShrink: 0 }} />}
-            {labelText}
+          <span style={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
+            {selectedOption?.color && (
+              <div
+                aria-hidden="true"
+                style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: selectedOption.color, marginRight: '8px', flexShrink: 0 }}
+              />
+            )}
+            <span className={labelClassName} style={{ minWidth: 0, flex: 1 }}>
+              {labelText}
+            </span>
           </span>
           <ChevronDown size={14} className="select-trigger__icon" aria-hidden="true" />
         </button>
