@@ -1,6 +1,8 @@
 export type AIProvider = 'openai' | 'anthropic' | 'gemini' | 'deepseek';
 export type AgentIntegration = 'ollama' | 'third_party';
 
+export const API_KEY_MASK = '••••••••••••';
+
 export interface WorkspaceSettings {
   defaultView: 'board' | 'list';
   theme: 'dark' | 'coal-black' | 'coffee' | 'marble-blue';

@@ -5,7 +5,15 @@ import { validateOllamaUrl } from '../lib/ai/utils.js';
 
 const API_KEY_MASK = '••••••••••••';
 
-const VALID_PROVIDERS = new Set(['openai', 'anthropic', 'gemini', 'deepseek', 'ollama']);
+const PROVIDER_LABELS: Record<string, string> = {
+  openai: 'OpenAI',
+  anthropic: 'Anthropic',
+  gemini: 'Gemini',
+  deepseek: 'DeepSeek',
+  ollama: 'Ollama',
+};
+
+const VALID_PROVIDERS = new Set(Object.keys(PROVIDER_LABELS));
 
 type ParsedApiKey = {
   value?: string;
@@ -42,21 +50,8 @@ function isMissingCredentialMessage(message: string) {
   return /No external credentials found|API key is required/i.test(message);
 }
 
-function providerLabel(provider: string) {
-  switch (provider.toLowerCase()) {
-    case 'openai':
-      return 'OpenAI';
-    case 'anthropic':
-      return 'Anthropic';
-    case 'gemini':
-      return 'Gemini';
-    case 'deepseek':
-      return 'DeepSeek';
-    case 'ollama':
-      return 'Ollama';
-    default:
-      return 'AI provider';
-  }
+function providerLabel(provider: string): string {
+  return PROVIDER_LABELS[provider] ?? 'AI provider';
 }
 
 function sanitizeAiError(

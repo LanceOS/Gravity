@@ -25,12 +25,11 @@ import { DashboardLayout } from '../../components/DashboardLayout/DashboardLayou
 import type { User } from '../../context/TicketContext';
 import {
   AI_PROVIDER_OPTIONS,
+  API_KEY_MASK,
   getProviderOption,
   type AIProvider,
   type WorkspaceSettings,
 } from '../../utils/settings';
-
-const API_KEY_MASK = '••••••••••••';
 
 type SettingsCategoryId = 'general' | 'providers' | 'ollama' | 'onboarding';
 

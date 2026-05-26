@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { User } from '../context/TicketContext';
 import {
   DEFAULT_WORKSPACE_SETTINGS,
+  API_KEY_MASK,
   getProviderOption,
   normalizeWorkspaceSettings,
   type WorkspaceSettings,
@@ -12,14 +13,18 @@ interface StatusMessage {
   message: string;
 }
 
-const API_KEY_MASK = '••••••••••••';
-
 function normalizeApiKeyInput(value: string): string {
   if (value.startsWith(API_KEY_MASK)) {
     return value.slice(API_KEY_MASK.length);
   }
   return value;
 }
+
+const KEY_ACTION: Record<'stored' | 'cleared' | 'pending', 'keep' | 'clear' | 'update'> = {
+  stored: 'keep',
+  cleared: 'clear',
+  pending: 'update',
+};
 
 function shallowEqual<T extends Record<string, any>>(objA: T, objB: T): boolean {
   if (Object.is(objA, objB)) return true;
@@ -123,10 +128,7 @@ export function useAccountSettings({
           setOriginalSettings(normalized);
           setTheme(normalized.theme);
           setView(normalized.defaultView);
-          setApiKeyState(normalized.apiKey === '••••••••••••' ? 'stored' : 'cleared');
-        }
-      })
-      .catch((error: Error) => {
+          setApiKeyState(normalized.apiKey === API_KEY_MASK ? 'stored' : 'cleared');((error: Error) => {
         if (!cancelled) {
           setSaveError(error.message);
         }
@@ -227,7 +229,7 @@ export function useAccountSettings({
     setSaveError(null);
 
     try {
-      const keyAction = apiKeyState === 'pending' ? 'update' : apiKeyState === 'cleared' ? 'clear' : 'keep';
+      const keyAction = KEY_ACTION[apiKeyState];
       const normalizedApiKey = normalizeApiKeyInput(settings.apiKey).trim();
       const payload = {
         ...settings,
@@ -256,7 +258,7 @@ export function useAccountSettings({
       setOriginalSettings(normalized);
       setTheme(normalized.theme);
       setView(normalized.defaultView);
-      setApiKeyState(normalized.apiKey === '••••••••••••' ? 'stored' : 'cleared');
+      setApiKeyState(normalized.apiKey === API_KEY_MASK ? 'stored' : 'cleared');
       setSaveSuccess(true);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to save account settings.';
@@ -268,7 +270,7 @@ export function useAccountSettings({
 
   const testApiKey = useCallback(async () => {
     const provider = getProviderOption(settings.aiProvider);
-    const keyAction = apiKeyState === 'pending' ? 'update' : apiKeyState === 'cleared' ? 'clear' : 'keep';
+    const keyAction = KEY_ACTION[apiKeyState];
     const normalizedApiKey = normalizeApiKeyInput(settings.apiKey).trim();
 
     if (keyAction === 'clear' || (keyAction === 'keep' && !settings.apiKey)) {

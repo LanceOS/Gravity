@@ -75,7 +75,7 @@ export function createSettingsRouter() {
         .where(eq(userExternalCredentials.userId, req.params.userId))
         .limit(1);
 
-      const apiKeyPlaceholder = record ? '••••••••••••' : '';
+      const apiKeyPlaceholder = record ? API_KEY_MASK : '';
       res.json(toSettingsResponse(settings, apiKeyPlaceholder));
     } catch (error) {
       console.error(`Failed to load account settings for user ${req.params.userId}:`, error);
@@ -143,8 +143,6 @@ export function createSettingsRouter() {
       }
 
       const current = await getUserSettingsRecord(userId);
-      
-      let apiKeyPlaceholder = '';
 
       // Hoist check to run exactly once and determine if a key exists
       const [existingCredential] = await db
@@ -178,17 +176,19 @@ export function createSettingsRouter() {
       }
 
       // Perform all database modifications in a single atomic transaction block
-      const merged = await db.transaction(async (tx) => {
+      const { settings: merged, apiKeyPlaceholder } = await db.transaction(async (tx) => {
+        let placeholder: string;
+
         if (keyAction === 'clear') {
           await tx.delete(userExternalCredentials).where(eq(userExternalCredentials.userId, userId));
-          apiKeyPlaceholder = '';
+          placeholder = '';
         } else if (keyAction === 'update') {
           const rawKey = (incomingApiKey as string).trim();
           await credentialManager.StoreCredential(userId, rawKey, tx);
-          apiKeyPlaceholder = '••••••••••••';
+          placeholder = API_KEY_MASK;
         } else {
           // 'keep': leave credentials unchanged
-          apiKeyPlaceholder = hasExistingCredential ? '••••••••••••' : '';
+          placeholder = hasExistingCredential ? API_KEY_MASK : '';
         }
 
         const nextSettings = {
@@ -219,7 +219,7 @@ export function createSettingsRouter() {
           })
           .where(eq(userSettings.userId, userId));
 
-        return nextSettings;
+        return { settings: nextSettings, apiKeyPlaceholder: placeholder };
       });
 
       res.json(toSettingsResponse(merged, apiKeyPlaceholder));
