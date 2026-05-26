@@ -135,6 +135,11 @@ export function createAiRouter() {
 
     const parsedApiKey = parseIncomingApiKey(req.body?.apiKey);
 
+    if (parsedApiKey.invalidType) {
+      res.status(400).json({ error: 'API key must be a string.' });
+      return;
+    }
+
     if (parsedApiKey.blank) {
       res.status(400).json({ error: 'API key must not be empty.' });
       return;
