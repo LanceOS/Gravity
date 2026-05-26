@@ -91,7 +91,7 @@ export function useAccountSettings({
 
     let cancelled = false;
     setSettingsLoading(true);
-  setSettingsHydrated(false);
+    setSettingsHydrated(false);
 
     fetch(`/api/v1/settings/${currentUser.id}`)
       .then(async (response) => {

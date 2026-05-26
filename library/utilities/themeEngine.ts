@@ -45,6 +45,7 @@ export const KNOWN_THEME_COLOR_KEYS = [
   'textError',
   'textInfo',
   'textOnAccent',
+  'textOnDanger',
   'textDisabled',
   'textPlaceholder',
   'textLink',
