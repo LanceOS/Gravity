@@ -168,7 +168,7 @@ export function WorkspacePage({
                   domainById={domainById}
                   userAvatarById={userAvatarById}
                   onMoveTicket={onUpdateTicket}
-                  onSelectTicket={(ticket) => onSelectTicket(ticket)}
+                  onSelectTicket={onSelectTicket}
                   onOpenCreateTicket={onOpenCreateTicket}
                 />
               ) : (
@@ -177,7 +177,7 @@ export function WorkspacePage({
                   groupedTickets={listGroupedTickets}
                   domainById={domainById}
                   userAvatarById={userAvatarById}
-                  onSelectTicket={(ticket) => onSelectTicket(ticket)}
+                  onSelectTicket={onSelectTicket}
                 />
               )}
             </div>

@@ -1,4 +1,4 @@
-import type { DragEvent } from 'react';
+import React, { DragEvent, useCallback, useMemo } from 'react';
 import type { Ticket } from '../../../context/TicketContext';
 import { BOARD_COLUMNS } from '../utils/ticketView';
 import { Button, KanbanBoard, Flex } from '@library';
@@ -16,11 +16,11 @@ export const TicketBoard: React.FC<TicketBoardProps> = ({
   onSelectTicket,
   onOpenCreateTicket,
 }) => {
-  const handleDragStart = (event: DragEvent, ticketId: string) => {
+  const handleDragStart = useCallback((event: DragEvent, ticketId: string) => {
     event.dataTransfer.setData('text/plain', ticketId);
-  };
+  }, []);
 
-  const renderColumnHeader = (columnId: string, title: string, count: number) => {
+  const renderColumnHeader = useCallback((columnId: string, title: string, count: number) => {
     const col = BOARD_COLUMNS.find((c) => c.id === columnId);
     return (
       <Flex
@@ -67,9 +67,10 @@ export const TicketBoard: React.FC<TicketBoardProps> = ({
         </Button>
       </Flex>
     );
-  };
+  }, [onOpenCreateTicket]);
 
-  const formattedCards = BOARD_COLUMNS.flatMap((col) => {
+  const formattedCards = useMemo(() => {
+    return BOARD_COLUMNS.flatMap((col) => {
     const colTickets = ticketsByColumn[col.id] || [];
     return colTickets.map((ticket) => {
       const domainMeta = getDomainMeta(domainById, ticket.domainId);
@@ -91,6 +92,11 @@ export const TicketBoard: React.FC<TicketBoardProps> = ({
       };
     });
   });
+  }, [ticketsByColumn, domainById, userAvatarById, onSelectTicket, handleDragStart]);
+
+  const handleCardMove = useCallback((cardId: string, nextStatus: string) => {
+    onMoveTicket(cardId, { status: nextStatus as Ticket['status'] });
+  }, [onMoveTicket]);
 
   return (
     <Flex direction="column" style={{ height: '100%', flex: 1, overflow: 'hidden' }}>
@@ -100,7 +106,7 @@ export const TicketBoard: React.FC<TicketBoardProps> = ({
         <KanbanBoard
           columns={BOARD_COLUMNS}
           cards={formattedCards}
-          onCardMove={(cardId, nextStatus) => onMoveTicket(cardId, { status: nextStatus as Ticket['status'] })}
+          onCardMove={handleCardMove}
           renderColumnHeader={renderColumnHeader}
         />
       </div>
