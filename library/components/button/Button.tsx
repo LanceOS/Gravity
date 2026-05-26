@@ -58,7 +58,7 @@ export function Button({
     activeBg = 'var(--color-primary-light)';
   } else if (variant === 'danger') {
     bg = 'var(--color-error)';
-    color = '#ffffff';
+    color = 'var(--color-text-on-danger)';
     border = '1px solid var(--color-error)';
     hoverBg = 'var(--color-error-dark)';
     activeBg = 'var(--color-error-dark)';

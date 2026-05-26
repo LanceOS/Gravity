@@ -45,6 +45,7 @@ export const KNOWN_THEME_COLOR_KEYS = [
   'textError',
   'textInfo',
   'textOnAccent',
+  'textOnDanger',
   'textDisabled',
   'textPlaceholder',
   'textLink',
@@ -99,7 +100,7 @@ export const normalizeThemePreference = (value: string | null | undefined): Them
   }
 
   if (value === 'noir') {
-    return 'marble-blue';
+    return 'dark';
   }
 
   return 'system';
