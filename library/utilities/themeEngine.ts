@@ -114,7 +114,11 @@ export const resolveThemePreference = (preference: ThemePreference): ResolvedThe
     return preference;
   }
 
-  return 'marble-blue';
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return 'marble-blue';
+  }
+
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'marble-blue';
 };
 
 const shouldWarnOnThemeIssues = () => {
