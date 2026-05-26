@@ -117,7 +117,6 @@ type Action =
   | { type: 'SET_VIEW'; payload: 'list' | 'board' }
   | { type: 'SET_FILTERS'; payload: Partial<State['filters']> }
   | { type: 'SET_USER'; payload: User | null }
-  | { type: 'TOGGLE_THEME' }
   | { type: 'SET_THEME_RAW'; payload: 'dark' | 'light' | 'coal-black' | 'coffee' | 'marble-blue' }
   | { type: 'ADD_COMMENT'; payload: Comment }
   | { type: 'REPLACE_COMMENT'; payload: { optimisticId: string; comment: Comment } }
