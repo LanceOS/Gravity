@@ -98,4 +98,4 @@ User-provided Ollama URLs (`OLLAMA_BASE_URL`) undergo strict validation before u
 Credential and settings updates utilize `db.transaction()` to prevent race conditions and ensure database integrity when handling user configuration state.
 
 ### Strict Session Gating
-All administrative and execution routes mandate `x-user-id` header validation, strictly tying encryption operations and AI provider execution to the authenticated context.
+All administrative and execution routes require an authenticated actor. In development/test, `x-user-id` can be used as a shortcut; in production the server resolves the user from the Better Auth session.
