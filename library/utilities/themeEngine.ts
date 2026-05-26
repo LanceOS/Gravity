@@ -99,9 +99,6 @@ export const normalizeThemePreference = (value: string | null | undefined): Them
     return value;
   }
 
-  if (value === 'noir') {
-    return 'dark';
-  }
 
   return 'system';
 };
@@ -196,11 +193,11 @@ export const applyResolvedTheme = (resolvedTheme: ResolvedThemeMode) => {
 
   const root = document.documentElement;
 
-  root.classList.remove('dark-theme', 'light-theme', 'noir-theme', 'coal-black-theme', 'coffee-theme', 'marble-blue-theme');
+  root.classList.remove('dark-theme', 'coal-black-theme', 'coffee-theme', 'marble-blue-theme');
   root.removeAttribute('data-theme');
 
   if (resolvedTheme === 'dark') {
-    root.classList.add('noir-theme', 'dark-theme');
+    root.classList.add('dark-theme');
     root.setAttribute('data-theme', 'dark');
     applyThemeConfig(noirTheme);
   } else if (resolvedTheme === 'coal-black') {
