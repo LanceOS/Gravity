@@ -1,13 +1,17 @@
-import { memo, useState } from 'react';
+import { memo, useState, useCallback } from 'react';
 import { GitMerge, GitPullRequest, Paperclip } from 'lucide-react';
 import type { TicketRowProps } from '../types/TicketList';
 
 function TicketRowImpl({ ticket, onClick, priorityIcon, assigneeAvatar, domainTag }: TicketRowProps) {
   const [isHovered, setIsHovered] = useState(false);
 
+  const handleClick = useCallback(() => {
+    onClick(ticket);
+  }, [onClick, ticket]);
+
   return (
     <div
-      onClick={onClick}
+      onClick={handleClick}
       className="clickable"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}

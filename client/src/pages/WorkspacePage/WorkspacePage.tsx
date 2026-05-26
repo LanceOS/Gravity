@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import { Button } from '@library';
 import type { Comment, Cycle, Domain, Project, Ticket, User } from '../../context/TicketContext';
 import type { TicketFilters, TicketListSort } from '../../modules/tickets/utils/ticketView';
@@ -99,7 +99,7 @@ export function WorkspacePage({
     () => (detailSubtasks.length > 0 ? (completedDetailSubtasks / detailSubtasks.length) * 100 : 0),
     [detailSubtasks, completedDetailSubtasks]
   );
-  const handleClearFilters = () => {
+  const handleClearFilters = useCallback(() => {
     onSetFilters({
       ...filters,
       search: '',
@@ -107,7 +107,7 @@ export function WorkspacePage({
       status: '',
       domainId: '',
     });
-  };
+  }, [filters, onSetFilters]);
 
   return (
     <div className="workspace-page">

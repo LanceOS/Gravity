@@ -71,27 +71,27 @@ export const TicketBoard: React.FC<TicketBoardProps> = ({
 
   const formattedCards = useMemo(() => {
     return BOARD_COLUMNS.flatMap((col) => {
-    const colTickets = ticketsByColumn[col.id] || [];
-    return colTickets.map((ticket) => {
-      const domainMeta = getDomainMeta(domainById, ticket.domainId);
-      return {
-        id: ticket.id,
-        status: ticket.status,
-        content: (
-          <TicketCard
-            ticket={ticket}
-            onClick={() => onSelectTicket(ticket)}
-            onDragStart={(e) => handleDragStart(e, ticket.id)}
-            priorityIcon={getPriorityIcon(ticket.priority)}
-            priorityColor={getPriorityColor(ticket.priority)}
-            domainColor={domainMeta.color}
-            domainName={domainMeta.name}
-            assigneeAvatar={getAssigneeAvatar(userAvatarById, ticket.assigneeId)}
-          />
-        ),
-      };
+      const colTickets = ticketsByColumn[col.id] || [];
+      return colTickets.map((ticket) => {
+        const domainMeta = getDomainMeta(domainById, ticket.domainId);
+        return {
+          id: ticket.id,
+          status: ticket.status,
+          content: (
+            <TicketCard
+              ticket={ticket}
+              onClick={() => onSelectTicket(ticket)}
+              onDragStart={(e) => handleDragStart(e, ticket.id)}
+              priorityIcon={getPriorityIcon(ticket.priority)}
+              priorityColor={getPriorityColor(ticket.priority)}
+              domainColor={domainMeta.color}
+              domainName={domainMeta.name}
+              assigneeAvatar={getAssigneeAvatar(userAvatarById, ticket.assigneeId)}
+            />
+          ),
+        };
+      });
     });
-  });
   }, [ticketsByColumn, domainById, userAvatarById, onSelectTicket, handleDragStart]);
 
   const handleCardMove = useCallback((cardId: string, nextStatus: string) => {

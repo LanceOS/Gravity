@@ -12,7 +12,7 @@ export interface TicketListProps {
 
 export interface TicketRowProps {
   ticket: Ticket;
-  onClick: () => void;
+  onClick: (ticket: Ticket) => void;
   priorityIcon: ReactNode;
   assigneeAvatar: string | null;
   domainTag: ReactNode;
