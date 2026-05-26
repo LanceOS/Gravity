@@ -116,11 +116,10 @@ export function Select({
     }
 
     const triggerRect = triggerRef.current.getBoundingClientRect();
-    const estimatedMenuWidth = triggerRect.width;
     const spaceBelow = window.innerHeight - triggerRect.bottom;
     const spaceAbove = triggerRect.top;
     const openAbove = spaceBelow < 220 && spaceAbove > spaceBelow;
-    const left = Math.max(8, Math.min(triggerRect.left, window.innerWidth - estimatedMenuWidth - 8));
+    const left = Math.max(8, Math.min(triggerRect.left, window.innerWidth - triggerRect.width - 8));
 
     setMenuStyle({
       position: 'fixed',
@@ -128,9 +127,8 @@ export function Select({
       left: `${left}px`,
       top: openAbove ? `${Math.max(8, triggerRect.top - 4)}px` : `${triggerRect.bottom + 4}px`,
       transform: openAbove ? 'translateY(-100%)' : 'none',
-      width: 'max-content',
-      minWidth: `${triggerRect.width}px`,
-      maxWidth: 'calc(100vw - 16px)',
+      width: `${triggerRect.width}px`,
+      boxSizing: 'border-box',
       maxHeight: '240px',
     });
   }, []);
