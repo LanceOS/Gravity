@@ -127,7 +127,10 @@ export const mcpToolsList: McpToolDefinition[] = [
       properties: {
         ticketKey: { type: 'string' },
         body: { type: 'string' },
-        createdAt: { type: 'string' },
+        createdAt: {
+          type: 'string',
+          description: 'Optional manual override for the comment creation timestamp as an ISO 8601 date string.',
+        },
       },
       required: ['ticketKey', 'body'],
     },
