@@ -158,12 +158,6 @@ export function createSettingsRouter() {
 
       const current = await getUserSettingsRecord(userId);
 
-      const aiProvider = getOptionalEnumValue(req.body, 'aiProvider', AI_PROVIDERS);
-      if (!aiProvider.ok) {
-        res.status(400).json({ error: aiProvider.error });
-        return;
-      }
-
       const credentialProvider = getOptionalEnumValue(req.body, 'credentialProvider', AI_PROVIDERS);
       if (!credentialProvider.ok) {
         res.status(400).json({ error: credentialProvider.error });
