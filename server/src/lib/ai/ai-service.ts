@@ -40,6 +40,10 @@ export class AiService {
   }
 
   private getEnvironmentApiKey(provider: string): string | undefined {
+    if (!env.allowEnvAiKeys) {
+      return undefined;
+    }
+
     if (env.nodeEnv !== 'development' && env.nodeEnv !== 'test') {
       return undefined;
     }

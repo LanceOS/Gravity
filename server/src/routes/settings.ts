@@ -133,8 +133,11 @@ export function createSettingsRouter() {
           validateOllamaUrl(ollamaEndpoint);
         } catch (error) {
           const message = error instanceof Error ? error.message : 'Invalid ollamaEndpoint.';
-          const sanitized = message.includes('Security Exception') ? 'External credentials configuration error.' : message;
-          res.status(400).json({ error: sanitized });
+          const safe =
+            message === 'Invalid URL format.' || message === 'URL scheme must be http or https.'
+              ? message
+              : 'Invalid Ollama endpoint.';
+          res.status(400).json({ error: safe });
           return;
         }
       }

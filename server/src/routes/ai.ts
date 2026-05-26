@@ -5,6 +5,8 @@ import { validateOllamaUrl } from '../lib/ai/utils.js';
 
 const API_KEY_MASK = '••••••••••••';
 
+const VALID_PROVIDERS = new Set(['openai', 'anthropic', 'gemini', 'deepseek', 'ollama']);
+
 type ParsedApiKey = {
   value?: string;
   provided: boolean;
@@ -129,7 +131,12 @@ export function createAiRouter() {
       return;
     }
 
-    const provider = typeof req.body?.provider === 'string' ? req.body.provider : 'openai';
+    const provider = (typeof req.body?.provider === 'string' ? req.body.provider : 'openai').toLowerCase();
+    if (!VALID_PROVIDERS.has(provider)) {
+      res.status(400).json({ error: 'Unsupported provider.' });
+      return;
+    }
+
     const parsedApiKey = parseIncomingApiKey(req.body?.apiKey);
 
     if (parsedApiKey.blank) {
@@ -141,7 +148,7 @@ export function createAiRouter() {
     // If apiKey is provided, use it directly as a live validation.
     try {
       await aiService.testConnection(actorUserId, provider, { apiKey: parsedApiKey.value });
-      res.json({ message: `${provider} API key validated successfully.` });
+      res.json({ message: `${providerLabel(provider)} API key validated successfully.` });
     } catch (error) {
       console.error(`AI test-key failed for provider ${provider}:`, error);
       const sanitized = sanitizeAiError(error, provider, 'test');
@@ -156,7 +163,12 @@ export function createAiRouter() {
       return;
     }
 
-    const provider = typeof req.body?.provider === 'string' ? req.body.provider : 'openai';
+    const provider = (typeof req.body?.provider === 'string' ? req.body.provider : 'openai').toLowerCase();
+    if (!VALID_PROVIDERS.has(provider)) {
+      res.status(400).json({ error: 'Unsupported provider.' });
+      return;
+    }
+
     const parsedApiKey = parseIncomingApiKey(req.body?.apiKey ?? req.body?.api_key);
 
     if (parsedApiKey.blank) {
@@ -195,7 +207,12 @@ export function createAiRouter() {
       return;
     }
 
-    const provider = typeof req.body?.provider === 'string' ? req.body.provider.toLowerCase() : 'ollama';
+    const provider = (typeof req.body?.provider === 'string' ? req.body.provider : 'ollama').toLowerCase();
+    if (!VALID_PROVIDERS.has(provider)) {
+      res.status(400).json({ error: 'Unsupported provider.' });
+      return;
+    }
+
     const model = typeof req.body?.model === 'string' ? req.body.model : '';
     const messages = Array.isArray(req.body?.messages) ? req.body.messages : [];
     const tools = Array.isArray(req.body?.tools) && req.body.tools.length > 0 ? req.body.tools : undefined;
