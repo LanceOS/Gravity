@@ -36,6 +36,8 @@ export function SidebarProjectsSection({
               background: 'none',
               border: 'none',
               padding: 0,
+              font: 'inherit',
+              color: 'inherit',
               width: '100%',
               textAlign: 'left',
             }}

@@ -94,22 +94,22 @@ interface State {
     search: string;
   };
   currentUser: User | null;
-  theme: 'dark' | 'light';
+  theme: 'dark' | 'light' | 'coal-black' | 'coffee' | 'marble-blue';
   loading: boolean;
 }
 
 type Action =
   | { type: 'SET_LOADING'; payload: boolean }
   | {
-      type: 'SET_INITIAL_DATA';
-      payload: {
-        tickets: Ticket[];
-        projects: Project[];
-        domains: Domain[];
-        cycles: Cycle[];
-        users: User[];
-      };
-    }
+    type: 'SET_INITIAL_DATA';
+    payload: {
+      tickets: Ticket[];
+      projects: Project[];
+      domains: Domain[];
+      cycles: Cycle[];
+      users: User[];
+    };
+  }
   | { type: 'SET_PROJECT_DATA'; payload: { tickets: Ticket[]; domains: Domain[]; cycles: Cycle[] } }
   | { type: 'SET_TICKETS_RAW'; payload: Ticket[] }
   | { type: 'SET_COMMENTS_RAW'; payload: Comment[] }
@@ -118,7 +118,7 @@ type Action =
   | { type: 'SET_FILTERS'; payload: Partial<State['filters']> }
   | { type: 'SET_USER'; payload: User | null }
   | { type: 'TOGGLE_THEME' }
-  | { type: 'SET_THEME_RAW'; payload: 'dark' | 'light' }
+  | { type: 'SET_THEME_RAW'; payload: 'dark' | 'light' | 'coal-black' | 'coffee' | 'marble-blue' }
   | { type: 'ADD_COMMENT'; payload: Comment }
   | { type: 'REPLACE_COMMENT'; payload: { optimisticId: string; comment: Comment } }
   | { type: 'OPTIMISTIC_TICKET_UPDATE'; payload: { id: string; updates: Partial<Ticket> } }
@@ -310,7 +310,7 @@ interface TicketContextType extends State {
   signOut: () => void;
   setCurrentUser: (user: User | null) => void;
   toggleTheme: () => void;
-  setTheme: (theme: 'dark' | 'light') => void;
+  setTheme: (theme: 'dark' | 'light' | 'coal-black' | 'coffee' | 'marble-blue') => void;
   setActiveTicket: (ticket: Ticket | null) => void;
   setView: (view: 'list' | 'board') => void;
   setFilters: (filters: Partial<State['filters']>) => void;
@@ -538,7 +538,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     try {
       const response = await fetch(`${API_URL}/tickets`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'X-Project-Id': ticketInput.projectId
         },
@@ -547,7 +547,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       if (!response.ok) throw new Error('Failed to create ticket');
       const createdTicket = await response.json();
-      
+
       // Update local state if the ticket belongs to the current active project
       if (ticketInput.projectId === activeProjectId) {
         const listRes = await fetch(`${API_URL}/tickets`, { headers: { 'X-Project-Id': activeProjectId } });
@@ -570,7 +570,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     try {
       const response = await fetch(`${API_URL}/tickets/${id}`, {
         method: 'PATCH',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'X-Project-Id': activeProjectId
         },
@@ -657,7 +657,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     try {
       const response = await fetch(`${API_URL}/tickets/${ticketId}/comments`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'X-Project-Id': activeProjectId
         },
@@ -713,39 +713,39 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [state.comments, activeProjectId]);
 
-// Reusable helper to safely parse HTTP responses and return descriptive errors for network failures
-async function handleResponseJson(response: Response, fallbackError: string) {
-  let text = '';
-  try {
-    text = await response.text();
-  } catch (e) {
-    // Ignore error reading body
-  }
-
-  if (!response.ok) {
-    let errorMessage = fallbackError;
+  // Reusable helper to safely parse HTTP responses and return descriptive errors for network failures
+  async function handleResponseJson(response: Response, fallbackError: string) {
+    let text = '';
     try {
-      const parsed = text ? JSON.parse(text) : null;
-      errorMessage = parsed?.error || parsed?.message || fallbackError;
-    } catch {
-      // If response is HTML, it's likely a proxy/gateway/server error page
-      if (text.includes('<!DOCTYPE html>') || text.includes('<html') || text.includes('<body')) {
-        errorMessage = `${fallbackError}: Server returned an HTML page instead of JSON. The backend server might be down, crashed, or unreachable (Status ${response.status}).`;
-      } else if (text) {
-        errorMessage = `${fallbackError}: ${text.slice(0, 150)}`;
-      } else {
-        errorMessage = `${fallbackError} (Status ${response.status})`;
-      }
+      text = await response.text();
+    } catch (e) {
+      // Ignore error reading body
     }
-    throw new Error(errorMessage);
-  }
 
-  try {
-    return text ? JSON.parse(text) : {};
-  } catch (e) {
-    throw new Error(`Invalid response format from server (Status ${response.status})`);
+    if (!response.ok) {
+      let errorMessage = fallbackError;
+      try {
+        const parsed = text ? JSON.parse(text) : null;
+        errorMessage = parsed?.error || parsed?.message || fallbackError;
+      } catch {
+        // If response is HTML, it's likely a proxy/gateway/server error page
+        if (text.includes('<!DOCTYPE html>') || text.includes('<html') || text.includes('<body')) {
+          errorMessage = `${fallbackError}: Server returned an HTML page instead of JSON. The backend server might be down, crashed, or unreachable (Status ${response.status}).`;
+        } else if (text) {
+          errorMessage = `${fallbackError}: ${text.slice(0, 150)}`;
+        } else {
+          errorMessage = `${fallbackError} (Status ${response.status})`;
+        }
+      }
+      throw new Error(errorMessage);
+    }
+
+    try {
+      return text ? JSON.parse(text) : {};
+    } catch (e) {
+      throw new Error(`Invalid response format from server (Status ${response.status})`);
+    }
   }
-}
 
   const createProject = useCallback(async (projectInput: CreateProjectInput) => {
     if (!state.currentUser) {
@@ -883,7 +883,7 @@ async function handleResponseJson(response: Response, fallbackError: string) {
     dispatch({ type: 'TOGGLE_THEME' });
   }, []);
 
-  const setTheme = useCallback((theme: 'dark' | 'light') => {
+  const setTheme = useCallback((theme: 'dark' | 'light' | 'coal-black' | 'coffee' | 'marble-blue') => {
     dispatch({ type: 'SET_THEME_RAW', payload: theme });
   }, []);
 

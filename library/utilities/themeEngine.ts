@@ -1,5 +1,8 @@
 import lightTheme from '../themes/light.json';
 import noirTheme from '../themes/noir.json';
+import coalBlackTheme from '../themes/coal-black.json';
+import coffeeTheme from '../themes/coffee.json';
+import marbleBlueTheme from '../themes/marble-blue.json';
 
 export const KNOWN_THEME_COLOR_KEYS = [
   'primary',
@@ -83,15 +86,15 @@ export type ThemeValidationResult = {
   unknown: string[];
 };
 
-export type ThemePreference = 'light' | 'dark' | 'system';
-export type ResolvedThemeMode = 'light' | 'dark';
+export type ThemePreference = 'light' | 'dark' | 'coal-black' | 'coffee' | 'marble-blue' | 'system';
+export type ResolvedThemeMode = 'light' | 'dark' | 'coal-black' | 'coffee' | 'marble-blue';
 
 export const THEME_STORAGE_KEY = 'gravity_theme';
 
 const knownThemeColorKeySet = new Set<string>(KNOWN_THEME_COLOR_KEYS);
 
 export const normalizeThemePreference = (value: string | null | undefined): ThemePreference => {
-  if (value === 'light' || value === 'dark' || value === 'system') {
+  if (value === 'light' || value === 'dark' || value === 'coal-black' || value === 'coffee' || value === 'marble-blue' || value === 'system') {
     return value;
   }
 
@@ -192,13 +195,25 @@ export const applyResolvedTheme = (resolvedTheme: ResolvedThemeMode) => {
 
   const root = document.documentElement;
 
-  root.classList.remove('dark-theme', 'light-theme', 'noir-theme');
+  root.classList.remove('dark-theme', 'light-theme', 'noir-theme', 'coal-black-theme', 'coffee-theme', 'marble-blue-theme');
   root.removeAttribute('data-theme');
 
   if (resolvedTheme === 'dark') {
     root.classList.add('noir-theme', 'dark-theme');
     root.setAttribute('data-theme', 'dark');
     applyThemeConfig(noirTheme);
+  } else if (resolvedTheme === 'coal-black') {
+    root.classList.add('coal-black-theme', 'dark-theme');
+    root.setAttribute('data-theme', 'coal-black');
+    applyThemeConfig(coalBlackTheme);
+  } else if (resolvedTheme === 'coffee') {
+    root.classList.add('coffee-theme', 'dark-theme');
+    root.setAttribute('data-theme', 'coffee');
+    applyThemeConfig(coffeeTheme);
+  } else if (resolvedTheme === 'marble-blue') {
+    root.classList.add('marble-blue-theme', 'light-theme');
+    root.setAttribute('data-theme', 'marble-blue');
+    applyThemeConfig(marbleBlueTheme);
   } else {
     root.classList.add('light-theme');
     root.setAttribute('data-theme', 'light');

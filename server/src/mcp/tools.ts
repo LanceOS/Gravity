@@ -65,8 +65,14 @@ export const mcpToolsList: McpToolDefinition[] = [
         cycleId: { type: 'string' },
         assigneeId: { type: 'string' },
         parentId: { type: 'string' },
-        createdAt: { type: 'string', description: 'Optional ISO date string to manually set the creation time.' },
-        updatedAt: { type: 'string', description: 'Optional ISO date string to manually set the update time.' },
+        createdAt: {
+          type: 'string',
+          description: 'Optional manual override for the ticket creation timestamp as an ISO 8601 date string.',
+        },
+        updatedAt: {
+          type: 'string',
+          description: 'Optional manual override for the ticket last-updated timestamp as an ISO 8601 date string.',
+        },
       },
       required: ['title', 'projectId'],
     },
@@ -88,8 +94,14 @@ export const mcpToolsList: McpToolDefinition[] = [
         parentId: { type: 'string' },
         prStatus: { type: 'string' },
         prUrl: { type: 'string' },
-        createdAt: { type: 'string', description: 'Optional ISO date string to manually set the creation time.' },
-        updatedAt: { type: 'string', description: 'Optional ISO date string to manually set the update time.' },
+        createdAt: {
+          type: 'string',
+          description: 'Optional manual override for the ticket creation timestamp as an ISO 8601 date string.',
+        },
+        updatedAt: {
+          type: 'string',
+          description: 'Optional manual override for the ticket last-updated timestamp as an ISO 8601 date string.',
+        },
       },
       required: ['ticketKey'],
     },
@@ -102,7 +114,10 @@ export const mcpToolsList: McpToolDefinition[] = [
       properties: {
         ticketKey: { type: 'string' },
         body: { type: 'string' },
-        createdAt: { type: 'string', description: 'Optional ISO date string to manually set the creation time.' },
+        createdAt: {
+          type: 'string',
+          description: 'Optional manual override for the comment creation timestamp as an ISO 8601 date string.',
+        },
       },
       required: ['ticketKey', 'body'],
     },
@@ -115,7 +130,10 @@ export const mcpToolsList: McpToolDefinition[] = [
       properties: {
         ticketKey: { type: 'string' },
         body: { type: 'string' },
-        createdAt: { type: 'string', description: 'Optional ISO date string to manually set the creation time.' },
+        createdAt: {
+          type: 'string',
+          description: 'Optional manual override for the comment creation timestamp as an ISO 8601 date string.',
+        },
       },
       required: ['ticketKey', 'body'],
     },

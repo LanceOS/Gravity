@@ -15,9 +15,9 @@ interface StatusMessage {
 interface UseAccountSettingsOptions {
   currentUser: User | null;
   activeView: 'board' | 'list';
-  theme: 'dark' | 'light';
+  theme: 'dark' | 'light' | 'coal-black' | 'coffee' | 'marble-blue';
   setView: (view: 'board' | 'list') => void;
-  setTheme: (theme: 'dark' | 'light') => void;
+  setTheme: (theme: 'dark' | 'light' | 'coal-black' | 'coffee' | 'marble-blue') => void;
 }
 
 export function useAccountSettings({

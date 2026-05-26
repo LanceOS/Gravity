@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Sidebar, type SidebarProps } from '../../components/Sidebar';
 import { DashboardLayout } from '../../components/DashboardLayout/DashboardLayout';
-import { ThemeToggle, Select } from '@library';
+import { Select } from '@library';
 import './WorkspaceLayout.css';
 
 interface WorkspaceLayoutProps {
@@ -34,9 +34,6 @@ export function WorkspaceLayout({ sidebarProps, children, rightPanels }: Workspa
           />
         </div>
 
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
-          <ThemeToggle />
-        </div>
       </DashboardLayout.Header>
       <Sidebar {...sidebarProps} />
       <DashboardLayout.Main>{children}</DashboardLayout.Main>
