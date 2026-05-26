@@ -61,15 +61,14 @@ export function createSettingsRouter() {
 
     try {
       const settings = await getUserSettingsRecord(req.params.userId);
-      let apiKey = '';
-      try {
-        await credentialManager.ExecuteWithCredential(req.params.userId, (decryptedKey) => {
-          apiKey = decryptedKey;
-        });
-      } catch {
-        // Fallback to empty if not found
-      }
-      res.json(toSettingsResponse(settings, apiKey));
+      const [record] = await db
+        .select({ userId: userExternalCredentials.userId })
+        .from(userExternalCredentials)
+        .where(eq(userExternalCredentials.userId, req.params.userId))
+        .limit(1);
+
+      const apiKeyPlaceholder = record ? '••••••••••••' : '';
+      res.json(toSettingsResponse(settings, apiKeyPlaceholder));
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load settings.' });
     }
@@ -121,24 +120,31 @@ export function createSettingsRouter() {
 
       const current = await getUserSettingsRecord(userId);
       
-      let apiKey = '';
+      let apiKeyPlaceholder = '';
       if (typeof req.body?.apiKey === 'string') {
         const trimmed = req.body.apiKey.trim();
         if (trimmed === '') {
           await db.delete(userExternalCredentials).where(eq(userExternalCredentials.userId, userId));
-          apiKey = '';
+          apiKeyPlaceholder = '';
+        } else if (trimmed === '••••••••••••') {
+          // If the placeholder is sent, verify if a key actually exists
+          const [record] = await db
+            .select({ userId: userExternalCredentials.userId })
+            .from(userExternalCredentials)
+            .where(eq(userExternalCredentials.userId, userId))
+            .limit(1);
+          apiKeyPlaceholder = record ? '••••••••••••' : '';
         } else {
           await credentialManager.StoreCredential(userId, trimmed);
-          apiKey = trimmed;
+          apiKeyPlaceholder = '••••••••••••';
         }
       } else {
-        try {
-          await credentialManager.ExecuteWithCredential(userId, (decryptedKey) => {
-            apiKey = decryptedKey;
-          });
-        } catch {
-          apiKey = '';
-        }
+        const [record] = await db
+          .select({ userId: userExternalCredentials.userId })
+          .from(userExternalCredentials)
+          .where(eq(userExternalCredentials.userId, userId))
+          .limit(1);
+        apiKeyPlaceholder = record ? '••••••••••••' : '';
       }
 
       const merged = {
@@ -169,7 +175,7 @@ export function createSettingsRouter() {
         })
         .where(eq(userSettings.userId, userId));
 
-      res.json(toSettingsResponse(merged, apiKey));
+      res.json(toSettingsResponse(merged, apiKeyPlaceholder));
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to update settings.' });
     }

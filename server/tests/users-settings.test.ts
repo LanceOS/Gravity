@@ -62,7 +62,7 @@ describe('users and settings routes', () => {
       ollamaModel: 'llama3.2',
       ollamaEndpoint: 'http://ollama.internal:11434',
       theme: 'light',
-      apiKey: 'sk-test-123',
+      apiKey: '••••••••••••',
       aiProvider: 'anthropic',
       projectLayout: 'condensed',
     });

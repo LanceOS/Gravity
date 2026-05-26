@@ -83,7 +83,7 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
 
       if (response.ok) {
         const data = await response.json() as { models?: string[]; connected?: boolean; error?: string };
-        const nextModels = Array.isArray(data.models) 
+        const nextModels = Array.isArray(data.models)
           ? data.models.filter((m): m is string => typeof m === 'string' && m.length > 0)
           : [];
 
@@ -138,13 +138,13 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
 
     const newMessages: Message[] = autoRunMessages || [...messages, { role: 'user', content: textToSend }];
     setMessages(newMessages);
-        if (!autoRunMessages) setIsGenerating(true);
+    if (!autoRunMessages) setIsGenerating(true);
 
     try {
       const payload: Record<string, any> = {
         model,
-        messages: newMessages.map(m => ({ 
-          role: m.role, 
+        messages: newMessages.map(m => ({
+          role: m.role,
           content: m.content,
           ...(m.tool_calls ? { tool_calls: m.tool_calls } : {}),
           ...(m.tool_call_id ? { tool_call_id: m.tool_call_id, name: m.name } : {})
@@ -153,9 +153,7 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
         ...(mcpTools.length > 0 ? { tools: mcpTools } : {})
       };
 
-      if (isThirdParty) {
-        payload.apiKey = settings.apiKey;
-      } else {
+      if (!isThirdParty) {
         payload.ollamaUrl = ollamaUrl;
       }
 
@@ -176,12 +174,12 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
       const aiResponse = data.message?.content || '';
       const toolCalls = data.message?.tool_calls;
 
-      const assistantMessage: Message = { 
-        role: 'assistant', 
+      const assistantMessage: Message = {
+        role: 'assistant',
         content: aiResponse,
         ...(toolCalls ? { tool_calls: toolCalls } : {})
       };
-      
+
       const nextMessages = [...newMessages, assistantMessage];
       setMessages(nextMessages);
 
@@ -192,7 +190,7 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
           try {
             const toolResponse = await fetch('/api/v1/mcp/sse', {
               method: 'POST',
-              headers: { 
+              headers: {
                 'Content-Type': 'application/json',
                 ...(workspaceId ? { 'X-Workspace-Id': workspaceId } : {})
               },
@@ -223,7 +221,7 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
             });
           }
         }
-        
+
         // Auto-continue chat with tool results
         await handleSendMessage('', [...nextMessages, ...toolMessages]);
       } else if (!aiResponse) {
@@ -276,7 +274,7 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
             <span style={{ color: 'var(--color-text-disabled)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
               {isThirdParty ? 'Cloud Provider Status:' : 'Ollama Endpoint Status:'}
             </span>
-            <span 
+            <span
               onClick={() => !isThirdParty && void checkOllamaStatus()}
               className={isThirdParty ? "" : "clickable"}
               style={{
@@ -296,7 +294,7 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
 
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             {!isThirdParty ? (
-              <DenseTextInput 
+              <DenseTextInput
                 placeholder="http://localhost:11434"
                 value={ollamaUrl}
                 onChange={(e) => setOllamaUrl(e.target.value)}
@@ -304,7 +302,7 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
                 style={{ fontSize: '11.5px', flex: 1 }}
               />
             ) : null}
-            
+
             <select
               value={model}
               onChange={(e) => setModel(e.target.value)}
@@ -354,7 +352,7 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
       quickActions={
         activeTicket ? (
           <>
-            <button 
+            <button
               onClick={() => handleQuickAction('analyze')}
               className="btn clickable"
               style={{ padding: '4px 8px', fontSize: '10px', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--color-surface-card)', color: 'var(--color-text-primary)' }}
@@ -362,8 +360,8 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
               <FileText size={10} />
               <span>Analyze Ticket</span>
             </button>
-            
-            <button 
+
+            <button
               onClick={() => handleQuickAction('subtasks')}
               className="btn clickable"
               style={{ padding: '4px 8px', fontSize: '10px', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--color-surface-card)', color: 'var(--color-text-primary)' }}
@@ -372,7 +370,7 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
               <span>Create Checklist</span>
             </button>
 
-            <button 
+            <button
               onClick={() => handleQuickAction('release')}
               className="btn clickable"
               style={{ padding: '4px 8px', fontSize: '10px', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--color-surface-card)', color: 'var(--color-text-primary)' }}

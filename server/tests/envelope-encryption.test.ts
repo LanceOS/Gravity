@@ -168,7 +168,7 @@ describe('Envelope Encryption & Secure Credential Storage', () => {
       expect(patchResponse.status).toBe(200);
       expect(patchResponse.body).toMatchObject({
         userId: user.id,
-        apiKey: targetApiKey,
+        apiKey: '••••••••••••',
         theme: 'coal-black',
       });
 
@@ -195,7 +195,7 @@ describe('Envelope Encryption & Secure Credential Storage', () => {
       expect(getResponse.status).toBe(200);
       expect(getResponse.body).toMatchObject({
         userId: user.id,
-        apiKey: targetApiKey,
+        apiKey: '••••••••••••',
         theme: 'coal-black',
       });
     });

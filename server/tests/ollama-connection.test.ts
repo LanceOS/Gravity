@@ -1,5 +1,17 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { api, jsonResponse } from './helpers/test-helpers.js';
+import { api as baseApi, jsonResponse, seedUser } from './helpers/test-helpers.js';
+import { credentialManager } from '../src/lib/kms/index.js';
+
+// Custom API wrapper that automatically passes the test user ID header to authenticate all requests.
+function api() {
+  const client = baseApi();
+  return {
+    get: (url: string) => client.get(url).set('x-user-id', 'mock-user-id'),
+    post: (url: string) => client.post(url).set('x-user-id', 'mock-user-id'),
+    patch: (url: string) => client.patch(url).set('x-user-id', 'mock-user-id'),
+    delete: (url: string) => client.delete(url).set('x-user-id', 'mock-user-id'),
+  };
+}
 
 /**
  * Builds a mock fetch that succeeds on the first call to host.docker.internal.
@@ -29,8 +41,14 @@ function dockerFailLocalSuccessMock(models: Array<{ name: string }>) {
 }
 
 describe('Ollama connection & AI proxy routes', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.restoreAllMocks();
+    try {
+      await seedUser({ id: 'mock-user-id' });
+      await credentialManager.StoreCredential('mock-user-id', 'sk-test-key');
+    } catch {
+      // ignore
+    }
   });
 
   // ─── Model listing: happy paths ────────────────────────────────────────────
@@ -422,17 +440,19 @@ describe('Ollama connection & AI proxy routes', () => {
       expect(roles).not.toContain('assistant');
     });
 
-    it('returns 400 when a cloud provider is used without an API key', async () => {
+    it('returns 502 when a cloud provider is used without configured credentials', async () => {
+      await seedUser({ id: 'no-key-user-id', email: 'nokey@example.com' });
       const res = await api()
         .post('/api/v1/ai/chat')
+        .set('x-user-id', 'no-key-user-id')
         .send({
           provider: 'openai',
           model: 'gpt-4o-mini',
           messages: [{ role: 'user', content: 'Hello' }],
         });
 
-      expect(res.status).toBe(400);
-      expect(res.body.error).toMatch(/api key/i);
+      expect(res.status).toBe(502);
+      expect(res.body.error).toMatch(/credentials/i);
     });
 
     it('returns 400 for an unsupported provider', async () => {

@@ -19,7 +19,10 @@ describe('projects and tickets routes', () => {
       endDate: new Date('2025-01-10T00:00:00.000Z'),
     });
 
-    const listResponse = await api().get('/api/v1/projects').query({ userId: owner.id, workspaceId: workspace.id });
+    const listResponse = await api()
+      .get('/api/v1/projects')
+      .set('x-user-id', owner.id)
+      .query({ userId: owner.id, workspaceId: workspace.id });
     expect(listResponse.status).toBe(200);
     expect(listResponse.body).toEqual([
       expect.objectContaining({
