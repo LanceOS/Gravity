@@ -12,6 +12,15 @@ interface StatusMessage {
   message: string;
 }
 
+const API_KEY_MASK = '••••••••••••';
+
+function normalizeApiKeyInput(value: string): string {
+  if (value.startsWith(API_KEY_MASK)) {
+    return value.slice(API_KEY_MASK.length);
+  }
+  return value;
+}
+
 function shallowEqual<T extends Record<string, any>>(objA: T, objB: T): boolean {
   if (Object.is(objA, objB)) return true;
   if (typeof objA !== 'object' || objA === null || typeof objB !== 'object' || objB === null) return false;
@@ -186,19 +195,24 @@ export function useAccountSettings({
   }, [currentUser, settings.ollamaEndpoint, settingsHydrated, refreshOllamaModels]);
 
   const updateSettings = useCallback((updates: Partial<WorkspaceSettings>) => {
-    setSettings((current) => ({ ...current, ...updates }));
+    const nextUpdates = { ...updates };
+    if (typeof nextUpdates.apiKey === 'string') {
+      nextUpdates.apiKey = normalizeApiKeyInput(nextUpdates.apiKey);
+    }
+
+    setSettings((current) => ({ ...current, ...nextUpdates }));
     setSaveSuccess(false);
     setSaveError(null);
 
-    if (updates.apiKey !== undefined) {
-      setApiKeyState(updates.apiKey === '' ? 'cleared' : 'pending');
+    if (nextUpdates.apiKey !== undefined) {
+      setApiKeyState(nextUpdates.apiKey === '' ? 'cleared' : 'pending');
       setTestResult(null);
     }
-    if (updates.aiProvider !== undefined) {
+    if (nextUpdates.aiProvider !== undefined) {
       setTestResult(null);
     }
 
-    if (updates.ollamaEndpoint !== undefined) {
+    if (nextUpdates.ollamaEndpoint !== undefined) {
       setOllamaModels([]);
     }
   }, []);
@@ -214,10 +228,11 @@ export function useAccountSettings({
 
     try {
       const keyAction = apiKeyState === 'pending' ? 'update' : apiKeyState === 'cleared' ? 'clear' : 'keep';
+      const normalizedApiKey = normalizeApiKeyInput(settings.apiKey).trim();
       const payload = {
         ...settings,
         keyAction,
-        apiKey: keyAction === 'update' ? settings.apiKey : undefined,
+        apiKey: keyAction === 'update' ? normalizedApiKey : undefined,
         ollamaModel: ollamaModels.length > 0 ? settings.ollamaModel : '',
       };
 
@@ -254,6 +269,7 @@ export function useAccountSettings({
   const testApiKey = useCallback(async () => {
     const provider = getProviderOption(settings.aiProvider);
     const keyAction = apiKeyState === 'pending' ? 'update' : apiKeyState === 'cleared' ? 'clear' : 'keep';
+    const normalizedApiKey = normalizeApiKeyInput(settings.apiKey).trim();
 
     if (keyAction === 'clear' || (keyAction === 'keep' && !settings.apiKey)) {
       setTestResult({ success: false, message: `Please enter a ${provider.label} API key to test.` });
@@ -269,7 +285,7 @@ export function useAccountSettings({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           provider: settings.aiProvider,
-          apiKey: keyAction === 'update' ? settings.apiKey.trim() : undefined
+          apiKey: keyAction === 'update' ? normalizedApiKey : undefined
         }),
       });
 

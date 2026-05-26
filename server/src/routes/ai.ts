@@ -3,6 +3,21 @@ import { aiService } from '../lib/ai/index.js';
 import { resolveRequestActorUserId } from '../lib/request-auth.js';
 import { validateOllamaUrl } from '../lib/ai/utils.js';
 
+const API_KEY_MASK = '••••••••••••';
+
+function normalizeIncomingApiKey(rawValue: unknown): string | undefined {
+  if (typeof rawValue !== 'string') {
+    return undefined;
+  }
+
+  const trimmed = rawValue.trim();
+  if (!trimmed || trimmed === API_KEY_MASK) {
+    return undefined;
+  }
+
+  return trimmed;
+}
+
 export function createAiRouter() {
   const router = Router();
 
@@ -36,15 +51,10 @@ export function createAiRouter() {
     }
 
     const provider = typeof req.body?.provider === 'string' ? req.body.provider : 'openai';
-    const apiKey = typeof req.body?.apiKey === 'string' ? req.body.apiKey.trim() : undefined;
+    const apiKey = normalizeIncomingApiKey(req.body?.apiKey);
 
     // If no apiKey is provided, delegate to the stored credential via testConnection.
     // If apiKey is provided, use it directly as a live validation.
-    if (apiKey !== undefined && !apiKey) {
-      res.status(400).json({ error: 'API key must not be empty.' });
-      return;
-    }
-
     try {
       await aiService.testConnection(actorUserId, provider, { apiKey });
       res.json({ message: `${provider} API key validated successfully.` });
@@ -63,17 +73,7 @@ export function createAiRouter() {
     }
 
     const provider = typeof req.body?.provider === 'string' ? req.body.provider : 'openai';
-    const apiKey =
-      typeof req.body?.apiKey === 'string'
-        ? req.body.apiKey.trim()
-        : typeof req.body?.api_key === 'string'
-          ? req.body.api_key.trim()
-          : undefined;
-
-    if (apiKey !== undefined && !apiKey) {
-      res.status(400).json({ error: 'API key must not be empty.' });
-      return;
-    }
+    const apiKey = normalizeIncomingApiKey(req.body?.apiKey ?? req.body?.api_key);
 
     const ollamaUrl = typeof req.body?.ollamaUrl === 'string' ? req.body.ollamaUrl.trim() : undefined;
 

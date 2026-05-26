@@ -30,6 +30,8 @@ import {
   type WorkspaceSettings,
 } from '../../utils/settings';
 
+const API_KEY_MASK = '••••••••••••';
+
 type SettingsCategoryId = 'general' | 'providers' | 'ollama' | 'onboarding';
 
 interface StatusMessage {
@@ -184,6 +186,7 @@ function CloudProviderSection({
   onTestApiKey: () => void;
 }) {
   const providerOption = useMemo(() => getProviderOption(settings.aiProvider), [settings.aiProvider]);
+  const hasStoredApiKey = settings.apiKey === API_KEY_MASK;
 
   return (
     <Card style={{ padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)' }}>
@@ -209,8 +212,8 @@ function CloudProviderSection({
           <TextInput
             label={providerOption.keyLabel}
             type="password"
-            value={settings.apiKey}
-            placeholder={providerOption.keyPlaceholder}
+            value={hasStoredApiKey ? '' : settings.apiKey}
+            placeholder={hasStoredApiKey ? 'Stored in KMS. Enter a new key to replace.' : providerOption.keyPlaceholder}
             onChange={(event) => onChangeSettings({ apiKey: event.target.value })}
           />
         </Grid>

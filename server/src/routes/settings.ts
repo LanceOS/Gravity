@@ -13,6 +13,7 @@ const THEMES = new Set(['dark', 'coal-black', 'coffee', 'marble-blue']);
 const AI_PROVIDERS = new Set(['openai', 'anthropic', 'gemini', 'deepseek']);
 const AGENT_INTEGRATIONS = new Set(['ollama', 'third_party']);
 const PROJECT_LAYOUTS = new Set(['standard', 'condensed']);
+const API_KEY_MASK = '••••••••••••';
 
 function toSettingsResponse(settings: Awaited<ReturnType<typeof getUserSettingsRecord>>, apiKey: string) {
   return {
@@ -146,17 +147,28 @@ export function createSettingsRouter() {
 
       const hasExistingCredential = Boolean(existingCredential);
 
-      // Determine the intended credential action from the explicit keyAction discriminator.
-      // Accepted values: 'update' (store new key), 'clear' (delete key), 'keep' (no change).
-      // Omitting keyAction defaults to 'keep', preserving backward-compatibility.
-      const keyAction = typeof req.body?.keyAction === 'string' ? req.body.keyAction : 'keep';
-      if (!['update', 'clear', 'keep'].includes(keyAction)) {
-        res.status(400).json({ error: 'Invalid keyAction. Must be one of: update, clear, keep.' });
-        return;
+      // Determine credential action from keyAction when present.
+      // For backward compatibility, infer behavior from apiKey when keyAction is omitted.
+      const explicitKeyAction = typeof req.body?.keyAction === 'string' ? req.body.keyAction : undefined;
+      const incomingApiKey = typeof req.body?.apiKey === 'string' ? req.body.apiKey.trim() : undefined;
+
+      let keyAction: 'update' | 'clear' | 'keep';
+      if (explicitKeyAction !== undefined) {
+        if (!['update', 'clear', 'keep'].includes(explicitKeyAction)) {
+          res.status(400).json({ error: 'Invalid keyAction. Must be one of: update, clear, keep.' });
+          return;
+        }
+        keyAction = explicitKeyAction as 'update' | 'clear' | 'keep';
+      } else if (incomingApiKey === '') {
+        keyAction = 'clear';
+      } else if (incomingApiKey && incomingApiKey !== API_KEY_MASK) {
+        keyAction = 'update';
+      } else {
+        keyAction = 'keep';
       }
 
       if (keyAction === 'update') {
-        const rawKey = typeof req.body?.apiKey === 'string' ? req.body.apiKey.trim() : '';
+        const rawKey = incomingApiKey ?? '';
         if (!rawKey) {
           res.status(400).json({ error: 'apiKey is required when keyAction is "update".' });
           return;
@@ -169,7 +181,7 @@ export function createSettingsRouter() {
           await tx.delete(userExternalCredentials).where(eq(userExternalCredentials.userId, userId));
           apiKeyPlaceholder = '';
         } else if (keyAction === 'update') {
-          const rawKey = (req.body.apiKey as string).trim();
+          const rawKey = (incomingApiKey as string).trim();
           await credentialManager.StoreCredential(userId, rawKey, tx);
           apiKeyPlaceholder = '••••••••••••';
         } else {
