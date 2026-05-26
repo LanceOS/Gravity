@@ -326,6 +326,52 @@ export function useAccountSettings({
     }
   }, [currentUser, settings, apiKeyState, ollamaModels, setTheme, setView]);
 
+  const removeCredential = useCallback(async (provider: WorkspaceSettings['aiProvider']) => {
+    if (!currentUser) {
+      return;
+    }
+
+    setSaveLoading(true);
+    setSaveError(null);
+
+    try {
+      const response = await fetch(`/api/v1/settings/${currentUser.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          aiProvider: provider,
+          keyAction: 'clear',
+        }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to remove credential.');
+      }
+
+      setSavedCredentials(normalizeSavedCredentials(data.savedCredentials));
+
+      // If the removed provider is the active one, reset the key field
+      setSettings((current) => {
+        if (current.aiProvider !== provider) {
+          return current;
+        }
+        return { ...current, apiKey: '' };
+      });
+      setApiKeyState((current) => {
+        if (settings.aiProvider !== provider) {
+          return current;
+        }
+        return 'cleared';
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to remove credential.';
+      setSaveError(message);
+    } finally {
+      setSaveLoading(false);
+    }
+  }, [currentUser, settings.aiProvider]);
+
   const resetProviderDraft = useCallback(() => {
     const selectedCredential = getSavedCredentialForProvider(savedCredentials, settings.aiProvider);
 
@@ -442,6 +488,7 @@ export function useAccountSettings({
     ollamaModelsLoading,
     updateSettings,
     saveSettings,
+    removeCredential,
     resetProviderDraft,
     testApiKey,
     resetTutorial,

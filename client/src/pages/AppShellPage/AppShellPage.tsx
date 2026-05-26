@@ -169,6 +169,7 @@ export function AppShellPage() {
     ollamaModelsLoading,
     updateSettings: updateAccountSettings,
     saveSettings: saveAccountSettings,
+    removeCredential: removeCredential,
     resetProviderDraft,
     testApiKey,
     resetTutorial,
@@ -666,6 +667,7 @@ export function AppShellPage() {
           onResetTutorial={resetTutorial}
           onSaveSettings={saveAccountSettings}
           onTestApiKey={testApiKey}
+          onRemoveCredential={removeCredential}
         />
         {onboarding}
       </>
