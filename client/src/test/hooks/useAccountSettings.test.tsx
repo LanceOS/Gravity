@@ -82,7 +82,7 @@ describe('useAccountSettings', () => {
     expect(result.current.savedCredentials).toHaveLength(2);
     expect(setTheme).toHaveBeenCalledWith('coffee');
     expect(setView).toHaveBeenCalledWith('list');
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
 
     act(() => {
       result.current.updateSettings({ aiProvider: 'openai' });
