@@ -112,14 +112,17 @@ export function createAiRouter() {
     }
 
     try {
-      const rawOllamaUrl = typeof req.body?.ollamaUrl === 'string' ? req.body.ollamaUrl : 'http://localhost:11434';
-      validateOllamaUrl(rawOllamaUrl);
+      const rawOllamaUrl = typeof req.body?.ollamaUrl === 'string' ? req.body.ollamaUrl : undefined;
+      const ollamaUrl = provider === 'ollama' ? (rawOllamaUrl ?? 'http://localhost:11434') : undefined;
+      if (ollamaUrl) {
+        validateOllamaUrl(ollamaUrl);
+      }
 
       const result = await aiService.chat(actorUserId, provider, {
         model,
         messages,
         tools,
-        ollamaUrl: rawOllamaUrl,
+        ...(ollamaUrl ? { ollamaUrl } : {}),
       });
 
       res.json({
