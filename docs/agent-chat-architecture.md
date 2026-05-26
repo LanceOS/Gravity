@@ -27,9 +27,10 @@ To prevent data leakage, cross-tenant access, and abuse, the agent chat implemen
 
 ### 1. Zero-Exposure State Map
 The AI is completely blinded to actual internal database primary keys and UUIDs.
-- **Sanitization:** When MCP tools return data to the LLM, the `StateMap` strips out raw database IDs and replaces them with session-scoped, ephemeral identifiers (e.g., mapping `p-eeebd7ff...` to `Temp-Project-A`).
+- **Sanitization:** When MCP tools return data to the LLM, the `StateMap` strips out raw database IDs and replaces them with temporary aliases (e.g., mapping `p-eeebd7ff...` to `Temp-Project-A`).
 - **Desanitization:** When the LLM calls a tool using a temporary ID, the `McpRequestHandler` translates it back to the real database UUID before the tool executes.
-- **Why:** This ensures the LLM cannot hallucinate or leak internal identifiers, preventing enumeration attacks or data exposure.
+- **Current scope/retention:** The current implementation stores these mappings in process-wide in-memory maps. They are not scoped to an individual user session and are retained until explicitly overwritten, the process restarts, or the implementation performs cleanup.
+- **Why:** This prevents the LLM from seeing raw internal identifiers directly, reducing accidental leakage and making identifier guessing/enumeration harder, but it should not be relied on as a per-session isolation boundary by itself.
 
 ### 2. Hard Rate Limiting
 Even with strict prompts, LLMs can be jailbroken into attempting bulk operations.
