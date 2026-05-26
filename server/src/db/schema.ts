@@ -15,7 +15,7 @@ export const bytea = customType<{ data: Buffer; driverData: string }>({
   fromDriver(value: unknown): Buffer {
     if (Buffer.isBuffer(value)) {
       const str = value.toString('utf8');
-      if (str.startsWith('\\x')) {
+      if (/^\\x[0-9a-fA-F]+$/.test(str)) {
         return Buffer.from(str.slice(2), 'hex');
       }
       return value;
