@@ -43,7 +43,7 @@ interface AccountPreferencesPageProps {
   settingsLoading: boolean;
   saveLoading: boolean;
   saveSuccess: boolean;
-  hasChanges: boolean;
+  hasChanges?: boolean;
   saveError: string | null;
   testing: boolean;
   testResult: StatusMessage | null;
