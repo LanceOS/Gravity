@@ -2,7 +2,7 @@ import type { CSSProperties, ChangeEvent, InputHTMLAttributes } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { LocalAIChat } from '../../components/LocalAIChat/LocalAIChat.tsx';
+import { LocalAIChat } from '../../modules/ai';
 
 const mocks = vi.hoisted(() => ({
   useTickets: vi.fn(),
@@ -36,7 +36,7 @@ vi.mock('@library', async (importOriginal) => {
   };
 });
 
-vi.mock('../../components/LocalAIChat/components', () => ({
+vi.mock('../../modules/ai/components/LocalAIChat/components', () => ({
   FormattedMarkdown: ({ text }: { text: string }) => <div>{text}</div>,
 }));
 
@@ -96,6 +96,7 @@ function renderLocalAIChat(overrides: Partial<Parameters<typeof LocalAIChat>[0]>
     initialOllamaUrl: '',
     initialModel: '',
     settings: mockSettings,
+    workspaceId: 'workspace-1',
     ...overrides,
   };
 
@@ -220,27 +221,38 @@ describe('LocalAIChat', () => {
 
   it('fetches MCP tools on mount and executes them automatically', async () => {
     const user = userEvent.setup();
-    mocks.fetch
-      // 1. tools list
-      .mockResolvedValueOnce(createJsonResponse({ result: { tools: [{ name: 'list_tickets' }] } }))
-      // 2. ollama models
-      .mockResolvedValueOnce(createJsonResponse({ models: ['llama3'], connected: true }))
-      // 3. chat request (returns tool call)
-      .mockResolvedValueOnce(createJsonResponse({ 
-        message: { 
-          role: 'assistant', 
-          content: '',
-          tool_calls: [{ id: 'call_1', name: 'list_tickets', arguments: '{}' }] 
-        } 
-      }))
-      // 4. tool execution via mcp
-      .mockResolvedValueOnce(createJsonResponse({
-        result: { content: [{ text: 'Found 1 ticket' }] }
-      }))
-      // 5. auto-followup chat request
-      .mockResolvedValueOnce(createJsonResponse({
-        message: { role: 'assistant', content: 'You have 1 ticket' }
-      }));
+    let chatCount = 0;
+    let sseCount = 0;
+    mocks.fetch.mockImplementation((url: string) => {
+      if (url === '/api/v1/mcp/sse') {
+        sseCount++;
+        if (sseCount === 1) {
+          return Promise.resolve(createJsonResponse({ result: { tools: [{ name: 'list_tickets' }] } }));
+        }
+        return Promise.resolve(createJsonResponse({
+          result: { content: [{ text: 'Found 1 ticket' }] }
+        }));
+      }
+      if (url.includes('ollama/models')) {
+        return Promise.resolve(createJsonResponse({ models: ['llama3'], connected: true }));
+      }
+      if (url === '/api/v1/ai/chat') {
+        chatCount++;
+        if (chatCount === 1) {
+          return Promise.resolve(createJsonResponse({ 
+            message: { 
+              role: 'assistant', 
+              content: '',
+              tool_calls: [{ id: 'call_1', name: 'list_tickets', arguments: '{}' }] 
+            } 
+          }));
+        }
+        return Promise.resolve(createJsonResponse({
+          message: { role: 'assistant', content: 'You have 1 ticket' }
+        }));
+      }
+      return Promise.resolve(createJsonResponse({}));
+    });
 
     renderLocalAIChat();
 

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { render, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ThemeProvider } from '../../context/ThemeProvider';
+import { ThemeProvider } from '../../modules/settings';
 import { AppShellPage } from '../../pages/AppShellPage/AppShellPage.tsx';
 
 const mocks = vi.hoisted(() => ({
@@ -32,19 +32,20 @@ vi.mock('../../utils/webmcp', () => ({
   registerWebMCPTools: mocks.registerWebMCPTools,
 }));
 
-vi.mock('../../components/AuthScreen', () => ({
+vi.mock('../../modules/auth', () => ({
   AuthScreen: () => <div>AuthScreen</div>,
 }));
 
-vi.mock('../../components/CreateTicketModal', () => ({
+vi.mock('../../modules/tickets', () => ({
   CreateTicketModal: () => <div>CreateTicketModal</div>,
 }));
 
-vi.mock('../../components/LocalAIChat', () => ({
+vi.mock('../../modules/ai', () => ({
+  AgentSimulator: () => <div>AgentSimulator</div>,
   LocalAIChat: () => <div>LocalAIChat</div>,
 }));
 
-vi.mock('../../components/OnboardingModal', () => ({
+vi.mock('../../modules/onboarding', () => ({
   OnboardingModal: () => <div>OnboardingModal</div>,
 }));
 
@@ -74,9 +75,13 @@ vi.mock('../../pages/WorkspaceProjectsPage/WorkspaceProjectsPage', () => ({
   WorkspaceProjectsPage: () => <div>WorkspaceProjectsPage</div>,
 }));
 
-vi.mock('../../pages/SettingsPage/SettingsPage', () => ({
-  SettingsPage: () => <div>SettingsPage</div>,
-}));
+vi.mock('../../modules/settings', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../modules/settings')>();
+  return {
+    ...actual,
+    SettingsScreen: () => <div>SettingsPage</div>,
+  };
+});
 
 vi.mock('../../pages/AccountPreferencesPage/AccountPreferencesPage', () => ({
   AccountPreferencesPage: () => <div>AccountPreferencesPage</div>,

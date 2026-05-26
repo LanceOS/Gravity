@@ -2,7 +2,7 @@ import type { ButtonHTMLAttributes, ChangeEvent, ReactNode, SelectHTMLAttributes
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { CreateTicketModal } from '../../components/CreateTicketModal/CreateTicketModal.tsx';
+import { CreateTicketModal } from '../../modules/tickets';
 
 type MockButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   children?: ReactNode;

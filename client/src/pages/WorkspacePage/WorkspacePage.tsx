@@ -1,19 +1,16 @@
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import { Button } from '@library';
 import type { Comment, Cycle, Domain, Project, Ticket, User } from '../../context/TicketContext';
-import type { TicketFilters, TicketListSort } from '../../utils/ticketView';
-import { TicketBoard } from '../../components/TicketBoard';
-import { TicketList } from '../../components/TicketList';
-import { TicketDetail } from '../../components/TicketDetail';
+import type { TicketFilters, TicketListSort } from '../../modules/tickets/utils/ticketView';
+import { TicketBoard, TicketList, TicketDetail, TicketFilterBar } from '../../modules/tickets';
 import {
   filterTickets,
   getWorkspaceHeaderTitle,
   groupTicketsByStatus,
   hasActiveTicketFilters,
   sortTicketsForList,
-} from '../../utils/ticketView';
-import { TicketFilterBar } from '../../components/TicketFilterBar';
-import { WorkspaceHeader } from '../../components/WorkspaceHeader';
+} from '../../modules/tickets/utils/ticketView';
+import { WorkspaceHeader } from '../../modules/workspaces';
 import './WorkspacePage.css';
 
 interface WorkspacePageProps {
@@ -102,15 +99,17 @@ export function WorkspacePage({
     () => (detailSubtasks.length > 0 ? (completedDetailSubtasks / detailSubtasks.length) * 100 : 0),
     [detailSubtasks, completedDetailSubtasks]
   );
-  const handleClearFilters = () => {
+  const handleClearFilters = useCallback(() => {
     onSetFilters({
       ...filters,
       search: '',
       priority: '',
       status: '',
       domainId: '',
+      cycleId: '',
+      assigneeId: '',
     });
-  };
+  }, [filters, onSetFilters]);
 
   return (
     <div className="workspace-page">
@@ -167,34 +166,20 @@ export function WorkspacePage({
                 </div>
               ) : activeView === 'board' ? (
                 <TicketBoard
-                  projects={projects}
-                  filters={filters}
-                  filteredCount={filteredTickets.length}
-                  totalCount={tickets.length}
                   ticketsByColumn={groupedTickets}
                   domainById={domainById}
                   userAvatarById={userAvatarById}
-                  hasActiveFilters={hasFiltersApplied}
-                  onFilterChange={onSetFilters}
-                  onClearFilters={handleClearFilters}
                   onMoveTicket={onUpdateTicket}
-                  onSelectTicket={(ticket) => onSelectTicket(ticket)}
+                  onSelectTicket={onSelectTicket}
                   onOpenCreateTicket={onOpenCreateTicket}
                 />
               ) : (
                 <TicketList
-                  filters={filters}
                   filteredCount={filteredTickets.length}
-                  totalCount={tickets.length}
                   groupedTickets={listGroupedTickets}
-                  listSort={listSort}
                   domainById={domainById}
                   userAvatarById={userAvatarById}
-                  hasActiveFilters={hasFiltersApplied}
-                  onFilterChange={onSetFilters}
-                  onClearFilters={handleClearFilters}
-                  onListSortChange={onSetListSort}
-                  onSelectTicket={(ticket) => onSelectTicket(ticket)}
+                  onSelectTicket={onSelectTicket}
                 />
               )}
             </div>

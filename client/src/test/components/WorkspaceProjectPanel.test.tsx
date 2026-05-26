@@ -2,11 +2,11 @@ import type { ButtonHTMLAttributes, ChangeEvent, ReactNode } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { WorkspaceProjectPanel } from '../../components/WorkspaceProjectPanel/WorkspaceProjectPanel.tsx';
+import { WorkspaceProjectPanel } from '../../modules/workspaces';
 import type {
   ProjectCreateOverlayProps,
   ProjectSelectionRailProps,
-} from '../../components/WorkspaceProjectPanel/types';
+} from '../../modules/workspaces/types/WorkspaceProjectPanel';
 
 type MockButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   children?: ReactNode;
@@ -32,7 +32,7 @@ vi.mock('@library', () => ({
   ),
 }));
 
-vi.mock('../../components/WorkspaceProjectPanel/components', () => ({
+vi.mock('../../modules/workspaces/components/ProjectCreateOverlay', () => ({
   ProjectCreateOverlay: ({ onClose, onSubmitProject }: ProjectCreateOverlayProps) => (
     <div>
       <div>ProjectCreateOverlay</div>
@@ -53,6 +53,9 @@ vi.mock('../../components/WorkspaceProjectPanel/components', () => ({
       </button>
     </div>
   ),
+}));
+
+vi.mock('../../modules/workspaces/components/ProjectSelectionRail', () => ({
   ProjectSelectionRail: ({ selectedProjectId, onSelectProject }: ProjectSelectionRailProps) => (
     <div>
       <div>{`ProjectSelectionRail ${selectedProjectId ?? 'none'}`}</div>

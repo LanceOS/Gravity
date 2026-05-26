@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { User } from '../context/TicketContext';
 import type { WorkspaceJoinMode } from './useWorkspaceDirectory';
 
@@ -97,14 +97,20 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
   const [revokeLoadingId, setRevokeLoadingId] = useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const refreshRequestIdRef = useRef(0);
 
   const refreshWorkspaceAdmin = useCallback(async () => {
+    const requestId = ++refreshRequestIdRef.current;
+    const workspaceId = activeWorkspaceId;
+
     if (!currentUser || !activeWorkspaceId) {
-      setSettings(defaultSettings(activeWorkspaceId));
+      setSettings(defaultSettings(workspaceId));
       setMembers([]);
       setInvites([]);
       setJoinRequests([]);
       setDeleteError(null);
+      setSaveError(null);
+      setInviteError(null);
       return;
     }
 
@@ -154,8 +160,12 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
         throw new Error(joinRequestsData.error || 'Failed to load workspace join requests.');
       }
 
+      if (requestId !== refreshRequestIdRef.current) {
+        return;
+      }
+
       setSettings({
-        workspaceId: settingsData.workspaceId || activeWorkspaceId,
+        workspaceId: settingsData.workspaceId || workspaceId,
         key: settingsData.key || '',
         hostUrl: settingsData.hostUrl || '',
         joinMode: settingsData.joinMode === 'auto_join' ? 'auto_join' : 'approval_required',
@@ -166,14 +176,21 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
       setInvites(Array.isArray(invitesData) ? invitesData.map((invite) => normalizeWorkspaceInvite(invite as Record<string, unknown>)) : []);
       setJoinRequests(!joinRequestsForbidden && Array.isArray(joinRequestsData) ? joinRequestsData : []);
     } catch (refreshError) {
+      if (requestId !== refreshRequestIdRef.current) {
+        return;
+      }
+
       const message = refreshError instanceof Error ? refreshError.message : 'Failed to load workspace administration data.';
       setSaveError(message);
+      setSettings(defaultSettings(workspaceId));
       setMembers([]);
       setInvites([]);
       setJoinRequests([]);
     } finally {
-      setSettingsLoading(false);
-      setInvitesLoading(false);
+      if (requestId === refreshRequestIdRef.current) {
+        setSettingsLoading(false);
+        setInvitesLoading(false);
+      }
     }
   }, [activeWorkspaceId, currentUser]);
 

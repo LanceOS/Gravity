@@ -13,7 +13,14 @@ type WorkspaceProjectPanelMockProps = {
   onCreateDomain: (domain: { projectId: string; name: string; color: string }) => void | Promise<void>;
 };
 
-vi.mock('../../components/WorkspaceProjectPanel', () => ({
+vi.mock('../../modules/workspaces', () => ({
+  WorkspaceHeader: Object.assign(
+    ({ children }: any) => <header>{children}</header>,
+    {
+      Top: ({ children }: any) => <div>{children}</div>,
+      Title: ({ children }: any) => <h1>{children}</h1>,
+    }
+  ),
   WorkspaceProjectPanel: ({
     workspaceName,
     activeProjectId,

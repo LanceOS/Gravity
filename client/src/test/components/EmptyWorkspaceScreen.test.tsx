@@ -2,7 +2,7 @@ import type { ChangeEvent, InputHTMLAttributes, TextareaHTMLAttributes } from 'r
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { EmptyWorkspaceScreen } from '../../components/EmptyWorkspaceScreen/EmptyWorkspaceScreen.tsx';
+import { EmptyWorkspaceScreen } from '../../modules/workspaces';
 
 type MockInputProps = InputHTMLAttributes<HTMLInputElement> & {
   label?: string;

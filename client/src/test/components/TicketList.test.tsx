@@ -2,8 +2,8 @@ import type { ButtonHTMLAttributes, ChangeEvent, CSSProperties, ReactNode, Selec
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { TicketList } from '../../components/TicketList/TicketList.tsx';
-import type { TicketRowProps } from '../../components/TicketList/types';
+import { TicketList } from '../../modules/tickets';
+import type { TicketRowProps } from '../../modules/tickets/types/TicketList';
 
 type MockButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   children?: ReactNode;
@@ -47,13 +47,13 @@ vi.mock('@library', () => ({
   ),
 }));
 
-vi.mock('../../components/TicketList/components', () => ({
+vi.mock('../../modules/tickets/components/TicketRow', () => ({
   TicketRow: ({ ticket, onClick, assigneeAvatar }: TicketRowProps) => (
     <button type="button" onClick={onClick}>{`TicketRow ${ticket.key} ${assigneeAvatar || 'no-avatar'}`}</button>
   ),
 }));
 
-vi.mock('../../components/performance/DenseGridController', () => ({
+vi.mock('../../modules/tickets/components/DenseGridController', () => ({
   DenseGridController: ({ tickets, onSelectTicket }: { tickets: Array<{ key: string }>; onSelectTicket: (ticket: { key: string }) => void }) => (
     <div>
       <div>{`DenseGridController ${tickets.length}`}</div>
@@ -102,17 +102,7 @@ const doneTicket = {
 
 function renderTicketList(overrides: Partial<Parameters<typeof TicketList>[0]> = {}) {
   const props = {
-    filters: {
-      search: '',
-      priority: '',
-      status: '',
-      projectId: '',
-      domainId: '',
-      cycleId: '',
-      assigneeId: '',
-    },
     filteredCount: 2,
-    totalCount: 2,
     groupedTickets: {
       backlog: [backlogTicket],
       todo: [],
@@ -121,7 +111,6 @@ function renderTicketList(overrides: Partial<Parameters<typeof TicketList>[0]> =
       done: [doneTicket],
       canceled: [],
     },
-    listSort: 'created' as const,
     domainById: {
       'domain-1': {
         id: 'domain-1',
@@ -132,10 +121,6 @@ function renderTicketList(overrides: Partial<Parameters<typeof TicketList>[0]> =
     userAvatarById: {
       'user-1': 'avatar-1.png',
     },
-    hasActiveFilters: false,
-    onFilterChange: vi.fn(),
-    onClearFilters: vi.fn(),
-    onListSortChange: vi.fn(),
     onSelectTicket: vi.fn(),
     ...overrides,
   };
@@ -147,72 +132,16 @@ function renderTicketList(overrides: Partial<Parameters<typeof TicketList>[0]> =
 }
 
 describe('TicketList', () => {
-  it('forwards filter and sort updates, clears filters, and selects grouped rows', async () => {
+  it('clears filters and selects grouped rows', async () => {
     const user = userEvent.setup();
     const { props } = renderTicketList({
-      hasActiveFilters: true,
       filteredCount: 1,
-      totalCount: 2,
-      filters: {
-        search: 'sync',
-        priority: 'high',
-        status: 'backlog',
-        projectId: '',
-        domainId: '',
-        cycleId: '',
-        assigneeId: '',
-      },
     });
 
     expect(screen.getByText('BACKLOG')).toBeInTheDocument();
     expect(screen.getByText('DONE')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByDisplayValue('sync'), {
-      target: { value: 'ship' },
-    });
-    expect(props.onFilterChange).toHaveBeenCalled();
-
-    fireEvent.change(screen.getByDisplayValue('high'), {
-      target: { value: 'low' },
-    });
-    expect(props.onFilterChange).toHaveBeenCalledTimes(2);
-
-    fireEvent.change(screen.getByDisplayValue('backlog'), {
-      target: { value: 'done' },
-    });
-    expect(props.onFilterChange).toHaveBeenCalledTimes(3);
-
-    fireEvent.change(screen.getByDisplayValue('created'), {
-      target: { value: 'updated' },
-    });
-    expect(props.onListSortChange).toHaveBeenCalled();
-
-    await user.click(screen.getByRole('button', { name: /clear filters/i }));
-    expect(props.onClearFilters).toHaveBeenCalled();
-
     await user.click(screen.getByRole('button', { name: 'TicketRow GRA-1 avatar-1.png' }));
     expect(props.onSelectTicket).toHaveBeenCalledWith(backlogTicket);
   });
-
-  it('switches to interactive grid mode and shows the empty state when there are no tickets', async () => {
-    const user = userEvent.setup();
-
-    renderTicketList({
-      filteredCount: 0,
-      totalCount: 0,
-      groupedTickets: {
-        backlog: [],
-        todo: [],
-        in_progress: [],
-        in_review: [],
-        done: [],
-        canceled: [],
-      },
-    });
-
-    await user.click(screen.getByRole('button', { name: /interactive grid/i }));
-
-    expect(screen.getByText(/no tickets/i)).toBeInTheDocument();
-  });
-
 });

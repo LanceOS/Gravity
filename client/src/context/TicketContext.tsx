@@ -1,79 +1,18 @@
 import React, { createContext, useContext, useReducer, useEffect, useCallback, useMemo } from 'react';
 
-// Type definitions matching the backend API contract.
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  avatar: string;
-  role: string;
-  tutorial_completed?: number | boolean;
-}
-
-export interface Project {
-  id: string;
-  name: string;
-  description: string;
-  key: string;
-  status: 'planned' | 'active' | 'completed';
-  workspaceId?: string | null;
-}
-
-type CreateProjectInput = {
-  name: string;
-  description: string;
-  key: string;
-  status?: Project['status'];
-  workspaceId?: string;
-};
-
-export interface Domain {
-  id: string;
-  name: string;
-  color: string;
-}
-
-export interface Cycle {
-  id: string;
-  name: string;
-  startDate: string;
-  endDate: string;
-  completed: number;
-}
-
-export interface Ticket {
-  id: string;
-  key: string;
-  title: string;
-  description: string;
-  status: 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done' | 'canceled';
-  priority: 'no_priority' | 'low' | 'medium' | 'high' | 'urgent';
-  assigneeId: string | null;
-  projectId: string;
-  domainId: string | null;
-  cycleId: string | null;
-  parentId: string | null;
-  prStatus: 'open' | 'merged' | 'closed' | 'none';
-  prUrl: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface Comment {
-  id: string;
-  ticketId: string;
-  userId: string;
-  body: string;
-  createdAt: string;
-  userName?: string;
-  userAvatar?: string;
-  author?: {
-    id: string;
-    username: string;
-    avatar_url?: string;
-    role?: string;
-  };
-}
+// Domain entity types live in src/types/domain.ts.
+// They are re-exported here for backwards compatibility — all existing import
+// sites pointing to this file continue to work without any changes.
+export type {
+  User,
+  Project,
+  Domain,
+  Cycle,
+  Ticket,
+  Comment,
+  CreateProjectInput,
+} from '../types/domain';
+import type { User, Project, Domain, Cycle, Ticket, Comment, CreateProjectInput } from '../types/domain';
 
 interface State {
   tickets: Ticket[];
@@ -100,6 +39,8 @@ interface State {
 
 type Action =
   | { type: 'SET_LOADING'; payload: boolean }
+  | { type: 'CLEAR_WORKSPACE_DATA' }
+  | { type: 'CLEAR_PROJECT_DATA' }
   | {
     type: 'SET_INITIAL_DATA';
     payload: {
@@ -187,6 +128,15 @@ function createInitialState(): State {
   };
 }
 
+
+function upsertTicket(existingTickets: Ticket[], nextTicket: Ticket) {
+  const ticketIndex = existingTickets.findIndex((ticket) => ticket.id === nextTicket.id);
+  if (ticketIndex === -1) {
+    return [...existingTickets, nextTicket];
+  }
+
+  return existingTickets.map((ticket, index) => (index === ticketIndex ? nextTicket : ticket));
+}
 // API Base URL
 const API_URL = '/api/v1';
 const AUTH_API_URL = '/api/auth';
@@ -195,6 +145,27 @@ function ticketReducer(state: State, action: Action): State {
   switch (action.type) {
     case 'SET_LOADING':
       return { ...state, loading: action.payload };
+    case 'CLEAR_WORKSPACE_DATA':
+      return {
+        ...state,
+        tickets: [],
+        projects: [],
+        domains: [],
+        cycles: [],
+        users: [],
+        comments: [],
+        activeTicket: null,
+        filters: initialFilters,
+      };
+    case 'CLEAR_PROJECT_DATA':
+      return {
+        ...state,
+        tickets: [],
+        domains: [],
+        cycles: [],
+        comments: [],
+        activeTicket: null,
+      };
     case 'SET_INITIAL_DATA':
       return {
         ...state,
@@ -317,6 +288,8 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [state, dispatch] = useReducer(ticketReducer, undefined, createInitialState);
   const [activeProjectId, setActiveProjectIdState] = React.useState<string>('');
   const [authResolved, setAuthResolved] = React.useState(false);
+  const loadedUserIdRef = React.useRef<string | null>(null);
+  const loadedProjectIdRef = React.useRef<string | null>(null);
 
   const setActiveProjectId = useCallback((id: string) => {
     setActiveProjectIdState(id);
@@ -324,14 +297,28 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     dispatch({ type: 'SET_FILTERS', payload: { projectId: id } });
   }, []);
 
+  const clearWorkspaceData = useCallback(() => {
+    loadedUserIdRef.current = null;
+    loadedProjectIdRef.current = null;
+    setActiveProjectIdState('');
+    dispatch({ type: 'CLEAR_WORKSPACE_DATA' });
+  }, []);
+
+  const clearProjectData = useCallback(() => {
+    loadedProjectIdRef.current = null;
+    dispatch({ type: 'CLEAR_PROJECT_DATA' });
+  }, []);
+
   // 1. Fetch initial central data (projects, users)
   const fetchInitialData = useCallback(async (userId?: string) => {
     if (!userId) {
-      dispatch({
-        type: 'SET_INITIAL_DATA',
-        payload: { tickets: [], projects: [], domains: [], cycles: [], users: [] },
-      });
+      clearWorkspaceData();
       return;
+    }
+
+    const isUserTransition = loadedUserIdRef.current !== null && loadedUserIdRef.current !== userId;
+    if (isUserTransition) {
+      clearWorkspaceData();
     }
 
     dispatch({ type: 'SET_LOADING', payload: true });
@@ -341,23 +328,32 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         fetch(`${API_URL}/users`),
       ]);
 
-      const projects = await projectsRes.json();
-      const users = await usersRes.json();
+      const [projects, users] = await Promise.all([
+        handleArrayResponse<Project>(projectsRes, 'Failed to load projects'),
+        handleArrayResponse<User>(usersRes, 'Failed to load users'),
+      ]);
 
       dispatch({
         type: 'SET_INITIAL_DATA',
         payload: { tickets: [], projects, domains: [], cycles: [], users },
       });
+      loadedUserIdRef.current = userId;
     } catch (error) {
       console.error('Failed to load initial workspace data:', error);
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
     }
-  }, []);
+  }, [clearWorkspaceData]);
 
   // Fetch project-specific data (tickets, domains, cycles)
   const fetchProjectData = useCallback(async (projId: string) => {
     if (!projId) return;
+
+    const isProjectTransition = loadedProjectIdRef.current !== null && loadedProjectIdRef.current !== projId;
+    if (isProjectTransition) {
+      clearProjectData();
+    }
+
     try {
       const [ticketsRes, domainsRes, cyclesRes] = await Promise.all([
         fetch(`${API_URL}/tickets`, { headers: { 'X-Project-Id': projId } }),
@@ -365,18 +361,21 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         fetch(`${API_URL}/cycles`, { headers: { 'X-Project-Id': projId } }),
       ]);
 
-      const tickets = await ticketsRes.json();
-      const domains = await domainsRes.json();
-      const cycles = await cyclesRes.json();
+      const [tickets, domains, cycles] = await Promise.all([
+        handleArrayResponse<Ticket>(ticketsRes, `Failed to load tickets for project ${projId}`),
+        handleArrayResponse<Domain>(domainsRes, `Failed to load domains for project ${projId}`),
+        handleArrayResponse<Cycle>(cyclesRes, `Failed to load cycles for project ${projId}`),
+      ]);
 
       dispatch({
         type: 'SET_PROJECT_DATA',
         payload: { tickets, domains, cycles }
       });
+      loadedProjectIdRef.current = projId;
     } catch (e) {
       console.error(`Failed to fetch project data for project ${projId}:`, e);
     }
-  }, []);
+  }, [clearProjectData]);
 
   // Load project data when active project changes
   useEffect(() => {
@@ -447,7 +446,8 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     if (activeProjectId && !state.projects.some((project) => project.id === activeProjectId)) {
-      setActiveProjectIdState('');
+      loadedProjectIdRef.current = null;
+      setActiveProjectId('');
     }
   }, [state.currentUser, state.projects, activeProjectId, setActiveProjectId]);
 
@@ -458,9 +458,6 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     if (!state.currentUser) {
       fetchInitialData();
-      setActiveProjectIdState('');
-      dispatch({ type: 'SET_ACTIVE_TICKET', payload: null });
-      dispatch({ type: 'SET_COMMENTS_RAW', payload: [] });
       return;
     }
 
@@ -502,9 +499,10 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             dispatch({ type: 'SET_COMMENTS_RAW', payload: message.data.comments });
           }
         } else if (message.type === 'users-updated') {
-          fetch(`${API_URL}/users`)
-            .then(res => res.json())
-            .then(users => {
+          void (async () => {
+            try {
+              const usersResponse = await fetch(`${API_URL}/users`);
+              const users = await handleArrayResponse<User>(usersResponse, 'Failed to refresh users');
               dispatch({
                 type: 'SET_INITIAL_DATA',
                 payload: {
@@ -512,10 +510,13 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                   projects: state.projects,
                   domains: state.domains,
                   cycles: state.cycles,
-                  users: users
+                  users,
                 }
               });
-            });
+            } catch (error) {
+              console.error('Failed to refresh users:', error);
+            }
+          })();
         }
       } catch (e) {
         console.error('Error parsing SSE event:', e);
@@ -544,9 +545,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       // Update local state if the ticket belongs to the current active project
       if (ticketInput.projectId === activeProjectId) {
-        const listRes = await fetch(`${API_URL}/tickets`, { headers: { 'X-Project-Id': activeProjectId } });
-        const allTickets = await listRes.json();
-        dispatch({ type: 'SET_TICKETS_RAW', payload: allTickets });
+        await refreshTicketsForProject(activeProjectId, upsertTicket(state.tickets, createdTicket));
       }
 
       return createdTicket;
@@ -554,11 +553,12 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       console.error(e);
       return null;
     }
-  }, [activeProjectId]);
+  }, [activeProjectId, refreshTicketsForProject, state.tickets]);
 
   // 4. Update Ticket with project header
   const updateTicket = useCallback(async (id: string, updates: Partial<Ticket>) => {
     if (!activeProjectId) return;
+    const originalTickets = [...state.tickets];
     dispatch({ type: 'OPTIMISTIC_TICKET_UPDATE', payload: { id, updates } });
 
     try {
@@ -574,11 +574,9 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (!response.ok) throw new Error('Failed to update ticket');
     } catch (e) {
       console.error('Error updating ticket on server, rolling back:', e);
-      const response = await fetch(`${API_URL}/tickets`, { headers: { 'X-Project-Id': activeProjectId } });
-      const freshTickets = await response.json();
-      dispatch({ type: 'SET_TICKETS_RAW', payload: freshTickets });
+      await refreshTicketsForProject(activeProjectId, originalTickets);
     }
-  }, [activeProjectId]);
+  }, [activeProjectId, refreshTicketsForProject, state.tickets]);
 
   // 5. Delete Ticket with project header
   const deleteTicket = useCallback(async (id: string) => {
@@ -741,6 +739,30 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }
 
+  async function handleArrayResponse<T>(response: Response, fallbackError: string) {
+    const data = await handleResponseJson(response, fallbackError);
+    if (!Array.isArray(data)) {
+      throw new Error(`${fallbackError}: Expected an array response.`);
+    }
+
+    return data as T[];
+  }
+
+  async function refreshTicketsForProject(projectId: string, fallbackTickets?: Ticket[]) {
+    try {
+      const response = await fetch(`${API_URL}/tickets`, { headers: { 'X-Project-Id': projectId } });
+      const tickets = await handleArrayResponse<Ticket>(response, `Failed to refresh tickets for project ${projectId}`);
+      dispatch({ type: 'SET_TICKETS_RAW', payload: tickets });
+      return tickets;
+    } catch (error) {
+      console.error(`Failed to refresh tickets for project ${projectId}:`, error);
+      if (fallbackTickets) {
+        dispatch({ type: 'SET_TICKETS_RAW', payload: fallbackTickets });
+      }
+      return null;
+    }
+  }
+
   const createProject = useCallback(async (projectInput: CreateProjectInput) => {
     if (!state.currentUser) {
       return null;
@@ -865,8 +887,8 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
 
     dispatch({ type: 'SET_USER', payload: null });
-    setActiveProjectIdState('');
-  }, []);
+    clearWorkspaceData();
+  }, [clearWorkspaceData]);
 
   const setCurrentUser = useCallback((user: User | null) => {
     dispatch({ type: 'SET_USER', payload: user });

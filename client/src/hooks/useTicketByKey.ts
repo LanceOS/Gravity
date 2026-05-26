@@ -21,6 +21,7 @@ export function useTicketByKey(ticketKey: string) {
   const [error, setError] = useState<Error | null>(null);
 
   const normalizedKey = ticketKey.trim().toUpperCase();
+  const cacheKey = `${currentUser?.id ?? 'anonymous'}::${normalizedKey}`;
   const localTicket = tickets.find(t => t.key.toUpperCase() === normalizedKey);
 
   useEffect(() => {
@@ -40,8 +41,8 @@ export function useTicketByKey(ticketKey: string) {
     }
 
     // 2. Resolve from globally resolved cache if available
-    if (resolvedCache[normalizedKey]) {
-      setTicketInfo(resolvedCache[normalizedKey]);
+    if (resolvedCache[cacheKey]) {
+      setTicketInfo(resolvedCache[cacheKey]);
       setError(null);
       setLoading(false);
       return;
@@ -52,7 +53,7 @@ export function useTicketByKey(ticketKey: string) {
     setError(null);
 
     // 3. Initiate fetching or hook into existing pending query
-    if (!fetchCache[normalizedKey]) {
+    if (!fetchCache[cacheKey]) {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
       };
@@ -60,7 +61,7 @@ export function useTicketByKey(ticketKey: string) {
         headers['X-User-Id'] = currentUser.id;
       }
 
-      fetchCache[normalizedKey] = fetch(`/api/v1/tickets/key/${normalizedKey}`, { headers })
+      fetchCache[cacheKey] = fetch(`/api/v1/tickets/key/${normalizedKey}`, { headers })
         .then(async res => {
           if (res.ok) return res.json();
 
@@ -87,16 +88,16 @@ export function useTicketByKey(ticketKey: string) {
           throw new Error(serverError || `Request failed with status ${res.status}`);
         })
         .then(data => {
-          resolvedCache[normalizedKey] = data;
+          resolvedCache[cacheKey] = data;
           return data;
         })
         .finally(() => {
           // Evict settled requests from the in-flight cache; successful results live in resolvedCache.
-          delete fetchCache[normalizedKey];
+          delete fetchCache[cacheKey];
         });
     }
 
-    fetchCache[normalizedKey]
+    fetchCache[cacheKey]
       .then(data => {
         if (active) {
           setTicketInfo(data);
@@ -118,7 +119,7 @@ export function useTicketByKey(ticketKey: string) {
     return () => {
       active = false;
     };
-  }, [normalizedKey, localTicket, currentUser?.id]);
+  }, [cacheKey, normalizedKey, localTicket, currentUser?.id]);
 
   return { ticketInfo, loading, error };
 }

@@ -2,8 +2,8 @@ import type { ButtonHTMLAttributes, ChangeEvent, CSSProperties, DragEvent, React
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { TicketBoard } from '../../components/TicketBoard/TicketBoard.tsx';
-import type { TicketCardProps } from '../../components/TicketBoard/types';
+import { TicketBoard } from '../../modules/tickets/components/TicketBoard';
+import type { TicketCardProps } from '../../modules/tickets/types/TicketBoard';
 
 type MockButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   children?: ReactNode;
@@ -77,7 +77,7 @@ vi.mock('@library', () => ({
   ),
 }));
 
-vi.mock('../../components/TicketBoard/components', () => ({
+vi.mock('../../modules/tickets/components/TicketCard', () => ({
   TicketCard: ({ ticket, onClick, onDragStart, domainName, assigneeAvatar }: TicketCardProps) => (
     <button type="button" draggable onClick={onClick} onDragStart={onDragStart}>
       {`Card ${ticket.key} ${domainName || 'No domain'} ${assigneeAvatar || 'No avatar'}`}
@@ -123,35 +123,6 @@ const todoTicket = {
 
 function renderTicketBoard(overrides: Partial<Parameters<typeof TicketBoard>[0]> = {}) {
   const props = {
-    projects: [
-      {
-        id: 'project-1',
-        name: 'Gravity Core',
-        description: 'Primary workspace',
-        key: 'GRA',
-        status: 'active' as const,
-        workspaceId: 'workspace-1',
-      },
-      {
-        id: 'project-2',
-        name: 'Orbit Delivery',
-        description: 'Partner workspace',
-        key: 'ORB',
-        status: 'planned' as const,
-        workspaceId: 'workspace-1',
-      },
-    ],
-    filters: {
-      search: '',
-      priority: '',
-      status: '',
-      projectId: '',
-      domainId: '',
-      cycleId: '',
-      assigneeId: '',
-    },
-    filteredCount: 2,
-    totalCount: 2,
     ticketsByColumn: {
       backlog: [backlogTicket],
       todo: [todoTicket],
@@ -170,9 +141,6 @@ function renderTicketBoard(overrides: Partial<Parameters<typeof TicketBoard>[0]>
     userAvatarById: {
       'user-1': 'avatar-1.png',
     },
-    hasActiveFilters: false,
-    onFilterChange: vi.fn(),
-    onClearFilters: vi.fn(),
     onMoveTicket: vi.fn().mockResolvedValue(undefined),
     onSelectTicket: vi.fn(),
     onOpenCreateTicket: vi.fn(),
@@ -186,43 +154,9 @@ function renderTicketBoard(overrides: Partial<Parameters<typeof TicketBoard>[0]>
 }
 
 describe('TicketBoard', () => {
-  it('forwards filter changes, shows counts, and opens the create flow for a column', async () => {
+  it('opens the create flow for a column', async () => {
     const user = userEvent.setup();
-    const { props } = renderTicketBoard({
-      hasActiveFilters: true,
-      filteredCount: 1,
-      totalCount: 2,
-      filters: {
-        search: 'sync',
-        priority: 'high',
-        status: '',
-        projectId: 'project-1',
-        domainId: '',
-        cycleId: '',
-        assigneeId: '',
-      },
-    });
-
-    expect(screen.getByText('1 of 2 tickets')).toBeInTheDocument();
-
-    const searchInput = screen.getByRole('textbox');
-    await user.clear(searchInput);
-    await user.type(searchInput, 'sync issue');
-    expect(props.onFilterChange).toHaveBeenCalledWith('search', 's');
-    expect(props.onFilterChange).toHaveBeenCalledWith('search', 'sync issue');
-
-    fireEvent.change(screen.getByRole('combobox', { name: 'Priority' }), {
-      target: { value: 'medium' },
-    });
-    expect(props.onFilterChange).toHaveBeenCalledWith('priority', 'medium');
-
-    fireEvent.change(screen.getByRole('combobox', { name: 'Project' }), {
-      target: { value: 'project-2' },
-    });
-    expect(props.onFilterChange).toHaveBeenCalledWith('projectId', 'project-2');
-
-    await user.click(screen.getByRole('button', { name: 'Clear filters' }));
-    expect(props.onClearFilters).toHaveBeenCalledTimes(1);
+    const { props } = renderTicketBoard();
 
     await user.click(screen.getByRole('button', { name: 'Create ticket in Done' }));
     expect(props.onOpenCreateTicket).toHaveBeenCalledWith('done');

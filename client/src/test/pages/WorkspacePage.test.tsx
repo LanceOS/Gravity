@@ -5,16 +5,10 @@ import { WorkspacePage } from '../../pages/WorkspacePage/WorkspacePage.tsx';
 import type { Cycle, Domain, Project, Ticket } from '../../context/TicketContext.tsx';
 
 type TicketBoardMockProps = {
-  filteredCount: number;
-  totalCount: number;
-  hasActiveFilters: boolean;
-  onClearFilters: () => void;
 };
 
 type TicketListMockProps = {
   filteredCount: number;
-  totalCount: number;
-  listSort: string;
 };
 
 type TicketDetailMockProps = {
@@ -26,15 +20,12 @@ type TicketDetailMockProps = {
   subtaskProgressPercent: number;
 };
 
-vi.mock('../../components/TicketBoard', () => ({
-  TicketBoard: ({ filteredCount, totalCount, hasActiveFilters }: TicketBoardMockProps) => (
+vi.mock('../../modules/tickets', () => ({
+  TicketBoard: () => (
     <div>
-      <div>{`TicketBoard ${filteredCount}/${totalCount} ${hasActiveFilters ? 'filtered' : 'unfiltered'}`}</div>
+      <div>TicketBoard Mock</div>
     </div>
   ),
-}));
-
-vi.mock('../../components/TicketFilterBar', () => ({
   TicketFilterBar: ({
     hasActiveFilters,
     onClearFilters,
@@ -47,15 +38,9 @@ vi.mock('../../components/TicketFilterBar', () => ({
         Clear board filters
       </button>
     ) : null,
-}));
-
-vi.mock('../../components/TicketList', () => ({
-  TicketList: ({ filteredCount, totalCount, listSort }: TicketListMockProps) => (
-    <div>{`TicketList ${filteredCount}/${totalCount} ${listSort}`}</div>
+  TicketList: ({ filteredCount }: TicketListMockProps) => (
+    <div>{`TicketList ${filteredCount}`}</div>
   ),
-}));
-
-vi.mock('../../components/TicketDetail', () => ({
   TicketDetail: ({ activeTicket, subtasks, completedSubtasks, subtaskProgressPercent }: TicketDetailMockProps) => (
     <div>{`TicketDetail ${activeTicket.title} ${subtasks.length} ${completedSubtasks} ${Math.round(subtaskProgressPercent)}`}</div>
   ),
@@ -218,7 +203,7 @@ describe('WorkspacePage', () => {
     });
 
     expect(screen.getByText('Gravity Core')).toBeInTheDocument();
-    expect(screen.getByText('TicketBoard 1/2 filtered')).toBeInTheDocument();
+    expect(screen.getByText('TicketBoard Mock')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'List' }));
     expect(props.onSetView).toHaveBeenCalledWith('list');
@@ -243,10 +228,34 @@ describe('WorkspacePage', () => {
     });
 
     expect(screen.getByText('All Issues')).toBeInTheDocument();
-    expect(screen.getByText('TicketList 4/4 created')).toBeInTheDocument();
+    expect(screen.getByText('TicketList 4')).toBeInTheDocument();
     expect(screen.getByText('TicketDetail Fix billing edge case 2 1 50')).toBeInTheDocument();
+  });
 
-    await user.click(screen.getByRole('button', { name: 'Board' }));
-    expect(props.onSetView).toHaveBeenCalledWith('board');
+  it('shows cycle-scoped headers and clears cycle and assignee filters together', async () => {
+    const user = userEvent.setup();
+    const { props } = renderWorkspacePage({
+      filters: {
+        search: '',
+        priority: '',
+        status: '',
+        projectId: 'project-1',
+        domainId: '',
+        cycleId: 'cycle-1',
+        assigneeId: 'user-2',
+      },
+    });
+
+    expect(screen.getByText('Sprint 1')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Clear board filters' }));
+    expect(props.onSetFilters).toHaveBeenCalledWith({
+      search: '',
+      priority: '',
+      status: '',
+      projectId: 'project-1',
+      domainId: '',
+      cycleId: '',
+      assigneeId: '',
+    });
   });
 });

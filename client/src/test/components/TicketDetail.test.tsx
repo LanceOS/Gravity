@@ -8,7 +8,7 @@ import type {
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { TicketDetail } from '../../components/TicketDetail/TicketDetail.tsx';
+import { TicketDetail } from '../../modules/tickets/components/TicketDetail';
 
 type MockButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   children?: ReactNode;
@@ -58,7 +58,7 @@ vi.mock('@library', () => ({
   Portal: ({ children }: { children: ReactNode }) => <div data-testid="portal">{children}</div>,
 }));
 
-vi.mock('../../components/TicketDetail/components', () => ({
+vi.mock('../../modules/tickets/components/MarkdownContent', () => ({
   MarkdownContent: ({ text }: { text: string }) => <div>{text}</div>,
 }));
 
@@ -245,7 +245,7 @@ describe('TicketDetail', () => {
     });
   });
 
-  it('forwards selector changes and handles the delete confirmation flow', async () => {
+  it('forwards editable selector changes, keeps project assignment read-only, and handles the delete confirmation flow', async () => {
     const user = userEvent.setup();
     const { props } = renderTicketDetail();
 
@@ -258,8 +258,10 @@ describe('TicketDetail', () => {
     await user.selectOptions(screen.getByLabelText('Select ticket assignee'), 'user-2');
     expect(props.onUpdateTicket).toHaveBeenCalledWith('ticket-1', { assigneeId: 'user-2' });
 
-    await user.selectOptions(screen.getByLabelText('Select ticket project'), 'project-2');
-    expect(props.onUpdateTicket).toHaveBeenCalledWith('ticket-1', { projectId: 'project-2' });
+    expect(screen.getByLabelText('Select ticket project')).toBeDisabled();
+    expect(
+      screen.getByText('Project moves are managed outside ticket details to keep ticket keys and related project data consistent.')
+    ).toBeInTheDocument();
 
     await user.selectOptions(screen.getByLabelText('Select ticket domain'), 'domain-2');
     expect(props.onUpdateTicket).toHaveBeenCalledWith('ticket-1', { domainId: 'domain-2' });
