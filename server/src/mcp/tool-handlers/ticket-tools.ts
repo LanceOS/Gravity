@@ -115,7 +115,7 @@ export class TicketTools {
     const lastCreationTime = this.creationRateLimitMap.get(context.actorUserId) ?? 0;
     
     if (process.env.NODE_ENV !== 'test' && now - lastCreationTime < 3000) {
-      throw new Error('Rate limit exceeded: You can only create one ticket every 3 seconds to maintain data integrity.');
+      throw new Error('Rate limit exceeded: You can only create one ticket every 3 seconds from this server instance. Please wait a moment and try again.');
     }
     
     this.creationRateLimitMap.set(context.actorUserId, now);
