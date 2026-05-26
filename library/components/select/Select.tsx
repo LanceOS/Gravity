@@ -127,7 +127,9 @@ export function Select({
       left: `${left}px`,
       top: openAbove ? `${Math.max(8, triggerRect.top - 4)}px` : `${triggerRect.bottom + 4}px`,
       transform: openAbove ? 'translateY(-100%)' : 'none',
-      width: `${triggerRect.width}px`,
+      width: 'max-content',
+      minWidth: `${triggerRect.width}px`,
+      maxWidth: 'calc(100vw - 16px)',
       boxSizing: 'border-box',
       maxHeight: '240px',
     });
@@ -277,7 +279,7 @@ export function Select({
             id={menuId}
             role="listbox"
             aria-labelledby={label ? labelId : undefined}
-            className="select-menu"
+            className="select-menu scroll-container"
             style={menuStyle}
           >
             {allOptions.map((opt, index) => {
