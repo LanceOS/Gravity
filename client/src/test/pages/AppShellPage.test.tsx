@@ -314,7 +314,6 @@ describe('AppShellPage', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
-    savedCredentials: [],
   });
 
   it('renders the auth screen when no current user is available', () => {

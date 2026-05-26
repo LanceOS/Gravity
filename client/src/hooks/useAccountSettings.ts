@@ -109,6 +109,15 @@ export function useAccountSettings({
   }, [saveSuccess]);
 
   useEffect(() => {
+    if (!testResult?.success) {
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => setTestResult(null), 3000);
+    return () => window.clearTimeout(timer);
+  }, [testResult]);
+
+  useEffect(() => {
     if (currentUser) {
       return;
     }

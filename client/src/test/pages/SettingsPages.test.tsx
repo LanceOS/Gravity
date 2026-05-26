@@ -389,7 +389,7 @@ describe('AccountPreferencesPage', () => {
 
     expect(screen.getByText('Saved keys')).toBeInTheDocument();
     expect(screen.getByText('2 saved')).toBeInTheDocument();
-    expect(screen.getByText('OpenAI')).toBeInTheDocument();
+    expect(screen.getAllByText('OpenAI')).toHaveLength(2);
     expect(screen.getByText('Anthropic')).toBeInTheDocument();
     expect(screen.getByText('Active')).toBeInTheDocument();
     expect(screen.getByText('Inactive')).toBeInTheDocument();

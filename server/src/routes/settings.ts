@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { eq } from 'drizzle-orm';
 import { db } from '../db/index.js';
-import { userSettings, userExternalCredentials } from '../db/schema.js';
+import { userSettings } from '../db/schema.js';
 import { credentialManager } from '../lib/kms/index.js';
 import { getUserSettingsRecord } from '../lib/platform.js';
 import { resolveRequestActorUserId } from '../lib/request-auth.js';
@@ -158,8 +158,8 @@ export function createSettingsRouter() {
 
       const current = await getUserSettingsRecord(userId);
       const providerForCredential = (aiProvider.value ?? current.aiProvider).toLowerCase();
-      const savedCredentials = await credentialManager.ListCredentials(userId);
-      const hasExistingCredential = savedCredentials.some((credential) => credential.provider === providerForCredential);
+      const savedCredentialsBefore = await credentialManager.ListCredentials(userId);
+      const hasExistingCredential = savedCredentialsBefore.some((credential) => credential.provider === providerForCredential);
 
       const explicitKeyAction = typeof req.body?.keyAction === 'string' ? req.body.keyAction : undefined;
       const incomingApiKey = typeof req.body?.apiKey === 'string' ? req.body.apiKey.trim() : undefined;

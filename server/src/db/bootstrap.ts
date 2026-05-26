@@ -180,13 +180,41 @@ export async function initializeDatabase() {
 
   await pool.query(`
     ALTER TABLE user_external_credentials ADD COLUMN IF NOT EXISTS provider TEXT;
-    UPDATE user_external_credentials uec
-    SET provider = COALESCE(uec.provider, us.ai_provider, 'openai')
-    FROM user_settings us
-    WHERE uec.user_id = us.user_id;
-    UPDATE user_external_credentials
-    SET provider = 'openai'
-    WHERE provider IS NULL;
+  `);
+
+  const missingProviderRows = await pool.query(
+    `
+      SELECT user_id
+      FROM user_external_credentials
+      WHERE provider IS NULL OR provider = ''
+    `,
+  );
+
+  for (const row of missingProviderRows.rows as Array<{ user_id: string }>) {
+    const [settingsRow] = (
+      await pool.query(
+        `
+          SELECT ai_provider
+          FROM user_settings
+          WHERE user_id = $1
+          LIMIT 1
+        `,
+        [row.user_id],
+      )
+    ).rows as Array<{ ai_provider?: string }>;
+
+    const provider = settingsRow?.ai_provider || 'openai';
+    await pool.query(
+      `
+        UPDATE user_external_credentials
+        SET provider = $1
+        WHERE user_id = $2
+      `,
+      [provider, row.user_id],
+    );
+  }
+
+  await pool.query(`
     ALTER TABLE user_external_credentials ALTER COLUMN provider SET NOT NULL;
     ALTER TABLE user_external_credentials DROP CONSTRAINT IF EXISTS user_external_credentials_pkey;
     ALTER TABLE user_external_credentials ADD PRIMARY KEY (user_id, provider);

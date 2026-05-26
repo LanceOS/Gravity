@@ -114,7 +114,7 @@ describe('AiService', () => {
 
     const service = new AiService(credentialManager);
     await service.testConnection(user.id, 'openai');
-    expect(executeSpy).toHaveBeenCalledWith(user.id, expect.any(Function));
+    expect(executeSpy).toHaveBeenCalledWith(user.id, 'openai', expect.any(Function));
   });
 });
 

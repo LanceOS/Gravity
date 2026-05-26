@@ -76,7 +76,7 @@ describe('Envelope Encryption & Secure Credential Storage', () => {
       const records = await db
         .select()
         .from(userExternalCredentials)
-        .where(eq(userExternalCredentials.userId, user.id));
+        .where(and(eq(userExternalCredentials.userId, user.id), eq(userExternalCredentials.provider, 'openai')));
 
       expect(records.length).toBe(1);
       const record = records[0];
@@ -93,7 +93,7 @@ describe('Envelope Encryption & Secure Credential Storage', () => {
       const user = await seedUser({ id: 'test-secure-user-2', email: 'sec2@example.com' });
       const testApiKey = 'sk-proj-another-secret-999';
 
-      await credentialManager.StoreCredential(user.id, testApiKey);
+      await credentialManager.StoreCredential(user.id, 'openai', testApiKey);
 
       // We spy on fill to ensure wiping is called on plaintext secrets
       const fillSpy = vi.spyOn(Buffer.prototype, 'fill');
@@ -114,13 +114,13 @@ describe('Envelope Encryption & Secure Credential Storage', () => {
       const user = await seedUser({ id: 'test-secure-user-3', email: 'sec3@example.com' });
       const testApiKey = 'sk-tamper-proof';
 
-      await credentialManager.StoreCredential(user.id, testApiKey);
+      await credentialManager.StoreCredential(user.id, 'openai', testApiKey);
 
       // Tamper with the database stored initialization vector (aesIv)
       const [record] = await db
         .select()
         .from(userExternalCredentials)
-        .where(eq(userExternalCredentials.userId, user.id));
+        .where(and(eq(userExternalCredentials.userId, user.id), eq(userExternalCredentials.provider, 'openai')));
 
       const tamperedIv = Buffer.from(record.aesIv);
       tamperedIv[0] ^= 0x01; // flip a bit
@@ -128,7 +128,7 @@ describe('Envelope Encryption & Secure Credential Storage', () => {
       await db
         .update(userExternalCredentials)
         .set({ aesIv: tamperedIv })
-        .where(eq(userExternalCredentials.userId, user.id));
+        .where(and(eq(userExternalCredentials.userId, user.id), eq(userExternalCredentials.provider, 'openai')));
 
       // Attempting to execute with credential should throw due to integrity/GCM verification failure
       await expect(

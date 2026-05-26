@@ -247,7 +247,7 @@ export const userExternalCredentials = pgTable('user_external_credentials', {
 }, (table) => ({
   pk: primaryKey({ columns: [table.userId, table.provider] }),
   userIdIdx: index('user_external_credentials_user_id_idx').on(table.userId),
-});
+}));
 
 export const schema = {
   authUsers,
