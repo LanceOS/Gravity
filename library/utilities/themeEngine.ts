@@ -191,7 +191,7 @@ export const applyResolvedTheme = (resolvedTheme: ResolvedThemeMode) => {
 
   const root = document.documentElement;
 
-  root.classList.remove('dark-theme', 'coal-black-theme', 'coffee-theme', 'marble-blue-theme');
+  root.classList.remove('dark-theme', 'light-theme', 'coal-black-theme', 'coffee-theme', 'marble-blue-theme');
   root.removeAttribute('data-theme');
 
   if (resolvedTheme === 'dark') {
