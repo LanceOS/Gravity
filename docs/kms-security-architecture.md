@@ -38,19 +38,20 @@ The system utilizes an envelope encryption model with **AES-256-GCM** (Authentic
 
 ## 2. Database Schema
 
-Credentials are tied to the user and their associated provider.
+Credentials are tied to the user (one credential record per user).
 
-```sql
+~~~sql
 CREATE TABLE user_external_credentials (
-    user_id UUID PRIMARY KEY REFERENCES users(id),
+    user_id TEXT PRIMARY KEY,
     encrypted_api_key BYTEA NOT NULL,      -- The user's cloud API key, encrypted with the DEK
     encrypted_dek BYTEA NOT NULL,          -- The Data Encryption Key, encrypted by the KMS
     aes_iv BYTEA NOT NULL,                 -- Initialization Vector for AES-GCM
     aes_auth_tag BYTEA NOT NULL,           -- Authentication Tag for AES-GCM
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    kms_kek_id TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-```
+~~~
 
 ---
 
