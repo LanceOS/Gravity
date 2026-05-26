@@ -1,5 +1,10 @@
 import { boolean, customType, index, integer, jsonb, pgTable, primaryKey, serial, text, timestamp } from 'drizzle-orm/pg-core';
 
+/**
+ * @description Custom Drizzle ORM type for storing raw binary data (bytea) in PostgreSQL.
+ * Handles serialization to and from the database driver format, specifically
+ * managing the '\\x' hex prefix required by pg-mem and Postgres.
+ */
 export const bytea = customType<{ data: Buffer; driverData: string }>({
   dataType() {
     return 'bytea';
@@ -224,6 +229,11 @@ export const comments = pgTable('comments', {
   userIdIdx: index('comments_user_id_idx').on(table.userId),
 }));
 
+/**
+ * @description Table for securely storing user third-party credentials using envelope encryption.
+ * Stores the ciphertext, the encrypted Data Encryption Key (DEK), and GCM parameters.
+ * Plaintext keys are never stored.
+ */
 export const userExternalCredentials = pgTable('user_external_credentials', {
   userId: text('user_id').primaryKey(),
   encryptedApiKey: bytea('encrypted_api_key').notNull(),

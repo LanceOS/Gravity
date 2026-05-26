@@ -4,11 +4,18 @@ import { db } from '../../db/index.js';
 import { userExternalCredentials } from '../../db/schema.js';
 import { IKMSProvider } from './types.js';
 
+/**
+ * @description Manages the secure storage and retrieval of external credentials (e.g., API keys).
+ * Uses envelope encryption to protect credentials at rest. Relies on an injected KMS provider
+ * to handle Data Encryption Keys (DEKs). Enforces zeroization of sensitive memory.
+ */
 export class CredentialManager {
   constructor(private readonly kmsProvider: IKMSProvider) {}
 
   /**
-   * Helper to safely fill/zero out Buffers to avoid retaining secrets in memory.
+   * @description Helper to safely fill/zero out Buffers to avoid retaining secrets in memory.
+   * Overwrites the buffer contents with zeros.
+   * @param {Buffer | undefined | null} buf - The buffer to securely wipe.
    */
   private secureWipeBuffer(buf: Buffer | undefined | null): void {
     if (buf) {
@@ -17,8 +24,12 @@ export class CredentialManager {
   }
 
   /**
-   * Flow A: Encrypts and securely stores the user's external API key in the database
+   * @description Flow A: Encrypts and securely stores the user's external API key in the database
    * using envelope encryption (AES-256-GCM).
+   * @param {string} userId - The unique identifier of the user.
+   * @param {string} plaintextAPIKey - The raw API key to be encrypted and stored.
+   * @return {Promise<void>} Resolves when the credential has been safely stored.
+   * @throws {Error} If required parameters are missing.
    */
   async StoreCredential(userId: string, plaintextAPIKey: string): Promise<void> {
     if (!userId) {
@@ -82,8 +93,12 @@ export class CredentialManager {
   }
 
   /**
-   * Flow B: Retrieves and decrypts the user's API key, executes the callback with it,
+   * @description Flow B: Retrieves and decrypts the user's API key, executes the provided callback with it,
    * and guarantees complete memory zeroization of the secrets when done.
+   * @param {string} userId - The unique identifier of the user.
+   * @param {(decryptedAPIKey: string) => Promise<T> | T} executionCallback - The function to execute with the decrypted key.
+   * @return {Promise<T>} The result of the execution callback.
+   * @throws {Error} If credentials are not found, or if decryption/integrity check fails.
    */
   async ExecuteWithCredential<T>(
     userId: string,

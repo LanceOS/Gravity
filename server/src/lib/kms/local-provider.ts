@@ -1,6 +1,12 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import { IKMSProvider } from './types.js';
 
+/**
+ * @description A KMS provider for local development and testing.
+ * Simulates a Key Management Service by using a local environment variable (LOCAL_TESTING_KEK)
+ * to encrypt and decrypt Data Encryption Keys (DEKs).
+ * WARNING: Do not use this provider in a production environment.
+ */
 export class LocalEnvKmsProvider implements IKMSProvider {
   private readonly kek: Buffer;
 
@@ -29,6 +35,11 @@ export class LocalEnvKmsProvider implements IKMSProvider {
     }
   }
 
+  /**
+   * @description Generates a random 256-bit Data Encryption Key (DEK) and wraps it using the local KEK.
+   * Uses AES-256-GCM to encrypt the DEK. The returned encryptedDEK contains the IV, Auth Tag, and Ciphertext.
+   * @return {{ plaintextDEK: Buffer; encryptedDEK: Buffer; kekId: string }} The generated keys and local kek identifier.
+   */
   GenerateDataKey(): { plaintextDEK: Buffer; encryptedDEK: Buffer; kekId: string } {
     // Generate a 32-byte (256-bit) high-entropy DEK using CSPRNG
     const plaintextDEK = randomBytes(32);
@@ -54,6 +65,13 @@ export class LocalEnvKmsProvider implements IKMSProvider {
     };
   }
 
+  /**
+   * @description Decrypts a wrapped Data Encryption Key (DEK) using the local KEK.
+   * Extracts the IV and Auth Tag from the payload to perform AES-256-GCM decryption.
+   * @param {Buffer} encryptedDEK - The wrapped DEK containing [12 bytes IV][16 bytes Auth Tag][ciphertext].
+   * @return {Buffer} The decrypted plaintext DEK.
+   * @throws {Error} If decryption or integrity verification fails.
+   */
   DecryptDataKey(encryptedDEK: Buffer): Buffer {
     if (encryptedDEK.length < 28) {
       throw new Error('Security Exception: Invalid or corrupted encrypted DEK.');
