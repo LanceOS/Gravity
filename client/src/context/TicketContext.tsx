@@ -280,8 +280,10 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         fetch(`${API_URL}/users`),
       ]);
 
-      const projects = await projectsRes.json();
-      const users = await usersRes.json();
+      const [projects, users] = await Promise.all([
+        handleArrayResponse<Project>(projectsRes, 'Failed to load projects'),
+        handleArrayResponse<User>(usersRes, 'Failed to load users'),
+      ]);
 
       dispatch({
         type: 'SET_INITIAL_DATA',
@@ -304,9 +306,11 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         fetch(`${API_URL}/cycles`, { headers: { 'X-Project-Id': projId } }),
       ]);
 
-      const tickets = await ticketsRes.json();
-      const domains = await domainsRes.json();
-      const cycles = await cyclesRes.json();
+      const [tickets, domains, cycles] = await Promise.all([
+        handleArrayResponse<Ticket>(ticketsRes, `Failed to load tickets for project ${projId}`),
+        handleArrayResponse<Domain>(domainsRes, `Failed to load domains for project ${projId}`),
+        handleArrayResponse<Cycle>(cyclesRes, `Failed to load cycles for project ${projId}`),
+      ]);
 
       dispatch({
         type: 'SET_PROJECT_DATA',
@@ -441,9 +445,10 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             dispatch({ type: 'SET_COMMENTS_RAW', payload: message.data.comments });
           }
         } else if (message.type === 'users-updated') {
-          fetch(`${API_URL}/users`)
-            .then(res => res.json())
-            .then(users => {
+          void (async () => {
+            try {
+              const usersResponse = await fetch(`${API_URL}/users`);
+              const users = await handleArrayResponse<User>(usersResponse, 'Failed to refresh users');
               dispatch({
                 type: 'SET_INITIAL_DATA',
                 payload: {
@@ -451,10 +456,13 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                   projects: state.projects,
                   domains: state.domains,
                   cycles: state.cycles,
-                  users: users
+                  users,
                 }
               });
-            });
+            } catch (error) {
+              console.error('Failed to refresh users:', error);
+            }
+          })();
         }
       } catch (e) {
         console.error('Error parsing SSE event:', e);
@@ -678,6 +686,15 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     } catch (e) {
       throw new Error(`Invalid response format from server (Status ${response.status})`);
     }
+  }
+
+  async function handleArrayResponse<T>(response: Response, fallbackError: string) {
+    const data = await handleResponseJson(response, fallbackError);
+    if (!Array.isArray(data)) {
+      throw new Error(`${fallbackError}: Expected an array response.`);
+    }
+
+    return data as T[];
   }
 
   const createProject = useCallback(async (projectInput: CreateProjectInput) => {

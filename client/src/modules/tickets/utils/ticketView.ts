@@ -120,7 +120,9 @@ export function hasActiveTicketFilters(filters: TicketFilters): boolean {
     filters.search ||
       filters.priority ||
       filters.status ||
-      filters.domainId
+      filters.domainId ||
+      filters.cycleId ||
+      filters.assigneeId
   );
 }
 
@@ -133,11 +135,6 @@ export function getWorkspaceHeaderTitle(
 ): string {
   if (filters.assigneeId === currentUser?.id) return 'My Issues';
 
-  if (filters.projectId) {
-    const project = projects.find((item) => item.id === filters.projectId);
-    return project ? project.name : 'Project Issues';
-  }
-
   if (filters.domainId) {
     const domain = domains.find((item) => item.id === filters.domainId);
     return domain ? `${domain.name} Domain` : 'Domain Issues';
@@ -146,6 +143,11 @@ export function getWorkspaceHeaderTitle(
   if (filters.cycleId) {
     const cycle = cycles.find((item) => item.id === filters.cycleId);
     return cycle ? cycle.name : 'Cycle Issues';
+  }
+
+  if (filters.projectId) {
+    const project = projects.find((item) => item.id === filters.projectId);
+    return project ? project.name : 'Project Issues';
   }
 
   return 'All Issues';

@@ -231,4 +231,31 @@ describe('WorkspacePage', () => {
     expect(screen.getByText('TicketList 4')).toBeInTheDocument();
     expect(screen.getByText('TicketDetail Fix billing edge case 2 1 50')).toBeInTheDocument();
   });
+
+  it('shows cycle-scoped headers and clears cycle and assignee filters together', async () => {
+    const user = userEvent.setup();
+    const { props } = renderWorkspacePage({
+      filters: {
+        search: '',
+        priority: '',
+        status: '',
+        projectId: 'project-1',
+        domainId: '',
+        cycleId: 'cycle-1',
+        assigneeId: 'user-2',
+      },
+    });
+
+    expect(screen.getByText('Sprint 1')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Clear board filters' }));
+    expect(props.onSetFilters).toHaveBeenCalledWith({
+      search: '',
+      priority: '',
+      status: '',
+      projectId: 'project-1',
+      domainId: '',
+      cycleId: '',
+      assigneeId: '',
+    });
+  });
 });

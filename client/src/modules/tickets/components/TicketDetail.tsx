@@ -636,10 +636,13 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             <span className="label">Project</span>
             <Select
               value={activeTicket.projectId}
-              onValueChange={(nextProjectId: string) => onUpdateTicket(activeTicket.id, { projectId: nextProjectId })}
               options={projectOptions}
               aria-label="Select ticket project"
+              disabled
             />
+            <div style={{ marginTop: '6px', fontSize: '11px', color: 'var(--color-text-disabled)', lineHeight: '1.4' }}>
+              Project moves are managed outside ticket details to keep ticket keys and related project data consistent.
+            </div>
           </div>
 
           {/* Domain */}

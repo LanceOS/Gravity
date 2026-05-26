@@ -106,6 +106,8 @@ export function WorkspacePage({
       priority: '',
       status: '',
       domainId: '',
+      cycleId: '',
+      assigneeId: '',
     });
   }, [filters, onSetFilters]);
 

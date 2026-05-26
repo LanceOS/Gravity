@@ -10,12 +10,14 @@ function jsonResponse(body: unknown, status = 200) {
 }
 
 function ContextProbe() {
-  const { currentUser, loading } = useTickets();
+  const { currentUser, loading, projects, users } = useTickets();
 
   return (
     <div>
       <div data-testid="loading-state">{loading ? 'loading' : 'ready'}</div>
       <div data-testid="user-email">{currentUser?.email ?? 'anonymous'}</div>
+      <div data-testid="project-count">{projects.length}</div>
+      <div data-testid="user-count">{users.length}</div>
     </div>
   );
 }
@@ -139,6 +141,42 @@ describe('TicketContext', () => {
 
     expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/auth/session', { credentials: 'same-origin' });
     expect(window.localStorage.getItem('gravity_user')).toContain(user.id);
+    consoleErrorSpy.mockRestore();
+  });
+
+  it('keeps bootstrap collections as arrays when the initial workspace fetch fails', async () => {
+    const user = {
+      id: 'user-session-2',
+      name: 'Grace Hopper',
+      email: 'grace@example.com',
+      avatar: '',
+      role: 'owner',
+      tutorial_completed: 1,
+    };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ user, session: { userId: user.id } }))
+      .mockResolvedValueOnce(jsonResponse({ error: 'Authentication required.' }, 401))
+      .mockResolvedValueOnce(jsonResponse([]));
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    stubEventSource();
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <TicketProvider>
+        <ContextProbe />
+      </TicketProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('user-email')).toHaveTextContent('grace@example.com');
+      expect(screen.getByTestId('loading-state')).toHaveTextContent('ready');
+    });
+
+    expect(screen.getByTestId('project-count')).toHaveTextContent('0');
+    expect(screen.getByTestId('user-count')).toHaveTextContent('0');
+    expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to load initial workspace data:', expect.any(Error));
+
     consoleErrorSpy.mockRestore();
   });
 });

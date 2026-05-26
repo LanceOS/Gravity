@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppShellPage } from '../../pages/AppShellPage/AppShellPage.tsx';
 
 type WorkspaceLayoutMockProps = {
@@ -22,7 +22,15 @@ const mocks = vi.hoisted(() => ({
   useAccountSettings: vi.fn(),
   useWorkspaceSettings: vi.fn(),
   registerWebMCPTools: vi.fn(() => null),
+  fetch: vi.fn(),
 }));
+
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
 
 vi.mock('../../context/TicketContext', () => ({
   useTickets: mocks.useTickets,
@@ -261,11 +269,16 @@ function buildWorkspaceSettings(overrides: Partial<Record<string, unknown>> = {}
     inviteError: null,
     approveLoadingId: null,
     revokeLoadingId: null,
+    deleteWorkspace: vi.fn(),
+    deleteLoading: false,
+    deleteError: null,
+    clearDeleteError: vi.fn(),
     updateSettings: vi.fn(),
     saveSettings: vi.fn(),
     createInvite: vi.fn(),
     revokeInvite: vi.fn(),
     approveJoinRequest: vi.fn(),
+    updateMemberActivity: vi.fn(),
     ...overrides,
   };
 }
@@ -293,6 +306,14 @@ describe('AppShellPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.clear();
+    mocks.fetch.mockImplementation(() =>
+      Promise.resolve(jsonResponse({ success: true, lastActiveAt: '2026-05-26T10:00:00.000Z' }))
+    );
+    vi.stubGlobal('fetch', mocks.fetch);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('renders the auth screen when no current user is available', () => {
@@ -308,6 +329,7 @@ describe('AppShellPage', () => {
     renderAppShell({
       tickets: buildUseTickets({ loading: true }),
     });
+    updateMemberActivity: vi.fn(),
 
     expect(screen.getByText('LoadingPage')).toBeInTheDocument();
   });
@@ -409,5 +431,19 @@ describe('AppShellPage', () => {
     await user.keyboard('n');
 
     expect(screen.queryByText('CreateTicketModal')).not.toBeInTheDocument();
+  });
+
+  it('records member activity for the active workspace', async () => {
+    renderAppShell();
+
+    await waitFor(() => {
+      expect(mocks.fetch).toHaveBeenCalledWith('/api/v1/workspaces/workspace-1/members/user-1/activity', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Id': 'user-1',
+        },
+      });
+    });
   });
 });
