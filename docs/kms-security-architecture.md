@@ -63,8 +63,7 @@ We enforce a strict interface for KMS providers:
 - `GenerateDataKey(): { plaintextDEK: Buffer; encryptedDEK: Buffer; kekId: string }`
 - `DecryptDataKey(encryptedDEK: Buffer): Buffer`
 ### Current KMS Implementations
-- **LocalKmsProvider:** Uses a local root key stored in environment variables (`KMS_ROOT_KEY`). Primarily for local development or self-hosted instances. Features a default-deny validation pattern ensuring secure startup.
-
+- **LocalEnvKmsProvider:** Uses `LOCAL_TESTING_KEK` (development/test only). Primarily for local development; do not use in production.
 ---
 
 ## 4. Runtime Security & AI Orchestration
