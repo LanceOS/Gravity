@@ -167,12 +167,13 @@ export function createSettingsRouter() {
       const activeAiProviderForResponse = (aiProvider.value ?? current.aiProvider).toLowerCase();
       const providerForCredential = (credentialProvider.value ?? activeAiProviderForResponse).toLowerCase();
       const savedCredentialsBefore = await credentialManager.ListCredentials(userId);
-      const hasExistingCredential = savedCredentialsBefore.some(
+      const hasExistingCredentialForCredentialProvider = savedCredentialsBefore.some(
         (credential) => credential.provider === providerForCredential,
       );
       const hasExistingCredentialForActiveProvider = savedCredentialsBefore.some(
         (credential) => credential.provider === activeAiProviderForResponse,
       );
+      const hasExistingCredential = hasExistingCredentialForActiveProvider;
 
       const explicitKeyAction = typeof req.body?.keyAction === 'string' ? req.body.keyAction : undefined;
       const incomingApiKey = typeof req.body?.apiKey === 'string' ? req.body.apiKey.trim() : undefined;
