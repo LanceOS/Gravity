@@ -8,20 +8,17 @@ let kmsProvider: IKMSProvider;
 if (env.nodeEnv === 'development' || env.nodeEnv === 'test') {
   kmsProvider = new LocalEnvKmsProvider();
 } else {
-  // =========================================================================
-  // PRODUCTION SECURE SECRET STORAGE CONFIGURATION (TODO)
-  // =========================================================================
-  // In production, we must instantiate a concrete CloudKmsProvider which wraps/unwraps
-  // DEKs using a Cloud HSM or Managed Key Service (e.g. AWS KMS, Google Cloud KMS, HashiCorp Vault).
-  //
-  // Example future setup:
-  // class CloudKmsProvider implements IKMSProvider { ... }
-  // kmsProvider = new CloudKmsProvider();
-  // =========================================================================
-  throw new Error(
-    'Production Configuration Failure: CloudKmsProvider is not yet implemented. ' +
-    'Please implement and register CloudKmsProvider before deploying to production.'
-  );
+  class UnconfiguredKmsProvider implements IKMSProvider {
+    GenerateDataKey(): { plaintextDEK: Buffer; encryptedDEK: Buffer; kekId: string } {
+      throw new Error('Security Exception: KMS provider is not configured.');
+    }
+
+    DecryptDataKey(_encryptedDEK: Buffer): Buffer {
+      throw new Error('Security Exception: KMS provider is not configured.');
+    }
+  }
+
+  kmsProvider = new UnconfiguredKmsProvider();
 }
 
 export const credentialManager = new CredentialManager(kmsProvider);
