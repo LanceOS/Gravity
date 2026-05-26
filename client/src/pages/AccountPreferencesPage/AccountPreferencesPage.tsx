@@ -43,6 +43,7 @@ interface AccountPreferencesPageProps {
   settingsLoading: boolean;
   saveLoading: boolean;
   saveSuccess: boolean;
+  hasChanges: boolean;
   saveError: string | null;
   testing: boolean;
   testResult: StatusMessage | null;
@@ -347,6 +348,7 @@ export function AccountPreferencesPage({
   settingsLoading,
   saveLoading,
   saveSuccess,
+  hasChanges,
   saveError,
   testing,
   testResult,
@@ -387,7 +389,7 @@ export function AccountPreferencesPage({
           </Flex>
         }
         rightContent={
-          <Button variant="accent" size="sm" onClick={onSaveSettings} loading={saveLoading}>
+          <Button variant="accent" size="sm" onClick={onSaveSettings} loading={saveLoading} disabled={!hasChanges}>
             {saveSuccess ? 'Changes Saved' : 'Save Changes'}
           </Button>
         }

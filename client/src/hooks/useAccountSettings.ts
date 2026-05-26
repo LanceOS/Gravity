@@ -30,6 +30,7 @@ export function useAccountSettings({
   const [settings, setSettings] = useState<WorkspaceSettings>(() =>
     normalizeWorkspaceSettings(null, activeView, theme)
   );
+  const [originalSettings, setOriginalSettings] = useState<WorkspaceSettings | null>(null);
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -56,6 +57,7 @@ export function useAccountSettings({
     }
 
     setSettings(normalizeWorkspaceSettings(null, activeView, theme));
+    setOriginalSettings(null);
     setSaveError(null);
     setTestResult(null);
     setTutorialResult(null);
@@ -88,6 +90,7 @@ export function useAccountSettings({
             DEFAULT_WORKSPACE_SETTINGS.theme
           );
           setSettings(normalized);
+          setOriginalSettings(normalized);
           setTheme(normalized.theme);
           setView(normalized.defaultView);
         }
@@ -202,6 +205,7 @@ export function useAccountSettings({
         DEFAULT_WORKSPACE_SETTINGS.theme
       );
       setSettings(normalized);
+      setOriginalSettings(normalized);
       setTheme(normalized.theme);
       setView(normalized.defaultView);
       setSaveSuccess(true);
@@ -273,6 +277,8 @@ export function useAccountSettings({
     }
   }, [currentUser]);
 
+  const hasChanges = originalSettings !== null && JSON.stringify(settings) !== JSON.stringify(originalSettings);
+
   return {
     settings,
     settingsLoading,
@@ -289,5 +295,6 @@ export function useAccountSettings({
     testApiKey,
     resetTutorial,
     refreshOllamaModels,
+    hasChanges,
   };
 }
