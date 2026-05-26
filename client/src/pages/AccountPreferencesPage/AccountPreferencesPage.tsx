@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft,
   Bot,
@@ -56,6 +56,7 @@ interface AccountPreferencesPageProps {
   onBack: () => void;
   onOpenDirectory: () => void;
   onChangeSettings: (updates: Partial<WorkspaceSettings>) => void;
+  onResetProviderDraft: () => void;
   savedCredentials: SavedApiCredential[];
   onRefreshOllamaModels: () => void;
   onResetTutorial: () => void;
@@ -447,6 +448,7 @@ export function AccountPreferencesPage({
   onBack,
   onOpenDirectory,
   onChangeSettings,
+  onResetProviderDraft,
   onRefreshOllamaModels,
   onResetTutorial,
   onSaveSettings,
@@ -455,6 +457,14 @@ export function AccountPreferencesPage({
   const [activeCategory, setActiveCategory] = useState<SettingsCategoryId>('general');
 
   const activeCategoryMeta = SETTINGS_CATEGORIES.find((category) => category.id === activeCategory) || SETTINGS_CATEGORIES[0];
+
+  useEffect(() => {
+    if (activeCategory !== 'providers') {
+      return;
+    }
+
+    onResetProviderDraft();
+  }, [activeCategory, onResetProviderDraft]);
 
   return (
     <DashboardLayout>

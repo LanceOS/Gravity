@@ -91,6 +91,36 @@ describe('useAccountSettings', () => {
     expect(result.current.settings.aiProvider).toBe('openai');
     expect(result.current.settings.apiKey).toBe(API_KEY_MASK);
 
+    act(() => {
+      result.current.updateSettings({ apiKey: 'sk-unsaved-replacement' });
+    });
+
+    expect(result.current.settings.apiKey).toBe('sk-unsaved-replacement');
+
+    act(() => {
+      result.current.resetProviderDraft();
+    });
+
+    expect(result.current.settings.apiKey).toBe(API_KEY_MASK);
+
+    act(() => {
+      result.current.updateSettings({ aiProvider: 'deepseek' });
+    });
+
+    expect(result.current.settings.apiKey).toBe('');
+
+    act(() => {
+      result.current.updateSettings({ apiKey: 'sk-deepseek-unsaved' });
+    });
+
+    expect(result.current.settings.apiKey).toBe('sk-deepseek-unsaved');
+
+    act(() => {
+      result.current.resetProviderDraft();
+    });
+
+    expect(result.current.settings.apiKey).toBe('');
+
     rerender({ activeView: 'list', theme: 'coffee' });
 
     await waitFor(() => {

@@ -195,6 +195,7 @@ function buildAccountSettings(overrides: Partial<Record<string, unknown>> = {}) 
       agentIntegration: 'ollama',
     },
     settingsLoading: false,
+      resetProviderDraft: vi.fn(),
     saveLoading: false,
     saveSuccess: false,
     saveError: null,

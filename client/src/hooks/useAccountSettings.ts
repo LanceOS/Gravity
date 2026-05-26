@@ -326,6 +326,19 @@ export function useAccountSettings({
     }
   }, [currentUser, settings, apiKeyState, ollamaModels, setTheme, setView]);
 
+  const resetProviderDraft = useCallback(() => {
+    const selectedCredential = getSavedCredentialForProvider(savedCredentials, settings.aiProvider);
+
+    setSettings((current) => ({
+      ...current,
+      apiKey: selectedCredential ? API_KEY_MASK : '',
+    }));
+    setApiKeyState(selectedCredential ? 'stored' : 'cleared');
+    setTestResult(null);
+    setSaveSuccess(false);
+    setSaveError(null);
+  }, [savedCredentials, settings.aiProvider]);
+
   const testApiKey = useCallback(async () => {
     const provider = getProviderOption(settings.aiProvider);
     const keyAction = KEY_ACTION[apiKeyState];
@@ -413,6 +426,7 @@ export function useAccountSettings({
     ollamaModelsLoading,
     updateSettings,
     saveSettings,
+    resetProviderDraft,
     testApiKey,
     resetTutorial,
     refreshOllamaModels,

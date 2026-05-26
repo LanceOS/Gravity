@@ -162,6 +162,7 @@ function renderAccountPreferencesPage(overrides: Partial<Parameters<typeof Accou
     onBack: vi.fn(),
     onOpenDirectory: vi.fn(),
     onChangeSettings: vi.fn(),
+    onResetProviderDraft: vi.fn(),
     onRefreshOllamaModels: vi.fn(),
     onResetTutorial: vi.fn(),
     onSaveSettings: vi.fn(),
@@ -355,6 +356,7 @@ describe('AccountPreferencesPage', () => {
 
     await user.click(screen.getByRole('button', { name: /Cloud AI/i }));
     expect(screen.getByText('Cloud AI provider')).toBeInTheDocument();
+    expect(props.onResetProviderDraft).toHaveBeenCalledTimes(1);
     await user.click(screen.getByRole('button', { name: 'Provider' }));
     await user.click(screen.getByRole('option', { name: 'Anthropic' }));
     expect(props.onChangeSettings).toHaveBeenCalledWith({ aiProvider: 'anthropic' });
@@ -398,5 +400,18 @@ describe('AccountPreferencesPage', () => {
     expect(screen.getByText('Active')).toBeInTheDocument();
     expect(screen.getByText('Inactive')).toBeInTheDocument();
     expect(screen.getAllByText(API_KEY_MASK)).toHaveLength(2);
+  });
+
+  it('allows pasting an API key into the cloud provider field', async () => {
+    const user = userEvent.setup();
+    const { props } = renderAccountPreferencesPage();
+
+    await user.click(screen.getByRole('button', { name: /Cloud AI/i }));
+    const apiKeyInput = screen.getByLabelText('API Key');
+
+    await user.click(apiKeyInput);
+    await user.paste('sk-pasted-test-key');
+
+    expect(props.onChangeSettings).toHaveBeenCalledWith({ apiKey: 'sk-pasted-test-key' });
   });
 });

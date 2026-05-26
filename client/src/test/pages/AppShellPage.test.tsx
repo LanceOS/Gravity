@@ -234,6 +234,7 @@ function buildAccountSettings(overrides: Partial<Record<string, unknown>> = {}) 
     },
     settingsLoading: false,
     saveLoading: false,
+      resetProviderDraft: vi.fn(),
     saveSuccess: false,
     saveError: null,
     hasProviderChanges: false,

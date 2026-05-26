@@ -169,6 +169,7 @@ export function AppShellPage() {
     ollamaModelsLoading,
     updateSettings: updateAccountSettings,
     saveSettings: saveAccountSettings,
+    resetProviderDraft,
     testApiKey,
     resetTutorial,
     refreshOllamaModels,
@@ -660,6 +661,7 @@ export function AppShellPage() {
           onBack={() => setActiveSection(activeWorkspace ? 'workspace' : 'directory')}
           onOpenDirectory={() => setActiveSection('directory')}
           onChangeSettings={updateAccountSettings}
+          onResetProviderDraft={() => resetProviderDraft()}
           onRefreshOllamaModels={() => void refreshOllamaModels()}
           onResetTutorial={() => void resetTutorial()}
           onSaveSettings={() => void saveAccountSettings()}
