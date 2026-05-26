@@ -58,11 +58,10 @@ CREATE TABLE user_external_credentials (
 
 The `CredentialManager` handles the cryptographic workflow. It relies on dependency injection (DI) to interface with different KMS providers, making the system easily testable and environment-agnostic.
 
-### KMS Interface (`IKmsProvider`)
+### KMS Interface (`IKMSProvider`)
 We enforce a strict interface for KMS providers:
-- `generateDataKey(): Promise<{ plaintextDek: Buffer, encryptedDek: Buffer }>`
-- `decryptDataKey(encryptedDek: Buffer): Promise<Buffer>`
-
+- `GenerateDataKey(): { plaintextDEK: Buffer; encryptedDEK: Buffer; kekId: string }`
+- `DecryptDataKey(encryptedDEK: Buffer): Buffer`
 ### Current KMS Implementations
 - **LocalKmsProvider:** Uses a local root key stored in environment variables (`KMS_ROOT_KEY`). Primarily for local development or self-hosted instances. Features a default-deny validation pattern ensuring secure startup.
 
