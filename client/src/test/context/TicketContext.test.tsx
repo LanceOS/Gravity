@@ -10,7 +10,18 @@ function jsonResponse(body: unknown, status = 200) {
 }
 
 function ContextProbe() {
-  const { currentUser, loading, projects, users, tickets, setCurrentUser, setActiveProjectId } = useTickets();
+  const {
+    activeProjectId,
+    currentUser,
+    loading,
+    projects,
+    users,
+    tickets,
+    createTicket,
+    updateTicket,
+    setCurrentUser,
+    setActiveProjectId,
+  } = useTickets();
 
   const switchUser = () => {
     setCurrentUser({
@@ -30,8 +41,38 @@ function ContextProbe() {
       <div data-testid="project-count">{projects.length}</div>
       <div data-testid="user-count">{users.length}</div>
       <div data-testid="ticket-count">{tickets.length}</div>
+      <div data-testid="active-project-id">{activeProjectId || 'none'}</div>
+      <div data-testid="ticket-titles">{tickets.map((ticket) => ticket.title).join('|')}</div>
       <button type="button" onClick={switchUser}>Switch user</button>
       <button type="button" onClick={() => setActiveProjectId('project-2')}>Switch project</button>
+      <button
+        type="button"
+        onClick={() => {
+          void createTicket({
+            title: 'Created ticket',
+            description: '',
+            status: 'todo',
+            priority: 'medium',
+            projectId: activeProjectId || projects[0]?.id || 'project-1',
+            domainId: null,
+            cycleId: null,
+            assigneeId: null,
+            parentId: null,
+          });
+        }}
+      >
+        Create ticket
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          if (tickets[0]) {
+            void updateTicket(tickets[0].id, { title: 'Updated ticket' });
+          }
+        }}
+      >
+        Update first ticket
+      </button>
     </div>
   );
 }
@@ -308,6 +349,134 @@ describe('TicketContext', () => {
     });
 
     expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to fetch project data for project project-2:', expect.any(Error));
+    consoleErrorSpy.mockRestore();
+  });
+
+  it('falls back to the created ticket when the post-create refresh payload is invalid', async () => {
+    const user = {
+      id: 'user-session-1',
+      name: 'Ada Lovelace',
+      email: 'ada@example.com',
+      avatar: '',
+      role: 'owner',
+      tutorial_completed: 1,
+    };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ user, session: { userId: user.id } }))
+      .mockResolvedValueOnce(jsonResponse([{ id: 'project-1', name: 'Gravity Core', description: '', key: 'GRA', status: 'active', workspaceId: 'workspace-1' }]))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({
+        id: 'ticket-2',
+        key: 'GRA-2',
+        title: 'Created ticket',
+        description: '',
+        status: 'todo',
+        priority: 'medium',
+        projectId: 'project-1',
+        domainId: null,
+        cycleId: null,
+        assigneeId: null,
+        parentId: null,
+        prStatus: 'none',
+        prUrl: null,
+        createdAt: '2026-05-02T00:00:00.000Z',
+        updatedAt: '2026-05-02T00:00:00.000Z',
+      }))
+      .mockResolvedValueOnce(jsonResponse({ error: 'gateway down' }, 502));
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    stubEventSource();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const userEvent = await import('@testing-library/user-event').then((module) => module.default.setup());
+
+    render(
+      <TicketProvider>
+        <ContextProbe />
+      </TicketProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('active-project-id')).toHaveTextContent('project-1');
+      expect(screen.getByTestId('ticket-count')).toHaveTextContent('0');
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Create ticket' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ticket-count')).toHaveTextContent('1');
+      expect(screen.getByTestId('ticket-titles')).toHaveTextContent('Created ticket');
+    });
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to refresh tickets for project project-1:', expect.any(Error));
+    consoleErrorSpy.mockRestore();
+  });
+
+  it('rolls back to the original tickets when update rollback refresh fails', async () => {
+    const user = {
+      id: 'user-session-1',
+      name: 'Ada Lovelace',
+      email: 'ada@example.com',
+      avatar: '',
+      role: 'owner',
+      tutorial_completed: 1,
+    };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ user, session: { userId: user.id } }))
+      .mockResolvedValueOnce(jsonResponse([{ id: 'project-1', name: 'Gravity Core', description: '', key: 'GRA', status: 'active', workspaceId: 'workspace-1' }]))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse([
+        {
+          id: 'ticket-1',
+          key: 'GRA-1',
+          title: 'Seed ticket',
+          description: '',
+          status: 'todo',
+          priority: 'medium',
+          projectId: 'project-1',
+          domainId: null,
+          cycleId: null,
+          assigneeId: null,
+          parentId: null,
+          prStatus: 'none',
+          prUrl: null,
+          createdAt: '2026-05-01T00:00:00.000Z',
+          updatedAt: '2026-05-01T00:00:00.000Z',
+        },
+      ]))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ error: 'update failed' }, 500))
+      .mockResolvedValueOnce(jsonResponse({ error: 'refresh failed' }, 502));
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    stubEventSource();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const userEvent = await import('@testing-library/user-event').then((module) => module.default.setup());
+
+    render(
+      <TicketProvider>
+        <ContextProbe />
+      </TicketProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ticket-count')).toHaveTextContent('1');
+      expect(screen.getByTestId('ticket-titles')).toHaveTextContent('Seed ticket');
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Update first ticket' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ticket-titles')).toHaveTextContent('Seed ticket');
+    });
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith('Error updating ticket on server, rolling back:', expect.any(Error));
+    expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to refresh tickets for project project-1:', expect.any(Error));
     consoleErrorSpy.mockRestore();
   });
 });

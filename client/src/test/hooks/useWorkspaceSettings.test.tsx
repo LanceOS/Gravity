@@ -29,6 +29,17 @@ function getHeader(headers: HeadersInit | undefined, name: string) {
   return entry?.[1] ?? null;
 }
 
+function createDeferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+
+  return { promise, resolve, reject };
+}
+
 describe('useWorkspaceSettings', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -166,5 +177,127 @@ describe('useWorkspaceSettings', () => {
     ]);
     expect(result.current.invites).toEqual([]);
     expect(result.current.joinRequests).toEqual([]);
+  });
+
+  it('resets settings to defaults when the active workspace refresh fails', async () => {
+    const currentUser = {
+      id: 'owner-1',
+      name: 'Casey Carter',
+      email: 'casey@example.com',
+      avatar: '',
+      role: 'owner',
+      tutorial_completed: 1,
+    };
+
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+
+      if (url.endsWith('/workspaces/workspace-1/settings')) {
+        return jsonResponse({ workspaceId: 'workspace-1', key: 'GRA', hostUrl: 'http://localhost:8080', joinMode: 'approval_required', workspaceKey: 'PRIVATE', disabledMcpTools: [] });
+      }
+
+      if (url.endsWith('/workspaces/workspace-2/settings')) {
+        return jsonResponse({ error: 'Failed to load workspace settings.' }, 500);
+      }
+
+      if (url.endsWith('/members') || url.endsWith('/invites') || url.endsWith('/join-requests')) {
+        return jsonResponse([]);
+      }
+
+      throw new Error(`Unexpected fetch call: ${url}`);
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { result, rerender } = renderHook(
+      ({ activeWorkspaceId }) =>
+        useWorkspaceSettings({
+          currentUser,
+          activeWorkspaceId,
+        }),
+      { initialProps: { activeWorkspaceId: 'workspace-1' } }
+    );
+
+    await waitFor(() => {
+      expect(result.current.settings.workspaceId).toBe('workspace-1');
+      expect(result.current.settings.key).toBe('GRA');
+    });
+
+    rerender({ activeWorkspaceId: 'workspace-2' });
+
+    await waitFor(() => {
+      expect(result.current.settingsLoading).toBe(false);
+      expect(result.current.saveError).toBe('Failed to load workspace settings.');
+    });
+
+    expect(result.current.settings).toEqual({
+      workspaceId: 'workspace-2',
+      key: '',
+      hostUrl: '',
+      joinMode: 'approval_required',
+      workspaceKey: '',
+      disabledMcpTools: [],
+    });
+    expect(result.current.members).toEqual([]);
+    expect(result.current.invites).toEqual([]);
+    expect(result.current.joinRequests).toEqual([]);
+  });
+
+  it('ignores late refresh responses from a previously selected workspace', async () => {
+    const currentUser = {
+      id: 'owner-1',
+      name: 'Casey Carter',
+      email: 'casey@example.com',
+      avatar: '',
+      role: 'owner',
+      tutorial_completed: 1,
+    };
+    const firstSettingsResponse = createDeferred<Response>();
+
+    const fetchMock = vi.fn((input: string | URL | Request) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+
+      if (url.endsWith('/workspaces/workspace-1/settings')) {
+        return firstSettingsResponse.promise;
+      }
+
+      if (url.endsWith('/workspaces/workspace-2/settings')) {
+        return Promise.resolve(jsonResponse({ workspaceId: 'workspace-2', key: 'OPS', hostUrl: 'http://localhost:9090', joinMode: 'auto_join', workspaceKey: 'OPS-KEY', disabledMcpTools: ['tool-a'] }));
+      }
+
+      if (url.includes('/workspaces/workspace-1/') || url.includes('/workspaces/workspace-2/')) {
+        return Promise.resolve(jsonResponse([]));
+      }
+
+      throw new Error(`Unexpected fetch call: ${url}`);
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { result, rerender } = renderHook(
+      ({ activeWorkspaceId }) =>
+        useWorkspaceSettings({
+          currentUser,
+          activeWorkspaceId,
+        }),
+      { initialProps: { activeWorkspaceId: 'workspace-1' } }
+    );
+
+    rerender({ activeWorkspaceId: 'workspace-2' });
+
+    await waitFor(() => {
+      expect(result.current.settings.workspaceId).toBe('workspace-2');
+      expect(result.current.settings.key).toBe('OPS');
+      expect(result.current.settings.joinMode).toBe('auto_join');
+    });
+
+    await act(async () => {
+      firstSettingsResponse.resolve(jsonResponse({ workspaceId: 'workspace-1', key: 'GRA', hostUrl: 'http://localhost:8080', joinMode: 'approval_required', workspaceKey: 'GRA-KEY', disabledMcpTools: [] }));
+      await Promise.resolve();
+    });
+
+    expect(result.current.settings.workspaceId).toBe('workspace-2');
+    expect(result.current.settings.key).toBe('OPS');
+    expect(result.current.settings.hostUrl).toBe('http://localhost:9090');
   });
 });

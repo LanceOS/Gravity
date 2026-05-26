@@ -128,6 +128,15 @@ function createInitialState(): State {
   };
 }
 
+
+function upsertTicket(existingTickets: Ticket[], nextTicket: Ticket) {
+  const ticketIndex = existingTickets.findIndex((ticket) => ticket.id === nextTicket.id);
+  if (ticketIndex === -1) {
+    return [...existingTickets, nextTicket];
+  }
+
+  return existingTickets.map((ticket, index) => (index === ticketIndex ? nextTicket : ticket));
+}
 // API Base URL
 const API_URL = '/api/v1';
 const AUTH_API_URL = '/api/auth';
@@ -536,9 +545,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       // Update local state if the ticket belongs to the current active project
       if (ticketInput.projectId === activeProjectId) {
-        const listRes = await fetch(`${API_URL}/tickets`, { headers: { 'X-Project-Id': activeProjectId } });
-        const allTickets = await listRes.json();
-        dispatch({ type: 'SET_TICKETS_RAW', payload: allTickets });
+        await refreshTicketsForProject(activeProjectId, upsertTicket(state.tickets, createdTicket));
       }
 
       return createdTicket;
@@ -546,11 +553,12 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       console.error(e);
       return null;
     }
-  }, [activeProjectId]);
+  }, [activeProjectId, refreshTicketsForProject, state.tickets]);
 
   // 4. Update Ticket with project header
   const updateTicket = useCallback(async (id: string, updates: Partial<Ticket>) => {
     if (!activeProjectId) return;
+    const originalTickets = [...state.tickets];
     dispatch({ type: 'OPTIMISTIC_TICKET_UPDATE', payload: { id, updates } });
 
     try {
@@ -566,11 +574,9 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (!response.ok) throw new Error('Failed to update ticket');
     } catch (e) {
       console.error('Error updating ticket on server, rolling back:', e);
-      const response = await fetch(`${API_URL}/tickets`, { headers: { 'X-Project-Id': activeProjectId } });
-      const freshTickets = await response.json();
-      dispatch({ type: 'SET_TICKETS_RAW', payload: freshTickets });
+      await refreshTicketsForProject(activeProjectId, originalTickets);
     }
-  }, [activeProjectId]);
+  }, [activeProjectId, refreshTicketsForProject, state.tickets]);
 
   // 5. Delete Ticket with project header
   const deleteTicket = useCallback(async (id: string) => {
@@ -740,6 +746,21 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     return data as T[];
+  }
+
+  async function refreshTicketsForProject(projectId: string, fallbackTickets?: Ticket[]) {
+    try {
+      const response = await fetch(`${API_URL}/tickets`, { headers: { 'X-Project-Id': projectId } });
+      const tickets = await handleArrayResponse<Ticket>(response, `Failed to refresh tickets for project ${projectId}`);
+      dispatch({ type: 'SET_TICKETS_RAW', payload: tickets });
+      return tickets;
+    } catch (error) {
+      console.error(`Failed to refresh tickets for project ${projectId}:`, error);
+      if (fallbackTickets) {
+        dispatch({ type: 'SET_TICKETS_RAW', payload: fallbackTickets });
+      }
+      return null;
+    }
   }
 
   const createProject = useCallback(async (projectInput: CreateProjectInput) => {

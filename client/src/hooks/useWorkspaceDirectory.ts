@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { User } from '../context/TicketContext';
 
 export type WorkspaceJoinMode = 'approval_required' | 'auto_join';
@@ -40,12 +40,17 @@ export function useWorkspaceDirectory({ currentUser, setCurrentUser }: UseWorksp
   const [pendingAction, setPendingAction] = useState<'create' | 'join' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const refreshRequestIdRef = useRef(0);
 
   const refreshWorkspaces = useCallback(async () => {
+    const requestId = ++refreshRequestIdRef.current;
+    const requestedUserId = currentUser?.id ?? null;
+
     if (!currentUser) {
       setLoading(false);
       setWorkspaces([]);
       setResolvedUserId(null);
+      setError(null);
       return [];
     }
 
@@ -60,6 +65,10 @@ export function useWorkspaceDirectory({ currentUser, setCurrentUser }: UseWorksp
       });
       const data = await response.json();
 
+      if (requestId !== refreshRequestIdRef.current) {
+        return [];
+      }
+
       if (response.status === 401) {
         setCurrentUser(null);
         setWorkspaces([]);
@@ -73,15 +82,21 @@ export function useWorkspaceDirectory({ currentUser, setCurrentUser }: UseWorksp
       setWorkspaces(Array.isArray(data) ? data : []);
       return Array.isArray(data) ? data : [];
     } catch (loadError) {
+      if (requestId !== refreshRequestIdRef.current) {
+        return [];
+      }
+
       const message = loadError instanceof Error ? loadError.message : 'Failed to load workspaces.';
       setError(message);
       setWorkspaces([]);
       return [];
     } finally {
-      setResolvedUserId(currentUser.id);
-      setLoading(false);
+      if (requestId === refreshRequestIdRef.current) {
+        setResolvedUserId(requestedUserId);
+        setLoading(false);
+      }
     }
-  }, [currentUser]);
+  }, [currentUser, setCurrentUser]);
 
   useEffect(() => {
     void refreshWorkspaces();
