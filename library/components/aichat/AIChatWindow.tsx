@@ -148,7 +148,7 @@ export function AIChatWindow({
               className="animate-spin"
               style={{ animation: 'spin 1s linear infinite' }}
             />
-            <span>AI Assistant is writing...</span>
+            <span>Working...</span>
           </div>
         )}
         <div ref={chatEndRef} />
