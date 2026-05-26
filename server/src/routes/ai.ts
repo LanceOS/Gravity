@@ -20,9 +20,10 @@ export function createAiRouter() {
       res.json({ models, connected: true });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to contact Ollama.';
-      const normalizedError = /fetch failed|network|econnrefused|enotfound|aborted/i.test(message)
+      const sanitized = message.includes('Security Exception') ? 'External credentials configuration error.' : message;
+      const normalizedError = /fetch failed|network|econnrefused|enotfound|aborted/i.test(sanitized)
         ? 'Could not connect to Ollama.'
-        : message;
+        : sanitized;
       res.json({ models: [], connected: false, error: normalizedError });
     }
   });
