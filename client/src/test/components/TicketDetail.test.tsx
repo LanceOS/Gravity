@@ -36,8 +36,11 @@ type MockTextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
   onChange: (event: ChangeEvent<HTMLTextAreaElement>) => void;
 };
 
-vi.mock('@library', () => ({
-  Button: ({ children, ...props }: MockButtonProps) => {
+vi.mock('@library', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@library')>();
+  return {
+    ...actual,
+    Button: ({ children, ...props }: MockButtonProps) => {
     const buttonProps = { ...props };
     delete buttonProps.variant;
     delete buttonProps.size;
@@ -56,7 +59,8 @@ vi.mock('@library', () => ({
   Textarea: ({ value, onChange, autoGrow, inputStyle, ...props }: any) => <textarea value={value} onChange={onChange} {...props} />,
   ClickAwayListener: ({ children }: { children: ReactNode }) => children,
   Portal: ({ children }: { children: ReactNode }) => <div data-testid="portal">{children}</div>,
-}));
+  };
+});
 
 vi.mock('../../modules/tickets/components/MarkdownContent', () => ({
   MarkdownContent: ({ text }: { text: string }) => <div>{text}</div>,

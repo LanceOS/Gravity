@@ -1,14 +1,12 @@
 import React, { useState, useCallback } from 'react';
 import type { Ticket } from '../../../context/TicketContext';
-import { Button, Select, TextInput, Textarea } from '@library';
+import { Button, Select, TextInput, Textarea, EditInPlace } from '@library';
 import { ClickAwayListener, Portal } from '@library';
 import { 
   CheckSquare, GitPullRequest, GitMerge, Send, Trash2,
   Plus, Edit3, ChevronLeft, MoreHorizontal, Link, FileText
 } from 'lucide-react';
 import { MarkdownContent } from './MarkdownContent';
-import { EditInPlaceTitle } from './EditInPlaceTitle';
-import { EditInPlaceDescription } from './EditInPlaceDescription';
 import type { TicketDetailProps } from '../types/TicketDetail';
 import { PRIORITY_OPTIONS, STATUS_OPTIONS } from '../utils/TicketDetail';
 
@@ -132,9 +130,25 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
           
           {/* Title Area */}
           <div>
-            <EditInPlaceTitle 
-              title={activeTicket.title} 
-              onSave={(newTitle) => onUpdateTicket(activeTicket.id, { title: newTitle })} 
+            <EditInPlace
+              value={activeTicket.title}
+              onSave={(newTitle) => onUpdateTicket(activeTicket.id, { title: newTitle })}
+              saveHint="Enter"
+              saveOnEnter={true}
+              containerClass="editable-display editable-display--title"
+              inputStyle={{ 
+                fontSize: '22px', 
+                fontWeight: 600, 
+                padding: '6px 8px', 
+                minHeight: '38px', 
+                lineHeight: 'normal',
+                color: 'var(--color-text-primary)'
+              }}
+              renderDisplay={(val) => (
+                <h1 style={{ fontSize: '22px', fontWeight: 600, color: 'var(--color-text-primary)', margin: 0, flex: 1, minWidth: 0 }}>
+                  {val}
+                </h1>
+              )}
             />
           </div>
 
@@ -144,9 +158,17 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
               <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase' }}>Description</span>
             </div>
 
-            <EditInPlaceDescription 
-              description={activeTicket.description || ''} 
-              onSave={(newDesc) => onUpdateTicket(activeTicket.id, { description: newDesc })} 
+            <EditInPlace
+              value={activeTicket.description || ''}
+              onSave={(newDesc) => onUpdateTicket(activeTicket.id, { description: newDesc })}
+              saveHint="Esc"
+              saveOnEnter={false}
+              placeholder="Describe your issue using markdown..."
+              emptyText="No description provided. Click to add details..."
+              containerClass="markdown-content editable-display editable-display--multiline"
+              containerStyle={{ fontSize: '13px', lineHeight: '1.6', minHeight: '60px', paddingRight: '104px', position: 'relative' }}
+              inputStyle={{ fontFamily: 'var(--mono)', fontSize: '13px', lineHeight: '1.6', padding: '8px 10px', color: 'var(--color-text-primary)' }}
+              renderDisplay={(val) => <MarkdownContent text={val} />}
             />
           </div>
 
