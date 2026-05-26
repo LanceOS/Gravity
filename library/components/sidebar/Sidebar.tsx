@@ -82,7 +82,7 @@ export interface SidebarGroupProps extends React.HTMLAttributes<HTMLDivElement> 
 
 export function SidebarGroup({ label, children, className, style, ...props }: SidebarGroupProps) {
   return (
-    <div className={className} style={{ marginBottom: '16px', ...style }} {...props}>
+    <div className={className} style={{ marginBottom: '6px', ...style }} {...props}>
       {label && (
         <div
           style={{

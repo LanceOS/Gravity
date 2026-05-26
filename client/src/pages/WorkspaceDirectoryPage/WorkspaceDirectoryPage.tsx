@@ -151,7 +151,7 @@ export function WorkspaceDirectoryPage({
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
               <Server size={15} style={{ color: 'var(--color-text-disabled)' }} />
-              <span style={{ color: 'var(--color-text-disabled)' }}>Local Account:</span>
+              <span style={{ color: 'var(--color-text-disabled)' }}>Current User:</span>
               <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{currentUser.email}</span>
             </div>
           </div>

@@ -12,12 +12,31 @@ interface StatusMessage {
   message: string;
 }
 
+function shallowEqual<T extends Record<string, any>>(objA: T, objB: T): boolean {
+  if (Object.is(objA, objB)) return true;
+  if (typeof objA !== 'object' || objA === null || typeof objB !== 'object' || objB === null) return false;
+  
+  const keysA = Object.keys(objA);
+  const keysB = Object.keys(objB);
+
+  if (keysA.length !== keysB.length) return false;
+
+  for (let i = 0; i < keysA.length; i++) {
+    const key = keysA[i];
+    if (!Object.prototype.hasOwnProperty.call(objB, key) || !Object.is(objA[key], objB[key])) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 interface UseAccountSettingsOptions {
   currentUser: User | null;
   activeView: 'board' | 'list';
-  theme: 'dark' | 'light' | 'coal-black' | 'coffee' | 'marble-blue';
+  theme: 'dark' | 'coal-black' | 'coffee' | 'marble-blue';
   setView: (view: 'board' | 'list') => void;
-  setTheme: (theme: 'dark' | 'light' | 'coal-black' | 'coffee' | 'marble-blue') => void;
+  setTheme: (theme: 'dark' | 'coal-black' | 'coffee' | 'marble-blue') => void;
 }
 
 export function useAccountSettings({
@@ -30,6 +49,7 @@ export function useAccountSettings({
   const [settings, setSettings] = useState<WorkspaceSettings>(() =>
     normalizeWorkspaceSettings(null, activeView, theme)
   );
+  const [originalSettings, setOriginalSettings] = useState<WorkspaceSettings | null>(null);
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -56,6 +76,7 @@ export function useAccountSettings({
     }
 
     setSettings(normalizeWorkspaceSettings(null, activeView, theme));
+    setOriginalSettings(null);
     setSaveError(null);
     setTestResult(null);
     setTutorialResult(null);
@@ -70,7 +91,7 @@ export function useAccountSettings({
 
     let cancelled = false;
     setSettingsLoading(true);
-  setSettingsHydrated(false);
+    setSettingsHydrated(false);
 
     fetch(`/api/v1/settings/${currentUser.id}`)
       .then(async (response) => {
@@ -88,6 +109,7 @@ export function useAccountSettings({
             DEFAULT_WORKSPACE_SETTINGS.theme
           );
           setSettings(normalized);
+          setOriginalSettings(normalized);
           setTheme(normalized.theme);
           setView(normalized.defaultView);
         }
@@ -202,6 +224,7 @@ export function useAccountSettings({
         DEFAULT_WORKSPACE_SETTINGS.theme
       );
       setSettings(normalized);
+      setOriginalSettings(normalized);
       setTheme(normalized.theme);
       setView(normalized.defaultView);
       setSaveSuccess(true);
@@ -273,6 +296,9 @@ export function useAccountSettings({
     }
   }, [currentUser]);
 
+  const baselineSettings = originalSettings ?? normalizeWorkspaceSettings(null, activeView, theme);
+  const hasChanges = !shallowEqual(settings, baselineSettings);
+
   return {
     settings,
     settingsLoading,
@@ -289,5 +315,6 @@ export function useAccountSettings({
     testApiKey,
     resetTutorial,
     refreshOllamaModels,
+    hasChanges,
   };
 }

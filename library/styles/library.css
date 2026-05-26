@@ -154,7 +154,6 @@
 .lib-focus-ring:focus-visible {
   outline: none;
   border-color: var(--color-state-focus-ring) !important;
-  box-shadow: 0 0 0 3px var(--color-state-selected-bg) !important;
 }
 
 /* Form validation states styling matching accessible error announcement */
@@ -216,8 +215,8 @@
 
 .input:focus,
 .input:focus-visible {
+  outline: none;
   border-color: var(--color-state-focus-ring);
-  box-shadow: 0 0 0 3px var(--color-state-selected-bg);
 }
 
 .input:disabled {
@@ -228,7 +227,6 @@
 
 .input[aria-invalid='true'] {
   border-color: var(--color-border-error);
-  box-shadow: 0 0 0 3px var(--color-bg-error);
 }
 
 .input:-webkit-autofill,
@@ -287,7 +285,6 @@
 .select-trigger[data-open='true'] {
   outline: none;
   border-color: var(--color-state-focus-ring);
-  box-shadow: 0 0 0 3px var(--color-state-selected-bg);
 }
 
 .select-trigger:disabled {
@@ -299,7 +296,6 @@
 
 .select-trigger[aria-invalid='true'] {
   border-color: var(--color-border-error);
-  box-shadow: 0 0 0 3px var(--color-bg-error);
 }
 
 .select-trigger__value {
@@ -327,6 +323,7 @@
   position: fixed;
   z-index: 1400;
   padding: 6px;
+  box-sizing: border-box;
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border-default);
   background: var(--color-surface-card);

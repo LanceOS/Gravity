@@ -94,7 +94,7 @@ interface State {
     search: string;
   };
   currentUser: User | null;
-  theme: 'dark' | 'light' | 'coal-black' | 'coffee' | 'marble-blue';
+  theme: 'dark' | 'coal-black' | 'coffee' | 'marble-blue';
   loading: boolean;
 }
 
@@ -117,8 +117,7 @@ type Action =
   | { type: 'SET_VIEW'; payload: 'list' | 'board' }
   | { type: 'SET_FILTERS'; payload: Partial<State['filters']> }
   | { type: 'SET_USER'; payload: User | null }
-  | { type: 'TOGGLE_THEME' }
-  | { type: 'SET_THEME_RAW'; payload: 'dark' | 'light' | 'coal-black' | 'coffee' | 'marble-blue' }
+  | { type: 'SET_THEME_RAW'; payload: 'dark' | 'coal-black' | 'coffee' | 'marble-blue' }
   | { type: 'ADD_COMMENT'; payload: Comment }
   | { type: 'REPLACE_COMMENT'; payload: { optimisticId: string; comment: Comment } }
   | { type: 'OPTIMISTIC_TICKET_UPDATE'; payload: { id: string; updates: Partial<Ticket> } }
@@ -227,10 +226,6 @@ function ticketReducer(state: State, action: Action): State {
       return { ...state, filters: { ...state.filters, ...action.payload } };
     case 'SET_USER':
       return { ...state, currentUser: action.payload };
-    case 'TOGGLE_THEME': {
-      const nextTheme = state.theme === 'dark' ? 'light' : 'dark';
-      return { ...state, theme: nextTheme };
-    }
     case 'SET_THEME_RAW':
       return { ...state, theme: action.payload };
     case 'ADD_COMMENT':
@@ -309,8 +304,7 @@ interface TicketContextType extends State {
   signUp: (name: string, email: string, password?: string) => Promise<boolean>;
   signOut: () => void;
   setCurrentUser: (user: User | null) => void;
-  toggleTheme: () => void;
-  setTheme: (theme: 'dark' | 'light' | 'coal-black' | 'coffee' | 'marble-blue') => void;
+  setTheme: (theme: 'dark' | 'coal-black' | 'coffee' | 'marble-blue') => void;
   setActiveTicket: (ticket: Ticket | null) => void;
   setView: (view: 'list' | 'board') => void;
   setFilters: (filters: Partial<State['filters']>) => void;
@@ -878,12 +872,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     dispatch({ type: 'SET_USER', payload: user });
   }, []);
 
-  // 9. Layout Adjustments
-  const toggleTheme = useCallback(() => {
-    dispatch({ type: 'TOGGLE_THEME' });
-  }, []);
-
-  const setTheme = useCallback((theme: 'dark' | 'light' | 'coal-black' | 'coffee' | 'marble-blue') => {
+  const setTheme = useCallback((theme: 'dark' | 'coal-black' | 'coffee' | 'marble-blue') => {
     dispatch({ type: 'SET_THEME_RAW', payload: theme });
   }, []);
 
@@ -923,7 +912,6 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       signUp,
       signOut,
       setCurrentUser,
-      toggleTheme,
       setTheme,
       setActiveTicket,
       setView,
@@ -949,7 +937,6 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       signUp,
       signOut,
       setCurrentUser,
-      toggleTheme,
       setTheme,
       setActiveTicket,
       setView,
