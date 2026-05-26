@@ -66,8 +66,15 @@ export function SidebarProjectsSection({
                     </div>
                   </SidebarItem>
 
-                  {isActiveProject && !isCollapsed ? (
-                    <div style={{ marginLeft: '14px', paddingLeft: '8px', borderLeft: '1px solid var(--color-border-default)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateRows: isActiveProject && !isCollapsed ? '1fr' : '0fr',
+                      transition: 'grid-template-rows var(--transition-normal)',
+                    }}
+                  >
+                    <div style={{ overflow: 'hidden', minHeight: 0 }}>
+                      <div style={{ marginLeft: '14px', paddingLeft: '8px', borderLeft: '1px solid var(--color-border-default)', display: 'flex', flexDirection: 'column', gap: '4px', paddingTop: '4px', paddingBottom: '4px' }}>
                       <SidebarGroup label="Views">
                         <SidebarItem
                           nested
@@ -119,8 +126,9 @@ export function SidebarProjectsSection({
                           </SidebarItem>
                         ))}
                       </SidebarGroup>
+                      </div>
                     </div>
-                  ) : null}
+                  </div>
                 </div>
               );
             })}
