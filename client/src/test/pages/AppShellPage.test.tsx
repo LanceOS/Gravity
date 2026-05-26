@@ -55,7 +55,7 @@ vi.mock('../../components/AgentSimulator', () => ({
   AgentSimulator: () => <div>AgentSimulator</div>,
 }));
 
-vi.mock('../../components/AuthScreen', () => ({
+vi.mock('../../modules/auth', () => ({
   AuthScreen: () => <div>AuthScreen</div>,
 }));
 

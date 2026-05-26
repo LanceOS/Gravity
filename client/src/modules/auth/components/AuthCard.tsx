@@ -1,0 +1,170 @@
+import React from 'react';
+import { LogIn } from 'lucide-react';
+import { Button, TextInput, PasswordInput } from '@library';
+
+interface AuthCardProps {
+  isSignUp: boolean;
+  name: string;
+  setName: (name: string) => void;
+  email: string;
+  setEmail: (email: string) => void;
+  password: string;
+  setPassword: (password: string) => void;
+  loading: boolean;
+  errorMsg: string;
+  handleSubmit: (e: React.FormEvent) => void;
+  toggleMode: () => void;
+}
+
+export const AuthCard: React.FC<AuthCardProps> = ({
+  isSignUp,
+  name,
+  setName,
+  email,
+  setEmail,
+  password,
+  setPassword,
+  loading,
+  errorMsg,
+  handleSubmit,
+  toggleMode,
+}) => {
+  return (
+    <div style={cardStyle} className="glass">
+      {/* Logo/Icon */}
+      <div style={headerStyle}>
+        <div style={logoContainerStyle}>
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="12" r="10" stroke="var(--color-text-primary)" strokeWidth="2.5" />
+            <circle cx="12" cy="12" r="6" stroke="var(--color-primary)" strokeWidth="2" strokeDasharray="4 2" />
+            <circle cx="12" cy="12" r="2" fill="var(--color-text-primary)" />
+          </svg>
+        </div>
+        <h1 style={titleStyle}>Gravity</h1>
+        <p style={subtitleStyle}>Production-grade Project Management Workspace</p>
+      </div>
+
+      {errorMsg && <div style={errorStyle}>{errorMsg}</div>}
+
+      <form onSubmit={handleSubmit} style={formStyle}>
+        {isSignUp && (
+          <TextInput
+            label="Full Name"
+            placeholder="John Doe"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+          />
+        )}
+
+        <TextInput
+          label="Email Address"
+          type="email"
+          placeholder="you@example.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
+
+        <PasswordInput
+          label="Password"
+          placeholder="••••••••"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+        />
+
+        <Button
+          type="submit"
+          loading={loading}
+          variant="primary"
+          fullWidth
+          leftIcon={loading ? undefined : <LogIn size={16} />}
+          style={{ marginTop: '8px' }}
+        >
+          {isSignUp ? 'Create Account' : 'Sign In'}
+        </Button>
+      </form>
+
+      <div style={footerStyle}>
+        <button onClick={toggleMode} style={toggleButtonStyle}>
+          {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// Styles
+const cardStyle: React.CSSProperties = {
+  width: '400px',
+  padding: '40px',
+  borderRadius: '8px',
+  border: '1px solid var(--color-border-default)',
+  background: 'var(--color-surface-card)',
+  zIndex: 10,
+  boxShadow: 'var(--shadow-lg)',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '24px'
+};
+
+const headerStyle: React.CSSProperties = {
+  textAlign: 'center',
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  gap: '8px'
+};
+
+const logoContainerStyle: React.CSSProperties = {
+  padding: '12px',
+  borderRadius: '8px',
+  background: 'var(--color-base50)',
+  border: '1px solid var(--color-border-default)',
+  marginBottom: '8px'
+};
+
+const titleStyle: React.CSSProperties = {
+  fontSize: '24px',
+  fontWeight: 600,
+  color: 'var(--color-text-primary)',
+  letterSpacing: '-0.5px'
+};
+
+const subtitleStyle: React.CSSProperties = {
+  fontSize: '13px',
+  color: 'var(--color-text-disabled)',
+  lineHeight: '1.4'
+};
+
+const errorStyle: React.CSSProperties = {
+  padding: '10px 14px',
+  background: 'rgba(239, 68, 68, 0.08)',
+  border: '1px solid rgba(239, 68, 68, 0.18)',
+  borderRadius: '6px',
+  color: '#ef4444',
+  fontSize: '12px',
+  lineHeight: '1.4'
+};
+
+const formStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '16px'
+};
+
+const footerStyle: React.CSSProperties = {
+  textAlign: 'center',
+  marginTop: '8px'
+};
+
+const toggleButtonStyle: React.CSSProperties = {
+  background: 'none',
+  border: 'none',
+  color: 'var(--color-primary)',
+  fontSize: '12px',
+  cursor: 'pointer',
+  outline: 'none',
+  transition: 'color var(--transition-fast)'
+};

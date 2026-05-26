@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { MessageSquare, X } from 'lucide-react';
 
-import { AuthScreen } from '../../components/AuthScreen';
+import { AuthScreen } from '../../modules/auth';
 import { CreateTicketModal } from '../../components/CreateTicketModal';
 import { LocalAIChat } from '../../components/LocalAIChat';
 import { OnboardingModal } from '../../components/OnboardingModal';

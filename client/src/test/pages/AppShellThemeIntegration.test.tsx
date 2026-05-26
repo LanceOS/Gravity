@@ -32,7 +32,7 @@ vi.mock('../../utils/webmcp', () => ({
   registerWebMCPTools: mocks.registerWebMCPTools,
 }));
 
-vi.mock('../../components/AuthScreen', () => ({
+vi.mock('../../modules/auth', () => ({
   AuthScreen: () => <div>AuthScreen</div>,
 }));
 
