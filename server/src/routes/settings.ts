@@ -1,8 +1,7 @@
 import { Router } from 'express';
 import { eq } from 'drizzle-orm';
 import { db } from '../db/index.js';
-import { userSettings, userExternalCredentials } from '../db/schema.js';
-import { decryptSecret, encryptSecret } from '../lib/crypto.js';
+import { userSettings } from '../db/schema.js';
 import { credentialManager } from '../lib/kms/index.js';
 import { getUserSettingsRecord } from '../lib/platform.js';
 import { resolveRequestActorUserId } from '../lib/request-auth.js';
@@ -13,8 +12,32 @@ const THEMES = new Set(['dark', 'coal-black', 'coffee', 'marble-blue']);
 const AI_PROVIDERS = new Set(['openai', 'anthropic', 'gemini', 'deepseek']);
 const AGENT_INTEGRATIONS = new Set(['ollama', 'third_party']);
 const PROJECT_LAYOUTS = new Set(['standard', 'condensed']);
+const KEY_ACTIONS = new Set(['update', 'clear', 'keep']);
+const API_KEY_MASK = '••••••••••••';
+const SETTINGS_LOAD_ERROR = 'Failed to load account settings.';
+const SETTINGS_UPDATE_ERROR = 'Failed to update account settings.';
 
-function toSettingsResponse(settings: Awaited<ReturnType<typeof getUserSettingsRecord>>, apiKey: string) {
+function hasOwn(body: Record<string, unknown> | null | undefined, field: string) {
+  return Boolean(body) && Object.prototype.hasOwnProperty.call(body, field);
+}
+
+function getCredentialListSummary(
+  credentials: Awaited<ReturnType<typeof credentialManager.ListCredentials>>,
+  activeProvider: string,
+) {
+  return credentials.map((credential) => ({
+    provider: credential.provider,
+    apiKey: API_KEY_MASK,
+    active: credential.provider === activeProvider,
+    updatedAt: credential.updatedAt,
+  }));
+}
+
+function toSettingsResponse(
+  settings: Awaited<ReturnType<typeof getUserSettingsRecord>>,
+  apiKey: string,
+  savedCredentials: Array<{ provider: string; apiKey: string; active: boolean; updatedAt: Date }>,
+) {
   return {
     userId: settings.userId,
     defaultView: settings.defaultView,
@@ -25,6 +48,7 @@ function toSettingsResponse(settings: Awaited<ReturnType<typeof getUserSettingsR
     aiProvider: settings.aiProvider,
     agentIntegration: settings.agentIntegration,
     projectLayout: settings.projectLayout,
+    savedCredentials,
   };
 }
 
@@ -62,18 +86,14 @@ export function createSettingsRouter() {
 
     try {
       const settings = await getUserSettingsRecord(req.params.userId);
-      const [record] = await db
-        .select({ userId: userExternalCredentials.userId })
-        .from(userExternalCredentials)
-        .where(eq(userExternalCredentials.userId, req.params.userId))
-        .limit(1);
+      const savedCredentials = await credentialManager.ListCredentials(req.params.userId);
 
-      const apiKeyPlaceholder = record ? '••••••••••••' : '';
-      res.json(toSettingsResponse(settings, apiKeyPlaceholder));
+      const currentCredential = savedCredentials.find((credential) => credential.provider === settings.aiProvider);
+      const apiKeyPlaceholder = currentCredential ? API_KEY_MASK : '';
+      res.json(toSettingsResponse(settings, apiKeyPlaceholder, getCredentialListSummary(savedCredentials, settings.aiProvider)));
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to load settings.';
-      const sanitized = message.includes('Security Exception') ? 'External credentials configuration error.' : message;
-      res.status(500).json({ error: sanitized });
+      console.error(`Failed to load account settings for user ${req.params.userId}:`, error);
+      res.status(500).json({ error: SETTINGS_LOAD_ERROR });
     }
   });
 
@@ -127,54 +147,67 @@ export function createSettingsRouter() {
           validateOllamaUrl(ollamaEndpoint);
         } catch (error) {
           const message = error instanceof Error ? error.message : 'Invalid ollamaEndpoint.';
-          const sanitized = message.includes('Security Exception') ? 'External credentials configuration error.' : message;
-          res.status(400).json({ error: sanitized });
+          const safe =
+            message === 'Invalid URL format.' || message === 'URL scheme must be http or https.'
+              ? message
+              : 'Invalid Ollama endpoint.';
+          res.status(400).json({ error: safe });
           return;
         }
       }
 
       const current = await getUserSettingsRecord(userId);
-      
-      let apiKeyPlaceholder = '';
 
-      // Hoist check to run exactly once and determine if a key exists
-      const [existingCredential] = await db
-        .select({ userId: userExternalCredentials.userId })
-        .from(userExternalCredentials)
-        .where(eq(userExternalCredentials.userId, userId))
-        .limit(1);
-
-      const hasExistingCredential = Boolean(existingCredential);
-
-      // Determine the intended credential action from the explicit keyAction discriminator.
-      // Accepted values: 'update' (store new key), 'clear' (delete key), 'keep' (no change).
-      // Omitting keyAction defaults to 'keep', preserving backward-compatibility.
-      const keyAction = typeof req.body?.keyAction === 'string' ? req.body.keyAction : 'keep';
-      if (!['update', 'clear', 'keep'].includes(keyAction)) {
-        res.status(400).json({ error: 'Invalid keyAction. Must be one of: update, clear, keep.' });
+      const credentialProvider = getOptionalEnumValue(req.body, 'credentialProvider', AI_PROVIDERS);
+      if (!credentialProvider.ok) {
+        res.status(400).json({ error: credentialProvider.error });
         return;
       }
 
+      const activeAiProviderForResponse = (aiProvider.value ?? current.aiProvider).toLowerCase();
+      const providerForCredential = (credentialProvider.value ?? activeAiProviderForResponse).toLowerCase();
+      const savedCredentialsBefore = await credentialManager.ListCredentials(userId);
+      const hasExistingCredentialForActiveProvider = savedCredentialsBefore.some(
+        (credential) => credential.provider === activeAiProviderForResponse,
+      );
+      const hasExistingCredential = hasExistingCredentialForActiveProvider;
+
+      const explicitKeyAction = typeof req.body?.keyAction === 'string' ? req.body.keyAction : undefined;
+      const incomingApiKey = typeof req.body?.apiKey === 'string' ? req.body.apiKey.trim() : undefined;
+      const apiKeyProvided = hasOwn(req.body, 'apiKey');
+
+      if (!explicitKeyAction || !KEY_ACTIONS.has(explicitKeyAction)) {
+        res.status(400).json({ error: 'keyAction is required and must be one of: update, clear, keep.' });
+        return;
+      }
+
+      const keyAction = explicitKeyAction as 'update' | 'clear' | 'keep';
+
       if (keyAction === 'update') {
-        const rawKey = typeof req.body?.apiKey === 'string' ? req.body.apiKey.trim() : '';
-        if (!rawKey) {
+        const rawKey = incomingApiKey ?? '';
+        if (!rawKey || rawKey === API_KEY_MASK) {
           res.status(400).json({ error: 'apiKey is required when keyAction is "update".' });
           return;
         }
+      } else if (apiKeyProvided) {
+        res.status(400).json({ error: `apiKey must be omitted when keyAction is "${keyAction}".` });
+        return;
       }
 
       // Perform all database modifications in a single atomic transaction block
-      const merged = await db.transaction(async (tx) => {
+      const { settings: merged, apiKeyPlaceholder } = await db.transaction(async (tx) => {
+        let placeholder: string;
+
         if (keyAction === 'clear') {
-          await tx.delete(userExternalCredentials).where(eq(userExternalCredentials.userId, userId));
-          apiKeyPlaceholder = '';
+          await credentialManager.DeleteCredential(userId, providerForCredential, tx);
+          placeholder = '';
         } else if (keyAction === 'update') {
-          const rawKey = (req.body.apiKey as string).trim();
-          await credentialManager.StoreCredential(userId, rawKey, tx);
-          apiKeyPlaceholder = '••••••••••••';
+          const rawKey = (incomingApiKey as string).trim();
+          await credentialManager.StoreCredential(userId, providerForCredential, rawKey, tx);
+          placeholder = API_KEY_MASK;
         } else {
           // 'keep': leave credentials unchanged
-          apiKeyPlaceholder = hasExistingCredential ? '••••••••••••' : '';
+          placeholder = hasExistingCredential ? API_KEY_MASK : '';
         }
 
         const nextSettings = {
@@ -205,14 +238,14 @@ export function createSettingsRouter() {
           })
           .where(eq(userSettings.userId, userId));
 
-        return nextSettings;
+        return { settings: nextSettings, apiKeyPlaceholder: placeholder };
       });
 
-      res.json(toSettingsResponse(merged, apiKeyPlaceholder));
+      const savedCredentials = await credentialManager.ListCredentials(userId);
+      res.json(toSettingsResponse(merged, apiKeyPlaceholder, getCredentialListSummary(savedCredentials, merged.aiProvider)));
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to update settings.';
-      const sanitized = message.includes('Security Exception') ? 'External credentials configuration error.' : message;
-      res.status(500).json({ error: sanitized });
+      console.error(`Failed to update account settings for user ${userId}:`, error);
+      res.status(500).json({ error: SETTINGS_UPDATE_ERROR });
     }
   });
 

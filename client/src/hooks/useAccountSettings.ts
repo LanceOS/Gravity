@@ -2,8 +2,10 @@ import { useCallback, useEffect, useState } from 'react';
 import type { User } from '../context/TicketContext';
 import {
   DEFAULT_WORKSPACE_SETTINGS,
+  API_KEY_MASK,
   getProviderOption,
   normalizeWorkspaceSettings,
+  type SavedApiCredential,
   type WorkspaceSettings,
 } from '../utils/settings';
 
@@ -11,6 +13,40 @@ interface StatusMessage {
   success: boolean;
   message: string;
 }
+
+function normalizeApiKeyInput(value: string): string {
+  if (value.startsWith(API_KEY_MASK)) {
+    return value.slice(API_KEY_MASK.length);
+  }
+  return value;
+}
+
+function getSavedCredentialForProvider(
+  credentials: SavedApiCredential[],
+  provider: WorkspaceSettings['aiProvider'],
+) {
+  return credentials.find((credential) => credential.provider === provider);
+}
+
+function normalizeSavedCredentials(rawCredentials: unknown): SavedApiCredential[] {
+  if (!Array.isArray(rawCredentials)) {
+    return [];
+  }
+
+  return rawCredentials.filter((credential): credential is SavedApiCredential => {
+    if (!credential || typeof credential !== 'object') {
+      return false;
+    }
+
+    return typeof credential.provider === 'string' && typeof credential.apiKey === 'string';
+  });
+}
+
+const KEY_ACTION: Record<'stored' | 'cleared' | 'pending', 'keep' | 'clear' | 'update'> = {
+  stored: 'keep',
+  cleared: 'clear',
+  pending: 'update',
+};
 
 function shallowEqual<T extends Record<string, any>>(objA: T, objB: T): boolean {
   if (Object.is(objA, objB)) return true;
@@ -60,6 +96,7 @@ export function useAccountSettings({
   const [ollamaModels, setOllamaModels] = useState<string[]>([]);
   const [ollamaModelsLoading, setOllamaModelsLoading] = useState(false);
   const [settingsHydrated, setSettingsHydrated] = useState(false);
+  const [savedCredentials, setSavedCredentials] = useState<SavedApiCredential[]>([]);
   const [apiKeyState, setApiKeyState] = useState<'stored' | 'cleared' | 'pending'>('cleared');
 
   useEffect(() => {
@@ -72,6 +109,15 @@ export function useAccountSettings({
   }, [saveSuccess]);
 
   useEffect(() => {
+    if (!testResult?.success) {
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => setTestResult(null), 3000);
+    return () => window.clearTimeout(timer);
+  }, [testResult]);
+
+  useEffect(() => {
     if (currentUser) {
       return;
     }
@@ -82,6 +128,8 @@ export function useAccountSettings({
     setTestResult(null);
     setTutorialResult(null);
     setOllamaModels([]);
+    setSavedCredentials([]);
+    setApiKeyState('cleared');
     setSettingsHydrated(false);
   }, [currentUser, activeView, theme]);
 
@@ -112,9 +160,10 @@ export function useAccountSettings({
           );
           setSettings(normalized);
           setOriginalSettings(normalized);
+          setSavedCredentials(normalizeSavedCredentials(data.savedCredentials));
           setTheme(normalized.theme);
           setView(normalized.defaultView);
-          setApiKeyState(normalized.apiKey === '••••••••••••' ? 'stored' : 'cleared');
+          setApiKeyState(normalized.apiKey === API_KEY_MASK ? 'stored' : 'cleared');
         }
       })
       .catch((error: Error) => {
@@ -186,22 +235,45 @@ export function useAccountSettings({
   }, [currentUser, settings.ollamaEndpoint, settingsHydrated, refreshOllamaModels]);
 
   const updateSettings = useCallback((updates: Partial<WorkspaceSettings>) => {
-    setSettings((current) => ({ ...current, ...updates }));
+    const nextUpdates = { ...updates };
+    if (typeof nextUpdates.apiKey === 'string') {
+      nextUpdates.apiKey = normalizeApiKeyInput(nextUpdates.apiKey);
+    }
+
+    const providerChanged = typeof nextUpdates.aiProvider === 'string';
+    if (providerChanged) {
+      const selectedCredential = getSavedCredentialForProvider(
+        savedCredentials,
+        nextUpdates.aiProvider as WorkspaceSettings['aiProvider'],
+      );
+
+      nextUpdates.apiKey = selectedCredential ? API_KEY_MASK : '';
+    }
+
+    setSettings((current) => ({ ...current, ...nextUpdates }));
     setSaveSuccess(false);
     setSaveError(null);
 
-    if (updates.apiKey !== undefined) {
-      setApiKeyState(updates.apiKey === '' ? 'cleared' : 'pending');
+    if (providerChanged) {
+      const selectedCredential = getSavedCredentialForProvider(
+        savedCredentials,
+        nextUpdates.aiProvider as WorkspaceSettings['aiProvider'],
+      );
+
+      setApiKeyState(selectedCredential ? 'stored' : 'cleared');
+      setTestResult(null);
+    } else if (nextUpdates.apiKey !== undefined) {
+      setApiKeyState(nextUpdates.apiKey === '' ? 'cleared' : 'pending');
       setTestResult(null);
     }
-    if (updates.aiProvider !== undefined) {
+    if (nextUpdates.aiProvider !== undefined) {
       setTestResult(null);
     }
 
-    if (updates.ollamaEndpoint !== undefined) {
+    if (nextUpdates.ollamaEndpoint !== undefined) {
       setOllamaModels([]);
     }
-  }, []);
+  }, [savedCredentials]);
 
   const saveSettings = useCallback(async () => {
     if (!currentUser) {
@@ -213,11 +285,12 @@ export function useAccountSettings({
     setSaveError(null);
 
     try {
-      const keyAction = apiKeyState === 'pending' ? 'update' : apiKeyState === 'cleared' ? 'clear' : 'keep';
+      const keyAction = KEY_ACTION[apiKeyState];
+      const normalizedApiKey = normalizeApiKeyInput(settings.apiKey).trim();
       const payload = {
         ...settings,
         keyAction,
-        apiKey: keyAction === 'update' ? settings.apiKey : undefined,
+        apiKey: keyAction === 'update' ? normalizedApiKey : undefined,
         ollamaModel: ollamaModels.length > 0 ? settings.ollamaModel : '',
       };
 
@@ -239,9 +312,11 @@ export function useAccountSettings({
       );
       setSettings(normalized);
       setOriginalSettings(normalized);
+      setSavedCredentials(normalizeSavedCredentials(data.savedCredentials));
       setTheme(normalized.theme);
       setView(normalized.defaultView);
-      setApiKeyState(normalized.apiKey === '••••••••••••' ? 'stored' : 'cleared');
+      setApiKeyState(normalized.apiKey === API_KEY_MASK ? 'stored' : 'cleared');
+      setTestResult(null);
       setSaveSuccess(true);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to save account settings.';
@@ -251,9 +326,69 @@ export function useAccountSettings({
     }
   }, [currentUser, settings, apiKeyState, ollamaModels, setTheme, setView]);
 
+  const removeCredential = useCallback(async (provider: WorkspaceSettings['aiProvider']) => {
+    if (!currentUser) {
+      return;
+    }
+
+    setSaveLoading(true);
+    setSaveError(null);
+
+    try {
+      const response = await fetch(`/api/v1/settings/${currentUser.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          credentialProvider: provider,
+          keyAction: 'clear',
+        }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to remove credential.');
+      }
+
+      setSavedCredentials(normalizeSavedCredentials(data.savedCredentials));
+
+      // If the removed provider is the active one, reset the key field
+      setSettings((current) => {
+        if (current.aiProvider !== provider) {
+          return current;
+        }
+        return { ...current, apiKey: '' };
+      });
+      setApiKeyState((current) => {
+        if (settings.aiProvider !== provider) {
+          return current;
+        }
+        return 'cleared';
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to remove credential.';
+      setSaveError(message);
+    } finally {
+      setSaveLoading(false);
+    }
+  }, [currentUser, settings.aiProvider]);
+
+  const resetProviderDraft = useCallback(() => {
+    const selectedCredential = getSavedCredentialForProvider(savedCredentials, settings.aiProvider);
+
+    setSettings((current) => ({
+      ...current,
+      apiKey: selectedCredential ? API_KEY_MASK : '',
+    }));
+    setApiKeyState(selectedCredential ? 'stored' : 'cleared');
+    setTestResult(null);
+    setSaveSuccess(false);
+    setSaveError(null);
+  }, [savedCredentials, settings.aiProvider]);
+
   const testApiKey = useCallback(async () => {
     const provider = getProviderOption(settings.aiProvider);
-    const keyAction = apiKeyState === 'pending' ? 'update' : apiKeyState === 'cleared' ? 'clear' : 'keep';
+    const keyAction = KEY_ACTION[apiKeyState];
+    const normalizedApiKey = normalizeApiKeyInput(settings.apiKey).trim();
 
     if (keyAction === 'clear' || (keyAction === 'keep' && !settings.apiKey)) {
       setTestResult({ success: false, message: `Please enter a ${provider.label} API key to test.` });
@@ -269,7 +404,7 @@ export function useAccountSettings({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           provider: settings.aiProvider,
-          apiKey: keyAction === 'update' ? settings.apiKey.trim() : undefined
+          apiKey: keyAction === 'update' ? normalizedApiKey : undefined
         }),
       });
 
@@ -316,9 +451,28 @@ export function useAccountSettings({
       setTutorialResult({ success: false, message });
     }
   }, [currentUser]);
-
   const baselineSettings = originalSettings ?? normalizeWorkspaceSettings(null, activeView, theme);
-  const hasChanges = !shallowEqual(settings, baselineSettings);
+  const hasChanges = !shallowEqual(
+    {
+      defaultView: settings.defaultView,
+      theme: settings.theme,
+      projectLayout: settings.projectLayout,
+      agentIntegration: settings.agentIntegration,
+      ollamaModel: settings.ollamaModel,
+      ollamaEndpoint: settings.ollamaEndpoint,
+    },
+    {
+      defaultView: baselineSettings.defaultView,
+      theme: baselineSettings.theme,
+      projectLayout: baselineSettings.projectLayout,
+      agentIntegration: baselineSettings.agentIntegration,
+      ollamaModel: baselineSettings.ollamaModel,
+      ollamaEndpoint: baselineSettings.ollamaEndpoint,
+    }
+  );
+  const baselineApiKeyState = baselineSettings.apiKey === API_KEY_MASK ? 'stored' : 'cleared';
+  const hasProviderChanges =
+    settings.aiProvider !== baselineSettings.aiProvider || apiKeyState !== baselineApiKeyState;
 
   return {
     settings,
@@ -329,13 +483,17 @@ export function useAccountSettings({
     testing,
     testResult,
     tutorialResult,
+    savedCredentials,
     ollamaModels,
     ollamaModelsLoading,
     updateSettings,
     saveSettings,
+    removeCredential,
+    resetProviderDraft,
     testApiKey,
     resetTutorial,
     refreshOllamaModels,
+    hasProviderChanges,
     hasChanges,
   };
 }

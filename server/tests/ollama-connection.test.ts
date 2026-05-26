@@ -1,17 +1,11 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { api as baseApi, jsonResponse, seedUser } from './helpers/test-helpers.js';
-import { credentialManager } from '../src/lib/kms/index.js';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import { createAuthenticatedApi, jsonResponse } from './helpers/test-helpers.js';
 import { aiService } from '../src/lib/ai/index.js';
 
-// Custom API wrapper that automatically passes the test user ID header to authenticate all requests.
+let authenticatedApi: Awaited<ReturnType<typeof createAuthenticatedApi>>;
+
 function api() {
-  const client = baseApi();
-  return {
-    get: (url: string) => client.get(url).set('x-user-id', 'mock-user-id'),
-    post: (url: string) => client.post(url).set('x-user-id', 'mock-user-id'),
-    patch: (url: string) => client.patch(url).set('x-user-id', 'mock-user-id'),
-    delete: (url: string) => client.delete(url).set('x-user-id', 'mock-user-id'),
-  };
+  return authenticatedApi;
 }
 
 /**
@@ -45,12 +39,18 @@ describe('Ollama connection & AI proxy routes', () => {
   beforeEach(async () => {
     vi.restoreAllMocks();
     aiService.getOllamaProvider().clearCache();
-    try {
-      await seedUser({ id: 'mock-user-id' });
-      await credentialManager.StoreCredential('mock-user-id', 'sk-test-key');
-    } catch {
-      // ignore
-    }
+    process.env.OPENAI_API_KEY = 'env-openai-test-key';
+    process.env.ANTHROPIC_API_KEY = 'env-anthropic-test-key';
+    process.env.GEMINI_API_KEY = 'env-gemini-test-key';
+    process.env.DEEPSEEK_API_KEY = 'env-deepseek-test-key';
+    authenticatedApi = await createAuthenticatedApi({
+      name: 'Mock User',
+      email: 'mockuser@example.com',
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   // ─── Model listing: happy paths ────────────────────────────────────────────
@@ -443,18 +443,22 @@ describe('Ollama connection & AI proxy routes', () => {
     });
 
     it('returns 502 when a cloud provider is used without configured credentials', async () => {
-      await seedUser({ id: 'no-key-user-id', email: 'nokey@example.com' });
-      const res = await api()
+      const originalOpenAiApiKey = process.env.OPENAI_API_KEY;
+      delete process.env.OPENAI_API_KEY;
+
+      const noKeyApi = await createAuthenticatedApi({ email: 'nokey@example.com' });
+      const res = await noKeyApi
         .post('/api/v1/ai/chat')
-        .set('x-user-id', 'no-key-user-id')
         .send({
           provider: 'openai',
           model: 'gpt-4o-mini',
           messages: [{ role: 'user', content: 'Hello' }],
         });
 
-      expect(res.status).toBe(502);
-      expect(res.body.error).toMatch(/credentials/i);
+      process.env.OPENAI_API_KEY = originalOpenAiApiKey;
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('No API key configured for this account.');
     });
 
     it('returns 400 for an unsupported provider', async () => {
@@ -492,7 +496,7 @@ describe('Ollama connection & AI proxy routes', () => {
         });
 
       expect(res.status).toBe(502);
-      expect(res.body.error).toBeTruthy();
+      expect(res.body.error).toBe('OpenAI request failed.');
     });
   });
 
@@ -538,7 +542,7 @@ describe('Ollama connection & AI proxy routes', () => {
         .send({ provider: 'openai', apiKey: 'sk-bad' });
 
       expect(res.status).toBe(400);
-      expect(res.body.error).toBeTruthy();
+      expect(res.body.error).toBe('Connection verification failed for OpenAI. Check your provider settings and API key.');
     });
 
     it('test-connection returns latency_ms on success', async () => {
@@ -559,7 +563,7 @@ describe('Ollama connection & AI proxy routes', () => {
     it('test-connection returns connected:false when connection fails', async () => {
       vi.stubGlobal(
         'fetch',
-        vi.fn().mockRejectedValueOnce(new TypeError('fetch failed')),
+        vi.fn().mockRejectedValue(new TypeError('fetch failed')),
       );
 
       const res = await api()

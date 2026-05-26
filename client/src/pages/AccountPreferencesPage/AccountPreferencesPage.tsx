@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft,
   Bot,
@@ -7,6 +7,7 @@ import {
   RefreshCw,
   Settings2,
   SlidersHorizontal,
+  Trash2,
   WandSparkles,
 } from 'lucide-react';
 import {
@@ -25,8 +26,10 @@ import { DashboardLayout } from '../../components/DashboardLayout/DashboardLayou
 import type { User } from '../../context/TicketContext';
 import {
   AI_PROVIDER_OPTIONS,
+  API_KEY_MASK,
   getProviderOption,
   type AIProvider,
+  type SavedApiCredential,
   type WorkspaceSettings,
 } from '../../utils/settings';
 
@@ -44,6 +47,7 @@ interface AccountPreferencesPageProps {
   saveLoading: boolean;
   saveSuccess: boolean;
   hasChanges?: boolean;
+  hasProviderChanges?: boolean;
   saveError: string | null;
   testing: boolean;
   testResult: StatusMessage | null;
@@ -53,10 +57,13 @@ interface AccountPreferencesPageProps {
   onBack: () => void;
   onOpenDirectory: () => void;
   onChangeSettings: (updates: Partial<WorkspaceSettings>) => void;
+  onResetProviderDraft: () => void;
+  savedCredentials: SavedApiCredential[];
   onRefreshOllamaModels: () => void;
   onResetTutorial: () => void;
   onSaveSettings: () => void;
   onTestApiKey: () => void;
+  onRemoveCredential: (provider: AIProvider) => void;
 }
 
 const SETTINGS_CATEGORIES: Array<{
@@ -170,20 +177,178 @@ function GeneralSettingsSection({
   );
 }
 
+// ---------------------------------------------------------------------------
+// SavedKeyItem — reusable credential row
+// ---------------------------------------------------------------------------
+function SavedKeyItem({
+  credential,
+  isActive,
+  onRemove,
+}: {
+  credential: SavedApiCredential;
+  isActive: boolean;
+  onRemove: () => void;
+}) {
+  const option = getProviderOption(credential.provider);
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 'var(--space-4)',
+        padding: 'var(--space-3) var(--space-4)',
+        borderRadius: 'var(--radius-md)',
+        border: '1px solid var(--color-border-default)',
+        borderLeft: isActive
+          ? '3px solid var(--color-accent)'
+          : '1px solid var(--color-border-default)',
+        background: 'var(--color-surface-card)',
+      }}
+    >
+      {/* Provider info */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            fontSize: '13px',
+            fontWeight: 600,
+            color: 'var(--color-text-primary)',
+            marginBottom: '2px',
+          }}
+        >
+          {option.label}
+        </div>
+        <div
+          style={{
+            fontSize: '11.5px',
+            fontFamily: 'monospace',
+            color: 'var(--color-text-disabled)',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {credential.apiKey}
+        </div>
+      </div>
+
+      {/* Active label */}
+      <span
+        style={{
+          flexShrink: 0,
+          fontSize: '12px',
+          fontWeight: 500,
+          color: isActive ? 'var(--color-success)' : 'var(--color-text-disabled)',
+        }}
+      >
+        {isActive ? 'Active' : 'Inactive'}
+      </span>
+
+      {/* Remove button */}
+      <Button
+        variant="danger"
+        size="sm"
+        onClick={onRemove}
+        aria-label={`Remove ${option.label} key`}
+        title={`Remove ${option.label} key`}
+      >
+        <Trash2 size={13} aria-hidden="true" />
+      </Button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// SavedKeysCard — separate card listing all stored credentials
+// ---------------------------------------------------------------------------
+function SavedKeysCard({
+  savedCredentials,
+  activeProvider,
+  onRemoveCredential,
+}: {
+  savedCredentials: SavedApiCredential[];
+  activeProvider: AIProvider;
+  onRemoveCredential: (provider: AIProvider) => void;
+}) {
+  return (
+    <Card style={{ padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)' }}>
+      <Stack gap="var(--space-4)">
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+          <div>
+            <h3
+              style={{
+                margin: 0,
+                fontSize: '15px',
+                fontWeight: 600,
+                color: 'var(--color-text-primary)',
+              }}
+            >
+              Saved keys
+            </h3>
+            <p
+              style={{
+                margin: '3px 0 0',
+                fontSize: '12px',
+                color: 'var(--color-text-disabled)',
+                lineHeight: 1.5,
+              }}
+            >
+              Masked credentials stored securely for this account.
+            </p>
+          </div>
+          <span
+            style={{
+              fontSize: '12px',
+              color: 'var(--color-text-disabled)',
+            }}
+          >
+            {savedCredentials.length} saved
+          </span>
+        </div>
+
+        {savedCredentials.length === 0 ? (
+          <Alert type="info">Save a key above to add it to this list.</Alert>
+        ) : (
+          <Stack gap="var(--space-2)">
+            {savedCredentials.map((credential) => (
+              <SavedKeyItem
+                key={credential.provider}
+                credential={credential}
+                isActive={credential.provider === activeProvider}
+                onRemove={() => onRemoveCredential(credential.provider as AIProvider)}
+              />
+            ))}
+          </Stack>
+        )}
+      </Stack>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// CloudProviderSection — entry card (provider selector + key input + actions)
+// ---------------------------------------------------------------------------
 function CloudProviderSection({
   settings,
+  saveLoading,
+  hasProviderChanges,
   testing,
   testResult,
   onChangeSettings,
+  onSaveSettings,
   onTestApiKey,
 }: {
   settings: WorkspaceSettings;
+  saveLoading: boolean;
+  hasProviderChanges: boolean;
   testing: boolean;
   testResult: StatusMessage | null;
   onChangeSettings: (updates: Partial<WorkspaceSettings>) => void;
+  onSaveSettings: () => void;
   onTestApiKey: () => void;
 }) {
   const providerOption = useMemo(() => getProviderOption(settings.aiProvider), [settings.aiProvider]);
+  const hasStoredApiKey = settings.apiKey === API_KEY_MASK;
 
   return (
     <Card style={{ padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)' }}>
@@ -209,15 +374,19 @@ function CloudProviderSection({
           <TextInput
             label={providerOption.keyLabel}
             type="password"
-            value={settings.apiKey}
-            placeholder={providerOption.keyPlaceholder}
+            autoComplete="new-password"
+            value={hasStoredApiKey ? '' : settings.apiKey}
+            placeholder={hasStoredApiKey ? 'Stored in KMS. Enter a new key to replace.' : providerOption.keyPlaceholder}
             onChange={(event) => onChangeSettings({ apiKey: event.target.value })}
           />
         </Grid>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
           <Button variant="default" onClick={onTestApiKey} loading={testing}>
             Test {providerOption.label}
+          </Button>
+          <Button variant="accent" onClick={onSaveSettings} loading={saveLoading} disabled={!hasProviderChanges}>
+            Save Key
           </Button>
         </div>
 
@@ -349,23 +518,35 @@ export function AccountPreferencesPage({
   saveLoading,
   saveSuccess,
   hasChanges,
+  hasProviderChanges = false,
   saveError,
   testing,
   testResult,
+  savedCredentials,
   tutorialResult,
   ollamaModels,
   ollamaModelsLoading,
   onBack,
   onOpenDirectory,
   onChangeSettings,
+  onResetProviderDraft,
   onRefreshOllamaModels,
   onResetTutorial,
   onSaveSettings,
   onTestApiKey,
+  onRemoveCredential,
 }: AccountPreferencesPageProps) {
   const [activeCategory, setActiveCategory] = useState<SettingsCategoryId>('general');
 
   const activeCategoryMeta = SETTINGS_CATEGORIES.find((category) => category.id === activeCategory) || SETTINGS_CATEGORIES[0];
+
+  useEffect(() => {
+    if (activeCategory !== 'providers') {
+      return;
+    }
+
+    onResetProviderDraft();
+  }, [activeCategory, onResetProviderDraft]);
 
   return (
     <DashboardLayout>
@@ -476,13 +657,23 @@ export function AccountPreferencesPage({
               )}
 
               {activeCategory === 'providers' && (
-                <CloudProviderSection
-                  settings={settings}
-                  testing={testing}
-                  testResult={testResult}
-                  onChangeSettings={onChangeSettings}
-                  onTestApiKey={onTestApiKey}
-                />
+                <Stack gap="var(--space-4)">
+                  <CloudProviderSection
+                    settings={settings}
+                    saveLoading={saveLoading}
+                    hasProviderChanges={hasProviderChanges}
+                    testing={testing}
+                    testResult={testResult}
+                    onChangeSettings={onChangeSettings}
+                    onSaveSettings={onSaveSettings}
+                    onTestApiKey={onTestApiKey}
+                  />
+                  <SavedKeysCard
+                    savedCredentials={savedCredentials}
+                    activeProvider={settings.aiProvider}
+                    onRemoveCredential={onRemoveCredential}
+                  />
+                </Stack>
               )}
 
               {activeCategory === 'ollama' && (

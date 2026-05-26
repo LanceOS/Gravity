@@ -17,7 +17,7 @@ import {
   workspaces,
   workspaceSettings,
 } from '../../src/db/schema.js';
-import { ensureUserDefaults } from '../../src/lib/platform.js';
+import { ensureUserDefaults, getUserById } from '../../src/lib/platform.js';
 
 type UserSeed = {
   id: string;
@@ -56,6 +56,15 @@ export function api() {
   return request(createApp());
 }
 
+export function apiForAgent(agent: ReturnType<typeof request.agent>) {
+  return {
+    get: (url: string) => agent.get(url),
+    post: (url: string) => agent.post(url),
+    patch: (url: string) => agent.patch(url),
+    delete: (url: string) => agent.delete(url),
+  };
+}
+
 export async function resetDatabase() {
   const result = await pool.query(`
     SELECT table_name
@@ -86,15 +95,33 @@ export async function seedUser(overrides: Partial<UserSeed> = {}) {
     avatarUrl: overrides.avatarUrl ?? 'https://example.com/avatar.png',
   } satisfies UserSeed;
 
-  await db.insert(authUsers).values({
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    emailVerified: true,
-    image: '',
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  });
+  const existingRows = await db
+    .select({ id: authUsers.id })
+    .from(authUsers)
+    .where(eq(authUsers.id, user.id))
+    .limit(1);
+
+  if (existingRows[0]) {
+    await db
+      .update(authUsers)
+      .set({
+        name: user.name,
+        email: user.email,
+        image: '',
+        updatedAt: new Date(),
+      })
+      .where(eq(authUsers.id, user.id));
+  } else {
+    await db.insert(authUsers).values({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      emailVerified: true,
+      image: '',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  }
 
   await ensureUserDefaults(user.id);
   await db
@@ -106,6 +133,48 @@ export async function seedUser(overrides: Partial<UserSeed> = {}) {
     .where(eq(userProfiles.userId, user.id));
 
   return user;
+}
+
+export async function createAuthenticatedApi(
+  overrides: Partial<UserSeed> & { password?: string } = {},
+) {
+  const agent = request.agent(createApp());
+  const password = overrides.password ?? 'super-secret-password';
+  const name = overrides.name ?? 'Authenticated Test User';
+  const email = overrides.email ?? `user-${Date.now()}@example.com`;
+  const role = overrides.role ?? 'guest_contributor';
+  const avatarUrl = overrides.avatarUrl ?? 'https://example.com/avatar.png';
+
+  const signUpResponse = await agent.post('/api/auth/sign-up').send({
+    name,
+    email,
+    password,
+  });
+
+  if (signUpResponse.status !== 200 || typeof signUpResponse.body?.user?.id !== 'string') {
+    throw new Error(`Failed to create authenticated test user: ${JSON.stringify(signUpResponse.body)}`);
+  }
+
+  const userId = signUpResponse.body.user.id as string;
+  await seedUser({
+    id: userId,
+    name,
+    email,
+    role,
+    avatarUrl,
+  });
+
+  const user = await getUserById(userId);
+  if (!user) {
+    throw new Error(`Failed to load authenticated test user ${userId}.`);
+  }
+
+  return {
+    agent,
+    user,
+    password,
+    ...apiForAgent(agent),
+  };
 }
 
 export async function seedWorkspaceFixture(seed: WorkspaceFixtureSeed = {}) {

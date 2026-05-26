@@ -1,4 +1,4 @@
-import { boolean, customType, index, integer, jsonb, pgTable, primaryKey, serial, text, timestamp } from 'drizzle-orm/pg-core';
+import { boolean, customType, index, integer, jsonb, pgTable, primaryKey, text, timestamp } from 'drizzle-orm/pg-core';
 
 /**
  * @description Custom Drizzle ORM type for storing raw binary data (bytea) in PostgreSQL.
@@ -235,7 +235,8 @@ export const comments = pgTable('comments', {
  * Plaintext keys are never stored.
  */
 export const userExternalCredentials = pgTable('user_external_credentials', {
-  userId: text('user_id').primaryKey(),
+  userId: text('user_id').notNull(),
+  provider: text('provider').notNull(),
   encryptedApiKey: bytea('encrypted_api_key').notNull(),
   encryptedDek: bytea('encrypted_dek').notNull(),
   aesIv: bytea('aes_iv').notNull(),
@@ -243,7 +244,10 @@ export const userExternalCredentials = pgTable('user_external_credentials', {
   kmsKekId: text('kms_kek_id').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => ({
+  pk: primaryKey({ columns: [table.userId, table.provider] }),
+  userIdIdx: index('user_external_credentials_user_id_idx').on(table.userId),
+}));
 
 export const schema = {
   authUsers,

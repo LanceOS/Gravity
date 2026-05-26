@@ -163,14 +163,18 @@ export function AppShellPage() {
     saveError: accountSaveError,
     testing: accountTesting,
     testResult: accountTestResult,
+    savedCredentials: accountSavedCredentials,
     tutorialResult: accountTutorialResult,
     ollamaModels,
     ollamaModelsLoading,
     updateSettings: updateAccountSettings,
     saveSettings: saveAccountSettings,
+    removeCredential: removeCredential,
+    resetProviderDraft,
     testApiKey,
     resetTutorial,
     refreshOllamaModels,
+    hasProviderChanges: accountHasProviderChanges,
     hasChanges: accountHasChanges,
   } = useAccountSettings({
     currentUser,
@@ -647,19 +651,23 @@ export function AppShellPage() {
           saveLoading={accountSaveLoading}
           saveSuccess={accountSaveSuccess}
           hasChanges={accountHasChanges}
+          hasProviderChanges={accountHasProviderChanges}
           saveError={accountSaveError}
           testing={accountTesting}
           testResult={accountTestResult}
+          savedCredentials={accountSavedCredentials}
           tutorialResult={accountTutorialResult}
           ollamaModels={ollamaModels}
           ollamaModelsLoading={ollamaModelsLoading}
           onBack={() => setActiveSection(activeWorkspace ? 'workspace' : 'directory')}
           onOpenDirectory={() => setActiveSection('directory')}
           onChangeSettings={updateAccountSettings}
-          onRefreshOllamaModels={() => void refreshOllamaModels()}
-          onResetTutorial={() => void resetTutorial()}
-          onSaveSettings={() => void saveAccountSettings()}
-          onTestApiKey={() => void testApiKey()}
+          onResetProviderDraft={resetProviderDraft}
+          onRefreshOllamaModels={refreshOllamaModels}
+          onResetTutorial={resetTutorial}
+          onSaveSettings={saveAccountSettings}
+          onTestApiKey={testApiKey}
+          onRemoveCredential={removeCredential}
         />
         {onboarding}
       </>

@@ -1,6 +1,8 @@
 export type AIProvider = 'openai' | 'anthropic' | 'gemini' | 'deepseek';
 export type AgentIntegration = 'ollama' | 'third_party';
 
+export const API_KEY_MASK = '••••••••••••';
+
 export interface WorkspaceSettings {
   defaultView: 'board' | 'list';
   theme: 'dark' | 'coal-black' | 'coffee' | 'marble-blue';
@@ -12,6 +14,13 @@ export interface WorkspaceSettings {
   agentIntegration: AgentIntegration;
 }
 
+export interface SavedApiCredential {
+  provider: AIProvider;
+  apiKey: string;
+  active?: boolean;
+  updatedAt?: string;
+}
+
 export interface ProviderOption {
   value: AIProvider;
   label: string;
@@ -19,29 +28,31 @@ export interface ProviderOption {
   keyPlaceholder: string;
 }
 
+const GENERIC_API_KEY_LABEL = 'API Key';
+
 export const AI_PROVIDER_OPTIONS: ProviderOption[] = [
   {
     value: 'openai',
     label: 'OpenAI',
-    keyLabel: 'OpenAI API Key',
+    keyLabel: GENERIC_API_KEY_LABEL,
     keyPlaceholder: 'sk-...',
   },
   {
     value: 'anthropic',
     label: 'Anthropic',
-    keyLabel: 'Anthropic API Key',
+    keyLabel: GENERIC_API_KEY_LABEL,
     keyPlaceholder: 'sk-ant-...',
   },
   {
     value: 'gemini',
     label: 'Gemini',
-    keyLabel: 'Gemini API Key',
+    keyLabel: GENERIC_API_KEY_LABEL,
     keyPlaceholder: 'AIza...',
   },
   {
     value: 'deepseek',
     label: 'DeepSeek',
-    keyLabel: 'DeepSeek API Key',
+    keyLabel: GENERIC_API_KEY_LABEL,
     keyPlaceholder: 'sk-...',
   },
 ];

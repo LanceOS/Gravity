@@ -20,6 +20,7 @@ const envSchema = z.object({
   MCP_STDIO_WORKSPACE_ID: z.string().optional(),
   MCP_STDIO_ACTOR_USER_ID: z.string().optional(),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  ALLOW_ENV_AI_KEYS: z.coerce.boolean().default(false),
 });
 
 const parsed = envSchema.parse(process.env);
@@ -56,4 +57,5 @@ export const env = {
   mcpStdioWorkspaceId: parsed.MCP_STDIO_WORKSPACE_ID?.trim() || undefined,
   mcpStdioActorUserId: parsed.MCP_STDIO_ACTOR_USER_ID?.trim() || undefined,
   nodeEnv: parsed.NODE_ENV,
+  allowEnvAiKeys: parsed.ALLOW_ENV_AI_KEYS,
 };

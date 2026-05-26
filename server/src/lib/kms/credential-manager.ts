@@ -1,8 +1,12 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
+import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { db } from '../../db/index.js';
+import * as schema from '../../db/schema.js';
 import { userExternalCredentials } from '../../db/schema.js';
 import { IKMSProvider } from './types.js';
+
+type DbClient = NodePgDatabase<typeof schema> | Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 /**
  * @description Manages the secure storage and retrieval of external credentials (e.g., API keys).
@@ -33,15 +37,21 @@ export class CredentialManager {
    */
   async StoreCredential(
     userId: string,
+    provider: string,
     plaintextAPIKey: string,
-    dbClient: Pick<typeof db, 'insert'> = db,
+    dbClient: DbClient = db,
   ): Promise<void> {
     if (!userId) {
       throw new Error('User ID is required to store credentials.');
     }
+    if (!provider) {
+      throw new Error('Provider is required to store credentials.');
+    }
     if (!plaintextAPIKey) {
       throw new Error('API Key cannot be empty.');
     }
+
+    const normalizedProvider = provider.toLowerCase();
 
     // 1. Generate DEK from KMS provider
     const { plaintextDEK, encryptedDEK, kekId } = this.kmsProvider.GenerateDataKey();
@@ -69,6 +79,7 @@ export class CredentialManager {
         .insert(userExternalCredentials)
         .values({
           userId,
+          provider: normalizedProvider,
           encryptedApiKey: ciphertext,
           encryptedDek: encryptedDEK,
           aesIv: iv,
@@ -77,7 +88,7 @@ export class CredentialManager {
           updatedAt: new Date(),
         })
         .onConflictDoUpdate({
-          target: userExternalCredentials.userId,
+          target: [userExternalCredentials.userId, userExternalCredentials.provider],
           set: {
             encryptedApiKey: ciphertext,
             encryptedDek: encryptedDEK,
@@ -106,21 +117,27 @@ export class CredentialManager {
    */
   async ExecuteWithCredential<T>(
     userId: string,
+    provider: string,
     executionCallback: (decryptedAPIKey: string) => Promise<T> | T
   ): Promise<T> {
     if (!userId) {
       throw new Error('User ID is required to execute with credentials.');
     }
+    if (!provider) {
+      throw new Error('Provider is required to execute with credentials.');
+    }
+
+    const normalizedProvider = provider.toLowerCase();
 
     // 1. Fetch user's record from database
     const [record] = await db
       .select()
       .from(userExternalCredentials)
-      .where(eq(userExternalCredentials.userId, userId))
+      .where(and(eq(userExternalCredentials.userId, userId), eq(userExternalCredentials.provider, normalizedProvider)))
       .limit(1);
 
     if (!record) {
-      throw new Error(`Security Exception: No external credentials found for user ${userId}`);
+      throw new Error(`Security Exception: No external credentials found for user ${userId} and provider ${normalizedProvider}`);
     }
 
     let plaintextDEK: Buffer | null = null;
@@ -161,5 +178,36 @@ export class CredentialManager {
         this.secureWipeBuffer(decryptedKeyBuffer);
       }
     }
+  }
+
+  async DeleteCredential(userId: string, provider: string, dbClient: DbClient = db): Promise<void> {
+    if (!userId) {
+      throw new Error('User ID is required to delete credentials.');
+    }
+    if (!provider) {
+      throw new Error('Provider is required to delete credentials.');
+    }
+
+    const normalizedProvider = provider.toLowerCase();
+
+    await dbClient
+      .delete(userExternalCredentials)
+      .where(and(eq(userExternalCredentials.userId, userId), eq(userExternalCredentials.provider, normalizedProvider)));
+  }
+
+  async ListCredentials(userId: string) {
+    if (!userId) {
+      throw new Error('User ID is required to list credentials.');
+    }
+
+    return db
+      .select({
+        provider: userExternalCredentials.provider,
+        createdAt: userExternalCredentials.createdAt,
+        updatedAt: userExternalCredentials.updatedAt,
+      })
+      .from(userExternalCredentials)
+      .where(eq(userExternalCredentials.userId, userId))
+      .orderBy(asc(userExternalCredentials.provider));
   }
 }

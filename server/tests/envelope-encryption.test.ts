@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { randomBytes } from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { db } from '../src/db/index.js';
 import { userExternalCredentials } from '../src/db/schema.js';
 import { LocalEnvKmsProvider } from '../src/lib/kms/local-provider.js';
 import { CredentialManager } from '../src/lib/kms/credential-manager.js';
 import { credentialManager } from '../src/lib/kms/index.js';
-import { api, seedUser } from './helpers/test-helpers.js';
+import { api, createAuthenticatedApi, seedUser } from './helpers/test-helpers.js';
 
 describe('Envelope Encryption & Secure Credential Storage', () => {
   describe('LocalEnvKmsProvider', () => {
@@ -70,13 +70,13 @@ describe('Envelope Encryption & Secure Credential Storage', () => {
       const user = await seedUser({ id: 'test-secure-user-1', email: 'sec1@example.com' });
       const testApiKey = 'sk-proj-super-secret-key-123456';
 
-      await credentialManager.StoreCredential(user.id, testApiKey);
+      await credentialManager.StoreCredential(user.id, 'openai', testApiKey);
 
       // Verify the record was inserted into the database and no plaintext was stored
       const records = await db
         .select()
         .from(userExternalCredentials)
-        .where(eq(userExternalCredentials.userId, user.id));
+        .where(and(eq(userExternalCredentials.userId, user.id), eq(userExternalCredentials.provider, 'openai')));
 
       expect(records.length).toBe(1);
       const record = records[0];
@@ -93,12 +93,12 @@ describe('Envelope Encryption & Secure Credential Storage', () => {
       const user = await seedUser({ id: 'test-secure-user-2', email: 'sec2@example.com' });
       const testApiKey = 'sk-proj-another-secret-999';
 
-      await credentialManager.StoreCredential(user.id, testApiKey);
+      await credentialManager.StoreCredential(user.id, 'openai', testApiKey);
 
       // We spy on fill to ensure wiping is called on plaintext secrets
       const fillSpy = vi.spyOn(Buffer.prototype, 'fill');
 
-      const result = await credentialManager.ExecuteWithCredential(user.id, (apiKey) => {
+      const result = await credentialManager.ExecuteWithCredential(user.id, 'openai', (apiKey) => {
         expect(apiKey).toBe(testApiKey);
         return 'callback-success-value';
       });
@@ -114,13 +114,13 @@ describe('Envelope Encryption & Secure Credential Storage', () => {
       const user = await seedUser({ id: 'test-secure-user-3', email: 'sec3@example.com' });
       const testApiKey = 'sk-tamper-proof';
 
-      await credentialManager.StoreCredential(user.id, testApiKey);
+      await credentialManager.StoreCredential(user.id, 'openai', testApiKey);
 
       // Tamper with the database stored initialization vector (aesIv)
       const [record] = await db
         .select()
         .from(userExternalCredentials)
-        .where(eq(userExternalCredentials.userId, user.id));
+        .where(and(eq(userExternalCredentials.userId, user.id), eq(userExternalCredentials.provider, 'openai')));
 
       const tamperedIv = Buffer.from(record.aesIv);
       tamperedIv[0] ^= 0x01; // flip a bit
@@ -128,38 +128,38 @@ describe('Envelope Encryption & Secure Credential Storage', () => {
       await db
         .update(userExternalCredentials)
         .set({ aesIv: tamperedIv })
-        .where(eq(userExternalCredentials.userId, user.id));
+        .where(and(eq(userExternalCredentials.userId, user.id), eq(userExternalCredentials.provider, 'openai')));
 
       // Attempting to execute with credential should throw due to integrity/GCM verification failure
       await expect(
-        credentialManager.ExecuteWithCredential(user.id, () => {})
+        credentialManager.ExecuteWithCredential(user.id, 'openai', () => {})
       ).rejects.toThrow(/Failed to decrypt credentials. Integrity check failed/);
     });
   });
 
   describe('Integration: Settings Routes with Envelope Encryption', () => {
     it('GET /api/v1/settings/:userId returns an empty apiKey if no credential is set', async () => {
-      const user = await seedUser({ id: 'settings-integ-1', email: 'int1@example.com' });
+      const userApi = await createAuthenticatedApi({ email: 'int1@example.com' });
+      const user = userApi.user;
 
-      const response = await api()
-        .get(`/api/v1/settings/${user.id}`)
-        .set('x-user-id', user.id);
+      const response = await userApi.get(`/api/v1/settings/${user.id}`);
 
       expect(response.status).toBe(200);
       expect(response.body).toMatchObject({
         userId: user.id,
         apiKey: '',
+        savedCredentials: [],
       });
     });
 
     it('PATCH /api/v1/settings/:userId stores and GET returns the envelope encrypted apiKey', async () => {
-      const user = await seedUser({ id: 'settings-integ-2', email: 'int2@example.com' });
+      const userApi = await createAuthenticatedApi({ email: 'int2@example.com' });
+      const user = userApi.user;
       const targetApiKey = 'sk-integration-test-key-555';
 
       // 1. PATCH setting with apiKey using the explicit keyAction: 'update'
-      const patchResponse = await api()
+      const patchResponse = await userApi
         .patch(`/api/v1/settings/${user.id}`)
-        .set('x-user-id', user.id)
         .send({
           keyAction: 'update',
           apiKey: targetApiKey,
@@ -173,48 +173,62 @@ describe('Envelope Encryption & Secure Credential Storage', () => {
         theme: 'coal-black',
       });
 
+      expect(patchResponse.body.savedCredentials).toEqual([
+        expect.objectContaining({
+          provider: 'openai',
+          apiKey: '••••••••••••',
+          active: true,
+        }),
+      ]);
+
       // Verify it exists in user_external_credentials
       const externalRecords = await db
         .select()
         .from(userExternalCredentials)
-        .where(eq(userExternalCredentials.userId, user.id));
+        .where(and(eq(userExternalCredentials.userId, user.id), eq(userExternalCredentials.provider, 'openai')));
       expect(externalRecords.length).toBe(1);
 
       // 2. GET setting should return placeholder seamlessly
-      const getResponse = await api()
-        .get(`/api/v1/settings/${user.id}`)
-        .set('x-user-id', user.id);
+      const getResponse = await userApi.get(`/api/v1/settings/${user.id}`);
 
       expect(getResponse.status).toBe(200);
       expect(getResponse.body).toMatchObject({
         userId: user.id,
         apiKey: '••••••••••••',
         theme: 'coal-black',
+        savedCredentials: [
+          expect.objectContaining({
+            provider: 'openai',
+            apiKey: '••••••••••••',
+            active: true,
+          }),
+        ],
       });
     });
 
     it('PATCH /api/v1/settings/:userId clears credentials when keyAction is clear', async () => {
-      const user = await seedUser({ id: 'settings-integ-3', email: 'int3@example.com' });
+      const userApi = await createAuthenticatedApi({ email: 'int3@example.com' });
+      const user = userApi.user;
 
       // First store a credential
-      await credentialManager.StoreCredential(user.id, 'sk-temp-key');
+      await credentialManager.StoreCredential(user.id, 'openai', 'sk-temp-key');
 
       // Clear the credential via settings PATCH using the explicit keyAction: 'clear'
-      const clearResponse = await api()
+      const clearResponse = await userApi
         .patch(`/api/v1/settings/${user.id}`)
-        .set('x-user-id', user.id)
         .send({
           keyAction: 'clear',
         });
 
       expect(clearResponse.status).toBe(200);
       expect(clearResponse.body.apiKey).toBe('');
+      expect(clearResponse.body.savedCredentials).toEqual([]);
 
       // Verify the credential record is deleted from user_external_credentials
       const externalRecords = await db
         .select()
         .from(userExternalCredentials)
-        .where(eq(userExternalCredentials.userId, user.id));
+        .where(and(eq(userExternalCredentials.userId, user.id), eq(userExternalCredentials.provider, 'openai')));
       expect(externalRecords.length).toBe(0);
     });
   });

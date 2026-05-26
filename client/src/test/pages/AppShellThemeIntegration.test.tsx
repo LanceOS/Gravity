@@ -186,7 +186,7 @@ function buildAccountSettings(overrides: Partial<Record<string, unknown>> = {}) 
   return {
     settings: {
       defaultView: 'board',
-      theme: 'light',
+      theme: 'marble-blue',
       projectLayout: 'condensed',
       aiProvider: 'openai',
       apiKey: '',
@@ -195,9 +195,11 @@ function buildAccountSettings(overrides: Partial<Record<string, unknown>> = {}) 
       agentIntegration: 'ollama',
     },
     settingsLoading: false,
+      resetProviderDraft: vi.fn(),
     saveLoading: false,
     saveSuccess: false,
     saveError: null,
+    hasProviderChanges: false,
     testing: false,
     testResult: null,
     tutorialResult: null,
@@ -289,12 +291,12 @@ describe('AppShellPage theme integration', () => {
     renderAppShell();
 
     await waitFor(() => {
-      expect(document.documentElement).toHaveAttribute('data-theme', 'light');
+      expect(document.documentElement).toHaveAttribute('data-theme', 'marble-blue');
       expect(document.documentElement).toHaveAttribute('data-density', 'compact');
-      expect(document.documentElement.style.getPropertyValue('--color-surface-elevated')).toBe('rgba(255, 255, 255, 0.92)');
-      expect(document.documentElement.style.getPropertyValue('--color-overlay-scrim')).toBe('rgba(9, 9, 11, 0.7)');
+      expect(document.documentElement.style.getPropertyValue('--color-surface-elevated')).toBe('rgba(255, 255, 255, 0.95)');
+      expect(document.documentElement.style.getPropertyValue('--color-overlay-scrim')).toBe('rgba(15, 23, 42, 0.7)');
       expect(document.documentElement.style.getPropertyValue('--space-base-multiplier')).toBe('0.75');
-      expect(window.localStorage.getItem('gravity_theme')).toBe('light');
+      expect(window.localStorage.getItem('gravity_theme')).toBe('marble-blue');
     });
   });
 });

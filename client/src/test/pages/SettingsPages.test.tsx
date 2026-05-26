@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SettingsScreen as SettingsPage } from '../../modules/settings';
 import { AccountPreferencesPage } from '../../pages/AccountPreferencesPage/AccountPreferencesPage.tsx';
 import type { WorkspaceSummary } from '../../hooks/useWorkspaceDirectory.ts';
+import { API_KEY_MASK } from '../../utils/settings.ts';
 
 const currentUser = {
   id: 'user-1',
@@ -69,6 +70,7 @@ function renderSettingsPage(overrides: Partial<Parameters<typeof SettingsPage>[0
         avatar: '',
         role: 'owner',
         createdAt: '2026-05-01T09:00:00.000Z',
+        savedCredentials: [],
         lastActiveAt: new Date().toISOString(), // Today
       },
       {
@@ -150,14 +152,17 @@ function renderAccountPreferencesPage(overrides: Partial<Parameters<typeof Accou
     saveLoading: false,
     saveSuccess: false,
     saveError: null,
+    hasProviderChanges: false,
     testing: false,
     testResult: null,
+    savedCredentials: [],
     tutorialResult: null,
     ollamaModels: ['llama3', 'phi3'],
     ollamaModelsLoading: false,
     onBack: vi.fn(),
     onOpenDirectory: vi.fn(),
     onChangeSettings: vi.fn(),
+    onResetProviderDraft: vi.fn(),
     onRefreshOllamaModels: vi.fn(),
     onResetTutorial: vi.fn(),
     onSaveSettings: vi.fn(),
@@ -344,17 +349,21 @@ describe('AccountPreferencesPage', () => {
   it('switches provider, ollama, and onboarding sections and forwards actions', async () => {
     const user = userEvent.setup();
     const { props } = renderAccountPreferencesPage({
+      hasProviderChanges: true,
       testResult: { success: true, message: 'Provider connection ok.' },
       tutorialResult: { success: true, message: 'Tutorial will replay on next load.' },
     });
 
     await user.click(screen.getByRole('button', { name: /Cloud AI/i }));
     expect(screen.getByText('Cloud AI provider')).toBeInTheDocument();
+    expect(props.onResetProviderDraft).toHaveBeenCalledTimes(1);
     await user.click(screen.getByRole('button', { name: 'Provider' }));
     await user.click(screen.getByRole('option', { name: 'Anthropic' }));
     expect(props.onChangeSettings).toHaveBeenCalledWith({ aiProvider: 'anthropic' });
     await user.click(screen.getByRole('button', { name: 'Test OpenAI' }));
     expect(props.onTestApiKey).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole('button', { name: 'Save Key' }));
+    expect(props.onSaveSettings).toHaveBeenCalledTimes(1);
     expect(screen.getByText('Provider connection ok.')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /Ollama/i }));
@@ -370,5 +379,39 @@ describe('AccountPreferencesPage', () => {
     await user.click(screen.getByRole('button', { name: 'Reset & Start Tutorial' }));
     expect(props.onResetTutorial).toHaveBeenCalledTimes(1);
     expect(screen.getByText('Tutorial will replay on next load.')).toBeInTheDocument();
+  });
+
+  it('shows saved cloud keys with active and inactive tags', async () => {
+    const user = userEvent.setup();
+
+    renderAccountPreferencesPage({
+      savedCredentials: [
+        { provider: 'openai', apiKey: API_KEY_MASK },
+        { provider: 'anthropic', apiKey: API_KEY_MASK },
+      ],
+    });
+
+    await user.click(screen.getByRole('button', { name: /Cloud AI/i }));
+
+    expect(screen.getByText('Saved keys')).toBeInTheDocument();
+    expect(screen.getByText('2 saved')).toBeInTheDocument();
+    expect(screen.getAllByText('OpenAI')).toHaveLength(2);
+    expect(screen.getByText('Anthropic')).toBeInTheDocument();
+    expect(screen.getByText('Active')).toBeInTheDocument();
+    expect(screen.getByText('Inactive')).toBeInTheDocument();
+    expect(screen.getAllByText(API_KEY_MASK)).toHaveLength(2);
+  });
+
+  it('allows pasting an API key into the cloud provider field', async () => {
+    const user = userEvent.setup();
+    const { props } = renderAccountPreferencesPage();
+
+    await user.click(screen.getByRole('button', { name: /Cloud AI/i }));
+    const apiKeyInput = screen.getByLabelText('API Key');
+
+    await user.click(apiKeyInput);
+    await user.paste('sk-pasted-test-key');
+
+    expect(props.onChangeSettings).toHaveBeenCalledWith({ apiKey: 'sk-pasted-test-key' });
   });
 });

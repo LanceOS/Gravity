@@ -1,8 +1,8 @@
 import React from 'react';
 import { Sun, Moon, Laptop } from 'lucide-react';
-import { applyThemePreference, getStoredThemePreference, THEME_STORAGE_KEY } from '../../utilities/themeEngine';
+import { applyThemePreference, getStoredThemePreference, THEME_STORAGE_KEY, type ThemePreference } from '../../utilities/themeEngine';
 
-export type ThemeMode = 'light' | 'dark' | 'system';
+export type ThemeMode = ThemePreference;
 
 export function ThemeToggle() {
   const [theme, setTheme] = React.useState<ThemeMode>(() => {
@@ -25,7 +25,7 @@ export function ThemeToggle() {
   }, [theme]);
 
   const toggleTheme = () => {
-    const modes: ThemeMode[] = ['light', 'dark', 'system'];
+    const modes: ThemeMode[] = ['marble-blue', 'dark', 'coal-black', 'coffee', 'system'];
     const currentIndex = modes.indexOf(theme);
     const nextIndex = (currentIndex + 1) % modes.length;
     const nextTheme = modes[nextIndex];
@@ -52,8 +52,10 @@ export function ThemeToggle() {
         cursor: 'pointer',
       }}
     >
-      {theme === 'light' && <Sun size={15} style={{ color: 'var(--color-text-secondary)' }} />}
-      {theme === 'dark' && <Moon size={15} style={{ color: 'var(--color-primary)' }} />}
+      {theme === 'marble-blue' && <Sun size={15} style={{ color: 'var(--color-text-secondary)' }} />}
+      {(theme === 'dark' || theme === 'coal-black' || theme === 'coffee') && (
+        <Moon size={15} style={{ color: 'var(--color-primary)' }} />
+      )}
       {theme === 'system' && <Laptop size={15} style={{ color: 'var(--color-text-disabled)' }} />}
     </button>
   );

@@ -1,6 +1,7 @@
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useAccountSettings } from '../../hooks/useAccountSettings.ts';
+import { API_KEY_MASK } from '../../utils/settings.ts';
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -30,12 +31,16 @@ describe('useAccountSettings', () => {
         jsonResponse({
           userId: currentUser.id,
           defaultView: 'list',
-          theme: 'light',
+          theme: 'coffee',
           ollamaModel: 'llama3.2',
           ollamaEndpoint: 'http://ollama.internal:11434',
           projectLayout: 'condensed',
-          apiKey: '',
+          apiKey: API_KEY_MASK,
           aiProvider: 'anthropic',
+          savedCredentials: [
+            { provider: 'openai', apiKey: API_KEY_MASK },
+            { provider: 'anthropic', apiKey: API_KEY_MASK },
+          ],
         })
       )
       .mockResolvedValueOnce(jsonResponse({ models: ['llama3.2'] }));
@@ -45,7 +50,7 @@ describe('useAccountSettings', () => {
     const { result, rerender } = renderHook(
       (props: {
         activeView: 'board' | 'list';
-        theme: 'dark' | 'light';
+        theme: 'dark' | 'coal-black' | 'coffee' | 'marble-blue';
       }) =>
         useAccountSettings({
           currentUser,
@@ -69,21 +74,136 @@ describe('useAccountSettings', () => {
 
     expect(result.current.settings).toMatchObject({
       defaultView: 'list',
-      theme: 'light',
+      theme: 'coffee',
       projectLayout: 'condensed',
       aiProvider: 'anthropic',
       ollamaModel: 'llama3.2',
     });
-    expect(setTheme).toHaveBeenCalledWith('light');
+    expect(result.current.savedCredentials).toHaveLength(2);
+    expect(setTheme).toHaveBeenCalledWith('coffee');
     expect(setView).toHaveBeenCalledWith('list');
     expect(fetchMock).toHaveBeenCalledTimes(2);
 
-    rerender({ activeView: 'list', theme: 'light' });
+    act(() => {
+      result.current.updateSettings({ aiProvider: 'openai' });
+    });
+
+    expect(result.current.settings.aiProvider).toBe('openai');
+    expect(result.current.settings.apiKey).toBe(API_KEY_MASK);
+
+    act(() => {
+      result.current.updateSettings({ apiKey: 'sk-unsaved-replacement' });
+    });
+
+    expect(result.current.settings.apiKey).toBe('sk-unsaved-replacement');
+
+    act(() => {
+      result.current.resetProviderDraft();
+    });
+
+    expect(result.current.settings.apiKey).toBe(API_KEY_MASK);
+
+    act(() => {
+      result.current.updateSettings({ aiProvider: 'deepseek' });
+    });
+
+    expect(result.current.settings.apiKey).toBe('');
+
+    act(() => {
+      result.current.updateSettings({ apiKey: 'sk-deepseek-unsaved' });
+    });
+
+    expect(result.current.settings.apiKey).toBe('sk-deepseek-unsaved');
+
+    act(() => {
+      result.current.resetProviderDraft();
+    });
+
+    expect(result.current.settings.apiKey).toBe('');
+
+    rerender({ activeView: 'list', theme: 'coffee' });
 
     await waitFor(() => {
       expect(result.current.settings.defaultView).toBe('list');
     });
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('decouples general settings hasChanges from cloud provider/api key hasProviderChanges', async () => {
+    const currentUser = {
+      id: 'user-settings-2',
+      name: 'Grace Hopper',
+      email: 'grace@example.com',
+      avatar: '',
+      role: 'developer',
+      tutorial_completed: 1,
+    };
+    const setTheme = vi.fn();
+    const setView = vi.fn();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          userId: currentUser.id,
+          defaultView: 'board',
+          theme: 'dark',
+          ollamaModel: 'llama3',
+          ollamaEndpoint: 'http://localhost:11434',
+          projectLayout: 'standard',
+          apiKey: '',
+          aiProvider: 'openai',
+          savedCredentials: [],
+        })
+      );
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { result } = renderHook(() =>
+      useAccountSettings({
+        currentUser,
+        activeView: 'board',
+        theme: 'dark',
+        setTheme,
+        setView,
+      })
+    );
+
+    await waitFor(() => {
+      expect(result.current.settingsLoading).toBe(false);
+    });
+
+    // Baseline state: no changes, no provider changes
+    expect(result.current.hasChanges).toBe(false);
+    expect(result.current.hasProviderChanges).toBe(false);
+
+    // Update general preference defaultView
+    act(() => {
+      result.current.updateSettings({ defaultView: 'list' });
+    });
+    // Should flag general hasChanges, but no provider changes
+    expect(result.current.hasChanges).toBe(true);
+    expect(result.current.hasProviderChanges).toBe(false);
+
+    // Reset back to baseline
+    act(() => {
+      result.current.updateSettings({ defaultView: 'board' });
+    });
+    expect(result.current.hasChanges).toBe(false);
+
+    // Update API Key
+    act(() => {
+      result.current.updateSettings({ apiKey: 'sk-new-api-key' });
+    });
+    // Should flag provider changes, but NOT general hasChanges (decoupled!)
+    expect(result.current.hasChanges).toBe(false);
+    expect(result.current.hasProviderChanges).toBe(true);
+
+    // Update provider
+    act(() => {
+      result.current.updateSettings({ aiProvider: 'anthropic' });
+    });
+    // Should flag provider changes, but NOT general hasChanges
+    expect(result.current.hasChanges).toBe(false);
+    expect(result.current.hasProviderChanges).toBe(true);
   });
 });

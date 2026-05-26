@@ -23,7 +23,7 @@ async function main() {
     ollamaModel: '',
     ollamaEndpoint: 'http://localhost:11434',
     projectLayout: 'standard',
-    apiKey: '',
+    keyAction: 'keep',
     aiProvider: 'openai',
     agentIntegration: 'ollama'
   }));
