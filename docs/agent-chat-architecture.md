@@ -18,8 +18,8 @@ The system supports multiple providers including OpenAI, Anthropic, Gemini, Deep
    - The LLM decides if it needs to call an MCP tool to fulfill the request.
    - If a tool is called, the request routes through the `McpRequestHandler`.
    - The handler verifies authorization and proxies the request to the specific tool class (e.g., `TicketTools`).
-6. **State Sanitization:** Before the tool output is returned to the LLM, it passes through the `StateMap` desanitization layer (see Safeguards below).
-7. **Final Response:** The LLM receives the sanitized tool data and synthesizes a final, human-readable response back to the user.
+6. **State Sanitization:** Before the tool output is returned to the LLM, it passes through the `StateMap` sanitization layer (see Safeguards below).
+7. **Final Response:** The LLM receives the sanitized tool output and synthesizes a final, human-readable response back to the user.
 
 ## Limitations & Safeguards
 
