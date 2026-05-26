@@ -60,7 +60,16 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   const toggleTheme = React.useCallback(() => {
-    setTheme(theme === 'light' ? 'dark' : 'light');
+    switch (theme) {
+      case 'light':
+        setTheme('dark');
+        break;
+      case 'dark':
+        setTheme('light');
+        break;
+      default:
+        break;
+    }
   }, [theme, setTheme]);
 
   return (
