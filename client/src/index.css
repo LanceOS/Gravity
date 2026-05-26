@@ -299,7 +299,6 @@ button.clickable:not(.btn):hover {
 
 .input:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-state-selected-bg);
   background-color: var(--color-surface-card);
 }
 
