@@ -6,6 +6,7 @@ import { credentialManager } from '../lib/kms/index.js';
 import { getUserSettingsRecord } from '../lib/platform.js';
 import { resolveRequestActorUserId } from '../lib/request-auth.js';
 import { validateOllamaUrl } from '../lib/ai/utils.js';
+import { aiService } from '../lib/ai/index.js';
 
 const DEFAULT_VIEWS = new Set(['board', 'list']);
 const THEMES = new Set(['dark', 'coal-black', 'coffee', 'marble-blue']);
@@ -29,6 +30,7 @@ function getCredentialListSummary(
     provider: credential.provider,
     apiKey: API_KEY_MASK,
     active: credential.provider === activeProvider,
+    preferredModel: credential.preferredModel ?? '',
     updatedAt: credential.updatedAt,
   }));
 }
@@ -194,6 +196,16 @@ export function createSettingsRouter() {
         return;
       }
 
+      let preferredModel: string | undefined = undefined;
+      if (keyAction === 'update') {
+        const rawKey = (incomingApiKey as string).trim();
+        try {
+          preferredModel = await aiService.fetchAndChooseBestModel(providerForCredential, rawKey);
+        } catch (error) {
+          console.warn(`Failed to auto-select preferred model for ${providerForCredential}:`, error);
+        }
+      }
+
       // Perform all database modifications in a single atomic transaction block
       const { settings: merged, apiKeyPlaceholder } = await db.transaction(async (tx) => {
         let placeholder: string;
@@ -203,7 +215,7 @@ export function createSettingsRouter() {
           placeholder = '';
         } else if (keyAction === 'update') {
           const rawKey = (incomingApiKey as string).trim();
-          await credentialManager.StoreCredential(userId, providerForCredential, rawKey, tx);
+          await credentialManager.StoreCredential(userId, providerForCredential, rawKey, preferredModel, tx);
           placeholder = API_KEY_MASK;
         } else {
           // 'keep': leave credentials unchanged

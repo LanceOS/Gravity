@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { randomBytes } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
 import { db } from '../src/db/index.js';
@@ -138,6 +138,19 @@ describe('Envelope Encryption & Secure Credential Storage', () => {
   });
 
   describe('Integration: Settings Routes with Envelope Encryption', () => {
+    beforeEach(() => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ data: [{ id: 'gpt-4o-mini' }] }),
+        text: async () => JSON.stringify({ data: [{ id: 'gpt-4o-mini' }] }),
+      }));
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
     it('GET /api/v1/settings/:userId returns an empty apiKey if no credential is set', async () => {
       const userApi = await createAuthenticatedApi({ email: 'int1@example.com' });
       const user = userApi.user;
@@ -230,6 +243,54 @@ describe('Envelope Encryption & Secure Credential Storage', () => {
         .from(userExternalCredentials)
         .where(and(eq(userExternalCredentials.userId, user.id), eq(userExternalCredentials.provider, 'openai')));
       expect(externalRecords.length).toBe(0);
+    });
+
+    it('PATCH /api/v1/settings/:userId fetches and stores the most cost effective MCP model', async () => {
+      const userApi = await createAuthenticatedApi({ email: 'int4@example.com' });
+      const user = userApi.user;
+      const targetApiKey = 'sk-mcp-cost-test-key';
+
+      // 1. Stub fetch to return multiple models, including gpt-4o-mini and gpt-4o
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          data: [
+            { id: 'gpt-4o' },
+            { id: 'gpt-4o-mini' },
+            { id: 'some-other-model' }
+          ]
+        }),
+      }));
+
+      // 2. PATCH setting with apiKey using keyAction: 'update'
+      const patchResponse = await userApi
+        .patch(`/api/v1/settings/${user.id}`)
+        .send({
+          keyAction: 'update',
+          apiKey: targetApiKey,
+          aiProvider: 'openai',
+        });
+
+      expect(patchResponse.status).toBe(200);
+
+      // 3. Verify in user_external_credentials that preferredModel is saved as the most cost-effective one (gpt-4o-mini)
+      const externalRecords = await db
+        .select()
+        .from(userExternalCredentials)
+        .where(and(eq(userExternalCredentials.userId, user.id), eq(userExternalCredentials.provider, 'openai')));
+      expect(externalRecords.length).toBe(1);
+      expect(externalRecords[0].preferredModel).toBe('gpt-4o-mini');
+
+      // 4. Verify savedCredentials list has the preferredModel
+      expect(patchResponse.body.savedCredentials).toEqual([
+        expect.objectContaining({
+          provider: 'openai',
+          apiKey: '••••••••••••',
+          active: true,
+          preferredModel: 'gpt-4o-mini',
+        }),
+      ]);
     });
   });
 });

@@ -81,6 +81,27 @@ export class AnthropicProvider implements IAiProvider {
     }
   }
 
+  async fetchModels(apiKey: string): Promise<string[]> {
+    if (!apiKey) {
+      throw new Error('API key is required.');
+    }
+
+    const response = await fetchWithTimeout('https://api.anthropic.com/v1/models', {
+      method: 'GET',
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+    }, 10000, 3);
+
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response, 'Failed to fetch Anthropic models.'));
+    }
+
+    const data = (await response.json()) as any;
+    return (data.data || []).map((m: any) => m.id);
+  }
+
   private mapMessages(messages: any[]): any[] {
     const result: any[] = [];
     for (const m of messages) {

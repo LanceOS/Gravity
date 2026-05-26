@@ -242,6 +242,7 @@ export const userExternalCredentials = pgTable('user_external_credentials', {
   aesIv: bytea('aes_iv').notNull(),
   aesAuthTag: bytea('aes_auth_tag').notNull(),
   kmsKekId: text('kms_kek_id').notNull(),
+  preferredModel: text('preferred_model'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({

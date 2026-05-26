@@ -175,3 +175,59 @@ export async function readErrorMessage(response: Response, fallback: string): Pr
   }
 }
 
+export function chooseBestMcpModel(provider: string, models: string[]): string {
+  const lowerProvider = provider.toLowerCase();
+
+  if (lowerProvider === 'openai') {
+    const mcpModels = ['gpt-4o-mini', 'gpt-4o'];
+    for (const m of mcpModels) {
+      if (models.includes(m)) return m;
+    }
+    return 'gpt-4o-mini';
+  }
+
+  if (lowerProvider === 'deepseek') {
+    const mcpModels = ['deepseek-chat', 'deepseek-reasoner'];
+    for (const m of mcpModels) {
+      if (models.includes(m)) return m;
+    }
+    return 'deepseek-chat';
+  }
+
+  if (lowerProvider === 'anthropic') {
+    const mcpModels = [
+      'claude-3-haiku-20240307',
+      'claude-3-haiku',
+      'claude-3-5-haiku-20241022',
+      'claude-3-5-haiku',
+      'claude-3-5-sonnet-20241022',
+      'claude-3-5-sonnet-20240620',
+      'claude-3-5-sonnet'
+    ];
+    for (const m of mcpModels) {
+      if (models.includes(m)) return m;
+    }
+    return 'claude-3-haiku-20240307';
+  }
+
+  if (lowerProvider === 'gemini') {
+    const mcpModels = [
+      'gemini-1.5-flash',
+      'gemini-2.0-flash',
+      'gemini-1.5-pro',
+      'gemini-1.0-pro'
+    ];
+    for (const m of mcpModels) {
+      const match = models.find(available => 
+        available === m || 
+        available.replace(/^models\//, '') === m ||
+        available.includes(m)
+      );
+      if (match) return match.replace(/^models\//, '');
+    }
+    return 'gemini-1.5-flash';
+  }
+
+  return '';
+}
+

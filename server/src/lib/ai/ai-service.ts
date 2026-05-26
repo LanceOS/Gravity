@@ -5,6 +5,7 @@ import { GeminiProvider } from './gemini-provider.js';
 import { OllamaProvider } from './ollama-provider.js';
 import { ChatOptions, IAiProvider } from './types.js';
 import { env } from '../../env.js';
+import { chooseBestMcpModel } from './utils.js';
 
 const PROVIDER_ENV_TOKEN_NAMES: Record<string, string> = {
   openai: 'OPENAI_API_KEY',
@@ -125,5 +126,15 @@ export class AiService {
     }
 
     return Date.now() - startedAt;
+  }
+
+  async fetchAndChooseBestModel(provider: string, apiKey: string): Promise<string> {
+    const lower = provider.toLowerCase();
+    const providerInst = this.getProvider(lower);
+    if (!providerInst.fetchModels) {
+      throw new Error(`fetchModels is not supported by provider ${provider}`);
+    }
+    const models = await providerInst.fetchModels(apiKey);
+    return chooseBestMcpModel(lower, models);
   }
 }

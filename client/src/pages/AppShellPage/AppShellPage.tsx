@@ -788,7 +788,11 @@ export function AppShellPage() {
                 <LocalAIChat
                   onClose={handleToggleOllama}
                   initialOllamaUrl={accountSettings.ollamaEndpoint}
-                  initialModel={accountSettings.ollamaModel || ollamaModels[0] || ''}
+                  initialModel={
+                    accountSettings.agentIntegration === 'third_party'
+                      ? (accountSavedCredentials.find((c) => c.provider === accountSettings.aiProvider)?.preferredModel || '')
+                      : (accountSettings.ollamaModel || ollamaModels[0] || '')
+                  }
                   settings={accountSettings}
                   workspaceId={activeWorkspaceId}
                   isClosing={isOllamaClosing}
