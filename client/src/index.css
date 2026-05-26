@@ -302,6 +302,12 @@ button.clickable:not(.btn):hover {
   background-color: var(--color-surface-card);
 }
 
+.input.auto-grow {
+  field-sizing: content;
+  resize: none;
+  overflow-y: hidden;
+}
+
 .input::placeholder {
   color: var(--color-text-disabled);
   opacity: 0.8;

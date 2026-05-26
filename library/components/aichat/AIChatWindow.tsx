@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Cpu, Loader2, Send, X } from 'lucide-react';
-import { DenseTextInput } from '../densetextinput';
+import { DenseTextarea } from '../densetextarea';
 import { AIChatMessageBubble } from './AIChatMessage';
 import type { AIChatMessage } from './types';
 
@@ -172,17 +172,28 @@ export function AIChatWindow({
 
       {/* Input bar */}
       <div style={{ padding: '12px', borderTop: '1px solid var(--color-border-default)' }}>
-        <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '6px' }}>
-          <DenseTextInput
+        <form onSubmit={handleSubmit} style={{ display: 'flex', alignItems: 'flex-end', gap: '6px' }}>
+          <DenseTextarea
             placeholder={placeholder}
             value={chatInput}
             onChange={(e) => setChatInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                if (chatInput.trim() && !isGenerating) {
+                  onSendMessage(chatInput);
+                  setChatInput('');
+                }
+              }
+            }}
+            autoGrow
+            style={{ flex: 1 }}
           />
           <button
             type="submit"
             aria-label="Send message"
             className="btn btn-primary clickable"
-            style={{ width: '32px', height: '32px', padding: 0 }}
+            style={{ width: '32px', height: '32px', flexShrink: 0, padding: 0 }}
           >
             <Send size={12} />
           </button>

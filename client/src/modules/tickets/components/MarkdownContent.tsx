@@ -195,17 +195,60 @@ export function MarkdownContent({ text }: MarkdownTextProps) {
   return (
     <>
       {text.split('\n').map((line, lineIndex) => {
-        if (line.startsWith('# ')) {
-          return <h2 key={lineIndex} style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text-primary)', margin: '12px 0 6px' }}>{line.replace('# ', '')}</h2>;
+        // Headers (1-6 hashes)
+        const headingMatch = line.match(/^(#{1,6})\s+(.*)$/);
+        if (headingMatch) {
+          const level = headingMatch[1].length;
+          const content = headingMatch[2];
+          const Tag = `h${Math.min(level + 1, 6)}` as keyof JSX.IntrinsicElements;
+          
+          const fontSizes = { 1: '16px', 2: '14px', 3: '13px', 4: '12px', 5: '12px', 6: '12px' };
+          const fontSize = fontSizes[level as keyof typeof fontSizes] || '16px';
+          const margin = level === 1 ? '12px 0 6px' : '10px 0 4px';
+          
+          return React.createElement(Tag, {
+            key: lineIndex,
+            style: { fontSize, fontWeight: 600, color: 'var(--color-text-primary)', margin }
+          }, <FormattedText text={content} />);
         }
 
-        if (line.startsWith('## ')) {
-          return <h3 key={lineIndex} style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-primary)', margin: '10px 0 4px' }}>{line.replace('## ', '')}</h3>;
+        // Blockquotes
+        if (line.trim().startsWith('> ')) {
+          const content = line.replace(/^\s*>\s+/, '');
+          return (
+            <blockquote key={lineIndex} style={{ borderLeft: '3px solid var(--color-border-default)', paddingLeft: '12px', margin: '8px 0', color: 'var(--color-text-secondary)' }}>
+              <FormattedText text={content} />
+            </blockquote>
+          );
         }
 
+        // Unordered lists and Task lists
         if (line.trim().startsWith('* ') || line.trim().startsWith('- ')) {
           const content = line.replace(/^\s*[*-]\s+/, '');
+          
+          // Task list check
+          const taskMatch = content.match(/^\[([ xX])\]\s+(.*)$/);
+          if (taskMatch) {
+            const isChecked = taskMatch[1].toLowerCase() === 'x';
+            return (
+              <li key={lineIndex} style={{ marginLeft: '12px', fontSize: '13px', margin: '2px 0', listStyle: 'none', display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+                <input type="checkbox" checked={isChecked} readOnly style={{ marginTop: '2px' }} />
+                <span><FormattedText text={taskMatch[2]} /></span>
+              </li>
+            );
+          }
+          
           return <li key={lineIndex} style={{ marginLeft: '12px', fontSize: '13px', margin: '2px 0' }}><FormattedText text={content} /></li>;
+        }
+
+        // Numbered lists
+        const numberedMatch = line.trim().match(/^(\d+)\.\s+(.*)$/);
+        if (numberedMatch) {
+          return (
+            <li key={lineIndex} style={{ marginLeft: '12px', fontSize: '13px', margin: '2px 0', listStyleType: 'decimal' }}>
+              <FormattedText text={numberedMatch[2]} />
+            </li>
+          );
         }
 
         return (

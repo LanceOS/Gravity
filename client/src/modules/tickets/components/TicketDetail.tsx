@@ -159,14 +159,19 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
           {/* Title Area */}
           <div>
             {isEditingTitle ? (
-              <input 
-                type="text"
+              <Textarea 
                 className="input"
-                style={{ fontSize: '22px', fontWeight: 600, padding: '6px 10px' }}
+                style={{ fontSize: '22px', fontWeight: 600, padding: '6px 10px', minHeight: '38px' }}
                 value={titleValue}
                 onChange={(e) => setTitleValue(e.target.value)}
                 onBlur={handleTitleBlur}
-                onKeyDown={(e) => e.key === 'Enter' && handleTitleBlur()}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleTitleBlur();
+                  }
+                }}
+                autoGrow
                 autoFocus
               />
             ) : (
@@ -208,12 +213,12 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
 
             {isEditingDesc ? (
               <Textarea 
-                rows={8}
-                style={{ fontFamily: 'var(--mono)', fontSize: '13px', lineHeight: '1.6', resize: 'vertical' }}
+                style={{ fontFamily: 'var(--mono)', fontSize: '13px', lineHeight: '1.6' }}
                 value={descValue}
                 onChange={(e) => setDescValue(e.target.value)}
                 placeholder="Describe your issue using markdown..."
                 onBlur={handleDescBlur}
+                autoGrow
                 autoFocus
               />
             ) : (
@@ -516,10 +521,10 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                       {editingCommentId === comment.id ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
                           <Textarea
-                            rows={3}
                             value={editingCommentBody}
                             onChange={(e) => setEditingCommentBody(e.target.value)}
                             style={{ fontSize: '13px', lineHeight: '1.5', fontFamily: 'inherit' }}
+                            autoGrow
                             autoFocus
                           />
                           <div style={{ display: 'flex', gap: '6px', alignSelf: 'flex-end' }}>
@@ -555,16 +560,18 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             </div>
 
             {/* Post comment form */}
-            <form onSubmit={handlePostComment} style={{ display: 'flex', gap: '10px', marginTop: '12px', width: '100%' }}>
-              <TextInput 
+            <form onSubmit={handlePostComment} style={{ display: 'flex', alignItems: 'flex-end', gap: '10px', marginTop: '12px', width: '100%' }}>
+              <Textarea 
                 placeholder="Post updates, links, or mention PRs..."
                 value={commentInput}
                 onChange={(e) => setCommentInput(e.target.value)}
+                style={{ flex: 1 }}
+                autoGrow
               />
               <Button
                 type="submit" 
                 variant="primary"
-                style={{ padding: '8px 16px' }}
+                style={{ padding: '8px 16px', height: '34px' }}
               >
                 <Send size={12} />
                 <span>Comment</span>
