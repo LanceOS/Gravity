@@ -296,7 +296,8 @@ export function useAccountSettings({
     }
   }, [currentUser]);
 
-  const hasChanges = originalSettings !== null && !shallowEqual(settings, originalSettings);
+  const baselineSettings = originalSettings ?? normalizeWorkspaceSettings(DEFAULT_WORKSPACE_SETTINGS);
+  const hasChanges = !shallowEqual(settings, baselineSettings);
 
   return {
     settings,
