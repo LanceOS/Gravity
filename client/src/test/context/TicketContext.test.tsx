@@ -10,7 +10,18 @@ function jsonResponse(body: unknown, status = 200) {
 }
 
 function ContextProbe() {
-  const { currentUser, loading, projects, users } = useTickets();
+  const { currentUser, loading, projects, users, tickets, setCurrentUser, setActiveProjectId } = useTickets();
+
+  const switchUser = () => {
+    setCurrentUser({
+      id: 'user-session-3',
+      name: 'Katherine Johnson',
+      email: 'katherine@example.com',
+      avatar: '',
+      role: 'owner',
+      tutorial_completed: 1,
+    });
+  };
 
   return (
     <div>
@@ -18,6 +29,9 @@ function ContextProbe() {
       <div data-testid="user-email">{currentUser?.email ?? 'anonymous'}</div>
       <div data-testid="project-count">{projects.length}</div>
       <div data-testid="user-count">{users.length}</div>
+      <div data-testid="ticket-count">{tickets.length}</div>
+      <button type="button" onClick={switchUser}>Switch user</button>
+      <button type="button" onClick={() => setActiveProjectId('project-2')}>Switch project</button>
     </div>
   );
 }
@@ -177,6 +191,123 @@ describe('TicketContext', () => {
     expect(screen.getByTestId('user-count')).toHaveTextContent('0');
     expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to load initial workspace data:', expect.any(Error));
 
+    consoleErrorSpy.mockRestore();
+  });
+
+  it('clears prior workspace data before a different user refetch fails', async () => {
+    const firstUser = {
+      id: 'user-session-1',
+      name: 'Ada Lovelace',
+      email: 'ada@example.com',
+      avatar: '',
+      role: 'owner',
+      tutorial_completed: 1,
+    };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ user: firstUser, session: { userId: firstUser.id } }))
+      .mockResolvedValueOnce(jsonResponse([{ id: 'project-1', name: 'Gravity Core', description: '', key: 'GRA', status: 'active', workspaceId: 'workspace-1' }]))
+      .mockResolvedValueOnce(jsonResponse([{ id: 'user-1', name: 'Ada Lovelace', email: 'ada@example.com', avatar: '', role: 'owner' }]))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ error: 'Authentication required.' }, 401))
+      .mockResolvedValueOnce(jsonResponse([]));
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    stubEventSource();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const user = await import('@testing-library/user-event').then((module) => module.default.setup());
+
+    render(
+      <TicketProvider>
+        <ContextProbe />
+      </TicketProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('project-count')).toHaveTextContent('1');
+      expect(screen.getByTestId('user-count')).toHaveTextContent('1');
+      expect(screen.getByTestId('loading-state')).toHaveTextContent('ready');
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Switch user' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('user-email')).toHaveTextContent('katherine@example.com');
+      expect(screen.getByTestId('project-count')).toHaveTextContent('0');
+      expect(screen.getByTestId('user-count')).toHaveTextContent('0');
+      expect(screen.getByTestId('loading-state')).toHaveTextContent('ready');
+    });
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to load initial workspace data:', expect.any(Error));
+    consoleErrorSpy.mockRestore();
+  });
+
+  it('clears prior project data before a different project fetch fails', async () => {
+    const user = {
+      id: 'user-session-1',
+      name: 'Ada Lovelace',
+      email: 'ada@example.com',
+      avatar: '',
+      role: 'owner',
+      tutorial_completed: 1,
+    };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ user, session: { userId: user.id } }))
+      .mockResolvedValueOnce(jsonResponse([
+        { id: 'project-1', name: 'Gravity Core', description: '', key: 'GRA', status: 'active', workspaceId: 'workspace-1' },
+        { id: 'project-2', name: 'Agent Ops', description: '', key: 'OPS', status: 'active', workspaceId: 'workspace-1' },
+      ]))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse([
+        {
+          id: 'ticket-1',
+          key: 'GRA-1',
+          title: 'Seed project data',
+          description: '',
+          status: 'todo',
+          priority: 'medium',
+          projectId: 'project-1',
+          domainId: null,
+          cycleId: null,
+          assigneeId: null,
+          parentId: null,
+          prStatus: 'none',
+          prUrl: null,
+          createdAt: '2026-05-01T00:00:00.000Z',
+          updatedAt: '2026-05-01T00:00:00.000Z',
+        },
+      ]))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ error: 'Project load failed.' }, 500))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse([]));
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    stubEventSource();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const userEvent = await import('@testing-library/user-event').then((module) => module.default.setup());
+
+    render(
+      <TicketProvider>
+        <ContextProbe />
+      </TicketProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ticket-count')).toHaveTextContent('1');
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Switch project' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ticket-count')).toHaveTextContent('0');
+    });
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to fetch project data for project project-2:', expect.any(Error));
     consoleErrorSpy.mockRestore();
   });
 });

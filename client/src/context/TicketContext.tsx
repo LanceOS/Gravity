@@ -39,6 +39,8 @@ interface State {
 
 type Action =
   | { type: 'SET_LOADING'; payload: boolean }
+  | { type: 'CLEAR_WORKSPACE_DATA' }
+  | { type: 'CLEAR_PROJECT_DATA' }
   | {
     type: 'SET_INITIAL_DATA';
     payload: {
@@ -134,6 +136,27 @@ function ticketReducer(state: State, action: Action): State {
   switch (action.type) {
     case 'SET_LOADING':
       return { ...state, loading: action.payload };
+    case 'CLEAR_WORKSPACE_DATA':
+      return {
+        ...state,
+        tickets: [],
+        projects: [],
+        domains: [],
+        cycles: [],
+        users: [],
+        comments: [],
+        activeTicket: null,
+        filters: initialFilters,
+      };
+    case 'CLEAR_PROJECT_DATA':
+      return {
+        ...state,
+        tickets: [],
+        domains: [],
+        cycles: [],
+        comments: [],
+        activeTicket: null,
+      };
     case 'SET_INITIAL_DATA':
       return {
         ...state,
@@ -256,6 +279,8 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [state, dispatch] = useReducer(ticketReducer, undefined, createInitialState);
   const [activeProjectId, setActiveProjectIdState] = React.useState<string>('');
   const [authResolved, setAuthResolved] = React.useState(false);
+  const loadedUserIdRef = React.useRef<string | null>(null);
+  const loadedProjectIdRef = React.useRef<string | null>(null);
 
   const setActiveProjectId = useCallback((id: string) => {
     setActiveProjectIdState(id);
@@ -263,14 +288,28 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     dispatch({ type: 'SET_FILTERS', payload: { projectId: id } });
   }, []);
 
+  const clearWorkspaceData = useCallback(() => {
+    loadedUserIdRef.current = null;
+    loadedProjectIdRef.current = null;
+    setActiveProjectIdState('');
+    dispatch({ type: 'CLEAR_WORKSPACE_DATA' });
+  }, []);
+
+  const clearProjectData = useCallback(() => {
+    loadedProjectIdRef.current = null;
+    dispatch({ type: 'CLEAR_PROJECT_DATA' });
+  }, []);
+
   // 1. Fetch initial central data (projects, users)
   const fetchInitialData = useCallback(async (userId?: string) => {
     if (!userId) {
-      dispatch({
-        type: 'SET_INITIAL_DATA',
-        payload: { tickets: [], projects: [], domains: [], cycles: [], users: [] },
-      });
+      clearWorkspaceData();
       return;
+    }
+
+    const isUserTransition = loadedUserIdRef.current !== null && loadedUserIdRef.current !== userId;
+    if (isUserTransition) {
+      clearWorkspaceData();
     }
 
     dispatch({ type: 'SET_LOADING', payload: true });
@@ -289,16 +328,23 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         type: 'SET_INITIAL_DATA',
         payload: { tickets: [], projects, domains: [], cycles: [], users },
       });
+      loadedUserIdRef.current = userId;
     } catch (error) {
       console.error('Failed to load initial workspace data:', error);
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
     }
-  }, []);
+  }, [clearWorkspaceData]);
 
   // Fetch project-specific data (tickets, domains, cycles)
   const fetchProjectData = useCallback(async (projId: string) => {
     if (!projId) return;
+
+    const isProjectTransition = loadedProjectIdRef.current !== null && loadedProjectIdRef.current !== projId;
+    if (isProjectTransition) {
+      clearProjectData();
+    }
+
     try {
       const [ticketsRes, domainsRes, cyclesRes] = await Promise.all([
         fetch(`${API_URL}/tickets`, { headers: { 'X-Project-Id': projId } }),
@@ -316,10 +362,11 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         type: 'SET_PROJECT_DATA',
         payload: { tickets, domains, cycles }
       });
+      loadedProjectIdRef.current = projId;
     } catch (e) {
       console.error(`Failed to fetch project data for project ${projId}:`, e);
     }
-  }, []);
+  }, [clearProjectData]);
 
   // Load project data when active project changes
   useEffect(() => {
@@ -390,7 +437,8 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     if (activeProjectId && !state.projects.some((project) => project.id === activeProjectId)) {
-      setActiveProjectIdState('');
+      loadedProjectIdRef.current = null;
+      setActiveProjectId('');
     }
   }, [state.currentUser, state.projects, activeProjectId, setActiveProjectId]);
 
@@ -401,9 +449,6 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     if (!state.currentUser) {
       fetchInitialData();
-      setActiveProjectIdState('');
-      dispatch({ type: 'SET_ACTIVE_TICKET', payload: null });
-      dispatch({ type: 'SET_COMMENTS_RAW', payload: [] });
       return;
     }
 
@@ -821,8 +866,8 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
 
     dispatch({ type: 'SET_USER', payload: null });
-    setActiveProjectIdState('');
-  }, []);
+    clearWorkspaceData();
+  }, [clearWorkspaceData]);
 
   const setCurrentUser = useCallback((user: User | null) => {
     dispatch({ type: 'SET_USER', payload: user });

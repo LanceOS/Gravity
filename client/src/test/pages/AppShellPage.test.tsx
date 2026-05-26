@@ -329,7 +329,6 @@ describe('AppShellPage', () => {
     renderAppShell({
       tickets: buildUseTickets({ loading: true }),
     });
-    updateMemberActivity: vi.fn(),
 
     expect(screen.getByText('LoadingPage')).toBeInTheDocument();
   });
