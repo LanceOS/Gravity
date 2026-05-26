@@ -65,8 +65,14 @@ export const mcpToolsList: McpToolDefinition[] = [
         cycleId: { type: 'string' },
         assigneeId: { type: 'string' },
         parentId: { type: 'string' },
-        createdAt: { type: 'string' },
-        updatedAt: { type: 'string' },
+        createdAt: {
+          type: 'string',
+          description: 'Optional manual override for the ticket creation timestamp as an ISO 8601 date string.',
+        },
+        updatedAt: {
+          type: 'string',
+          description: 'Optional manual override for the ticket last-updated timestamp as an ISO 8601 date string.',
+        },
       },
       required: ['title', 'projectId'],
     },
