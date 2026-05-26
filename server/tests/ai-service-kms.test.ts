@@ -5,7 +5,7 @@ import { LocalEnvKmsProvider } from '../src/lib/kms/local-provider.js';
 import { credentialManager } from '../src/lib/kms/index.js';
 import { userExternalCredentials } from '../src/db/schema.js';
 import { db } from '../src/db/index.js';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { seedUser } from './helpers/test-helpers.js';
 import { OllamaProvider } from '../src/lib/ai/ollama-provider.js';
 import { validateOllamaUrl } from '../src/lib/ai/utils.js';
@@ -33,7 +33,7 @@ describe('AiService', () => {
   it('throws for an unsupported provider name in chat()', async () => {
     const service = new AiService(credentialManager);
     const user = await seedUser({ id: 'aiservice-user-1', email: 'aiservice1@example.com' });
-    await credentialManager.StoreCredential(user.id, 'sk-test');
+    await credentialManager.StoreCredential(user.id, 'openai', 'sk-test');
 
     await expect(
       service.chat(user.id, 'unsupported-llm', { model: 'x', messages: [] }),
@@ -63,7 +63,7 @@ describe('AiService', () => {
   it('decrypts stored credentials and forwards them to cloud providers in chat()', async () => {
     const user = await seedUser({ id: 'aiservice-user-2', email: 'aiservice2@example.com' });
     const targetKey = 'sk-cloud-key-xyz';
-    await credentialManager.StoreCredential(user.id, targetKey);
+    await credentialManager.StoreCredential(user.id, 'openai', targetKey);
 
     vi.stubGlobal(
       'fetch',
@@ -106,7 +106,7 @@ describe('AiService', () => {
 
   it('testConnection loads stored credentials when no apiKey is supplied', async () => {
     const user = await seedUser({ id: 'aiservice-user-3', email: 'aiservice3@example.com' });
-    await credentialManager.StoreCredential(user.id, 'sk-stored-key');
+    await credentialManager.StoreCredential(user.id, 'openai', 'sk-stored-key');
 
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(makeResponse({ data: [] })));
 
@@ -128,45 +128,45 @@ describe('CredentialManager — edge cases', () => {
   });
 
   it('throws when userId is empty in StoreCredential', async () => {
-    await expect(credentialManager.StoreCredential('', 'sk-key')).rejects.toThrow(
+    await expect(credentialManager.StoreCredential('', 'openai', 'sk-key')).rejects.toThrow(
       'User ID is required',
     );
   });
 
   it('throws when plaintextAPIKey is empty in StoreCredential', async () => {
-    await expect(credentialManager.StoreCredential('user-x', '')).rejects.toThrow(
+    await expect(credentialManager.StoreCredential('user-x', 'openai', '')).rejects.toThrow(
       'API Key cannot be empty',
     );
   });
 
   it('throws when userId is empty in ExecuteWithCredential', async () => {
-    await expect(credentialManager.ExecuteWithCredential('', () => {})).rejects.toThrow(
+    await expect(credentialManager.ExecuteWithCredential('', 'openai', () => {})).rejects.toThrow(
       'User ID is required',
     );
   });
 
   it('throws a security exception when no credential exists for the user', async () => {
     await expect(
-      credentialManager.ExecuteWithCredential('no-such-user', () => 'result'),
+      credentialManager.ExecuteWithCredential('no-such-user', 'openai', () => 'result'),
     ).rejects.toThrow(/No external credentials found/i);
   });
 
   it('StoreCredential is idempotent — upserts without creating duplicate records', async () => {
     const user = await seedUser({ id: 'cm-upsert-user', email: 'cmupsert@example.com' });
 
-    await credentialManager.StoreCredential(user.id, 'sk-first-key');
-    await credentialManager.StoreCredential(user.id, 'sk-second-key');
+    await credentialManager.StoreCredential(user.id, 'openai', 'sk-first-key');
+    await credentialManager.StoreCredential(user.id, 'openai', 'sk-second-key');
 
     const records = await db
       .select()
       .from(userExternalCredentials)
-      .where(eq(userExternalCredentials.userId, user.id));
+      .where(and(eq(userExternalCredentials.userId, user.id), eq(userExternalCredentials.provider, 'openai')));
 
     // Must be exactly one record (upsert, not insert)
     expect(records).toHaveLength(1);
 
     // The stored credential should reflect the latest key
-    const decrypted = await credentialManager.ExecuteWithCredential(user.id, (key) => key);
+    const decrypted = await credentialManager.ExecuteWithCredential(user.id, 'openai', (key) => key);
     expect(decrypted).toBe('sk-second-key');
   });
 
@@ -174,11 +174,11 @@ describe('CredentialManager — edge cases', () => {
     const userA = await seedUser({ id: 'isolation-user-a', email: 'iso-a@example.com' });
     const userB = await seedUser({ id: 'isolation-user-b', email: 'iso-b@example.com' });
 
-    await credentialManager.StoreCredential(userA.id, 'sk-user-a-key');
+    await credentialManager.StoreCredential(userA.id, 'openai', 'sk-user-a-key');
 
     // userB has no stored credential — accessing their slot must fail, not return userA's key
     await expect(
-      credentialManager.ExecuteWithCredential(userB.id, () => 'should-not-run'),
+      credentialManager.ExecuteWithCredential(userB.id, 'openai', () => 'should-not-run'),
     ).rejects.toThrow(/No external credentials found/i);
   });
 
@@ -186,7 +186,7 @@ describe('CredentialManager — edge cases', () => {
     const user = await seedUser({ id: 'cm-wipe-user', email: 'cmwipe@example.com' });
     const fillSpy = vi.spyOn(Buffer.prototype, 'fill');
 
-    await credentialManager.StoreCredential(user.id, 'sk-wipe-test');
+    await credentialManager.StoreCredential(user.id, 'openai', 'sk-wipe-test');
 
     // Both the plaintext DEK and the key buffer must have been wiped
     expect(fillSpy).toHaveBeenCalledWith(0);
@@ -273,7 +273,7 @@ describe('CredentialManager with a mock IKMSProvider', () => {
     const manager = new CredentialManager(mockKms);
     const user = await seedUser({ id: 'di-test-user', email: 'ditest@example.com' });
 
-    await manager.StoreCredential(user.id, 'sk-di-key');
+    await manager.StoreCredential(user.id, 'openai', 'sk-di-key');
     expect(mockKms.GenerateDataKey).toHaveBeenCalledTimes(1);
   });
 
@@ -283,14 +283,14 @@ describe('CredentialManager with a mock IKMSProvider', () => {
     const realManager = new CredentialManager(realProvider);
 
     const user = await seedUser({ id: 'di-decrypt-user', email: 'didecrypt@example.com' });
-    await realManager.StoreCredential(user.id, 'sk-real-key');
+    await realManager.StoreCredential(user.id, 'openai', 'sk-real-key');
 
     // Now swap to a mock provider that wraps the real one but records calls
     const decryptSpy = vi.fn((enc: Buffer) => realProvider.DecryptDataKey(enc));
     const mockKms = { GenerateDataKey: vi.fn(), DecryptDataKey: decryptSpy };
     const mockManager = new CredentialManager(mockKms);
 
-    await mockManager.ExecuteWithCredential(user.id, (key) => {
+    await mockManager.ExecuteWithCredential(user.id, 'openai', (key) => {
       expect(key).toBe('sk-real-key');
     });
     expect(decryptSpy).toHaveBeenCalledTimes(1);

@@ -163,6 +163,7 @@ export function AppShellPage() {
     saveError: accountSaveError,
     testing: accountTesting,
     testResult: accountTestResult,
+    savedCredentials: accountSavedCredentials,
     tutorialResult: accountTutorialResult,
     ollamaModels,
     ollamaModelsLoading,
@@ -650,6 +651,7 @@ export function AppShellPage() {
           saveError={accountSaveError}
           testing={accountTesting}
           testResult={accountTestResult}
+          savedCredentials={accountSavedCredentials}
           tutorialResult={accountTutorialResult}
           ollamaModels={ollamaModels}
           ollamaModelsLoading={ollamaModelsLoading}

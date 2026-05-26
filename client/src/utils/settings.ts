@@ -14,6 +14,13 @@ export interface WorkspaceSettings {
   agentIntegration: AgentIntegration;
 }
 
+export interface SavedApiCredential {
+  provider: AIProvider;
+  apiKey: string;
+  active?: boolean;
+  updatedAt?: string;
+}
+
 export interface ProviderOption {
   value: AIProvider;
   label: string;

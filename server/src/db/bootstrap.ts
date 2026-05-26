@@ -165,15 +165,32 @@ export async function initializeDatabase() {
     );
 
     CREATE TABLE IF NOT EXISTS user_external_credentials (
-      user_id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      provider TEXT NOT NULL,
       encrypted_api_key BYTEA NOT NULL,
       encrypted_dek BYTEA NOT NULL,
       aes_iv BYTEA NOT NULL,
       aes_auth_tag BYTEA NOT NULL,
       kms_kek_id VARCHAR(255) NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (user_id, provider)
     );
+  `);
+
+  await pool.query(`
+    ALTER TABLE user_external_credentials ADD COLUMN IF NOT EXISTS provider TEXT;
+    UPDATE user_external_credentials uec
+    SET provider = COALESCE(uec.provider, us.ai_provider, 'openai')
+    FROM user_settings us
+    WHERE uec.user_id = us.user_id;
+    UPDATE user_external_credentials
+    SET provider = 'openai'
+    WHERE provider IS NULL;
+    ALTER TABLE user_external_credentials ALTER COLUMN provider SET NOT NULL;
+    ALTER TABLE user_external_credentials DROP CONSTRAINT IF EXISTS user_external_credentials_pkey;
+    ALTER TABLE user_external_credentials ADD PRIMARY KEY (user_id, provider);
+    CREATE INDEX IF NOT EXISTS user_external_credentials_user_id_idx ON user_external_credentials (user_id);
   `);
 
   await pool.query(`

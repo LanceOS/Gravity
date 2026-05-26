@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SettingsScreen as SettingsPage } from '../../modules/settings';
 import { AccountPreferencesPage } from '../../pages/AccountPreferencesPage/AccountPreferencesPage.tsx';
 import type { WorkspaceSummary } from '../../hooks/useWorkspaceDirectory.ts';
+import { API_KEY_MASK } from '../../utils/settings.ts';
 
 const currentUser = {
   id: 'user-1',
@@ -69,6 +70,7 @@ function renderSettingsPage(overrides: Partial<Parameters<typeof SettingsPage>[0
         avatar: '',
         role: 'owner',
         createdAt: '2026-05-01T09:00:00.000Z',
+        savedCredentials: [],
         lastActiveAt: new Date().toISOString(), // Today
       },
       {
@@ -152,6 +154,7 @@ function renderAccountPreferencesPage(overrides: Partial<Parameters<typeof Accou
     saveError: null,
     testing: false,
     testResult: null,
+    savedCredentials: [],
     tutorialResult: null,
     ollamaModels: ['llama3', 'phi3'],
     ollamaModelsLoading: false,
@@ -370,5 +373,26 @@ describe('AccountPreferencesPage', () => {
     await user.click(screen.getByRole('button', { name: 'Reset & Start Tutorial' }));
     expect(props.onResetTutorial).toHaveBeenCalledTimes(1);
     expect(screen.getByText('Tutorial will replay on next load.')).toBeInTheDocument();
+  });
+
+  it('shows saved cloud keys with active and inactive tags', async () => {
+    const user = userEvent.setup();
+
+    renderAccountPreferencesPage({
+      savedCredentials: [
+        { provider: 'openai', apiKey: API_KEY_MASK },
+        { provider: 'anthropic', apiKey: API_KEY_MASK },
+      ],
+    });
+
+    await user.click(screen.getByRole('button', { name: /Cloud AI/i }));
+
+    expect(screen.getByText('Saved keys')).toBeInTheDocument();
+    expect(screen.getByText('2 saved')).toBeInTheDocument();
+    expect(screen.getByText('OpenAI')).toBeInTheDocument();
+    expect(screen.getByText('Anthropic')).toBeInTheDocument();
+    expect(screen.getByText('Active')).toBeInTheDocument();
+    expect(screen.getByText('Inactive')).toBeInTheDocument();
+    expect(screen.getAllByText(API_KEY_MASK)).toHaveLength(2);
   });
 });

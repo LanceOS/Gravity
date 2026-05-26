@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { randomBytes } from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { db } from '../src/db/index.js';
 import { userExternalCredentials } from '../src/db/schema.js';
 import { LocalEnvKmsProvider } from '../src/lib/kms/local-provider.js';
@@ -70,7 +70,7 @@ describe('Envelope Encryption & Secure Credential Storage', () => {
       const user = await seedUser({ id: 'test-secure-user-1', email: 'sec1@example.com' });
       const testApiKey = 'sk-proj-super-secret-key-123456';
 
-      await credentialManager.StoreCredential(user.id, testApiKey);
+      await credentialManager.StoreCredential(user.id, 'openai', testApiKey);
 
       // Verify the record was inserted into the database and no plaintext was stored
       const records = await db
@@ -98,7 +98,7 @@ describe('Envelope Encryption & Secure Credential Storage', () => {
       // We spy on fill to ensure wiping is called on plaintext secrets
       const fillSpy = vi.spyOn(Buffer.prototype, 'fill');
 
-      const result = await credentialManager.ExecuteWithCredential(user.id, (apiKey) => {
+      const result = await credentialManager.ExecuteWithCredential(user.id, 'openai', (apiKey) => {
         expect(apiKey).toBe(testApiKey);
         return 'callback-success-value';
       });
@@ -132,7 +132,7 @@ describe('Envelope Encryption & Secure Credential Storage', () => {
 
       // Attempting to execute with credential should throw due to integrity/GCM verification failure
       await expect(
-        credentialManager.ExecuteWithCredential(user.id, () => {})
+        credentialManager.ExecuteWithCredential(user.id, 'openai', () => {})
       ).rejects.toThrow(/Failed to decrypt credentials. Integrity check failed/);
     });
   });
@@ -148,6 +148,7 @@ describe('Envelope Encryption & Secure Credential Storage', () => {
       expect(response.body).toMatchObject({
         userId: user.id,
         apiKey: '',
+        savedCredentials: [],
       });
     });
 
@@ -172,11 +173,19 @@ describe('Envelope Encryption & Secure Credential Storage', () => {
         theme: 'coal-black',
       });
 
+      expect(patchResponse.body.savedCredentials).toEqual([
+        expect.objectContaining({
+          provider: 'openai',
+          apiKey: '••••••••••••',
+          active: true,
+        }),
+      ]);
+
       // Verify it exists in user_external_credentials
       const externalRecords = await db
         .select()
         .from(userExternalCredentials)
-        .where(eq(userExternalCredentials.userId, user.id));
+        .where(and(eq(userExternalCredentials.userId, user.id), eq(userExternalCredentials.provider, 'openai')));
       expect(externalRecords.length).toBe(1);
 
       // 2. GET setting should return placeholder seamlessly
@@ -187,6 +196,13 @@ describe('Envelope Encryption & Secure Credential Storage', () => {
         userId: user.id,
         apiKey: '••••••••••••',
         theme: 'coal-black',
+        savedCredentials: [
+          expect.objectContaining({
+            provider: 'openai',
+            apiKey: '••••••••••••',
+            active: true,
+          }),
+        ],
       });
     });
 
@@ -195,7 +211,7 @@ describe('Envelope Encryption & Secure Credential Storage', () => {
       const user = userApi.user;
 
       // First store a credential
-      await credentialManager.StoreCredential(user.id, 'sk-temp-key');
+      await credentialManager.StoreCredential(user.id, 'openai', 'sk-temp-key');
 
       // Clear the credential via settings PATCH using the explicit keyAction: 'clear'
       const clearResponse = await userApi
@@ -206,12 +222,13 @@ describe('Envelope Encryption & Secure Credential Storage', () => {
 
       expect(clearResponse.status).toBe(200);
       expect(clearResponse.body.apiKey).toBe('');
+      expect(clearResponse.body.savedCredentials).toEqual([]);
 
       // Verify the credential record is deleted from user_external_credentials
       const externalRecords = await db
         .select()
         .from(userExternalCredentials)
-        .where(eq(userExternalCredentials.userId, user.id));
+        .where(and(eq(userExternalCredentials.userId, user.id), eq(userExternalCredentials.provider, 'openai')));
       expect(externalRecords.length).toBe(0);
     });
   });

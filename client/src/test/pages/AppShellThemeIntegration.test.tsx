@@ -277,6 +277,7 @@ describe('AppShellPage theme integration', () => {
       'fetch',
       vi.fn().mockResolvedValue({
         json: async () => ({ success: true, lastActiveAt: '2026-05-25T12:00:00.000Z' }),
+    savedCredentials: [],
       })
     );
   });

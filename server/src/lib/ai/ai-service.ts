@@ -67,7 +67,7 @@ export class AiService {
       return executionCallback(environmentApiKey);
     }
 
-    return this.credentialManager.ExecuteWithCredential(userId, executionCallback);
+    return this.credentialManager.ExecuteWithCredential(userId, provider, executionCallback);
   }
 
   /**
@@ -119,7 +119,7 @@ export class AiService {
     } else {
       // Always test the actual stored user credential — never use env token shortcuts here,
       // so the result genuinely reflects whether the saved key is valid.
-      await this.credentialManager.ExecuteWithCredential(userId, async (decryptedKey) => {
+      await this.credentialManager.ExecuteWithCredential(userId, provider, async (decryptedKey) => {
         await providerInst.testConnection({ apiKey: decryptedKey });
       });
     }

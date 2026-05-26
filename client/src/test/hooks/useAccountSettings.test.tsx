@@ -1,6 +1,7 @@
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useAccountSettings } from '../../hooks/useAccountSettings.ts';
+import { API_KEY_MASK } from '../../utils/settings.ts';
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -34,8 +35,12 @@ describe('useAccountSettings', () => {
           ollamaModel: 'llama3.2',
           ollamaEndpoint: 'http://ollama.internal:11434',
           projectLayout: 'condensed',
-          apiKey: '',
+          apiKey: API_KEY_MASK,
           aiProvider: 'anthropic',
+          savedCredentials: [
+            { provider: 'openai', apiKey: API_KEY_MASK },
+            { provider: 'anthropic', apiKey: API_KEY_MASK },
+          ],
         })
       )
       .mockResolvedValueOnce(jsonResponse({ models: ['llama3.2'] }));
@@ -74,9 +79,17 @@ describe('useAccountSettings', () => {
       aiProvider: 'anthropic',
       ollamaModel: 'llama3.2',
     });
+    expect(result.current.savedCredentials).toHaveLength(2);
     expect(setTheme).toHaveBeenCalledWith('coffee');
     expect(setView).toHaveBeenCalledWith('list');
     expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      result.current.updateSettings({ aiProvider: 'openai' });
+    });
+
+    expect(result.current.settings.aiProvider).toBe('openai');
+    expect(result.current.settings.apiKey).toBe(API_KEY_MASK);
 
     rerender({ activeView: 'list', theme: 'coffee' });
 

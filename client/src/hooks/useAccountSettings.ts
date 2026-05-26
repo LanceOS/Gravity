@@ -5,6 +5,7 @@ import {
   API_KEY_MASK,
   getProviderOption,
   normalizeWorkspaceSettings,
+  type SavedApiCredential,
   type WorkspaceSettings,
 } from '../utils/settings';
 
@@ -18,6 +19,27 @@ function normalizeApiKeyInput(value: string): string {
     return value.slice(API_KEY_MASK.length);
   }
   return value;
+}
+
+function getSavedCredentialForProvider(
+  credentials: SavedApiCredential[],
+  provider: WorkspaceSettings['aiProvider'],
+) {
+  return credentials.find((credential) => credential.provider === provider);
+}
+
+function normalizeSavedCredentials(rawCredentials: unknown): SavedApiCredential[] {
+  if (!Array.isArray(rawCredentials)) {
+    return [];
+  }
+
+  return rawCredentials.filter((credential): credential is SavedApiCredential => {
+    if (!credential || typeof credential !== 'object') {
+      return false;
+    }
+
+    return typeof credential.provider === 'string' && typeof credential.apiKey === 'string';
+  });
 }
 
 const KEY_ACTION: Record<'stored' | 'cleared' | 'pending', 'keep' | 'clear' | 'update'> = {
@@ -74,6 +96,7 @@ export function useAccountSettings({
   const [ollamaModels, setOllamaModels] = useState<string[]>([]);
   const [ollamaModelsLoading, setOllamaModelsLoading] = useState(false);
   const [settingsHydrated, setSettingsHydrated] = useState(false);
+  const [savedCredentials, setSavedCredentials] = useState<SavedApiCredential[]>([]);
   const [apiKeyState, setApiKeyState] = useState<'stored' | 'cleared' | 'pending'>('cleared');
 
   useEffect(() => {
@@ -96,6 +119,8 @@ export function useAccountSettings({
     setTestResult(null);
     setTutorialResult(null);
     setOllamaModels([]);
+    setSavedCredentials([]);
+    setApiKeyState('cleared');
     setSettingsHydrated(false);
   }, [currentUser, activeView, theme]);
 
@@ -126,6 +151,7 @@ export function useAccountSettings({
           );
           setSettings(normalized);
           setOriginalSettings(normalized);
+          setSavedCredentials(normalizeSavedCredentials(data.savedCredentials));
           setTheme(normalized.theme);
           setView(normalized.defaultView);
           setApiKeyState(normalized.apiKey === API_KEY_MASK ? 'stored' : 'cleared');
@@ -205,11 +231,29 @@ export function useAccountSettings({
       nextUpdates.apiKey = normalizeApiKeyInput(nextUpdates.apiKey);
     }
 
+    const providerChanged = typeof nextUpdates.aiProvider === 'string';
+    if (providerChanged) {
+      const selectedCredential = getSavedCredentialForProvider(
+        savedCredentials,
+        nextUpdates.aiProvider as WorkspaceSettings['aiProvider'],
+      );
+
+      nextUpdates.apiKey = selectedCredential ? API_KEY_MASK : '';
+    }
+
     setSettings((current) => ({ ...current, ...nextUpdates }));
     setSaveSuccess(false);
     setSaveError(null);
 
-    if (nextUpdates.apiKey !== undefined) {
+    if (providerChanged) {
+      const selectedCredential = getSavedCredentialForProvider(
+        savedCredentials,
+        nextUpdates.aiProvider as WorkspaceSettings['aiProvider'],
+      );
+
+      setApiKeyState(selectedCredential ? 'stored' : 'cleared');
+      setTestResult(null);
+    } else if (nextUpdates.apiKey !== undefined) {
       setApiKeyState(nextUpdates.apiKey === '' ? 'cleared' : 'pending');
       setTestResult(null);
     }
@@ -220,7 +264,7 @@ export function useAccountSettings({
     if (nextUpdates.ollamaEndpoint !== undefined) {
       setOllamaModels([]);
     }
-  }, []);
+  }, [savedCredentials]);
 
   const saveSettings = useCallback(async () => {
     if (!currentUser) {
@@ -259,9 +303,11 @@ export function useAccountSettings({
       );
       setSettings(normalized);
       setOriginalSettings(normalized);
+      setSavedCredentials(normalizeSavedCredentials(data.savedCredentials));
       setTheme(normalized.theme);
       setView(normalized.defaultView);
       setApiKeyState(normalized.apiKey === API_KEY_MASK ? 'stored' : 'cleared');
+      setTestResult(null);
       setSaveSuccess(true);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to save account settings.';
@@ -350,6 +396,7 @@ export function useAccountSettings({
     testing,
     testResult,
     tutorialResult,
+    savedCredentials,
     ollamaModels,
     ollamaModelsLoading,
     updateSettings,

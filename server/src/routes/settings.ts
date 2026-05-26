@@ -21,7 +21,23 @@ function hasOwn(body: Record<string, unknown> | null | undefined, field: string)
   return Boolean(body) && Object.prototype.hasOwnProperty.call(body, field);
 }
 
-function toSettingsResponse(settings: Awaited<ReturnType<typeof getUserSettingsRecord>>, apiKey: string) {
+function getCredentialListSummary(
+  credentials: Awaited<ReturnType<typeof credentialManager.ListCredentials>>,
+  activeProvider: string,
+) {
+  return credentials.map((credential) => ({
+    provider: credential.provider,
+    apiKey: API_KEY_MASK,
+    active: credential.provider === activeProvider,
+    updatedAt: credential.updatedAt,
+  }));
+}
+
+function toSettingsResponse(
+  settings: Awaited<ReturnType<typeof getUserSettingsRecord>>,
+  apiKey: string,
+  savedCredentials: Array<{ provider: string; apiKey: string; active: boolean; updatedAt: Date }>,
+) {
   return {
     userId: settings.userId,
     defaultView: settings.defaultView,
@@ -32,6 +48,7 @@ function toSettingsResponse(settings: Awaited<ReturnType<typeof getUserSettingsR
     aiProvider: settings.aiProvider,
     agentIntegration: settings.agentIntegration,
     projectLayout: settings.projectLayout,
+    savedCredentials,
   };
 }
 
@@ -69,14 +86,11 @@ export function createSettingsRouter() {
 
     try {
       const settings = await getUserSettingsRecord(req.params.userId);
-      const [record] = await db
-        .select({ userId: userExternalCredentials.userId })
-        .from(userExternalCredentials)
-        .where(eq(userExternalCredentials.userId, req.params.userId))
-        .limit(1);
+      const savedCredentials = await credentialManager.ListCredentials(req.params.userId);
 
-      const apiKeyPlaceholder = record ? API_KEY_MASK : '';
-      res.json(toSettingsResponse(settings, apiKeyPlaceholder));
+      const currentCredential = savedCredentials.find((credential) => credential.provider === settings.aiProvider);
+      const apiKeyPlaceholder = currentCredential ? API_KEY_MASK : '';
+      res.json(toSettingsResponse(settings, apiKeyPlaceholder, getCredentialListSummary(savedCredentials, settings.aiProvider)));
     } catch (error) {
       console.error(`Failed to load account settings for user ${req.params.userId}:`, error);
       res.status(500).json({ error: SETTINGS_LOAD_ERROR });
@@ -143,15 +157,9 @@ export function createSettingsRouter() {
       }
 
       const current = await getUserSettingsRecord(userId);
-
-      // Hoist check to run exactly once and determine if a key exists
-      const [existingCredential] = await db
-        .select({ userId: userExternalCredentials.userId })
-        .from(userExternalCredentials)
-        .where(eq(userExternalCredentials.userId, userId))
-        .limit(1);
-
-      const hasExistingCredential = Boolean(existingCredential);
+      const providerForCredential = (aiProvider.value ?? current.aiProvider).toLowerCase();
+      const savedCredentials = await credentialManager.ListCredentials(userId);
+      const hasExistingCredential = savedCredentials.some((credential) => credential.provider === providerForCredential);
 
       const explicitKeyAction = typeof req.body?.keyAction === 'string' ? req.body.keyAction : undefined;
       const incomingApiKey = typeof req.body?.apiKey === 'string' ? req.body.apiKey.trim() : undefined;
@@ -180,11 +188,11 @@ export function createSettingsRouter() {
         let placeholder: string;
 
         if (keyAction === 'clear') {
-          await tx.delete(userExternalCredentials).where(eq(userExternalCredentials.userId, userId));
+          await credentialManager.DeleteCredential(userId, providerForCredential, tx);
           placeholder = '';
         } else if (keyAction === 'update') {
           const rawKey = (incomingApiKey as string).trim();
-          await credentialManager.StoreCredential(userId, rawKey, tx);
+          await credentialManager.StoreCredential(userId, providerForCredential, rawKey, tx);
           placeholder = API_KEY_MASK;
         } else {
           // 'keep': leave credentials unchanged
@@ -222,7 +230,8 @@ export function createSettingsRouter() {
         return { settings: nextSettings, apiKeyPlaceholder: placeholder };
       });
 
-      res.json(toSettingsResponse(merged, apiKeyPlaceholder));
+      const savedCredentials = await credentialManager.ListCredentials(userId);
+      res.json(toSettingsResponse(merged, apiKeyPlaceholder, getCredentialListSummary(savedCredentials, merged.aiProvider)));
     } catch (error) {
       console.error(`Failed to update account settings for user ${userId}:`, error);
       res.status(500).json({ error: SETTINGS_UPDATE_ERROR });

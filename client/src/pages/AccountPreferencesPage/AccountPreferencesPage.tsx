@@ -28,6 +28,7 @@ import {
   API_KEY_MASK,
   getProviderOption,
   type AIProvider,
+  type SavedApiCredential,
   type WorkspaceSettings,
 } from '../../utils/settings';
 
@@ -54,6 +55,7 @@ interface AccountPreferencesPageProps {
   onBack: () => void;
   onOpenDirectory: () => void;
   onChangeSettings: (updates: Partial<WorkspaceSettings>) => void;
+  savedCredentials: SavedApiCredential[];
   onRefreshOllamaModels: () => void;
   onResetTutorial: () => void;
   onSaveSettings: () => void;
@@ -175,12 +177,14 @@ function CloudProviderSection({
   settings,
   testing,
   testResult,
+  savedCredentials,
   onChangeSettings,
   onTestApiKey,
 }: {
   settings: WorkspaceSettings;
   testing: boolean;
   testResult: StatusMessage | null;
+  savedCredentials: SavedApiCredential[];
   onChangeSettings: (updates: Partial<WorkspaceSettings>) => void;
   onTestApiKey: () => void;
 }) {
@@ -225,6 +229,72 @@ function CloudProviderSection({
             <Button variant="ghost" onClick={() => onChangeSettings({ apiKey: '' })}>
               Remove stored key
             </Button>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Saved keys</h3>
+              <p style={{ margin: '4px 0 0', color: 'var(--color-text-disabled)', fontSize: '12px', lineHeight: 1.5 }}>
+                Masked credentials stored for this account.
+              </p>
+            </div>
+            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)' }}>
+              {savedCredentials.length} saved
+            </span>
+          </div>
+
+          {savedCredentials.length === 0 ? (
+            <Alert type="info">Save a key to add it to the list.</Alert>
+          ) : (
+            <Stack gap="var(--space-2)">
+              {savedCredentials.map((credential) => {
+                const credentialOption = getProviderOption(credential.provider);
+                const isActive = credential.provider === settings.aiProvider;
+
+                return (
+                  <div
+                    key={credential.provider}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 'var(--space-4)',
+                      padding: 'var(--space-3) var(--space-4)',
+                      borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--color-border-default)',
+                      background: 'var(--color-surface-card)',
+                    }}
+                  >
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                        {credentialOption.label}
+                      </div>
+                      <div style={{ marginTop: '2px', fontSize: '12px', color: 'var(--color-text-disabled)' }}>
+                        {credential.apiKey}
+                      </div>
+                    </div>
+
+                    <span
+                      style={{
+                        flexShrink: 0,
+                        padding: '2px 8px',
+                        borderRadius: '999px',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        letterSpacing: '0.02em',
+                        color: isActive ? 'var(--color-success)' : 'var(--color-text-disabled)',
+                        background: isActive ? 'color-mix(in srgb, var(--color-success) 12%, transparent)' : 'var(--color-surface-muted)',
+                        border: `1px solid ${isActive ? 'color-mix(in srgb, var(--color-success) 28%, transparent)' : 'var(--color-border-default)'}`,
+                      }}
+                    >
+                      {isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                );
+              })}
+            </Stack>
           )}
         </div>
 
@@ -359,6 +429,7 @@ export function AccountPreferencesPage({
   saveError,
   testing,
   testResult,
+  savedCredentials,
   tutorialResult,
   ollamaModels,
   ollamaModelsLoading,
@@ -487,6 +558,7 @@ export function AccountPreferencesPage({
                   settings={settings}
                   testing={testing}
                   testResult={testResult}
+                  savedCredentials={savedCredentials}
                   onChangeSettings={onChangeSettings}
                   onTestApiKey={onTestApiKey}
                 />
