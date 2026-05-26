@@ -5,10 +5,11 @@ export interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextArea
   label?: string;
   error?: string;
   autoGrow?: boolean;
+  inputStyle?: React.CSSProperties;
 }
 
 export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
-  ({ label, error, className = '', id, style, autoGrow, value, onChange, ...props }, ref) => {
+  ({ label, error, className = '', id, style, inputStyle, autoGrow, value, onChange, ...props }, ref) => {
     const generatedId = React.useId();
     const inputId = id || generatedId;
     const errorId = `${inputId}-error`;
@@ -50,6 +51,7 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
             minHeight: autoGrow ? 'none' : '80px',
             resize: autoGrow ? 'none' : 'vertical',
             overflowY: autoGrow ? 'hidden' : 'auto',
+            ...inputStyle
           }}
           value={value}
           onChange={handleChange}

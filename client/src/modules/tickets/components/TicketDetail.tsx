@@ -162,7 +162,8 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <Textarea 
                   className="input"
-                  style={{ fontSize: '22px', fontWeight: 600, padding: '6px 10px', minHeight: '38px' }}
+                  style={{ margin: 0 }}
+                  inputStyle={{ fontSize: '22px', fontWeight: 600, padding: '6px 8px', minHeight: '38px', lineHeight: 'normal' }}
                   value={titleValue}
                   onChange={(e) => setTitleValue(e.target.value)}
                   onBlur={handleTitleBlur}
@@ -175,7 +176,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                   autoGrow
                   autoFocus
                 />
-                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
                   <Button
                     onMouseDown={(e) => {
                       e.preventDefault();
@@ -183,9 +184,10 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                     }}
                     variant="primary"
                     size="sm"
-                    style={{ padding: '4px 12px', fontSize: '12px' }}
+                    style={{ padding: '4px 12px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}
                   >
-                    Save
+                    <span>Save</span>
+                    <span aria-hidden="true" style={{ fontSize: '10px', opacity: 0.6, background: 'rgba(255,255,255,0.2)', padding: '1px 5px', borderRadius: '3px' }}>Enter</span>
                   </Button>
                 </div>
               </div>
@@ -243,7 +245,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                   autoGrow
                   autoFocus
                 />
-                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
                   <Button
                     onMouseDown={(e) => {
                       e.preventDefault();
@@ -251,9 +253,10 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                     }}
                     variant="primary"
                     size="sm"
-                    style={{ padding: '4px 12px', fontSize: '12px' }}
+                    style={{ padding: '4px 12px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}
                   >
-                    Save
+                    <span>Save</span>
+                    <span aria-hidden="true" style={{ fontSize: '10px', opacity: 0.6, background: 'rgba(255,255,255,0.2)', padding: '1px 5px', borderRadius: '3px' }}>Esc</span>
                   </Button>
                 </div>
               </div>
