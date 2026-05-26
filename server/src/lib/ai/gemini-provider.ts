@@ -84,6 +84,26 @@ export class GeminiProvider implements IAiProvider {
     }
   }
 
+  async fetchModels(apiKey: string): Promise<string[]> {
+    if (!apiKey) {
+      throw new Error('API key is required.');
+    }
+
+    const response = await fetchWithTimeout(
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`,
+      { method: 'GET' },
+      10000,
+      3,
+    );
+
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response, 'Failed to fetch Gemini models.'));
+    }
+
+    const data = (await response.json()) as any;
+    return (data.models || []).map((m: any) => m.name.replace(/^models\//, ''));
+  }
+
   private mapMessages(messages: any[]): any[] {
     const result: any[] = [];
     for (const m of messages) {

@@ -17,6 +17,7 @@ export interface WorkspaceSettings {
 export interface SavedApiCredential {
   provider: AIProvider;
   apiKey: string;
+  preferredModel?: string;
   active?: boolean;
   updatedAt?: string;
 }

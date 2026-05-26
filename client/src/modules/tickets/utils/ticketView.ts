@@ -55,7 +55,12 @@ export function groupTicketsByStatus(tickets: Ticket[]): TicketsByStatus {
   };
 
   tickets.forEach((ticket) => {
-    groups[ticket.status].push(ticket);
+    if (groups[ticket.status]) {
+      groups[ticket.status].push(ticket);
+    } else {
+      console.warn(`Encountered unknown ticket status "${ticket.status}" for ticket ${ticket.id}. Falling back to 'todo'.`);
+      groups['todo'].push(ticket);
+    }
   });
 
   return groups;

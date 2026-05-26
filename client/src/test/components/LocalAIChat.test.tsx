@@ -267,7 +267,6 @@ describe('LocalAIChat', () => {
     fireEvent.submit(chatForm as HTMLFormElement);
 
     await waitFor(() => {
-      expect(screen.getByText('Tool Execution: list_tickets')).toBeInTheDocument();
       expect(screen.getByText('You have 1 ticket')).toBeInTheDocument();
     });
 

@@ -139,6 +139,10 @@ export class OllamaProvider implements IAiProvider {
     }
   }
 
+  async fetchModels(apiKey: string): Promise<string[]> {
+    return [];
+  }
+
   clearCache(): void {
     this.resolvedUrlCache.clear();
   }

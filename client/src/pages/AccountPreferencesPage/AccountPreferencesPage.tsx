@@ -216,7 +216,7 @@ function SavedKeyItem({
             marginBottom: '2px',
           }}
         >
-          {option.label}
+          {option.label}{credential.preferredModel ? ` - ${credential.preferredModel}` : ''}
         </div>
         <div
           style={{

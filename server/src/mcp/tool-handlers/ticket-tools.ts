@@ -30,6 +30,8 @@ function parseDateArg(value: unknown, fieldName: string): Date | undefined {
  * touching ticket data.
  */
 export class TicketTools {
+  private creationRateLimitMap = new Map<string, number>();
+
   /**
    * @description Lists tickets for a single authorized project or for every
    * project in the caller's workspace.
@@ -109,6 +111,15 @@ export class TicketTools {
    * @throws When the target project is outside the authorized workspace.
    */
   async createTicket(args: Record<string, unknown>, context: ToolExecutionContext) {
+    const now = Date.now();
+    const lastCreationTime = this.creationRateLimitMap.get(context.actorUserId) ?? 0;
+    
+    if (process.env.NODE_ENV !== 'test' && now - lastCreationTime < 3000) {
+      throw new Error('Rate limit exceeded: You can only create one ticket every 3 seconds from this server instance. Please wait a moment and try again.');
+    }
+    
+    this.creationRateLimitMap.set(context.actorUserId, now);
+
     const projectId = String(args.projectId ?? '');
     await this.assertProjectInWorkspace(projectId, context.workspaceId);
 

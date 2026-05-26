@@ -39,6 +39,7 @@ export class CredentialManager {
     userId: string,
     provider: string,
     plaintextAPIKey: string,
+    preferredModel?: string,
     dbClient: DbClient = db,
   ): Promise<void> {
     if (!userId) {
@@ -75,28 +76,37 @@ export class CredentialManager {
       authTag = cipher.getAuthTag();
 
       // 5. Save/Upsert the credential record to the database using the injected dbClient
+      const valuesToInsert: any = {
+        userId,
+        provider: normalizedProvider,
+        encryptedApiKey: ciphertext,
+        encryptedDek: encryptedDEK,
+        aesIv: iv,
+        aesAuthTag: authTag,
+        kmsKekId: kekId,
+        updatedAt: new Date(),
+      };
+      
+      const valuesToSet: any = {
+        encryptedApiKey: ciphertext,
+        encryptedDek: encryptedDEK,
+        aesIv: iv,
+        aesAuthTag: authTag,
+        kmsKekId: kekId,
+        updatedAt: new Date(),
+      };
+
+      if (preferredModel !== undefined) {
+        valuesToInsert.preferredModel = preferredModel;
+        valuesToSet.preferredModel = preferredModel;
+      }
+
       await dbClient
         .insert(userExternalCredentials)
-        .values({
-          userId,
-          provider: normalizedProvider,
-          encryptedApiKey: ciphertext,
-          encryptedDek: encryptedDEK,
-          aesIv: iv,
-          aesAuthTag: authTag,
-          kmsKekId: kekId,
-          updatedAt: new Date(),
-        })
+        .values(valuesToInsert)
         .onConflictDoUpdate({
           target: [userExternalCredentials.userId, userExternalCredentials.provider],
-          set: {
-            encryptedApiKey: ciphertext,
-            encryptedDek: encryptedDEK,
-            aesIv: iv,
-            aesAuthTag: authTag,
-            kmsKekId: kekId,
-            updatedAt: new Date(),
-          },
+          set: valuesToSet,
         });
     } finally {
       // 4. Immediately zeroize/overwrite plaintext keys in memory
@@ -203,6 +213,7 @@ export class CredentialManager {
     return db
       .select({
         provider: userExternalCredentials.provider,
+        preferredModel: userExternalCredentials.preferredModel,
         createdAt: userExternalCredentials.createdAt,
         updatedAt: userExternalCredentials.updatedAt,
       })

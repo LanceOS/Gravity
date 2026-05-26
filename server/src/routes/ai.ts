@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { aiService } from '../lib/ai/index.js';
 import { resolveRequestActorUserId } from '../lib/request-auth.js';
 import { validateOllamaUrl } from '../lib/ai/utils.js';
+import { systemPrompt } from '../config/sysPrompt.js';
+import { getUserSettingsRecord } from '../lib/platform.js';
 
 const API_KEY_MASK = '••••••••••••';
 
@@ -110,6 +112,12 @@ export function createAiRouter() {
 
     const rawUrl = typeof req.query.ollamaUrl === 'string' ? req.query.ollamaUrl : 'http://localhost:11434';
     try {
+      const settings = await getUserSettingsRecord(actorUserId);
+      if (settings.agentIntegration !== 'ollama') {
+        res.json({ models: [], connected: false, error: 'Ollama integration is not enabled in settings.' });
+        return;
+      }
+
       validateOllamaUrl(rawUrl);
       const models = await aiService.getOllamaProvider().fetchOllamaModels(rawUrl);
       res.json({ models, connected: true });
@@ -220,12 +228,18 @@ export function createAiRouter() {
     }
 
     const model = typeof req.body?.model === 'string' ? req.body.model : '';
-    const messages = Array.isArray(req.body?.messages) ? req.body.messages : [];
+    let messages = Array.isArray(req.body?.messages) ? req.body.messages : [];
     const tools = Array.isArray(req.body?.tools) && req.body.tools.length > 0 ? req.body.tools : undefined;
 
     if (!model || messages.length === 0) {
       res.status(400).json({ error: 'model and messages are required.' });
       return;
+    }
+
+    if (messages.length > 0 && messages[0].role === 'system') {
+      messages[0] = { ...messages[0], content: messages[0].content + '\n\n' + systemPrompt };
+    } else {
+      messages = [{ role: 'system', content: systemPrompt }, ...messages];
     }
 
     try {

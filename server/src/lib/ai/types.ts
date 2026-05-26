@@ -18,4 +18,5 @@ export interface ChatOptions {
 export interface IAiProvider {
   chat(options: ChatOptions): Promise<{ content: string; toolCalls?: any[] }>;
   testConnection(options?: string | { apiKey?: string; ollamaUrl?: string }): Promise<void>;
+  fetchModels?(apiKey: string): Promise<string[]>;
 }

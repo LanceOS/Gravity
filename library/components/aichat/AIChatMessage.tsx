@@ -8,6 +8,14 @@ export interface AIChatMessageBubbleProps {
 }
 
 export function AIChatMessageBubble({ message: m }: AIChatMessageBubbleProps) {
+  if (m.role === 'tool') {
+    return null;
+  }
+
+  if (m.role === 'assistant' && m.tool_calls && !m.content) {
+    return null;
+  }
+
   return (
     <div
       style={{
@@ -20,16 +28,12 @@ export function AIChatMessageBubble({ message: m }: AIChatMessageBubbleProps) {
             ? 'var(--color-base100)'
             : m.role === 'system'
             ? 'var(--color-error-light)'
-            : m.role === 'tool'
-            ? 'var(--color-base50)'
             : 'var(--color-surface-card)',
         border: `1px solid ${
           m.role === 'user'
             ? 'var(--color-border-focus)'
             : m.role === 'system'
             ? 'var(--color-error-dark)'
-            : m.role === 'tool'
-            ? 'var(--color-border-default)'
             : 'var(--color-border-default)'
         }`,
         borderRadius: '8px',
@@ -42,48 +46,9 @@ export function AIChatMessageBubble({ message: m }: AIChatMessageBubbleProps) {
             : m.role === 'system'
             ? 'var(--color-error-dark)'
             : 'var(--color-text-secondary)',
-        opacity: m.role === 'tool' ? 0.7 : 1,
       }}
     >
-      {m.role === 'tool' && (
-        <div
-          style={{
-            fontSize: '10px',
-            color: 'var(--color-text-disabled)',
-            marginBottom: '4px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px',
-          }}
-        >
-          <Cpu size={10} /> Tool Execution: {m.name}
-        </div>
-      )}
       {m.content && <FormattedMarkdown text={m.content} />}
-      {m.tool_calls &&
-        m.tool_calls.map((tc) => (
-          <div
-            key={tc.id}
-            style={{
-              marginTop: m.content ? '8px' : '0',
-              padding: '6px',
-              background: 'var(--color-base50)',
-              borderRadius: '4px',
-              fontSize: '10px',
-              color: 'var(--color-text-disabled)',
-              border: '1px dashed var(--color-border-default)',
-            }}
-          >
-            <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <Sparkles size={10} /> Calling tool: {tc.name}
-            </div>
-            <div style={{ fontFamily: 'var(--mono)', marginTop: '4px', opacity: 0.8 }}>
-              {typeof tc.arguments === 'string'
-                ? tc.arguments
-                : JSON.stringify(tc.arguments, null, 2)}
-            </div>
-          </div>
-        ))}
     </div>
   );
 }

@@ -195,6 +195,7 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
+                'X-Mcp-Sanitize': 'true',
                 ...(workspaceId ? { 'X-Workspace-Id': workspaceId } : {})
               },
               body: JSON.stringify({

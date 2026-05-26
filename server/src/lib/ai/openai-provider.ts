@@ -93,6 +93,32 @@ export class OpenAiProvider implements IAiProvider {
     }
   }
 
+  async fetchModels(apiKey: string): Promise<string[]> {
+    if (!apiKey) {
+      throw new Error('API key is required.');
+    }
+
+    const response = await fetchWithTimeout(
+      `${this.getBaseUrl()}/v1/models`,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+        },
+      },
+      10000,
+      3,
+    );
+
+    const providerLabel = this.isDeepSeek ? 'DeepSeek' : 'OpenAI';
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response, `Failed to fetch ${providerLabel} models.`));
+    }
+
+    const data = (await response.json()) as any;
+    return (data.data || []).map((m: any) => m.id);
+  }
+
   private mapMessages(messages: any[]): any[] {
     return messages.map((m) => {
       if (m.role === 'tool') {

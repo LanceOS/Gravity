@@ -175,3 +175,74 @@ export async function readErrorMessage(response: Response, fallback: string): Pr
   }
 }
 
+export function chooseBestMcpModel(provider: string, models: string[]): string {
+  const lowerProvider = provider.toLowerCase();
+
+  if (lowerProvider === 'openai') {
+    const mcpModels = ['gpt-4o-mini', 'gpt-4o'];
+    for (const m of mcpModels) {
+      if (models.includes(m)) return m;
+    }
+    return 'gpt-4o-mini';
+  }
+
+  if (lowerProvider === 'deepseek') {
+    const mcpModels = ['deepseek-chat', 'deepseek-reasoner'];
+    for (const m of mcpModels) {
+      if (models.includes(m)) return m;
+    }
+    return 'deepseek-chat';
+  }
+
+  if (lowerProvider === 'anthropic') {
+    const mcpModels = [
+      {
+        canonical: 'claude-3-haiku',
+        aliases: ['claude-3-haiku', 'claude-3-haiku-20240307']
+      },
+      {
+        canonical: 'claude-3-5-haiku',
+        aliases: ['claude-3-5-haiku', 'claude-3-5-haiku-20241022']
+      },
+      {
+        canonical: 'claude-3-5-sonnet',
+        aliases: ['claude-3-5-sonnet', 'claude-3-5-sonnet-20240620', 'claude-3-5-sonnet-20241022']
+      }
+    ];
+    for (const model of mcpModels) {
+      if (model.aliases.some(alias => models.includes(alias))) return model.canonical;
+    }
+    return 'claude-3-haiku';
+  }
+
+  if (lowerProvider === 'gemini') {
+    const mcpModels = [
+      {
+        canonical: 'gemini-1.5-flash',
+        aliases: ['gemini-1.5-flash', 'gemini-2.0-flash']
+      },
+      {
+        canonical: 'gemini-1.5-pro',
+        aliases: ['gemini-1.5-pro']
+      },
+      {
+        canonical: 'gemini-1.0-pro',
+        aliases: ['gemini-1.0-pro']
+      }
+    ];
+    for (const model of mcpModels) {
+      const match = models.find(available =>
+        model.aliases.some(alias =>
+          available === alias ||
+          available.replace(/^models\//, '') === alias ||
+          available.includes(alias)
+        )
+      );
+      if (match) return model.canonical;
+    }
+    return 'gemini-1.5-flash';
+  }
+
+  return '';
+}
+
