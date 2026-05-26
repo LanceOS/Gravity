@@ -1,8 +1,9 @@
 import { Router } from 'express';
 import { eq } from 'drizzle-orm';
 import { db } from '../db/index.js';
-import { userSettings } from '../db/schema.js';
+import { userSettings, userExternalCredentials } from '../db/schema.js';
 import { decryptSecret, encryptSecret } from '../lib/crypto.js';
+import { credentialManager } from '../lib/kms/index.js';
 import { getUserSettingsRecord } from '../lib/platform.js';
 import { resolveRequestActorUserId } from '../lib/request-auth.js';
 
@@ -12,14 +13,14 @@ const AI_PROVIDERS = new Set(['openai', 'anthropic', 'gemini', 'deepseek']);
 const AGENT_INTEGRATIONS = new Set(['ollama', 'third_party']);
 const PROJECT_LAYOUTS = new Set(['standard', 'condensed']);
 
-function toSettingsResponse(settings: Awaited<ReturnType<typeof getUserSettingsRecord>>) {
+function toSettingsResponse(settings: Awaited<ReturnType<typeof getUserSettingsRecord>>, apiKey: string) {
   return {
     userId: settings.userId,
     defaultView: settings.defaultView,
     ollamaModel: settings.preferredOllamaModel ?? '',
     ollamaEndpoint: settings.ollamaEndpoint,
     theme: settings.theme,
-    apiKey: decryptSecret(settings.encryptedApiKey),
+    apiKey,
     aiProvider: settings.aiProvider,
     agentIntegration: settings.agentIntegration,
     projectLayout: settings.projectLayout,
@@ -60,7 +61,15 @@ export function createSettingsRouter() {
 
     try {
       const settings = await getUserSettingsRecord(req.params.userId);
-      res.json(toSettingsResponse(settings));
+      let apiKey = '';
+      try {
+        await credentialManager.ExecuteWithCredential(req.params.userId, (decryptedKey) => {
+          apiKey = decryptedKey;
+        });
+      } catch {
+        // Fallback to empty if not found
+      }
+      res.json(toSettingsResponse(settings, apiKey));
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load settings.' });
     }
@@ -111,6 +120,27 @@ export function createSettingsRouter() {
       }
 
       const current = await getUserSettingsRecord(userId);
+      
+      let apiKey = '';
+      if (typeof req.body?.apiKey === 'string') {
+        const trimmed = req.body.apiKey.trim();
+        if (trimmed === '') {
+          await db.delete(userExternalCredentials).where(eq(userExternalCredentials.userId, userId));
+          apiKey = '';
+        } else {
+          await credentialManager.StoreCredential(userId, trimmed);
+          apiKey = trimmed;
+        }
+      } else {
+        try {
+          await credentialManager.ExecuteWithCredential(userId, (decryptedKey) => {
+            apiKey = decryptedKey;
+          });
+        } catch {
+          apiKey = '';
+        }
+      }
+
       const merged = {
         ...current,
         defaultView: defaultView.value ?? current.defaultView,
@@ -122,10 +152,6 @@ export function createSettingsRouter() {
         aiProvider: aiProvider.value ?? current.aiProvider,
         agentIntegration: agentIntegration.value ?? current.agentIntegration,
         projectLayout: projectLayout.value ?? current.projectLayout,
-        encryptedApiKey:
-          typeof req.body?.apiKey === 'string'
-            ? encryptSecret(req.body.apiKey.trim())
-            : current.encryptedApiKey,
       };
 
       await db
@@ -138,12 +164,12 @@ export function createSettingsRouter() {
           aiProvider: merged.aiProvider,
           agentIntegration: merged.agentIntegration,
           projectLayout: merged.projectLayout,
-          encryptedApiKey: merged.encryptedApiKey,
+          encryptedApiKey: null,
           updatedAt: new Date(),
         })
         .where(eq(userSettings.userId, userId));
 
-      res.json(toSettingsResponse(merged));
+      res.json(toSettingsResponse(merged, apiKey));
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to update settings.' });
     }

@@ -1,4 +1,29 @@
-import { boolean, index, integer, jsonb, pgTable, primaryKey, serial, text, timestamp } from 'drizzle-orm/pg-core';
+import { boolean, customType, index, integer, jsonb, pgTable, primaryKey, serial, text, timestamp } from 'drizzle-orm/pg-core';
+
+export const bytea = customType<{ data: Buffer; driverData: string }>({
+  dataType() {
+    return 'bytea';
+  },
+  toDriver(value: Buffer): string {
+    return `\\x${value.toString('hex')}`;
+  },
+  fromDriver(value: unknown): Buffer {
+    if (Buffer.isBuffer(value)) {
+      const str = value.toString('utf8');
+      if (str.startsWith('\\x')) {
+        return Buffer.from(str.slice(2), 'hex');
+      }
+      return value;
+    }
+    if (typeof value === 'string') {
+      if (value.startsWith('\\x')) {
+        return Buffer.from(value.slice(2), 'hex');
+      }
+      return Buffer.from(value, 'hex');
+    }
+    return Buffer.from(value as any);
+  }
+});
 
 export const authUsers = pgTable('user', {
   id: text('id').primaryKey(),
@@ -199,6 +224,17 @@ export const comments = pgTable('comments', {
   userIdIdx: index('comments_user_id_idx').on(table.userId),
 }));
 
+export const userExternalCredentials = pgTable('user_external_credentials', {
+  userId: text('user_id').primaryKey(),
+  encryptedApiKey: bytea('encrypted_api_key').notNull(),
+  encryptedDek: bytea('encrypted_dek').notNull(),
+  aesIv: bytea('aes_iv').notNull(),
+  aesAuthTag: bytea('aes_auth_tag').notNull(),
+  kmsKekId: text('kms_kek_id').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const schema = {
   authUsers,
   userProfiles,
@@ -215,4 +251,5 @@ export const schema = {
   cycles,
   tickets,
   comments,
+  userExternalCredentials,
 };

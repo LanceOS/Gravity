@@ -1,5 +1,6 @@
 process.env.DATABASE_URL = 'pgmem://gravity';
 process.env.NODE_ENV = 'test';
+process.env.LOCAL_TESTING_KEK = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 process.env.BETTER_AUTH_SECRET = 'test-secret-1234567890';
 process.env.BETTER_AUTH_BASE_URL = 'http://localhost:8080';
 process.env.CORS_ORIGINS = 'http://localhost:5173';
