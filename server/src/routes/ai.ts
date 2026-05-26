@@ -5,17 +5,99 @@ import { validateOllamaUrl } from '../lib/ai/utils.js';
 
 const API_KEY_MASK = '••••••••••••';
 
-function normalizeIncomingApiKey(rawValue: unknown): string | undefined {
+type ParsedApiKey = {
+  value?: string;
+  provided: boolean;
+  blank: boolean;
+};
+
+function parseIncomingApiKey(rawValue: unknown): ParsedApiKey {
+  if (rawValue === undefined) {
+    return { value: undefined, provided: false, blank: false };
+  }
+
   if (typeof rawValue !== 'string') {
-    return undefined;
+    return { value: undefined, provided: true, blank: true };
   }
 
   const trimmed = rawValue.trim();
-  if (!trimmed || trimmed === API_KEY_MASK) {
-    return undefined;
+  if (!trimmed) {
+    return { value: undefined, provided: true, blank: true };
   }
 
-  return trimmed;
+  if (trimmed === API_KEY_MASK) {
+    return { value: undefined, provided: true, blank: false };
+  }
+
+  return { value: trimmed, provided: true, blank: false };
+}
+
+function isSafeValidationMessage(message: string) {
+  return message === 'Invalid URL format.' || message === 'URL scheme must be http or https.';
+}
+
+function isMissingCredentialMessage(message: string) {
+  return /No external credentials found|API key is required/i.test(message);
+}
+
+function providerLabel(provider: string) {
+  switch (provider.toLowerCase()) {
+    case 'openai':
+      return 'OpenAI';
+    case 'anthropic':
+      return 'Anthropic';
+    case 'gemini':
+      return 'Gemini';
+    case 'deepseek':
+      return 'DeepSeek';
+    case 'ollama':
+      return 'Ollama';
+    default:
+      return 'AI provider';
+  }
+}
+
+function sanitizeAiError(
+  error: unknown,
+  provider: string,
+  operation: 'models' | 'test' | 'chat',
+): { status: number; message: string } {
+  const message = error instanceof Error ? error.message : 'Unexpected error.';
+
+  if (message.includes('Unsupported provider')) {
+    return { status: 400, message: 'Unsupported provider.' };
+  }
+
+  if (isSafeValidationMessage(message)) {
+    return { status: 400, message };
+  }
+
+  if (isMissingCredentialMessage(message)) {
+    return { status: 400, message: 'No API key configured for this account.' };
+  }
+
+  if (message.includes('Security Exception')) {
+    return {
+      status: provider === 'ollama' ? 400 : operation === 'chat' ? 502 : 400,
+      message:
+        provider === 'ollama'
+          ? 'Provided Ollama endpoint is not allowed.'
+          : 'Cloud AI provider configuration error.',
+    };
+  }
+
+  if (provider === 'ollama') {
+    return { status: operation === 'chat' ? 502 : 400, message: 'Could not connect to Ollama.' };
+  }
+
+  if (operation === 'chat') {
+    return { status: 502, message: `${providerLabel(provider)} request failed.` };
+  }
+
+  return {
+    status: 400,
+    message: `Connection verification failed for ${providerLabel(provider)}. Check your provider settings and API key.`,
+  };
 }
 
 export function createAiRouter() {
@@ -34,12 +116,9 @@ export function createAiRouter() {
       const models = await aiService.getOllamaProvider().fetchOllamaModels(rawUrl);
       res.json({ models, connected: true });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to contact Ollama.';
-      const sanitized = message.includes('Security Exception') ? 'External credentials configuration error.' : message;
-      const normalizedError = /fetch failed|network|econnrefused|enotfound|aborted/i.test(sanitized)
-        ? 'Could not connect to Ollama.'
-        : sanitized;
-      res.json({ models: [], connected: false, error: normalizedError });
+      console.error('Failed to load Ollama models:', error);
+      const sanitized = sanitizeAiError(error, 'ollama', 'models');
+      res.json({ models: [], connected: false, error: sanitized.message });
     }
   });
 
@@ -51,17 +130,22 @@ export function createAiRouter() {
     }
 
     const provider = typeof req.body?.provider === 'string' ? req.body.provider : 'openai';
-    const apiKey = normalizeIncomingApiKey(req.body?.apiKey);
+    const parsedApiKey = parseIncomingApiKey(req.body?.apiKey);
+
+    if (parsedApiKey.blank) {
+      res.status(400).json({ error: 'API key must not be empty.' });
+      return;
+    }
 
     // If no apiKey is provided, delegate to the stored credential via testConnection.
     // If apiKey is provided, use it directly as a live validation.
     try {
-      await aiService.testConnection(actorUserId, provider, { apiKey });
+      await aiService.testConnection(actorUserId, provider, { apiKey: parsedApiKey.value });
       res.json({ message: `${provider} API key validated successfully.` });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Connection test failed.';
-      const sanitized = message.includes('Security Exception') ? 'External credentials configuration error.' : message;
-      res.status(400).json({ error: sanitized });
+      console.error(`AI test-key failed for provider ${provider}:`, error);
+      const sanitized = sanitizeAiError(error, provider, 'test');
+      res.status(sanitized.status).json({ error: sanitized.message });
     }
   });
 
@@ -73,7 +157,12 @@ export function createAiRouter() {
     }
 
     const provider = typeof req.body?.provider === 'string' ? req.body.provider : 'openai';
-    const apiKey = normalizeIncomingApiKey(req.body?.apiKey ?? req.body?.api_key);
+    const parsedApiKey = parseIncomingApiKey(req.body?.apiKey ?? req.body?.api_key);
+
+    if (parsedApiKey.blank) {
+      res.status(400).json({ error: 'API key must not be empty.' });
+      return;
+    }
 
     const ollamaUrl = typeof req.body?.ollamaUrl === 'string' ? req.body.ollamaUrl.trim() : undefined;
 
@@ -81,7 +170,7 @@ export function createAiRouter() {
       if (ollamaUrl) {
         validateOllamaUrl(ollamaUrl);
       }
-      const latency = await aiService.testConnection(actorUserId, provider, { apiKey, ollamaUrl });
+      const latency = await aiService.testConnection(actorUserId, provider, { apiKey: parsedApiKey.value, ollamaUrl });
       res.json({
         connected: true,
         latency_ms: latency,
@@ -89,12 +178,12 @@ export function createAiRouter() {
         error: null,
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Connection test failed.';
-      const sanitized = message.includes('Security Exception') ? 'External credentials configuration error.' : message;
-      res.status(400).json({
+      console.error(`AI test-connection failed for provider ${provider}:`, error);
+      const sanitized = sanitizeAiError(error, provider, 'test');
+      res.status(sanitized.status).json({
         connected: false,
         latency_ms: null,
-        error: sanitized,
+        error: sanitized.message,
       });
     }
   });
@@ -138,26 +227,9 @@ export function createAiRouter() {
         },
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Chat execution failed.';
-      
-      if (message.includes('Unsupported provider')) {
-        res.status(400).json({ error: message });
-        return;
-      }
-
-      if (message.includes('Security Exception')) {
-        const status = provider === 'ollama' ? 400 : 502;
-        res.status(status).json({ error: 'External credentials configuration error.' });
-        return;
-      }
-
-      const isOllama = provider === 'ollama';
-      const normalizedError =
-        isOllama && /fetch failed|network|econnrefused|enotfound|aborted/i.test(message)
-          ? 'Could not connect to Ollama.'
-          : message;
-
-      res.status(502).json({ error: normalizedError });
+      console.error(`AI chat failed for provider ${provider}:`, error);
+      const sanitized = sanitizeAiError(error, provider, 'chat');
+      res.status(sanitized.status).json({ error: sanitized.message });
     }
   });
 

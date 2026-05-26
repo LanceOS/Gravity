@@ -4,6 +4,14 @@ import { AnthropicProvider } from './anthropic-provider.js';
 import { GeminiProvider } from './gemini-provider.js';
 import { OllamaProvider } from './ollama-provider.js';
 import { ChatOptions, IAiProvider } from './types.js';
+import { env } from '../../env.js';
+
+const PROVIDER_ENV_TOKEN_NAMES: Record<string, string> = {
+  openai: 'OPENAI_API_KEY',
+  anthropic: 'ANTHROPIC_API_KEY',
+  gemini: 'GEMINI_API_KEY',
+  deepseek: 'DEEPSEEK_API_KEY',
+};
 
 export class AiService {
   private readonly providers: Record<string, IAiProvider>;
@@ -31,6 +39,33 @@ export class AiService {
     return inst;
   }
 
+  private getEnvironmentApiKey(provider: string): string | undefined {
+    if (env.nodeEnv !== 'development' && env.nodeEnv !== 'test') {
+      return undefined;
+    }
+
+    const envName = PROVIDER_ENV_TOKEN_NAMES[provider.toLowerCase()];
+    if (!envName) {
+      return undefined;
+    }
+
+    const token = process.env[envName]?.trim();
+    return token ? token : undefined;
+  }
+
+  private async withProviderCredential<T>(
+    userId: string,
+    provider: string,
+    executionCallback: (apiKey: string) => Promise<T>,
+  ): Promise<T> {
+    const environmentApiKey = this.getEnvironmentApiKey(provider);
+    if (environmentApiKey) {
+      return executionCallback(environmentApiKey);
+    }
+
+    return this.credentialManager.ExecuteWithCredential(userId, executionCallback);
+  }
+
   /**
    * Proxies a chat completion to the specified provider.
    * Decrypts any stored external API keys in-memory on the fly and wipes them when done.
@@ -48,7 +83,7 @@ export class AiService {
     // Validate provider existence first (throws if unsupported)
     this.getProvider(provider);
 
-    return this.credentialManager.ExecuteWithCredential(userId, async (decryptedKey) => {
+    return this.withProviderCredential(userId, provider, async (decryptedKey) => {
       const providerInst = this.getProvider(provider);
       return providerInst.chat({ ...options, apiKey: decryptedKey });
     });
@@ -78,8 +113,8 @@ export class AiService {
       // Test the newly typed unsaved API Key
       await providerInst.testConnection({ apiKey: options.apiKey });
     } else {
-      // Test the saved key inside our envelope-encrypted db
-      await this.credentialManager.ExecuteWithCredential(userId, async (decryptedKey) => {
+      // Prefer a non-production environment token when configured; otherwise load the saved key.
+      await this.withProviderCredential(userId, provider, async (decryptedKey) => {
         await providerInst.testConnection({ apiKey: decryptedKey });
       });
     }

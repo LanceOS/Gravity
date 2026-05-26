@@ -63,7 +63,7 @@ export const TicketList: React.FC<TicketListProps> = ({
                     <TicketRow
                       key={ticket.id}
                       ticket={ticket}
-                      onClick={onSelectTicket}
+                      onClick={() => onSelectTicket(ticket)}
                       priorityIcon={getPriorityIcon(ticket.priority)}
                       assigneeAvatar={getAssigneeAvatar(userAvatarById, ticket.assigneeId)}
                       domainTag={getDomainTag(domainById, ticket.domainId)}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { api, seedUser } from './helpers/test-helpers.js';
+import { api, createAuthenticatedApi, seedUser } from './helpers/test-helpers.js';
 
 describe('users and settings routes', () => {
   it('lists users and updates tutorial completion', async () => {
@@ -27,9 +27,13 @@ describe('users and settings routes', () => {
   });
 
   it('returns and updates user settings', async () => {
-    const user = await seedUser();
+    const userApi = await createAuthenticatedApi({
+      name: 'Ada Lovelace',
+      email: 'ada@example.com',
+    });
+    const user = userApi.user;
 
-    const getResponse = await api().get(`/api/v1/settings/${user.id}`).set('x-user-id', user.id);
+    const getResponse = await userApi.get(`/api/v1/settings/${user.id}`);
     expect(getResponse.status).toBe(200);
     expect(getResponse.body).toMatchObject({
       userId: user.id,
@@ -42,14 +46,13 @@ describe('users and settings routes', () => {
       apiKey: '',
     });
 
-    const patchResponse = await api()
+    const patchResponse = await userApi
       .patch(`/api/v1/settings/${user.id}`)
-      .set('x-user-id', user.id)
       .send({
         defaultView: 'list',
         ollamaModel: 'llama3.2',
         ollamaEndpoint: 'http://ollama.internal:11434',
-        theme: 'light',
+        theme: 'coffee',
         keyAction: 'update',
         apiKey: 'sk-test-123',
         aiProvider: 'anthropic',
@@ -62,7 +65,7 @@ describe('users and settings routes', () => {
       defaultView: 'list',
       ollamaModel: 'llama3.2',
       ollamaEndpoint: 'http://ollama.internal:11434',
-      theme: 'light',
+      theme: 'coffee',
       apiKey: '••••••••••••',
       aiProvider: 'anthropic',
       projectLayout: 'condensed',
@@ -70,31 +73,42 @@ describe('users and settings routes', () => {
   });
 
   it('rejects cross-user and invalid settings updates', async () => {
-    const user = await seedUser({
-      id: 'settings-user',
+    const userApi = await createAuthenticatedApi({
       email: 'settings-user@example.com',
     });
-    const otherUser = await seedUser({
-      id: 'settings-other-user',
+    const otherUserApi = await createAuthenticatedApi({
       email: 'settings-other-user@example.com',
     });
+    const user = userApi.user;
 
-    const forbiddenGetResponse = await api().get(`/api/v1/settings/${user.id}`).set('x-user-id', otherUser.id);
+    const forbiddenGetResponse = await otherUserApi.get(`/api/v1/settings/${user.id}`);
     expect(forbiddenGetResponse.status).toBe(403);
     expect(forbiddenGetResponse.body).toEqual({ error: 'Forbidden.' });
 
-    const forbiddenPatchResponse = await api()
+    const headerBypassResponse = await api()
+      .get(`/api/v1/settings/${user.id}`)
+      .set('x-user-id', user.id);
+    expect(headerBypassResponse.status).toBe(401);
+    expect(headerBypassResponse.body).toEqual({ error: 'Unauthorized.' });
+
+    const forbiddenPatchResponse = await otherUserApi
       .patch(`/api/v1/settings/${user.id}`)
-      .set('x-user-id', otherUser.id)
       .send({ theme: 'light' });
     expect(forbiddenPatchResponse.status).toBe(403);
     expect(forbiddenPatchResponse.body).toEqual({ error: 'Forbidden.' });
 
-    const invalidPatchResponse = await api()
+    const invalidPatchResponse = await userApi
       .patch(`/api/v1/settings/${user.id}`)
-      .set('x-user-id', user.id)
-      .send({ projectLayout: 'kanban' });
+      .send({ keyAction: 'keep', projectLayout: 'kanban' });
     expect(invalidPatchResponse.status).toBe(400);
     expect(invalidPatchResponse.body).toEqual({ error: 'Invalid projectLayout.' });
+
+    const missingKeyActionResponse = await userApi
+      .patch(`/api/v1/settings/${user.id}`)
+      .send({ theme: 'coffee' });
+    expect(missingKeyActionResponse.status).toBe(400);
+    expect(missingKeyActionResponse.body).toEqual({
+      error: 'keyAction is required and must be one of: update, clear, keep.',
+    });
   });
 });

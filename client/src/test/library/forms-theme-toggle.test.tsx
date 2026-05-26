@@ -395,19 +395,30 @@ describe('library forms and theme toggle', () => {
 
     const toggle = screen.getByRole('button');
     expect(toggle).toHaveAttribute('title', 'Theme: system');
-    expect(document.documentElement).toHaveAttribute('data-theme', 'light');
-    expect(document.documentElement.style.getPropertyValue('--color-surface-elevated')).toBe('rgba(255, 255, 255, 0.92)');
-    expect(document.documentElement.style.getPropertyValue('--color-overlay-scrim')).toBe('rgba(9, 9, 11, 0.7)');
+    expect(document.documentElement).toHaveAttribute('data-theme', 'marble-blue');
+    expect(document.documentElement.style.getPropertyValue('--color-surface-elevated')).toBe('rgba(255, 255, 255, 0.95)');
+    expect(document.documentElement.style.getPropertyValue('--color-overlay-scrim')).toBe('rgba(15, 23, 42, 0.7)');
 
     await user.click(toggle);
-    expect(toggle).toHaveAttribute('title', 'Theme: light');
-    expect(window.localStorage.getItem('gravity_theme')).toBe('light');
+    expect(toggle).toHaveAttribute('title', 'Theme: marble-blue');
+    expect(document.documentElement).toHaveAttribute('data-theme', 'marble-blue');
+    expect(window.localStorage.getItem('gravity_theme')).toBe('marble-blue');
 
     await user.click(toggle);
     expect(toggle).toHaveAttribute('title', 'Theme: dark');
     expect(document.documentElement).toHaveAttribute('data-theme', 'dark');
     expect(document.documentElement.style.getPropertyValue('--color-surface-elevated')).toBe('rgba(44, 44, 46, 0.9)');
     expect(document.documentElement.style.getPropertyValue('--color-overlay-scrim')).toBe('rgba(9, 9, 11, 0.7)');
+
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute('title', 'Theme: coal-black');
+    expect(document.documentElement).toHaveAttribute('data-theme', 'coal-black');
+    expect(window.localStorage.getItem('gravity_theme')).toBe('coal-black');
+
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute('title', 'Theme: coffee');
+    expect(document.documentElement).toHaveAttribute('data-theme', 'coffee');
+    expect(window.localStorage.getItem('gravity_theme')).toBe('coffee');
 
     await user.click(toggle);
     expect(toggle).toHaveAttribute('title', 'Theme: system');

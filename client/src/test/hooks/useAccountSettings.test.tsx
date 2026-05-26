@@ -30,7 +30,7 @@ describe('useAccountSettings', () => {
         jsonResponse({
           userId: currentUser.id,
           defaultView: 'list',
-          theme: 'light',
+          theme: 'coffee',
           ollamaModel: 'llama3.2',
           ollamaEndpoint: 'http://ollama.internal:11434',
           projectLayout: 'condensed',
@@ -45,7 +45,7 @@ describe('useAccountSettings', () => {
     const { result, rerender } = renderHook(
       (props: {
         activeView: 'board' | 'list';
-        theme: 'dark' | 'light';
+        theme: 'dark' | 'coal-black' | 'coffee' | 'marble-blue';
       }) =>
         useAccountSettings({
           currentUser,
@@ -69,21 +69,21 @@ describe('useAccountSettings', () => {
 
     expect(result.current.settings).toMatchObject({
       defaultView: 'list',
-      theme: 'light',
+      theme: 'coffee',
       projectLayout: 'condensed',
       aiProvider: 'anthropic',
       ollamaModel: 'llama3.2',
     });
-    expect(setTheme).toHaveBeenCalledWith('light');
+    expect(setTheme).toHaveBeenCalledWith('coffee');
     expect(setView).toHaveBeenCalledWith('list');
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
 
-    rerender({ activeView: 'list', theme: 'light' });
+    rerender({ activeView: 'list', theme: 'coffee' });
 
     await waitFor(() => {
       expect(result.current.settings.defaultView).toBe('list');
     });
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

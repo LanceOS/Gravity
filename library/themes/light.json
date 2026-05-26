@@ -40,6 +40,7 @@
     "textError": "#991B1B",
     "textInfo": "#1E40AF",
     "textOnAccent": "#FFFFFF",
+    "textOnDanger": "#FFFFFF",
     "textDisabled": "#a09a96",
     "textPlaceholder": "#a09a96",
     "textLink": "#2563EB",

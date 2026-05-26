@@ -2,7 +2,6 @@ import { Router } from 'express';
 import { eq } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import { userSettings, userExternalCredentials } from '../db/schema.js';
-import { decryptSecret, encryptSecret } from '../lib/crypto.js';
 import { credentialManager } from '../lib/kms/index.js';
 import { getUserSettingsRecord } from '../lib/platform.js';
 import { resolveRequestActorUserId } from '../lib/request-auth.js';
@@ -13,7 +12,14 @@ const THEMES = new Set(['dark', 'coal-black', 'coffee', 'marble-blue']);
 const AI_PROVIDERS = new Set(['openai', 'anthropic', 'gemini', 'deepseek']);
 const AGENT_INTEGRATIONS = new Set(['ollama', 'third_party']);
 const PROJECT_LAYOUTS = new Set(['standard', 'condensed']);
+const KEY_ACTIONS = new Set(['update', 'clear', 'keep']);
 const API_KEY_MASK = '••••••••••••';
+const SETTINGS_LOAD_ERROR = 'Failed to load account settings.';
+const SETTINGS_UPDATE_ERROR = 'Failed to update account settings.';
+
+function hasOwn(body: Record<string, unknown> | null | undefined, field: string) {
+  return Boolean(body) && Object.prototype.hasOwnProperty.call(body, field);
+}
 
 function toSettingsResponse(settings: Awaited<ReturnType<typeof getUserSettingsRecord>>, apiKey: string) {
   return {
@@ -72,9 +78,8 @@ export function createSettingsRouter() {
       const apiKeyPlaceholder = record ? '••••••••••••' : '';
       res.json(toSettingsResponse(settings, apiKeyPlaceholder));
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to load settings.';
-      const sanitized = message.includes('Security Exception') ? 'External credentials configuration error.' : message;
-      res.status(500).json({ error: sanitized });
+      console.error(`Failed to load account settings for user ${req.params.userId}:`, error);
+      res.status(500).json({ error: SETTINGS_LOAD_ERROR });
     }
   });
 
@@ -147,32 +152,26 @@ export function createSettingsRouter() {
 
       const hasExistingCredential = Boolean(existingCredential);
 
-      // Determine credential action from keyAction when present.
-      // For backward compatibility, infer behavior from apiKey when keyAction is omitted.
       const explicitKeyAction = typeof req.body?.keyAction === 'string' ? req.body.keyAction : undefined;
       const incomingApiKey = typeof req.body?.apiKey === 'string' ? req.body.apiKey.trim() : undefined;
+      const apiKeyProvided = hasOwn(req.body, 'apiKey');
 
-      let keyAction: 'update' | 'clear' | 'keep';
-      if (explicitKeyAction !== undefined) {
-        if (!['update', 'clear', 'keep'].includes(explicitKeyAction)) {
-          res.status(400).json({ error: 'Invalid keyAction. Must be one of: update, clear, keep.' });
-          return;
-        }
-        keyAction = explicitKeyAction as 'update' | 'clear' | 'keep';
-      } else if (incomingApiKey === '') {
-        keyAction = 'clear';
-      } else if (incomingApiKey && incomingApiKey !== API_KEY_MASK) {
-        keyAction = 'update';
-      } else {
-        keyAction = 'keep';
+      if (!explicitKeyAction || !KEY_ACTIONS.has(explicitKeyAction)) {
+        res.status(400).json({ error: 'keyAction is required and must be one of: update, clear, keep.' });
+        return;
       }
+
+      const keyAction = explicitKeyAction as 'update' | 'clear' | 'keep';
 
       if (keyAction === 'update') {
         const rawKey = incomingApiKey ?? '';
-        if (!rawKey) {
+        if (!rawKey || rawKey === API_KEY_MASK) {
           res.status(400).json({ error: 'apiKey is required when keyAction is "update".' });
           return;
         }
+      } else if (apiKeyProvided) {
+        res.status(400).json({ error: `apiKey must be omitted when keyAction is "${keyAction}".` });
+        return;
       }
 
       // Perform all database modifications in a single atomic transaction block
@@ -222,9 +221,8 @@ export function createSettingsRouter() {
 
       res.json(toSettingsResponse(merged, apiKeyPlaceholder));
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to update settings.';
-      const sanitized = message.includes('Security Exception') ? 'External credentials configuration error.' : message;
-      res.status(500).json({ error: sanitized });
+      console.error(`Failed to update account settings for user ${userId}:`, error);
+      res.status(500).json({ error: SETTINGS_UPDATE_ERROR });
     }
   });
 

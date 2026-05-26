@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   api,
+  createAuthenticatedApi,
   seedCycle,
   seedDomain,
   seedTicket,
@@ -10,7 +11,22 @@ import {
 
 describe('projects and tickets routes', () => {
   it('lists, creates, updates, and shares projects', async () => {
-    const { owner, workspace, project } = await seedWorkspaceFixture();
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Grace Hopper',
+      email: 'grace@example.com',
+      role: 'owner',
+      avatarUrl: 'https://example.com/grace.png',
+    });
+    const owner = ownerApi.user;
+    const { workspace, project } = await seedWorkspaceFixture({
+      owner: {
+        id: owner.id,
+        name: owner.name,
+        email: owner.email,
+        role: 'owner',
+        avatarUrl: owner.avatar,
+      },
+    });
     const domain = await seedDomain(project.id, { id: 'domain-1', name: 'Frontend', color: '#2563EB' });
     const cycle = await seedCycle(project.id, {
       id: 'cycle-1',
@@ -19,9 +35,8 @@ describe('projects and tickets routes', () => {
       endDate: new Date('2025-01-10T00:00:00.000Z'),
     });
 
-    const listResponse = await api()
+    const listResponse = await ownerApi
       .get('/api/v1/projects')
-      .set('x-user-id', owner.id)
       .query({ userId: owner.id, workspaceId: workspace.id });
     expect(listResponse.status).toBe(200);
     expect(listResponse.body).toEqual([
@@ -221,7 +236,22 @@ describe('projects and tickets routes', () => {
   });
 
   it('resolves ticket details by its key prefix/key and validates access', async () => {
-    const { owner, workspace, project } = await seedWorkspaceFixture();
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Grace Hopper',
+      email: 'grace-key@example.com',
+      role: 'owner',
+      avatarUrl: 'https://example.com/grace.png',
+    });
+    const owner = ownerApi.user;
+    const { project } = await seedWorkspaceFixture({
+      owner: {
+        id: owner.id,
+        name: owner.name,
+        email: owner.email,
+        role: 'owner',
+        avatarUrl: owner.avatar,
+      },
+    });
     const ticket = await seedTicket(project.id, {
       id: 'ticket-99',
       title: 'Auto-link test ticket',
@@ -231,10 +261,8 @@ describe('projects and tickets routes', () => {
 
     expect(ticket.key).toBeDefined();
 
-    // 1. Authorized request with X-User-Id header (user is workspace member)
-    const response = await api()
-      .get(`/api/v1/tickets/key/${ticket.key}`)
-      .set('x-user-id', owner.id);
+    // 1. Authorized request by a workspace member
+    const response = await ownerApi.get(`/api/v1/tickets/key/${ticket.key}`);
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({
       id: ticket.id,
@@ -242,25 +270,20 @@ describe('projects and tickets routes', () => {
       title: 'Auto-link test ticket',
     });
 
-    // 2. Unauthorized request with X-User-Id header (user is not workspace member)
-    const otherUser = await seedUser({
-      id: 'user-unauthorized',
+    // 2. Unauthorized request by a non-member
+    const otherUserApi = await createAuthenticatedApi({
       name: 'Non Member',
       email: 'nonmember@example.com',
       role: 'developer',
       avatarUrl: 'https://example.com/nonmember.png',
     });
-    const unauthorizedResponse = await api()
-      .get(`/api/v1/tickets/key/${ticket.key}`)
-      .set('x-user-id', otherUser.id);
+    const unauthorizedResponse = await otherUserApi.get(`/api/v1/tickets/key/${ticket.key}`);
     expect(unauthorizedResponse.status).toBe(403);
 
 
 
     // 5. Non-existent ticket key resolves to 404
-    const notFoundResponse = await api()
-      .get('/api/v1/tickets/key/NONEXIST-999')
-      .set('x-user-id', owner.id);
+    const notFoundResponse = await ownerApi.get('/api/v1/tickets/key/NONEXIST-999');
     expect(notFoundResponse.status).toBe(404);
   });
 

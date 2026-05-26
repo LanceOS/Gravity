@@ -6,7 +6,7 @@ import { userExternalCredentials } from '../src/db/schema.js';
 import { LocalEnvKmsProvider } from '../src/lib/kms/local-provider.js';
 import { CredentialManager } from '../src/lib/kms/credential-manager.js';
 import { credentialManager } from '../src/lib/kms/index.js';
-import { api, seedUser } from './helpers/test-helpers.js';
+import { api, createAuthenticatedApi, seedUser } from './helpers/test-helpers.js';
 
 describe('Envelope Encryption & Secure Credential Storage', () => {
   describe('LocalEnvKmsProvider', () => {
@@ -139,11 +139,10 @@ describe('Envelope Encryption & Secure Credential Storage', () => {
 
   describe('Integration: Settings Routes with Envelope Encryption', () => {
     it('GET /api/v1/settings/:userId returns an empty apiKey if no credential is set', async () => {
-      const user = await seedUser({ id: 'settings-integ-1', email: 'int1@example.com' });
+      const userApi = await createAuthenticatedApi({ email: 'int1@example.com' });
+      const user = userApi.user;
 
-      const response = await api()
-        .get(`/api/v1/settings/${user.id}`)
-        .set('x-user-id', user.id);
+      const response = await userApi.get(`/api/v1/settings/${user.id}`);
 
       expect(response.status).toBe(200);
       expect(response.body).toMatchObject({
@@ -153,13 +152,13 @@ describe('Envelope Encryption & Secure Credential Storage', () => {
     });
 
     it('PATCH /api/v1/settings/:userId stores and GET returns the envelope encrypted apiKey', async () => {
-      const user = await seedUser({ id: 'settings-integ-2', email: 'int2@example.com' });
+      const userApi = await createAuthenticatedApi({ email: 'int2@example.com' });
+      const user = userApi.user;
       const targetApiKey = 'sk-integration-test-key-555';
 
       // 1. PATCH setting with apiKey using the explicit keyAction: 'update'
-      const patchResponse = await api()
+      const patchResponse = await userApi
         .patch(`/api/v1/settings/${user.id}`)
-        .set('x-user-id', user.id)
         .send({
           keyAction: 'update',
           apiKey: targetApiKey,
@@ -181,9 +180,7 @@ describe('Envelope Encryption & Secure Credential Storage', () => {
       expect(externalRecords.length).toBe(1);
 
       // 2. GET setting should return placeholder seamlessly
-      const getResponse = await api()
-        .get(`/api/v1/settings/${user.id}`)
-        .set('x-user-id', user.id);
+      const getResponse = await userApi.get(`/api/v1/settings/${user.id}`);
 
       expect(getResponse.status).toBe(200);
       expect(getResponse.body).toMatchObject({
@@ -194,15 +191,15 @@ describe('Envelope Encryption & Secure Credential Storage', () => {
     });
 
     it('PATCH /api/v1/settings/:userId clears credentials when keyAction is clear', async () => {
-      const user = await seedUser({ id: 'settings-integ-3', email: 'int3@example.com' });
+      const userApi = await createAuthenticatedApi({ email: 'int3@example.com' });
+      const user = userApi.user;
 
       // First store a credential
       await credentialManager.StoreCredential(user.id, 'sk-temp-key');
 
       // Clear the credential via settings PATCH using the explicit keyAction: 'clear'
-      const clearResponse = await api()
+      const clearResponse = await userApi
         .patch(`/api/v1/settings/${user.id}`)
-        .set('x-user-id', user.id)
         .send({
           keyAction: 'clear',
         });

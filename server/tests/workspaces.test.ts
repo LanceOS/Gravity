@@ -1,19 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { api, seedUser, seedWorkspaceFixture } from './helpers/test-helpers.js';
+import { api, createAuthenticatedApi, seedUser, seedWorkspaceFixture } from './helpers/test-helpers.js';
 
 describe('workspaces routes', () => {
   it('creates, lists, and updates workspaces with settings and members', async () => {
-    const owner = await seedUser({
-      id: 'workspace-owner',
+    const ownerApi = await createAuthenticatedApi({
       name: 'Workspace Owner',
       email: 'workspace-owner@example.com',
       role: 'owner',
       avatarUrl: 'https://example.com/workspace-owner.png',
     });
+    const owner = ownerApi.user;
 
-    const createResponse = await api()
+    const createResponse = await ownerApi
       .post('/api/v1/workspaces')
-      .set('x-user-id', owner.id)
       .send({
         name: 'Gravity Core',
         description: 'The main Gravity workspace.',
@@ -35,7 +34,7 @@ describe('workspaces routes', () => {
     const workspaceId = createResponse.body.workspace.id;
     const defaultProjectId = createResponse.body.workspace.defaultProjectId;
 
-    const listResponse = await api().get('/api/v1/workspaces').set('x-user-id', owner.id).query({ userId: owner.id });
+    const listResponse = await ownerApi.get('/api/v1/workspaces').query({ userId: owner.id });
     expect(listResponse.status).toBe(200);
     expect(listResponse.body).toEqual([
       expect.objectContaining({
@@ -62,9 +61,8 @@ describe('workspaces routes', () => {
       defaultProjectId,
     });
 
-    const patchResponse = await api()
+    const patchResponse = await ownerApi
       .patch(`/api/v1/workspaces/${workspaceId}/settings`)
-      .set('x-user-id', owner.id)
       .send({
         hostUrl: 'http://gravity.test',
         joinMode: 'auto_join',
@@ -81,9 +79,7 @@ describe('workspaces routes', () => {
       defaultProjectId,
     });
 
-    const membersResponse = await api()
-      .get(`/api/v1/workspaces/${workspaceId}/members`)
-      .set('x-user-id', owner.id);
+    const membersResponse = await ownerApi.get(`/api/v1/workspaces/${workspaceId}/members`);
     expect(membersResponse.status).toBe(200);
     expect(membersResponse.body).toEqual([
       expect.objectContaining({
@@ -96,24 +92,23 @@ describe('workspaces routes', () => {
   });
 
   it('rejects mismatched actor identifiers when creating or listing workspaces', async () => {
-    const owner = await seedUser({
-      id: 'workspace-owner-authz',
+    const ownerApi = await createAuthenticatedApi({
       name: 'Workspace Owner Authz',
       email: 'workspace-owner-authz@example.com',
       role: 'owner',
       avatarUrl: 'https://example.com/workspace-owner-authz.png',
     });
-    const otherUser = await seedUser({
-      id: 'workspace-other-user',
+    const otherUserApi = await createAuthenticatedApi({
       name: 'Workspace Other User',
       email: 'workspace-other-user@example.com',
       role: 'member',
       avatarUrl: 'https://example.com/workspace-other-user.png',
     });
+    const owner = ownerApi.user;
+    const otherUser = otherUserApi.user;
 
-    const createResponse = await api()
+    const createResponse = await ownerApi
       .post('/api/v1/workspaces')
-      .set('x-user-id', owner.id)
       .send({
         name: 'Gravity Core Authz',
         description: 'The main Gravity workspace.',
@@ -124,9 +119,8 @@ describe('workspaces routes', () => {
     expect(createResponse.status).toBe(403);
     expect(createResponse.body).toEqual({ error: 'Forbidden.' });
 
-    const authorizedCreateResponse = await api()
+    const authorizedCreateResponse = await ownerApi
       .post('/api/v1/workspaces')
-      .set('x-user-id', owner.id)
       .send({
         name: 'Gravity Core Authorized',
         description: 'The main Gravity workspace.',
@@ -137,15 +131,14 @@ describe('workspaces routes', () => {
     expect(authorizedCreateResponse.status).toBe(201);
     const workspaceId = authorizedCreateResponse.body.workspace.id;
 
-    const listResponse = await api()
+    const listResponse = await ownerApi
       .get('/api/v1/workspaces')
-      .set('x-user-id', owner.id)
       .query({ userId: otherUser.id });
 
     expect(listResponse.status).toBe(403);
     expect(listResponse.body).toEqual({ error: 'Forbidden.' });
 
-    const authorizedListResponse = await api().get('/api/v1/workspaces').set('x-user-id', owner.id);
+    const authorizedListResponse = await ownerApi.get('/api/v1/workspaces');
     expect(authorizedListResponse.status).toBe(200);
     expect(authorizedListResponse.body).toEqual([
       expect.objectContaining({
@@ -156,11 +149,25 @@ describe('workspaces routes', () => {
   });
 
   it('creates invites, join requests, approvals, and workspace connections', async () => {
-    const { owner, workspace, project } = await seedWorkspaceFixture();
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Grace Hopper',
+      email: 'grace@example.com',
+      role: 'owner',
+      avatarUrl: 'https://example.com/grace.png',
+    });
+    const owner = ownerApi.user;
+    const { workspace, project } = await seedWorkspaceFixture({
+      owner: {
+        id: owner.id,
+        name: owner.name,
+        email: owner.email,
+        role: 'owner',
+        avatarUrl: owner.avatar,
+      },
+    });
 
-    const inviteResponse = await api()
+    const inviteResponse = await ownerApi
       .post(`/api/v1/workspaces/${workspace.id}/invites`)
-      .set('x-user-id', owner.id)
       .send({
         label: 'Team Invite',
       });
@@ -201,9 +208,7 @@ describe('workspaces routes', () => {
       }),
     ]);
 
-    const listJoinRequestsResponse = await api()
-      .get(`/api/v1/workspaces/${workspace.id}/join-requests`)
-      .set('x-user-id', owner.id);
+    const listJoinRequestsResponse = await ownerApi.get(`/api/v1/workspaces/${workspace.id}/join-requests`);
     expect(listJoinRequestsResponse.status).toBe(200);
     expect(listJoinRequestsResponse.body).toEqual([
       expect.objectContaining({
@@ -213,9 +218,8 @@ describe('workspaces routes', () => {
       }),
     ]);
 
-    const approveResponse = await api()
+    const approveResponse = await ownerApi
       .post(`/api/v1/workspaces/${workspace.id}/join-requests/${joinRequestResponse.body.id}/approve`)
-      .set('x-user-id', owner.id)
       .send({});
 
     expect(approveResponse.status).toBe(200);

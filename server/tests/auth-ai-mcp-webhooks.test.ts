@@ -1,35 +1,23 @@
 import { eq } from 'drizzle-orm';
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../src/app.js';
 import { db } from '../src/db/index.js';
 import { projects, tickets, workspaceMembers } from '../src/db/schema.js';
 import {
   api as baseApi,
+  createAuthenticatedApi,
   jsonResponse,
   readSseChunk,
   seedTicket,
   seedUser,
   seedWorkspaceFixture,
 } from './helpers/test-helpers.js';
-import { credentialManager } from '../src/lib/kms/index.js';
 
-// Custom API wrapper that automatically passes the test user ID header to authenticate AI requests.
+let authenticatedAiApi: Awaited<ReturnType<typeof createAuthenticatedApi>>;
+
 function api() {
-  const client = baseApi();
-  const wrap = (url: string, reqBuilder: any) => {
-    if (url.includes('/ai/')) {
-      return reqBuilder.set('x-user-id', 'mock-user-id');
-    }
-    return reqBuilder;
-  };
-
-  return {
-    get: (url: string) => wrap(url, client.get(url)),
-    post: (url: string) => wrap(url, client.post(url)),
-    patch: (url: string) => wrap(url, client.patch(url)),
-    delete: (url: string) => wrap(url, client.delete(url)),
-  };
+  return authenticatedAiApi;
 }
 
 function parseMcpResult(response: { body: { result?: { content?: Array<{ text?: string }> } } }) {
@@ -39,12 +27,18 @@ function parseMcpResult(response: { body: { result?: { content?: Array<{ text?: 
 
 describe('auth, AI, MCP, webhooks, and realtime routes', () => {
   beforeEach(async () => {
-    try {
-      await seedUser({ id: 'mock-user-id', email: 'mockuser@example.com' });
-      await credentialManager.StoreCredential('mock-user-id', 'sk-test');
-    } catch {
-      // ignore
-    }
+    process.env.OPENAI_API_KEY = 'env-openai-test-key';
+    process.env.ANTHROPIC_API_KEY = 'env-anthropic-test-key';
+    process.env.GEMINI_API_KEY = 'env-gemini-test-key';
+    process.env.DEEPSEEK_API_KEY = 'env-deepseek-test-key';
+    authenticatedAiApi = await createAuthenticatedApi({
+      name: 'Mock User',
+      email: 'mockuser@example.com',
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
   it('supports auth compatibility sign-up, sign-in, and session checks', async () => {
     const agent = request.agent(createApp());
@@ -247,7 +241,22 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
     vi.unstubAllGlobals();
   });
   it('handles MCP initialization, tool listing, and tool execution', async () => {
-    const { owner, project, workspace } = await seedWorkspaceFixture();
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Grace Hopper',
+      email: 'grace-mcp@example.com',
+      role: 'owner',
+      avatarUrl: 'https://example.com/grace.png',
+    });
+    const owner = ownerApi.user;
+    const { project, workspace } = await seedWorkspaceFixture({
+      owner: {
+        id: owner.id,
+        name: owner.name,
+        email: owner.email,
+        role: 'owner',
+        avatarUrl: owner.avatar,
+      },
+    });
     const existingTicket = await seedTicket(project.id, {
       id: 'ticket-mcp-1',
       key: `${project.key}-1`,
@@ -255,10 +264,10 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
       assigneeId: owner.id,
     });
 
-    const initializeResponse = await api().post('/api/v1/mcp/sse')
-      .set('x-user-id', owner.id)
-      .set('X-Workspace-Id', workspace.id)
-      .send({
+    const ownerMcpRequest = (payload: Record<string, unknown>) =>
+      ownerApi.post('/api/v1/mcp/sse').set('X-Workspace-Id', workspace.id).send(payload);
+
+    const initializeResponse = await ownerMcpRequest({
         jsonrpc: '2.0',
         id: 1,
         method: 'initialize',
@@ -270,10 +279,7 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
       serverInfo: { name: 'gravity-mcp-server' },
     });
 
-    const toolsResponse = await api().post('/api/v1/mcp/sse')
-      .set('x-user-id', owner.id)
-      .set('X-Workspace-Id', workspace.id)
-      .send({
+    const toolsResponse = await ownerMcpRequest({
         jsonrpc: '2.0',
         id: 2,
         method: 'tools/list',
@@ -292,10 +298,7 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
       ]),
     );
 
-    const createTicketResponse = await api().post('/api/v1/mcp/sse')
-      .set('x-user-id', owner.id)
-      .set('X-Workspace-Id', workspace.id)
-      .send({
+    const createTicketResponse = await ownerMcpRequest({
         jsonrpc: '2.0',
         id: 3,
         method: 'tools/call',
@@ -316,10 +319,7 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
       }),
     });
 
-    const listTicketsResponse = await api().post('/api/v1/mcp/sse')
-      .set('x-user-id', owner.id)
-      .set('X-Workspace-Id', workspace.id)
-      .send({
+    const listTicketsResponse = await ownerMcpRequest({
         jsonrpc: '2.0',
         id: 4,
         method: 'tools/call',
@@ -338,10 +338,7 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
       ]),
     );
 
-    const detailsResponse = await api().post('/api/v1/mcp/sse')
-      .set('x-user-id', owner.id)
-      .set('X-Workspace-Id', workspace.id)
-      .send({
+    const detailsResponse = await ownerMcpRequest({
         jsonrpc: '2.0',
         id: 5,
         method: 'tools/call',
@@ -365,10 +362,7 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
       name: project.name,
     });
 
-    const readDetailsResponse = await api().post('/api/v1/mcp/sse')
-      .set('x-user-id', owner.id)
-      .set('X-Workspace-Id', workspace.id)
-      .send({
+    const readDetailsResponse = await ownerMcpRequest({
         jsonrpc: '2.0',
         id: 51,
         method: 'tools/call',
@@ -391,10 +385,7 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
       name: project.name,
     });
 
-    const updateResponse = await api().post('/api/v1/mcp/sse')
-      .set('x-user-id', owner.id)
-      .set('X-Workspace-Id', workspace.id)
-      .send({
+    const updateResponse = await ownerMcpRequest({
         jsonrpc: '2.0',
         id: 6,
         method: 'tools/call',
@@ -410,10 +401,7 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
     expect(updateResponse.status).toBe(200);
     expect(updateResponse.body.result.content[0].text).toContain('in_review');
 
-    const addCommentResponse = await api().post('/api/v1/mcp/sse')
-      .set('x-user-id', owner.id)
-      .set('X-Workspace-Id', workspace.id)
-      .send({
+    const addCommentResponse = await ownerMcpRequest({
         jsonrpc: '2.0',
         id: 7,
         method: 'tools/call',
@@ -430,10 +418,7 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
     expect(addCommentResponse.body.result.content[0].text).toContain('Comment created through MCP.');
     const commentData = parseMcpResult(addCommentResponse) as { comment: { id: string } };
 
-    const readCommentsResponse = await api().post('/api/v1/mcp/sse')
-      .set('x-user-id', owner.id)
-      .set('X-Workspace-Id', workspace.id)
-      .send({
+    const readCommentsResponse = await ownerMcpRequest({
         jsonrpc: '2.0',
         id: 71,
         method: 'tools/call',
@@ -448,10 +433,7 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
     expect(readCommentsResponse.status).toBe(200);
     expect(readCommentsResponse.body.result.content[0].text).toContain('Comment created through MCP.');
 
-    const updateCommentResponse = await api().post('/api/v1/mcp/sse')
-      .set('x-user-id', owner.id)
-      .set('X-Workspace-Id', workspace.id)
-      .send({
+    const updateCommentResponse = await ownerMcpRequest({
         jsonrpc: '2.0',
         id: 715,
         method: 'tools/call',
@@ -468,10 +450,7 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
     expect(updateCommentResponse.status).toBe(200);
     expect(updateCommentResponse.body.result.content[0].text).toContain('Comment updated through MCP!');
 
-    const removeCommentResponse = await api().post('/api/v1/mcp/sse')
-      .set('x-user-id', owner.id)
-      .set('X-Workspace-Id', workspace.id)
-      .send({
+    const removeCommentResponse = await ownerMcpRequest({
         jsonrpc: '2.0',
         id: 72,
         method: 'tools/call',
@@ -487,10 +466,7 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
     expect(removeCommentResponse.status).toBe(200);
     expect(removeCommentResponse.body.result.content[0].text).toContain('"success": true');
 
-    const createWithTimestampsResponse = await api().post('/api/v1/mcp/sse')
-      .set('x-user-id', owner.id)
-      .set('X-Workspace-Id', workspace.id)
-      .send({
+    const createWithTimestampsResponse = await ownerMcpRequest({
         jsonrpc: '2.0',
         id: 75,
         method: 'tools/call',
@@ -510,10 +486,7 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
     expect(migratedTicket.ticket.createdAt).toBe(new Date('2023-01-01T12:00:00Z').toISOString());
     expect(migratedTicket.ticket.updatedAt).toBe(new Date('2023-01-02T12:00:00Z').toISOString());
 
-    const listMembersResponse = await api().post('/api/v1/mcp/sse')
-      .set('x-user-id', owner.id)
-      .set('X-Workspace-Id', workspace.id)
-      .send({
+    const listMembersResponse = await ownerMcpRequest({
         jsonrpc: '2.0',
         id: 8,
         method: 'tools/call',
@@ -534,7 +507,25 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
   });
 
   it('lists workspace tickets in global createdAt order across projects', async () => {
-    const { owner, workspace, project } = await seedWorkspaceFixture();
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Grace Hopper',
+      email: 'grace-mcp-order@example.com',
+      role: 'owner',
+      avatarUrl: 'https://example.com/grace.png',
+    });
+    const owner = ownerApi.user;
+    const { workspace, project } = await seedWorkspaceFixture({
+      owner: {
+        id: owner.id,
+        name: owner.name,
+        email: owner.email,
+        role: 'owner',
+        avatarUrl: owner.avatar,
+      },
+    });
+
+    const ownerMcpRequest = (payload: Record<string, unknown>) =>
+      ownerApi.post('/api/v1/mcp/sse').set('X-Workspace-Id', workspace.id).send(payload);
 
     await db.insert(projects).values({
       id: 'project-2',
@@ -569,10 +560,7 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
       .set({ createdAt: new Date('2025-01-01T00:00:00.000Z') })
       .where(eq(tickets.id, earlierTicket.id));
 
-    const listTicketsResponse = await api().post('/api/v1/mcp/sse')
-      .set('x-user-id', owner.id)
-      .set('X-Workspace-Id', workspace.id)
-      .send({
+    const listTicketsResponse = await ownerMcpRequest({
         jsonrpc: '2.0',
         id: 401,
         method: 'tools/call',
@@ -593,15 +581,29 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
   });
 
   it('keeps MCP route guard failures as HTTP-native errors', async () => {
-    const { owner, workspace } = await seedWorkspaceFixture();
-    const stranger = await seedUser({
-      id: 'mcp-stranger-1',
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Grace Hopper',
+      email: 'grace-mcp-guard@example.com',
+      role: 'owner',
+      avatarUrl: 'https://example.com/grace.png',
+    });
+    const owner = ownerApi.user;
+    const { workspace } = await seedWorkspaceFixture({
+      owner: {
+        id: owner.id,
+        name: owner.name,
+        email: owner.email,
+        role: 'owner',
+        avatarUrl: owner.avatar,
+      },
+    });
+    const strangerApi = await createAuthenticatedApi({
       name: 'Mcp Stranger',
       email: 'mcp-stranger@example.com',
       role: 'member',
     });
 
-    const unauthenticatedResponse = await api()
+    const unauthenticatedResponse = await baseApi()
       .post('/api/v1/mcp/sse')
       .set('X-Workspace-Id', workspace.id)
       .send({
@@ -613,9 +615,8 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
     expect(unauthenticatedResponse.status).toBe(401);
     expect(unauthenticatedResponse.body).toEqual({ error: 'Authentication required.' });
 
-    const missingWorkspaceResponse = await api()
+    const missingWorkspaceResponse = await ownerApi
       .post('/api/v1/mcp/sse')
-      .set('x-user-id', owner.id)
       .send({
         jsonrpc: '2.0',
         id: 502,
@@ -627,9 +628,8 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
       error: 'X-Workspace-Id header or params.workspaceId is required.',
     });
 
-    const unauthorizedWorkspaceResponse = await api()
+    const unauthorizedWorkspaceResponse = await strangerApi
       .post('/api/v1/mcp/sse')
-      .set('x-user-id', stranger.id)
       .set('X-Workspace-Id', workspace.id)
       .send({
         jsonrpc: '2.0',
@@ -688,13 +688,31 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
   });
 
   it('enforces MCP tool disablement and strict workspace owner authorization', async () => {
-    const { owner, workspace, project } = await seedWorkspaceFixture();
-    const collaborator = await seedUser({
-      id: 'collab-user-1',
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Grace Hopper',
+      email: 'grace-mcp-disable@example.com',
+      role: 'owner',
+      avatarUrl: 'https://example.com/grace.png',
+    });
+    const owner = ownerApi.user;
+    const { workspace, project } = await seedWorkspaceFixture({
+      owner: {
+        id: owner.id,
+        name: owner.name,
+        email: owner.email,
+        role: 'owner',
+        avatarUrl: owner.avatar,
+      },
+    });
+    const collaboratorApi = await createAuthenticatedApi({
       name: 'Collaborator',
       email: 'collab@example.com',
       role: 'member',
     });
+    const collaborator = collaboratorApi.user;
+
+    const ownerMcpRequest = (payload: Record<string, unknown>) =>
+      ownerApi.post('/api/v1/mcp/sse').set('X-Workspace-Id', workspace.id).send(payload);
 
     // Seed collaborator as a regular member in workspace
     await db.insert(workspaceMembers).values({
@@ -705,40 +723,32 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
     });
 
     // 1. Unauthenticated PATCH settings is blocked
-    const unauthPatch = await api()
+    const unauthPatch = await baseApi()
       .patch(`/api/v1/workspaces/${workspace.id}/settings`)
       .send({ disabledMcpTools: ['list_tickets', 'create_ticket'] });
     expect(unauthPatch.status).toBe(401);
 
     // 2. Non-owner (collaborator) PATCH settings is blocked
-    const nonOwnerPatch = await api()
+    const nonOwnerPatch = await collaboratorApi
       .patch(`/api/v1/workspaces/${workspace.id}/settings`)
-      .set('x-user-id', collaborator.id)
       .send({ disabledMcpTools: ['list_tickets', 'create_ticket'] });
     expect(nonOwnerPatch.status).toBe(403);
     expect(nonOwnerPatch.body.error).toContain('Only workspace owners');
 
     // 3. Owner PATCH settings succeeds
-    const ownerPatch = await api()
+    const ownerPatch = await ownerApi
       .patch(`/api/v1/workspaces/${workspace.id}/settings`)
-      .set('x-user-id', owner.id)
       .send({ disabledMcpTools: ['list_tickets', 'create_ticket'] });
     expect(ownerPatch.status).toBe(200);
     expect(ownerPatch.body.disabledMcpTools).toEqual(['list_tickets', 'create_ticket']);
 
     // 4. GET settings returns disabled list correctly
-    const getSettings = await api()
-      .get(`/api/v1/workspaces/${workspace.id}/settings`)
-      .set('x-user-id', owner.id);
+    const getSettings = await ownerApi.get(`/api/v1/workspaces/${workspace.id}/settings`);
     expect(getSettings.status).toBe(200);
     expect(getSettings.body.disabledMcpTools).toEqual(['list_tickets', 'create_ticket']);
 
     // 5. tools/list filters out disabled tools when X-Workspace-Id header is sent
-    const listFiltered = await api()
-      .post('/api/v1/mcp/sse')
-      .set('x-user-id', owner.id)
-      .set('X-Workspace-Id', workspace.id)
-      .send({
+    const listFiltered = await ownerMcpRequest({
         jsonrpc: '2.0',
         id: 10,
         method: 'tools/list',
@@ -751,11 +761,7 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
     expect(filteredTools.some(t => t.name === 'read_ticket_details')).toBe(true);
 
     // 6. tools/call blocks calling disabled tools
-    const callDisabled = await api()
-      .post('/api/v1/mcp/sse')
-      .set('x-user-id', owner.id)
-      .set('X-Workspace-Id', workspace.id)
-      .send({
+    const callDisabled = await ownerMcpRequest({
         jsonrpc: '2.0',
         id: 11,
         method: 'tools/call',
@@ -771,11 +777,7 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
     expect(callDisabled.body.error.message).toContain('disabled in this workspace');
 
     // 7. tools/call allows calling enabled tools
-    const callEnabled = await api()
-      .post('/api/v1/mcp/sse')
-      .set('x-user-id', owner.id)
-      .set('X-Workspace-Id', workspace.id)
-      .send({
+    const callEnabled = await ownerMcpRequest({
         jsonrpc: '2.0',
         id: 12,
         method: 'tools/call',
