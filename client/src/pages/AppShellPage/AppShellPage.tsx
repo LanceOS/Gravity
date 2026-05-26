@@ -661,11 +661,11 @@ export function AppShellPage() {
           onBack={() => setActiveSection(activeWorkspace ? 'workspace' : 'directory')}
           onOpenDirectory={() => setActiveSection('directory')}
           onChangeSettings={updateAccountSettings}
-          onResetProviderDraft={() => resetProviderDraft()}
-          onRefreshOllamaModels={() => void refreshOllamaModels()}
-          onResetTutorial={() => void resetTutorial()}
-          onSaveSettings={() => void saveAccountSettings()}
-          onTestApiKey={() => void testApiKey()}
+          onResetProviderDraft={resetProviderDraft}
+          onRefreshOllamaModels={refreshOllamaModels}
+          onResetTutorial={resetTutorial}
+          onSaveSettings={saveAccountSettings}
+          onTestApiKey={testApiKey}
         />
         {onboarding}
       </>

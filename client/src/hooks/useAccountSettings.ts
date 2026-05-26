@@ -405,9 +405,25 @@ export function useAccountSettings({
       setTutorialResult({ success: false, message });
     }
   }, [currentUser]);
-
   const baselineSettings = originalSettings ?? normalizeWorkspaceSettings(null, activeView, theme);
-  const hasChanges = !shallowEqual(settings, baselineSettings);
+  const hasChanges = !shallowEqual(
+    {
+      defaultView: settings.defaultView,
+      theme: settings.theme,
+      projectLayout: settings.projectLayout,
+      agentIntegration: settings.agentIntegration,
+      ollamaModel: settings.ollamaModel,
+      ollamaEndpoint: settings.ollamaEndpoint,
+    },
+    {
+      defaultView: baselineSettings.defaultView,
+      theme: baselineSettings.theme,
+      projectLayout: baselineSettings.projectLayout,
+      agentIntegration: baselineSettings.agentIntegration,
+      ollamaModel: baselineSettings.ollamaModel,
+      ollamaEndpoint: baselineSettings.ollamaEndpoint,
+    }
+  );
   const baselineApiKeyState = baselineSettings.apiKey === API_KEY_MASK ? 'stored' : 'cleared';
   const hasProviderChanges =
     settings.aiProvider !== baselineSettings.aiProvider || apiKeyState !== baselineApiKeyState;

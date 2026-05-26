@@ -223,6 +223,7 @@ function CloudProviderSection({
           <TextInput
             label={providerOption.keyLabel}
             type="password"
+            autoComplete="new-password"
             value={hasStoredApiKey ? '' : settings.apiKey}
             placeholder={hasStoredApiKey ? 'Stored in KMS. Enter a new key to replace.' : providerOption.keyPlaceholder}
             onChange={(event) => onChangeSettings({ apiKey: event.target.value })}

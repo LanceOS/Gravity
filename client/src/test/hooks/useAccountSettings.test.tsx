@@ -129,4 +129,81 @@ describe('useAccountSettings', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+
+  it('decouples general settings hasChanges from cloud provider/api key hasProviderChanges', async () => {
+    const currentUser = {
+      id: 'user-settings-2',
+      name: 'Grace Hopper',
+      email: 'grace@example.com',
+      avatar: '',
+      role: 'developer',
+      tutorial_completed: 1,
+    };
+    const setTheme = vi.fn();
+    const setView = vi.fn();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          userId: currentUser.id,
+          defaultView: 'board',
+          theme: 'dark',
+          ollamaModel: 'llama3',
+          ollamaEndpoint: 'http://localhost:11434',
+          projectLayout: 'standard',
+          apiKey: '',
+          aiProvider: 'openai',
+          savedCredentials: [],
+        })
+      );
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { result } = renderHook(() =>
+      useAccountSettings({
+        currentUser,
+        activeView: 'board',
+        theme: 'dark',
+        setTheme,
+        setView,
+      })
+    );
+
+    await waitFor(() => {
+      expect(result.current.settingsLoading).toBe(false);
+    });
+
+    // Baseline state: no changes, no provider changes
+    expect(result.current.hasChanges).toBe(false);
+    expect(result.current.hasProviderChanges).toBe(false);
+
+    // Update general preference defaultView
+    act(() => {
+      result.current.updateSettings({ defaultView: 'list' });
+    });
+    // Should flag general hasChanges, but no provider changes
+    expect(result.current.hasChanges).toBe(true);
+    expect(result.current.hasProviderChanges).toBe(false);
+
+    // Reset back to baseline
+    act(() => {
+      result.current.updateSettings({ defaultView: 'board' });
+    });
+    expect(result.current.hasChanges).toBe(false);
+
+    // Update API Key
+    act(() => {
+      result.current.updateSettings({ apiKey: 'sk-new-api-key' });
+    });
+    // Should flag provider changes, but NOT general hasChanges (decoupled!)
+    expect(result.current.hasChanges).toBe(false);
+    expect(result.current.hasProviderChanges).toBe(true);
+
+    // Update provider
+    act(() => {
+      result.current.updateSettings({ aiProvider: 'anthropic' });
+    });
+    // Should flag provider changes, but NOT general hasChanges
+    expect(result.current.hasChanges).toBe(false);
+    expect(result.current.hasProviderChanges).toBe(true);
+  });
 });

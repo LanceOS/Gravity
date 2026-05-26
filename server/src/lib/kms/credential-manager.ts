@@ -1,8 +1,12 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import { and, asc, eq } from 'drizzle-orm';
+import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { db } from '../../db/index.js';
+import * as schema from '../../db/schema.js';
 import { userExternalCredentials } from '../../db/schema.js';
 import { IKMSProvider } from './types.js';
+
+type DbClient = NodePgDatabase<typeof schema> | Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 /**
  * @description Manages the secure storage and retrieval of external credentials (e.g., API keys).
@@ -35,7 +39,7 @@ export class CredentialManager {
     userId: string,
     provider: string,
     plaintextAPIKey: string,
-    dbClient: typeof db = db,
+    dbClient: DbClient = db,
   ): Promise<void> {
     if (!userId) {
       throw new Error('User ID is required to store credentials.');
@@ -176,7 +180,7 @@ export class CredentialManager {
     }
   }
 
-  async DeleteCredential(userId: string, provider: string, dbClient: typeof db = db): Promise<void> {
+  async DeleteCredential(userId: string, provider: string, dbClient: DbClient = db): Promise<void> {
     if (!userId) {
       throw new Error('User ID is required to delete credentials.');
     }
