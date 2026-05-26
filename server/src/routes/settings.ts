@@ -167,9 +167,6 @@ export function createSettingsRouter() {
       const activeAiProviderForResponse = (aiProvider.value ?? current.aiProvider).toLowerCase();
       const providerForCredential = (credentialProvider.value ?? activeAiProviderForResponse).toLowerCase();
       const savedCredentialsBefore = await credentialManager.ListCredentials(userId);
-      const hasExistingCredentialForCredentialProvider = savedCredentialsBefore.some(
-        (credential) => credential.provider === providerForCredential,
-      );
       const hasExistingCredentialForActiveProvider = savedCredentialsBefore.some(
         (credential) => credential.provider === activeAiProviderForResponse,
       );
