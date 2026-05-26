@@ -128,7 +128,10 @@ export function useAccountSettings({
           setOriginalSettings(normalized);
           setTheme(normalized.theme);
           setView(normalized.defaultView);
-          setApiKeyState(normalized.apiKey === API_KEY_MASK ? 'stored' : 'cleared');((error: Error) => {
+          setApiKeyState(normalized.apiKey === API_KEY_MASK ? 'stored' : 'cleared');
+        }
+      })
+      .catch((error: Error) => {
         if (!cancelled) {
           setSaveError(error.message);
         }
