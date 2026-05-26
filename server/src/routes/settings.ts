@@ -123,7 +123,14 @@ export function createSettingsRouter() {
 
       const ollamaEndpoint = typeof req.body?.ollamaEndpoint === 'string' ? req.body.ollamaEndpoint : undefined;
       if (ollamaEndpoint) {
-        validateOllamaUrl(ollamaEndpoint);
+        try {
+          validateOllamaUrl(ollamaEndpoint);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Invalid ollamaEndpoint.';
+          const sanitized = message.includes('Security Exception') ? 'External credentials configuration error.' : message;
+          res.status(400).json({ error: sanitized });
+          return;
+        }
       }
 
       const current = await getUserSettingsRecord(userId);
