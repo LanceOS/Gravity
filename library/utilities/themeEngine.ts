@@ -120,7 +120,7 @@ export const resolveThemePreference = (preference: ThemePreference): ResolvedThe
     return 'marble-blue';
   }
 
-  return 'marble-blue';
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'marble-blue';
 };
 
 const shouldWarnOnThemeIssues = () => {
