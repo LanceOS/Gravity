@@ -19,7 +19,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (typeof window !== 'undefined') {
       return resolveThemePreference(getStoredThemePreference());
     }
-    return 'dark';
+    return 'marble-blue';
   });
 
   const [density, setDensityState] = useState<DensityScale>(() => {

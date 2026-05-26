@@ -48,7 +48,7 @@ export const AI_PROVIDER_OPTIONS: ProviderOption[] = [
 
 export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
   defaultView: 'board',
-  theme: 'dark',
+  theme: 'marble-blue',
   ollamaModel: '',
   ollamaEndpoint: 'http://localhost:11434',
   projectLayout: 'standard',

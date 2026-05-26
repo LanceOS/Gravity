@@ -99,7 +99,7 @@ export const normalizeThemePreference = (value: string | null | undefined): Them
   }
 
   if (value === 'noir') {
-    return 'dark';
+    return 'marble-blue';
   }
 
   return 'system';
@@ -119,10 +119,10 @@ export const resolveThemePreference = (preference: ThemePreference): ResolvedThe
   }
 
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
-    return 'dark';
+    return 'marble-blue';
   }
 
-  return 'dark';
+  return 'marble-blue';
 };
 
 const shouldWarnOnThemeIssues = () => {
