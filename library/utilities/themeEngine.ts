@@ -99,7 +99,6 @@ export const normalizeThemePreference = (value: string | null | undefined): Them
     return value;
   }
 
-
   return 'system';
 };
 
@@ -116,11 +115,7 @@ export const resolveThemePreference = (preference: ThemePreference): ResolvedThe
     return preference;
   }
 
-  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
-    return 'marble-blue';
-  }
-
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'marble-blue';
+  return 'marble-blue';
 };
 
 const shouldWarnOnThemeIssues = () => {
