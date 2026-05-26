@@ -55,7 +55,11 @@ export function groupTicketsByStatus(tickets: Ticket[]): TicketsByStatus {
   };
 
   tickets.forEach((ticket) => {
-    groups[ticket.status].push(ticket);
+    if (groups[ticket.status]) {
+      groups[ticket.status].push(ticket);
+    } else {
+      groups['todo'].push(ticket);
+    }
   });
 
   return groups;

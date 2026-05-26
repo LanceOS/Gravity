@@ -32,6 +32,10 @@ export const systemPrompt = {
                     "Searching the database..."
                 ],
                 "execution_rule": "Execute all MCP tools silently. Wait until all data is gathered. Output ONLY the final, consolidated answer in a single message."
+            },
+            "bulk_actions_and_rate_limiting": {
+                "policy_status": "MANDATORY_NON_NEGOTIABLE",
+                "creation_rule": "You are strictly forbidden from creating multiple tickets at once. You may only create a maximum of ONE ticket per user request. Refuse any request to bulk-create tickets or generate random test data."
             }
         }
     }
