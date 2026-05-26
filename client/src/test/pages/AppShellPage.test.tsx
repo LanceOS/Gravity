@@ -236,6 +236,7 @@ function buildAccountSettings(overrides: Partial<Record<string, unknown>> = {}) 
     saveLoading: false,
     saveSuccess: false,
     saveError: null,
+    hasProviderChanges: false,
     testing: false,
     testResult: null,
     tutorialResult: null,

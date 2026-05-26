@@ -172,6 +172,7 @@ export function AppShellPage() {
     testApiKey,
     resetTutorial,
     refreshOllamaModels,
+    hasProviderChanges: accountHasProviderChanges,
     hasChanges: accountHasChanges,
   } = useAccountSettings({
     currentUser,
@@ -648,6 +649,7 @@ export function AppShellPage() {
           saveLoading={accountSaveLoading}
           saveSuccess={accountSaveSuccess}
           hasChanges={accountHasChanges}
+          hasProviderChanges={accountHasProviderChanges}
           saveError={accountSaveError}
           testing={accountTesting}
           testResult={accountTestResult}

@@ -395,6 +395,9 @@ export function useAccountSettings({
 
   const baselineSettings = originalSettings ?? normalizeWorkspaceSettings(null, activeView, theme);
   const hasChanges = !shallowEqual(settings, baselineSettings);
+  const baselineApiKeyState = baselineSettings.apiKey === API_KEY_MASK ? 'stored' : 'cleared';
+  const hasProviderChanges =
+    settings.aiProvider !== baselineSettings.aiProvider || apiKeyState !== baselineApiKeyState;
 
   return {
     settings,
@@ -413,6 +416,7 @@ export function useAccountSettings({
     testApiKey,
     resetTutorial,
     refreshOllamaModels,
+    hasProviderChanges,
     hasChanges,
   };
 }

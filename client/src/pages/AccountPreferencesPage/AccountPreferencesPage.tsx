@@ -46,6 +46,7 @@ interface AccountPreferencesPageProps {
   saveLoading: boolean;
   saveSuccess: boolean;
   hasChanges?: boolean;
+  hasProviderChanges?: boolean;
   saveError: string | null;
   testing: boolean;
   testResult: StatusMessage | null;
@@ -175,17 +176,23 @@ function GeneralSettingsSection({
 
 function CloudProviderSection({
   settings,
+  saveLoading,
+  hasProviderChanges,
   testing,
   testResult,
   savedCredentials,
   onChangeSettings,
+  onSaveSettings,
   onTestApiKey,
 }: {
   settings: WorkspaceSettings;
+  saveLoading: boolean;
+  hasProviderChanges: boolean;
   testing: boolean;
   testResult: StatusMessage | null;
   savedCredentials: SavedApiCredential[];
   onChangeSettings: (updates: Partial<WorkspaceSettings>) => void;
+  onSaveSettings: () => void;
   onTestApiKey: () => void;
 }) {
   const providerOption = useMemo(() => getProviderOption(settings.aiProvider), [settings.aiProvider]);
@@ -224,6 +231,9 @@ function CloudProviderSection({
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
           <Button variant="default" onClick={onTestApiKey} loading={testing}>
             Test {providerOption.label}
+          </Button>
+          <Button variant="accent" onClick={onSaveSettings} loading={saveLoading} disabled={!hasProviderChanges}>
+            Save Key
           </Button>
           {hasStoredApiKey && (
             <Button variant="ghost" onClick={() => onChangeSettings({ apiKey: '' })}>
@@ -426,6 +436,7 @@ export function AccountPreferencesPage({
   saveLoading,
   saveSuccess,
   hasChanges,
+  hasProviderChanges = false,
   saveError,
   testing,
   testResult,
@@ -556,10 +567,13 @@ export function AccountPreferencesPage({
               {activeCategory === 'providers' && (
                 <CloudProviderSection
                   settings={settings}
+                  saveLoading={saveLoading}
+                  hasProviderChanges={hasProviderChanges}
                   testing={testing}
                   testResult={testResult}
                   savedCredentials={savedCredentials}
                   onChangeSettings={onChangeSettings}
+                  onSaveSettings={onSaveSettings}
                   onTestApiKey={onTestApiKey}
                 />
               )}

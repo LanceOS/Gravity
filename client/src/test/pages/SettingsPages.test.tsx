@@ -152,6 +152,7 @@ function renderAccountPreferencesPage(overrides: Partial<Parameters<typeof Accou
     saveLoading: false,
     saveSuccess: false,
     saveError: null,
+    hasProviderChanges: false,
     testing: false,
     testResult: null,
     savedCredentials: [],
@@ -347,6 +348,7 @@ describe('AccountPreferencesPage', () => {
   it('switches provider, ollama, and onboarding sections and forwards actions', async () => {
     const user = userEvent.setup();
     const { props } = renderAccountPreferencesPage({
+      hasProviderChanges: true,
       testResult: { success: true, message: 'Provider connection ok.' },
       tutorialResult: { success: true, message: 'Tutorial will replay on next load.' },
     });
@@ -358,6 +360,8 @@ describe('AccountPreferencesPage', () => {
     expect(props.onChangeSettings).toHaveBeenCalledWith({ aiProvider: 'anthropic' });
     await user.click(screen.getByRole('button', { name: 'Test OpenAI' }));
     expect(props.onTestApiKey).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole('button', { name: 'Save Key' }));
+    expect(props.onSaveSettings).toHaveBeenCalledTimes(1);
     expect(screen.getByText('Provider connection ok.')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /Ollama/i }));
