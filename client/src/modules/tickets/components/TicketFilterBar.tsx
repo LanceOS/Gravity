@@ -1,5 +1,5 @@
 import React from 'react';
-import type { Domain, Ticket } from '../../../context/TicketContext';
+import type { Ticket } from '../../../context/TicketContext';
 import type { TicketFilters, TicketListSort } from '../utils/ticketView';
 import { Button, Select, DenseTextInput } from '@library';
 import {
@@ -7,18 +7,8 @@ import {
   STATUS_FILTER_OPTIONS,
   LIST_SORT_OPTIONS,
 } from '../utils/TicketList';
+import type { TicketFilterBarProps } from '../types/TicketFilterBar';
 
-export interface TicketFilterBarProps {
-  filters: TicketFilters;
-  onFilterChange: (filters: Partial<TicketFilters>) => void;
-  hasActiveFilters: boolean;
-  onClearFilters: () => void;
-  filteredCount: number;
-  totalCount: number;
-  listSort?: TicketListSort;
-  onListSortChange?: (sort: TicketListSort) => void;
-  domains?: Domain[];
-}
 
 export const TicketFilterBar: React.FC<TicketFilterBarProps> = ({
   filters,
