@@ -43,6 +43,7 @@ interface AccountPreferencesPageProps {
   settingsLoading: boolean;
   saveLoading: boolean;
   saveSuccess: boolean;
+  hasChanges?: boolean;
   saveError: string | null;
   testing: boolean;
   testResult: StatusMessage | null;
@@ -140,8 +141,7 @@ function GeneralSettingsSection({
               { value: 'dark', label: 'Noir' },
               { value: 'coal-black', label: 'Coal Black' },
               { value: 'coffee', label: 'Coffee' },
-              { value: 'marble-blue', label: 'Marble Blue' },
-              { value: 'light', label: 'White Paper' }
+              { value: 'marble-blue', label: 'Marble Blue' }
             ]}
           />
 
@@ -348,6 +348,7 @@ export function AccountPreferencesPage({
   settingsLoading,
   saveLoading,
   saveSuccess,
+  hasChanges,
   saveError,
   testing,
   testResult,
@@ -388,7 +389,7 @@ export function AccountPreferencesPage({
           </Flex>
         }
         rightContent={
-          <Button variant="accent" size="sm" onClick={onSaveSettings} loading={saveLoading}>
+          <Button variant="accent" size="sm" onClick={onSaveSettings} loading={saveLoading} disabled={!hasChanges}>
             {saveSuccess ? 'Changes Saved' : 'Save Changes'}
           </Button>
         }
@@ -398,9 +399,9 @@ export function AccountPreferencesPage({
         <div style={{ padding: 'var(--space-5)', display: 'flex', flexDirection: 'column', gap: 'var(--space-5)', height: '100%', overflowY: 'auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--color-surface-card)', border: '1px solid var(--color-border-default)' }}>
             <Avatar src={currentUser.avatar} name={currentUser.name} size="md" />
-            <div>
-              <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>{currentUser.name}</div>
-              <div style={{ fontSize: '11px', color: 'var(--color-text-disabled)' }}>{currentUser.email}</div>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{currentUser.name}</div>
+              <div style={{ fontSize: '11px', color: 'var(--color-text-disabled)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{currentUser.email}</div>
             </div>
           </div>
 

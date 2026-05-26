@@ -118,25 +118,29 @@ export function WorkspacePage({
         <WorkspaceHeader>
           <WorkspaceHeader.Top>
             <WorkspaceHeader.Title>{headerTitle}</WorkspaceHeader.Title>
-            <WorkspaceHeader.ViewToggle
-              activeView={activeView}
-              onSetView={onSetView}
-            />
+            {!activeTicket && (
+              <WorkspaceHeader.ViewToggle
+                activeView={activeView}
+                onSetView={onSetView}
+              />
+            )}
           </WorkspaceHeader.Top>
           
-          <WorkspaceHeader.Bottom>
-            <TicketFilterBar
-              filters={filters}
-              onFilterChange={onSetFilters}
-              hasActiveFilters={hasFiltersApplied}
-              onClearFilters={handleClearFilters}
-              filteredCount={filteredTickets.length}
-              totalCount={tickets.length}
-              listSort={activeView === 'list' ? listSort : undefined}
-              onListSortChange={activeView === 'list' ? onSetListSort : undefined}
-              domains={Object.values(domainById)}
-            />
-          </WorkspaceHeader.Bottom>
+          {!activeTicket && (
+            <WorkspaceHeader.Bottom>
+              <TicketFilterBar
+                filters={filters}
+                onFilterChange={onSetFilters}
+                hasActiveFilters={hasFiltersApplied}
+                onClearFilters={handleClearFilters}
+                filteredCount={filteredTickets.length}
+                totalCount={tickets.length}
+                listSort={activeView === 'list' ? listSort : undefined}
+                onListSortChange={activeView === 'list' ? onSetListSort : undefined}
+                domains={Object.values(domainById)}
+              />
+            </WorkspaceHeader.Bottom>
+          )}
         </WorkspaceHeader>
       ) : null}
 

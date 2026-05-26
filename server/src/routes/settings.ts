@@ -9,7 +9,7 @@ import { resolveRequestActorUserId } from '../lib/request-auth.js';
 import { validateOllamaUrl } from '../lib/ai/utils.js';
 
 const DEFAULT_VIEWS = new Set(['board', 'list']);
-const THEMES = new Set(['dark', 'light', 'coal-black', 'coffee', 'marble-blue']);
+const THEMES = new Set(['dark', 'coal-black', 'coffee', 'marble-blue']);
 const AI_PROVIDERS = new Set(['openai', 'anthropic', 'gemini', 'deepseek']);
 const AGENT_INTEGRATIONS = new Set(['ollama', 'third_party']);
 const PROJECT_LAYOUTS = new Set(['standard', 'condensed']);

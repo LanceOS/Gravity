@@ -7,6 +7,7 @@ export interface SelectOption {
   value: string;
   label: string;
   disabled?: boolean;
+  color?: string;
 }
 
 function normalizeSelectValue(value: React.SelectHTMLAttributes<HTMLSelectElement>['value']) {
@@ -115,11 +116,10 @@ export function Select({
     }
 
     const triggerRect = triggerRef.current.getBoundingClientRect();
-    const estimatedMenuWidth = triggerRect.width;
     const spaceBelow = window.innerHeight - triggerRect.bottom;
     const spaceAbove = triggerRect.top;
     const openAbove = spaceBelow < 220 && spaceAbove > spaceBelow;
-    const left = Math.max(8, Math.min(triggerRect.left, window.innerWidth - estimatedMenuWidth - 8));
+    const left = Math.max(8, Math.min(triggerRect.left, window.innerWidth - triggerRect.width - 8));
 
     setMenuStyle({
       position: 'fixed',
@@ -130,6 +130,7 @@ export function Select({
       width: 'max-content',
       minWidth: `${triggerRect.width}px`,
       maxWidth: 'calc(100vw - 16px)',
+      boxSizing: 'border-box',
       maxHeight: '240px',
     });
   }, []);
@@ -264,7 +265,17 @@ export function Select({
           disabled={disabled}
           {...buttonProps}
         >
-          <span className={labelClassName}>{labelText}</span>
+          <span style={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
+            {selectedOption?.color && (
+              <div
+                aria-hidden="true"
+                style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: selectedOption.color, marginRight: '8px', flexShrink: 0 }}
+              />
+            )}
+            <span className={labelClassName} style={{ minWidth: 0, flex: 1 }}>
+              {labelText}
+            </span>
+          </span>
           <ChevronDown size={14} className="select-trigger__icon" aria-hidden="true" />
         </button>
 
@@ -275,7 +286,7 @@ export function Select({
             id={menuId}
             role="listbox"
             aria-labelledby={label ? labelId : undefined}
-            className="select-menu"
+            className="select-menu scroll-container"
             style={menuStyle}
           >
             {allOptions.map((opt, index) => {
@@ -302,9 +313,10 @@ export function Select({
                       commitValue(opt.value);
                     }
                   }}
-                  style={{ pointerEvents: opt.disabled ? 'none' : 'auto' }}
+                  style={{ pointerEvents: opt.disabled ? 'none' : 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}
                 >
-                  <span className="select-option__label">{opt.label}</span>
+                  {opt.color && <div aria-hidden="true" style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: opt.color, flexShrink: 0 }} />}
+                  <span className="select-option__label" style={{ flex: 1 }}>{opt.label}</span>
                   {isSelected ? <Check size={14} aria-hidden="true" /> : null}
                 </div>
               );
