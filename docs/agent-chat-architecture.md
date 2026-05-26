@@ -27,7 +27,7 @@ To prevent data leakage, cross-tenant access, and abuse, the agent chat implemen
 
 ### 1. Zero-Exposure State Map
 The AI is completely blinded to actual internal database primary keys and UUIDs.
-- **Sanitization:** When MCP tools return data to the LLM, the `StateMap` strips out raw database IDs and replaces them with session-scoped, ephemeral identifiers (e.g., mapping `p-eeebd7ff...` to `Temp-1`).
+- **Sanitization:** When MCP tools return data to the LLM, the `StateMap` strips out raw database IDs and replaces them with session-scoped, ephemeral identifiers (e.g., mapping `p-eeebd7ff...` to `Temp-Project-A`).
 - **Desanitization:** When the LLM calls a tool using a temporary ID, the `McpRequestHandler` translates it back to the real database UUID before the tool executes.
 - **Why:** This ensures the LLM cannot hallucinate or leak internal identifiers, preventing enumeration attacks or data exposure.
 
