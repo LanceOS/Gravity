@@ -27,7 +27,7 @@ export type McpToolDefinition = {
   description: string;
   inputSchema: {
     type: 'object';
-    properties: Record<string, { type: string }>;
+    properties: Record<string, { type: string; description?: string }>;
     required?: string[];
   };
 };
