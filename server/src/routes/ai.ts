@@ -19,27 +19,28 @@ type ParsedApiKey = {
   value?: string;
   provided: boolean;
   blank: boolean;
+  invalidType: boolean;
 };
 
 function parseIncomingApiKey(rawValue: unknown): ParsedApiKey {
   if (rawValue === undefined) {
-    return { value: undefined, provided: false, blank: false };
+    return { value: undefined, provided: false, blank: false, invalidType: false };
   }
 
   if (typeof rawValue !== 'string') {
-    return { value: undefined, provided: true, blank: true };
+    return { value: undefined, provided: true, blank: false, invalidType: true };
   }
 
   const trimmed = rawValue.trim();
   if (!trimmed) {
-    return { value: undefined, provided: true, blank: true };
+    return { value: undefined, provided: true, blank: true, invalidType: false };
   }
 
   if (trimmed === API_KEY_MASK) {
-    return { value: undefined, provided: true, blank: false };
+    return { value: undefined, provided: true, blank: false, invalidType: false };
   }
 
-  return { value: trimmed, provided: true, blank: false };
+  return { value: trimmed, provided: true, blank: false, invalidType: false };
 }
 
 function isSafeValidationMessage(message: string) {
