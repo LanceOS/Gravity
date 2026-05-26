@@ -24,6 +24,7 @@
   flex: 1;
   overflow: hidden;
   background: var(--color-surface-app);
+  animation: lib-fade-in var(--transition-spring);
 }
 
 .workspace-page__issues-shell {

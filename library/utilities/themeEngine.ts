@@ -1,4 +1,4 @@
-import lightTheme from '../themes/light.json';
+
 import noirTheme from '../themes/noir.json';
 import coalBlackTheme from '../themes/coal-black.json';
 import coffeeTheme from '../themes/coffee.json';
@@ -86,15 +86,15 @@ export type ThemeValidationResult = {
   unknown: string[];
 };
 
-export type ThemePreference = 'light' | 'dark' | 'coal-black' | 'coffee' | 'marble-blue' | 'system';
-export type ResolvedThemeMode = 'light' | 'dark' | 'coal-black' | 'coffee' | 'marble-blue';
+export type ThemePreference = 'dark' | 'coal-black' | 'coffee' | 'marble-blue' | 'system';
+export type ResolvedThemeMode = 'dark' | 'coal-black' | 'coffee' | 'marble-blue';
 
 export const THEME_STORAGE_KEY = 'gravity_theme';
 
 const knownThemeColorKeySet = new Set<string>(KNOWN_THEME_COLOR_KEYS);
 
 export const normalizeThemePreference = (value: string | null | undefined): ThemePreference => {
-  if (value === 'light' || value === 'dark' || value === 'coal-black' || value === 'coffee' || value === 'marble-blue' || value === 'system') {
+  if (value === 'dark' || value === 'coal-black' || value === 'coffee' || value === 'marble-blue' || value === 'system') {
     return value;
   }
 
@@ -119,10 +119,10 @@ export const resolveThemePreference = (preference: ThemePreference): ResolvedThe
   }
 
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
-    return 'light';
+    return 'dark';
   }
 
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  return 'dark';
 };
 
 const shouldWarnOnThemeIssues = () => {
@@ -214,10 +214,6 @@ export const applyResolvedTheme = (resolvedTheme: ResolvedThemeMode) => {
     root.classList.add('marble-blue-theme', 'light-theme');
     root.setAttribute('data-theme', 'marble-blue');
     applyThemeConfig(marbleBlueTheme);
-  } else {
-    root.classList.add('light-theme');
-    root.setAttribute('data-theme', 'light');
-    applyThemeConfig(lightTheme);
   }
 
   return resolvedTheme;
