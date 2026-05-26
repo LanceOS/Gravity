@@ -5,6 +5,7 @@ import { createMcpErrorResponse } from './responses.js';
 import { mcpToolsList } from './tools.js';
 import { McpRequestPayload } from './types.js';
 import { getDisabledTools } from './workspace-tools.js';
+import { desanitize, sanitize } from './state-map.js';
 
 /**
  * @description Lets transports skip the membership query when they already
@@ -12,6 +13,7 @@ import { getDisabledTools } from './workspace-tools.js';
  */
 type McpRequestHandlerOptions = {
   accessChecked?: boolean;
+  sanitize?: boolean;
 };
 
 /**
@@ -92,17 +94,24 @@ export class McpRequestHandler {
           throw new Error(`MCP tool "${toolName}" is disabled in this workspace.`);
         }
 
+        const shouldSanitize = options.sanitize === true;
+        const rawArgs = payload.params?.arguments ?? {};
+        const desanitizedArgs = shouldSanitize ? desanitize(rawArgs) : rawArgs;
+
         const result = await executeTool(
           toolName,
-          payload.params?.arguments ?? {},
+          desanitizedArgs,
           context.workspaceId,
           context.actorUserId,
         );
+
+        const sanitizedResult = shouldSanitize ? sanitize(result) : result;
+
         return {
           jsonrpc: '2.0',
           id: payload.id ?? null,
           result: {
-            content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+            content: [{ type: 'text', text: JSON.stringify(sanitizedResult, null, 2) }],
           },
         };
       }

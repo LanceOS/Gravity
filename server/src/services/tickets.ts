@@ -58,11 +58,15 @@ function mapTicket(record: TicketRecord) {
 
 export async function listTickets(projectId: string, filters: TicketFilters = {}) {
   const rows = await db
-    .select()
+    .select({ ticket: tickets, projectName: projects.name })
     .from(tickets)
+    .innerJoin(projects, eq(projects.id, tickets.projectId))
     .where(and(...buildTicketFilterConditions([projectId], filters)))
     .orderBy(asc(tickets.createdAt));
-  return rows.map(mapTicket);
+  return rows.map((r) => ({
+    ...mapTicket(r.ticket),
+    projectName: r.projectName,
+  }));
 }
 
 export async function listWorkspaceTickets(projectIds: string[], filters: TicketFilters = {}) {
@@ -71,11 +75,15 @@ export async function listWorkspaceTickets(projectIds: string[], filters: Ticket
   }
 
   const rows = await db
-    .select()
+    .select({ ticket: tickets, projectName: projects.name })
     .from(tickets)
+    .innerJoin(projects, eq(projects.id, tickets.projectId))
     .where(and(...buildTicketFilterConditions(projectIds, filters)))
     .orderBy(asc(tickets.createdAt));
-  return rows.map(mapTicket);
+  return rows.map((r) => ({
+    ...mapTicket(r.ticket),
+    projectName: r.projectName,
+  }));
 }
 
 export async function getTicketById(ticketId: string, projectId?: string) {
