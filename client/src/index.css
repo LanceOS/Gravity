@@ -313,6 +313,20 @@ button.clickable:not(.btn):hover {
   opacity: 0.8;
 }
 
+.input-seamless {
+  border: 1px solid transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.input-seamless:focus {
+  border-color: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
 .editable-display {
   position: relative;
   border: 1px solid transparent;

@@ -53,7 +53,7 @@ vi.mock('@library', () => ({
     </select>
   ),
   TextInput: ({ value, onChange, ...props }: MockTextInputProps) => <input value={value} onChange={onChange} {...props} />,
-  Textarea: ({ value, onChange, autoGrow, ...props }: any) => <textarea value={value} onChange={onChange} {...props} />,
+  Textarea: ({ value, onChange, autoGrow, inputStyle, ...props }: any) => <textarea value={value} onChange={onChange} {...props} />,
   ClickAwayListener: ({ children }: { children: ReactNode }) => children,
   Portal: ({ children }: { children: ReactNode }) => <div data-testid="portal">{children}</div>,
 }));
