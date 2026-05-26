@@ -65,36 +65,24 @@ function getPrefixHint(key: string, value: string, parentObj?: any): string {
   return 'Ref';
 }
 
+function replaceMatchedIds(value: string, regex: RegExp, keyContext: string, parentObj?: any): string {
+  return value.replace(regex, (match) => {
+    const hint = getPrefixHint(keyContext, match, parentObj);
+    return McpStateMap.getOrCreateTempId(match, hint);
+  });
+}
+
 export function sanitize(obj: any, keyContext = '', parentObj?: any): any {
   if (obj === null || obj === undefined) return obj;
 
   if (typeof obj === 'string') {
     let sanitizedStr = obj;
 
-    // First replace any existing known real IDs
-    for (const [realId, tempId] of McpStateMap.getAllRealToTemp()) {
-      sanitizedStr = sanitizedStr.replaceAll(realId, tempId);
-    }
+    // Replace Gravity IDs found in the string in a single regex pass.
+    sanitizedStr = replaceMatchedIds(sanitizedStr, GRAVITY_ID_GLOBAL_REGEX, keyContext, parentObj);
 
-    // Scan for any unmapped Gravity IDs in the string
-    const gravityMatches = sanitizedStr.match(GRAVITY_ID_GLOBAL_REGEX);
-    if (gravityMatches) {
-      for (const match of gravityMatches) {
-        const hint = getPrefixHint(keyContext, match, parentObj);
-        const tempId = McpStateMap.getOrCreateTempId(match, hint);
-        sanitizedStr = sanitizedStr.replaceAll(match, tempId);
-      }
-    }
-
-    // Scan for any unmapped raw UUIDs in the string
-    const uuidMatches = sanitizedStr.match(UUID_GLOBAL_REGEX);
-    if (uuidMatches) {
-      for (const match of uuidMatches) {
-        const hint = getPrefixHint(keyContext, match, parentObj);
-        const tempId = McpStateMap.getOrCreateTempId(match, hint);
-        sanitizedStr = sanitizedStr.replaceAll(match, tempId);
-      }
-    }
+    // Replace raw UUIDs found in the string in a single regex pass.
+    sanitizedStr = replaceMatchedIds(sanitizedStr, UUID_GLOBAL_REGEX, keyContext, parentObj);
 
     // Check if the whole string itself is a candidate key-based ID (like 'user-1' or similar for assigneeId)
     const isSpecialKey = ['assigneeId', 'userId', 'projectId', 'workspaceId', 'domainId', 'cycleId', 'parentId', 'commentId'].includes(keyContext);
