@@ -141,7 +141,8 @@ export function createAiRouter() {
       }
 
       if (message.includes('Security Exception')) {
-        res.status(502).json({ error: 'External credentials configuration error.' });
+        const status = provider === 'ollama' ? 400 : 502;
+        res.status(status).json({ error: 'External credentials configuration error.' });
         return;
       }
 
