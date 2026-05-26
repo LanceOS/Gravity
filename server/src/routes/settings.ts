@@ -157,7 +157,14 @@ export function createSettingsRouter() {
       }
 
       const current = await getUserSettingsRecord(userId);
-      const providerForCredential = (aiProvider.value ?? current.aiProvider).toLowerCase();
+
+      const credentialProvider = getOptionalEnumValue(req.body, 'credentialProvider', AI_PROVIDERS);
+      if (!credentialProvider.ok) {
+        res.status(400).json({ error: credentialProvider.error });
+        return;
+      }
+
+      const providerForCredential = (credentialProvider.value ?? current.aiProvider).toLowerCase();
       const savedCredentialsBefore = await credentialManager.ListCredentials(userId);
       const hasExistingCredential = savedCredentialsBefore.some((credential) => credential.provider === providerForCredential);
 
