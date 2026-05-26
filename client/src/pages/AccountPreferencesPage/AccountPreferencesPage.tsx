@@ -249,9 +249,10 @@ function SavedKeyItem({
         variant="danger"
         size="sm"
         onClick={onRemove}
+        aria-label={`Remove ${option.label} key`}
         title={`Remove ${option.label} key`}
       >
-        <Trash2 size={13} />
+        <Trash2 size={13} aria-hidden="true" />
       </Button>
     </div>
   );
