@@ -34,7 +34,7 @@ The AI is completely blinded to actual internal database primary keys and UUIDs.
 
 ### 2. Hard Rate Limiting
 Even with strict prompts, LLMs can be jailbroken into attempting bulk operations.
-- Tool handlers (like `createTicket` in `TicketTools`) enforce backend rate limits (e.g., a 3000ms delay between ticket creations per user).
+- Tool handlers (like `createTicket` in `TicketTools`) enforce backend rate limits by requiring at least 3000ms between ticket creations per user; requests made sooner are rejected rather than delayed.
 - If the AI attempts to rapidly create or delete multiple tickets, the backend will reject subsequent requests with a `Rate limit exceeded` error, protecting database integrity.
 
 ### 3. Strict System Prompt Directives
