@@ -40,6 +40,7 @@ export function useAccountSettings({
   const [ollamaModels, setOllamaModels] = useState<string[]>([]);
   const [ollamaModelsLoading, setOllamaModelsLoading] = useState(false);
   const [settingsHydrated, setSettingsHydrated] = useState(false);
+  const [apiKeyState, setApiKeyState] = useState<'stored' | 'cleared' | 'pending'>('cleared');
 
   useEffect(() => {
     if (!saveSuccess) {
@@ -70,7 +71,8 @@ export function useAccountSettings({
 
     let cancelled = false;
     setSettingsLoading(true);
-  setSettingsHydrated(false);
+    setSaveError(null);
+    setSettingsHydrated(false);
 
     fetch(`/api/v1/settings/${currentUser.id}`)
       .then(async (response) => {
@@ -90,6 +92,7 @@ export function useAccountSettings({
           setSettings(normalized);
           setTheme(normalized.theme);
           setView(normalized.defaultView);
+          setApiKeyState(normalized.apiKey === '••••••••••••' ? 'stored' : 'cleared');
         }
       })
       .catch((error: Error) => {
@@ -153,7 +156,11 @@ export function useAccountSettings({
       return;
     }
 
-    void refreshOllamaModels(settings.ollamaEndpoint);
+    const timer = setTimeout(() => {
+      void refreshOllamaModels(settings.ollamaEndpoint);
+    }, 500);
+
+    return () => clearTimeout(timer);
   }, [currentUser, settings.ollamaEndpoint, settingsHydrated, refreshOllamaModels]);
 
   const updateSettings = useCallback((updates: Partial<WorkspaceSettings>) => {
@@ -161,7 +168,11 @@ export function useAccountSettings({
     setSaveSuccess(false);
     setSaveError(null);
 
-    if (updates.apiKey !== undefined || updates.aiProvider !== undefined) {
+    if (updates.apiKey !== undefined) {
+      setApiKeyState(updates.apiKey === '' ? 'cleared' : 'pending');
+      setTestResult(null);
+    }
+    if (updates.aiProvider !== undefined) {
       setTestResult(null);
     }
 
@@ -180,8 +191,11 @@ export function useAccountSettings({
     setSaveError(null);
 
     try {
+      const keyAction = apiKeyState === 'pending' ? 'update' : apiKeyState === 'cleared' ? 'clear' : 'keep';
       const payload = {
         ...settings,
+        keyAction,
+        apiKey: keyAction === 'update' ? settings.apiKey : undefined,
         ollamaModel: ollamaModels.length > 0 ? settings.ollamaModel : '',
       };
 
@@ -204,6 +218,7 @@ export function useAccountSettings({
       setSettings(normalized);
       setTheme(normalized.theme);
       setView(normalized.defaultView);
+      setApiKeyState(normalized.apiKey === '••••••••••••' ? 'stored' : 'cleared');
       setSaveSuccess(true);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to save account settings.';
@@ -211,11 +226,13 @@ export function useAccountSettings({
     } finally {
       setSaveLoading(false);
     }
-  }, [currentUser, settings, ollamaModels, setTheme, setView]);
+  }, [currentUser, settings, apiKeyState, ollamaModels, setTheme, setView]);
 
   const testApiKey = useCallback(async () => {
     const provider = getProviderOption(settings.aiProvider);
-    if (!settings.apiKey.trim()) {
+    const keyAction = apiKeyState === 'pending' ? 'update' : apiKeyState === 'cleared' ? 'clear' : 'keep';
+
+    if (keyAction === 'clear' || (keyAction === 'keep' && !settings.apiKey)) {
       setTestResult({ success: false, message: `Please enter a ${provider.label} API key to test.` });
       return;
     }
@@ -227,8 +244,12 @@ export function useAccountSettings({
       const response = await fetch('/api/v1/ai/test-connection', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider: settings.aiProvider, api_key: settings.apiKey.trim() }),
+        body: JSON.stringify({ 
+          provider: settings.aiProvider, 
+          apiKey: keyAction === 'update' ? settings.apiKey.trim() : undefined 
+        }),
       });
+
       const data = await response.json();
 
       if (!response.ok) {
@@ -242,7 +263,7 @@ export function useAccountSettings({
     } finally {
       setTesting(false);
     }
-  }, [settings.aiProvider, settings.apiKey]);
+  }, [settings.aiProvider, settings.apiKey, apiKeyState]);
 
   const resetTutorial = useCallback(async () => {
     if (!currentUser) {

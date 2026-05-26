@@ -63,21 +63,25 @@ export function createAiRouter() {
     }
 
     const provider = typeof req.body?.provider === 'string' ? req.body.provider : 'openai';
-    const apiKeyValue =
-      typeof req.body?.api_key === 'string'
-        ? req.body.api_key.trim()
-        : typeof req.body?.apiKey === 'string'
-          ? req.body.apiKey.trim()
+    const apiKey =
+      typeof req.body?.apiKey === 'string'
+        ? req.body.apiKey.trim()
+        : typeof req.body?.api_key === 'string'
+          ? req.body.api_key.trim()
           : undefined;
 
-    const keyToUse = apiKeyValue === '••••••••••••' ? undefined : apiKeyValue;
+    if (apiKey !== undefined && !apiKey) {
+      res.status(400).json({ error: 'API key must not be empty.' });
+      return;
+    }
+
     const ollamaUrl = typeof req.body?.ollamaUrl === 'string' ? req.body.ollamaUrl.trim() : undefined;
 
     try {
       if (ollamaUrl) {
         validateOllamaUrl(ollamaUrl);
       }
-      const latency = await aiService.testConnection(actorUserId, provider, { apiKey: keyToUse, ollamaUrl });
+      const latency = await aiService.testConnection(actorUserId, provider, { apiKey, ollamaUrl });
       res.json({
         connected: true,
         latency_ms: latency,
