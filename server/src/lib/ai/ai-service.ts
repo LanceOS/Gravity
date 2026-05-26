@@ -113,8 +113,9 @@ export class AiService {
       // Test the newly typed unsaved API Key
       await providerInst.testConnection({ apiKey: options.apiKey });
     } else {
-      // Prefer a non-production environment token when configured; otherwise load the saved key.
-      await this.withProviderCredential(userId, provider, async (decryptedKey) => {
+      // Always test the actual stored user credential — never use env token shortcuts here,
+      // so the result genuinely reflects whether the saved key is valid.
+      await this.credentialManager.ExecuteWithCredential(userId, async (decryptedKey) => {
         await providerInst.testConnection({ apiKey: decryptedKey });
       });
     }

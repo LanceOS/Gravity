@@ -218,10 +218,15 @@ function CloudProviderSection({
           />
         </Grid>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
           <Button variant="default" onClick={onTestApiKey} loading={testing}>
             Test {providerOption.label}
           </Button>
+          {hasStoredApiKey && (
+            <Button variant="ghost" onClick={() => onChangeSettings({ apiKey: '' })}>
+              Remove stored key
+            </Button>
+          )}
         </div>
 
         {testResult && (
