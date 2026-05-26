@@ -1,4 +1,4 @@
-import type { Domain, Ticket } from '../../../context/TicketContext';
+import type { Domain } from '../../../context/TicketContext';
 import type { TicketFilters, TicketListSort } from '../utils/ticketView';
 
 export interface TicketFilterBarProps {

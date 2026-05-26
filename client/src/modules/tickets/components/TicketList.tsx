@@ -7,17 +7,10 @@ import type { TicketListProps } from '../types/TicketList';
 import { getAssigneeAvatar, getDomainTag, getPriorityIcon, getStatusLabel, getStatusColor } from '../utils/TicketList';
 
 export const TicketList: React.FC<TicketListProps> = ({
-  filters,
   filteredCount,
-  totalCount,
   groupedTickets,
-  listSort,
   domainById,
   userAvatarById,
-  hasActiveFilters,
-  onFilterChange,
-  onClearFilters,
-  onListSortChange,
   onSelectTicket,
 }) => {
 

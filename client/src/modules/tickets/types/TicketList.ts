@@ -1,19 +1,12 @@
 import type { ReactNode } from 'react';
 import type { Domain, Ticket } from '../../../context/TicketContext';
-import type { TicketFilters, TicketListSort, TicketsByStatus } from '../utils/ticketView';
+import type { TicketsByStatus } from '../utils/ticketView';
 
 export interface TicketListProps {
-  filters: TicketFilters;
   filteredCount: number;
-  totalCount: number;
   groupedTickets: TicketsByStatus;
-  listSort: TicketListSort;
   domainById: Record<string, Domain>;
   userAvatarById: Record<string, string>;
-  hasActiveFilters: boolean;
-  onFilterChange: (filters: Partial<TicketFilters>) => void;
-  onClearFilters: () => void;
-  onListSortChange: (sort: TicketListSort) => void;
   onSelectTicket: (ticket: Ticket) => void;
 }
 

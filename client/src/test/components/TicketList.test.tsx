@@ -102,17 +102,7 @@ const doneTicket = {
 
 function renderTicketList(overrides: Partial<Parameters<typeof TicketList>[0]> = {}) {
   const props = {
-    filters: {
-      search: '',
-      priority: '',
-      status: '',
-      projectId: '',
-      domainId: '',
-      cycleId: '',
-      assigneeId: '',
-    },
     filteredCount: 2,
-    totalCount: 2,
     groupedTickets: {
       backlog: [backlogTicket],
       todo: [],
@@ -121,7 +111,6 @@ function renderTicketList(overrides: Partial<Parameters<typeof TicketList>[0]> =
       done: [doneTicket],
       canceled: [],
     },
-    listSort: 'created' as const,
     domainById: {
       'domain-1': {
         id: 'domain-1',
@@ -132,10 +121,6 @@ function renderTicketList(overrides: Partial<Parameters<typeof TicketList>[0]> =
     userAvatarById: {
       'user-1': 'avatar-1.png',
     },
-    hasActiveFilters: false,
-    onFilterChange: vi.fn(),
-    onClearFilters: vi.fn(),
-    onListSortChange: vi.fn(),
     onSelectTicket: vi.fn(),
     ...overrides,
   };
@@ -147,21 +132,10 @@ function renderTicketList(overrides: Partial<Parameters<typeof TicketList>[0]> =
 }
 
 describe('TicketList', () => {
-  it('forwards filter and sort updates, clears filters, and selects grouped rows', async () => {
+  it('clears filters and selects grouped rows', async () => {
     const user = userEvent.setup();
     const { props } = renderTicketList({
-      hasActiveFilters: true,
       filteredCount: 1,
-      totalCount: 2,
-      filters: {
-        search: 'sync',
-        priority: 'high',
-        status: 'backlog',
-        projectId: '',
-        domainId: '',
-        cycleId: '',
-        assigneeId: '',
-      },
     });
 
     expect(screen.getByText('BACKLOG')).toBeInTheDocument();

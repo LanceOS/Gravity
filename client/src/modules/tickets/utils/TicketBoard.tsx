@@ -1,6 +1,6 @@
 import { ArrowDown, ArrowRight, ArrowUp, Minus, ShieldAlert } from 'lucide-react';
 import type { ReactNode } from 'react';
-import type { Domain, Project, Ticket } from '../../../context/TicketContext';
+import type { Domain, Ticket } from '../../../context/TicketContext';
 
 const PRIORITY_FILTER_VALUES: Array<[string, string]> = [
   ['', 'Any Priority'],

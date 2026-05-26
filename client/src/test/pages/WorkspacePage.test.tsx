@@ -5,16 +5,10 @@ import { WorkspacePage } from '../../pages/WorkspacePage/WorkspacePage.tsx';
 import type { Cycle, Domain, Project, Ticket } from '../../context/TicketContext.tsx';
 
 type TicketBoardMockProps = {
-  filteredCount: number;
-  totalCount: number;
-  hasActiveFilters: boolean;
-  onClearFilters: () => void;
 };
 
 type TicketListMockProps = {
   filteredCount: number;
-  totalCount: number;
-  listSort: string;
 };
 
 type TicketDetailMockProps = {
@@ -27,9 +21,9 @@ type TicketDetailMockProps = {
 };
 
 vi.mock('../../modules/tickets', () => ({
-  TicketBoard: ({ filteredCount, totalCount, hasActiveFilters }: TicketBoardMockProps) => (
+  TicketBoard: () => (
     <div>
-      <div>{`TicketBoard ${filteredCount}/${totalCount} ${hasActiveFilters ? 'filtered' : 'unfiltered'}`}</div>
+      <div>TicketBoard Mock</div>
     </div>
   ),
   TicketFilterBar: ({
@@ -44,8 +38,8 @@ vi.mock('../../modules/tickets', () => ({
         Clear board filters
       </button>
     ) : null,
-  TicketList: ({ filteredCount, totalCount, listSort }: TicketListMockProps) => (
-    <div>{`TicketList ${filteredCount}/${totalCount} ${listSort}`}</div>
+  TicketList: ({ filteredCount }: TicketListMockProps) => (
+    <div>{`TicketList ${filteredCount}`}</div>
   ),
   TicketDetail: ({ activeTicket, subtasks, completedSubtasks, subtaskProgressPercent }: TicketDetailMockProps) => (
     <div>{`TicketDetail ${activeTicket.title} ${subtasks.length} ${completedSubtasks} ${Math.round(subtaskProgressPercent)}`}</div>
@@ -209,7 +203,7 @@ describe('WorkspacePage', () => {
     });
 
     expect(screen.getByText('Gravity Core')).toBeInTheDocument();
-    expect(screen.getByText('TicketBoard 1/2 filtered')).toBeInTheDocument();
+    expect(screen.getByText('TicketBoard Mock')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'List' }));
     expect(props.onSetView).toHaveBeenCalledWith('list');
@@ -234,7 +228,7 @@ describe('WorkspacePage', () => {
     });
 
     expect(screen.getByText('All Issues')).toBeInTheDocument();
-    expect(screen.getByText('TicketList 4/4 created')).toBeInTheDocument();
+    expect(screen.getByText('TicketList 4')).toBeInTheDocument();
     expect(screen.getByText('TicketDetail Fix billing edge case 2 1 50')).toBeInTheDocument();
   });
 });

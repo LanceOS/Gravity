@@ -6,7 +6,7 @@ import { delay, getInitialAgentLogs } from '../utils/AgentSimulator';
 import { Button, Textarea } from '@library';
 
 export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
-  const { fetchInitialData, projects, users } = useTickets();
+  const { fetchInitialData } = useTickets();
   const [prompt, setPrompt] = useState('Create a backend ticket for setup auth, assign to bob, and add comment "Lance is waiting"');
   const [logs, setLogs] = useState<AgentLogEntry[]>(getInitialAgentLogs);
   const [isRunning, setIsRunning] = useState(false);

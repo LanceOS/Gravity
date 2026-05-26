@@ -9,16 +9,9 @@ import type { TicketBoardProps } from '../types/TicketBoard';
 import { getAssigneeAvatar, getDomainMeta, getPriorityColor, getPriorityIcon } from '../utils/TicketBoard';
 
 export const TicketBoard: React.FC<TicketBoardProps> = ({
-  projects,
-  filters,
-  filteredCount,
-  totalCount,
   ticketsByColumn,
   domainById,
   userAvatarById,
-  hasActiveFilters,
-  onFilterChange,
-  onClearFilters,
   onMoveTicket,
   onSelectTicket,
   onOpenCreateTicket,

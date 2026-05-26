@@ -164,33 +164,19 @@ export function WorkspacePage({
                 </div>
               ) : activeView === 'board' ? (
                 <TicketBoard
-                  projects={projects}
-                  filters={filters}
-                  filteredCount={filteredTickets.length}
-                  totalCount={tickets.length}
                   ticketsByColumn={groupedTickets}
                   domainById={domainById}
                   userAvatarById={userAvatarById}
-                  hasActiveFilters={hasFiltersApplied}
-                  onFilterChange={onSetFilters}
-                  onClearFilters={handleClearFilters}
                   onMoveTicket={onUpdateTicket}
                   onSelectTicket={(ticket) => onSelectTicket(ticket)}
                   onOpenCreateTicket={onOpenCreateTicket}
                 />
               ) : (
                 <TicketList
-                  filters={filters}
                   filteredCount={filteredTickets.length}
-                  totalCount={tickets.length}
                   groupedTickets={listGroupedTickets}
-                  listSort={listSort}
                   domainById={domainById}
                   userAvatarById={userAvatarById}
-                  hasActiveFilters={hasFiltersApplied}
-                  onFilterChange={onSetFilters}
-                  onClearFilters={handleClearFilters}
-                  onListSortChange={onSetListSort}
                   onSelectTicket={(ticket) => onSelectTicket(ticket)}
                 />
               )}
