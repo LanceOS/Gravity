@@ -2,11 +2,15 @@
   "compilerOptions": {
     "tsBuildInfoFile": "client/node_modules/.tmp/tsconfig.app.tsbuildinfo",
     "target": "es2023",
-    "lib": ["ES2023", "DOM"],
+    "lib": [
+      "ES2023",
+      "DOM"
+    ],
     "module": "esnext",
-    "types": ["vite/client"],
+    "types": [
+      "vite/client"
+    ],
     "skipLibCheck": true,
-
     /* Bundler mode */
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
@@ -14,25 +18,42 @@
     "moduleDetection": "force",
     "noEmit": true,
     "jsx": "react-jsx",
-
     /* Linting */
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true,
-
     "baseUrl": ".",
-    "ignoreDeprecations": "6.0",
+    "ignoreDeprecations": "5.0",
     "paths": {
-      "react": ["node_modules/@types/react"],
-      "react/*": ["node_modules/@types/react/*"],
-      "react-dom": ["node_modules/@types/react-dom"],
-      "react-dom/*": ["node_modules/@types/react-dom/*"],
-      "lucide-react": ["node_modules/lucide-react"],
-      "lucide-react/*": ["node_modules/lucide-react/*"],
-      "@library": ["../library/index.ts"],
-      "@library/*": ["../library/*"]
+      "react": [
+        "node_modules/@types/react"
+      ],
+      "react/*": [
+        "node_modules/@types/react/*"
+      ],
+      "react-dom": [
+        "node_modules/@types/react-dom"
+      ],
+      "react-dom/*": [
+        "node_modules/@types/react-dom/*"
+      ],
+      "lucide-react": [
+        "node_modules/lucide-react"
+      ],
+      "lucide-react/*": [
+        "node_modules/lucide-react/*"
+      ],
+      "@library": [
+        "../library/index.ts"
+      ],
+      "@library/*": [
+        "../library/*"
+      ]
     }
   },
-  "include": ["src"]
+  "include": [
+    "src",
+    "../library"
+  ]
 }
