@@ -52,7 +52,7 @@ export class McpRouterFactory {
 
         const response = await handleMcpRequest(req.body, workspaceId, actorUserId, {
           accessChecked: true,
-          sanitize: req.header('x-mcp-sanitize') === 'true' || req.header('X-Mcp-Sanitize') === 'true',
+          sanitize: req.header('x-mcp-sanitize') === 'true',
         });
         res.json(response);
       } catch (error) {
