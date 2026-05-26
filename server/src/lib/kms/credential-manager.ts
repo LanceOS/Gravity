@@ -126,6 +126,8 @@ export class CredentialManager {
     let plaintextDEK: Buffer | null = null;
     let decryptedKeyBuffer: Buffer | null = null;
 
+    let decryptedAPIKeyString: string;
+
     try {
       // 2. Call DecryptDataKey to unwrap the DEK
       plaintextDEK = this.kmsProvider.DecryptDataKey(record.encryptedDek);
@@ -134,21 +136,18 @@ export class CredentialManager {
       const decipher = createDecipheriv('aes-256-gcm', plaintextDEK, record.aesIv);
       decipher.setAuthTag(record.aesAuthTag);
 
-      decryptedKeyBuffer = Buffer.concat([
-        decipher.update(record.encryptedApiKey),
-        decipher.final()
-      ]);
-
-      const decryptedAPIKeyString = decryptedKeyBuffer.toString('utf8');
-
-      // 4. Pass decrypted key to callback
-      return await executionCallback(decryptedAPIKeyString);
+      decryptedKeyBuffer = Buffer.concat([decipher.update(record.encryptedApiKey), decipher.final()]);
+      decryptedAPIKeyString = decryptedKeyBuffer.toString('utf8');
     } catch (error) {
       throw new Error(
         `Security Exception: Failed to decrypt credentials. Integrity check failed or data was tampered with: ${
           error instanceof Error ? error.message : String(error)
-        }`
+        }`,
       );
+    }
+
+    // Run the callback outside the decryption try/catch so non-crypto errors aren't mislabeled.
+    return await executionCallback(decryptedAPIKeyString);
     } finally {
       // 5. Ensure plaintext secrets are securely wiped from memory inside a finally block
       if (plaintextDEK) {
