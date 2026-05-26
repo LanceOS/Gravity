@@ -7,6 +7,7 @@ export interface SelectOption {
   value: string;
   label: string;
   disabled?: boolean;
+  color?: string;
 }
 
 function normalizeSelectValue(value: React.SelectHTMLAttributes<HTMLSelectElement>['value']) {
@@ -264,7 +265,10 @@ export function Select({
           disabled={disabled}
           {...buttonProps}
         >
-          <span className={labelClassName}>{labelText}</span>
+          <span className={labelClassName} style={{ display: 'flex', alignItems: 'center' }}>
+            {selectedOption?.color && <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: selectedOption.color, marginRight: '8px', flexShrink: 0 }} />}
+            {labelText}
+          </span>
           <ChevronDown size={14} className="select-trigger__icon" aria-hidden="true" />
         </button>
 
@@ -302,9 +306,10 @@ export function Select({
                       commitValue(opt.value);
                     }
                   }}
-                  style={{ pointerEvents: opt.disabled ? 'none' : 'auto' }}
+                  style={{ pointerEvents: opt.disabled ? 'none' : 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}
                 >
-                  <span className="select-option__label">{opt.label}</span>
+                  {opt.color && <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: opt.color, flexShrink: 0 }} />}
+                  <span className="select-option__label" style={{ flex: 1 }}>{opt.label}</span>
                   {isSelected ? <Check size={14} aria-hidden="true" /> : null}
                 </div>
               );
