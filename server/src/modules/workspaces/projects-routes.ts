@@ -4,8 +4,6 @@ import { db } from '../../db/index.js';
 import { cycles, domains, projectMembers, projects, workspaceMembers, workspaces, workspaceSettings } from '../../db/schema.js';
 import {
   createId,
-  invalidateUserWorkspacesCache,
-  invalidateWorkspaceCache,
   normalizeEntityKey,
   normalizeIsoDate,
 } from '../../lib/platform.js';
@@ -100,7 +98,6 @@ export function createProjectsRouter() {
         workspaceId: targetWorkspaceId,
       });
 
-      await invalidateWorkspaceCache(project.workspaceId);
       res.status(201).json({
         ...mapProject(project),
         inviteCode: project.inviteCode,
@@ -146,8 +143,6 @@ export function createProjectsRouter() {
 
       await acceptProjectInvite(project.id, project.workspaceId, userId);
 
-      await invalidateWorkspaceCache(project.workspaceId);
-      await invalidateUserWorkspacesCache(userId);
       res.json({ project: mapProject(project) });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to accept invite.' });
@@ -170,8 +165,6 @@ export function createProjectsRouter() {
 
       await addProjectMemberRecord(project.id, project.workspaceId, userId, typeof role === 'string' ? role : 'developer');
 
-      await invalidateWorkspaceCache(project.workspaceId);
-      await invalidateUserWorkspacesCache(userId);
       res.status(201).json({ success: true });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to add project member.' });
