@@ -135,17 +135,18 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
               onSave={(newTitle) => onUpdateTicket(activeTicket.id, { title: newTitle })}
               saveHint="Esc"
               saveOnEnter={false}
+              hideSaveButton={true}
               containerClass="editable-seamless"
               inputStyle={{ 
                 fontSize: '22px', 
                 fontWeight: 600, 
                 padding: 0, 
-                minHeight: '38px', 
-                lineHeight: 'normal',
+                minHeight: 0,
+                lineHeight: 1.2,
                 color: 'var(--color-text-primary)'
               }}
               renderDisplay={(val) => (
-                <h1 style={{ fontSize: '22px', fontWeight: 600, color: 'var(--color-text-primary)', margin: 0, flex: 1, minWidth: 0 }}>
+                <h1 style={{ fontSize: '22px', fontWeight: 600, color: 'var(--color-text-primary)', margin: 0, flex: 1, minWidth: 0, lineHeight: 1.2 }}>
                   {val}
                 </h1>
               )}

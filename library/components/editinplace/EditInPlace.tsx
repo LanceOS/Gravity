@@ -14,6 +14,7 @@ export interface EditInPlaceProps {
   saveOnEnter?: boolean;
   placeholder?: string;
   emptyText?: string;
+  hideSaveButton?: boolean;
 }
 
 export const EditInPlace: React.FC<EditInPlaceProps> = ({
@@ -26,7 +27,8 @@ export const EditInPlace: React.FC<EditInPlaceProps> = ({
   saveHint = 'Enter',
   saveOnEnter = true,
   placeholder,
-  emptyText = 'Click to edit...'
+  emptyText = 'Click to edit...',
+  hideSaveButton = false
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [value, setValue] = useState(propValue);
@@ -81,20 +83,22 @@ export const EditInPlace: React.FC<EditInPlaceProps> = ({
           autoGrow
           autoFocus
         />
-        <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-          <Button
-            onMouseDown={(e) => {
-              e.preventDefault();
-              handleSave();
-            }}
-            variant="primary"
-            size="sm"
-            style={{ padding: '4px 12px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}
-          >
-            <span>Save</span>
-            <span aria-hidden="true" style={{ fontSize: '10px', opacity: 0.6, background: 'rgba(255,255,255,0.2)', padding: '1px 5px', borderRadius: '3px' }}>{saveHint}</span>
-          </Button>
-        </div>
+        {!hideSaveButton && (
+          <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+            <Button
+              onMouseDown={(e) => {
+                e.preventDefault();
+                handleSave();
+              }}
+              variant="primary"
+              size="sm"
+              style={{ padding: '4px 12px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}
+            >
+              <span>Save</span>
+              <span aria-hidden="true" style={{ fontSize: '10px', opacity: 0.6, background: 'rgba(255,255,255,0.2)', padding: '1px 5px', borderRadius: '3px' }}>{saveHint}</span>
+            </Button>
+          </div>
+        )}
       </div>
     );
   }
