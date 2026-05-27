@@ -87,8 +87,6 @@ describe('useAccountSettings', () => {
       expect(fetchMock).toHaveBeenCalledTimes(2);
     });
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-
     act(() => {
       result.current.updateSettings({ aiProvider: 'openai' });
     });
