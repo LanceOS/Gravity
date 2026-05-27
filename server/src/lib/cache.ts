@@ -46,7 +46,7 @@ export async function get<T>(key: CacheKey): Promise<T | null> {
     } catch (parseError) {
       console.warn(`Cache parse error for key "${fullKey}". Removing malformed cache entry:`, parseError);
       // Clean up the malformed entry asynchronously
-      del(key).catch(() => {});
+      void del(key);
       return null;
     }
   } catch (error) {
