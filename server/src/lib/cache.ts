@@ -132,21 +132,22 @@ export async function wrap<T>(
   }
 
   // Promise coalescing: if a request is already in flight for this key, await it
-  if (inFlightRequests.has(key)) {
-    return inFlightRequests.get(key) as Promise<T>;
+  const inFlightKey = getFullKey(key);
+  if (inFlightRequests.has(inFlightKey)) {
+    return inFlightRequests.get(inFlightKey) as Promise<T>;
   }
 
   const fetchPromise = fetchFn()
-    .then(async (freshData) => {
-      await set(key, freshData, ttlSeconds).catch((err) => {
+    .then((freshData) => {
+      void set(key, freshData, ttlSeconds).catch((err) => {
         console.warn(`Cache wrap failed to set key "${key}":`, err);
       });
       return freshData;
     })
     .finally(() => {
-      inFlightRequests.delete(key);
+      inFlightRequests.delete(inFlightKey);
     });
 
-  inFlightRequests.set(key, fetchPromise);
+  inFlightRequests.set(inFlightKey, fetchPromise);
   return fetchPromise;
 }
