@@ -3,9 +3,9 @@ import { randomBytes } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
 import { db } from '../src/db/index.js';
 import { userExternalCredentials } from '../src/db/schema.js';
-import { LocalEnvKmsProvider } from '../src/lib/kms/local-provider.js';
-import { CredentialManager } from '../src/lib/kms/credential-manager.js';
-import { credentialManager } from '../src/lib/kms/index.js';
+import { LocalEnvKmsProvider } from '../src/modules/auth/kms/local-provider.js';
+import { CredentialManager } from '../src/modules/auth/kms/credential-manager.js';
+import { credentialManager } from '../src/modules/auth/kms/index.js';
 import { api, createAuthenticatedApi, seedUser } from './helpers/test-helpers.js';
 
 describe('Envelope Encryption & Secure Credential Storage', () => {

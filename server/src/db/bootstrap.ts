@@ -1,5 +1,5 @@
 import { getMigrations } from 'better-auth/db/migration';
-import { auth } from '../auth.js';
+import { auth } from '../modules/auth/auth.js';
 import { env } from '../env.js';
 import { pool } from './index.js';
 

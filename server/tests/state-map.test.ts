@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { McpStateMap, sanitize, desanitize } from '../src/mcp/state-map.js';
+import { McpStateMap, sanitize, desanitize } from '../src/modules/mcp/state-map.js';
 
 describe('McpStateMap & Sanitization Flow', () => {
   beforeEach(() => {

@@ -1,14 +1,14 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { AiService } from '../src/lib/ai/ai-service.js';
-import { CredentialManager } from '../src/lib/kms/credential-manager.js';
-import { LocalEnvKmsProvider } from '../src/lib/kms/local-provider.js';
-import { credentialManager } from '../src/lib/kms/index.js';
+import { AiService } from '../src/modules/ai/services/ai-service.js';
+import { CredentialManager } from '../src/modules/auth/kms/credential-manager.js';
+import { LocalEnvKmsProvider } from '../src/modules/auth/kms/local-provider.js';
+import { credentialManager } from '../src/modules/auth/kms/index.js';
 import { userExternalCredentials } from '../src/db/schema.js';
 import { db } from '../src/db/index.js';
 import { and, eq } from 'drizzle-orm';
 import { seedUser } from './helpers/test-helpers.js';
-import { OllamaProvider } from '../src/lib/ai/ollama-provider.js';
-import { validateOllamaUrl } from '../src/lib/ai/utils.js';
+import { OllamaProvider } from '../src/modules/ai/providers/ollama-provider.js';
+import { validateOllamaUrl } from '../src/modules/ai/utils/utils.js';
 import { env } from '../src/env.js';
 
 // ---------------------------------------------------------------------------

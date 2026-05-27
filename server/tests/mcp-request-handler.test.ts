@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { McpRequestHandler } from '../src/mcp/request-handler.js';
-import * as accessModule from '../src/mcp/access.js';
-import * as workspaceToolsModule from '../src/mcp/workspace-tools.js';
+import { McpRequestHandler } from '../src/modules/mcp/request-handler.js';
+import * as accessModule from '../src/modules/mcp/access.js';
+import * as workspaceToolsModule from '../src/modules/mcp/workspace-tools.js';
 
 describe('McpRequestHandler', () => {
   afterEach(() => {

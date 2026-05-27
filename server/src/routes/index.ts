@@ -1,13 +1,13 @@
 import { Router } from 'express';
-import { createAiRouter } from './ai.js';
-import { createHealthRouter } from './health.js';
-import { createProjectsRouter } from './projects.js';
-import { createSettingsRouter } from './settings.js';
-import { createTicketsRouter } from './tickets.js';
-import { createUsersRouter } from './users.js';
-import { createWorkspacesRouter } from './workspaces.js';
-import { createMcpRouter } from '../mcp/index.js';
-import { createWebhookRouter } from '../webhooks.js';
+import { createAiRouter } from '../modules/ai/routes.js';
+import { createHealthRouter } from '../modules/health/routes.js';
+import { createProjectsRouter } from '../modules/workspaces/projects-routes.js';
+import { createSettingsRouter } from '../modules/settings/routes.js';
+import { createTicketsRouter } from '../modules/tickets/routes.js';
+import { createUsersRouter } from '../modules/users/routes.js';
+import { createWorkspacesRouter } from '../modules/workspaces/routes.js';
+import { createMcpRouter } from '../modules/mcp/index.js';
+import { createWebhookRouter } from '../modules/webhooks/routes.js';
 import { subscribeToEvents } from '../realtime.js';
 
 export function createApiRouter() {

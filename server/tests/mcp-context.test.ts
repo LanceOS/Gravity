@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveMcpContext } from '../src/mcp/request-context.js';
+import { resolveMcpContext } from '../src/modules/mcp/request-context.js';
 
 describe('resolveMcpContext', () => {
   it('uses request workspace but ignores request actor without trusted context', () => {
