@@ -139,9 +139,7 @@ export async function wrap<T>(
 
   const fetchPromise = fetchFn()
     .then((freshData) => {
-      void set(key, freshData, ttlSeconds).catch((err) => {
-        console.warn(`Cache wrap failed to set key "${key}":`, err);
-      });
+      void set(key, freshData, ttlSeconds);
       return freshData;
     })
     .finally(() => {
