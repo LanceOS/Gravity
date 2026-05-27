@@ -137,6 +137,22 @@ function upsertTicket(existingTickets: Ticket[], nextTicket: Ticket) {
 
   return existingTickets.map((ticket, index) => (index === ticketIndex ? nextTicket : ticket));
 }
+
+const TICKET_UPDATE_DEBOUNCE_MS = 250;
+
+type TicketUpdateBatch = {
+  originalTickets: Ticket[];
+  projectId: string;
+  updates: Partial<Ticket>;
+  timerId: number | null;
+  flushRequested: boolean;
+};
+
+type InFlightTicketUpdateBatch = {
+  originalTickets: Ticket[];
+  projectId: string;
+  updates: Partial<Ticket>;
+};
 // API Base URL
 const API_URL = '/api/v1';
 const AUTH_API_URL = '/api/auth';
@@ -289,8 +305,33 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [state, dispatch] = useReducer(ticketReducer, undefined, createInitialState);
   const [activeProjectId, setActiveProjectIdState] = React.useState<string>('');
   const [authResolved, setAuthResolved] = React.useState(false);
+  const stateRef = React.useRef(state);
+  const activeProjectIdRef = React.useRef(activeProjectId);
+  const pendingTicketUpdateBatchesRef = React.useRef(new Map<string, TicketUpdateBatch>());
+  const inFlightTicketUpdateBatchesRef = React.useRef(new Map<string, InFlightTicketUpdateBatch>());
   const loadedUserIdRef = React.useRef<string | null>(null);
   const loadedProjectIdRef = React.useRef<string | null>(null);
+
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
+
+  useEffect(() => {
+    activeProjectIdRef.current = activeProjectId;
+  }, [activeProjectId]);
+
+  useEffect(() => {
+    return () => {
+      for (const batch of pendingTicketUpdateBatchesRef.current.values()) {
+        if (batch.timerId !== null) {
+          window.clearTimeout(batch.timerId);
+        }
+      }
+
+      pendingTicketUpdateBatchesRef.current.clear();
+      inFlightTicketUpdateBatchesRef.current.clear();
+    };
+  }, []);
 
   const setActiveProjectId = useCallback((id: string) => {
     setActiveProjectIdState(id);
@@ -556,28 +597,106 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [activeProjectId, refreshTicketsForProject, state.tickets]);
 
-  // 4. Update Ticket with project header
-  const updateTicket = useCallback(async (id: string, updates: Partial<Ticket>) => {
-    if (!activeProjectId) return;
-    const originalTickets = [...state.tickets];
-    dispatch({ type: 'OPTIMISTIC_TICKET_UPDATE', payload: { id, updates } });
+  const flushPendingTicketUpdate = useCallback(async (ticketId: string) => {
+    const pendingBatch = pendingTicketUpdateBatchesRef.current.get(ticketId);
+    if (!pendingBatch) {
+      return;
+    }
+
+    if (pendingBatch.timerId !== null) {
+      window.clearTimeout(pendingBatch.timerId);
+      pendingBatch.timerId = null;
+    }
+
+    if (inFlightTicketUpdateBatchesRef.current.has(ticketId)) {
+      pendingBatch.flushRequested = true;
+      return;
+    }
+
+    if (Object.keys(pendingBatch.updates).length === 0) {
+      pendingTicketUpdateBatchesRef.current.delete(ticketId);
+      return;
+    }
+
+    pendingTicketUpdateBatchesRef.current.delete(ticketId);
+    inFlightTicketUpdateBatchesRef.current.set(ticketId, {
+      originalTickets: pendingBatch.originalTickets,
+      projectId: pendingBatch.projectId,
+      updates: pendingBatch.updates,
+    });
 
     try {
-      const response = await fetch(`${API_URL}/tickets/${id}`, {
+      const response = await fetch(`${API_URL}/tickets/${ticketId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          'X-Project-Id': activeProjectId
+          'X-Project-Id': pendingBatch.projectId,
         },
-        body: JSON.stringify(updates),
+        body: JSON.stringify(pendingBatch.updates),
       });
 
       if (!response.ok) throw new Error('Failed to update ticket');
+
+      inFlightTicketUpdateBatchesRef.current.delete(ticketId);
+
+      const followUpBatch = pendingTicketUpdateBatchesRef.current.get(ticketId);
+      if (followUpBatch && followUpBatch.flushRequested) {
+        followUpBatch.flushRequested = false;
+        void flushPendingTicketUpdate(ticketId);
+      }
     } catch (e) {
       console.error('Error updating ticket on server, rolling back:', e);
-      await refreshTicketsForProject(activeProjectId, originalTickets);
+      inFlightTicketUpdateBatchesRef.current.delete(ticketId);
+      await refreshTicketsForProject(pendingBatch.projectId, pendingBatch.originalTickets);
+
+      const followUpBatch = pendingTicketUpdateBatchesRef.current.get(ticketId);
+      if (followUpBatch) {
+        followUpBatch.originalTickets = pendingBatch.originalTickets;
+        if (Object.keys(followUpBatch.updates).length > 0) {
+          dispatch({ type: 'OPTIMISTIC_TICKET_UPDATE', payload: { id: ticketId, updates: followUpBatch.updates } });
+        }
+
+        if (followUpBatch.flushRequested) {
+          followUpBatch.flushRequested = false;
+          void flushPendingTicketUpdate(ticketId);
+        }
+      }
     }
-  }, [activeProjectId, refreshTicketsForProject, state.tickets]);
+  }, [dispatch, refreshTicketsForProject]);
+
+  // 4. Update Ticket with project header
+  const updateTicket = useCallback(async (id: string, updates: Partial<Ticket>) => {
+    const projectId = activeProjectIdRef.current;
+    if (!projectId) return;
+
+    const pendingBatch = pendingTicketUpdateBatchesRef.current.get(id);
+    if (!pendingBatch) {
+      pendingTicketUpdateBatchesRef.current.set(id, {
+        originalTickets: [...stateRef.current.tickets],
+        projectId,
+        updates: {},
+        timerId: null,
+        flushRequested: false,
+      });
+    }
+
+    dispatch({ type: 'OPTIMISTIC_TICKET_UPDATE', payload: { id, updates } });
+
+    const nextBatch = pendingTicketUpdateBatchesRef.current.get(id);
+    if (!nextBatch) return;
+
+    nextBatch.projectId = projectId;
+    nextBatch.updates = { ...nextBatch.updates, ...updates };
+    nextBatch.flushRequested = false;
+
+    if (nextBatch.timerId !== null) {
+      window.clearTimeout(nextBatch.timerId);
+    }
+
+    nextBatch.timerId = window.setTimeout(() => {
+      void flushPendingTicketUpdate(id);
+    }, TICKET_UPDATE_DEBOUNCE_MS);
+  }, [dispatch, flushPendingTicketUpdate]);
 
   // 5. Delete Ticket with project header
   const deleteTicket = useCallback(async (id: string) => {
