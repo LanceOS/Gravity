@@ -12,9 +12,9 @@ The `mcp` module (`server/src/modules/mcp/`) serves as the core framework implem
 - **Global Router**: `src/modules/mcp/router.ts` builds the MCP-compliant JSON-RPC router.
 
 ## 4. Flow Steps
-1. **Connection Initialization**: A client connects via stdio. The server reads `X-Workspace-Id`, `X-Project-Id`, and auth headers from the process environment config mapping.
+1. **Connection Initialization**: A client connects via stdio. The stdio transport resolves trusted context from the process environment using `MCP_STDIO_WORKSPACE_ID` and `MCP_STDIO_ACTOR_USER_ID`.
 2. **Request Reception**: The router intercepts JSON-RPC requests (`tools/list`, `tools/call`).
-3. **Context Resolution**: `resolveMcpContext` parses headers to verify the trusted context and actor ID.
+3. **Context Resolution**: `resolveMcpContext` verifies the trusted context and actor ID using the transport-specific source; header parsing applies to the HTTP router path, while stdio uses the resolved stdio configuration.
 4. **Tool Dispatch**: `executeTool` matches the requested tool name against the `toolHandlers` registry and delegates the arguments to the target handler.
 
 ## 5. Data Stores and Resources
