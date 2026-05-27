@@ -27,9 +27,13 @@ This document details the data architecture for Workspaces, Projects, Domains, a
 - **Purpose**: Top-level tenant container.
 - **Key Fields**: `id`, `name`, `key`, `workspaceKey`, `hostUrl`.
 
-### `workspace_members` & `workspace_member_activity` Tables
-- **Purpose**: Maps users to workspaces with specific roles. Tracks user activity.
-- **Key Fields**: `workspaceId`, `userId`, `role`, `lastActiveAt`.
+### `workspace_members` Table
+- **Purpose**: Maps users to workspaces with specific roles.
+- **Key Fields**: `workspaceId`, `userId`, `role`.
+
+### `workspace_member_activity` Table
+- **Purpose**: Tracks per-member activity within a workspace.
+- **Key Fields**: `workspaceId`, `userId`, `lastActiveAt`.
 
 ### `workspace_settings` Table
 - **Purpose**: Configures workspace behaviors (join modes, disabled tools).
