@@ -19,14 +19,14 @@ services:
       retries: 5
 
   redis:
+  redis:
     image: redis:7-alpine
     container_name: ${GRAVITY_REDIS_CONTAINER:-gravity_redis}
-    command: redis-server --requirepass ${GRAVITY_REDIS_PASSWORD:?Set GRAVITY_REDIS_PASSWORD}
+    command: redis-server --requirepass ${GRAVITY_REDIS_PASSWORD:-secure_dev_password_change_me_in_prod}
     ports:
       - "127.0.0.1:${GRAVITY_REDIS_PORT:-6379}:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${GRAVITY_REDIS_PASSWORD:?Set GRAVITY_REDIS_PASSWORD}", "ping"]
-      interval: 5s
+      test: ["CMD", "redis-cli", "-a", "${GRAVITY_REDIS_PASSWORD:-secure_dev_password_change_me_in_prod}", "ping"]
       timeout: 5s
       retries: 5
 
