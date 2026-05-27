@@ -28,7 +28,7 @@ This document covers the primary user workflows and integrated tools provided by
 - **WebMCP**: Integrates local browser context (e.g., currently loaded tickets) into the AI chat interface seamlessly.
 
 ## 6. Interfaces and Contracts
-- `LocalAIChat.tsx` acts as the primary boundary between human users and the Local LLM. It passes the currently selected `aiProvider` and active `workspaceId` as props.
+- `LocalAIChat.tsx` acts as the primary boundary between human users and the Local LLM. It receives the active `workspaceId` as a prop, and the selected `aiProvider` is supplied via the `settings` prop.
 - Global Keydown listener:
   ```typescript
   if (event.key === 'n' || event.key === 'N') {
