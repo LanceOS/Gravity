@@ -12,7 +12,7 @@ This document details the data architecture for User Profiles and Settings withi
 ## 3. Entry Points
 
 - **Schema Definition**: `server/src/modules/users/schema.ts`
-- **Routes**: `server/src/modules/users/routes.js`
+- **Routes**: `server/src/modules/users/routes.ts`
 
 ## 4. Flow Steps
 
