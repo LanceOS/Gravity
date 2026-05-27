@@ -33,7 +33,7 @@ This document outlines how the React client manages application state, data fetc
 
 ## 6. Interfaces and Contracts
 - `TicketContextType` in `TicketContext.tsx` defines the shape of the global state and mutations.
-- `fetchInitialData` contract expects the backend to return tickets containing their relations (e.g., assignee).
+- `fetchInitialData` hydrates projects and users, while initializing tickets, domains, and cycles as empty state; ticket data is loaded later by `fetchProjectData(activeProjectId)`.
 
 ## 7. Key Files and Modules
 - `client/src/context/TicketContext.tsx`: Central state hub.
