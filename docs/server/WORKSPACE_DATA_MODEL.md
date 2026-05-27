@@ -75,5 +75,5 @@ This document details the data architecture for Workspaces, Projects, Domains, a
 
 ## 11. Related Docs
 
-- [Database Architecture Flow](file:///home/lance/Documents/Gravity%20copy/docs/server/DATABASE_ARCHITECTURE_FLOW.md)
-- [Ticket Data Model](file:///home/lance/Documents/Gravity%20copy/docs/server/TICKET_DATA_MODEL.md)
+- [Database Architecture Flow](./DATABASE_ARCHITECTURE_FLOW.md)
+- [Ticket Data Model](./TICKET_DATA_MODEL.md)
