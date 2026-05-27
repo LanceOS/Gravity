@@ -8,6 +8,8 @@ import {
   createWorkspaceAccessKey,
   ensureProjectMembership,
   ensureWorkspaceMembership,
+  invalidateWorkspaceCache,
+  invalidateUserWorkspacesCache,
   normalizeEntityKey,
   normalizeIsoDate,
 } from '../../../lib/platform.js';
@@ -148,7 +150,11 @@ export async function createProjectRecord(params: {
   });
 
   const rows = await db.select().from(projects).where(eq(projects.id, projectId)).limit(1);
-  return rows[0];
+  const project = rows[0];
+  if (project) {
+    await invalidateWorkspaceCache(project.workspaceId);
+  }
+  return project;
 }
 
 export async function updateProjectRecord(projectId: string, params: { name?: string; description?: string; status?: string }) {
@@ -181,6 +187,9 @@ export async function acceptProjectInvite(projectId: string, workspaceId: string
     await ensureWorkspaceMembership(workspaceId, userId, 'member', undefined, tx);
     await ensureProjectMembership(projectId, userId, 'developer', undefined, tx);
   });
+
+  await invalidateWorkspaceCache(workspaceId);
+  await invalidateUserWorkspacesCache(userId);
 }
 
 export async function addProjectMemberRecord(projectId: string, workspaceId: string, userId: string, role: string) {
@@ -188,4 +197,7 @@ export async function addProjectMemberRecord(projectId: string, workspaceId: str
     await ensureWorkspaceMembership(workspaceId, userId, 'member', undefined, tx);
     await ensureProjectMembership(projectId, userId, role, undefined, tx);
   });
+
+  await invalidateWorkspaceCache(workspaceId);
+  await invalidateUserWorkspacesCache(userId);
 }
