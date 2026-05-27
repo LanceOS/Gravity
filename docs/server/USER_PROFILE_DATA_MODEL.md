@@ -60,5 +60,5 @@ This document details the data architecture for User Profiles and Settings withi
 
 ## 11. Related Docs
 
-- [Auth Data Model](file:///home/lance/Documents/Gravity%20copy/docs/server/AUTH_DATA_MODEL.md)
-- [Database Architecture Flow](file:///home/lance/Documents/Gravity%20copy/docs/server/DATABASE_ARCHITECTURE_FLOW.md)
+- [Auth Data Model](./AUTH_DATA_MODEL.md)
+- [Database Architecture Flow](./DATABASE_ARCHITECTURE_FLOW.md)
