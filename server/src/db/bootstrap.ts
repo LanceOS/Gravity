@@ -94,6 +94,23 @@ export async function initializeDatabase() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
+    CREATE TABLE IF NOT EXISTS mcp_connection_tokens (
+      id TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL,
+      token_hash TEXT NOT NULL,
+      hmac_key_id TEXT NOT NULL,
+      scopes JSONB NOT NULL DEFAULT '[]'::jsonb,
+      expires_at TIMESTAMPTZ,
+      single_use BOOLEAN NOT NULL DEFAULT TRUE,
+      status TEXT NOT NULL DEFAULT 'active',
+      generated_by TEXT NOT NULL,
+      source_ip TEXT,
+      connection_type TEXT NOT NULL DEFAULT 'http-post',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      used_at TIMESTAMPTZ,
+      revoked_at TIMESTAMPTZ
+    );
+
 
 
 

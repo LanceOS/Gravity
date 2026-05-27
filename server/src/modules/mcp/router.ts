@@ -37,6 +37,19 @@ export class McpRouterFactory {
         let actorUserId = await resolveRequestActorUserId(req);
         let accessChecked = false;
 
+        // When tests enable ALLOW_DEV_AUTH_BYPASS the bearer token in the
+        // `Authorization` header may be interpreted as a user id by the
+        // test helper. If the resolved actorUserId exactly matches the raw
+        // bearer token we detected, treat it as a token instead so the
+        // explicit token verification path below runs.
+        const rawAuthHeader = (req.header('authorization') || req.header('Authorization') || '').trim();
+        if (actorUserId && rawAuthHeader.toLowerCase().startsWith('bearer ')) {
+          const possibleToken = rawAuthHeader.slice('bearer '.length).trim();
+          if (possibleToken && actorUserId === possibleToken) {
+            actorUserId = null;
+          }
+        }
+
         if (actorUserId) {
           const hasAccess = await isWorkspaceMember(workspaceId, actorUserId);
           if (!hasAccess) {
