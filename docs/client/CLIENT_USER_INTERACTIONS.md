@@ -50,7 +50,7 @@ This document covers the primary user workflows and integrated tools provided by
 - Tool execution failures are displayed in the chat interface as error message blocks.
 
 ## 10. Change Hazards, Invariants, or Migration Constraints
-- **Global Shortcuts**: When adding new keyboard shortcuts in `AppShellPage.tsx`, ensure that `event.target` is checked to prevent firing shortcuts while the user is typing in `INPUT`, `TEXTAREA`, or `contenteditable` elements.
+- **Global Shortcuts**: When adding new keyboard shortcuts in `AppShellPage.tsx`, ensure that `event.target` is checked to prevent firing shortcuts while the user is typing or interacting in `INPUT`, `TEXTAREA`, `SELECT`, or `contenteditable` elements.
 
 ## 11. Related Docs
 - [Client Routing & Flow](CLIENT_ROUTING_FLOW.md)
