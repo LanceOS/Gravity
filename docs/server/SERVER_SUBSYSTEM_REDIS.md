@@ -37,7 +37,7 @@ The `cache.ts` module exports generic, type-safe functions. It automatically han
 ## 7. Key Files and Modules
 - `server/src/lib/redis.ts`: Manages the Redis client singleton lifecycle, connection events, reconnect strategies, and graceful shutdown.
 - `server/src/lib/cache.ts`: The caching service API that implements the "soft-dependency" logic and cache-aside patterns.
-- `server/tests/cache.test.ts`: Comprehensive unit testing suite verifying cache hits, misses, error resilience, and shutdown behavior.
+- `server/tests/cache.test.ts`: Unit tests verifying cache hits, misses, and error resilience.
 
 ## 8. Permissions, Guards, or Tenant Boundaries
 - **Strict Namespacing**: All cache keys are prefixed with `gravity:` (enforced via `getFullKey()`). This helps avoid collisions with other applications; run separate Redis instances/DBs (or add an environment-specific prefix) to isolate multiple Gravity environments.
