@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TicketProvider, useTickets } from '../../context/TicketContext.tsx';
 
@@ -43,6 +43,7 @@ function ContextProbe() {
       <div data-testid="ticket-count">{tickets.length}</div>
       <div data-testid="active-project-id">{activeProjectId || 'none'}</div>
       <div data-testid="ticket-titles">{tickets.map((ticket) => ticket.title).join('|')}</div>
+      <div data-testid="ticket-statuses">{tickets.map((ticket) => ticket.status).join('|')}</div>
       <button type="button" onClick={switchUser}>Switch user</button>
       <button type="button" onClick={() => setActiveProjectId('project-2')}>Switch project</button>
       <button
@@ -62,6 +63,16 @@ function ContextProbe() {
         }}
       >
         Create ticket
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          if (tickets[0]) {
+            void updateTicket(tickets[0].id, { status: 'done' });
+          }
+        }}
+      >
+        Mark first ticket done
       </button>
       <button
         type="button"
@@ -478,5 +489,88 @@ describe('TicketContext', () => {
     expect(consoleErrorSpy).toHaveBeenCalledWith('Error updating ticket on server, rolling back:', expect.any(Error));
     expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to refresh tickets for project project-1:', expect.any(Error));
     consoleErrorSpy.mockRestore();
+  });
+
+  it('batches rapid ticket updates into a single patch request', async () => {
+    const user = {
+      id: 'user-session-1',
+      name: 'Ada Lovelace',
+      email: 'ada@example.com',
+      avatar: '',
+      role: 'owner',
+      tutorial_completed: 1,
+    };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ user, session: { userId: user.id } }))
+      .mockResolvedValueOnce(jsonResponse([{ id: 'project-1', name: 'Gravity Core', description: '', key: 'GRA', status: 'active', workspaceId: 'workspace-1' }]))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse([
+        {
+          id: 'ticket-1',
+          key: 'GRA-1',
+          title: 'Seed ticket',
+          description: '',
+          status: 'todo',
+          priority: 'medium',
+          projectId: 'project-1',
+          domainId: null,
+          cycleId: null,
+          assigneeId: null,
+          parentId: null,
+          prStatus: 'none',
+          prUrl: null,
+          createdAt: '2026-05-01T00:00:00.000Z',
+          updatedAt: '2026-05-01T00:00:00.000Z',
+        },
+      ]))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({
+        id: 'ticket-1',
+        key: 'GRA-1',
+        title: 'Updated ticket',
+        description: '',
+        status: 'done',
+        priority: 'medium',
+        projectId: 'project-1',
+        domainId: null,
+        cycleId: null,
+        assigneeId: null,
+        parentId: null,
+        prStatus: 'none',
+        prUrl: null,
+        createdAt: '2026-05-01T00:00:00.000Z',
+        updatedAt: '2026-05-01T00:00:00.000Z',
+      }));
+
+    stubEventSource();
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <TicketProvider>
+        <ContextProbe />
+      </TicketProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ticket-count')).toHaveTextContent('1');
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Update first ticket' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Mark first ticket done' }));
+
+    expect(screen.getByTestId('ticket-titles')).toHaveTextContent('Updated ticket');
+    expect(screen.getByTestId('ticket-statuses')).toHaveTextContent('done');
+
+    const patchCallsBeforeFlush = fetchMock.mock.calls.filter(([url, init]) => url === '/api/v1/tickets/ticket-1' && init?.method === 'PATCH');
+    expect(patchCallsBeforeFlush).toHaveLength(0);
+
+    await waitFor(() => {
+      const patchCalls = fetchMock.mock.calls.filter(([url, init]) => url === '/api/v1/tickets/ticket-1' && init?.method === 'PATCH');
+      expect(patchCalls).toHaveLength(1);
+
+      const [, patchInit] = patchCalls[0];
+      expect(JSON.parse(patchInit?.body as string)).toEqual({ title: 'Updated ticket', status: 'done' });
+    });
   });
 });
