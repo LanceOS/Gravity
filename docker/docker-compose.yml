@@ -44,7 +44,7 @@ services:
       OLLAMA_DEFAULT_ENDPOINT: http://host.docker.internal:11434
       NODE_ENV: production
       PORT: 8080
-      REDIS_URL: redis://default:${GRAVITY_REDIS_PASSWORD:?Set GRAVITY_REDIS_PASSWORD}@redis:6379
+      REDIS_URL: redis://default:${GRAVITY_REDIS_PASSWORD:-secure_dev_password_change_me_in_prod}@redis:6379
       REDIS_ENABLED: "true"
     ports:
       - "${GRAVITY_BACKEND_PORT:-8080}:8080"
