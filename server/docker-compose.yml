@@ -17,5 +17,18 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: gravity_redis_dev
+    restart: unless-stopped
+    command: redis-server --requirepass secure_dev_password_change_me_in_prod
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "secure_dev_password_change_me_in_prod", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
 volumes:
   gravity_postgres_data:

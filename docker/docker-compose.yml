@@ -18,6 +18,18 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: ${GRAVITY_REDIS_CONTAINER:-gravity_redis}
+    command: redis-server --requirepass secure_dev_password_change_me_in_prod
+    ports:
+      - "${GRAVITY_REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "secure_dev_password_change_me_in_prod", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   backend:
     build:
       context: ../server
@@ -32,12 +44,16 @@ services:
       OLLAMA_DEFAULT_ENDPOINT: http://host.docker.internal:11434
       NODE_ENV: production
       PORT: 8080
+      REDIS_URL: redis://default:secure_dev_password_change_me_in_prod@redis:6379
+      REDIS_ENABLED: "true"
     ports:
       - "${GRAVITY_BACKEND_PORT:-8080}:8080"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   frontend:

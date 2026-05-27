@@ -9,6 +9,8 @@ import {
   createWorkspaceAccessKey,
   ensureProjectMembership,
   ensureWorkspaceMembership,
+  invalidateUserWorkspacesCache,
+  invalidateWorkspaceCache,
   normalizeEntityKey,
   normalizeIsoDate,
 } from '../../lib/platform.js';
@@ -231,6 +233,8 @@ export function createProjectsRouter() {
       await ensureProjectMembership(projectId, ownerId, 'owner');
       await addWorkspaceMembersToProject(targetWorkspaceId!, projectId);
 
+      await invalidateWorkspaceCache(targetWorkspaceId!);
+
       const rows = await db.select().from(projects).where(eq(projects.id, projectId)).limit(1);
       res.status(201).json({
         ...mapProject(rows[0]),
@@ -283,6 +287,10 @@ export function createProjectsRouter() {
 
       await ensureWorkspaceMembership(project.workspaceId, userId, 'member');
       await ensureProjectMembership(project.id, userId, 'developer');
+
+      await invalidateWorkspaceCache(project.workspaceId);
+      await invalidateUserWorkspacesCache(userId);
+
       res.json({ project: mapProject(project) });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to accept invite.' });
@@ -306,6 +314,10 @@ export function createProjectsRouter() {
 
       await ensureWorkspaceMembership(project.workspaceId, userId, 'member');
       await ensureProjectMembership(project.id, userId, typeof role === 'string' ? role : 'developer');
+
+      await invalidateWorkspaceCache(project.workspaceId);
+      await invalidateUserWorkspacesCache(userId);
+
       res.status(201).json({ success: true });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to add project member.' });

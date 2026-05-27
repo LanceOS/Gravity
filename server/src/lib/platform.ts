@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { Request } from 'express';
+import * as cache from './cache.js';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import {
@@ -257,97 +258,125 @@ export type WorkspaceSummary = {
 };
 
 export async function listWorkspaceSummaries(userId?: string): Promise<WorkspaceSummary[]> {
-  const memberRoleByWorkspace = new Map<string, string>();
-  let accessibleWorkspaceIds: string[] | null = null;
+  const cacheKey = userId ? `user-workspaces:${userId}` : 'all-workspaces';
+  return cache.wrap(cacheKey, 300, async () => {
+    const memberRoleByWorkspace = new Map<string, string>();
+    let accessibleWorkspaceIds: string[] | null = null;
 
-  if (userId) {
-    const membershipRows = await db
-      .select({
-        workspaceId: workspaceMembers.workspaceId,
-        role: workspaceMembers.role,
-      })
-      .from(workspaceMembers)
-      .where(eq(workspaceMembers.userId, userId));
+    if (userId) {
+      const membershipRows = await db
+        .select({
+          workspaceId: workspaceMembers.workspaceId,
+          role: workspaceMembers.role,
+        })
+        .from(workspaceMembers)
+        .where(eq(workspaceMembers.userId, userId));
 
-    for (const membership of membershipRows) {
-      memberRoleByWorkspace.set(membership.workspaceId, membership.role);
+      for (const membership of membershipRows) {
+        memberRoleByWorkspace.set(membership.workspaceId, membership.role);
+      }
+
+      accessibleWorkspaceIds = membershipRows.map((membership) => membership.workspaceId);
+      if (!accessibleWorkspaceIds || accessibleWorkspaceIds.length === 0) {
+        return [];
+      }
     }
 
-    accessibleWorkspaceIds = membershipRows.map((membership) => membership.workspaceId);
-    if (!accessibleWorkspaceIds || accessibleWorkspaceIds.length === 0) {
+    const workspaceQuery = db
+      .select({
+        id: workspaces.id,
+        name: workspaces.name,
+        description: workspaces.description,
+        key: workspaces.key,
+        defaultProjectId: workspaces.defaultProjectId,
+        workspaceHostUrl: workspaces.hostUrl,
+        settingsHostUrl: workspaceSettings.hostUrl,
+        joinMode: workspaceSettings.joinMode,
+      })
+      .from(workspaces)
+      .leftJoin(workspaceSettings, eq(workspaceSettings.workspaceId, workspaces.id));
+
+    const workspaceRows: WorkspaceRow[] = accessibleWorkspaceIds
+      ? await workspaceQuery.where(inArray(workspaces.id, accessibleWorkspaceIds)).orderBy(asc(workspaces.createdAt))
+      : await workspaceQuery.orderBy(asc(workspaces.createdAt));
+    if (workspaceRows.length === 0) {
       return [];
     }
-  }
 
-  const workspaceQuery = db
-    .select({
-      id: workspaces.id,
-      name: workspaces.name,
-      description: workspaces.description,
-      key: workspaces.key,
-      defaultProjectId: workspaces.defaultProjectId,
-      workspaceHostUrl: workspaces.hostUrl,
-      settingsHostUrl: workspaceSettings.hostUrl,
-      joinMode: workspaceSettings.joinMode,
-    })
-    .from(workspaces)
-    .leftJoin(workspaceSettings, eq(workspaceSettings.workspaceId, workspaces.id));
+    const workspaceIds = workspaceRows.map((workspace) => workspace.id);
 
-  const workspaceRows: WorkspaceRow[] = accessibleWorkspaceIds
-    ? await workspaceQuery.where(inArray(workspaces.id, accessibleWorkspaceIds)).orderBy(asc(workspaces.createdAt))
-    : await workspaceQuery.orderBy(asc(workspaces.createdAt));
-  if (workspaceRows.length === 0) {
-    return [];
-  }
+    const [projectCountRows, memberCountRows, pendingJoinRequestCountRows] = await Promise.all([
+      db
+        .select({
+          workspaceId: projects.workspaceId,
+          count: sql<number>`count(*)`,
+        })
+        .from(projects)
+        .where(inArray(projects.workspaceId, workspaceIds))
+        .groupBy(projects.workspaceId),
+      db
+        .select({
+          workspaceId: workspaceMembers.workspaceId,
+          count: sql<number>`count(*)`,
+        })
+        .from(workspaceMembers)
+        .where(inArray(workspaceMembers.workspaceId, workspaceIds))
+        .groupBy(workspaceMembers.workspaceId),
+      db
+        .select({
+          workspaceId: workspaceJoinRequests.workspaceId,
+          count: sql<number>`count(*)`,
+        })
+        .from(workspaceJoinRequests)
+        .where(and(inArray(workspaceJoinRequests.workspaceId, workspaceIds), eq(workspaceJoinRequests.status, 'pending')))
+        .groupBy(workspaceJoinRequests.workspaceId),
+    ]);
 
-  const workspaceIds = workspaceRows.map((workspace) => workspace.id);
+    const projectCountByWorkspace: Map<string, number> = new Map(projectCountRows.map((row) => [row.workspaceId, Number(row.count ?? 0)]));
+    const memberCountByWorkspace: Map<string, number> = new Map(memberCountRows.map((row) => [row.workspaceId, Number(row.count ?? 0)]));
+    const pendingJoinRequestCountByWorkspace: Map<string, number> = new Map(
+      pendingJoinRequestCountRows.map((row) => [row.workspaceId, Number(row.count ?? 0)]),
+    );
 
-  const [projectCountRows, memberCountRows, pendingJoinRequestCountRows] = await Promise.all([
-    db
-      .select({
-        workspaceId: projects.workspaceId,
-        count: sql<number>`count(*)`,
-      })
-      .from(projects)
-      .where(inArray(projects.workspaceId, workspaceIds))
-      .groupBy(projects.workspaceId),
-    db
-      .select({
-        workspaceId: workspaceMembers.workspaceId,
-        count: sql<number>`count(*)`,
-      })
+    return workspaceRows.map((workspace): WorkspaceSummary => ({
+      id: workspace.id,
+      name: workspace.name,
+      description: workspace.description ?? '',
+      key: workspace.key,
+      defaultProjectId: workspace.defaultProjectId ?? null,
+      hostUrl: workspace.settingsHostUrl || workspace.workspaceHostUrl || '',
+      joinMode: workspace.joinMode === 'auto_join' ? 'auto_join' : 'approval_required',
+      projectCount: projectCountByWorkspace.get(workspace.id) ?? 0,
+      memberCount: memberCountByWorkspace.get(workspace.id) ?? 0,
+      pendingJoinRequestCount: pendingJoinRequestCountByWorkspace.get(workspace.id) ?? 0,
+      ...(memberRoleByWorkspace.has(workspace.id) ? { memberRole: memberRoleByWorkspace.get(workspace.id) } : {}),
+    }));
+  });
+}
+
+export async function invalidateWorkspaceCache(workspaceId: string): Promise<void> {
+  try {
+    await cache.del('all-workspaces');
+    const members = await db
+      .select({ userId: workspaceMembers.userId })
       .from(workspaceMembers)
-      .where(inArray(workspaceMembers.workspaceId, workspaceIds))
-      .groupBy(workspaceMembers.workspaceId),
-    db
-      .select({
-        workspaceId: workspaceJoinRequests.workspaceId,
-        count: sql<number>`count(*)`,
-      })
-      .from(workspaceJoinRequests)
-      .where(and(inArray(workspaceJoinRequests.workspaceId, workspaceIds), eq(workspaceJoinRequests.status, 'pending')))
-      .groupBy(workspaceJoinRequests.workspaceId),
-  ]);
+      .where(eq(workspaceMembers.workspaceId, workspaceId));
 
-  const projectCountByWorkspace: Map<string, number> = new Map(projectCountRows.map((row) => [row.workspaceId, Number(row.count ?? 0)]));
-  const memberCountByWorkspace: Map<string, number> = new Map(memberCountRows.map((row) => [row.workspaceId, Number(row.count ?? 0)]));
-  const pendingJoinRequestCountByWorkspace: Map<string, number> = new Map(
-    pendingJoinRequestCountRows.map((row) => [row.workspaceId, Number(row.count ?? 0)]),
-  );
+    for (const member of members) {
+      await cache.del(`user-workspaces:${member.userId}`);
+    }
+  } catch (error) {
+    console.error(`Failed to invalidate cache for workspace ${workspaceId}:`, error);
+  }
+}
 
-  return workspaceRows.map((workspace): WorkspaceSummary => ({
-    id: workspace.id,
-    name: workspace.name,
-    description: workspace.description ?? '',
-    key: workspace.key,
-    defaultProjectId: workspace.defaultProjectId ?? null,
-    hostUrl: workspace.settingsHostUrl || workspace.workspaceHostUrl || '',
-    joinMode: workspace.joinMode === 'auto_join' ? 'auto_join' : 'approval_required',
-    projectCount: projectCountByWorkspace.get(workspace.id) ?? 0,
-    memberCount: memberCountByWorkspace.get(workspace.id) ?? 0,
-    pendingJoinRequestCount: pendingJoinRequestCountByWorkspace.get(workspace.id) ?? 0,
-    ...(memberRoleByWorkspace.has(workspace.id) ? { memberRole: memberRoleByWorkspace.get(workspace.id) } : {}),
-  }));
+export async function invalidateUserWorkspacesCache(userId: string): Promise<void> {
+  try {
+    await cache.del('all-workspaces');
+    await cache.del(`user-workspaces:${userId}`);
+  } catch (error) {
+    console.error(`Failed to invalidate cache for user ${userId}:`, error);
+  }
 }
 
 export async function getWorkspaceSummary(workspaceId: string, userId?: string) {
