@@ -30,6 +30,8 @@ import {
   ensureWorkspaceSettingsRecord,
   getUserById,
   getWorkspaceSummary,
+  invalidateUserWorkspacesCache,
+  invalidateWorkspaceCache,
   listWorkspaceSummaries,
   normalizeEntityKey,
 } from '../../lib/platform.js';
@@ -227,6 +229,7 @@ export function createWorkspacesRouter() {
         }
       });
 
+      await invalidateUserWorkspacesCache(effectiveOwnerId);
       const workspace = await getWorkspaceSummary(workspaceId, effectiveOwnerId);
       res.status(201).json({ workspace });
     } catch (error) {
@@ -379,6 +382,7 @@ export function createWorkspacesRouter() {
           .where(eq(workspaceSettings.workspaceId, workspaceId));
       });
 
+      await invalidateWorkspaceCache(workspaceId);
       res.json(await loadWorkspaceSettingsPayload(workspaceId));
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to update workspace settings.' });
@@ -812,6 +816,11 @@ export function createWorkspacesRouter() {
         await addUserToWorkspaceProjects(workspaceId, userId);
       }
 
+      await invalidateWorkspaceCache(workspaceId);
+      if (autoJoin) {
+        await invalidateUserWorkspacesCache(userId);
+      }
+
       res.status(201).json({
         id: requestId,
         workspaceId,
@@ -920,6 +929,11 @@ export function createWorkspacesRouter() {
       if (request.requestingUserId) {
         await ensureWorkspaceMembership(workspaceId, request.requestingUserId, 'member');
         await addUserToWorkspaceProjects(workspaceId, request.requestingUserId);
+      }
+
+      await invalidateWorkspaceCache(workspaceId);
+      if (request.requestingUserId) {
+        await invalidateUserWorkspacesCache(request.requestingUserId);
       }
 
       res.json({

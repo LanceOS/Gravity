@@ -20,7 +20,21 @@ const envSchema = z.object({
   MCP_STDIO_WORKSPACE_ID: z.string().optional(),
   MCP_STDIO_ACTOR_USER_ID: z.string().optional(),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  ALLOW_ENV_AI_KEYS: z.coerce.boolean().default(false),
+  ALLOW_ENV_AI_KEYS: z.preprocess((v) => {
+    if (typeof v !== 'string') return v;
+    const s = v.trim().toLowerCase();
+    if (s === 'true' || s === '1') return true;
+    if (s === 'false' || s === '0' || s === '') return false;
+    return v;
+  }, z.boolean()).default(false),
+  REDIS_URL: z.string().default('redis://localhost:6379'),
+  REDIS_ENABLED: z.preprocess((v) => {
+    if (typeof v !== 'string') return v;
+    const s = v.trim().toLowerCase();
+    if (s === 'true' || s === '1') return true;
+    if (s === 'false' || s === '0' || s === '') return false;
+    return v;
+  }, z.boolean()).default(false),
 });
 
 const parsed = envSchema.parse(process.env);
@@ -58,4 +72,6 @@ export const env = {
   mcpStdioActorUserId: parsed.MCP_STDIO_ACTOR_USER_ID?.trim() || undefined,
   nodeEnv: parsed.NODE_ENV,
   allowEnvAiKeys: parsed.ALLOW_ENV_AI_KEYS,
+  redisUrl: parsed.REDIS_URL,
+  redisEnabled: parsed.REDIS_ENABLED,
 };
