@@ -280,6 +280,7 @@ interface TicketContextType extends State {
   setView: (view: 'list' | 'board') => void;
   setFilters: (filters: Partial<State['filters']>) => void;
   resetFilters: () => void;
+  ticketMap: Map<string, Ticket>;
 }
 
 export const TicketContext = createContext<TicketContextType | undefined>(undefined);
@@ -914,6 +915,8 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     dispatch({ type: 'SET_FILTERS', payload: { ...initialFilters, projectId: activeProjectId } });
   }, [activeProjectId]);
 
+  const ticketMap = useMemo(() => new Map(state.tickets.map(t => [t.key.toUpperCase(), t])), [state.tickets]);
+
   const value = useMemo(
     () => ({
       ...state,
@@ -939,6 +942,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setView,
       setFilters,
       resetFilters,
+      ticketMap,
     }),
     [
       state,
@@ -964,6 +968,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setView,
       setFilters,
       resetFilters,
+      ticketMap,
     ]
   );
 

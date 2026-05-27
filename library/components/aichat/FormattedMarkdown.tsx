@@ -1,55 +1,30 @@
 import React from 'react';
 import type { MarkdownTextProps } from './types';
 
-type InlineMatch =
-  | { index: number; length: number; type: 'bold'; text: string }
-  | { index: number; length: number; type: 'code'; text: string };
-
 function TextInlineParser({ text }: MarkdownTextProps) {
   const parts: React.ReactNode[] = [];
-  let remaining = text;
   let keyIndex = 0;
+  let lastIndex = 0;
 
-  while (remaining.length > 0) {
-    const boldMatch = remaining.match(/\*\*([^*]+)\*\*/);
-    const codeMatch = remaining.match(/`([^`]+)`/);
+  const combinedRegex = /\*\*([^*]+)\*\*|`([^`]+)`/g;
+  const matches = Array.from(text.matchAll(combinedRegex));
 
-    const matches: InlineMatch[] = [
-      boldMatch && boldMatch.index !== undefined
-        ? { index: boldMatch.index, length: boldMatch[0].length, type: 'bold', text: boldMatch[1] }
-        : null,
-      codeMatch && codeMatch.index !== undefined
-        ? { index: codeMatch.index, length: codeMatch[0].length, type: 'code', text: codeMatch[1] }
-        : null,
-    ].filter((match): match is InlineMatch => match !== null);
-
-    if (matches.length === 0) {
-      const key = keyIndex;
-      keyIndex += 1;
-      parts.push(<span key={key}>{remaining}</span>);
-      break;
+  for (const match of matches) {
+    if (match.index !== undefined && match.index > lastIndex) {
+      parts.push(<span key={keyIndex++}>{text.substring(lastIndex, match.index)}</span>);
     }
 
-    matches.sort((left, right) => left.index - right.index);
-    const firstMatch = matches[0];
-
-    if (firstMatch.index > 0) {
-      const key = keyIndex;
-      keyIndex += 1;
-      parts.push(<span key={key}>{remaining.substring(0, firstMatch.index)}</span>);
+    if (match[1]) {
+      parts.push(<strong key={keyIndex++} style={{ color: 'var(--color-text-primary)', fontWeight: 600 }}>{match[1]}</strong>);
+    } else if (match[2]) {
+      parts.push(<code key={keyIndex++} style={{ background: 'var(--color-base100)', padding: '1px 3px', borderRadius: '3px', fontSize: '11px', fontFamily: 'var(--mono)', color: 'var(--color-primary)' }}>{match[2]}</code>);
     }
 
-    if (firstMatch.type === 'bold') {
-      const key = keyIndex;
-      keyIndex += 1;
-      parts.push(<strong key={key} style={{ color: 'var(--color-text-primary)', fontWeight: 600 }}>{firstMatch.text}</strong>);
-    } else {
-      const key = keyIndex;
-      keyIndex += 1;
-      parts.push(<code key={key} style={{ background: 'var(--color-base100)', padding: '1px 3px', borderRadius: '3px', fontSize: '11px', fontFamily: 'var(--mono)', color: 'var(--color-primary)' }}>{firstMatch.text}</code>);
-    }
+    lastIndex = match.index! + match[0].length;
+  }
 
-    remaining = remaining.substring(firstMatch.index + firstMatch.length);
+  if (lastIndex < text.length) {
+    parts.push(<span key={keyIndex++}>{text.substring(lastIndex)}</span>);
   }
 
   return <>{parts}</>;

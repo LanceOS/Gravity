@@ -322,6 +322,16 @@ button.clickable:not(.btn):hover {
   outline: none !important;
 }
 
+.ticket-title-editor {
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--color-text-primary);
+}
+.ticket-title-editor p {
+  margin: 0;
+}
+
 .input-seamless:focus {
   border: 0 !important;
   padding: 0 !important;

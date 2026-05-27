@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import DOMPurify from 'dompurify';
 import type { MarkdownTextProps } from '../types/TicketDetail';
 import { useTickets } from '../../../context/TicketContext';
 import { useTicketByKey } from '../../../hooks/useTicketByKey';
@@ -13,9 +14,9 @@ import { getStatusColor } from '../utils/TicketDetail';
  * @returns {JSX.Element} A React component rendering the inline ticket button.
  */
 export function TicketLink({ ticketKey }: { ticketKey: string }) {
-  const { tickets, setActiveTicket, setActiveProjectId } = useTickets();
+  const { ticketMap, setActiveTicket, setActiveProjectId } = useTickets();
   const normalizedKey = ticketKey.toUpperCase();
-  const localTicket = tickets.find(t => t.key.toUpperCase() === normalizedKey);
+  const localTicket = ticketMap.get(normalizedKey);
   const { ticketInfo } = useTicketByKey(normalizedKey);
 
   /**
@@ -113,11 +114,8 @@ function FormattedText({ text }: MarkdownTextProps) {
   }, [ticketRegexPart]);
 
   const isSafeUrl = (url: string) => {
-    const protocolMatch = url.match(/^([a-z0-9+.-]+):/i);
-    if (protocolMatch) {
-      return ['http:', 'https:', 'mailto:'].includes(protocolMatch[1].toLowerCase() + ':');
-    }
-    return true;
+    // Rely on DOMPurify's battle-tested URL validation to prevent XSS
+    return DOMPurify.isValidAttribute('a', 'href', url);
   };
 
   const matches = Array.from(text.matchAll(combinedRegex));

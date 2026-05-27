@@ -16,6 +16,7 @@ export default defineConfig({
       '@tiptap/starter-kit': resolve(__dirname, './node_modules/@tiptap/starter-kit'),
       '@tiptap/extension-placeholder': resolve(__dirname, './node_modules/@tiptap/extension-placeholder'),
       '@tiptap/extension-bubble-menu': resolve(__dirname, './node_modules/@tiptap/extension-bubble-menu'),
+      '@tiptap/core': resolve(__dirname, './node_modules/@tiptap/core'),
       'tiptap-markdown': resolve(__dirname, './node_modules/tiptap-markdown'),
     },
   },

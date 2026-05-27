@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import type { Ticket } from '../../../context/TicketContext';
-import { Button, Select, TextInput, Textarea, EditInPlace, MarkdownEditor } from '@library';
+import { Button, Select, TextInput, Textarea, MarkdownEditor } from '@library';
 import { ClickAwayListener, Portal } from '@library';
 import { 
   CheckSquare, GitPullRequest, GitMerge, Send, Trash2,
@@ -130,27 +130,12 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
           
           {/* Title Area */}
           <div>
-            <EditInPlace
+            <MarkdownEditor
               value={activeTicket.title}
               onSave={(newTitle) => onUpdateTicket(activeTicket.id, { title: newTitle })}
-              saveHint="Esc"
-              saveOnEnter={false}
-              hideSaveButton={true}
-              containerClass="editable-seamless"
-              alwaysEditable={true}
-              inputStyle={{ 
-                fontSize: '22px', 
-                fontWeight: 600, 
-                padding: 0, 
-                minHeight: 0,
-                lineHeight: 1.2,
-                color: 'var(--color-text-primary)'
-              }}
-              renderDisplay={(val) => (
-                <h1 style={{ fontSize: '22px', fontWeight: 600, color: 'var(--color-text-primary)', margin: 0, flex: 1, minWidth: 0, lineHeight: 1.2 }}>
-                  {val}
-                </h1>
-              )}
+              singleLine={true}
+              minHeight="auto"
+              className="ticket-title-editor"
             />
           </div>
 

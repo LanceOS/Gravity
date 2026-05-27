@@ -4,6 +4,7 @@ import { BubbleMenu as ReactBubbleMenu } from '@tiptap/react/menus';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import BubbleMenu from '@tiptap/extension-bubble-menu';
+import { Extension } from '@tiptap/core';
 import { Markdown } from 'tiptap-markdown';
 import { cn } from '../../utilities';
 import { Bold, Italic, Strikethrough, Code, Heading1, Heading2, List } from 'lucide-react';
@@ -14,6 +15,7 @@ export interface MarkdownEditorProps {
   placeholder?: string;
   minHeight?: string;
   className?: string;
+  singleLine?: boolean;
 }
 
 export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
@@ -21,7 +23,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
   onSave,
   placeholder = 'Type markdown...',
   minHeight = '120px',
-  className = ''
+  className = '',
+  singleLine = false,
 }) => {
   const valueRef = useRef(value);
 
@@ -37,6 +40,21 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
       BubbleMenu.configure({
         element: null,
       }),
+      ...(singleLine
+        ? [
+            Extension.create({
+              name: 'singleLine',
+              addKeyboardShortcuts() {
+                return {
+                  Enter: () => {
+                    this.editor.commands.blur();
+                    return true;
+                  },
+                };
+              },
+            }),
+          ]
+        : []),
     ],
     content: value,
     editorProps: {
@@ -125,30 +143,34 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
           >
             <Code size={13} />
           </button>
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-            className={cn('bubble-menu-btn', editor.isActive('heading', { level: 1 }) ? 'is-active' : '')}
-            title="Heading 1"
-          >
-            <Heading1 size={13} />
-          </button>
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-            className={cn('bubble-menu-btn', editor.isActive('heading', { level: 2 }) ? 'is-active' : '')}
-            title="Heading 2"
-          >
-            <Heading2 size={13} />
-          </button>
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().toggleBulletList().run()}
-            className={cn('bubble-menu-btn', editor.isActive('bulletList') ? 'is-active' : '')}
-            title="Bullet List"
-          >
-            <List size={13} />
-          </button>
+          {!singleLine && (
+            <>
+              <button
+                type="button"
+                onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+                className={cn('bubble-menu-btn', editor.isActive('heading', { level: 1 }) ? 'is-active' : '')}
+                title="Heading 1"
+              >
+                <Heading1 size={13} />
+              </button>
+              <button
+                type="button"
+                onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+                className={cn('bubble-menu-btn', editor.isActive('heading', { level: 2 }) ? 'is-active' : '')}
+                title="Heading 2"
+              >
+                <Heading2 size={13} />
+              </button>
+              <button
+                type="button"
+                onClick={() => editor.chain().focus().toggleBulletList().run()}
+                className={cn('bubble-menu-btn', editor.isActive('bulletList') ? 'is-active' : '')}
+                title="Bullet List"
+              >
+                <List size={13} />
+              </button>
+            </>
+          )}
         </ReactBubbleMenu>
       )}
       <EditorContent editor={editor} />
