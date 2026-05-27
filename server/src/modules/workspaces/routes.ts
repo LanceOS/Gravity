@@ -710,9 +710,11 @@ export function createWorkspacesRouter() {
 
   router.post('/workspaces/invites/:inviteCode/join-requests', async (req, res) => {
     const { inviteCode } = req.params;
-    const { userId, message } = req.body ?? {};
+    const { message } = req.body ?? {};
+    const userId = await resolveRequestActorUserId(req);
+    
     if (!userId) {
-      res.status(400).json({ error: 'userId is required.' });
+      res.status(401).json({ error: 'Authentication required.' });
       return;
     }
 

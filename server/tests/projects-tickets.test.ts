@@ -122,9 +122,16 @@ describe('projects and tickets routes', () => {
   });
 
   it('manages tickets, comments, domains, and cycles', async () => {
-    const { owner, workspace, project } = await seedWorkspaceFixture();
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Test Owner',
+      email: 'test@example.com',
+      role: 'owner',
+    });
+    const { owner, workspace, project } = await seedWorkspaceFixture({
+      owner: { id: ownerApi.user.id, name: ownerApi.user.name, email: ownerApi.user.email, role: 'owner', avatarUrl: ownerApi.user.avatar }
+    });
 
-    const createDomainResponse = await api().post('/api/v1/domains').send({
+    const createDomainResponse = await ownerApi.post('/api/v1/domains').send({
       projectId: project.id,
       name: 'Platform',
       color: '#0F766E',
@@ -132,7 +139,7 @@ describe('projects and tickets routes', () => {
 
     expect(createDomainResponse.status).toBe(201);
 
-    const listDomainsResponse = await api().get('/api/v1/domains').query({ projectId: project.id });
+    const listDomainsResponse = await ownerApi.get('/api/v1/domains').query({ projectId: project.id });
     expect(listDomainsResponse.status).toBe(200);
     expect(listDomainsResponse.body).toEqual([
       {
@@ -142,7 +149,7 @@ describe('projects and tickets routes', () => {
       },
     ]);
 
-    const createCycleResponse = await api().post('/api/v1/cycles').send({
+    const createCycleResponse = await ownerApi.post('/api/v1/cycles').send({
       projectId: project.id,
       name: 'Sprint Alpha',
       startDate: '2025-01-15T00:00:00.000Z',
@@ -151,7 +158,7 @@ describe('projects and tickets routes', () => {
 
     expect(createCycleResponse.status).toBe(201);
 
-    const listCyclesResponse = await api().get('/api/v1/cycles').query({ projectId: project.id });
+    const listCyclesResponse = await ownerApi.get('/api/v1/cycles').query({ projectId: project.id });
     expect(listCyclesResponse.status).toBe(200);
     expect(listCyclesResponse.body).toEqual([
       expect.objectContaining({
@@ -160,7 +167,7 @@ describe('projects and tickets routes', () => {
       }),
     ]);
 
-    const createTicketResponse = await api().post('/api/v1/tickets').send({
+    const createTicketResponse = await ownerApi.post('/api/v1/tickets').send({
       projectId: project.id,
       title: 'Ship server endpoint coverage',
       description: 'Cover every route with pg-mem-backed tests.',
@@ -179,7 +186,7 @@ describe('projects and tickets routes', () => {
       assigneeId: owner.id,
     });
 
-    const listTicketsResponse = await api().get('/api/v1/tickets').query({ projectId: project.id });
+    const listTicketsResponse = await ownerApi.get('/api/v1/tickets').query({ projectId: project.id });
     expect(listTicketsResponse.status).toBe(200);
     expect(listTicketsResponse.body).toEqual([
       expect.objectContaining({
@@ -188,7 +195,7 @@ describe('projects and tickets routes', () => {
       }),
     ]);
 
-    const detailResponse = await api()
+    const detailResponse = await ownerApi
       .get(`/api/v1/tickets/${createTicketResponse.body.id}`)
       .query({ projectId: project.id });
     expect(detailResponse.status).toBe(200);
@@ -197,7 +204,7 @@ describe('projects and tickets routes', () => {
       title: 'Ship server endpoint coverage',
     });
 
-    const patchResponse = await api()
+    const patchResponse = await ownerApi
       .patch(`/api/v1/tickets/${createTicketResponse.body.id}`)
       .set('x-project-id', project.id)
       .send({ status: 'in_review', prStatus: 'open' });
@@ -209,7 +216,7 @@ describe('projects and tickets routes', () => {
       prStatus: 'open',
     });
 
-    const ownerCommentResponse = await api().post(`/api/v1/tickets/${createTicketResponse.body.id}/comments`).send({
+    const ownerCommentResponse = await ownerApi.post(`/api/v1/tickets/${createTicketResponse.body.id}/comments`).send({
       userId: owner.id,
       body: 'First pass ready.',
     });
@@ -221,13 +228,13 @@ describe('projects and tickets routes', () => {
       body: 'First pass ready.',
     });
 
-    const listCommentsResponse = await api()
+    const listCommentsResponse = await ownerApi
       .get(`/api/v1/tickets/${createTicketResponse.body.id}/comments`);
 
     expect(listCommentsResponse.status).toBe(200);
     expect(listCommentsResponse.body).toHaveLength(1);
 
-    const deleteResponse = await api()
+    const deleteResponse = await ownerApi
       .delete(`/api/v1/tickets/${createTicketResponse.body.id}`)
       .query({ projectId: project.id });
 
@@ -288,7 +295,14 @@ describe('projects and tickets routes', () => {
   });
 
   it('handles comment editing and deletion via PATCH and DELETE', async () => {
-    const { owner, project } = await seedWorkspaceFixture();
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Test Owner 2',
+      email: 'test2@example.com',
+      role: 'owner',
+    });
+    const { owner, project } = await seedWorkspaceFixture({
+      owner: { id: ownerApi.user.id, name: ownerApi.user.name, email: ownerApi.user.email, role: 'owner', avatarUrl: ownerApi.user.avatar }
+    });
     const ticket = await seedTicket(project.id, {
       id: 'ticket-1',
       title: 'Comment overhaul task',
@@ -296,7 +310,7 @@ describe('projects and tickets routes', () => {
       priority: 'low',
     });
 
-    const createCommentResponse = await api().post(`/api/v1/tickets/${ticket.id}/comments`).send({
+    const createCommentResponse = await ownerApi.post(`/api/v1/tickets/${ticket.id}/comments`).send({
       userId: owner.id,
       body: 'Initial comment body',
     });
@@ -304,7 +318,7 @@ describe('projects and tickets routes', () => {
     const commentId = createCommentResponse.body.id;
 
     // PATCH comment successfully
-    const patchResponse = await api()
+    const patchResponse = await ownerApi
       .patch(`/api/v1/tickets/${ticket.id}/comments/${commentId}`)
       .send({ body: 'Updated comment body' });
     expect(patchResponse.status).toBe(200);
@@ -314,25 +328,25 @@ describe('projects and tickets routes', () => {
     });
 
     // PATCH comment with empty body
-    const patchEmptyResponse = await api()
+    const patchEmptyResponse = await ownerApi
       .patch(`/api/v1/tickets/${ticket.id}/comments/${commentId}`)
       .send({ body: '' });
     expect(patchEmptyResponse.status).toBe(400);
 
     // PATCH comment for non-existent comment
-    const patchNonExistentResponse = await api()
+    const patchNonExistentResponse = await ownerApi
       .patch(`/api/v1/tickets/${ticket.id}/comments/non-existent-comment`)
       .send({ body: 'Some body' });
     expect(patchNonExistentResponse.status).toBe(404);
 
     // DELETE comment successfully
-    const deleteResponse = await api()
+    const deleteResponse = await ownerApi
       .delete(`/api/v1/tickets/${ticket.id}/comments/${commentId}`);
     expect(deleteResponse.status).toBe(200);
     expect(deleteResponse.body).toEqual({ success: true });
 
     // DELETE comment for non-existent comment
-    const deleteNonExistentResponse = await api()
+    const deleteNonExistentResponse = await ownerApi
       .delete(`/api/v1/tickets/${ticket.id}/comments/non-existent-comment`);
     expect(deleteNonExistentResponse.status).toBe(404);
   });

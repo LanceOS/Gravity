@@ -642,7 +642,13 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
   });
 
   it('updates tickets from GitHub pull request webhooks', async () => {
-    const { owner, project } = await seedWorkspaceFixture();
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Test Owner',
+      email: 'test-webhook@example.com',
+    });
+    const { owner, project } = await seedWorkspaceFixture({
+      owner: { id: ownerApi.user.id, name: ownerApi.user.name, email: ownerApi.user.email, role: 'owner' }
+    });
     const ticket = await seedTicket(project.id, {
       id: 'ticket-webhook-1',
       key: `${project.key}-7`,
@@ -668,7 +674,7 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
       updatedTickets: [ticket.key],
     });
 
-    const ticketResponse = await api().get(`/api/v1/tickets/${ticket.id}`).query({ projectId: project.id });
+    const ticketResponse = await ownerApi.get(`/api/v1/tickets/${ticket.id}`);
     expect(ticketResponse.status).toBe(200);
     expect(ticketResponse.body).toMatchObject({
       id: ticket.id,
