@@ -26,6 +26,14 @@ if (!document.elementFromPoint) {
   document.elementFromPoint = () => null;
 }
 
+if (typeof Document !== 'undefined' && !(Document.prototype as any).elementFromPoint) {
+  (Document.prototype as any).elementFromPoint = () => null;
+}
+
+if (typeof ShadowRoot !== 'undefined' && !(ShadowRoot.prototype as any).elementFromPoint) {
+  (ShadowRoot.prototype as any).elementFromPoint = () => null;
+}
+
 const emptyDOMRectList = {
   item: () => null,
   length: 0,
@@ -50,6 +58,18 @@ if (!HTMLElement.prototype.getClientRects) {
 
 if (!HTMLElement.prototype.getBoundingClientRect) {
   HTMLElement.prototype.getBoundingClientRect = () => emptyDOMRect;
+}
+
+if (typeof Node !== 'undefined') {
+  const nodePrototype = Node.prototype as any;
+
+  if (!nodePrototype.getClientRects) {
+    nodePrototype.getClientRects = () => emptyDOMRectList;
+  }
+
+  if (!nodePrototype.getBoundingClientRect) {
+    nodePrototype.getBoundingClientRect = () => emptyDOMRect;
+  }
 }
 
 if (typeof Range !== 'undefined') {
