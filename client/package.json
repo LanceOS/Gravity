@@ -13,6 +13,7 @@
     "test:e2e": "vitest run -c E2E/vitest.config.ts"
   },
   "dependencies": {
+    "@tiptap/extension-bubble-menu": "^3.23.6",
     "@tiptap/extension-placeholder": "^3.23.6",
     "@tiptap/pm": "^3.23.6",
     "@tiptap/react": "^3.23.6",

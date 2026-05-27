@@ -1,9 +1,12 @@
 import React, { useEffect, useRef } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
+import { BubbleMenu as ReactBubbleMenu } from '@tiptap/react/menus';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
+import BubbleMenu from '@tiptap/extension-bubble-menu';
 import { Markdown } from 'tiptap-markdown';
 import { cn } from '../../utilities';
+import { Bold, Italic, Strikethrough, Code, Heading1, Heading2, List } from 'lucide-react';
 
 export interface MarkdownEditorProps {
   value: string;
@@ -30,6 +33,9 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
       }),
       Markdown.configure({
         html: false,
+      }),
+      BubbleMenu.configure({
+        element: null,
       }),
     ],
     content: value,
@@ -80,7 +86,71 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
   }
 
   return (
-    <div className="markdown-editor-wrapper" style={{ width: '100%', cursor: 'text' }}>
+    <div className="markdown-editor-wrapper" style={{ width: '100%', cursor: 'text', position: 'relative' }}>
+      {editor && (
+        <ReactBubbleMenu
+          editor={editor}
+          tippyOptions={{ duration: 150, zIndex: 1000 }}
+          className="markdown-bubble-menu"
+        >
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().toggleBold().run()}
+            className={cn('bubble-menu-btn', editor.isActive('bold') ? 'is-active' : '')}
+            title="Bold"
+          >
+            <Bold size={13} />
+          </button>
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().toggleItalic().run()}
+            className={cn('bubble-menu-btn', editor.isActive('italic') ? 'is-active' : '')}
+            title="Italic"
+          >
+            <Italic size={13} />
+          </button>
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().toggleStrike().run()}
+            className={cn('bubble-menu-btn', editor.isActive('strike') ? 'is-active' : '')}
+            title="Strikethrough"
+          >
+            <Strikethrough size={13} />
+          </button>
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().toggleCode().run()}
+            className={cn('bubble-menu-btn', editor.isActive('code') ? 'is-active' : '')}
+            title="Code Inline"
+          >
+            <Code size={13} />
+          </button>
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+            className={cn('bubble-menu-btn', editor.isActive('heading', { level: 1 }) ? 'is-active' : '')}
+            title="Heading 1"
+          >
+            <Heading1 size={13} />
+          </button>
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+            className={cn('bubble-menu-btn', editor.isActive('heading', { level: 2 }) ? 'is-active' : '')}
+            title="Heading 2"
+          >
+            <Heading2 size={13} />
+          </button>
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().toggleBulletList().run()}
+            className={cn('bubble-menu-btn', editor.isActive('bulletList') ? 'is-active' : '')}
+            title="Bullet List"
+          >
+            <List size={13} />
+          </button>
+        </ReactBubbleMenu>
+      )}
       <EditorContent editor={editor} />
     </div>
   );

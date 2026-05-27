@@ -589,3 +589,42 @@ button.tool-submit-active {
   pointer-events: none;
   opacity: 0.7;
 }
+
+/* TipTap Bubble Formatting Menu */
+.markdown-bubble-menu {
+  display: flex;
+  background-color: var(--color-surface-card);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: 4px;
+  gap: 2px;
+  align-items: center;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  z-index: 1000;
+}
+
+.bubble-menu-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.bubble-menu-btn:hover {
+  background: var(--color-base100);
+  color: var(--color-text-primary);
+}
+
+.bubble-menu-btn.is-active {
+  background: var(--color-primary);
+  color: var(--color-text-on-accent) !important;
+}
