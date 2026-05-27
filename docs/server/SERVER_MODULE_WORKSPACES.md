@@ -17,7 +17,7 @@ The `workspaces` module (`server/src/modules/workspaces/`) encapsulates the doma
 3. **Membership & Invites**: Members can be invited via unique invite codes. The system processes join requests, allowing workspace owners to approve or reject them.
 
 ## 5. Data Stores and Resources
-Owns and mutates the following PostgreSQL tables via Drizzle ORM:
+Owns and mutates the following PostgreSQL tables via Drizzle ORM, defined locally in `src/modules/workspaces/schema.ts` and re-exported centrally:
 - `workspaces`
 - `workspace_settings`
 - `workspace_members`
@@ -36,12 +36,14 @@ Owns and mutates the following PostgreSQL tables via Drizzle ORM:
 ## 7. Key Files and Modules
 - `routes.ts`: Extensive Express router for workspace administration.
 - `projects-routes.ts`: Express router specifically for project boundaries.
-- `mcp.ts`: Exports `WorkspaceMemberTools` for MCP interaction.
+- `mcp.ts`: Exports `WorkspaceMemberTools`, tool definitions, and tool handlers for dynamic MCP interaction.
+- `schema.ts`: Drizzle ORM table definitions for workspaces, projects, and domains.
+- `services/membership.ts`: Abstracted membership verification service (`isWorkspaceMember` and `getProjectWorkspaceId`) for cross-domain usage.
 - `utils/project-creation.ts`: Domain-specific utility for scaffolding default project resources (domains, cycles).
 
 ## 8. Permissions, Guards, or Tenant Boundaries
 - **Strict Tenancy**: Operations require `resolveRequestActorUserId` verification. Workspace routes explicitly check that the actor has the required role (e.g., `owner` for deletions) in the `workspace_members` table.
-- **Cross-Tenant Prevention**: Operations strictly filter by the verified `workspaceId`.
+- **Cross-Tenant Prevention**: Operations strictly filter by the verified `workspaceId`. External domains (like tickets and MCP) consume the `services/membership.ts` abstractions to guarantee isolated tenancy.
 
 ## 9. Failure Modes, Observability, or Operational Notes
 - Validates the uniqueness of `workspaceKey` and `projectKey` upon creation, returning structured 409 Conflict errors if a collision occurs.

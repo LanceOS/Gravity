@@ -15,15 +15,15 @@ This document outlines the high-level architecture of the `server/src/` director
 1. **Request Reception**: Requests hit `server/src/app.ts` (Express) or `server/src/modules/mcp/stdio.ts` (MCP).
 2. **Global Routing**: Express routes are forwarded to `server/src/routes/index.ts`, which mounts sub-routers from individual domain modules.
 3. **Module Handling**: Each module (e.g., `src/modules/workspaces/routes.ts`) defines its own REST endpoints and interacts with module-specific services.
-4. **Data Persistence**: Modules access PostgreSQL via Drizzle ORM (`server/src/db/index.ts` and `server/src/db/schema.ts`).
+4. **Data Persistence**: Modules access PostgreSQL via Drizzle ORM (`server/src/db/index.js`). Schema definitions are isolated within each module (e.g., `src/modules/tickets/schema.ts`) and merged centrally in `server/src/db/schema.ts`.
 
 ## 5. Data Stores and Resources
-- **PostgreSQL**: Primary relational datastore configured via `src/db/index.ts`. Shared schemas are defined in `src/db/schema.ts` to prevent circular dependencies.
+- **PostgreSQL**: Primary relational datastore configured via `src/db/index.ts`. Schema models are decoupled into domain-specific modules (`src/modules/<domain>/schema.ts`) and re-exported by `src/db/schema.ts` for database migrations.
 - **In-Memory/External**: `pg-mem` is used for test environments.
 
 ## 6. Interfaces and Contracts
 - **REST API**: Exposes `api/v1/*` routes mounted per module.
-- **MCP API**: The MCP Router (`src/modules/mcp/router.ts`) dynamically resolves tools like `ticketTools` and `workspaceMemberTools` from their respective domain modules.
+- **MCP API**: The MCP server uses dynamic tool registration. Modules export their specific definitions and handlers (e.g., `ticketTools` and `workspaceMemberTools`), which are registered globally in `src/app.ts` via the `registerMcpTools` and `registerToolHandlers` registry pattern.
 
 ## 7. Key Files and Modules
 The architecture is structured under `src/modules/`:
@@ -36,11 +36,11 @@ The architecture is structured under `src/modules/`:
 
 ## 8. Permissions, Guards, or Tenant Boundaries
 - **Cross-Domain Dependencies**: Core DB setups (`src/db`) and platform queries (`src/lib/platform.ts`) are shared to prevent circular references.
-- **Workspace Authorization**: All ticket and workspace routes/MCP tools enforce strict workspace-level isolation using `resolveRequestActorUserId`.
+- **Workspace Authorization**: All ticket and workspace routes/MCP tools enforce strict workspace-level isolation using `resolveRequestActorUserId`. Authorization checks are abstracted into the `isWorkspaceMember` service to decouple domain logic from internal membership schemas.
 
 ## 9. Failure Modes, Observability, or Operational Notes
 - Modular structure isolates feature failures; an error in the AI module's provider fetch does not impact ticket operations.
-- Test environments utilize the `ALLOW_DEV_AUTH_BYPASS` flag in `request-auth.ts` to allow `x-user-id` header impersonation.
+- Test environments utilize the `ALLOW_DEV_AUTH_BYPASS` flag in `request-auth.ts` to allow `x-user-id` header impersonation. This is securely gated behind `NODE_ENV !== 'production'` to prevent security bypasses in live environments.
 
 ## 10. Change Hazards, Invariants, or Migration Constraints
 - When adding a new feature, developers must create a new self-contained directory in `src/modules/`.

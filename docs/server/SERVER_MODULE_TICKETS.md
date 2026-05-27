@@ -19,7 +19,7 @@ The `tickets` module (`server/src/modules/tickets/`) manages the core unit of wo
 4. **Agent Action**: Agents connect via MCP and use `listTickets` or `createTicket` tools exposed by `src/modules/tickets/mcp.ts`. The tools implicitly verify workspace boundaries using the MCP context.
 
 ## 5. Data Stores and Resources
-Owns and mutates the following PostgreSQL tables via Drizzle ORM:
+Owns and mutates the following PostgreSQL tables via Drizzle ORM, defined locally in `src/modules/tickets/schema.ts` and re-exported centrally:
 - `tickets`
 - `comments`
 
@@ -30,14 +30,15 @@ Owns and mutates the following PostgreSQL tables via Drizzle ORM:
 ## 7. Key Files and Modules
 - `routes.ts`: Express router defining all REST interactions.
 - `services/tickets.ts`: Reusable database service methods for complex joins (e.g., ticket with assignee, project, domain, cycle).
-- `mcp.ts`: Maps the ticket services to the Model Context Protocol constraints, injecting rigorous cross-tenant authorization checks.
+- `mcp.ts`: Exports `TicketTools`, tool definitions, and tool handlers for dynamic MCP interaction, injecting rigorous cross-tenant authorization checks.
+- `schema.ts`: Drizzle ORM table definitions for tickets and comments.
 
 ## 8. Permissions, Guards, or Tenant Boundaries
 - **Project Boundary**: REST APIs strictly demand an `X-Project-Id` header and verify the request actor is a member of that project (`project_members` table).
-- **Workspace Boundary**: MCP endpoints verify that the ticket's parent project belongs to the trusted workspace authorized in the MCP connection handshake.
+- **Workspace Boundary**: MCP and generic REST endpoints verify that the ticket's parent project belongs to the trusted workspace authorized in the connection handshake, utilizing the `isWorkspaceMember` service to decouple domain logic.
 
 ## 9. Failure Modes, Observability, or Operational Notes
-- This module does not document or enforce a ticket-specific MCP rate limit; operators should not assume rapid ticket creation via MCP tools is throttled unless that protection is implemented elsewhere.
+- **Rate Limiting**: To prevent abuse from agentic clients, the `createTicket` MCP tool enforces a strict rate limit of 1 ticket per 3 seconds per actor.
 
 ## 10. Change Hazards, Invariants, or Migration Constraints
 - A ticket's `key` (e.g., `PRJ-123`) is immutable and globally unique across the system, derived from the parent project. Modifying project keys does not inherently backport to existing tickets.

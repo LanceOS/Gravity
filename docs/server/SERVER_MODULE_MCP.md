@@ -24,14 +24,14 @@ The `mcp` module (`server/src/modules/mcp/`) serves as the core framework implem
 ## 6. Interfaces and Contracts
 - **Stdio Transport**: Listens to `process.stdin` and writes to `process.stdout`.
 - **JSON-RPC Schema**: Uses TypeScript-defined MCP request and response types in `src/modules/mcp/types.ts`; this module does not document runtime zod schema enforcement.
-- **Tool Registry**: Other modules must expose handlers matching the `McpRequestHandler` interface to be imported into `tool-handlers/registry.ts`.
+- **Tool Registry**: Other modules must expose handlers matching the `ToolHandler` interface. These are dynamically registered during application boot via `registerToolHandlers` and `registerMcpTools` rather than being hardcoded into the MCP module.
 
 ## 7. Key Files and Modules
 - `stdio.ts` & `stdio-config.ts`: Transport lifecycle and configuration parsers.
 - `router.ts`: The central dispatcher.
 - `tool-executor.ts`: Evaluates tool executions safely.
 - `request-context.ts`: Authorizes cross-tenant MCP calls.
-- `tool-handlers/registry.ts`: The central registry aggregating handlers from `tickets`, `workspaces`, etc.
+- `tool-handlers/registry.ts` & `tools.ts`: The central dynamic registries holding loaded handlers and tool metadata. Handlers are injected at startup to prevent circular dependencies.
 - `index.ts`: The barrel file for the `mcp` module API.
 
 ## 8. Permissions, Guards, or Tenant Boundaries

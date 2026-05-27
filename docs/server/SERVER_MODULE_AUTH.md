@@ -18,7 +18,8 @@ The `auth` module (`server/src/modules/auth/`) owns the integration with Better 
 3. **External Credential Provisioning**: Users submit external API keys (e.g., OpenAI). The `CredentialManager` (`src/modules/auth/kms/credential-manager.ts`) uses envelope encryption via a KMS provider (e.g., `LocalEnvKmsProvider`) to encrypt the key before persistence.
 
 ## 5. Data Stores and Resources
-- `authUsers`: Better Auth core table.
+Owns and mutates the following PostgreSQL tables via Drizzle ORM, defined locally in `src/modules/auth/schema.ts` and re-exported centrally:
+- `user` and `session` (Better Auth core tables)
 - `user_external_credentials`: Stores AES-GCM encrypted API keys and Data Encryption Keys (DEKs).
 
 ## 6. Interfaces and Contracts
@@ -32,7 +33,7 @@ The `auth` module (`server/src/modules/auth/`) owns the integration with Better 
 - `kms/`: The sub-module managing envelope encryption schemas and credential caching.
 
 ## 8. Permissions, Guards, or Tenant Boundaries
-- **Test Environments**: In specific test environments (when `ALLOW_DEV_AUTH_BYPASS === 'true'`), `resolveRequestActorUserId` honors `x-user-id` headers for test bypassing. **This is strictly prohibited in production.**
+- **Test Environments**: In specific test environments (when `ALLOW_DEV_AUTH_BYPASS === 'true'`), `resolveRequestActorUserId` honors `x-user-id` headers for test bypassing. **This is strictly gated behind `NODE_ENV !== 'production'` and is impossible to exploit in production.**
 
 ## 9. Failure Modes, Observability, or Operational Notes
 - If the KMS provider is unreachable, API credential decryption fails securely (fail-closed model).
