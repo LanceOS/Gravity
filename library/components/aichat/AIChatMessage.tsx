@@ -1,7 +1,7 @@
 import React from 'react';
 import { Cpu, Sparkles } from 'lucide-react';
 import type { AIChatMessage } from './types';
-import { FormattedMarkdown } from './FormattedMarkdown';
+import { MarkdownRenderer } from '../markdownrenderer';
 
 export interface AIChatMessageBubbleProps {
   message: AIChatMessage;

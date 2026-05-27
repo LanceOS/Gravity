@@ -1,9 +1,9 @@
 import React, { useMemo } from 'react';
-import DOMPurify from 'dompurify';
 import type { MarkdownTextProps } from '../types/TicketDetail';
 import { useTickets } from '../../../context/TicketContext';
 import { useTicketByKey } from '../../../hooks/useTicketByKey';
 import { getStatusColor } from '../utils/TicketDetail';
+import { MarkdownRenderer } from '@library';
 
 /**
  * @description A component that renders an interactive ticket link for a given ticket key.
@@ -44,233 +44,92 @@ export function TicketLink({ ticketKey }: { ticketKey: string }) {
   return (
     <span style={{ display: 'inline-block' }}>
       <button
-        type="button"
         onClick={handleClick}
+        className="clickable"
         style={{
-          background: 'var(--color-surface-card)',
+          background: 'var(--color-base50)',
           border: '1px solid var(--color-border-default)',
           borderRadius: '4px',
           padding: '2px 6px',
-          margin: '0 2px',
-          color: 'var(--color-text-primary)',
-          fontFamily: 'var(--mono)',
-          fontSize: '0.9em',
-          fontWeight: 600,
-          textDecoration: 'none',
-          cursor: 'pointer',
           display: 'inline-flex',
           alignItems: 'center',
           gap: '6px',
-          boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+          cursor: 'pointer',
+          fontFamily: 'var(--font-sans)',
+          fontSize: '12px',
+          fontWeight: 500,
+          color: 'var(--color-text-primary)',
+          transition: 'all var(--transition-fast)',
+          textDecoration: 'none',
+          verticalAlign: 'middle',
+          margin: '0 2px'
         }}
-        className="clickable"
-        title={ticketInfo ? `View ${normalizedKey}` : `View ${normalizedKey} (Loading...)`}
+        title={ticketInfo?.title || `Ticket ${normalizedKey}`}
       >
+        <span style={{ color: 'var(--color-primary)', fontWeight: 600 }}>
+          {normalizedKey}
+        </span>
+        
         {ticketInfo && (
-          <span
-            aria-hidden="true"
-            role="presentation"
-            style={{
-              width: '8px',
-              height: '8px',
-              borderRadius: '50%',
-              backgroundColor: getStatusColor(ticketInfo.status),
-              flexShrink: 0
-            }}
-          />
+          <span style={{ 
+            color: 'var(--color-text-secondary)',
+            maxWidth: '150px',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
+          }}>
+            {ticketInfo.title}
+          </span>
         )}
-        <span>{normalizedKey}{ticketInfo ? `: ${ticketInfo.title}` : ''}</span>
+
+        {ticketInfo?.status && (
+          <span style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+            fontSize: '10px',
+            textTransform: 'uppercase',
+            fontWeight: 700,
+            color: getStatusColor(ticketInfo.status),
+            background: `${getStatusColor(ticketInfo.status)}15`,
+            padding: '2px 4px',
+            borderRadius: '2px'
+          }}>
+            <div style={{ width: 6, height: 6, borderRadius: '50%', background: getStatusColor(ticketInfo.status) }} />
+            {ticketInfo.status}
+          </span>
+        )}
       </button>
     </span>
   );
 }
 
 /**
- * @description A utility component that parses a raw markdown string and replaces specific patterns
- * (like bold text, inline code, external links, and workspace ticket keys) with their corresponding React elements.
- * Employs a single-pass regex tokenizer for O(L) time complexity and sanitizes URLs to prevent XSS.
- * @param {MarkdownTextProps} props - The component props.
- * @param {string} props.text - The raw markdown text to be parsed and formatted.
- * @returns {JSX.Element} A React fragment containing the parsed and formatted text nodes.
- */
-function FormattedText({ text }: MarkdownTextProps) {
-  const { projects } = useTickets();
-  const parts: React.ReactNode[] = [];
-  let keyIndex = 0;
-  let lastIndex = 0;
-
-  const ticketRegexPart = useMemo(() => {
-    const projectKeys = projects?.map(p => p.key).filter(Boolean) || [];
-    if (projectKeys.length === 0) return '$^';
-    const escapedKeys = projectKeys.map(k => k.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')).join('|');
-    return `(?:${escapedKeys})`;
-  }, [projects]);
-
-  const combinedRegex = useMemo(() => {
-    return new RegExp(
-      `\\*\\*([^*]+)\\*\\*|\`([^\`]+)\`|\\[([^\\]]+)\\]\\(([^)]+)\\)|\\b(${ticketRegexPart}-\\d+)\\b`,
-      'gi'
-    );
-  }, [ticketRegexPart]);
-
-  const isSafeUrl = (url: string) => {
-    // Rely on DOMPurify's battle-tested URL validation to prevent XSS
-    return DOMPurify.isValidAttribute('a', 'href', url);
-  };
-
-  const matches = Array.from(text.matchAll(combinedRegex));
-
-  for (const match of matches) {
-    if (match.index !== undefined && match.index > lastIndex) {
-      parts.push(<span key={keyIndex++}>{text.substring(lastIndex, match.index)}</span>);
-    }
-
-    if (match[1]) {
-      parts.push(<strong key={keyIndex++} style={{ color: 'var(--color-text-primary)', fontWeight: 600 }}>{match[1]}</strong>);
-    } else if (match[2]) {
-      parts.push(<code key={keyIndex++} style={{ background: 'var(--color-base50)', padding: '1px 4px', borderRadius: '4px', fontSize: '11px', fontFamily: 'var(--mono)', color: 'var(--color-text-primary)' }}>{match[2]}</code>);
-    } else if (match[3] && match[4]) {
-      const safeHref = isSafeUrl(match[4]) ? match[4] : 'about:blank';
-      parts.push(<a key={keyIndex++} href={safeHref} target="_blank" rel="noreferrer" style={{ color: 'var(--color-primary)', textDecoration: 'none' }} className="clickable">{match[3]}</a>);
-    } else if (match[5]) {
-      parts.push(<TicketLink key={keyIndex++} ticketKey={match[5]} />);
-    }
-
-    lastIndex = match.index! + match[0].length;
-  }
-
-  if (lastIndex < text.length) {
-    parts.push(<span key={keyIndex++}>{text.substring(lastIndex)}</span>);
-  }
-
-  return <>{parts}</>;
-}
-
-import { CheckSquare, Square } from 'lucide-react';
-
-/**
- * @description A lightweight markdown renderer component. It splits the input text by lines and parses
- * basic markdown elements like headers (h2, h3), unordered lists, and paragraphs.
- * It delegates inline text formatting to the FormattedText component.
+ * @description A lightweight markdown renderer component for tickets.
+ * It uses the generic MarkdownRenderer and injects the domain-specific TicketLink component.
  * @param {MarkdownTextProps} props - The component props.
  * @param {string} props.text - The full markdown string to render.
- * @returns {JSX.Element | null} A React fragment containing the rendered markdown blocks, or null if text is empty.
+ * @returns {JSX.Element | null} A React fragment containing the rendered markdown blocks.
  */
 export function MarkdownContent({ text }: MarkdownTextProps) {
-  if (!text) {
-    return null;
-  }
+  const { projects } = useTickets();
 
-  const lines = text.split('\n');
-  const elements: React.ReactNode[] = [];
+  const customTokenRegex = useMemo(() => {
+    const projectKeys = projects?.map(p => p.key).filter(Boolean) || [];
+    if (projectKeys.length === 0) return undefined;
+    const escapedKeys = projectKeys.map(k => k.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')).join('|');
+    return new RegExp(`\\b((?:${escapedKeys})-\\d+)\\b`);
+  }, [projects]);
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-
-    // Headers (1-6 hashes)
-    const headingMatch = line.match(/^(#{1,6})\s+(.*)$/);
-    if (headingMatch) {
-      const level = headingMatch[1].length;
-      const content = headingMatch[2];
-      const Tag = `h${Math.min(level + 1, 6)}` as keyof JSX.IntrinsicElements;
-      
-      const fontSizes = { 1: '16px', 2: '14px', 3: '13px', 4: '12px', 5: '12px', 6: '12px' };
-      const fontSize = fontSizes[level as keyof typeof fontSizes] || '16px';
-      const margin = level === 1 ? '12px 0 6px' : '10px 0 4px';
-      
-      elements.push(
-        React.createElement(Tag, {
-          key: i,
-          style: { fontSize, fontWeight: 600, color: 'var(--color-text-primary)', margin }
-        }, <FormattedText text={content} />)
-      );
-      continue;
-    }
-
-    // Blockquotes
-    if (line.trim().startsWith('> ')) {
-      const content = line.replace(/^\s*>\s+/, '');
-      elements.push(
-        <blockquote key={i} style={{ borderLeft: '3px solid var(--color-border-default)', paddingLeft: '12px', margin: '8px 0', color: 'var(--color-text-secondary)' }}>
-          <FormattedText text={content} />
-        </blockquote>
-      );
-      continue;
-    }
-
-    // Unordered lists and Task lists
-    if (line.trim().startsWith('* ') || line.trim().startsWith('- ')) {
-      const listItems: React.ReactNode[] = [];
-      let isTask = false;
-      
-      while (i < lines.length && (lines[i].trim().startsWith('* ') || lines[i].trim().startsWith('- '))) {
-        const currentLine = lines[i];
-        const content = currentLine.replace(/^\s*[*-]\s+/, '');
-        
-        // Task list check
-        const taskMatch = content.match(/^\[([ xX])\]\s+(.*)$/);
-        if (taskMatch) {
-          isTask = true;
-          const isChecked = taskMatch[1].toLowerCase() === 'x';
-          listItems.push(
-            <li key={i} style={{ listStyle: 'none', display: 'flex', alignItems: 'flex-start', gap: '8px', margin: '4px 0' }}>
-              {isChecked ? (
-                <CheckSquare size={16} color="var(--color-text-primary)" style={{ marginTop: '2px', flexShrink: 0 }} />
-              ) : (
-                <Square size={16} color="var(--color-text-disabled)" style={{ marginTop: '2px', flexShrink: 0 }} />
-              )}
-              <span><FormattedText text={taskMatch[2]} /></span>
-            </li>
-          );
-        } else {
-          listItems.push(
-            <li key={i} style={{ margin: '2px 0', fontSize: '13px' }}>
-              <FormattedText text={content} />
-            </li>
-          );
-        }
-        i++;
+  const renderCustomToken = useMemo(() => {
+    return (match: RegExpMatchArray, keyIndex: number) => {
+      // For our generic customTokenRegex \b((?:KEY)-\d+)\b, the match group 1 is the key
+      if (match[5]) {
+        return <TicketLink key={keyIndex} ticketKey={match[5]} />;
       }
-      i--; // step back since outer loop will increment
-      
-      elements.push(
-        <ul key={`ul-${i}`} style={{ marginLeft: isTask ? '0' : '20px', paddingLeft: isTask ? '0' : '8px', marginBottom: '12px' }}>
-          {listItems}
-        </ul>
-      );
-      continue;
-    }
+      return null;
+    };
+  }, []);
 
-    // Numbered lists
-    const numberedMatch = line.trim().match(/^(\d+)\.\s+(.*)$/);
-    if (numberedMatch) {
-      const listItems: React.ReactNode[] = [];
-      while (i < lines.length && lines[i].trim().match(/^(\d+)\.\s+(.*)$/)) {
-        const m = lines[i].trim().match(/^(\d+)\.\s+(.*)$/);
-        listItems.push(
-          <li key={i} style={{ margin: '2px 0', fontSize: '13px' }}>
-            <FormattedText text={m![2]} />
-          </li>
-        );
-        i++;
-      }
-      i--; // step back
-      
-      elements.push(
-        <ol key={`ol-${i}`} style={{ marginLeft: '24px', paddingLeft: '8px', marginBottom: '12px' }}>
-          {listItems}
-        </ol>
-      );
-      continue;
-    }
-
-    // Paragraphs
-    elements.push(
-      <p key={i} style={{ minHeight: '18px', margin: '4px 0' }}>
-        <FormattedText text={line} />
-      </p>
-    );
-  }
-
-  return <div className="markdown-content">{elements}</div>;
+  return <MarkdownRenderer text={text} customTokenRegex={customTokenRegex} renderCustomToken={renderCustomToken} />;
 }
