@@ -113,6 +113,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
       const nextValue = singleLine ? normalizeSingleLineContent(markdown) : markdown;
 
       if (nextValue !== valueRef.current) {
+        valueRef.current = nextValue;
         onSave(nextValue);
       }
     },
