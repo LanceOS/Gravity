@@ -63,12 +63,12 @@ if (typeof Range !== 'undefined') {
 }
 
 if (typeof Text !== 'undefined') {
-  if (!Text.prototype.getClientRects) {
-    Text.prototype.getClientRects = () => emptyDOMRectList;
+  if (!(Text.prototype as any).getClientRects) {
+    (Text.prototype as any).getClientRects = () => emptyDOMRectList;
   }
 
-  if (!Text.prototype.getBoundingClientRect) {
-    Text.prototype.getBoundingClientRect = () => emptyDOMRect;
+  if (!(Text.prototype as any).getBoundingClientRect) {
+    (Text.prototype as any).getBoundingClientRect = () => emptyDOMRect;
   }
 }
 

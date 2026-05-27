@@ -8,7 +8,9 @@
     ],
     "module": "esnext",
     "types": [
-      "vite/client"
+      "vite/client",
+      "react",
+      "react-dom"
     ],
     "skipLibCheck": true,
     /* Bundler mode */
@@ -24,7 +26,7 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true,
     "baseUrl": ".",
-    "ignoreDeprecations": "5.0",
+    "ignoreDeprecations": "6.0",
     "paths": {
       "react": [
         "node_modules/@types/react"

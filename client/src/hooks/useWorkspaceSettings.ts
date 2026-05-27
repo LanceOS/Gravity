@@ -19,6 +19,7 @@ export interface WorkspaceMember {
   role: string;
   createdAt: string;
   lastActiveAt?: string | null;
+  savedCredentials?: { provider: string; apiKey: string }[];
 }
 
 export interface WorkspaceInvite {

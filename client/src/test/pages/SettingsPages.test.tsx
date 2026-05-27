@@ -167,6 +167,7 @@ function renderAccountPreferencesPage(overrides: Partial<Parameters<typeof Accou
     onResetTutorial: vi.fn(),
     onSaveSettings: vi.fn(),
     onTestApiKey: vi.fn(),
+    onRemoveCredential: vi.fn(),
     hasChanges: true,
     ...overrides,
   };
