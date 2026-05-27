@@ -133,13 +133,13 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             <EditInPlace
               value={activeTicket.title}
               onSave={(newTitle) => onUpdateTicket(activeTicket.id, { title: newTitle })}
-              saveHint="Enter"
-              saveOnEnter={true}
-              containerClass="editable-display editable-display--title"
+              saveHint="Esc"
+              saveOnEnter={false}
+              containerClass="editable-seamless"
               inputStyle={{ 
                 fontSize: '22px', 
                 fontWeight: 600, 
-                padding: '6px 8px', 
+                padding: 0, 
                 minHeight: '38px', 
                 lineHeight: 'normal',
                 color: 'var(--color-text-primary)'
@@ -165,9 +165,9 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
               saveOnEnter={false}
               placeholder="Describe your issue using markdown..."
               emptyText="No description provided. Click to add details..."
-              containerClass="markdown-content editable-display editable-display--multiline"
+              containerClass="markdown-content editable-seamless"
               containerStyle={{ fontSize: '13px', lineHeight: '1.6', minHeight: '60px', paddingRight: '104px', position: 'relative' }}
-              inputStyle={{ fontFamily: 'var(--mono)', fontSize: '13px', lineHeight: '1.6', padding: '8px 10px', color: 'var(--color-text-primary)' }}
+              inputStyle={{ fontFamily: 'var(--mono)', fontSize: '13px', lineHeight: '1.6', padding: 0, color: 'var(--color-text-primary)' }}
               renderDisplay={(val) => <MarkdownContent text={val} />}
             />
           </div>

@@ -53,7 +53,7 @@ export const EditInPlace: React.FC<EditInPlaceProps> = ({
       handleSave();
     } else if (event.key === 'Escape') {
       event.preventDefault();
-      handleCancel();
+      handleSave();
     }
   };
 
