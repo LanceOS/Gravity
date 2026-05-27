@@ -43,4 +43,3 @@ The `auth` module (`server/src/modules/auth/`) owns the integration with Better 
 
 ## 11. Related Docs
 - [SERVER_ARCHITECTURE_OVERVIEW.md](SERVER_ARCHITECTURE_OVERVIEW.md)
-- [kms-security-architecture.md](kms-security-architecture.md)
