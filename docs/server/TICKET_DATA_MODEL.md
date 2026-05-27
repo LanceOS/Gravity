@@ -12,7 +12,7 @@ This document details the data architecture for Tickets and Comments in the Grav
 ## 3. Entry Points
 
 - **Schema Definition**: `server/src/modules/tickets/schema.ts`
-- **Routes**: `server/src/modules/tickets/routes.js`
+- **Routes**: `server/src/modules/tickets/routes.ts`
 
 ## 4. Flow Steps
 
