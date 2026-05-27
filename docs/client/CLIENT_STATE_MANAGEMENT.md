@@ -17,9 +17,11 @@ This document outlines how the React client manages application state, data fetc
    - `App.tsx` wraps the application in `ThemeProvider` and `TicketProvider`.
 2. **User Authentication Check**:
    - `TicketContext` uses `useEffect` to fetch `GET /api/auth/session` with `credentials: 'same-origin'`. If a valid user is returned, `currentUser` is set.
-3. **Data Hydration**:
-   - Once `currentUser` is set, `fetchInitialData(userId)` fetches domains, cycles, projects, and tickets, populating the global state.
-4. **Workspace Context**:
+3. **Initial Data Hydration**:
+   - Once `currentUser` is set, `fetchInitialData(userId)` fetches projects and users, and initializes tickets, domains, and cycles as empty state.
+4. **Project-Scoped Data Hydration**:
+   - When `activeProjectId` is set or changes, `fetchProjectData(activeProjectId)` loads the active project's tickets, domains, and cycles into global state.
+5. **Workspace Context**:
    - `useWorkspaceDirectory` fetches the list of workspaces the user is a member of. The active workspace filters the globally available tickets and projects.
 
 ## 5. Data Stores and Resources
