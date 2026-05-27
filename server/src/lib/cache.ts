@@ -93,8 +93,8 @@ export async function del(key: CacheKey): Promise<boolean> {
 }
 
 /**
- * Delete multiple entries from the cache atomically or in parallel using unlink.
- * Splitting into chunks if the array is exceptionally large to prevent blocking Redis.
+ * Delete multiple entries from the cache using UNLINK.
+ * Splits into chunks to avoid sending extremely large commands.
  */
 export async function delMany(keys: CacheKey[]): Promise<boolean> {
   if (!isRedisReady() || keys.length === 0) {
