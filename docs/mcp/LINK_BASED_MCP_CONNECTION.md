@@ -223,7 +223,56 @@ The link-based connection design is built on top of existing MCP and workspace c
 - Changing the token binding semantics after rollout may invalidate existing connectors.
 - Adding new `scopes` should be done conservatively and documented alongside workspace tool disablement.
 
-## 11. Related Docs
+## 11. Security Hardening Checklist
+These items are required for a production-grade link-based MCP flow.
+
+- Token lifecycle & delivery
+  - Use `POST` for token issuance and never place tokens in URLs or redirects.
+  - Return the raw token exactly once over HTTPS. Set `Cache-Control: no-store`, `Pragma: no-cache`, `Referrer-Policy: no-referrer`, and an appropriate `Content-Security-Policy` for the modal.
+  - Display the token once in the UI and then show only a masked preview.
+
+- Cryptography & key management
+  - Generate tokens with >=256 bits of entropy and use URL-safe encoding.
+  - Store only a keyed hash of the token (HMAC-SHA256) and persist the `hmacKeyId` to enable rotation.
+  - Manage HMAC keys in a KMS and rotate keys periodically; verify tokens against current and recent keys as needed.
+
+- Atomic consumption & DB semantics
+  - Validate-and-consume must be atomic. Use a single UPDATE ... RETURNING or a transaction that ensures `status = 'active'` and `expires_at > now()` before setting `status = 'used'`.
+  - Example pseudocode:
+
+    BEGIN TRANSACTION;
+    UPDATE mcp_connection_tokens
+      SET status = 'used', used_at = now()
+      WHERE id = :id AND status = 'active' AND expires_at > now()
+      RETURNING id;
+    -- If no row returned: rollback and reject; else commit and accept.
+
+- Verification & comparison
+  - Use constant-time comparison for token verification (compare hashes).
+  - Enforce TTL, `singleUse` semantics, and immediate revocation when misuse is detected.
+
+- CSRF, origin and cookie controls
+  - Protect issuance endpoints from CSRF (SameSite cookies, CSRF token, `Origin`/`Referer` checks).
+  - Generation must require an authenticated session and explicit user consent in the UI.
+
+- Network controls & CORS
+  - Require TLS and HSTS. Restrict CORS for browser endpoints; the MCP transport should be treated as a server-to-server API.
+
+- Rate limiting & monitoring
+  - Apply per-user and per-workspace rate limits to issuance and validation endpoints.
+  - Alert on suspicious patterns (many failed validations, repeated issuance by the same actor, or rapid revocations).
+
+- Logging & auditing
+  - Record `token_created`, `token_used`, `token_revoked`, and `token_validation_failed` events with `workspaceId`, `tokenId`, `generatedByUserId`, `sourceIp`, and `userAgent` — never store raw tokens in logs.
+  - Mask token previews in the UI and logs.
+
+- Threat model reminders
+  - Clipboard leakage: mitigate via short TTLs, single-use tokens, and user guidance.
+  - Replay: mitigate with atomic consumption and DB checks.
+  - Brute-force: mitigate with large token entropy, rate limits, and monitoring.
+  - Provider impersonation: require signed JWTs, HMAC-challenge, or mTLS for high-trust integrations.
+
+## 12. Related Docs
 - [MCP and Agent Interactions](MCP_FLOW.md)
 - [Server MCP Module](../server/SERVER_MODULE_MCP.md)
 - [Client MCP and WebMCP UX](../client/CLIENT_USER_INTERACTIONS.md)
