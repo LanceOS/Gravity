@@ -18,7 +18,9 @@ The `ai` module (`server/src/modules/ai/`) handles all integrations with externa
 4. **Tool Use Translation**: If the model invokes a function, the adapter normalizes it to the system's standard tool-call schema.
 
 ## 5. Data Stores and Resources
-- Mutates the `ai_conversations` and `ai_messages` tables to keep history of chat context.
+- Reads provider-related configuration and user/workspace settings as needed to determine which AI provider and credentials should be used.
+- Uses encrypted external provider credentials via `src/modules/auth/kms/credential-manager.ts`, which decrypts API keys just-in-time for outbound requests.
+- Does not persist AI chat history in `ai_conversations` or `ai_messages`; the current module operates on request-time input and provider responses.
 
 ## 6. Interfaces and Contracts
 - **`IAiProvider`**: Defined in `src/modules/ai/types.ts`. All new providers (e.g., Gemini, Ollama) must implement this interface to ensure standardized input/output formatting.
