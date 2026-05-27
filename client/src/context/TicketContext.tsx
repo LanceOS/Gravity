@@ -619,11 +619,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     pendingTicketUpdateBatchesRef.current.delete(ticketId);
-    inFlightTicketUpdateBatchesRef.current.set(ticketId, {
-      originalTickets: pendingBatch.originalTickets,
-      projectId: pendingBatch.projectId,
-      updates: pendingBatch.updates,
-    });
+    (inFlightTicketUpdateBatchesRef.current as Set<string>).add(ticketId);
 
     try {
       const response = await fetch(`${API_URL}/tickets/${ticketId}`, {
