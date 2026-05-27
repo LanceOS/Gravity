@@ -9,6 +9,25 @@ import { Markdown } from 'tiptap-markdown';
 import { cn } from '../../utilities';
 import { Bold, Italic, Strikethrough, Code, Heading1, Heading2, List } from 'lucide-react';
 
+const singleLineStarterKitOptions = {
+  blockquote: false,
+  bold: false,
+  bulletList: false,
+  code: false,
+  codeBlock: false,
+  hardBreak: false,
+  heading: false,
+  horizontalRule: false,
+  italic: false,
+  listItem: false,
+  orderedList: false,
+  strike: false,
+} as const;
+
+function normalizeSingleLineContent(content: string) {
+  return content.replace(/\s*[\r\n]+\s*/g, ' ');
+}
+
 export interface MarkdownEditorProps {
   value: string;
   onSave: (newValue: string) => void;
@@ -26,20 +45,25 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
   className = '',
   singleLine = false,
 }) => {
-  const valueRef = useRef(value);
+  const normalizedValue = singleLine ? normalizeSingleLineContent(value) : value;
+  const valueRef = useRef(normalizedValue);
 
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure(singleLine ? singleLineStarterKitOptions : {}),
       Placeholder.configure({
         placeholder,
       }),
       Markdown.configure({
         html: false,
       }),
-      BubbleMenu.configure({
-        element: null,
-      }),
+      ...(!singleLine
+        ? [
+            BubbleMenu.configure({
+              element: null,
+            }),
+          ]
+        : []),
       ...(singleLine
         ? [
             Extension.create({
@@ -56,31 +80,56 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
           ]
         : []),
     ],
-    content: value,
+    content: normalizedValue,
     editorProps: {
       attributes: {
         class: cn('ProseMirror input-seamless', className),
         style: `min-height: ${minHeight}; outline: none; width: 100%; word-break: break-word;`,
       },
+      ...(singleLine
+        ? {
+            handlePaste: (view, event) => {
+              const pastedText = event.clipboardData?.getData('text/plain');
+
+              if (typeof pastedText !== 'string') {
+                return false;
+              }
+
+              view.dispatch(
+                view.state.tr.insertText(
+                  normalizeSingleLineContent(pastedText),
+                  view.state.selection.from,
+                  view.state.selection.to,
+                ),
+              );
+
+              return true;
+            },
+          }
+        : {}),
     },
     onBlur: ({ editor }) => {
       const markdown = editor.storage.markdown.getMarkdown();
-      if (markdown !== valueRef.current) {
-        onSave(markdown);
+      const nextValue = singleLine ? normalizeSingleLineContent(markdown) : markdown;
+
+      if (nextValue !== valueRef.current) {
+        onSave(nextValue);
       }
     },
   });
 
   // Track external database value changes safely
   useEffect(() => {
-    valueRef.current = value;
+    valueRef.current = normalizedValue;
     if (editor && !editor.isFocused) {
       const currentMarkdown = editor.storage.markdown.getMarkdown();
-      if (currentMarkdown !== value) {
-        editor.commands.setContent(value);
+      const nextMarkdown = singleLine ? normalizeSingleLineContent(currentMarkdown) : currentMarkdown;
+
+      if (nextMarkdown !== normalizedValue) {
+        editor.commands.setContent(normalizedValue);
       }
     }
-  }, [value, editor]);
+  }, [editor, normalizedValue, singleLine]);
 
   // Handle global Escape key to blur the active editor session
   useEffect(() => {
@@ -105,7 +154,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 
   return (
     <div className="markdown-editor-wrapper" style={{ width: '100%', cursor: 'text', position: 'relative' }}>
-      {editor && (
+      {!singleLine && editor && (
         <ReactBubbleMenu
           editor={editor}
           tippyOptions={{ duration: 150, zIndex: 1000 }}

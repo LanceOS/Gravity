@@ -33,7 +33,6 @@ export * from './drawer';
 export * from './dropdownmenu';
 
 export * from './markdowneditor';
-export * from './markdownrenderer';
 export * from './emptystate';
 export * from './fileuploader';
 export * from './flex';

@@ -22,6 +22,56 @@ if (!HTMLElement.prototype.scrollIntoView) {
   HTMLElement.prototype.scrollIntoView = () => {};
 }
 
+if (!document.elementFromPoint) {
+  document.elementFromPoint = () => null;
+}
+
+const emptyDOMRectList = {
+  item: () => null,
+  length: 0,
+  [Symbol.iterator]: function* iterator() {},
+} as unknown as DOMRectList;
+
+const emptyDOMRect = {
+  bottom: 0,
+  height: 0,
+  left: 0,
+  right: 0,
+  top: 0,
+  width: 0,
+  x: 0,
+  y: 0,
+  toJSON: () => ({}),
+} as DOMRect;
+
+if (!HTMLElement.prototype.getClientRects) {
+  HTMLElement.prototype.getClientRects = () => emptyDOMRectList;
+}
+
+if (!HTMLElement.prototype.getBoundingClientRect) {
+  HTMLElement.prototype.getBoundingClientRect = () => emptyDOMRect;
+}
+
+if (typeof Range !== 'undefined') {
+  if (!Range.prototype.getClientRects) {
+    Range.prototype.getClientRects = () => emptyDOMRectList;
+  }
+
+  if (!Range.prototype.getBoundingClientRect) {
+    Range.prototype.getBoundingClientRect = () => emptyDOMRect;
+  }
+}
+
+if (typeof Text !== 'undefined') {
+  if (!Text.prototype.getClientRects) {
+    Text.prototype.getClientRects = () => emptyDOMRectList;
+  }
+
+  if (!Text.prototype.getBoundingClientRect) {
+    Text.prototype.getBoundingClientRect = () => emptyDOMRect;
+  }
+}
+
 afterEach(() => {
   cleanup();
 });

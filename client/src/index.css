@@ -341,55 +341,6 @@ button.clickable:not(.btn):hover {
   outline: none !important;
 }
 
-.editable-display {
-  position: relative;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  transition: all var(--transition-normal);
-}
-
-.editable-display:hover,
-.editable-display:focus-visible {
-  background: var(--color-base100);
-  border-color: var(--color-border-default);
-  outline: none;
-}
-
-.editable-display__hint {
-  opacity: 0;
-  color: var(--color-text-disabled);
-  transition: opacity var(--transition-normal);
-}
-
-.editable-display:hover .editable-display__hint,
-.editable-display:focus-visible .editable-display__hint {
-  opacity: 1;
-}
-
-.editable-display--title {
-  padding: 6px 8px;
-}
-
-.editable-display--multiline {
-  padding: 8px 10px;
-}
-
-.editable-seamless {
-  position: relative;
-}
-
-.editable-seamless .editable-display__hint {
-  opacity: 0;
-  color: var(--color-text-disabled);
-  transition: opacity var(--transition-normal);
-}
-
-.editable-seamless:hover .editable-display__hint,
-.editable-seamless:focus-visible .editable-display__hint {
-  opacity: 1;
-}
-
 .label {
   display: block;
   font-size: 10px;

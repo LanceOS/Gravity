@@ -48,6 +48,7 @@ describe('useTicketByKey', () => {
 
     let ticketsState = {
       tickets: [],
+      ticketMap: new Map<string, never>(),
       currentUser: owner,
     };
 
@@ -68,6 +69,7 @@ describe('useTicketByKey', () => {
 
     ticketsState = {
       tickets: [],
+      ticketMap: new Map<string, never>(),
       currentUser: member,
     };
 
