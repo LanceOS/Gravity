@@ -48,7 +48,7 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
           ref={localRef}
           className={cn('input', autoGrow ? 'auto-grow' : '', className)}
           style={{
-            minHeight: autoGrow ? 'none' : '80px',
+            minHeight: autoGrow ? undefined : '80px',
             resize: autoGrow ? 'none' : 'vertical',
             overflowY: autoGrow ? 'hidden' : 'auto',
             ...inputStyle
