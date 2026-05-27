@@ -22,7 +22,7 @@ This document covers the primary user workflows and integrated tools provided by
 ### 4.2 Local AI Chat
 1. **Invocation**: Users click the AI chat button in the sidebar or tools menu, which toggles `isOllamaOpen` in the `AppShellPage`.
 2. **Conversation**: `LocalAIChat` renders in a slide-out panel, connecting to a locally running Ollama instance or third-party providers (configured via `AccountPreferencesPage`).
-3. **MCP Integration**: The AI chat utilizes MCP (Model Context Protocol). `registerWebMCPTools` is called on app load, exposing client-side tools (like `createTicket`, `getTickets`) to the AI via WebMCP.
+3. **MCP Integration**: `LocalAIChat` uses MCP (Model Context Protocol) by talking directly to the server MCP endpoint (for example, `/api/v1/mcp/sse`). Separately, `registerWebMCPTools` is called on app load from `AppShellPage` to expose browser-side tools (like `createTicket`, `getTickets`) through WebMCP-capable APIs; this registration is adjacent to, but not required for, the core `LocalAIChat` connection flow.
 
 ## 5. Data Stores and Resources
 - **WebMCP**: Integrates local browser context (e.g., currently loaded tickets) into the AI chat interface seamlessly.
