@@ -30,28 +30,54 @@ function defineGeometryMethod(target: object, name: string, value: (...args: nev
   });
 }
 
+function defineGeometryMethodIfMissing(target: object, name: string, value: (...args: never[]) => unknown) {
+  const descriptor = Object.getOwnPropertyDescriptor(target, name);
+
+  if (descriptor && typeof descriptor.value === 'function') {
+    return;
+  }
+
+  defineGeometryMethod(target, name, value);
+}
+
 function emptyPointTarget(this: Document) {
   return this.body ?? this.documentElement ?? null;
 }
 
 if (typeof document !== 'undefined') {
-  defineGeometryMethod(document, 'elementFromPoint', emptyPointTarget as unknown as (...args: never[]) => unknown);
+  defineGeometryMethodIfMissing(
+    document,
+    'elementFromPoint',
+    emptyPointTarget as unknown as (...args: never[]) => unknown,
+  );
 }
 
 if (typeof Document !== 'undefined') {
-  defineGeometryMethod(Document.prototype, 'elementFromPoint', emptyPointTarget as unknown as (...args: never[]) => unknown);
+  defineGeometryMethodIfMissing(
+    Document.prototype,
+    'elementFromPoint',
+    emptyPointTarget as unknown as (...args: never[]) => unknown,
+  );
 }
 
 if (typeof DocumentFragment !== 'undefined') {
-  defineGeometryMethod(DocumentFragment.prototype, 'elementFromPoint', function () {
-    return null;
-  } as unknown as (...args: never[]) => unknown);
+  defineGeometryMethodIfMissing(
+    DocumentFragment.prototype,
+    'elementFromPoint',
+    function () {
+      return null;
+    } as unknown as (...args: never[]) => unknown,
+  );
 }
 
 if (typeof ShadowRoot !== 'undefined') {
-  defineGeometryMethod(ShadowRoot.prototype, 'elementFromPoint', function (this: ShadowRoot) {
-    return this.host ?? null;
-  } as unknown as (...args: never[]) => unknown);
+  defineGeometryMethodIfMissing(
+    ShadowRoot.prototype,
+    'elementFromPoint',
+    function (this: ShadowRoot) {
+      return this.host ?? null;
+    } as unknown as (...args: never[]) => unknown,
+  );
 }
 
 const emptyDOMRectList = {
