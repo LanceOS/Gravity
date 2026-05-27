@@ -31,7 +31,19 @@ This document covers the primary user workflows and integrated tools provided by
 - `LocalAIChat.tsx` acts as the primary boundary between human users and the Local LLM. It receives the active `workspaceId` as a prop, and the selected `aiProvider` is supplied via the `settings` prop.
 - Global Keydown listener:
   ```typescript
+  const target = event.target as HTMLElement | null;
+  if (
+    target &&
+    (target.tagName === 'INPUT' ||
+      target.tagName === 'TEXTAREA' ||
+      target.tagName === 'SELECT' ||
+      target.isContentEditable)
+  ) {
+    return;
+  }
+
   if (event.key === 'n' || event.key === 'N') {
+    event.preventDefault();
     handleOpenCreateTicket();
   }
   ```
