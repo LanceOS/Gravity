@@ -35,7 +35,7 @@ The client codebase is heavily modularized using a domain-driven structure under
 
 ## 8. Permissions, Guards, or Tenant Boundaries
 - **Authentication**: Unauthorized users are directed to the `AuthScreen`.
-- **Workspace Boundaries**: Projects, tickets, and team members are strictly isolated by the `activeWorkspaceId`. 
+- **Workspace Boundaries**: The client uses `activeWorkspaceId` to filter and scope which projects, tickets, and team members are shown in the UI; strict workspace/tenant isolation is enforced server-side rather than by client-side storage alone.
 
 ## 9. Failure Modes, Observability, or Operational Notes
 - If the server is unreachable, the client will display generic error boundaries or fallback loading screens.
