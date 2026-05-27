@@ -84,15 +84,10 @@ export function TicketLink({ ticketKey }: { ticketKey: string }) {
   );
 }
 
-type MarkdownMatch =
-  | { index: number; length: number; type: 'bold'; text: string }
-  | { index: number; length: number; type: 'code'; text: string }
-  | { index: number; length: number; type: 'link'; text: string; url: string }
-  | { index: number; length: number; type: 'ticket'; text: string };
-
 /**
  * @description A utility component that parses a raw markdown string and replaces specific patterns
  * (like bold text, inline code, external links, and workspace ticket keys) with their corresponding React elements.
+ * Employs a single-pass regex tokenizer for O(L) time complexity and sanitizes URLs to prevent XSS.
  * @param {MarkdownTextProps} props - The component props.
  * @param {string} props.text - The raw markdown text to be parsed and formatted.
  * @returns {JSX.Element} A React fragment containing the parsed and formatted text nodes.
@@ -100,80 +95,54 @@ type MarkdownMatch =
 function FormattedText({ text }: MarkdownTextProps) {
   const { projects } = useTickets();
   const parts: React.ReactNode[] = [];
-  let remaining = text;
   let keyIndex = 0;
+  let lastIndex = 0;
 
-  // Memoize regex compilation to avoid recompilation on every render/line
-  const ticketRegex = useMemo(() => {
+  const ticketRegexPart = useMemo(() => {
     const projectKeys = projects?.map(p => p.key).filter(Boolean) || [];
-
-    if (projectKeys.length === 0) {
-      return /$^/i;
-    }
-
-    const projectKeysRegexPart = projectKeys
-      .map(key => key.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'))
-      .join('|');
-
-    return new RegExp(`\\b(${projectKeysRegexPart})-\\d+\\b`, 'i');
+    if (projectKeys.length === 0) return '$^';
+    const escapedKeys = projectKeys.map(k => k.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')).join('|');
+    return `(?:${escapedKeys})`;
   }, [projects]);
 
-  while (remaining.length > 0) {
-    const boldMatch = remaining.match(/\*\*([^*]+)\*\*/);
-    const codeMatch = remaining.match(/`([^`]+)`/);
-    const linkMatch = remaining.match(/\[([^\]]+)\]\(([^)]+)\)/);
-    const ticketMatch = remaining.match(ticketRegex);
+  const combinedRegex = useMemo(() => {
+    return new RegExp(
+      `\\*\\*([^*]+)\\*\\*|\`([^\`]+)\`|\\[([^\\]]+)\\]\\(([^)]+)\\)|\\b(${ticketRegexPart}-\\d+)\\b`,
+      'gi'
+    );
+  }, [ticketRegexPart]);
 
-    const matches: MarkdownMatch[] = [
-      boldMatch && boldMatch.index !== undefined
-        ? { index: boldMatch.index, length: boldMatch[0].length, type: 'bold', text: boldMatch[1] }
-        : null,
-      codeMatch && codeMatch.index !== undefined
-        ? { index: codeMatch.index, length: codeMatch[0].length, type: 'code', text: codeMatch[1] }
-        : null,
-      linkMatch && linkMatch.index !== undefined
-        ? { index: linkMatch.index, length: linkMatch[0].length, type: 'link', text: linkMatch[1], url: linkMatch[2] }
-        : null,
-      ticketMatch && ticketMatch.index !== undefined
-        ? { index: ticketMatch.index, length: ticketMatch[0].length, type: 'ticket', text: ticketMatch[0] }
-        : null,
-    ].filter((match): match is MarkdownMatch => match !== null);
+  const isSafeUrl = (url: string) => {
+    const protocolMatch = url.match(/^([a-z0-9+.-]+):/i);
+    if (protocolMatch) {
+      return ['http:', 'https:', 'mailto:'].includes(protocolMatch[1].toLowerCase() + ':');
+    }
+    return true;
+  };
 
-    if (matches.length === 0) {
-      const key = keyIndex;
-      keyIndex += 1;
-      parts.push(<span key={key}>{remaining}</span>);
-      break;
+  const matches = Array.from(text.matchAll(combinedRegex));
+
+  for (const match of matches) {
+    if (match.index !== undefined && match.index > lastIndex) {
+      parts.push(<span key={keyIndex++}>{text.substring(lastIndex, match.index)}</span>);
     }
 
-    matches.sort((left, right) => left.index - right.index);
-    const firstMatch = matches[0];
-
-    if (firstMatch.index > 0) {
-      const key = keyIndex;
-      keyIndex += 1;
-      parts.push(<span key={key}>{remaining.substring(0, firstMatch.index)}</span>);
+    if (match[1]) {
+      parts.push(<strong key={keyIndex++} style={{ color: 'var(--color-text-primary)', fontWeight: 600 }}>{match[1]}</strong>);
+    } else if (match[2]) {
+      parts.push(<code key={keyIndex++} style={{ background: 'var(--color-base50)', padding: '1px 4px', borderRadius: '4px', fontSize: '11px', fontFamily: 'var(--mono)', color: 'var(--color-text-primary)' }}>{match[2]}</code>);
+    } else if (match[3] && match[4]) {
+      const safeHref = isSafeUrl(match[4]) ? match[4] : 'about:blank';
+      parts.push(<a key={keyIndex++} href={safeHref} target="_blank" rel="noreferrer" style={{ color: 'var(--color-primary)', textDecoration: 'none' }} className="clickable">{match[3]}</a>);
+    } else if (match[5]) {
+      parts.push(<TicketLink key={keyIndex++} ticketKey={match[5]} />);
     }
 
-    if (firstMatch.type === 'bold') {
-      const key = keyIndex;
-      keyIndex += 1;
-      parts.push(<strong key={key} style={{ color: 'var(--color-text-primary)', fontWeight: 600 }}>{firstMatch.text}</strong>);
-    } else if (firstMatch.type === 'code') {
-      const key = keyIndex;
-      keyIndex += 1;
-      parts.push(<code key={key} style={{ background: 'var(--color-base50)', padding: '1px 4px', borderRadius: '4px', fontSize: '11px', fontFamily: 'var(--mono)', color: 'var(--color-text-primary)' }}>{firstMatch.text}</code>);
-    } else if (firstMatch.type === 'link') {
-      const key = keyIndex;
-      keyIndex += 1;
-      parts.push(<a key={key} href={firstMatch.url} target="_blank" rel="noreferrer" style={{ color: 'var(--color-primary)', textDecoration: 'none' }} className="clickable">{firstMatch.text}</a>);
-    } else if (firstMatch.type === 'ticket') {
-      const key = keyIndex;
-      keyIndex += 1;
-      parts.push(<TicketLink key={key} ticketKey={firstMatch.text} />);
-    }
+    lastIndex = match.index! + match[0].length;
+  }
 
-    remaining = remaining.substring(firstMatch.index + firstMatch.length);
+  if (lastIndex < text.length) {
+    parts.push(<span key={keyIndex++}>{text.substring(lastIndex)}</span>);
   }
 
   return <>{parts}</>;

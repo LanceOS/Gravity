@@ -32,8 +32,10 @@ export const EditInPlace: React.FC<EditInPlaceProps> = ({
   const [value, setValue] = useState(propValue);
 
   useEffect(() => {
-    setValue(propValue);
-  }, [propValue]);
+    if (!isEditing) {
+      setValue(propValue);
+    }
+  }, [propValue, isEditing]);
 
   const handleSave = () => {
     setIsEditing(false);
