@@ -28,68 +28,28 @@ function mapCycle(cycle: typeof cycles.$inferSelect) {
 }
 
 export async function listProjectsWithDetails(userId: string, workspaceId?: string) {
-  let projectRows: Array<{
+  const baseQuery = db
+    .select({
+      id: projects.id,
+      name: projects.name,
+      description: projects.description,
+      key: projects.key,
+      status: projects.status,
+      workspaceId: projects.workspaceId,
+    })
+    .from(projects)
+    .innerJoin(projectMembers, and(eq(projectMembers.projectId, projects.id), eq(projectMembers.userId, userId)));
+
+  const projectRows: Array<{
     id: string;
     name: string;
     description: string;
     key: string;
     status: string;
     workspaceId: string;
-  }>;
-
-  if (userId && workspaceId) {
-    projectRows = await db
-      .select({
-        id: projects.id,
-        name: projects.name,
-        description: projects.description,
-        key: projects.key,
-        status: projects.status,
-        workspaceId: projects.workspaceId,
-      })
-      .from(projects)
-      .innerJoin(projectMembers, and(eq(projectMembers.projectId, projects.id), eq(projectMembers.userId, userId)))
-      .where(eq(projects.workspaceId, workspaceId))
-      .orderBy(asc(projects.createdAt));
-  } else if (userId) {
-    projectRows = await db
-      .select({
-        id: projects.id,
-        name: projects.name,
-        description: projects.description,
-        key: projects.key,
-        status: projects.status,
-        workspaceId: projects.workspaceId,
-      })
-      .from(projects)
-      .innerJoin(projectMembers, and(eq(projectMembers.projectId, projects.id), eq(projectMembers.userId, userId)))
-      .orderBy(asc(projects.createdAt));
-  } else if (workspaceId) {
-    projectRows = await db
-      .select({
-        id: projects.id,
-        name: projects.name,
-        description: projects.description,
-        key: projects.key,
-        status: projects.status,
-        workspaceId: projects.workspaceId,
-      })
-      .from(projects)
-      .where(eq(projects.workspaceId, workspaceId))
-      .orderBy(asc(projects.createdAt));
-  } else {
-    projectRows = await db
-      .select({
-        id: projects.id,
-        name: projects.name,
-        description: projects.description,
-        key: projects.key,
-        status: projects.status,
-        workspaceId: projects.workspaceId,
-      })
-      .from(projects)
-      .orderBy(asc(projects.createdAt));
-  }
+  }> = workspaceId
+    ? await baseQuery.where(eq(projects.workspaceId, workspaceId)).orderBy(asc(projects.createdAt))
+    : await baseQuery.orderBy(asc(projects.createdAt));
 
   const projectIds = projectRows.map((project) => project.id);
 
