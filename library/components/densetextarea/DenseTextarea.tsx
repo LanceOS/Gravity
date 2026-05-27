@@ -1,15 +1,14 @@
 import React, { useRef, useEffect, useImperativeHandle } from 'react';
 import { cn } from '../../utilities';
 
-export interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+export interface DenseTextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
   label?: string;
   error?: string;
   autoGrow?: boolean;
-  inputStyle?: React.CSSProperties;
 }
 
-export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
-  ({ label, error, className = '', id, style, inputStyle, autoGrow, value, onChange, ...props }, ref) => {
+export const DenseTextarea = React.forwardRef<HTMLTextAreaElement, DenseTextareaProps>(
+  ({ label, error, style, className, id, autoGrow, value, onChange, ...props }, ref) => {
     const generatedId = React.useId();
     const inputId = id || generatedId;
     const errorId = `${inputId}-error`;
@@ -37,21 +36,35 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
     };
 
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%', ...style }}>
+      <div
+        className={className}
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '2px',
+          width: '100%',
+          ...style
+        }}
+      >
         {label && (
-          <label htmlFor={inputId} className="label" style={{ color: 'var(--color-text-primary)', fontWeight: 500 }}>
+          <label htmlFor={inputId} className="label label--dense">
             {label}
           </label>
         )}
         <textarea
           id={inputId}
           ref={localRef}
-          className={cn('input', autoGrow ? 'auto-grow' : '', className)}
+          className={cn('input input--dense', autoGrow ? 'auto-grow' : '', error ? 'input--error' : undefined, className)}
           style={{
-            minHeight: autoGrow ? undefined : '80px',
             resize: autoGrow ? 'none' : 'vertical',
+            minHeight: '32px',
             overflowY: autoGrow ? 'hidden' : 'auto',
-            ...inputStyle
+            paddingTop: '6px',
+            paddingBottom: '6px',
+            lineHeight: '1.4',
+            height: autoGrow ? 'auto' : '32px',
+            ...style
+          }}
           }}
           value={value}
           onChange={handleChange}
@@ -60,7 +73,7 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
           {...props}
         />
         {error && (
-          <span id={errorId} className="lib-field-error-msg" role="alert">
+          <span id={errorId} className="lib-field-error-msg lib-field-error-msg--dense" role="alert">
             {error}
           </span>
         )}
@@ -69,4 +82,4 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
   }
 );
 
-Textarea.displayName = 'Textarea';
+DenseTextarea.displayName = 'DenseTextarea';

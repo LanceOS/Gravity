@@ -65,3 +65,13 @@ podman compose -f docker/docker-compose.yml up -d --build frontend
 ```
 
 - On some systems you may need to adapt the volume flags (`:Z`, `:z`) or file ownership to allow the container to read mounted files.
+
+## Local CI
+
+Run the repo's local CI flow from the project root with:
+
+```bash
+./local-ci.sh
+```
+
+This delegates to the maintained CI driver in `scripts/local-ci.sh`, which installs dependencies, runs the client and server test suites, builds both apps, and performs a compose-based smoke check.

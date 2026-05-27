@@ -49,7 +49,7 @@ vi.mock('@library', () => ({
 
 vi.mock('../../modules/tickets/components/TicketRow', () => ({
   TicketRow: ({ ticket, onClick, assigneeAvatar }: TicketRowProps) => (
-    <button type="button" onClick={onClick}>{`TicketRow ${ticket.key} ${assigneeAvatar || 'no-avatar'}`}</button>
+    <button type="button" onClick={() => onClick(ticket)}>{`TicketRow ${ticket.key} ${assigneeAvatar || 'no-avatar'}`}</button>
   ),
 }));
 

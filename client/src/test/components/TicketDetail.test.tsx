@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type {
   ButtonHTMLAttributes,
   ChangeEvent,
@@ -36,8 +37,11 @@ type MockTextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
   onChange: (event: ChangeEvent<HTMLTextAreaElement>) => void;
 };
 
-vi.mock('@library', () => ({
-  Button: ({ children, ...props }: MockButtonProps) => {
+vi.mock('@library', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@library')>();
+  return {
+    ...actual,
+    Button: ({ children, ...props }: MockButtonProps) => {
     const buttonProps = { ...props };
     delete buttonProps.variant;
     delete buttonProps.size;
@@ -53,10 +57,30 @@ vi.mock('@library', () => ({
     </select>
   ),
   TextInput: ({ value, onChange, ...props }: MockTextInputProps) => <input value={value} onChange={onChange} {...props} />,
-  Textarea: ({ value, onChange, ...props }: MockTextareaProps) => <textarea value={value} onChange={onChange} {...props} />,
+  Textarea: ({ value, onChange, autoGrow, inputStyle, ...props }: any) => <textarea value={value} onChange={onChange} {...props} />,
+  MarkdownEditor: ({ value, onSave, placeholder }: any) => {
+    const [editing, setEditing] = useState(false);
+    if (!editing) {
+      return (
+        <div onClick={() => setEditing(true)}>{value || placeholder}</div>
+      );
+    }
+    return (
+      <textarea
+        placeholder={placeholder}
+        defaultValue={value}
+        onBlur={(e) => {
+          setEditing(false);
+          onSave(e.target.value);
+        }}
+        autoFocus
+      />
+    );
+  },
   ClickAwayListener: ({ children }: { children: ReactNode }) => children,
   Portal: ({ children }: { children: ReactNode }) => <div data-testid="portal">{children}</div>,
-}));
+  };
+});
 
 vi.mock('../../modules/tickets/components/MarkdownContent', () => ({
   MarkdownContent: ({ text }: { text: string }) => <div>{text}</div>,

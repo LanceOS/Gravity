@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import type { Ticket } from '../../../context/TicketContext';
-import { Button, Select, TextInput, Textarea } from '@library';
+import { Button, Select, TextInput, Textarea, MarkdownEditor } from '@library';
 import { ClickAwayListener, Portal } from '@library';
 import { 
   CheckSquare, GitPullRequest, GitMerge, Send, Trash2,
@@ -29,13 +29,6 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
   onClose,
   onOpenCreateSubtask,
 }) => {
-  // Local state for editing fields
-  const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [titleValue, setTitleValue] = useState(activeTicket.title);
-  
-  const [isEditingDesc, setIsEditingDesc] = useState(false);
-  const [descValue, setDescValue] = useState(activeTicket.description || '');
-
   const [commentInput, setCommentInput] = useState('');
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
 
@@ -45,20 +38,6 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
   const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
 
   const closeCommentMenu = useCallback(() => setOpenMenuCommentId(null), []);
-
-  const handleTitleBlur = () => {
-    setIsEditingTitle(false);
-    if (titleValue.trim() && titleValue !== activeTicket.title) {
-      onUpdateTicket(activeTicket.id, { title: titleValue });
-    }
-  };
-
-  const handleDescBlur = () => {
-    setIsEditingDesc(false);
-    if (descValue !== (activeTicket.description || '')) {
-      onUpdateTicket(activeTicket.id, { description: descValue });
-    }
-  };
 
   const handlePostComment = (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,13 +54,6 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
   const confirmDelete = async () => {
     await onDeleteTicket(activeTicket.id);
     setIsDeleteConfirmOpen(false);
-  };
-
-  const handleEditableKeyDown = (event: React.KeyboardEvent<HTMLDivElement>, onActivate: () => void) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      onActivate();
-    }
   };
 
   const assigneeOptions = [{ value: '', label: 'Unassigned' }, ...users.map((user) => ({ value: user.id, label: user.name }))];
@@ -158,46 +130,13 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
           
           {/* Title Area */}
           <div>
-            {isEditingTitle ? (
-              <input 
-                type="text"
-                className="input"
-                style={{ fontSize: '22px', fontWeight: 600, padding: '6px 10px' }}
-                value={titleValue}
-                onChange={(e) => setTitleValue(e.target.value)}
-                onBlur={handleTitleBlur}
-                onKeyDown={(e) => e.key === 'Enter' && handleTitleBlur()}
-                autoFocus
-              />
-            ) : (
-              <div
-                onClick={() => setIsEditingTitle(true)}
-                onKeyDown={(event) => handleEditableKeyDown(event, () => setIsEditingTitle(true))}
-                className="editable-display editable-display--title"
-                role="button"
-                tabIndex={0}
-                title="Click to edit title"
-              >
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
-                  <h1
-                    style={{
-                      fontSize: '22px',
-                      fontWeight: 600,
-                      color: 'var(--color-text-primary)',
-                      margin: 0,
-                      flex: 1,
-                      minWidth: 0
-                    }}
-                  >
-                    {activeTicket.title}
-                  </h1>
-                  <span className="editable-display__hint" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 500, whiteSpace: 'nowrap' }}>
-                    <Edit3 size={12} />
-                    <span>Edit</span>
-                  </span>
-                </div>
-              </div>
-            )}
+            <MarkdownEditor
+              value={activeTicket.title}
+              onSave={(newTitle) => onUpdateTicket(activeTicket.id, { title: newTitle })}
+              singleLine={true}
+              minHeight="auto"
+              className="ticket-title-editor"
+            />
           </div>
 
           {/* Description Area */}
@@ -206,55 +145,13 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
               <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase' }}>Description</span>
             </div>
 
-            {isEditingDesc ? (
-              <Textarea 
-                rows={8}
-                style={{ fontFamily: 'var(--mono)', fontSize: '13px', lineHeight: '1.6', resize: 'vertical' }}
-                value={descValue}
-                onChange={(e) => setDescValue(e.target.value)}
-                placeholder="Describe your issue using markdown..."
-                onBlur={handleDescBlur}
-                autoFocus
-              />
-            ) : (
-              <div 
-                onClick={() => setIsEditingDesc(true)}
-                onKeyDown={(event) => handleEditableKeyDown(event, () => setIsEditingDesc(true))}
-                className="markdown-content editable-display editable-display--multiline"
-                role="button"
-                tabIndex={0}
-                style={{ 
-                  fontSize: '13px', 
-                  lineHeight: '1.6', 
-                  minHeight: '60px', 
-                  paddingRight: '104px',
-                  position: 'relative'
-                }}
-              >
-                <span
-                  className="editable-display__hint"
-                  style={{
-                    position: 'absolute',
-                    top: '8px',
-                    right: '10px',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    fontSize: '11px',
-                    fontWeight: 500,
-                    pointerEvents: 'none'
-                  }}
-                >
-                  <Edit3 size={12} />
-                  <span>Edit</span>
-                </span>
-                {activeTicket.description ? (
-                  <MarkdownContent text={activeTicket.description} />
-                ) : (
-                  <span style={{ color: 'var(--color-text-disabled)', fontStyle: 'italic' }}>No description provided. Click to add details...</span>
-                )}
-              </div>
-            )}
+            <MarkdownEditor
+              value={activeTicket.description || ''}
+              onSave={(newDesc) => onUpdateTicket(activeTicket.id, { description: newDesc })}
+              placeholder="Describe your issue using markdown..."
+              minHeight="120px"
+              className="markdown-content"
+            />
           </div>
 
           {/* Sub-tickets / Checklist Section */}
@@ -516,10 +413,10 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                       {editingCommentId === comment.id ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
                           <Textarea
-                            rows={3}
                             value={editingCommentBody}
                             onChange={(e) => setEditingCommentBody(e.target.value)}
                             style={{ fontSize: '13px', lineHeight: '1.5', fontFamily: 'inherit' }}
+                            autoGrow
                             autoFocus
                           />
                           <div style={{ display: 'flex', gap: '6px', alignSelf: 'flex-end' }}>
@@ -555,16 +452,18 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             </div>
 
             {/* Post comment form */}
-            <form onSubmit={handlePostComment} style={{ display: 'flex', gap: '10px', marginTop: '12px', width: '100%' }}>
-              <TextInput 
+            <form onSubmit={handlePostComment} style={{ display: 'flex', alignItems: 'flex-end', gap: '10px', marginTop: '12px', width: '100%' }}>
+              <Textarea 
                 placeholder="Post updates, links, or mention PRs..."
                 value={commentInput}
                 onChange={(e) => setCommentInput(e.target.value)}
+                style={{ flex: 1 }}
+                autoGrow
               />
               <Button
                 type="submit" 
                 variant="primary"
-                style={{ padding: '8px 16px' }}
+                style={{ padding: '8px 16px', height: '34px' }}
               >
                 <Send size={12} />
                 <span>Comment</span>

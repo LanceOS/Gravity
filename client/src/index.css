@@ -302,43 +302,43 @@ button.clickable:not(.btn):hover {
   background-color: var(--color-surface-card);
 }
 
+.input.auto-grow {
+  field-sizing: content;
+  resize: none;
+  overflow-y: hidden;
+}
+
 .input::placeholder {
   color: var(--color-text-disabled);
   opacity: 0.8;
 }
 
-.editable-display {
-  position: relative;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  transition: all var(--transition-normal);
+.input-seamless {
+  border: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
 }
 
-.editable-display:hover,
-.editable-display:focus-visible {
-  background: var(--color-base100);
-  border-color: var(--color-border-default);
-  outline: none;
+.ticket-title-editor {
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--color-text-primary);
+}
+.ticket-title-editor p {
+  margin: 0;
 }
 
-.editable-display__hint {
-  opacity: 0;
-  color: var(--color-text-disabled);
-  transition: opacity var(--transition-normal);
-}
-
-.editable-display:hover .editable-display__hint,
-.editable-display:focus-visible .editable-display__hint {
-  opacity: 1;
-}
-
-.editable-display--title {
-  padding: 6px 8px;
-}
-
-.editable-display--multiline {
-  padding: 8px 10px;
+.input-seamless:focus {
+  border: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
 }
 
 .label {
@@ -505,4 +505,87 @@ button.tool-submit-active {
   .workspace-directory-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* TipTap ProseMirror Editor Custom Stylings */
+.ProseMirror {
+  outline: none !important;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--color-text-primary);
+}
+
+.ProseMirror p {
+  margin-bottom: 8px;
+  line-height: 1.6;
+}
+
+.ProseMirror ul,
+.ProseMirror ol {
+  margin-left: 20px;
+  margin-bottom: 12px;
+}
+
+.ProseMirror li {
+  margin-bottom: 4px;
+}
+
+.ProseMirror code {
+  font-family: var(--mono);
+  background: var(--color-base100);
+  border: 1px solid var(--color-border-default);
+  padding: 2px 5px;
+  border-radius: var(--radius-xs);
+  font-size: 11.5px;
+  color: var(--color-primary);
+}
+
+/* Placeholder styling inside TipTap */
+.ProseMirror p.is-editor-empty:first-child::before {
+  color: var(--color-text-disabled);
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+/* TipTap Bubble Formatting Menu */
+.markdown-bubble-menu {
+  display: flex;
+  background-color: var(--color-surface-card);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: 4px;
+  gap: 2px;
+  align-items: center;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  z-index: 1000;
+}
+
+.bubble-menu-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.bubble-menu-btn:hover {
+  background: var(--color-base100);
+  color: var(--color-text-primary);
+}
+
+.bubble-menu-btn.is-active {
+  background: var(--color-primary);
+  color: var(--color-text-on-accent) !important;
 }

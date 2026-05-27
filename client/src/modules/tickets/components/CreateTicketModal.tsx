@@ -123,10 +123,16 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
         <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {/* Title */}
           <div>
-            <TextInput 
+            <Textarea 
               placeholder="Issue title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                }
+              }}
+              autoGrow
               autoFocus
               required
             />
@@ -135,11 +141,11 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
           {/* Description */}
           <div>
             <Textarea 
-              rows={5}
               aria-label="Description"
               placeholder="Add description... (markdown supported)"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
+              autoGrow
             />
           </div>
         </div>

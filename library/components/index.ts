@@ -24,12 +24,15 @@ export * from './datepicker';
 export * from './daterangepicker';
 export * from './datetimepicker';
 export * from './densetable';
+export * from './densetextarea';
 export * from './densetextinput';
 export * from './densevirtuallist';
 export * from './descriptionlist';
 export * from './divider';
 export * from './drawer';
 export * from './dropdownmenu';
+
+export * from './markdowneditor';
 export * from './emptystate';
 export * from './fileuploader';
 export * from './flex';

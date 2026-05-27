@@ -61,7 +61,7 @@ vi.mock('@library', () => ({
     ) : null,
   Alert: ({ children }: { children: ReactNode }) => <div role="alert">{children}</div>,
   TextInput: ({ value, onChange, ...props }: MockTextInputProps) => <input value={value} onChange={onChange} {...props} />,
-  Textarea: ({ value, onChange, ...props }: MockTextareaProps) => <textarea value={value} onChange={onChange} {...props} />,
+  Textarea: ({ value, onChange, autoGrow, ...props }: any) => <textarea value={value} onChange={onChange} {...props} />,
 }));
 
 const projects = [

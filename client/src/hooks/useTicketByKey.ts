@@ -15,14 +15,14 @@ const resolvedCache: Record<string, any> = {};
  * @returns {Object} An object containing the ticketInfo, loading state, and error (if any).
  */
 export function useTicketByKey(ticketKey: string) {
-  const { tickets, currentUser } = useTickets();
+  const { ticketMap, currentUser } = useTickets();
   const [ticketInfo, setTicketInfo] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
   const normalizedKey = ticketKey.trim().toUpperCase();
   const cacheKey = `${currentUser?.id ?? 'anonymous'}::${normalizedKey}`;
-  const localTicket = tickets.find(t => t.key.toUpperCase() === normalizedKey);
+  const localTicket = ticketMap.get(normalizedKey);
 
   useEffect(() => {
     if (!normalizedKey) {
