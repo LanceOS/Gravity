@@ -259,7 +259,7 @@ export type WorkspaceSummary = {
 };
 
 export async function listWorkspaceSummaries(userId?: string): Promise<WorkspaceSummary[]> {
-  const cacheKey = userId ? `user-workspaces:${userId}` : 'all-workspaces';
+  const cacheKey = userId ? cache.CacheKeys.workspaces.byUser(userId) : cache.CacheKeys.workspaces.all();
   return cache.wrap(cacheKey, 300, async () => {
     const memberRoleByWorkspace = new Map<string, string>();
     let accessibleWorkspaceIds: string[] | null = null;
@@ -357,15 +357,16 @@ export async function listWorkspaceSummaries(userId?: string): Promise<Workspace
 
 export async function invalidateWorkspaceCache(workspaceId: string): Promise<void> {
   try {
-    await cache.del('all-workspaces');
+    const keysToInvalidate = [cache.CacheKeys.workspaces.all()];
     const members = await db
       .select({ userId: workspaceMembers.userId })
       .from(workspaceMembers)
       .where(eq(workspaceMembers.workspaceId, workspaceId));
 
     for (const member of members) {
-      await cache.del(`user-workspaces:${member.userId}`);
+      keysToInvalidate.push(cache.CacheKeys.workspaces.byUser(member.userId));
     }
+    await cache.delMany(keysToInvalidate);
   } catch (error) {
     console.error(`Failed to invalidate cache for workspace ${workspaceId}:`, error);
   }
@@ -373,8 +374,10 @@ export async function invalidateWorkspaceCache(workspaceId: string): Promise<voi
 
 export async function invalidateUserWorkspacesCache(userId: string): Promise<void> {
   try {
-    await cache.del('all-workspaces');
-    await cache.del(`user-workspaces:${userId}`);
+    await cache.delMany([
+      cache.CacheKeys.workspaces.all(),
+      cache.CacheKeys.workspaces.byUser(userId),
+    ]);
   } catch (error) {
     console.error(`Failed to invalidate cache for user ${userId}:`, error);
   }

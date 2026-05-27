@@ -9,6 +9,7 @@ const mockRedisClient = {
   get: vi.fn(),
   set: vi.fn(),
   del: vi.fn(),
+  unlink: vi.fn(),
 };
 
 describe('Cache Service Caching & Fallback Tests', () => {
@@ -40,6 +41,12 @@ describe('Cache Service Caching & Fallback Tests', () => {
       const result = await cache.del('test-key');
       expect(result).toBe(false);
       expect(mockRedisClient.del).not.toHaveBeenCalled();
+    });
+
+    it('delMany() should return false without calling Redis', async () => {
+      const result = await cache.delMany(['test-key1', 'test-key2']);
+      expect(result).toBe(false);
+      expect(mockRedisClient.unlink).not.toHaveBeenCalled();
     });
 
     it('wrap() should execute fetchFn directly on Redis offline', async () => {
@@ -98,6 +105,13 @@ describe('Cache Service Caching & Fallback Tests', () => {
       expect(mockRedisClient.del).toHaveBeenCalledWith('gravity:user:1');
     });
 
+    it('delMany() should call redis client.unlink with chunked namespaces', async () => {
+      mockRedisClient.unlink.mockResolvedValue(2);
+      const success = await cache.delMany(['user:1', 'user:2']);
+      expect(success).toBe(true);
+      expect(mockRedisClient.unlink).toHaveBeenCalledWith(['gravity:user:1', 'gravity:user:2']);
+    });
+
     it('wrap() should return cached data on cache hit without calling fetchFn', async () => {
       const cachedData = { data: 'old' };
       mockRedisClient.get.mockResolvedValue(JSON.stringify(cachedData));
@@ -140,6 +154,12 @@ describe('Cache Service Caching & Fallback Tests', () => {
     it('set() should return false gracefully on Redis command failure', async () => {
       mockRedisClient.set.mockRejectedValue(new Error('Redis command timeout'));
       const success = await cache.set('my-key', 'value');
+      expect(success).toBe(false);
+    });
+
+    it('delMany() should return false gracefully on Redis command failure', async () => {
+      mockRedisClient.unlink.mockRejectedValue(new Error('Redis unlink failure'));
+      const success = await cache.delMany(['my-key1', 'my-key2']);
       expect(success).toBe(false);
     });
 

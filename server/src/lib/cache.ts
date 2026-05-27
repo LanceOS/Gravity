@@ -2,6 +2,13 @@ import { client } from './redis.js';
 
 const KEY_PREFIX = 'gravity:';
 
+export const CacheKeys = {
+  workspaces: {
+    all: () => 'all-workspaces',
+    byUser: (userId: string) => `user-workspaces:${userId}`,
+  },
+};
+
 function getFullKey(key: string): string {
   if (key.startsWith(KEY_PREFIX)) {
     return key;
@@ -77,6 +84,30 @@ export async function del(key: string): Promise<boolean> {
     return true;
   } catch (error) {
     console.warn(`Cache del failed for key "${fullKey}":`, error);
+    return false;
+  }
+}
+
+/**
+ * Delete multiple entries from the cache atomically or in parallel using unlink.
+ * Splitting into chunks if the array is exceptionally large to prevent blocking Redis.
+ */
+export async function delMany(keys: string[]): Promise<boolean> {
+  if (!isRedisReady() || keys.length === 0) {
+    return false;
+  }
+
+  const CHUNK_SIZE = 500;
+  try {
+    // Process in chunks of 500 to prevent blocking the Redis event loop
+    for (let i = 0; i < keys.length; i += CHUNK_SIZE) {
+      const chunk = keys.slice(i, i + CHUNK_SIZE).map(getFullKey);
+      await client!.unlink(chunk);
+    }
+    return true;
+  } catch (error) {
+    const fullKeys = keys.map(getFullKey);
+    console.warn(`Cache delMany failed for keys [${fullKeys.join(', ')}]:`, error);
     return false;
   }
 }
