@@ -2,12 +2,16 @@ import { client } from './redis.js';
 
 const KEY_PREFIX = 'gravity:';
 
+export type CacheKey = string & { readonly __brand: unique symbol };
+
 export const CacheKeys = {
   workspaces: {
-    all: () => 'all-workspaces',
-    byUser: (userId: string) => `user-workspaces:${userId}`,
+    all: () => 'all-workspaces' as CacheKey,
+    byUser: (userId: string) => `user-workspaces:${userId}` as CacheKey,
   },
 };
+
+const inFlightRequests = new Map<string, Promise<any>>();
 
 function getFullKey(key: string): string {
   if (key.startsWith(KEY_PREFIX)) {
@@ -26,7 +30,7 @@ function isRedisReady(): boolean {
 /**
  * Retrieve a parsed value from cache
  */
-export async function get<T>(key: string): Promise<T | null> {
+export async function get<T>(key: CacheKey): Promise<T | null> {
   if (!isRedisReady()) {
     return null;
   }
@@ -54,7 +58,7 @@ export async function get<T>(key: string): Promise<T | null> {
 /**
  * Set a value in the cache with a Time-To-Live (TTL) in seconds
  */
-export async function set<T>(key: string, value: T, ttlSeconds = 300): Promise<boolean> {
+export async function set<T>(key: CacheKey, value: T, ttlSeconds = 300): Promise<boolean> {
   if (!isRedisReady()) {
     return false;
   }
@@ -73,7 +77,7 @@ export async function set<T>(key: string, value: T, ttlSeconds = 300): Promise<b
 /**
  * Delete an entry from the cache
  */
-export async function del(key: string): Promise<boolean> {
+export async function del(key: CacheKey): Promise<boolean> {
   if (!isRedisReady()) {
     return false;
   }
@@ -92,7 +96,7 @@ export async function del(key: string): Promise<boolean> {
  * Delete multiple entries from the cache atomically or in parallel using unlink.
  * Splitting into chunks if the array is exceptionally large to prevent blocking Redis.
  */
-export async function delMany(keys: string[]): Promise<boolean> {
+export async function delMany(keys: CacheKey[]): Promise<boolean> {
   if (!isRedisReady() || keys.length === 0) {
     return false;
   }
@@ -115,9 +119,10 @@ export async function delMany(keys: string[]): Promise<boolean> {
 /**
  * Cache-aside helper. Checks the cache first, on miss executes fetchFn,
  * caches the result, and returns it. Falls back gracefully to fetchFn on any Redis error.
+ * Includes Promise coalescing to prevent cache stampedes (thundering herd).
  */
 export async function wrap<T>(
-  key: string,
+  key: CacheKey,
   ttlSeconds: number,
   fetchFn: () => Promise<T>
 ): Promise<T> {
@@ -126,9 +131,22 @@ export async function wrap<T>(
     return cached;
   }
 
-  const freshData = await fetchFn();
-  await set(key, freshData, ttlSeconds).catch((err) => {
-    console.warn(`Cache wrap failed to set key "${key}":`, err);
-  });
-  return freshData;
+  // Promise coalescing: if a request is already in flight for this key, await it
+  if (inFlightRequests.has(key)) {
+    return inFlightRequests.get(key) as Promise<T>;
+  }
+
+  const fetchPromise = fetchFn()
+    .then(async (freshData) => {
+      await set(key, freshData, ttlSeconds).catch((err) => {
+        console.warn(`Cache wrap failed to set key "${key}":`, err);
+      });
+      return freshData;
+    })
+    .finally(() => {
+      inFlightRequests.delete(key);
+    });
+
+  inFlightRequests.set(key, fetchPromise);
+  return fetchPromise;
 }
