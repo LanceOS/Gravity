@@ -26,9 +26,9 @@ export function bootstrapMcpRegistries() {
   mcpRegistriesBootstrapped = true;
 }
 
-bootstrapMcpRegistries();
-
 export function createApp() {
+  bootstrapMcpRegistries();
+
   const app = express();
 
   app.use(
