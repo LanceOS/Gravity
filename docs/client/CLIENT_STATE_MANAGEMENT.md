@@ -14,7 +14,7 @@ This document outlines how the React client manages application state, data fetc
 
 ## 4. Flow Steps
 1. **Initial Mount**:
-   - `App.tsx` wraps the application in `ThemeProvider` and `TicketContext.Provider`.
+   - `App.tsx` wraps the application in `ThemeProvider` and `TicketProvider`.
 2. **User Authentication Check**:
    - `TicketContext` uses `useEffect` to fetch `GET /api/v1/auth/me`. If a valid user is returned, `currentUser` is set.
 3. **Data Hydration**:
