@@ -40,7 +40,7 @@ The `cache.ts` module exports generic, type-safe functions. It automatically han
 - `server/tests/cache.test.ts`: Comprehensive unit testing suite verifying cache hits, misses, error resilience, and shutdown behavior.
 
 ## 8. Permissions, Guards, or Tenant Boundaries
-- **Strict Namespacing**: All cache keys are strictly prefixed with `gravity:` (enforced via `getFullKey()`). This prevents key collisions if the Redis instance is shared across multiple environments or applications.
+- **Strict Namespacing**: All cache keys are prefixed with `gravity:` (enforced via `getFullKey()`). This helps avoid collisions with other applications; run separate Redis instances/DBs (or add an environment-specific prefix) to isolate multiple Gravity environments.
 - **Tenant Isolation**: When caching tenant-specific data, cache keys MUST include the Tenant ID / Workspace ID (e.g., `workspace_summary_cache_key_${workspaceId}`). Cross-tenant data leakage via cache is prevented by incorporating boundary identifiers directly into the cache key.
 
 ## 9. Best Security Practices and Implementation Standards
