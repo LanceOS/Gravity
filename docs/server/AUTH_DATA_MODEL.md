@@ -61,5 +61,5 @@ This document details the data architecture for authentication and external cred
 
 ## 11. Related Docs
 
-- [Database Architecture Flow](file:///home/lance/Documents/Gravity%20copy/docs/server/DATABASE_ARCHITECTURE_FLOW.md)
-- [KMS Security Architecture](file:///home/lance/Documents/Gravity%20copy/docs/server/kms-security-architecture.md)
+- [Database Architecture Flow](./DATABASE_ARCHITECTURE_FLOW.md)
+- [KMS Security Architecture](./kms-security-architecture.md)
