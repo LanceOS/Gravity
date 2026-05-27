@@ -24,7 +24,7 @@ Owns and mutates the following PostgreSQL tables via Drizzle ORM:
 - `comments`
 
 ## 6. Interfaces and Contracts
-- **REST**: Strict validation using Zod schemas for all mutation payloads (e.g., ticket status constraints).
+- **REST**: Route handlers enforce project scoping and membership checks via the `X-Project-Id` header; request validation is route-specific and should not be assumed to be uniformly enforced by Zod for all mutation payloads.
 - **MCP**: Exposes tools such as `createTicket`, `listTickets`, `readTicketDetails`, `updateTicket`, `createComment`, `readComments`, etc.
 
 ## 7. Key Files and Modules
