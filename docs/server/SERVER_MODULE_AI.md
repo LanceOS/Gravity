@@ -27,9 +27,8 @@ The `ai` module (`server/src/modules/ai/`) handles all integrations with externa
 
 ## 7. Key Files and Modules
 - `routes.ts`: Exposes the AI chatting endpoints.
-- `providers/openai.ts`: The OpenAI API adapter.
-- `providers/anthropic.ts`: The Anthropic API adapter.
-- `prompt-builder.ts`: Utilities for assembling consistent system prompts across different contexts.
+- `providers/openai-provider.ts`: The OpenAI API adapter.
+- `providers/anthropic-provider.ts`: The Anthropic API adapter.
 - `types.ts`: Defines the generic AI interaction interfaces.
 
 ## 8. Permissions, Guards, or Tenant Boundaries
