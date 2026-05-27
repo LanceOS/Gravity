@@ -111,11 +111,6 @@ if (typeof Element !== 'undefined') {
   defineGeometryMethod(Element.prototype, 'getBoundingClientRect', () => emptyDOMRect);
 }
 
-if (typeof Node !== 'undefined') {
-  defineGeometryMethod(Node.prototype, 'getClientRects', () => emptyDOMRectList);
-  defineGeometryMethod(Node.prototype, 'getBoundingClientRect', () => emptyDOMRect);
-}
-
 if (typeof Range !== 'undefined') {
   defineGeometryMethod(Range.prototype, 'getClientRects', () => emptyDOMRectList);
   defineGeometryMethod(Range.prototype, 'getBoundingClientRect', () => emptyDOMRect);
