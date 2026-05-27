@@ -10,11 +10,23 @@ import { registerMcpTools } from './modules/mcp/tools.js';
 import { ticketToolDefinitions, ticketToolHandlers } from './modules/tickets/mcp.js';
 import { workspaceToolDefinitions, workspaceToolHandlers } from './modules/workspaces/mcp.js';
 
-registerToolHandlers(ticketToolHandlers);
-registerToolHandlers(workspaceToolHandlers);
+let mcpRegistriesBootstrapped = false;
 
-registerMcpTools(ticketToolDefinitions);
-registerMcpTools(workspaceToolDefinitions);
+export function bootstrapMcpRegistries() {
+  if (mcpRegistriesBootstrapped) {
+    return;
+  }
+
+  registerToolHandlers(ticketToolHandlers);
+  registerToolHandlers(workspaceToolHandlers);
+
+  registerMcpTools(ticketToolDefinitions);
+  registerMcpTools(workspaceToolDefinitions);
+
+  mcpRegistriesBootstrapped = true;
+}
+
+bootstrapMcpRegistries();
 
 export function createApp() {
   const app = express();
