@@ -12,7 +12,7 @@ This document details the data architecture for Workspaces, Projects, Domains, a
 ## 3. Entry Points
 
 - **Schema Definition**: `server/src/modules/workspaces/schema.ts`
-- **Routes**: `server/src/modules/workspaces/routes.js`, `server/src/modules/workspaces/projects-routes.js`
+- **Routes**: `server/src/modules/workspaces/routes.ts`, `server/src/modules/workspaces/projects-routes.ts`
 
 ## 4. Flow Steps
 
