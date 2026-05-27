@@ -5,7 +5,7 @@ This document outlines the high-level architecture of the `server/src/` director
 
 ## 2. Non-Goals or Boundary Limits
 - Does not cover client-side architecture (see [client-architecture.md](client-architecture.md)).
-- Does not cover detailed sub-module implementations like specific AI integrations or KMS envelope encryption (see [kms-security-architecture.md](kms-security-architecture.md)).
+- Does not cover detailed sub-module implementations like specific AI integrations or KMS envelope encryption.
 
 ## 3. Entry Points
 - **HTTP Server**: `server/src/index.ts` and `server/src/app.ts` initialize the Express application and mount the global API router from `server/src/routes/index.ts`.
