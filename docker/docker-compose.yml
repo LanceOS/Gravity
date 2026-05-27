@@ -21,11 +21,11 @@ services:
   redis:
     image: redis:7-alpine
     container_name: ${GRAVITY_REDIS_CONTAINER:-gravity_redis}
-    command: redis-server --requirepass secure_dev_password_change_me_in_prod
+    command: redis-server --requirepass ${GRAVITY_REDIS_PASSWORD:-secure_dev_password_change_me_in_prod}
     ports:
       - "${GRAVITY_REDIS_PORT:-6379}:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "secure_dev_password_change_me_in_prod", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${GRAVITY_REDIS_PASSWORD:-secure_dev_password_change_me_in_prod}", "ping"]
       interval: 5s
       timeout: 5s
       retries: 5
