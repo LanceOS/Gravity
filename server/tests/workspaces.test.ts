@@ -179,17 +179,17 @@ describe('workspaces routes', () => {
       label: 'Team Invite',
     });
 
-    const applicant = await seedUser({
-      id: 'join-user',
+    const applicantApi = await createAuthenticatedApi({
       name: 'Join Requester',
       email: 'joiner@example.com',
       role: 'member',
       avatarUrl: 'https://example.com/joiner.png',
     });
+    const applicant = applicantApi.user;
 
-    const joinRequestResponse = await api()
+    const joinRequestResponse = await applicantApi
       .post(`/api/v1/workspaces/invites/${inviteResponse.body.code}/join-requests`)
-      .send({ userId: applicant.id, message: 'Requesting access to the workspace.' });
+      .send({ message: 'Requesting access to the workspace.' });
 
     expect(joinRequestResponse.status).toBe(201);
     expect(joinRequestResponse.body).toMatchObject({

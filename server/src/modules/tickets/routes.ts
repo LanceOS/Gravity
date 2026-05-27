@@ -1,5 +1,5 @@
 import { and, asc, eq } from 'drizzle-orm';
-import { type Response, Router } from 'express';
+import { type Request, type Response, Router } from 'express';
 import { db } from '../../db/index.js';
 import { cycles, domains, projects, tickets, workspaceMembers } from '../../db/schema.js';
 import { broadcastEvent } from '../../realtime.js';
@@ -50,10 +50,32 @@ export function createTicketsRouter() {
     return { allowed: true as const, ticket };
   }
 
+  async function authorizeProjectAccess(req: Request, projectId: string) {
+    const userId = await resolveRequestActorUserId(req);
+    if (!userId) {
+      return { allowed: false as const, error: 'Authentication required.', status: 401 };
+    }
+    const workspaceId = await getProjectWorkspaceId(projectId);
+    if (!workspaceId) {
+      return { allowed: false as const, error: 'Project not found.', status: 404 };
+    }
+    const isMember = await isWorkspaceMember(workspaceId, userId);
+    if (!isMember) {
+      return { allowed: false as const, error: 'Access denied: not a member of the workspace.', status: 403 };
+    }
+    return { allowed: true as const, userId };
+  }
+
   router.get('/tickets', async (req, res) => {
     const projectId = getProjectIdFromRequest(req);
     if (!projectId) {
       res.status(400).json({ error: 'Project ID is required.' });
+      return;
+    }
+
+    const auth = await authorizeProjectAccess(req, projectId);
+    if (!auth.allowed) {
+      res.status(auth.status).json({ error: auth.error });
       return;
     }
 
@@ -75,6 +97,12 @@ export function createTicketsRouter() {
     const projectId = getProjectIdFromRequest(req);
     if (!projectId || !req.body?.title) {
       res.status(400).json({ error: 'Project ID and ticket title are required.' });
+      return;
+    }
+
+    const auth = await authorizeProjectAccess(req, projectId);
+    if (!auth.allowed) {
+      res.status(auth.status).json({ error: auth.error });
       return;
     }
 
@@ -118,25 +146,10 @@ export function createTicketsRouter() {
         return;
       }
 
-      const userId = await resolveRequestActorUserId(req);
-      if (!userId) {
-        res.status(401).json({ error: 'Authentication required.' });
+      const auth = await authorizeProjectAccess(req, ticket.projectId);
+      if (!auth.allowed) {
+        res.status(auth.status).json({ error: auth.error });
         return;
-      }
-      if (userId) {
-        // Get the ticket's workspace ID
-        const workspaceId = await getProjectWorkspaceId(ticket.projectId);
-        if (!workspaceId) {
-          res.status(404).json({ error: 'Ticket project not found.' });
-          return;
-        }
-
-        // Check if the user is a member of the workspace
-        const isMember = await isWorkspaceMember(workspaceId, userId);
-        if (!isMember) {
-          res.status(403).json({ error: 'Access denied: not a member of the workspace.' });
-          return;
-        }
       }
 
       res.json(ticket);
@@ -148,13 +161,20 @@ export function createTicketsRouter() {
   router.get('/tickets/:ticketId', async (req, res) => {
     try {
       const ticketId = normalizeRouteParam(req.params.ticketId);
-      const ticket = await getTicketDetails(ticketId, getProjectIdFromRequest(req) || undefined);
+      const ticket = await getTicketById(ticketId, getProjectIdFromRequest(req) || undefined);
       if (!ticket) {
         res.status(404).json({ error: 'Ticket not found.' });
         return;
       }
 
-      res.json(ticket);
+      const auth = await authorizeProjectAccess(req, ticket.projectId);
+      if (!auth.allowed) {
+        res.status(auth.status).json({ error: auth.error });
+        return;
+      }
+
+      const ticketDetails = await getTicketDetails(ticket.id, ticket.projectId);
+      res.json(ticketDetails);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load ticket.' });
     }
@@ -164,6 +184,12 @@ export function createTicketsRouter() {
     const projectId = getProjectIdFromRequest(req);
     if (!projectId) {
       res.status(400).json({ error: 'Project ID is required.' });
+      return;
+    }
+
+    const auth = await authorizeProjectAccess(req, projectId);
+    if (!auth.allowed) {
+      res.status(auth.status).json({ error: auth.error });
       return;
     }
 
@@ -189,6 +215,12 @@ export function createTicketsRouter() {
       return;
     }
 
+    const auth = await authorizeProjectAccess(req, projectId);
+    if (!auth.allowed) {
+      res.status(auth.status).json({ error: auth.error });
+      return;
+    }
+
     try {
       const ticketId = normalizeRouteParam(req.params.ticketId);
       const deleted = await deleteTicketRecord(ticketId, projectId);
@@ -207,6 +239,18 @@ export function createTicketsRouter() {
   router.get('/tickets/:ticketId/comments', async (req, res) => {
     try {
       const ticketId = normalizeRouteParam(req.params.ticketId);
+      const ticket = await getTicketById(ticketId);
+      if (!ticket) {
+        res.status(404).json({ error: 'Ticket not found.' });
+        return;
+      }
+
+      const auth = await authorizeProjectAccess(req, ticket.projectId);
+      if (!auth.allowed) {
+        res.status(auth.status).json({ error: auth.error });
+        return;
+      }
+
       res.json(await listComments(ticketId));
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load comments.' });
@@ -215,21 +259,31 @@ export function createTicketsRouter() {
 
   router.post('/tickets/:ticketId/comments', async (req, res) => {
     const ticketId = normalizeRouteParam(req.params.ticketId);
-    const actorUserId = await resolveRequestActorUserId(req);
-    const userId = actorUserId ?? (typeof req.body?.userId === 'string' ? req.body.userId : '');
-    const body =
-      typeof req.body?.content === 'string'
-        ? req.body.content
-        : typeof req.body?.body === 'string'
-          ? req.body.body
-          : '';
-
-    if (!userId || !body) {
-      res.status(400).json({ error: 'userId and body are required.' });
-      return;
-    }
-
     try {
+      const ticket = await getTicketById(ticketId);
+      if (!ticket) {
+        res.status(404).json({ error: 'Ticket not found.' });
+        return;
+      }
+
+      const auth = await authorizeProjectAccess(req, ticket.projectId);
+      if (!auth.allowed) {
+        res.status(auth.status).json({ error: auth.error });
+        return;
+      }
+
+      const userId = auth.userId;
+      const body =
+        typeof req.body?.content === 'string'
+          ? req.body.content
+          : typeof req.body?.body === 'string'
+            ? req.body.body
+            : '';
+
+      if (!body) {
+        res.status(400).json({ error: 'Comment body is required.' });
+        return;
+      }
 
       const comment = await addCommentRecord(ticketId, userId, body);
       const allComments = await listComments(ticketId);
@@ -243,14 +297,26 @@ export function createTicketsRouter() {
   router.patch('/tickets/:ticketId/comments/:commentId', async (req, res) => {
     const ticketId = normalizeRouteParam(req.params.ticketId);
     const commentId = normalizeRouteParam(req.params.commentId);
-    const body = typeof req.body?.body === 'string' ? req.body.body : '';
-
-    if (!body) {
-      res.status(400).json({ error: 'Comment body is required.' });
-      return;
-    }
-
+    
     try {
+      const ticket = await getTicketById(ticketId);
+      if (!ticket) {
+        res.status(404).json({ error: 'Ticket not found.' });
+        return;
+      }
+
+      const auth = await authorizeProjectAccess(req, ticket.projectId);
+      if (!auth.allowed) {
+        res.status(auth.status).json({ error: auth.error });
+        return;
+      }
+
+      const body = typeof req.body?.body === 'string' ? req.body.body : '';
+
+      if (!body) {
+        res.status(400).json({ error: 'Comment body is required.' });
+        return;
+      }
 
       const comment = await updateCommentRecord(commentId, ticketId, body);
       if (!comment) {
@@ -271,6 +337,17 @@ export function createTicketsRouter() {
     const commentId = normalizeRouteParam(req.params.commentId);
 
     try {
+      const ticket = await getTicketById(ticketId);
+      if (!ticket) {
+        res.status(404).json({ error: 'Ticket not found.' });
+        return;
+      }
+
+      const auth = await authorizeProjectAccess(req, ticket.projectId);
+      if (!auth.allowed) {
+        res.status(auth.status).json({ error: auth.error });
+        return;
+      }
 
       const deleted = await deleteCommentRecord(commentId, ticketId);
       if (!deleted) {
@@ -293,6 +370,12 @@ export function createTicketsRouter() {
       return;
     }
 
+    const auth = await authorizeProjectAccess(req, projectId);
+    if (!auth.allowed) {
+      res.status(auth.status).json({ error: auth.error });
+      return;
+    }
+
     try {
       const rows = await db.select().from(domains).where(eq(domains.projectId, projectId)).orderBy(asc(domains.createdAt));
       res.json(rows.map((domain) => ({ id: domain.id, name: domain.name, color: domain.color })));
@@ -305,6 +388,12 @@ export function createTicketsRouter() {
     const projectId = getProjectIdFromRequest(req);
     if (!projectId || !req.body?.name) {
       res.status(400).json({ error: 'Project ID and domain name are required.' });
+      return;
+    }
+
+    const auth = await authorizeProjectAccess(req, projectId);
+    if (!auth.allowed) {
+      res.status(auth.status).json({ error: auth.error });
       return;
     }
 
@@ -333,6 +422,12 @@ export function createTicketsRouter() {
       return;
     }
 
+    const auth = await authorizeProjectAccess(req, projectId);
+    if (!auth.allowed) {
+      res.status(auth.status).json({ error: auth.error });
+      return;
+    }
+
     try {
       const rows = await db.select().from(cycles).where(eq(cycles.projectId, projectId)).orderBy(asc(cycles.startDate));
       res.json(rows.map(mapCycle));
@@ -345,6 +440,12 @@ export function createTicketsRouter() {
     const projectId = getProjectIdFromRequest(req);
     if (!projectId || !req.body?.name || !req.body?.startDate || !req.body?.endDate) {
       res.status(400).json({ error: 'Project ID, cycle name, startDate, and endDate are required.' });
+      return;
+    }
+
+    const auth = await authorizeProjectAccess(req, projectId);
+    if (!auth.allowed) {
+      res.status(auth.status).json({ error: auth.error });
       return;
     }
 

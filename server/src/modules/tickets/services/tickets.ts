@@ -138,43 +138,50 @@ export async function getTicketDetails(ticketId: string, projectId?: string) {
     return null;
   }
 
-  const [ticketComments, subtasks] = await Promise.all([
+  const [
+    ticketComments,
+    subtasks,
+    assigneeResult,
+    projectResult,
+    domainResult,
+    cycleResult
+  ] = await Promise.all([
     listComments(ticket.id),
     db.select().from(tickets).where(eq(tickets.parentId, ticket.id)),
+    ticket.assigneeId
+      ? db
+          .select({
+            id: authUsers.id,
+            name: authUsers.name,
+            email: authUsers.email,
+            avatarUrl: userProfiles.avatarUrl,
+            image: authUsers.image,
+          })
+          .from(authUsers)
+          .leftJoin(userProfiles, eq(userProfiles.userId, authUsers.id))
+          .where(eq(authUsers.id, ticket.assigneeId))
+          .limit(1)
+      : Promise.resolve([]),
+    db.select().from(projects).where(eq(projects.id, ticket.projectId)).limit(1),
+    ticket.domainId
+      ? db.select().from(domains).where(eq(domains.id, ticket.domainId)).limit(1)
+      : Promise.resolve([]),
+    ticket.cycleId
+      ? db.select().from(cycles).where(eq(cycles.id, ticket.cycleId)).limit(1)
+      : Promise.resolve([]),
   ]);
 
-  // Fetch assignee details if assigneeId is set
-  let assignee = null;
-  if (ticket.assigneeId) {
-    const [userRow] = await db
-      .select({
-        id: authUsers.id,
-        name: authUsers.name,
-        email: authUsers.email,
-        avatarUrl: userProfiles.avatarUrl,
-        image: authUsers.image,
-      })
-      .from(authUsers)
-      .leftJoin(userProfiles, eq(userProfiles.userId, authUsers.id))
-      .where(eq(authUsers.id, ticket.assigneeId))
-      .limit(1);
-
-    if (userRow) {
-      assignee = {
+  const userRow = assigneeResult[0];
+  const assignee = userRow
+    ? {
         id: userRow.id,
         name: userRow.name,
         email: userRow.email,
         avatarUrl: userRow.avatarUrl ?? userRow.image ?? '',
-      };
-    }
-  }
+      }
+    : null;
 
-  // Fetch project details
-  const [projectRow] = await db
-    .select()
-    .from(projects)
-    .where(eq(projects.id, ticket.projectId))
-    .limit(1);
+  const projectRow = projectResult[0];
   const project = projectRow
     ? {
         id: projectRow.id,
@@ -184,41 +191,25 @@ export async function getTicketDetails(ticketId: string, projectId?: string) {
       }
     : null;
 
-  // Fetch domain details if domainId is set
-  let domain = null;
-  if (ticket.domainId) {
-    const [domainRow] = await db
-      .select()
-      .from(domains)
-      .where(eq(domains.id, ticket.domainId))
-      .limit(1);
-    if (domainRow) {
-      domain = {
+  const domainRow = domainResult[0];
+  const domain = domainRow
+    ? {
         id: domainRow.id,
         name: domainRow.name,
         color: domainRow.color,
-      };
-    }
-  }
+      }
+    : null;
 
-  // Fetch cycle details if cycleId is set
-  let cycle = null;
-  if (ticket.cycleId) {
-    const [cycleRow] = await db
-      .select()
-      .from(cycles)
-      .where(eq(cycles.id, ticket.cycleId))
-      .limit(1);
-    if (cycleRow) {
-      cycle = {
+  const cycleRow = cycleResult[0];
+  const cycle = cycleRow
+    ? {
         id: cycleRow.id,
         name: cycleRow.name,
         startDate: normalizeIsoDate(cycleRow.startDate),
         endDate: normalizeIsoDate(cycleRow.endDate),
         completed: cycleRow.completed ? 1 : 0,
-      };
-    }
-  }
+      }
+    : null;
 
   return {
     ...ticket,
@@ -322,9 +313,12 @@ export async function deleteTicketRecord(ticketId: string, projectId?: string) {
     return false;
   }
 
-  await db.delete(comments).where(eq(comments.ticketId, ticketId));
-  await db.delete(tickets).where(eq(tickets.parentId, ticketId));
-  await db.delete(tickets).where(eq(tickets.id, ticketId));
+  await db.transaction(async (tx) => {
+    await tx.delete(comments).where(eq(comments.ticketId, ticketId));
+    await tx.delete(tickets).where(eq(tickets.parentId, ticketId));
+    await tx.delete(tickets).where(eq(tickets.id, ticketId));
+  });
+  
   return true;
 }
 
