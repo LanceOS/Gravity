@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { createAuthenticatedApi, jsonResponse } from './helpers/test-helpers.js';
-import { aiService } from '../src/lib/ai/index.js';
+import { aiService } from '../src/modules/ai/index.js';
 
 let authenticatedApi: Awaited<ReturnType<typeof createAuthenticatedApi>>;
 

@@ -1,12 +1,34 @@
 import cors from 'cors';
 import express from 'express';
 import { toNodeHandler } from 'better-auth/node';
-import { auth } from './auth.js';
+import { auth } from './modules/auth/auth.js';
 import { env } from './env.js';
 import { createApiRouter } from './routes/index.js';
-import { createAuthCompatibilityRouter } from './routes/auth.js';
+import { createAuthCompatibilityRouter } from './modules/auth/routes.js';
+import { registerToolHandlers } from './modules/mcp/tool-handlers/registry.js';
+import { registerMcpTools } from './modules/mcp/tools.js';
+import { ticketToolDefinitions, ticketToolHandlers } from './modules/tickets/mcp.js';
+import { workspaceToolDefinitions, workspaceToolHandlers } from './modules/workspaces/mcp.js';
+
+let mcpRegistriesBootstrapped = false;
+
+export function bootstrapMcpRegistries() {
+  if (mcpRegistriesBootstrapped) {
+    return;
+  }
+
+  registerToolHandlers(ticketToolHandlers);
+  registerToolHandlers(workspaceToolHandlers);
+
+  registerMcpTools(ticketToolDefinitions);
+  registerMcpTools(workspaceToolDefinitions);
+
+  mcpRegistriesBootstrapped = true;
+}
 
 export function createApp() {
+  bootstrapMcpRegistries();
+
   const app = express();
 
   app.use(

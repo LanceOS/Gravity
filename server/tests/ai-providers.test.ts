@@ -1,9 +1,9 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { OpenAiProvider } from '../src/lib/ai/openai-provider.js';
-import { AnthropicProvider } from '../src/lib/ai/anthropic-provider.js';
-import { GeminiProvider } from '../src/lib/ai/gemini-provider.js';
-import { OllamaProvider } from '../src/lib/ai/ollama-provider.js';
-import { fetchWithTimeout, readErrorMessage } from '../src/lib/ai/utils.js';
+import { OpenAiProvider } from '../src/modules/ai/providers/openai-provider.js';
+import { AnthropicProvider } from '../src/modules/ai/providers/anthropic-provider.js';
+import { GeminiProvider } from '../src/modules/ai/providers/gemini-provider.js';
+import { OllamaProvider } from '../src/modules/ai/providers/ollama-provider.js';
+import { fetchWithTimeout, readErrorMessage } from '../src/modules/ai/utils/utils.js';
 
 // ---------------------------------------------------------------------------
 // Helpers

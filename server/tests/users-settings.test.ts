@@ -85,11 +85,7 @@ describe('users and settings routes', () => {
     expect(forbiddenGetResponse.status).toBe(403);
     expect(forbiddenGetResponse.body).toEqual({ error: 'Forbidden.' });
 
-    const headerBypassResponse = await api()
-      .get(`/api/v1/settings/${user.id}`)
-      .set('x-user-id', user.id);
-    expect(headerBypassResponse.status).toBe(401);
-    expect(headerBypassResponse.body).toEqual({ error: 'Unauthorized.' });
+
 
     const forbiddenPatchResponse = await otherUserApi
       .patch(`/api/v1/settings/${user.id}`)

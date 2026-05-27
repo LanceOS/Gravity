@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getMcpStdioContext } from '../src/mcp/stdio-config.js';
+import { getMcpStdioContext } from '../src/modules/mcp/stdio-config.js';
 
 describe('getMcpStdioContext', () => {
   it('throws when the stdio workspace id is missing', () => {
