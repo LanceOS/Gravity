@@ -15,7 +15,7 @@ This document explains how the React client handles routing, navigation flows, a
    - If `!currentUser`, the `AuthScreen` is rendered.
    - If `loading` or workspaces are fetching, `LoadingPage` is rendered.
 2. **Onboarding Check**:
-   - If the user has not completed the tutorial (`currentUser.tutorial_completed === 0`), the `OnboardingModal` renders on top of the current screen.
+   - If the user has not completed the tutorial (`currentUser.tutorial_completed === 0 || currentUser.tutorial_completed === false`), the `OnboardingModal` renders on top of the current screen.
 3. **Workspace Resolution**:
    - The app reads `gravity_active_workspace:{userId}` from `localStorage`.
    - If no workspaces exist, the user is locked to the `directory` section.
