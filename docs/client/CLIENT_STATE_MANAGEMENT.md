@@ -44,7 +44,7 @@ This document outlines how the React client manages application state, data fetc
 - Client-side filtering applies `activeWorkspaceId` to ensure users only see projects and tickets belonging to the workspace they are currently viewing. However, the true tenant boundary is enforced by the server on every API call.
 
 ## 9. Failure Modes, Observability, or Operational Notes
-- **State Stagnation**: Since the app doesn't currently utilize WebSockets for real-time ticket updates, a user must refresh the page (or perform an action that triggers a re-fetch) to see updates made by other users.
+- **State Stagnation / Partial Real-Time Sync**: The app does not use WebSockets, but `TicketContext` does subscribe to Server-Sent Events (SSE) via `/api/v1/events/subscribe` and reacts to events such as `tickets-updated` and `comments-updated`. In practice, this means some ticket/comment changes can appear without a full page refresh. However, the live updates are still limited to what the active SSE handling refreshes (for example, the currently active project or ticket context), so users may still need to refresh or navigate to see changes outside that active scope.
 - **Race Conditions**: Some hooks have loading states (`settingsLoading`, `saveLoading`). UI components must respect these states to prevent double-submissions.
 
 ## 10. Change Hazards, Invariants, or Migration Constraints
