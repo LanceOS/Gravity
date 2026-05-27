@@ -22,12 +22,6 @@ export class McpRouterFactory {
     router.post('/mcp/sse', async (req: Request, res: Response) => {
       try {
         // Transport-level auth and workspace validation use plain HTTP semantics.
-        const actorUserId = await resolveRequestActorUserId(req);
-        if (!actorUserId) {
-          res.status(401).json({ error: 'Authentication required.' });
-          return;
-        }
-
         const headerWorkspaceId = (req.header('x-workspace-id') || req.header('X-Workspace-Id'))?.trim();
         const bodyWorkspaceId =
           typeof req.body?.params?.workspaceId === 'string' && req.body.params.workspaceId.trim().length > 0
@@ -39,11 +33,43 @@ export class McpRouterFactory {
           return;
         }
 
-        const hasAccess = await isWorkspaceMember(workspaceId, actorUserId);
+        // First try normal session-based authentication.
+        let actorUserId = await resolveRequestActorUserId(req);
+        let accessChecked = false;
 
-        if (!hasAccess) {
-          res.status(403).json({ error: 'Unauthorized workspace access.' });
-          return;
+        if (actorUserId) {
+          const hasAccess = await isWorkspaceMember(workspaceId, actorUserId);
+          if (!hasAccess) {
+            res.status(403).json({ error: 'Unauthorized workspace access.' });
+            return;
+          }
+          accessChecked = true;
+        } else {
+          // Fallback to bearer token auth for external MCP clients. Token must be bound to workspace.
+          const authHeader = (req.header('authorization') || req.header('Authorization') || '').trim();
+          if (authHeader.startsWith('Bearer ')) {
+            const token = authHeader.slice('Bearer '.length).trim();
+            if (token) {
+              try {
+                const { verifyAndConsumeToken } = await import('./connection.js');
+                const tokenRow = await verifyAndConsumeToken(token, workspaceId);
+                if (!tokenRow) {
+                  res.status(401).json({ error: 'Invalid or expired token.' });
+                  return;
+                }
+                actorUserId = tokenRow.generatedBy;
+                accessChecked = true;
+              } catch (err) {
+                res.status(401).json({ error: 'Invalid token.' });
+                return;
+              }
+            }
+          }
+
+          if (!accessChecked) {
+            res.status(401).json({ error: 'Authentication required.' });
+            return;
+          }
         }
 
         const response = await handleMcpRequest(req.body, workspaceId, actorUserId, {

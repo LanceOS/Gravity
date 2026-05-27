@@ -11,9 +11,11 @@ import {
   sortTicketsForList,
 } from '../../modules/tickets/utils/ticketView';
 import { WorkspaceHeader } from '../../modules/workspaces';
+import WorkspaceMcpModal from '../../modules/workspaces/components/WorkspaceMcpModal';
 import './WorkspacePage.css';
 
 interface WorkspacePageProps {
+  workspaceId?: string;
   activeTicket: Ticket | null;
   activeView: 'board' | 'list';
   comments: Comment[];
@@ -40,6 +42,7 @@ interface WorkspacePageProps {
 }
 
 export function WorkspacePage({
+  workspaceId,
   activeTicket,
   activeView,
   comments,
@@ -64,6 +67,7 @@ export function WorkspacePage({
   onSetView,
   onUpdateTicket,
 }: WorkspacePageProps) {
+  const [isMcpOpen, setIsMcpOpen] = useState(false);
   const filteredTickets = useMemo(() => filterTickets(tickets, filters), [tickets, filters]);
   const hasFiltersApplied = useMemo(() => hasActiveTicketFilters(filters), [filters]);
   const headerTitle = useMemo(
@@ -122,6 +126,13 @@ export function WorkspacePage({
                 activeView={activeView}
                 onSetView={onSetView}
               />
+            )}
+            {!activeTicket && (
+              <div style={{ marginLeft: 12 }}>
+                <Button type="button" variant="secondary" onClick={() => setIsMcpOpen(true)}>
+                  Connect External AI
+                </Button>
+              </div>
             )}
           </WorkspaceHeader.Top>
           
@@ -211,6 +222,7 @@ export function WorkspacePage({
           </div>
         ) : null}
       </div>
+      <WorkspaceMcpModal workspaceId={workspaceId} isOpen={isMcpOpen} onClose={() => setIsMcpOpen(false)} />
     </div>
   );
 }

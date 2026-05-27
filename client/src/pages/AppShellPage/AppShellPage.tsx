@@ -820,6 +820,7 @@ export function AppShellPage() {
             />
           ) : (
             <WorkspacePage
+              workspaceId={activeWorkspaceId}
               activeTicket={activeTicket}
               activeView={activeView}
               comments={comments}

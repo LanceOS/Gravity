@@ -17,6 +17,7 @@ import {
   workspaceMemberActivity,
   workspaces,
   workspaceSettings,
+  mcpConnectionTokens,
 } from '../../db/schema.js';
 import {
   addUserToWorkspaceProjects,
@@ -35,6 +36,8 @@ import {
   listWorkspaceSummaries,
   normalizeEntityKey,
 } from '../../lib/platform.js';
+import { createConnectionToken, revokeConnectionToken } from '../mcp/connection.js';
+import { isWorkspaceMember } from './services/membership.js';
 import { mapProjectCreationError } from './utils/project-creation.js';
 import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
 
@@ -709,6 +712,87 @@ export function createWorkspacesRouter() {
       res.json({ ...invite, revokedAt });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to revoke invite.' });
+    }
+  });
+
+  // Create a short-lived MCP connection token bound to this workspace.
+  router.post('/workspaces/:workspaceId/mcp/connection', async (req, res) => {
+    const { workspaceId } = req.params;
+    const actorUserId = await resolveRequestActorUserId(req);
+    if (!actorUserId) {
+      res.status(401).json({ error: 'Authentication required.' });
+      return;
+    }
+
+    try {
+      const member = await isWorkspaceMember(workspaceId, actorUserId);
+      if (!member) {
+        res.status(403).json({ error: 'Workspace membership required.' });
+        return;
+      }
+
+      const { scopes, ttlSeconds, singleUse, connectionType } = req.body ?? {};
+      const sourceIp = req.ip ?? (req.headers['x-forwarded-for'] as string) ?? null;
+
+      const token = await createConnectionToken({
+        workspaceId,
+        generatedBy: actorUserId,
+        scopes: Array.isArray(scopes) ? scopes : undefined,
+        ttlSeconds: typeof ttlSeconds === 'number' ? ttlSeconds : undefined,
+        singleUse: singleUse === false ? false : true,
+        connectionType: typeof connectionType === 'string' ? connectionType : 'http-post',
+        sourceIp,
+      });
+
+      res.status(201).json({
+        id: token.id,
+        token: token.rawToken,
+        expires_at: token.expiresAt,
+        scopes: token.scopes,
+      });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create connection token.' });
+    }
+  });
+
+  router.post('/workspaces/:workspaceId/mcp/connection/:tokenId/revoke', async (req, res) => {
+    const { workspaceId, tokenId } = req.params;
+    const actorUserId = await resolveRequestActorUserId(req);
+    if (!actorUserId) {
+      res.status(401).json({ error: 'Authentication required.' });
+      return;
+    }
+
+    try {
+      const membershipRows = await db
+        .select()
+        .from(workspaceMembers)
+        .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, actorUserId)))
+        .limit(1);
+      const membership = membershipRows[0];
+
+      // Allow revoke if token owner or workspace owner/admin
+      const tokenRows = await db
+        .select()
+        .from(mcpConnectionTokens)
+        .where(and(eq(mcpConnectionTokens.id, tokenId), eq(mcpConnectionTokens.workspaceId, workspaceId)))
+        .limit(1);
+      const token = tokenRows[0];
+      if (!token) {
+        res.status(404).json({ error: 'Token not found.' });
+        return;
+      }
+
+      const isOwnerOrAdmin = membership && ['owner', 'admin'].includes(membership.role);
+      if (token.generatedBy !== actorUserId && !isOwnerOrAdmin) {
+        res.status(403).json({ error: 'Insufficient privileges to revoke token.' });
+        return;
+      }
+
+      await revokeConnectionToken(tokenId, actorUserId);
+      res.json({ id: tokenId, revoked_at: new Date().toISOString() });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to revoke token.' });
     }
   });
 
