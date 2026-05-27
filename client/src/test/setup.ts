@@ -22,8 +22,62 @@ if (!HTMLElement.prototype.scrollIntoView) {
   HTMLElement.prototype.scrollIntoView = () => {};
 }
 
-if (!document.elementFromPoint) {
-  document.elementFromPoint = () => null;
+function defineGeometryMethod(target: object, name: string, value: (...args: never[]) => unknown) {
+  Object.defineProperty(target, name, {
+    configurable: true,
+    writable: true,
+    value,
+  });
+}
+
+function defineGeometryMethodIfMissing(target: object, name: string, value: (...args: never[]) => unknown) {
+  const descriptor = Object.getOwnPropertyDescriptor(target, name);
+
+  if (descriptor && typeof descriptor.value === 'function') {
+    return;
+  }
+
+  defineGeometryMethod(target, name, value);
+}
+
+function emptyPointTarget(this: Document) {
+  return this.body ?? this.documentElement ?? null;
+}
+
+if (typeof document !== 'undefined') {
+  defineGeometryMethodIfMissing(
+    document,
+    'elementFromPoint',
+    emptyPointTarget as unknown as (...args: never[]) => unknown,
+  );
+}
+
+if (typeof Document !== 'undefined') {
+  defineGeometryMethodIfMissing(
+    Document.prototype,
+    'elementFromPoint',
+    emptyPointTarget as unknown as (...args: never[]) => unknown,
+  );
+}
+
+if (typeof DocumentFragment !== 'undefined') {
+  defineGeometryMethodIfMissing(
+    DocumentFragment.prototype,
+    'elementFromPoint',
+    function () {
+      return null;
+    } as unknown as (...args: never[]) => unknown,
+  );
+}
+
+if (typeof ShadowRoot !== 'undefined') {
+  defineGeometryMethodIfMissing(
+    ShadowRoot.prototype,
+    'elementFromPoint',
+    function (this: ShadowRoot) {
+      return this.host ?? null;
+    } as unknown as (...args: never[]) => unknown,
+  );
 }
 
 const emptyDOMRectList = {
@@ -52,24 +106,19 @@ if (!HTMLElement.prototype.getBoundingClientRect) {
   HTMLElement.prototype.getBoundingClientRect = () => emptyDOMRect;
 }
 
-if (typeof Range !== 'undefined') {
-  if (!Range.prototype.getClientRects) {
-    Range.prototype.getClientRects = () => emptyDOMRectList;
-  }
+if (typeof Element !== 'undefined') {
+  defineGeometryMethod(Element.prototype, 'getClientRects', () => emptyDOMRectList);
+  defineGeometryMethod(Element.prototype, 'getBoundingClientRect', () => emptyDOMRect);
+}
 
-  if (!Range.prototype.getBoundingClientRect) {
-    Range.prototype.getBoundingClientRect = () => emptyDOMRect;
-  }
+if (typeof Range !== 'undefined') {
+  defineGeometryMethod(Range.prototype, 'getClientRects', () => emptyDOMRectList);
+  defineGeometryMethod(Range.prototype, 'getBoundingClientRect', () => emptyDOMRect);
 }
 
 if (typeof Text !== 'undefined') {
-  if (!Text.prototype.getClientRects) {
-    Text.prototype.getClientRects = () => emptyDOMRectList;
-  }
-
-  if (!Text.prototype.getBoundingClientRect) {
-    Text.prototype.getBoundingClientRect = () => emptyDOMRect;
-  }
+  defineGeometryMethod(Text.prototype, 'getClientRects', () => emptyDOMRectList);
+  defineGeometryMethod(Text.prototype, 'getBoundingClientRect', () => emptyDOMRect);
 }
 
 afterEach(() => {

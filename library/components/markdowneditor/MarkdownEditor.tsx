@@ -88,7 +88,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
       },
       ...(singleLine
         ? {
-            handlePaste: (view, event) => {
+            handlePaste: (view: any, event: any) => {
               const pastedText = event.clipboardData?.getData('text/plain');
 
               if (typeof pastedText !== 'string') {
@@ -108,7 +108,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
           }
         : {}),
     },
-    onBlur: ({ editor }) => {
+    onBlur: ({ editor }: { editor: any }) => {
       const markdown = editor.storage.markdown.getMarkdown();
       const nextValue = singleLine ? normalizeSingleLineContent(markdown) : markdown;
 

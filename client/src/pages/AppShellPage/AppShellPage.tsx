@@ -13,7 +13,7 @@ import { useWorkspaceDirectory } from '../../hooks/useWorkspaceDirectory';
 import { useWorkspaceSettings } from '../../hooks/useWorkspaceSettings';
 import { WorkspaceLayout } from '../../layouts/WorkspaceLayout/WorkspaceLayout';
 import { AccountPreferencesPage } from '../AccountPreferencesPage/AccountPreferencesPage';
-import type { TicketListSort } from '../../utils/ticketView';
+import type { TicketListSort } from '../../modules/tickets/utils/ticketView';
 import { registerWebMCPTools } from '../../utils/webmcp';
 import { LoadingPage } from '../LoadingPage/LoadingPage';
 import { WorkspaceDirectoryPage } from '../WorkspaceDirectoryPage/WorkspaceDirectoryPage';

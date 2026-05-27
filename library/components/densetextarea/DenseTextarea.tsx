@@ -65,7 +65,6 @@ export const DenseTextarea = React.forwardRef<HTMLTextAreaElement, DenseTextarea
             height: autoGrow ? 'auto' : '32px',
             ...style
           }}
-          }}
           value={value}
           onChange={handleChange}
           aria-invalid={error ? 'true' : undefined}

@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import DOMPurify from 'dompurify';
+import { CheckSquare, Square } from 'lucide-react';
 import type { MarkdownTextProps } from '../types/TicketDetail';
 import { useTickets } from '../../../context/TicketContext';
 import { useTicketByKey } from '../../../hooks/useTicketByKey';
@@ -170,7 +171,8 @@ export function MarkdownContent({ text }: MarkdownTextProps) {
     if (headingMatch) {
       const level = headingMatch[1].length;
       const content = headingMatch[2];
-      const Tag = `h${Math.min(level + 1, 6)}` as keyof JSX.IntrinsicElements;
+      const headingTags = ['h2', 'h3', 'h4', 'h5', 'h6', 'h6'] as const;
+      const Tag = headingTags[level - 1];
       
       const fontSizes = { 1: '16px', 2: '14px', 3: '13px', 4: '12px', 5: '12px', 6: '12px' };
       const fontSize = fontSizes[level as keyof typeof fontSizes] || '16px';
