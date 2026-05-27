@@ -62,4 +62,4 @@ This document details the data architecture for authentication and external cred
 ## 11. Related Docs
 
 - [Database Architecture Flow](./DATABASE_ARCHITECTURE_FLOW.md)
-- [KMS Security Architecture](./kms-security-architecture.md)
+- KMS Security Architecture documentation (link pending addition of the referenced doc)
