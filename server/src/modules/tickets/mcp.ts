@@ -13,7 +13,8 @@ import {
   updateCommentRecord,
   updateTicketRecord,
 } from './services/tickets.js';
-import { ToolExecutionContext } from '../mcp/tool-handlers/types.js';
+import { ToolExecutionContext, ToolHandler } from '../mcp/tool-handlers/types.js';
+import { McpToolDefinition } from '../mcp/types.js';
 
 function parseDateArg(value: unknown, fieldName: string): Date | undefined {
   if (typeof value !== 'string') return undefined;
@@ -304,3 +305,176 @@ export class TicketTools {
 }
 
 export const ticketTools = new TicketTools();
+
+export const ticketToolHandlers: Record<string, ToolHandler> = {
+  list_tickets: (args, context) => ticketTools.listTickets(args, context),
+  get_ticket_details: (args, context) => ticketTools.getTicketDetails(args, context),
+  read_ticket_details: (args, context) => ticketTools.readTicketDetails(args, context),
+  create_ticket: (args, context) => ticketTools.createTicket(args, context),
+  update_ticket: (args, context) => ticketTools.updateTicket(args, context),
+  add_comment: (args, context) => ticketTools.createComment(args, context),
+  create_comment: (args, context) => ticketTools.createComment(args, context),
+  read_comments: (args, context) => ticketTools.readComments(args, context),
+  delete_comment: (args, context) => ticketTools.deleteComment(args, context),
+  update_comment: (args, context) => ticketTools.updateComment(args, context),
+};
+
+export const ticketToolDefinitions: McpToolDefinition[] = [
+  {
+    name: 'list_tickets',
+    description: 'Retrieve a list of tickets from the workspace with optional filters.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string' },
+        priority: { type: 'string' },
+        projectId: { type: 'string' },
+        domainId: { type: 'string' },
+        assigneeId: { type: 'string' },
+        cycleId: { type: 'string' },
+      },
+    },
+  },
+  {
+    name: 'get_ticket_details',
+    description: 'Retrieve detailed information for a specific ticket by its unique ticket key.',
+    inputSchema: {
+      type: 'object',
+      properties: { ticketKey: { type: 'string' } },
+      required: ['ticketKey'],
+    },
+  },
+  {
+    name: 'read_ticket_details',
+    description: 'Retrieve fully resolved details of a ticket including status, priority, assignee, project, domain, and cycle.',
+    inputSchema: {
+      type: 'object',
+      properties: { ticketKey: { type: 'string' } },
+      required: ['ticketKey'],
+    },
+  },
+  {
+    name: 'create_ticket',
+    description: 'Create a new ticket or sub-ticket in the workspace.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        description: { type: 'string' },
+        status: { type: 'string' },
+        priority: { type: 'string' },
+        projectId: { type: 'string' },
+        domainId: { type: 'string' },
+        cycleId: { type: 'string' },
+        assigneeId: { type: 'string' },
+        parentId: { type: 'string' },
+        createdAt: {
+          type: 'string',
+          description: 'Optional manual override for the ticket creation timestamp as an ISO 8601 date string.',
+        },
+        updatedAt: {
+          type: 'string',
+          description: 'Optional manual override for the ticket last-updated timestamp as an ISO 8601 date string.',
+        },
+      },
+      required: ['title', 'projectId'],
+    },
+  },
+  {
+    name: 'update_ticket',
+    description: 'Modify properties of an existing ticket by its unique ticket key.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ticketKey: { type: 'string' },
+        title: { type: 'string' },
+        description: { type: 'string' },
+        status: { type: 'string' },
+        priority: { type: 'string' },
+        assigneeId: { type: 'string' },
+        domainId: { type: 'string' },
+        cycleId: { type: 'string' },
+        parentId: { type: 'string' },
+        prStatus: { type: 'string' },
+        prUrl: { type: 'string' },
+        createdAt: {
+          type: 'string',
+          description: 'Optional manual override for the ticket creation timestamp as an ISO 8601 date string.',
+        },
+        updatedAt: {
+          type: 'string',
+          description: 'Optional manual override for the ticket last-updated timestamp as an ISO 8601 date string.',
+        },
+      },
+      required: ['ticketKey'],
+    },
+  },
+  {
+    name: 'add_comment',
+    description: 'Create a new comment on an existing ticket.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ticketKey: { type: 'string' },
+        body: { type: 'string' },
+        createdAt: {
+          type: 'string',
+          description: 'Optional manual override for the comment creation timestamp as an ISO 8601 date string.',
+        },
+      },
+      required: ['ticketKey', 'body'],
+    },
+  },
+  {
+    name: 'create_comment',
+    description: 'Create a new comment on an existing ticket.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ticketKey: { type: 'string' },
+        body: { type: 'string' },
+        createdAt: {
+          type: 'string',
+          description: 'Optional manual override for the comment creation timestamp as an ISO 8601 date string.',
+        },
+      },
+      required: ['ticketKey', 'body'],
+    },
+  },
+  {
+    name: 'read_comments',
+    description: 'Read all comment threads on a specific ticket.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ticketKey: { type: 'string' },
+      },
+      required: ['ticketKey'],
+    },
+  },
+  {
+    name: 'delete_comment',
+    description: 'Delete a specific comment on a ticket.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ticketKey: { type: 'string' },
+        commentId: { type: 'string' },
+      },
+      required: ['ticketKey', 'commentId'],
+    },
+  },
+  {
+    name: 'update_comment',
+    description: 'Update the text body of a specific comment on a ticket.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ticketKey: { type: 'string' },
+        commentId: { type: 'string' },
+        body: { type: 'string' },
+      },
+      required: ['ticketKey', 'commentId', 'body'],
+    },
+  },
+];

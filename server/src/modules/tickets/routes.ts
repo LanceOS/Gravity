@@ -5,6 +5,7 @@ import { cycles, domains, projects, tickets, workspaceMembers } from '../../db/s
 import { broadcastEvent } from '../../realtime.js';
 import { createId, getProjectIdFromRequest, normalizeIsoDate } from '../../lib/platform.js';
 import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
+import { isWorkspaceMember, getProjectWorkspaceId } from '../workspaces/services/membership.js';
 import {
   addCommentRecord,
   createTicketRecord,
@@ -41,13 +42,8 @@ export function createTicketsRouter() {
       return { allowed: false as const, reason: 'not_found' as const };
     }
 
-    const projectRows = await db
-      .select({ workspaceId: projects.workspaceId })
-      .from(projects)
-      .where(eq(projects.id, ticket.projectId))
-      .limit(1);
-    const project = projectRows[0];
-    if (!project || project.workspaceId !== workspaceId) {
+    const ticketWorkspaceId = await getProjectWorkspaceId(ticket.projectId);
+    if (!ticketWorkspaceId || ticketWorkspaceId !== workspaceId) {
       return { allowed: false as const, reason: 'forbidden' as const };
     }
 
@@ -129,28 +125,15 @@ export function createTicketsRouter() {
       }
       if (userId) {
         // Get the ticket's workspace ID
-        const projectRows = await db
-          .select({ workspaceId: projects.workspaceId })
-          .from(projects)
-          .where(eq(projects.id, ticket.projectId))
-          .limit(1);
-        const project = projectRows[0];
-        if (!project) {
+        const workspaceId = await getProjectWorkspaceId(ticket.projectId);
+        if (!workspaceId) {
           res.status(404).json({ error: 'Ticket project not found.' });
           return;
         }
 
         // Check if the user is a member of the workspace
-        const memberRows = await db
-          .select()
-          .from(workspaceMembers)
-          .where(and(
-            eq(workspaceMembers.workspaceId, project.workspaceId),
-            eq(workspaceMembers.userId, userId)
-          ))
-          .limit(1);
-
-        if (memberRows.length === 0) {
+        const isMember = await isWorkspaceMember(workspaceId, userId);
+        if (!isMember) {
           res.status(403).json({ error: 'Access denied: not a member of the workspace.' });
           return;
         }

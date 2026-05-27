@@ -6,7 +6,8 @@ import {
   workspaceMemberActivity,
   workspaceMembers,
 } from '../../db/schema.js';
-import { ToolExecutionContext } from '../mcp/tool-handlers/types.js';
+import { ToolExecutionContext, ToolHandler } from '../mcp/tool-handlers/types.js';
+import { McpToolDefinition } from '../mcp/types.js';
 
 /**
  * @description Workspace-member MCP handlers. These APIs only expose members
@@ -66,3 +67,21 @@ export class WorkspaceMemberTools {
 }
 
 export const workspaceMemberTools = new WorkspaceMemberTools();
+
+export const workspaceToolHandlers: Record<string, ToolHandler> = {
+  list_workspace_members: (args, context) => workspaceMemberTools.listWorkspaceMembers(args, context),
+};
+
+export const workspaceToolDefinitions: McpToolDefinition[] = [
+  {
+    name: 'list_workspace_members',
+    description: 'Retrieve a list of members in a workspace, including their roles and last active times.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workspaceId: { type: 'string' },
+      },
+      required: ['workspaceId'],
+    },
+  },
+];

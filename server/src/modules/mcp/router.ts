@@ -1,9 +1,9 @@
 import { and, eq } from 'drizzle-orm';
 import { type Request, type Response, Router } from 'express';
 import { db } from '../../db/index.js';
-import { workspaceMembers } from '../../db/schema.js';
 import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
 import { handleMcpRequest } from './request-handler.js';
+import { isWorkspaceMember } from '../workspaces/services/membership.js';
 import { createMcpErrorResponse } from './responses.js';
 
 /**
@@ -39,13 +39,9 @@ export class McpRouterFactory {
           return;
         }
 
-        const membershipRows = await db
-          .select({ role: workspaceMembers.role })
-          .from(workspaceMembers)
-          .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, actorUserId)))
-          .limit(1);
+        const hasAccess = await isWorkspaceMember(workspaceId, actorUserId);
 
-        if (membershipRows.length === 0) {
+        if (!hasAccess) {
           res.status(403).json({ error: 'Unauthorized workspace access.' });
           return;
         }

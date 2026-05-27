@@ -1,0 +1,36 @@
+import { index, pgTable, text, timestamp } from 'drizzle-orm/pg-core';
+
+export const tickets = pgTable('tickets', {
+  id: text('id').primaryKey(),
+  key: text('key').notNull().unique(),
+  title: text('title').notNull(),
+  description: text('description').notNull().default(''),
+  status: text('status').notNull().default('todo'),
+  priority: text('priority').notNull().default('no_priority'),
+  assigneeId: text('assignee_id'),
+  projectId: text('project_id').notNull(),
+  domainId: text('domain_id'),
+  cycleId: text('cycle_id'),
+  parentId: text('parent_id'),
+  prStatus: text('pr_status').notNull().default('none'),
+  prUrl: text('pr_url'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  projectIdIdx: index('tickets_project_id_idx').on(table.projectId),
+  assigneeIdIdx: index('tickets_assignee_id_idx').on(table.assigneeId),
+  domainIdIdx: index('tickets_domain_id_idx').on(table.domainId),
+  cycleIdIdx: index('tickets_cycle_id_idx').on(table.cycleId),
+  parentIdIdx: index('tickets_parent_id_idx').on(table.parentId),
+}));
+
+export const comments = pgTable('comments', {
+  id: text('id').primaryKey(),
+  ticketId: text('ticket_id').notNull(),
+  userId: text('user_id').notNull(),
+  body: text('body').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  ticketIdIdx: index('comments_ticket_id_idx').on(table.ticketId),
+  userIdIdx: index('comments_user_id_idx').on(table.userId),
+}));
