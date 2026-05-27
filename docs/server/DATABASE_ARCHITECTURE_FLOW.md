@@ -58,7 +58,7 @@ This document explains the overarching database architecture, connection managem
 
 ## 11. Related Docs
 
-- [Auth Data Model](file:///home/lance/Documents/Gravity%20copy/docs/server/AUTH_DATA_MODEL.md)
-- [User Profile Data Model](file:///home/lance/Documents/Gravity%20copy/docs/server/USER_PROFILE_DATA_MODEL.md)
-- [Workspace Data Model](file:///home/lance/Documents/Gravity%20copy/docs/server/WORKSPACE_DATA_MODEL.md)
-- [Ticket Data Model](file:///home/lance/Documents/Gravity%20copy/docs/server/TICKET_DATA_MODEL.md)
+- [Auth Data Model](AUTH_DATA_MODEL.md)
+- [User Profile Data Model](USER_PROFILE_DATA_MODEL.md)
+- [Workspace Data Model](WORKSPACE_DATA_MODEL.md)
+- [Ticket Data Model](TICKET_DATA_MODEL.md)
