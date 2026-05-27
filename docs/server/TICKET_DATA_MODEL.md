@@ -62,5 +62,5 @@ This document details the data architecture for Tickets and Comments in the Grav
 
 ## 11. Related Docs
 
-- [Workspace Data Model](file:///home/lance/Documents/Gravity%20copy/docs/server/WORKSPACE_DATA_MODEL.md)
-- [Database Architecture Flow](file:///home/lance/Documents/Gravity%20copy/docs/server/DATABASE_ARCHITECTURE_FLOW.md)
+- [Workspace Data Model](WORKSPACE_DATA_MODEL.md)
+- [Database Architecture Flow](DATABASE_ARCHITECTURE_FLOW.md)
