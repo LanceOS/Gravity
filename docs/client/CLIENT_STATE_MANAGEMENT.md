@@ -32,7 +32,7 @@ This document outlines how the React client manages application state, data fetc
   - `useAccountSettings`: manages personal account preferences and Local AI settings.
 
 ## 6. Interfaces and Contracts
-- `TicketContextValue` interface in `TicketContext.tsx` defines the shape of the global state and mutations.
+- `TicketContextType` in `TicketContext.tsx` defines the shape of the global state and mutations.
 - `fetchInitialData` contract expects the backend to return tickets containing their relations (e.g., assignee).
 
 ## 7. Key Files and Modules
