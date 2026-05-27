@@ -146,8 +146,6 @@ function FormattedText({ text }: MarkdownTextProps) {
   return <>{parts}</>;
 }
 
-import { CheckSquare, Square } from 'lucide-react';
-
 /**
  * @description A lightweight markdown renderer component. It splits the input text by lines and parses
  * basic markdown elements like headers (h2, h3), unordered lists, and paragraphs.
