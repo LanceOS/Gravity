@@ -62,7 +62,7 @@ if (env.redisEnabled) {
   process.on('SIGTERM', shutdown);
 }
 
-export function setClient(newClient: any) {
+export function setClient(newClient: RedisClientType | null) {
   client = newClient;
 }
 
