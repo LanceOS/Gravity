@@ -12,6 +12,15 @@ import {
   normalizeEntityKey,
   normalizeIsoDate,
 } from '../../lib/platform.js';
+import {
+  listProjectsWithDetails,
+  createProjectRecord,
+  updateProjectRecord,
+  getProjectByInviteCode,
+  acceptProjectInvite,
+  getProjectById,
+  addProjectMemberRecord,
+} from './services/projects.js';
 import { buildProjectKeyConflictMessage, mapProjectCreationError, projectKeyExists } from './utils/project-creation.js';
 import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
 
@@ -61,102 +70,8 @@ export function createProjectsRouter() {
       const userId = actorUserId;
       const workspaceId = typeof req.query.workspaceId === 'string' ? req.query.workspaceId : undefined;
 
-      let projectRows: Array<{
-        id: string;
-        name: string;
-        description: string;
-        key: string;
-        status: string;
-        workspaceId: string;
-      }>;
-
-      if (userId && workspaceId) {
-        projectRows = await db
-          .select({
-            id: projects.id,
-            name: projects.name,
-            description: projects.description,
-            key: projects.key,
-            status: projects.status,
-            workspaceId: projects.workspaceId,
-          })
-          .from(projects)
-          .innerJoin(projectMembers, and(eq(projectMembers.projectId, projects.id), eq(projectMembers.userId, userId)))
-          .where(eq(projects.workspaceId, workspaceId))
-          .orderBy(asc(projects.createdAt));
-      } else if (userId) {
-        projectRows = await db
-          .select({
-            id: projects.id,
-            name: projects.name,
-            description: projects.description,
-            key: projects.key,
-            status: projects.status,
-            workspaceId: projects.workspaceId,
-          })
-          .from(projects)
-          .innerJoin(projectMembers, and(eq(projectMembers.projectId, projects.id), eq(projectMembers.userId, userId)))
-          .orderBy(asc(projects.createdAt));
-      } else if (workspaceId) {
-        projectRows = await db
-          .select({
-            id: projects.id,
-            name: projects.name,
-            description: projects.description,
-            key: projects.key,
-            status: projects.status,
-            workspaceId: projects.workspaceId,
-          })
-          .from(projects)
-          .where(eq(projects.workspaceId, workspaceId))
-          .orderBy(asc(projects.createdAt));
-      } else {
-        projectRows = await db
-          .select({
-            id: projects.id,
-            name: projects.name,
-            description: projects.description,
-            key: projects.key,
-            status: projects.status,
-            workspaceId: projects.workspaceId,
-          })
-          .from(projects)
-          .orderBy(asc(projects.createdAt));
-      }
-
-      const projectIds = projectRows.map((project) => project.id);
-
-      if (projectIds.length === 0) {
-        res.json([]);
-        return;
-      }
-
-      const [domainRows, cycleRows] = await Promise.all([
-        db.select().from(domains).where(inArray(domains.projectId, projectIds)).orderBy(asc(domains.createdAt)),
-        db.select().from(cycles).where(inArray(cycles.projectId, projectIds)).orderBy(asc(cycles.startDate)),
-      ]);
-
-      const domainsByProject = new Map<string, Array<{ id: string; name: string; color: string }>>();
-      for (const domain of domainRows) {
-        const nextDomains = domainsByProject.get(domain.projectId) ?? [];
-        nextDomains.push({ id: domain.id, name: domain.name, color: domain.color });
-        domainsByProject.set(domain.projectId, nextDomains);
-      }
-
-      const cyclesByProject = new Map<string, Array<ReturnType<typeof mapCycle>>>();
-      for (const cycle of cycleRows) {
-        const nextCycles = cyclesByProject.get(cycle.projectId) ?? [];
-        nextCycles.push(mapCycle(cycle));
-        cyclesByProject.set(cycle.projectId, nextCycles);
-      }
-
-      res.json(
-        projectRows.map((project) => ({
-          ...project,
-          domains: domainsByProject.get(project.id) ?? [],
-          cycles: cyclesByProject.get(project.id) ?? [],
-        })),
-      );
+      const projectsList = await listProjectsWithDetails(userId, workspaceId);
+      res.json(projectsList);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load projects.' });
     }
@@ -179,62 +94,18 @@ export function createProjectsRouter() {
 
       let targetWorkspaceId = workspaceId as string | undefined;
 
-      await db.transaction(async (tx) => {
-        if (!targetWorkspaceId) {
-          targetWorkspaceId = createId('w');
-          await tx.insert(workspaces).values({
-            id: targetWorkspaceId,
-            name,
-            description: description ?? '',
-            key: normalizedKey,
-            workspaceKey: createWorkspaceAccessKey(normalizedKey),
-            defaultProjectId: projectId,
-            hostUrl: '',
-            createdBy: ownerId,
-            createdAt: new Date(),
-          });
-          await tx.insert(workspaceSettings).values({
-            workspaceId: targetWorkspaceId,
-            hostUrl: '',
-            joinMode: 'approval_required',
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          });
-          await tx.insert(workspaceMembers).values({
-            workspaceId: targetWorkspaceId,
-            userId: ownerId,
-            role: 'owner',
-            createdAt: new Date(),
-          });
-        }
-
-        await tx.insert(projects).values({
-          id: projectId,
-          workspaceId: targetWorkspaceId!,
-          name,
-          description: description ?? '',
-          key: normalizedKey,
-          status: status ?? 'active',
-          inviteCode: createProjectInviteCode(normalizedKey),
-          createdBy: ownerId,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
-
-        await tx
-          .update(workspaces)
-          .set({ defaultProjectId: projectId })
-          .where(and(eq(workspaces.id, targetWorkspaceId!), isNull(workspaces.defaultProjectId)));
+      const project = await createProjectRecord({
+        name,
+        description,
+        key: normalizedKey,
+        status,
+        ownerId,
+        workspaceId: targetWorkspaceId,
       });
 
-      await ensureWorkspaceMembership(targetWorkspaceId!, ownerId, 'owner');
-      await ensureProjectMembership(projectId, ownerId, 'owner');
-      await addWorkspaceMembersToProject(targetWorkspaceId!, projectId);
-
-      const rows = await db.select().from(projects).where(eq(projects.id, projectId)).limit(1);
       res.status(201).json({
-        ...mapProject(rows[0]),
-        inviteCode: rows[0].inviteCode,
+        ...mapProject(project),
+        inviteCode: project.inviteCode,
       });
     } catch (error) {
       const mapped = mapProjectCreationError(error, normalizeEntityKey(key));
@@ -244,23 +115,18 @@ export function createProjectsRouter() {
 
   router.patch('/projects/:projectId', async (req, res) => {
     try {
-      const rows = await db
-        .update(projects)
-        .set({
-          ...(typeof req.body?.name === 'string' ? { name: req.body.name } : {}),
-          ...(typeof req.body?.description === 'string' ? { description: req.body.description } : {}),
-          ...(typeof req.body?.status === 'string' ? { status: req.body.status } : {}),
-          updatedAt: new Date(),
-        })
-        .where(eq(projects.id, req.params.projectId))
-        .returning();
+      const updatedProject = await updateProjectRecord(req.params.projectId, {
+        name: typeof req.body?.name === 'string' ? req.body.name : undefined,
+        description: typeof req.body?.description === 'string' ? req.body.description : undefined,
+        status: typeof req.body?.status === 'string' ? req.body.status : undefined,
+      });
 
-      if (!rows[0]) {
+      if (!updatedProject) {
         res.status(404).json({ error: 'Project not found.' });
         return;
       }
 
-      res.json(mapProject(rows[0]));
+      res.json(mapProject(updatedProject));
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to update project.' });
     }
@@ -274,15 +140,13 @@ export function createProjectsRouter() {
     }
 
     try {
-      const rows = await db.select().from(projects).where(eq(projects.inviteCode, inviteCode)).limit(1);
-      const project = rows[0];
+      const project = await getProjectByInviteCode(inviteCode);
       if (!project) {
         res.status(404).json({ error: 'Project invite not found.' });
         return;
       }
 
-      await ensureWorkspaceMembership(project.workspaceId, userId, 'member');
-      await ensureProjectMembership(project.id, userId, 'developer');
+      await acceptProjectInvite(project.id, project.workspaceId, userId);
       res.json({ project: mapProject(project) });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to accept invite.' });
@@ -297,15 +161,13 @@ export function createProjectsRouter() {
     }
 
     try {
-      const rows = await db.select().from(projects).where(eq(projects.id, req.params.projectId)).limit(1);
-      const project = rows[0];
+      const project = await getProjectById(req.params.projectId);
       if (!project) {
         res.status(404).json({ error: 'Project not found.' });
         return;
       }
 
-      await ensureWorkspaceMembership(project.workspaceId, userId, 'member');
-      await ensureProjectMembership(project.id, userId, typeof role === 'string' ? role : 'developer');
+      await addProjectMemberRecord(project.id, project.workspaceId, userId, typeof role === 'string' ? role : 'developer');
       res.status(201).json({ success: true });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to add project member.' });
