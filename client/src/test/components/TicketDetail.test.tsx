@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type {
   ButtonHTMLAttributes,
   ChangeEvent,
@@ -57,6 +58,25 @@ vi.mock('@library', async (importOriginal) => {
   ),
   TextInput: ({ value, onChange, ...props }: MockTextInputProps) => <input value={value} onChange={onChange} {...props} />,
   Textarea: ({ value, onChange, autoGrow, inputStyle, ...props }: any) => <textarea value={value} onChange={onChange} {...props} />,
+  MarkdownEditor: ({ value, onSave, placeholder }: any) => {
+    const [editing, setEditing] = useState(false);
+    if (!editing) {
+      return (
+        <div onClick={() => setEditing(true)}>{value || placeholder}</div>
+      );
+    }
+    return (
+      <textarea
+        placeholder={placeholder}
+        defaultValue={value}
+        onBlur={(e) => {
+          setEditing(false);
+          onSave(e.target.value);
+        }}
+        autoFocus
+      />
+    );
+  },
   ClickAwayListener: ({ children }: { children: ReactNode }) => children,
   Portal: ({ children }: { children: ReactNode }) => <div data-testid="portal">{children}</div>,
   };

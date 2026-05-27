@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import type { Ticket } from '../../../context/TicketContext';
-import { Button, Select, TextInput, Textarea, EditInPlace } from '@library';
+import { Button, Select, TextInput, Textarea, EditInPlace, MarkdownEditor } from '@library';
 import { ClickAwayListener, Portal } from '@library';
 import { 
   CheckSquare, GitPullRequest, GitMerge, Send, Trash2,
@@ -137,6 +137,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
               saveOnEnter={false}
               hideSaveButton={true}
               containerClass="editable-seamless"
+              alwaysEditable={true}
               inputStyle={{ 
                 fontSize: '22px', 
                 fontWeight: 600, 
@@ -159,17 +160,12 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
               <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase' }}>Description</span>
             </div>
 
-            <EditInPlace
+            <MarkdownEditor
               value={activeTicket.description || ''}
               onSave={(newDesc) => onUpdateTicket(activeTicket.id, { description: newDesc })}
-              saveHint="Esc"
-              saveOnEnter={false}
               placeholder="Describe your issue using markdown..."
-              emptyText="No description provided. Click to add details..."
-              containerClass="markdown-content editable-seamless"
-              containerStyle={{ fontSize: '13px', lineHeight: '1.6', minHeight: '60px', paddingRight: '104px', position: 'relative' }}
-              inputStyle={{ fontFamily: 'var(--mono)', fontSize: '13px', lineHeight: '1.6', padding: 0, color: 'var(--color-text-primary)' }}
-              renderDisplay={(val) => <MarkdownContent text={val} />}
+              minHeight="120px"
+              className="markdown-content"
             />
           </div>
 

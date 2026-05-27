@@ -32,6 +32,7 @@ export * from './divider';
 export * from './drawer';
 export * from './dropdownmenu';
 export * from './editinplace';
+export * from './markdowneditor';
 export * from './emptystate';
 export * from './fileuploader';
 export * from './flex';

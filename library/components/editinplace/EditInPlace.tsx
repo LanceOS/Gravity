@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '../button';
-import { Textarea } from '../textarea';
 import { Edit3 } from 'lucide-react';
+import { cn } from '../../utilities';
 
 export interface EditInPlaceProps {
   value: string;
@@ -15,6 +15,7 @@ export interface EditInPlaceProps {
   placeholder?: string;
   emptyText?: string;
   hideSaveButton?: boolean;
+  alwaysEditable?: boolean;
 }
 
 export const EditInPlace: React.FC<EditInPlaceProps> = ({
@@ -28,36 +29,57 @@ export const EditInPlace: React.FC<EditInPlaceProps> = ({
   saveOnEnter = true,
   placeholder,
   emptyText = 'Click to edit...',
-  hideSaveButton = false
+  hideSaveButton = false,
+  alwaysEditable = false
 }) => {
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(alwaysEditable || false);
   const [value, setValue] = useState(propValue);
+  const [isFocused, setIsFocused] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    if (!isEditing) {
+    if (alwaysEditable) {
+      setIsEditing(true);
+    }
+  }, [alwaysEditable]);
+
+  useEffect(() => {
+    if (!isEditing || (alwaysEditable && !isFocused)) {
       setValue(propValue);
     }
-  }, [propValue, isEditing]);
+  }, [propValue, isEditing, alwaysEditable, isFocused]);
+
+  // Handle auto-growing height of textarea to match content exactly
+  useEffect(() => {
+    if (isEditing && textareaRef.current) {
+      const textarea = textareaRef.current;
+      textarea.style.height = 'auto';
+      textarea.style.height = `${textarea.scrollHeight}px`;
+    }
+  }, [isEditing, value]);
 
   const handleSave = () => {
-    setIsEditing(false);
+    if (!alwaysEditable) {
+      setIsEditing(false);
+    }
     if (value !== propValue) {
       onSave(value);
     }
-  };
-
-  const handleCancel = () => {
-    setIsEditing(false);
-    setValue(propValue);
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (saveOnEnter && event.key === 'Enter') {
       event.preventDefault();
       handleSave();
+      if (alwaysEditable && textareaRef.current) {
+        textareaRef.current.blur();
+      }
     } else if (event.key === 'Escape') {
       event.preventDefault();
       handleSave();
+      if (alwaysEditable && textareaRef.current) {
+        textareaRef.current.blur();
+      }
     }
   };
 
@@ -68,22 +90,77 @@ export const EditInPlace: React.FC<EditInPlaceProps> = ({
     }
   };
 
-  if (isEditing) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', ...containerStyle }}>
-        <Textarea 
-          className="input-seamless"
-          style={{ margin: 0 }}
-          inputStyle={inputStyle}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          placeholder={placeholder}
-          onBlur={handleSave}
-          onKeyDown={handleKeyDown}
-          autoGrow
-          autoFocus
-        />
-        {!hideSaveButton && (
+  return (
+    <div
+      onClick={!isEditing ? () => setIsEditing(true) : undefined}
+      onKeyDown={!isEditing ? handleEditableKeyDown : undefined}
+      className={cn(containerClass, isEditing ? 'is-editing' : '')}
+      role={!isEditing ? 'button' : undefined}
+      tabIndex={!isEditing ? 0 : undefined}
+      title={!isEditing ? 'Click to edit' : undefined}
+      style={{
+        ...containerStyle,
+        cursor: isEditing ? 'default' : 'pointer'
+      }}
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', width: '100%' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {isEditing ? (
+              <textarea
+                ref={textareaRef}
+                className="input auto-grow input-seamless"
+                style={{
+                  width: '100%',
+                  border: '0px !important',
+                  padding: '0px !important',
+                  margin: '0px !important',
+                  background: 'transparent !important',
+                  boxShadow: 'none !important',
+                  outline: 'none !important',
+                  minHeight: '0px',
+                  resize: 'none',
+                  overflowY: 'hidden',
+                  ...inputStyle
+                }}
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                onFocus={() => setIsFocused(true)}
+                onBlur={() => {
+                  setIsFocused(false);
+                  handleSave();
+                }}
+                placeholder={placeholder}
+                onKeyDown={handleKeyDown}
+                autoFocus={!alwaysEditable}
+              />
+            ) : (
+              propValue ? renderDisplay(propValue) : (
+                <span style={{ color: 'var(--color-text-disabled)', fontStyle: 'italic' }}>{emptyText}</span>
+              )
+            )}
+          </div>
+
+          {!isEditing && (
+            <span
+              className="editable-display__hint"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                fontSize: '11px',
+                fontWeight: 500,
+                whiteSpace: 'nowrap',
+                ...(containerStyle?.position === 'relative' ? { position: 'absolute', top: '8px', right: '10px' } : {})
+              }}
+            >
+              <Edit3 size={12} />
+              <span>Edit</span>
+            </span>
+          )}
+        </div>
+
+        {isEditing && !hideSaveButton && (
           <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
             <Button
               onMouseDown={(e) => {
@@ -100,47 +177,7 @@ export const EditInPlace: React.FC<EditInPlaceProps> = ({
           </div>
         )}
       </div>
-    );
-  }
-
-  return (
-    <div
-      onClick={() => setIsEditing(true)}
-      onKeyDown={handleEditableKeyDown}
-      className={containerClass}
-      role="button"
-      tabIndex={0}
-      title="Click to edit"
-      style={containerStyle}
-    >
-      {/* 
-        We use an absolute positioned edit hint for multi-line / complex components, 
-        or inline for simpler flex layouts, depending on how the parent styles the container.
-        Here we inject the hint robustly so it works in both contexts.
-      */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', width: '100%' }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          {propValue ? renderDisplay(propValue) : (
-            <span style={{ color: 'var(--color-text-disabled)', fontStyle: 'italic' }}>{emptyText}</span>
-          )}
-        </div>
-        
-        <span 
-          className="editable-display__hint" 
-          style={{ 
-            display: 'inline-flex', 
-            alignItems: 'center', 
-            gap: '4px', 
-            fontSize: '11px', 
-            fontWeight: 500, 
-            whiteSpace: 'nowrap',
-            ...(containerStyle?.position === 'relative' ? { position: 'absolute', top: '8px', right: '10px' } : {})
-          }}
-        >
-          <Edit3 size={12} />
-          <span>Edit</span>
-        </span>
-      </div>
     </div>
   );
 };
+

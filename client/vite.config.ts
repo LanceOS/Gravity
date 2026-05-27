@@ -15,6 +15,11 @@ export default defineConfig(({ mode }) => {
         'react': resolve(__dirname, './node_modules/react'),
         'react-dom': resolve(__dirname, './node_modules/react-dom'),
         'lucide-react': resolve(__dirname, './node_modules/lucide-react'),
+        '@tiptap/react': resolve(__dirname, './node_modules/@tiptap/react'),
+        '@tiptap/pm': resolve(__dirname, './node_modules/@tiptap/pm'),
+        '@tiptap/starter-kit': resolve(__dirname, './node_modules/@tiptap/starter-kit'),
+        '@tiptap/extension-placeholder': resolve(__dirname, './node_modules/@tiptap/extension-placeholder'),
+        'tiptap-markdown': resolve(__dirname, './node_modules/tiptap-markdown'),
       },
     },
     server: {
