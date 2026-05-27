@@ -57,13 +57,14 @@ export const DenseTextarea = React.forwardRef<HTMLTextAreaElement, DenseTextarea
           className={cn('input input--dense', autoGrow ? 'auto-grow' : '', error ? 'input--error' : undefined, className)}
           style={{
             resize: autoGrow ? 'none' : 'vertical',
-            minHeight: autoGrow ? 'none' : '32px',
+            minHeight: '32px',
             overflowY: autoGrow ? 'hidden' : 'auto',
             paddingTop: '6px',
             paddingBottom: '6px',
             lineHeight: '1.4',
-            height: '32px',
+            height: autoGrow ? 'auto' : '32px',
             ...style
+          }}
           }}
           value={value}
           onChange={handleChange}
