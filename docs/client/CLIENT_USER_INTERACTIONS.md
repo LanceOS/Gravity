@@ -55,7 +55,7 @@ This document covers the primary user workflows and integrated tools provided by
 - `client/src/utils/webmcp.ts`
 
 ## 8. Permissions, Guards, or Tenant Boundaries
-- AI Tools and WebMCP functions only expose data related to the currently active workspace. When the AI invokes `getTickets()`, it only receives tickets belonging to the projects in the user's current context.
+- AI Tools and WebMCP functions expose the client-side data currently supplied to `registerWebMCPTools`. In the current implementation, `getTickets()` returns the ticket set loaded for the active project context, while `getProjects()` can include all projects available to the signed-in user rather than being limited to the active workspace.
 
 ## 9. Failure Modes, Observability, or Operational Notes
 - If the configured Local AI provider (e.g., Ollama) is not running or unreachable, the chat interface displays a connection error block, prompting the user to check their instance.
