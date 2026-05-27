@@ -21,7 +21,7 @@ The subsystem exposes a clean interface via `server/src/lib/cache.ts`:
    - On a cache hit, the data is returned immediately.
    - On a cache miss (or if Redis is down), the fallback `fetchFn` is executed against the primary database.
    - The result is asynchronously cached via `set` and returned to the caller.
-3. **Cache Invalidation**: Mutations to resources must explicitly call `del(key)` or pattern-matching deletions to clear stale data from the cache to ensure consistency.
+3. **Cache Invalidation**: Mutations to resources must explicitly call `del(key)` / `delMany(keys)` to clear stale data from the cache to ensure consistency.
 
 ## 5. Data Stores and Resources
 - **Redis Server**: The underlying memory store, configured via environment variables:
