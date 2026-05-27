@@ -37,7 +37,7 @@ Owns and mutates the following PostgreSQL tables via Drizzle ORM:
 - **Workspace Boundary**: MCP endpoints verify that the ticket's parent project belongs to the trusted workspace authorized in the MCP connection handshake.
 
 ## 9. Failure Modes, Observability, or Operational Notes
-- Rapid ticket creation via MCP tools is rate-limited to prevent agents from spamming databases in infinite loops.
+- This module does not document or enforce a ticket-specific MCP rate limit; operators should not assume rapid ticket creation via MCP tools is throttled unless that protection is implemented elsewhere.
 
 ## 10. Change Hazards, Invariants, or Migration Constraints
 - A ticket's `key` (e.g., `PRJ-123`) is immutable and globally unique across the system, derived from the parent project. Modifying project keys does not inherently backport to existing tickets.
