@@ -156,10 +156,28 @@ export async function refreshConnectionToken(
 }
 
 export async function verifyAndConsumeToken(rawToken: string, workspaceId: string, opts?: { sourceIp?: string | null }) {
-  // Build a keyed map of known secrets: current secret under key 'env'
-  // plus any keyed old secrets from `env.betterAuthOldSecretsMap`.
-  const keyedSecrets: Record<string, string> = { env: env.betterAuthSecret, ...(env.betterAuthOldSecretsMap ?? {}) };
-  const fallbackSecrets = Array.isArray(env.betterAuthOldSecrets) ? env.betterAuthOldSecrets : [];
+  // Build a keyed map of known secrets. Prefer reading from `process.env` so
+  // test helpers that mutate `process.env` are immediately reflected even if
+  // modules were previously imported. Fall back to the `env` module values.
+  const splitList = (value?: string) =>
+    (value ?? '')
+      .toString()
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean) as string[];
+
+  const rawOldSecrets = splitList(process.env.BETTER_AUTH_OLD_SECRETS ?? (Array.isArray(env.betterAuthOldSecrets) ? env.betterAuthOldSecrets.join(',') : ''));
+  const oldMap: Record<string, string> = {};
+  for (const item of rawOldSecrets) {
+    const m = item.match(/^([^=:\s]+)[=:](.+)$/);
+    if (m) oldMap[m[1]] = m[2];
+  }
+
+  const currentSecret = process.env.BETTER_AUTH_SECRET ?? env.betterAuthSecret;
+  const keyedSecrets: Record<string, string> = { env: currentSecret, ...(oldMap ?? {}) };
+  const fallbackSecrets = rawOldSecrets;
+
+  // (no-op) keep verification deterministic; do not log secrets in tests
 
   const rowOrUpdated = await db.transaction(async (tx) => {
     let matchedRow: any = null;
@@ -183,11 +201,14 @@ export async function verifyAndConsumeToken(rawToken: string, workspaceId: strin
       const storedKeyId = candidate.hmacKeyId ?? 'env';
       const preferredSecret = keyedSecrets[storedKeyId];
 
+      
+
       // If the row records a key id that we can map to a secret, prefer verifying with that secret.
       if (preferredSecret) {
         const expected = createHmac('sha256', preferredSecret).update(rawToken).digest('hex');
         if (expected === candidate.tokenHash) {
           matchedRow = candidate;
+          
           break;
         }
 
@@ -195,9 +216,11 @@ export async function verifyAndConsumeToken(rawToken: string, workspaceId: strin
         continue;
       }
 
-      // No preferred secret mapping available; accept the candidate we found via keyed secret.
-      matchedRow = candidate;
-      break;
+      // No preferred secret mapping available; do not accept a candidate that
+      // references a key id we no longer have a mapping for. Continue searching
+      // so we only verify tokens against known secrets.
+      
+      continue;
     }
 
     // Fallback: try unkeyed legacy secrets (preserve original behavior for plain-list configs)
