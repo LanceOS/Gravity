@@ -16,7 +16,7 @@ type StoreEntry = {
 // This module centralizes cleanup into a single timer, trims per-entry
 // timestamp lists, evicts idle entries, and performs LRU-style evictions
 // when the store grows too large. For production and multi-instance
-// deployments prefer a Redis-based store (not implemented here).
+// deployments prefer the Redis-based limiter in rateLimitRedis.ts.
 
 const centralStore = new Map<string, StoreEntry>();
 let cleanupTimer: NodeJS.Timeout | null = null;
