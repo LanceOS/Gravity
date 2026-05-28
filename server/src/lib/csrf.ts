@@ -74,7 +74,7 @@ export function csrfProtect(
             : false;
 
           if (trusted) {
-            const xfh = (req.get('x-forwarded-host') || req.get('x-forwarded-host') as string | undefined) as string | undefined;
+            const xfh = req.get('x-forwarded-host') as string | undefined;
             if (xfh) {
               const fh = xfh.split(',')[0].trim().toLowerCase();
               if (allowedHosts.includes(fh)) return next();
