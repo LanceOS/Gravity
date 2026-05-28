@@ -88,12 +88,7 @@ export class McpRouterFactory {
             if (token) {
                 // Throttle repeated failed verification attempts by IP and workspace
                 const ipKey = `ip:${req.ip}`;
-                const headerWorkspaceId = (req.header('x-workspace-id') || req.header('X-Workspace-Id'))?.trim();
-                const bodyWorkspaceId =
-                  typeof req.body?.params?.workspaceId === 'string' && req.body.params.workspaceId.trim().length > 0
-                    ? req.body.params.workspaceId.trim()
-                    : undefined;
-                const wsKey = headerWorkspaceId || bodyWorkspaceId ? `workspace:${headerWorkspaceId || bodyWorkspaceId}` : null;
+                const wsKey = workspaceId ? `workspace:${workspaceId}` : null;
                 if (await isBlocked(ipKey) || (wsKey && await isBlocked(wsKey))) {
                   res.status(429).json({ error: 'Too many authentication attempts; try later.' });
                   return;
