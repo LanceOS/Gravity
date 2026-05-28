@@ -1,0 +1,16 @@
+# .dockerignore for the server Docker build
+# Exclude local development artifacts and secrets from the build context
+node_modules
+dist
+npm-debug.log
+docker-compose.yml
+.git
+.gitignore
+.env
+.env.*
+.vscode
+.idea
+coverage
+*.log
+*.tsbuildinfo
+__pycache__

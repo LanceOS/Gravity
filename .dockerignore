@@ -1,3 +1,19 @@
+# Exclude node modules and build artifacts from Docker context
+node_modules
+**/node_modules
+dist
+**/dist
+npm-debug.log
+.git
+.gitignore
+.vscode
+.idea
+.env
+.env.*
+coverage
+*.log
+*.tsbuildinfo
+.DS_Store
 
 **/node_modules
 **/dist

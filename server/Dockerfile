@@ -1,28 +1,41 @@
 FROM node:20-slim AS builder
 
-WORKDIR /app
+WORKDIR /workspace
 
-COPY package.json package-lock.json ./
-RUN npm ci
+# Install server dependencies
+COPY server/package.json server/package-lock.json ./server/
+RUN cd server && npm ci
 
-COPY tsconfig.json drizzle.config.ts ./
-COPY src ./src
+# Install client dependencies (needed for building the client)
+COPY client/package.json client/package-lock.json ./client/
+RUN cd client && npm ci
 
-RUN npm run build
+# Copy server and client sources and any shared library
+COPY server/tsconfig.json server/drizzle.config.ts ./server/
+COPY server/src ./server/src
+COPY client ./client
+COPY library ./library
+
+# Build client (Vite) then build server (TypeScript)
+RUN cd client && npm run build
+RUN cd server && npm run build
 
 FROM node:20-slim AS runner
-
 WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=8080
 
-COPY package.json package-lock.json ./
+# Install only production dependencies for server
+COPY server/package.json server/package-lock.json ./
 RUN npm ci --omit=dev
 
-COPY --from=builder /app/dist ./dist
-COPY .env ./.env
-COPY .env.example ./.env.example
+# Copy built server and client assets into final image
+COPY --from=builder /workspace/server/dist ./dist
+COPY --from=builder /workspace/client/dist ./public
+
+# Provide example env in image (do NOT copy secrets into image)
+COPY server/.env.example ./.env.example
 
 EXPOSE 8080
 

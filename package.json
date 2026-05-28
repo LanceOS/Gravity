@@ -1,0 +1,19 @@
+{
+  "name": "gravity",
+  "version": "0.6.6",
+  "private": true,
+  "workspaces": [
+    "server",
+    "client",
+    "library"
+  ],
+  "scripts": {
+    "build": "npm run build:client && npm run build:server",
+    "build:client": "npm --workspace=client run build",
+    "build:server": "npm --workspace=server run build",
+    "start": "npm --workspace=server run start",
+    "start:dev": "npm run -w server dev & npm run -w client dev",
+    "sync-versions": "node ./scripts/sync-versions.js",
+    "test": "npm run -w server test && npm run -w client test"
+  }
+}

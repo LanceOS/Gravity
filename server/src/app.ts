@@ -9,6 +9,7 @@ import { registerToolHandlers } from './modules/mcp/tool-handlers/registry.js';
 import { registerMcpTools } from './modules/mcp/tools.js';
 import { ticketToolDefinitions, ticketToolHandlers } from './modules/tickets/mcp.js';
 import { workspaceToolDefinitions, workspaceToolHandlers } from './modules/workspaces/mcp.js';
+import path from 'path';
 
 let mcpRegistriesBootstrapped = false;
 
@@ -49,8 +50,25 @@ export function createApp() {
   app.all('/api/auth/*splat', toNodeHandler(auth));
 
   app.use(express.json({ limit: '1mb' }));
+
   app.use('/api/v1', createApiRouter());
 
+  // Serve built client files when available. The build process copies the
+  // client's `dist` into `public/` in the final image.
+  const clientDist = path.join(process.cwd(), 'public');
+  app.use(express.static(clientDist, { index: false }));
+
+  // For any non-API request, serve the client's index.html (SPA fallback).
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) {
+      return next();
+    }
+    res.sendFile(path.join(clientDist, 'index.html'), (err) => {
+      if (err) next(err);
+    });
+  });
+
+  // Fallback for API routes that are not found
   app.use((_req, res) => {
     res.status(404).json({ error: 'Not found' });
   });
