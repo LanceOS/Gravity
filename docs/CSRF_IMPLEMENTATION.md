@@ -175,7 +175,7 @@ TRUSTED_SERVICE_TOKENS=svc-token-abc123,svc-token-xyz456
   Notes:
   - When `CSRF_ALLOW_HOST_FALLBACK` is disabled (the default), requests lacking `Origin` or `Referer`
     will be rejected with `403` to avoid a potential CSRF bypass.
-  - Only enable the fallback when you control the proxy chain and can guarantee the immedate proxy
+  - Only enable the fallback when you control the proxy chain and can guarantee the immediate proxy
     IPs listed in `TRUSTED_PROXIES` are not user-controllable. Misconfiguration may allow attackers to
     bypass CSRF protections.
 
