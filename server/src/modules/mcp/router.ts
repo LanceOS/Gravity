@@ -139,7 +139,7 @@ export class McpRouterFactory {
 
         // tokenScopes propagated to handler (no debug log here)
 
-        const response = await handleMcpRequest(req.body, workspaceId, actorUserId, {
+        const response = await handleMcpRequest(req.body, workspaceId, actorUserId ?? undefined, {
           accessChecked: true,
           sanitize: req.header('x-mcp-sanitize') === 'true',
           tokenScopes,
