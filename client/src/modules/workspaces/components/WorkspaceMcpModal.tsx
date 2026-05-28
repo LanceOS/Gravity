@@ -22,7 +22,10 @@ export function WorkspaceMcpModal({ workspaceId, isOpen, onClose }: Props) {
       // Extract raw token and avoid storing it in the main result object
       // Use `auth.token` as the canonical raw token field.
       const token = payload?.auth?.token ?? null;
-      const safePayload = { ...payload };
+      const safePayload = {
+        ...payload,
+        ...(payload?.auth ? { auth: { ...payload.auth } } : {}),
+      };
       if (safePayload.token) delete safePayload.token;
       if (safePayload.auth && safePayload.auth.token) delete safePayload.auth.token;
       setResult(safePayload);

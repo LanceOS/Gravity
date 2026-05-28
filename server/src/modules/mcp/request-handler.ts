@@ -135,9 +135,6 @@ export class McpRequestHandler {
 
       return createMcpErrorResponse(payload.id, -32601, `Method not found: ${payload.method ?? 'unknown'}`);
     } catch (error) {
-        // Debug: log unexpected errors with stack for easier diagnosis in tests.
-        // eslint-disable-next-line no-console
-        console.error('MCP handler error:', error instanceof Error ? error.stack ?? error.message : error);
         return createMcpErrorResponse(
           payload.id,
           -32603,

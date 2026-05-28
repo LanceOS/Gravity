@@ -93,13 +93,8 @@ export class McpRouterFactory {
             if (token) {
                 // Throttle repeated failed verification attempts by IP and workspace
                 const ipKey = `ip:${getRequestSourceIp(req) ?? req.ip}`;
-                const headerWorkspaceId = (req.header('x-workspace-id') || req.header('X-Workspace-Id'))?.trim();
-                const bodyWorkspaceId =
-                  typeof req.body?.params?.workspaceId === 'string' && req.body.params.workspaceId.trim().length > 0
-                    ? req.body.params.workspaceId.trim()
-                    : undefined;
-                const wsKey = headerWorkspaceId || bodyWorkspaceId ? `workspace:${headerWorkspaceId || bodyWorkspaceId}` : null;
-                if (isBlocked(ipKey) || (wsKey && isBlocked(wsKey))) {
+                const wsKey = workspaceId ? `workspace:${workspaceId}` : null;
+                if (await isBlocked(ipKey) || (wsKey && await isBlocked(wsKey))) {
                   res.status(429).json({ error: 'Too many authentication attempts; try later.' });
                   return;
                 }
@@ -110,8 +105,8 @@ export class McpRouterFactory {
                 if (!tokenRow) {
                     // record failed attempt counters
                     try {
-                      recordFailedAttempt(ipKey);
-                      if (wsKey) recordFailedAttempt(wsKey);
+                      await recordFailedAttempt(ipKey);
+                      if (wsKey) await recordFailedAttempt(wsKey);
                     } catch (e) {
                       // best-effort
                     }
@@ -120,8 +115,8 @@ export class McpRouterFactory {
                 }
                   // reset any failure counters on successful verification
                   try {
-                    resetAttempts(ipKey);
-                    if (wsKey) resetAttempts(wsKey);
+                    await resetAttempts(ipKey);
+                    if (wsKey) await resetAttempts(wsKey);
                   } catch (e) {
                     // best-effort
                   }
