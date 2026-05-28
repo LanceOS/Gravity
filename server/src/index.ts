@@ -24,9 +24,6 @@ async function main() {
   // MCP stdio requires exclusive use of stdout for JSON-RPC responses, but the
   // API server logs to stdout.
   // Run `server/src/modules/mcp/stdio.ts` as a separate process when stdio is needed.
-  } catch (err) {
-    console.error('Failed to start MCP stdio transport:', err);
-  }
 
   // Optionally spawn a configured agent command and attach it via stdio.
   if (env.mcpAgentCommand && env.mcpStdioWorkspaceId && env.mcpStdioActorUserId) {
