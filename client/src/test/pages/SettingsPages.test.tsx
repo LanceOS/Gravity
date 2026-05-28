@@ -70,7 +70,6 @@ function renderSettingsPage(overrides: Partial<Parameters<typeof SettingsPage>[0
         avatar: '',
         role: 'owner',
         createdAt: '2026-05-01T09:00:00.000Z',
-        savedCredentials: [],
         lastActiveAt: new Date().toISOString(), // Today
       },
       {

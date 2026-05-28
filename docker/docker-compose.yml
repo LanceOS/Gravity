@@ -35,8 +35,10 @@ services:
 
   backend:
     build:
-      context: ../server
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: server/Dockerfile
+    env_file:
+      - ../server/.env
     container_name: ${GRAVITY_BACKEND_CONTAINER:-gravity_app_server}
     environment:
       DATABASE_URL: "${DATABASE_URL:-postgresql://${GRAVITY_POSTGRES_USER:-gravity_user}:${GRAVITY_POSTGRES_PASSWORD}@postgres:${GRAVITY_POSTGRES_PORT:-5432}/${GRAVITY_POSTGRES_DB:-gravity_workspace}}"
@@ -47,6 +49,7 @@ services:
       TRUSTED_ORIGINS: ${GRAVITY_FRONTEND_PUBLIC_URL:-http://localhost:5173},${GRAVITY_BACKEND_PUBLIC_URL:-http://localhost:8080}
       OLLAMA_DEFAULT_ENDPOINT: ${OLLAMA_DEFAULT_ENDPOINT:-http://host.docker.internal:11434}
       NODE_ENV: ${NODE_ENV:-production}
+      LOCAL_TESTING_KEK: ${LOCAL_TESTING_KEK}
       PORT: ${GRAVITY_BACKEND_PORT:-8080}
       REDIS_URL: "redis://default:${GRAVITY_REDIS_PASSWORD}@redis:${GRAVITY_REDIS_PORT:-6379}"
       REDIS_ENABLED: ${REDIS_ENABLED:-"true"}

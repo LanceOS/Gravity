@@ -59,7 +59,7 @@ export function createApp() {
   app.use(express.static(clientDist, { index: false }));
 
   // For any non-API request, serve the client's index.html (SPA fallback).
-  app.get('*', (req, res, next) => {
+  app.get(/.*/, (req, res, next) => {
     if (req.path.startsWith('/api')) {
       return next();
     }
