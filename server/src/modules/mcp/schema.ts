@@ -21,7 +21,10 @@ export const mcpConnectionTokens = pgTable(
   },
   (table) => ({
     workspaceIdIdx: index('mcp_connection_tokens_workspace_id_idx').on(table.workspaceId),
-    tokenHashIdx: index('mcp_connection_tokens_token_hash_idx').on(table.tokenHash),
+    workspaceTokenHashIdx: index('mcp_connection_tokens_workspace_id_token_hash_idx').on(
+      table.workspaceId,
+      table.tokenHash,
+    ),
   }),
 );
 

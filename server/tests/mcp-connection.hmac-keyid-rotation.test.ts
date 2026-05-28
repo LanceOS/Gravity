@@ -11,12 +11,8 @@ describe('MCP HMAC key-id rotation (keyed secrets)', () => {
     // Prepare environment so the keyed old secret is known at creation time
     process.env.BETTER_AUTH_SECRET = newSecret;
     process.env.BETTER_AUTH_OLD_SECRETS = `${oldKeyId}=${oldSecret}`;
-    vi.resetModules();
-    // Ensure DB schema is initialized after resetting modules
-    const { initializeDatabase } = await import('../src/db/bootstrap.js');
-    await initializeDatabase();
-
     const helpers = await import('./helpers/test-helpers.js');
+    await helpers.resetTestApp();
     const connModule = await import('../src/modules/mcp/connection.js');
     const envMod = await import('../src/env.js');
 
@@ -30,9 +26,11 @@ describe('MCP HMAC key-id rotation (keyed secrets)', () => {
     const rawToken = payload.rawToken;
 
     // Simulate rotation: new secret becomes current, but we retain the keyed mapping to the old secret
-    envMod.env.betterAuthSecret = newSecret + '-rotated';
-    envMod.env.betterAuthOldSecrets = [`${oldKeyId}=${oldSecret}`];
-    envMod.env.betterAuthOldSecretsMap = { [oldKeyId]: oldSecret };
+    helpers.setSecretsForTest({
+      betterAuthSecret: newSecret + '-rotated',
+      betterAuthOldSecrets: [`${oldKeyId}=${oldSecret}`],
+      betterAuthOldSecretsMap: { [oldKeyId]: oldSecret },
+    });
 
     const verified = await connModule.verifyAndConsumeToken(rawToken, workspace.id);
     expect(verified).toBeTruthy();
@@ -44,11 +42,8 @@ describe('MCP HMAC key-id rotation (keyed secrets)', () => {
 
     process.env.BETTER_AUTH_SECRET = oldSecret;
     process.env.BETTER_AUTH_OLD_SECRETS = `${oldKeyId}=${oldSecret}`;
-    vi.resetModules();
-    const { initializeDatabase } = await import('../src/db/bootstrap.js');
-    await initializeDatabase();
-
     const helpers = await import('./helpers/test-helpers.js');
+    await helpers.resetTestApp();
     const connModule = await import('../src/modules/mcp/connection.js');
     const envMod = await import('../src/env.js');
 
@@ -61,9 +56,11 @@ describe('MCP HMAC key-id rotation (keyed secrets)', () => {
     const rawToken = payload.rawToken;
 
     // Now simulate rotation where the keyed mapping is NOT retained
-    envMod.env.betterAuthSecret = 'some-new-secret';
-    envMod.env.betterAuthOldSecrets = [];
-    envMod.env.betterAuthOldSecretsMap = {};
+    helpers.setSecretsForTest({
+      betterAuthSecret: 'some-new-secret',
+      betterAuthOldSecrets: [],
+      betterAuthOldSecretsMap: {},
+    });
 
     const verified = await connModule.verifyAndConsumeToken(rawToken, workspace.id);
     // Should be rejected because the keyed mapping no longer exists

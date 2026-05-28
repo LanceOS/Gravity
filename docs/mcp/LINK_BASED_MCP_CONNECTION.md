@@ -21,7 +21,49 @@ Suggested API:
 - `POST /api/v1/workspaces/:workspaceId/mcp/connection` — returns a generated MCP JSON payload for an authenticated workspace user.
 - `POST /api/v1/workspaces/:workspaceId/mcp/connection/refresh` — optionally refreshes a still-valid connection token.
 
-These endpoints are not currently implemented in the repository, but the design assumes they will extend the existing workspace and MCP modules.
+These endpoints are implemented in the repository. See [server/src/modules/workspaces/routes.ts](../server/SERVER_MODULE_MCP.md) for the router implementation.
+
+Implemented endpoints (server):
+- `POST /api/v1/workspaces/:workspaceId/mcp/connection` — issues a short-lived connection payload and returns the canonical response shown below.
+- `POST /api/v1/workspaces/:workspaceId/mcp/connection/:tokenId/refresh` — refreshes an existing active token and returns a new raw token value.
+- `POST /api/v1/workspaces/:workspaceId/mcp/connection/:tokenId/revoke` — revokes a token.
+- `GET /api/v1/workspaces/:workspaceId/mcp/connections` — lists token metadata for owner/admin users.
+
+Canonical payload shape (what the `/mcp/connection` endpoint returns):
+
+```json
+{
+  "id": "mct_...",
+  "type": "mcp_http",
+  "expires_at": "2026-05-27T14:00:00Z",
+  "scopes": ["tools/list","tools/call"],
+  "single_use": true,
+  "connection_type": "http-post",
+  "args": {
+    "mcpEndpoint": "https://app.example.com/api/v1/mcp/sse",
+    "workspaceId": "ws_1234",
+    "transport": "http-post",
+    "protocol": "mcp-jsonrpc"
+  },
+  "auth": {
+    "scheme": "one_time_token",
+    "token": "<raw-token-value>",
+    "expiresAt": "2026-05-27T14:00:00Z",
+    "singleUse": true,
+    "connectionType": "http-post"
+  },
+  "metadata": {
+    "workspaceName": "Customer Support",
+    "generatedBy": "alice@example.com"
+  }
+}
+```
+
+HMAC key semantics and rotation:
+
+- The server stores only a keyed hash of raw token values (`token_hash`) and records the HMAC key id used to compute the hash in the `hmac_key_id` column. The default key id is `env` which maps to the process environment secret `BETTER_AUTH_SECRET`.
+- To support key rotation, the server may be configured with `BETTER_AUTH_OLD_SECRETS` (or a map via `BETTER_AUTH_OLD_SECRETS` entries) so verification tries keyed secrets first and falls back to legacy secrets when necessary. See `src/modules/mcp/connection.ts` for the verification algorithm (it prefers the recorded `hmac_key_id` secret when available).
+- The `verifyAndConsumeToken` implementation atomically validates and consumes single-use tokens, updates `usage_count` for multi-use tokens, and enforces `sourceIp` binding when present.
 
 The workspace connection link is a trigger for payload generation, not a direct authorization token. The external client must receive the generated payload through a secure, authenticated channel or manual handoff.
 

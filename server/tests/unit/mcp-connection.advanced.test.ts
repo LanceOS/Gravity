@@ -5,16 +5,14 @@ import { mcpConnectionTokens } from '../../src/db/schema.js';
 import { eq } from 'drizzle-orm';
 
 // Helpers are in tests/helpers
-import { api as publicApi, createAuthenticatedApi, seedWorkspaceFixture } from '../helpers/test-helpers.js';
+import { api as publicApi, createAuthenticatedApi, seedWorkspaceFixture, resetTestApp } from '../helpers/test-helpers.js';
 
 describe('MCP connection advanced flows', () => {
   afterEach(async () => {
     // Keep env clean between tests that mutate it and ensure DB schema
     delete process.env.BETTER_AUTH_SECRET;
     delete process.env.BETTER_AUTH_OLD_SECRETS;
-    vi.resetModules();
-    const { initializeDatabase } = await import('../../src/db/bootstrap.js');
-    await initializeDatabase();
+    await resetTestApp();
   });
 
   it('increments usageCount for multi-use tokens and keeps status active', async () => {
@@ -86,9 +84,8 @@ describe('MCP connection advanced flows', () => {
     process.env.BETTER_AUTH_SECRET = newSecret;
     process.env.BETTER_AUTH_OLD_SECRETS = oldSecret;
     // Mutate runtime env so existing modules pick up rotated keys without resetting DB
-    const envMod = await import('../../src/env.js');
-    envMod.env.betterAuthOldSecrets = [oldSecret];
-    envMod.env.betterAuthSecret = newSecret;
+    const helpers = await import('../helpers/test-helpers.js');
+    helpers.setSecretsForTest({ betterAuthSecret: newSecret, betterAuthOldSecrets: [oldSecret] });
 
     const verified = await connModule.verifyAndConsumeToken(rawToken, workspace.id);
     expect(verified).toBeTruthy();

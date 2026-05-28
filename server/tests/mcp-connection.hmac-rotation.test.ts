@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { api, createAuthenticatedApi, seedWorkspaceFixture } from './helpers/test-helpers.js';
+import { api, createAuthenticatedApi, seedWorkspaceFixture, setSecretsForTest } from './helpers/test-helpers.js';
 import { env } from '../src/env.js';
 
 describe('MCP HMAC key rotation simulation', () => {
@@ -21,16 +21,14 @@ describe('MCP HMAC key rotation simulation', () => {
     try {
       // Simulate token issuance with an old secret
       const oldSecret = 'old-rot-secret-test-1';
-      env.betterAuthSecret = oldSecret;
-      env.betterAuthOldSecrets = [];
+      const restoreOld = setSecretsForTest({ betterAuthSecret: oldSecret, betterAuthOldSecrets: [] });
 
       const createRes = await ownerApi.post(`/api/v1/workspaces/${workspace.id}/mcp/connection`).send({});
       expect(createRes.status).toBe(201);
       const rawToken = createRes.body.auth.token;
 
       // Rotate to a new secret but do NOT retain the old secret -> token should be rejected
-      env.betterAuthSecret = 'new-rot-secret-test-1';
-      env.betterAuthOldSecrets = [];
+      const restoreNew = setSecretsForTest({ betterAuthSecret: 'new-rot-secret-test-1', betterAuthOldSecrets: [] });
 
       const resRejected = await api()
         .post('/api/v1/mcp/sse')
@@ -42,7 +40,7 @@ describe('MCP HMAC key rotation simulation', () => {
       expect(resRejected.body).toEqual({ error: 'Invalid or expired token.' });
 
       // Now retain the old secret in rotation window -> token should be accepted once
-      env.betterAuthOldSecrets = [oldSecret];
+      const restoreRetain = setSecretsForTest({ betterAuthSecret: 'new-rot-secret-test-1', betterAuthOldSecrets: [oldSecret] });
 
       const resAccepted = await api()
         .post('/api/v1/mcp/sse')
@@ -61,8 +59,13 @@ describe('MCP HMAC key rotation simulation', () => {
         .send({ jsonrpc: '2.0', id: 3, method: 'tools/list', params: {} });
 
       expect(resSecond.status).toBe(401);
+
+      // unwind nested restores (restoreRetain -> restoreNew -> restoreOld)
+      restoreRetain();
+      restoreNew();
+      restoreOld();
     } finally {
-      // Restore environment
+      // Restore environment (defensive)
       env.betterAuthSecret = origSecret;
       env.betterAuthOldSecrets = origOld;
     }

@@ -94,7 +94,7 @@ export class McpRouterFactory {
                     ? req.body.params.workspaceId.trim()
                     : undefined;
                 const wsKey = headerWorkspaceId || bodyWorkspaceId ? `workspace:${headerWorkspaceId || bodyWorkspaceId}` : null;
-                if (isBlocked(ipKey) || (wsKey && isBlocked(wsKey))) {
+                if (await isBlocked(ipKey) || (wsKey && await isBlocked(wsKey))) {
                   res.status(429).json({ error: 'Too many authentication attempts; try later.' });
                   return;
                 }
@@ -105,8 +105,8 @@ export class McpRouterFactory {
                 if (!tokenRow) {
                     // record failed attempt counters
                     try {
-                      recordFailedAttempt(ipKey);
-                      if (wsKey) recordFailedAttempt(wsKey);
+                      await recordFailedAttempt(ipKey);
+                      if (wsKey) await recordFailedAttempt(wsKey);
                     } catch (e) {
                       // best-effort
                     }
@@ -115,8 +115,8 @@ export class McpRouterFactory {
                 }
                   // reset any failure counters on successful verification
                   try {
-                    resetAttempts(ipKey);
-                    if (wsKey) resetAttempts(wsKey);
+                    await resetAttempts(ipKey);
+                    if (wsKey) await resetAttempts(wsKey);
                   } catch (e) {
                     // best-effort
                   }
