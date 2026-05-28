@@ -39,6 +39,7 @@ import {
 import { createConnectionToken, refreshConnectionToken, revokeConnectionToken } from '../mcp/connection.js';
 import { csrfProtect } from '../../lib/csrf.js';
 import { createRateLimiter } from '../../lib/rateLimit.js';
+import { getRequestSourceIp } from '../../lib/request-ip.js';
 import { isWorkspaceMember } from './services/membership.js';
 import { mapProjectCreationError } from './utils/project-creation.js';
 import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
@@ -216,10 +217,11 @@ export function createWorkspacesRouter() {
     max: 10,
     keyFn: async (req) => {
       const actor = await resolveRequestActorUserId(req);
-      return actor ? `user:${actor}` : `ip:${req.ip}`;
+      const clientIp = getRequestSourceIp(req) ?? req.ip;
+      return actor ? `user:${actor}` : `ip:${clientIp}`;
     },
   });
-  const issuanceIpLimiter = createRateLimiter({ windowMs: 60_000, max: 60, keyFn: (req) => `ip:${req.ip}` });
+  const issuanceIpLimiter = createRateLimiter({ windowMs: 60_000, max: 60, keyFn: (req) => `ip:${getRequestSourceIp(req) ?? req.ip}` });
   // Enforce CSRF Origin/Referer checks for state-changing requests by default.
   // `csrfProtect` allows Authorization header or service tokens to bypass when appropriate.
   router.use(csrfProtect());
@@ -823,7 +825,7 @@ export function createWorkspacesRouter() {
       }
 
       const { scopes, ttlSeconds, singleUse, connectionType } = req.body ?? {};
-      const sourceIp = req.ip ?? (req.headers['x-forwarded-for'] as string) ?? null;
+      const sourceIp = getRequestSourceIp(req);
 
       const token = await createConnectionToken({
         workspaceId,
@@ -895,7 +897,7 @@ export function createWorkspacesRouter() {
       }
 
       const ttlSeconds = typeof req.body?.ttlSeconds === 'number' ? req.body.ttlSeconds : undefined;
-      const sourceIp = req.ip ?? (req.headers['x-forwarded-for'] as string) ?? null;
+      const sourceIp = getRequestSourceIp(req);
       const token = await refreshConnectionToken(tokenId, actorUserId, { ttlSeconds, sourceIp });
 
       if (!token) {

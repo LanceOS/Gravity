@@ -7,6 +7,7 @@ import { isWorkspaceMember } from '../workspaces/services/membership.js';
 import { createMcpErrorResponse } from './responses.js';
 import { createRateLimiter } from '../../lib/rateLimit.js';
 import { recordFailedAttempt, isBlocked, resetAttempts } from '../../lib/authThrottle.js';
+import { getRequestSourceIp } from '../../lib/request-ip.js';
 
 /**
  * @description Builds the HTTP MCP transport. Request authentication and
@@ -31,11 +32,12 @@ export class McpRouterFactory {
             ? req.body.params.workspaceId.trim()
             : undefined;
         const workspaceId = headerWorkspaceId || bodyWorkspaceId;
-        return workspaceId ? `workspace:${workspaceId}` : `ip:${req.ip}`;
+        const clientIp = getRequestSourceIp(req) ?? req.ip;
+        return workspaceId ? `workspace:${workspaceId}` : `ip:${clientIp}`;
       },
     });
 
-    const transportIpLimiter = createRateLimiter({ windowMs: 60_000, max: 300, keyFn: (req) => `ip:${req.ip}` });
+    const transportIpLimiter = createRateLimiter({ windowMs: 60_000, max: 300, keyFn: (req) => `ip:${getRequestSourceIp(req) ?? req.ip}` });
 
     router.post('/mcp/sse', workspaceTransportLimiter, transportIpLimiter, async (req: Request, res: Response) => {
       try {
@@ -98,7 +100,7 @@ export class McpRouterFactory {
                 }
               try {
                 const { verifyAndConsumeToken } = await import('./connection.js');
-                const sourceIp = req.ip ?? (req.headers['x-forwarded-for'] as string) ?? null;
+                const sourceIp = getRequestSourceIp(req);
                 const tokenRow = await verifyAndConsumeToken(token, workspaceId, { sourceIp });
                 if (!tokenRow) {
                     // record failed attempt counters

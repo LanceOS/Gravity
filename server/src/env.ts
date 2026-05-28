@@ -20,6 +20,7 @@ const envSchema = z.object({
   TRUSTED_SERVICE_TOKENS_FILE: z.string().optional(),
   TRUSTED_SERVICE_TOKENS_REFRESH_INTERVAL_MS: z.coerce.number().int().nonnegative().default(60000),
   BETTER_AUTH_OLD_SECRETS: z.string().optional(),
+  TRUSTED_PROXIES: z.string().optional(),
   OLLAMA_DEFAULT_ENDPOINT: z.string().url().optional(),
   MCP_STDIO_WORKSPACE_ID: z.string().optional(),
   MCP_STDIO_ACTOR_USER_ID: z.string().optional(),
@@ -93,4 +94,5 @@ export const env = {
     }
     return map;
   })(),
+  trustedProxies: splitList(parsed.TRUSTED_PROXIES),
 };

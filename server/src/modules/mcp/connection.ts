@@ -222,10 +222,11 @@ export async function verifyAndConsumeToken(rawToken: string, workspaceId: strin
     if (row.status !== 'active') return null;
     if (row.expiresAt && row.expiresAt <= new Date()) return null;
 
-    // Optional source IP enforcement: if token bound to an IP and the caller
-    // presented a different source IP, reject verification.
-    if (row.sourceIp && opts?.sourceIp && row.sourceIp !== opts.sourceIp) {
-      return null;
+    // Enforce source IP binding: if the token row is bound to a specific
+    // source IP, the caller MUST present a source IP and it MUST match.
+    if (row.sourceIp) {
+      if (!opts?.sourceIp) return null;
+      if (row.sourceIp !== opts.sourceIp) return null;
     }
 
     if (row.singleUse) {
