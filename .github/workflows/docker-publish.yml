@@ -3,11 +3,13 @@ name: Build and publish server Docker image
 on:
   push:
     branches:
-    - main
+      - main
     paths:
-    - 'server/**'
-    - 'client/**'
-    - '.github/workflows/docker-publish.yml'
+      - 'server/**'
+      - 'client/**'
+      - 'library/**'
+      - 'package.json'
+      - '.github/workflows/docker-publish.yml'
   release:
     types: [ published ]
 
