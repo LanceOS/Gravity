@@ -87,8 +87,9 @@ export class McpRouterFactory {
         } else {
           // Fallback to bearer token auth for external MCP clients. Token must be bound to workspace.
           const authHeader = (req.header('authorization') || req.header('Authorization') || '').trim();
-          if (authHeader.startsWith('Bearer ')) {
-            const token = authHeader.slice('Bearer '.length).trim();
+          const bearerMatch = authHeader.match(/^bearer\s+(.+)$/i);
+          if (bearerMatch) {
+            const token = bearerMatch[1].trim();
             if (token) {
                 // Throttle repeated failed verification attempts by IP and workspace
                 const ipKey = `ip:${getRequestSourceIp(req) ?? req.ip}`;
