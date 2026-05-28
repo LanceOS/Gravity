@@ -247,7 +247,7 @@ export async function verifyAndConsumeToken(rawToken: string, workspaceId: strin
     const updatedMulti = await tx
       .update(mcpConnectionTokens)
       .set({ usedAt: new Date(), usageCount: sql`coalesce(usage_count, 0) + 1` })
-      .where(eq(mcpConnectionTokens.id, row.id))
+      .where(and(eq(mcpConnectionTokens.id, row.id), eq(mcpConnectionTokens.status, 'active')))
       .returning();
 
     return updatedMulti[0] ?? null;

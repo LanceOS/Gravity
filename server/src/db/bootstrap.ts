@@ -279,6 +279,8 @@ export async function initializeDatabase() {
   // Ensure `usage_count` exists for mcp_connection_tokens (backfill-safe)
   await pool.query(`
     ALTER TABLE mcp_connection_tokens ADD COLUMN IF NOT EXISTS usage_count INTEGER NOT NULL DEFAULT 0;
+    CREATE INDEX IF NOT EXISTS mcp_connection_tokens_workspace_id_idx ON mcp_connection_tokens (workspace_id);
+    CREATE INDEX IF NOT EXISTS mcp_connection_tokens_token_hash_idx ON mcp_connection_tokens (token_hash);
   `);
 
   const { runMigrations } = await getMigrations(auth.options);

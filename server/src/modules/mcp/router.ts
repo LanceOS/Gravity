@@ -6,6 +6,8 @@ import { handleMcpRequest } from './request-handler.js';
 import { isWorkspaceMember } from '../workspaces/services/membership.js';
 import { createMcpErrorResponse } from './responses.js';
 import { createRateLimiter } from '../../lib/rateLimit.js';
+import { createRedisRateLimiter } from '../../lib/rateLimitRedis.js';
+import { env } from '../../env.js';
 import { recordFailedAttempt, isBlocked, resetAttempts } from '../../lib/authThrottle.js';
 import { getRequestSourceIp } from '../../lib/request-ip.js';
 
@@ -22,7 +24,9 @@ export class McpRouterFactory {
   create() {
     const router = Router();
 
-    const workspaceTransportLimiter = createRateLimiter({
+    const createLimiter = env.redisEnabled ? createRedisRateLimiter : createRateLimiter;
+
+    const workspaceTransportLimiter = createLimiter({
       windowMs: 60_000,
       max: 120,
       keyFn: async (req) => {
@@ -37,7 +41,7 @@ export class McpRouterFactory {
       },
     });
 
-    const transportIpLimiter = createRateLimiter({ windowMs: 60_000, max: 300, keyFn: (req) => `ip:${getRequestSourceIp(req) ?? req.ip}` });
+    const transportIpLimiter = createLimiter({ windowMs: 60_000, max: 300, keyFn: (req) => `ip:${getRequestSourceIp(req) ?? req.ip}` });
 
     router.post('/mcp/sse', workspaceTransportLimiter, transportIpLimiter, async (req: Request, res: Response) => {
       try {
@@ -83,11 +87,12 @@ export class McpRouterFactory {
         } else {
           // Fallback to bearer token auth for external MCP clients. Token must be bound to workspace.
           const authHeader = (req.header('authorization') || req.header('Authorization') || '').trim();
-          if (authHeader.startsWith('Bearer ')) {
-            const token = authHeader.slice('Bearer '.length).trim();
+          const bearerMatch = authHeader.match(/^bearer\s+(.+)$/i);
+          if (bearerMatch) {
+            const token = bearerMatch[1].trim();
             if (token) {
                 // Throttle repeated failed verification attempts by IP and workspace
-                const ipKey = `ip:${req.ip}`;
+                const ipKey = `ip:${getRequestSourceIp(req) ?? req.ip}`;
                 const wsKey = workspaceId ? `workspace:${workspaceId}` : null;
                 if (await isBlocked(ipKey) || (wsKey && await isBlocked(wsKey))) {
                   res.status(429).json({ error: 'Too many authentication attempts; try later.' });

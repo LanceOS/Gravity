@@ -95,7 +95,7 @@ export function WorkspaceMcpModal({ workspaceId, isOpen, onClose }: Props) {
         ) : null}
 
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <Button type="button" variant="secondary" onClick={onClose}>Close</Button>
+          <Button type="button" variant="secondary" onClick={handleClose}>Close</Button>
           <Button type="button" variant="primary" onClick={handleCreate} disabled={loading}>
             {loading ? 'Generating…' : 'Generate Token'}
           </Button>
