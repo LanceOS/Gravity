@@ -36,8 +36,8 @@ describe('MCP tools/call granular scopes', () => {
       .set('X-Workspace-Id', workspace.id)
       .send({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'get_ticket_details', arguments: { ticketKey: 'T-1' } } });
 
-    expect(rejected.status).toBe(403);
-    expect(rejected.body).toEqual({ error: 'Insufficient token scopes.' });
+    expect(rejected.status).toBe(200);
+    expect(rejected.body).toEqual({ jsonrpc: '2.0', id: 2, error: { code: -32001, message: 'Insufficient token scopes.' } });
   });
 
   it('allows any tools when token has global tools/call scope', async () => {

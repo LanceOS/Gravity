@@ -61,8 +61,8 @@ describe('MCP token multi-use, scopes, and RBAC', () => {
       .set('X-Workspace-Id', workspace.id)
       .send({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'some_tool', arguments: {} } });
 
-    expect(callRes.status).toBe(403);
-    expect(callRes.body).toEqual({ error: 'Insufficient token scopes.' });
+    expect(callRes.status).toBe(200);
+    expect(callRes.body).toEqual({ jsonrpc: '2.0', id: 3, error: { code: -32001, message: 'Insufficient token scopes.' } });
   });
 
   it('enforces RBAC: non-members cannot create or revoke tokens', async () => {

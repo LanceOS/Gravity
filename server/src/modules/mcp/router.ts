@@ -35,6 +35,9 @@ export class McpRouterFactory {
 
         // First try normal session-based authentication.
         let actorUserId = await resolveRequestActorUserId(req);
+        // Prepare optional token scopes placeholder for token-authenticated transports.
+        let tokenScopes: string[] | undefined = undefined;
+        // (debug logs removed)
         let accessChecked = false;
 
         // When tests enable ALLOW_DEV_AUTH_BYPASS the bearer token in the
@@ -71,30 +74,7 @@ export class McpRouterFactory {
                   return;
                 }
 
-                // Attach scopes for later transport-level checks.
-                const tokenScopes = Array.isArray(tokenRow.scopes) ? tokenRow.scopes : [];
-
-                // Enforce token scopes at transport level for common MCP methods.
-                const requestedMethod = typeof req.body?.method === 'string' ? req.body.method : '';
-                if (requestedMethod === 'tools/list') {
-                  if (!tokenScopes.includes('tools/list')) {
-                    res.status(403).json({ error: 'Insufficient token scopes.' });
-                    return;
-                  }
-                }
-
-                if (requestedMethod === 'tools/call') {
-                  const toolName = typeof req.body?.params?.name === 'string' ? req.body.params.name : '';
-
-                  const hasGlobalCall = tokenScopes.includes('tools/call') || tokenScopes.includes('tools/call:*');
-                  const hasExactCall = toolName ? tokenScopes.includes(`tools/call:${toolName}`) : false;
-
-                  if (!hasGlobalCall && !hasExactCall) {
-                    res.status(403).json({ error: 'Insufficient token scopes.' });
-                    return;
-                  }
-                }
-
+                tokenScopes = Array.isArray(tokenRow.scopes) ? tokenRow.scopes : [];
                 actorUserId = tokenRow.generatedBy;
                 accessChecked = true;
               } catch (err) {
@@ -110,9 +90,12 @@ export class McpRouterFactory {
           }
         }
 
+        // tokenScopes propagated to handler (no debug log here)
+
         const response = await handleMcpRequest(req.body, workspaceId, actorUserId, {
           accessChecked: true,
           sanitize: req.header('x-mcp-sanitize') === 'true',
+          tokenScopes,
         });
         res.json(response);
       } catch (error) {
