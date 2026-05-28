@@ -99,7 +99,7 @@ export function csrfProtect(
         if (trusted) {
           try {
             const originHost = new URL(originNormalized).host.toLowerCase();
-            const xfh = (req.get('x-forwarded-host') || req.get('x-forwarded-host') as string | undefined) as string | undefined;
+            const xfh = req.get('x-forwarded-host') as string | undefined;
             if (xfh) {
               const fh = xfh.split(',')[0].trim().toLowerCase();
               if (fh === originHost) return next();
