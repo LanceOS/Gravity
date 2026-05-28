@@ -19,7 +19,6 @@ import {
   workspaceSettings,
 } from '../../src/db/schema.js';
 import { ensureUserDefaults, getUserById } from '../../src/lib/platform.js';
-import { vi } from 'vitest';
 import { env } from '../../src/env.js';
 
 type UserSeed = {
