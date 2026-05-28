@@ -33,7 +33,6 @@ coverage
 scripts
 
 # Server package (not needed for the client/frontend build)
-server
 
 # Dependencies – reinstalled inside the image
 **/node_modules
