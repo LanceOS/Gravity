@@ -26,6 +26,7 @@ export class McpRouterFactory {
      * @return The configured MCP router instance.
      */
     create() {
+                const router = Router();
                 const createLimiter = env.redisEnabled ? createRedisRateLimiter : createRateLimiter;
 
                 const workspaceTransportLimiter = createLimiter({
@@ -170,4 +171,4 @@ const defaultRouterFactory = new McpRouterFactory();
 export function createMcpRouter() {
     return defaultRouterFactory.create();
 }
-        });
+
