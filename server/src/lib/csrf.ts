@@ -5,16 +5,17 @@ function normalizeOrigin(origin: string) {
   return origin.replace(/\/$/, '').toLowerCase();
 }
 
-export function csrfProtect(allowedOrigins?: string[]) {
+export function csrfProtect(allowedOrigins?: string[], options?: { enforceInTest?: boolean }) {
   const allowed = (allowedOrigins ?? env.trustedOrigins).map(normalizeOrigin);
+  const enforceInTest = options?.enforceInTest === true;
 
   return (req: Request, res: Response, next: NextFunction) => {
     try {
       // Only protect unsafe methods
       if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
 
-      // In tests, skip CSRF checks to keep unit tests deterministic
-      if (env.nodeEnv === 'test') return next();
+      // In tests, skip CSRF checks by default to keep unit tests deterministic
+      if (env.nodeEnv === 'test' && !enforceInTest) return next();
 
       // If client provided an Authorization header (bearer token), assume non-browser client
       const authHeader = req.get('authorization');
