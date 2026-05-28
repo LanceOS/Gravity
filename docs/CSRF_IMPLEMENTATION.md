@@ -145,4 +145,18 @@ TRUSTED_SERVICE_TOKENS=svc-token-abc123,svc-token-xyz456
 
 * 2026-05-27: Initial document created to describe CSRF usage and implementation in this repository.
 
+## MCP compatibility note (short)
+
+- MCP HTTP transport (`/api/v1/mcp/sse`) uses bearer tokens. External connectors should call the
+  transport with `Authorization: Bearer <one-time-token>` and include `X-Workspace-Id: <workspace-id>`.
+
+- The CSRF middleware explicitly bypasses requests with an `Authorization` header, so MCP JSON-RPC
+  calls authenticated this way will not be blocked by CSRF. Token issuance/refresh/revoke endpoints
+  remain protected by CSRF because they are intended to be invoked from browser UI flows (session cookies
+  and `Origin` checks). For automation that needs to call issuance endpoints, prefer service tokens
+  (`X-Service-Token`/`X-API-KEY` from `TRUSTED_SERVICE_TOKENS`) or an authenticated API client.
+
+- If you encounter 403s for issuance from automation, check proxies/CDNs for header stripping and
+  prefer service tokens in those environments.
+
 
