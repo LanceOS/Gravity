@@ -6,6 +6,7 @@ import { handleMcpRequest } from './request-handler.js';
 import { isWorkspaceMember } from '../workspaces/services/membership.js';
 import { createMcpErrorResponse } from './responses.js';
 import { createRateLimiter } from '../../lib/rateLimit.js';
+import { recordFailedAttempt, isBlocked, resetAttempts } from '../../lib/authThrottle.js';
 
 /**
  * @description Builds the HTTP MCP transport. Request authentication and
@@ -83,17 +84,43 @@ export class McpRouterFactory {
           if (authHeader.startsWith('Bearer ')) {
             const token = authHeader.slice('Bearer '.length).trim();
             if (token) {
+                // Throttle repeated failed verification attempts by IP and workspace
+                const ipKey = `ip:${req.ip}`;
+                const headerWorkspaceId = (req.header('x-workspace-id') || req.header('X-Workspace-Id'))?.trim();
+                const bodyWorkspaceId =
+                  typeof req.body?.params?.workspaceId === 'string' && req.body.params.workspaceId.trim().length > 0
+                    ? req.body.params.workspaceId.trim()
+                    : undefined;
+                const wsKey = headerWorkspaceId || bodyWorkspaceId ? `workspace:${headerWorkspaceId || bodyWorkspaceId}` : null;
+                if (isBlocked(ipKey) || (wsKey && isBlocked(wsKey))) {
+                  res.status(429).json({ error: 'Too many authentication attempts; try later.' });
+                  return;
+                }
               try {
                 const { verifyAndConsumeToken } = await import('./connection.js');
                 const tokenRow = await verifyAndConsumeToken(token, workspaceId);
                 if (!tokenRow) {
-                  res.status(401).json({ error: 'Invalid or expired token.' });
-                  return;
+                    // record failed attempt counters
+                    try {
+                      recordFailedAttempt(ipKey);
+                      if (wsKey) recordFailedAttempt(wsKey);
+                    } catch (e) {
+                      // best-effort
+                    }
+                    res.status(401).json({ error: 'Invalid or expired token.' });
+                    return;
                 }
+                  // reset any failure counters on successful verification
+                  try {
+                    resetAttempts(ipKey);
+                    if (wsKey) resetAttempts(wsKey);
+                  } catch (e) {
+                    // best-effort
+                  }
 
-                tokenScopes = Array.isArray(tokenRow.scopes) ? tokenRow.scopes : [];
-                actorUserId = tokenRow.generatedBy;
-                accessChecked = true;
+                  tokenScopes = Array.isArray(tokenRow.scopes) ? tokenRow.scopes : [];
+                  actorUserId = tokenRow.generatedBy;
+                  accessChecked = true;
               } catch (err) {
                 res.status(401).json({ error: 'Invalid token.' });
                 return;
