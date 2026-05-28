@@ -91,7 +91,7 @@ export class McpRouterFactory {
             const token = authHeader.slice('Bearer '.length).trim();
             if (token) {
                 // Throttle repeated failed verification attempts by IP and workspace
-                const ipKey = `ip:${req.ip}`;
+                const ipKey = `ip:${getRequestSourceIp(req) ?? req.ip}`;
                 const headerWorkspaceId = (req.header('x-workspace-id') || req.header('X-Workspace-Id'))?.trim();
                 const bodyWorkspaceId =
                   typeof req.body?.params?.workspaceId === 'string' && req.body.params.workspaceId.trim().length > 0
