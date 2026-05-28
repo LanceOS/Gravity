@@ -1,6 +1,10 @@
 import dotenv from 'dotenv';
+import { join } from 'path';
 import { z } from 'zod';
 
+// Load root-level .env first if present (consolidated env for repo)
+dotenv.config({ path: join(process.cwd(), '..', '.env') });
+// Then load local server/.env to allow overrides (if present)
 dotenv.config();
 
 const envSchema = z.object({

@@ -37,8 +37,9 @@ services:
     build:
       context: ..
       dockerfile: server/Dockerfile
+    # Use the consolidated repository-level .env
     env_file:
-      - ../server/.env
+      - ../.env
     container_name: ${GRAVITY_BACKEND_CONTAINER:-gravity_app_server}
     environment:
       DATABASE_URL: "${DATABASE_URL:-postgresql://${GRAVITY_POSTGRES_USER:-gravity_user}:${GRAVITY_POSTGRES_PASSWORD}@postgres:${GRAVITY_POSTGRES_PORT:-5432}/${GRAVITY_POSTGRES_DB:-gravity_workspace}}"
