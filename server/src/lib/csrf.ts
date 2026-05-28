@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import { env } from '../env.js';
+import { getTrustedServiceTokens } from './serviceTokens.js';
 
 function normalizeOrigin(origin: string) {
   return origin.replace(/\/$/, '').toLowerCase();
@@ -11,9 +12,9 @@ export function csrfProtect(
 ) {
   const allowed = (allowedOrigins ?? env.trustedOrigins).map(normalizeOrigin);
   const enforceInTest = options?.enforceInTest === true;
-  const allowedServiceTokens = (options?.allowedServiceTokens && options.allowedServiceTokens.length)
+  const allowedServiceTokensOption = (options?.allowedServiceTokens && options.allowedServiceTokens.length)
     ? options.allowedServiceTokens
-    : (env.trustedServiceTokens ?? []);
+    : undefined;
 
   return (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -29,6 +30,7 @@ export function csrfProtect(
 
       // Allow service-to-service tokens provided via `x-service-token` or `x-api-key`
       const serviceToken = req.get('x-service-token') || req.get('x-api-key');
+      const allowedServiceTokens = allowedServiceTokensOption ?? getTrustedServiceTokens();
       if (serviceToken && allowedServiceTokens.length > 0 && allowedServiceTokens.includes(String(serviceToken))) return next();
 
       // Prefer Origin header; fall back to Referer
