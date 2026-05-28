@@ -28,6 +28,10 @@ export const systemPrompt = `
 **Chain of Thought Output**: DISABLED
 **Conversational Filler**: DISABLED
 **Execution Rule**: Execute all MCP tools silently. Wait until all data is gathered. Output ONLY the final, consolidated answer in a single message.
+ 
+## Emoji Usage
+**Emoji Usage**: PROHIBITED
+**Translation Rule**: Do not use emojis, emoticons, pictographic characters, or similar symbols in any generated output, including task titles, ticket descriptions, status indicators, or conversational responses. Replace any emoji-based emphasis with clear plain-text wording.
 
 **Forbidden Phrases**:
 - "I can see the project ID is..."
