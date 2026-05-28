@@ -68,8 +68,8 @@ services:
     container_name: ${GRAVITY_FRONTEND_CONTAINER:-gravity_frontend}
     environment:
       BACKEND_UPSTREAM: http://backend:8080
-    expose:
-      - "5173"
+    ports:
+      - "${GRAVITY_FRONTEND_PORT:-5173}:5173"
     depends_on:
       backend:
         condition: service_started
