@@ -35,7 +35,7 @@ async function main() {
   }
 
   // Optionally spawn a configured agent command and attach it via stdio.
-  if (env.mcpAgentCommand) {
+  if (env.mcpAgentCommand && env.mcpStdioWorkspaceId && env.mcpStdioActorUserId) {
     try {
       const { spawn } = await import('node:child_process');
       const child = spawn(env.mcpAgentCommand, { shell: true, stdio: ['pipe', 'pipe', 'inherit'] });
