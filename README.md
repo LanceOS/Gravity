@@ -25,6 +25,10 @@ To stop the dev stack:
 podman compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml down
 ```
 
+Docs
+-----
+Documentation is located in the `docs/` folder. See [docs/CSRF_IMPLEMENTATION.md](docs/CSRF_IMPLEMENTATION.md) for details on the server CSRF implementation.
+
 ## Watch the nginx frontend on 5173
 
 If you want to keep the production-style frontend container on host port `5173`
