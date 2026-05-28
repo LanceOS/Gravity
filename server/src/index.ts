@@ -3,7 +3,6 @@ import { createApp } from './app.js';
 import { initializeDatabase } from './db/bootstrap.js';
 import { env } from './env.js';
 import { start as startServiceTokens } from './lib/serviceTokens.js';
-import { McpStdioServer } from './modules/mcp/stdio.js';
 import { McpStdioSession } from './modules/mcp/stdio-session.js';
 
 async function main() {
