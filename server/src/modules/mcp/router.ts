@@ -1,19 +1,13 @@
-import { and, eq } from "drizzle-orm";
-import { type Request, type Response, Router } from "express";
-import { db } from "../../db/index.js";
-import { resolveRequestActorUserId } from "../auth/utils/request-auth.js";
-import { handleMcpRequest } from "./request-handler.js";
-import { isWorkspaceMember } from "../workspaces/services/membership.js";
-import { createMcpErrorResponse } from "./responses.js";
-import { createRateLimiter } from "../../lib/rateLimit.js";
-import { createRedisRateLimiter } from "../../lib/rateLimitRedis.js";
-import { env } from "../../env.js";
-import {
-    recordFailedAttempt,
-    isBlocked,
-    resetAttempts,
-} from "../../lib/authThrottle.js";
-import { getRequestSourceIp } from "../../lib/request-ip.js";
+import { type Request, type Response, Router } from 'express';
+import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
+import { handleMcpRequest } from './request-handler.js';
+import { isWorkspaceMember } from '../workspaces/services/membership.js';
+import { createMcpErrorResponse } from './responses.js';
+import { createRateLimiter } from '../../lib/rateLimit.js';
+import { createRedisRateLimiter } from '../../lib/rateLimitRedis.js';
+import { env } from '../../env.js';
+import { recordFailedAttempt, isBlocked, resetAttempts } from '../../lib/authThrottle.js';
+import { getRequestSourceIp } from '../../lib/request-ip.js';
 
 /**
  * @description Builds the HTTP MCP transport. Request authentication and
