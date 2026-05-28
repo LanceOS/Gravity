@@ -4,8 +4,7 @@
   "private": true,
   "workspaces": [
     "server",
-    "client",
-    "library"
+    "client"
   ],
   "scripts": {
     "build": "npm run build:client && npm run build:server",
