@@ -82,4 +82,3 @@ volumes:
 networks:
   gravity_internal:
     driver: bridge
-    internal: true
