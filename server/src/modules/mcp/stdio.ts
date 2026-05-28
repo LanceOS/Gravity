@@ -11,7 +11,7 @@ export class McpStdioServer {
   /**
    * @description Starts the stdio transport and listens for one JSON-RPC
    * request per input line.
-   * @param opts.startWithDb When true the server will initialize the database
+   * @param opts.initDb When true the server will initialize the database
    * before installing the listener. When false the caller is responsible for
    * ensuring the DB is initialized.
    * @return Resolves once the stdio listener has been installed.
