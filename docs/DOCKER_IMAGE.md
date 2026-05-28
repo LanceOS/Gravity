@@ -69,7 +69,7 @@ volumes:
 
 CI / publishing
 
-The workflow at [.github/workflows/docker-publish.yml](.github/workflows/docker-publish.yml) builds from the repository root (so the `client/` folder is available to the `server/Dockerfile`) and publishes to GHCR as `gravity-app`. It reads the version from the root [package.json](package.json) and applies a version tag.
+The workflow at [.github/workflows/docker-publish.yml](../.github/workflows/docker-publish.yml) builds from the repository root (so the `client/` folder is available to the `server/Dockerfile`) and publishes to GHCR as `gravity-app`. It reads the version from the root [package.json](../package.json) and applies a version tag.
 
 Notes
 
