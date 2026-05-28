@@ -843,6 +843,9 @@ export function createWorkspacesRouter() {
       res.set('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none';");
       res.status(201).json(response);
     } catch (error) {
+      // Log error for debugging
+      // eslint-disable-next-line no-console
+      console.error('Error creating MCP connection token:', error);
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create connection token.' });
     }
   });
