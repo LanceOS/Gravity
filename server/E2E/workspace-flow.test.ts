@@ -35,7 +35,7 @@ describe('Server Workspaces Flow E2E', () => {
         key: 'ROPS',
         workspaceKey: 'ROPS-SECRET',
         ownerId,
-        defaultProjectName: 'Remote Ops Core',
+        defaultProjectName: 'Remote Ops',
         defaultProjectKey: 'ROPS',
       });
 
