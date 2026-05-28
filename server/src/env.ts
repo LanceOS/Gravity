@@ -31,6 +31,7 @@ const envSchema = z.object({
   OLLAMA_DEFAULT_ENDPOINT: z.string().url().optional(),
   MCP_STDIO_WORKSPACE_ID: z.string().optional(),
   MCP_STDIO_ACTOR_USER_ID: z.string().optional(),
+  MCP_AGENT_COMMAND: z.string().optional(),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   ALLOW_ENV_AI_KEYS: z.preprocess((v) => {
     if (typeof v !== 'string') return v;
@@ -85,6 +86,7 @@ export const env = {
     (parsed.NODE_ENV === 'test' ? 'http://localhost:11434' : 'http://host.docker.internal:11434'),
   mcpStdioWorkspaceId: parsed.MCP_STDIO_WORKSPACE_ID?.trim() || undefined,
   mcpStdioActorUserId: parsed.MCP_STDIO_ACTOR_USER_ID?.trim() || undefined,
+  mcpAgentCommand: parsed.MCP_AGENT_COMMAND?.trim() || undefined,
   nodeEnv: parsed.NODE_ENV,
   allowEnvAiKeys: parsed.ALLOW_ENV_AI_KEYS,
   redisUrl: parsed.REDIS_URL,

@@ -1,8 +1,7 @@
-import readline from 'node:readline';
 import { initializeDatabase } from '../../db/bootstrap.js';
 import { env } from '../../env.js';
-import { handleMcpRequest } from './request-handler.js';
 import { getMcpStdioContext } from './stdio-config.js';
+import { McpStdioSession } from './stdio-session.js';
 
 /**
  * @description Runs the MCP server over stdio using a single trusted workspace
@@ -12,43 +11,28 @@ export class McpStdioServer {
   /**
    * @description Starts the stdio transport and listens for one JSON-RPC
    * request per input line.
+   * @param opts.startWithDb When true the server will initialize the database
+   * before installing the listener. When false the caller is responsible for
+   * ensuring the DB is initialized.
    * @return Resolves once the stdio listener has been installed.
    */
-  async start() {
+  async start(opts: { initDb?: boolean } = {}) {
     // Stdio never trusts per-request identity, so startup fails if the env is incomplete.
     const context = getMcpStdioContext(env);
 
-    await initializeDatabase();
+    if (opts.initDb) {
+      await initializeDatabase();
+    }
 
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout,
-      terminal: false,
+    const session = new McpStdioSession(process.stdin, process.stdout, {
+      workspaceId: context.workspaceId,
+      actorUserId: context.actorUserId,
+      allowHandshake: false,
     });
+
+    session.start();
 
     console.error('Gravity MCP Stdio Server running...');
-
-    rl.on('line', async (line: string) => {
-      if (!line.trim()) {
-        return;
-      }
-
-      try {
-        const request = JSON.parse(line);
-        const response = await handleMcpRequest(request, context.workspaceId, context.actorUserId);
-        console.log(JSON.stringify(response));
-      } catch (error) {
-        // Malformed stdin input is surfaced as a JSON-RPC parse error to the client.
-        console.error(error instanceof Error ? error.message : error);
-        console.log(
-          JSON.stringify({
-            jsonrpc: '2.0',
-            id: null,
-            error: { code: -32700, message: 'Parse error' },
-          }),
-        );
-      }
-    });
   }
 }
 
@@ -59,7 +43,7 @@ export class McpStdioServer {
  */
 async function main() {
   const server = new McpStdioServer();
-  await server.start();
+  await server.start({ initDb: true });
 }
 
 main().catch((error) => {

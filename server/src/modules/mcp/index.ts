@@ -8,6 +8,8 @@ export { handleMcpRequest, McpRequestHandler } from './request-handler.js';
 export { resolveMcpContext } from './request-context.js';
 export { createMcpErrorResponse } from './responses.js';
 export { getMcpStdioContext } from './stdio-config.js';
+export { McpStdioServer } from './stdio.js';
+export { McpStdioSession } from './stdio-session.js';
 export { executeTool } from './tool-executor.js';
 export { mcpToolsList } from './tools.js';
 export { getDisabledTools } from './workspace-tools.js';
