@@ -21,11 +21,14 @@ services:
     image: redis:7-alpine
     container_name: gravity_redis_dev
     restart: unless-stopped
-    command: redis-server --requirepass ${GRAVITY_REDIS_PASSWORD}
+    env_file:
+      - ../.env
+    command: >
+      sh -c 'if [ -n "$$GRAVITY_REDIS_PASSWORD" ]; then redis-server --requirepass "$$GRAVITY_REDIS_PASSWORD"; else redis-server; fi'
     ports:
       - "127.0.0.1:6379:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${GRAVITY_REDIS_PASSWORD}", "ping"]
+      test: ["CMD-SHELL", "if [ -n \"$$GRAVITY_REDIS_PASSWORD\" ]; then redis-cli -a \"$$GRAVITY_REDIS_PASSWORD\" ping; else redis-cli ping; fi"]
       interval: 5s
       timeout: 5s
       retries: 5

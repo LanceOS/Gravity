@@ -23,11 +23,14 @@ services:
   redis:
     image: redis:7-alpine
     container_name: ${GRAVITY_REDIS_CONTAINER:-gravity_redis}
-    command: redis-server --requirepass ${GRAVITY_REDIS_PASSWORD}
+    env_file:
+      - ../.env
+    command: >
+      sh -c 'if [ -n "$$GRAVITY_REDIS_PASSWORD" ]; then redis-server --requirepass "$$GRAVITY_REDIS_PASSWORD"; else redis-server; fi'
     expose:
       - "6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${GRAVITY_REDIS_PASSWORD}", "ping"]
+      test: ["CMD-SHELL", "if [ -n \"$$GRAVITY_REDIS_PASSWORD\" ]; then redis-cli -a \"$$GRAVITY_REDIS_PASSWORD\" ping; else redis-cli ping; fi"]
       timeout: 5s
       retries: 5
     networks:
@@ -52,7 +55,7 @@ services:
       NODE_ENV: ${NODE_ENV:-production}
       LOCAL_TESTING_KEK: ${LOCAL_TESTING_KEK}
       PORT: ${GRAVITY_BACKEND_PORT:-8080}
-      REDIS_URL: "redis://default:${GRAVITY_REDIS_PASSWORD}@redis:${GRAVITY_REDIS_PORT:-6379}"
+      # REDIS_URL is provided via ../.env (env_file) to avoid empty substitution during compose parsing.
       REDIS_ENABLED: ${REDIS_ENABLED:-"true"}
     expose:
       - "8080"
