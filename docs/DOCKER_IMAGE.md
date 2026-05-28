@@ -75,8 +75,7 @@ Notes
 
 - The server serves the client static files from `public/` in the image. Don't bake secrets into the image; pass them at runtime as environment variables or use your platform's secrets mechanism.
 - To change the published image name or add Docker Hub support, update the workflow accordingly.
- - Example environment files no longer include dev-default passwords; create `docker/.env` (or set environment variables) and populate secrets. See `docker/.env.example` for required keys.
- - To change the published image name or add Docker Hub support, update the workflow accordingly.
+- Example environment files no longer include dev-default passwords; create `docker/.env` (or set environment variables) and populate secrets. See `docker/.env.example` for required keys.
 
 ## Release builds and tags
 
