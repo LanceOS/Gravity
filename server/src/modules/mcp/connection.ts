@@ -28,7 +28,7 @@ type ConnectionTokenPayload = {
 export async function createConnectionToken(opts: CreateOptions): Promise<ConnectionTokenPayload> {
   const id = createId('mct');
   const raw = randomBytes(32).toString('hex');
-  const hmacKeyId = 'env';
+  const hmacKeyId = opts.hmacKeyId ?? 'env';
   const tokenHash = createHmac('sha256', env.betterAuthSecret).update(raw).digest('hex');
 
   const expiresAt = opts.ttlSeconds ? new Date(Date.now() + opts.ttlSeconds * 1000) : new Date(Date.now() + 5 * 60 * 1000);
@@ -106,7 +106,7 @@ export async function refreshConnectionToken(
   }
 
   const raw = randomBytes(32).toString('hex');
-  const hmacKeyId = 'env';
+  const hmacKeyId = row.hmacKeyId ?? 'env';
   const tokenHash = createHmac('sha256', env.betterAuthSecret).update(raw).digest('hex');
   const expiresAt = opts.ttlSeconds ? new Date(Date.now() + opts.ttlSeconds * 1000) : new Date(Date.now() + 5 * 60 * 1000);
 

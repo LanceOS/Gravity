@@ -78,4 +78,15 @@ export const env = {
   redisUrl: parsed.REDIS_URL,
   redisEnabled: parsed.REDIS_ENABLED,
   betterAuthOldSecrets: splitList(parsed.BETTER_AUTH_OLD_SECRETS),
+  betterAuthOldSecretsMap: (() => {
+    const raw = splitList(parsed.BETTER_AUTH_OLD_SECRETS);
+    const map: Record<string, string> = {};
+    for (const item of raw) {
+      const m = item.match(/^([^=:\s]+)[=:](.+)$/);
+      if (m) {
+        map[m[1]] = m[2];
+      }
+    }
+    return map;
+  })(),
 };
