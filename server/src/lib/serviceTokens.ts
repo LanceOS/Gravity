@@ -79,7 +79,11 @@ export function stopAutoRefresh() {
   }
 }
 
-// Start periodic refresh unless we're running tests.
-startAutoRefresh();
+// Exposed start lifecycle: load tokens now and start the periodic refresh.
+// Call this from server startup so imports have no side-effects.
+export async function start(): Promise<void> {
+  await refreshFromSecretManager();
+  startAutoRefresh();
+}
 
-export default { getTrustedServiceTokens, setTrustedServiceTokens, refreshFromSecretManager, startAutoRefresh, stopAutoRefresh };
+export default { getTrustedServiceTokens, setTrustedServiceTokens, refreshFromSecretManager, startAutoRefresh, stopAutoRefresh, start };
