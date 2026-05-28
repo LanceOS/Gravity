@@ -14,6 +14,7 @@ type CreateOptions = {
   sourceIp?: string | null;
   ttlSeconds?: number;
   singleUse?: boolean;
+  hmacKeyId?: string;
 };
 
 type ConnectionTokenPayload = {
@@ -29,7 +30,11 @@ export async function createConnectionToken(opts: CreateOptions): Promise<Connec
   const id = createId('mct');
   const raw = randomBytes(32).toString('hex');
   const hmacKeyId = opts.hmacKeyId ?? 'env';
-  const tokenHash = createHmac('sha256', env.betterAuthSecret).update(raw).digest('hex');
+  // Determine secret for the given key id. Prefer mapped keyed secrets, fall back to current env secret.
+  const secretForKey = hmacKeyId !== 'env' && env.betterAuthOldSecretsMap && env.betterAuthOldSecretsMap[hmacKeyId]
+    ? env.betterAuthOldSecretsMap[hmacKeyId]
+    : env.betterAuthSecret;
+  const tokenHash = createHmac('sha256', secretForKey).update(raw).digest('hex');
 
   const expiresAt = opts.ttlSeconds ? new Date(Date.now() + opts.ttlSeconds * 1000) : new Date(Date.now() + 5 * 60 * 1000);
 
@@ -107,7 +112,10 @@ export async function refreshConnectionToken(
 
   const raw = randomBytes(32).toString('hex');
   const hmacKeyId = row.hmacKeyId ?? 'env';
-  const tokenHash = createHmac('sha256', env.betterAuthSecret).update(raw).digest('hex');
+  const secretForKey = hmacKeyId !== 'env' && env.betterAuthOldSecretsMap && env.betterAuthOldSecretsMap[hmacKeyId]
+    ? env.betterAuthOldSecretsMap[hmacKeyId]
+    : env.betterAuthSecret;
+  const tokenHash = createHmac('sha256', secretForKey).update(raw).digest('hex');
   const expiresAt = opts.ttlSeconds ? new Date(Date.now() + opts.ttlSeconds * 1000) : new Date(Date.now() + 5 * 60 * 1000);
 
   await db.update(mcpConnectionTokens).set({
@@ -144,14 +152,20 @@ export async function refreshConnectionToken(
 }
 
 export async function verifyAndConsumeToken(rawToken: string, workspaceId: string, opts?: { sourceIp?: string | null }) {
-  // Support key rotation by attempting verification with the current
-  // secret plus any legacy secrets configured in `env.betterAuthOldSecrets`.
-  const secrets = [env.betterAuthSecret, ...(Array.isArray(env.betterAuthOldSecrets) ? env.betterAuthOldSecrets : [])];
+  // Build a keyed map of known secrets: current secret under key 'env'
+  // plus any keyed old secrets from `env.betterAuthOldSecretsMap`.
+  const keyedSecrets: Record<string, string> = { env: env.betterAuthSecret, ...(env.betterAuthOldSecretsMap ?? {}) };
+  const fallbackSecrets = Array.isArray(env.betterAuthOldSecrets) ? env.betterAuthOldSecrets : [];
 
   const rowOrUpdated = await db.transaction(async (tx) => {
-    // Try each secret to find a matching token row.
     let matchedRow: any = null;
-    for (const secret of secrets) {
+
+    // First, try keyed secrets (prefer mapping by key id)
+    const keyedIds = ['env', ...Object.keys(env.betterAuthOldSecretsMap ?? {})].filter(Boolean);
+    for (const keyId of keyedIds) {
+      const secret = keyedSecrets[keyId];
+      if (!secret) continue;
+
       const tokenHash = createHmac('sha256', secret).update(rawToken).digest('hex');
       const rows = await tx
         .select()
@@ -159,9 +173,44 @@ export async function verifyAndConsumeToken(rawToken: string, workspaceId: strin
         .where(and(eq(mcpConnectionTokens.tokenHash, tokenHash), eq(mcpConnectionTokens.workspaceId, workspaceId)))
         .limit(1);
 
-      if (rows[0]) {
-        matchedRow = rows[0];
-        break;
+      if (!rows[0]) continue;
+
+      const candidate = rows[0];
+      const storedKeyId = candidate.hmacKeyId ?? 'env';
+      const preferredSecret = keyedSecrets[storedKeyId];
+
+      // If the row records a key id that we can map to a secret, prefer verifying with that secret.
+      if (preferredSecret) {
+        const expected = createHmac('sha256', preferredSecret).update(rawToken).digest('hex');
+        if (expected === candidate.tokenHash) {
+          matchedRow = candidate;
+          break;
+        }
+
+        // preferred secret didn't match; keep searching for other candidates
+        continue;
+      }
+
+      // No preferred secret mapping available; accept the candidate we found via keyed secret.
+      matchedRow = candidate;
+      break;
+    }
+
+    // Fallback: try unkeyed legacy secrets (preserve original behavior for plain-list configs)
+    if (!matchedRow && fallbackSecrets.length) {
+      for (const secret of fallbackSecrets) {
+        // avoid re-checking secrets already covered by keyedSecrets
+        if (Object.values(keyedSecrets).includes(secret)) continue;
+        const tokenHash = createHmac('sha256', secret).update(rawToken).digest('hex');
+        const rows = await tx
+          .select()
+          .from(mcpConnectionTokens)
+          .where(and(eq(mcpConnectionTokens.tokenHash, tokenHash), eq(mcpConnectionTokens.workspaceId, workspaceId)))
+          .limit(1);
+        if (rows[0]) {
+          matchedRow = rows[0];
+          break;
+        }
       }
     }
 
