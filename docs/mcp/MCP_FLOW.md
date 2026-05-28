@@ -65,4 +65,5 @@ The unified JSON-RPC dispatcher.
 - **Tool name aliases**: Notice that `add_comment` and `create_comment` are aliased in the logic (`disablementAlias`). Altering these tool names requires careful synchronization to ensure workspace disablement settings continue to function.
 
 ## Related Docs
+- [Link-Based MCP Connection](LINK_BASED_MCP_CONNECTION.md)
 - *(Add links to related auth, workspace membership, or ticket model documentation if applicable)*

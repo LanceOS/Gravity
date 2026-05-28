@@ -94,6 +94,23 @@ export async function initializeDatabase() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
+    CREATE TABLE IF NOT EXISTS mcp_connection_tokens (
+      id TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL,
+      token_hash TEXT NOT NULL,
+      hmac_key_id TEXT NOT NULL,
+      scopes JSONB NOT NULL DEFAULT '[]'::jsonb,
+      expires_at TIMESTAMPTZ,
+      single_use BOOLEAN NOT NULL DEFAULT TRUE,
+      status TEXT NOT NULL DEFAULT 'active',
+      generated_by TEXT NOT NULL,
+      source_ip TEXT,
+      connection_type TEXT NOT NULL DEFAULT 'http-post',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      used_at TIMESTAMPTZ,
+      revoked_at TIMESTAMPTZ
+    );
+
 
 
 
@@ -257,6 +274,11 @@ export async function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS tickets_parent_id_idx ON tickets (parent_id);
     CREATE INDEX IF NOT EXISTS comments_ticket_id_idx ON comments (ticket_id);
     CREATE INDEX IF NOT EXISTS comments_user_id_idx ON comments (user_id);
+  `);
+
+  // Ensure `usage_count` exists for mcp_connection_tokens (backfill-safe)
+  await pool.query(`
+    ALTER TABLE mcp_connection_tokens ADD COLUMN IF NOT EXISTS usage_count INTEGER NOT NULL DEFAULT 0;
   `);
 
   const { runMigrations } = await getMigrations(auth.options);

@@ -14,6 +14,7 @@ import { desanitize, sanitize } from './state-map.js';
 type McpRequestHandlerOptions = {
   accessChecked?: boolean;
   sanitize?: boolean;
+  tokenScopes?: string[];
 };
 
 /**
@@ -39,6 +40,9 @@ export class McpRequestHandler {
     const payload = request as McpRequestPayload;
     const context = resolveMcpContext(payload, { workspaceId, actorUserId });
     const accessChecked = options.accessChecked === true;
+    const tokenScopes = Array.isArray(options.tokenScopes) ? options.tokenScopes : undefined;
+
+    // tokenScopes is available when requests were authenticated via connection tokens.
 
     try {
       if (payload.method === 'initialize') {
@@ -55,6 +59,10 @@ export class McpRequestHandler {
       }
 
       if (payload.method === 'tools/list') {
+        // If the transport supplied token scopes (external clients), enforce them here.
+        if (tokenScopes && !tokenScopes.includes('tools/list')) {
+          return createMcpErrorResponse(payload.id ?? null, -32001, 'Insufficient token scopes.');
+        }
         // HTTP may have already checked membership; stdio and direct callers rely on the handler.
         if (!accessChecked) {
           await assertMcpWorkspaceAccess(context);
@@ -80,6 +88,15 @@ export class McpRequestHandler {
       }
 
       if (payload.method === 'tools/call') {
+        // Enforce token scopes for external clients when provided.
+        if (tokenScopes) {
+          const toolName = payload.params?.name ?? '';
+          const hasGlobalCall = tokenScopes.includes('tools/call') || tokenScopes.includes('tools/call:*');
+          const hasExactCall = typeof toolName === 'string' && toolName.length > 0 && tokenScopes.includes(`tools/call:${toolName}`);
+          if (!hasGlobalCall && !hasExactCall) {
+            return createMcpErrorResponse(payload.id ?? null, -32001, 'Insufficient token scopes.');
+          }
+        }
         // Tool execution always uses the trusted context resolved above.
         if (!accessChecked) {
           await assertMcpWorkspaceAccess(context);
@@ -118,11 +135,11 @@ export class McpRequestHandler {
 
       return createMcpErrorResponse(payload.id, -32601, `Method not found: ${payload.method ?? 'unknown'}`);
     } catch (error) {
-      return createMcpErrorResponse(
-        payload.id,
-        -32603,
-        error instanceof Error ? error.message : 'Internal error executing tool',
-      );
+        return createMcpErrorResponse(
+          payload.id,
+          -32603,
+          error instanceof Error ? error.message : 'Internal error executing tool',
+        );
     }
   }
 }

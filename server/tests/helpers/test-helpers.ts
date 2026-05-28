@@ -1,5 +1,6 @@
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import request from 'supertest';
 import { createApp } from '../../src/app.js';
@@ -18,6 +19,7 @@ import {
   workspaceSettings,
 } from '../../src/db/schema.js';
 import { ensureUserDefaults, getUserById } from '../../src/lib/platform.js';
+import { env } from '../../src/env.js';
 
 type UserSeed = {
   id: string;
@@ -84,6 +86,14 @@ export async function resetDatabase() {
   for (const table of tables) {
     await pool.query(`TRUNCATE TABLE ${quoteIdentifier(table)} RESTART IDENTITY CASCADE`);
   }
+}
+
+export async function resetTestApp() {
+  // Clear module cache so subsequent imports re-evaluate env and modules.
+  vi.resetModules();
+  // Re-run DB initialization (rewrites schema in pg-mem)
+  const { initializeDatabase } = await import('../../src/db/bootstrap.js');
+  await initializeDatabase();
 }
 
 export async function seedUser(overrides: Partial<UserSeed> = {}) {
@@ -446,4 +456,73 @@ export async function readSseChunk(path: string) {
       });
     });
   }
+}
+
+type SecretsOpts = {
+  betterAuthSecret?: string;
+  betterAuthOldSecrets?: string[] | string;
+  betterAuthOldSecretsMap?: Record<string, string>;
+};
+
+/**
+ * Mutate runtime auth secrets for tests in a reversible way.
+ * Returns a `restore()` function that will restore the previous values.
+ * This helper updates both the exported `env` object and `process.env`.
+ */
+export function setSecretsForTest(opts: SecretsOpts = {}) {
+  const { betterAuthSecret, betterAuthOldSecrets, betterAuthOldSecretsMap } = opts;
+  const prev = {
+    betterAuthSecret: env.betterAuthSecret,
+    betterAuthOldSecrets: Array.isArray(env.betterAuthOldSecrets) ? [...env.betterAuthOldSecrets] : env.betterAuthOldSecrets,
+    betterAuthOldSecretsMap: env.betterAuthOldSecretsMap ? { ...env.betterAuthOldSecretsMap } : env.betterAuthOldSecretsMap,
+  };
+
+  if (typeof betterAuthSecret !== 'undefined') {
+    env.betterAuthSecret = betterAuthSecret;
+    process.env.BETTER_AUTH_SECRET = betterAuthSecret;
+  }
+  if (typeof betterAuthOldSecrets !== 'undefined') {
+    env.betterAuthOldSecrets = Array.isArray(betterAuthOldSecrets)
+      ? betterAuthOldSecrets
+      : betterAuthOldSecrets
+      ? [String(betterAuthOldSecrets)]
+      : [];
+    process.env.BETTER_AUTH_OLD_SECRETS = Array.isArray(betterAuthOldSecrets)
+      ? betterAuthOldSecrets.join(',')
+      : String(betterAuthOldSecrets ?? '');
+  }
+  if (typeof betterAuthOldSecretsMap !== 'undefined') {
+    env.betterAuthOldSecretsMap = { ...betterAuthOldSecretsMap };
+  }
+
+  return function restore() {
+    env.betterAuthSecret = prev.betterAuthSecret;
+    env.betterAuthOldSecrets = prev.betterAuthOldSecrets;
+    env.betterAuthOldSecretsMap = prev.betterAuthOldSecretsMap;
+    if (typeof prev.betterAuthSecret === 'undefined') {
+      delete process.env.BETTER_AUTH_SECRET;
+    } else {
+      process.env.BETTER_AUTH_SECRET = prev.betterAuthSecret as string;
+    }
+    if (typeof prev.betterAuthOldSecrets === 'undefined') {
+      delete process.env.BETTER_AUTH_OLD_SECRETS;
+    } else {
+      process.env.BETTER_AUTH_OLD_SECRETS = Array.isArray(prev.betterAuthOldSecrets)
+        ? prev.betterAuthOldSecrets.join(',')
+        : String(prev.betterAuthOldSecrets ?? '');
+    }
+  };
+}
+
+/**
+ * Convenience: set secrets then reset module cache so subsequent imports re-evaluate env parsing.
+ * Returns a restore function that will restore previous secrets and reset modules again.
+ */
+export function setSecretsAndResetModulesForTest(opts: SecretsOpts = {}) {
+  const restore = setSecretsForTest(opts);
+  vi.resetModules();
+  return function restoreAll() {
+    restore();
+    vi.resetModules();
+  };
 }

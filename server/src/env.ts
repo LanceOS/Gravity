@@ -16,6 +16,18 @@ const envSchema = z.object({
   BETTER_AUTH_BASE_URL: z.string().url().optional(),
   CORS_ORIGINS: z.string().optional(),
   TRUSTED_ORIGINS: z.string().optional(),
+  TRUSTED_SERVICE_TOKENS: z.string().optional(),
+  TRUSTED_SERVICE_TOKENS_FILE: z.string().optional(),
+  TRUSTED_SERVICE_TOKENS_REFRESH_INTERVAL_MS: z.coerce.number().int().nonnegative().default(60000),
+  BETTER_AUTH_OLD_SECRETS: z.string().optional(),
+  TRUSTED_PROXIES: z.string().optional(),
+    CSRF_ALLOW_HOST_FALLBACK: z.preprocess((v) => {
+      if (typeof v !== 'string') return v;
+      const s = v.trim().toLowerCase();
+      if (s === 'true' || s === '1') return true;
+      if (s === 'false' || s === '0' || s === '') return false;
+      return v;
+    }, z.boolean()).default(false),
   OLLAMA_DEFAULT_ENDPOINT: z.string().url().optional(),
   MCP_STDIO_WORKSPACE_ID: z.string().optional(),
   MCP_STDIO_ACTOR_USER_ID: z.string().optional(),
@@ -65,6 +77,9 @@ export const env = {
 
     return [`http://localhost:${parsed.PORT}`];
   })(),
+  trustedServiceTokens: splitList(parsed.TRUSTED_SERVICE_TOKENS),
+  trustedServiceTokensFile: parsed.TRUSTED_SERVICE_TOKENS_FILE?.trim() || undefined,
+  trustedServiceTokensRefreshIntervalMs: parsed.TRUSTED_SERVICE_TOKENS_REFRESH_INTERVAL_MS,
   ollamaDefaultEndpoint:
     parsed.OLLAMA_DEFAULT_ENDPOINT ??
     (parsed.NODE_ENV === 'test' ? 'http://localhost:11434' : 'http://host.docker.internal:11434'),
@@ -74,4 +89,18 @@ export const env = {
   allowEnvAiKeys: parsed.ALLOW_ENV_AI_KEYS,
   redisUrl: parsed.REDIS_URL,
   redisEnabled: parsed.REDIS_ENABLED,
+  betterAuthOldSecrets: splitList(parsed.BETTER_AUTH_OLD_SECRETS),
+  betterAuthOldSecretsMap: (() => {
+    const raw = splitList(parsed.BETTER_AUTH_OLD_SECRETS);
+    const map: Record<string, string> = {};
+    for (const item of raw) {
+      const m = item.match(/^([^=:\s]+)[=:](.+)$/);
+      if (m) {
+        map[m[1]] = m[2];
+      }
+    }
+    return map;
+  })(),
+  trustedProxies: splitList(parsed.TRUSTED_PROXIES),
+  csrfAllowHostFallback: parsed.CSRF_ALLOW_HOST_FALLBACK,
 };
