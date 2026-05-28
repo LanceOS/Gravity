@@ -29,6 +29,7 @@ async function main() {
     try {
       const { spawn } = await import('node:child_process');
       const child = spawn(env.mcpAgentCommand, { shell: true, stdio: ['pipe', 'pipe', 'inherit'] });
+      child.on('error', (error) => console.error('Agent process spawn error:', error));
       const session = new McpStdioSession(child.stdout, child.stdin, {
         workspaceId: env.mcpStdioWorkspaceId,
         actorUserId: env.mcpStdioActorUserId,
