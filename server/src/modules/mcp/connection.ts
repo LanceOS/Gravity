@@ -143,7 +143,7 @@ export async function refreshConnectionToken(
   };
 }
 
-export async function verifyAndConsumeToken(rawToken: string, workspaceId: string) {
+export async function verifyAndConsumeToken(rawToken: string, workspaceId: string, opts?: { sourceIp?: string | null }) {
   // Support key rotation by attempting verification with the current
   // secret plus any legacy secrets configured in `env.betterAuthOldSecrets`.
   const secrets = [env.betterAuthSecret, ...(Array.isArray(env.betterAuthOldSecrets) ? env.betterAuthOldSecrets : [])];
@@ -172,6 +172,12 @@ export async function verifyAndConsumeToken(rawToken: string, workspaceId: strin
     // Reject if not active or expired
     if (row.status !== 'active') return null;
     if (row.expiresAt && row.expiresAt <= new Date()) return null;
+
+    // Optional source IP enforcement: if token bound to an IP and the caller
+    // presented a different source IP, reject verification.
+    if (row.sourceIp && opts?.sourceIp && row.sourceIp !== opts.sourceIp) {
+      return null;
+    }
 
     if (row.singleUse) {
       const updated = await tx

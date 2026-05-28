@@ -98,7 +98,8 @@ export class McpRouterFactory {
                 }
               try {
                 const { verifyAndConsumeToken } = await import('./connection.js');
-                const tokenRow = await verifyAndConsumeToken(token, workspaceId);
+                const sourceIp = req.ip ?? (req.headers['x-forwarded-for'] as string) ?? null;
+                const tokenRow = await verifyAndConsumeToken(token, workspaceId, { sourceIp });
                 if (!tokenRow) {
                     // record failed attempt counters
                     try {
