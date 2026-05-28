@@ -1048,7 +1048,7 @@ export function createWorkspacesRouter() {
   });
 
   router.post('/workspaces/invites/:inviteCode/join-requests', async (req, res) => {
-    const { inviteCode } = req.params;
+    const inviteCode = Array.isArray(req.params.inviteCode) ? req.params.inviteCode[0] : (req.params.inviteCode as string);
     const { message } = req.body ?? {};
     const userId = await resolveRequestActorUserId(req);
     
@@ -1300,7 +1300,7 @@ export function createWorkspacesRouter() {
       return;
     }
 
-    const { workspaceId } = req.params;
+    const workspaceId = Array.isArray(req.params.workspaceId) ? req.params.workspaceId[0] : (req.params.workspaceId as string);
 
     try {
       const membershipRows = await db
