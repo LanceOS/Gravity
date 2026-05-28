@@ -5,6 +5,7 @@ import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
 import { handleMcpRequest } from './request-handler.js';
 import { isWorkspaceMember } from '../workspaces/services/membership.js';
 import { createMcpErrorResponse } from './responses.js';
+import { createRateLimiter } from '../../lib/rateLimit.js';
 
 /**
  * @description Builds the HTTP MCP transport. Request authentication and
@@ -19,7 +20,23 @@ export class McpRouterFactory {
   create() {
     const router = Router();
 
-    router.post('/mcp/sse', async (req: Request, res: Response) => {
+    const workspaceTransportLimiter = createRateLimiter({
+      windowMs: 60_000,
+      max: 120,
+      keyFn: async (req) => {
+        const headerWorkspaceId = (req.header('x-workspace-id') || req.header('X-Workspace-Id'))?.trim();
+        const bodyWorkspaceId =
+          typeof req.body?.params?.workspaceId === 'string' && req.body.params.workspaceId.trim().length > 0
+            ? req.body.params.workspaceId.trim()
+            : undefined;
+        const workspaceId = headerWorkspaceId || bodyWorkspaceId;
+        return workspaceId ? `workspace:${workspaceId}` : `ip:${req.ip}`;
+      },
+    });
+
+    const transportIpLimiter = createRateLimiter({ windowMs: 60_000, max: 300, keyFn: (req) => `ip:${req.ip}` });
+
+    router.post('/mcp/sse', workspaceTransportLimiter, transportIpLimiter, async (req: Request, res: Response) => {
       try {
         // Transport-level auth and workspace validation use plain HTTP semantics.
         const headerWorkspaceId = (req.header('x-workspace-id') || req.header('X-Workspace-Id'))?.trim();
