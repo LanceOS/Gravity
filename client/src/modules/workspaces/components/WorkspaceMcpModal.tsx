@@ -11,6 +11,7 @@ type Props = {
 export function WorkspaceMcpModal({ workspaceId, isOpen, onClose }: Props) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any | null>(null);
+  const [rawToken, setRawToken] = useState<string | null>(null);
   const mcp = useWorkspaceMcp(workspaceId);
 
   async function handleCreate() {
@@ -18,7 +19,13 @@ export function WorkspaceMcpModal({ workspaceId, isOpen, onClose }: Props) {
     setResult(null);
     try {
       const payload = await mcp.createConnection({ ttlSeconds: 300 });
-      setResult(payload);
+      // Extract raw token and avoid storing it in the main result object
+      const token = payload?.token ?? payload?.auth?.token ?? null;
+      const safePayload = { ...payload };
+      if (safePayload.token) delete safePayload.token;
+      if (safePayload.auth && safePayload.auth.token) delete safePayload.auth.token;
+      setResult(safePayload);
+      setRawToken(token);
     } catch (err) {
       setResult({ error: err instanceof Error ? err.message : String(err) });
     } finally {
@@ -26,8 +33,26 @@ export function WorkspaceMcpModal({ workspaceId, isOpen, onClose }: Props) {
     }
   }
 
+  async function handleCopy() {
+    if (!rawToken) return;
+    try {
+      await navigator.clipboard.writeText(rawToken);
+    } catch (e) {
+      // best-effort copy; ignore failures
+    } finally {
+      // Clear the token from the UI immediately after copy
+      setRawToken(null);
+    }
+  }
+
+  function handleClose() {
+    setRawToken(null);
+    setResult(null);
+    onClose();
+  }
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Connect External AI">
+    <Modal isOpen={isOpen} onClose={handleClose} title="Connect External AI">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <p>
           Generate a short-lived one-time connection token for external AI connectors. The token is shown only once.
@@ -39,10 +64,27 @@ export function WorkspaceMcpModal({ workspaceId, isOpen, onClose }: Props) {
               <div style={{ color: 'var(--color-danger)' }}>{result.error}</div>
             ) : (
               <>
-                <div style={{ marginBottom: 8 }}>
-                  <strong>Token (copy now)</strong>
-                </div>
-                <textarea readOnly value={JSON.stringify(result, null, 2)} style={{ width: '100%', minHeight: 120 }} />
+                {rawToken ? (
+                  <>
+                    <div style={{ marginBottom: 8 }}>
+                      <strong>Token (copy now)</strong>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <input readOnly value={rawToken} style={{ width: '100%' }} />
+                      <Button type="button" variant="primary" onClick={handleCopy}>Copy</Button>
+                    </div>
+                    <div style={{ marginTop: 8, fontSize: 'smaller' }}>
+                      Token will be cleared from the UI after copying or when you close this dialog.
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ marginBottom: 8 }}>
+                      <strong>Connection Payload</strong>
+                    </div>
+                    <textarea readOnly value={JSON.stringify(result, null, 2)} style={{ width: '100%', minHeight: 120 }} />
+                  </>
+                )}
               </>
             )}
           </div>

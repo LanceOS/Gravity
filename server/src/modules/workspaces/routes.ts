@@ -821,6 +821,11 @@ export function createWorkspacesRouter() {
       });
 
       const response = await buildMcpConnectionResponse(token, workspaceId, actorUserId);
+      // Security: prevent token values from being stored in caches or exposed in referrers
+      res.set('Cache-Control', 'no-store');
+      res.set('Pragma', 'no-cache');
+      res.set('Referrer-Policy', 'no-referrer');
+      res.set('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none';");
       res.status(201).json(response);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create connection token.' });
@@ -881,6 +886,11 @@ export function createWorkspacesRouter() {
       }
 
       const response = await buildMcpConnectionResponse(token, workspaceId, actorUserId);
+      // Security: ensure one-time token responses are not cached or leaked
+      res.set('Cache-Control', 'no-store');
+      res.set('Pragma', 'no-cache');
+      res.set('Referrer-Policy', 'no-referrer');
+      res.set('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none';");
       res.status(200).json(response);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to refresh connection token.' });
