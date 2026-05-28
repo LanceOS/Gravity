@@ -35,7 +35,7 @@ COPY --from=builder /workspace/server/dist ./dist
 COPY --from=builder /workspace/client/dist ./public
 
 # Provide example env in image (do NOT copy secrets into image)
-COPY server/.env.example ./.env.example
+COPY docker/.env.example ./.env.example
 
 EXPOSE 8080
 
