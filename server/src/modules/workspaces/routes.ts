@@ -37,6 +37,7 @@ import {
   normalizeEntityKey,
 } from '../../lib/platform.js';
 import { createConnectionToken, refreshConnectionToken, revokeConnectionToken } from '../mcp/connection.js';
+import { csrfProtect } from '../../lib/csrf.js';
 import { isWorkspaceMember } from './services/membership.js';
 import { mapProjectCreationError } from './utils/project-creation.js';
 import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
@@ -792,7 +793,7 @@ export function createWorkspacesRouter() {
   });
 
   // Create a short-lived MCP connection token bound to this workspace.
-  router.post('/workspaces/:workspaceId/mcp/connection', async (req, res) => {
+  router.post('/workspaces/:workspaceId/mcp/connection', csrfProtect(), async (req, res) => {
     const { workspaceId } = req.params;
     const actorUserId = await resolveRequestActorUserId(req);
     if (!actorUserId) {
@@ -832,7 +833,7 @@ export function createWorkspacesRouter() {
     }
   });
 
-  router.post('/workspaces/:workspaceId/mcp/connection/:tokenId/refresh', async (req, res) => {
+  router.post('/workspaces/:workspaceId/mcp/connection/:tokenId/refresh', csrfProtect(), async (req, res) => {
     const { workspaceId, tokenId } = req.params;
     const actorUserId = await resolveRequestActorUserId(req);
     if (!actorUserId) {
@@ -897,7 +898,7 @@ export function createWorkspacesRouter() {
     }
   });
 
-  router.post('/workspaces/:workspaceId/mcp/connection/:tokenId/revoke', async (req, res) => {
+  router.post('/workspaces/:workspaceId/mcp/connection/:tokenId/revoke', csrfProtect(), async (req, res) => {
     const { workspaceId, tokenId } = req.params;
     const actorUserId = await resolveRequestActorUserId(req);
     if (!actorUserId) {
