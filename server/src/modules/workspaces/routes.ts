@@ -36,10 +36,11 @@ import {
   listWorkspaceSummaries,
   normalizeEntityKey,
 } from '../../lib/platform.js';
-import { createConnectionToken, revokeConnectionToken } from '../mcp/connection.js';
+import { createConnectionToken, refreshConnectionToken, revokeConnectionToken } from '../mcp/connection.js';
 import { isWorkspaceMember } from './services/membership.js';
 import { mapProjectCreationError } from './utils/project-creation.js';
 import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
+import { env } from '../../env.js';
 
 async function recordWorkspaceActivity(workspaceId: string, userId: string) {
   try {
@@ -127,6 +128,81 @@ function mapPeerInvite(invite: {
     guest_username: invite.guestUsername ?? null,
     created_at: invite.createdAt.toISOString(),
     revoked_at: invite.revokedAt ? invite.revokedAt.toISOString() : null,
+  };
+}
+
+async function getWorkspaceName(workspaceId: string) {
+  const rows = await db.select({ name: workspaces.name }).from(workspaces).where(eq(workspaces.id, workspaceId)).limit(1);
+  return rows[0]?.name ?? null;
+}
+
+async function getUserEmail(userId: string) {
+  const rows = await db.select({ email: authUsers.email }).from(authUsers).where(eq(authUsers.id, userId)).limit(1);
+  return rows[0]?.email ?? null;
+}
+
+type McpConnectionResponsePayload = {
+  id: string;
+  type: 'mcp_http';
+  token: string;
+  expires_at: string;
+  scopes: string[];
+  single_use: boolean;
+  connection_type: string;
+  args: {
+    mcpEndpoint: string;
+    workspaceId: string;
+    transport: 'http-post';
+    protocol: 'mcp-jsonrpc';
+  };
+  auth: {
+    scheme: 'one_time_token';
+    token: string;
+    expiresAt: string;
+    singleUse: boolean;
+    connectionType: string;
+  };
+  metadata: {
+    workspaceName: string | null;
+    generatedBy: string;
+  };
+};
+
+async function buildMcpConnectionResponse(
+  token: Awaited<ReturnType<typeof createConnectionToken>>,
+  workspaceId: string,
+  generatedBy: string,
+): Promise<McpConnectionResponsePayload> {
+  const [workspaceName, generatedByEmail] = await Promise.all([
+    getWorkspaceName(workspaceId),
+    getUserEmail(generatedBy),
+  ]);
+
+  return {
+    id: token.id,
+    type: 'mcp_http',
+    token: token.rawToken,
+    expires_at: token.expiresAt,
+    scopes: token.scopes,
+    single_use: token.singleUse,
+    connection_type: token.connectionType,
+    args: {
+      mcpEndpoint: `${env.betterAuthBaseUrl}/api/v1/mcp/sse`,
+      workspaceId,
+      transport: 'http-post',
+      protocol: 'mcp-jsonrpc',
+    },
+    auth: {
+      scheme: 'one_time_token',
+      token: token.rawToken,
+      expiresAt: token.expiresAt,
+      singleUse: token.singleUse,
+      connectionType: token.connectionType,
+    },
+    metadata: {
+      workspaceName,
+      generatedBy: generatedByEmail ?? generatedBy,
+    },
   };
 }
 
@@ -744,14 +820,70 @@ export function createWorkspacesRouter() {
         sourceIp,
       });
 
-      res.status(201).json({
-        id: token.id,
-        token: token.rawToken,
-        expires_at: token.expiresAt,
-        scopes: token.scopes,
-      });
+      const response = await buildMcpConnectionResponse(token, workspaceId, actorUserId);
+      res.status(201).json(response);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create connection token.' });
+    }
+  });
+
+  router.post('/workspaces/:workspaceId/mcp/connection/:tokenId/refresh', async (req, res) => {
+    const { workspaceId, tokenId } = req.params;
+    const actorUserId = await resolveRequestActorUserId(req);
+    if (!actorUserId) {
+      res.status(401).json({ error: 'Authentication required.' });
+      return;
+    }
+
+    try {
+      const member = await isWorkspaceMember(workspaceId, actorUserId);
+      if (!member) {
+        res.status(403).json({ error: 'Workspace membership required.' });
+        return;
+      }
+
+      const membershipRows = await db
+        .select()
+        .from(workspaceMembers)
+        .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, actorUserId)))
+        .limit(1);
+      const membership = membershipRows[0];
+
+      const tokenRows = await db
+        .select()
+        .from(mcpConnectionTokens)
+        .where(and(eq(mcpConnectionTokens.id, tokenId), eq(mcpConnectionTokens.workspaceId, workspaceId)))
+        .limit(1);
+      const tokenRow = tokenRows[0];
+      if (!tokenRow) {
+        res.status(404).json({ error: 'Token not found.' });
+        return;
+      }
+
+      const isOwnerOrAdmin = membership && ['owner', 'admin'].includes(membership.role);
+      if (tokenRow.generatedBy !== actorUserId && !isOwnerOrAdmin) {
+        res.status(403).json({ error: 'Insufficient privileges to refresh token.' });
+        return;
+      }
+
+      if (tokenRow.status !== 'active' || (tokenRow.expiresAt && tokenRow.expiresAt <= new Date())) {
+        res.status(400).json({ error: 'Token cannot be refreshed.' });
+        return;
+      }
+
+      const ttlSeconds = typeof req.body?.ttlSeconds === 'number' ? req.body.ttlSeconds : undefined;
+      const sourceIp = req.ip ?? (req.headers['x-forwarded-for'] as string) ?? null;
+      const token = await refreshConnectionToken(tokenId, actorUserId, { ttlSeconds, sourceIp });
+
+      if (!token) {
+        res.status(400).json({ error: 'Token could not be refreshed.' });
+        return;
+      }
+
+      const response = await buildMcpConnectionResponse(token, workspaceId, actorUserId);
+      res.status(200).json(response);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to refresh connection token.' });
     }
   });
 

@@ -19,13 +19,78 @@ describe('MCP connection endpoints', () => {
 
     const res = await ownerApi.post(`/api/v1/workspaces/${workspace.id}/mcp/connection`).send({ scopes: ['tools/list'], ttlSeconds: 300 });
     expect(res.status).toBe(201);
-    expect(res.body).toMatchObject({ id: expect.any(String), token: expect.any(String), expires_at: expect.any(String) });
+    expect(res.body).toMatchObject({
+      id: expect.any(String),
+      token: expect.any(String),
+      expires_at: expect.any(String),
+      scopes: expect.any(Array),
+      type: 'mcp_http',
+      auth: {
+        scheme: 'one_time_token',
+        token: expect.any(String),
+      },
+      metadata: {
+        generatedBy: expect.any(String),
+      },
+    });
 
     const rows = await db.select().from(mcpConnectionTokens).where(eq(mcpConnectionTokens.id, res.body.id)).limit(1);
     const row = rows[0];
     expect(row).toBeTruthy();
     expect(row.status).toBe('active');
     expect(row.tokenHash).toBeTruthy();
+  });
+
+  it('refreshes a connection token and invalidates the previous raw token', async () => {
+    const ownerApi = await createAuthenticatedApi({
+      name: 'MCP Refresh Owner',
+      email: 'mcp-refresh-owner@example.com',
+      role: 'owner',
+      avatarUrl: 'https://example.com/owner.png',
+    });
+    const owner = ownerApi.user;
+    const { workspace } = await seedWorkspaceFixture({
+      owner: { id: owner.id, name: owner.name, email: owner.email, role: owner.role, avatarUrl: owner.avatar },
+    });
+
+    const createRes = await ownerApi.post(`/api/v1/workspaces/${workspace.id}/mcp/connection`).send({ ttlSeconds: 300 });
+    expect(createRes.status).toBe(201);
+    const oldToken = createRes.body.token;
+    const oldExpiresAt = new Date(createRes.body.expires_at);
+
+    const refreshRes = await ownerApi.post(`/api/v1/workspaces/${workspace.id}/mcp/connection/${createRes.body.id}/refresh`).send({ ttlSeconds: 600 });
+    expect(refreshRes.status).toBe(200);
+    expect(refreshRes.body).toMatchObject({
+      id: createRes.body.id,
+      token: expect.any(String),
+      expires_at: expect.any(String),
+      type: 'mcp_http',
+      auth: {
+        scheme: 'one_time_token',
+        token: expect.any(String),
+      },
+    });
+
+    const newToken = refreshRes.body.token;
+    expect(newToken).not.toBe(oldToken);
+    expect(new Date(refreshRes.body.expires_at).getTime()).toBeGreaterThan(oldExpiresAt.getTime());
+
+    const oldUse = await api()
+      .post('/api/v1/mcp/sse')
+      .set('Authorization', `Bearer ${oldToken}`)
+      .set('X-Workspace-Id', workspace.id)
+      .send({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} });
+
+    expect(oldUse.status).toBe(401);
+
+    const newUse = await api()
+      .post('/api/v1/mcp/sse')
+      .set('Authorization', `Bearer ${newToken}`)
+      .set('X-Workspace-Id', workspace.id)
+      .send({ jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} });
+
+    expect(newUse.status).toBe(200);
+    expect(newUse.body).toMatchObject({ jsonrpc: '2.0', id: 2, result: { tools: expect.any(Array) } });
   });
 
   it('revokes a token when requested by owner', async () => {

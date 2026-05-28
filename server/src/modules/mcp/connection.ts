@@ -15,7 +15,16 @@ type CreateOptions = {
   singleUse?: boolean;
 };
 
-export async function createConnectionToken(opts: CreateOptions) {
+type ConnectionTokenPayload = {
+  id: string;
+  rawToken: string;
+  expiresAt: string;
+  scopes: string[];
+  singleUse: boolean;
+  connectionType: string;
+};
+
+export async function createConnectionToken(opts: CreateOptions): Promise<ConnectionTokenPayload> {
   const id = createId('mct');
   const raw = randomBytes(32).toString('hex');
   const hmacKeyId = 'env';
@@ -43,11 +52,46 @@ export async function createConnectionToken(opts: CreateOptions) {
     rawToken: raw,
     expiresAt: expiresAt.toISOString(),
     scopes: opts.scopes || ['tools/list', 'tools/call'],
+    singleUse: opts.singleUse !== undefined ? opts.singleUse : true,
+    connectionType: opts.connectionType ?? 'http-post',
   };
 }
 
 export async function revokeConnectionToken(tokenId: string, requestingUserId: string) {
   await db.update(mcpConnectionTokens).set({ status: 'revoked', revokedAt: new Date() }).where(eq(mcpConnectionTokens.id, tokenId));
+}
+
+export async function refreshConnectionToken(
+  tokenId: string,
+  requestingUserId: string,
+  opts: { ttlSeconds?: number; sourceIp?: string | null } = {},
+): Promise<ConnectionTokenPayload | null> {
+  const rows = await db.select().from(mcpConnectionTokens).where(eq(mcpConnectionTokens.id, tokenId)).limit(1);
+  const row = rows[0];
+  if (!row || row.status !== 'active' || (row.expiresAt && row.expiresAt <= new Date())) {
+    return null;
+  }
+
+  const raw = randomBytes(32).toString('hex');
+  const hmacKeyId = 'env';
+  const tokenHash = createHmac('sha256', env.betterAuthSecret).update(raw).digest('hex');
+  const expiresAt = opts.ttlSeconds ? new Date(Date.now() + opts.ttlSeconds * 1000) : new Date(Date.now() + 5 * 60 * 1000);
+
+  await db.update(mcpConnectionTokens).set({
+    tokenHash,
+    hmacKeyId,
+    expiresAt,
+    sourceIp: opts.sourceIp ?? row.sourceIp,
+  }).where(eq(mcpConnectionTokens.id, tokenId));
+
+  return {
+    id: row.id,
+    rawToken: raw,
+    expiresAt: expiresAt.toISOString(),
+    scopes: row.scopes,
+    singleUse: row.singleUse,
+    connectionType: row.connectionType,
+  };
 }
 
 export async function verifyAndConsumeToken(rawToken: string, workspaceId: string) {
