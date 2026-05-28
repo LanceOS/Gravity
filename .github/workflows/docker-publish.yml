@@ -37,24 +37,24 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set PACKAGE_VERSION
-        run: |
-          # If this run was triggered by a tag (release), use the tag name
-          if [[ "${GITHUB_REF}" =~ ^refs/tags/(.*)$ ]]; then
-            TAG="${BASH_REMATCH[1]}"
-            echo "PACKAGE_VERSION=${TAG}" >> $GITHUB_ENV
-          else
-            echo "PACKAGE_VERSION=$(node -p \"require('./package.json').version\")" >> $GITHUB_ENV
-          fi
+    - name: Set PACKAGE_VERSION
+      run: |
+        # If this run was triggered by a tag (release), use the tag name
+        if [[ "${GITHUB_REF}" =~ ^refs/tags/(.*)$ ]]; then
+          TAG="${BASH_REMATCH[1]}"
+          echo "PACKAGE_VERSION=${TAG}" >> $GITHUB_ENV
+        else
+          echo "PACKAGE_VERSION=$(node -p \"require('./package.json').version\")" >> $GITHUB_ENV
+        fi
 
-      - name: Build and push image
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          file: ./server/Dockerfile
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository_owner }}/gravity-app:latest
-            ghcr.io/${{ github.repository_owner }}/gravity-app:${{ env.PACKAGE_VERSION }}
-            ghcr.io/${{ github.repository_owner }}/gravity-app:${{ github.sha }}
-          platforms: linux/amd64,linux/arm64
+    - name: Build and push image
+      uses: docker/build-push-action@v4
+      with:
+        context: .
+        file: ./server/Dockerfile
+        push: true
+        tags: |
+          ghcr.io/${{ github.repository_owner }}/gravity-app:latest
+          ghcr.io/${{ github.repository_owner }}/gravity-app:${{ env.PACKAGE_VERSION }}
+          ghcr.io/${{ github.repository_owner }}/gravity-app:${{ github.sha }}
+        platforms: linux/amd64,linux/arm64
