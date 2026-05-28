@@ -1,7 +1,31 @@
 import dotenv from 'dotenv';
+import { existsSync, readFileSync } from 'fs';
+import { join } from 'path';
 import { z } from 'zod';
 
-dotenv.config();
+const rootEnvPath = join(process.cwd(), '..', '.env');
+const serverEnvPath = join(process.cwd(), '.env');
+
+function parseEnvFile(path: string): Record<string, string> {
+  if (!existsSync(path)) {
+    return {};
+  }
+
+  return dotenv.parse(readFileSync(path));
+}
+
+// Merge env files explicitly so server/.env overrides root .env,
+// while existing process.env values from the real environment still win.
+const mergedEnv = {
+  ...parseEnvFile(rootEnvPath),
+  ...parseEnvFile(serverEnvPath),
+};
+
+for (const [key, value] of Object.entries(mergedEnv)) {
+  if (process.env[key] === undefined) {
+    process.env[key] = value;
+  }
+}
 
 const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(8080),

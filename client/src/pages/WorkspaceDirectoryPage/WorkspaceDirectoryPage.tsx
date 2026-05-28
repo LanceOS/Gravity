@@ -75,7 +75,7 @@ export function WorkspaceDirectoryPage({
       description: workspaceDescription,
       key: workspaceKey,
       workspaceKey: workspaceAccessKey,
-      defaultProjectName: `${workspaceName} Core`,
+      defaultProjectName: workspaceName,
       defaultProjectKey: workspaceKey,
     });
   };

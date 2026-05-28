@@ -150,7 +150,7 @@ async function run() {
       key: 'ROPS',
       workspaceKey: 'ROPS-SECRET',
       ownerId,
-      defaultProjectName: 'Remote Ops Core',
+      defaultProjectName: 'Remote Ops',
       defaultProjectKey: 'ROPS',
     });
     assert(createWorkspace.response.status === 201, 'Workspace creation should return 201.');
