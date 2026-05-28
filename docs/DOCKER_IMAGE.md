@@ -2,9 +2,9 @@
 
 Files used:
 
-- [server/Dockerfile](server/Dockerfile)
-- [.github/workflows/docker-publish.yml](.github/workflows/docker-publish.yml)
-- [package.json](package.json) (root — defines version and workspaces)
+- [server/Dockerfile](../server/Dockerfile)
+- [.github/workflows/docker-publish.yml](../.github/workflows/docker-publish.yml)
+- [package.json](../package.json) (root — defines version and workspaces)
 
 What changed
 
