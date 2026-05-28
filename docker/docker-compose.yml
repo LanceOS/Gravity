@@ -5,29 +5,33 @@ services:
     image: postgres:16-alpine
     container_name: ${GRAVITY_POSTGRES_CONTAINER:-gravity_postgres}
     environment:
-      POSTGRES_USER: gravity_user
-      POSTGRES_PASSWORD: secure_dev_password_change_me_in_prod
-      POSTGRES_DB: gravity_workspace
-    ports:
-      - "${GRAVITY_POSTGRES_PORT:-5432}:5432"
+      POSTGRES_USER: ${GRAVITY_POSTGRES_USER:-gravity_user}
+      POSTGRES_PASSWORD: ${GRAVITY_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${GRAVITY_POSTGRES_DB:-gravity_workspace}
+    expose:
+      - "5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U gravity_user -d gravity_workspace"]
+      test: ["CMD-SHELL", "pg_isready -U ${GRAVITY_POSTGRES_USER:-gravity_user} -d ${GRAVITY_POSTGRES_DB:-gravity_workspace}"]
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - gravity_internal
 
   redis:
     image: redis:7-alpine
     container_name: ${GRAVITY_REDIS_CONTAINER:-gravity_redis}
-    command: redis-server --requirepass ${GRAVITY_REDIS_PASSWORD:-secure_dev_password_change_me_in_prod}
-    ports:
-      - "127.0.0.1:${GRAVITY_REDIS_PORT:-6379}:6379"
+    command: redis-server --requirepass ${GRAVITY_REDIS_PASSWORD}
+    expose:
+      - "6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${GRAVITY_REDIS_PASSWORD:-secure_dev_password_change_me_in_prod}", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${GRAVITY_REDIS_PASSWORD}", "ping"]
       timeout: 5s
       retries: 5
+    networks:
+      - gravity_internal
 
   backend:
     build:
@@ -35,18 +39,19 @@ services:
       dockerfile: Dockerfile
     container_name: ${GRAVITY_BACKEND_CONTAINER:-gravity_app_server}
     environment:
-      DATABASE_URL: postgresql://gravity_user:secure_dev_password_change_me_in_prod@postgres:5432/gravity_workspace
-      BETTER_AUTH_SECRET: change-me-before-production
+      DATABASE_URL: "${DATABASE_URL:-postgresql://${GRAVITY_POSTGRES_USER:-gravity_user}:${GRAVITY_POSTGRES_PASSWORD}@postgres:${GRAVITY_POSTGRES_PORT:-5432}/${GRAVITY_POSTGRES_DB:-gravity_workspace}}"
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      NODE_IDENTITY_MASTER_KEY: ${NODE_IDENTITY_MASTER_KEY}
       BETTER_AUTH_BASE_URL: ${GRAVITY_BACKEND_PUBLIC_URL:-http://localhost:8080}
       CORS_ORIGINS: ${GRAVITY_FRONTEND_PUBLIC_URL:-http://localhost:5173}
       TRUSTED_ORIGINS: ${GRAVITY_FRONTEND_PUBLIC_URL:-http://localhost:5173},${GRAVITY_BACKEND_PUBLIC_URL:-http://localhost:8080}
-      OLLAMA_DEFAULT_ENDPOINT: http://host.docker.internal:11434
-      NODE_ENV: production
-      PORT: 8080
-      REDIS_URL: redis://default:${GRAVITY_REDIS_PASSWORD:-secure_dev_password_change_me_in_prod}@redis:6379
-      REDIS_ENABLED: "true"
-    ports:
-      - "${GRAVITY_BACKEND_PORT:-8080}:8080"
+      OLLAMA_DEFAULT_ENDPOINT: ${OLLAMA_DEFAULT_ENDPOINT:-http://host.docker.internal:11434}
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: ${GRAVITY_BACKEND_PORT:-8080}
+      REDIS_URL: "redis://default:${GRAVITY_REDIS_PASSWORD}@redis:${GRAVITY_REDIS_PORT:-6379}"
+      REDIS_ENABLED: ${REDIS_ENABLED:-"true"}
+    expose:
+      - "8080"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -54,6 +59,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    networks:
+      - gravity_internal
 
   frontend:
     build:
@@ -67,6 +74,12 @@ services:
     depends_on:
       backend:
         condition: service_started
+    networks:
+      - gravity_internal
 
 volumes:
   pgdata:
+
+networks:
+  gravity_internal:
+    driver: bridge

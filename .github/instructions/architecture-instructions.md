@@ -283,7 +283,7 @@ services:
     container_name: gravity_postgres
     environment:
       POSTGRES_USER: gravity_user
-      POSTGRES_PASSWORD: secure_dev_password_change_me_in_prod
+      POSTGRES_PASSWORD: ${GRAVITY_POSTGRES_PASSWORD}
       POSTGRES_DB: gravity_workspace
     ports:
       - "5432:5432"
@@ -301,7 +301,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - DATABASE_URL=postgresql://gravity_user:secure_dev_password_change_me_in_prod@postgres:5432/gravity_workspace
+      - DATABASE_URL=postgresql://gravity_user:${GRAVITY_POSTGRES_PASSWORD}@postgres:5432/gravity_workspace
       - NODE_ENV=production
     depends_on:
       postgres:

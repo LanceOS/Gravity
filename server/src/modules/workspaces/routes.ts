@@ -46,6 +46,12 @@ import { mapProjectCreationError } from './utils/project-creation.js';
 import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
 import { env } from '../../env.js';
 
+function getParamString(param?: string | string[] | undefined): string {
+  if (typeof param === 'string') return param;
+  if (Array.isArray(param) && param.length > 0) return param[0];
+  return '';
+}
+
 async function recordWorkspaceActivity(workspaceId: string, userId: string) {
   try {
     await db
@@ -399,7 +405,11 @@ export function createWorkspacesRouter() {
   });
 
   router.patch('/workspaces/:workspaceId/settings', async (req, res) => {
-    const workspaceId = Array.isArray(req.params.workspaceId) ? req.params.workspaceId[0] : (req.params.workspaceId as string);
+    const workspaceId = getParamString(req.params.workspaceId);
+    if (!workspaceId) {
+      res.status(400).json({ error: 'Invalid workspace id.' });
+      return;
+    }
 
     try {
       await ensureWorkspaceSettingsRecord(workspaceId);
@@ -549,8 +559,12 @@ export function createWorkspacesRouter() {
 
   router.get('/workspaces/:workspaceId/members/:userId/activity', async (req, res) => {
     try {
-      const workspaceId = Array.isArray(req.params.workspaceId) ? req.params.workspaceId[0] : (req.params.workspaceId as string);
-      const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : (req.params.userId as string);
+      const workspaceId = getParamString(req.params.workspaceId);
+      const userId = getParamString(req.params.userId);
+      if (!workspaceId || !userId) {
+        res.status(400).json({ error: 'Invalid workspace id or user id.' });
+        return;
+      }
       const rows = await db
         .select()
         .from(workspaceMemberActivity)
@@ -580,8 +594,12 @@ export function createWorkspacesRouter() {
 
   router.post('/workspaces/:workspaceId/members/:userId/activity', async (req, res) => {
     try {
-      const workspaceId = Array.isArray(req.params.workspaceId) ? req.params.workspaceId[0] : (req.params.workspaceId as string);
-      const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : (req.params.userId as string);
+      const workspaceId = getParamString(req.params.workspaceId);
+      const userId = getParamString(req.params.userId);
+      if (!workspaceId || !userId) {
+        res.status(400).json({ error: 'Invalid workspace id or user id.' });
+        return;
+      }
       const actorUserId = await resolveRequestActorUserId(req);
 
       if (typeof actorUserId !== 'string' || actorUserId.length === 0) {
@@ -698,7 +716,11 @@ export function createWorkspacesRouter() {
 
 
   router.post('/workspaces/:workspaceId/invites', async (req, res) => {
-    const workspaceId = Array.isArray(req.params.workspaceId) ? req.params.workspaceId[0] : (req.params.workspaceId as string);
+    const workspaceId = getParamString(req.params.workspaceId);
+    if (!workspaceId) {
+      res.status(400).json({ error: 'Invalid workspace id.' });
+      return;
+    }
     const { label } = req.body ?? {};
 
     const actorUserId = await resolveRequestActorUserId(req);
@@ -762,8 +784,12 @@ export function createWorkspacesRouter() {
   });
 
   router.post('/workspaces/:workspaceId/invites/:inviteId/revoke', async (req, res) => {
-    const workspaceId = Array.isArray(req.params.workspaceId) ? req.params.workspaceId[0] : (req.params.workspaceId as string);
-    const inviteId = Array.isArray(req.params.inviteId) ? req.params.inviteId[0] : (req.params.inviteId as string);
+    const workspaceId = getParamString(req.params.workspaceId);
+    const inviteId = getParamString(req.params.inviteId);
+    if (!workspaceId || !inviteId) {
+      res.status(400).json({ error: 'Invalid workspace id or invite id.' });
+      return;
+    }
     const actorUserId = await resolveRequestActorUserId(req);
     if (!actorUserId) {
       res.status(401).json({ error: 'Unauthorized.' });
@@ -813,7 +839,11 @@ export function createWorkspacesRouter() {
 
   // Create a short-lived MCP connection token bound to this workspace.
   router.post('/workspaces/:workspaceId/mcp/connection', issuanceUserLimiter, issuanceIpLimiter, async (req, res) => {
-    const workspaceId = Array.isArray(req.params.workspaceId) ? req.params.workspaceId[0] : (req.params.workspaceId as string);
+    const workspaceId = getParamString(req.params.workspaceId);
+    if (!workspaceId) {
+      res.status(400).json({ error: 'Invalid workspace id.' });
+      return;
+    }
     const actorUserId = await resolveRequestActorUserId(req);
     if (!actorUserId) {
       res.status(401).json({ error: 'Authentication required.' });
@@ -856,8 +886,12 @@ export function createWorkspacesRouter() {
   });
 
   router.post('/workspaces/:workspaceId/mcp/connection/:tokenId/refresh', issuanceUserLimiter, issuanceIpLimiter, async (req, res) => {
-    const workspaceId = Array.isArray(req.params.workspaceId) ? req.params.workspaceId[0] : (req.params.workspaceId as string);
-    const tokenId = Array.isArray(req.params.tokenId) ? req.params.tokenId[0] : (req.params.tokenId as string);
+    const workspaceId = getParamString(req.params.workspaceId);
+    const tokenId = getParamString(req.params.tokenId);
+    if (!workspaceId || !tokenId) {
+      res.status(400).json({ error: 'Invalid workspace id or token id.' });
+      return;
+    }
     const actorUserId = await resolveRequestActorUserId(req);
     if (!actorUserId) {
       res.status(401).json({ error: 'Authentication required.' });
@@ -922,8 +956,12 @@ export function createWorkspacesRouter() {
   });
 
   router.post('/workspaces/:workspaceId/mcp/connection/:tokenId/revoke', issuanceUserLimiter, issuanceIpLimiter, async (req, res) => {
-    const workspaceId = Array.isArray(req.params.workspaceId) ? req.params.workspaceId[0] : (req.params.workspaceId as string);
-    const tokenId = Array.isArray(req.params.tokenId) ? req.params.tokenId[0] : (req.params.tokenId as string);
+    const workspaceId = getParamString(req.params.workspaceId);
+    const tokenId = getParamString(req.params.tokenId);
+    if (!workspaceId || !tokenId) {
+      res.status(400).json({ error: 'Invalid workspace id or token id.' });
+      return;
+    }
     const actorUserId = await resolveRequestActorUserId(req);
     if (!actorUserId) {
       res.status(401).json({ error: 'Authentication required.' });
@@ -965,7 +1003,11 @@ export function createWorkspacesRouter() {
 
   // List MCP connection tokens (metadata only) for a workspace - owner/admin only
   router.get('/workspaces/:workspaceId/mcp/connections', async (req, res) => {
-    const workspaceId = Array.isArray(req.params.workspaceId) ? req.params.workspaceId[0] : (req.params.workspaceId as string);
+    const workspaceId = getParamString(req.params.workspaceId);
+    if (!workspaceId) {
+      res.status(400).json({ error: 'Invalid workspace id.' });
+      return;
+    }
     const actorUserId = await resolveRequestActorUserId(req);
     if (!actorUserId) {
       res.status(401).json({ error: 'Authentication required.' });
@@ -1133,7 +1175,11 @@ export function createWorkspacesRouter() {
   });
 
   router.get('/workspaces/:workspaceId/join-requests', async (req, res) => {
-    const workspaceId = Array.isArray(req.params.workspaceId) ? req.params.workspaceId[0] : (req.params.workspaceId as string);
+    const workspaceId = getParamString(req.params.workspaceId);
+    if (!workspaceId) {
+      res.status(400).json({ error: 'Invalid workspace id.' });
+      return;
+    }
     const actorUserId = await resolveRequestActorUserId(req);
     if (!actorUserId) {
       res.status(401).json({ error: 'Authentication required.' });
@@ -1183,8 +1229,12 @@ export function createWorkspacesRouter() {
   });
 
   router.post('/workspaces/:workspaceId/join-requests/:requestId/approve', async (req, res) => {
-    const workspaceId = Array.isArray(req.params.workspaceId) ? req.params.workspaceId[0] : (req.params.workspaceId as string);
-    const requestId = Array.isArray(req.params.requestId) ? req.params.requestId[0] : (req.params.requestId as string);
+    const workspaceId = getParamString(req.params.workspaceId);
+    const requestId = getParamString(req.params.requestId);
+    if (!workspaceId || !requestId) {
+      res.status(400).json({ error: 'Invalid workspace id or request id.' });
+      return;
+    }
     const actorUserId = await resolveRequestActorUserId(req);
     if (!actorUserId) {
       res.status(401).json({ error: 'Authentication required.' });
