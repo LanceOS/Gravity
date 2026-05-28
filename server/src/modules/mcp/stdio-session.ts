@@ -88,7 +88,7 @@ export class McpStdioSession {
 
       try {
         const resp = await handleMcpRequest(request, workspaceId, actorUserId, {
-          accessChecked: true,
+          accessChecked: Array.isArray(this.options.tokenScopes),
           sanitize: !!this.options.sanitize,
           tokenScopes: this.options.tokenScopes,
         });
