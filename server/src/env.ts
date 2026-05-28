@@ -16,6 +16,7 @@ const envSchema = z.object({
   BETTER_AUTH_BASE_URL: z.string().url().optional(),
   CORS_ORIGINS: z.string().optional(),
   TRUSTED_ORIGINS: z.string().optional(),
+  BETTER_AUTH_OLD_SECRETS: z.string().optional(),
   OLLAMA_DEFAULT_ENDPOINT: z.string().url().optional(),
   MCP_STDIO_WORKSPACE_ID: z.string().optional(),
   MCP_STDIO_ACTOR_USER_ID: z.string().optional(),
@@ -74,4 +75,5 @@ export const env = {
   allowEnvAiKeys: parsed.ALLOW_ENV_AI_KEYS,
   redisUrl: parsed.REDIS_URL,
   redisEnabled: parsed.REDIS_ENABLED,
+  betterAuthOldSecrets: splitList(parsed.BETTER_AUTH_OLD_SECRETS),
 };

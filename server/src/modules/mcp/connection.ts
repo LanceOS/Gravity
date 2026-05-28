@@ -51,27 +51,36 @@ export async function revokeConnectionToken(tokenId: string, requestingUserId: s
 }
 
 export async function verifyAndConsumeToken(rawToken: string, workspaceId: string) {
-  const tokenHash = createHmac('sha256', env.betterAuthSecret).update(rawToken).digest('hex');
+  // Support key rotation by attempting verification with the current
+  // secret plus any legacy secrets configured in `env.betterAuthOldSecrets`.
+  const secrets = [env.betterAuthSecret, ...(Array.isArray(env.betterAuthOldSecrets) ? env.betterAuthOldSecrets : [])];
 
-  // Validate and return the token row. Respect `singleUse` tokens by
-  // atomically marking them as used; allow reuse when `singleUse` is false.
   const rowOrUpdated = await db.transaction(async (tx) => {
-    // Load row first to inspect `singleUse` and metadata.
-    const rows = await tx
-      .select()
-      .from(mcpConnectionTokens)
-      .where(and(eq(mcpConnectionTokens.tokenHash, tokenHash), eq(mcpConnectionTokens.workspaceId, workspaceId)))
-      .limit(1);
+    // Try each secret to find a matching token row.
+    let matchedRow: any = null;
+    for (const secret of secrets) {
+      const tokenHash = createHmac('sha256', secret).update(rawToken).digest('hex');
+      const rows = await tx
+        .select()
+        .from(mcpConnectionTokens)
+        .where(and(eq(mcpConnectionTokens.tokenHash, tokenHash), eq(mcpConnectionTokens.workspaceId, workspaceId)))
+        .limit(1);
 
-    const row = rows[0];
-    if (!row) return null;
+      if (rows[0]) {
+        matchedRow = rows[0];
+        break;
+      }
+    }
+
+    if (!matchedRow) return null;
+
+    const row = matchedRow;
 
     // Reject if not active or expired
     if (row.status !== 'active') return null;
     if (row.expiresAt && row.expiresAt <= new Date()) return null;
 
     if (row.singleUse) {
-      // Atomic consume for single-use tokens.
       const updated = await tx
         .update(mcpConnectionTokens)
         .set({ status: 'used', usedAt: new Date() })
@@ -81,7 +90,7 @@ export async function verifyAndConsumeToken(rawToken: string, workspaceId: strin
       return updated[0] ?? null;
     }
 
-    // For multi-use tokens, update `usedAt` but keep status active so it can be reused.
+    // Multi-use: update usedAt but keep status active.
     await tx.update(mcpConnectionTokens).set({ usedAt: new Date() }).where(eq(mcpConnectionTokens.id, row.id));
     return row;
   });
