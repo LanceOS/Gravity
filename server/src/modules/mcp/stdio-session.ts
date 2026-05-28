@@ -1,5 +1,5 @@
-import * as readline from 'readline';
-import type { Readable, Writable } from 'stream';
+import * as readline from 'node:readline';
+import type { Readable, Writable } from 'node:stream';
 import { handleMcpRequest } from './request-handler.js';
 import { createMcpErrorResponse } from './responses.js';
 
