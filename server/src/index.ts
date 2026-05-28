@@ -20,16 +20,10 @@ async function main() {
     console.log(`gravity-server listening on ${env.port}`);
   });
 
-  // Optionally start a stdio transport bound to a fixed trusted context when
-  // the environment variables are configured. This allows local agents to
-  // communicate with the server over stdin/stdout.
-  try {
-    if (env.mcpStdioWorkspaceId && env.mcpStdioActorUserId) {
-      const stdioServer = new McpStdioServer();
-      // DB is already initialized above — do not reinitialize.
-      await stdioServer.start();
-      console.log('MCP stdio transport active (process stdio).');
-    }
+  // NOTE: Do not start the MCP stdio transport in the main HTTP server process.
+  // MCP stdio requires exclusive use of stdout for JSON-RPC responses, but the
+  // API server logs to stdout.
+  // Run `server/src/modules/mcp/stdio.ts` as a separate process when stdio is needed.
   } catch (err) {
     console.error('Failed to start MCP stdio transport:', err);
   }
