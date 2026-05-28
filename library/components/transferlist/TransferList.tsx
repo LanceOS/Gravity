@@ -29,7 +29,6 @@ export function TransferList({ leftItems, rightItems, onChange, label }: Transfe
     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
       {label && <div className="label">{label}</div>}
       <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-        {/* Left List */}
         <div
           style={{
             flex: 1,
@@ -63,7 +62,6 @@ export function TransferList({ leftItems, rightItems, onChange, label }: Transfe
           ))}
         </div>
 
-        {/* Action Controls */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <button type="button" onClick={transferToRight} className="btn btn-sm clickable" style={{ minWidth: '40px' }}>
             &gt;
@@ -73,7 +71,6 @@ export function TransferList({ leftItems, rightItems, onChange, label }: Transfe
           </button>
         </div>
 
-        {/* Right List */}
         <div
           style={{
             flex: 1,

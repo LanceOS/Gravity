@@ -17,7 +17,6 @@ export function Tabs({ items, defaultTab, style }: TabsProps) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%', ...style }}>
-      {/* Tab List */}
       <div
         role="tablist"
         aria-label="Tabs navigation"
@@ -56,7 +55,6 @@ export function Tabs({ items, defaultTab, style }: TabsProps) {
           );
         })}
       </div>
-      {/* Tab Panels */}
       {items.map((item) => {
         const isSelected = item.id === activeTab;
         return (

@@ -18,7 +18,6 @@ export const TicketList: React.FC<TicketListProps> = ({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', flex: 1, overflow: 'hidden' }}>
 
-      {/* Main Rows Scrolling Container */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px' }}>
         <>
           {Object.entries(groupedTickets).map(([status, ticketsInGroup]) => {
@@ -26,7 +25,6 @@ export const TicketList: React.FC<TicketListProps> = ({
             return (
               <div key={status} style={{ marginBottom: '24px' }}>
 
-                {/* Group Title */}
                 <div
                   style={{
                     display: 'flex',
@@ -57,7 +55,6 @@ export const TicketList: React.FC<TicketListProps> = ({
                   </span>
                 </div>
 
-                {/* Rows List */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {ticketsInGroup.map(ticket => (
                     <TicketRow

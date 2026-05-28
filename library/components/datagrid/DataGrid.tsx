@@ -58,7 +58,6 @@ export function DataGrid<T>({ columns, data, rowHeight = 36, height = 360, style
         ...style,
       }}
     >
-      {/* Header Sticky */}
       <div
         style={{
           position: 'sticky',
@@ -83,7 +82,6 @@ export function DataGrid<T>({ columns, data, rowHeight = 36, height = 360, style
         ))}
       </div>
 
-      {/* Grid Scrollable Canvas */}
       <div style={{ position: 'relative', height: `${totalHeight + rowHeight}px`, width: '100%' }}>
         {visibleRows.map((row) => (
           <div

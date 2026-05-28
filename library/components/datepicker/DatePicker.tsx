@@ -61,7 +61,6 @@ export function DatePicker({ value, onChange, placeholder = 'Pick date', label }
               width: '240px',
             }}
           >
-            {/* Header controls */}
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', alignItems: 'center' }}>
               <button type="button" onClick={handlePrevMonth} className="btn btn-sm clickable" style={{ padding: '2px 6px' }}>
                 &lt;
@@ -73,7 +72,6 @@ export function DatePicker({ value, onChange, placeholder = 'Pick date', label }
                 &gt;
               </button>
             </div>
-            {/* Day grid */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', textAlign: 'center' }}>
               {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((d) => (
                 <span key={d} style={{ fontSize: '11px', fontWeight: 500, color: 'var(--color-text-disabled)' }}>

@@ -65,7 +65,6 @@ export function Modal({ isOpen, onClose, title, children, footer, style }: Modal
                 ...style,
               }}
             >
-              {/* Header */}
               <div
                 style={{
                   display: 'flex',
@@ -90,9 +89,8 @@ export function Modal({ isOpen, onClose, title, children, footer, style }: Modal
                   <X size={16} />
                 </button>
               </div>
-              {/* Content */}
               <div style={{ padding: '20px', overflowY: 'auto', flexGrow: 1, fontSize: '13px' }}>{children}</div>
-              {/* Footer */}
+              
               {footer && (
                 <div
                   style={{
