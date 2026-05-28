@@ -44,7 +44,7 @@ end
 
 export function createRedisRateLimiter(options: RedisRateLimitOptions) {
   const { windowMs, max, keyFn, client = defaultClient, prefix = 'gravity:rl:' } = options;
-  const limiterId = `rl:${windowMs}:${max}`;
+  const limiterId = `rl:${windowMs}:${max}:${Math.random().toString(36).slice(2, 10)}`;
   return async function rateLimiter(req: Request, res: Response, next: NextFunction) {
     try {
       if (!client || !client.isOpen || !client.isReady) {
