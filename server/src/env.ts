@@ -17,6 +17,8 @@ const envSchema = z.object({
   CORS_ORIGINS: z.string().optional(),
   TRUSTED_ORIGINS: z.string().optional(),
   TRUSTED_SERVICE_TOKENS: z.string().optional(),
+  TRUSTED_SERVICE_TOKENS_FILE: z.string().optional(),
+  TRUSTED_SERVICE_TOKENS_REFRESH_INTERVAL_MS: z.coerce.number().int().nonnegative().default(60000),
   BETTER_AUTH_OLD_SECRETS: z.string().optional(),
   OLLAMA_DEFAULT_ENDPOINT: z.string().url().optional(),
   MCP_STDIO_WORKSPACE_ID: z.string().optional(),
@@ -68,6 +70,8 @@ export const env = {
     return [`http://localhost:${parsed.PORT}`];
   })(),
   trustedServiceTokens: splitList(parsed.TRUSTED_SERVICE_TOKENS),
+  trustedServiceTokensFile: parsed.TRUSTED_SERVICE_TOKENS_FILE?.trim() || undefined,
+  trustedServiceTokensRefreshIntervalMs: parsed.TRUSTED_SERVICE_TOKENS_REFRESH_INTERVAL_MS,
   ollamaDefaultEndpoint:
     parsed.OLLAMA_DEFAULT_ENDPOINT ??
     (parsed.NODE_ENV === 'test' ? 'http://localhost:11434' : 'http://host.docker.internal:11434'),
