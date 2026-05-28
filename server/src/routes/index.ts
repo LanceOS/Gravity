@@ -8,10 +8,15 @@ import { createUsersRouter } from '../modules/users/routes.js';
 import { createWorkspacesRouter } from '../modules/workspaces/routes.js';
 import { createMcpRouter } from '../modules/mcp/index.js';
 import { createWebhookRouter } from '../modules/webhooks/routes.js';
+import { csrfProtect } from '../lib/csrf.js';
 import { subscribeToEvents } from '../realtime.js';
 
 export function createApiRouter() {
   const router = Router();
+
+  // Apply CSRF protection to state-changing API endpoints. Authorization headers
+  // and service tokens bypass the check.
+  router.use(csrfProtect());
 
   router.use(createHealthRouter());
   router.use(createUsersRouter());
