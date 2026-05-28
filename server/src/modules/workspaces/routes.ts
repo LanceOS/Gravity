@@ -38,6 +38,7 @@ import {
 } from '../../lib/platform.js';
 import { createConnectionToken, refreshConnectionToken, revokeConnectionToken } from '../mcp/connection.js';
 import { csrfProtect } from '../../lib/csrf.js';
+import { createRateLimiter } from '../../lib/rateLimit.js';
 import { isWorkspaceMember } from './services/membership.js';
 import { mapProjectCreationError } from './utils/project-creation.js';
 import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
@@ -209,6 +210,16 @@ async function buildMcpConnectionResponse(
 
 export function createWorkspacesRouter() {
   const router = Router();
+  // Basic rate limiters: per-user (or per-ip fallback) and per-ip
+  const issuanceUserLimiter = createRateLimiter({
+    windowMs: 60_000,
+    max: 10,
+    keyFn: async (req) => {
+      const actor = await resolveRequestActorUserId(req);
+      return actor ? `user:${actor}` : `ip:${req.ip}`;
+    },
+  });
+  const issuanceIpLimiter = createRateLimiter({ windowMs: 60_000, max: 60, keyFn: (req) => `ip:${req.ip}` });
   // Enforce CSRF Origin/Referer checks for state-changing requests by default.
   // `csrfProtect` allows Authorization header or service tokens to bypass when appropriate.
   router.use(csrfProtect());
@@ -796,7 +807,7 @@ export function createWorkspacesRouter() {
   });
 
   // Create a short-lived MCP connection token bound to this workspace.
-  router.post('/workspaces/:workspaceId/mcp/connection', async (req, res) => {
+  router.post('/workspaces/:workspaceId/mcp/connection', issuanceUserLimiter, issuanceIpLimiter, async (req, res) => {
     const { workspaceId } = req.params;
     const actorUserId = await resolveRequestActorUserId(req);
     if (!actorUserId) {
@@ -836,7 +847,7 @@ export function createWorkspacesRouter() {
     }
   });
 
-  router.post('/workspaces/:workspaceId/mcp/connection/:tokenId/refresh', async (req, res) => {
+  router.post('/workspaces/:workspaceId/mcp/connection/:tokenId/refresh', issuanceUserLimiter, issuanceIpLimiter, async (req, res) => {
     const { workspaceId, tokenId } = req.params;
     const actorUserId = await resolveRequestActorUserId(req);
     if (!actorUserId) {
@@ -901,7 +912,7 @@ export function createWorkspacesRouter() {
     }
   });
 
-  router.post('/workspaces/:workspaceId/mcp/connection/:tokenId/revoke', async (req, res) => {
+  router.post('/workspaces/:workspaceId/mcp/connection/:tokenId/revoke', issuanceUserLimiter, issuanceIpLimiter, async (req, res) => {
     const { workspaceId, tokenId } = req.params;
     const actorUserId = await resolveRequestActorUserId(req);
     if (!actorUserId) {
