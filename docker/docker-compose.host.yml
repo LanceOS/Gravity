@@ -1,0 +1,6 @@
+# Optional override to publish frontend to host for local access.
+# Usage: docker compose -f docker/docker-compose.yml -f docker/docker-compose.host.yml up -d
+services:
+  frontend:
+    ports:
+      - "${GRAVITY_FRONTEND_PORT:-5173}:5173"
