@@ -380,7 +380,6 @@ async function run() {
       'Validated peer invites should report revoked_at once access is revoked.',
     );
 
-    console.log('workspace-api.test.ts passed');
   } finally {
     cleanupSandbox();
   }

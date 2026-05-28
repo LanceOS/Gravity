@@ -48,7 +48,6 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 // Setup sandboxed test directory
 function setupSandbox() {
-  console.log(`\n${CYAN}${BOLD}=== Setting up sandboxed test environment ===${RESET}`);
   if (fs.existsSync(testDataDir)) {
     fs.rmSync(testDataDir, { recursive: true, force: true });
   }
@@ -57,20 +56,16 @@ function setupSandbox() {
 
 // Clean up sandbox
 function cleanupSandbox() {
-  console.log(`\n${CYAN}${BOLD}=== Cleaning up sandboxed database storage ===${RESET}`);
   if (serverProcess) {
     serverProcess.kill('SIGTERM');
-    console.log(`${YELLOW}Server child process terminated.${RESET}`);
   }
   if (fs.existsSync(testDataDir)) {
     fs.rmSync(testDataDir, { recursive: true, force: true });
-    console.log(`${YELLOW}Test data directory deleted.${RESET}`);
   }
 }
 
 // Start backend server
 async function startServer(): Promise<void> {
-  console.log(`${CYAN}Starting Gravity server on port ${PORT} with DB_DIR=${testDataDir}...${RESET}`);
 
   if (!TEST_DATABASE_URL) {
     throw new Error('WORKSPACE_TEST_DATABASE_URL or DATABASE_URL is required to run api.test.ts against PostgreSQL.');
@@ -98,7 +93,6 @@ async function startServer(): Promise<void> {
     try {
       const res = await fetch(`${BASE_URL}/api/users`);
       if (res.ok) {
-        console.log(`${GREEN}✔ Server successfully online and responding to requests!${RESET}`);
         return;
       }
     } catch {
@@ -1132,7 +1126,7 @@ async function runSuite() {
   try {
     await startServer();
     
-    console.log(`\n${CYAN}${BOLD}=== Running Integration Test Suite ===${RESET}\n`);
+    
 
     for (let i = 0; i < tests.length; i++) {
       const t = tests[i];
@@ -1149,16 +1143,12 @@ async function runSuite() {
       }
     }
 
-    console.log(`\n${BOLD}================================================${RESET}`);
-    console.log(`${BOLD}Gravity API Integration Test Results Summary:${RESET}`);
-    console.log(`  Passed Tests: ${GREEN}${BOLD}${successCount}${RESET}`);
-    console.log(`  Failed Tests: ${RED}${BOLD}${failureCount}${RESET}`);
-    console.log(`${BOLD}================================================${RESET}\n`);
+    
 
     if (failureCount > 0) {
       process.exitCode = 1;
     } else {
-      console.log(`${GREEN}${BOLD}✔ ALL INTEGRATION TESTS PASSED TRIUMPHANTLY!${RESET}\n`);
+      
     }
 
   } catch (error: any) {

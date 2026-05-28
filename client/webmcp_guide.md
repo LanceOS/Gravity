@@ -112,11 +112,9 @@ The window emits events when agents start or stop interacting with a tool:
 
 ```javascript
 window.addEventListener('toolactivated', ({ toolName }) => {
-  console.log(`Tool "${toolName}" was activated by the agent.`);
 });
 
 window.addEventListener('toolcancel', ({ toolName }) => {
-  console.log(`Tool "${toolName}" interaction was cancelled.`);
 });
 ```
 
