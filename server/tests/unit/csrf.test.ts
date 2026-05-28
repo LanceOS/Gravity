@@ -47,7 +47,12 @@ describe('csrfProtect middleware', () => {
     app.use(express.json());
     app.post('/test', csrfProtect(undefined, { enforceInTest: true }), (req, res) => res.json({ ok: true }));
 
-    const res = await request(app).post('/test').set('Origin', 'http://example.com').set('Host', 'example.com').send({});
+    // Provide allowed origin explicitly rather than relying on Host fallback
+    const app2 = express();
+    app2.use(express.json());
+    app2.post('/test', csrfProtect(['http://example.com'], { enforceInTest: true }), (req, res) => res.json({ ok: true }));
+
+    const res = await request(app2).post('/test').set('Origin', 'http://example.com').set('Host', 'example.com').send({});
     expect(res.status).toBe(200);
   });
 });

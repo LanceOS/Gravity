@@ -19,7 +19,7 @@ describe('MCP concurrency', () => {
 
     const createRes = await ownerApi.post(`/api/v1/workspaces/${workspace.id}/mcp/connection`).send({});
     expect(createRes.status).toBe(201);
-    const rawToken = createRes.body.token;
+    const rawToken = createRes.body.auth.token;
 
     const concurrency = 12;
     const promises = Array.from({ length: concurrency }).map((_, i) =>

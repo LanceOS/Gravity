@@ -26,7 +26,7 @@ describe('MCP HMAC key rotation simulation', () => {
 
       const createRes = await ownerApi.post(`/api/v1/workspaces/${workspace.id}/mcp/connection`).send({});
       expect(createRes.status).toBe(201);
-      const rawToken = createRes.body.token;
+      const rawToken = createRes.body.auth.token;
 
       // Rotate to a new secret but do NOT retain the old secret -> token should be rejected
       env.betterAuthSecret = 'new-rot-secret-test-1';

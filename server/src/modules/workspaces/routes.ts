@@ -147,7 +147,6 @@ async function getUserEmail(userId: string) {
 type McpConnectionResponsePayload = {
   id: string;
   type: 'mcp_http';
-  token: string;
   expires_at: string;
   scopes: string[];
   single_use: boolean;
@@ -184,7 +183,6 @@ async function buildMcpConnectionResponse(
   return {
     id: token.id,
     type: 'mcp_http',
-    token: token.rawToken,
     expires_at: token.expiresAt,
     scopes: token.scopes,
     single_use: token.singleUse,

@@ -16,7 +16,7 @@ describe('MCP token multi-use, scopes, and RBAC', () => {
 
     const createRes = await ownerApi.post(`/api/v1/workspaces/${workspace.id}/mcp/connection`).send({ singleUse: false });
     expect(createRes.status).toBe(201);
-    const rawToken = createRes.body.token;
+    const rawToken = createRes.body.auth.token;
 
     // First use
     const first = await api()
@@ -53,7 +53,7 @@ describe('MCP token multi-use, scopes, and RBAC', () => {
 
     const createRes = await ownerApi.post(`/api/v1/workspaces/${workspace.id}/mcp/connection`).send({ scopes: ['tools/list'] });
     expect(createRes.status).toBe(201);
-    const rawToken = createRes.body.token;
+    const rawToken = createRes.body.auth.token;
 
     const callRes = await api()
       .post('/api/v1/mcp/sse')

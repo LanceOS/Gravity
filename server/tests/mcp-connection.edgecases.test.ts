@@ -20,7 +20,7 @@ describe('MCP connection edge cases', () => {
     const createRes = await ownerApi.post(`/api/v1/workspaces/${workspace.id}/mcp/connection`).send({});
     expect(createRes.status).toBe(201);
     const tokenId = createRes.body.id;
-    const rawToken = createRes.body.token;
+    const rawToken = createRes.body.auth.token;
 
     // Force the token to be expired
     await db.update(mcpConnectionTokens).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(mcpConnectionTokens.id, tokenId));
@@ -50,7 +50,7 @@ describe('MCP connection edge cases', () => {
     const createRes = await ownerApi.post(`/api/v1/workspaces/${workspace.id}/mcp/connection`).send({});
     expect(createRes.status).toBe(201);
     const tokenId = createRes.body.id;
-    const rawToken = createRes.body.token;
+    const rawToken = createRes.body.auth.token;
 
     // Revoke via the API
     const revokeRes = await ownerApi.post(`/api/v1/workspaces/${workspace.id}/mcp/connection/${tokenId}/revoke`).send({});
@@ -80,7 +80,7 @@ describe('MCP connection edge cases', () => {
 
     const createRes = await ownerApi.post(`/api/v1/workspaces/${workspace.id}/mcp/connection`).send({});
     expect(createRes.status).toBe(201);
-    const rawToken = createRes.body.token;
+    const rawToken = createRes.body.auth.token;
 
     const res = await api()
       .post('/api/v1/mcp/sse')
@@ -106,7 +106,7 @@ describe('MCP connection edge cases', () => {
 
     const createRes = await ownerApi.post(`/api/v1/workspaces/${workspace.id}/mcp/connection`).send({});
     expect(createRes.status).toBe(201);
-    const rawToken = createRes.body.token;
+    const rawToken = createRes.body.auth.token;
 
     // Tamper the token (flip last character)
     const tampered = rawToken.slice(0, -1) + (rawToken.slice(-1) === 'a' ? 'b' : 'a');

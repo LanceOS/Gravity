@@ -20,7 +20,8 @@ export function WorkspaceMcpModal({ workspaceId, isOpen, onClose }: Props) {
     try {
       const payload = await mcp.createConnection({ ttlSeconds: 300 });
       // Extract raw token and avoid storing it in the main result object
-      const token = payload?.token ?? payload?.auth?.token ?? null;
+      // Use `auth.token` as the canonical raw token field.
+      const token = payload?.auth?.token ?? null;
       const safePayload = { ...payload };
       if (safePayload.token) delete safePayload.token;
       if (safePayload.auth && safePayload.auth.token) delete safePayload.auth.token;

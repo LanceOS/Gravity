@@ -159,4 +159,24 @@ TRUSTED_SERVICE_TOKENS=svc-token-abc123,svc-token-xyz456
 - If you encounter 403s for issuance from automation, check proxies/CDNs for header stripping and
   prefer service tokens in those environments.
 
+## Proxy deployment note (important)
+
+- The CSRF middleware now avoids trusting the client-provided `Host` header by default. Relying on
+  `Host` weakens CSRF protections when requests transit through proxies or when headers can be
+  manipulated by clients. If your deployment requires a Host-based fallback (for example, because a
+  legacy proxy strips `Origin`/`Referer`) you MUST opt-in explicitly:
+
+  1. Set `CSRF_ALLOW_HOST_FALLBACK=true` in your process environment.
+  2. Configure `TRUSTED_PROXIES` to a comma-separated list of immediate proxy IP addresses that are
+     authorized to inject forwarding headers (for example `127.0.0.1,10.0.0.1`).
+  3. Ensure your proxy sets `X-Forwarded-Host` to the original host header; the middleware will only
+     trust `X-Forwarded-Host` when the immediate remote IP matches one of `TRUSTED_PROXIES`.
+
+  Notes:
+  - When `CSRF_ALLOW_HOST_FALLBACK` is disabled (the default), requests lacking `Origin` or `Referer`
+    will be rejected with `403` to avoid a potential CSRF bypass.
+  - Only enable the fallback when you control the proxy chain and can guarantee the immedate proxy
+    IPs listed in `TRUSTED_PROXIES` are not user-controllable. Misconfiguration may allow attackers to
+    bypass CSRF protections.
+
 

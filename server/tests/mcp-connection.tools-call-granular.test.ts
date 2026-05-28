@@ -17,7 +17,7 @@ describe('MCP tools/call granular scopes', () => {
     // Issue token scoped only to the list_tickets tool
     const createRes = await ownerApi.post(`/api/v1/workspaces/${workspace.id}/mcp/connection`).send({ scopes: ['tools/call:list_tickets'], singleUse: false });
     expect(createRes.status).toBe(201);
-    const rawToken = createRes.body.token;
+    const rawToken = createRes.body.auth.token;
 
     // Should be allowed to call list_tickets
     const allowed = await api()
@@ -54,7 +54,7 @@ describe('MCP tools/call granular scopes', () => {
 
     const createRes = await ownerApi.post(`/api/v1/workspaces/${workspace.id}/mcp/connection`).send({ scopes: ['tools/call'] });
     expect(createRes.status).toBe(201);
-    const rawToken = createRes.body.token;
+    const rawToken = createRes.body.auth.token;
 
     const callRes = await api()
       .post('/api/v1/mcp/sse')

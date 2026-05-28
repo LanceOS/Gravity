@@ -21,7 +21,6 @@ describe('MCP connection endpoints', () => {
     expect(res.status).toBe(201);
     expect(res.body).toMatchObject({
       id: expect.any(String),
-      token: expect.any(String),
       expires_at: expect.any(String),
       scopes: expect.any(Array),
       type: 'mcp_http',
@@ -55,14 +54,13 @@ describe('MCP connection endpoints', () => {
 
     const createRes = await ownerApi.post(`/api/v1/workspaces/${workspace.id}/mcp/connection`).send({ ttlSeconds: 300 });
     expect(createRes.status).toBe(201);
-    const oldToken = createRes.body.token;
+    const oldToken = createRes.body.auth.token;
     const oldExpiresAt = new Date(createRes.body.expires_at);
 
     const refreshRes = await ownerApi.post(`/api/v1/workspaces/${workspace.id}/mcp/connection/${createRes.body.id}/refresh`).send({ ttlSeconds: 600 });
     expect(refreshRes.status).toBe(200);
     expect(refreshRes.body).toMatchObject({
       id: createRes.body.id,
-      token: expect.any(String),
       expires_at: expect.any(String),
       type: 'mcp_http',
       auth: {
@@ -71,7 +69,7 @@ describe('MCP connection endpoints', () => {
       },
     });
 
-    const newToken = refreshRes.body.token;
+    const newToken = refreshRes.body.auth.token;
     expect(newToken).not.toBe(oldToken);
     expect(new Date(refreshRes.body.expires_at).getTime()).toBeGreaterThan(oldExpiresAt.getTime());
 
@@ -132,7 +130,7 @@ describe('MCP connection endpoints', () => {
 
     const createRes = await ownerApi.post(`/api/v1/workspaces/${workspace.id}/mcp/connection`).send({});
     expect(createRes.status).toBe(201);
-    const rawToken = createRes.body.token;
+    const rawToken = createRes.body.auth.token;
 
     // First use should succeed
     const sseRes = await api()

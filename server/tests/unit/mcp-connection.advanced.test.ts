@@ -31,7 +31,7 @@ describe('MCP connection advanced flows', () => {
 
     const createRes = await ownerApi.post(`/api/v1/workspaces/${workspace.id}/mcp/connection`).send({ singleUse: false });
     expect(createRes.status).toBe(201);
-    const rawToken = createRes.body.token;
+    const rawToken = createRes.body.auth.token;
 
     // Use twice (multi-use)
     const use1 = await publicApi()

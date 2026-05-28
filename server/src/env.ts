@@ -21,6 +21,13 @@ const envSchema = z.object({
   TRUSTED_SERVICE_TOKENS_REFRESH_INTERVAL_MS: z.coerce.number().int().nonnegative().default(60000),
   BETTER_AUTH_OLD_SECRETS: z.string().optional(),
   TRUSTED_PROXIES: z.string().optional(),
+    CSRF_ALLOW_HOST_FALLBACK: z.preprocess((v) => {
+      if (typeof v !== 'string') return v;
+      const s = v.trim().toLowerCase();
+      if (s === 'true' || s === '1') return true;
+      if (s === 'false' || s === '0' || s === '') return false;
+      return v;
+    }, z.boolean()).default(false),
   OLLAMA_DEFAULT_ENDPOINT: z.string().url().optional(),
   MCP_STDIO_WORKSPACE_ID: z.string().optional(),
   MCP_STDIO_ACTOR_USER_ID: z.string().optional(),
@@ -95,4 +102,5 @@ export const env = {
     return map;
   })(),
   trustedProxies: splitList(parsed.TRUSTED_PROXIES),
+  csrfAllowHostFallback: parsed.CSRF_ALLOW_HOST_FALLBACK,
 };

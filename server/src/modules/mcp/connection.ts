@@ -55,6 +55,7 @@ export async function createConnectionToken(opts: CreateOptions): Promise<Connec
 
   // Audit: token created (do not include raw token)
   try {
+    const masked = `${raw.slice(0, 8)}...${raw.slice(-4)}`;
     audit('mcp.token.created', {
       id,
       workspaceId: opts.workspaceId,
@@ -65,6 +66,7 @@ export async function createConnectionToken(opts: CreateOptions): Promise<Connec
       sourceIp: opts.sourceIp ?? null,
       expiresAt: expiresAt.toISOString(),
       hmacKeyId,
+      maskedToken: masked,
     });
   } catch (e) {
     // best-effort logging
@@ -127,6 +129,7 @@ export async function refreshConnectionToken(
 
   // Audit: token refreshed
   try {
+    const masked = `${raw.slice(0, 8)}...${raw.slice(-4)}`;
     audit('mcp.token.refreshed', {
       id: row.id,
       workspaceId: row.workspaceId,
@@ -136,6 +139,7 @@ export async function refreshConnectionToken(
       connectionType: row.connectionType,
       sourceIp: opts.sourceIp ?? row.sourceIp,
       expiresAt: expiresAt.toISOString(),
+      maskedToken: masked,
     });
   } catch (e) {
     // best-effort
