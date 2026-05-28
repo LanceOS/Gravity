@@ -55,6 +55,7 @@ function ensureCleanupTimerStarted() {
       for (let i = 0; i < toRemove; i++) centralStore.delete(items[i][0]);
     }
   }, CLEANUP_INTERVAL_MS);
+  if (typeof (cleanupTimer as any)?.unref === 'function') (cleanupTimer as any).unref();
 }
 
 export function createRateLimiter(options: RateLimitOptions) {
