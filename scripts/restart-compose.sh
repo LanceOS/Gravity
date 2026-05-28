@@ -9,17 +9,27 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 COMPOSE_FILE="$REPO_ROOT/docker/docker-compose.yml"
 ENV_FILE="$REPO_ROOT/.env"
 
-if command -v podman >/dev/null 2>&1; then
+podman_compose_available() {
+  command -v podman >/dev/null 2>&1 &&
+    podman info >/dev/null 2>&1 &&
+    podman compose version >/dev/null 2>&1
+}
+
+if podman_compose_available; then
   COMPOSE_CLI="podman"
 elif command -v docker >/dev/null 2>&1; then
   COMPOSE_CLI="docker"
 else
-  echo "Error: neither podman nor docker found in PATH" >&2
+  echo "Error: neither a working podman compose setup nor docker found in PATH" >&2
   exit 1
 fi
 
 compose() {
-  "$COMPOSE_CLI" compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "$@"
+  if [ -f "$ENV_FILE" ]; then
+    "$COMPOSE_CLI" compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "$@"
+  else
+    "$COMPOSE_CLI" compose -f "$COMPOSE_FILE" "$@"
+  fi
 }
 
 usage() {
