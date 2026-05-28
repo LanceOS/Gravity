@@ -182,7 +182,7 @@ export async function verifyAndConsumeToken(rawToken: string, workspaceId: strin
     if (row.singleUse) {
       const updated = await tx
         .update(mcpConnectionTokens)
-        .set({ status: 'used', usedAt: new Date() })
+        .set({ status: 'used', usedAt: new Date(), usageCount: sql`coalesce(usage_count, 0) + 1` })
         .where(and(eq(mcpConnectionTokens.id, row.id), eq(mcpConnectionTokens.status, 'active')))
         .returning();
 
@@ -190,8 +190,13 @@ export async function verifyAndConsumeToken(rawToken: string, workspaceId: strin
     }
 
     // Multi-use: update usedAt but keep status active.
-    await tx.update(mcpConnectionTokens).set({ usedAt: new Date() }).where(eq(mcpConnectionTokens.id, row.id));
-    return row;
+    const updatedMulti = await tx
+      .update(mcpConnectionTokens)
+      .set({ usedAt: new Date(), usageCount: sql`coalesce(usage_count, 0) + 1` })
+      .where(eq(mcpConnectionTokens.id, row.id))
+      .returning();
+
+    return updatedMulti[0] ?? null;
   });
 
   if (!rowOrUpdated) return null;

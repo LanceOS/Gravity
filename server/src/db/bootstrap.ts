@@ -276,6 +276,11 @@ export async function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS comments_user_id_idx ON comments (user_id);
   `);
 
+  // Ensure `usage_count` exists for mcp_connection_tokens (backfill-safe)
+  await pool.query(`
+    ALTER TABLE mcp_connection_tokens ADD COLUMN IF NOT EXISTS usage_count INTEGER NOT NULL DEFAULT 0;
+  `);
+
   const { runMigrations } = await getMigrations(auth.options);
   await runMigrations();
 }

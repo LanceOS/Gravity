@@ -1,4 +1,4 @@
-import { boolean, index, jsonb, pgTable, primaryKey, text, timestamp } from 'drizzle-orm/pg-core';
+import { boolean, index, integer, jsonb, pgTable, primaryKey, text, timestamp } from 'drizzle-orm/pg-core';
 
 export const mcpConnectionTokens = pgTable(
   'mcp_connection_tokens',
@@ -15,6 +15,7 @@ export const mcpConnectionTokens = pgTable(
     sourceIp: text('source_ip'),
     connectionType: text('connection_type').notNull().default('http-post'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    usageCount: integer('usage_count').notNull().default(0),
     usedAt: timestamp('used_at', { withTimezone: true }),
     revokedAt: timestamp('revoked_at', { withTimezone: true }),
   },
