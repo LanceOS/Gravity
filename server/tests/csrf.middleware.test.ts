@@ -95,4 +95,16 @@ describe('CSRF middleware', () => {
 
     expect(nextCalled).toBe(true);
   });
+
+  it('allows when x-service-token matches trusted tokens', () => {
+    const mw = csrfProtect(undefined, { enforceInTest: true, allowedServiceTokens: ['svc-secret-1'] });
+    const req = makeReq({ 'x-service-token': 'svc-secret-1' }, 'POST');
+    const res = makeRes();
+    let nextCalled = false;
+    mw(req, res, () => {
+      nextCalled = true;
+    });
+
+    expect(nextCalled).toBe(true);
+  });
 });

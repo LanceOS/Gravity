@@ -209,6 +209,9 @@ async function buildMcpConnectionResponse(
 
 export function createWorkspacesRouter() {
   const router = Router();
+  // Enforce CSRF Origin/Referer checks for state-changing requests by default.
+  // `csrfProtect` allows Authorization header or service tokens to bypass when appropriate.
+  router.use(csrfProtect());
 
   router.get('/workspaces', async (req, res) => {
     const actorUserId = await resolveRequestActorUserId(req);
@@ -793,7 +796,7 @@ export function createWorkspacesRouter() {
   });
 
   // Create a short-lived MCP connection token bound to this workspace.
-  router.post('/workspaces/:workspaceId/mcp/connection', csrfProtect(), async (req, res) => {
+  router.post('/workspaces/:workspaceId/mcp/connection', async (req, res) => {
     const { workspaceId } = req.params;
     const actorUserId = await resolveRequestActorUserId(req);
     if (!actorUserId) {
@@ -833,7 +836,7 @@ export function createWorkspacesRouter() {
     }
   });
 
-  router.post('/workspaces/:workspaceId/mcp/connection/:tokenId/refresh', csrfProtect(), async (req, res) => {
+  router.post('/workspaces/:workspaceId/mcp/connection/:tokenId/refresh', async (req, res) => {
     const { workspaceId, tokenId } = req.params;
     const actorUserId = await resolveRequestActorUserId(req);
     if (!actorUserId) {
@@ -898,7 +901,7 @@ export function createWorkspacesRouter() {
     }
   });
 
-  router.post('/workspaces/:workspaceId/mcp/connection/:tokenId/revoke', csrfProtect(), async (req, res) => {
+  router.post('/workspaces/:workspaceId/mcp/connection/:tokenId/revoke', async (req, res) => {
     const { workspaceId, tokenId } = req.params;
     const actorUserId = await resolveRequestActorUserId(req);
     if (!actorUserId) {

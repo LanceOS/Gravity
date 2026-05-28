@@ -5,9 +5,15 @@ function normalizeOrigin(origin: string) {
   return origin.replace(/\/$/, '').toLowerCase();
 }
 
-export function csrfProtect(allowedOrigins?: string[], options?: { enforceInTest?: boolean }) {
+export function csrfProtect(
+  allowedOrigins?: string[],
+  options?: { enforceInTest?: boolean; allowedServiceTokens?: string[] },
+) {
   const allowed = (allowedOrigins ?? env.trustedOrigins).map(normalizeOrigin);
   const enforceInTest = options?.enforceInTest === true;
+  const allowedServiceTokens = (options?.allowedServiceTokens && options.allowedServiceTokens.length)
+    ? options.allowedServiceTokens
+    : (env.trustedServiceTokens ?? []);
 
   return (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -20,6 +26,10 @@ export function csrfProtect(allowedOrigins?: string[], options?: { enforceInTest
       // If client provided an Authorization header (bearer token), assume non-browser client
       const authHeader = req.get('authorization');
       if (authHeader && String(authHeader).trim().length > 0) return next();
+
+      // Allow service-to-service tokens provided via `x-service-token` or `x-api-key`
+      const serviceToken = req.get('x-service-token') || req.get('x-api-key');
+      if (serviceToken && allowedServiceTokens.length > 0 && allowedServiceTokens.includes(String(serviceToken))) return next();
 
       // Prefer Origin header; fall back to Referer
       let origin = req.get('origin') as string | undefined;
