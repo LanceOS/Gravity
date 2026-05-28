@@ -953,6 +953,48 @@ export function createWorkspacesRouter() {
     }
   });
 
+  // List MCP connection tokens (metadata only) for a workspace - owner/admin only
+  router.get('/workspaces/:workspaceId/mcp/connections', async (req, res) => {
+    const { workspaceId } = req.params;
+    const actorUserId = await resolveRequestActorUserId(req);
+    if (!actorUserId) {
+      res.status(401).json({ error: 'Authentication required.' });
+      return;
+    }
+
+    try {
+      const membershipRows = await db
+        .select()
+        .from(workspaceMembers)
+        .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, actorUserId)))
+        .limit(1);
+      const membership = membershipRows[0];
+      if (!membership || !['owner', 'admin'].includes(membership.role)) {
+        res.status(403).json({ error: 'Owner or admin access is required.' });
+        return;
+      }
+
+      const rows = await db.select().from(mcpConnectionTokens).where(eq(mcpConnectionTokens.workspaceId, workspaceId)).orderBy(desc(mcpConnectionTokens.createdAt));
+
+      res.json(
+        rows.map((r) => ({
+          id: r.id,
+          generatedBy: r.generatedBy,
+          scopes: r.scopes,
+          singleUse: r.singleUse,
+          status: r.status,
+          connectionType: r.connectionType,
+          createdAt: r.createdAt ? r.createdAt.toISOString() : null,
+          expiresAt: r.expiresAt ? r.expiresAt.toISOString() : null,
+          usedAt: r.usedAt ? r.usedAt.toISOString() : null,
+          revokedAt: r.revokedAt ? r.revokedAt.toISOString() : null,
+        })),
+      );
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to list connection tokens.' });
+    }
+  });
+
   router.post('/workspaces/invites/:inviteCode/join-requests', async (req, res) => {
     const { inviteCode } = req.params;
     const { message } = req.body ?? {};
