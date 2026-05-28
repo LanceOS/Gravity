@@ -70,8 +70,28 @@ export class McpRouterFactory {
                   res.status(401).json({ error: 'Invalid or expired token.' });
                   return;
                 }
-                actorUserId = tokenRow.generatedBy;
-                accessChecked = true;
+                    // Enforce token scopes at transport level for common MCP methods.
+                    const requestedMethod = typeof req.body?.method === 'string' ? req.body.method : '';
+                    if (requestedMethod === 'tools/list' && !Array.isArray(tokenRow.scopes)) {
+                      res.status(403).json({ error: 'Insufficient token scopes.' });
+                      return;
+                    }
+                    if (requestedMethod === 'tools/list' && !tokenRow.scopes.includes('tools/list')) {
+                      res.status(403).json({ error: 'Insufficient token scopes.' });
+                      return;
+                    }
+                    if (requestedMethod === 'tools/call') {
+                      const hasCallScope =
+                        (Array.isArray(tokenRow.scopes) && tokenRow.scopes.includes('tools/call')) ||
+                        (Array.isArray(tokenRow.scopes) && tokenRow.scopes.some((s: string) => s.startsWith('tools/call:')));
+                      if (!hasCallScope) {
+                        res.status(403).json({ error: 'Insufficient token scopes.' });
+                        return;
+                      }
+                    }
+
+                    actorUserId = tokenRow.generatedBy;
+                    accessChecked = true;
               } catch (err) {
                 res.status(401).json({ error: 'Invalid token.' });
                 return;

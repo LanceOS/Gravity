@@ -53,35 +53,47 @@ export async function revokeConnectionToken(tokenId: string, requestingUserId: s
 export async function verifyAndConsumeToken(rawToken: string, workspaceId: string) {
   const tokenHash = createHmac('sha256', env.betterAuthSecret).update(rawToken).digest('hex');
 
-  // Atomic validate-and-consume: update a row matching tokenHash, workspaceId, active status and non-expired
-  const updated = await db.transaction(async (tx) => {
+  // Validate and return the token row. Respect `singleUse` tokens by
+  // atomically marking them as used; allow reuse when `singleUse` is false.
+  const rowOrUpdated = await db.transaction(async (tx) => {
+    // Load row first to inspect `singleUse` and metadata.
     const rows = await tx
-      .update(mcpConnectionTokens)
-      .set({ status: 'used', usedAt: new Date() })
-      .where(
-        and(
-          eq(mcpConnectionTokens.tokenHash, tokenHash),
-          eq(mcpConnectionTokens.workspaceId, workspaceId),
-          eq(mcpConnectionTokens.status, 'active'),
-          sql`${mcpConnectionTokens.expiresAt} > ${new Date()}`,
-        ),
-      )
-      .returning();
+      .select()
+      .from(mcpConnectionTokens)
+      .where(and(eq(mcpConnectionTokens.tokenHash, tokenHash), eq(mcpConnectionTokens.workspaceId, workspaceId)))
+      .limit(1);
 
-    return rows[0];
+    const row = rows[0];
+    if (!row) return null;
+
+    // Reject if not active or expired
+    if (row.status !== 'active') return null;
+    if (row.expiresAt && row.expiresAt <= new Date()) return null;
+
+    if (row.singleUse) {
+      // Atomic consume for single-use tokens.
+      const updated = await tx
+        .update(mcpConnectionTokens)
+        .set({ status: 'used', usedAt: new Date() })
+        .where(and(eq(mcpConnectionTokens.id, row.id), eq(mcpConnectionTokens.status, 'active')))
+        .returning();
+
+      return updated[0] ?? null;
+    }
+
+    // For multi-use tokens, update `usedAt` but keep status active so it can be reused.
+    await tx.update(mcpConnectionTokens).set({ usedAt: new Date() }).where(eq(mcpConnectionTokens.id, row.id));
+    return row;
   });
 
-  // If no row returned, token invalid/used/expired
-  if (!updated) {
-    return null;
-  }
+  if (!rowOrUpdated) return null;
 
   return {
-    id: updated.id,
-    workspaceId: updated.workspaceId,
-    generatedBy: updated.generatedBy,
-    scopes: updated.scopes,
-    connectionType: updated.connectionType,
+    id: rowOrUpdated.id,
+    workspaceId: rowOrUpdated.workspaceId,
+    generatedBy: rowOrUpdated.generatedBy,
+    scopes: rowOrUpdated.scopes,
+    connectionType: rowOrUpdated.connectionType,
   };
 }
 
