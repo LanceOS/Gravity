@@ -4,6 +4,7 @@ import { db } from '../../db/index.js';
 import { mcpConnectionTokens } from '../../db/schema.js';
 import { createId } from '../../lib/platform.js';
 import { env } from '../../env.js';
+import { audit } from '../../lib/logger.js';
 
 type CreateOptions = {
   workspaceId: string;
@@ -47,6 +48,23 @@ export async function createConnectionToken(opts: CreateOptions): Promise<Connec
     createdAt: new Date(),
   });
 
+  // Audit: token created (do not include raw token)
+  try {
+    audit('mcp.token.created', {
+      id,
+      workspaceId: opts.workspaceId,
+      generatedBy: opts.generatedBy,
+      scopes: opts.scopes || ['tools/list', 'tools/call'],
+      singleUse: opts.singleUse !== undefined ? opts.singleUse : true,
+      connectionType: opts.connectionType ?? 'http-post',
+      sourceIp: opts.sourceIp ?? null,
+      expiresAt: expiresAt.toISOString(),
+      hmacKeyId,
+    });
+  } catch (e) {
+    // best-effort logging
+  }
+
   return {
     id,
     rawToken: raw,
@@ -58,7 +76,22 @@ export async function createConnectionToken(opts: CreateOptions): Promise<Connec
 }
 
 export async function revokeConnectionToken(tokenId: string, requestingUserId: string) {
+  // Fetch token metadata for audit, then revoke
+  const rows = await db.select().from(mcpConnectionTokens).where(eq(mcpConnectionTokens.id, tokenId)).limit(1);
+  const tokenRow = rows[0];
   await db.update(mcpConnectionTokens).set({ status: 'revoked', revokedAt: new Date() }).where(eq(mcpConnectionTokens.id, tokenId));
+  try {
+    audit('mcp.token.revoked', {
+      id: tokenId,
+      workspaceId: tokenRow?.workspaceId ?? null,
+      generatedBy: tokenRow?.generatedBy ?? null,
+      revokedBy: requestingUserId,
+      connectionType: tokenRow?.connectionType ?? null,
+      scopes: tokenRow?.scopes ?? null,
+    });
+  } catch (e) {
+    // best-effort
+  }
 }
 
 export async function refreshConnectionToken(
@@ -83,6 +116,22 @@ export async function refreshConnectionToken(
     expiresAt,
     sourceIp: opts.sourceIp ?? row.sourceIp,
   }).where(eq(mcpConnectionTokens.id, tokenId));
+
+  // Audit: token refreshed
+  try {
+    audit('mcp.token.refreshed', {
+      id: row.id,
+      workspaceId: row.workspaceId,
+      generatedBy: row.generatedBy,
+      scopes: row.scopes,
+      singleUse: row.singleUse,
+      connectionType: row.connectionType,
+      sourceIp: opts.sourceIp ?? row.sourceIp,
+      expiresAt: expiresAt.toISOString(),
+    });
+  } catch (e) {
+    // best-effort
+  }
 
   return {
     id: row.id,
@@ -140,6 +189,19 @@ export async function verifyAndConsumeToken(rawToken: string, workspaceId: strin
   });
 
   if (!rowOrUpdated) return null;
+
+  // Audit: token consumed (do not log raw token)
+  try {
+    audit('mcp.token.consumed', {
+      id: rowOrUpdated.id,
+      workspaceId: rowOrUpdated.workspaceId,
+      generatedBy: rowOrUpdated.generatedBy,
+      scopes: rowOrUpdated.scopes,
+      connectionType: rowOrUpdated.connectionType,
+    });
+  } catch (e) {
+    // best-effort
+  }
 
   return {
     id: rowOrUpdated.id,
