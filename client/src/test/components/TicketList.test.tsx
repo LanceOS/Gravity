@@ -1,3 +1,65 @@
+import React from 'react';
+import { render } from '@testing-library/react';
+import { describe, it, expect } from 'vitest';
+import { TicketList } from '../../../modules/tickets/components/TicketList';
+import type { TicketsByStatus } from '../../../modules/tickets/utils/ticketView';
+
+function makeTicket(overrides: Partial<any> = {}) {
+  return {
+    id: overrides.id || 'ticket-1',
+    key: overrides.key || 'GRA-1',
+    title: overrides.title || 'A ticket',
+    description: overrides.description || '',
+    status: (overrides.status as any) || 'backlog',
+    priority: overrides.priority || 'no_priority',
+    projectId: overrides.projectId || '',
+    domainId: overrides.domainId ?? null,
+    cycleId: overrides.cycleId ?? null,
+    assigneeId: overrides.assigneeId ?? null,
+    parentId: overrides.parentId ?? null,
+    prStatus: 'none',
+    prUrl: null,
+    createdAt: overrides.createdAt || '2026-05-01T00:00:00.000Z',
+    updatedAt: overrides.updatedAt || '2026-05-01T00:00:00.000Z',
+  };
+}
+
+describe('TicketList ordering', () => {
+  it('renders statuses in the configured LIST_STATUS_ORDER', () => {
+    const groupedTickets: TicketsByStatus = {
+      backlog: [makeTicket({ id: 'b', title: 'Backlog', status: 'backlog' })],
+      todo: [makeTicket({ id: 't', title: 'Todo', status: 'todo' })],
+      in_progress: [makeTicket({ id: 'p', title: 'In Progress', status: 'in_progress' })],
+      in_review: [makeTicket({ id: 'r', title: 'In Review', status: 'in_review' })],
+      done: [makeTicket({ id: 'd', title: 'Done', status: 'done' })],
+      canceled: [],
+    };
+
+    const { container } = render(
+      <TicketList
+        filteredCount={6}
+        groupedTickets={groupedTickets}
+        domainById={{}}
+        userAvatarById={{}}
+        onSelectTicket={() => {}}
+      />
+    );
+
+    const content = container.textContent || '';
+
+    const idxInReview = content.indexOf('IN REVIEW');
+    const idxInProgress = content.indexOf('IN PROGRESS');
+    const idxTodo = content.indexOf('TODO');
+    const idxBacklog = content.indexOf('BACKLOG');
+    const idxDone = content.indexOf('DONE');
+
+    expect(idxInReview).toBeGreaterThan(-1);
+    expect(idxInReview).toBeLessThan(idxInProgress);
+    expect(idxInProgress).toBeLessThan(idxTodo);
+    expect(idxTodo).toBeLessThan(idxBacklog);
+    expect(idxBacklog).toBeLessThan(idxDone);
+  });
+});
 import type { ButtonHTMLAttributes, ChangeEvent, CSSProperties, ReactNode, SelectHTMLAttributes } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
