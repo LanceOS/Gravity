@@ -1,8 +1,8 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import type { Ticket } from '../../../context/TicketContext';
-import { Button, Select, TextInput, Textarea, MarkdownEditor, toast, ClickAwayListener, Portal } from '@library';
+import { Button, Select, Textarea, MarkdownEditor, toast, ClickAwayListener, Portal } from '@library';
 import generateBranchName from '../../../utils/branch';
-import TicketUtilities from './TicketUtilities';
+import TicketUtilities from './TicketUtilities.tsx';
 
 const DEFAULT_TICKET_URL_BASE = 'https://tickets.placeholder.local';
 
