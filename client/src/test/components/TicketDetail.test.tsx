@@ -319,7 +319,7 @@ describe('TicketDetail', () => {
     });
 
     const writeTextSpy = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
-    const toastSpy = vi.spyOn(toast, 'show').mockImplementation(() => {});
+    const toastSpy = vi.spyOn(toast, 'show').mockImplementation(() => 'mock-toast-id');
 
     expect(screen.getByRole('link', { name: 'Ticket link' })).toHaveAttribute(
       'href',
@@ -348,7 +348,7 @@ describe('TicketDetail', () => {
     const user = userEvent.setup();
     const { props } = renderTicketDetail();
     const writeTextSpy = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
-    const toastSpy = vi.spyOn(toast, 'show').mockImplementation(() => {});
+    const toastSpy = vi.spyOn(toast, 'show').mockImplementation(() => 'mock-toast-id');
 
     // Verify right-sidebar utilities
     expect(screen.getByText('Ticket Utilities')).toBeInTheDocument();

@@ -8,7 +8,6 @@ gravity/
 ├── docker/                       # Compose files for local/dev deployments
 │   ├── docker-compose.yml        # Base multi-container orchestration (frontend + backend + postgres)
 │   ├── docker-compose.dev.yml    # Vite/HMR overrides for local frontend development
-│   └── docker-compose.watch.yml  # Rebuild-on-change overrides for backend/frontend containers
 ├── client/
 │   └── Dockerfile                # Production nginx frontend image
 └── server/
