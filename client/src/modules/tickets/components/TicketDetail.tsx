@@ -1,7 +1,8 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import type { Ticket } from '../../../context/TicketContext';
-import { Button, Select, TextInput, Textarea, MarkdownEditor } from '@library';
+import { Button, Select, TextInput, Textarea, MarkdownEditor, toast } from '@library';
 import { ClickAwayListener, Portal } from '@library';
+import generateBranchName from '../../../utils/branch';
 import { 
   CheckSquare, GitPullRequest, GitMerge, Send, Trash2,
   Plus, Edit3, ChevronLeft, MoreHorizontal, Link, FileText
@@ -39,25 +40,24 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
 
   const closeCommentMenu = useCallback(() => setOpenMenuCommentId(null), []);
 
-  const ticketLink = useMemo(() => `https://tickets.placeholder.local/${activeTicket.key}`, [activeTicket.key]);
+  const TICKET_URL_BASE = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_TICKET_URL_BASE) || 'https://tickets.placeholder.local';
 
-  const generatedBranchName = useMemo(() => {
-    const slug = activeTicket.title
-      .toLowerCase()
-      .replace(/[#*_`~>[\]{}()]/g, '')
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 48);
+  const ticketLink = useMemo(() => `${TICKET_URL_BASE.replace(/\/$/, '')}/${activeTicket.key}`, [activeTicket.key]);
 
-    return `feature/${activeTicket.key}-${slug || 'update-ticket'}`;
-  }, [activeTicket.key, activeTicket.title]);
+  const generatedBranchName = useMemo(() => generateBranchName(activeTicket.key, activeTicket.title), [activeTicket.key, activeTicket.title]);
 
-  const copyToClipboard = useCallback((value: string) => {
+  const copyToClipboard = useCallback(async (value: string, successMessage?: string) => {
     if (!navigator.clipboard?.writeText) {
+      if (toast?.show) toast.show('Clipboard not supported', 'warning');
       return;
     }
 
-    void navigator.clipboard.writeText(value);
+    try {
+      await navigator.clipboard.writeText(value);
+      if (toast?.show) toast.show(successMessage || 'Copied to clipboard', 'success');
+    } catch (err) {
+      if (toast?.show) toast.show('Failed to copy', 'error');
+    }
   }, []);
 
   const handlePostComment = (e: React.FormEvent) => {
@@ -333,7 +333,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                                 type="button"
                                 onClick={() => {
                                   const url = `${window.location.origin}${window.location.pathname}#comment-${comment.id}`;
-                                  navigator.clipboard.writeText(url);
+                                  void copyToClipboard(url, 'Comment link copied');
                                   setOpenMenuCommentId(null);
                                 }}
                                 style={{
@@ -355,7 +355,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                               <button
                                 type="button"
                                 onClick={() => {
-                                  navigator.clipboard.writeText(comment.body);
+                                  void copyToClipboard(comment.body, 'Comment copied');
                                   setOpenMenuCommentId(null);
                                 }}
                                 style={{
@@ -513,7 +513,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                 {ticketLink}
               </a>
               <Button
-                onClick={() => copyToClipboard(ticketLink)}
+                onClick={() => void copyToClipboard(ticketLink, 'Ticket link copied')}
                 variant="ghost"
                 size="sm"
                 style={{ alignSelf: 'flex-start', padding: '3px 8px', fontSize: '11px' }}
@@ -528,7 +528,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                 {generatedBranchName}
               </span>
               <Button
-                onClick={() => copyToClipboard(generatedBranchName)}
+                onClick={() => void copyToClipboard(generatedBranchName, 'Branch name copied')}
                 variant="ghost"
                 size="sm"
                 style={{ alignSelf: 'flex-start', padding: '3px 8px', fontSize: '11px' }}
@@ -538,7 +538,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             </div>
 
             <Button
-              onClick={() => copyToClipboard(activeTicket.description || '')}
+              onClick={() => void copyToClipboard(activeTicket.description || '', 'Description copied')}
               variant="ghost"
               size="sm"
               style={{ alignSelf: 'flex-start', padding: '3px 8px', fontSize: '11px' }}
@@ -556,7 +556,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             </span>
             <div style={{ marginTop: '8px' }}>
               <Button
-                onClick={() => copyToClipboard(activeTicket.key)}
+                onClick={() => void copyToClipboard(activeTicket.key, 'Ticket key copied')}
                 variant="ghost"
                 size="sm"
                 style={{ padding: '3px 8px', fontSize: '11px' }}
