@@ -1,18 +1,87 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: gravity_postgres_dev
+    env_file:
+      - ../.env
+    environment:
+      POSTGRES_USER: ${GRAVITY_POSTGRES_USER:-gravity_user}
+      POSTGRES_DB: ${GRAVITY_POSTGRES_DB:-gravity_workspace}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${GRAVITY_POSTGRES_USER:-gravity_user} -d ${GRAVITY_POSTGRES_DB:-gravity_workspace}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - gravity_internal
+
+  redis:
+    image: redis:7-alpine
+    container_name: gravity_redis_dev
+    env_file:
+      - ../.env
+    command: >
+      sh -c 'if [ -n "$$GRAVITY_REDIS_PASSWORD" ]; then redis-server --requirepass "$$GRAVITY_REDIS_PASSWORD"; else redis-server; fi'
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD-SHELL", "if [ -n \"$$GRAVITY_REDIS_PASSWORD\" ]; then redis-cli -a \"$$GRAVITY_REDIS_PASSWORD\" ping; else redis-cli ping; fi"]
+      timeout: 5s
+      retries: 5
+    networks:
+      - gravity_internal
+
+  backend:
+    image: node:20-slim
+    container_name: gravity_backend_dev
+    working_dir: /app/server
+    # Run as root inside the container so mounts are accessible under Podman
+    user: "0:0"
+    env_file:
+      - ../.env
+    environment:
+      - NODE_ENV=development
+      - PORT=8080
+      - BETTER_AUTH_BASE_URL=${GRAVITY_BACKEND_PUBLIC_URL:-http://localhost:8080}
+      - CORS_ORIGINS=http://localhost:5173
+      - TRUSTED_ORIGINS=http://localhost:5173,http://localhost:8080
+      - OLLAMA_DEFAULT_ENDPOINT=${OLLAMA_DEFAULT_ENDPOINT:-http://host.docker.internal:11434}
+    volumes:
+      - ../server:/app/server
+      - ../library:/app/library
+      - ../server/node_modules:/app/server/node_modules
+    ports:
+      - "8080:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: >
+      sh -c "cd /app/server && npm run dev"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - gravity_internal
+
   # Override the frontend service for local development: run Vite inside a container
   frontend:
     image: node:20-slim
     container_name: gravity_frontend_dev
     working_dir: /app/client
-    # Run the process as the host user so mounted files are accessible inside
-    user: "${UID:-1000}:${GID:-1000}"
+    # Run as root inside the container so mounts are accessible under Podman
+    user: "0:0"
     environment:
       - NODE_ENV=development
       - BACKEND_UPSTREAM=http://backend:8080
     volumes:
-      - ../client:/app/client:cached
-      - ../library:/app/library:cached
-      - ../client/node_modules:/app/client/node_modules:delegated
+      - ../client:/app/client
+      - ../library:/app/library
+      - ../client/node_modules:/app/client/node_modules
     ports:
       - "5173:5173"
     # Use host-installed node_modules (mounted) and run Vite dev server so file changes
@@ -47,10 +116,12 @@ services:
       ' & cd /app/client && npm run dev -- --host 0.0.0.0 --port 5173"
     depends_on:
       - backend
+    networks:
+      - gravity_internal
 
-  # Override backend origin allowlists for local development so requests from the
-  # Vite dev server exposed on localhost:5173 are accepted.
-  backend:
-    environment:
-      CORS_ORIGINS: http://localhost:5173
-      TRUSTED_ORIGINS: http://localhost:5173
+volumes:
+  pgdata:
+
+networks:
+  gravity_internal:
+    driver: bridge

@@ -17,7 +17,7 @@ function makeTicket(overrides: Partial<any> = {}) {
     cycleId: overrides.cycleId ?? null,
     assigneeId: overrides.assigneeId ?? null,
     parentId: overrides.parentId ?? null,
-    prStatus: 'none',
+    prStatus: 'none' as const,
     prUrl: null,
     createdAt: overrides.createdAt || '2026-05-01T00:00:00.000Z',
     updatedAt: overrides.updatedAt || '2026-05-01T00:00:00.000Z',
