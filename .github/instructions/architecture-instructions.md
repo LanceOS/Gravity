@@ -1,14 +1,13 @@
 **Decentralized Multi-Tenant Workspace & AI-Powered Task Engine**
-
-## 1. Executive Summary & Design Philosophy
-
-Gravity is a self-hostable, centralized productivity application. Unlike traditional multi-tenant SaaS platforms, Gravity operates on a **Single-Host Workspace** paradigm:
-
-* **The Workspace Boundary:** Each self-hosted instance (running on PostgreSQL) represents an isolated security and data boundary containing workspaces, projects, domains, cycles, and local accounts.
-* **Centralized Identity:** Users access the workspace via the host's URL. Authentication and authorization are handled via session-based user actors within the host. Access to specific workspaces is granted through invitation links containing a unique invite code.
-* **Strict Logic Decoupling:** Components and pages are strictly presentation layers. State orchestration and network actions are completely isolated within custom React hooks and utility layers.
-
-## 2. Directory Structure (Clean, Modular Separation)
+```
+gravity/
+├── docker/                         # Compose files
+│   ├── docker-compose.yml          # Base multi-container orchestration (App + Postgres)
+│   ├── docker-compose.dev.yml      # Dev override for Vite frontend container
+├── client/
+│   └── Dockerfile                  # Frontend image definition
+└── server/
+  └── Dockerfile                  # Backend image definition
 
 To prevent monolithic file bloat, the workspace utilizes a strict Page-and-Feature structure. All inline styles are abandoned for utility-first Tailwind classes, and logic is entirely decoupled from TSX markups.
 
@@ -17,7 +16,6 @@ gravity/
 ├── docker/                         # Compose files
 │   ├── docker-compose.yml          # Base multi-container orchestration (App + Postgres)
 │   ├── docker-compose.dev.yml      # Dev override for the Vite frontend container
-│   ├── docker-compose.watch.yml    # Rebuild-on-change override for backend/frontend containers
 ├── client/
 │   └── Dockerfile                  # Frontend image definition
 └── server/

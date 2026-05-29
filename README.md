@@ -35,8 +35,8 @@ If you want to keep the production-style frontend container on host port `5173`
 up to date without manually rerunning `up --build`, use the Docker watch override:
 
 ```bash
-docker compose -f docker/docker-compose.yml -f docker/docker-compose.watch.yml up -d
-docker compose -f docker/docker-compose.yml -f docker/docker-compose.watch.yml watch
+docker compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml up -d
+docker compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml watch
 ```
 
 Run `watch` in a second terminal and leave it attached. It rebuilds the backend
@@ -68,8 +68,8 @@ podman run -d --rm --userns=keep-id --name gravity_frontend_dev_run \
 
 Notes:
 - Frontend Dockerfile lives at `client/Dockerfile`, and the API container Dockerfile lives at `server/Dockerfile`.
-- If you want that nginx container on `5173` to rebuild automatically on frontend changes,
-  use `docker/docker-compose.watch.yml` with `docker compose watch`.
+-- If you want that nginx container on `5173` to rebuild automatically on frontend changes,
+  use `docker/docker-compose.dev.yml` with `docker compose watch`.
 - If you change frontend source and want the production nginx container to serve changes, rebuild the image with:
 
 ```bash

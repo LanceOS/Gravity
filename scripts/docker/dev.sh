@@ -3,7 +3,7 @@ set -euo pipefail
 
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SELF_DIR/../.." && pwd)"
-DEFAULT_COMPOSE="docker/docker-compose.watch.yml"
+DEFAULT_COMPOSE="docker/docker-compose.dev.yml"
 
 usage() {
   cat <<-EOF
@@ -82,7 +82,7 @@ set -euo pipefail
 
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SELF_DIR/../.." && pwd)"
-DEFAULT_COMPOSE="docker/docker-compose.watch.yml"
+DEFAULT_COMPOSE="docker/docker-compose.dev.yml"
 
 usage() {
   cat <<-EOF
