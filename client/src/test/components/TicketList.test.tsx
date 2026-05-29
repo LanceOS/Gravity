@@ -1,5 +1,5 @@
 import React from 'react';
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import { TicketList } from '../../../modules/tickets/components/TicketList';
 import type { TicketsByStatus } from '../../../modules/tickets/utils/ticketView';
@@ -35,7 +35,7 @@ describe('TicketList ordering', () => {
       canceled: [],
     };
 
-    const { container } = render(
+    render(
       <TicketList
         filteredCount={6}
         groupedTickets={groupedTickets}
@@ -45,19 +45,16 @@ describe('TicketList ordering', () => {
       />
     );
 
-    const content = container.textContent || '';
+    const order = ['IN REVIEW', 'IN PROGRESS', 'TODO', 'BACKLOG', 'DONE'];
+    const elems = order.map((label) => screen.getByText(label));
 
-    const idxInReview = content.indexOf('IN REVIEW');
-    const idxInProgress = content.indexOf('IN PROGRESS');
-    const idxTodo = content.indexOf('TODO');
-    const idxBacklog = content.indexOf('BACKLOG');
-    const idxDone = content.indexOf('DONE');
+    function isBefore(a: Element, b: Element) {
+      return Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+    }
 
-    expect(idxInReview).toBeGreaterThan(-1);
-    expect(idxInReview).toBeLessThan(idxInProgress);
-    expect(idxInProgress).toBeLessThan(idxTodo);
-    expect(idxTodo).toBeLessThan(idxBacklog);
-    expect(idxBacklog).toBeLessThan(idxDone);
+    for (let i = 0; i < elems.length - 1; i++) {
+      expect(isBefore(elems[i], elems[i + 1])).toBe(true);
+    }
   });
 });
 import type { ButtonHTMLAttributes, ChangeEvent, CSSProperties, ReactNode, SelectHTMLAttributes } from 'react';
