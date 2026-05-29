@@ -90,7 +90,7 @@ services:
       target: development
     container_name: ${GRAVITY_FRONTEND_CONTAINER:-gravity_frontend}
     environment:
-      BACKEND_UPSTREAM: http://backend:8080
+      BACKEND_UPSTREAM: http://gravity_app_server:8080
       NODE_ENV: development
     command: ["sh","-c","npm run dev -- --host 0.0.0.0 --port 5173"]
     ports:
