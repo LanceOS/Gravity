@@ -79,7 +79,9 @@ services:
             - node_modules/
             - dist/
     networks:
-      - gravity_internal
+      gravity_internal:
+        aliases:
+          - backend
 
   frontend:
     build:
