@@ -37,6 +37,14 @@ fi
 
 COMPOSE_PATH="$REPO_ROOT/$COMPOSE_FILE"
 
+# Prefer including the base compose file with overrides for dev workflows so
+# services inherit their `build` or `image` settings from the base file.
+if [ "${COMPOSE_FILE##*/}" = "docker-compose.dev.yml" ]; then
+  COMPOSE_FILES=( -f "$REPO_ROOT/docker/docker-compose.yml" -f "$REPO_ROOT/docker/docker-compose.dev.yml" )
+else
+  COMPOSE_FILES=( -f "$COMPOSE_PATH" )
+fi
+
 if command -v podman >/dev/null 2>&1; then
   COMPOSE_BIN="podman"
 elif command -v docker >/dev/null 2>&1; then
@@ -53,25 +61,25 @@ cd "$REPO_ROOT"
 
 case "$CMD" in
   start)
-    $COMPOSE_CMD -f "$COMPOSE_PATH" up -d
+    $COMPOSE_CMD "${COMPOSE_FILES[@]}" up -d
     ;;
   stop)
-    $COMPOSE_CMD -f "$COMPOSE_PATH" down
+    $COMPOSE_CMD "${COMPOSE_FILES[@]}" down
     ;;
   rebuild)
-    $COMPOSE_CMD -f "$COMPOSE_PATH" pull || true
-    $COMPOSE_CMD -f "$COMPOSE_PATH" build --no-cache
-    $COMPOSE_CMD -f "$COMPOSE_PATH" up -d
+    $COMPOSE_CMD "${COMPOSE_FILES[@]}" pull || true
+    $COMPOSE_CMD "${COMPOSE_FILES[@]}" build --no-cache
+    $COMPOSE_CMD "${COMPOSE_FILES[@]}" up -d
     ;;
   watch)
-    $COMPOSE_CMD -f "$COMPOSE_PATH" up -d
-    $COMPOSE_CMD -f "$COMPOSE_PATH" watch
+    $COMPOSE_CMD "${COMPOSE_FILES[@]}" up -d
+    $COMPOSE_CMD "${COMPOSE_FILES[@]}" watch
     ;;
   logs)
-    $COMPOSE_CMD -f "$COMPOSE_PATH" logs -f --tail 200
+    $COMPOSE_CMD "${COMPOSE_FILES[@]}" logs -f --tail 200
     ;;
   status)
-    $COMPOSE_CMD -f "$COMPOSE_PATH" ps
+    $COMPOSE_CMD "${COMPOSE_FILES[@]}" ps
     ;;
   *)
     usage
