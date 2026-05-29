@@ -1,8 +1,8 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
-import { TicketList } from '../../../modules/tickets/components/TicketList';
-import type { TicketsByStatus } from '../../../modules/tickets/utils/ticketView';
+import { TicketList } from '../../modules/tickets/components/TicketList';
+import type { TicketsByStatus } from '../../modules/tickets/utils/ticketView';
 
 function makeTicket(overrides: Partial<any> = {}) {
   return {
