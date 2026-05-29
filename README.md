@@ -42,6 +42,14 @@ docker compose -f docker/docker-compose.yml -f docker/docker-compose.watch.yml w
 Run `watch` in a second terminal and leave it attached. It rebuilds the backend
 and frontend images whenever files under `server/`, `client/`, or `library/` change
 (excluding ignored paths like `node_modules/`, build output, and tests).
+
+Prerequisites & notes:
+
+- Requires Docker Compose CLI v2.22 or newer (the Compose "watch" feature).
+- The watch config syncs source files into running development image targets
+  (server -> `/app/server/src`, client -> `/app/client/src`) and issues
+  rebuilds when package files change. Ensure `node_modules` is excluded
+  from watched paths for performance.
 ## Standalone dev container (what I used)
 
 If you prefer running only the frontend dev server in a container (maps host `node_modules` and preserves UID):
