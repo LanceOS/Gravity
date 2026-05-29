@@ -15,13 +15,52 @@ function parseAllowedHosts(raw?: string): string[] {
 
 const ALLOWED_TICKET_HOSTS = parseAllowedHosts(RAW_ALLOWED_TICKET_HOSTS);
 
+/**
+ * Determine whether a parsed URL matches any allowlist entry.
+ * Supported allowlist entry formats:
+ *  - exact hostname: example.com
+ *  - wildcard subdomain: *.example.com  (matches a.example.com but not example.com)
+ *  - host with port: example.com:8080
+ *  - '*' to allow any host (not recommended)
+ */
+function isHostAllowed(url: URL, allowed: string[]): boolean {
+  const hostname = url.hostname.toLowerCase();
+  const hostWithPort = url.host.toLowerCase();
+
+  for (const rawEntry of allowed) {
+    const entry = rawEntry.toLowerCase();
+    if (!entry) continue;
+    if (entry === '*') return true;
+
+    // Explicit host:port match
+    if (entry.includes(':')) {
+      if (hostWithPort === entry) return true;
+      continue;
+    }
+
+    // Wildcard subdomain match: *.example.com matches api.example.com
+    if (entry.startsWith('*.')) {
+      const root = entry.slice(2);
+      if (!root) continue;
+      if (hostname === root) continue; // do not match root domain for wildcard
+      if (hostname.endsWith('.' + root)) return true;
+      continue;
+    }
+
+    // Exact hostname match
+    if (hostname === entry) return true;
+  }
+
+  return false;
+}
+
 function sanitizeTicketUrlBase(raw?: string): string {
   if (!raw) return DEFAULT_TICKET_URL_BASE;
   if (raw.startsWith('/')) return raw.replace(/\/$/, '');
   try {
     const url = new URL(raw);
     if (url.protocol !== 'https:') return DEFAULT_TICKET_URL_BASE;
-    if (!ALLOWED_TICKET_HOSTS.includes(url.hostname)) return DEFAULT_TICKET_URL_BASE;
+    if (!isHostAllowed(url, ALLOWED_TICKET_HOSTS)) return DEFAULT_TICKET_URL_BASE;
     return url.origin.replace(/\/$/, '');
   } catch {
     return DEFAULT_TICKET_URL_BASE;
