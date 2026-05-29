@@ -325,14 +325,14 @@ describe('TicketDetail', () => {
       'href',
       'https://tickets.placeholder.local/GRA-101'
     );
-    expect(screen.getByText('feature/GRA-101-update-ticket')).toBeInTheDocument();
+    expect(screen.getByText('feature/gra-101-update-ticket')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Copy Link' }));
     expect(writeTextSpy).toHaveBeenCalledWith('https://tickets.placeholder.local/GRA-101');
     expect(toastSpy).toHaveBeenCalledWith('Ticket link copied', 'success');
 
     await user.click(screen.getByRole('button', { name: 'Copy Branch Name' }));
-    expect(writeTextSpy).toHaveBeenCalledWith('feature/GRA-101-update-ticket');
+    expect(writeTextSpy).toHaveBeenCalledWith('feature/gra-101-update-ticket');
     expect(toastSpy).toHaveBeenCalledWith('Branch name copied', 'success');
 
     await user.click(screen.getByRole('button', { name: 'Copy as Markdown' }));
@@ -356,7 +356,7 @@ describe('TicketDetail', () => {
     const ticketLink = screen.getByRole('link', { name: 'Ticket link' });
     expect(ticketLink).toHaveAttribute('href', 'https://tickets.placeholder.local/GRA-101');
 
-    const generatedBranchName = 'feature/GRA-101-fix-sync-retries';
+    const generatedBranchName = 'feature/gra-101-fix-sync-retries';
     expect(screen.getByText(generatedBranchName)).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Copy Link' }));
