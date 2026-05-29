@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Backwards-compatible wrapper: forward to compose.sh in the same folder
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec "$SCRIPT_DIR/compose.sh" "$@"
+#!/usr/bin/env bash
+set -euo pipefail
+
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SELF_DIR/../.." && pwd)"
 DEFAULT_COMPOSE="docker/docker-compose.watch.yml"
