@@ -1,8 +1,24 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import type { Ticket } from '../../../context/TicketContext';
-import { Button, Select, TextInput, Textarea, MarkdownEditor, toast } from '@library';
-import { ClickAwayListener, Portal } from '@library';
+import { Button, Select, TextInput, Textarea, MarkdownEditor, toast, ClickAwayListener, Portal } from '@library';
 import generateBranchName from '../../../utils/branch';
+import TicketUtilities from './TicketUtilities';
+
+const DEFAULT_TICKET_URL_BASE = 'https://tickets.placeholder.local';
+
+function sanitizeTicketUrlBase(raw?: string): string {
+  if (!raw) return DEFAULT_TICKET_URL_BASE;
+  if (raw.startsWith('/')) return raw.replace(/\/$/, '');
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== 'https:') return DEFAULT_TICKET_URL_BASE;
+    return url.toString().replace(/\/$/, '');
+  } catch {
+    return DEFAULT_TICKET_URL_BASE;
+  }
+}
+
+const TICKET_URL_BASE = sanitizeTicketUrlBase((typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_TICKET_URL_BASE) || undefined);
 import { 
   CheckSquare, GitPullRequest, GitMerge, Send, Trash2,
   Plus, Edit3, ChevronLeft, MoreHorizontal, Link, FileText
@@ -40,9 +56,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
 
   const closeCommentMenu = useCallback(() => setOpenMenuCommentId(null), []);
 
-  const TICKET_URL_BASE = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_TICKET_URL_BASE) || 'https://tickets.placeholder.local';
-
-  const ticketLink = useMemo(() => `${TICKET_URL_BASE.replace(/\/$/, '')}/${activeTicket.key}`, [activeTicket.key]);
+  const ticketLink = useMemo(() => `${TICKET_URL_BASE}/${activeTicket.key}`, [activeTicket.key]);
 
   const generatedBranchName = useMemo(() => generateBranchName(activeTicket.key, activeTicket.title), [activeTicket.key, activeTicket.title]);
 
@@ -58,7 +72,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
     } catch (err) {
       if (toast?.show) toast.show('Failed to copy', 'error');
     }
-  }, []);
+  }, [toast]);
 
   const handlePostComment = (e: React.FormEvent) => {
     e.preventDefault();
@@ -489,63 +503,13 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             overflowY: 'auto'
           }}
         >
-          <div style={{ borderBottom: '1px solid var(--color-border-default)', paddingBottom: '12px', marginBottom: '4px' }}>
-            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase', display: 'block', marginBottom: '10px' }}>
-              Ticket Utilities
-            </span>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '10px' }}>
-              <span className="label" style={{ marginBottom: 0 }}>Ticket Link</span>
-              <a
-                href={ticketLink}
-                target="_blank"
-                rel="noreferrer"
-                aria-label="Ticket link"
-                style={{
-                  fontSize: '11px',
-                  color: 'var(--color-primary)',
-                  textDecoration: 'none',
-                  wordBreak: 'break-all',
-                  lineHeight: '1.35'
-                }}
-                className="clickable"
-              >
-                {ticketLink}
-              </a>
-              <Button
-                onClick={() => void copyToClipboard(ticketLink, 'Ticket link copied')}
-                variant="ghost"
-                size="sm"
-                style={{ alignSelf: 'flex-start', padding: '3px 8px', fontSize: '11px' }}
-              >
-                Copy Link
-              </Button>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '10px' }}>
-              <span className="label" style={{ marginBottom: 0 }}>Generated Branch Name</span>
-              <span style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--color-text-primary)', wordBreak: 'break-all', lineHeight: '1.35' }}>
-                {generatedBranchName}
-              </span>
-              <Button
-                onClick={() => void copyToClipboard(generatedBranchName, 'Branch name copied')}
-                variant="ghost"
-                size="sm"
-                style={{ alignSelf: 'flex-start', padding: '3px 8px', fontSize: '11px' }}
-              >
-                Copy Branch Name
-              </Button>
-            </div>
-
-            <Button
-              onClick={() => void copyToClipboard(activeTicket.description || '', 'Description copied')}
-              variant="ghost"
-              size="sm"
-              style={{ alignSelf: 'flex-start', padding: '3px 8px', fontSize: '11px' }}
-            >
-              Copy as Markdown
-            </Button>
-          </div>
+          <TicketUtilities
+            ticketLink={ticketLink}
+            generatedBranchName={generatedBranchName}
+            description={activeTicket.description || ''}
+            ticketKey={activeTicket.key}
+            onCopy={copyToClipboard}
+          />
 
           <div style={{ borderBottom: '1px solid var(--color-border-default)', paddingBottom: '12px', marginBottom: '4px' }}>
             <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>

@@ -20,4 +20,11 @@ describe('generateBranchName', () => {
     const slug = result.replace(/^feature\/GRA-123-/, '');
     expect(slug.length).toBeLessThanOrEqual(48);
   });
+
+  it('handles unicode characters by producing an ascii-safe slug', () => {
+    const result = generateBranchName('GRA-123', 'Résumé — fix');
+    const slug = result.replace(/^feature\/GRA-123-/, '');
+    // slug should only contain lowercase ascii letters, numbers and hyphens
+    expect(/^[a-z0-9-]+$/.test(slug)).toBe(true);
+  });
 });
