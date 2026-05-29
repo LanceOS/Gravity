@@ -1,7 +1,73 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import type { Ticket } from '../../../context/TicketContext';
-import { Button, Select, TextInput, Textarea, MarkdownEditor } from '@library';
-import { ClickAwayListener, Portal } from '@library';
+import { Button, Select, Textarea, MarkdownEditor, toast, ClickAwayListener, Portal } from '@library';
+import generateBranchName from '../../../utils/branch';
+import TicketUtilities from './TicketUtilities.tsx';
+
+const DEFAULT_TICKET_URL_BASE = 'https://tickets.placeholder.local';
+
+const RAW_ALLOWED_TICKET_HOSTS = (typeof import.meta !== 'undefined' && (import.meta as unknown as { env?: Record<string, string | undefined> }).env?.VITE_ALLOWED_TICKET_HOSTS) || undefined;
+
+function parseAllowedHosts(raw?: string): string[] {
+  if (!raw) return [new URL(DEFAULT_TICKET_URL_BASE).hostname];
+  return raw.split(',').map((s: string) => s.trim()).filter(Boolean);
+}
+
+const ALLOWED_TICKET_HOSTS = parseAllowedHosts(RAW_ALLOWED_TICKET_HOSTS);
+
+/**
+ * Determine whether a parsed URL matches any allowlist entry.
+ * Supported allowlist entry formats:
+ *  - exact hostname: example.com
+ *  - wildcard subdomain: *.example.com  (matches a.example.com but not example.com)
+ *  - host with port: example.com:8080
+ *  - '*' to allow any host (not recommended)
+ */
+function isHostAllowed(url: URL, allowed: string[]): boolean {
+  const hostname = url.hostname.toLowerCase();
+  const hostWithPort = url.host.toLowerCase();
+
+  for (const rawEntry of allowed) {
+    const entry = rawEntry.toLowerCase();
+    if (!entry) continue;
+    if (entry === '*') return true;
+
+    // Explicit host:port match
+    if (entry.includes(':')) {
+      if (hostWithPort === entry) return true;
+      continue;
+    }
+
+    // Wildcard subdomain match: *.example.com matches api.example.com
+    if (entry.startsWith('*.')) {
+      const root = entry.slice(2);
+      if (!root) continue;
+      if (hostname === root) continue; // do not match root domain for wildcard
+      if (hostname.endsWith('.' + root)) return true;
+      continue;
+    }
+
+    // Exact hostname match
+    if (hostname === entry) return true;
+  }
+
+  return false;
+}
+
+function sanitizeTicketUrlBase(raw?: string): string {
+  if (!raw) return DEFAULT_TICKET_URL_BASE;
+  if (raw.startsWith('/')) return raw.replace(/\/$/, '');
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== 'https:') return DEFAULT_TICKET_URL_BASE;
+    if (!isHostAllowed(url, ALLOWED_TICKET_HOSTS)) return DEFAULT_TICKET_URL_BASE;
+    return url.origin.replace(/\/$/, '');
+  } catch {
+    return DEFAULT_TICKET_URL_BASE;
+  }
+}
+
+const TICKET_URL_BASE = sanitizeTicketUrlBase((typeof import.meta !== 'undefined' && (import.meta as unknown as { env?: Record<string, string | undefined> }).env?.VITE_TICKET_URL_BASE) || undefined);
 import { 
   CheckSquare, GitPullRequest, GitMerge, Send, Trash2,
   Plus, Edit3, ChevronLeft, MoreHorizontal, Link, FileText
@@ -38,6 +104,24 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
   const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
 
   const closeCommentMenu = useCallback(() => setOpenMenuCommentId(null), []);
+
+  const ticketLink = useMemo(() => `${TICKET_URL_BASE}/${activeTicket.key}`, [activeTicket.key]);
+
+  const generatedBranchName = useMemo(() => generateBranchName(activeTicket.key, activeTicket.title), [activeTicket.key, activeTicket.title]);
+
+  const copyToClipboard = useCallback(async (value: string, successMessage?: string) => {
+    if (!navigator.clipboard?.writeText) {
+      if (toast?.show) toast.show('Clipboard not supported', 'warning');
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(value);
+      if (toast?.show) toast.show(successMessage || 'Copied to clipboard', 'success');
+    } catch {
+      if (toast?.show) toast.show('Failed to copy', 'error');
+    }
+  }, [toast]);
 
   const handlePostComment = (e: React.FormEvent) => {
     e.preventDefault();
@@ -312,7 +396,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                                 type="button"
                                 onClick={() => {
                                   const url = `${window.location.origin}${window.location.pathname}#comment-${comment.id}`;
-                                  navigator.clipboard.writeText(url);
+                                  void copyToClipboard(url, 'Comment link copied');
                                   setOpenMenuCommentId(null);
                                 }}
                                 style={{
@@ -334,7 +418,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                               <button
                                 type="button"
                                 onClick={() => {
-                                  navigator.clipboard.writeText(comment.body);
+                                  void copyToClipboard(comment.body, 'Comment copied');
                                   setOpenMenuCommentId(null);
                                 }}
                                 style={{
@@ -468,6 +552,14 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             overflowY: 'auto'
           }}
         >
+          <TicketUtilities
+            ticketLink={ticketLink}
+            generatedBranchName={generatedBranchName}
+            description={activeTicket.description || ''}
+            ticketKey={activeTicket.key}
+            onCopy={copyToClipboard}
+          />
+
           <div style={{ borderBottom: '1px solid var(--color-border-default)', paddingBottom: '12px', marginBottom: '4px' }}>
             <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
               Ticket Key
@@ -475,6 +567,16 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             <span style={{ fontFamily: 'var(--mono)', fontSize: '18px', fontWeight: 700, color: 'var(--color-primary)' }}>
               {activeTicket.key}
             </span>
+            <div style={{ marginTop: '8px' }}>
+              <Button
+                onClick={() => void copyToClipboard(activeTicket.key, 'Ticket key copied')}
+                variant="ghost"
+                size="sm"
+                style={{ padding: '3px 8px', fontSize: '11px' }}
+              >
+                Copy Ticket Key
+              </Button>
+            </div>
           </div>
           
           <div>

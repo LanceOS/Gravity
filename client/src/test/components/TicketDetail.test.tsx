@@ -86,6 +86,8 @@ vi.mock('../../modules/tickets/components/MarkdownContent', () => ({
   MarkdownContent: ({ text }: { text: string }) => <div>{text}</div>,
 }));
 
+import { toast } from '@library';
+
 const activeTicket = {
   id: 'ticket-1',
   key: 'GRA-101',
@@ -306,9 +308,68 @@ describe('TicketDetail', () => {
     });
   });
 
+  it('copies sidebar utility values for ticket link, branch name, markdown description, and ticket key', async () => {
+    const user = userEvent.setup();
+    renderTicketDetail({
+      activeTicket: {
+        ...activeTicket,
+        title: '***',
+        description: '',
+      },
+    });
+
+    const writeTextSpy = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
+    const toastSpy = vi.spyOn(toast, 'show').mockImplementation(() => {});
+
+    expect(screen.getByRole('link', { name: 'Ticket link' })).toHaveAttribute(
+      'href',
+      'https://tickets.placeholder.local/GRA-101'
+    );
+    expect(screen.getByText('feature/GRA-101-update-ticket')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Copy Link' }));
+    expect(writeTextSpy).toHaveBeenCalledWith('https://tickets.placeholder.local/GRA-101');
+    expect(toastSpy).toHaveBeenCalledWith('Ticket link copied', 'success');
+
+    await user.click(screen.getByRole('button', { name: 'Copy Branch Name' }));
+    expect(writeTextSpy).toHaveBeenCalledWith('feature/GRA-101-update-ticket');
+    expect(toastSpy).toHaveBeenCalledWith('Branch name copied', 'success');
+
+    await user.click(screen.getByRole('button', { name: 'Copy as Markdown' }));
+    expect(writeTextSpy).toHaveBeenCalledWith('');
+    expect(toastSpy).toHaveBeenCalledWith('Description copied', 'success');
+
+    await user.click(screen.getByRole('button', { name: 'Copy Ticket Key' }));
+    expect(writeTextSpy).toHaveBeenCalledWith('GRA-101');
+    expect(toastSpy).toHaveBeenCalledWith('Ticket key copied', 'success');
+  });
+
   it('displays the ticket key in the right sidebar and handles comment actions dropdown/inline editing/deletion', async () => {
     const user = userEvent.setup();
     const { props } = renderTicketDetail();
+    const writeTextSpy = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
+    const toastSpy = vi.spyOn(toast, 'show').mockImplementation(() => {});
+
+    // Verify right-sidebar utilities
+    expect(screen.getByText('Ticket Utilities')).toBeInTheDocument();
+
+    const ticketLink = screen.getByRole('link', { name: 'Ticket link' });
+    expect(ticketLink).toHaveAttribute('href', 'https://tickets.placeholder.local/GRA-101');
+
+    const generatedBranchName = 'feature/GRA-101-fix-sync-retries';
+    expect(screen.getByText(generatedBranchName)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Copy Link' }));
+    expect(writeTextSpy).toHaveBeenCalledWith('https://tickets.placeholder.local/GRA-101');
+    expect(toastSpy).toHaveBeenCalledWith('Ticket link copied', 'success');
+
+    await user.click(screen.getByRole('button', { name: 'Copy Branch Name' }));
+    expect(writeTextSpy).toHaveBeenCalledWith(generatedBranchName);
+    expect(toastSpy).toHaveBeenCalledWith('Branch name copied', 'success');
+
+    await user.click(screen.getByRole('button', { name: 'Copy as Markdown' }));
+    expect(writeTextSpy).toHaveBeenCalledWith('Retry the event stream after disconnects.');
+    expect(toastSpy).toHaveBeenCalledWith('Description copied', 'success');
 
     // Verify Ticket Key Display in attributes panel
     const sidebarKeyTitle = screen.getByText('Ticket Key');
@@ -316,6 +377,10 @@ describe('TicketDetail', () => {
     
     const sidebarKeyVal = screen.getAllByText('GRA-101')[1]; // first is in top header, second in right sidebar
     expect(sidebarKeyVal).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Copy Ticket Key' }));
+    expect(writeTextSpy).toHaveBeenCalledWith('GRA-101');
+    expect(toastSpy).toHaveBeenCalledWith('Ticket key copied', 'success');
 
     // Verify Comment Options dropdown trigger exists
     const commentOptionsBtn = screen.getByRole('button', { name: 'Comment options' });
@@ -332,7 +397,6 @@ describe('TicketDetail', () => {
     expect(screen.getByRole('button', { name: 'Delete Comment' })).toBeInTheDocument();
 
     // Click Grab Link — dropdown closes
-    const writeTextSpy = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
     await user.click(screen.getByRole('button', { name: 'Grab Link' }));
     expect(writeTextSpy).toHaveBeenCalledWith(expect.stringContaining('#comment-comment-1'));
     expect(screen.queryByRole('button', { name: 'Grab Link' })).not.toBeInTheDocument();
