@@ -6,13 +6,23 @@ import TicketUtilities from './TicketUtilities';
 
 const DEFAULT_TICKET_URL_BASE = 'https://tickets.placeholder.local';
 
+const RAW_ALLOWED_TICKET_HOSTS = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_ALLOWED_TICKET_HOSTS) || undefined;
+
+function parseAllowedHosts(raw?: string): string[] {
+  if (!raw) return [new URL(DEFAULT_TICKET_URL_BASE).hostname];
+  return raw.split(',').map((s: string) => s.trim()).filter(Boolean);
+}
+
+const ALLOWED_TICKET_HOSTS = parseAllowedHosts(RAW_ALLOWED_TICKET_HOSTS);
+
 function sanitizeTicketUrlBase(raw?: string): string {
   if (!raw) return DEFAULT_TICKET_URL_BASE;
   if (raw.startsWith('/')) return raw.replace(/\/$/, '');
   try {
     const url = new URL(raw);
     if (url.protocol !== 'https:') return DEFAULT_TICKET_URL_BASE;
-    return url.toString().replace(/\/$/, '');
+    if (!ALLOWED_TICKET_HOSTS.includes(url.hostname)) return DEFAULT_TICKET_URL_BASE;
+    return url.origin.replace(/\/$/, '');
   } catch {
     return DEFAULT_TICKET_URL_BASE;
   }
