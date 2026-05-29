@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { getWorkspaceHeaderTitle, hasActiveTicketFilters, type TicketFilters } from '../../modules/tickets/utils/ticketView';
+import { filterTickets } from '../../modules/tickets/utils/ticketView';
 
 const currentUser = {
   id: 'user-1',
@@ -70,5 +71,30 @@ describe('ticketView utils', () => {
         [cycle],
       )
     ).toBe('Sprint 1');
+  });
+
+  it('filters tickets by branch name when searching', () => {
+    const branchTicket = {
+      id: 'ticket-branch-1',
+      key: 'GRA-99',
+      title: 'Some title',
+      description: '',
+      status: 'todo',
+      priority: 'low',
+      projectId: 'project-1',
+      domainId: '',
+      cycleId: '',
+      assigneeId: '',
+      parentId: null,
+      prStatus: 'none',
+      prUrl: null,
+      createdAt: '2026-05-01T00:00:00.000Z',
+      updatedAt: '2026-05-01T00:00:00.000Z',
+      branchName: 'feature/GRA-99-new-thing',
+    } as any;
+
+    const results = filterTickets([branchTicket], { ...baseFilters, search: 'GRA-99' });
+    expect(results).toHaveLength(1);
+    expect(results[0].id).toBe('ticket-branch-1');
   });
 });

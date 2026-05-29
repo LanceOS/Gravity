@@ -31,7 +31,7 @@ export const TicketFilterBar: React.FC<TicketFilterBarProps> = ({
       }}
     >
       <DenseTextInput
-        placeholder="Filter tickets by title, body, or ID..."
+        placeholder="Filter tickets by title, body, ID, or branch..."
         value={filters.search}
         onChange={(e) => onFilterChange({ search: e.target.value })}
         style={{ maxWidth: '300px' }}

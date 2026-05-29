@@ -48,7 +48,8 @@ export function filterTickets(tickets: Ticket[], filters: TicketFilters): Ticket
       const titleMatch = ticket.title.toLowerCase().includes(searchLower);
       const keyMatch = ticket.key.toLowerCase().includes(searchLower);
       const descMatch = ticket.description?.toLowerCase().includes(searchLower) || false;
-      return titleMatch || keyMatch || descMatch;
+      const branchMatch = ticket.branchName?.toLowerCase().includes(searchLower) || false;
+      return titleMatch || keyMatch || descMatch || branchMatch;
     }
 
     return true;
