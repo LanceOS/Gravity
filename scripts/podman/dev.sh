@@ -37,35 +37,41 @@ fi
 
 COMPOSE_PATH="$REPO_ROOT/$COMPOSE_FILE"
 
-if ! command -v podman >/dev/null 2>&1; then
-  echo "podman is required but not found in PATH." >&2
-  echo "Install Podman or run the equivalent commands with docker compose." >&2
+if command -v podman >/dev/null 2>&1; then
+  COMPOSE_BIN="podman"
+elif command -v docker >/dev/null 2>&1; then
+  COMPOSE_BIN="docker"
+else
+  echo "podman or docker is required but not found in PATH." >&2
+  echo "Install Podman or Docker to use this helper." >&2
   exit 2
 fi
+
+COMPOSE_CMD="$COMPOSE_BIN compose"
 
 cd "$REPO_ROOT"
 
 case "$CMD" in
   start)
-    podman compose -f "$COMPOSE_PATH" up -d
+    $COMPOSE_CMD -f "$COMPOSE_PATH" up -d
     ;;
   stop)
-    podman compose -f "$COMPOSE_PATH" down
+    $COMPOSE_CMD -f "$COMPOSE_PATH" down
     ;;
   rebuild)
-    podman compose -f "$COMPOSE_PATH" pull || true
-    podman compose -f "$COMPOSE_PATH" build --no-cache
-    podman compose -f "$COMPOSE_PATH" up -d
+    $COMPOSE_CMD -f "$COMPOSE_PATH" pull || true
+    $COMPOSE_CMD -f "$COMPOSE_PATH" build --no-cache
+    $COMPOSE_CMD -f "$COMPOSE_PATH" up -d
     ;;
   watch)
-    podman compose -f "$COMPOSE_PATH" up -d
-    podman compose -f "$COMPOSE_PATH" watch
+    $COMPOSE_CMD -f "$COMPOSE_PATH" up -d
+    $COMPOSE_CMD -f "$COMPOSE_PATH" watch
     ;;
   logs)
-    podman compose -f "$COMPOSE_PATH" logs -f --tail 200
+    $COMPOSE_CMD -f "$COMPOSE_PATH" logs -f --tail 200
     ;;
   status)
-    podman compose -f "$COMPOSE_PATH" ps
+    $COMPOSE_CMD -f "$COMPOSE_PATH" ps
     ;;
   *)
     usage
