@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import type { Ticket } from '../../../context/TicketContext';
 import { Button, Select, TextInput, Textarea, MarkdownEditor } from '@library';
 import { ClickAwayListener, Portal } from '@library';
@@ -38,6 +38,27 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
   const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
 
   const closeCommentMenu = useCallback(() => setOpenMenuCommentId(null), []);
+
+  const ticketLink = useMemo(() => `https://tickets.placeholder.local/${activeTicket.key}`, [activeTicket.key]);
+
+  const generatedBranchName = useMemo(() => {
+    const slug = activeTicket.title
+      .toLowerCase()
+      .replace(/[#*_`~>[\]{}()]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 48);
+
+    return `feature/${activeTicket.key}-${slug || 'update-ticket'}`;
+  }, [activeTicket.key, activeTicket.title]);
+
+  const copyToClipboard = useCallback((value: string) => {
+    if (!navigator.clipboard?.writeText) {
+      return;
+    }
+
+    void navigator.clipboard.writeText(value);
+  }, []);
 
   const handlePostComment = (e: React.FormEvent) => {
     e.preventDefault();
@@ -469,12 +490,80 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
           }}
         >
           <div style={{ borderBottom: '1px solid var(--color-border-default)', paddingBottom: '12px', marginBottom: '4px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase', display: 'block', marginBottom: '10px' }}>
+              Ticket Utilities
+            </span>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '10px' }}>
+              <span className="label" style={{ marginBottom: 0 }}>Ticket Link</span>
+              <a
+                href={ticketLink}
+                target="_blank"
+                rel="noreferrer"
+                aria-label="Ticket link"
+                style={{
+                  fontSize: '11px',
+                  color: 'var(--color-primary)',
+                  textDecoration: 'none',
+                  wordBreak: 'break-all',
+                  lineHeight: '1.35'
+                }}
+                className="clickable"
+              >
+                {ticketLink}
+              </a>
+              <Button
+                onClick={() => copyToClipboard(ticketLink)}
+                variant="ghost"
+                size="sm"
+                style={{ alignSelf: 'flex-start', padding: '3px 8px', fontSize: '11px' }}
+              >
+                Copy Link
+              </Button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '10px' }}>
+              <span className="label" style={{ marginBottom: 0 }}>Generated Branch Name</span>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--color-text-primary)', wordBreak: 'break-all', lineHeight: '1.35' }}>
+                {generatedBranchName}
+              </span>
+              <Button
+                onClick={() => copyToClipboard(generatedBranchName)}
+                variant="ghost"
+                size="sm"
+                style={{ alignSelf: 'flex-start', padding: '3px 8px', fontSize: '11px' }}
+              >
+                Copy Branch Name
+              </Button>
+            </div>
+
+            <Button
+              onClick={() => copyToClipboard(activeTicket.description || '')}
+              variant="ghost"
+              size="sm"
+              style={{ alignSelf: 'flex-start', padding: '3px 8px', fontSize: '11px' }}
+            >
+              Copy as Markdown
+            </Button>
+          </div>
+
+          <div style={{ borderBottom: '1px solid var(--color-border-default)', paddingBottom: '12px', marginBottom: '4px' }}>
             <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
               Ticket Key
             </span>
             <span style={{ fontFamily: 'var(--mono)', fontSize: '18px', fontWeight: 700, color: 'var(--color-primary)' }}>
               {activeTicket.key}
             </span>
+            <div style={{ marginTop: '8px' }}>
+              <Button
+                onClick={() => copyToClipboard(activeTicket.key)}
+                variant="ghost"
+                size="sm"
+                style={{ padding: '3px 8px', fontSize: '11px' }}
+              >
+                Copy Ticket Key
+              </Button>
+            </div>
           </div>
           
           <div>
