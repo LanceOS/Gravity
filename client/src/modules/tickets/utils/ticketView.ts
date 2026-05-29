@@ -23,6 +23,17 @@ export const BOARD_COLUMNS: Array<{ id: Ticket['status']; title: string; color: 
   { id: 'canceled', title: 'Canceled', color: '#ef4444' },
 ];
 
+// Order used specifically for the list (non-board) ticket view. This presents a
+// linear workflow progression: In Review -> In Progress -> Todo -> Backlog -> Done
+export const LIST_STATUS_ORDER: Ticket['status'][] = [
+  'in_review',
+  'in_progress',
+  'todo',
+  'backlog',
+  'done',
+  'canceled',
+];
+
 export function filterTickets(tickets: Ticket[], filters: TicketFilters): Ticket[] {
   return tickets.filter((ticket) => {
     if (filters.status && ticket.status !== filters.status) return false;

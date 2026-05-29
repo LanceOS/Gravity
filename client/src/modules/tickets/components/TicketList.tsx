@@ -5,6 +5,7 @@ import { TicketRow } from './TicketRow';
 
 import type { TicketListProps } from '../types/TicketList';
 import { getAssigneeAvatar, getDomainTag, getPriorityIcon, getStatusLabel, getStatusColor } from '../utils/TicketList';
+import { LIST_STATUS_ORDER } from '../utils/ticketView';
 
 export const TicketList: React.FC<TicketListProps> = ({
   filteredCount,
@@ -20,8 +21,9 @@ export const TicketList: React.FC<TicketListProps> = ({
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px' }}>
         <>
-          {Object.entries(groupedTickets).map(([status, ticketsInGroup]) => {
-            if (ticketsInGroup.length === 0) return null;
+          {LIST_STATUS_ORDER.map((status) => {
+            const ticketsInGroup = groupedTickets[status];
+            if (!ticketsInGroup || ticketsInGroup.length === 0) return null;
             return (
               <div key={status} style={{ marginBottom: '24px' }}>
 

@@ -4,6 +4,12 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { TicketList } from '../../modules/tickets';
 import type { TicketRowProps } from '../../modules/tickets/types/TicketList';
+import type { ButtonHTMLAttributes, ChangeEvent, CSSProperties, ReactNode, SelectHTMLAttributes } from 'react';
+import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
+import { TicketList } from '../../modules/tickets';
+import type { TicketRowProps } from '../../modules/tickets/types/TicketList';
 
 type MockButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   children?: ReactNode;

@@ -4,9 +4,12 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: ${GRAVITY_POSTGRES_CONTAINER:-gravity_postgres}
+    env_file:
+      - ../.env
     environment:
       POSTGRES_USER: ${GRAVITY_POSTGRES_USER:-gravity_user}
-      POSTGRES_PASSWORD: ${GRAVITY_POSTGRES_PASSWORD}
+      # POSTGRES_PASSWORD will be supplied via env_file (../.env) to avoid
+      # interpolation issues when running compose from the docker/ directory.
       POSTGRES_DB: ${GRAVITY_POSTGRES_DB:-gravity_workspace}
     expose:
       - "5432"
