@@ -2,19 +2,34 @@ services:
   backend:
     develop:
       watch:
-        - action: rebuild
-          path: ../server
+        - action: sync
+          path: ../server/src
+          target: /app/server/src
           ignore:
             - node_modules/
             - dist/
             - coverage/
             - tests/
+        - action: rebuild
+          path: ../server/package.json
+          ignore:
+            - node_modules/
+            - dist/
+        - action: rebuild
+          path: ../server/tsconfig.json
+        - action: sync
+          path: ../library
+          target: /app/library
+          ignore:
+            - node_modules/
+            - dist/
 
   frontend:
     develop:
       watch:
-        - action: rebuild
-          path: ../client
+        - action: sync
+          path: ../client/src
+          target: /app/client/src
           ignore:
             - node_modules/
             - dist/
@@ -22,4 +37,12 @@ services:
             - src/test/
             - tests/
         - action: rebuild
+          path: ../client/package.json
+        - action: rebuild
+          path: ../client/tsconfig.json
+        - action: sync
           path: ../library
+          target: /app/library
+          ignore:
+            - node_modules/
+            - dist/

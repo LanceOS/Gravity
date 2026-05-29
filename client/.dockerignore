@@ -1,0 +1,19 @@
+node_modules
+**/node_modules
+dist
+.vite
+npm-debug.log
+.env
+.env.*
+coverage
+*.log
+.DS_Store
+.git
+.gitignore
+vscode
+.vscode
+.idea
+
+# Local test artifacts
+src/test
+tests

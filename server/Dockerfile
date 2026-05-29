@@ -1,3 +1,22 @@
+FROM node:20-slim AS development
+
+WORKDIR /app/server
+
+ENV NODE_ENV=development
+ENV PORT=8080
+
+# Install dependencies for local development (includes devDeps like tsx)
+COPY server/package.json server/package-lock.json ./
+RUN npm ci
+
+# Copy server source and shared library for live-sync into container
+COPY server ./src
+COPY library /app/library
+
+EXPOSE 8080
+
+CMD ["npm", "run", "dev"]
+
 FROM node:20-slim AS builder
 
 WORKDIR /workspace
