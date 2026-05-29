@@ -6,7 +6,7 @@ import TicketUtilities from './TicketUtilities.tsx';
 
 const DEFAULT_TICKET_URL_BASE = 'https://tickets.placeholder.local';
 
-const RAW_ALLOWED_TICKET_HOSTS = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_ALLOWED_TICKET_HOSTS) || undefined;
+const RAW_ALLOWED_TICKET_HOSTS = (typeof import.meta !== 'undefined' && (import.meta as unknown as { env?: Record<string, string | undefined> }).env?.VITE_ALLOWED_TICKET_HOSTS) || undefined;
 
 function parseAllowedHosts(raw?: string): string[] {
   if (!raw) return [new URL(DEFAULT_TICKET_URL_BASE).hostname];
@@ -67,7 +67,7 @@ function sanitizeTicketUrlBase(raw?: string): string {
   }
 }
 
-const TICKET_URL_BASE = sanitizeTicketUrlBase((typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_TICKET_URL_BASE) || undefined);
+const TICKET_URL_BASE = sanitizeTicketUrlBase((typeof import.meta !== 'undefined' && (import.meta as unknown as { env?: Record<string, string | undefined> }).env?.VITE_TICKET_URL_BASE) || undefined);
 import { 
   CheckSquare, GitPullRequest, GitMerge, Send, Trash2,
   Plus, Edit3, ChevronLeft, MoreHorizontal, Link, FileText
@@ -118,7 +118,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
     try {
       await navigator.clipboard.writeText(value);
       if (toast?.show) toast.show(successMessage || 'Copied to clipboard', 'success');
-    } catch (err) {
+    } catch {
       if (toast?.show) toast.show('Failed to copy', 'error');
     }
   }, [toast]);
