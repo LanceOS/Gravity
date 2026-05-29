@@ -119,9 +119,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
           </div>
         )}
         
-        {/* Main Title & Description Inputs */}
         <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          {/* Title */}
           <div>
             <Textarea 
               placeholder="Issue title"
@@ -138,7 +136,6 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
             />
           </div>
 
-          {/* Description */}
           <div>
             <Textarea 
               aria-label="Description"
@@ -151,7 +148,6 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
         </div>
 
 
-        {/* Bottom Grid Selectors */}
         <div 
           style={{
             padding: '16px 20px',
@@ -162,7 +158,6 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
             gap: '12px'
           }}
         >
-          {/* Project */}
           <div>
             <span className="label" style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-disabled)', marginBottom: '4px' }}>Project</span>
             <Select
@@ -174,7 +169,6 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
             />
           </div>
 
-          {/* Status */}
           <div>
             <span className="label" style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-disabled)', marginBottom: '4px' }}>Status</span>
             <Select
@@ -185,7 +179,6 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
             />
           </div>
 
-          {/* Priority */}
           <div>
             <span className="label" style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-disabled)', marginBottom: '4px' }}>Priority</span>
             <Select
@@ -196,7 +189,6 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
             />
           </div>
 
-          {/* Assignee */}
           <div>
             <span className="label" style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-disabled)', marginBottom: '4px' }}>Assignee</span>
             <Select
@@ -207,7 +199,6 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
             />
           </div>
 
-          {/* Domain */}
           <div>
             <span className="label" style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-disabled)', marginBottom: '4px' }}>Domain</span>
             <Select
@@ -218,7 +209,6 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
             />
           </div>
 
-          {/* Cycle */}
           <div>
             <span className="label" style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-disabled)', marginBottom: '4px' }}>Cycle</span>
             <Select

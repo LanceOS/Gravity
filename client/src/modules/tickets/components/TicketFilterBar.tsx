@@ -30,7 +30,6 @@ export const TicketFilterBar: React.FC<TicketFilterBarProps> = ({
         width: '100%',
       }}
     >
-      {/* Search */}
       <DenseTextInput
         placeholder="Filter tickets by title, body, or ID..."
         value={filters.search}
@@ -38,7 +37,6 @@ export const TicketFilterBar: React.FC<TicketFilterBarProps> = ({
         style={{ maxWidth: '300px' }}
       />
 
-      {/* Priority Filter */}
       <Select
         value={filters.priority}
         onValueChange={(priority: string) => onFilterChange({ priority: priority as Ticket['priority'] | '' })}
@@ -47,7 +45,6 @@ export const TicketFilterBar: React.FC<TicketFilterBarProps> = ({
         style={{ width: 'fit-content' }}
       />
 
-      {/* Status Filter */}
       <Select
         value={filters.status}
         onValueChange={(status: string) => onFilterChange({ status: status as Ticket['status'] | '' })}
@@ -56,7 +53,6 @@ export const TicketFilterBar: React.FC<TicketFilterBarProps> = ({
         style={{ width: 'fit-content' }}
       />
 
-      {/* Domain Filter */}
       {domains && domains.length > 0 && (
         <Select
           value={filters.domainId || ''}
@@ -70,7 +66,6 @@ export const TicketFilterBar: React.FC<TicketFilterBarProps> = ({
         />
       )}
 
-      {/* List Sort */}
       {listSort !== undefined && onListSortChange !== undefined && (
         <Select
           value={listSort}
@@ -81,7 +76,6 @@ export const TicketFilterBar: React.FC<TicketFilterBarProps> = ({
         />
       )}
 
-      {/* Clear Filters Button */}
       {hasActiveFilters && (
         <Button
           onClick={onClearFilters}

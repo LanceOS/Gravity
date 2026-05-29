@@ -84,7 +84,6 @@ describe('MCP connection advanced flows', () => {
     process.env.BETTER_AUTH_SECRET = newSecret;
     process.env.BETTER_AUTH_OLD_SECRETS = oldSecret;
     // Mutate runtime env so existing modules pick up rotated keys without resetting DB
-    const helpers = await import('../helpers/test-helpers.js');
     helpers.setSecretsForTest({ betterAuthSecret: newSecret, betterAuthOldSecrets: [oldSecret] });
 
     const verified = await connModule.verifyAndConsumeToken(rawToken, workspace.id);

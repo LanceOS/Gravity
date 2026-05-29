@@ -63,7 +63,6 @@ export function AIChatWindow({
         animation: isClosing ? 'aiChatSlideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards' : 'aiChatSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
       }}
     >
-      {/* Header */}
       <div
         style={{
           padding: '14px 16px',
@@ -97,7 +96,6 @@ export function AIChatWindow({
         )}
       </div>
 
-      {/* Settings Panel */}
       {settingsPanel && (
         <div
           style={{
@@ -113,7 +111,6 @@ export function AIChatWindow({
         </div>
       )}
 
-      {/* Message Feed Scrolling Area */}
       <div
         style={{
           flex: 1,
@@ -154,7 +151,6 @@ export function AIChatWindow({
         <div ref={chatEndRef} />
       </div>
 
-      {/* Quick Prompt Triggers */}
       {quickActions && (
         <div
           style={{
@@ -170,7 +166,6 @@ export function AIChatWindow({
         </div>
       )}
 
-      {/* Input bar */}
       <div style={{ padding: '12px', borderTop: '1px solid var(--color-border-default)' }}>
         <form onSubmit={handleSubmit} style={{ display: 'flex', alignItems: 'flex-end', gap: '6px' }}>
           <DenseTextarea

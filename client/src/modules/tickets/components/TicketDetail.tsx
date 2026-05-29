@@ -73,7 +73,6 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
           overflow: 'hidden'
         }}
       >
-      {/* Top Header Navigation */}
       <div 
         style={{
           padding: '12px 24px',
@@ -106,7 +105,6 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
           {activeTicket.key}
         </span>
 
-        {/* Delete button */}
         <Button
           onClick={handleDelete}
           variant="danger"
@@ -122,13 +120,10 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
         </Button>
       </div>
 
-      {/* Main Details Panel Layout */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         
-        {/* Left Side: Title, Desc, Subtasks, Comments */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '24px 32px', display: 'flex', flexDirection: 'column', gap: '28px' }}>
           
-          {/* Title Area */}
           <div>
             <MarkdownEditor
               value={activeTicket.title}
@@ -139,7 +134,6 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             />
           </div>
 
-          {/* Description Area */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--color-border-default)', paddingBottom: '6px' }}>
               <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase' }}>Description</span>
@@ -154,7 +148,6 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             />
           </div>
 
-          {/* Sub-tickets / Checklist Section */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--color-border-default)', paddingBottom: '6px' }}>
               <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase' }}>
@@ -175,7 +168,6 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             {subtasks.length > 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 
-                {/* Progress bar */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <div style={{ flex: 1, height: '4px', background: 'var(--color-border-default)', borderRadius: '2px', overflow: 'hidden' }}>
                     <div style={{ width: `${subtaskProgressPercent}%`, height: '100%', background: 'var(--color-primary)', transition: 'width 0.2s ease' }} />
@@ -185,7 +177,6 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                   </span>
                 </div>
 
-                {/* Subtask rows */}
                 <div style={{ display: 'flex', flexDirection: 'column', border: '1px solid var(--color-border-default)', borderRadius: '6px', overflow: 'hidden' }}>
                   {subtasks.map(sub => (
                     <div 
@@ -229,7 +220,6 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             )}
           </div>
 
-          {/* Comments Section */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
             <div style={{ borderBottom: '1px solid var(--color-border-default)', paddingBottom: '6px' }}>
               <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase' }}>
@@ -237,7 +227,6 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
               </span>
             </div>
 
-            {/* Comments List */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {comments.map((comment) => (
                 <div key={comment.id} id={`comment-${comment.id}`} style={{ display: 'flex', gap: '12px' }}>
@@ -256,7 +245,6 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                         </span>
                       </div>
 
-                      {/* Comment options dropdown */}
                       <ClickAwayListener onClickAway={closeCommentMenu} active={openMenuCommentId === comment.id}>
                         <div style={{ position: 'relative' }}>
                           <button
@@ -297,7 +285,6 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                                 gap: '1px',
                               }}
                             >
-                              {/* Edit */}
                               <button
                                 type="button"
                                 onClick={() => {
@@ -321,7 +308,6 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                                 <span>Edit Comment</span>
                               </button>
 
-                              {/* Copy Link */}
                               <button
                                 type="button"
                                 onClick={() => {
@@ -345,7 +331,6 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                                 <span>Grab Link</span>
                               </button>
 
-                              {/* Copy Markdown */}
                               <button
                                 type="button"
                                 onClick={() => {
@@ -368,10 +353,8 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                                 <span>Copy Markdown</span>
                               </button>
 
-                              {/* Divider */}
                               <div style={{ height: '1px', background: 'var(--color-border-default)', margin: '3px 6px' }} />
 
-                              {/* Delete */}
                               <button
                                 type="button"
                                 onClick={() => {
@@ -451,7 +434,6 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
               ))}
             </div>
 
-            {/* Post comment form */}
             <form onSubmit={handlePostComment} style={{ display: 'flex', alignItems: 'flex-end', gap: '10px', marginTop: '12px', width: '100%' }}>
               <Textarea 
                 placeholder="Post updates, links, or mention PRs..."
@@ -474,7 +456,6 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
 
         </div>
 
-        {/* Right Side: Attributes Selectors Panel (takes 280px width) */}
         <div 
           style={{
             width: '280px',
@@ -487,7 +468,6 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             overflowY: 'auto'
           }}
         >
-          {/* Ticket Key Display */}
           <div style={{ borderBottom: '1px solid var(--color-border-default)', paddingBottom: '12px', marginBottom: '4px' }}>
             <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
               Ticket Key
@@ -497,7 +477,6 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             </span>
           </div>
           
-          {/* Status */}
           <div>
             <span className="label">Status</span>
             <Select
@@ -508,7 +487,6 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             />
           </div>
 
-          {/* Priority */}
           <div>
             <span className="label">Priority</span>
             <Select
@@ -519,7 +497,6 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             />
           </div>
 
-          {/* Assignee */}
           <div>
             <span className="label">Assignee</span>
             <Select
@@ -530,7 +507,6 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             />
           </div>
 
-          {/* Project */}
           <div>
             <span className="label">Project</span>
             <Select
@@ -544,7 +520,6 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             </div>
           </div>
 
-          {/* Domain */}
           <div>
             <span className="label">Domain</span>
             <Select
@@ -555,7 +530,6 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             />
           </div>
 
-          {/* Cycle */}
           <div>
             <span className="label">Cycle / Milestone</span>
             <Select
@@ -566,7 +540,6 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             />
           </div>
 
-          {/* GitHub PR Integration badge indicator */}
           <div style={{ borderTop: '1px solid var(--color-border-default)', paddingTop: '16px', marginTop: '8px' }}>
             <span className="label" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               <GitPullRequest size={12} />
@@ -652,7 +625,6 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                 flexDirection: 'column',
               }}
             >
-              {/* Danger zone header stripe */}
               <div style={{ background: 'var(--color-bg-error)', borderBottom: '1px solid var(--color-border-error)', padding: '16px 20px 14px' }}>
                 <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-text-primary)', display: 'block', marginBottom: '4px' }}>
                   Delete {activeTicket.key}?
@@ -700,7 +672,6 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                 flexDirection: 'column',
               }}
             >
-              {/* Danger zone header stripe */}
               <div style={{ background: 'var(--color-bg-error)', borderBottom: '1px solid var(--color-border-error)', padding: '16px 20px 14px' }}>
                 <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-text-primary)', display: 'block', marginBottom: '4px' }}>
                   Delete this comment?

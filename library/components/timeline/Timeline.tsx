@@ -15,7 +15,6 @@ export interface TimelineProps {
 export function Timeline({ events, style }: TimelineProps) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', position: 'relative', paddingLeft: '20px', ...style }}>
-      {/* Vert line */}
       <div
         style={{
           position: 'absolute',
@@ -28,7 +27,6 @@ export function Timeline({ events, style }: TimelineProps) {
       />
       {events.map((evt, idx) => (
         <div key={idx} style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          {/* Dot */}
           <div
             style={{
               position: 'absolute',

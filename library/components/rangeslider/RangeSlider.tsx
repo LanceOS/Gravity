@@ -81,7 +81,6 @@ export function RangeSlider({ min, max, value, onChange, label }: RangeSliderPro
             borderRadius: 'var(--radius-full)',
           }}
         />
-        {/* Left Thumb */}
         <div
           className="clickable"
           onMouseDown={(e) => handleDrag(e, 0)}
@@ -99,7 +98,6 @@ export function RangeSlider({ min, max, value, onChange, label }: RangeSliderPro
             boxShadow: 'var(--shadow-sm)',
           }}
         />
-        {/* Right Thumb */}
         <div
           className="clickable"
           onMouseDown={(e) => handleDrag(e, 1)}

@@ -18,11 +18,9 @@ export function registerWebMCPTools(actions: WebMCPActions): AbortController | n
   // 1. Feature detection
   const nav = navigator as any;
   if (!('modelContext' in nav) || !('registerTool' in nav.modelContext)) {
-    console.log('WebMCP browser APIs not supported in this environment. Ignored.');
     return null;
   }
 
-  console.log('Gravity: WebMCP Native APIs detected! Registering browser tools...');
 
   const controller = new AbortController();
   const signal = controller.signal;
@@ -104,7 +102,6 @@ export function registerWebMCPTools(actions: WebMCPActions): AbortController | n
       }
     }, { signal });
 
-    console.log('Gravity: WebMCP Browser tools registered successfully!');
   } catch (error) {
     console.error('Gravity: WebMCP tool registration failed:', error);
   }

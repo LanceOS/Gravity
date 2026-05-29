@@ -62,7 +62,6 @@ export const DenseGridController: React.FC<DenseGridControllerProps> = ({
         backgroundColor: 'var(--color-surface-card)'
       }}
     >
-      {/* Search and Metadata Top Bar */}
       <div 
         style={{ 
           display: 'flex', 
@@ -93,7 +92,6 @@ export const DenseGridController: React.FC<DenseGridControllerProps> = ({
         </div>
       </div>
 
-      {/* Sticky Table Header */}
       <div
         style={{
           display: 'flex',
@@ -117,7 +115,6 @@ export const DenseGridController: React.FC<DenseGridControllerProps> = ({
         <span style={{ width: '90px', padding: '0 8px' }}>Assignee</span>
       </div>
 
-      {/* Virtualized Scrollable Canvas */}
       <div style={{ flex: 1, minHeight: 0 }}>
         {filteredTickets.length > 0 ? (
           <DenseVirtualList
@@ -156,12 +153,10 @@ export const DenseGridController: React.FC<DenseGridControllerProps> = ({
                   }}
                   className="dense-table-row"
                 >
-                  {/* ID Column */}
                   <span style={{ width: '70px', padding: '0 8px', color: 'var(--color-text-disabled)' }}>
                     {t.key}
                   </span>
 
-                  {/* Title Column with optional Domain Tag */}
                   <span 
                     style={{ 
                       flex: 1, 
@@ -196,7 +191,6 @@ export const DenseGridController: React.FC<DenseGridControllerProps> = ({
                     )}
                   </span>
 
-                  {/* Priority Column */}
                   <span 
                     style={{ 
                       width: '100px', 
@@ -212,7 +206,6 @@ export const DenseGridController: React.FC<DenseGridControllerProps> = ({
                     <span style={{ fontSize: '10px' }}>{t.priority.replace('_', ' ')}</span>
                   </span>
 
-                  {/* Status Column */}
                   <span style={{ width: '110px', padding: '0 8px', display: 'flex', alignItems: 'center' }}>
                     <span
                       style={{
@@ -229,7 +222,6 @@ export const DenseGridController: React.FC<DenseGridControllerProps> = ({
                     </span>
                   </span>
 
-                  {/* Assignee Column */}
                   <span style={{ width: '90px', padding: '0 8px', display: 'flex', alignItems: 'center' }}>
                     {avatar ? (
                       <div
