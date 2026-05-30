@@ -41,6 +41,11 @@ detect_compose() {
     return 0
   fi
 
+  if command -v podman-compose >/dev/null 2>&1; then
+    printf '%s\n' 'podman-compose'
+    return 0
+  fi
+
   if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
     printf '%s\n' 'docker compose'
     return 0
