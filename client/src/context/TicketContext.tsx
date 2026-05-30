@@ -128,6 +128,26 @@ function createInitialState(): State {
   };
 }
 
+// Normalize incoming ticket status values to the canonical app values.
+function canonicalizeStatus(status: string | undefined | null): Ticket['status'] {
+  if (!status || typeof status !== 'string') return 'todo';
+  const lower = status.toLowerCase().trim();
+  const normalized = lower.replace(/[^a-z0-9]+/g, '_');
+  const allowed = new Set(['backlog', 'todo', 'in_progress', 'in_review', 'done', 'canceled']);
+  if (allowed.has(normalized)) return normalized as Ticket['status'];
+
+  const collapsed = normalized.replace(/_/g, '');
+  if (collapsed === 'inprogress' || collapsed === 'in_progress') return 'in_progress';
+  if (collapsed === 'inreview' || collapsed === 'in_review') return 'in_review';
+  if (collapsed === 'cancelled' || collapsed === 'canceled') return 'canceled';
+  if (collapsed === 'backlog') return 'backlog';
+  if (collapsed === 'done') return 'done';
+  if (collapsed === 'todo' || collapsed === 'to_do') return 'todo';
+
+  // Fallback to todo for any unrecognized value
+  return 'todo';
+}
+
 
 function upsertTicket(existingTickets: Ticket[], nextTicket: Ticket) {
   const ticketIndex = existingTickets.findIndex((ticket) => ticket.id === nextTicket.id);
@@ -191,7 +211,7 @@ function ticketReducer(state: State, action: Action): State {
     case 'SET_PROJECT_DATA':
       return {
         ...state,
-        tickets: action.payload.tickets,
+        tickets: action.payload.tickets.map((t) => ({ ...t, status: canonicalizeStatus(t.status) })),
         domains: action.payload.domains,
         cycles: action.payload.cycles,
       };
@@ -201,7 +221,7 @@ function ticketReducer(state: State, action: Action): State {
         const found = action.payload.find(t => t.id === nextActive!.id);
         if (found) nextActive = found;
       }
-      return { ...state, tickets: action.payload, activeTicket: nextActive };
+      return { ...state, tickets: action.payload.map((t) => ({ ...t, status: canonicalizeStatus(t.status) })), activeTicket: nextActive };
     }
     case 'SET_COMMENTS_RAW':
       return { ...state, comments: action.payload };

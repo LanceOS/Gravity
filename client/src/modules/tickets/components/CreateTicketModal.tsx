@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import type { Ticket } from '../../../context/TicketContext';
-import { Button, Select, Modal, Alert, TextInput, Textarea } from '@library';
+import { Button, Select, Modal, Alert, Textarea } from '@library';
 import { AlertCircle } from 'lucide-react';
 import type { CreateTicketModalProps } from '../types/CreateTicketModal';
 import { PRIORITY_OPTIONS, STATUS_OPTIONS } from '../utils/CreateTicketModal';
@@ -27,24 +27,12 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
   const [cycleId, setCycleId] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
 
-  useEffect(() => {
-    setProjectId(parentTicket ? parentTicket.projectId : defaultProjectId);
-  }, [parentTicket, defaultProjectId]);
+  // `projectId` is initialized from props via useState above. The modal
+  // component is mounted/unmounted when opened, so remounting will reset
+  // the initial value. Removing the synchronous setState in an effect
+  // avoids cascading renders.
 
-  // Handle keyboard shortcut Esc to close
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-      // Ctrl/Cmd + Enter to submit
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-        handleSubmit();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [title, description, projectId, status, priority, assigneeId, domainId, cycleId]);
-
-  const handleSubmit = async (e?: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setFormError(null);
 
@@ -75,7 +63,20 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
     } else {
       setFormError('Failed to create the ticket.');
     }
-  };
+  }, [title, description, status, priority, projectId, domainId, cycleId, assigneeId, parentId, onSubmitTicket, onClose]);
+
+  // Handle keyboard shortcut Esc to close
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+      // Ctrl/Cmd + Enter to submit
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        void handleSubmit();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleSubmit, onClose]);
 
   const projectOptions = projects.map((project) => ({ value: project.id, label: project.name }));
   const assigneeOptions = [{ value: '', label: 'Unassigned' }, ...users.map((user) => ({ value: user.id, label: user.name }))];

@@ -18,7 +18,9 @@ function buildTicketFilterConditions(projectIds: string[], filters: TicketFilter
   const conditions = [inArray(tickets.projectId, projectIds)];
 
   if (filters.status) {
-    conditions.push(eq(tickets.status, filters.status));
+    // Normalize incoming status filter to canonical DB values
+    const s = canonicalizeStatus(filters.status);
+    conditions.push(eq(tickets.status, s));
   }
   if (filters.priority) {
     conditions.push(eq(tickets.priority, filters.priority));
@@ -42,7 +44,7 @@ function mapTicket(record: TicketRecord) {
     key: record.key,
     title: record.title,
     description: record.description,
-    status: record.status,
+    status: canonicalizeStatus(record.status),
     priority: record.priority,
     assigneeId: record.assigneeId,
     projectId: record.projectId,
@@ -56,6 +58,25 @@ function mapTicket(record: TicketRecord) {
     createdAt: normalizeIsoDate(record.createdAt),
     updatedAt: normalizeIsoDate(record.updatedAt),
   };
+}
+
+// Normalize status strings to canonical DB/application values.
+export function canonicalizeStatus(status?: string | null): string {
+  if (!status || typeof status !== 'string') return 'todo';
+  const lower = status.toLowerCase().trim();
+  const normalized = lower.replace(/[^a-z0-9]+/g, '_');
+  const allowed = new Set(['backlog', 'todo', 'in_progress', 'in_review', 'done', 'canceled']);
+  if (allowed.has(normalized)) return normalized;
+
+  const collapsed = normalized.replace(/_/g, '');
+  if (collapsed === 'inprogress') return 'in_progress';
+  if (collapsed === 'inreview') return 'in_review';
+  if (collapsed === 'cancelled' || collapsed === 'canceled') return 'canceled';
+  if (collapsed === 'backlog') return 'backlog';
+  if (collapsed === 'done') return 'done';
+  if (collapsed === 'todo' || collapsed === 'todo') return 'todo';
+
+  return 'todo';
 }
 
 export async function listTickets(projectId: string, filters: TicketFilters = {}) {
@@ -250,7 +271,7 @@ export async function createTicketRecord(input: {
       key,
       title: input.title,
       description: input.description ?? '',
-      status: input.status ?? 'todo',
+      status: canonicalizeStatus(input.status ?? 'todo'),
       priority: input.priority ?? 'no_priority',
       projectId: input.projectId,
       domainId: input.domainId ?? null,
@@ -289,7 +310,7 @@ export async function updateTicketRecord(
   const payload = {
     ...(updates.title !== undefined ? { title: updates.title } : {}),
     ...(updates.description !== undefined ? { description: updates.description } : {}),
-    ...(updates.status !== undefined ? { status: updates.status } : {}),
+    ...(updates.status !== undefined ? { status: canonicalizeStatus(updates.status as string) } : {}),
     ...(updates.priority !== undefined ? { priority: updates.priority } : {}),
     ...(updates.assigneeId !== undefined ? { assigneeId: updates.assigneeId } : {}),
     ...(updates.domainId !== undefined ? { domainId: updates.domainId } : {}),
