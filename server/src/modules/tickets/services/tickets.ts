@@ -23,7 +23,9 @@ function buildTicketFilterConditions(projectIds: string[], filters: TicketFilter
     conditions.push(eq(tickets.status, s));
   }
   if (filters.priority) {
-    conditions.push(eq(tickets.priority, filters.priority));
+    // Normalize incoming priority filter to canonical DB values
+    const p = canonicalizePriority(filters.priority);
+    conditions.push(eq(tickets.priority, p));
   }
   if (filters.domainId) {
     conditions.push(eq(tickets.domainId, filters.domainId));
@@ -42,19 +44,19 @@ function mapTicket(record: TicketRecord) {
   return {
     id: record.id,
     key: record.key,
-    title: record.title,
+    title: sanitizeTitle(record.title),
     description: record.description,
     status: canonicalizeStatus(record.status),
-    priority: record.priority,
+    priority: canonicalizePriority(record.priority),
     assigneeId: record.assigneeId,
     projectId: record.projectId,
     domainId: record.domainId,
     cycleId: record.cycleId,
     parentId: record.parentId,
     isSubtask: record.parentId !== null,
-    prStatus: record.prStatus,
+    prStatus: canonicalizePrStatus(record.prStatus),
     prUrl: record.prUrl,
-    branchName: record.branchName,
+    branchName: canonicalizeBranchName(record.branchName),
     createdAt: normalizeIsoDate(record.createdAt),
     updatedAt: normalizeIsoDate(record.updatedAt),
   };
@@ -77,6 +79,65 @@ export function canonicalizeStatus(status?: string | null): string {
   if (collapsed === 'todo' || collapsed === 'todo') return 'todo';
 
   return 'todo';
+}
+
+// Normalize priority strings to canonical DB/application values.
+export function canonicalizePriority(priority?: string | null): string {
+  if (!priority || typeof priority !== 'string') return 'no_priority';
+  const lower = priority.toLowerCase().trim();
+  const normalized = lower.replace(/[^a-z0-9]+/g, '_');
+  const allowed = new Set(['no_priority', 'low', 'medium', 'high', 'urgent']);
+  if (allowed.has(normalized)) return normalized;
+
+  const collapsed = normalized.replace(/_/g, '');
+  if (collapsed === 'nopriority' || collapsed === 'none') return 'no_priority';
+  if (collapsed === 'urgent') return 'urgent';
+  if (collapsed === 'high') return 'high';
+  if (collapsed === 'medium') return 'medium';
+  if (collapsed === 'low') return 'low';
+
+  // Fallback to no_priority for unrecognized values
+  return 'no_priority';
+}
+
+// Normalize pull-request status strings to canonical app values.
+export function canonicalizePrStatus(prStatus?: string | null): string {
+  if (!prStatus || typeof prStatus !== 'string') return 'none';
+  const lower = prStatus.toLowerCase().trim();
+  const normalized = lower.replace(/[^a-z0-9]+/g, '_');
+  const allowed = new Set(['open', 'merged', 'closed', 'none']);
+  if (allowed.has(normalized)) return normalized;
+
+  const collapsed = normalized.replace(/_/g, '');
+  if (collapsed === 'open') return 'open';
+  if (collapsed === 'merged' || collapsed === 'merge') return 'merged';
+  if (collapsed === 'closed') return 'closed';
+
+  return 'none';
+}
+
+// Normalize and sanitize ticket titles for storage and display.
+export function sanitizeTitle(title?: string | null): string {
+  if (!title || typeof title !== 'string') return '';
+  // Trim, collapse consecutive whitespace, remove control chars, limit length
+  const trimmed = title.trim();
+  const collapsed = trimmed.replace(/\s+/g, ' ');
+  const cleaned = collapsed.replace(/[\x00-\x1F\x7F]+/g, '');
+  return cleaned.slice(0, 240);
+}
+
+// Normalize branch names to a safe, lower-case form. Preserve slash separators.
+export function canonicalizeBranchName(name?: string | null): string {
+  if (!name || typeof name !== 'string') return '';
+  let s = name.toLowerCase().trim();
+  s = s.replace(/\s+/g, '-');
+  s = s.replace(/[^a-z0-9\/\-_]+/g, '');
+  s = s.replace(/-+/g, '-');
+  // Remove hyphens adjacent to slashes introduced by whitespace replacement
+  s = s.replace(/-+\//g, '/').replace(/\/-+/g, '/');
+  s = s.replace(/(^-+|-+$)/g, '');
+  s = s.replace(/\/+/g, '/');
+  return s;
 }
 
 export async function listTickets(projectId: string, filters: TicketFilters = {}) {
@@ -264,21 +325,22 @@ export async function createTicketRecord(input: {
   updatedAt?: Date;
 }) {
   const key = await nextTicketKey(input.projectId);
+  const sanitizedTitle = sanitizeTitle(input.title);
   const rows = await db
     .insert(tickets)
     .values({
       id: createId('ti'),
       key,
-      title: input.title,
+      title: sanitizedTitle,
       description: input.description ?? '',
       status: canonicalizeStatus(input.status ?? 'todo'),
-      priority: input.priority ?? 'no_priority',
+      priority: canonicalizePriority(input.priority ?? 'no_priority'),
       projectId: input.projectId,
       domainId: input.domainId ?? null,
       cycleId: input.cycleId ?? null,
       assigneeId: input.assigneeId ?? null,
       parentId: input.parentId ?? null,
-      branchName: generateBranchName(key, input.title),
+      branchName: generateBranchName(key, sanitizedTitle),
       prStatus: 'none',
       prUrl: null,
       createdAt: input.createdAt ?? new Date(),
@@ -308,15 +370,15 @@ export async function updateTicketRecord(
   projectId?: string,
 ) {
   const payload = {
-    ...(updates.title !== undefined ? { title: updates.title } : {}),
+    ...(updates.title !== undefined ? { title: sanitizeTitle(updates.title as string) } : {}),
     ...(updates.description !== undefined ? { description: updates.description } : {}),
     ...(updates.status !== undefined ? { status: canonicalizeStatus(updates.status as string) } : {}),
-    ...(updates.priority !== undefined ? { priority: updates.priority } : {}),
+    ...(updates.priority !== undefined ? { priority: canonicalizePriority(updates.priority as string) } : {}),
     ...(updates.assigneeId !== undefined ? { assigneeId: updates.assigneeId } : {}),
     ...(updates.domainId !== undefined ? { domainId: updates.domainId } : {}),
     ...(updates.cycleId !== undefined ? { cycleId: updates.cycleId } : {}),
     ...(updates.parentId !== undefined ? { parentId: updates.parentId } : {}),
-    ...(updates.prStatus !== undefined ? { prStatus: updates.prStatus } : {}),
+    ...(updates.prStatus !== undefined ? { prStatus: canonicalizePrStatus(updates.prStatus as string) } : {}),
     ...(updates.prUrl !== undefined ? { prUrl: updates.prUrl } : {}),
     ...(updates.createdAt !== undefined ? { createdAt: updates.createdAt } : {}),
     updatedAt: updates.updatedAt ?? new Date(),
@@ -324,6 +386,7 @@ export async function updateTicketRecord(
 
   // If the title changed, regenerate the branch name using the existing ticket key
   if (updates.title !== undefined) {
+    const sanitizedTitle = sanitizeTitle(updates.title as string);
     const keyRows = await db
       .select({ key: tickets.key })
       .from(tickets)
@@ -332,7 +395,7 @@ export async function updateTicketRecord(
 
     const existingKey = keyRows[0]?.key;
     if (existingKey) {
-      (payload as any).branchName = generateBranchName(existingKey, updates.title as string);
+      (payload as any).branchName = generateBranchName(existingKey, sanitizedTitle);
     }
   }
 
