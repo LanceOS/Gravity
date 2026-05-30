@@ -15,7 +15,7 @@ COPY --chown=node:node server/package.json server/package-lock.json ./
 RUN npm ci
 
 # Copy server source and shared library for live-sync into container
-COPY --chown=node:node server ./src
+COPY --chown=node:node server ./
 COPY --chown=node:node library /app/library
 
 EXPOSE 8080

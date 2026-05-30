@@ -112,13 +112,13 @@ if [[ "$ACTION" == "up" ]]; then
     log_success ".env configuration file detected."
   fi
   
-  log_info "Bringing up the stack in HOT-RELOAD mode..."
+  log_info "Bringing up the stack in STATIC/TESTING mode (no hot-reloading)..."
   if [ ${#ADDITIONAL_ARGS[@]} -eq 0 ]; then
-    exec $COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml up --build
+    exec $COMPOSE_CMD up --build
   else
-    exec $COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml up "${ADDITIONAL_ARGS[@]}"
+    exec $COMPOSE_CMD up "${ADDITIONAL_ARGS[@]}"
   fi
 else
   log_info "Stopping the stack..."
-  exec $COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml down "${ADDITIONAL_ARGS[@]}"
+  exec $COMPOSE_CMD down "${ADDITIONAL_ARGS[@]}"
 fi
