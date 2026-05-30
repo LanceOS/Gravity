@@ -126,4 +126,24 @@ async function createPool() {
 
 export const pool = await createPool();
 
+// Handle unexpected errors on idle Postgres clients to avoid an unhandled
+// 'error' event bringing down the whole Node process. When this happens we
+// attempt to trigger a graceful shutdown by emitting SIGTERM so the main
+// process handlers can clean up (HTTP server, redis, etc.).
+if (pool && typeof (pool as any).on === 'function') {
+  (pool as any).on('error', (err: unknown) => {
+    try {
+      console.error('Unexpected Postgres client error:', err);
+      // Emit SIGTERM which the app should handle and perform a graceful
+      // shutdown. Using `process.emit` calls the registered listeners.
+      // If no listener is present yet, the app will still have the error
+      // logged and we preserve the process (avoid uncaught exception crash).
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (process as any).emit('SIGTERM');
+    } catch (e) {
+      console.error('Error while handling Postgres client error:', e);
+    }
+  });
+}
+
 export const db = drizzle(pool, { schema });
