@@ -4,15 +4,15 @@ services:
     container_name: gravity_postgres_dev
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${GRAVITY_POSTGRES_DB:-gravity_workspace}
-      POSTGRES_USER: ${GRAVITY_POSTGRES_USER:-gravity_user}
-      POSTGRES_PASSWORD: ${GRAVITY_POSTGRES_PASSWORD}
+      POSTGRES_DB: gravity_workspace
+      POSTGRES_USER: gravity_user
+      POSTGRES_PASSWORD: admin
     ports:
       - "5432:5432"
     volumes:
       - gravity_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${GRAVITY_POSTGRES_USER:-gravity_user} -d ${GRAVITY_POSTGRES_DB:-gravity_workspace}"]
+      test: ["CMD-SHELL", "pg_isready -U gravity_user -d gravity_workspace"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -21,14 +21,12 @@ services:
     image: redis:7-alpine
     container_name: gravity_redis_dev
     restart: unless-stopped
-    env_file:
-      - ../.env
     command: >
-      sh -c 'if [ -n "$$GRAVITY_REDIS_PASSWORD" ]; then redis-server --requirepass "$$GRAVITY_REDIS_PASSWORD"; else redis-server; fi'
+      sh -c 'redis-server --requirepass "admin"'
     ports:
       - "127.0.0.1:6379:6379"
     healthcheck:
-      test: ["CMD-SHELL", "if [ -n \"$$GRAVITY_REDIS_PASSWORD\" ]; then redis-cli -a \"$$GRAVITY_REDIS_PASSWORD\" ping; else redis-cli ping; fi"]
+      test: ["CMD-SHELL", "redis-cli -a admin ping"]
       interval: 5s
       timeout: 5s
       retries: 5
