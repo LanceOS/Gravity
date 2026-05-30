@@ -567,16 +567,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             <span style={{ fontFamily: 'var(--mono)', fontSize: '18px', fontWeight: 700, color: 'var(--color-primary)' }}>
               {activeTicket.key}
             </span>
-            <div style={{ marginTop: '8px' }}>
-              <Button
-                onClick={() => void copyToClipboard(activeTicket.key, 'Ticket key copied')}
-                variant="ghost"
-                size="sm"
-                style={{ padding: '3px 8px', fontSize: '11px' }}
-              >
-                Copy Ticket Key
-              </Button>
-            </div>
+            {/* Copy Ticket Key button removed per UI update; key remains displayed */}
           </div>
           
           <div>
