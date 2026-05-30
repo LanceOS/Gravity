@@ -2,6 +2,7 @@ import { initializeDatabase } from '../../db/bootstrap.js';
 import { env } from '../../env.js';
 import { getMcpStdioContext } from './stdio-config.js';
 import { McpStdioSession } from './stdio-session.js';
+import { fileURLToPath } from 'node:url';
 
 /**
  * @description Runs the MCP server over stdio using a single trusted workspace
@@ -9,8 +10,10 @@ import { McpStdioSession } from './stdio-session.js';
  */
 export class McpStdioServer {
   /**
-   * @description Starts the stdio transport and listens for one JSON-RPC
-   * request per input line.
+   * @description Starts the stdio transport and listens for framed JSON-RPC
+   * messages using a Content-Length header (LSP-style). For backwards
+   * compatibility it also accepts legacy single-line JSON messages as a
+   * fallback (those must remain compact single-line JSON objects).
    * @param opts.initDb When true the server will initialize the database
    * before installing the listener. When false the caller is responsible for
    * ensuring the DB is initialized.
@@ -46,7 +49,11 @@ async function main() {
   await server.start({ initDb: true });
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+// Only run the standalone main when this module is executed directly.
+const isMain = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
+if (isMain) {
+  main().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}
