@@ -1,4 +1,4 @@
-import { McpContext } from './types.js';
+import type { McpContext } from './types.js';
 
 export type McpStdioConfig = {
   mcpStdioWorkspaceId?: string;

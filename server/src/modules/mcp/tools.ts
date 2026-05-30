@@ -1,4 +1,4 @@
-import { McpToolDefinition } from './types.js';
+import type { McpToolDefinition } from './types.js';
 
 /**
  * @description Canonical tool metadata returned by MCP tools/list. Keep this

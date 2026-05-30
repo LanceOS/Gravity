@@ -4,7 +4,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { db } from '../../../db/index.js';
 import * as schema from '../../../db/schema.js';
 import { userExternalCredentials } from '../../../db/schema.js';
-import { IKMSProvider } from './types.js';
+import type { IKMSProvider } from './types.js';
 
 type DbClient = NodePgDatabase<typeof schema> | Parameters<Parameters<typeof db.transaction>[0]>[0];
 

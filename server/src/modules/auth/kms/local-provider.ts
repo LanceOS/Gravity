@@ -1,5 +1,5 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
-import { IKMSProvider } from './types.js';
+import type { IKMSProvider } from './types.js';
 
 /**
  * @description A KMS provider for local development and testing.

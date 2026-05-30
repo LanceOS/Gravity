@@ -3,7 +3,7 @@ import { executeTool } from './tool-executor.js';
 import { resolveMcpContext } from './request-context.js';
 import { createMcpErrorResponse } from './responses.js';
 import { mcpToolsList } from './tools.js';
-import { McpRequestPayload } from './types.js';
+import type { McpRequestPayload } from './types.js';
 import { getDisabledTools } from './workspace-tools.js';
 import { desanitize, sanitize } from './state-map.js';
 

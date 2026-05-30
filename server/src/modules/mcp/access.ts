@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import { db } from '../../db/index.js';
 import { workspaceMembers } from '../../db/schema.js';
-import { McpContext } from './types.js';
+import type { McpContext } from './types.js';
 
 /**
  * @description Enforces the shared workspace membership check used by non-HTTP
