@@ -60,6 +60,7 @@ export interface Ticket {
   parentId: string | null;
   prStatus: 'open' | 'merged' | 'closed' | 'none';
   prUrl: string | null;
+  branchName?: string;
   createdAt: string;
   updatedAt: string;
 }

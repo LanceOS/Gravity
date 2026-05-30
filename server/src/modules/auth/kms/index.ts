@@ -1,7 +1,7 @@
 import { env } from '../../../env.js';
 import { CredentialManager } from './credential-manager.js';
 import { LocalEnvKmsProvider } from './local-provider.js';
-import { IKMSProvider } from './types.js';
+import type { IKMSProvider } from './types.js';
 
 let kmsProvider: IKMSProvider;
 
@@ -23,6 +23,6 @@ if (env.nodeEnv === 'development' || env.nodeEnv === 'test') {
 
 export const credentialManager = new CredentialManager(kmsProvider);
 
-export { IKMSProvider } from './types.js';
+export type { IKMSProvider } from './types.js';
 export { LocalEnvKmsProvider } from './local-provider.js';
 export { CredentialManager } from './credential-manager.js';

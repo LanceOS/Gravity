@@ -1,4 +1,4 @@
-import { ToolHandler } from './types.js';
+import type { ToolHandler } from './types.js';
 
 /**
  * @description Central registry used by the executor. Modules register their
