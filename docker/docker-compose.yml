@@ -1,4 +1,4 @@
-name: gravitycopy
+name: gravity
 
 services:
   postgres:
