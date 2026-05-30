@@ -44,11 +44,20 @@ export function filterTickets(tickets: Ticket[], filters: TicketFilters): Ticket
     if (filters.assigneeId && ticket.assigneeId !== filters.assigneeId) return false;
 
     if (filters.search) {
-      const searchLower = filters.search.toLowerCase();
-      const titleMatch = ticket.title.toLowerCase().includes(searchLower);
-      const keyMatch = ticket.key.toLowerCase().includes(searchLower);
-      const descMatch = ticket.description?.toLowerCase().includes(searchLower) || false;
-      const branchMatch = ticket.branchName?.toLowerCase().includes(searchLower) || false;
+      const searchLower = filters.search.trim().toLowerCase();
+      const normalizedSearch = searchLower.replace(/[^a-z0-9]+/g, '');
+      const hasNormalizedSearch = normalizedSearch.length > 0;
+
+      const title = ticket.title?.toLowerCase() ?? '';
+      const key = ticket.key?.toLowerCase() ?? '';
+      const desc = ticket.description?.toLowerCase() ?? '';
+      const branch = ticket.branchName?.toLowerCase() ?? '';
+
+      const titleMatch = title.includes(searchLower) || (hasNormalizedSearch && title.replace(/[^a-z0-9]+/g, '').includes(normalizedSearch));
+      const keyMatch = key.includes(searchLower) || (hasNormalizedSearch && key.replace(/[^a-z0-9]+/g, '').includes(normalizedSearch));
+      const descMatch = desc.includes(searchLower) || (hasNormalizedSearch && desc.replace(/[^a-z0-9]+/g, '').includes(normalizedSearch));
+      const branchMatch = branch.includes(searchLower) || (hasNormalizedSearch && branch.replace(/[^a-z0-9]+/g, '').includes(normalizedSearch));
+
       return titleMatch || keyMatch || descMatch || branchMatch;
     }
 

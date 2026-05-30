@@ -97,4 +97,29 @@ describe('ticketView utils', () => {
     expect(results).toHaveLength(1);
     expect(results[0].id).toBe('ticket-branch-1');
   });
+
+  it('matches branch/key variants like GRA99 or feature/gra-99', () => {
+    const branchTicket = {
+      id: 'ticket-branch-2',
+      key: 'GRA-100',
+      title: 'Some title',
+      description: '',
+      status: 'todo',
+      priority: 'low',
+      projectId: 'project-1',
+      domainId: '',
+      cycleId: '',
+      assigneeId: '',
+      parentId: null,
+      prStatus: 'none',
+      prUrl: null,
+      createdAt: '2026-05-01T00:00:00.000Z',
+      updatedAt: '2026-05-01T00:00:00.000Z',
+      branchName: 'feature/GRA-100-awesome',
+    } as any;
+
+    expect(filterTickets([branchTicket], { ...baseFilters, search: 'GRA100' })).toHaveLength(1);
+    expect(filterTickets([branchTicket], { ...baseFilters, search: 'gra-100' })).toHaveLength(1);
+    expect(filterTickets([branchTicket], { ...baseFilters, search: 'feature/gra-100' })).toHaveLength(1);
+  });
 });
