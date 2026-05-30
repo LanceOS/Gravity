@@ -1,4 +1,4 @@
-import { McpContext, McpRequestPayload } from './types.js';
+import type { McpContext, McpRequestPayload } from './types.js';
 
 function normalizeContextValue(value: unknown) {
   return typeof value === 'string' ? value.trim() : '';

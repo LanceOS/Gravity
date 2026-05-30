@@ -330,7 +330,7 @@ describe('TicketDetail', () => {
     // Copy Link button removed — link is now the anchor icon only
 
     await user.click(screen.getByRole('button', { name: 'Copy Branch Name' }));
-    expect(writeTextSpy).toHaveBeenCalledWith('feature/GRA-101-update-ticket');
+    expect(writeTextSpy).toHaveBeenCalledWith('feature/gra-101-update-ticket');
     expect(toastSpy).toHaveBeenCalledWith('Branch name copied', 'success');
 
     await user.click(screen.getByRole('button', { name: 'Copy as Markdown' }));
@@ -352,8 +352,8 @@ describe('TicketDetail', () => {
     const ticketLink = screen.getByRole('link', { name: 'Ticket link' });
     expect(ticketLink).toHaveAttribute('href', 'https://tickets.placeholder.local/GRA-101');
 
-    const generatedBranchName = 'feature/GRA-101-fix-sync-retries';
-    expect(screen.getByRole('button', { name: 'Copy Branch Name' })).toBeInTheDocument();
+  const generatedBranchName = 'feature/gra-101-fix-sync-retries';
+  expect(screen.getByRole('button', { name: 'Copy Branch Name' })).toBeInTheDocument();
 
     // Copy Link button removed — link is now the anchor icon only
 

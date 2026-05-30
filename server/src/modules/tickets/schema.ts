@@ -14,6 +14,7 @@ export const tickets = pgTable('tickets', {
   parentId: text('parent_id'),
   prStatus: text('pr_status').notNull().default('none'),
   prUrl: text('pr_url'),
+  branchName: text('branch_name').notNull().default(''),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({

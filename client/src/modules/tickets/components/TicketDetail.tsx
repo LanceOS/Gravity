@@ -107,7 +107,10 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
 
   const ticketLink = useMemo(() => `${TICKET_URL_BASE}/${activeTicket.key}`, [activeTicket.key]);
 
-  const generatedBranchName = useMemo(() => generateBranchName(activeTicket.key, activeTicket.title), [activeTicket.key, activeTicket.title]);
+  const generatedBranchName = useMemo(
+    () => (activeTicket.branchName ? activeTicket.branchName : generateBranchName(activeTicket.key, activeTicket.title)),
+    [activeTicket.branchName, activeTicket.key, activeTicket.title]
+  );
 
   const copyToClipboard = useCallback(async (value: string, successMessage?: string) => {
     if (!navigator.clipboard?.writeText) {

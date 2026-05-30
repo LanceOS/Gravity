@@ -2,6 +2,7 @@ import { and, asc, eq, inArray } from 'drizzle-orm';
 import { db } from '../../../db/index.js';
 import { authUsers, comments, tickets, userProfiles, projects, domains, cycles } from '../../../db/schema.js';
 import { createId, getProjectByKeyPrefix, nextTicketKey, normalizeIsoDate } from '../../../lib/platform.js';
+import generateBranchName from '../utils/branch.js';
 
 type TicketRecord = typeof tickets.$inferSelect;
 
@@ -51,6 +52,7 @@ function mapTicket(record: TicketRecord) {
     isSubtask: record.parentId !== null,
     prStatus: record.prStatus,
     prUrl: record.prUrl,
+    branchName: record.branchName,
     createdAt: normalizeIsoDate(record.createdAt),
     updatedAt: normalizeIsoDate(record.updatedAt),
   };
@@ -255,6 +257,7 @@ export async function createTicketRecord(input: {
       cycleId: input.cycleId ?? null,
       assigneeId: input.assigneeId ?? null,
       parentId: input.parentId ?? null,
+      branchName: generateBranchName(key, input.title),
       prStatus: 'none',
       prUrl: null,
       createdAt: input.createdAt ?? new Date(),
@@ -297,6 +300,20 @@ export async function updateTicketRecord(
     ...(updates.createdAt !== undefined ? { createdAt: updates.createdAt } : {}),
     updatedAt: updates.updatedAt ?? new Date(),
   };
+
+  // If the title changed, regenerate the branch name using the existing ticket key
+  if (updates.title !== undefined) {
+    const keyRows = await db
+      .select({ key: tickets.key })
+      .from(tickets)
+      .where(projectId ? and(eq(tickets.id, ticketId), eq(tickets.projectId, projectId)) : eq(tickets.id, ticketId))
+      .limit(1);
+
+    const existingKey = keyRows[0]?.key;
+    if (existingKey) {
+      (payload as any).branchName = generateBranchName(existingKey, updates.title as string);
+    }
+  }
 
   const rows = await db
     .update(tickets)
