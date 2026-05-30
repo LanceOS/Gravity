@@ -1,60 +1,73 @@
-FROM node:20-slim AS development
+FROM docker.io/library/node:20-slim AS development
 
 WORKDIR /app/server
 
 ENV NODE_ENV=development
 ENV PORT=8080
 
+# Setup directories and non-root node user permissions
+RUN mkdir -p /app/server /app/library && chown -R node:node /app
+
+USER node
+
 # Install dependencies for local development (includes devDeps like tsx)
-COPY server/package.json server/package-lock.json ./
+COPY --chown=node:node server/package.json server/package-lock.json ./
 RUN npm ci
 
 # Copy server source and shared library for live-sync into container
-COPY server ./src
-COPY library /app/library
+COPY --chown=node:node server ./src
+COPY --chown=node:node library /app/library
 
 EXPOSE 8080
 
 CMD ["npm", "run", "dev"]
 
-FROM node:20-slim AS builder
+FROM docker.io/library/node:20-slim AS builder
 
 WORKDIR /workspace
 
+RUN mkdir -p /workspace && chown -R node:node /workspace
+
+USER node
+
 # Install server dependencies
-COPY server/package.json server/package-lock.json ./server/
+COPY --chown=node:node server/package.json server/package-lock.json ./server/
 RUN cd server && npm ci
 
 # Install client dependencies (needed for building the client)
-COPY client/package.json client/package-lock.json ./client/
+COPY --chown=node:node client/package.json client/package-lock.json ./client/
 RUN cd client && npm ci
 
 # Copy server and client sources and any shared library
-COPY server/tsconfig.json server/drizzle.config.ts ./server/
-COPY server/src ./server/src
-COPY client ./client
-COPY library ./library
+COPY --chown=node:node server/tsconfig.json server/drizzle.config.ts ./server/
+COPY --chown=node:node server/src ./server/src
+COPY --chown=node:node client ./client
+COPY --chown=node:node library ./library
 
 # Build client (Vite) then build server (TypeScript)
 RUN cd client && npm run build
 RUN cd server && npm run build
 
-FROM node:20-slim AS runner
+FROM docker.io/library/node:20-slim AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=8080
 
+RUN mkdir -p /app && chown -R node:node /app
+
 # Install only production dependencies for server
-COPY server/package.json server/package-lock.json ./
+COPY --chown=node:node server/package.json server/package-lock.json ./
 RUN npm ci --omit=dev
 
 # Copy built server and client assets into final image
-COPY --from=builder /workspace/server/dist ./dist
-COPY --from=builder /workspace/client/dist ./public
+COPY --from=builder --chown=node:node /workspace/server/dist ./dist
+COPY --from=builder --chown=node:node /workspace/client/dist ./public
 
 # Provide example env in image (do NOT copy secrets into image)
-COPY docker/.env.example ./.env.example
+COPY --chown=node:node docker/.env.example ./.env.example
+
+USER node
 
 EXPOSE 8080
 

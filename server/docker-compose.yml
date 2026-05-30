@@ -1,35 +1,42 @@
+version: '3.8'
+
 services:
   postgres:
-    image: postgres:16-alpine
-    container_name: gravity_postgres_dev
+    image: docker.io/library/postgres:16-alpine
+    container_name: ${GRAVITY_POSTGRES_CONTAINER:-gravity_postgres_dev}
     restart: unless-stopped
     environment:
-      POSTGRES_DB: gravity_workspace
-      POSTGRES_USER: gravity_user
-      POSTGRES_PASSWORD: admin
-    ports:
-      - "5432:5432"
+      POSTGRES_DB: ${GRAVITY_POSTGRES_DB:-gravity_workspace}
+      POSTGRES_USER: ${GRAVITY_POSTGRES_USER:-gravity_user}
+      POSTGRES_PASSWORD: ${GRAVITY_POSTGRES_PASSWORD:-admin}
     volumes:
       - gravity_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U gravity_user -d gravity_workspace"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - gravity_backend_db_redis
 
   redis:
-    image: redis:7-alpine
-    container_name: gravity_redis_dev
+    image: docker.io/library/redis:7-alpine
+    container_name: ${GRAVITY_REDIS_CONTAINER:-gravity_redis_dev}
     restart: unless-stopped
     command: >
-      sh -c 'redis-server --requirepass "admin"'
-    ports:
-      - "127.0.0.1:6379:6379"
+      sh -c 'if [ -n "$$GRAVITY_REDIS_PASSWORD" ]; then redis-server --requirepass "$$GRAVITY_REDIS_PASSWORD"; else redis-server; fi'
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli -a admin ping"]
+      test: ["CMD-SHELL", "if [ -n \"$$GRAVITY_REDIS_PASSWORD\" ]; then redis-cli -a \"$$GRAVITY_REDIS_PASSWORD\" ping; else redis-cli ping; fi"]
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - gravity_backend_db_redis
 
 volumes:
   gravity_postgres_data:
+
+networks:
+  gravity_backend_db_redis:
+    name: gravity_backend_db_redis
+    driver: bridge

@@ -23,7 +23,7 @@ find_available_port() {
 POSTGRES_PORT="${GRAVITY_CI_POSTGRES_PORT:-$(find_available_port 45432)}"
 BACKEND_PORT="${GRAVITY_CI_BACKEND_PORT:-$(find_available_port 48080)}"
 FRONTEND_PORT="${GRAVITY_CI_FRONTEND_PORT:-$(find_available_port 43100)}"
-BACKEND_PUBLIC_URL="http://localhost:${BACKEND_PORT}"
+BACKEND_PUBLIC_URL="http://localhost:${FRONTEND_PORT}"
 FRONTEND_PUBLIC_URL="http://localhost:${FRONTEND_PORT}"
 
 log() {
@@ -64,7 +64,7 @@ compose() {
   GRAVITY_POSTGRES_CONTAINER="$POSTGRES_CONTAINER_NAME" \
   GRAVITY_BACKEND_CONTAINER="$BACKEND_CONTAINER_NAME" \
   GRAVITY_FRONTEND_CONTAINER="$FRONTEND_CONTAINER_NAME" \
-    ${COMPOSE_BIN} -p "$PROJECT_NAME" -f "$ROOT_DIR/docker/docker-compose.yml" "$@"
+    ${COMPOSE_BIN} -p "$PROJECT_NAME" -f "$ROOT_DIR/docker-compose.yml" "$@"
 }
 
 cleanup() {

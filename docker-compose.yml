@@ -1,0 +1,100 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: docker.io/library/postgres:16-alpine
+    container_name: ${GRAVITY_POSTGRES_CONTAINER:-gravity_postgres_dev}
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${GRAVITY_POSTGRES_DB:-gravity_workspace}
+      POSTGRES_USER: ${GRAVITY_POSTGRES_USER:-gravity_user}
+      POSTGRES_PASSWORD: ${GRAVITY_POSTGRES_PASSWORD:-admin}
+    volumes:
+      - gravity_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - gravity_backend_db_redis
+
+  redis:
+    image: docker.io/library/redis:7-alpine
+    container_name: ${GRAVITY_REDIS_CONTAINER:-gravity_redis_dev}
+    restart: unless-stopped
+    command: >
+      sh -c 'if [ -n "$$GRAVITY_REDIS_PASSWORD" ]; then redis-server --requirepass "$$GRAVITY_REDIS_PASSWORD"; else redis-server; fi'
+    healthcheck:
+      test: ["CMD-SHELL", "if [ -n \"$$GRAVITY_REDIS_PASSWORD\" ]; then redis-cli -a \"$$GRAVITY_REDIS_PASSWORD\" ping; else redis-cli ping; fi"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - gravity_backend_db_redis
+
+  backend:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+      target: runner
+    container_name: ${GRAVITY_BACKEND_CONTAINER:-gravity_app_server}
+    restart: unless-stopped
+    environment:
+      PORT: ${PORT:-8080}
+      NODE_ENV: ${NODE_ENV:-production}
+      # Construct database and redis URLs dynamically to connect internally via service names
+      DATABASE_URL: postgresql://${GRAVITY_POSTGRES_USER:-gravity_user}:${GRAVITY_POSTGRES_PASSWORD:-admin}@postgres:5432/${GRAVITY_POSTGRES_DB:-gravity_workspace}
+      REDIS_URL: redis://default:${GRAVITY_REDIS_PASSWORD:-admin}@redis:6379
+      REDIS_ENABLED: ${REDIS_ENABLED:-true}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-test-secret}
+      BETTER_AUTH_BASE_URL: ${GRAVITY_BACKEND_PUBLIC_URL:-http://localhost:8080}
+      NODE_IDENTITY_MASTER_KEY: ${NODE_IDENTITY_MASTER_KEY:-test-master-key}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,https://gravity.themanagerworkspace.com}
+      TRUSTED_ORIGINS: ${TRUSTED_ORIGINS:-http://localhost:5173,http://localhost:8080,https://gravity.themanagerworkspace.com}
+      OLLAMA_DEFAULT_ENDPOINT: ${OLLAMA_DEFAULT_ENDPOINT:-http://host.docker.internal:11434}
+      LOCAL_TESTING_KEK: ${LOCAL_TESTING_KEK:-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}
+      FEDERATION_SYNC_INTERVAL_MS: ${FEDERATION_SYNC_INTERVAL_MS:-5000}
+      FEDERATION_SYNC_FAILURE_BASE_MS: ${FEDERATION_SYNC_FAILURE_BASE_MS:-5000}
+      FEDERATION_SYNC_FAILURE_MAX_MS: ${FEDERATION_SYNC_FAILURE_MAX_MS:-60000}
+      FEDERATION_SYNC_FAILURE_MAX_RETRIES: ${FEDERATION_SYNC_FAILURE_MAX_RETRIES:-5}
+    expose:
+      - "8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - gravity_backend_db_redis
+      - gravity_frontend_backend
+
+  frontend:
+    build:
+      context: .
+      dockerfile: client/Dockerfile
+      target: runner
+    container_name: ${GRAVITY_FRONTEND_CONTAINER:-gravity_frontend}
+    restart: unless-stopped
+    environment:
+      BACKEND_UPSTREAM: http://backend:8080
+    ports:
+      - "${GRAVITY_FRONTEND_PORT:-5173}:5173"
+    depends_on:
+      backend:
+        condition: service_started
+    networks:
+      - gravity_frontend_backend
+
+volumes:
+  gravity_postgres_data:
+
+networks:
+  gravity_frontend_backend:
+    name: gravity_frontend_backend
+    driver: bridge
+  gravity_backend_db_redis:
+    name: gravity_backend_db_redis
+    driver: bridge
