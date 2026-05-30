@@ -6,12 +6,7 @@ vi.mock('../src/modules/mcp/request-handler.js', () => ({
   handleMcpRequest: vi.fn(async (req: any) => ({ jsonrpc: '2.0', id: req?.id ?? null, result: { echoed: true, id: req?.id ?? null } })),
 }));
 vi.mock('../src/modules/mcp/responses.js', () => ({
-  createMcpErrorResponse: (id: any, code: number, message: string) => {
-    // debug trace for tests
-    // eslint-disable-next-line no-console
-    console.log('MOCK createMcpErrorResponse called:', code, message);
-    return { jsonrpc: '2.0', id, error: { code, message } };
-  },
+  createMcpErrorResponse: (id: any, code: number, message: string) => ({ jsonrpc: '2.0', id, error: { code, message } }),
 }));
 
 import { McpStdioSession } from '../src/modules/mcp/stdio-session.js';

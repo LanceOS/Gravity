@@ -2,6 +2,7 @@ import { initializeDatabase } from '../../db/bootstrap.js';
 import { env } from '../../env.js';
 import { getMcpStdioContext } from './stdio-config.js';
 import { McpStdioSession } from './stdio-session.js';
+import { fileURLToPath } from 'node:url';
 
 /**
  * @description Runs the MCP server over stdio using a single trusted workspace
@@ -48,7 +49,11 @@ async function main() {
   await server.start({ initDb: true });
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+// Only run the standalone main when this module is executed directly.
+const isMain = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
+if (isMain) {
+  main().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}

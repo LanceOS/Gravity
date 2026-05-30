@@ -1,6 +1,12 @@
 import type { Readable, Writable } from 'node:stream';
 import { handleMcpRequest } from './request-handler.js';
 import { createMcpErrorResponse } from './responses.js';
+import {
+  ERR_MISSING_CONTENT_LENGTH,
+  ERR_INVALID_CONTENT_LENGTH,
+  ERR_CONTENT_LENGTH_TOO_LARGE,
+  ERR_MESSAGE_TOO_LARGE,
+} from './transport-error-codes.js';
 
 /**
  * Options for the stdio session.
@@ -19,6 +25,9 @@ export type McpSessionOptions = {
   legacyOutput?: boolean;
 };
 
+// Default maximum allowed message size in bytes. Exported for reuse.
+export const DEFAULT_MAX_MESSAGE_SIZE = 10 * 1024 * 1024;
+
 /**
  * McpStdioSession implements a Content-Length framed protocol (LSP-style)
  * for robustness when reading from stdio. It also accepts the legacy
@@ -31,11 +40,39 @@ export class McpStdioSession {
   private totalLength = 0;
   private running = false;
   private maxMessageSize: number;
+  // Queue for outgoing messages when the writable signals backpressure.
+  private sendQueue: string[] = [];
+  private backpressureActive = false;
+  // Bound drain handler so we can add/remove the listener reliably.
+  private onDrain = () => {
+    this.backpressureActive = false;
+    // Flush queued messages in FIFO order.
+    while (this.sendQueue.length > 0) {
+      const next = this.sendQueue.shift()!;
+      const ok = this.output.write(next);
+      if (!ok) {
+        // Still backpressured; wait for the next drain.
+        this.backpressureActive = true;
+        this.output.once('drain', this.onDrain);
+        return;
+      }
+    }
+
+    // Queue drained — resume input if it was paused.
+    try {
+      // resume is idempotent if not paused
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore - `resume` exists on Readable
+      this.input.resume();
+    } catch (e) {
+      // best-effort
+    }
+  };
   // Serializes request handling to avoid races (handshake mutates session state).
   private processingPromise: Promise<void> = Promise.resolve();
 
   constructor(private input: Readable, private output: Writable, private options: McpSessionOptions = {}) {
-    this.maxMessageSize = options.maxMessageSize ?? 10 * 1024 * 1024;
+    this.maxMessageSize = options.maxMessageSize ?? DEFAULT_MAX_MESSAGE_SIZE;
   }
 
   start() {
@@ -74,7 +111,7 @@ export class McpStdioSession {
       let headerTermLen = 4;
       if (headerEnd === -1) {
         headerEnd = peek.indexOf('\n\n');
-        headerTermLen = headerEnd === -1 ? 2 : 2;
+        if (headerEnd !== -1) headerTermLen = 2;
       }
 
       if (headerEnd !== -1) {
@@ -85,21 +122,21 @@ export class McpStdioSession {
         if (!m) {
           // Header block present but missing Content-Length — reject explicitly.
           this.consumeBytes(headerEnd + headerTermLen);
-          this.send(createMcpErrorResponse(null, -32700, 'Missing Content-Length header'));
+          this.send(createMcpErrorResponse(null, ERR_MISSING_CONTENT_LENGTH, 'Missing Content-Length header'));
           continue;
         }
 
         const length = parseInt(m[1], 10);
         if (!Number.isFinite(length) || length < 0) {
           this.consumeBytes(headerEnd + headerTermLen);
-          this.send(createMcpErrorResponse(null, -32700, 'Invalid Content-Length header'));
+          this.send(createMcpErrorResponse(null, ERR_INVALID_CONTENT_LENGTH, 'Invalid Content-Length header'));
           continue;
         }
 
         // Early guard: reject declared lengths that exceed configured limit.
         if (length > this.maxMessageSize) {
           this.consumeBytes(headerEnd + headerTermLen);
-          this.send(createMcpErrorResponse(null, -32700, 'Content-Length too large'));
+          this.send(createMcpErrorResponse(null, ERR_CONTENT_LENGTH_TOO_LARGE, 'Content-Length too large'));
           continue;
         }
 
@@ -108,7 +145,7 @@ export class McpStdioSession {
           // Not enough data yet; wait for more.
           if (this.totalLength > this.maxMessageSize) {
             this.clearChunks();
-            this.send(createMcpErrorResponse(null, -32700, 'Message too large'));
+            this.send(createMcpErrorResponse(null, ERR_MESSAGE_TOO_LARGE, 'Message too large'));
           }
           return;
         }
@@ -135,10 +172,10 @@ export class McpStdioSession {
       }
 
       // Not enough data yet and no newline/header found. Enforce max size guard.
-      if (this.totalLength > this.maxMessageSize) {
-        this.clearChunks();
-        this.send(createMcpErrorResponse(null, -32700, 'Message too large'));
-      }
+        if (this.totalLength > this.maxMessageSize) {
+          this.clearChunks();
+          this.send(createMcpErrorResponse(null, ERR_MESSAGE_TOO_LARGE, 'Message too large'));
+        }
       return;
     }
   }
@@ -296,15 +333,30 @@ export class McpStdioSession {
   send(msg: unknown) {
     try {
       const s = JSON.stringify(msg);
-      if (this.options.legacyOutput) {
-        // Backwards-compatible newline-delimited JSON
-        this.output.write(s + '\n');
+      // Prepare payload
+      const payload = this.options.legacyOutput ? s + '\n' : `Content-Length: ${Buffer.byteLength(s, 'utf8')}\r\n\r\n` + s;
+
+      // If we're currently under backpressure or already have queued messages,
+      // enqueue the payload and return. It will be flushed on 'drain'.
+      if (this.backpressureActive || this.sendQueue.length > 0) {
+        this.sendQueue.push(payload);
         return;
       }
 
-      const len = Buffer.byteLength(s, 'utf8');
-      const header = `Content-Length: ${len}\r\n\r\n`;
-      this.output.write(header + s);
+      const ok = this.output.write(payload);
+      if (!ok) {
+        // Writable signaled it's full — pause input and wait for drain.
+        this.backpressureActive = true;
+        try {
+          // pause is idempotent
+          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+          // @ts-ignore
+          this.input.pause();
+        } catch (e) {
+          // best-effort
+        }
+        this.output.once('drain', this.onDrain);
+      }
     } catch (e) {
       // best-effort
     }
@@ -317,6 +369,21 @@ export class McpStdioSession {
       this.input.removeAllListeners('data');
       this.input.removeAllListeners('end');
       this.input.removeAllListeners('error');
+      // Clean up any pending drain listener and queued messages.
+      try {
+        this.output.removeListener('drain', this.onDrain);
+      } catch (e) {
+        // ignore
+      }
+      this.sendQueue.length = 0;
+      try {
+        // resume input if paused
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+        this.input.resume();
+      } catch (e) {
+        // ignore
+      }
     } catch (e) {
       // ignore
     }
