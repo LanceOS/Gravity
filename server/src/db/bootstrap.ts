@@ -201,44 +201,20 @@ export async function initializeDatabase() {
     ALTER TABLE user_external_credentials ADD COLUMN IF NOT EXISTS preferred_model TEXT;
   `);
 
-  const missingProviderRows = await pool.query(
-    `
-      SELECT user_id
-      FROM user_external_credentials
-      WHERE provider IS NULL OR provider = ''
-    `,
-  );
-
-  for (const row of missingProviderRows.rows as Array<{ user_id: string }>) {
-    const [settingsRow] = (
-      await pool.query(
-        `
-          SELECT ai_provider
-          FROM user_settings
-          WHERE user_id = $1
-          LIMIT 1
-        `,
-        [row.user_id],
-      )
-    ).rows as Array<{ ai_provider?: string }>;
-
-    const provider = settingsRow?.ai_provider || 'openai';
-    await pool.query(
-      `
-        UPDATE user_external_credentials
-        SET provider = $1
-        WHERE user_id = $2
-      `,
-      [provider, row.user_id],
-    );
-  }
-
+  // Backfill `provider` in a set-based update (avoids N+1 queries)
   await pool.query(`
-    ALTER TABLE user_external_credentials ALTER COLUMN provider SET NOT NULL;
-    ALTER TABLE user_external_credentials DROP CONSTRAINT IF EXISTS user_external_credentials_pkey;
-    ALTER TABLE user_external_credentials ADD PRIMARY KEY (user_id, provider);
-    CREATE INDEX IF NOT EXISTS user_external_credentials_user_id_idx ON user_external_credentials (user_id);
+    UPDATE user_external_credentials u
+    SET provider = COALESCE(
+      (SELECT s.ai_provider FROM user_settings s WHERE s.user_id = u.user_id LIMIT 1),
+      'openai'
+    )
+    WHERE u.provider IS NULL OR u.provider = '';
   `);
+
+  // NOTE: structural changes (primary key/index) are handled in a dedicated
+  // migration under `server/drizzle/`. That migration performs safe,
+  // set-based backfills, de-duplication, and constraint changes with
+  // appropriate locking. This keeps startup fast and avoids long DDL locks.
 
   await pool.query(`
     ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS default_view TEXT NOT NULL DEFAULT 'board';
