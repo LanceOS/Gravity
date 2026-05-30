@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      target: development
+    volumes:
+      - ./server:/app/server
+      - backend_node_modules:/app/server/node_modules
+      - ./library:/app/library
+    command: ["npm", "run", "dev"]
+
+  frontend:
+    build:
+      target: development
+    volumes:
+      - ./client:/app/client
+      - frontend_node_modules:/app/client/node_modules
+      - ./library:/app/library
+    # Vite needs --host to bind to 0.0.0.0 in the container
+    command: ["npm", "run", "dev", "--", "--host"]
+    environment:
+      # CHOKIDAR_USEPOLLING helps with file watching reliability on some OS/container setups
+      - CHOKIDAR_USEPOLLING=true
+
+volumes:
+  backend_node_modules:
+  frontend_node_modules:
