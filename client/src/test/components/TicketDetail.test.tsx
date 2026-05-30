@@ -325,11 +325,9 @@ describe('TicketDetail', () => {
       'href',
       'https://tickets.placeholder.local/GRA-101'
     );
-    expect(screen.getByText('feature/gra-101-update-ticket')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Copy Branch Name' })).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Copy Link' }));
-    expect(writeTextSpy).toHaveBeenCalledWith('https://tickets.placeholder.local/GRA-101');
-    expect(toastSpy).toHaveBeenCalledWith('Ticket link copied', 'success');
+    // Copy Link button removed — link is now the anchor icon only
 
     await user.click(screen.getByRole('button', { name: 'Copy Branch Name' }));
     expect(writeTextSpy).toHaveBeenCalledWith('feature/gra-101-update-ticket');
@@ -339,9 +337,7 @@ describe('TicketDetail', () => {
     expect(writeTextSpy).toHaveBeenCalledWith('');
     expect(toastSpy).toHaveBeenCalledWith('Description copied', 'success');
 
-    await user.click(screen.getByRole('button', { name: 'Copy Ticket Key' }));
-    expect(writeTextSpy).toHaveBeenCalledWith('GRA-101');
-    expect(toastSpy).toHaveBeenCalledWith('Ticket key copied', 'success');
+    // Copy Ticket Key button removed — no action here
   });
 
   it('displays the ticket key in the right sidebar and handles comment actions dropdown/inline editing/deletion', async () => {
@@ -356,12 +352,10 @@ describe('TicketDetail', () => {
     const ticketLink = screen.getByRole('link', { name: 'Ticket link' });
     expect(ticketLink).toHaveAttribute('href', 'https://tickets.placeholder.local/GRA-101');
 
-    const generatedBranchName = 'feature/gra-101-fix-sync-retries';
-    expect(screen.getByText(generatedBranchName)).toBeInTheDocument();
+  const generatedBranchName = 'feature/gra-101-fix-sync-retries';
+  expect(screen.getByRole('button', { name: 'Copy Branch Name' })).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Copy Link' }));
-    expect(writeTextSpy).toHaveBeenCalledWith('https://tickets.placeholder.local/GRA-101');
-    expect(toastSpy).toHaveBeenCalledWith('Ticket link copied', 'success');
+    // Copy Link button removed — link is now the anchor icon only
 
     await user.click(screen.getByRole('button', { name: 'Copy Branch Name' }));
     expect(writeTextSpy).toHaveBeenCalledWith(generatedBranchName);
@@ -378,9 +372,7 @@ describe('TicketDetail', () => {
     const sidebarKeyVal = screen.getAllByText('GRA-101')[1]; // first is in top header, second in right sidebar
     expect(sidebarKeyVal).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Copy Ticket Key' }));
-    expect(writeTextSpy).toHaveBeenCalledWith('GRA-101');
-    expect(toastSpy).toHaveBeenCalledWith('Ticket key copied', 'success');
+    // Copy Ticket Key button removed — no action here
 
     // Verify Comment Options dropdown trigger exists
     const commentOptionsBtn = screen.getByRole('button', { name: 'Comment options' });
