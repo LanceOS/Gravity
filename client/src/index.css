@@ -617,6 +617,12 @@ button.tool-submit-active {
   cursor: pointer;
   min-width: 0;
   overflow: hidden;
+  transition: none;
+}
+.ticket-parent-btn:hover {
+  background: transparent !important;
+  transform: none !important;
+  box-shadow: none !important;
 }
 .ticket-parent-key {
   flex: 0 0 auto;
@@ -631,15 +637,16 @@ button.tool-submit-active {
 }
 
 /* Responsive sizing and visibility */
-.ticket-parent-btn { max-width: 900px; }
+/* Desktop: wider parent ref to show longer titles */
+.ticket-parent-btn { max-width: 700px; }
 @media (max-width: 1199px) {
-  .ticket-parent-btn { max-width: 280px; }
+  .ticket-parent-btn { max-width: 500px; }
 }
 @media (max-width: 900px) {
-  .ticket-parent-btn { max-width: 220px; }
+  .ticket-parent-btn { max-width: 360px; }
 }
 @media (max-width: 600px) {
-  .ticket-parent-btn { max-width: 160px; }
+  .ticket-parent-btn { max-width: 220px; }
 }
 @media (max-width: 500px) {
   .ticket-parent-ref { display: none; }
