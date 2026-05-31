@@ -436,4 +436,30 @@ describe('TicketDetail', () => {
       expect(screen.queryByText('Delete this comment?')).not.toBeInTheDocument();
     });
   });
+
+  it('shows parent reference when active ticket is a sub-ticket and navigates on click', async () => {
+    const user = userEvent.setup();
+    const parentTicket = {
+      ...activeTicket,
+      id: 'ticket-0',
+      key: 'GRA-100',
+      title: 'Parent Ticket Title',
+      parentId: null,
+    };
+
+    const childTicket = {
+      ...activeTicket,
+      id: 'ticket-4',
+      key: 'GRA-104',
+      title: 'Child Ticket',
+      parentId: 'ticket-0',
+    };
+
+    const { props } = renderTicketDetail({ activeTicket: childTicket, parentTicket, onSelectTicket: vi.fn() });
+
+    expect(screen.getByText('Sub ticket of')).toBeInTheDocument();
+    const parentBtn = screen.getByRole('button', { name: 'GRA-100 - Parent Ticket Title' });
+    await user.click(parentBtn);
+    expect(props.onSelectTicket).toHaveBeenCalledWith(parentTicket);
+  });
 });

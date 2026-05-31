@@ -10,6 +10,7 @@ export interface TicketDetailProps {
   projects: Project[];
   domains: Domain[];
   cycles: Cycle[];
+  parentTicket?: Ticket | null;
   onSelectTicket: (ticket: Ticket | null) => void;
   onUpdateTicket: (id: string, updates: Partial<Ticket>) => Promise<void>;
   onDeleteTicket: (ticketId: string) => Promise<void>;

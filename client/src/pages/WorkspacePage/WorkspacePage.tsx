@@ -95,6 +95,11 @@ export function WorkspacePage({
     () => (activeTicket ? tickets.filter((ticket) => ticket.parentId === activeTicket.id) : []),
     [tickets, activeTicket]
   );
+
+  const parentTicket = useMemo(
+    () => (activeTicket ? tickets.find((t) => t.id === activeTicket.parentId) || null : null),
+    [tickets, activeTicket]
+  );
   const completedDetailSubtasks = useMemo(
     () => detailSubtasks.filter((ticket) => ticket.status === 'done' || ticket.status === 'canceled').length,
     [detailSubtasks]
@@ -205,6 +210,7 @@ export function WorkspacePage({
               subtasks={detailSubtasks}
               completedSubtasks={completedDetailSubtasks}
               subtaskProgressPercent={detailSubtaskProgressPercent}
+              parentTicket={parentTicket}
               users={users}
               projects={projects}
               domains={domains}
