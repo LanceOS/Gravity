@@ -190,9 +190,17 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
         <span style={{ color: 'var(--color-text-disabled)' }}>/</span>
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontFamily: 'var(--mono)', fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)', whiteSpace: 'nowrap' }}>
-            {activeTicket.key}
-          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="ticket-header-key clickable"
+            style={{ background: 'none', border: 'none', padding: 0, margin: 0 }}
+            aria-label={`Back — ${activeTicket.key}`}
+          >
+            <span style={{ fontFamily: 'var(--mono)', fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)', whiteSpace: 'nowrap' }}>
+              {activeTicket.key}
+            </span>
+          </button>
 
           {parentTicket ? (
             <span className="ticket-parent-ref">
