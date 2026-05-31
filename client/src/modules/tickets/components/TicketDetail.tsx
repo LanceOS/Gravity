@@ -73,6 +73,8 @@ import {
   Plus, Edit3, ChevronLeft, MoreHorizontal, Link, FileText
 } from 'lucide-react';
 import { MarkdownContent } from './MarkdownContent';
+import { TicketRow } from './TicketRow';
+import { getPriorityIcon, getAssigneeAvatar, getDomainTag } from '../utils/TicketList';
 import type { TicketDetailProps } from '../types/TicketDetail';
 import { PRIORITY_OPTIONS, STATUS_OPTIONS } from '../utils/TicketDetail';
 import './TicketDetail.css';
@@ -283,38 +285,21 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                   </span>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {subtasks.map(sub => (
-                    <div
-                      key={sub.id}
-                      onClick={() => onSelectTicket(sub)}
-                      className="clickable ticket-subtask-item"
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '12px',
-                        padding: '8px 12px',
-                        background: 'var(--color-surface-card)'
-                      }}
-                    >
-                      <CheckSquare size={14} color={sub.status === 'done' ? 'var(--color-primary)' : 'var(--color-text-disabled)'} />
-                      <span style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--color-text-disabled)' }}>{sub.key}</span>
-                      <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--color-text-primary)', textDecoration: sub.status === 'done' ? 'line-through' : 'none' }}>{sub.title}</span>
-                      
-                      <span 
-                        style={{ 
-                          marginLeft: 'auto', 
-                          fontSize: '10px', 
-                          padding: '1px 5px', 
-                          borderRadius: '4px', 
-                          background: 'var(--color-border-default)', 
-                          color: 'var(--color-text-primary)' 
-                        }}
-                      >
-                        {sub.status.replace('_', ' ')}
-                      </span>
-                    </div>
-                  ))}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {(() => {
+                    const userAvatarById = Object.fromEntries(users.map((u) => [u.id, u.avatar]));
+                    const domainById = Object.fromEntries(domains.map((d) => [d.id, d]));
+                    return subtasks.map((sub) => (
+                      <TicketRow
+                        key={sub.id}
+                        ticket={sub}
+                        onClick={onSelectTicket}
+                        priorityIcon={getPriorityIcon(sub.priority)}
+                        assigneeAvatar={getAssigneeAvatar(userAvatarById, sub.assigneeId)}
+                        domainTag={getDomainTag(domainById, sub.domainId)}
+                      />
+                    ));
+                  })()}
                 </div>
 
               </div>
