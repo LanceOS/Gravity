@@ -198,9 +198,8 @@ export function WorkspacePage({
         </div>
 
         {activeTicket ? (
-          <div className="workspace-page__detail">
+          <div key={activeTicket.id} className="workspace-page__detail">
             <TicketDetail
-              key={activeTicket.id}
               activeTicket={activeTicket}
               comments={comments}
               subtasks={detailSubtasks}
