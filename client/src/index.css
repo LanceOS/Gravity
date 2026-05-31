@@ -617,17 +617,27 @@ button.tool-submit-active {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px var(--color-state-selected-bg);
 }
+.ticket-parent-btn {
   font-weight: 600;
   color: var(--color-text-primary);
   cursor: pointer;
   min-width: 0;
   overflow: hidden;
-  transition: none;
+  transition: all var(--transition-normal);
+  background: transparent;
+  border: 1px solid transparent;
 }
 .ticket-parent-btn:hover {
-  background: transparent !important;
-  transform: none !important;
-  box-shadow: none !important;
+  background: var(--color-base100);
+  border-color: var(--color-border-focus);
+  color: var(--color-text-primary);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+  text-decoration: none;
+}
+.ticket-parent-btn:focus-visible {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-state-selected-bg);
 }
 .ticket-parent-key {
   flex: 0 0 auto;
