@@ -252,6 +252,10 @@ export async function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS comments_user_id_idx ON comments (user_id);
   `);
 
+  await pool.query(`
+    ALTER TABLE tickets ADD COLUMN IF NOT EXISTS branch_name TEXT NOT NULL DEFAULT '';
+  `);
+
   // Ensure `usage_count` exists for mcp_connection_tokens (backfill-safe)
   await pool.query(`
     ALTER TABLE mcp_connection_tokens ADD COLUMN IF NOT EXISTS usage_count INTEGER NOT NULL DEFAULT 0;
