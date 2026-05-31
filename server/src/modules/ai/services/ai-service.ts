@@ -130,6 +130,11 @@ export class AiService {
 
   async fetchAndChooseBestModel(provider: string, apiKey: string): Promise<string> {
     const lower = provider.toLowerCase();
+    // Avoid making external network calls during test runs — return empty preferred model quickly.
+    if (env.nodeEnv === 'test') {
+      return '';
+    }
+
     const providerInst = this.getProvider(lower);
     if (!providerInst.fetchModels) {
       throw new Error(`fetchModels is not supported by provider ${provider}`);

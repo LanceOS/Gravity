@@ -101,7 +101,13 @@ export class McpStdioSession {
 
   private processBuffer() {
     // Loop to extract multiple messages if present in the chunk queue.
-    const MAX_HEADER_SCAN = 64 * 1024; // reasonable header limit
+    // We prefer a Content-Length framed protocol (LSP-style). As a fallback
+    // we accept legacy newline-delimited JSON, but that fallback is strictly
+    // limited: legacy messages must be single-line (no embedded CR/LF) and
+    // kept small to avoid unbounded buffering.
+    const MAX_HEADER_SCAN = 64 * 1024; // reasonable header limit for scanning headers
+    const LEGACY_LINE_LIMIT = Math.min(this.maxMessageSize, 64 * 1024); // single-line fallback cap
+
     while (this.totalLength > 0) {
       // Peek up to header scan limit to find header terminator.
       const peekLen = Math.min(this.totalLength, MAX_HEADER_SCAN);
@@ -142,7 +148,7 @@ export class McpStdioSession {
 
         const totalNeeded = headerEnd + headerTermLen + length;
         if (this.totalLength < totalNeeded) {
-          // Not enough data yet; wait for more.
+          // Not enough data yet; wait for more. Also guard overall buffer size.
           if (this.totalLength > this.maxMessageSize) {
             this.clearChunks();
             this.send(createMcpErrorResponse(null, ERR_MESSAGE_TOO_LARGE, 'Message too large'));
@@ -158,24 +164,43 @@ export class McpStdioSession {
         continue;
       }
 
-      // No header terminator found within the scanned window. If we don't have
-      // any header and there's at least one newline, treat as legacy single-line JSON.
-      const nlIndex = this.indexOfByte(0x0a); // '\n'
+      // No header terminator found within the scanned window. Try to locate a
+      // newline for legacy single-line JSON, but only within the safe legacy cap.
+      const nlSearchLen = Math.min(this.totalLength, LEGACY_LINE_LIMIT);
+      const nlPeek = this.peekUpTo(nlSearchLen);
+      const nlIndex = nlPeek.indexOf('\n');
       if (nlIndex !== -1) {
+        // Found a newline within the safe window: extract the line (without the newline).
         const lineBuf = this.readBytes(nlIndex);
-        // consume the newline
+        // consume the newline byte
         this.consumeBytes(1);
+
+        // Defensive guards for legacy input: enforce size and single-line constraint.
+        if (lineBuf.length > LEGACY_LINE_LIMIT) {
+          this.clearChunks();
+          this.send(createMcpErrorResponse(null, ERR_MESSAGE_TOO_LARGE, 'Message too large'));
+          continue;
+        }
+
         const line = lineBuf.toString('utf8');
         if (!line.trim()) continue;
+        // Reject if line contains any stray CR or LF characters (enforces single-line JSON)
+        if (line.includes('\r') || line.includes('\n')) {
+          this.send(createMcpErrorResponse(null, ERR_MESSAGE_TOO_LARGE, 'Malformed legacy message'));
+          continue;
+        }
+
         this.handleRawJson(line);
         continue;
       }
 
-      // Not enough data yet and no newline/header found. Enforce max size guard.
-        if (this.totalLength > this.maxMessageSize) {
-          this.clearChunks();
-          this.send(createMcpErrorResponse(null, ERR_MESSAGE_TOO_LARGE, 'Message too large'));
-        }
+      // If we don't find a newline within the legacy cap and the buffered data
+      // already exceeds the cap, reject to avoid unbounded buffering.
+      if (this.totalLength > LEGACY_LINE_LIMIT) {
+        this.clearChunks();
+        this.send(createMcpErrorResponse(null, ERR_MESSAGE_TOO_LARGE, 'Message too large'));
+      }
+
       return;
     }
   }
