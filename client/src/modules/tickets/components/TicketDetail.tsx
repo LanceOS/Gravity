@@ -282,7 +282,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                   </span>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', border: '1px solid var(--color-border-default)', borderRadius: '6px', overflow: 'hidden' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', border: '1px solid var(--color-border-default)', borderRadius: '6px', overflow: 'hidden', gap: '6px', padding: '6px' }}>
                   {subtasks.map(sub => (
                     <div 
                       key={sub.id} 
@@ -293,8 +293,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                         alignItems: 'center', 
                         gap: '12px', 
                         padding: '8px 12px', 
-                        background: 'var(--color-surface-card)',
-                        borderBottom: '1px solid var(--color-border-default)'
+                        background: 'var(--color-surface-card)'
                       }}
                     >
                       <CheckSquare size={14} color={sub.status === 'done' ? 'var(--color-primary)' : 'var(--color-text-disabled)'} />
