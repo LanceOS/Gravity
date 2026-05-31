@@ -77,3 +77,23 @@
     transform: translateY(20px);
   }
 }
+
+/* Markdown/chat renderer: ensure long words/URLs/code wrap correctly inside bubbles */
+.markdown-renderer {
+  overflow-wrap: anywhere;
+  word-wrap: break-word;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.markdown-renderer a,
+.markdown-renderer code,
+.markdown-renderer span,
+.markdown-renderer p,
+.markdown-renderer h2,
+.markdown-renderer h3,
+.markdown-renderer li {
+  overflow-wrap: anywhere;
+  word-wrap: break-word;
+  word-break: break-word;
+}

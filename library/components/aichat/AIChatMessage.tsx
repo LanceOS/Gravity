@@ -23,6 +23,11 @@ export function AIChatMessageBubble({ message: m }: AIChatMessageBubbleProps) {
         flexDirection: 'column',
         alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
         maxWidth: '85%',
+          /* Ensure long continuous text wraps inside the bubble */
+          whiteSpace: 'pre-wrap',
+          overflowWrap: 'anywhere',
+          wordWrap: 'break-word',
+          wordBreak: 'break-word',
         background:
           m.role === 'user'
             ? 'var(--color-base100)'
