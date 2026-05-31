@@ -77,9 +77,11 @@ describe('Sub-ticket navigation E2E', () => {
     // Click the parent reference to navigate back to the parent
     await user.click(parentBtn);
 
-    // Parent detail should be visible again (verify by parent key)
+    // Parent detail should be visible again — check the ticket key inside the detail container
+    const detailContainerAfter = document.querySelector('.workspace-page__detail');
+    expect(detailContainerAfter).toBeTruthy();
     await waitFor(() => {
-      expect(screen.getByText(parentTicket.key)).toBeInTheDocument();
+      expect(within(detailContainerAfter as Element).getByText(parentTicket.title, { selector: 'p' })).toBeInTheDocument();
     });
   });
 });
