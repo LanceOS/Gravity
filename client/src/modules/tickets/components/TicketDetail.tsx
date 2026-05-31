@@ -292,7 +292,8 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                         display: 'flex', 
                         alignItems: 'center', 
                         gap: '12px', 
-                        padding: '8px 12px'
+                        padding: '8px 12px', 
+                        background: 'var(--color-surface-card)'
                       }}
                     >
                       <CheckSquare size={14} color={sub.status === 'done' ? 'var(--color-primary)' : 'var(--color-text-disabled)'} />
