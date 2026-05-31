@@ -54,6 +54,10 @@ function quoteIdentifier(value: string) {
   return `"${value.replace(/"/g, '""')}"`;
 }
 
+const TEST_DEBUG_ENABLED =
+  process.env.NODE_ENV === 'test' &&
+  (process.env.TEST_DEBUG === '1' || process.env.TEST_DEBUG === 'true');
+
 export function api() {
   return request(createApp());
 }
@@ -91,9 +95,11 @@ export async function resetDatabase() {
 export async function resetTestApp() {
   // Clear module cache so subsequent imports re-evaluate env and modules.
   vi.resetModules();
+  if (TEST_DEBUG_ENABLED) console.debug('[test-helper] resetTestApp: resetModules');
   // Re-run DB initialization (rewrites schema in pg-mem)
   const { initializeDatabase } = await import('../../src/db/bootstrap.js');
   await initializeDatabase();
+  if (TEST_DEBUG_ENABLED) console.debug('[test-helper] resetTestApp: initializeDatabase complete');
 }
 
 export async function seedUser(overrides: Partial<UserSeed> = {}) {
@@ -148,6 +154,10 @@ export async function seedUser(overrides: Partial<UserSeed> = {}) {
 export async function createAuthenticatedApi(
   overrides: Partial<UserSeed> & { password?: string } = {},
 ) {
+  const tdebug = (...args: any[]) => {
+    if (TEST_DEBUG_ENABLED) console.debug('[test-helper]', ...args);
+  };
+
   const agent = request.agent(createApp());
   const password = overrides.password ?? 'super-secret-password';
   const name = overrides.name ?? 'Authenticated Test User';
@@ -155,11 +165,15 @@ export async function createAuthenticatedApi(
   const role = overrides.role ?? 'guest_contributor';
   const avatarUrl = overrides.avatarUrl ?? 'https://example.com/avatar.png';
 
+  tdebug('createAuthenticatedApi start', { name, email });
+
   const signUpResponse = await agent.post('/api/auth/sign-up').send({
     name,
     email,
     password,
   });
+
+  tdebug('signUpResponse', { status: signUpResponse.status, body: signUpResponse.body?.user && { id: signUpResponse.body.user.id } });
 
   if (signUpResponse.status !== 200 || typeof signUpResponse.body?.user?.id !== 'string') {
     throw new Error(`Failed to create authenticated test user: ${JSON.stringify(signUpResponse.body)}`);
@@ -174,10 +188,14 @@ export async function createAuthenticatedApi(
     avatarUrl,
   });
 
+  tdebug('seedUser done', { userId });
+
   const user = await getUserById(userId);
   if (!user) {
     throw new Error(`Failed to load authenticated test user ${userId}.`);
   }
+
+  tdebug('getUserById found', { userId: user.id });
 
   return {
     agent,

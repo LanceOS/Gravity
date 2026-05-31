@@ -13,7 +13,9 @@ export class McpStdioServer {
    * @description Starts the stdio transport and listens for framed JSON-RPC
    * messages using a Content-Length header (LSP-style). For backwards
    * compatibility it also accepts legacy single-line JSON messages as a
-   * fallback (those must remain compact single-line JSON objects).
+   * fallback. Legacy messages must be single-line (no embedded CR/LF) and are
+   * strictly limited in size (typically capped at 64 KiB) to avoid unbounded
+   * buffering — Content-Length framing is strongly preferred for production.
    * @param opts.initDb When true the server will initialize the database
    * before installing the listener. When false the caller is responsible for
    * ensuring the DB is initialized.
