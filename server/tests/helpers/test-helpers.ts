@@ -54,6 +54,10 @@ function quoteIdentifier(value: string) {
   return `"${value.replace(/"/g, '""')}"`;
 }
 
+const TEST_DEBUG_ENABLED =
+  process.env.NODE_ENV === 'test' &&
+  (process.env.TEST_DEBUG === '1' || process.env.TEST_DEBUG === 'true');
+
 export function api() {
   return request(createApp());
 }
@@ -91,11 +95,11 @@ export async function resetDatabase() {
 export async function resetTestApp() {
   // Clear module cache so subsequent imports re-evaluate env and modules.
   vi.resetModules();
-  if (process.env.TEST_DEBUG) console.debug('[test-helper] resetTestApp: resetModules');
+  if (TEST_DEBUG_ENABLED) console.debug('[test-helper] resetTestApp: resetModules');
   // Re-run DB initialization (rewrites schema in pg-mem)
   const { initializeDatabase } = await import('../../src/db/bootstrap.js');
   await initializeDatabase();
-  if (process.env.TEST_DEBUG) console.debug('[test-helper] resetTestApp: initializeDatabase complete');
+  if (TEST_DEBUG_ENABLED) console.debug('[test-helper] resetTestApp: initializeDatabase complete');
 }
 
 export async function seedUser(overrides: Partial<UserSeed> = {}) {
@@ -150,9 +154,8 @@ export async function seedUser(overrides: Partial<UserSeed> = {}) {
 export async function createAuthenticatedApi(
   overrides: Partial<UserSeed> & { password?: string } = {},
 ) {
-  const TEST_DEBUG = Boolean(process.env.TEST_DEBUG);
   const tdebug = (...args: any[]) => {
-    if (TEST_DEBUG) console.debug('[test-helper]', ...args);
+    if (TEST_DEBUG_ENABLED) console.debug('[test-helper]', ...args);
   };
 
   const agent = request.agent(createApp());

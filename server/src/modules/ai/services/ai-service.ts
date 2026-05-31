@@ -130,9 +130,10 @@ export class AiService {
 
   async fetchAndChooseBestModel(provider: string, apiKey: string): Promise<string> {
     const lower = provider.toLowerCase();
-    // Avoid making external network calls during test runs — return empty preferred model quickly.
+    // Avoid making external network calls during test runs — return the provider's
+    // default preferred model (so tests remain deterministic) instead of fetching.
     if (env.nodeEnv === 'test') {
-      return '';
+      return chooseBestMcpModel(lower, []);
     }
 
     const providerInst = this.getProvider(lower);
