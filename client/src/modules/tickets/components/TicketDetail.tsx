@@ -190,13 +190,13 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
         <span style={{ color: 'var(--color-text-disabled)' }}>/</span>
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontFamily: 'var(--mono)', fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)', whiteSpace: 'nowrap' }}>
             {activeTicket.key}
           </span>
 
           {parentTicket ? (
             <span style={{ fontSize: '12px', color: 'var(--color-text-disabled)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ marginRight: 4 }}>Sub ticket of</span>
+              <span style={{ marginRight: 4, whiteSpace: 'nowrap' }}>Sub ticket of</span>
               <button
                 type="button"
                 onClick={() => onSelectTicket(parentTicket)}
@@ -206,14 +206,23 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                   border: 'none',
                   padding: 0,
                   margin: 0,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
                   fontFamily: 'var(--mono)',
                   fontSize: '13px',
                   fontWeight: 600,
                   color: 'var(--color-text-primary)',
                   cursor: 'pointer',
+                  maxWidth: '220px',
+                  overflow: 'hidden',
+                  minWidth: 0,
                 }}
               >
-                {parentTicket.key} - {parentTicket.title}
+                <span style={{ flex: '0 0 auto', marginRight: 6 }}>{parentTicket.key}</span>
+                <span style={{ flex: '1 1 0', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {` - ${parentTicket.title}`}
+                </span>
               </button>
             </span>
           ) : null}
