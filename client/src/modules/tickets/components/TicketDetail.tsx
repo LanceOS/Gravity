@@ -195,34 +195,16 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
           </span>
 
           {parentTicket ? (
-            <span style={{ fontSize: '12px', color: 'var(--color-text-disabled)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ marginRight: 4, whiteSpace: 'nowrap' }}>Sub ticket of</span>
+            <span className="ticket-parent-ref">
+              <span className="ticket-parent-label">Sub ticket of</span>
               <button
                 type="button"
                 onClick={() => onSelectTicket(parentTicket)}
-                className="clickable"
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  padding: 0,
-                  margin: 0,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  fontFamily: 'var(--mono)',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  color: 'var(--color-text-primary)',
-                  cursor: 'pointer',
-                  maxWidth: '220px',
-                  overflow: 'hidden',
-                  minWidth: 0,
-                }}
+                className="ticket-parent-btn clickable"
+                aria-label={`${parentTicket.key} - ${parentTicket.title}`}
               >
-                <span style={{ flex: '0 0 auto', marginRight: 6 }}>{parentTicket.key}</span>
-                <span style={{ flex: '1 1 0', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {` - ${parentTicket.title}`}
-                </span>
+                <span className="ticket-parent-key">{parentTicket.key}</span>
+                <span className="ticket-parent-title">{` - ${parentTicket.title}`}</span>
               </button>
             </span>
           ) : null}
