@@ -135,12 +135,12 @@ export function SidebarItem({
     fontSize: nested ? '12px' : '13px',
     color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
     background: active ? 'var(--color-border-default)' : isHovered ? 'rgba(255,255,255,0.03)' : 'transparent',
-    fontWeight: active ? 500 : 400,
+    fontWeight: 400,
     cursor: 'pointer',
     border: 'none',
     textAlign: 'left',
     width: '100%',
-    transition: 'background 0.1s, color 0.1s',
+    transition: 'background 0.1s, color 0.1s, box-shadow 0.1s',
     ...style,
   };
 
