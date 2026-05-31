@@ -1,0 +1,9 @@
+.ticket-subtask-item {
+  transition: background var(--transition-fast), transform var(--transition-fast);
+  will-change: background, transform;
+}
+
+.ticket-subtask-item:hover {
+  background: var(--color-base100);
+  transform: translateX(3px);
+}
