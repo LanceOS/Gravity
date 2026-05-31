@@ -123,8 +123,8 @@ describe('Gravity Client End-to-End User Journey', () => {
     const manageProjectsBtn = await screen.findByRole('button', { name: /Manage Projects/i });
     await user.click(manageProjectsBtn);
 
-    // Verify we transitioned to project manager view
-    const manageProjectsHeader = await screen.findByText('Manage Projects');
+    // Verify we transitioned to project manager view (pick the header element)
+    const manageProjectsHeader = await screen.findByText('Manage Projects', { selector: '.workspace-header__title' });
     expect(manageProjectsHeader).toBeInTheDocument();
 
     // Click "New Project" button in the WorkspaceProjectPanel
@@ -182,7 +182,7 @@ describe('Gravity Client End-to-End User Journey', () => {
     await user.click(ticketCardOnBoard);
 
     // Verify details panel opened
-    const ticketKeyText = await screen.findByText(/Ticket Key/i);
+    const ticketKeyText = await screen.findByText(/Ticket Key/i, { selector: 'span' });
     expect(ticketKeyText).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Delete Ticket/i })).toBeInTheDocument();
 

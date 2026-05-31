@@ -94,6 +94,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
   onDeleteComment,
   onClose,
   onOpenCreateSubtask,
+  parentTicket,
 }) => {
   const [commentInput, setCommentInput] = useState('');
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
@@ -188,9 +189,26 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
 
         <span style={{ color: 'var(--color-text-disabled)' }}>/</span>
         
-        <span style={{ fontFamily: 'var(--mono)', fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
-          {activeTicket.key}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)', whiteSpace: 'nowrap' }}>
+            {activeTicket.key}
+          </span>
+
+          {parentTicket ? (
+            <span className="ticket-parent-ref">
+              <span className="ticket-parent-label">Sub ticket of</span>
+              <button
+                type="button"
+                onClick={() => onSelectTicket(parentTicket)}
+                className="ticket-parent-btn clickable"
+                aria-label={`${parentTicket.key} - ${parentTicket.title}`}
+              >
+                <span className="ticket-parent-key">{parentTicket.key}</span>
+                <span className="ticket-parent-title">{` - ${parentTicket.title}`}</span>
+              </button>
+            </span>
+          ) : null}
+        </div>
 
         <Button
           onClick={handleDelete}
