@@ -97,3 +97,13 @@
   word-wrap: break-word;
   word-break: break-word;
 }
+
+/* Preserve preformatted blocks: do not force-wrap; allow horizontal scroll */
+.markdown-renderer pre {
+  white-space: pre; /* keep original pre behavior */
+  word-break: normal;
+  overflow-wrap: normal;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
