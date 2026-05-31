@@ -631,7 +631,7 @@ button.tool-submit-active {
 }
 
 /* Responsive sizing and visibility */
-.ticket-parent-btn { max-width: 360px; }
+.ticket-parent-btn { max-width: 900px; }
 @media (max-width: 1199px) {
   .ticket-parent-btn { max-width: 280px; }
 }
