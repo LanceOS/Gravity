@@ -75,6 +75,7 @@ import {
 import { MarkdownContent } from './MarkdownContent';
 import type { TicketDetailProps } from '../types/TicketDetail';
 import { PRIORITY_OPTIONS, STATUS_OPTIONS } from '../utils/TicketDetail';
+import './TicketDetail.css';
 
 export const TicketDetail: React.FC<TicketDetailProps> = ({
   activeTicket,
@@ -284,15 +285,15 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   {subtasks.map(sub => (
-                    <div 
-                      key={sub.id} 
+                    <div
+                      key={sub.id}
                       onClick={() => onSelectTicket(sub)}
-                      className="clickable"
-                      style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: '12px', 
-                        padding: '8px 12px', 
+                      className="clickable ticket-subtask-item"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        padding: '8px 12px',
                         background: 'var(--color-surface-card)'
                       }}
                     >
