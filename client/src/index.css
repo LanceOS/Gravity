@@ -592,6 +592,12 @@ button.tool-submit-active {
 
 /* Ticket parent reference responsive styles */
 .ticket-parent-ref {
+  font-size: 12px;
+  color: var(--color-text-disabled);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
 .ticket-header-key {
   display: inline-flex;
   align-items: center;
