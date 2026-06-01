@@ -55,14 +55,14 @@
 .dashboard-layout__header-left {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--space-md);
   min-width: 0;
 }
 
 .dashboard-layout__header-right {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-md);
 }
 
 .dashboard-layout__content {

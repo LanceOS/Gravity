@@ -122,8 +122,8 @@ export function AccessSection({
   };
 
   return (
-    <Card style={{ padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)' }}>
-      <Stack gap="var(--space-5)">
+    <Card style={{ padding: 'var(--space-lg)', borderRadius: 'var(--radius-lg)' }}>
+      <Stack gap="var(--space-lg)">
         <div>
           <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Workspace Invites</h2>
           <p style={{ margin: '4px 0 0', color: 'var(--color-text-disabled)', fontSize: '12.5px', lineHeight: 1.5 }}>
@@ -131,7 +131,7 @@ export function AccessSection({
           </p>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)', padding: 'var(--space-4)', borderRadius: 'var(--radius-md)', background: 'var(--color-base100)', border: '1px solid var(--color-border-default)' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-md)', padding: 'var(--space-md)', borderRadius: 'var(--radius-md)', background: 'var(--color-base100)', border: '1px solid var(--color-border-default)' }}>
           <Mail size={16} style={{ color: 'var(--color-primary)', flexShrink: 0, marginTop: '2px' }} />
           <div>
             <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Invitation Link Process</div>
@@ -141,7 +141,7 @@ export function AccessSection({
           </div>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 'var(--space-3)', alignItems: isMobile ? 'stretch' : 'flex-end' }}>
+        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 'var(--space-md)', alignItems: isMobile ? 'stretch' : 'flex-end' }}>
           <div style={{ flex: 1 }}>
             <TextInput
               label="Invite Label"
@@ -156,7 +156,7 @@ export function AccessSection({
         </div>
 
         {latestInvite && (
-          <Stack gap="var(--space-3)" style={{ padding: 'var(--space-4)', borderRadius: 'var(--radius-md)', background: 'rgba(170, 59, 255, 0.02)', border: '1px solid rgba(170, 59, 255, 0.15)' }}>
+          <Stack gap="var(--space-md)" style={{ padding: 'var(--space-md)', borderRadius: 'var(--radius-md)', background: 'rgba(170, 59, 255, 0.02)', border: '1px solid rgba(170, 59, 255, 0.15)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifySelf: 'stretch', justifyContent: 'space-between' }}>
               <div>
                 <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--color-text-disabled)' }}>Most Recent Invite</span>
@@ -167,10 +167,10 @@ export function AccessSection({
               </Badge>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--color-base100)', border: '1px solid var(--color-border-default)' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)', padding: 'var(--space-md)', borderRadius: 'var(--radius-md)', background: 'var(--color-base100)', border: '1px solid var(--color-border-default)' }}>
               <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase' }}>Invite URL</span>
               <span style={{ fontSize: '12px', color: 'var(--color-text-primary)', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{getInviteLink(latestInvite.code)}</span>
-              <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-1)' }}>
+              <div style={{ display: 'flex', gap: 'var(--space-sm)', marginTop: 'var(--space-xs)' }}>
                 <Button variant="default" size="xs" onClick={() => void handleCopy('invite-url', getInviteLink(latestInvite.code))}>
                   {copiedField === 'invite-url' ? 'Copied URL' : 'Copy Invite URL'}
                 </Button>
@@ -180,14 +180,14 @@ export function AccessSection({
               </div>
             </div>
 
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)', fontSize: '11px', color: 'var(--color-text-disabled)', marginTop: 'var(--space-1)' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-md)', fontSize: '11px', color: 'var(--color-text-disabled)', marginTop: 'var(--space-xs)' }}>
               <span>Created by {latestInvite.createdByName}</span>
               <span>Used {latestInvite.useCount} times</span>
               {latestInvite.revokedAt && <span>Revoked {new Date(latestInvite.revokedAt).toLocaleString()}</span>}
             </div>
 
             {!latestInvite.revokedAt && (
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'var(--space-2)' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'var(--space-sm)' }}>
                 <Button
                   variant="danger"
                   size="sm"
@@ -201,11 +201,11 @@ export function AccessSection({
           </Stack>
         )}
 
-        {invitesLoading && <div style={{ color: 'var(--color-text-disabled)', fontSize: '13px', textAlign: 'center', padding: 'var(--space-4)' }}>Loading invites...</div>}
-        {!invitesLoading && invites.length === 0 && <div style={{ color: 'var(--color-text-disabled)', fontSize: '13px', textAlign: 'center', padding: 'var(--space-4)' }}>No invites exist yet for this workspace.</div>}
+        {invitesLoading && <div style={{ color: 'var(--color-text-disabled)', fontSize: '13px', textAlign: 'center', padding: 'var(--space-md)' }}>Loading invites...</div>}
+        {!invitesLoading && invites.length === 0 && <div style={{ color: 'var(--color-text-disabled)', fontSize: '13px', textAlign: 'center', padding: 'var(--space-md)' }}>No invites exist yet for this workspace.</div>}
 
         {invites.length > 0 && (
-          <Stack gap="var(--space-3)" style={{ marginTop: 'var(--space-2)' }}>
+          <Stack gap="var(--space-md)" style={{ marginTop: 'var(--space-sm)' }}>
             <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--color-text-disabled)' }}>Historical Invites ({invites.length})</span>
             {invites.map((invite) => (
               <div
@@ -215,8 +215,8 @@ export function AccessSection({
                   flexDirection: isMobile ? 'column' : 'row',
                   alignItems: isMobile ? 'flex-start' : 'center',
                   justifyContent: 'space-between',
-                  gap: 'var(--space-3)',
-                  padding: 'var(--space-4)',
+                  gap: 'var(--space-md)',
+                  padding: 'var(--space-md)',
                   borderRadius: 'var(--radius-md)',
                   background: 'var(--color-base100)',
                   border: '1px solid var(--color-border-default)'
@@ -224,14 +224,14 @@ export function AccessSection({
               >
                 <div>
                   <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>{invite.label || 'No Label'}</div>
-                  <div style={{ fontSize: '11px', color: 'var(--color-text-disabled)', marginTop: '4px', display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--color-text-disabled)', marginTop: '4px', display: 'flex', flexWrap: 'wrap', gap: 'var(--space-md)' }}>
                     <span>Code: {invite.code}</span>
                     <span>Used: {invite.useCount}</span>
                     <span>Created by: {invite.createdByName}</span>
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: 'var(--space-sm)', alignItems: 'center' }}>
                   <Badge variant={getInviteStateVariant(invite)}>
                     {getInviteStateLabel(invite)}
                   </Badge>

@@ -122,8 +122,8 @@ function GeneralSettingsSection({
   isMobile: boolean;
 }) {
   return (
-    <Card style={{ padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)' }}>
-      <Stack gap="var(--space-5)">
+    <Card style={{ padding: 'var(--space-lg)', borderRadius: 'var(--radius-lg)' }}>
+      <Stack gap="var(--space-lg)">
         <div>
           <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Local account preferences</h2>
           <p style={{ margin: '4px 0 0', color: 'var(--color-text-disabled)', fontSize: '12.5px', lineHeight: 1.5 }}>
@@ -131,8 +131,8 @@ function GeneralSettingsSection({
           </p>
         </div>
 
-        <Grid columns={isMobile ? 1 : 2} gap="var(--space-4)">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+        <Grid columns={isMobile ? 1 : 2} gap="var(--space-md)">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' }}>
             <Select
               label="Default View Mode"
               value={settings.defaultView}
@@ -205,8 +205,8 @@ function SavedKeyItem({
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: 'var(--space-2)',
-        padding: 'var(--space-3) var(--space-4)',
+        gap: 'var(--space-sm)',
+        padding: 'var(--space-md) var(--space-md)',
         borderRadius: 'var(--radius-md)',
         border: '1px solid var(--color-border-default)',
         borderLeft: isActive
@@ -241,7 +241,7 @@ function SavedKeyItem({
       </div>
 
       {/* Active label + remove button */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-md)' }}>
         <span
           style={{
             fontSize: '12px',
@@ -279,8 +279,8 @@ function SavedKeysCard({
   onRemoveCredential: (provider: AIProvider) => void;
 }) {
   return (
-    <Card style={{ padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)' }}>
-      <Stack gap="var(--space-4)">
+    <Card style={{ padding: 'var(--space-lg)', borderRadius: 'var(--radius-lg)' }}>
+      <Stack gap="var(--space-md)">
         <div>
           <h3
             style={{
@@ -305,7 +305,7 @@ function SavedKeysCard({
           <span
             style={{
               display: 'inline-block',
-              marginTop: 'var(--space-2)',
+              marginTop: 'var(--space-sm)',
               fontSize: '12px',
               color: 'var(--color-text-disabled)',
             }}
@@ -317,7 +317,7 @@ function SavedKeysCard({
         {savedCredentials.length === 0 ? (
           <Alert type="info">Save a key above to add it to this list.</Alert>
         ) : (
-          <Stack gap="var(--space-2)">
+          <Stack gap="var(--space-sm)">
             {savedCredentials.map((credential) => (
               <SavedKeyItem
                 key={credential.provider}
@@ -361,8 +361,8 @@ function CloudProviderSection({
   const hasStoredApiKey = settings.apiKey === API_KEY_MASK;
 
   return (
-    <Card style={{ padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)' }}>
-      <Stack gap="var(--space-5)">
+    <Card style={{ padding: 'var(--space-lg)', borderRadius: 'var(--radius-lg)' }}>
+      <Stack gap="var(--space-lg)">
         <div>
           <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Cloud AI provider</h2>
           <p style={{ margin: '4px 0 0', color: 'var(--color-text-disabled)', fontSize: '12.5px', lineHeight: 1.5 }}>
@@ -370,7 +370,7 @@ function CloudProviderSection({
           </p>
         </div>
 
-        <Grid columns={isMobile ? 1 : '1.5fr 3fr'} gap="var(--space-4)">
+        <Grid columns={isMobile ? 1 : '1.5fr 3fr'} gap="var(--space-md)">
           <Select
             label="Provider"
             value={settings.aiProvider}
@@ -391,7 +391,7 @@ function CloudProviderSection({
           />
         </Grid>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)' }}>
           <Button variant="default" onClick={onTestApiKey} loading={testing}>
             Test {providerOption.label}
           </Button>
@@ -445,8 +445,8 @@ function OllamaSettingsSection({
   ];
 
   return (
-    <Card style={{ padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)' }}>
-      <Stack gap="var(--space-5)">
+    <Card style={{ padding: 'var(--space-lg)', borderRadius: 'var(--radius-lg)' }}>
+      <Stack gap="var(--space-lg)">
         <div>
           <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Local Ollama assistant</h2>
           <p style={{ margin: '4px 0 0', color: 'var(--color-text-disabled)', fontSize: '12.5px', lineHeight: 1.5 }}>
@@ -454,7 +454,7 @@ function OllamaSettingsSection({
           </p>
         </div>
 
-        <Grid columns={isMobile ? 1 : '3fr 1fr'} gap="var(--space-4)" style={{ alignItems: 'end' }}>
+        <Grid columns={isMobile ? 1 : '3fr 1fr'} gap="var(--space-md)" style={{ alignItems: 'end' }}>
           <TextInput
             label="Ollama API Endpoint"
             value={settings.ollamaEndpoint}
@@ -500,8 +500,8 @@ function OnboardingSection({
   onResetTutorial: () => void;
 }) {
   return (
-    <Card style={{ padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)' }}>
-      <Stack gap="var(--space-5)">
+    <Card style={{ padding: 'var(--space-lg)', borderRadius: 'var(--radius-lg)' }}>
+      <Stack gap="var(--space-lg)">
         <div>
           <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Onboarding and guidance</h2>
           <p style={{ margin: '4px 0 0', color: 'var(--color-text-disabled)', fontSize: '12.5px', lineHeight: 1.5 }}>
@@ -577,7 +577,7 @@ export function AccountPreferencesPage({
               Back
             </Button>
           ) : (
-            <Flex align="center" gap="var(--space-4)">
+            <Flex align="center" gap="var(--space-md)">
               <Button variant="ghost" size="sm" onClick={onBack} leftIcon={<ArrowLeft size={14} />}>
                 Back
               </Button>
@@ -609,8 +609,8 @@ export function AccountPreferencesPage({
       />
 
       <DashboardLayout.Sidebar>
-        <div style={{ padding: 'var(--space-5)', display: 'flex', flexDirection: 'column', gap: 'var(--space-5)', height: '100%', overflowY: 'auto' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--color-surface-card)', border: '1px solid var(--color-border-default)' }}>
+        <div style={{ padding: 'var(--space-lg)', display: 'flex', flexDirection: 'column', gap: 'var(--space-lg)', height: '100%', overflowY: 'auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)', padding: 'var(--space-md)', borderRadius: 'var(--radius-md)', background: 'var(--color-surface-card)', border: '1px solid var(--color-border-default)' }}>
             <Avatar src={currentUser.avatar} name={currentUser.name} size="md" />
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{currentUser.name}</div>
@@ -630,8 +630,8 @@ export function AccountPreferencesPage({
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 'var(--space-3)',
-                    padding: 'var(--space-3) var(--space-4)',
+                    gap: 'var(--space-md)',
+                    padding: 'var(--space-md) var(--space-md)',
                     border: '1px solid transparent',
                     borderRadius: 'var(--radius-md)',
                     background: isActive ? 'var(--color-surface-card)' : 'transparent',
@@ -658,8 +658,8 @@ export function AccountPreferencesPage({
 
       <DashboardLayout.Main>
         <DashboardLayout.Content>
-          <div style={{ padding: 'var(--space-6) var(--space-6) var(--space-8) var(--space-6)', maxWidth: '800px', margin: '0 auto' }}>
-            <Stack gap="var(--space-5)">
+          <div style={{ padding: 'var(--space-lg) var(--space-lg) var(--space-xl) var(--space-lg)', maxWidth: '800px', margin: '0 auto' }}>
+            <Stack gap="var(--space-lg)">
               {!isMobile && (
                 <div>
                   <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-text-disabled)' }}>
@@ -691,7 +691,7 @@ export function AccountPreferencesPage({
               )}
 
               {(isMobile || activeCategory === 'providers') && (
-                <Stack gap="var(--space-4)">
+                <Stack gap="var(--space-md)">
                   <CloudProviderSection
                     settings={settings}
                     saveLoading={saveLoading}
@@ -727,7 +727,7 @@ export function AccountPreferencesPage({
               )}
 
               {isMobile && (
-                <div style={{ display: 'flex', marginTop: 'var(--space-4)' }}>
+                <div style={{ display: 'flex', marginTop: 'var(--space-md)' }}>
                   <Button
                     variant="accent"
                     size="lg"

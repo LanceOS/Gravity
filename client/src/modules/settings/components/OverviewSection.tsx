@@ -18,8 +18,8 @@ export function OverviewSection({
   isMobile,
 }: OverviewSectionProps) {
   return (
-    <Card style={{ padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)' }}>
-      <Stack gap="var(--space-5)">
+    <Card style={{ padding: 'var(--space-lg)', borderRadius: 'var(--radius-lg)' }}>
+      <Stack gap="var(--space-lg)">
         <div>
           <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Host Configuration</h2>
           <p style={{ margin: '4px 0 0', color: 'var(--color-text-disabled)', fontSize: '12.5px', lineHeight: 1.5 }}>
@@ -27,7 +27,7 @@ export function OverviewSection({
           </p>
         </div>
 
-        <Grid columns={isMobile ? 1 : 2} gap="var(--space-4)">
+        <Grid columns={isMobile ? 1 : 2} gap="var(--space-md)">
           <TextInput label="Workspace Name" value={workspace.name} disabled />
           <TextInput label="Workspace Key" value={workspace.key} disabled />
         </Grid>
@@ -39,7 +39,7 @@ export function OverviewSection({
           onChange={(event) => onChangeSettings({ hostUrl: event.target.value })}
         />
 
-        <Grid columns={isMobile ? 1 : 2} gap="var(--space-4)">
+        <Grid columns={isMobile ? 1 : 2} gap="var(--space-md)">
           <Select
             label="Join Policy"
             value={settings.joinMode}
@@ -59,8 +59,8 @@ export function OverviewSection({
 
         <Divider />
 
-        <Grid columns={isMobile ? 1 : 3} gap="var(--space-3)">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--color-base100)', border: '1px solid var(--color-border-default)' }}>
+        <Grid columns={isMobile ? 1 : 3} gap="var(--space-md)">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)', padding: 'var(--space-md)', borderRadius: 'var(--radius-md)', background: 'var(--color-base100)', border: '1px solid var(--color-border-default)' }}>
             <Globe size={16} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />
             <div>
               <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)' }}>Projects</div>
@@ -68,7 +68,7 @@ export function OverviewSection({
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--color-base100)', border: '1px solid var(--color-border-default)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)', padding: 'var(--space-md)', borderRadius: 'var(--radius-md)', background: 'var(--color-base100)', border: '1px solid var(--color-border-default)' }}>
             <Users size={16} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />
             <div>
               <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)' }}>Members</div>
@@ -76,7 +76,7 @@ export function OverviewSection({
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--color-base100)', border: '1px solid var(--color-border-default)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)', padding: 'var(--space-md)', borderRadius: 'var(--radius-md)', background: 'var(--color-base100)', border: '1px solid var(--color-border-default)' }}>
             <UserPlus size={16} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />
             <div>
               <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)' }}>Pending Reviews</div>

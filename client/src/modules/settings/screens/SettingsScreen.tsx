@@ -97,7 +97,7 @@ export function SettingsScreen({
               Workspace
             </Button>
           ) : (
-            <Flex align="center" gap="var(--space-4)">
+            <Flex align="center" gap="var(--space-md)">
               <Button variant="ghost" size="sm" onClick={onBackToWorkspace} leftIcon={<ArrowLeft size={14} />}>
                 Workspace
               </Button>
@@ -129,8 +129,8 @@ export function SettingsScreen({
       />
 
       <DashboardLayout.Sidebar>
-        <div style={{ padding: 'var(--space-5)', display: 'flex', flexDirection: 'column', gap: 'var(--space-5)', height: '100%', overflowY: 'auto' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--color-surface-card)', border: '1px solid var(--color-border-default)' }}>
+        <div style={{ padding: 'var(--space-lg)', display: 'flex', flexDirection: 'column', gap: 'var(--space-lg)', height: '100%', overflowY: 'auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)', padding: 'var(--space-md)', borderRadius: 'var(--radius-md)', background: 'var(--color-surface-card)', border: '1px solid var(--color-border-default)' }}>
             <Avatar src={currentUser.avatar} name={currentUser.name} size="md" />
             <div>
               <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>{currentUser.name}</div>
@@ -150,8 +150,8 @@ export function SettingsScreen({
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 'var(--space-3)',
-                    padding: 'var(--space-3) var(--space-4)',
+                    gap: 'var(--space-md)',
+                    padding: 'var(--space-md) var(--space-md)',
                     border: '1px solid transparent',
                     borderRadius: 'var(--radius-md)',
                     background: isActive ? 'var(--color-surface-card)' : 'transparent',
@@ -178,8 +178,8 @@ export function SettingsScreen({
 
       <DashboardLayout.Main>
         <DashboardLayout.Content>
-          <div style={{ padding: 'var(--space-6) var(--space-6) var(--space-8) var(--space-6)', maxWidth: '800px', margin: '0 auto' }}>
-            <Stack gap="var(--space-5)">
+          <div style={{ padding: 'var(--space-lg) var(--space-lg) var(--space-xl) var(--space-lg)', maxWidth: '800px', margin: '0 auto' }}>
+            <Stack gap="var(--space-lg)">
               {!isMobile && (
                 <div>
                   <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-text-disabled)' }}>
@@ -262,7 +262,7 @@ export function SettingsScreen({
               )}
 
               {isMobile && (
-                <div style={{ display: 'flex', marginTop: 'var(--space-4)' }}>
+                <div style={{ display: 'flex', marginTop: 'var(--space-md)' }}>
                   <Button
                     variant="accent"
                     size="lg"

@@ -114,4 +114,20 @@ describe('NotesList', () => {
     await user.click(loadMoreBtn);
     expect(loadMoreMock).toHaveBeenCalled();
   });
+
+  it('disables the Load More button and shows Loading... when loading is true', () => {
+    vi.spyOn(useNotesModule, 'useNotes').mockReturnValue({
+      notes: mockNotes,
+      loading: true,
+      error: null,
+      hasMore: true,
+      loadMore: vi.fn(),
+    });
+
+    render(<NotesList projectId="proj-1" onSelectNote={onSelectNoteMock} />);
+    
+    const loadMoreBtn = screen.getByRole('button', { name: 'Loading...' });
+    expect(loadMoreBtn).toBeInTheDocument();
+    expect(loadMoreBtn).toBeDisabled();
+  });
 });

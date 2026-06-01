@@ -22,8 +22,8 @@ export function DangerZoneSection({
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
 
   return (
-    <Card style={{ padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)', border: '1px solid rgba(239, 68, 68, 0.3)', background: 'rgba(239, 68, 68, 0.05)' }}>
-      <Stack gap="var(--space-5)">
+    <Card style={{ padding: 'var(--space-lg)', borderRadius: 'var(--radius-lg)', border: '1px solid rgba(239, 68, 68, 0.3)', background: 'rgba(239, 68, 68, 0.05)' }}>
+      <Stack gap="var(--space-lg)">
         <div>
           <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: '#ef4444' }}>Danger Zone</h2>
           <p style={{ margin: '4px 0 0', color: 'var(--color-text-disabled)', fontSize: '12.5px', lineHeight: 1.5 }}>
@@ -37,7 +37,7 @@ export function DangerZoneSection({
           </Alert>
         )}
 
-        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 'var(--space-3)', alignItems: isMobile ? 'stretch' : 'flex-end' }}>
+        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 'var(--space-md)', alignItems: isMobile ? 'stretch' : 'flex-end' }}>
           <div style={{ flex: 1 }}>
             <TextInput
               label={`Type "${workspace.name}" to confirm`}

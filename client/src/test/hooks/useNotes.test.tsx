@@ -1,0 +1,141 @@
+import { renderHook, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { useNotes } from '../../modules/notes/hooks/useNotes';
+
+describe('useNotes', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('fetches notes on mount and sets state appropriately', async () => {
+    const mockNotes = [
+      { id: '1', title: 'Note 1' },
+      { id: '2', title: 'Note 2' },
+    ];
+    
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockNotes,
+    } as Response);
+
+    const { result } = renderHook(() => useNotes('proj-1'));
+
+    expect(result.current.loading).toBe(true);
+    expect(result.current.notes).toEqual([]);
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.notes).toEqual(mockNotes);
+    expect(result.current.error).toBeNull();
+    // Assuming limit is 20 and we returned 2 items, hasMore should be false
+    expect(result.current.hasMore).toBe(false);
+
+    expect(fetchSpy).toHaveBeenCalledWith('/api/v1/notes?limit=20&offset=0', {
+      headers: { 'x-project-id': 'proj-1' },
+    });
+  });
+
+  it('handles fetch errors correctly', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: false,
+    } as Response);
+
+    const { result } = renderHook(() => useNotes('proj-1'));
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.error).toBe('Failed to load notes');
+    expect(result.current.notes).toEqual([]);
+  });
+
+  it('handles loadMore when there are more notes', async () => {
+    const firstPage = Array.from({ length: 20 }, (_, i) => ({ id: `${i}`, title: `Note ${i}` }));
+    const secondPage = [{ id: '20', title: 'Note 20' }];
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => firstPage,
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => secondPage,
+      } as Response);
+
+    const { result } = renderHook(() => useNotes('proj-1'));
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.notes).toHaveLength(20);
+    expect(result.current.hasMore).toBe(true);
+
+    // Trigger loadMore
+    result.current.loadMore();
+
+    await waitFor(() => {
+      expect(result.current.notes).toHaveLength(21);
+    });
+
+    expect(result.current.hasMore).toBe(false);
+    expect(fetchSpy).toHaveBeenLastCalledWith('/api/v1/notes?limit=20&offset=20', {
+      headers: { 'x-project-id': 'proj-1' },
+    });
+  });
+
+  it('does not loadMore if already loading or no more items', async () => {
+    const firstPage = [{ id: '1', title: 'Note 1' }];
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: async () => firstPage,
+    } as Response);
+
+    const { result } = renderHook(() => useNotes('proj-1'));
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.hasMore).toBe(false);
+
+    // Trigger loadMore
+    result.current.loadMore();
+
+    // fetch shouldn't be called again
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+  
+  it('resets state when projectId changes', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => [],
+    } as Response);
+
+    const { result, rerender } = renderHook(({ projectId }) => useNotes(projectId), {
+      initialProps: { projectId: 'proj-1' },
+    });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    rerender({ projectId: 'proj-2' });
+    
+    expect(result.current.loading).toBe(true);
+    
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+    
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(fetchSpy).toHaveBeenLastCalledWith(expect.stringContaining('/api/v1/notes'), {
+      headers: { 'x-project-id': 'proj-2' },
+    });
+  });
+});

@@ -1,7 +1,8 @@
-import { Router } from 'express';
+import express, { Router } from 'express';
 import { getProjectIdFromRequest } from '../../lib/platform.js';
 import { authorizeProjectAccess } from '../workspaces/services/membership.js';
 import { createNote, deleteNote, getNote, listNotes, updateNote } from './services/notes.js';
+import { MetadataRepository, NotesRepository } from './repositories.js';
 
 export function createNotesRouter() {
   const router = Router();
@@ -146,6 +147,74 @@ export function createNotesRouter() {
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to delete note.' });
+    }
+  });
+
+  router.post('/notes/:noteId/media', express.raw({ type: '*/*', limit: '10mb' }), async (req, res) => {
+    const projectId = getProjectIdFromRequest(req);
+    if (!projectId) {
+      res.status(400).json({ error: 'Project ID is required.' });
+      return;
+    }
+
+    const auth = await authorizeProjectAccess(req, projectId);
+    if (!auth.allowed) {
+      res.status(auth.status).json({ error: auth.error });
+      return;
+    }
+
+    try {
+      const noteId = normalizeRouteParam(req.params.noteId);
+      const filename = req.query.filename ? String(req.query.filename) : `upload-${Date.now()}`;
+      
+      const noteMeta = await MetadataRepository.getNoteMetadata(noteId);
+      if (!noteMeta || noteMeta.projectId !== projectId) {
+        res.status(404).json({ error: 'Note not found.' });
+        return;
+      }
+      
+      await NotesRepository.saveAttachment(noteMeta.bucketPath, filename, req.body);
+      
+      res.status(201).json({ url: `/api/v1/notes/${noteId}/media/${encodeURIComponent(filename)}` });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to upload media.' });
+    }
+  });
+
+  router.get('/notes/:noteId/media/:filename', async (req, res) => {
+    const projectId = getProjectIdFromRequest(req);
+    if (!projectId) {
+      res.status(400).json({ error: 'Project ID is required.' });
+      return;
+    }
+
+    const auth = await authorizeProjectAccess(req, projectId);
+    if (!auth.allowed) {
+      res.status(auth.status).json({ error: auth.error });
+      return;
+    }
+
+    try {
+      const noteId = normalizeRouteParam(req.params.noteId);
+      const filename = normalizeRouteParam(req.params.filename);
+      
+      const noteMeta = await MetadataRepository.getNoteMetadata(noteId);
+      if (!noteMeta || noteMeta.projectId !== projectId) {
+        res.status(404).json({ error: 'Note not found.' });
+        return;
+      }
+
+      const fileBuffer = await NotesRepository.getAttachment(noteMeta.bucketPath, filename);
+      
+      // Determine content type heuristically or just let browser handle
+      res.type(filename.split('.').pop() || 'application/octet-stream');
+      res.send(fileBuffer);
+    } catch (error: any) {
+      if (error.code === 'ENOENT') {
+        res.status(404).json({ error: 'Media not found.' });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load media.' });
+      }
     }
   });
 
