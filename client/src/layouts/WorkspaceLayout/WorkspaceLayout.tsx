@@ -1,6 +1,6 @@
 import { ReactNode, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Menu, X } from 'lucide-react';
+import { Menu, MessageSquare, X } from 'lucide-react';
 import { Sidebar, type SidebarProps } from '../../components/Sidebar';
 import { DashboardLayout } from '../../components/DashboardLayout/DashboardLayout';
 import { Select } from '@library';
@@ -79,14 +79,24 @@ export function WorkspaceLayout({ sidebarProps, children, rightPanels, isMobile 
         </div>
 
         {isMobile && (
-          <button
-            type="button"
-            className="workspace-header-hamburger"
-            onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
-            aria-label="Toggle sidebar"
-          >
-            {isMobileSidebarOpen ? <X size={20} /> : <Menu size={20} />}
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button
+              type="button"
+              className="workspace-header-hamburger"
+              onClick={sidebarProps.tools.onOpenOllama}
+              aria-label={sidebarProps.tools.isOllamaOpen ? 'Close AI Assistant' : 'Ask Agent'}
+            >
+              {sidebarProps.tools.isOllamaOpen ? <X size={20} /> : <MessageSquare size={20} />}
+            </button>
+            <button
+              type="button"
+              className="workspace-header-hamburger"
+              onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+              aria-label="Toggle sidebar"
+            >
+              {isMobileSidebarOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
+          </div>
         )}
       </DashboardLayout.Header>
 
