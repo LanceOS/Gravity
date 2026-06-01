@@ -117,7 +117,12 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
   );
 
   const copyToClipboard = useCallback(async (value: string, successMessage?: string) => {
+    const isDev = Boolean(typeof import.meta !== 'undefined' && (import.meta as unknown as { env?: Record<string, any> }).env?.DEV);
+
     if (!navigator.clipboard?.writeText) {
+      if (isDev && console && console.warn) {
+        console.warn('Clipboard API not available in this environment; copy action skipped.');
+      }
       if (toast?.show) toast.show('Clipboard not supported', 'warning');
       return;
     }
@@ -125,7 +130,10 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
     try {
       await navigator.clipboard.writeText(value);
       if (toast?.show) toast.show(successMessage || 'Copied to clipboard', 'success');
-    } catch {
+    } catch (err) {
+      if (isDev && console && console.error) {
+        console.error('Failed to write to clipboard', err);
+      }
       if (toast?.show) toast.show('Failed to copy', 'error');
     }
   }, [toast]);
