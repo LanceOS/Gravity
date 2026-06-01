@@ -2,7 +2,8 @@ import React from 'react';
 
 export const getWindowStyle = (isMobile: boolean, isClosing: boolean): React.CSSProperties => ({
   position: 'fixed',
-  bottom: isMobile ? '16px' : '84px',
+  top: isMobile ? undefined : '64px',
+  bottom: isMobile ? '16px' : undefined,
   left: isMobile ? '0' : undefined,
   right: isMobile ? '0' : '24px',
   margin: isMobile ? '0 auto' : undefined,
@@ -20,5 +21,7 @@ export const getWindowStyle = (isMobile: boolean, isClosing: boolean): React.CSS
   overflow: 'hidden',
   backdropFilter: 'blur(20px)',
   WebkitBackdropFilter: 'blur(20px)',
-  animation: isClosing ? 'aiChatSlideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards' : 'aiChatSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+  animation: isClosing 
+    ? 'aiChatFadeUpClose 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards'
+    : 'aiChatFadeDownOpen 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
 });

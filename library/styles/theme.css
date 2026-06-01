@@ -78,6 +78,28 @@
   }
 }
 
+@keyframes aiChatFadeDownOpen {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes aiChatFadeUpClose {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+}
+
 /* Markdown/chat renderer: ensure long words/URLs/code wrap correctly inside bubbles */
 .markdown-renderer {
   overflow-wrap: anywhere;
