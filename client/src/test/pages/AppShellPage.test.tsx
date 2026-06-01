@@ -11,6 +11,9 @@ type WorkspaceLayoutMockProps = {
       onOpenAccountPreferences: () => void;
       onOpenProjectManager: () => void;
     };
+    projects?: {
+      onSelectDomain?: (domainId: string) => void;
+    };
   };
   children?: ReactNode;
   rightPanels?: ReactNode;
@@ -98,6 +101,9 @@ vi.mock('../../layouts/WorkspaceLayout/WorkspaceLayout', () => ({
       </button>
       <button type="button" onClick={sidebarProps.userMenu.onOpenProjectManager}>
         Open project manager
+      </button>
+      <button type="button" onClick={() => sidebarProps.projects?.onSelectDomain?.('d-1')}>
+        Select domain
       </button>
       {children}
       {rightPanels}
@@ -446,5 +452,30 @@ describe('AppShellPage', () => {
         },
       });
     });
+  });
+
+  it('clears active ticket and applies domain filters when a domain is selected', async () => {
+    const user = userEvent.setup();
+    const setActiveTicket = vi.fn();
+    const setFilters = vi.fn();
+
+    renderAppShell({
+      tickets: buildUseTickets({
+        activeTicket: { id: 't-1' },
+        domains: [{ id: 'd-1', name: 'Frontend', color: '#fff' }],
+        setActiveTicket,
+        setFilters,
+        activeProjectId: 'project-1',
+      }),
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('WorkspaceLayout')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Select domain' }));
+
+    expect(setActiveTicket).toHaveBeenCalledWith(null);
+    expect(setFilters).toHaveBeenCalledWith({ projectId: 'project-1', domainId: 'd-1', cycleId: '', assigneeId: '' });
   });
 });

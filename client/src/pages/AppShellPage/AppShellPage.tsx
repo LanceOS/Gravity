@@ -531,6 +531,7 @@ export function AppShellPage() {
     }
 
     setFilters({ projectId: activeProjectId, assigneeId: '', domainId: '', cycleId: '' });
+    setActiveTicket(null);
     setActiveSection('workspace');
   };
 
@@ -540,6 +541,7 @@ export function AppShellPage() {
     }
 
     setFilters({ projectId: activeProjectId, assigneeId: currentUser.id, domainId: '', cycleId: '' });
+    setActiveTicket(null);
     setActiveSection('workspace');
   };
 
@@ -549,6 +551,7 @@ export function AppShellPage() {
     }
 
     setFilters({ projectId: activeProjectId, cycleId, domainId: '', assigneeId: '' });
+    setActiveTicket(null);
     setActiveSection('workspace');
   };
 
@@ -558,6 +561,7 @@ export function AppShellPage() {
     }
 
     setFilters({ projectId: activeProjectId, domainId, cycleId: '', assigneeId: '' });
+    setActiveTicket(null);
     setActiveSection('workspace');
   };
 
