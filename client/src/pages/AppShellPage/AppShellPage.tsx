@@ -103,6 +103,20 @@ export function AppShellPage() {
   const [createInitialStatus, setCreateInitialStatus] = useState<Ticket['status'] | undefined>(undefined);
   const [createParentId, setCreateParentId] = useState<string | undefined>(undefined);
   const [listSort, setListSort] = useState<TicketListSort>('created');
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth <= 768;
+      setIsMobile(mobile);
+      if (mobile && activeView !== 'list') {
+        setView('list');
+      }
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [activeView, setView]);
   const [projectCreateLoading, setProjectCreateLoading] = useState(false);
   const [projectCreateError, setProjectCreateError] = useState<string | null>(null);
   const [domainCreateLoading, setDomainCreateLoading] = useState(false);
@@ -736,6 +750,7 @@ export function AppShellPage() {
     },
     tools: {
       onOpenOllama: handleToggleOllama,
+      isOllamaOpen,
       onOpenSimulator: () => { },
       onOpenCreateTicket: () => handleOpenCreateTicket(),
       agentIntegration: accountSettings.agentIntegration,
@@ -786,6 +801,7 @@ export function AppShellPage() {
       ) : (
         <WorkspaceLayout
           sidebarProps={sidebarProps}
+          isMobile={isMobile}
           rightPanels={
             <>
               {isOllamaOpen || isOllamaClosing ? (
@@ -802,7 +818,6 @@ export function AppShellPage() {
                   isClosing={isOllamaClosing}
                 />
               ) : null}
-
             </>
           }
         >
@@ -869,37 +884,6 @@ export function AppShellPage() {
       ) : null}
 
       {onboarding}
-
-      {/* Floating Chat Trigger Button */}
-      <button
-        type="button"
-        aria-label={isOllamaOpen ? 'Close AI Assistant' : 'Ask Agent'}
-        onClick={handleToggleOllama}
-        className="clickable"
-        style={{
-          position: 'fixed',
-          bottom: '24px',
-          right: '24px',
-          height: '40px',
-          padding: '0 16px',
-          borderRadius: '20px',
-          background: 'var(--color-primary)',
-          color: 'var(--color-text-on-accent)',
-          border: '1px solid var(--color-border-focus)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '8px',
-          zIndex: 900,
-          cursor: 'pointer',
-          fontWeight: 500,
-          fontSize: '13px',
-        }}
-        title="Toggle AI Assistant"
-      >
-        {isOllamaOpen ? <X size={16} /> : <MessageSquare size={16} />}
-        {isOllamaOpen ? 'Close' : 'Ask Agent'}
-      </button>
     </>
   );
 }

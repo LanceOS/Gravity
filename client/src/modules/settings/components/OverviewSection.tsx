@@ -8,12 +8,14 @@ interface OverviewSectionProps {
   workspace: WorkspaceSummary;
   settings: WorkspaceAdminSettings;
   onChangeSettings: (updates: Partial<WorkspaceAdminSettings>) => void;
+  isMobile: boolean;
 }
 
 export function OverviewSection({
   workspace,
   settings,
   onChangeSettings,
+  isMobile,
 }: OverviewSectionProps) {
   return (
     <Card style={{ padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)' }}>
@@ -25,7 +27,7 @@ export function OverviewSection({
           </p>
         </div>
 
-        <Grid columns={2} gap="var(--space-4)">
+        <Grid columns={isMobile ? 1 : 2} gap="var(--space-4)">
           <TextInput label="Workspace Name" value={workspace.name} disabled />
           <TextInput label="Workspace Key" value={workspace.key} disabled />
         </Grid>
@@ -37,7 +39,7 @@ export function OverviewSection({
           onChange={(event) => onChangeSettings({ hostUrl: event.target.value })}
         />
 
-        <Grid columns={2} gap="var(--space-4)">
+        <Grid columns={isMobile ? 1 : 2} gap="var(--space-4)">
           <Select
             label="Join Policy"
             value={settings.joinMode}
@@ -57,7 +59,7 @@ export function OverviewSection({
 
         <Divider />
 
-        <Grid columns={3} gap="var(--space-3)">
+        <Grid columns={isMobile ? 1 : 3} gap="var(--space-3)">
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--color-base100)', border: '1px solid var(--color-border-default)' }}>
             <Globe size={16} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />
             <div>

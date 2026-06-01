@@ -3,6 +3,7 @@ import { Cpu, Loader2, Send, X } from 'lucide-react';
 import { DenseTextarea } from '../densetextarea';
 import { AIChatMessageBubble } from './AIChatMessage';
 import type { AIChatMessage } from './types';
+import { getWindowStyle } from './styles';
 
 export interface AIChatWindowProps {
   title?: React.ReactNode;
@@ -29,6 +30,14 @@ export function AIChatWindow({
 }: AIChatWindowProps) {
   const [chatInput, setChatInput] = useState('');
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -43,25 +52,7 @@ export function AIChatWindow({
 
   return (
     <div
-      style={{
-        position: 'fixed',
-        bottom: '84px',
-        right: '24px',
-        width: '360px',
-        height: '580px',
-        maxHeight: 'calc(100vh - 140px)',
-        background: 'var(--color-surface-elevated)',
-        border: '1px solid var(--color-border-default)',
-        borderRadius: '16px',
-        boxShadow: 'var(--shadow-xl)',
-        display: 'flex',
-        flexDirection: 'column',
-        zIndex: 900,
-        overflow: 'hidden',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        animation: isClosing ? 'aiChatSlideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards' : 'aiChatSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-      }}
+      style={getWindowStyle(isMobile, isClosing)}
     >
       <div
         style={{

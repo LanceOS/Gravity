@@ -68,28 +68,29 @@ export function MembersSection({ members }: MembersSectionProps) {
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: 'var(--space-4)',
+                gap: 'var(--space-3)',
                 padding: 'var(--space-4)',
                 borderRadius: 'var(--radius-md)',
                 background: 'var(--color-base100)',
-                border: '1px solid var(--color-border-default)'
+                border: '1px solid var(--color-border-default)',
+                minWidth: 0,
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-                <Avatar src={member.avatar} name={member.name} size="md" />
-                <div>
-                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>{member.name}</div>
-                  <div style={{ fontSize: '12px', color: 'var(--color-text-disabled)', marginTop: '2px' }}>{member.email}</div>
-                  <div style={{ fontSize: '11px', color: 'var(--color-text-disabled)', marginTop: '4px', fontStyle: 'italic' }}>
-                    Last active: {formatLastActive(member.lastActiveAt)}
-                  </div>
+              <Avatar src={member.avatar} name={member.name} size="md" style={{ flexShrink: 0 }} />
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>{member.name}</span>
+                  <Badge variant={member.role === 'owner' ? 'accent' : 'default'}>
+                    {member.role}
+                  </Badge>
+                </div>
+                <div style={{ fontSize: '12px', color: 'var(--color-text-disabled)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {member.email}
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--color-text-disabled)', marginTop: '4px', fontStyle: 'italic' }}>
+                  Last active: {formatLastActive(member.lastActiveAt)}
                 </div>
               </div>
-
-              <Badge variant={member.role === 'owner' ? 'accent' : 'default'}>
-                {member.role}
-              </Badge>
             </div>
           ))}
         </Stack>

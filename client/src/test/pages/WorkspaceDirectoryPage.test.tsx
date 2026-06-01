@@ -152,4 +152,38 @@ describe('WorkspaceDirectoryPage', () => {
 
     expect(screen.getByText('No approved workspaces yet. Create one or request access with an invite code.')).toBeInTheDocument();
   });
+
+  it('renders the create/join panel in an accordion on mobile viewports', async () => {
+    const user = userEvent.setup();
+    const originalInnerWidth = window.innerWidth;
+    Object.defineProperty(window, 'innerWidth', {
+      writable: true,
+      configurable: true,
+      value: 500,
+    });
+
+    renderWorkspaceDirectoryPage();
+
+    // Trigger resize to force isMobile state to true
+    window.dispatchEvent(new Event('resize'));
+
+    // Verify accordion button is visible
+    const accordionButton = screen.getByRole('button', { name: /Create or Join Workspace/i });
+    expect(accordionButton).toBeInTheDocument();
+
+    // Initial state: panel content is hidden (Establish Boundary text is inside the panel)
+    expect(screen.queryByText('Establish Boundary')).not.toBeInTheDocument();
+
+    // Click to open
+    await user.click(accordionButton);
+
+    // Verify panel content is visible
+    expect(screen.getByText('Establish Boundary')).toBeInTheDocument();
+
+    // Verify workspace cards use mobile layout by checking for 'Open Workspace' button text
+    // instead of 'Open' (desktop).
+    expect(screen.getAllByRole('button', { name: 'Open Workspace' })).toHaveLength(2);
+
+    window.innerWidth = originalInnerWidth;
+  });
 });

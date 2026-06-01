@@ -793,3 +793,44 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Ticket row responsive visibility */
+.ticket-list__row-mobile {
+  display: none;
+}
+
+.ticket-list__row-desktop {
+  display: block;
+}
+
+@media (max-width: 768px) {
+  .ticket-row {
+    gap: 8px !important;
+    padding: 8px 12px !important;
+  }
+  .ticket-row-key {
+    display: none !important;
+  }
+  .ticket-row-date {
+    display: none !important;
+  }
+  .ticket-row-sub {
+    display: none !important;
+  }
+  .ticket-row-domain {
+    display: none !important;
+  }
+  .ticket-row-pr {
+    font-size: 10px !important;
+    padding: 1px 4px !important;
+  }
+  .workspace-header__mcp-btn {
+    display: none;
+  }
+  .ticket-list__row-desktop {
+    display: none;
+  }
+  .ticket-list__row-mobile {
+    display: block;
+  }
+}

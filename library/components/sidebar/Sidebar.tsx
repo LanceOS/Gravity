@@ -1,4 +1,5 @@
 import React, { CSSProperties } from 'react';
+import './Sidebar.css';
 
 export interface SidebarProps extends React.HTMLAttributes<HTMLElement> {
   children: React.ReactNode;
@@ -85,13 +86,12 @@ export function SidebarGroup({ label, children, className, style, ...props }: Si
     <div className={className} style={{ marginBottom: '6px', ...style }} {...props}>
       {label && (
         <div
+          className="sidebar-group-label"
           style={{
-            fontSize: '10px',
             fontWeight: 600,
             color: 'var(--color-text-disabled)',
             textTransform: 'uppercase',
             letterSpacing: '0.04em',
-            padding: '4px 8px 0 8px',
             marginBottom: '4px',
           }}
         >
@@ -130,9 +130,7 @@ export function SidebarItem({
     display: 'flex',
     alignItems: 'center',
     gap: '10px',
-    padding: nested ? '5px 8px' : '6px 10px',
     borderRadius: '6px',
-    fontSize: nested ? '12px' : '13px',
     color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
     background: active ? 'var(--color-border-default)' : isHovered ? 'rgba(255,255,255,0.03)' : 'transparent',
     fontWeight: 400,
@@ -146,7 +144,7 @@ export function SidebarItem({
 
   return (
     <button
-      className={className}
+      className={`sidebar-item ${nested ? 'sidebar-item-nested' : ''} ${className || ''}`}
       style={baseStyle}
       onMouseEnter={(e) => {
         setIsHovered(true);

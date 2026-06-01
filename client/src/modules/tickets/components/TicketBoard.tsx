@@ -27,7 +27,7 @@ export const TicketBoard: React.FC<TicketBoardProps> = ({
         align="center"
         gap="8px"
         style={{
-          padding: '16px 20px 8px 20px',
+          padding: '10px 20px 8px 20px',
           width: '100%',
           boxSizing: 'border-box'
         }}
@@ -102,7 +102,7 @@ export const TicketBoard: React.FC<TicketBoardProps> = ({
     <Flex direction="column" style={{ height: '100%', flex: 1, overflow: 'hidden' }}>
 
       {/* Kanban Board Container */}
-      <div style={{ flex: 1, overflowY: 'hidden', padding: '16px', background: 'var(--color-surface-app)' }}>
+      <div style={{ flex: 1, overflowY: 'hidden', padding: '8px 16px 16px', background: 'var(--color-surface-app)' }}>
         <KanbanBoard
           columns={BOARD_COLUMNS}
           cards={formattedCards}

@@ -3,8 +3,8 @@
 .workspace-header {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 16px 24px;
+  gap: 12px;
+  padding: 12px 24px;
   background: var(--color-base50); /* Clean solid background to avoid backdrop-filter viewport-containing-block issue for Select dropdowns */
   flex-shrink: 0;
   z-index: 10;
@@ -72,4 +72,14 @@
   display: flex;
   align-items: center;
   width: 100%;
+}
+
+@media (max-width: 768px) {
+  .workspace-header {
+    padding: 12px 16px !important;
+    gap: 12px !important;
+  }
+  .workspace-header__view-toggle {
+    display: none !important;
+  }
 }

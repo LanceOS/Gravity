@@ -478,4 +478,36 @@ describe('AppShellPage', () => {
     expect(setActiveTicket).toHaveBeenCalledWith(null);
     expect(setFilters).toHaveBeenCalledWith({ projectId: 'project-1', domainId: 'd-1', cycleId: '', assigneeId: '' });
   });
+
+  it('forces activeView to list mode and triggers setView when resizing to a mobile viewport', async () => {
+    const setView = vi.fn();
+    
+    // Stub window.innerWidth
+    const originalInnerWidth = window.innerWidth;
+    Object.defineProperty(window, 'innerWidth', {
+      writable: true,
+      configurable: true,
+      value: 1024,
+    });
+
+    renderAppShell({
+      tickets: buildUseTickets({
+        activeView: 'board',
+        setView,
+      }),
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('WorkspaceLayout')).toBeInTheDocument();
+    });
+
+    // Resize to mobile
+    window.innerWidth = 500;
+    window.dispatchEvent(new Event('resize'));
+
+    expect(setView).toHaveBeenCalledWith('list');
+
+    // Restore window.innerWidth
+    window.innerWidth = originalInnerWidth;
+  });
 });

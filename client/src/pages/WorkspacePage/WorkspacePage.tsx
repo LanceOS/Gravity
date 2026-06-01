@@ -133,7 +133,7 @@ export function WorkspacePage({
               />
             )}
             {!activeTicket && (
-              <div style={{ marginLeft: 12 }}>
+              <div style={{ marginLeft: 12 }} className="workspace-header__mcp-btn">
                 <Button type="button" variant="secondary" onClick={() => setIsMcpOpen(true)}>
                   Connect External AI
                 </Button>

@@ -53,6 +53,12 @@ vi.mock('../../modules/tickets/components/TicketRow', () => ({
   ),
 }));
 
+vi.mock('../../modules/tickets/components/TicketRowMobile', () => ({
+  TicketRowMobile: ({ ticket, onClick, assigneeAvatar }: TicketRowProps) => (
+    <button type="button" onClick={() => onClick(ticket)}>{`TicketRowMobile ${ticket.key} ${assigneeAvatar || 'no-avatar'}`}</button>
+  ),
+}));
+
 vi.mock('../../modules/tickets/components/DenseGridController', () => ({
   DenseGridController: ({ tickets, onSelectTicket }: { tickets: Array<{ key: string }>; onSelectTicket: (ticket: { key: string }) => void }) => (
     <div>
@@ -141,7 +147,10 @@ describe('TicketList', () => {
     expect(screen.getByText('BACKLOG')).toBeInTheDocument();
     expect(screen.getByText('DONE')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'TicketRow GRA-1 avatar-1.png' }));
+    expect(screen.getByText('TicketRow GRA-1 avatar-1.png')).toBeInTheDocument();
+    expect(screen.getByText('TicketRowMobile GRA-1 avatar-1.png')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'TicketRowMobile GRA-1 avatar-1.png' }));
     expect(props.onSelectTicket).toHaveBeenCalledWith(backlogTicket);
   });
 });

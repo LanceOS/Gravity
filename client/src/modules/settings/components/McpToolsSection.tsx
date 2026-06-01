@@ -130,8 +130,8 @@ export function McpToolsSection({
                       data-testid={`mcp-tool-row-${tool.name}`}
                       style={{
                         display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
+                        flexDirection: 'column',
+                        alignItems: 'flex-start',
                         gap: 'var(--space-4)',
                         padding: 'var(--space-4)',
                         borderRadius: 'var(--radius-md)',
@@ -140,7 +140,7 @@ export function McpToolsSection({
                         transition: 'border-color 0.2s ease',
                       }}
                     >
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
                           <div
                             style={{
@@ -163,7 +163,7 @@ export function McpToolsSection({
                         </span>
                       </div>
 
-                      <div style={{ flexShrink: 0 }}>
+                      <div style={{ paddingLeft: 'calc(8px + var(--space-3))' }}>
                         <Switch
                           label={isEnabled ? 'Enabled' : 'Disabled'}
                           checked={isEnabled}

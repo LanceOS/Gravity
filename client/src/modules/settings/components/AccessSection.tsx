@@ -10,6 +10,7 @@ interface AccessSectionProps {
   revokeLoadingId: string | null;
   onCreateInvite: (input: CreateWorkspaceInviteInput) => Promise<boolean>;
   onRevokeInvite: (inviteId: string) => Promise<boolean>;
+  isMobile: boolean;
 }
 
 const COPY_FEEDBACK_STORAGE_KEY = 'gravity_peer_invite_copy_feedback';
@@ -32,6 +33,7 @@ export function AccessSection({
   revokeLoadingId,
   onCreateInvite,
   onRevokeInvite,
+  isMobile,
 }: AccessSectionProps) {
   const latestInvite = invites[0] ?? null;
   const [label, setLabel] = useState('');
@@ -139,7 +141,7 @@ export function AccessSection({
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-end' }}>
+        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 'var(--space-3)', alignItems: isMobile ? 'stretch' : 'flex-end' }}>
           <div style={{ flex: 1 }}>
             <TextInput
               label="Invite Label"
@@ -210,9 +212,10 @@ export function AccessSection({
                 key={invite.id}
                 style={{
                   display: 'flex',
-                  alignItems: 'center',
+                  flexDirection: isMobile ? 'column' : 'row',
+                  alignItems: isMobile ? 'flex-start' : 'center',
                   justifyContent: 'space-between',
-                  gap: 'var(--space-4)',
+                  gap: 'var(--space-3)',
                   padding: 'var(--space-4)',
                   borderRadius: 'var(--radius-md)',
                   background: 'var(--color-base100)',

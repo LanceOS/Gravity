@@ -39,6 +39,7 @@ export interface SidebarProjectSection {
 
 export interface SidebarToolSection {
   onOpenOllama: () => void;
+  isOllamaOpen?: boolean;
   onOpenSimulator: () => void;
   onOpenCreateTicket: () => void;
   agentIntegration?: 'ollama' | 'third_party';

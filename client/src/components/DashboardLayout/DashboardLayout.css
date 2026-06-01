@@ -72,3 +72,16 @@
   position: relative;
   background: var(--color-surface-app);
 }
+
+@media (max-width: 768px) {
+  .dashboard-layout {
+    grid-template-columns: 1fr !important;
+  }
+  .dashboard-layout > aside,
+  .dashboard-layout__sidebar {
+    display: none !important;
+  }
+  .dashboard-layout__main {
+    grid-column: 1 !important;
+  }
+}
