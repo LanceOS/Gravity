@@ -162,43 +162,19 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
 
   return (
     <>
-      <div 
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          height: '100%',
-          flex: 1,
-          background: 'var(--color-surface-app)',
-          overflow: 'hidden'
-        }}
-      >
-      <div 
-        style={{
-          padding: '12px 24px',
-          borderBottom: '1px solid var(--color-border-default)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          background: 'var(--color-base50)'
-        }}
-      >
+      <div className="ticket-detail">
+      <div className="ticket-detail__header">
         <Button
           onClick={onClose}
           variant="ghost"
           size="sm"
-          style={{
-            color: 'var(--color-text-secondary)',
-            padding: '4px 6px',
-            border: 'none',
-            minHeight: '28px',
-            fontSize: '13px'
-          }}
+          className="ticket-detail__back-btn clickable"
         >
           <ChevronLeft size={16} />
           <span>Back</span>
         </Button>
 
-        <span style={{ color: 'var(--color-text-disabled)' }}>/</span>
+        <span className="ticket-detail__sep">/</span>
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ fontFamily: 'var(--mono)', fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)', whiteSpace: 'nowrap' }}>
@@ -554,18 +530,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
 
         </div>
 
-        <div 
-          style={{
-            width: '280px',
-            borderLeft: '1px solid var(--color-border-default)',
-            padding: '24px 20px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '20px',
-            background: 'var(--color-base50)',
-            overflowY: 'auto'
-          }}
-        >
+        <div className="ticket-detail__sidebar">
           <TicketUtilities
             ticketLink={ticketLink}
             generatedBranchName={generatedBranchName}

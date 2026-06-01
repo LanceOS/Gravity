@@ -7,3 +7,72 @@
   background: var(--color-base100);
   transform: translateX(3px);
 }
+
+/* Extracted layout classes for TicketDetail */
+.ticket-detail {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  flex: 1 1 auto;
+  background: var(--color-surface-app);
+  overflow: hidden;
+}
+
+.ticket-detail__header {
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--color-border-default);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--color-base50);
+}
+
+.ticket-detail__back-btn {
+  color: var(--color-text-secondary);
+  padding: 4px 6px;
+  border: none;
+  min-height: 28px;
+  font-size: 13px;
+}
+
+.ticket-detail__sep {
+  color: var(--color-text-disabled);
+}
+
+.ticket-detail__key-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ticket-detail__delete-btn {
+  margin-left: auto;
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.ticket-detail__body {
+  flex: 1 1 auto;
+  display: flex;
+  overflow: hidden;
+}
+
+.ticket-detail__content {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 24px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.ticket-detail__sidebar {
+  width: 280px;
+  border-left: 1px solid var(--color-border-default);
+  padding: 24px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  background: var(--color-base50);
+  overflow-y: auto;
+}
