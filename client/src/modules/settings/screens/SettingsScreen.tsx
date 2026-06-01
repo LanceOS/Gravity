@@ -226,6 +226,7 @@ export function SettingsScreen({
                     deleteError={deleteError}
                     onDeleteWorkspace={onDeleteWorkspace}
                     onClearDeleteError={onClearDeleteError}
+                    isMobile={isMobile}
                   />
                 </>
               )}

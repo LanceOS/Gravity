@@ -8,6 +8,7 @@ interface DangerZoneSectionProps {
   deleteError?: string | null;
   onDeleteWorkspace?: () => Promise<void>;
   onClearDeleteError?: () => void;
+  isMobile?: boolean;
 }
 
 export function DangerZoneSection({
@@ -16,6 +17,7 @@ export function DangerZoneSection({
   deleteError,
   onDeleteWorkspace,
   onClearDeleteError,
+  isMobile,
 }: DangerZoneSectionProps) {
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
 
@@ -23,7 +25,7 @@ export function DangerZoneSection({
     <Card style={{ padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)', border: '1px solid rgba(239, 68, 68, 0.3)', background: 'rgba(239, 68, 68, 0.05)' }}>
       <Stack gap="var(--space-5)">
         <div>
-          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: '#FFF' }}>Danger Zone</h2>
+          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: '#ef4444' }}>Danger Zone</h2>
           <p style={{ margin: '4px 0 0', color: 'var(--color-text-disabled)', fontSize: '12.5px', lineHeight: 1.5 }}>
             Deleting a workspace is permanent and cannot be undone. All projects, tickets, comments, and members within this workspace will be deleted.
           </p>
@@ -35,7 +37,7 @@ export function DangerZoneSection({
           </Alert>
         )}
 
-        <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-end' }}>
+        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 'var(--space-3)', alignItems: isMobile ? 'stretch' : 'flex-end' }}>
           <div style={{ flex: 1 }}>
             <TextInput
               label={`Type "${workspace.name}" to confirm`}
