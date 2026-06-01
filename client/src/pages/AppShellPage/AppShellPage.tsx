@@ -61,6 +61,7 @@ export function AppShellPage() {
 
   const [activeSection, setActiveSection] = useState<AppSection>('workspace');
   const [activeWorkspaceId, setActiveWorkspaceId] = useState('');
+  const [activeContext, setActiveContext] = useState<'issues' | 'notes'>('issues');
   const [workspaceReady, setWorkspaceReady] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isOllamaOpen, setIsOllamaOpen] = useState(false);
@@ -471,6 +472,7 @@ export function AppShellPage() {
     setActiveProjectId(projectId);
     setActiveTicket(null);
     setFilters({ assigneeId: '', domainId: '', cycleId: '' });
+    setActiveContext('issues');
     setActiveSection(nextSection);
   };
 
@@ -546,6 +548,7 @@ export function AppShellPage() {
 
     setFilters({ projectId: activeProjectId, assigneeId: '', domainId: '', cycleId: '' });
     setActiveTicket(null);
+    setActiveContext('issues');
     setActiveSection('workspace');
   };
 
@@ -556,6 +559,7 @@ export function AppShellPage() {
 
     setFilters({ projectId: activeProjectId, assigneeId: currentUser.id, domainId: '', cycleId: '' });
     setActiveTicket(null);
+    setActiveContext('issues');
     setActiveSection('workspace');
   };
 
@@ -566,6 +570,7 @@ export function AppShellPage() {
 
     setFilters({ projectId: activeProjectId, cycleId, domainId: '', assigneeId: '' });
     setActiveTicket(null);
+    setActiveContext('issues');
     setActiveSection('workspace');
   };
 
@@ -576,6 +581,17 @@ export function AppShellPage() {
 
     setFilters({ projectId: activeProjectId, domainId, cycleId: '', assigneeId: '' });
     setActiveTicket(null);
+    setActiveContext('issues');
+    setActiveSection('workspace');
+  };
+
+  const handleShowNotes = () => {
+    if (!activeProjectId) {
+      return;
+    }
+
+    setActiveTicket(null);
+    setActiveContext('notes');
     setActiveSection('workspace');
   };
 
@@ -742,9 +758,11 @@ export function AppShellPage() {
         domains: domainCounts,
         cycles: cycleCounts,
       },
+      activeContext,
       onSelectProject: handleSelectProject,
       onShowProjectIssues: handleShowProjectIssues,
       onShowMyIssues: handleShowMyIssues,
+      onShowNotes: handleShowNotes,
       onSelectCycle: handleSelectCycle,
       onSelectDomain: handleSelectDomain,
     },
@@ -840,6 +858,7 @@ export function AppShellPage() {
           ) : (
             <WorkspacePage
               workspaceId={activeWorkspaceId}
+              activeContext={activeContext}
               activeTicket={activeTicket}
               activeView={activeView}
               comments={comments}
@@ -859,6 +878,7 @@ export function AppShellPage() {
               onOpenCreateTicket={handleOpenCreateTicket}
               onOpenProjectManager={handleOpenProjectManager}
               onSelectTicket={setActiveTicket}
+              onSelectNote={(noteId) => console.log('Select note:', noteId)}
               onSetFilters={setFilters}
               onSetListSort={setListSort}
               onSetView={setView}

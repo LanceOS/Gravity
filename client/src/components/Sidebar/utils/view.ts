@@ -9,10 +9,11 @@ export function getProjectCollapsedState(
 }
 
 export function isProjectIssuesView(section: SidebarProjectSection) {
-  const { activeProjectId, filters } = section;
+  const { activeProjectId, filters, activeContext } = section;
 
   return (
-    filters.projectId === activeProjectId
+    activeContext !== 'notes'
+    && filters.projectId === activeProjectId
     && !filters.assigneeId
     && !filters.domainId
     && !filters.cycleId
@@ -20,12 +21,17 @@ export function isProjectIssuesView(section: SidebarProjectSection) {
 }
 
 export function isMyIssuesView(section: SidebarProjectSection) {
-  const { activeProjectId, currentUser, filters } = section;
+  const { activeProjectId, currentUser, filters, activeContext } = section;
 
   return (
-    filters.projectId === activeProjectId
+    activeContext !== 'notes'
+    && filters.projectId === activeProjectId
     && filters.assigneeId === currentUser.id
     && !filters.domainId
     && !filters.cycleId
   );
+}
+
+export function isNotesView(section: SidebarProjectSection) {
+  return section.activeContext === 'notes';
 }

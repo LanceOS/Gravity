@@ -3,6 +3,7 @@ import { Button } from '@library';
 import type { Comment, Cycle, Domain, Project, Ticket, User } from '../../context/TicketContext';
 import type { TicketFilters, TicketListSort } from '../../modules/tickets/utils/ticketView';
 import { TicketBoard, TicketList, TicketDetail, TicketFilterBar } from '../../modules/tickets';
+import { NotesList } from '../../modules/notes';
 import {
   filterTickets,
   getWorkspaceHeaderTitle,
@@ -16,6 +17,7 @@ import './WorkspacePage.css';
 
 interface WorkspacePageProps {
   workspaceId?: string;
+  activeContext?: 'issues' | 'notes';
   activeTicket: Ticket | null;
   activeView: 'board' | 'list';
   comments: Comment[];
@@ -35,6 +37,7 @@ interface WorkspacePageProps {
   onOpenCreateTicket: (initialStatus?: Ticket['status']) => void;
   onOpenProjectManager: () => void;
   onSelectTicket: (ticket: Ticket | null) => void;
+  onSelectNote?: (noteId: string) => void;
   onSetFilters: (filters: Partial<TicketFilters>) => void;
   onSetListSort: (sort: TicketListSort) => void;
   onSetView: (view: 'board' | 'list') => void;
@@ -43,6 +46,7 @@ interface WorkspacePageProps {
 
 export function WorkspacePage({
   workspaceId,
+  activeContext = 'issues',
   activeTicket,
   activeView,
   comments,
@@ -62,6 +66,7 @@ export function WorkspacePage({
   onOpenCreateTicket,
   onOpenProjectManager,
   onSelectTicket,
+  onSelectNote,
   onSetFilters,
   onSetListSort,
   onSetView,
@@ -126,13 +131,13 @@ export function WorkspacePage({
         <WorkspaceHeader>
           <WorkspaceHeader.Top>
             <WorkspaceHeader.Title>{headerTitle}</WorkspaceHeader.Title>
-            {!activeTicket && (
+            {!activeTicket && activeContext === 'issues' && (
               <WorkspaceHeader.ViewToggle
                 activeView={activeView}
                 onSetView={onSetView}
               />
             )}
-            {!activeTicket && (
+            {!activeTicket && activeContext === 'issues' && (
               <div style={{ marginLeft: 12 }} className="workspace-header__mcp-btn">
                 <Button type="button" variant="secondary" onClick={() => setIsMcpOpen(true)}>
                   Connect External AI
@@ -141,7 +146,7 @@ export function WorkspacePage({
             )}
           </WorkspaceHeader.Top>
           
-          {!activeTicket && (
+          {!activeTicket && activeContext === 'issues' && (
             <WorkspaceHeader.Bottom>
               <TicketFilterBar
                 filters={filters}
@@ -163,7 +168,9 @@ export function WorkspacePage({
         <div className={`workspace-page__issues ${activeTicket ? 'workspace-page__issues--hidden' : ''}`}>
           <div className="workspace-page__issues-shell">
             <div className="workspace-page__issues-content">
-              {projects.length === 0 ? (
+              {activeContext === 'notes' ? (
+                <NotesList projectId={filters.projectId || ''} onSelectNote={onSelectNote || (() => {})} />
+              ) : projects.length === 0 ? (
                 <div className="workspace-page__empty-state">
                   <div className="workspace-page__empty-state-title">No projects in this workspace yet</div>
                   <p className="workspace-page__empty-state-copy">

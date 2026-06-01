@@ -29,6 +29,7 @@ describe('Sidebar', () => {
           onSelectProject: vi.fn(),
           onShowProjectIssues: vi.fn(),
           onShowMyIssues: vi.fn(),
+          onShowNotes: vi.fn(),
           onSelectCycle: vi.fn(),
           onSelectDomain: vi.fn(),
         }}
