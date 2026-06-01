@@ -70,7 +70,7 @@ function sanitizeTicketUrlBase(raw?: string): string {
 const TICKET_URL_BASE = sanitizeTicketUrlBase((typeof import.meta !== 'undefined' && (import.meta as unknown as { env?: Record<string, string | undefined> }).env?.VITE_TICKET_URL_BASE) || undefined);
 import { 
   CheckSquare, GitPullRequest, GitMerge, Send, Trash2,
-  Plus, Edit3, ChevronLeft, MoreHorizontal, Link, FileText, Ticket as TicketIcon
+  Plus, Edit3, ChevronLeft, MoreHorizontal, Link, FileText, CornerLeftUp
 } from 'lucide-react';
 import { MarkdownContent } from './MarkdownContent';
 import { TicketRow } from './TicketRow';
@@ -335,9 +335,9 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                 className="ticket-parent-mobile-btn"
                 onClick={() => onSelectTicket(parentTicket)}
                 aria-label={`Parent ticket: ${parentTicket.key}`}
-                style={{ padding: '2px 8px', fontSize: '11px', height: '26px' }}
+                style={{ padding: '4px 10px', fontSize: '12.5px', height: '28px' }}
               >
-                <TicketIcon size={12} />
+                <CornerLeftUp size={14} />
                 <span>Parent</span>
               </Button>
             </>
