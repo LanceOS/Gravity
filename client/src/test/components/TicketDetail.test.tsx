@@ -275,6 +275,9 @@ describe('TicketDetail', () => {
     const user = userEvent.setup();
     const { props } = renderTicketDetail();
 
+    await user.click(screen.getByRole('button', { name: /Ticket Details/i }));
+
+    expect(screen.getByLabelText('Select ticket status')).toBeInTheDocument();
     await user.selectOptions(screen.getByLabelText('Select ticket status'), 'done');
     expect(props.onUpdateTicket).toHaveBeenCalledWith('ticket-1', { status: 'done' });
 
@@ -321,6 +324,8 @@ describe('TicketDetail', () => {
     const writeTextSpy = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
     const toastSpy = vi.spyOn(toast, 'show').mockImplementation(() => 'mock-toast-id');
 
+    await user.click(screen.getByRole('button', { name: /Ticket Details/i }));
+
     expect(screen.getByRole('link', { name: 'Ticket link' })).toHaveAttribute(
       'href',
       'https://tickets.placeholder.local/GRA-101'
@@ -345,6 +350,8 @@ describe('TicketDetail', () => {
     const { props } = renderTicketDetail();
     const writeTextSpy = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
     const toastSpy = vi.spyOn(toast, 'show').mockImplementation(() => 'mock-toast-id');
+
+    await user.click(screen.getByRole('button', { name: /Ticket Details/i }));
 
     // Verify right-sidebar utilities
     expect(screen.getByText('Ticket Utilities')).toBeInTheDocument();

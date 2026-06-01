@@ -47,11 +47,24 @@ export function Accordion({ items, style }: AccordionProps) {
               <span>{item.title}</span>
               <span>{isOpen ? '▲' : '▼'}</span>
             </button>
-            {isOpen && (
-              <div style={{ padding: '12px 16px', borderTop: '1px solid var(--color-border-default)', fontSize: '13px', color: 'var(--color-text-secondary)' }}>
-                {item.content}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateRows: isOpen ? '1fr' : '0fr',
+                transition: 'grid-template-rows 0.3s ease-in-out',
+              }}
+            >
+              <div style={{ overflow: 'hidden' }}>
+                <div style={{ 
+                  padding: '12px 16px', 
+                  borderTop: '1px solid var(--color-border-default)', 
+                  fontSize: '13px', 
+                  color: 'var(--color-text-secondary)' 
+                }}>
+                  {item.content}
+                </div>
               </div>
-            )}
+            </div>
           </div>
         );
       })}
