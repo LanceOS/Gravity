@@ -3,7 +3,7 @@ import { Button } from '@library';
 import type { Comment, Cycle, Domain, Project, Ticket, User } from '../../context/TicketContext';
 import type { TicketFilters, TicketListSort } from '../../modules/tickets/utils/ticketView';
 import { TicketBoard, TicketList, TicketDetail, TicketFilterBar } from '../../modules/tickets';
-import { NotesList } from '../../modules/notes';
+import { NotesList, NoteEditor } from '../../modules/notes';
 import {
   filterTickets,
   getWorkspaceHeaderTitle,
@@ -19,6 +19,7 @@ import './WorkspacePage.css';
 interface WorkspacePageProps {
   workspaceId?: string;
   activeContext?: 'issues' | 'notes';
+  activeNoteId?: string;
   activeTicket: Ticket | null;
   activeView: 'board' | 'list';
   comments: Comment[];
@@ -48,6 +49,7 @@ interface WorkspacePageProps {
 export function WorkspacePage({
   workspaceId,
   activeContext = 'issues',
+  activeNoteId,
   activeTicket,
   activeView,
   comments,
@@ -126,6 +128,29 @@ export function WorkspacePage({
     });
   }, [filters, onSetFilters]);
 
+  const handleCreateNote = useCallback(async () => {
+    if (!filters.projectId) return;
+    try {
+      const response = await fetch('/api/v1/notes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-project-id': filters.projectId,
+        },
+        body: JSON.stringify({
+          title: 'Untitled Note',
+          body: '# \n\n',
+        }),
+      });
+      if (response.ok) {
+        const note = await response.json();
+        onSelectNote?.(note.id);
+      }
+    } catch (err) {
+      console.error('Failed to create note', err);
+    }
+  }, [filters.projectId, onSelectNote]);
+
   const displayTitle = activeContext === 'notes' ? 'Notes' : headerTitle;
 
   return (
@@ -149,9 +174,15 @@ export function WorkspacePage({
             )}
             {!activeTicket && activeContext === 'notes' && (
               <div style={{ marginLeft: 'auto' }}>
-                <Button type="button" variant="primary" onClick={() => console.log('Create Note')}>
-                  Create New Note
-                </Button>
+                {activeNoteId ? (
+                  <Button type="button" variant="secondary" onClick={() => onSelectNote?.('')}>
+                    Back to Notes
+                  </Button>
+                ) : (
+                  <Button type="button" variant="primary" onClick={handleCreateNote}>
+                    Create New Note
+                  </Button>
+                )}
               </div>
             )}
           </WorkspaceHeader.Top>
@@ -180,7 +211,11 @@ export function WorkspacePage({
             <div className="workspace-page__issues-content">
               {activeContext === 'notes' ? (
                 <WorkspaceViewContainer>
-                  <NotesList projectId={filters.projectId || ''} onSelectNote={onSelectNote || (() => {})} />
+                  {activeNoteId ? (
+                    <NoteEditor projectId={filters.projectId || ''} noteId={activeNoteId} />
+                  ) : (
+                    <NotesList projectId={filters.projectId || ''} onSelectNote={onSelectNote || (() => {})} />
+                  )}
                 </WorkspaceViewContainer>
               ) : projects.length === 0 ? (
                 <div className="workspace-page__empty-state">

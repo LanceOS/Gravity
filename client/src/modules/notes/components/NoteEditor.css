@@ -1,0 +1,197 @@
+.note-editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg-surface);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  position: relative;
+}
+
+.note-editor__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-surface-elevated);
+}
+
+
+.note-editor__status {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  margin-left: var(--spacing-md);
+  white-space: nowrap;
+}
+
+.note-editor__status--error {
+  color: var(--color-danger);
+}
+
+.note-editor__toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-md);
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-surface);
+  flex-wrap: wrap;
+}
+
+.note-editor__toolbar-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--border-color);
+  margin: 0 var(--spacing-xs);
+}
+
+.note-editor__toolbar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.note-editor__toolbar-btn:hover {
+  background: var(--bg-surface-hover);
+  color: var(--text-primary);
+}
+
+.note-editor__toolbar-btn--active {
+  background: var(--color-primary-subtle);
+  color: var(--color-primary);
+}
+
+.note-editor__toolbar-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.note-editor__content {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-lg) var(--spacing-xl);
+  position: relative;
+}
+
+.note-editor__content .ProseMirror {
+  min-height: 100%;
+  outline: none;
+  color: var(--text-primary);
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+/* TipTap default styles */
+.note-editor__content .ProseMirror p.is-editor-empty:first-child::before,
+.note-editor__content .ProseMirror h1.is-empty::before,
+.note-editor__content .ProseMirror h2.is-empty::before,
+.note-editor__content .ProseMirror p.is-empty::before {
+  color: var(--text-tertiary);
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.note-editor__content .ProseMirror p {
+  margin-bottom: 1em;
+}
+
+.note-editor__content .ProseMirror h1,
+.note-editor__content .ProseMirror h2,
+.note-editor__content .ProseMirror h3 {
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.note-editor__content .ProseMirror ul,
+.note-editor__content .ProseMirror ol {
+  padding-left: 1.5em;
+  margin-bottom: 1em;
+}
+
+.note-editor__content .ProseMirror code {
+  background: var(--bg-surface-elevated);
+  padding: 0.2em 0.4em;
+  border-radius: var(--radius-sm);
+  font-family: monospace;
+  font-size: 0.9em;
+}
+
+.note-editor__content .ProseMirror pre {
+  background: var(--bg-surface-elevated);
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+  margin-bottom: 1em;
+}
+
+.note-editor__content .ProseMirror pre code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+
+.note-editor__content .ProseMirror blockquote {
+  border-left: 3px solid var(--color-primary);
+  padding-left: 1em;
+  margin-left: 0;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.note-editor__content .ProseMirror img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-md);
+  margin: 1em 0;
+}
+
+.note-editor__content .ProseMirror img.ProseMirror-selectednode {
+  outline: 2px solid var(--color-primary);
+}
+
+.note-editor__drag-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(var(--color-primary-rgb), 0.1);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  border: 2px dashed var(--color-primary);
+  border-radius: var(--radius-md);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.note-editor__drag-overlay--active {
+  opacity: 1;
+}
+
+.note-editor__drag-message {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  background: var(--bg-surface);
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-md);
+}
