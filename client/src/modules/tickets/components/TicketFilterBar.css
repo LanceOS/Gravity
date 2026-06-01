@@ -63,7 +63,6 @@
   .ticket-filter-bar__grid {
     grid-template-columns: 1fr 1fr;
   }
-  }
 }
 .ticket-filter-bar__metrics {
   margin-top: 4px;

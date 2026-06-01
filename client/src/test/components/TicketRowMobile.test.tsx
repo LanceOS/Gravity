@@ -62,6 +62,9 @@ describe('TicketRowMobile', () => {
       <TicketRowMobile
         ticket={ticketWithoutMeta}
         onClick={vi.fn()}
+        priorityIcon={null as any}
+        assigneeAvatar={null as any}
+        domainTag={null as any}
       />
     );
 
