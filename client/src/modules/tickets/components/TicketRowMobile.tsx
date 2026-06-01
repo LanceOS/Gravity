@@ -10,7 +10,7 @@ function TicketRowMobileImpl({ ticket, onClick, priorityIcon, assigneeAvatar, do
     onClick(ticket);
   }, [onClick, ticket]);
 
-  const hasMeta = !!ticket.domainId || !!ticket.parentId;
+  const formattedDate = new Date(ticket.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
   return (
     <div
@@ -34,9 +34,9 @@ function TicketRowMobileImpl({ ticket, onClick, priorityIcon, assigneeAvatar, do
         </div>
       </div>
 
-      {/* Meta row: domain + sub-ticket indicator */}
-      {hasMeta && (
-        <div className="ticket-row-mobile__meta">
+      {/* Meta row: domain + sub-ticket indicator + date */}
+      <div className="ticket-row-mobile__meta">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           {ticket.domainId && domainTag && (
             <div className="ticket-row-mobile__domain">{domainTag}</div>
           )}
@@ -47,7 +47,10 @@ function TicketRowMobileImpl({ ticket, onClick, priorityIcon, assigneeAvatar, do
             </span>
           )}
         </div>
-      )}
+        <span style={{ marginLeft: 'auto', fontSize: '11px', color: 'var(--color-text-disabled)', whiteSpace: 'nowrap' }}>
+          {formattedDate}
+        </span>
+      </div>
     </div>
   );
 }

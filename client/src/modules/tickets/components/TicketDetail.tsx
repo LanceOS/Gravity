@@ -74,6 +74,7 @@ import {
 } from 'lucide-react';
 import { MarkdownContent } from './MarkdownContent';
 import { TicketRow } from './TicketRow';
+import { TicketRowMobile } from './TicketRowMobile';
 import { getPriorityIcon, getAssigneeAvatar, getDomainTag } from '../utils/TicketList';
 import type { TicketDetailProps } from '../types/TicketDetail';
 import { PRIORITY_OPTIONS, STATUS_OPTIONS } from '../utils/TicketDetail';
@@ -428,16 +429,25 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                   {(() => {
                     const userAvatarById = Object.fromEntries(users.map((u) => [u.id, u.avatar]));
                     const domainById = Object.fromEntries(domains.map((d) => [d.id, d]));
-                    return subtasks.map((sub) => (
-                      <TicketRow
-                        key={sub.id}
-                        ticket={sub}
-                        onClick={onSelectTicket}
-                        priorityIcon={getPriorityIcon(sub.priority)}
-                        assigneeAvatar={getAssigneeAvatar(userAvatarById, sub.assigneeId)}
-                        domainTag={getDomainTag(domainById, sub.domainId)}
-                      />
-                    ));
+                    return subtasks.map((sub) => {
+                      const rowProps = {
+                        ticket: sub,
+                        onClick: onSelectTicket,
+                        priorityIcon: getPriorityIcon(sub.priority),
+                        assigneeAvatar: getAssigneeAvatar(userAvatarById, sub.assigneeId),
+                        domainTag: getDomainTag(domainById, sub.domainId),
+                      };
+                      return (
+                        <React.Fragment key={sub.id}>
+                          <div className="ticket-list__row-desktop">
+                            <TicketRow {...rowProps} />
+                          </div>
+                          <div className="ticket-list__row-mobile">
+                            <TicketRowMobile {...rowProps} />
+                          </div>
+                        </React.Fragment>
+                      );
+                    });
                   })()}
                 </div>
 
