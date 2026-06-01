@@ -17,7 +17,6 @@ export const TicketFilterBar: React.FC<TicketFilterBarProps> = ({
   onClearFilters,
   filteredCount,
   totalCount,
-  completedCount,
   listSort,
   onListSortChange,
   domains,
@@ -110,15 +109,13 @@ export const TicketFilterBar: React.FC<TicketFilterBarProps> = ({
         <Accordion
           items={[{ id: 'filters', title: filterTitle, content: accordionContent }]}
         />
-        <span className="ticket-filter-bar__count">
-          {filteredCount} of {totalCount}
-        </span>
       </div>
 
-      {/* Row 3: Total tickets count */}
-      <div className="ticket-filter-bar__total">
-        <span>Total tickets: {totalCount}</span>
-        <span>Completed: {completedCount}</span>
+      {/* Row 3: Metrics */}
+      <div className="ticket-filter-bar__metrics">
+        <span className="ticket-filter-bar__count">
+          {filteredCount} of {totalCount} tickets
+        </span>
       </div>
     </div>
   );

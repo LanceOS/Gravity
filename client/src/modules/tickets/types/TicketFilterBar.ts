@@ -8,7 +8,6 @@ export interface TicketFilterBarProps {
   onClearFilters: () => void;
   filteredCount: number;
   totalCount: number;
-  completedCount: number;
   listSort?: TicketListSort;
   onListSortChange?: (sort: TicketListSort) => void;
   domains?: Domain[];

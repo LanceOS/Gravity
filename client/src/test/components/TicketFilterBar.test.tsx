@@ -48,9 +48,7 @@ describe('TicketFilterBar', () => {
 
     render(<TicketFilterBar {...props} />);
 
-    expect(screen.getByText('Completed: 3')).toBeInTheDocument();
-    expect(screen.getByText('Total tickets: 10')).toBeInTheDocument();
-    expect(screen.getByText('5 of 10')).toBeInTheDocument();
+    expect(screen.getByText('5 of 10 tickets')).toBeInTheDocument();
   });
 
   it('renders filters inside accordion', async () => {

@@ -160,6 +160,140 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
   const domainOptions = [{ value: '', label: 'No Domain' }, ...domains.map((domain) => ({ value: domain.id, label: domain.name }))];
   const cycleOptions = [{ value: '', label: 'No Cycle' }, ...cycles.map((cycle) => ({ value: cycle.id, label: cycle.name }))];
 
+  const propertiesContent = (
+    <div className="ticket-detail__properties-grid">
+      <TicketUtilities
+        ticketLink={ticketLink}
+        generatedBranchName={generatedBranchName}
+        description={activeTicket.description || ''}
+        onCopy={copyToClipboard}
+      />
+
+      <div>
+        <span className="label">Ticket Key</span>
+        <span style={{ fontFamily: 'var(--mono)', fontSize: '15px', fontWeight: 600, color: 'var(--color-primary)', display: 'block', marginTop: '6px' }}>
+          {activeTicket.key}
+        </span>
+      </div>
+      
+      <div>
+        <span className="label">Status</span>
+        <Select
+          value={activeTicket.status}
+          onValueChange={(nextStatus: string) => onUpdateTicket(activeTicket.id, { status: nextStatus as Ticket['status'] })}
+          options={STATUS_OPTIONS}
+          aria-label="Select ticket status"
+        />
+      </div>
+
+      <div>
+        <span className="label">Priority</span>
+        <Select
+          value={activeTicket.priority}
+          onValueChange={(nextPriority: string) => onUpdateTicket(activeTicket.id, { priority: nextPriority as Ticket['priority'] })}
+          options={PRIORITY_OPTIONS}
+          aria-label="Select ticket priority"
+        />
+      </div>
+
+      <div>
+        <span className="label">Assignee</span>
+        <Select
+          value={activeTicket.assigneeId || ''}
+          onValueChange={(nextAssigneeId: string) => onUpdateTicket(activeTicket.id, { assigneeId: nextAssigneeId || null })}
+          options={assigneeOptions}
+          aria-label="Select ticket assignee"
+        />
+      </div>
+
+      <div>
+        <span className="label">Project</span>
+        <Select
+          value={activeTicket.projectId}
+          options={projectOptions}
+          aria-label="Select ticket project"
+          disabled
+        />
+        <div style={{ marginTop: '6px', fontSize: '11px', color: 'var(--color-text-disabled)', lineHeight: '1.4' }}>
+          Project moves are managed outside ticket details to keep ticket keys and related project data consistent.
+        </div>
+      </div>
+
+      <div>
+        <span className="label">Domain</span>
+        <Select
+          value={activeTicket.domainId || ''}
+          onValueChange={(nextDomainId: string) => onUpdateTicket(activeTicket.id, { domainId: nextDomainId || null })}
+          options={domainOptions}
+          aria-label="Select ticket domain"
+        />
+      </div>
+
+      <div>
+        <span className="label">Cycle / Milestone</span>
+        <Select
+          value={activeTicket.cycleId || ''}
+          onValueChange={(nextCycleId: string) => onUpdateTicket(activeTicket.id, { cycleId: nextCycleId || null })}
+          options={cycleOptions}
+          aria-label="Select ticket cycle"
+        />
+      </div>
+
+      <div style={{ gridColumn: '1 / -1', borderTop: '1px solid var(--color-border-default)', paddingTop: '16px', marginTop: '8px' }}>
+        <span className="label" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <GitPullRequest size={12} />
+          <span>GitHub Connection</span>
+        </span>
+
+        {activeTicket.prStatus !== 'none' ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '6px' }}>
+            <a 
+              href={activeTicket.prUrl || '#'} 
+              target="_blank" 
+              rel="noreferrer"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                padding: '8px',
+                borderRadius: '6px',
+                background: activeTicket.prStatus === 'merged' ? 'rgba(16,185,129,0.1)' : 'rgba(59,130,246,0.1)',
+                border: `1px solid ${activeTicket.prStatus === 'merged' ? '#10b981' : '#3b82f6'}30`,
+                color: activeTicket.prStatus === 'merged' ? '#10b981' : '#3b82f6',
+                textDecoration: 'none',
+                fontWeight: 500,
+                fontSize: '12px'
+              }}
+              className="clickable"
+            >
+              {activeTicket.prStatus === 'merged' ? <GitMerge size={14} /> : <GitPullRequest size={14} />}
+              <span>PR Status: {activeTicket.prStatus.toUpperCase()}</span>
+            </a>
+            <span style={{ fontSize: '10px', color: 'var(--color-text-disabled)', textAlign: 'center' }}>
+              Auto-updated via webhook hooks
+            </span>
+          </div>
+        ) : (
+          <div 
+            style={{ 
+              fontSize: '11px', 
+              color: 'var(--color-text-disabled)', 
+              background: 'rgba(255,255,255,0.01)', 
+              border: '1px dashed var(--color-border-default)',
+              borderRadius: '6px',
+              padding: '10px',
+              marginTop: '6px',
+              lineHeight: '1.4'
+            }}
+          >
+            No PR linked. Mention key <strong>{activeTicket.key}</strong> in PR title or branch (e.g. <code>feature/{activeTicket.key}-auth</code>) to link automatically.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <>
       <div className="ticket-detail">
@@ -212,147 +346,17 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
         
         <div className="ticket-detail__content">
           
-          <Accordion
-            items={[
-              {
-                id: 'ticket-details',
-                title: 'Ticket Details',
-                content: (
-                  <div className="ticket-detail__properties-grid">
-                    <TicketUtilities
-                      ticketLink={ticketLink}
-                      generatedBranchName={generatedBranchName}
-                      description={activeTicket.description || ''}
-                      onCopy={copyToClipboard}
-                    />
-
-                    <div>
-                      <span className="label">Ticket Key</span>
-                      <span style={{ fontFamily: 'var(--mono)', fontSize: '15px', fontWeight: 600, color: 'var(--color-primary)', display: 'block', marginTop: '6px' }}>
-                        {activeTicket.key}
-                      </span>
-                    </div>
-                    
-                    <div>
-                      <span className="label">Status</span>
-                      <Select
-                        value={activeTicket.status}
-                        onValueChange={(nextStatus: string) => onUpdateTicket(activeTicket.id, { status: nextStatus as Ticket['status'] })}
-                        options={STATUS_OPTIONS}
-                        aria-label="Select ticket status"
-                      />
-                    </div>
-
-                    <div>
-                      <span className="label">Priority</span>
-                      <Select
-                        value={activeTicket.priority}
-                        onValueChange={(nextPriority: string) => onUpdateTicket(activeTicket.id, { priority: nextPriority as Ticket['priority'] })}
-                        options={PRIORITY_OPTIONS}
-                        aria-label="Select ticket priority"
-                      />
-                    </div>
-
-                    <div>
-                      <span className="label">Assignee</span>
-                      <Select
-                        value={activeTicket.assigneeId || ''}
-                        onValueChange={(nextAssigneeId: string) => onUpdateTicket(activeTicket.id, { assigneeId: nextAssigneeId || null })}
-                        options={assigneeOptions}
-                        aria-label="Select ticket assignee"
-                      />
-                    </div>
-
-                    <div>
-                      <span className="label">Project</span>
-                      <Select
-                        value={activeTicket.projectId}
-                        options={projectOptions}
-                        aria-label="Select ticket project"
-                        disabled
-                      />
-                      <div style={{ marginTop: '6px', fontSize: '11px', color: 'var(--color-text-disabled)', lineHeight: '1.4' }}>
-                        Project moves are managed outside ticket details to keep ticket keys and related project data consistent.
-                      </div>
-                    </div>
-
-                    <div>
-                      <span className="label">Domain</span>
-                      <Select
-                        value={activeTicket.domainId || ''}
-                        onValueChange={(nextDomainId: string) => onUpdateTicket(activeTicket.id, { domainId: nextDomainId || null })}
-                        options={domainOptions}
-                        aria-label="Select ticket domain"
-                      />
-                    </div>
-
-                    <div>
-                      <span className="label">Cycle / Milestone</span>
-                      <Select
-                        value={activeTicket.cycleId || ''}
-                        onValueChange={(nextCycleId: string) => onUpdateTicket(activeTicket.id, { cycleId: nextCycleId || null })}
-                        options={cycleOptions}
-                        aria-label="Select ticket cycle"
-                      />
-                    </div>
-
-                    <div style={{ gridColumn: '1 / -1', borderTop: '1px solid var(--color-border-default)', paddingTop: '16px', marginTop: '8px' }}>
-                      <span className="label" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <GitPullRequest size={12} />
-                        <span>GitHub Connection</span>
-                      </span>
-
-                      {activeTicket.prStatus !== 'none' ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '6px' }}>
-                          <a 
-                            href={activeTicket.prUrl || '#'} 
-                            target="_blank" 
-                            rel="noreferrer"
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '6px',
-                              padding: '8px',
-                              borderRadius: '6px',
-                              background: activeTicket.prStatus === 'merged' ? 'rgba(16,185,129,0.1)' : 'rgba(59,130,246,0.1)',
-                              border: `1px solid ${activeTicket.prStatus === 'merged' ? '#10b981' : '#3b82f6'}30`,
-                              color: activeTicket.prStatus === 'merged' ? '#10b981' : '#3b82f6',
-                              textDecoration: 'none',
-                              fontWeight: 500,
-                              fontSize: '12px'
-                            }}
-                            className="clickable"
-                          >
-                            {activeTicket.prStatus === 'merged' ? <GitMerge size={14} /> : <GitPullRequest size={14} />}
-                            <span>PR Status: {activeTicket.prStatus.toUpperCase()}</span>
-                          </a>
-                          <span style={{ fontSize: '10px', color: 'var(--color-text-disabled)', textAlign: 'center' }}>
-                            Auto-updated via webhook hooks
-                          </span>
-                        </div>
-                      ) : (
-                        <div 
-                          style={{ 
-                            fontSize: '11px', 
-                            color: 'var(--color-text-disabled)', 
-                            background: 'rgba(255,255,255,0.01)', 
-                            border: '1px dashed var(--color-border-default)',
-                            borderRadius: '6px',
-                            padding: '10px',
-                            marginTop: '6px',
-                            lineHeight: '1.4'
-                          }}
-                        >
-                          No PR linked. Mention key <strong>{activeTicket.key}</strong> in PR title or branch (e.g. <code>feature/{activeTicket.key}-auth</code>) to link automatically.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )
-              }
-            ]}
-          />
+          <div className="ticket-detail__accordion-mobile">
+            <Accordion
+              items={[
+                {
+                  id: 'ticket-details',
+                  title: 'Ticket Details',
+                  content: propertiesContent
+                }
+              ]}
+            />
+          </div>
 
           <div>
             <MarkdownEditor
@@ -666,6 +670,13 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
 
           </div>
 
+        </div>
+
+        <div className="ticket-detail__sidebar" data-testid="desktop-sidebar">
+          <div style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-disabled)', marginBottom: '16px' }}>
+            Properties
+          </div>
+          {propertiesContent}
         </div>
 
 

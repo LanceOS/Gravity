@@ -6,7 +6,7 @@ import type {
   SelectHTMLAttributes,
   TextareaHTMLAttributes,
 } from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { TicketDetail } from '../../modules/tickets/components/TicketDetail';
@@ -275,27 +275,27 @@ describe('TicketDetail', () => {
     const user = userEvent.setup();
     const { props } = renderTicketDetail();
 
-    await user.click(screen.getByRole('button', { name: /Ticket Details/i }));
+    const sidebar = within(screen.getByTestId('desktop-sidebar'));
 
-    expect(screen.getByLabelText('Select ticket status')).toBeInTheDocument();
-    await user.selectOptions(screen.getByLabelText('Select ticket status'), 'done');
+    expect(sidebar.getByLabelText('Select ticket status')).toBeInTheDocument();
+    await user.selectOptions(sidebar.getByLabelText('Select ticket status'), 'done');
     expect(props.onUpdateTicket).toHaveBeenCalledWith('ticket-1', { status: 'done' });
 
-    await user.selectOptions(screen.getByLabelText('Select ticket priority'), 'urgent');
+    await user.selectOptions(sidebar.getByLabelText('Select ticket priority'), 'urgent');
     expect(props.onUpdateTicket).toHaveBeenCalledWith('ticket-1', { priority: 'urgent' });
 
-    await user.selectOptions(screen.getByLabelText('Select ticket assignee'), 'user-2');
+    await user.selectOptions(sidebar.getByLabelText('Select ticket assignee'), 'user-2');
     expect(props.onUpdateTicket).toHaveBeenCalledWith('ticket-1', { assigneeId: 'user-2' });
 
-    expect(screen.getByLabelText('Select ticket project')).toBeDisabled();
+    expect(sidebar.getByLabelText('Select ticket project')).toBeDisabled();
     expect(
-      screen.getByText('Project moves are managed outside ticket details to keep ticket keys and related project data consistent.')
+      sidebar.getByText('Project moves are managed outside ticket details to keep ticket keys and related project data consistent.')
     ).toBeInTheDocument();
 
-    await user.selectOptions(screen.getByLabelText('Select ticket domain'), 'domain-2');
+    await user.selectOptions(sidebar.getByLabelText('Select ticket domain'), 'domain-2');
     expect(props.onUpdateTicket).toHaveBeenCalledWith('ticket-1', { domainId: 'domain-2' });
 
-    await user.selectOptions(screen.getByLabelText('Select ticket cycle'), 'cycle-2');
+    await user.selectOptions(sidebar.getByLabelText('Select ticket cycle'), 'cycle-2');
     expect(props.onUpdateTicket).toHaveBeenCalledWith('ticket-1', { cycleId: 'cycle-2' });
 
     await user.click(screen.getAllByRole('button', { name: 'Delete Ticket' })[0]);
@@ -324,21 +324,21 @@ describe('TicketDetail', () => {
     const writeTextSpy = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
     const toastSpy = vi.spyOn(toast, 'show').mockImplementation(() => 'mock-toast-id');
 
-    await user.click(screen.getByRole('button', { name: /Ticket Details/i }));
+    const sidebar = within(screen.getByTestId('desktop-sidebar'));
 
-    expect(screen.getByRole('link', { name: 'Ticket link' })).toHaveAttribute(
+    expect(sidebar.getByRole('link', { name: 'Ticket link' })).toHaveAttribute(
       'href',
       'https://tickets.placeholder.local/GRA-101'
     );
-    expect(screen.getByRole('button', { name: 'Copy Branch Name' })).toBeInTheDocument();
+    expect(sidebar.getByRole('button', { name: 'Copy Branch Name' })).toBeInTheDocument();
 
     // Copy Link button removed — link is now the anchor icon only
 
-    await user.click(screen.getByRole('button', { name: 'Copy Branch Name' }));
+    await user.click(sidebar.getByRole('button', { name: 'Copy Branch Name' }));
     expect(writeTextSpy).toHaveBeenCalledWith('feature/gra-101-update-ticket');
     expect(toastSpy).toHaveBeenCalledWith('Branch name copied', 'success');
 
-    await user.click(screen.getByRole('button', { name: 'Copy as Markdown' }));
+    await user.click(sidebar.getByRole('button', { name: 'Copy as Markdown' }));
     expect(writeTextSpy).toHaveBeenCalledWith('');
     expect(toastSpy).toHaveBeenCalledWith('Description copied', 'success');
 
@@ -351,32 +351,29 @@ describe('TicketDetail', () => {
     const writeTextSpy = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
     const toastSpy = vi.spyOn(toast, 'show').mockImplementation(() => 'mock-toast-id');
 
-    await user.click(screen.getByRole('button', { name: /Ticket Details/i }));
+    const sidebar = within(screen.getByTestId('desktop-sidebar'));
 
-    // Verify right-sidebar utilities
-    expect(screen.getByText('Ticket Utilities')).toBeInTheDocument();
-
-    const ticketLink = screen.getByRole('link', { name: 'Ticket link' });
+    const ticketLink = sidebar.getByRole('link', { name: 'Ticket link' });
     expect(ticketLink).toHaveAttribute('href', 'https://tickets.placeholder.local/GRA-101');
 
   const generatedBranchName = 'feature/gra-101-fix-sync-retries';
-  expect(screen.getByRole('button', { name: 'Copy Branch Name' })).toBeInTheDocument();
+  expect(sidebar.getByRole('button', { name: 'Copy Branch Name' })).toBeInTheDocument();
 
     // Copy Link button removed — link is now the anchor icon only
 
-    await user.click(screen.getByRole('button', { name: 'Copy Branch Name' }));
+    await user.click(sidebar.getByRole('button', { name: 'Copy Branch Name' }));
     expect(writeTextSpy).toHaveBeenCalledWith(generatedBranchName);
     expect(toastSpy).toHaveBeenCalledWith('Branch name copied', 'success');
 
-    await user.click(screen.getByRole('button', { name: 'Copy as Markdown' }));
+    await user.click(sidebar.getByRole('button', { name: 'Copy as Markdown' }));
     expect(writeTextSpy).toHaveBeenCalledWith('Retry the event stream after disconnects.');
     expect(toastSpy).toHaveBeenCalledWith('Description copied', 'success');
 
     // Verify Ticket Key Display in attributes panel
-    const sidebarKeyTitle = screen.getByText('Ticket Key');
+    const sidebarKeyTitle = sidebar.getByText('Ticket Key');
     expect(sidebarKeyTitle).toBeInTheDocument();
     
-    const sidebarKeyVal = screen.getAllByText('GRA-101')[1]; // first is in top header, second in right sidebar
+    const sidebarKeyVal = sidebar.getByText('GRA-101');
     expect(sidebarKeyVal).toBeInTheDocument();
 
     // Copy Ticket Key button removed — no action here

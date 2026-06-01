@@ -63,16 +63,10 @@
   .ticket-filter-bar__grid {
     grid-template-columns: 1fr 1fr;
   }
-
-  .ticket-filter-bar__count {
-    display: none;
   }
 }
-.ticket-filter-bar__total {
+.ticket-filter-bar__metrics {
   margin-top: 4px;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--color-text-disabled);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
 }
