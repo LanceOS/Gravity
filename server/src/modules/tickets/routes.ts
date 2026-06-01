@@ -5,7 +5,7 @@ import { cycles, domains, projects, tickets, workspaceMembers } from '../../db/s
 import { broadcastEvent } from '../../realtime.js';
 import { createId, getProjectIdFromRequest, normalizeIsoDate } from '../../lib/platform.js';
 import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
-import { isWorkspaceMember, getProjectWorkspaceId } from '../workspaces/services/membership.js';
+import { isWorkspaceMember, getProjectWorkspaceId, authorizeProjectAccess } from '../workspaces/services/membership.js';
 import {
   addCommentRecord,
   createTicketRecord,
@@ -48,22 +48,6 @@ export function createTicketsRouter() {
     }
 
     return { allowed: true as const, ticket };
-  }
-
-  async function authorizeProjectAccess(req: Request, projectId: string) {
-    const userId = await resolveRequestActorUserId(req);
-    if (!userId) {
-      return { allowed: false as const, error: 'Authentication required.', status: 401 };
-    }
-    const workspaceId = await getProjectWorkspaceId(projectId);
-    if (!workspaceId) {
-      return { allowed: false as const, error: 'Project not found.', status: 404 };
-    }
-    const isMember = await isWorkspaceMember(workspaceId, userId);
-    if (!isMember) {
-      return { allowed: false as const, error: 'Access denied: not a member of the workspace.', status: 403 };
-    }
-    return { allowed: true as const, userId };
   }
 
   router.get('/tickets', async (req, res) => {

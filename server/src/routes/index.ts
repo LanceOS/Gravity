@@ -7,6 +7,7 @@ import { createTicketsRouter } from '../modules/tickets/routes.js';
 import { createUsersRouter } from '../modules/users/routes.js';
 import { createWorkspacesRouter } from '../modules/workspaces/routes.js';
 import { createMcpRouter } from '../modules/mcp/index.js';
+import { createNotesRouter } from '../modules/notes/routes.js';
 import { createWebhookRouter } from '../modules/webhooks/routes.js';
 import { csrfProtect } from '../lib/csrf.js';
 import { subscribeToEvents } from '../realtime.js';
@@ -26,6 +27,7 @@ export function createApiRouter() {
   router.use(createTicketsRouter());
   router.use(createAiRouter());
   router.use(createMcpRouter());
+  router.use(createNotesRouter());
   router.use(createWebhookRouter());
   router.get('/events/subscribe', subscribeToEvents);
 
