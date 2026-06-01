@@ -1,7 +1,7 @@
-import { CheckCircle, ChevronDown, ChevronRight, Database, FolderTree, Inbox } from 'lucide-react';
+import { CheckCircle, ChevronDown, ChevronRight, Database, FolderTree, Inbox, FileText } from 'lucide-react';
 import { SidebarGroup, SidebarItem } from '@library';
 import type { SidebarProjectSection } from '../types';
-import { countBadgeStyle, getProjectCollapsedState, isMyIssuesView, isProjectIssuesView } from '../utils';
+import { countBadgeStyle, getProjectCollapsedState, isMyIssuesView, isProjectIssuesView, isNotesView } from '../utils';
 
 interface SidebarProjectsSectionProps {
   section: SidebarProjectSection;
@@ -20,6 +20,7 @@ export function SidebarProjectsSection({
 }: SidebarProjectsSectionProps) {
   const showProjectIssues = isProjectIssuesView(section);
   const showMyIssues = isMyIssuesView(section);
+  const showNotes = isNotesView(section);
 
   return (
     <div style={{ marginTop: '4px' }}>
@@ -94,6 +95,15 @@ export function SidebarProjectsSection({
                           rightElement={<span style={countBadgeStyle()}>{section.counts.myIssues}</span>}
                         >
                           My Issues
+                        </SidebarItem>
+
+                        <SidebarItem
+                          nested
+                          active={showNotes}
+                          onClick={section.onShowNotes}
+                          leftIcon={<FileText size={13} />}
+                        >
+                          Notes
                         </SidebarItem>
                       </SidebarGroup>
 

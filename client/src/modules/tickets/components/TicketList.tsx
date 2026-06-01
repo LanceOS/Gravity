@@ -20,7 +20,7 @@ export const TicketList: React.FC<TicketListProps> = ({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', flex: 1, overflow: 'hidden' }}>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px' }}>
+      <div style={{ flex: 1, overflowY: 'auto' }}>
         <>
           {LIST_STATUS_ORDER.map((status) => {
             const ticketsInGroup = groupedTickets[status];

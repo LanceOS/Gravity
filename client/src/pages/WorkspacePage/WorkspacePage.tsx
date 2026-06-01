@@ -3,6 +3,7 @@ import { Button } from '@library';
 import type { Comment, Cycle, Domain, Project, Ticket, User } from '../../context/TicketContext';
 import type { TicketFilters, TicketListSort } from '../../modules/tickets/utils/ticketView';
 import { TicketBoard, TicketList, TicketDetail, TicketFilterBar } from '../../modules/tickets';
+import { NotesList } from '../../modules/notes';
 import {
   filterTickets,
   getWorkspaceHeaderTitle,
@@ -11,11 +12,13 @@ import {
   sortTicketsForList,
 } from '../../modules/tickets/utils/ticketView';
 import { WorkspaceHeader } from '../../modules/workspaces';
+import { WorkspaceViewContainer } from '../../components/WorkspaceViewContainer';
 import WorkspaceMcpModal from '../../modules/workspaces/components/WorkspaceMcpModal';
 import './WorkspacePage.css';
 
 interface WorkspacePageProps {
   workspaceId?: string;
+  activeContext?: 'issues' | 'notes';
   activeTicket: Ticket | null;
   activeView: 'board' | 'list';
   comments: Comment[];
@@ -35,6 +38,7 @@ interface WorkspacePageProps {
   onOpenCreateTicket: (initialStatus?: Ticket['status']) => void;
   onOpenProjectManager: () => void;
   onSelectTicket: (ticket: Ticket | null) => void;
+  onSelectNote?: (noteId: string) => void;
   onSetFilters: (filters: Partial<TicketFilters>) => void;
   onSetListSort: (sort: TicketListSort) => void;
   onSetView: (view: 'board' | 'list') => void;
@@ -43,6 +47,7 @@ interface WorkspacePageProps {
 
 export function WorkspacePage({
   workspaceId,
+  activeContext = 'issues',
   activeTicket,
   activeView,
   comments,
@@ -62,6 +67,7 @@ export function WorkspacePage({
   onOpenCreateTicket,
   onOpenProjectManager,
   onSelectTicket,
+  onSelectNote,
   onSetFilters,
   onSetListSort,
   onSetView,
@@ -120,28 +126,37 @@ export function WorkspacePage({
     });
   }, [filters, onSetFilters]);
 
+  const displayTitle = activeContext === 'notes' ? 'Notes' : headerTitle;
+
   return (
     <div className="workspace-page">
       {projects.length > 0 ? (
         <WorkspaceHeader>
           <WorkspaceHeader.Top>
-            <WorkspaceHeader.Title>{headerTitle}</WorkspaceHeader.Title>
-            {!activeTicket && (
+            <WorkspaceHeader.Title>{displayTitle}</WorkspaceHeader.Title>
+            {!activeTicket && activeContext === 'issues' && (
               <WorkspaceHeader.ViewToggle
                 activeView={activeView}
                 onSetView={onSetView}
               />
             )}
-            {!activeTicket && (
+            {!activeTicket && activeContext === 'issues' && (
               <div style={{ marginLeft: 12 }} className="workspace-header__mcp-btn">
                 <Button type="button" variant="secondary" onClick={() => setIsMcpOpen(true)}>
                   Connect External AI
                 </Button>
               </div>
             )}
+            {!activeTicket && activeContext === 'notes' && (
+              <div style={{ marginLeft: 'auto' }}>
+                <Button type="button" variant="primary" onClick={() => console.log('Create Note')}>
+                  Create New Note
+                </Button>
+              </div>
+            )}
           </WorkspaceHeader.Top>
           
-          {!activeTicket && (
+          {!activeTicket && activeContext === 'issues' && (
             <WorkspaceHeader.Bottom>
               <TicketFilterBar
                 filters={filters}
@@ -163,7 +178,11 @@ export function WorkspacePage({
         <div className={`workspace-page__issues ${activeTicket ? 'workspace-page__issues--hidden' : ''}`}>
           <div className="workspace-page__issues-shell">
             <div className="workspace-page__issues-content">
-              {projects.length === 0 ? (
+              {activeContext === 'notes' ? (
+                <WorkspaceViewContainer>
+                  <NotesList projectId={filters.projectId || ''} onSelectNote={onSelectNote || (() => {})} />
+                </WorkspaceViewContainer>
+              ) : projects.length === 0 ? (
                 <div className="workspace-page__empty-state">
                   <div className="workspace-page__empty-state-title">No projects in this workspace yet</div>
                   <p className="workspace-page__empty-state-copy">
@@ -181,22 +200,26 @@ export function WorkspacePage({
                   </div>
                 </div>
               ) : activeView === 'board' ? (
-                <TicketBoard
-                  ticketsByColumn={groupedTickets}
-                  domainById={domainById}
-                  userAvatarById={userAvatarById}
-                  onMoveTicket={onUpdateTicket}
-                  onSelectTicket={onSelectTicket}
-                  onOpenCreateTicket={onOpenCreateTicket}
-                />
+                <WorkspaceViewContainer>
+                  <TicketBoard
+                    ticketsByColumn={groupedTickets}
+                    domainById={domainById}
+                    userAvatarById={userAvatarById}
+                    onMoveTicket={onUpdateTicket}
+                    onSelectTicket={onSelectTicket}
+                    onOpenCreateTicket={onOpenCreateTicket}
+                  />
+                </WorkspaceViewContainer>
               ) : (
-                <TicketList
-                  filteredCount={filteredTickets.length}
-                  groupedTickets={listGroupedTickets}
-                  domainById={domainById}
-                  userAvatarById={userAvatarById}
-                  onSelectTicket={onSelectTicket}
-                />
+                <WorkspaceViewContainer>
+                  <TicketList
+                    filteredCount={filteredTickets.length}
+                    groupedTickets={listGroupedTickets}
+                    domainById={domainById}
+                    userAvatarById={userAvatarById}
+                    onSelectTicket={onSelectTicket}
+                  />
+                </WorkspaceViewContainer>
               )}
             </div>
           </div>

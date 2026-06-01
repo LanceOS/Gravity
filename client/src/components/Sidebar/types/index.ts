@@ -31,8 +31,10 @@ export interface SidebarProjectSection {
   filters: TicketFilters;
   counts: SidebarProjectCounts;
   onSelectProject: (projectId: string) => void;
+  activeContext?: 'issues' | 'notes';
   onShowProjectIssues: () => void;
   onShowMyIssues: () => void;
+  onShowNotes: () => void;
   onSelectCycle: (cycleId: string) => void;
   onSelectDomain: (domainId: string) => void;
 }
