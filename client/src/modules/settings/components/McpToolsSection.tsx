@@ -87,8 +87,8 @@ export function McpToolsSection({
   const disabledTools = settings.disabledMcpTools || [];
 
   return (
-    <Card style={{ padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)' }}>
-      <Stack gap="var(--space-5)">
+    <Card style={{ padding: 'var(--space-lg)', borderRadius: 'var(--radius-lg)' }}>
+      <Stack gap="var(--space-lg)">
         <div>
           <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--color-text-primary)' }}>MCP Agent Tools</h2>
           <p style={{ margin: '4px 0 0', color: 'var(--color-text-disabled)', fontSize: '12.5px', lineHeight: 1.5 }}>
@@ -102,13 +102,13 @@ export function McpToolsSection({
           </Alert>
         )}
 
-        <Stack gap="var(--space-6)">
+        <Stack gap="var(--space-lg)">
           {MCP_TOOL_GROUPS.map((group) => (
             <div key={group.title}>
-              <h3 style={{ margin: '0 0 var(--space-4) 0', fontSize: '16px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
+              <h3 style={{ margin: '0 0 var(--space-md) 0', fontSize: '16px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
                 {group.title}
               </h3>
-              <Stack gap="var(--space-3)">
+              <Stack gap="var(--space-md)">
                 {group.tools.map((tool) => {
                   const isEnabled = !disabledTools.includes(tool.name);
 
@@ -132,8 +132,8 @@ export function McpToolsSection({
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'flex-start',
-                        gap: 'var(--space-4)',
-                        padding: 'var(--space-4)',
+                        gap: 'var(--space-md)',
+                        padding: 'var(--space-md)',
                         borderRadius: 'var(--radius-md)',
                         background: 'var(--color-base100)',
                         border: '1px solid var(--color-border-default)',
@@ -141,7 +141,7 @@ export function McpToolsSection({
                       }}
                     >
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)' }}>
                           <div
                             style={{
                               width: '8px',
@@ -158,12 +158,12 @@ export function McpToolsSection({
                             {tool.label}
                           </span>
                         </div>
-                        <span style={{ fontSize: '12px', color: 'var(--color-text-disabled)', lineHeight: 1.4, paddingLeft: 'calc(8px + var(--space-3))' }}>
+                        <span style={{ fontSize: '12px', color: 'var(--color-text-disabled)', lineHeight: 1.4, paddingLeft: 'calc(8px + var(--space-md))' }}>
                           {tool.description}
                         </span>
                       </div>
 
-                      <div style={{ paddingLeft: 'calc(8px + var(--space-3))' }}>
+                      <div style={{ paddingLeft: 'calc(8px + var(--space-md))' }}>
                         <Switch
                           label={isEnabled ? 'Enabled' : 'Disabled'}
                           checked={isEnabled}

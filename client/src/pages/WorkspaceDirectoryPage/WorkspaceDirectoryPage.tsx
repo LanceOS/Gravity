@@ -95,10 +95,10 @@ export function WorkspaceDirectoryPage({
   };
 
   const createJoinPanel = (
-    <Card style={{ padding: 'var(--space-5)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border-default)', background: 'var(--color-surface-card)' }}>
-      <Stack gap="var(--space-4)">
+    <Card style={{ padding: 'var(--space-lg)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border-default)', background: 'var(--color-surface-card)' }}>
+      <Stack gap="var(--space-md)">
         {/* Sleek Underline Tab Headers */}
-        <div style={{ display: 'flex', borderBottom: '1px solid var(--color-border-default)', paddingBottom: '0.1px', marginBottom: 'var(--space-2)' }}>
+        <div style={{ display: 'flex', borderBottom: '1px solid var(--color-border-default)', paddingBottom: '0.1px', marginBottom: 'var(--space-sm)' }}>
           <button
             onClick={() => setActiveTab('create')}
             style={{
@@ -137,20 +137,20 @@ export function WorkspaceDirectoryPage({
 
         {/* Status Alert Panels */}
         {errorMessage && (
-          <Alert type="error" style={{ marginBottom: 'var(--space-2)' }}>
+          <Alert type="error" style={{ marginBottom: 'var(--space-sm)' }}>
             {errorMessage}
           </Alert>
         )}
         {successMessage && (
-          <Alert type="success" style={{ marginBottom: 'var(--space-2)' }}>
+          <Alert type="success" style={{ marginBottom: 'var(--space-sm)' }}>
             {successMessage}
           </Alert>
         )}
 
         {/* Form Content Blocks */}
         <form onSubmit={handleCreateSubmit} style={activeTab === 'create' ? {} : visuallyHiddenStyle}>
-          <Stack gap="var(--space-3)">
-            <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', marginBottom: 'var(--space-1)' }}>
+          <Stack gap="var(--space-md)">
+            <div style={{ display: 'flex', gap: 'var(--space-sm)', alignItems: 'center', marginBottom: 'var(--space-xs)' }}>
               <Globe size={16} style={{ color: 'var(--color-text-disabled)' }} />
               <h3 style={{ margin: 0, fontSize: '13.5px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Establish Boundary</h3>
             </div>
@@ -190,15 +190,15 @@ export function WorkspaceDirectoryPage({
               placeholder="Purpose of this workspace..."
             />
 
-            <Button type="submit" variant="primary" fullWidth loading={pendingAction === 'create'} style={{ marginTop: 'var(--space-2)' }}>
+            <Button type="submit" variant="primary" fullWidth loading={pendingAction === 'create'} style={{ marginTop: 'var(--space-sm)' }}>
               Create Workspace
             </Button>
           </Stack>
         </form>
 
         <form onSubmit={handleJoinSubmit} style={activeTab === 'join' ? {} : visuallyHiddenStyle}>
-          <Stack gap="var(--space-3)">
-            <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', marginBottom: 'var(--space-1)' }}>
+          <Stack gap="var(--space-md)">
+            <div style={{ display: 'flex', gap: 'var(--space-sm)', alignItems: 'center', marginBottom: 'var(--space-xs)' }}>
               <KeyRound size={16} style={{ color: 'var(--color-text-disabled)' }} />
               <h3 style={{ margin: 0, fontSize: '13.5px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Request Access</h3>
             </div>
@@ -222,7 +222,7 @@ export function WorkspaceDirectoryPage({
               placeholder="Brief note to workspace owner..."
             />
 
-            <Button type="submit" variant="primary" fullWidth loading={pendingAction === 'join'} style={{ marginTop: 'var(--space-2)' }}>
+            <Button type="submit" variant="primary" fullWidth loading={pendingAction === 'join'} style={{ marginTop: 'var(--space-sm)' }}>
               Send Join Request
             </Button>
           </Stack>
@@ -235,7 +235,7 @@ export function WorkspaceDirectoryPage({
     <div
       style={{
         height: '100dvh',
-        padding: isMobile ? 'var(--space-6) var(--space-4)' : 'var(--space-8) var(--space-6)',
+        padding: isMobile ? 'var(--space-lg) var(--space-md)' : 'var(--space-xl) var(--space-lg)',
         background: 'var(--color-surface-app)',
         overflowY: 'auto',
       }}
@@ -245,15 +245,15 @@ export function WorkspaceDirectoryPage({
         style={{
           display: isMobile ? 'flex' : undefined,
           flexDirection: isMobile ? 'column' : undefined,
-          gap: isMobile ? 'var(--space-6)' : undefined,
+          gap: isMobile ? 'var(--space-lg)' : undefined,
           maxWidth: '1280px',
           margin: '0 auto',
         }}
       >
         {/* Left Column: Header, Stats, and Directory Table */}
-        <Stack gap="var(--space-5)">
+        <Stack gap="var(--space-lg)">
           {/* Elegant Page Header */}
-          <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', borderBottom: '1px solid var(--color-border-default)', paddingBottom: 'var(--space-4)', marginBottom: 'var(--space-1)', gap: isMobile ? 'var(--space-4)' : 0 }}>
+          <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', borderBottom: '1px solid var(--color-border-default)', paddingBottom: 'var(--space-md)', marginBottom: 'var(--space-xs)', gap: isMobile ? 'var(--space-md)' : 0 }}>
             <div>
               <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '-0.02em' }}>
                 Workspace Directory
@@ -265,7 +265,7 @@ export function WorkspaceDirectoryPage({
                 Transition seamlessly between connected workspaces or peer-invitations.
               </p>
             </div>
-            <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+            <div style={{ display: 'flex', gap: 'var(--space-sm)' }}>
               <Button variant="default" size="sm" onClick={onOpenAccountPreferences} leftIcon={<Settings2 size={14} />}>
                 Preferences
               </Button>
@@ -281,25 +281,25 @@ export function WorkspaceDirectoryPage({
               display: 'flex',
               flexDirection: isMobile ? 'column' : 'row',
               flexWrap: isMobile ? 'nowrap' : 'wrap',
-              gap: isMobile ? 'var(--space-3)' : 'var(--space-6)',
-              padding: 'var(--space-3) var(--space-4)',
+              gap: isMobile ? 'var(--space-md)' : 'var(--space-lg)',
+              padding: 'var(--space-md) var(--space-md)',
               background: 'var(--color-base50)',
               border: '1px solid var(--color-border-default)',
               borderRadius: 'var(--radius-sm)',
               fontSize: '12px',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}>
               <FolderPlus size={15} style={{ color: 'var(--color-text-disabled)' }} />
               <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{workspaces.length}</span>
               <span style={{ color: 'var(--color-text-disabled)' }}>Workspaces</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}>
               <Users size={15} style={{ color: 'var(--color-text-disabled)' }} />
               <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{workspaces.reduce((sum, w) => sum + w.memberCount, 0)}</span>
               <span style={{ color: 'var(--color-text-disabled)' }}>Members</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}>
               <Server size={15} style={{ color: 'var(--color-text-disabled)' }} />
               <span style={{ color: 'var(--color-text-disabled)' }}>Current User:</span>
               <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{currentUser.email}</span>
@@ -312,7 +312,7 @@ export function WorkspaceDirectoryPage({
                 onClick={() => setIsCreateJoinOpen(!isCreateJoinOpen)}
                 style={{
                   width: '100%',
-                  padding: 'var(--space-4)',
+                  padding: 'var(--space-md)',
                   background: 'var(--color-base50)',
                   border: 'none',
                   textAlign: 'left',
@@ -329,7 +329,7 @@ export function WorkspaceDirectoryPage({
                 <span>{isCreateJoinOpen ? '▲' : '▼'}</span>
               </button>
               {isCreateJoinOpen && (
-                <div style={{ padding: 'var(--space-4)', background: 'var(--color-surface-card)', borderTop: '1px solid var(--color-border-default)' }}>
+                <div style={{ padding: 'var(--space-md)', background: 'var(--color-surface-card)', borderTop: '1px solid var(--color-border-default)' }}>
                   {createJoinPanel}
                 </div>
               )}
@@ -337,7 +337,7 @@ export function WorkspaceDirectoryPage({
           )}
 
           {/* High-density Workspaces Directory */}
-          <Stack gap="var(--space-3)">
+          <Stack gap="var(--space-md)">
             <div>
               <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-text-disabled)' }}>
                 Available Boundaries
@@ -348,13 +348,13 @@ export function WorkspaceDirectoryPage({
             </div>
 
             {loading && (
-              <div style={{ padding: 'var(--space-8)', textAlign: 'center', border: '1px dashed var(--color-border-default)', borderRadius: 'var(--radius-sm)', color: 'var(--color-text-disabled)' }}>
+              <div style={{ padding: 'var(--space-xl)', textAlign: 'center', border: '1px dashed var(--color-border-default)', borderRadius: 'var(--radius-sm)', color: 'var(--color-text-disabled)' }}>
                 Loading workspaces...
               </div>
             )}
 
             {!loading && workspaceCards.length === 0 && (
-              <div style={{ padding: 'var(--space-8)', textAlign: 'center', border: '1px dashed var(--color-border-default)', borderRadius: 'var(--radius-sm)', color: 'var(--color-text-disabled)', fontSize: '13px' }}>
+              <div style={{ padding: 'var(--space-xl)', textAlign: 'center', border: '1px dashed var(--color-border-default)', borderRadius: 'var(--radius-sm)', color: 'var(--color-text-disabled)', fontSize: '13px' }}>
                 No approved workspaces yet. Create one or request access with an invite code.
               </div>
             )}
@@ -395,7 +395,7 @@ export function WorkspaceDirectoryPage({
                         style={{
                           display: 'flex',
                           flexDirection: 'column',
-                          gap: 'var(--space-3)',
+                          gap: 'var(--space-md)',
                           padding: '16px',
                           borderBottom: '1px solid var(--color-border-default)',
                           background: isActive ? 'var(--color-state-selected-bg)' : 'transparent',
@@ -404,7 +404,7 @@ export function WorkspaceDirectoryPage({
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                           <div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}>
                               <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
                                 {workspace.name}
                               </span>
@@ -421,7 +421,7 @@ export function WorkspaceDirectoryPage({
                           </Badge>
                         </div>
                         
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-4)', marginTop: 'var(--space-1)' }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-md)', marginTop: 'var(--space-xs)' }}>
                           <div style={{ display: 'flex', flexDirection: 'column' }}>
                             <span style={{ fontSize: '10px', textTransform: 'uppercase', color: 'var(--color-text-disabled)', fontWeight: 700, letterSpacing: '0.05em' }}>Details</span>
                             <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
@@ -436,7 +436,7 @@ export function WorkspaceDirectoryPage({
                           </div>
                         </div>
 
-                        <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
+                        <div style={{ display: 'flex', gap: 'var(--space-sm)', marginTop: 'var(--space-sm)' }}>
                           <Button variant="primary" size="sm" onClick={() => onOpenWorkspace(workspace.id)} leftIcon={<ArrowRight size={13} />} style={{ flex: 1, minHeight: '32px' }}>
                             Open Workspace
                           </Button>
@@ -462,7 +462,7 @@ export function WorkspaceDirectoryPage({
                       }}
                     >
                       <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}>
                           <span style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
                             {workspace.name}
                           </span>
@@ -495,7 +495,7 @@ export function WorkspaceDirectoryPage({
                           {workspace.memberRole || 'member'}
                         </Badge>
                       </div>
-                      <div style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end' }}>
+                      <div style={{ display: 'flex', gap: 'var(--space-sm)', justifyContent: 'flex-end' }}>
                         <Button variant="primary" size="sm" onClick={() => onOpenWorkspace(workspace.id)} leftIcon={<ArrowRight size={13} />} style={{ minHeight: '26px', padding: '2px 8px' }}>
                           Open
                         </Button>
@@ -513,7 +513,7 @@ export function WorkspaceDirectoryPage({
 
         {/* Right Column: Unified Tabbed Action Panel */}
         {!isMobile && (
-          <div style={{ position: 'sticky', top: 'var(--space-8)' }}>
+          <div style={{ position: 'sticky', top: 'var(--space-xl)' }}>
             {createJoinPanel}
           </div>
         )}

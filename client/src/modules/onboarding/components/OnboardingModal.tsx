@@ -47,7 +47,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
   const renderContent = () => {
     if (step === 0) {
       return (
-        <Stack gap="var(--space-4)" align="center" style={{ textAlign: 'center', padding: '10px 0' }}>
+        <Stack gap="var(--space-md)" align="center" style={{ textAlign: 'center', padding: '10px 0' }}>
           <div style={iconContainerStyle}>
             <HelpCircle size={40} color="var(--color-primary)" />
           </div>
@@ -55,7 +55,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
           <p style={descriptionStyle}>
             Would you like a quick 1-minute tour of your new production-grade, multi-tenant project management workspace?
           </p>
-          <Flex gap="var(--space-3)" style={{ width: '100%', marginTop: '12px' }}>
+          <Flex gap="var(--space-md)" style={{ width: '100%', marginTop: '12px' }}>
             <Button variant="default" fullWidth onClick={handleSkip}>
               No thanks, skip it
             </Button>
@@ -68,9 +68,9 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
     }
 
     return (
-      <Stack gap="var(--space-4)" align="center" style={{ textAlign: 'center', padding: '10px 0' }}>
+      <Stack gap="var(--space-md)" align="center" style={{ textAlign: 'center', padding: '10px 0' }}>
         {/* Step Indicators */}
-        <Flex gap="var(--space-2)" justify="center" style={{ marginBottom: '8px' }}>
+        <Flex gap="var(--space-sm)" justify="center" style={{ marginBottom: '8px' }}>
           {[1, 2, 3, 4].map((i) => (
             <div
               key={i}
@@ -86,7 +86,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
         </Flex>
 
         {step === 1 && (
-          <Stack gap="var(--space-2)" align="center">
+          <Stack gap="var(--space-sm)" align="center">
             <div style={iconContainerStyle}>
               <Database size={40} color="var(--color-primary)" />
             </div>
@@ -98,7 +98,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
         )}
 
         {step === 2 && (
-          <Stack gap="var(--space-2)" align="center">
+          <Stack gap="var(--space-sm)" align="center">
             <div style={iconContainerStyle}>
               <Layers size={40} color="var(--color-primary)" />
             </div>
@@ -110,7 +110,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
         )}
 
         {step === 3 && (
-          <Stack gap="var(--space-2)" align="center">
+          <Stack gap="var(--space-sm)" align="center">
             <div style={iconContainerStyle}>
               <Sparkles size={40} color="var(--color-primary)" />
             </div>
@@ -122,7 +122,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
         )}
 
         {step === 4 && (
-          <Stack gap="var(--space-2)" align="center">
+          <Stack gap="var(--space-sm)" align="center">
             <div style={iconContainerStyle}>
               <Terminal size={40} color="var(--color-primary)" />
             </div>

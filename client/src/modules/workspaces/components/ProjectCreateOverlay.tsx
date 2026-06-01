@@ -90,14 +90,14 @@ export function ProjectCreateOverlay({
       footer={modalFooter}
       style={{ maxWidth: '500px' }}
     >
-      <form onSubmit={(e) => { e.preventDefault(); void handleSubmit(); }} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+      <form onSubmit={(e) => { e.preventDefault(); void handleSubmit(); }} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
         {feedbackMessage && (
           <Alert type="error">
             {feedbackMessage}
           </Alert>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 'var(--space-4)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 'var(--space-md)' }}>
           <TextInput
             label="Project Name"
             placeholder="Core Platform"
