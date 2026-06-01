@@ -78,16 +78,34 @@ export function WorkspaceLayout({ sidebarProps, children, rightPanels, isMobile 
           />
         </div>
 
-        {isMobile && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <button
-              type="button"
-              className="workspace-header-hamburger"
-              onClick={sidebarProps.tools.onOpenOllama}
-              aria-label={sidebarProps.tools.isOllamaOpen ? 'Close AI Assistant' : 'Ask Agent'}
-            >
-              {sidebarProps.tools.isOllamaOpen ? <X size={20} /> : <MessageSquare size={20} />}
-            </button>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            type="button"
+            className="clickable"
+            onClick={sidebarProps.tools.onOpenOllama}
+            aria-label={sidebarProps.tools.isOllamaOpen ? 'Close AI Assistant' : 'Ask Agent'}
+            style={{
+              height: '32px',
+              padding: '0 12px',
+              borderRadius: '16px',
+              background: 'var(--color-primary)',
+              color: 'var(--color-text-on-accent)',
+              border: '1px solid var(--color-border-focus)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              cursor: 'pointer',
+              fontWeight: 500,
+              fontSize: '12px',
+              flexShrink: 0,
+            }}
+          >
+            {sidebarProps.tools.isOllamaOpen ? <X size={14} /> : <MessageSquare size={14} />}
+            {sidebarProps.tools.isOllamaOpen ? 'Close' : 'Ask Agent'}
+          </button>
+
+          {isMobile && (
             <button
               type="button"
               className="workspace-header-hamburger"
@@ -96,8 +114,8 @@ export function WorkspaceLayout({ sidebarProps, children, rightPanels, isMobile 
             >
               {isMobileSidebarOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </DashboardLayout.Header>
 
       {isMobile ? null : <Sidebar {...sidebarProps} />}

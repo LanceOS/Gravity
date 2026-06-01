@@ -818,39 +818,6 @@ export function AppShellPage() {
                   isClosing={isOllamaClosing}
                 />
               ) : null}
-
-              {/* Floating Chat Trigger Button for Desktop */}
-              {!isMobile && (
-                <button
-                  type="button"
-                  aria-label={isOllamaOpen ? 'Close AI Assistant' : 'Ask Agent'}
-                  onClick={handleToggleOllama}
-                  className="clickable"
-                  style={{
-                    position: 'fixed',
-                    bottom: '24px',
-                    right: '24px',
-                    height: '40px',
-                    padding: '0 16px',
-                    borderRadius: '20px',
-                    background: 'var(--color-primary)',
-                    color: 'var(--color-text-on-accent)',
-                    border: '1px solid var(--color-border-focus)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '8px',
-                    zIndex: 900,
-                    cursor: 'pointer',
-                    fontWeight: 500,
-                    fontSize: '13px',
-                  }}
-                  title="Toggle AI Assistant"
-                >
-                  {isOllamaOpen ? <X size={16} /> : <MessageSquare size={16} />}
-                  {isOllamaOpen ? 'Close' : 'Ask Agent'}
-                </button>
-              )}
             </>
           }
         >

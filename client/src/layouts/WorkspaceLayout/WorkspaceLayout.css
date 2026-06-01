@@ -62,15 +62,16 @@
   }
 
   .workspace-header-workspace-select {
-    width: 160px;
-    margin-left: 0;
-    flex: 2;
+    width: auto;
+    margin-left: 12px;
+    flex: 1;
     display: flex;
-    justify-content: center;
+    justify-content: flex-start;
   }
 
   .workspace-header-workspace-select > div {
     width: 100%;
+    min-width: 100px;
   }
 
   .workspace-header-hamburger {
@@ -81,10 +82,7 @@
     border: none;
     color: var(--color-text-primary);
     cursor: pointer;
-    padding: 8px;
-    margin-right: -8px;
-    flex: 1;
-    justify-content: flex-end;
+    padding: 4px;
   }
 }
 
