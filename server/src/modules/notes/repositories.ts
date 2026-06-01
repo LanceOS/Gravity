@@ -1,0 +1,138 @@
+import { and, desc, eq } from 'drizzle-orm';
+import { db } from '../../db/index.js';
+import { noteMetadata } from './schema.js';
+import { RustFS } from '../../lib/rustfs.js';
+
+export type NoteMetadata = typeof noteMetadata.$inferSelect;
+
+export class MetadataRepository {
+  /**
+   * Creates a new note metadata record.
+   */
+  static async createNoteMetadata(data: {
+    id: string;
+    projectId: string;
+    userId: string;
+    title: string;
+    bucketPath: string;
+  }): Promise<NoteMetadata> {
+    const [record] = await db
+      .insert(noteMetadata)
+      .values({
+        id: data.id,
+        projectId: data.projectId,
+        userId: data.userId,
+        title: data.title,
+        bucketPath: data.bucketPath,
+      })
+      .returning();
+
+    return record;
+  }
+
+  /**
+   * Retrieves a note metadata record by ID.
+   */
+  static async getNoteMetadata(id: string): Promise<NoteMetadata | null> {
+    const [record] = await db.select().from(noteMetadata).where(eq(noteMetadata.id, id)).limit(1);
+    return record || null;
+  }
+
+  /**
+   * Lists note metadata for a given project and user, with basic pagination.
+   */
+  static async listNotesMetadata(
+    projectId: string,
+    userId: string,
+    limit: number = 20,
+    offset: number = 0
+  ): Promise<NoteMetadata[]> {
+    return await db
+      .select()
+      .from(noteMetadata)
+      .where(and(eq(noteMetadata.projectId, projectId), eq(noteMetadata.userId, userId)))
+      .orderBy(desc(noteMetadata.updatedAt))
+      .limit(limit)
+      .offset(offset);
+  }
+
+  /**
+   * Updates note metadata with optimistic locking.
+   * Throws if the version does not match.
+   */
+  static async updateNoteMetadata(
+    id: string,
+    currentVersion: number,
+    updates: Partial<{ title: string }>
+  ): Promise<NoteMetadata> {
+    const [record] = await db
+      .update(noteMetadata)
+      .set({
+        ...updates,
+        version: currentVersion + 1,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(noteMetadata.id, id), eq(noteMetadata.version, currentVersion)))
+      .returning();
+
+    if (!record) {
+      throw new Error('Optimistic locking failed or note not found');
+    }
+
+    return record;
+  }
+
+  /**
+   * Deletes a note metadata record.
+   */
+  static async deleteNoteMetadata(id: string): Promise<void> {
+    await db.delete(noteMetadata).where(eq(noteMetadata.id, id));
+  }
+}
+
+export class NotesRepository {
+  /**
+   * Saves the markdown body of a note.
+   */
+  static async saveBody(bucketPath: string, content: string): Promise<void> {
+    await RustFS.saveFile(bucketPath, 'body.md', content);
+  }
+
+  /**
+   * Retrieves the markdown body of a note.
+   */
+  static async getBody(bucketPath: string): Promise<string> {
+    return await RustFS.readFileUtf8(bucketPath, 'body.md');
+  }
+
+  /**
+   * Saves an attached file to the note's bucket.
+   */
+  static async saveAttachment(bucketPath: string, filename: string, content: string | Buffer): Promise<void> {
+    if (filename === 'body.md') {
+      throw new Error('Filename cannot be body.md');
+    }
+    await RustFS.saveFile(bucketPath, filename, content);
+  }
+
+  /**
+   * Retrieves an attached file from the note's bucket.
+   */
+  static async getAttachment(bucketPath: string, filename: string): Promise<Buffer> {
+    return await RustFS.readFile(bucketPath, filename);
+  }
+
+  /**
+   * Deletes a specific file from the note's bucket.
+   */
+  static async deleteFile(bucketPath: string, filename: string): Promise<void> {
+    await RustFS.deleteFile(bucketPath, filename);
+  }
+
+  /**
+   * Deletes the entire note bucket.
+   */
+  static async deleteBucket(bucketPath: string): Promise<void> {
+    await RustFS.deleteBucket(bucketPath);
+  }
+}

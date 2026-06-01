@@ -194,6 +194,17 @@ export async function initializeDatabase() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       PRIMARY KEY (user_id, provider)
     );
+
+    CREATE TABLE IF NOT EXISTS note_metadata (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      bucket_path TEXT NOT NULL,
+      version INTEGER NOT NULL DEFAULT 1,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
   `);
 
   await pool.query(`
@@ -202,14 +213,16 @@ export async function initializeDatabase() {
   `);
 
   // Backfill `provider` in a set-based update (avoids N+1 queries)
-  await pool.query(`
-    UPDATE user_external_credentials u
-    SET provider = COALESCE(
-      (SELECT s.ai_provider FROM user_settings s WHERE s.user_id = u.user_id LIMIT 1),
-      'openai'
-    )
-    WHERE u.provider IS NULL OR u.provider = '';
-  `);
+  if (!env.databaseUrl.startsWith('pgmem://')) {
+    await pool.query(`
+      UPDATE user_external_credentials
+      SET provider = COALESCE(
+        (SELECT s.ai_provider FROM user_settings s WHERE s.user_id = user_external_credentials.user_id LIMIT 1),
+        'openai'
+      )
+      WHERE provider IS NULL OR provider = '';
+    `);
+  }
 
   // NOTE: structural changes (primary key/index) are handled in a dedicated
   // migration under `server/drizzle/`. That migration performs safe,
@@ -250,6 +263,7 @@ export async function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS tickets_parent_id_idx ON tickets (parent_id);
     CREATE INDEX IF NOT EXISTS comments_ticket_id_idx ON comments (ticket_id);
     CREATE INDEX IF NOT EXISTS comments_user_id_idx ON comments (user_id);
+    CREATE INDEX IF NOT EXISTS note_metadata_project_id_user_id_idx ON note_metadata (project_id, user_id);
   `);
 
   await pool.query(`
