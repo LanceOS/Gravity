@@ -318,6 +318,35 @@ describe('SettingsPage', () => {
     const readOnlySwitch = within(readOnlyRow).getByRole('switch');
     expect(readOnlySwitch).toBeDisabled();
   });
+
+  it('renders all sections stacked on mobile viewport', () => {
+    const originalInnerWidth = window.innerWidth;
+    Object.defineProperty(window, 'innerWidth', {
+      writable: true,
+      configurable: true,
+      value: 500,
+    });
+
+    renderSettingsPage();
+    window.dispatchEvent(new Event('resize'));
+
+    // The title "Workspace Settings" is not shown in the header on mobile
+    expect(screen.queryByText('Workspace Settings')).not.toBeInTheDocument();
+
+    // Verify multiple sections are rendered simultaneously despite activeCategory being 'overview'
+    // Overview (implied by presence of Host URL or similar, but we know it's rendered)
+    expect(screen.getByLabelText('Host URL')).toBeInTheDocument();
+    // Access/Invites
+    expect(screen.getByText('Workspace Invites')).toBeInTheDocument();
+    // Members
+    expect(screen.getByText('Approved Members')).toBeInTheDocument();
+
+    // The Save Changes button is rendered at the bottom on mobile
+    const saveButtons = screen.getAllByRole('button', { name: 'Save Changes' });
+    expect(saveButtons).toHaveLength(1);
+
+    window.innerWidth = originalInnerWidth;
+  });
 });
 
 describe('AccountPreferencesPage', () => {
@@ -413,5 +442,31 @@ describe('AccountPreferencesPage', () => {
     await user.paste('sk-pasted-test-key');
 
     expect(props.onChangeSettings).toHaveBeenCalledWith({ apiKey: 'sk-pasted-test-key' });
+  });
+
+  it('renders all sections stacked on mobile viewport', () => {
+    const originalInnerWidth = window.innerWidth;
+    Object.defineProperty(window, 'innerWidth', {
+      writable: true,
+      configurable: true,
+      value: 500,
+    });
+
+    renderAccountPreferencesPage();
+    window.dispatchEvent(new Event('resize'));
+
+    // On mobile, the header title is not shown
+    expect(screen.queryByText('Account Preferences')).not.toBeInTheDocument();
+
+    // Sections are rendered simultaneously
+    expect(screen.getByText('Local account preferences')).toBeInTheDocument(); // General
+    expect(screen.getByText('Cloud AI provider')).toBeInTheDocument(); // Providers
+    expect(screen.getByText('Local Ollama assistant')).toBeInTheDocument(); // Ollama
+    expect(screen.getByText('Onboarding and guidance')).toBeInTheDocument(); // Onboarding
+
+    // Warning about list mode only on mobile
+    expect(screen.getByText(/Only/)).toHaveTextContent(/List mode/);
+
+    window.innerWidth = originalInnerWidth;
   });
 });
