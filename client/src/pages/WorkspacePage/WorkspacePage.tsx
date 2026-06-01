@@ -12,6 +12,7 @@ import {
   sortTicketsForList,
 } from '../../modules/tickets/utils/ticketView';
 import { WorkspaceHeader } from '../../modules/workspaces';
+import { WorkspaceViewContainer } from '../../components/WorkspaceViewContainer';
 import WorkspaceMcpModal from '../../modules/workspaces/components/WorkspaceMcpModal';
 import './WorkspacePage.css';
 
@@ -125,12 +126,14 @@ export function WorkspacePage({
     });
   }, [filters, onSetFilters]);
 
+  const displayTitle = activeContext === 'notes' ? 'Notes' : headerTitle;
+
   return (
     <div className="workspace-page">
       {projects.length > 0 ? (
         <WorkspaceHeader>
           <WorkspaceHeader.Top>
-            <WorkspaceHeader.Title>{headerTitle}</WorkspaceHeader.Title>
+            <WorkspaceHeader.Title>{displayTitle}</WorkspaceHeader.Title>
             {!activeTicket && activeContext === 'issues' && (
               <WorkspaceHeader.ViewToggle
                 activeView={activeView}
@@ -141,6 +144,13 @@ export function WorkspacePage({
               <div style={{ marginLeft: 12 }} className="workspace-header__mcp-btn">
                 <Button type="button" variant="secondary" onClick={() => setIsMcpOpen(true)}>
                   Connect External AI
+                </Button>
+              </div>
+            )}
+            {!activeTicket && activeContext === 'notes' && (
+              <div style={{ marginLeft: 'auto' }}>
+                <Button type="button" variant="primary" onClick={() => console.log('Create Note')}>
+                  Create New Note
                 </Button>
               </div>
             )}
@@ -169,7 +179,9 @@ export function WorkspacePage({
           <div className="workspace-page__issues-shell">
             <div className="workspace-page__issues-content">
               {activeContext === 'notes' ? (
-                <NotesList projectId={filters.projectId || ''} onSelectNote={onSelectNote || (() => {})} />
+                <WorkspaceViewContainer>
+                  <NotesList projectId={filters.projectId || ''} onSelectNote={onSelectNote || (() => {})} />
+                </WorkspaceViewContainer>
               ) : projects.length === 0 ? (
                 <div className="workspace-page__empty-state">
                   <div className="workspace-page__empty-state-title">No projects in this workspace yet</div>
@@ -188,22 +200,26 @@ export function WorkspacePage({
                   </div>
                 </div>
               ) : activeView === 'board' ? (
-                <TicketBoard
-                  ticketsByColumn={groupedTickets}
-                  domainById={domainById}
-                  userAvatarById={userAvatarById}
-                  onMoveTicket={onUpdateTicket}
-                  onSelectTicket={onSelectTicket}
-                  onOpenCreateTicket={onOpenCreateTicket}
-                />
+                <WorkspaceViewContainer>
+                  <TicketBoard
+                    ticketsByColumn={groupedTickets}
+                    domainById={domainById}
+                    userAvatarById={userAvatarById}
+                    onMoveTicket={onUpdateTicket}
+                    onSelectTicket={onSelectTicket}
+                    onOpenCreateTicket={onOpenCreateTicket}
+                  />
+                </WorkspaceViewContainer>
               ) : (
-                <TicketList
-                  filteredCount={filteredTickets.length}
-                  groupedTickets={listGroupedTickets}
-                  domainById={domainById}
-                  userAvatarById={userAvatarById}
-                  onSelectTicket={onSelectTicket}
-                />
+                <WorkspaceViewContainer>
+                  <TicketList
+                    filteredCount={filteredTickets.length}
+                    groupedTickets={listGroupedTickets}
+                    domainById={domainById}
+                    userAvatarById={userAvatarById}
+                    onSelectTicket={onSelectTicket}
+                  />
+                </WorkspaceViewContainer>
               )}
             </div>
           </div>

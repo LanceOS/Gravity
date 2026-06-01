@@ -1,0 +1,1 @@
+export { WorkspaceViewContainer } from './WorkspaceViewContainer';
