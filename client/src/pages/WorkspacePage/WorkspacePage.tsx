@@ -150,6 +150,7 @@ export function WorkspacePage({
                 onClearFilters={handleClearFilters}
                 filteredCount={filteredTickets.length}
                 totalCount={tickets.length}
+                completedCount={tickets.filter(t => t.status === 'done').length}
                 listSort={activeView === 'list' ? listSort : undefined}
                 onListSortChange={activeView === 'list' ? onSetListSort : undefined}
                 domains={Object.values(domainById)}

@@ -17,6 +17,7 @@ export const TicketFilterBar: React.FC<TicketFilterBarProps> = ({
   onClearFilters,
   filteredCount,
   totalCount,
+  completedCount,
   listSort,
   onListSortChange,
   domains,
@@ -114,6 +115,11 @@ export const TicketFilterBar: React.FC<TicketFilterBarProps> = ({
         </span>
       </div>
 
+      {/* Row 3: Total tickets count */}
+      <div className="ticket-filter-bar__total">
+        <span>Total tickets: {totalCount}</span>
+        <span>Completed: {completedCount}</span>
+      </div>
     </div>
   );
 };

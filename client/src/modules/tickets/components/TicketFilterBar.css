@@ -68,3 +68,11 @@
     display: none;
   }
 }
+.ticket-filter-bar__total {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--color-text-disabled);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
