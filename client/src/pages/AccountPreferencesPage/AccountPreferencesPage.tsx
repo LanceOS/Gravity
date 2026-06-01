@@ -115,9 +115,11 @@ function StatusNotice({ message, tone = 'neutral' }: { message: StatusMessage | 
 function GeneralSettingsSection({
   settings,
   onChangeSettings,
+  isMobile,
 }: {
   settings: WorkspaceSettings;
   onChangeSettings: (updates: Partial<WorkspaceSettings>) => void;
+  isMobile: boolean;
 }) {
   return (
     <Card style={{ padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)' }}>
@@ -129,16 +131,23 @@ function GeneralSettingsSection({
           </p>
         </div>
 
-        <Grid columns={2} gap="var(--space-4)">
-          <Select
-            label="Default View Mode"
-            value={settings.defaultView}
-            onChange={(event) => onChangeSettings({ defaultView: event.target.value as WorkspaceSettings['defaultView'] })}
-            options={[
-              { value: 'board', label: 'Kanban Board' },
-              { value: 'list', label: 'Issues List' }
-            ]}
-          />
+        <Grid columns={isMobile ? 1 : 2} gap="var(--space-4)">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+            <Select
+              label="Default View Mode"
+              value={settings.defaultView}
+              onChange={(event) => onChangeSettings({ defaultView: event.target.value as WorkspaceSettings['defaultView'] })}
+              options={[
+                { value: 'board', label: 'Kanban Board' },
+                { value: 'list', label: 'Issues List' }
+              ]}
+            />
+            {isMobile && (
+              <Alert type="warning">
+                Only <strong>List mode</strong> is available on mobile. Your default view preference will apply on desktop.
+              </Alert>
+            )}
+          </div>
 
           <Select
             label="Workspace Theme"
@@ -195,8 +204,8 @@ function SavedKeyItem({
     <div
       style={{
         display: 'flex',
-        alignItems: 'center',
-        gap: 'var(--space-4)',
+        flexDirection: 'column',
+        gap: 'var(--space-2)',
         padding: 'var(--space-3) var(--space-4)',
         borderRadius: 'var(--radius-md)',
         border: '1px solid var(--color-border-default)',
@@ -206,54 +215,53 @@ function SavedKeyItem({
         background: 'var(--color-surface-card)',
       }}
     >
-      {/* Provider info */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div
-          style={{
-            fontSize: '13px',
-            fontWeight: 600,
-            color: 'var(--color-text-primary)',
-            marginBottom: '2px',
-          }}
-        >
-          {option.label}{credential.preferredModel ? ` - ${credential.preferredModel}` : ''}
-        </div>
-        <div
-          style={{
-            fontSize: '11.5px',
-            fontFamily: 'monospace',
-            color: 'var(--color-text-disabled)',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {credential.apiKey}
-        </div>
-      </div>
-
-      {/* Active label */}
-      <span
+      {/* Provider name */}
+      <div
         style={{
-          flexShrink: 0,
-          fontSize: '12px',
-          fontWeight: 500,
-          color: isActive ? 'var(--color-success)' : 'var(--color-text-disabled)',
+          fontSize: '13px',
+          fontWeight: 600,
+          color: 'var(--color-text-primary)',
         }}
       >
-        {isActive ? 'Active' : 'Inactive'}
-      </span>
+        {option.label}{credential.preferredModel ? ` — ${credential.preferredModel}` : ''}
+      </div>
 
-      {/* Remove button */}
-      <Button
-        variant="danger"
-        size="sm"
-        onClick={onRemove}
-        aria-label={`Remove ${option.label} key`}
-        title={`Remove ${option.label} key`}
+      {/* Masked key */}
+      <div
+        style={{
+          fontSize: '11.5px',
+          fontFamily: 'monospace',
+          color: 'var(--color-text-disabled)',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}
       >
-        <Trash2 size={13} aria-hidden="true" />
-      </Button>
+        {credential.apiKey}
+      </div>
+
+      {/* Active label + remove button */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
+        <span
+          style={{
+            fontSize: '12px',
+            fontWeight: 500,
+            color: isActive ? 'var(--color-success)' : 'var(--color-text-disabled)',
+          }}
+        >
+          {isActive ? 'Active' : 'Inactive'}
+        </span>
+
+        <Button
+          variant="danger"
+          size="sm"
+          onClick={onRemove}
+          aria-label={`Remove ${option.label} key`}
+          title={`Remove ${option.label} key`}
+        >
+          <Trash2 size={13} aria-hidden="true" />
+        </Button>
+      </div>
     </div>
   );
 }
@@ -273,31 +281,31 @@ function SavedKeysCard({
   return (
     <Card style={{ padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)' }}>
       <Stack gap="var(--space-4)">
-        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-          <div>
-            <h3
-              style={{
-                margin: 0,
-                fontSize: '15px',
-                fontWeight: 600,
-                color: 'var(--color-text-primary)',
-              }}
-            >
-              Saved keys
-            </h3>
-            <p
-              style={{
-                margin: '3px 0 0',
-                fontSize: '12px',
-                color: 'var(--color-text-disabled)',
-                lineHeight: 1.5,
-              }}
-            >
-              Masked credentials stored securely for this account.
-            </p>
-          </div>
+        <div>
+          <h3
+            style={{
+              margin: 0,
+              fontSize: '15px',
+              fontWeight: 600,
+              color: 'var(--color-text-primary)',
+            }}
+          >
+            Saved keys
+          </h3>
+          <p
+            style={{
+              margin: '3px 0 0',
+              fontSize: '12px',
+              color: 'var(--color-text-disabled)',
+              lineHeight: 1.5,
+            }}
+          >
+            Masked credentials stored securely for this account.
+          </p>
           <span
             style={{
+              display: 'inline-block',
+              marginTop: 'var(--space-2)',
               fontSize: '12px',
               color: 'var(--color-text-disabled)',
             }}
@@ -337,6 +345,7 @@ function CloudProviderSection({
   onChangeSettings,
   onSaveSettings,
   onTestApiKey,
+  isMobile,
 }: {
   settings: WorkspaceSettings;
   saveLoading: boolean;
@@ -346,6 +355,7 @@ function CloudProviderSection({
   onChangeSettings: (updates: Partial<WorkspaceSettings>) => void;
   onSaveSettings: () => void;
   onTestApiKey: () => void;
+  isMobile: boolean;
 }) {
   const providerOption = useMemo(() => getProviderOption(settings.aiProvider), [settings.aiProvider]);
   const hasStoredApiKey = settings.apiKey === API_KEY_MASK;
@@ -360,7 +370,7 @@ function CloudProviderSection({
           </p>
         </div>
 
-        <Grid columns="1.5fr 3fr" gap="var(--space-4)">
+        <Grid columns={isMobile ? 1 : '1.5fr 3fr'} gap="var(--space-4)">
           <Select
             label="Provider"
             value={settings.aiProvider}
@@ -408,12 +418,14 @@ function OllamaSettingsSection({
   ollamaModelsLoading,
   onChangeSettings,
   onRefreshOllamaModels,
+  isMobile,
 }: {
   settings: WorkspaceSettings;
   ollamaModels: string[];
   ollamaModelsLoading: boolean;
   onChangeSettings: (updates: Partial<WorkspaceSettings>) => void;
   onRefreshOllamaModels: () => void;
+  isMobile: boolean;
 }) {
   const detectedModelValue = ollamaModels.includes(settings.ollamaModel) ? settings.ollamaModel : '';
 
@@ -442,7 +454,7 @@ function OllamaSettingsSection({
           </p>
         </div>
 
-        <Grid columns="3fr 1fr" gap="var(--space-4)" style={{ alignItems: 'end' }}>
+        <Grid columns={isMobile ? 1 : '3fr 1fr'} gap="var(--space-4)" style={{ alignItems: 'end' }}>
           <TextInput
             label="Ollama API Endpoint"
             value={settings.ollamaEndpoint}
@@ -537,8 +549,16 @@ export function AccountPreferencesPage({
   onRemoveCredential,
 }: AccountPreferencesPageProps) {
   const [activeCategory, setActiveCategory] = useState<SettingsCategoryId>('general');
+  const [isMobile, setIsMobile] = useState(false);
 
   const activeCategoryMeta = SETTINGS_CATEGORIES.find((category) => category.id === activeCategory) || SETTINGS_CATEGORIES[0];
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     if (activeCategory !== 'providers') {
@@ -552,27 +572,39 @@ export function AccountPreferencesPage({
     <DashboardLayout>
       <DashboardLayout.Header
         leftContent={
-          <Flex align="center" gap="var(--space-4)">
+          isMobile ? (
             <Button variant="ghost" size="sm" onClick={onBack} leftIcon={<ArrowLeft size={14} />}>
               Back
             </Button>
+          ) : (
+            <Flex align="center" gap="var(--space-4)">
+              <Button variant="ghost" size="sm" onClick={onBack} leftIcon={<ArrowLeft size={14} />}>
+                Back
+              </Button>
 
+              <Button variant="ghost" size="sm" onClick={onOpenDirectory} leftIcon={<Globe size={14} />}>
+                Workspaces
+              </Button>
+
+              <Divider vertical style={{ height: '20px' }} />
+
+              <div>
+                <h1 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: 'var(--color-text-primary)' }}>Account Preferences</h1>
+                <p style={{ margin: 0, fontSize: '11px', color: 'var(--color-text-disabled)' }}>Configure your local user environment</p>
+              </div>
+            </Flex>
+          )
+        }
+        rightContent={
+          isMobile ? (
             <Button variant="ghost" size="sm" onClick={onOpenDirectory} leftIcon={<Globe size={14} />}>
               Workspaces
             </Button>
-
-            <Divider vertical style={{ height: '20px' }} />
-
-            <div>
-              <h1 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: 'var(--color-text-primary)' }}>Account Preferences</h1>
-              <p style={{ margin: 0, fontSize: '11px', color: 'var(--color-text-disabled)' }}>Configure your local user environment</p>
-            </div>
-          </Flex>
-        }
-        rightContent={
-          <Button variant="accent" size="sm" onClick={onSaveSettings} loading={saveLoading} disabled={!hasChanges}>
-            {saveSuccess ? 'Changes Saved' : 'Save Changes'}
-          </Button>
+          ) : (
+            <Button variant="accent" size="sm" onClick={onSaveSettings} loading={saveLoading} disabled={!hasChanges}>
+              {saveSuccess ? 'Changes Saved' : 'Save Changes'}
+            </Button>
+          )
         }
       />
 
@@ -628,17 +660,19 @@ export function AccountPreferencesPage({
         <DashboardLayout.Content>
           <div style={{ padding: 'var(--space-6) var(--space-6) var(--space-8) var(--space-6)', maxWidth: '800px', margin: '0 auto' }}>
             <Stack gap="var(--space-5)">
-              <div>
-                <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-text-disabled)' }}>
-                  Account Settings
-                </span>
-                <h2 style={{ margin: '4px 0 0', fontSize: '24px', fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '-0.02em' }}>
-                  {activeCategoryMeta.label}
-                </h2>
-                <p style={{ margin: '6px 0 0', fontSize: '13.5px', color: 'var(--color-text-disabled)', lineHeight: 1.5 }}>
-                  {activeCategoryMeta.description}
-                </p>
-              </div>
+              {!isMobile && (
+                <div>
+                  <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-text-disabled)' }}>
+                    Account Settings
+                  </span>
+                  <h2 style={{ margin: '4px 0 0', fontSize: '24px', fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '-0.02em' }}>
+                    {activeCategoryMeta.label}
+                  </h2>
+                  <p style={{ margin: '6px 0 0', fontSize: '13.5px', color: 'var(--color-text-disabled)', lineHeight: 1.5 }}>
+                    {activeCategoryMeta.description}
+                  </p>
+                </div>
+              )}
 
               {settingsLoading && (
                 <Alert type="info">
@@ -652,11 +686,11 @@ export function AccountPreferencesPage({
                 </Alert>
               )}
 
-              {activeCategory === 'general' && (
-                <GeneralSettingsSection settings={settings} onChangeSettings={onChangeSettings} />
+              {(isMobile || activeCategory === 'general') && (
+                <GeneralSettingsSection settings={settings} onChangeSettings={onChangeSettings} isMobile={isMobile} />
               )}
 
-              {activeCategory === 'providers' && (
+              {(isMobile || activeCategory === 'providers') && (
                 <Stack gap="var(--space-4)">
                   <CloudProviderSection
                     settings={settings}
@@ -667,6 +701,7 @@ export function AccountPreferencesPage({
                     onChangeSettings={onChangeSettings}
                     onSaveSettings={onSaveSettings}
                     onTestApiKey={onTestApiKey}
+                    isMobile={isMobile}
                   />
                   <SavedKeysCard
                     savedCredentials={savedCredentials}
@@ -676,18 +711,34 @@ export function AccountPreferencesPage({
                 </Stack>
               )}
 
-              {activeCategory === 'ollama' && (
+              {(isMobile || activeCategory === 'ollama') && (
                 <OllamaSettingsSection
                   settings={settings}
                   ollamaModels={ollamaModels}
                   ollamaModelsLoading={ollamaModelsLoading}
                   onChangeSettings={onChangeSettings}
                   onRefreshOllamaModels={onRefreshOllamaModels}
+                  isMobile={isMobile}
                 />
               )}
 
-              {activeCategory === 'onboarding' && (
+              {(isMobile || activeCategory === 'onboarding') && (
                 <OnboardingSection tutorialResult={tutorialResult} onResetTutorial={onResetTutorial} />
+              )}
+
+              {isMobile && (
+                <div style={{ display: 'flex', marginTop: 'var(--space-4)' }}>
+                  <Button
+                    variant="accent"
+                    size="lg"
+                    onClick={onSaveSettings}
+                    loading={saveLoading}
+                    disabled={!hasChanges}
+                    style={{ width: '100%', justifyContent: 'center' }}
+                  >
+                    {saveSuccess ? 'Changes Saved' : 'Save Changes'}
+                  </Button>
+                </div>
               )}
             </Stack>
           </div>

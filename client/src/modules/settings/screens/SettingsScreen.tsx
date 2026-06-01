@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ArrowLeft, Globe, Link2, Settings2, ShieldCheck, UserPlus, Users } from 'lucide-react';
 import { Button, Divider, Flex, Avatar, Stack, Alert } from '@library';
 import { DashboardLayout } from '../../../components/DashboardLayout/DashboardLayout';
@@ -77,34 +77,54 @@ export function SettingsScreen({
   onClearDeleteError,
 }: SettingsScreenProps) {
   const [activeCategory, setActiveCategory] = useState<SettingsCategoryId>('overview');
+  const [isMobile, setIsMobile] = useState(false);
 
   const activeCategoryMeta = SETTINGS_CATEGORIES.find((category) => category.id === activeCategory) || SETTINGS_CATEGORIES[0];
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   return (
     <DashboardLayout>
       <DashboardLayout.Header
         leftContent={
-          <Flex align="center" gap="var(--space-4)">
+          isMobile ? (
             <Button variant="ghost" size="sm" onClick={onBackToWorkspace} leftIcon={<ArrowLeft size={14} />}>
               Workspace
             </Button>
+          ) : (
+            <Flex align="center" gap="var(--space-4)">
+              <Button variant="ghost" size="sm" onClick={onBackToWorkspace} leftIcon={<ArrowLeft size={14} />}>
+                Workspace
+              </Button>
 
+              <Button variant="ghost" size="sm" onClick={onOpenDirectory} leftIcon={<Globe size={14} />}>
+                Workspaces
+              </Button>
+
+              <Divider vertical style={{ height: '20px' }} />
+
+              <div>
+                <h1 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: 'var(--color-text-primary)' }}>Workspace Settings</h1>
+                <p style={{ margin: 0, fontSize: '11px', color: 'var(--color-text-disabled)' }}>Managing {workspace.name}</p>
+              </div>
+            </Flex>
+          )
+        }
+        rightContent={
+          isMobile ? (
             <Button variant="ghost" size="sm" onClick={onOpenDirectory} leftIcon={<Globe size={14} />}>
               Workspaces
             </Button>
-
-            <Divider vertical style={{ height: '20px' }} />
-
-            <div>
-              <h1 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: 'var(--color-text-primary)' }}>Workspace Settings</h1>
-              <p style={{ margin: 0, fontSize: '11px', color: 'var(--color-text-disabled)' }}>Managing {workspace.name}</p>
-            </div>
-          </Flex>
-        }
-        rightContent={
-          <Button variant="accent" size="sm" onClick={onSaveSettings} loading={saveLoading}>
-            {saveSuccess ? 'Changes Saved' : 'Save Changes'}
-          </Button>
+          ) : (
+            <Button variant="accent" size="sm" onClick={onSaveSettings} loading={saveLoading}>
+              {saveSuccess ? 'Changes Saved' : 'Save Changes'}
+            </Button>
+          )
         }
       />
 
@@ -160,17 +180,19 @@ export function SettingsScreen({
         <DashboardLayout.Content>
           <div style={{ padding: 'var(--space-6) var(--space-6) var(--space-8) var(--space-6)', maxWidth: '800px', margin: '0 auto' }}>
             <Stack gap="var(--space-5)">
-              <div>
-                <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-text-disabled)' }}>
-                  Settings Section
-                </span>
-                <h2 style={{ margin: '4px 0 0', fontSize: '24px', fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '-0.02em' }}>
-                  {activeCategoryMeta.label}
-                </h2>
-                <p style={{ margin: '6px 0 0', fontSize: '13.5px', color: 'var(--color-text-disabled)', lineHeight: 1.5 }}>
-                  {activeCategoryMeta.description}
-                </p>
-              </div>
+              {!isMobile && (
+                <div>
+                  <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-text-disabled)' }}>
+                    Settings Section
+                  </span>
+                  <h2 style={{ margin: '4px 0 0', fontSize: '24px', fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '-0.02em' }}>
+                    {activeCategoryMeta.label}
+                  </h2>
+                  <p style={{ margin: '6px 0 0', fontSize: '13.5px', color: 'var(--color-text-disabled)', lineHeight: 1.5 }}>
+                    {activeCategoryMeta.description}
+                  </p>
+                </div>
+              )}
 
               {settingsLoading && (
                 <Alert type="info">
@@ -190,12 +212,13 @@ export function SettingsScreen({
                 </Alert>
               )}
 
-              {activeCategory === 'overview' && (
+              {(isMobile || activeCategory === 'overview') && (
                 <>
                   <OverviewSection
                     workspace={workspace}
                     settings={settings}
                     onChangeSettings={onChangeSettings}
+                    isMobile={isMobile}
                   />
                   <DangerZoneSection
                     workspace={workspace}
@@ -207,7 +230,7 @@ export function SettingsScreen({
                 </>
               )}
 
-              {activeCategory === 'access' && (
+              {(isMobile || activeCategory === 'access') && (
                 <AccessSection
                   invites={invites}
                   invitesLoading={invitesLoading}
@@ -215,12 +238,13 @@ export function SettingsScreen({
                   revokeLoadingId={revokeLoadingId}
                   onCreateInvite={onCreateInvite}
                   onRevokeInvite={onRevokeInvite}
+                  isMobile={isMobile}
                 />
               )}
 
-              {activeCategory === 'members' && <MembersSection members={members} />}
+              {(isMobile || activeCategory === 'members') && <MembersSection members={members} />}
 
-              {activeCategory === 'requests' && (
+              {(isMobile || activeCategory === 'requests') && (
                 <RequestsSection
                   joinRequests={joinRequests}
                   approveLoadingId={approveLoadingId}
@@ -228,12 +252,26 @@ export function SettingsScreen({
                 />
               )}
 
-              {activeCategory === 'mcp_tools' && (
+              {(isMobile || activeCategory === 'mcp_tools') && (
                 <McpToolsSection
                   workspace={workspace}
                   settings={settings}
                   onChangeSettings={onChangeSettings}
                 />
+              )}
+
+              {isMobile && (
+                <div style={{ display: 'flex', marginTop: 'var(--space-4)' }}>
+                  <Button
+                    variant="accent"
+                    size="lg"
+                    onClick={onSaveSettings}
+                    loading={saveLoading}
+                    style={{ width: '100%', justifyContent: 'center' }}
+                  >
+                    {saveSuccess ? 'Changes Saved' : 'Save Changes'}
+                  </Button>
+                </div>
               )}
             </Stack>
           </div>
