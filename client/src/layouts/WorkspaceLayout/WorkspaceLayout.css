@@ -55,7 +55,7 @@
   }
 
   .workspace-header-logo {
-    flex: 1;
+    flex: 0 0 auto;
     display: flex;
     align-items: center;
     justify-content: flex-start;
@@ -89,9 +89,6 @@
 @media (max-width: 480px) {
   .workspace-header-logo-text {
     display: none;
-  }
-  .workspace-header-workspace-select {
-    width: 140px;
   }
 }
 

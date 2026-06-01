@@ -99,6 +99,8 @@ export function WorkspaceLayout({ sidebarProps, children, rightPanels, isMobile 
               fontWeight: 500,
               fontSize: '12px',
               flexShrink: 0,
+              width: '105px',
+              whiteSpace: 'nowrap',
             }}
           >
             {sidebarProps.tools.isOllamaOpen ? <X size={14} /> : <MessageSquare size={14} />}
