@@ -1,9 +1,13 @@
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import { db } from '../../db/index.js';
 import { noteMetadata } from './schema.js';
 import { RustFS } from '../../lib/rustfs.js';
 
 export type NoteMetadata = typeof noteMetadata.$inferSelect;
+
+function buildSearchVector(title: string, excerpt: string) {
+  return sql`to_tsvector('english', ${title} || ' ' || ${excerpt})`;
+}
 
 export class MetadataRepository {
   /**
@@ -14,8 +18,10 @@ export class MetadataRepository {
     projectId: string;
     userId: string;
     title: string;
+    excerpt?: string;
     bucketPath: string;
   }): Promise<NoteMetadata> {
+    const excerpt = data.excerpt || '';
     const [record] = await db
       .insert(noteMetadata)
       .values({
@@ -23,7 +29,9 @@ export class MetadataRepository {
         projectId: data.projectId,
         userId: data.userId,
         title: data.title,
+        excerpt,
         bucketPath: data.bucketPath,
+        searchVector: buildSearchVector(data.title, excerpt),
       })
       .returning();
 
@@ -57,18 +65,53 @@ export class MetadataRepository {
   }
 
   /**
+   * Searches note metadata for a given project and user using full-text search.
+   */
+  static async searchNotesMetadata(
+    projectId: string,
+    userId: string,
+    query: string,
+    limit: number = 20,
+    offset: number = 0
+  ): Promise<NoteMetadata[]> {
+    // We use websearch_to_tsquery for user-friendly query parsing
+    const tsQuery = sql`websearch_to_tsquery('english', ${query})`;
+    
+    return await db
+      .select()
+      .from(noteMetadata)
+      .where(
+        and(
+          eq(noteMetadata.projectId, projectId),
+          eq(noteMetadata.userId, userId),
+          sql`${noteMetadata.searchVector} @@ ${tsQuery}`
+        )
+      )
+      .orderBy(desc(sql`ts_rank(${noteMetadata.searchVector}, ${tsQuery})`))
+      .limit(limit)
+      .offset(offset);
+  }
+
+  /**
    * Updates note metadata with optimistic locking.
    * Throws if the version does not match.
    */
   static async updateNoteMetadata(
     id: string,
     currentVersion: number,
-    updates: Partial<{ title: string }>
+    updates: Partial<{ title: string; excerpt: string }>
   ): Promise<NoteMetadata> {
+    const existing = await this.getNoteMetadata(id);
+    if (!existing) throw new Error('Note not found');
+
+    const newTitle = updates.title ?? existing.title;
+    const newExcerpt = updates.excerpt ?? existing.excerpt;
+
     const [record] = await db
       .update(noteMetadata)
       .set({
         ...updates,
+        searchVector: buildSearchVector(newTitle, newExcerpt),
         version: currentVersion + 1,
         updatedAt: new Date(),
       })
