@@ -4,7 +4,6 @@
   height: 100%;
   background: var(--bg-surface);
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
   overflow: hidden;
   position: relative;
 }
@@ -81,6 +80,23 @@
   overflow-y: auto;
   padding: var(--spacing-lg) var(--spacing-xl);
   position: relative;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.note-editor__title-input {
+  width: 100%;
+  font-size: 2em;
+  font-weight: 600;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  outline: none;
+  margin-top: 0.25em;
+  margin-bottom: 0.5em;
+  padding: 0;
+}
+.note-editor__title-input::placeholder {
+  color: var(--text-tertiary);
 }
 
 .note-editor__content .ProseMirror {
@@ -93,8 +109,6 @@
 
 /* TipTap default styles */
 .note-editor__content .ProseMirror p.is-editor-empty:first-child::before,
-.note-editor__content .ProseMirror h1.is-empty::before,
-.note-editor__content .ProseMirror h2.is-empty::before,
 .note-editor__content .ProseMirror p.is-empty::before {
   color: var(--text-tertiary);
   content: attr(data-placeholder);

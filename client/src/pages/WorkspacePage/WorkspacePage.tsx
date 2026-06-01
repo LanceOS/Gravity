@@ -139,7 +139,7 @@ export function WorkspacePage({
         },
         body: JSON.stringify({
           title: 'Untitled Note',
-          body: '# \n\n',
+          body: '',
         }),
       });
       if (response.ok) {
@@ -186,7 +186,7 @@ export function WorkspacePage({
               </div>
             )}
           </WorkspaceHeader.Top>
-          
+
           {!activeTicket && activeContext === 'issues' && (
             <WorkspaceHeader.Bottom>
               <TicketFilterBar
@@ -214,7 +214,7 @@ export function WorkspacePage({
                   {activeNoteId ? (
                     <NoteEditor projectId={filters.projectId || ''} noteId={activeNoteId} />
                   ) : (
-                    <NotesList projectId={filters.projectId || ''} onSelectNote={onSelectNote || (() => {})} />
+                    <NotesList projectId={filters.projectId || ''} onSelectNote={onSelectNote || (() => { })} />
                   )}
                 </WorkspaceViewContainer>
               ) : projects.length === 0 ? (

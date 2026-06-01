@@ -20,6 +20,8 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
   const { note, loading, saving, saveError, savedAt, saveNote, uploadMedia } = useNote(projectId, noteId);
   
   const [isDragging, setIsDragging] = useState(false);
+  const [title, setTitle] = useState('');
+  const titleRef = useRef(title);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -34,29 +36,15 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
   }, []);
 
   const triggerSave = useCallback(() => {
-    // Only save if we have editor instance and note
     if (!editor || !note) return;
     
     const currentBody = editor.storage.markdown.getMarkdown();
-    
-    // Extract title from the first H1, or use a fallback
-    const json = editor.getJSON();
-    let extractedTitle = 'Untitled Note';
-    if (json.content && json.content.length > 0) {
-      const firstNode = json.content[0];
-      if (firstNode.type === 'heading' && firstNode.content) {
-        extractedTitle = firstNode.content.map((n: any) => n.text).join('');
-      } else if (firstNode.content) {
-        extractedTitle = firstNode.content.map((n: any) => n.text).join('').substring(0, 50);
-      }
-    }
-    if (!extractedTitle.trim()) extractedTitle = 'Untitled Note';
+    const currentTitle = titleRef.current.trim() || 'Untitled Note';
 
-    if (currentBody !== note.body || extractedTitle !== note.title) {
-      saveNote({ title: extractedTitle, body: currentBody });
+    if (currentBody !== note.body || currentTitle !== note.title) {
+      saveNote({ title: currentTitle, body: currentBody });
     }
-  }, [note, saveNote]); // we'll access editor via a ref or from closure if editor is stable, but editor isn't stable.
-  // Wait, let's keep editor in scope.
+  }, [note, saveNote]);
 
   const handleFileUpload = async (file: File) => {
     try {
@@ -74,15 +62,11 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
       Markdown,
       Image,
       Placeholder.configure({ 
-        placeholder: ({ node }) => {
-          if (node.type.name === 'heading' && node.attrs.level === 1) {
-            return 'Title...';
-          }
-          return 'Body...';
-        },
+        placeholder: 'Body...',
       }),
     ],
-    content: '',
+    // Explicit document structure so tiptap-markdown never infers a heading node
+    content: { type: 'doc', content: [{ type: 'paragraph' }] },
     onUpdate: () => {
       scheduleSave();
     },
@@ -101,9 +85,45 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
   }, [noteId]); // Recreate if noteId changes.
 
   // Sync content when note initially loads
+  const noteLoaded = useRef(false);
   useEffect(() => {
-    if (editor && note?.body && editor.isEmpty) {
-      editor.commands.setContent(note.body);
+    // Reset the loaded flag whenever noteId changes so we reload fresh content.
+    noteLoaded.current = false;
+  }, [noteId]);
+
+  useEffect(() => {
+    if (!note || !editor || noteLoaded.current) return;
+    noteLoaded.current = true;
+
+    const rawBody = note.body ?? '';
+
+    // Strip a legacy empty-H1 line written by the old creation code ("# \n\n").
+    // We only strip lines that are JUST "# " (no real heading text) so we never
+    // destroy intentional user content.
+    const cleanedBody = rawBody.replace(/^# ?\n/, '').trimStart();
+
+    if (cleanedBody) {
+      editor.commands.setContent(cleanedBody);
+
+      // Belt-and-suspenders: if tiptap-markdown still produced a leading H1
+      // node that is empty (a legacy artifact), convert it to a paragraph.
+      const json = editor.getJSON();
+      const firstNode = json.content?.[0];
+      if (firstNode?.type === 'heading' && !firstNode.content?.length) {
+        editor.chain()
+          .setTextSelection(1)
+          .setParagraph()
+          .run();
+      }
+    }
+
+    // Place cursor at the very start of the body.
+    editor.commands.focus('start');
+
+    // Populate the title input from stored metadata.
+    if (!title && note.title && note.title !== 'Untitled Note') {
+      setTitle(note.title);
+      titleRef.current = note.title;
     }
   }, [editor, note]);
 
@@ -114,25 +134,21 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
       saveTimeoutRef.current = setTimeout(() => {
         if (!editor || !note) return;
         const currentBody = editor.storage.markdown.getMarkdown();
-        
-        const json = editor.getJSON();
-        let extractedTitle = 'Untitled Note';
-        if (json.content && json.content.length > 0) {
-          const firstNode = json.content[0];
-          if (firstNode.type === 'heading' && firstNode.content) {
-            extractedTitle = firstNode.content.map((n: any) => n.text).join('');
-          } else if (firstNode.content) {
-            extractedTitle = firstNode.content.map((n: any) => n.text).join('').substring(0, 50);
-          }
-        }
-        if (!extractedTitle.trim()) extractedTitle = 'Untitled Note';
+        const currentTitle = titleRef.current.trim() || 'Untitled Note';
 
-        if (currentBody !== note.body || extractedTitle !== note.title) {
-          saveNote({ title: extractedTitle, body: currentBody });
+        if (currentBody !== note.body || currentTitle !== note.title) {
+          saveNote({ title: currentTitle, body: currentBody });
         }
       }, 3000);
     }
   }, [note, editor, saveNote]);
+
+  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newTitle = e.target.value;
+    setTitle(newTitle);
+    titleRef.current = newTitle;
+    scheduleSave();
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -287,6 +303,13 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
       </div>
 
       <div className="note-editor__content">
+        <input
+          type="text"
+          className="note-editor__title-input"
+          placeholder="Title..."
+          value={title}
+          onChange={handleTitleChange}
+        />
         <EditorContent editor={editor} />
         
         <div className={`note-editor__drag-overlay ${isDragging ? 'note-editor__drag-overlay--active' : ''}`}>
