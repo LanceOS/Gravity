@@ -1,6 +1,8 @@
 import { and, eq } from 'drizzle-orm';
 import { db } from '../../../db/index.js';
 import { workspaceMembers, projects } from '../schema.js';
+import type { Request } from 'express';
+import { resolveRequestActorUserId } from '../../auth/utils/request-auth.js';
 
 /**
  * Checks if a user is a member of a specific workspace.
@@ -26,4 +28,23 @@ export async function getProjectWorkspaceId(projectId: string): Promise<string |
     .limit(1);
     
   return projectRows[0]?.workspaceId ?? null;
+}
+
+/**
+ * Ensures the requester is authenticated and a member of the workspace that owns the project.
+ */
+export async function authorizeProjectAccess(req: Request, projectId: string) {
+  const userId = await resolveRequestActorUserId(req);
+  if (!userId) {
+    return { allowed: false as const, error: 'Authentication required.', status: 401 };
+  }
+  const workspaceId = await getProjectWorkspaceId(projectId);
+  if (!workspaceId) {
+    return { allowed: false as const, error: 'Project not found.', status: 404 };
+  }
+  const isMember = await isWorkspaceMember(workspaceId, userId);
+  if (!isMember) {
+    return { allowed: false as const, error: 'Access denied: not a member of the workspace.', status: 403 };
+  }
+  return { allowed: true as const, userId };
 }
