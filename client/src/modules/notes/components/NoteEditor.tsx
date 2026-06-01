@@ -4,8 +4,8 @@ import StarterKit from '@tiptap/starter-kit';
 import { Markdown } from 'tiptap-markdown';
 import Image from '@tiptap/extension-image';
 import Placeholder from '@tiptap/extension-placeholder';
-import { 
-  Bold, Italic, Strikethrough, Heading1, Heading2, 
+import {
+  Bold, Italic, Strikethrough, Heading1, Heading2,
   List, ListOrdered, Code, Quote, ImageIcon, Network, Check
 } from 'lucide-react';
 import { useNote } from '../hooks/useNote';
@@ -18,7 +18,7 @@ interface NoteEditorProps {
 
 export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
   const { note, loading, saving, saveError, savedAt, saveNote, uploadMedia } = useNote(projectId, noteId);
-  
+
   const [isDragging, setIsDragging] = useState(false);
   const [title, setTitle] = useState('');
   const titleRef = useRef(title);
@@ -37,7 +37,7 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
 
   const triggerSave = useCallback(() => {
     if (!editor || !note) return;
-    
+
     const currentBody = editor.storage.markdown.getMarkdown();
     const currentTitle = titleRef.current.trim() || 'Untitled Note';
 
@@ -61,7 +61,7 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
       StarterKit,
       Markdown,
       Image,
-      Placeholder.configure({ 
+      Placeholder.configure({
         placeholder: 'Body...',
       }),
     ],
@@ -185,7 +185,7 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
   }
 
   return (
-    <div 
+    <div
       className="note-editor"
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
@@ -202,7 +202,7 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
           ) : null}
         </div>
       </div>
-      
+
       <div className="note-editor__toolbar">
         <button
           className={`note-editor__toolbar-btn ${editor.isActive('bold') ? 'note-editor__toolbar-btn--active' : ''}`}
@@ -225,9 +225,9 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
         >
           <Strikethrough size={16} />
         </button>
-        
+
         <div className="note-editor__toolbar-divider" />
-        
+
         <button
           className={`note-editor__toolbar-btn ${editor.isActive('heading', { level: 1 }) ? 'note-editor__toolbar-btn--active' : ''}`}
           onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
@@ -242,9 +242,9 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
         >
           <Heading2 size={16} />
         </button>
-        
+
         <div className="note-editor__toolbar-divider" />
-        
+
         <button
           className={`note-editor__toolbar-btn ${editor.isActive('bulletList') ? 'note-editor__toolbar-btn--active' : ''}`}
           onClick={() => editor.chain().focus().toggleBulletList().run()}
@@ -259,9 +259,9 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
         >
           <ListOrdered size={16} />
         </button>
-        
+
         <div className="note-editor__toolbar-divider" />
-        
+
         <button
           className={`note-editor__toolbar-btn ${editor.isActive('codeBlock') ? 'note-editor__toolbar-btn--active' : ''}`}
           onClick={() => editor.chain().focus().toggleCodeBlock().run()}
@@ -278,11 +278,11 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
         </button>
 
         <div className="note-editor__toolbar-divider" />
-        
-        <input 
-          type="file" 
-          ref={fileInputRef} 
-          style={{ display: 'none' }} 
+
+        <input
+          type="file"
+          ref={fileInputRef}
+          style={{ display: 'none' }}
           accept="image/*,.svg"
           onChange={handleFileChange}
         />
@@ -311,7 +311,7 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
           onChange={handleTitleChange}
         />
         <EditorContent editor={editor} />
-        
+
         <div className={`note-editor__drag-overlay ${isDragging ? 'note-editor__drag-overlay--active' : ''}`}>
           <div className="note-editor__drag-message">
             Drop image to attach

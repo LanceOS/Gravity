@@ -209,7 +209,9 @@ export function WorkspacePage({
         <div className={`workspace-page__issues ${activeTicket ? 'workspace-page__issues--hidden' : ''}`}>
           <div className="workspace-page__issues-shell">
             <div className="workspace-page__issues-content">
-              {activeContext === 'notes' ? (
+
+              {/* Notes panel — always mounted, hidden when not in notes context */}
+              <div className={activeContext !== 'notes' ? 'workspace-page__issues--hidden' : ''}>
                 <WorkspaceViewContainer>
                   {activeNoteId ? (
                     <NoteEditor projectId={filters.projectId || ''} noteId={activeNoteId} />
@@ -217,48 +219,55 @@ export function WorkspacePage({
                     <NotesList projectId={filters.projectId || ''} onSelectNote={onSelectNote || (() => { })} />
                   )}
                 </WorkspaceViewContainer>
-              ) : projects.length === 0 ? (
-                <div className="workspace-page__empty-state">
-                  <div className="workspace-page__empty-state-title">No projects in this workspace yet</div>
-                  <p className="workspace-page__empty-state-copy">
-                    Open Manage Projects to create the first project for this workspace. Once a project exists, tickets, domains, and cycles will become available here.
-                  </p>
-                  <div className="workspace-page__empty-state-actions">
-                    <Button
-                      type="button"
-                      variant="primary"
-                      className="workspace-page__projects-button workspace-page__projects-button--primary"
-                      onClick={onOpenProjectManager}
-                    >
-                      Manage Projects
-                    </Button>
+              </div>
+
+              {/* Tickets panel — always mounted, hidden when in notes context */}
+              <div className={activeContext === 'notes' ? 'workspace-page__issues--hidden' : ''}>
+                {projects.length === 0 ? (
+                  <div className="workspace-page__empty-state">
+                    <div className="workspace-page__empty-state-title">No projects in this workspace yet</div>
+                    <p className="workspace-page__empty-state-copy">
+                      Open Manage Projects to create the first project for this workspace. Once a project exists, tickets, domains, and cycles will become available here.
+                    </p>
+                    <div className="workspace-page__empty-state-actions">
+                      <Button
+                        type="button"
+                        variant="primary"
+                        className="workspace-page__projects-button workspace-page__projects-button--primary"
+                        onClick={onOpenProjectManager}
+                      >
+                        Manage Projects
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              ) : activeView === 'board' ? (
-                <WorkspaceViewContainer>
-                  <TicketBoard
-                    ticketsByColumn={groupedTickets}
-                    domainById={domainById}
-                    userAvatarById={userAvatarById}
-                    onMoveTicket={onUpdateTicket}
-                    onSelectTicket={onSelectTicket}
-                    onOpenCreateTicket={onOpenCreateTicket}
-                  />
-                </WorkspaceViewContainer>
-              ) : (
-                <WorkspaceViewContainer>
-                  <TicketList
-                    filteredCount={filteredTickets.length}
-                    groupedTickets={listGroupedTickets}
-                    domainById={domainById}
-                    userAvatarById={userAvatarById}
-                    onSelectTicket={onSelectTicket}
-                  />
-                </WorkspaceViewContainer>
-              )}
+                ) : activeView === 'board' ? (
+                  <WorkspaceViewContainer>
+                    <TicketBoard
+                      ticketsByColumn={groupedTickets}
+                      domainById={domainById}
+                      userAvatarById={userAvatarById}
+                      onMoveTicket={onUpdateTicket}
+                      onSelectTicket={onSelectTicket}
+                      onOpenCreateTicket={onOpenCreateTicket}
+                    />
+                  </WorkspaceViewContainer>
+                ) : (
+                  <WorkspaceViewContainer>
+                    <TicketList
+                      filteredCount={filteredTickets.length}
+                      groupedTickets={listGroupedTickets}
+                      domainById={domainById}
+                      userAvatarById={userAvatarById}
+                      onSelectTicket={onSelectTicket}
+                    />
+                  </WorkspaceViewContainer>
+                )}
+              </div>
+
             </div>
           </div>
         </div>
+
 
         {activeTicket ? (
           <div key={activeTicket.id} className="workspace-page__detail">

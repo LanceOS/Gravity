@@ -29,13 +29,12 @@
   color: var(--color-danger);
 }
 
+
 .note-editor__toolbar {
   display: flex;
   align-items: center;
   gap: var(--spacing-xs);
-  padding: var(--spacing-xs) var(--spacing-md);
-  border-bottom: 1px solid var(--border-color);
-  background: var(--bg-surface);
+  background: transparent;
   flex-wrap: wrap;
 }
 
@@ -95,6 +94,7 @@
   margin-bottom: 0.5em;
   padding: 0;
 }
+
 .note-editor__title-input::placeholder {
   color: var(--text-tertiary);
 }
