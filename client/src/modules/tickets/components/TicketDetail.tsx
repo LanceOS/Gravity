@@ -2,7 +2,7 @@ import React, { useState, useCallback, useMemo } from 'react';
 import type { Ticket } from '../../../context/TicketContext';
 import { Button, Select, Textarea, MarkdownEditor, toast, ClickAwayListener, Portal } from '@library';
 import generateBranchName from '../../../utils/branch';
-import TicketUtilities from './TicketUtilities.tsx';
+import TicketUtilities from './TicketUtilities';
 
 const DEFAULT_TICKET_URL_BASE = 'https://tickets.placeholder.local';
 
@@ -562,7 +562,6 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             ticketLink={ticketLink}
             generatedBranchName={generatedBranchName}
             description={activeTicket.description || ''}
-            ticketKey={activeTicket.key}
             onCopy={copyToClipboard}
           />
 

@@ -1,0 +1,65 @@
+.ticket-utilities {
+  border-bottom: 1px solid var(--color-border-default);
+  padding-bottom: 12px;
+  margin-bottom: 4px;
+}
+
+.ticket-utilities__title {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-disabled);
+  text-transform: uppercase;
+}
+
+.ticket-utilities__actions {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.ticket-utilities__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+  cursor: pointer;
+}
+
+.ticket-utilities__action:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-primary-light);
+}
+
+.ticket-utilities__link {
+  width: 28px;
+  height: 28px;
+  border: 1px solid transparent;
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.ticket-utilities__link:hover,
+.ticket-utilities__link:focus-visible {
+  background: var(--color-base100);
+  border-color: var(--color-border-focus);
+}
+
+.ticket-utilities__copy-button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-text-secondary);
+}
+
+.ticket-utilities__copy-button:hover,
+.ticket-utilities__copy-button:focus-visible {
+  background: var(--color-base100);
+  border-color: var(--color-border-focus);
+}
