@@ -103,6 +103,20 @@ export function AppShellPage() {
   const [createInitialStatus, setCreateInitialStatus] = useState<Ticket['status'] | undefined>(undefined);
   const [createParentId, setCreateParentId] = useState<string | undefined>(undefined);
   const [listSort, setListSort] = useState<TicketListSort>('created');
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth <= 768;
+      setIsMobile(mobile);
+      if (mobile && activeView !== 'list') {
+        setView('list');
+      }
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [activeView, setView]);
   const [projectCreateLoading, setProjectCreateLoading] = useState(false);
   const [projectCreateError, setProjectCreateError] = useState<string | null>(null);
   const [domainCreateLoading, setDomainCreateLoading] = useState(false);
@@ -786,6 +800,7 @@ export function AppShellPage() {
       ) : (
         <WorkspaceLayout
           sidebarProps={sidebarProps}
+          isMobile={isMobile}
           rightPanels={
             <>
               {isOllamaOpen || isOllamaClosing ? (

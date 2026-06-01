@@ -73,3 +73,13 @@
   align-items: center;
   width: 100%;
 }
+
+@media (max-width: 768px) {
+  .workspace-header {
+    padding: 12px 16px !important;
+    gap: 12px !important;
+  }
+  .workspace-header__view-toggle {
+    display: none !important;
+  }
+}

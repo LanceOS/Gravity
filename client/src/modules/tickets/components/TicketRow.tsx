@@ -12,7 +12,7 @@ function TicketRowImpl({ ticket, onClick, priorityIcon, assigneeAvatar, domainTa
   return (
     <div
       onClick={handleClick}
-      className="clickable"
+      className="ticket-row clickable"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       style={{
@@ -28,13 +28,14 @@ function TicketRowImpl({ ticket, onClick, priorityIcon, assigneeAvatar, domainTa
         cursor: 'pointer',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>{priorityIcon}</div>
+      <div className="ticket-row-priority" style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>{priorityIcon}</div>
 
-      <span style={{ fontFamily: 'var(--mono)', fontSize: '12px', color: 'var(--color-text-disabled)', width: '60px', flexShrink: 0 }}>
+      <span className="ticket-row-key" style={{ fontFamily: 'var(--mono)', fontSize: '12px', color: 'var(--color-text-disabled)', width: '60px', flexShrink: 0 }}>
         {ticket.key}
       </span>
 
       <span
+        className="ticket-row-title"
         style={{
           fontSize: '13px',
           fontWeight: 500,
@@ -48,7 +49,7 @@ function TicketRowImpl({ ticket, onClick, priorityIcon, assigneeAvatar, domainTa
         {ticket.title}
       </span>
 
-      <div style={{ flexShrink: 0 }}>{domainTag}</div>
+      <div className="ticket-row-domain" style={{ flexShrink: 0 }}>{domainTag}</div>
 
       {ticket.prStatus !== 'none' ? (
         <a
@@ -56,6 +57,7 @@ function TicketRowImpl({ ticket, onClick, priorityIcon, assigneeAvatar, domainTa
           target="_blank"
           rel="noreferrer"
           onClick={(event) => event.stopPropagation()}
+          className="ticket-row-pr"
           style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -77,6 +79,7 @@ function TicketRowImpl({ ticket, onClick, priorityIcon, assigneeAvatar, domainTa
 
       {ticket.parentId ? (
         <span
+          className="ticket-row-sub"
           style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -94,7 +97,7 @@ function TicketRowImpl({ ticket, onClick, priorityIcon, assigneeAvatar, domainTa
         </span>
       ) : null}
 
-      <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'var(--color-base50)', border: '1px solid var(--color-border-default)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
+      <div className="ticket-row-avatar" style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'var(--color-base50)', border: '1px solid var(--color-border-default)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
         {assigneeAvatar ? (
           <img src={assigneeAvatar} alt="" style={{ width: '100%', height: '100%' }} />
         ) : (
@@ -102,7 +105,7 @@ function TicketRowImpl({ ticket, onClick, priorityIcon, assigneeAvatar, domainTa
         )}
       </div>
 
-      <span style={{ fontSize: '11px', color: 'var(--color-text-disabled)', width: '70px', textAlign: 'right', flexShrink: 0 }}>
+      <span className="ticket-row-date" style={{ fontSize: '11px', color: 'var(--color-text-disabled)', width: '70px', textAlign: 'right', flexShrink: 0 }}>
         {new Date(ticket.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
       </span>
     </div>
