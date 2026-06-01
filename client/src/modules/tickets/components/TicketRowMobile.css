@@ -1,0 +1,91 @@
+.ticket-row-mobile {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  background: var(--color-surface-card);
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ticket-row-mobile--hovered {
+  background: var(--color-surface-overlay);
+  border-color: var(--color-border-focus);
+}
+
+/* Main row: priority + title + avatar */
+.ticket-row-mobile__main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ticket-row-mobile__priority {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.ticket-row-mobile__title {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.ticket-row-mobile__avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--color-base50);
+  border: 1px solid var(--color-border-default);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.ticket-row-mobile__avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ticket-row-mobile__avatar-placeholder {
+  font-size: 9px;
+  color: var(--color-text-disabled);
+  font-weight: 500;
+}
+
+/* Meta row: domain tag + sub-ticket badge */
+.ticket-row-mobile__meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 24px; /* align under title, past priority icon */
+}
+
+.ticket-row-mobile__domain {
+  display: flex;
+  align-items: center;
+}
+
+.ticket-row-mobile__sub-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  color: var(--color-text-disabled);
+  background: var(--color-base50);
+  border: 1px solid var(--color-border-default);
+  padding: 1px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}

@@ -2,6 +2,7 @@ import React from 'react';
 import type { Ticket } from '../../../context/TicketContext';
 import { Compass } from 'lucide-react';
 import { TicketRow } from './TicketRow';
+import { TicketRowMobile } from './TicketRowMobile';
 
 import type { TicketListProps } from '../types/TicketList';
 import { getAssigneeAvatar, getDomainTag, getPriorityIcon, getStatusLabel, getStatusColor } from '../utils/TicketList';
@@ -58,16 +59,25 @@ export const TicketList: React.FC<TicketListProps> = ({
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {ticketsInGroup.map(ticket => (
-                    <TicketRow
-                      key={ticket.id}
-                      ticket={ticket}
-                      onClick={onSelectTicket}
-                      priorityIcon={getPriorityIcon(ticket.priority)}
-                      assigneeAvatar={getAssigneeAvatar(userAvatarById, ticket.assigneeId)}
-                      domainTag={getDomainTag(domainById, ticket.domainId)}
-                    />
-                  ))}
+                  {ticketsInGroup.map(ticket => {
+                    const rowProps = {
+                      ticket,
+                      onClick: onSelectTicket,
+                      priorityIcon: getPriorityIcon(ticket.priority),
+                      assigneeAvatar: getAssigneeAvatar(userAvatarById, ticket.assigneeId),
+                      domainTag: getDomainTag(domainById, ticket.domainId),
+                    };
+                    return (
+                      <React.Fragment key={ticket.id}>
+                        <div className="ticket-list__row-desktop">
+                          <TicketRow {...rowProps} />
+                        </div>
+                        <div className="ticket-list__row-mobile">
+                          <TicketRowMobile {...rowProps} />
+                        </div>
+                      </React.Fragment>
+                    );
+                  })}
                 </div>
 
               </div>
