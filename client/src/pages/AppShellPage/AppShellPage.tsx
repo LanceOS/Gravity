@@ -62,6 +62,7 @@ export function AppShellPage() {
   const [activeSection, setActiveSection] = useState<AppSection>('workspace');
   const [activeWorkspaceId, setActiveWorkspaceId] = useState('');
   const [activeContext, setActiveContext] = useState<'issues' | 'notes'>('issues');
+  const [activeNoteId, setActiveNoteId] = useState<string>('');
   const [workspaceReady, setWorkspaceReady] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isOllamaOpen, setIsOllamaOpen] = useState(false);
@@ -591,6 +592,7 @@ export function AppShellPage() {
     }
 
     setActiveTicket(null);
+    setActiveNoteId('');
     setActiveContext('notes');
     setActiveSection('workspace');
   };
@@ -878,7 +880,8 @@ export function AppShellPage() {
               onOpenCreateTicket={handleOpenCreateTicket}
               onOpenProjectManager={handleOpenProjectManager}
               onSelectTicket={setActiveTicket}
-              onSelectNote={(noteId) => console.log('Select note:', noteId)}
+              onSelectNote={(noteId) => setActiveNoteId(noteId)}
+              activeNoteId={activeNoteId}
               onSetFilters={setFilters}
               onSetListSort={setListSort}
               onSetView={setView}
