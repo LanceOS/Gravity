@@ -234,8 +234,8 @@ export function WorkspaceDirectoryPage({
   return (
     <div
       style={{
-        minHeight: '100vh',
-        padding: 'var(--space-8) var(--space-6)',
+        height: '100dvh',
+        padding: isMobile ? 'var(--space-6) var(--space-4)' : 'var(--space-8) var(--space-6)',
         background: 'var(--color-surface-app)',
         overflowY: 'auto',
       }}
@@ -360,9 +360,9 @@ export function WorkspaceDirectoryPage({
             )}
 
             {!loading && workspaceCards.length > 0 && (
-              <div style={{ border: '1px solid var(--color-border-default)', borderRadius: 'var(--radius-sm)', overflowX: 'auto', background: 'var(--color-surface-card)' }}>
-                <div style={{ minWidth: '700px' }}>
-                  {/* Table Header */}
+              <div style={{ border: '1px solid var(--color-border-default)', borderRadius: 'var(--radius-sm)', overflow: 'hidden', background: 'var(--color-surface-card)' }}>
+                {/* Table Header */}
+                {!isMobile && (
                   <div
                     style={{
                       display: 'grid',
@@ -383,68 +383,129 @@ export function WorkspaceDirectoryPage({
                     <div>Role</div>
                     <div style={{ textAlign: 'right' }}>Actions</div>
                   </div>
-                  {/* Table Rows */}
-                  {workspaceCards.map((workspace) => {
-                    const isActive = workspace.id === activeWorkspaceId;
+                )}
+                {/* Table Rows */}
+                {workspaceCards.map((workspace) => {
+                  const isActive = workspace.id === activeWorkspaceId;
+                  
+                  if (isMobile) {
                     return (
                       <div
                         key={workspace.id}
                         style={{
-                          display: 'grid',
-                          gridTemplateColumns: '1.8fr 1fr 1.2fr 90px 130px',
-                          alignItems: 'center',
-                          padding: '10px 16px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 'var(--space-3)',
+                          padding: '16px',
                           borderBottom: '1px solid var(--color-border-default)',
                           background: isActive ? 'var(--color-state-selected-bg)' : 'transparent',
                           transition: 'background var(--transition-normal)',
                         }}
                       >
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                            <span style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
-                              {workspace.name}
-                            </span>
-                            {isActive && <Badge variant="accent">Active</Badge>}
-                          </div>
-                          {workspace.description && (
-                            <div
-                              style={{
-                                fontSize: '11.5px',
-                                color: 'var(--color-text-disabled)',
-                                marginTop: '2px',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
-                                maxWidth: '320px',
-                              }}
-                            >
-                              {workspace.description}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                              <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                                {workspace.name}
+                              </span>
+                              {isActive && <Badge variant="accent">Active</Badge>}
                             </div>
-                          )}
-                        </div>
-                        <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
-                          {workspace.projectCount} {workspace.projectCount === 1 ? 'project' : 'projects'} · {workspace.memberCount} {workspace.memberCount === 1 ? 'member' : 'members'}
-                        </div>
-                        <div style={{ fontSize: '11.5px', color: 'var(--color-text-disabled)', fontFamily: 'var(--mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {workspace.hostUrl || 'Local Host'}
-                        </div>
-                        <div>
+                            {workspace.description && (
+                              <div style={{ fontSize: '12px', color: 'var(--color-text-disabled)', marginTop: '4px', lineHeight: 1.4 }}>
+                                {workspace.description}
+                              </div>
+                            )}
+                          </div>
                           <Badge variant={workspace.memberRole === 'owner' ? 'accent' : 'default'}>
                             {workspace.memberRole || 'member'}
                           </Badge>
                         </div>
-                        <div style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end' }}>
-                          <Button variant="primary" size="sm" onClick={() => onOpenWorkspace(workspace.id)} leftIcon={<ArrowRight size={13} />} style={{ minHeight: '26px', padding: '2px 8px' }}>
-                            Open
+                        
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-4)', marginTop: 'var(--space-1)' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <span style={{ fontSize: '10px', textTransform: 'uppercase', color: 'var(--color-text-disabled)', fontWeight: 700, letterSpacing: '0.05em' }}>Details</span>
+                            <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
+                              {workspace.projectCount} {workspace.projectCount === 1 ? 'project' : 'projects'} · {workspace.memberCount} {workspace.memberCount === 1 ? 'member' : 'members'}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <span style={{ fontSize: '10px', textTransform: 'uppercase', color: 'var(--color-text-disabled)', fontWeight: 700, letterSpacing: '0.05em' }}>Endpoint</span>
+                            <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '2px', fontFamily: 'var(--mono)' }}>
+                              {workspace.hostUrl || 'Local Host'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
+                          <Button variant="primary" size="sm" onClick={() => onOpenWorkspace(workspace.id)} leftIcon={<ArrowRight size={13} />} style={{ flex: 1, minHeight: '32px' }}>
+                            Open Workspace
                           </Button>
-                          <Button aria-label="Settings" variant="default" size="sm" onClick={() => onOpenSettings(workspace.id)} style={{ minHeight: '26px', padding: '2px 6px' }}>
-                            <Settings2 size={13} />
+                          <Button aria-label="Settings" variant="default" size="sm" onClick={() => onOpenSettings(workspace.id)} style={{ minHeight: '32px', padding: '0 12px' }}>
+                            <Settings2 size={14} />
                           </Button>
                         </div>
                       </div>
                     );
-                  })}
-                </div>
+                  }
+
+                  return (
+                    <div
+                      key={workspace.id}
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1.8fr 1fr 1.2fr 90px 130px',
+                        alignItems: 'center',
+                        padding: '10px 16px',
+                        borderBottom: '1px solid var(--color-border-default)',
+                        background: isActive ? 'var(--color-state-selected-bg)' : 'transparent',
+                        transition: 'background var(--transition-normal)',
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                          <span style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                            {workspace.name}
+                          </span>
+                          {isActive && <Badge variant="accent">Active</Badge>}
+                        </div>
+                        {workspace.description && (
+                          <div
+                            style={{
+                              fontSize: '11.5px',
+                              color: 'var(--color-text-disabled)',
+                              marginTop: '2px',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              maxWidth: '320px',
+                            }}
+                          >
+                            {workspace.description}
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                        {workspace.projectCount} {workspace.projectCount === 1 ? 'project' : 'projects'} · {workspace.memberCount} {workspace.memberCount === 1 ? 'member' : 'members'}
+                      </div>
+                      <div style={{ fontSize: '11.5px', color: 'var(--color-text-disabled)', fontFamily: 'var(--mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {workspace.hostUrl || 'Local Host'}
+                      </div>
+                      <div>
+                        <Badge variant={workspace.memberRole === 'owner' ? 'accent' : 'default'}>
+                          {workspace.memberRole || 'member'}
+                        </Badge>
+                      </div>
+                      <div style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end' }}>
+                        <Button variant="primary" size="sm" onClick={() => onOpenWorkspace(workspace.id)} leftIcon={<ArrowRight size={13} />} style={{ minHeight: '26px', padding: '2px 8px' }}>
+                          Open
+                        </Button>
+                        <Button aria-label="Settings" variant="default" size="sm" onClick={() => onOpenSettings(workspace.id)} style={{ minHeight: '26px', padding: '2px 6px' }}>
+                          <Settings2 size={13} />
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </Stack>
