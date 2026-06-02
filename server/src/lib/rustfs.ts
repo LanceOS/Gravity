@@ -80,4 +80,20 @@ export class RustFS {
       }
     }
   }
+
+  /**
+   * Lists all files in the specified bucket path.
+   */
+  static async listFiles(bucketPath: string): Promise<string[]> {
+    const dir = path.join(RUSTFS_BASE_PATH, bucketPath);
+    try {
+      const dirents = await fs.readdir(dir, { withFileTypes: true });
+      return dirents.filter(d => d.isFile()).map(d => d.name);
+    } catch (err: any) {
+      if (err.code === 'ENOENT') {
+        return [];
+      }
+      throw err;
+    }
+  }
 }

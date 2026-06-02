@@ -270,6 +270,41 @@ export async function initializeDatabase() {
     ALTER TABLE tickets ADD COLUMN IF NOT EXISTS branch_name TEXT NOT NULL DEFAULT '';
   `);
 
+  // Ensure note_metadata has excerpt and full-text search vector columns/indexes
+  await pool.query(`
+    ALTER TABLE note_metadata ADD COLUMN IF NOT EXISTS excerpt TEXT NOT NULL DEFAULT '';
+  `);
+  // Add search_vector column and indexes only when running against real Postgres.
+  if (!env.databaseUrl.startsWith('pgmem://')) {
+    await pool.query(`
+      ALTER TABLE note_metadata ADD COLUMN IF NOT EXISTS search_vector tsvector;
+    `);
+
+    // Backfill search_vector safely
+    await pool.query(`
+      UPDATE note_metadata
+      SET search_vector = to_tsvector('english', COALESCE(title, '') || ' ' || COALESCE(excerpt, ''))
+      WHERE search_vector IS NULL;
+    `);
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS note_metadata_search_idx ON note_metadata USING gin (search_vector);
+    `);
+  }
+  else {
+    // For pg-mem tests, create a fallback text column so Drizzle's INSERT
+    // statements (which may reference the column) succeed even though
+    // full-text features are unavailable in pg-mem.
+    await pool.query(`
+      ALTER TABLE note_metadata ADD COLUMN IF NOT EXISTS search_vector TEXT;
+    `);
+  }
+
+  // Ensure updated_at ordering index exists for note metadata (safe for pg-mem)
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS note_metadata_project_id_user_id_updated_at_idx ON note_metadata (project_id, user_id, updated_at);
+  `);
+
   // Ensure `usage_count` exists for mcp_connection_tokens (backfill-safe)
   await pool.query(`
     ALTER TABLE mcp_connection_tokens ADD COLUMN IF NOT EXISTS usage_count INTEGER NOT NULL DEFAULT 0;

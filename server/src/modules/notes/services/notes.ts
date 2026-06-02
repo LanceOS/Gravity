@@ -2,6 +2,19 @@ import { randomUUID } from 'node:crypto';
 import { MetadataRepository, NotesRepository } from '../repositories.js';
 import { RustFS } from '../../../lib/rustfs.js';
 
+function extractExcerpt(body: string, maxLength: number = 500): string {
+  // Strip simple markdown formatting
+  const plainText = body
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // links
+    .replace(/[#*`_~]/g, '') // formatting
+    .replace(/\n+/g, ' ') // newlines
+    .trim();
+  
+  return plainText.length > maxLength 
+    ? plainText.substring(0, maxLength) + '...'
+    : plainText;
+}
+
 export async function createNote(
   projectId: string,
   userId: string,
@@ -11,6 +24,7 @@ export async function createNote(
   const noteUuid = randomUUID();
   const noteId = `note-${noteUuid}`;
   const bucketPath = RustFS.getBucketPath(projectId, userId, noteUuid);
+  const excerpt = extractExcerpt(body);
 
   // Two-phase save: Create metadata first, then save body
   const metadata = await MetadataRepository.createNoteMetadata({
@@ -18,6 +32,7 @@ export async function createNote(
     projectId,
     userId,
     title,
+    excerpt,
     bucketPath,
   });
 
@@ -60,11 +75,14 @@ export async function updateNote(
     throw new Error('NOT_FOUND');
   }
 
+  const newExcerpt = updates.body !== undefined ? extractExcerpt(updates.body) : existing.excerpt;
+
   // Update metadata (optimistic locking enforced inside MetadataRepository)
   let updatedMeta;
   try {
     updatedMeta = await MetadataRepository.updateNoteMetadata(noteId, currentVersion, {
       title: updates.title,
+      excerpt: newExcerpt,
     });
   } catch (err: any) {
     if (err.message.includes('Optimistic locking failed')) {
@@ -105,4 +123,56 @@ export async function deleteNote(noteId: string, projectId: string) {
 
 export async function listNotes(projectId: string, userId: string, limit: number = 50, offset: number = 0) {
   return await MetadataRepository.listNotesMetadata(projectId, userId, limit, offset);
+}
+
+export async function searchNotes(projectId: string, userId: string, query: string, limit: number = 50, offset: number = 0) {
+  return await MetadataRepository.searchNotesMetadata(projectId, userId, query, limit, offset);
+}
+
+export async function cleanupNoteMedia(noteId: string, projectId: string) {
+  const metadata = await MetadataRepository.getNoteMetadata(noteId);
+  if (!metadata || metadata.projectId !== projectId) {
+    throw new Error('NOT_FOUND');
+  }
+
+  let body = '';
+  try {
+    body = await NotesRepository.getBody(metadata.bucketPath);
+  } catch (e: any) {
+    if (e.code !== 'ENOENT') throw e;
+  }
+
+  const allFiles = await RustFS.listFiles(metadata.bucketPath);
+  const mediaFiles = allFiles.filter(f => f !== 'body.md');
+  
+  // Find all file references in the body (e.g. /api/v1/notes/:noteId/media/:filename)
+  const referencePattern = new RegExp(`/api/v1/notes/${noteId}/media/([^\\s)"]+)`, 'g');
+  const referencedFiles = new Set<string>();
+  let match;
+  while ((match = referencePattern.exec(body)) !== null) {
+    referencedFiles.add(decodeURIComponent(match[1]));
+  }
+
+  const orphanedFiles: string[] = [];
+  const deadLinks: string[] = [];
+
+  // Identify and delete orphaned files
+  for (const file of mediaFiles) {
+    if (!referencedFiles.has(file)) {
+      orphanedFiles.push(file);
+      await NotesRepository.deleteFile(metadata.bucketPath, file);
+    }
+  }
+
+  // Identify dead links (referenced but file doesn't exist)
+  for (const ref of referencedFiles) {
+    if (!mediaFiles.includes(ref)) {
+      deadLinks.push(ref);
+    }
+  }
+
+  return {
+    cleanedFiles: orphanedFiles,
+    deadLinks: deadLinks
+  };
 }

@@ -1,7 +1,7 @@
 import express, { Router } from 'express';
 import { getProjectIdFromRequest } from '../../lib/platform.js';
 import { authorizeProjectAccess } from '../workspaces/services/membership.js';
-import { createNote, deleteNote, getNote, listNotes, updateNote } from './services/notes.js';
+import { createNote, deleteNote, getNote, listNotes, updateNote, searchNotes, cleanupNoteMedia } from './services/notes.js';
 import { MetadataRepository, NotesRepository } from './repositories.js';
 
 export function createNotesRouter() {
@@ -29,6 +29,35 @@ export function createNotesRouter() {
       res.status(201).json(created);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create note.' });
+    }
+  });
+
+  router.get('/notes/search', async (req, res) => {
+    const projectId = getProjectIdFromRequest(req);
+    if (!projectId) {
+      res.status(400).json({ error: 'Project ID is required.' });
+      return;
+    }
+
+    const auth = await authorizeProjectAccess(req, projectId);
+    if (!auth.allowed) {
+      res.status(auth.status).json({ error: auth.error });
+      return;
+    }
+
+    const query = typeof req.query.q === 'string' ? req.query.q : '';
+    if (!query) {
+      res.status(400).json({ error: 'Query parameter "q" is required.' });
+      return;
+    }
+
+    try {
+      const limit = Number(req.query.limit) || 50;
+      const offset = Number(req.query.offset) || 0;
+      const notesList = await searchNotes(projectId, auth.userId, query, limit, offset);
+      res.json(notesList);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to search notes.' });
     }
   });
 
@@ -214,6 +243,88 @@ export function createNotesRouter() {
         res.status(404).json({ error: 'Media not found.' });
       } else {
         res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load media.' });
+      }
+    }
+  });
+
+  router.delete('/notes/:noteId/media/:filename', async (req, res) => {
+    const projectId = getProjectIdFromRequest(req);
+    if (!projectId) {
+      res.status(400).json({ error: 'Project ID is required.' });
+      return;
+    }
+
+    const auth = await authorizeProjectAccess(req, projectId);
+    if (!auth.allowed) {
+      res.status(auth.status).json({ error: auth.error });
+      return;
+    }
+
+    try {
+      const noteId = normalizeRouteParam(req.params.noteId);
+      const filename = normalizeRouteParam(req.params.filename);
+
+      const noteMeta = await MetadataRepository.getNoteMetadata(noteId);
+      if (!noteMeta || noteMeta.projectId !== projectId) {
+        res.status(404).json({ error: 'Note not found.' });
+        return;
+      }
+
+      // Attempt to detect if file existed before deletion
+      let existed = true;
+      try {
+        await NotesRepository.getAttachment(noteMeta.bucketPath, filename);
+      } catch (err: any) {
+        if (err.code === 'ENOENT') existed = false;
+        else throw err;
+      }
+
+      await NotesRepository.deleteFile(noteMeta.bucketPath, filename);
+
+      // Scan the markdown body for remaining references to this filename
+      let body = '';
+      try {
+        body = await NotesRepository.getBody(noteMeta.bucketPath);
+      } catch (e: any) {
+        if (e.code !== 'ENOENT') throw e;
+      }
+
+      const referencePattern = new RegExp(`/api/v1/notes/${noteId}/media/([^\\s)\"]+)`, 'g');
+      const remainingRefs: string[] = [];
+      let match;
+      while ((match = referencePattern.exec(body)) !== null) {
+        const ref = decodeURIComponent(match[1]);
+        if (ref === filename) remainingRefs.push(ref);
+      }
+
+      res.json({ deleted: existed, remainingReferences: remainingRefs });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to delete media.' });
+    }
+  });
+
+  router.post('/notes/:noteId/cleanup', async (req, res) => {
+    const projectId = getProjectIdFromRequest(req);
+    if (!projectId) {
+      res.status(400).json({ error: 'Project ID is required.' });
+      return;
+    }
+
+    const auth = await authorizeProjectAccess(req, projectId);
+    if (!auth.allowed) {
+      res.status(auth.status).json({ error: auth.error });
+      return;
+    }
+
+    try {
+      const noteId = normalizeRouteParam(req.params.noteId);
+      const result = await cleanupNoteMedia(noteId, projectId);
+      res.json(result);
+    } catch (error: any) {
+      if (error.message === 'NOT_FOUND') {
+        res.status(404).json({ error: 'Note not found.' });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to cleanup media.' });
       }
     }
   });

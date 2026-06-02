@@ -13,6 +13,7 @@
     "start": "node dist/index.js",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
+    "cleanup:orphaned-assets": "tsx src/jobs/cleanupOrphanedAssets.ts",
     "mcp": "tsx src/mcp/stdio.ts"
   },
   "dependencies": {

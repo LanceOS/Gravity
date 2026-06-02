@@ -261,7 +261,9 @@ describe('TicketDetail', () => {
     await user.click(screen.getByRole('button', { name: 'Add Subtask' }));
     expect(props.onOpenCreateSubtask).toHaveBeenCalledWith('ticket-1');
 
-    await user.click(screen.getByText('Ship retry fix'));
+    const subtaskElements = screen.getAllByText('Ship retry fix') as HTMLElement[];
+    const subtaskDesktop = subtaskElements.find((el) => el.closest('.ticket-list__row-desktop')) || subtaskElements[0];
+    await user.click(subtaskDesktop);
     expect(props.onSelectTicket).toHaveBeenCalledWith(subtaskOne);
 
     await user.type(screen.getByPlaceholderText('Post updates, links, or mention PRs...'), 'Comment from test');

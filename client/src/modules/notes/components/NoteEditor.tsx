@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
+import type { EditorView } from 'prosemirror-view';
+import type { Slice } from 'prosemirror-model';
 import StarterKit from '@tiptap/starter-kit';
 import { Markdown } from 'tiptap-markdown';
 import Image from '@tiptap/extension-image';
@@ -71,7 +73,7 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
       scheduleSave();
     },
     editorProps: {
-      handleDrop: (view, event, slice, moved) => {
+      handleDrop: (view: EditorView, event: DragEvent, slice: Slice, moved: boolean) => {
         if (!moved && event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files.length > 0) {
           event.preventDefault();
           setIsDragging(false);
