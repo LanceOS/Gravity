@@ -2,8 +2,11 @@ import { and, desc, eq, sql } from 'drizzle-orm';
 import { db } from '../../db/index.js';
 import { noteMetadata } from './schema.js';
 import { RustFS } from '../../lib/rustfs.js';
+import { env } from '../../env.js';
 
 export type NoteMetadata = typeof noteMetadata.$inferSelect;
+
+export type NoteListItem = Pick<NoteMetadata, 'id' | 'title' | 'excerpt' | 'version' | 'createdAt' | 'updatedAt'>;
 
 function buildSearchVector(title: string, excerpt: string) {
   return sql`to_tsvector('english', ${title} || ' ' || ${excerpt})`;
@@ -22,18 +25,24 @@ export class MetadataRepository {
     bucketPath: string;
   }): Promise<NoteMetadata> {
     const excerpt = data.excerpt || '';
-    const [record] = await db
-      .insert(noteMetadata)
-      .values({
-        id: data.id,
-        projectId: data.projectId,
-        userId: data.userId,
-        title: data.title,
-        excerpt,
-        bucketPath: data.bucketPath,
-        searchVector: buildSearchVector(data.title, excerpt),
-      })
-      .returning();
+    const useSearchVector = typeof env.databaseUrl === 'string' && !env.databaseUrl.startsWith('pgmem://');
+
+    const insertValues: Record<string, unknown> = {
+      id: data.id,
+      projectId: data.projectId,
+      userId: data.userId,
+      title: data.title,
+      excerpt,
+      bucketPath: data.bucketPath,
+    };
+
+    if (useSearchVector) {
+      // Only include search vector when running against a real Postgres instance
+      // because pg-mem does not support the tsvector type and related functions.
+      insertValues.searchVector = buildSearchVector(data.title, excerpt);
+    }
+
+    const [record] = await db.insert(noteMetadata).values(insertValues).returning();
 
     return record;
   }
@@ -54,9 +63,16 @@ export class MetadataRepository {
     userId: string,
     limit: number = 20,
     offset: number = 0
-  ): Promise<NoteMetadata[]> {
+  ): Promise<NoteListItem[]> {
     return await db
-      .select()
+      .select({
+        id: noteMetadata.id,
+        title: noteMetadata.title,
+        excerpt: noteMetadata.excerpt,
+        version: noteMetadata.version,
+        createdAt: noteMetadata.createdAt,
+        updatedAt: noteMetadata.updatedAt,
+      })
       .from(noteMetadata)
       .where(and(eq(noteMetadata.projectId, projectId), eq(noteMetadata.userId, userId)))
       .orderBy(desc(noteMetadata.updatedAt))
@@ -73,21 +89,55 @@ export class MetadataRepository {
     query: string,
     limit: number = 20,
     offset: number = 0
-  ): Promise<NoteMetadata[]> {
-    // We use websearch_to_tsquery for user-friendly query parsing
-    const tsQuery = sql`websearch_to_tsquery('english', ${query})`;
-    
+  ): Promise<NoteListItem[]> {
+    const useSearchVector = typeof env.databaseUrl === 'string' && !env.databaseUrl.startsWith('pgmem://');
+
+    if (useSearchVector) {
+      // We use websearch_to_tsquery for user-friendly query parsing when tsvector is available
+      const tsQuery = sql`websearch_to_tsquery('english', ${query})`;
+
+      return await db
+        .select({
+          id: noteMetadata.id,
+          title: noteMetadata.title,
+          excerpt: noteMetadata.excerpt,
+          version: noteMetadata.version,
+          createdAt: noteMetadata.createdAt,
+          updatedAt: noteMetadata.updatedAt,
+        })
+        .from(noteMetadata)
+        .where(
+          and(
+            eq(noteMetadata.projectId, projectId),
+            eq(noteMetadata.userId, userId),
+            sql`${noteMetadata.searchVector} @@ ${tsQuery}`
+          )
+        )
+        .orderBy(desc(sql`ts_rank(${noteMetadata.searchVector}, ${tsQuery})`))
+        .limit(limit)
+        .offset(offset);
+    }
+
+    // Fallback for pg-mem or environments without tsvector: simple ILIKE on title/excerpt
+    const likeQuery = `%${query}%`;
     return await db
-      .select()
+      .select({
+        id: noteMetadata.id,
+        title: noteMetadata.title,
+        excerpt: noteMetadata.excerpt,
+        version: noteMetadata.version,
+        createdAt: noteMetadata.createdAt,
+        updatedAt: noteMetadata.updatedAt,
+      })
       .from(noteMetadata)
       .where(
         and(
           eq(noteMetadata.projectId, projectId),
           eq(noteMetadata.userId, userId),
-          sql`${noteMetadata.searchVector} @@ ${tsQuery}`
+          sql`(${noteMetadata.title} ILIKE ${likeQuery} OR ${noteMetadata.excerpt} ILIKE ${likeQuery})`
         )
       )
-      .orderBy(desc(sql`ts_rank(${noteMetadata.searchVector}, ${tsQuery})`))
+      .orderBy(desc(noteMetadata.updatedAt))
       .limit(limit)
       .offset(offset);
   }
@@ -110,10 +160,17 @@ export class MetadataRepository {
     const [record] = await db
       .update(noteMetadata)
       .set({
-        ...updates,
-        searchVector: buildSearchVector(newTitle, newExcerpt),
-        version: currentVersion + 1,
-        updatedAt: new Date(),
+        ...(() => {
+          const base: Record<string, unknown> = {
+            ...updates,
+            version: currentVersion + 1,
+            updatedAt: new Date(),
+          };
+          if (!(typeof env.databaseUrl === 'string' && env.databaseUrl.startsWith('pgmem://'))) {
+            base.searchVector = buildSearchVector(newTitle, newExcerpt);
+          }
+          return base;
+        })(),
       })
       .where(and(eq(noteMetadata.id, id), eq(noteMetadata.version, currentVersion)))
       .returning();
