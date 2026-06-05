@@ -7,7 +7,7 @@
  *  2. NoteEditor is shown (and NotesList is hidden) when activeNoteId is set.
  *  3. "Create New Note" is shown when there is no active note.
  *  4. "Back to Notes" is shown when a note is active.
- *  5. Clicking "Back to Notes" calls onSelectNote('').
+ *  5. Clicking "Back to Notes" uses browser back navigation.
  *  6. Clicking "Create New Note" POSTs to /api/v1/notes and calls onSelectNote with the new ID.
  *  7. A failed POST does NOT call onSelectNote.
  */
@@ -138,12 +138,13 @@ describe('WorkspacePage – notes context', () => {
     expect(screen.queryByRole('button', { name: /create new note/i })).not.toBeInTheDocument();
   });
 
-  it('calls onSelectNote("") when "Back to Notes" is clicked', async () => {
+  it('uses browser back navigation when "Back to Notes" is clicked', async () => {
     const user = userEvent.setup();
-    const onSelectNote = vi.fn();
-    render(<WorkspacePage {...buildProps({ activeNoteId: 'note-abc', onSelectNote })} />);
+    const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {});
+    render(<WorkspacePage {...buildProps({ activeNoteId: 'note-abc' })} />);
     await user.click(screen.getByRole('button', { name: /back to notes/i }));
-    expect(onSelectNote).toHaveBeenCalledWith('');
+    expect(backSpy).toHaveBeenCalledTimes(1);
+    backSpy.mockRestore();
   });
 
   it('POSTs to /api/v1/notes and calls onSelectNote with the new note ID on success', async () => {

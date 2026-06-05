@@ -234,9 +234,10 @@ describe('TicketDetail', () => {
   it('updates title and description, selects related subtasks, and posts comments', async () => {
     const user = userEvent.setup();
     const { props } = renderTicketDetail();
+    const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {});
 
     await user.click(screen.getByRole('button', { name: 'Back' }));
-    expect(props.onClose).toHaveBeenCalledTimes(1);
+    expect(backSpy).toHaveBeenCalledTimes(1);
 
     await user.click(screen.getByText('Fix sync retries'));
     const titleInput = screen.getByDisplayValue('Fix sync retries');
@@ -271,6 +272,8 @@ describe('TicketDetail', () => {
     await waitFor(() => {
       expect(props.onAddComment).toHaveBeenCalledWith('ticket-1', 'Comment from test');
     });
+
+    backSpy.mockRestore();
   });
 
   it('forwards editable selector changes, keeps project assignment read-only, and handles the delete confirmation flow', async () => {

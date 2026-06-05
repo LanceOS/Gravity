@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MessageSquare, X } from 'lucide-react';
-import { useParams, useLocation, useNavigate } from 'react-router-dom';
+import { useParams, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 
 import { AuthScreen } from '../../modules/auth';
 import { CreateTicketModal } from '../../modules/tickets';
@@ -209,27 +209,100 @@ export function AppShellPage() {
     }
   }, [accountSettings?.projectLayout, accountSettings?.theme, setDensity, setDsTheme]);
 
-  const { workspaceId } = useParams();
+  const { workspaceId, projectId: projectIdParam, ticketKey, noteId } = useParams();
   const { pathname } = useLocation();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  // URL-driven section and workspace syncing
+  // Track last-applied URL filter values to avoid calling setFilters in a loop
+  const lastSyncedFilterParams = useRef({ domainId: '', cycleId: '', assigneeId: '' });
+
+  // URL-driven section, workspace, project, ticket, and filter syncing
   useEffect(() => {
     if (pathname === '/workspaces' || pathname === '/workspaces/') {
       setActiveSection('directory');
-    } else if (pathname === '/account' || pathname === '/account/') {
-      setActiveSection('account');
-    } else if (workspaceId) {
-      setActiveWorkspaceId(workspaceId);
-      if (pathname.includes('/settings')) {
-        setActiveSection('settings');
-      } else if (pathname.includes('/projects')) {
-        setActiveSection('projects');
-      } else {
-        setActiveSection('workspace');
-      }
+      setActiveTicket(null);
+      setActiveNoteId('');
+      return;
     }
-  }, [pathname, workspaceId]);
+
+    if (pathname === '/account' || pathname === '/account/') {
+      setActiveSection('account');
+      setActiveNoteId('');
+      return;
+    }
+
+    if (!workspaceId) return;
+
+    setActiveWorkspaceId(workspaceId);
+
+    const isSettingsPath = pathname.includes('/settings');
+    const isProjectsManagementPath =
+      pathname === `/workspaces/${workspaceId}/projects` ||
+      pathname === `/workspaces/${workspaceId}/projects/`;
+    const isNotesPath = pathname.includes('/notes');
+    const isTicketsPath = pathname.includes('/tickets');
+
+    if (isSettingsPath) {
+      setActiveSection('settings');
+      setActiveTicket(null);
+      setActiveNoteId('');
+      return;
+    }
+
+    if (isProjectsManagementPath) {
+      setActiveSection('projects');
+      setActiveTicket(null);
+      setActiveNoteId('');
+      return;
+    }
+
+    // Workspace-level views (project routes, notes, tickets)
+    setActiveSection('workspace');
+
+    // Sync project from URL param when on a project-specific path
+    if (projectIdParam) {
+      setActiveProjectId(projectIdParam);
+    }
+
+    // Sync notes context
+    if (isNotesPath) {
+      setActiveContext('notes');
+      setActiveNoteId(noteId ?? '');
+    } else if (isTicketsPath || !isNotesPath) {
+      setActiveContext('issues');
+      setActiveNoteId('');
+    }
+
+    // Sync filters from URL search params — only call setFilters when URL params changed
+    const urlDomainId = searchParams.get('domainId') ?? '';
+    const urlCycleId = searchParams.get('cycleId') ?? '';
+    const urlAssigneeId = searchParams.get('assigneeId') ?? '';
+    const last = lastSyncedFilterParams.current;
+    if (
+      last.domainId !== urlDomainId ||
+      last.cycleId !== urlCycleId ||
+      last.assigneeId !== urlAssigneeId
+    ) {
+      lastSyncedFilterParams.current = { domainId: urlDomainId, cycleId: urlCycleId, assigneeId: urlAssigneeId };
+      setFilters({ domainId: urlDomainId, cycleId: urlCycleId, assigneeId: urlAssigneeId });
+    }
+
+    // Close ticket detail if URL no longer contains a ticketKey
+    if (!ticketKey) {
+      setActiveTicket(null);
+    }
+  }, [pathname, workspaceId, projectIdParam, ticketKey, noteId, searchParams]);
+
+  // Resolve ticketKey URL param → Ticket object once tickets have loaded
+  useEffect(() => {
+    if (!ticketKey) return;
+    // Only update if the active ticket doesn't already match the URL key
+    if (activeTicket?.key === ticketKey) return;
+    const resolved = tickets.find((t) => t.key === ticketKey) ?? null;
+    setActiveTicket(resolved);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ticketKey, tickets]);
 
   // Root path routing redirect
   useEffect(() => {
@@ -450,7 +523,15 @@ export function AppShellPage() {
   };
 
   const handleDeleteTicket = async (ticketId: string) => {
+    const deletedTicket =
+      tickets.find((ticket) => ticket.id === ticketId) || (activeTicket?.id === ticketId ? activeTicket : null);
     await deleteTicket(ticketId);
+
+    if (deletedTicket && activeTicket?.id === ticketId) {
+      navigate(`/workspaces/${activeWorkspaceId}/projects/${deletedTicket.projectId}/tickets`, { replace: true });
+      return;
+    }
+
     setActiveTicket(null);
   };
 
@@ -468,56 +549,33 @@ export function AppShellPage() {
     }
 
     await fetchInitialData(currentUser.id);
-    setActiveWorkspaceId(workspace.id);
-    setActiveSection('workspace');
+    navigate(`/workspaces/${workspace.id}`);
   };
 
   const handleRequestJoin = async (inviteCode: string, message?: string) => {
     await requestJoinByInvite(inviteCode, message);
-    setActiveSection('directory');
+    navigate('/workspaces');
   };
 
 
 
   const handleSelectWorkspace = (workspaceId: string) => {
-    const workspace = workspaces.find((candidate) => candidate.id === workspaceId) || null;
-    const workspaceProjects = projects.filter((project) => project.workspaceId === workspaceId);
-    const currentWorkspaceProject = workspaceProjects.find((project) => project.id === activeProjectId) || null;
-    const preferredProject = currentWorkspaceProject
-      || workspaceProjects.find((project) => project.id === workspace?.defaultProjectId)
-      || workspaceProjects[0]
-      || null;
-
-    setActiveWorkspaceId(workspaceId);
-    if (preferredProject) {
-      setActiveProjectId(preferredProject.id);
-    } else {
-      setActiveProjectId('');
-    }
     setActiveTicket(null);
     setFilters({ assigneeId: '', domainId: '', cycleId: '' });
-    setActiveSection('workspace');
-  };
-
-  const updateProjectSelection = (projectId: string, nextSection: 'workspace' | 'projects') => {
-    const project = projects.find((candidate) => candidate.id === projectId);
-    if (project?.workspaceId) {
-      setActiveWorkspaceId(project.workspaceId);
-    }
-
-    setActiveProjectId(projectId);
-    setActiveTicket(null);
-    setFilters({ assigneeId: '', domainId: '', cycleId: '' });
-    setActiveContext('issues');
-    setActiveSection(nextSection);
+    navigate(`/workspaces/${workspaceId}`);
   };
 
   const handleSelectProject = (projectId: string) => {
-    updateProjectSelection(projectId, 'workspace');
+    const project = projects.find((p) => p.id === projectId);
+    const wid = project?.workspaceId || activeWorkspaceId;
+    navigate(`/workspaces/${wid}/projects/${projectId}/tickets`);
   };
 
   const handleSelectProjectForManagement = (projectId: string) => {
-    updateProjectSelection(projectId, 'projects');
+    const project = projects.find((p) => p.id === projectId);
+    const wid = project?.workspaceId || activeWorkspaceId;
+    setActiveProjectId(projectId);
+    navigate(`/workspaces/${wid}/projects`);
   };
 
   const handleCreateProject = async (projectInput: { name: string; description: string; key: string }) => {
@@ -541,7 +599,7 @@ export function AppShellPage() {
 
       await refreshWorkspaces();
       setActiveTicket(null);
-      setActiveSection('workspace');
+      navigate(`/workspaces/${activeWorkspaceId}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create project in this workspace.';
       setProjectCreateError(message);
@@ -578,83 +636,67 @@ export function AppShellPage() {
   };
 
   const handleShowProjectIssues = () => {
-    if (!activeProjectId) {
-      return;
-    }
-
-    setFilters({ projectId: activeProjectId, assigneeId: '', domainId: '', cycleId: '' });
-    setActiveTicket(null);
-    setActiveContext('issues');
-    setActiveSection('workspace');
+    const pid = activeProjectId;
+    if (!pid) return;
+    navigate(`/workspaces/${activeWorkspaceId}/projects/${pid}/tickets`);
   };
 
   const handleShowMyIssues = () => {
-    if (!activeProjectId || !currentUser) {
-      return;
-    }
-
-    setFilters({ projectId: activeProjectId, assigneeId: currentUser.id, domainId: '', cycleId: '' });
-    setActiveTicket(null);
-    setActiveContext('issues');
-    setActiveSection('workspace');
+    const pid = activeProjectId;
+    if (!pid || !currentUser) return;
+    navigate(`/workspaces/${activeWorkspaceId}/projects/${pid}/tickets?assigneeId=${currentUser.id}`);
   };
 
   const handleSelectCycle = (cycleId: string) => {
-    if (!activeProjectId) {
-      return;
-    }
-
-    setFilters({ projectId: activeProjectId, cycleId, domainId: '', assigneeId: '' });
-    setActiveTicket(null);
-    setActiveContext('issues');
-    setActiveSection('workspace');
+    const pid = activeProjectId;
+    if (!pid) return;
+    navigate(`/workspaces/${activeWorkspaceId}/projects/${pid}/tickets?cycleId=${cycleId}`);
   };
 
   const handleSelectDomain = (domainId: string) => {
-    if (!activeProjectId) {
-      return;
-    }
-
-    setFilters({ projectId: activeProjectId, domainId, cycleId: '', assigneeId: '' });
-    setActiveTicket(null);
-    setActiveContext('issues');
-    setActiveSection('workspace');
+    const pid = activeProjectId;
+    if (!pid) return;
+    // GRAV-113: navigating to the domain-filtered URL closes any open ticket detail
+    // because the ticketKey disappears from the URL and the sync effect clears activeTicket.
+    navigate(`/workspaces/${activeWorkspaceId}/projects/${pid}/tickets?domainId=${domainId}`);
   };
 
   const handleShowNotes = () => {
-    if (!activeProjectId) {
+    const pid = activeProjectId || projectIdParam;
+    if (!pid) return;
+    navigate(`/workspaces/${activeWorkspaceId}/projects/${pid}/notes`);
+  };
+
+  const handleSelectNote = (nextNoteId: string) => {
+    const pid = activeProjectId || projectIdParam;
+    if (!pid) return;
+
+    if (!nextNoteId) {
+      navigate(`/workspaces/${activeWorkspaceId}/projects/${pid}/notes`);
       return;
     }
 
-    setActiveTicket(null);
-    setActiveNoteId('');
-    setActiveContext('notes');
-    setActiveSection('workspace');
+    navigate(`/workspaces/${activeWorkspaceId}/projects/${pid}/notes/${nextNoteId}`);
   };
 
   const handleOpenSettings = () => {
     if (!activeWorkspace) {
-      setActiveSection('directory');
+      navigate('/workspaces');
       return;
     }
-
-    setActiveTicket(null);
-    setActiveSection('settings');
+    navigate(`/workspaces/${activeWorkspaceId}/settings`);
   };
 
   const handleOpenAccountPreferences = () => {
-    setActiveTicket(null);
-    setActiveSection('account');
+    navigate('/account');
   };
 
   const handleOpenProjectManager = () => {
     if (!activeWorkspace) {
-      setActiveSection('directory');
+      navigate('/workspaces');
       return;
     }
-
-    setActiveTicket(null);
-    setActiveSection('projects');
+    navigate(`/workspaces/${activeWorkspaceId}/projects`);
   };
 
   const handleCreateInvite = async (input: { label: string }) => Boolean(await createInvite(input));
@@ -665,10 +707,10 @@ export function AppShellPage() {
     const success = await deleteWorkspace();
     if (success) {
       setActiveWorkspaceId('');
-      setActiveSection('directory');
+      navigate('/workspaces');
       await refreshWorkspaces();
     }
-  }, [deleteWorkspace, refreshWorkspaces]);
+  }, [deleteWorkspace, refreshWorkspaces, navigate]);
 
   useEffect(() => {
     const handleGlobalKeyDown = (event: KeyboardEvent) => {
@@ -730,8 +772,8 @@ export function AppShellPage() {
           tutorialResult={accountTutorialResult}
           ollamaModels={ollamaModels}
           ollamaModelsLoading={ollamaModelsLoading}
-          onBack={() => setActiveSection(activeWorkspace ? 'workspace' : 'directory')}
-          onOpenDirectory={() => setActiveSection('directory')}
+          onBack={() => navigate(activeWorkspace ? `/workspaces/${activeWorkspaceId}` : '/workspaces')}
+          onOpenDirectory={() => navigate('/workspaces')}
           onChangeSettings={updateAccountSettings}
           onResetProviderDraft={resetProviderDraft}
           onRefreshOllamaModels={refreshOllamaModels}
@@ -759,9 +801,8 @@ export function AppShellPage() {
           onCreateWorkspace={handleCreateWorkspace}
           onRequestJoin={handleRequestJoin}
           onOpenWorkspace={handleSelectWorkspace}
-          onOpenSettings={(workspaceId) => {
-            setActiveWorkspaceId(workspaceId);
-            setActiveSection('settings');
+          onOpenSettings={(wsId) => {
+            navigate(`/workspaces/${wsId}/settings`);
           }}
           onOpenAccountPreferences={handleOpenAccountPreferences}
           onSignOut={signOut}
@@ -780,7 +821,7 @@ export function AppShellPage() {
       workspaces: workspaces.map((workspace) => ({ id: workspace.id, name: workspace.name })),
       activeWorkspaceId,
       onSelectWorkspace: handleSelectWorkspace,
-      onOpenWorkspaceDirectory: () => setActiveSection('directory'),
+      onOpenWorkspaceDirectory: () => navigate('/workspaces'),
     },
     projects: {
       projects: activeWorkspaceProjects,
@@ -814,7 +855,7 @@ export function AppShellPage() {
     userMenu: {
       currentUser,
       activeArea: activeSection === 'projects' ? 'projects' : 'workspace',
-      onOpenWorkspaceDirectory: () => setActiveSection('directory'),
+      onOpenWorkspaceDirectory: () => navigate('/workspaces'),
       onOpenAccountPreferences: handleOpenAccountPreferences,
       onOpenProjectManager: handleOpenProjectManager,
       onOpenSettings: handleOpenSettings,
@@ -843,8 +884,8 @@ export function AppShellPage() {
           revokeLoadingId={revokeLoadingId}
           deleteLoading={deleteLoading}
           deleteError={deleteError}
-          onBackToWorkspace={() => setActiveSection('workspace')}
-          onOpenDirectory={() => setActiveSection('directory')}
+          onBackToWorkspace={() => navigate(`/workspaces/${activeWorkspaceId}`)}
+          onOpenDirectory={() => navigate('/workspaces')}
           onChangeSettings={updateSettings}
           onSaveSettings={saveSettings}
           onCreateInvite={handleCreateInvite}
@@ -887,7 +928,7 @@ export function AppShellPage() {
               projectCreateError={projectCreateError}
               domainCreateLoading={domainCreateLoading}
               domainCreateError={domainCreateError}
-              onBackToWorkspace={() => setActiveSection('workspace')}
+              onBackToWorkspace={() => navigate(`/workspaces/${activeWorkspaceId}`)}
               onCreateProject={handleCreateProject}
               onCreateDomain={handleCreateDomain}
               onSelectProject={handleSelectProjectForManagement}
@@ -895,6 +936,8 @@ export function AppShellPage() {
           ) : (
             <WorkspacePage
               workspaceId={activeWorkspaceId}
+              workspaceName={activeWorkspace?.name}
+              pathname={pathname}
               activeContext={activeContext}
               activeTicket={activeTicket}
               activeView={activeView}
@@ -914,8 +957,10 @@ export function AppShellPage() {
               onOpenCreateSubtask={handleOpenCreateSubtask}
               onOpenCreateTicket={handleOpenCreateTicket}
               onOpenProjectManager={handleOpenProjectManager}
-              onSelectTicket={setActiveTicket}
-              onSelectNote={(noteId) => setActiveNoteId(noteId)}
+              onSelectTicket={(ticket) => {
+                navigate(`/workspaces/${activeWorkspaceId}/projects/${ticket.projectId}/tickets/${ticket.key}`);
+              }}
+              onSelectNote={handleSelectNote}
               activeNoteId={activeNoteId}
               onSetFilters={setFilters}
               onSetListSort={setListSort}

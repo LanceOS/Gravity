@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 import { WorkspacePage } from '../../pages/WorkspacePage/WorkspacePage.tsx';
 import type { Cycle, Domain, Project, Ticket } from '../../context/TicketContext.tsx';
 
@@ -170,7 +171,11 @@ function renderWorkspacePage(overrides: Partial<Parameters<typeof WorkspacePage>
   const props = { ...baseProps, ...overrides };
 
   return {
-    ...render(<WorkspacePage {...props} />),
+    ...render(
+      <MemoryRouter initialEntries={['/workspaces/workspace-1/projects/project-1/tickets']}>
+        <WorkspacePage {...props} />
+      </MemoryRouter>
+    ),
     props,
   };
 }

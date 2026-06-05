@@ -13,11 +13,14 @@ import {
 } from '../../modules/tickets/utils/ticketView';
 import { WorkspaceHeader } from '../../modules/workspaces';
 import { WorkspaceViewContainer } from '../../components/WorkspaceViewContainer';
+import { Breadcrumbs } from '../../components/Breadcrumbs/Breadcrumbs';
 import WorkspaceMcpModal from '../../modules/workspaces/components/WorkspaceMcpModal';
 import './WorkspacePage.css';
 
 interface WorkspacePageProps {
   workspaceId?: string;
+  workspaceName?: string;
+  pathname?: string;
   activeContext?: 'issues' | 'notes';
   activeNoteId?: string;
   activeTicket: Ticket | null;
@@ -48,6 +51,8 @@ interface WorkspacePageProps {
 
 export function WorkspacePage({
   workspaceId,
+  workspaceName,
+  pathname,
   activeContext = 'issues',
   activeNoteId,
   activeTicket,
@@ -152,13 +157,25 @@ export function WorkspacePage({
   }, [filters.projectId, onSelectNote]);
 
   const displayTitle = activeContext === 'notes' ? 'Notes' : headerTitle;
+  const shouldShowBreadcrumbs = Boolean(pathname && workspaceId && pathname !== `/workspaces/${workspaceId}`);
 
   return (
     <div className="workspace-page">
       {projects.length > 0 ? (
         <WorkspaceHeader>
           <WorkspaceHeader.Top>
-            <WorkspaceHeader.Title>{displayTitle}</WorkspaceHeader.Title>
+            {shouldShowBreadcrumbs ? (
+              <Breadcrumbs
+                pathname={pathname || ''}
+                workspaceId={workspaceId || ''}
+                workspaceName={workspaceName}
+                projects={projects}
+                activeTicket={activeTicket}
+                activeNoteId={activeNoteId}
+              />
+            ) : (
+              <WorkspaceHeader.Title>{displayTitle}</WorkspaceHeader.Title>
+            )}
             {!activeTicket && activeContext === 'issues' && (
               <WorkspaceHeader.ViewToggle
                 activeView={activeView}
@@ -175,7 +192,7 @@ export function WorkspacePage({
             {!activeTicket && activeContext === 'notes' && (
               <div style={{ marginLeft: 'auto' }}>
                 {activeNoteId ? (
-                  <Button type="button" variant="secondary" onClick={() => onSelectNote?.('')}>
+                  <Button type="button" variant="secondary" onClick={() => window.history.back()}>
                     Back to Notes
                   </Button>
                 ) : (
@@ -288,7 +305,6 @@ export function WorkspacePage({
               onAddComment={onAddComment}
               onUpdateComment={onUpdateComment}
               onDeleteComment={onDeleteComment}
-              onClose={() => onSelectTicket(null)}
               onOpenCreateSubtask={onOpenCreateSubtask}
             />
           </div>

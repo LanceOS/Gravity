@@ -2,7 +2,14 @@ import type { ReactNode } from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { AppShellPage } from '../../pages/AppShellPage/AppShellPage.tsx';
+
+/** Helper: captures the current MemoryRouter URL from inside the tree. */
+function LocationDisplay() {
+  const loc = useLocation();
+  return <div data-testid="location-display">{loc.pathname}{loc.search}</div>;
+}
 
 type WorkspaceLayoutMockProps = {
   sidebarProps: {
@@ -17,6 +24,11 @@ type WorkspaceLayoutMockProps = {
   };
   children?: ReactNode;
   rightPanels?: ReactNode;
+};
+
+type WorkspacePageMockProps = {
+  onSelectNote?: (noteId: string) => void;
+  onDeleteTicket?: (ticketId: string) => void;
 };
 
 const mocks = vi.hoisted(() => ({
@@ -120,7 +132,21 @@ vi.mock('../../pages/WorkspaceDirectoryPage/WorkspaceDirectoryPage', () => ({
 }));
 
 vi.mock('../../pages/WorkspacePage/WorkspacePage', () => ({
-  WorkspacePage: () => <div>WorkspacePage</div>,
+  WorkspacePage: ({ onSelectNote, onDeleteTicket }: WorkspacePageMockProps) => (
+    <div>
+      <div>WorkspacePage</div>
+      {onSelectNote ? (
+        <button type="button" onClick={() => onSelectNote('note-1')}>
+          Open note
+        </button>
+      ) : null}
+      {onDeleteTicket ? (
+        <button type="button" onClick={() => onDeleteTicket('t-1')}>
+          Delete active ticket
+        </button>
+      ) : null}
+    </div>
+  ),
 }));
 
 vi.mock('../../pages/WorkspaceProjectsPage/WorkspaceProjectsPage', () => ({
@@ -307,7 +333,12 @@ function renderAppShell({
   mocks.useAccountSettings.mockReturnValue(account);
   mocks.useWorkspaceSettings.mockReturnValue(workspaceSettings);
 
-  return render(<AppShellPage />);
+  return render(
+    <MemoryRouter initialEntries={['/workspaces/workspace-1']}>
+      <LocationDisplay />
+      <AppShellPage />
+    </MemoryRouter>
+  );
 }
 
 describe('AppShellPage', () => {
@@ -393,7 +424,7 @@ describe('AppShellPage', () => {
   it('renders workspace routes and switches between workspace, settings, account, and projects', async () => {
     const user = userEvent.setup();
 
-    renderAppShell();
+    const firstRender = renderAppShell();
 
     await waitFor(() => {
       expect(screen.getByText('WorkspaceLayout')).toBeInTheDocument();
@@ -404,23 +435,35 @@ describe('AppShellPage', () => {
     expect(screen.getByText('CreateTicketModal')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Open settings' }));
-    expect(screen.getByText('SettingsPage')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByTestId('location-display').textContent).toBe('/workspaces/workspace-1/settings');
+    });
 
-    renderAppShell();
+    firstRender.unmount();
+
+    const secondRender = renderAppShell();
 
     await waitFor(() => {
       expect(screen.getByText('WorkspaceLayout')).toBeInTheDocument();
     });
     await user.click(screen.getByRole('button', { name: 'Open account preferences' }));
-    expect(screen.getByText('AccountPreferencesPage')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByTestId('location-display').textContent).toBe('/account');
+    });
 
-    renderAppShell();
+    secondRender.unmount();
+
+    const thirdRender = renderAppShell();
 
     await waitFor(() => {
       expect(screen.getByText('WorkspaceLayout')).toBeInTheDocument();
     });
     await user.click(screen.getByRole('button', { name: 'Open project manager' }));
-    expect(screen.getByText('WorkspaceProjectsPage')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByTestId('location-display').textContent).toBe('/workspaces/workspace-1/projects');
+    });
+
+    thirdRender.unmount();
   });
 
   it('does not open the create-ticket modal when the active workspace has no projects', async () => {
@@ -454,17 +497,13 @@ describe('AppShellPage', () => {
     });
   });
 
-  it('clears active ticket and applies domain filters when a domain is selected', async () => {
+  it('navigates to domain-filtered URL when a domain is selected (GRAV-113)', async () => {
     const user = userEvent.setup();
-    const setActiveTicket = vi.fn();
-    const setFilters = vi.fn();
 
     renderAppShell({
       tickets: buildUseTickets({
         activeTicket: { id: 't-1' },
         domains: [{ id: 'd-1', name: 'Frontend', color: '#fff' }],
-        setActiveTicket,
-        setFilters,
         activeProjectId: 'project-1',
       }),
     });
@@ -475,8 +514,60 @@ describe('AppShellPage', () => {
 
     await user.click(screen.getByRole('button', { name: 'Select domain' }));
 
-    expect(setActiveTicket).toHaveBeenCalledWith(null);
-    expect(setFilters).toHaveBeenCalledWith({ projectId: 'project-1', domainId: 'd-1', cycleId: '', assigneeId: '' });
+    // Verify that navigate() was called with the correct domain-filtered URL.
+    // The URL change drives the sync effect which then updates filters + closes the ticket detail.
+    await waitFor(() => {
+      expect(screen.getByTestId('location-display').textContent).toBe(
+        '/workspaces/workspace-1/projects/project-1/tickets?domainId=d-1'
+      );
+    });
+  });
+
+  it('navigates to a note detail URL when a note is selected', async () => {
+    const user = userEvent.setup();
+
+    renderAppShell();
+
+    await waitFor(() => {
+      expect(screen.getByText('WorkspacePage')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Open note' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('location-display').textContent).toBe(
+        '/workspaces/workspace-1/projects/project-1/notes/note-1'
+      );
+    });
+  });
+
+  it('returns to the ticket list URL after deleting the active ticket', async () => {
+    const user = userEvent.setup();
+    const activeTicket = {
+      id: 't-1',
+      key: 'TST-1',
+      title: 'Delete me',
+      projectId: 'project-1',
+    };
+
+    renderAppShell({
+      tickets: buildUseTickets({
+        activeTicket,
+        tickets: [activeTicket],
+      }),
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('WorkspacePage')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Delete active ticket' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('location-display').textContent).toBe(
+        '/workspaces/workspace-1/projects/project-1/tickets'
+      );
+    });
   });
 
   it('forces activeView to list mode and triggers setView when resizing to a mobile viewport', async () => {
