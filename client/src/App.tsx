@@ -1,12 +1,13 @@
-import { TicketProvider } from './context/TicketContext.tsx';
+import { RouterProvider } from 'react-router-dom';
+import { TicketProvider } from './context/TicketContext';
 import { ThemeProvider } from './modules/settings';
-import { AppShellPage } from './pages/AppShellPage/AppShellPage.tsx';
+import { router } from './router';
 
 export default function App() {
   return (
     <ThemeProvider>
       <TicketProvider>
-        <AppShellPage />
+        <RouterProvider router={router} />
       </TicketProvider>
     </ThemeProvider>
   );
