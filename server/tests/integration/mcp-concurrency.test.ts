@@ -4,6 +4,7 @@ import { createAuthenticatedApi, seedWorkspaceFixture, api } from '../helpers/te
 describe('MCP concurrency', () => {
   it(
     'allows only one consumer to successfully use a single-use token under concurrent requests',
+    { timeout: 10_000 },
     async () => {
     const ownerApi = await createAuthenticatedApi({
       name: 'Concurrency Owner',
@@ -36,7 +37,6 @@ describe('MCP concurrency', () => {
 
     expect(successCount).toBe(1);
     expect(unauthorizedCount).toBe(concurrency - 1);
-    },
-    { timeout: 10_000 },
+    }
   );
 });
