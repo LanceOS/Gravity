@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { MessageSquare, X } from 'lucide-react';
+import { useParams, useLocation, useNavigate } from 'react-router-dom';
 
 import { AuthScreen } from '../../modules/auth';
 import { CreateTicketModal } from '../../modules/tickets';
@@ -207,6 +208,40 @@ export function AppShellPage() {
       setDsTheme(accountSettings.theme);
     }
   }, [accountSettings?.projectLayout, accountSettings?.theme, setDensity, setDsTheme]);
+
+  const { workspaceId } = useParams();
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+
+  // URL-driven section and workspace syncing
+  useEffect(() => {
+    if (pathname === '/workspaces' || pathname === '/workspaces/') {
+      setActiveSection('directory');
+    } else if (pathname === '/account' || pathname === '/account/') {
+      setActiveSection('account');
+    } else if (workspaceId) {
+      setActiveWorkspaceId(workspaceId);
+      if (pathname.includes('/settings')) {
+        setActiveSection('settings');
+      } else if (pathname.includes('/projects')) {
+        setActiveSection('projects');
+      } else {
+        setActiveSection('workspace');
+      }
+    }
+  }, [pathname, workspaceId]);
+
+  // Root path routing redirect
+  useEffect(() => {
+    if (pathname === '/' && workspaceReady) {
+      if (activeWorkspaceId) {
+        navigate(`/workspaces/${activeWorkspaceId}`, { replace: true });
+      } else if (workspaces.length === 0) {
+        navigate('/workspaces', { replace: true });
+      }
+    }
+  }, [pathname, activeWorkspaceId, workspaceReady, workspaces, navigate]);
+
   const {
     settings,
     settingsLoading,
