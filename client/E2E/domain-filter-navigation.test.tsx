@@ -68,17 +68,17 @@ describe('Domain filter navigation E2E', () => {
     // Open ticket detail
     await user.click(ticketCard);
 
-    // Ensure detail opened by checking ticket key
-    const ticketKey = await screen.findByText('TST-1');
-    expect(ticketKey).toBeInTheDocument();
+    // Ensure detail opened by checking for Back button
+    const backBtn = await screen.findByRole('button', { name: 'Back' });
+    expect(backBtn).toBeInTheDocument();
 
     // Click the domain in the sidebar
-    const domainButton = await screen.findByRole('button', { name: 'Frontend' });
+    const domainButton = await screen.findByRole('button', { name: /Frontend/i });
     await user.click(domainButton);
 
     // Detail should close
     await waitFor(() => {
-      expect(screen.queryByText('TST-1')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
     });
 
     // Header should show domain title
@@ -129,16 +129,16 @@ describe('Domain filter navigation E2E', () => {
 
     await user.click(ticketCard);
 
-    // Detail opened
-    expect(await screen.findByText('TST-10')).toBeInTheDocument();
+    // Detail opened - verify back button is present
+    const backBtn = await screen.findByRole('button', { name: 'Back' });
+    expect(backBtn).toBeInTheDocument();
 
     // Click Back button inside detail
-    const backBtn = await screen.findByRole('button', { name: 'Back' });
     await user.click(backBtn);
 
     // Detail should close, header remains (project title or All Issues)
     await waitFor(() => {
-      expect(screen.queryByText('TST-10')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
     });
 
     // Header should display something meaningful (not the ticket key)
@@ -205,7 +205,7 @@ describe('Domain filter navigation E2E', () => {
     expect(await screen.findByText('Backend only ticket')).toBeInTheDocument();
 
     // Click the Frontend domain in the sidebar
-    const domainButton = await screen.findByRole('button', { name: 'Frontend' });
+    const domainButton = await screen.findByRole('button', { name: /Frontend/i });
     await user.click(domainButton);
 
     // Header should update

@@ -81,7 +81,7 @@ describe('Sub-ticket navigation E2E', () => {
     const detailContainerAfter = document.querySelector('.workspace-page__detail');
     expect(detailContainerAfter).toBeTruthy();
     await waitFor(() => {
-      expect(within(detailContainerAfter as Element).getByText(parentTicket.title, { selector: 'p' })).toBeInTheDocument();
+      expect(within(detailContainerAfter as Element).getByDisplayValue(parentTicket.title)).toBeInTheDocument();
     });
   });
 });

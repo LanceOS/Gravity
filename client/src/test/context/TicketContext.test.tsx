@@ -96,10 +96,12 @@ describe('TicketContext', () => {
 
   function stubEventSource() {
     const close = vi.fn();
-    const EventSourceMock = vi.fn(() => ({
-      close,
-      onmessage: null,
-    }));
+    const EventSourceMock = vi.fn().mockImplementation(function () {
+      return {
+        close,
+        onmessage: null,
+      };
+    });
 
     vi.stubGlobal('EventSource', EventSourceMock);
     Object.defineProperty(window, 'EventSource', {
@@ -190,7 +192,7 @@ describe('TicketContext', () => {
     window.localStorage.setItem('gravity_user', JSON.stringify(user));
 
     const fetchMock = vi.fn().mockRejectedValue(new Error('backend unavailable'));
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
     stubEventSource();
     vi.stubGlobal('fetch', fetchMock);
 
@@ -223,7 +225,7 @@ describe('TicketContext', () => {
       .mockResolvedValueOnce(jsonResponse({ user, session: { userId: user.id } }))
       .mockResolvedValueOnce(jsonResponse({ error: 'Authentication required.' }, 401))
       .mockResolvedValueOnce(jsonResponse([]));
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
 
     stubEventSource();
     vi.stubGlobal('fetch', fetchMock);
@@ -264,7 +266,7 @@ describe('TicketContext', () => {
       .mockResolvedValueOnce(jsonResponse([]))
       .mockResolvedValueOnce(jsonResponse({ error: 'Authentication required.' }, 401))
       .mockResolvedValueOnce(jsonResponse([]));
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
 
     stubEventSource();
     vi.stubGlobal('fetch', fetchMock);
@@ -336,7 +338,7 @@ describe('TicketContext', () => {
       .mockResolvedValueOnce(jsonResponse({ error: 'Project load failed.' }, 500))
       .mockResolvedValueOnce(jsonResponse([]))
       .mockResolvedValueOnce(jsonResponse([]));
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
 
     stubEventSource();
     vi.stubGlobal('fetch', fetchMock);
@@ -397,7 +399,7 @@ describe('TicketContext', () => {
         updatedAt: '2026-05-02T00:00:00.000Z',
       }))
       .mockResolvedValueOnce(jsonResponse({ error: 'gateway down' }, 502));
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
 
     stubEventSource();
     vi.stubGlobal('fetch', fetchMock);
@@ -462,7 +464,7 @@ describe('TicketContext', () => {
       .mockResolvedValueOnce(jsonResponse([]))
       .mockResolvedValueOnce(jsonResponse({ error: 'update failed' }, 500))
       .mockResolvedValueOnce(jsonResponse({ error: 'refresh failed' }, 502));
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
 
     stubEventSource();
     vi.stubGlobal('fetch', fetchMock);

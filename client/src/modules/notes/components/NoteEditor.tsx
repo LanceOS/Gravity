@@ -1,15 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useEditor, EditorContent } from '@tiptap/react';
-import type { EditorView } from 'prosemirror-view';
-import type { Slice } from 'prosemirror-model';
-import StarterKit from '@tiptap/starter-kit';
-import { Markdown } from 'tiptap-markdown';
-import Image from '@tiptap/extension-image';
-import Placeholder from '@tiptap/extension-placeholder';
-import {
-  Bold, Italic, Strikethrough, Heading1, Heading2,
-  List, ListOrdered, Code, Quote, ImageIcon, Network, Check
-} from 'lucide-react';
+import MDEditor from '@uiw/react-md-editor';
+import { Check, ImageIcon, Network } from 'lucide-react';
 import { useNote } from '../hooks/useNote';
 import './NoteEditor.css';
 
@@ -23,7 +14,9 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
 
   const [isDragging, setIsDragging] = useState(false);
   const [title, setTitle] = useState('');
+  const [body, setBody] = useState('');
   const titleRef = useRef(title);
+  const bodyRef = useRef(body);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -32,15 +25,14 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
       clearTimeout(saveTimeoutRef.current);
     }
     saveTimeoutRef.current = setTimeout(() => {
-      // Trigger save
       triggerSave();
     }, 3000);
   }, []);
 
   const triggerSave = useCallback(() => {
-    if (!editor || !note) return;
+    if (!note) return;
 
-    const currentBody = editor.storage.markdown.getMarkdown();
+    const currentBody = bodyRef.current;
     const currentTitle = titleRef.current.trim() || 'Untitled Note';
 
     if (currentBody !== note.body || currentTitle !== note.title) {
@@ -51,104 +43,57 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
   const handleFileUpload = async (file: File) => {
     try {
       const url = await uploadMedia(file);
-      editor?.chain().focus().setImage({ src: url }).run();
+      const markdownImage = `![${file.name}](${url})`;
+      const newBody = bodyRef.current + '\n' + markdownImage;
+      setBody(newBody);
+      bodyRef.current = newBody;
       scheduleSave();
     } catch (err) {
       console.error('Failed to upload file:', err);
     }
   };
 
-  const editor = useEditor({
-    extensions: [
-      StarterKit,
-      Markdown,
-      Image,
-      Placeholder.configure({
-        placeholder: 'Body...',
-      }),
-    ],
-    // Explicit document structure so tiptap-markdown never infers a heading node
-    content: { type: 'doc', content: [{ type: 'paragraph' }] },
-    onUpdate: () => {
-      scheduleSave();
-    },
-    editorProps: {
-      handleDrop: (view: EditorView, event: DragEvent, slice: Slice, moved: boolean) => {
-        if (!moved && event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files.length > 0) {
-          event.preventDefault();
-          setIsDragging(false);
-          const file = event.dataTransfer.files[0];
-          handleFileUpload(file);
-          return true;
-        }
-        return false;
-      }
-    }
-  }, [noteId]); // Recreate if noteId changes.
-
-  // Sync content when note initially loads
   const noteLoaded = useRef(false);
   useEffect(() => {
-    // Reset the loaded flag whenever noteId changes so we reload fresh content.
     noteLoaded.current = false;
   }, [noteId]);
 
   useEffect(() => {
-    if (!note || !editor || noteLoaded.current) return;
+    if (!note || noteLoaded.current) return;
     noteLoaded.current = true;
 
     const rawBody = note.body ?? '';
-
-    // Strip a legacy empty-H1 line written by the old creation code ("# \n\n").
-    // We only strip lines that are JUST "# " (no real heading text) so we never
-    // destroy intentional user content.
     const cleanedBody = rawBody.replace(/^# ?\n/, '').trimStart();
+    
+    setBody(cleanedBody);
+    bodyRef.current = cleanedBody;
 
-    if (cleanedBody) {
-      editor.commands.setContent(cleanedBody);
-
-      // Belt-and-suspenders: if tiptap-markdown still produced a leading H1
-      // node that is empty (a legacy artifact), convert it to a paragraph.
-      const json = editor.getJSON();
-      const firstNode = json.content?.[0];
-      if (firstNode?.type === 'heading' && !firstNode.content?.length) {
-        editor.chain()
-          .setTextSelection(1)
-          .setParagraph()
-          .run();
-      }
-    }
-
-    // Place cursor at the very start of the body.
-    editor.commands.focus('start');
-
-    // Populate the title input from stored metadata.
     if (!title && note.title && note.title !== 'Untitled Note') {
       setTitle(note.title);
       titleRef.current = note.title;
     }
-  }, [editor, note]);
+  }, [note]);
 
-  // Update scheduleSave closure references
   useEffect(() => {
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = setTimeout(() => {
-        if (!editor || !note) return;
-        const currentBody = editor.storage.markdown.getMarkdown();
-        const currentTitle = titleRef.current.trim() || 'Untitled Note';
-
-        if (currentBody !== note.body || currentTitle !== note.title) {
-          saveNote({ title: currentTitle, body: currentBody });
-        }
+        triggerSave();
       }, 3000);
     }
-  }, [note, editor, saveNote]);
+  }, [note, triggerSave]);
 
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newTitle = e.target.value;
     setTitle(newTitle);
     titleRef.current = newTitle;
+    scheduleSave();
+  };
+
+  const handleBodyChange = (value?: string) => {
+    const newBody = value || '';
+    setBody(newBody);
+    bodyRef.current = newBody;
     scheduleSave();
   };
 
@@ -169,8 +114,6 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
   };
 
   const onDrop = (e: React.DragEvent) => {
-    // Drop is handled by TipTap if it happens in the editor,
-    // but this covers the entire container.
     e.preventDefault();
     setIsDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
@@ -182,16 +125,13 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
     return <div className="note-editor" style={{ padding: 24 }}>Loading note...</div>;
   }
 
-  if (!editor) {
-    return null;
-  }
-
   return (
     <div
       className="note-editor"
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
+      data-color-mode="dark"
     >
       <div className="note-editor__header">
         <div className="note-editor__status">
@@ -205,114 +145,42 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
         </div>
       </div>
 
-      <div className="note-editor__toolbar">
-        <button
-          className={`note-editor__toolbar-btn ${editor.isActive('bold') ? 'note-editor__toolbar-btn--active' : ''}`}
-          onClick={() => editor.chain().focus().toggleBold().run()}
-          title="Bold"
-        >
-          <Bold size={16} />
-        </button>
-        <button
-          className={`note-editor__toolbar-btn ${editor.isActive('italic') ? 'note-editor__toolbar-btn--active' : ''}`}
-          onClick={() => editor.chain().focus().toggleItalic().run()}
-          title="Italic"
-        >
-          <Italic size={16} />
-        </button>
-        <button
-          className={`note-editor__toolbar-btn ${editor.isActive('strike') ? 'note-editor__toolbar-btn--active' : ''}`}
-          onClick={() => editor.chain().focus().toggleStrike().run()}
-          title="Strikethrough"
-        >
-          <Strikethrough size={16} />
-        </button>
-
-        <div className="note-editor__toolbar-divider" />
-
-        <button
-          className={`note-editor__toolbar-btn ${editor.isActive('heading', { level: 1 }) ? 'note-editor__toolbar-btn--active' : ''}`}
-          onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-          title="Heading 1"
-        >
-          <Heading1 size={16} />
-        </button>
-        <button
-          className={`note-editor__toolbar-btn ${editor.isActive('heading', { level: 2 }) ? 'note-editor__toolbar-btn--active' : ''}`}
-          onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-          title="Heading 2"
-        >
-          <Heading2 size={16} />
-        </button>
-
-        <div className="note-editor__toolbar-divider" />
-
-        <button
-          className={`note-editor__toolbar-btn ${editor.isActive('bulletList') ? 'note-editor__toolbar-btn--active' : ''}`}
-          onClick={() => editor.chain().focus().toggleBulletList().run()}
-          title="Bullet List"
-        >
-          <List size={16} />
-        </button>
-        <button
-          className={`note-editor__toolbar-btn ${editor.isActive('orderedList') ? 'note-editor__toolbar-btn--active' : ''}`}
-          onClick={() => editor.chain().focus().toggleOrderedList().run()}
-          title="Numbered List"
-        >
-          <ListOrdered size={16} />
-        </button>
-
-        <div className="note-editor__toolbar-divider" />
-
-        <button
-          className={`note-editor__toolbar-btn ${editor.isActive('codeBlock') ? 'note-editor__toolbar-btn--active' : ''}`}
-          onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-          title="Code Block"
-        >
-          <Code size={16} />
-        </button>
-        <button
-          className={`note-editor__toolbar-btn ${editor.isActive('blockquote') ? 'note-editor__toolbar-btn--active' : ''}`}
-          onClick={() => editor.chain().focus().toggleBlockquote().run()}
-          title="Quote"
-        >
-          <Quote size={16} />
-        </button>
-
-        <div className="note-editor__toolbar-divider" />
-
-        <input
-          type="file"
-          ref={fileInputRef}
-          style={{ display: 'none' }}
-          accept="image/*,.svg"
-          onChange={handleFileChange}
-        />
-        <button
-          className="note-editor__toolbar-btn"
-          onClick={() => fileInputRef.current?.click()}
-          title="Attach Image"
-        >
-          <ImageIcon size={16} />
-        </button>
-        <button
-          className="note-editor__toolbar-btn"
-          onClick={() => fileInputRef.current?.click()}
-          title="Attach Diagram"
-        >
-          <Network size={16} />
-        </button>
-      </div>
+      <input
+        type="file"
+        ref={fileInputRef}
+        style={{ display: 'none' }}
+        accept="image/*,.svg"
+        onChange={handleFileChange}
+      />
 
       <div className="note-editor__content">
-        <input
-          type="text"
-          className="note-editor__title-input"
-          placeholder="Title..."
-          value={title}
-          onChange={handleTitleChange}
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', alignItems: 'center' }}>
+          <input
+            type="text"
+            className="note-editor__title-input"
+            placeholder="Title..."
+            value={title}
+            onChange={handleTitleChange}
+            style={{ flex: 1 }}
+          />
+          <button
+            className="note-editor__toolbar-btn"
+            onClick={() => fileInputRef.current?.click()}
+            title="Attach Image"
+          >
+            <ImageIcon size={16} />
+          </button>
+        </div>
+        
+        <MDEditor
+          value={body}
+          onChange={handleBodyChange}
+          preview="live"
+          height="calc(100vh - 200px)"
+          textareaProps={{
+             placeholder: 'Write your notes in Markdown...'
+          }}
         />
-        <EditorContent editor={editor} />
 
         <div className={`note-editor__drag-overlay ${isDragging ? 'note-editor__drag-overlay--active' : ''}`}>
           <div className="note-editor__drag-message">
