@@ -56,9 +56,12 @@ services:
       TRUSTED_ORIGINS: ${GRAVITY_FRONTEND_PUBLIC_URL:-http://localhost:5173},${GRAVITY_BACKEND_PUBLIC_URL:-http://localhost:8080}
       OLLAMA_DEFAULT_ENDPOINT: ${OLLAMA_DEFAULT_ENDPOINT:-http://host.docker.internal:11434}
       NODE_ENV: ${NODE_ENV:-production}
+      RUSTFS_BASE_PATH: ${RUSTFS_BASE_PATH:-/data/rustfs}
       PORT: ${GRAVITY_BACKEND_PORT:-8080}
     expose:
       - "8080"
+    volumes:
+      - gravity_rustfs_data:/data/rustfs
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -86,6 +89,7 @@ services:
 
 volumes:
   pgdata:
+  gravity_rustfs_data:
 
 networks:
   gravity_internal:

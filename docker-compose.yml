@@ -43,6 +43,7 @@ services:
     environment:
       PORT: ${PORT:-8080}
       NODE_ENV: ${NODE_ENV:-production}
+      RUSTFS_BASE_PATH: ${RUSTFS_BASE_PATH:-/data/rustfs}
       # Construct database and redis URLs dynamically to connect internally via service names
       DATABASE_URL: postgresql://${GRAVITY_POSTGRES_USER:-gravity_user}:${GRAVITY_POSTGRES_PASSWORD:-admin}@postgres:5432/${GRAVITY_POSTGRES_DB:-gravity_workspace}
       REDIS_URL: redis://default:${GRAVITY_REDIS_PASSWORD:-admin}@redis:6379
@@ -60,6 +61,8 @@ services:
       FEDERATION_SYNC_FAILURE_MAX_RETRIES: ${FEDERATION_SYNC_FAILURE_MAX_RETRIES:-5}
     expose:
       - "8080"
+    volumes:
+      - gravity_rustfs_data:/data/rustfs
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -90,6 +93,7 @@ services:
 
 volumes:
   gravity_postgres_data:
+  gravity_rustfs_data:
 
 networks:
   gravity_frontend_backend:

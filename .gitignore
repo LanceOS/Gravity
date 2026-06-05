@@ -26,4 +26,4 @@ dist-ssr
 .github/agents
 .agents
 .vscode/
-.env*
+.env

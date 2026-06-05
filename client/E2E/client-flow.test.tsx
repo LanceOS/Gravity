@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import App from '../src/App';
@@ -182,12 +182,13 @@ describe('Gravity Client End-to-End User Journey', () => {
     await user.click(ticketCardOnBoard);
 
     // Verify details panel opened
-    const ticketKeyText = await screen.findByText(/Ticket Key/i, { selector: 'span' });
+    const desktopSidebar = await screen.findByTestId('desktop-sidebar');
+    const ticketKeyText = await within(desktopSidebar).findByText(/Ticket Key/i, { selector: 'span' });
     expect(ticketKeyText).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Delete Ticket/i })).toBeInTheDocument();
 
     // Update the ticket status using the custom select dropdown
-    const statusSelect = await screen.findByRole('button', { name: /Select ticket status/i });
+    const statusSelect = await within(desktopSidebar).findByRole('button', { name: /Select ticket status/i });
     await user.click(statusSelect);
 
     const inProgressOption = await screen.findByRole('option', { name: /In Progress/i });
