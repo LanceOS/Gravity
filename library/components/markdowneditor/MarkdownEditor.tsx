@@ -1,32 +1,6 @@
-import React, { useEffect, useRef } from 'react';
-import { useEditor, EditorContent } from '@tiptap/react';
-import { BubbleMenu as ReactBubbleMenu } from '@tiptap/react/menus';
-import StarterKit from '@tiptap/starter-kit';
-import Placeholder from '@tiptap/extension-placeholder';
-import BubbleMenu from '@tiptap/extension-bubble-menu';
-import { Extension } from '@tiptap/core';
-import { Markdown } from 'tiptap-markdown';
+import React, { useEffect, useRef, useState } from 'react';
+import MDEditor from '@uiw/react-md-editor';
 import { cn } from '../../utilities';
-import { Bold, Italic, Strikethrough, Code, Heading1, Heading2, List } from 'lucide-react';
-
-const singleLineStarterKitOptions = {
-  blockquote: false,
-  bold: false,
-  bulletList: false,
-  code: false,
-  codeBlock: false,
-  hardBreak: false,
-  heading: false,
-  horizontalRule: false,
-  italic: false,
-  listItem: false,
-  orderedList: false,
-  strike: false,
-} as const;
-
-function normalizeSingleLineContent(content: string) {
-  return content.replace(/\s*[\r\n]+\s*/g, ' ');
-}
 
 export interface MarkdownEditorProps {
   value: string;
@@ -35,6 +9,10 @@ export interface MarkdownEditorProps {
   minHeight?: string;
   className?: string;
   singleLine?: boolean;
+}
+
+function normalizeSingleLineContent(content: string) {
+  return content.replace(/\s*[\r\n]+\s*/g, ' ');
 }
 
 export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
@@ -46,184 +24,85 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
   singleLine = false,
 }) => {
   const normalizedValue = singleLine ? normalizeSingleLineContent(value) : value;
+  const [internalValue, setInternalValue] = useState(normalizedValue);
   const valueRef = useRef(normalizedValue);
 
-  const editor = useEditor({
-    extensions: [
-      StarterKit.configure(singleLine ? singleLineStarterKitOptions : {}),
-      Placeholder.configure({
-        placeholder,
-      }),
-      Markdown.configure({
-        html: false,
-      }),
-      ...(!singleLine
-        ? [
-            BubbleMenu.configure({
-              element: null,
-            }),
-          ]
-        : []),
-      ...(singleLine
-        ? [
-            Extension.create({
-              name: 'singleLine',
-              addKeyboardShortcuts() {
-                return {
-                  Enter: () => {
-                    this.editor.commands.blur();
-                    return true;
-                  },
-                };
-              },
-            }),
-          ]
-        : []),
-    ],
-    content: normalizedValue,
-    editorProps: {
-      attributes: {
-        class: cn('ProseMirror input-seamless', className),
-        style: `min-height: ${minHeight}; outline: none; width: 100%; word-break: break-word;`,
-      },
-      ...(singleLine
-        ? {
-            handlePaste: (view: any, event: any) => {
-              const pastedText = event.clipboardData?.getData('text/plain');
-
-              if (typeof pastedText !== 'string') {
-                return false;
-              }
-
-              view.dispatch(
-                view.state.tr.insertText(
-                  normalizeSingleLineContent(pastedText),
-                  view.state.selection.from,
-                  view.state.selection.to,
-                ),
-              );
-
-              return true;
-            },
-          }
-        : {}),
-    },
-    onBlur: ({ editor }: { editor: any }) => {
-      const markdown = editor.storage.markdown.getMarkdown();
-      const nextValue = singleLine ? normalizeSingleLineContent(markdown) : markdown;
-
-      if (nextValue !== valueRef.current) {
-        valueRef.current = nextValue;
-        onSave(nextValue);
-      }
-    },
-  });
-
-  // Track external database value changes safely
   useEffect(() => {
-    valueRef.current = normalizedValue;
-    if (editor && !editor.isFocused) {
-      const currentMarkdown = editor.storage.markdown.getMarkdown();
-      const nextMarkdown = singleLine ? normalizeSingleLineContent(currentMarkdown) : currentMarkdown;
-
-      if (nextMarkdown !== normalizedValue) {
-        editor.commands.setContent(normalizedValue);
-      }
+    const newNorm = singleLine ? normalizeSingleLineContent(value) : value;
+    if (newNorm !== valueRef.current) {
+      setInternalValue(newNorm);
+      valueRef.current = newNorm;
     }
-  }, [editor, normalizedValue, singleLine]);
+  }, [value, singleLine]);
 
-  // Handle global Escape key to blur the active editor session
-  useEffect(() => {
-    if (!editor) return;
+  const handleBlur = () => {
+    const finalVal = singleLine ? normalizeSingleLineContent(internalValue) : internalValue;
+    if (finalVal !== valueRef.current) {
+      valueRef.current = finalVal;
+      onSave(finalVal);
+    }
+  };
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && editor.isFocused) {
-        e.preventDefault();
-        editor.commands.blur();
-      }
-    };
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.currentTarget.blur();
+    }
+    if (singleLine && e.key === 'Enter') {
+      e.preventDefault();
+      e.currentTarget.blur();
+    }
+  };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [editor]);
-
-  if (!editor) {
-    return null;
+  if (singleLine) {
+    return (
+      <div className={cn("markdown-editor-wrapper single-line", className)} style={{ width: '100%', position: 'relative' }}>
+        <input
+          type="text"
+          value={internalValue}
+          onChange={(e) => setInternalValue(e.target.value)}
+          onBlur={handleBlur}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape' || e.key === 'Enter') {
+              e.preventDefault();
+              e.currentTarget.blur();
+            }
+          }}
+          onPaste={(e) => {
+            e.preventDefault();
+            const text = e.clipboardData.getData('text/plain');
+            const normalized = normalizeSingleLineContent(text);
+            const input = e.currentTarget;
+            const start = input.selectionStart || 0;
+            const end = input.selectionEnd || 0;
+            const newVal = internalValue.substring(0, start) + normalized + internalValue.substring(end);
+            setInternalValue(newVal);
+            // We can't easily set cursor position immediately after state update here, 
+            // but for single line it's fine.
+          }}
+          placeholder={placeholder}
+          style={{ width: '100%', minHeight, outline: 'none', background: 'transparent', border: 'none', color: 'inherit', font: 'inherit', padding: 0 }}
+          className="input-seamless"
+        />
+      </div>
+    );
   }
 
   return (
-    <div className="markdown-editor-wrapper" style={{ width: '100%', cursor: 'text', position: 'relative' }}>
-      {!singleLine && editor && (
-        <ReactBubbleMenu
-          editor={editor}
-          tippyOptions={{ duration: 150, zIndex: 1000 }}
-          className="markdown-bubble-menu"
-        >
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().toggleBold().run()}
-            className={cn('bubble-menu-btn', editor.isActive('bold') ? 'is-active' : '')}
-            title="Bold"
-          >
-            <Bold size={13} />
-          </button>
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().toggleItalic().run()}
-            className={cn('bubble-menu-btn', editor.isActive('italic') ? 'is-active' : '')}
-            title="Italic"
-          >
-            <Italic size={13} />
-          </button>
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().toggleStrike().run()}
-            className={cn('bubble-menu-btn', editor.isActive('strike') ? 'is-active' : '')}
-            title="Strikethrough"
-          >
-            <Strikethrough size={13} />
-          </button>
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().toggleCode().run()}
-            className={cn('bubble-menu-btn', editor.isActive('code') ? 'is-active' : '')}
-            title="Code Inline"
-          >
-            <Code size={13} />
-          </button>
-          {!singleLine && (
-            <>
-              <button
-                type="button"
-                onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-                className={cn('bubble-menu-btn', editor.isActive('heading', { level: 1 }) ? 'is-active' : '')}
-                title="Heading 1"
-              >
-                <Heading1 size={13} />
-              </button>
-              <button
-                type="button"
-                onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-                className={cn('bubble-menu-btn', editor.isActive('heading', { level: 2 }) ? 'is-active' : '')}
-                title="Heading 2"
-              >
-                <Heading2 size={13} />
-              </button>
-              <button
-                type="button"
-                onClick={() => editor.chain().focus().toggleBulletList().run()}
-                className={cn('bubble-menu-btn', editor.isActive('bulletList') ? 'is-active' : '')}
-                title="Bullet List"
-              >
-                <List size={13} />
-              </button>
-            </>
-          )}
-        </ReactBubbleMenu>
-      )}
-      <EditorContent editor={editor} />
+    <div className={cn("markdown-editor-wrapper", className)} style={{ width: '100%', position: 'relative' }} data-color-mode="dark">
+      <MDEditor
+        value={internalValue}
+        onChange={(val) => setInternalValue(val || '')}
+        preview="edit"
+        hideToolbar={false}
+        textareaProps={{
+          placeholder,
+          onBlur: handleBlur,
+          onKeyDown: handleKeyDown
+        }}
+        height={minHeight === 'auto' ? undefined : parseInt(minHeight) || 120}
+        minHeight={parseInt(minHeight) || 120}
+      />
     </div>
   );
 };
