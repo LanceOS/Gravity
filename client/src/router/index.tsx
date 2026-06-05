@@ -6,7 +6,6 @@ import { LoadingPage } from '../pages/LoadingPage/LoadingPage';
 import { useTickets } from '../context/TicketContext';
 
 // Lazy load placeholder views for code-splitting
-const WorkspaceDashboardView = lazy(() => import('../pages/PlaceholderViews/WorkspaceDashboardView'));
 const WorkspaceAllTasksView = lazy(() => import('../pages/PlaceholderViews/WorkspaceAllTasksView'));
 const TeamOverviewView = lazy(() => import('../pages/PlaceholderViews/TeamOverviewView'));
 const TeamAllTasksView = lazy(() => import('../pages/PlaceholderViews/TeamAllTasksView'));
@@ -14,10 +13,6 @@ const TeamSpecificViewView = lazy(() => import('../pages/PlaceholderViews/TeamSp
 const TeamCycleViewView = lazy(() => import('../pages/PlaceholderViews/TeamCycleViewView'));
 const TeamDomainViewView = lazy(() => import('../pages/PlaceholderViews/TeamDomainViewView'));
 const ProjectOverviewView = lazy(() => import('../pages/PlaceholderViews/ProjectOverviewView'));
-const ProjectTicketListView = lazy(() => import('../pages/PlaceholderViews/ProjectTicketListView'));
-const ProjectTicketDetailView = lazy(() => import('../pages/PlaceholderViews/ProjectTicketDetailView'));
-const ProjectNotesListView = lazy(() => import('../pages/PlaceholderViews/ProjectNotesListView'));
-const ProjectNoteDetailView = lazy(() => import('../pages/PlaceholderViews/ProjectNoteDetailView'));
 const WorkspaceSettingsView = lazy(() => import('../pages/PlaceholderViews/WorkspaceSettingsView'));
 const WorkspaceExportView = lazy(() => import('../pages/PlaceholderViews/WorkspaceExportView'));
 const NotFoundView = lazy(() => import('../pages/PlaceholderViews/NotFoundView'));
@@ -65,6 +60,11 @@ function TeamProjectNotesListGuard() {
 function TeamProjectNoteDetailGuard() {
   const { workspaceId, projectId, noteId } = useParams();
   return <Navigate to={`/workspaces/${workspaceId}/projects/${projectId}/notes/${noteId}`} replace />;
+}
+
+function ProjectHomeGuard() {
+  const { workspaceId, projectId } = useParams();
+  return <Navigate to={`/workspaces/${workspaceId}/projects/${projectId}/tickets`} replace />;
 }
 
 export const router = createBrowserRouter([
@@ -239,22 +239,28 @@ export const router = createBrowserRouter([
 
   // Individual (no teams) routing:
   {
-    path: '/workspaces/:workspaceId/projects/:projectId/tickets',
+    path: '/workspaces/:workspaceId/projects/:projectId',
     element: (
       <ProtectedRoute>
-        <Suspense fallback={<LoadingPage />}>
-          <ProjectTicketListView />
-        </Suspense>
+        <ProjectHomeGuard />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/workspaces/:workspaceId/projects/:projectId/tickets',
+    // Renders AppShellPage so the workspace shell + ticket list context is fully preserved
+    element: (
+      <ProtectedRoute>
+        <AppShellPage />
       </ProtectedRoute>
     ),
   },
   {
     path: '/workspaces/:workspaceId/projects/:projectId/tickets/:ticketKey',
+    // Renders AppShellPage; it reads ticketKey from URL params to open the detail panel
     element: (
       <ProtectedRoute>
-        <Suspense fallback={<LoadingPage />}>
-          <ProjectTicketDetailView />
-        </Suspense>
+        <AppShellPage />
       </ProtectedRoute>
     ),
   },
@@ -262,9 +268,7 @@ export const router = createBrowserRouter([
     path: '/workspaces/:workspaceId/projects/:projectId/notes',
     element: (
       <ProtectedRoute>
-        <Suspense fallback={<LoadingPage />}>
-          <ProjectNotesListView />
-        </Suspense>
+        <AppShellPage />
       </ProtectedRoute>
     ),
   },
@@ -272,9 +276,7 @@ export const router = createBrowserRouter([
     path: '/workspaces/:workspaceId/projects/:projectId/notes/:noteId',
     element: (
       <ProtectedRoute>
-        <Suspense fallback={<LoadingPage />}>
-          <ProjectNoteDetailView />
-        </Suspense>
+        <AppShellPage />
       </ProtectedRoute>
     ),
   },

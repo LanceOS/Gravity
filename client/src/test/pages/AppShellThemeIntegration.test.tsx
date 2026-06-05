@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { render, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 import { ThemeProvider } from '../../modules/settings';
 import { AppShellPage } from '../../pages/AppShellPage/AppShellPage.tsx';
 
@@ -259,9 +260,11 @@ function renderAppShell() {
   mocks.useWorkspaceSettings.mockReturnValue(buildWorkspaceSettings());
 
   return render(
-    <ThemeProvider>
-      <AppShellPage />
-    </ThemeProvider>
+    <MemoryRouter initialEntries={['/workspaces/workspace-1']}>
+      <ThemeProvider>
+        <AppShellPage />
+      </ThemeProvider>
+    </MemoryRouter>
   );
 }
 

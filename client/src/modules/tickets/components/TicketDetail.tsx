@@ -294,13 +294,12 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
       </div>
     </div>
   );
-
   return (
     <>
       <div className="ticket-detail">
       <div className="ticket-detail__header">
         <Button
-          onClick={onClose}
+          onClick={() => window.history.back()}
           variant="ghost"
           size="sm"
           className="ticket-detail__back-btn clickable"
