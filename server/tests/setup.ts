@@ -9,6 +9,7 @@ process.env.OLLAMA_DEFAULT_ENDPOINT = 'http://localhost:11434';
 process.env.ALLOW_ENV_AI_KEYS = 'true';
 process.env.ALLOW_DEV_AUTH_BYPASS = 'true';
 process.env.REDIS_ENABLED = 'false';
+process.env.RUSTFS_BASE_PATH = '/tmp/rustfs_test';
 
 const { afterEach, beforeAll, beforeEach, vi } = await import('vitest');
 const { initializeDatabase } = await import('../src/db/bootstrap.js');

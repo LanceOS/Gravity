@@ -17,7 +17,7 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
   const [body, setBody] = useState('');
   const titleRef = useRef(title);
   const bodyRef = useRef(body);
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const scheduleSave = useCallback(() => {
