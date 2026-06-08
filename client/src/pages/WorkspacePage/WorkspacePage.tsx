@@ -2,7 +2,7 @@ import { useMemo, useCallback, useState } from 'react';
 import { Button } from '@library';
 import type { Comment, Cycle, Domain, Project, Ticket, User } from '../../context/TicketContext';
 import type { TicketFilters, TicketListSort } from '../../modules/tickets/utils/ticketView';
-import { TicketBoard, TicketList, TicketDetail, TicketFilterBar } from '../../modules/tickets';
+import { TicketBoard, TicketList, TicketFilterBar } from '../../modules/tickets';
 import { NotesList, NoteEditor } from '../../modules/notes';
 import {
   filterTickets,
@@ -25,7 +25,6 @@ interface WorkspacePageProps {
   activeNoteId?: string;
   activeTicket: Ticket | null;
   activeView: 'board' | 'list';
-  comments: Comment[];
   currentUser: User | null;
   cycles: Cycle[];
   domains: Domain[];
@@ -34,11 +33,6 @@ interface WorkspacePageProps {
   projects: Project[];
   tickets: Ticket[];
   users: User[];
-  onAddComment: (ticketId: string, body: string) => Promise<void>;
-  onUpdateComment: (ticketId: string, commentId: string, body: string) => Promise<void>;
-  onDeleteComment: (ticketId: string, commentId: string) => Promise<void>;
-  onDeleteTicket: (ticketId: string) => Promise<void>;
-  onOpenCreateSubtask: (parentId: string) => void;
   onOpenCreateTicket: (initialStatus?: Ticket['status']) => void;
   onOpenProjectManager: () => void;
   onSelectTicket: (ticket: Ticket | null) => void;
@@ -57,7 +51,6 @@ export function WorkspacePage({
   activeNoteId,
   activeTicket,
   activeView,
-  comments,
   currentUser,
   cycles,
   domains,
@@ -66,11 +59,6 @@ export function WorkspacePage({
   projects,
   tickets,
   users,
-  onAddComment,
-  onUpdateComment,
-  onDeleteComment,
-  onDeleteTicket,
-  onOpenCreateSubtask,
   onOpenCreateTicket,
   onOpenProjectManager,
   onSelectTicket,
@@ -103,23 +91,6 @@ export function WorkspacePage({
   const listGroupedTickets = useMemo(
     () => (activeView === 'list' ? groupTicketsByStatus(listSortedTickets) : groupedTickets),
     [activeView, listSortedTickets, groupedTickets]
-  );
-  const detailSubtasks = useMemo(
-    () => (activeTicket ? tickets.filter((ticket) => ticket.parentId === activeTicket.id) : []),
-    [tickets, activeTicket]
-  );
-
-  const parentTicket = useMemo(
-    () => (activeTicket ? tickets.find((t) => t.id === activeTicket.parentId) || null : null),
-    [tickets, activeTicket]
-  );
-  const completedDetailSubtasks = useMemo(
-    () => detailSubtasks.filter((ticket) => ticket.status === 'done' || ticket.status === 'canceled').length,
-    [detailSubtasks]
-  );
-  const detailSubtaskProgressPercent = useMemo(
-    () => (detailSubtasks.length > 0 ? (completedDetailSubtasks / detailSubtasks.length) * 100 : 0),
-    [detailSubtasks, completedDetailSubtasks]
   );
   const handleClearFilters = useCallback(() => {
     onSetFilters({
@@ -223,7 +194,7 @@ export function WorkspacePage({
       ) : null}
 
       <div className="workspace-page__content">
-        <div className={`workspace-page__issues ${activeTicket ? 'workspace-page__issues--hidden' : ''}`}>
+        <div className="workspace-page__issues">
           <div className="workspace-page__issues-shell">
             <div className="workspace-page__issues-content">
 
@@ -280,35 +251,9 @@ export function WorkspacePage({
                   </WorkspaceViewContainer>
                 )}
               </div>
-
             </div>
           </div>
         </div>
-
-
-        {activeTicket ? (
-          <div key={activeTicket.id} className="workspace-page__detail">
-            <TicketDetail
-              activeTicket={activeTicket}
-              comments={comments}
-              subtasks={detailSubtasks}
-              completedSubtasks={completedDetailSubtasks}
-              subtaskProgressPercent={detailSubtaskProgressPercent}
-              parentTicket={parentTicket}
-              users={users}
-              projects={projects}
-              domains={domains}
-              cycles={cycles}
-              onSelectTicket={onSelectTicket}
-              onUpdateTicket={onUpdateTicket}
-              onDeleteTicket={onDeleteTicket}
-              onAddComment={onAddComment}
-              onUpdateComment={onUpdateComment}
-              onDeleteComment={onDeleteComment}
-              onOpenCreateSubtask={onOpenCreateSubtask}
-            />
-          </div>
-        ) : null}
       </div>
       <WorkspaceMcpModal workspaceId={workspaceId} isOpen={isMcpOpen} onClose={() => setIsMcpOpen(false)} />
     </div>
