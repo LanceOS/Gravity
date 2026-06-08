@@ -36,8 +36,14 @@ export const LIST_STATUS_ORDER: Ticket['status'][] = [
 
 export function filterTickets(tickets: Ticket[], filters: TicketFilters): Ticket[] {
   return tickets.filter((ticket) => {
-    if (filters.status && ticket.status !== filters.status) return false;
-    if (filters.priority && ticket.priority !== filters.priority) return false;
+    if (filters.status) {
+      const statuses = filters.status.split(',').map(s => s.trim());
+      if (!statuses.includes(ticket.status)) return false;
+    }
+    if (filters.priority) {
+      const priorities = filters.priority.split(',').map(p => p.trim());
+      if (!priorities.includes(ticket.priority)) return false;
+    }
     if (filters.projectId && ticket.projectId !== filters.projectId) return false;
     if (filters.domainId && ticket.domainId !== filters.domainId) return false;
     if (filters.cycleId && ticket.cycleId !== filters.cycleId) return false;
