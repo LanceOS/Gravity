@@ -15,12 +15,48 @@ export interface PopoverProps {
 export function Popover({ trigger, children, isOpen: controlledIsOpen, onOpenChange, style }: PopoverProps) {
   const [uncontrolledIsOpen, setUncontrolledIsOpen] = React.useState(false);
   const isCurrentlyOpen = controlledIsOpen !== undefined ? controlledIsOpen : uncontrolledIsOpen;
+  const popoverRef = React.useRef<HTMLDivElement>(null);
+  
+  const [shouldRender, setShouldRender] = React.useState(isCurrentlyOpen);
+  const [isAnimatingOut, setIsAnimatingOut] = React.useState(false);
+
+  React.useEffect(() => {
+    if (isCurrentlyOpen) {
+      setShouldRender(true);
+      setIsAnimatingOut(false);
+    } else if (shouldRender) {
+      setIsAnimatingOut(true);
+    }
+  }, [isCurrentlyOpen, shouldRender]);
+
+  React.useLayoutEffect(() => {
+    if (isCurrentlyOpen && popoverRef.current) {
+      // Reset first to measure natural left-aligned bounds
+      popoverRef.current.style.left = '0';
+      popoverRef.current.style.right = 'auto';
+      
+      const rect = popoverRef.current.getBoundingClientRect();
+      const rightOverflow = rect.right > window.innerWidth - 8;
+      
+      if (rightOverflow) {
+        popoverRef.current.style.left = 'auto';
+        popoverRef.current.style.right = '0';
+      }
+    }
+  }, [isCurrentlyOpen]);
 
   const setOpen = (open: boolean) => {
     if (onOpenChange) {
       onOpenChange(open);
     } else {
       setUncontrolledIsOpen(open);
+    }
+  };
+
+  const handleAnimationEnd = () => {
+    if (!isCurrentlyOpen) {
+      setShouldRender(false);
+      setIsAnimatingOut(false);
     }
   };
 
@@ -34,10 +70,12 @@ export function Popover({ trigger, children, isOpen: controlledIsOpen, onOpenCha
         >
           {trigger}
         </div>
-        {isCurrentlyOpen && (
+        {shouldRender && (
           <div
+            ref={popoverRef}
             role="dialog"
-            className="lib-animate-fade-in"
+            onAnimationEnd={handleAnimationEnd}
+            className={isAnimatingOut ? 'lib-animate-fade-out-up' : 'lib-animate-fade-in-down'}
             style={{
               position: 'absolute',
               top: '100%',

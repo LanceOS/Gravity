@@ -135,7 +135,7 @@ export function Select({
     });
   }, []);
 
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     if (!isOpen) {
       return;
     }
@@ -286,7 +286,7 @@ export function Select({
             id={menuId}
             role="listbox"
             aria-labelledby={label ? labelId : undefined}
-            className="select-menu scroll-container"
+            className={cn('select-menu scroll-container', menuStyle.transform === 'translateY(-100%)' && 'select-menu--up')}
             style={menuStyle}
           >
             {allOptions.map((opt, index) => {
