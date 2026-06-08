@@ -99,6 +99,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
   onClose,
   onOpenCreateSubtask,
   parentTicket,
+  ticketLink: customTicketLink,
 }) => {
   const [commentInput, setCommentInput] = useState('');
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
@@ -110,7 +111,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
 
   const closeCommentMenu = useCallback(() => setOpenMenuCommentId(null), []);
 
-  const ticketLink = useMemo(() => `${TICKET_URL_BASE}/${activeTicket.key}`, [activeTicket.key]);
+  const ticketLink = useMemo(() => customTicketLink || `${TICKET_URL_BASE}/${activeTicket.key}`, [customTicketLink, activeTicket.key]);
 
   const generatedBranchName = useMemo(
     () => (activeTicket.branchName ? activeTicket.branchName : generateBranchName(activeTicket.key, activeTicket.title)),
@@ -299,7 +300,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
       <div className="ticket-detail">
       <div className="ticket-detail__header">
         <Button
-          onClick={() => window.history.back()}
+          onClick={() => onClose ? onClose() : window.history.back()}
           variant="ghost"
           size="sm"
           className="ticket-detail__back-btn clickable"

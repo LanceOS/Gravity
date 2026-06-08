@@ -19,6 +19,7 @@ export interface TicketDetailProps {
   onDeleteComment: (ticketId: string, commentId: string) => Promise<void>;
   onClose?: () => void;
   onOpenCreateSubtask: (parentId: string) => void;
+  ticketLink?: string;
 }
 
 export interface MarkdownTextProps {

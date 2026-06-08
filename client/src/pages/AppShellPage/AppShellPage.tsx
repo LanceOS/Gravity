@@ -20,6 +20,7 @@ import { LoadingPage } from '../LoadingPage/LoadingPage';
 import { WorkspaceDirectoryPage } from '../WorkspaceDirectoryPage/WorkspaceDirectoryPage';
 import { WorkspacePage } from '../WorkspacePage/WorkspacePage';
 import { WorkspaceProjectsPage } from '../WorkspaceProjectsPage/WorkspaceProjectsPage';
+import { TicketDetailRoute } from '../../modules/tickets/components/TicketDetailRoute';
 
 type AppSection = 'directory' | 'workspace' | 'settings' | 'account' | 'projects';
 
@@ -933,6 +934,28 @@ export function AppShellPage() {
               onCreateDomain={handleCreateDomain}
               onSelectProject={handleSelectProjectForManagement}
             />
+          ) : ticketKey ? (
+            <TicketDetailRoute
+              activeWorkspaceId={activeWorkspaceId}
+              activeTicket={activeTicket}
+              comments={comments}
+              tickets={tickets}
+              users={users}
+              projects={activeWorkspaceProjects}
+              domains={domains}
+              cycles={cycles}
+              onSelectTicket={(ticket) => {
+                if (ticket) {
+                  navigate(`/workspaces/${activeWorkspaceId}/projects/${ticket.projectId}/tickets/${ticket.key}`);
+                }
+              }}
+              onUpdateTicket={updateTicket}
+              onDeleteTicket={handleDeleteTicket}
+              onAddComment={addComment}
+              onUpdateComment={updateComment}
+              onDeleteComment={deleteComment}
+              onOpenCreateSubtask={handleOpenCreateSubtask}
+            />
           ) : (
             <WorkspacePage
               workspaceId={activeWorkspaceId}
@@ -941,7 +964,6 @@ export function AppShellPage() {
               activeContext={activeContext}
               activeTicket={activeTicket}
               activeView={activeView}
-              comments={comments}
               currentUser={currentUser}
               cycles={cycles}
               domains={domains}
@@ -950,11 +972,6 @@ export function AppShellPage() {
               projects={activeWorkspaceProjects}
               tickets={tickets}
               users={users}
-              onAddComment={addComment}
-              onUpdateComment={updateComment}
-              onDeleteComment={deleteComment}
-              onDeleteTicket={handleDeleteTicket}
-              onOpenCreateSubtask={handleOpenCreateSubtask}
               onOpenCreateTicket={handleOpenCreateTicket}
               onOpenProjectManager={handleOpenProjectManager}
               onSelectTicket={(ticket) => {
