@@ -21,6 +21,7 @@ import { WorkspaceDirectoryPage } from '../WorkspaceDirectoryPage/WorkspaceDirec
 import { WorkspacePage } from '../WorkspacePage/WorkspacePage';
 import { WorkspaceProjectsPage } from '../WorkspaceProjectsPage/WorkspaceProjectsPage';
 import { TicketDetailRoute } from '../../modules/tickets/components/TicketDetailRoute';
+import './AppShellPage.css';
 
 type AppSection = 'directory' | 'workspace' | 'settings' | 'account' | 'projects';
 
@@ -937,6 +938,31 @@ export function AppShellPage() {
           isMobile={isMobile}
           rightPanels={
             <>
+              {!isMobile && ticketKey && activeSection !== 'projects' ? (
+                <div className="ticket-detail-side-panel">
+                  <TicketDetailRoute
+                    activeWorkspaceId={activeWorkspaceId}
+                    activeTicket={activeTicket}
+                    comments={comments}
+                    tickets={tickets}
+                    users={users}
+                    projects={activeWorkspaceProjects}
+                    domains={domains}
+                    cycles={cycles}
+                    onSelectTicket={(ticket) => {
+                      if (ticket) {
+                        navigate(`/workspaces/${activeWorkspaceId}/projects/${ticket.projectId}/tickets/${ticket.key}`);
+                      }
+                    }}
+                    onUpdateTicket={updateTicket}
+                    onDeleteTicket={handleDeleteTicket}
+                    onAddComment={addComment}
+                    onUpdateComment={updateComment}
+                    onDeleteComment={deleteComment}
+                    onOpenCreateSubtask={handleOpenCreateSubtask}
+                  />
+                </div>
+              ) : null}
               {isOllamaOpen || isOllamaClosing ? (
                 <LocalAIChat
                   onClose={handleToggleOllama}
@@ -970,7 +996,7 @@ export function AppShellPage() {
               onCreateDomain={handleCreateDomain}
               onSelectProject={handleSelectProjectForManagement}
             />
-          ) : ticketKey ? (
+          ) : isMobile && ticketKey ? (
             <TicketDetailRoute
               activeWorkspaceId={activeWorkspaceId}
               activeTicket={activeTicket}
