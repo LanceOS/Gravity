@@ -1,4 +1,4 @@
-import type { Domain } from '../../../context/TicketContext';
+import type { Domain, Cycle, User } from '../../../context/TicketContext';
 import type { TicketFilters, TicketListSort } from '../utils/ticketView';
 
 export interface TicketFilterBarProps {
@@ -11,4 +11,6 @@ export interface TicketFilterBarProps {
   listSort?: TicketListSort;
   onListSortChange?: (sort: TicketListSort) => void;
   domains?: Domain[];
+  cycles?: Cycle[];
+  users?: User[];
 }

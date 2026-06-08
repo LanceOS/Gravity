@@ -187,6 +187,8 @@ export function WorkspacePage({
                 listSort={activeView === 'list' ? listSort : undefined}
                 onListSortChange={activeView === 'list' ? onSetListSort : undefined}
                 domains={Object.values(domainById)}
+                cycles={cycles}
+                users={users}
               />
             </WorkspaceHeader.Bottom>
           )}
