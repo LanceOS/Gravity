@@ -212,11 +212,11 @@ export function AppShellPage() {
 
   const { workspaceId, projectId: projectIdParam, ticketKey, noteId } = useParams();
   const { pathname } = useLocation();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
   // Track last-applied URL filter values to avoid calling setFilters in a loop
-  const lastSyncedFilterParams = useRef({ domainId: '', cycleId: '', assigneeId: '' });
+  const lastSyncedFilterParams = useRef({ domainId: '', cycleId: '', assigneeId: '', status: '', priority: '', search: '' });
 
   // URL-driven section, workspace, project, ticket, and filter syncing
   useEffect(() => {
@@ -279,14 +279,35 @@ export function AppShellPage() {
     const urlDomainId = searchParams.get('domainId') ?? '';
     const urlCycleId = searchParams.get('cycleId') ?? '';
     const urlAssigneeId = searchParams.get('assigneeId') ?? '';
+    const urlStatus = searchParams.get('status') ?? '';
+    const urlPriority = searchParams.get('priority') ?? '';
+    const urlSearch = searchParams.get('q') ?? '';
+
     const last = lastSyncedFilterParams.current;
     if (
       last.domainId !== urlDomainId ||
       last.cycleId !== urlCycleId ||
-      last.assigneeId !== urlAssigneeId
+      last.assigneeId !== urlAssigneeId ||
+      last.status !== urlStatus ||
+      last.priority !== urlPriority ||
+      last.search !== urlSearch
     ) {
-      lastSyncedFilterParams.current = { domainId: urlDomainId, cycleId: urlCycleId, assigneeId: urlAssigneeId };
-      setFilters({ domainId: urlDomainId, cycleId: urlCycleId, assigneeId: urlAssigneeId });
+      lastSyncedFilterParams.current = {
+        domainId: urlDomainId,
+        cycleId: urlCycleId,
+        assigneeId: urlAssigneeId,
+        status: urlStatus,
+        priority: urlPriority,
+        search: urlSearch
+      };
+      setFilters({
+        domainId: urlDomainId,
+        cycleId: urlCycleId,
+        assigneeId: urlAssigneeId,
+        status: urlStatus,
+        priority: urlPriority,
+        search: urlSearch
+      });
     }
 
     // Close ticket detail if URL no longer contains a ticketKey
@@ -415,7 +436,7 @@ export function AppShellPage() {
     const pendingInvite = window.localStorage.getItem('gravity_pending_invite');
     if (pendingInvite) {
       window.localStorage.removeItem('gravity_pending_invite');
-      
+
       const runAutoJoin = async () => {
         const success = await requestJoinByInvite(pendingInvite);
         if (success) {
@@ -700,6 +721,21 @@ export function AppShellPage() {
     navigate(`/workspaces/${activeWorkspaceId}/projects`);
   };
 
+  const handleSetFilters = useCallback((updates: Partial<typeof filters>) => {
+    const nextParams = new URLSearchParams(searchParams);
+    const merged = { ...filters, ...updates };
+
+    if (merged.domainId) nextParams.set('domainId', merged.domainId); else nextParams.delete('domainId');
+    if (merged.cycleId) nextParams.set('cycleId', merged.cycleId); else nextParams.delete('cycleId');
+    if (merged.assigneeId) nextParams.set('assigneeId', merged.assigneeId); else nextParams.delete('assigneeId');
+    if (merged.status) nextParams.set('status', merged.status); else nextParams.delete('status');
+    if (merged.priority) nextParams.set('priority', merged.priority); else nextParams.delete('priority');
+    if (merged.search) nextParams.set('q', merged.search); else nextParams.delete('q');
+
+    const isOnlySearchUpdate = Object.keys(updates).length === 1 && 'search' in updates;
+    setSearchParams(nextParams, { replace: isOnlySearchUpdate });
+  }, [filters, searchParams, setSearchParams]);
+
   const handleCreateInvite = async (input: { label: string }) => Boolean(await createInvite(input));
   const handleRevokeInvite = async (inviteId: string) => Boolean(await revokeInvite(inviteId));
   const handleApproveJoinRequest = async (requestId: string) => Boolean(await approveJoinRequest(requestId));
@@ -979,7 +1015,7 @@ export function AppShellPage() {
               }}
               onSelectNote={handleSelectNote}
               activeNoteId={activeNoteId}
-              onSetFilters={setFilters}
+              onSetFilters={handleSetFilters}
               onSetListSort={setListSort}
               onSetView={setView}
               onUpdateTicket={updateTicket}
