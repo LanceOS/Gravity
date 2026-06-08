@@ -901,6 +901,30 @@ export function AppShellPage() {
     },
   };
 
+  const ticketDetailComponent = ticketKey ? (
+    <TicketDetailRoute
+      activeWorkspaceId={activeWorkspaceId}
+      activeTicket={activeTicket}
+      comments={comments}
+      tickets={tickets}
+      users={users}
+      projects={activeWorkspaceProjects}
+      domains={domains}
+      cycles={cycles}
+      onSelectTicket={(ticket) => {
+        if (ticket) {
+          navigate(`/workspaces/${activeWorkspaceId}/projects/${ticket.projectId}/tickets/${ticket.key}`);
+        }
+      }}
+      onUpdateTicket={updateTicket}
+      onDeleteTicket={handleDeleteTicket}
+      onAddComment={addComment}
+      onUpdateComment={updateComment}
+      onDeleteComment={deleteComment}
+      onOpenCreateSubtask={handleOpenCreateSubtask}
+    />
+  ) : null;
+
   return (
     <>
       {activeSection === 'settings' ? (
@@ -940,27 +964,7 @@ export function AppShellPage() {
             <>
               {!isMobile && ticketKey && activeSection !== 'projects' ? (
                 <div className="ticket-detail-side-panel">
-                  <TicketDetailRoute
-                    activeWorkspaceId={activeWorkspaceId}
-                    activeTicket={activeTicket}
-                    comments={comments}
-                    tickets={tickets}
-                    users={users}
-                    projects={activeWorkspaceProjects}
-                    domains={domains}
-                    cycles={cycles}
-                    onSelectTicket={(ticket) => {
-                      if (ticket) {
-                        navigate(`/workspaces/${activeWorkspaceId}/projects/${ticket.projectId}/tickets/${ticket.key}`);
-                      }
-                    }}
-                    onUpdateTicket={updateTicket}
-                    onDeleteTicket={handleDeleteTicket}
-                    onAddComment={addComment}
-                    onUpdateComment={updateComment}
-                    onDeleteComment={deleteComment}
-                    onOpenCreateSubtask={handleOpenCreateSubtask}
-                  />
+                  {ticketDetailComponent}
                 </div>
               ) : null}
               {isOllamaOpen || isOllamaClosing ? (
@@ -997,27 +1001,7 @@ export function AppShellPage() {
               onSelectProject={handleSelectProjectForManagement}
             />
           ) : isMobile && ticketKey ? (
-            <TicketDetailRoute
-              activeWorkspaceId={activeWorkspaceId}
-              activeTicket={activeTicket}
-              comments={comments}
-              tickets={tickets}
-              users={users}
-              projects={activeWorkspaceProjects}
-              domains={domains}
-              cycles={cycles}
-              onSelectTicket={(ticket) => {
-                if (ticket) {
-                  navigate(`/workspaces/${activeWorkspaceId}/projects/${ticket.projectId}/tickets/${ticket.key}`);
-                }
-              }}
-              onUpdateTicket={updateTicket}
-              onDeleteTicket={handleDeleteTicket}
-              onAddComment={addComment}
-              onUpdateComment={updateComment}
-              onDeleteComment={deleteComment}
-              onOpenCreateSubtask={handleOpenCreateSubtask}
-            />
+            ticketDetailComponent
           ) : (
             <WorkspacePage
               workspaceId={activeWorkspaceId}
