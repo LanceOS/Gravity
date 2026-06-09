@@ -149,6 +149,8 @@ export const TicketFilterBar: React.FC<TicketFilterBarProps> = ({
       {/* Filter Button with Popover */}
       <div className="ticket-filter-bar__actions">
         <Popover
+          align="right"
+          contentClassName="ticket-filter-popover-content"
           trigger={
             <Button variant="secondary" size="md" className="ticket-filter-bar__filter-btn">
               <Filter size={16} />

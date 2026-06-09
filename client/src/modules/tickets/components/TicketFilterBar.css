@@ -90,4 +90,8 @@
   .ticket-filter-bar__actions {
     justify-content: space-between;
   }
+  .ticket-filter-popover-content {
+    left: 0 !important;
+    right: auto !important;
+  }
 }
