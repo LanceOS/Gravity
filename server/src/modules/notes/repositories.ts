@@ -27,7 +27,7 @@ export class MetadataRepository {
     const excerpt = data.excerpt || '';
     const useSearchVector = typeof env.databaseUrl === 'string' && !env.databaseUrl.startsWith('pgmem://');
 
-    const insertValues: Record<string, unknown> = {
+    const insertValues: any = {
       id: data.id,
       projectId: data.projectId,
       userId: data.userId,
