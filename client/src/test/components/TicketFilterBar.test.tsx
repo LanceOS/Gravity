@@ -13,16 +13,13 @@ vi.mock('@library', () => ({
   DenseTextInput: ({ value, onChange, placeholder }: any) => (
     <input placeholder={placeholder} value={value} onChange={onChange} />
   ),
-  Accordion: ({ items }: any) => (
-    <div data-testid="accordion">
-      {items.map((item: any) => (
-        <div key={item.id}>
-          <button>{item.title}</button>
-          <div>{item.content}</div>
-        </div>
-      ))}
+  Popover: ({ trigger, children }: any) => (
+    <div data-testid="popover">
+      <div data-testid="popover-trigger">{trigger}</div>
+      <div data-testid="popover-content">{children}</div>
     </div>
   ),
+  Badge: ({ children }: any) => <span data-testid="badge">{children}</span>,
 }));
 
 describe('TicketFilterBar', () => {
@@ -51,9 +48,11 @@ describe('TicketFilterBar', () => {
     render(<TicketFilterBar {...props} />);
 
     expect(screen.getByText('5 of 10 tickets')).toBeInTheDocument();
+    // Badge shouldn't be rendered if there are no active filters
+    expect(screen.queryByTestId('badge')).not.toBeInTheDocument();
   });
 
-  it('renders filters inside accordion', async () => {
+  it('renders filters inside popover', async () => {
     const user = userEvent.setup();
     const onFilterChange = vi.fn();
     const props = {
@@ -79,8 +78,8 @@ describe('TicketFilterBar', () => {
 
     render(<TicketFilterBar {...props} />);
 
-    // Shows 2 active filters (search + priority)
-    expect(screen.getByText('Filters (2 active)')).toBeInTheDocument();
+    // Search is not counted as a popover filter, but priority is. So activeCount = 1
+    expect(screen.getByTestId('badge')).toHaveTextContent('1');
 
     // Select Priority change
     await user.selectOptions(screen.getByRole('combobox', { name: 'Filter list by priority' }), 'low');
