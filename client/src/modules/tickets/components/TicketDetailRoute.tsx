@@ -81,7 +81,7 @@ export const TicketDetailRoute: React.FC<TicketDetailRouteProps> = ({
   const ticketLink = `${window.location.origin}/workspaces/${activeWorkspaceId}/projects/${activeTicket.projectId}/tickets/${activeTicket.key}`;
 
   return (
-    <div style={{ height: '100%', overflowY: 'auto' }}>
+    <>
       <TicketDetail
         activeTicket={activeTicket}
         comments={comments}
@@ -103,6 +103,6 @@ export const TicketDetailRoute: React.FC<TicketDetailRouteProps> = ({
         ticketLink={ticketLink}
         onClose={() => navigate(`/workspaces/${activeWorkspaceId}/projects/${activeTicket.projectId}/tickets`)}
       />
-    </div>
+    </>
   );
 };

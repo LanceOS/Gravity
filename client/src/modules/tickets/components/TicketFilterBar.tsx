@@ -1,7 +1,8 @@
 import React from 'react';
+import { Filter } from 'lucide-react';
 import type { Ticket } from '../../../context/TicketContext';
 import type { TicketFilters, TicketListSort } from '../utils/ticketView';
-import { Button, Select, DenseTextInput, Accordion } from '@library';
+import { Button, Select, DenseTextInput, Popover, Badge } from '@library';
 import {
   PRIORITY_FILTER_OPTIONS,
   STATUS_FILTER_OPTIONS,
@@ -20,82 +21,123 @@ export const TicketFilterBar: React.FC<TicketFilterBarProps> = ({
   listSort,
   onListSortChange,
   domains,
+  cycles,
+  users,
 }) => {
   const activeCount = [
-    filters.search,
     filters.priority,
     filters.status,
     filters.domainId,
+    filters.cycleId,
+    filters.assigneeId,
   ].filter(Boolean).length;
 
-  const filterTitle = activeCount > 0
-    ? `Filters (${activeCount} active)`
-    : 'Filters';
+  const hasActivePopoverFilters = activeCount > 0;
 
-  const accordionContent = (
-    <div className="ticket-filter-bar__grid">
-      <div className="ticket-filter-bar__field">
-        <span className="ticket-filter-bar__label">Priority</span>
-        <Select
-          value={filters.priority}
-          onValueChange={(priority: string) => onFilterChange({ priority: priority as Ticket['priority'] | '' })}
-          options={PRIORITY_FILTER_OPTIONS}
-          aria-label="Filter list by priority"
-        />
-      </div>
+  const handleClearPopoverFilters = () => {
+    onFilterChange({
+      priority: '',
+      status: '',
+      domainId: '',
+      cycleId: '',
+      assigneeId: '',
+    });
+  };
 
-      <div className="ticket-filter-bar__field">
-        <span className="ticket-filter-bar__label">Status</span>
-        <Select
-          value={filters.status}
-          onValueChange={(status: string) => onFilterChange({ status: status as Ticket['status'] | '' })}
-          options={STATUS_FILTER_OPTIONS}
-          aria-label="Filter list by status"
-        />
-      </div>
-
-      {domains && domains.length > 0 && (
-        <div className="ticket-filter-bar__field">
-          <span className="ticket-filter-bar__label">Domain</span>
-          <Select
-            value={filters.domainId || ''}
-            onValueChange={(domainId: string) => onFilterChange({ domainId })}
-            options={[
-              { label: 'Any Domain', value: '' },
-              ...domains.map((d) => ({ label: d.name, value: d.id }))
-            ]}
-            aria-label="Filter list by domain"
-          />
-        </div>
-      )}
-
-      {listSort !== undefined && onListSortChange !== undefined && (
-        <div className="ticket-filter-bar__field">
-          <span className="ticket-filter-bar__label">Sort</span>
-          <Select
-            value={listSort}
-            onValueChange={(sort: string) => onListSortChange(sort as TicketListSort)}
-            options={LIST_SORT_OPTIONS}
-            aria-label="Sort list tickets"
-          />
-        </div>
-      )}
-
-      {hasActiveFilters && (
-        <div className="ticket-filter-bar__field ticket-filter-bar__field--clear">
-          <span className="ticket-filter-bar__label">&nbsp;</span>
-          <Button onClick={onClearFilters} variant="accent" size="md">
-            Clear Filters
+  const popoverContent = (
+    <div className="ticket-filter-bar__popover">
+      <div className="ticket-filter-bar__popover-header">
+        <span className="ticket-filter-bar__popover-title">Filters</span>
+        {hasActivePopoverFilters && (
+          <Button onClick={handleClearPopoverFilters} variant="ghost" size="sm">
+            Clear
           </Button>
+        )}
+      </div>
+      <div className="ticket-filter-bar__grid">
+        <div className="ticket-filter-bar__field">
+          <span className="ticket-filter-bar__label">Priority</span>
+          <Select
+            value={filters.priority}
+            onValueChange={(priority: string) => onFilterChange({ priority: priority as Ticket['priority'] | '' })}
+            options={PRIORITY_FILTER_OPTIONS}
+            aria-label="Filter list by priority"
+          />
         </div>
-      )}
+
+        <div className="ticket-filter-bar__field">
+          <span className="ticket-filter-bar__label">Status</span>
+          <Select
+            value={filters.status}
+            onValueChange={(status: string) => onFilterChange({ status: status as Ticket['status'] | '' })}
+            options={STATUS_FILTER_OPTIONS}
+            aria-label="Filter list by status"
+          />
+        </div>
+
+        {domains && domains.length > 0 && (
+          <div className="ticket-filter-bar__field">
+            <span className="ticket-filter-bar__label">Domain</span>
+            <Select
+              value={filters.domainId || ''}
+              onValueChange={(domainId: string) => onFilterChange({ domainId })}
+              options={[
+                { label: 'Any Domain', value: '' },
+                ...domains.map((d) => ({ label: d.name, value: d.id }))
+              ]}
+              aria-label="Filter list by domain"
+            />
+          </div>
+        )}
+
+        {cycles && cycles.length > 0 && (
+          <div className="ticket-filter-bar__field">
+            <span className="ticket-filter-bar__label">Cycle</span>
+            <Select
+              value={filters.cycleId || ''}
+              onValueChange={(cycleId: string) => onFilterChange({ cycleId })}
+              options={[
+                { label: 'Any Cycle', value: '' },
+                ...cycles.map((c) => ({ label: c.name, value: c.id }))
+              ]}
+              aria-label="Filter list by cycle"
+            />
+          </div>
+        )}
+
+        {users && users.length > 0 && (
+          <div className="ticket-filter-bar__field">
+            <span className="ticket-filter-bar__label">Assignee</span>
+            <Select
+              value={filters.assigneeId || ''}
+              onValueChange={(assigneeId: string) => onFilterChange({ assigneeId })}
+              options={[
+                { label: 'Any Assignee', value: '' },
+                ...users.map((u) => ({ label: u.name, value: u.id }))
+              ]}
+              aria-label="Filter list by assignee"
+            />
+          </div>
+        )}
+
+        {listSort !== undefined && onListSortChange !== undefined && (
+          <div className="ticket-filter-bar__field">
+            <span className="ticket-filter-bar__label">Sort</span>
+            <Select
+              value={listSort}
+              onValueChange={(sort: string) => onListSortChange(sort as TicketListSort)}
+              options={LIST_SORT_OPTIONS}
+              aria-label="Sort list tickets"
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 
   return (
     <div className="ticket-filter-bar">
-
-      {/* Row 1: Search */}
+      {/* Search Input */}
       <div className="ticket-filter-bar__search">
         <DenseTextInput
           placeholder="Search tickets by title, body, ID, or branch..."
@@ -104,15 +146,27 @@ export const TicketFilterBar: React.FC<TicketFilterBarProps> = ({
         />
       </div>
 
-      {/* Row 2: Filter accordion */}
-      <div className="ticket-filter-bar__accordion-wrap">
-        <Accordion
-          items={[{ id: 'filters', title: filterTitle, content: accordionContent }]}
-        />
-      </div>
+      {/* Filter Button with Popover */}
+      <div className="ticket-filter-bar__actions">
+        <Popover
+          align="right"
+          contentClassName="ticket-filter-popover-content"
+          trigger={
+            <Button variant="secondary" size="md" className="ticket-filter-bar__filter-btn">
+              <Filter size={16} />
+              <span>Filter</span>
+              {activeCount > 0 && (
+                <Badge variant="accent" style={{ marginLeft: 4 }}>
+                  {activeCount}
+                </Badge>
+              )}
+            </Button>
+          }
+        >
+          {popoverContent}
+        </Popover>
 
-      {/* Row 3: Metrics */}
-      <div className="ticket-filter-bar__metrics">
+        {/* Metrics */}
         <span className="ticket-filter-bar__count">
           {filteredCount} of {totalCount} tickets
         </span>

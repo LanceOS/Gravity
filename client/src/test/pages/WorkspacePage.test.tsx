@@ -137,7 +137,6 @@ function renderWorkspacePage(overrides: Partial<Parameters<typeof WorkspacePage>
   const baseProps: Parameters<typeof WorkspacePage>[0] = {
     activeTicket: null,
     activeView: 'board' as const,
-    comments: [],
     currentUser,
     cycles: [cycle],
     domains: [domain],
@@ -154,9 +153,6 @@ function renderWorkspacePage(overrides: Partial<Parameters<typeof WorkspacePage>
     projects: [project],
     tickets: [ticket, doneTicket, subtaskOpen, subtaskDone],
     users: [currentUser],
-    onAddComment: vi.fn().mockResolvedValue(undefined),
-    onDeleteTicket: vi.fn().mockResolvedValue(undefined),
-    onOpenCreateSubtask: vi.fn(),
     onOpenCreateTicket: vi.fn(),
     onOpenProjectManager: vi.fn(),
     onSelectTicket: vi.fn(),
@@ -164,8 +160,6 @@ function renderWorkspacePage(overrides: Partial<Parameters<typeof WorkspacePage>
     onSetListSort: vi.fn(),
     onSetView: vi.fn(),
     onUpdateTicket: vi.fn().mockResolvedValue(undefined),
-    onUpdateComment: vi.fn().mockResolvedValue(undefined),
-    onDeleteComment: vi.fn().mockResolvedValue(undefined),
   };
 
   const props = { ...baseProps, ...overrides };

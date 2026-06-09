@@ -901,10 +901,12 @@ export function AppShellPage() {
     },
   };
 
+  const resolvedTicketForRoute = ticketKey ? tickets.find((t) => t.key === ticketKey) || null : activeTicket;
+
   const ticketDetailComponent = ticketKey ? (
     <TicketDetailRoute
       activeWorkspaceId={activeWorkspaceId}
-      activeTicket={activeTicket}
+      activeTicket={resolvedTicketForRoute}
       comments={comments}
       tickets={tickets}
       users={users}
@@ -962,11 +964,6 @@ export function AppShellPage() {
           isMobile={isMobile}
           rightPanels={
             <>
-              {!isMobile && ticketKey && activeSection !== 'projects' ? (
-                <div className="ticket-detail-side-panel">
-                  {ticketDetailComponent}
-                </div>
-              ) : null}
               {isOllamaOpen || isOllamaClosing ? (
                 <LocalAIChat
                   onClose={handleToggleOllama}
@@ -1000,7 +997,7 @@ export function AppShellPage() {
               onCreateDomain={handleCreateDomain}
               onSelectProject={handleSelectProjectForManagement}
             />
-          ) : isMobile && ticketKey ? (
+          ) : ticketKey ? (
             ticketDetailComponent
           ) : (
             <WorkspacePage
@@ -1021,7 +1018,13 @@ export function AppShellPage() {
               onOpenCreateTicket={handleOpenCreateTicket}
               onOpenProjectManager={handleOpenProjectManager}
               onSelectTicket={(ticket) => {
-                navigate(`/workspaces/${activeWorkspaceId}/projects/${ticket.projectId}/tickets/${ticket.key}`);
+                if (ticket) {
+                  navigate(`/workspaces/${activeWorkspaceId}/projects/${ticket.projectId}/tickets/${ticket.key}`);
+                } else if (activeProjectId) {
+                  navigate(`/workspaces/${activeWorkspaceId}/projects/${activeProjectId}/tickets`);
+                } else {
+                  navigate(`/workspaces/${activeWorkspaceId}`);
+                }
               }}
               onSelectNote={handleSelectNote}
               activeNoteId={activeNoteId}

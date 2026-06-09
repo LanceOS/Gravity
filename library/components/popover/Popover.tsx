@@ -3,6 +3,7 @@ import { X, AlertCircle, Info, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { Portal } from '../../utilities';
 import { FocusTrap } from '../../utilities';
 import { ClickAwayListener } from '../../utilities';
+import './Popover.css';
 
 export interface PopoverProps {
   trigger: React.ReactNode;
@@ -10,17 +11,46 @@ export interface PopoverProps {
   isOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
   style?: React.CSSProperties;
+  align?: 'left' | 'right' | 'center';
+  contentClassName?: string;
 }
 
-export function Popover({ trigger, children, isOpen: controlledIsOpen, onOpenChange, style }: PopoverProps) {
+export function Popover({ trigger, children, isOpen: controlledIsOpen, onOpenChange, style, align = 'left', contentClassName = '' }: PopoverProps) {
   const [uncontrolledIsOpen, setUncontrolledIsOpen] = React.useState(false);
   const isCurrentlyOpen = controlledIsOpen !== undefined ? controlledIsOpen : uncontrolledIsOpen;
+  const popoverRef = React.useRef<HTMLDivElement>(null);
+  
+  const [renderState, setRenderState] = React.useState({
+    isOpen: isCurrentlyOpen,
+    shouldRender: isCurrentlyOpen,
+    isAnimatingOut: false,
+  });
+
+  if (isCurrentlyOpen !== renderState.isOpen) {
+    setRenderState({
+      isOpen: isCurrentlyOpen,
+      shouldRender: isCurrentlyOpen ? true : renderState.shouldRender,
+      isAnimatingOut: !isCurrentlyOpen,
+    });
+  }
+
+  const { shouldRender, isAnimatingOut } = renderState;
 
   const setOpen = (open: boolean) => {
     if (onOpenChange) {
       onOpenChange(open);
     } else {
       setUncontrolledIsOpen(open);
+    }
+  };
+
+  const handleAnimationEnd = () => {
+    if (!isCurrentlyOpen) {
+      setRenderState((prev) => ({
+        ...prev,
+        shouldRender: false,
+        isAnimatingOut: false,
+      }));
     }
   };
 
@@ -34,23 +64,12 @@ export function Popover({ trigger, children, isOpen: controlledIsOpen, onOpenCha
         >
           {trigger}
         </div>
-        {isCurrentlyOpen && (
+        {shouldRender && (
           <div
+            ref={popoverRef}
             role="dialog"
-            className="lib-animate-fade-in"
-            style={{
-              position: 'absolute',
-              top: '100%',
-              left: 0,
-              zIndex: 1000,
-              backgroundColor: 'var(--color-surface-card)',
-              border: '1px solid var(--color-border-default)',
-              borderRadius: 'var(--radius-md)',
-              boxShadow: 'var(--shadow-md)',
-              padding: 'var(--space-3)',
-              minWidth: '200px',
-              marginTop: '8px',
-            }}
+            onAnimationEnd={handleAnimationEnd}
+            className={`popover-content popover-content--align-${align} ${isAnimatingOut ? 'lib-animate-fade-out-up' : 'lib-animate-fade-in-down'} ${contentClassName}`}
           >
             {children}
           </div>

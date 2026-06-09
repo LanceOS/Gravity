@@ -16,6 +16,7 @@
   flex: 1 1 auto;
   background: var(--color-surface-app);
   overflow: hidden;
+  animation: lib-fade-in var(--transition-spring);
 }
 
 .ticket-detail__header {
