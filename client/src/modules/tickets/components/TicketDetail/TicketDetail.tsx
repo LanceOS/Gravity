@@ -2,7 +2,7 @@ import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import type { Ticket } from '../../../../context/TicketContext';
 import { Button, Select, MarkdownEditor, RichTextEditor, toast, ClickAwayListener, Portal, Accordion, Popover, createEmptyRichTextValue, isRichTextEmpty, serializeRichTextMarkdown } from '@library';
 import generateBranchName from '../../../../utils/branch';
-import TicketUtilities from '../TicketUtilities';
+import TicketUtilities from '../TicketUtilities/TicketUtilities';
 
 const DEFAULT_TICKET_URL_BASE = 'https://tickets.placeholder.local';
 
@@ -172,6 +172,13 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
     }, 1500);
 
     return () => clearTimeout(timeoutId);
+  }, [editingDescriptionBody, activeTicket.id, onUpdateTicket]);
+
+  const handleDescriptionBlur = useCallback(() => {
+    if (editingDescriptionBody !== lastSavedDescriptionRef.current) {
+      lastSavedDescriptionRef.current = editingDescriptionBody;
+      void onUpdateTicket(activeTicket.id, { description: editingDescriptionBody });
+    }
   }, [editingDescriptionBody, activeTicket.id, onUpdateTicket]);
 
   const ticketLink = useMemo(() => customTicketLink || `${TICKET_URL_BASE}/${activeTicket.key}`, [customTicketLink, activeTicket.key]);
@@ -513,6 +520,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                   key={`desc-${activeTicket.id}`}
                   value={editingDescriptionBody}
                   onChange={setEditingDescriptionBody}
+                  onBlur={handleDescriptionBlur}
                   placeholder="Describe your issue..."
                   className="ticket-detail__description-editor"
                   surface="bare"

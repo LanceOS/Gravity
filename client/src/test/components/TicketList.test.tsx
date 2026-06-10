@@ -53,7 +53,7 @@ vi.mock('../../modules/tickets/components/TicketRow', () => ({
   ),
 }));
 
-vi.mock('../../modules/tickets/components/TicketRowMobile', () => ({
+vi.mock('../../modules/tickets/components/TicketRowMobile/TicketRowMobile', () => ({
   TicketRowMobile: ({ ticket, onClick, assigneeAvatar }: TicketRowProps) => (
     <button type="button" onClick={() => onClick(ticket)}>{`TicketRowMobile ${ticket.key} ${assigneeAvatar || 'no-avatar'}`}</button>
   ),

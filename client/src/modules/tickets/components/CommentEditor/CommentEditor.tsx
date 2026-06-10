@@ -1,27 +1,42 @@
 import { forwardRef } from 'react';
-import { Textarea, type TextareaProps } from '@library';
+import { RichTextEditor, type RichTextEditorHandle } from '@library';
 import './CommentEditor.css';
 
-export interface CommentEditorProps extends Omit<TextareaProps, 'onChange'> {
+export interface CommentEditorProps {
+  value: string;
   onChange: (value: string) => void;
+  placeholder?: string;
+  className?: string;
+  autoFocus?: boolean;
+  readOnly?: boolean;
+  onBlur?: () => void;
 }
 
-export const CommentEditor = forwardRef<HTMLTextAreaElement, CommentEditorProps>(function CommentEditor(
+export const CommentEditor = forwardRef<RichTextEditorHandle, CommentEditorProps>(function CommentEditor(
   {
     className,
+    value,
     onChange,
-    ...props
+    placeholder = 'Post updates, links, or mention PRs...',
+    autoFocus = false,
+    readOnly = false,
+    onBlur,
   },
   ref,
 ) {
   return (
     <div className={`comment-editor-container ${className || ''}`}>
-      <Textarea
+      <RichTextEditor
         ref={ref}
-        onChange={(e) => onChange(e.target.value)}
-        autoGrow
-        className="comment-editor-textarea"
-        {...props}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        autoFocus={autoFocus}
+        readOnly={readOnly}
+        onBlur={onBlur}
+        surface="bare"
+        toolbarMode="bubble"
+        minHeight="40px"
       />
     </div>
   );

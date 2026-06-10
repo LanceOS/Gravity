@@ -1,9 +1,9 @@
-import { Node as ProseMirrorNode } from 'prosemirror-model';
+import { Node as ProseMirrorNode, MarkType } from 'prosemirror-model';
 import { EditorState, type Command } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { setBlockType, lift, wrapIn, toggleMark } from 'prosemirror-commands';
 import { liftListItem, wrapInList } from 'prosemirror-schema-list';
-import { inputRules, textblockTypeInputRule, wrappingInputRule } from 'prosemirror-inputrules';
+import { inputRules, textblockTypeInputRule, wrappingInputRule, InputRule } from 'prosemirror-inputrules';
 import { richTextSchema } from '../../../utilities/richtext';
 
 export function isSameNodeTypeActive(state: EditorState, nodeTypeName: string, attrs?: Record<string, unknown>) {
@@ -43,6 +43,33 @@ export function isMarkActive(state: EditorState, markName: string) {
   return state.doc.rangeHasMark(from, to, markType);
 }
 
+export function inlineMarkInputRule(regexp: RegExp, markType: MarkType, delimiterLength: number, getAttrs?: any): InputRule {
+  return new InputRule(regexp, (state, match, start, end) => {
+    const attrs = getAttrs instanceof Function ? getAttrs(match) : getAttrs;
+    const { tr } = state;
+    
+    const content = match[1];
+    if (content) {
+      const fullMatch = match[0];
+      const contentIndex = fullMatch.indexOf(content);
+      if (contentIndex === -1) return null;
+      
+      const prefixLength = contentIndex - delimiterLength;
+      const replaceStart = start + prefixLength;
+      const replaceEnd = end;
+      
+      const mark = markType.create(attrs);
+      const textNode = state.schema.text(content, [mark]);
+      
+      tr.replaceWith(replaceStart, replaceEnd, textNode);
+      tr.removeStoredMark(markType);
+      
+      return tr;
+    }
+    return null;
+  });
+}
+
 export function buildInputRules() {
   return inputRules({
     rules: [
@@ -54,6 +81,10 @@ export function buildInputRules() {
       wrappingInputRule(/^(\d+)\.\s$/, richTextSchema.nodes.ordered_list, (match) => ({
         order: Number(match[1]) || 1,
       })),
+      // Inline formatting input rules
+      inlineMarkInputRule(/(?:\*\*|__)([^*_]+)(?:\*\*|__)$/, richTextSchema.marks.strong, 2),
+      inlineMarkInputRule(/(?:^|[^*_])(?:\*|_)([^*_]+)(?:\*|_)$/, richTextSchema.marks.em, 1),
+      inlineMarkInputRule(/(?:^|[^`])(?:\`)([^`]+)(?:\`)$/, richTextSchema.marks.code, 1),
     ],
   });
 }

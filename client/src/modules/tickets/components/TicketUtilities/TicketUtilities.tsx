@@ -1,6 +1,6 @@
 import { Link as LinkIcon, GitBranch, FileText } from 'lucide-react';
 import { serializeRichTextMarkdown } from '@library';
-import type { TicketUtilitiesProps } from '../types/TicketUtilities';
+import type { TicketUtilitiesProps } from '../../types/TicketUtilities';
 import './TicketUtilities.css';
 
 export default function TicketUtilities({ ticketLink, generatedBranchName, description, onCopy }: TicketUtilitiesProps) {
