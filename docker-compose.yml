@@ -34,23 +34,18 @@ services:
       - gravity_backend_db_redis
 
   rustfs:
-    image: docker.io/library/minio:RELEASE.2024-01-28T22-35-53Z
+    image: rustfs/rustfs:latest
     container_name: ${GRAVITY_RUSTFS_CONTAINER:-gravity_rustfs_dev}
     restart: unless-stopped
     command: server /data/rustfs --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: ${RUSTFS_ACCESS_KEY:-admin}
-      MINIO_ROOT_PASSWORD: ${RUSTFS_SECRET_KEY:-password}
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:-admin}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:-password}
     volumes:
       - gravity_rustfs_data:/data/rustfs
     ports:
       - "${RUSTFS_PORT:-9000}:9000"
       - "${RUSTFS_CONSOLE_PORT:-9001}:9001"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
     networks:
       - gravity_backend_db_redis
 
@@ -95,7 +90,7 @@ services:
       redis:
         condition: service_healthy
       rustfs:
-        condition: service_healthy
+        condition: service_started
     networks:
       - gravity_backend_db_redis
       - gravity_frontend_backend

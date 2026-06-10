@@ -62,10 +62,17 @@ export class RustFS {
     try {
       await s3Client.send(command);
     } catch (err: any) {
-      if (err.name === 'NoSuchBucket') {
-        const createBucket = new CreateBucketCommand({ Bucket: env.rustfsBucket });
-        await s3Client.send(createBucket);
-        await s3Client.send(command);
+      if (err.name === 'NoSuchBucket' || err.name === 'NotFound' || err.message?.includes('bucket')) {
+        try {
+          const createBucket = new CreateBucketCommand({ Bucket: env.rustfsBucket });
+          await s3Client.send(createBucket);
+          await s3Client.send(command);
+        } catch (innerErr: any) {
+          if (innerErr.name !== 'BucketAlreadyOwnedByYou' && innerErr.name !== 'BucketAlreadyExists') {
+            throw err;
+          }
+          await s3Client.send(command);
+        }
       } else {
         throw err;
       }
@@ -95,10 +102,17 @@ export class RustFS {
     try {
       await s3Client.send(command);
     } catch (err: any) {
-      if (err.name === 'NoSuchBucket') {
-        const createBucket = new CreateBucketCommand({ Bucket: env.rustfsBucket });
-        await s3Client.send(createBucket);
-        await s3Client.send(command);
+      if (err.name === 'NoSuchBucket' || err.name === 'NotFound' || err.message?.includes('bucket')) {
+        try {
+          const createBucket = new CreateBucketCommand({ Bucket: env.rustfsBucket });
+          await s3Client.send(createBucket);
+          await s3Client.send(command);
+        } catch (innerErr: any) {
+          if (innerErr.name !== 'BucketAlreadyOwnedByYou' && innerErr.name !== 'BucketAlreadyExists') {
+            throw err;
+          }
+          await s3Client.send(command);
+        }
       } else {
         throw err;
       }
