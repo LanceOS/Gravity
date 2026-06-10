@@ -12,6 +12,7 @@ import './NoteEditor.css';
 interface NoteEditorProps {
   projectId: string;
   noteId: string;
+  onTitleChange?: (title: string) => void;
 }
 
 function normalizeLegacyNoteBody(rawBody: string): string {
@@ -27,7 +28,7 @@ function normalizeLegacyNoteBody(rawBody: string): string {
   return rawBody.replace(/^# ?\n/, '').trimStart();
 }
 
-export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
+export function NoteEditor({ projectId, noteId, onTitleChange }: NoteEditorProps) {
   const { note, loading, saving, saveError, savedAt, saveNote, uploadMedia } = useNote(projectId, noteId);
 
   const [isDragging, setIsDragging] = useState(false);
@@ -73,9 +74,10 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
     noteLoaded.current = false;
     setTitle('');
     titleRef.current = '';
+    onTitleChange?.('');
     setBody(createEmptyRichTextValue());
     bodyRef.current = createEmptyRichTextValue();
-  }, [noteId]);
+  }, [noteId, onTitleChange]);
 
   useEffect(() => {
     if (!note || noteLoaded.current) return;
@@ -86,9 +88,10 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
 
     setTitle(nextTitle);
     titleRef.current = nextTitle;
+    onTitleChange?.(nextTitle);
     setBody(nextBody);
     bodyRef.current = nextBody;
-  }, [note]);
+  }, [note, onTitleChange]);
 
   useEffect(() => {
     if (saveTimeoutRef.current) {
@@ -103,6 +106,7 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
     const newTitle = e.target.value;
     setTitle(newTitle);
     titleRef.current = newTitle;
+    onTitleChange?.(newTitle);
     scheduleSave();
   };
 

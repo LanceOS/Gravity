@@ -58,6 +58,7 @@ export interface SidebarUserMenuSection {
   onOpenAccountPreferences: () => void;
   onOpenProjectManager: () => void;
   onOpenSettings: () => void;
+  onOpenMcp: () => void;
   onSignOut: () => void;
 }
 

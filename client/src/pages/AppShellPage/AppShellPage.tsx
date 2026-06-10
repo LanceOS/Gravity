@@ -21,6 +21,7 @@ import { WorkspaceDirectoryPage } from '../WorkspaceDirectoryPage/WorkspaceDirec
 import { WorkspacePage } from '../WorkspacePage/WorkspacePage';
 import { WorkspaceProjectsPage } from '../WorkspaceProjectsPage/WorkspaceProjectsPage';
 import { TicketDetailRoute } from '../../modules/tickets/components/TicketDetailRoute';
+import { WorkspaceMcpModal } from '../../modules/workspaces/components/WorkspaceMcpModal';
 import './AppShellPage.css';
 
 type AppSection = 'directory' | 'workspace' | 'settings' | 'account' | 'projects';
@@ -71,6 +72,7 @@ export function AppShellPage() {
   const [workspaceReady, setWorkspaceReady] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isOllamaOpen, setIsOllamaOpen] = useState(false);
+  const [isMcpOpen, setIsMcpOpen] = useState(false);
   const [isOllamaClosing, setIsOllamaClosing] = useState(false);
   const [ollamaCloseTimer, setOllamaCloseTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
 
@@ -920,6 +922,7 @@ export function AppShellPage() {
       onOpenAccountPreferences: handleOpenAccountPreferences,
       onOpenProjectManager: handleOpenProjectManager,
       onOpenSettings: handleOpenSettings,
+      onOpenMcp: () => setIsMcpOpen(true),
       onSignOut: signOut,
     },
   };
@@ -1078,6 +1081,9 @@ export function AppShellPage() {
       ) : null}
 
       {onboarding}
+      {isMcpOpen ? (
+        <WorkspaceMcpModal workspaceId={activeWorkspaceId} isOpen={isMcpOpen} onClose={() => setIsMcpOpen(false)} />
+      ) : null}
     </>
   );
 }
