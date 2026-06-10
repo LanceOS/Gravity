@@ -40,16 +40,6 @@ export function NoteEditor({ projectId, noteId, onTitleChange }: NoteEditorProps
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const scheduleSave = useCallback(() => {
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-    saveTimeoutRef.current = setTimeout(() => {
-      saveTimeoutRef.current = null;
-      triggerSave();
-    }, 1500);
-  }, []);
-
   const triggerSave = useCallback(() => {
     if (!note) return;
 
@@ -60,6 +50,21 @@ export function NoteEditor({ projectId, noteId, onTitleChange }: NoteEditorProps
       saveNote({ title: currentTitle, body: currentBody });
     }
   }, [note, saveNote]);
+
+  const triggerSaveRef = useRef(triggerSave);
+  useEffect(() => {
+    triggerSaveRef.current = triggerSave;
+  }, [triggerSave]);
+
+  const scheduleSave = useCallback(() => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    saveTimeoutRef.current = setTimeout(() => {
+      saveTimeoutRef.current = null;
+      triggerSaveRef.current();
+    }, 1500);
+  }, []);
 
   const handleFileUpload = async (file: File) => {
     try {
@@ -94,15 +99,7 @@ export function NoteEditor({ projectId, noteId, onTitleChange }: NoteEditorProps
     bodyRef.current = nextBody;
   }, [note, onTitleChange]);
 
-  useEffect(() => {
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-      saveTimeoutRef.current = setTimeout(() => {
-        saveTimeoutRef.current = null;
-        triggerSave();
-      }, 1500);
-    }
-  }, [note, triggerSave]);
+
 
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newTitle = e.target.value;
