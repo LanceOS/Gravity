@@ -161,6 +161,7 @@ function renderSidebar(overrides: Partial<SidebarProps> = {}) {
       onOpenAccountPreferences: vi.fn(),
       onOpenProjectManager: vi.fn(),
       onOpenSettings: vi.fn(),
+      onOpenMcp: vi.fn(),
       onSignOut: vi.fn(),
     },
     ...overrides,

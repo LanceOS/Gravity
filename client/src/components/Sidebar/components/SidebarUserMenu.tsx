@@ -133,7 +133,7 @@ export function SidebarUserMenu({
             userMenu.onOpenMcp();
           }}
           className="clickable"
-          style={dropdownItemStyle(userMenu.activeArea, 'mcp')}
+          style={dropdownItemStyle(userMenu.activeArea)}
         >
           <Settings2 size={14} color="var(--color-primary)" />
           <span>Connect External AI</span>
