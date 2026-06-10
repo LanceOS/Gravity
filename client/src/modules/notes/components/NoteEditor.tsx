@@ -195,6 +195,7 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
           placeholder="Write your notes..."
           minHeight="calc(100vh - 200px)"
           className="note-editor__body-editor"
+          toolbarMode="full"
         />
 
         <div className={`note-editor__drag-overlay ${isDragging ? 'note-editor__drag-overlay--active' : ''}`}>

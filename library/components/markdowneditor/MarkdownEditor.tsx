@@ -92,6 +92,7 @@ export const MarkdownEditor = ({
         onBlur={handleBlur}
         placeholder={placeholder}
         minHeight={minHeight}
+        toolbarMode="full"
       />
     </div>
   );

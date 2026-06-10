@@ -475,7 +475,8 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                 onChange={(newDesc) => onUpdateTicket(activeTicket.id, { description: newDesc })}
                 placeholder="Describe your issue..."
                 minHeight="120px"
-                className="markdown-content"
+                className="ticket-detail__description-editor"
+                toolbarMode="bubble"
               />
             </div>
 
@@ -721,6 +722,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                               placeholder="Edit comment..."
                               minHeight="120px"
                               autoFocus
+                              toolbarMode="bubble"
                             />
                             <div style={{ display: 'flex', gap: '6px', alignSelf: 'flex-end' }}>
                               <Button
@@ -755,13 +757,14 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
               </div>
 
               <form onSubmit={handlePostComment} className="ticket-detail__comment-form">
-                <RichTextEditor
-                  placeholder="Post updates, links, or mention PRs..."
-                  value={commentInput}
-                  onChange={setCommentInput}
-                  minHeight="120px"
-                  className="ticket-detail__comment-editor"
-                />
+              <RichTextEditor
+                placeholder="Post updates, links, or mention PRs..."
+                value={commentInput}
+                onChange={setCommentInput}
+                minHeight="120px"
+                className="ticket-detail__comment-editor"
+                toolbarMode="bubble"
+              />
                 <Button
                   type="submit"
                   variant="primary"

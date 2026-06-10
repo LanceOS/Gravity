@@ -11,7 +11,7 @@ vi.mock('../../modules/notes/hooks/useNote', () => ({
 vi.mock('@library', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@library')>();
   const MockRichTextEditor = forwardRef<any, any>(function MockRichTextEditor(
-    { value, onChange, placeholder, className }: any,
+    { value, onChange, placeholder, className, toolbarMode }: any,
     ref,
   ) {
     const [internalValue, setInternalValue] = useState(value);
@@ -33,6 +33,7 @@ vi.mock('@library', async (importOriginal) => {
     return (
       <textarea
         data-testid="rich-text-editor"
+        data-toolbar-mode={toolbarMode || 'full'}
         aria-label="Rich text editor"
         placeholder={placeholder}
         className={className}
@@ -85,6 +86,7 @@ describe('NoteEditor', () => {
     expect(titleInput).toBeInTheDocument();
     expect(titleInput.value).toBe('Test Title');
     expect(screen.getByTestId('rich-text-editor')).toHaveValue('Test body');
+    expect(screen.getByTestId('rich-text-editor')).toHaveAttribute('data-toolbar-mode', 'full');
   });
 
   it('normalizes the legacy empty heading body on load', () => {

@@ -552,7 +552,9 @@ button.tool-submit-active {
 
 /* Rich text bubble formatting menu */
 .markdown-bubble-menu {
+  position: fixed;
   display: flex;
+  flex-wrap: wrap;
   background-color: var(--color-surface-card);
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-md);
@@ -562,7 +564,8 @@ button.tool-submit-active {
   align-items: center;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  z-index: 1000;
+  z-index: 1700;
+  max-width: min(420px, calc(100vw - 32px));
 }
 
 .bubble-menu-btn {

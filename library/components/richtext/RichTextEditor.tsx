@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
   Bold,
@@ -46,6 +46,7 @@ export interface RichTextEditorProps {
   autoFocus?: boolean;
   readOnly?: boolean;
   onBlur?: () => void;
+  toolbarMode?: 'full' | 'bubble' | 'none';
 }
 
 function normalizeSize(value?: string | number) {
@@ -201,14 +202,28 @@ function toggleLink(): Command {
   };
 }
 
-function toolbarButton(
+function runEditorCommand(view: EditorView | null, command: Command) {
+  if (!view) {
+    return;
+  }
+
+  command(view.state, view.dispatch);
+  view.focus();
+}
+
+function formattingButton(
   label: string,
   title: string,
   icon: ReactNode,
   onClick: () => void,
   active = false,
-  disabled = false
+  disabled = false,
+  variant: 'toolbar' | 'bubble' = 'toolbar'
 ) {
+  const buttonClassName = variant === 'bubble'
+    ? cn('bubble-menu-btn', active && 'is-active')
+    : cn('rich-text-editor__button', active && 'rich-text-editor__button--active');
+
   return (
     <button
       key={label}
@@ -217,7 +232,7 @@ function toolbarButton(
       aria-label={title}
       aria-pressed={active}
       disabled={disabled}
-      className={cn('rich-text-editor__button', active && 'rich-text-editor__button--active')}
+      className={buttonClassName}
       onMouseDown={(event) => {
         event.preventDefault();
       }}
@@ -238,15 +253,18 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
     autoFocus = false,
     readOnly = false,
     onBlur,
+    toolbarMode = 'full',
   },
   ref,
 ) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
+  const bubbleMenuRef = useRef<HTMLDivElement | null>(null);
   const onChangeRef = useRef(onChange);
   const onBlurRef = useRef(onBlur);
   const serializedValueRef = useRef('');
   const [, setRenderTick] = useState(0);
+  const [bubbleMenuStyle, setBubbleMenuStyle] = useState<{ left: number; top: number; placeBelow: boolean } | null>(null);
 
   useEffect(() => {
     onChangeRef.current = onChange;
@@ -345,6 +363,9 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
       },
       handleDOMEvents: {
         blur: () => {
+          if (toolbarMode === 'bubble') {
+            setBubbleMenuStyle(null);
+          }
           onBlurRef.current?.();
           return false;
         },
@@ -440,100 +461,156 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
   const orderedActive = viewState ? isSameNodeTypeActive(viewState, 'ordered_list') : false;
   const quoteActive = viewState ? isSameNodeTypeActive(viewState, 'blockquote') : false;
   const blockCodeActive = viewState ? isSameNodeTypeActive(viewState, 'code_block') : false;
+  const selectionKey = viewState ? `${viewState.selection.from}:${viewState.selection.to}:${viewState.selection.empty}` : 'no-selection';
+
+  useLayoutEffect(() => {
+    const view = viewRef.current;
+
+    if (!view || toolbarMode !== 'bubble' || readOnly) {
+      setBubbleMenuStyle(null);
+      return;
+    }
+
+    const selection = view.state.selection;
+    if (selection.empty) {
+      setBubbleMenuStyle(null);
+      return;
+    }
+
+    const updateBubblePosition = () => {
+      const currentView = viewRef.current;
+      if (!currentView || currentView.state.selection.empty) {
+        setBubbleMenuStyle(null);
+        return;
+      }
+
+      try {
+        const currentSelection = currentView.state.selection;
+        const fromCoords = currentView.coordsAtPos(currentSelection.from);
+        const toCoords = currentView.coordsAtPos(currentSelection.to);
+        const centerX = (fromCoords.left + toCoords.right) / 2;
+        const selectionTop = Math.min(fromCoords.top, toCoords.top);
+        const selectionBottom = Math.max(fromCoords.bottom, toCoords.bottom);
+        const placeBelow = selectionTop < 56;
+
+        setBubbleMenuStyle({
+          left: Math.max(16, Math.min(centerX, window.innerWidth - 16)),
+          top: Math.max(16, placeBelow ? selectionBottom + 10 : selectionTop - 10),
+          placeBelow,
+        });
+      } catch {
+        setBubbleMenuStyle(null);
+      }
+    };
+
+    updateBubblePosition();
+    window.addEventListener('resize', updateBubblePosition);
+    window.addEventListener('scroll', updateBubblePosition, true);
+
+    return () => {
+      window.removeEventListener('resize', updateBubblePosition);
+      window.removeEventListener('scroll', updateBubblePosition, true);
+    };
+  }, [readOnly, selectionKey, toolbarMode]);
 
   return (
     <div className={cn('rich-text-editor', className)}>
-      <div className="rich-text-editor__toolbar" role="toolbar" aria-label="Text formatting">
-        <div className="rich-text-editor__group">
-          {toolbarButton('bold', 'Bold', <Bold size={14} />, () => {
-            if (viewRef.current) {
-              toggleMark(richTextSchema.marks.strong)(viewRef.current.state, viewRef.current.dispatch);
-              viewRef.current.focus();
-            }
-          }, boldActive, readOnly)}
-          {toolbarButton('italic', 'Italic', <Italic size={14} />, () => {
-            if (viewRef.current) {
-              toggleMark(richTextSchema.marks.em)(viewRef.current.state, viewRef.current.dispatch);
-              viewRef.current.focus();
-            }
-          }, italicActive, readOnly)}
-          {toolbarButton('code', 'Inline code', <Code2 size={14} />, () => {
-            if (viewRef.current) {
-              toggleMark(richTextSchema.marks.code)(viewRef.current.state, viewRef.current.dispatch);
-              viewRef.current.focus();
-            }
-          }, codeActive, readOnly)}
-        </div>
+      {toolbarMode === 'full' && (
+        <div className="rich-text-editor__toolbar" role="toolbar" aria-label="Text formatting">
+          <div className="rich-text-editor__group">
+            {formattingButton('bold', 'Bold', <Bold size={14} />, () => {
+              runEditorCommand(viewRef.current, (state, dispatch) => toggleMark(richTextSchema.marks.strong)(state, dispatch));
+            }, boldActive, readOnly)}
+            {formattingButton('italic', 'Italic', <Italic size={14} />, () => {
+              runEditorCommand(viewRef.current, (state, dispatch) => toggleMark(richTextSchema.marks.em)(state, dispatch));
+            }, italicActive, readOnly)}
+            {formattingButton('code', 'Inline code', <Code2 size={14} />, () => {
+              runEditorCommand(viewRef.current, (state, dispatch) => toggleMark(richTextSchema.marks.code)(state, dispatch));
+            }, codeActive, readOnly)}
+          </div>
 
-        <div className="rich-text-editor__group">
-          {toolbarButton('h1', 'Heading 1', <Heading1 size={14} />, () => {
-            if (viewRef.current) {
-              toggleHeading(1)(viewRef.current.state, viewRef.current.dispatch);
-              viewRef.current.focus();
-            }
-          }, h1Active, readOnly)}
-          {toolbarButton('h2', 'Heading 2', <Heading2 size={14} />, () => {
-            if (viewRef.current) {
-              toggleHeading(2)(viewRef.current.state, viewRef.current.dispatch);
-              viewRef.current.focus();
-            }
-          }, h2Active, readOnly)}
-          {toolbarButton('h3', 'Heading 3', <Heading3 size={14} />, () => {
-            if (viewRef.current) {
-              toggleHeading(3)(viewRef.current.state, viewRef.current.dispatch);
-              viewRef.current.focus();
-            }
-          }, h3Active, readOnly)}
-        </div>
+          <div className="rich-text-editor__group">
+            {formattingButton('h1', 'Heading 1', <Heading1 size={14} />, () => {
+              runEditorCommand(viewRef.current, (state, dispatch) => toggleHeading(1)(state, dispatch));
+            }, h1Active, readOnly)}
+            {formattingButton('h2', 'Heading 2', <Heading2 size={14} />, () => {
+              runEditorCommand(viewRef.current, (state, dispatch) => toggleHeading(2)(state, dispatch));
+            }, h2Active, readOnly)}
+            {formattingButton('h3', 'Heading 3', <Heading3 size={14} />, () => {
+              runEditorCommand(viewRef.current, (state, dispatch) => toggleHeading(3)(state, dispatch));
+            }, h3Active, readOnly)}
+          </div>
 
-        <div className="rich-text-editor__group">
-          {toolbarButton('bullet-list', 'Bullet list', <List size={14} />, () => {
-            if (viewRef.current) {
-              toggleList('bullet_list')(viewRef.current.state, viewRef.current.dispatch);
-              viewRef.current.focus();
-            }
-          }, bulletActive, readOnly)}
-          {toolbarButton('ordered-list', 'Numbered list', <ListOrdered size={14} />, () => {
-            if (viewRef.current) {
-              toggleList('ordered_list')(viewRef.current.state, viewRef.current.dispatch);
-              viewRef.current.focus();
-            }
-          }, orderedActive, readOnly)}
-          {toolbarButton('quote', 'Blockquote', <Quote size={14} />, () => {
-            if (viewRef.current) {
-              toggleBlockQuote()(viewRef.current.state, viewRef.current.dispatch);
-              viewRef.current.focus();
-            }
-          }, quoteActive, readOnly)}
-          {toolbarButton('code-block', 'Code block', <span style={{ fontSize: 12, fontWeight: 700 }}>{'</>'}</span>, () => {
-            if (viewRef.current) {
-              toggleCodeBlock()(viewRef.current.state, viewRef.current.dispatch);
-              viewRef.current.focus();
-            }
-          }, blockCodeActive, readOnly)}
-        </div>
+          <div className="rich-text-editor__group">
+            {formattingButton('bullet-list', 'Bullet list', <List size={14} />, () => {
+              runEditorCommand(viewRef.current, (state, dispatch) => toggleList('bullet_list')(state, dispatch));
+            }, bulletActive, readOnly)}
+            {formattingButton('ordered-list', 'Numbered list', <ListOrdered size={14} />, () => {
+              runEditorCommand(viewRef.current, (state, dispatch) => toggleList('ordered_list')(state, dispatch));
+            }, orderedActive, readOnly)}
+            {formattingButton('quote', 'Blockquote', <Quote size={14} />, () => {
+              runEditorCommand(viewRef.current, (state, dispatch) => toggleBlockQuote()(state, dispatch));
+            }, quoteActive, readOnly)}
+            {formattingButton('code-block', 'Code block', <span style={{ fontSize: 12, fontWeight: 700 }}>{'</>'}</span>, () => {
+              runEditorCommand(viewRef.current, (state, dispatch) => toggleCodeBlock()(state, dispatch));
+            }, blockCodeActive, readOnly)}
+          </div>
 
-        <div className="rich-text-editor__group">
-          {toolbarButton('link', 'Link', <Link2 size={14} />, () => {
-            if (viewRef.current) {
-              toggleLink()(viewRef.current.state, viewRef.current.dispatch);
-              viewRef.current.focus();
-            }
-          }, linkActive, readOnly)}
-          {toolbarButton('undo', 'Undo', <Undo2 size={14} />, () => {
-            if (viewRef.current) {
-              undo(viewRef.current.state, viewRef.current.dispatch);
-              viewRef.current.focus();
-            }
-          }, false, readOnly || !viewState || undoDepth(viewState) === 0)}
-          {toolbarButton('redo', 'Redo', <Redo2 size={14} />, () => {
-            if (viewRef.current) {
-              redo(viewRef.current.state, viewRef.current.dispatch);
-              viewRef.current.focus();
-            }
-          }, false, readOnly || !viewState || redoDepth(viewState) === 0)}
+          <div className="rich-text-editor__group">
+            {formattingButton('link', 'Link', <Link2 size={14} />, () => {
+              runEditorCommand(viewRef.current, (state, dispatch) => toggleLink()(state, dispatch));
+            }, linkActive, readOnly)}
+            {formattingButton('undo', 'Undo', <Undo2 size={14} />, () => {
+              runEditorCommand(viewRef.current, (state, dispatch) => undo(state, dispatch));
+            }, false, readOnly || !viewState || undoDepth(viewState) === 0)}
+            {formattingButton('redo', 'Redo', <Redo2 size={14} />, () => {
+              runEditorCommand(viewRef.current, (state, dispatch) => redo(state, dispatch));
+            }, false, readOnly || !viewState || redoDepth(viewState) === 0)}
+          </div>
         </div>
-      </div>
+      )}
+
+      {toolbarMode === 'bubble' && bubbleMenuStyle && (
+        <div
+          ref={bubbleMenuRef}
+          className="markdown-bubble-menu"
+          role="toolbar"
+          aria-label="Text formatting"
+          onMouseDown={(event) => {
+            event.preventDefault();
+          }}
+          style={{
+            left: `${bubbleMenuStyle.left}px`,
+            top: `${bubbleMenuStyle.top}px`,
+            transform: bubbleMenuStyle.placeBelow ? 'translate(-50%, 0)' : 'translate(-50%, -100%)',
+          }}
+        >
+          {formattingButton('bubble-bold', 'Bold', <Bold size={14} />, () => {
+            runEditorCommand(viewRef.current, (state, dispatch) => toggleMark(richTextSchema.marks.strong)(state, dispatch));
+          }, boldActive, readOnly, 'bubble')}
+          {formattingButton('bubble-italic', 'Italic', <Italic size={14} />, () => {
+            runEditorCommand(viewRef.current, (state, dispatch) => toggleMark(richTextSchema.marks.em)(state, dispatch));
+          }, italicActive, readOnly, 'bubble')}
+          {formattingButton('bubble-link', 'Link', <Link2 size={14} />, () => {
+            runEditorCommand(viewRef.current, (state, dispatch) => toggleLink()(state, dispatch));
+          }, linkActive, readOnly, 'bubble')}
+          {formattingButton('bubble-code', 'Inline code', <Code2 size={14} />, () => {
+            runEditorCommand(viewRef.current, (state, dispatch) => toggleMark(richTextSchema.marks.code)(state, dispatch));
+          }, codeActive, readOnly, 'bubble')}
+          {formattingButton('bubble-h1', 'Heading 1', <Heading1 size={14} />, () => {
+            runEditorCommand(viewRef.current, (state, dispatch) => toggleHeading(1)(state, dispatch));
+          }, h1Active, readOnly, 'bubble')}
+          {formattingButton('bubble-h2', 'Heading 2', <Heading2 size={14} />, () => {
+            runEditorCommand(viewRef.current, (state, dispatch) => toggleHeading(2)(state, dispatch));
+          }, h2Active, readOnly, 'bubble')}
+          {formattingButton('bubble-bullet-list', 'Bullet list', <List size={14} />, () => {
+            runEditorCommand(viewRef.current, (state, dispatch) => toggleList('bullet_list')(state, dispatch));
+          }, bulletActive, readOnly, 'bubble')}
+          {formattingButton('bubble-ordered-list', 'Numbered list', <ListOrdered size={14} />, () => {
+            runEditorCommand(viewRef.current, (state, dispatch) => toggleList('ordered_list')(state, dispatch));
+          }, orderedActive, readOnly, 'bubble')}
+        </div>
+      )}
 
       <div className="rich-text-editor__content">
         <div ref={mountRef} className="rich-text-editor__mount" />

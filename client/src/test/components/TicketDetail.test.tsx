@@ -78,7 +78,7 @@ vi.mock('@library', async (importOriginal) => {
     });
 
   const MockRichTextEditor = forwardRef<any, any>(function MockRichTextEditor(
-    { value, onChange, placeholder, className, minHeight, autoFocus }: any,
+    { value, onChange, placeholder, className, minHeight, autoFocus, toolbarMode }: any,
     ref,
   ) {
     const [text, setText] = useState(() => {
@@ -107,6 +107,7 @@ vi.mock('@library', async (importOriginal) => {
     return (
       <textarea
         data-testid={placeholder}
+        data-toolbar-mode={toolbarMode || 'full'}
         aria-label={placeholder}
         placeholder={placeholder}
         className={className}
@@ -350,6 +351,7 @@ describe('TicketDetail', () => {
     });
 
     const descriptionInput = screen.getByPlaceholderText('Describe your issue...');
+    expect(descriptionInput).toHaveAttribute('data-toolbar-mode', 'bubble');
     await user.clear(descriptionInput);
     await user.type(descriptionInput, 'Add retry backoff and better logging.');
     await waitFor(() => {
@@ -367,6 +369,7 @@ describe('TicketDetail', () => {
     expect(props.onSelectTicket).toHaveBeenCalledWith(subtaskOne);
 
     await user.type(screen.getByPlaceholderText('Post updates, links, or mention PRs...'), 'Comment from test');
+    expect(screen.getByPlaceholderText('Post updates, links, or mention PRs...')).toHaveAttribute('data-toolbar-mode', 'bubble');
     await user.click(screen.getByRole('button', { name: 'Comment' }));
     await waitFor(() => {
       expect(props.onAddComment).toHaveBeenCalledWith('ticket-1', expect.stringContaining('"type":"doc"'));
@@ -511,6 +514,7 @@ describe('TicketDetail', () => {
     // Dropdown closes; inline edit textarea shown with the comment body
     expect(screen.queryByRole('button', { name: 'Edit Comment' })).not.toBeInTheDocument();
     const commentEditInput = screen.getByPlaceholderText('Edit comment...');
+    expect(commentEditInput).toHaveAttribute('data-toolbar-mode', 'bubble');
     await user.clear(commentEditInput);
     await user.type(commentEditInput, 'PR is approved now.');
     await user.click(screen.getByRole('button', { name: 'Save' }));
