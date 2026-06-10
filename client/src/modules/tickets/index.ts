@@ -5,3 +5,5 @@ export { TicketList } from './components/TicketList';
 export { CreateTicketModal } from './components/CreateTicketModal';
 export { TicketContextMenu } from './components/TicketContextMenu';
 export { DenseGridController } from './components/DenseGridController';
+export { LabelBadge } from './components/LabelBadge';
+

@@ -15,7 +15,7 @@ export function ProjectSelectionRail({
           <h3 className="workspace-page__project-browser-title">Workspace Projects</h3>
         </div>
         <p className="workspace-page__project-browser-copy workspace-page__project-browser-copy--left">
-          Select a project to view or update its domains.
+          Select a project to view or update its labels.
         </p>
       </div>
 
@@ -23,7 +23,7 @@ export function ProjectSelectionRail({
         {projects.map((project) => {
           const isSelected = selectedProjectId === project.id;
           const roleLabel = project.id === defaultProjectId ? 'Default workspace project' : 'Workspace project';
-          const selectionLabel = isSelected ? 'Currently managing' : 'Click to manage domains';
+          const selectionLabel = isSelected ? 'Currently managing' : 'Click to manage labels';
 
           return (
             <button

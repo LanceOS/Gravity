@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@library';
 import { TicketDetail } from './TicketDetail';
-import type { Ticket, Comment, User, Project, Domain, Cycle } from '../../../context/TicketContext';
+import type { Ticket, Comment, User, Project, Label, Cycle } from '../../../context/TicketContext';
 
 interface TicketDetailRouteProps {
   activeWorkspaceId: string;
@@ -11,7 +11,7 @@ interface TicketDetailRouteProps {
   tickets: Ticket[];
   users: User[];
   projects: Project[];
-  domains: Domain[];
+  labels: Label[];
   cycles: Cycle[];
   onSelectTicket: (ticket: Ticket | null) => void;
   onUpdateTicket: (id: string, updates: Partial<Ticket>) => Promise<void>;
@@ -29,7 +29,7 @@ export const TicketDetailRoute: React.FC<TicketDetailRouteProps> = ({
   tickets,
   users,
   projects,
-  domains,
+  labels,
   cycles,
   onSelectTicket,
   onUpdateTicket,
@@ -91,7 +91,7 @@ export const TicketDetailRoute: React.FC<TicketDetailRouteProps> = ({
         parentTicket={parentTicket}
         users={users}
         projects={projects}
-        domains={domains}
+        labels={labels}
         cycles={cycles}
         onSelectTicket={onSelectTicket}
         onUpdateTicket={onUpdateTicket}

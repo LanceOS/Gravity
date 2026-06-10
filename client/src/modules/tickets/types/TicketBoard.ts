@@ -1,10 +1,11 @@
 import type { DragEvent, ReactNode } from 'react';
-import type { Domain, Ticket } from '../../../context/TicketContext';
+import type { Label, Ticket } from '../../../context/TicketContext';
 import type { TicketsByStatus } from '../utils/ticketView';
 
 export interface TicketBoardProps {
   ticketsByColumn: TicketsByStatus;
-  domainById: Record<string, Domain>;
+  labelById?: Record<string, Label>;
+  domainById?: Record<string, Label>;
   userAvatarById: Record<string, string>;
   onMoveTicket: (ticketId: string, updates: Partial<Ticket>) => Promise<void>;
   onSelectTicket: (ticket: Ticket) => void;
@@ -17,7 +18,5 @@ export interface TicketCardProps {
   onDragStart: (event: DragEvent) => void;
   priorityIcon: ReactNode;
   priorityColor: string;
-  domainColor: string;
-  domainName: string;
   assigneeAvatar: string | null;
 }

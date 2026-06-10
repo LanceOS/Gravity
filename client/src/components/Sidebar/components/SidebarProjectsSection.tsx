@@ -21,6 +21,9 @@ export function SidebarProjectsSection({
   const showProjectIssues = isProjectIssuesView(section);
   const showMyIssues = isMyIssuesView(section);
   const showNotes = isNotesView(section);
+  const labels = section.labels ?? section.domains ?? [];
+  const labelCounts = section.counts.labels ?? section.counts.domains ?? {};
+  const handleSelectLabel = section.onSelectLabel ?? section.onSelectDomain ?? (() => {});
 
   return (
     <div style={{ marginTop: '4px' }}>
@@ -123,14 +126,14 @@ export function SidebarProjectsSection({
                       </SidebarGroup>
 
                       <SidebarGroup label="Labels">
-                        {section.labels.map((label) => (
+                        {labels.map((label) => (
                           <SidebarItem
                             key={label.id}
                             nested
                             active={section.filters.labels?.includes(label.id)}
-                            onClick={() => section.onSelectLabel(label.id)}
+                            onClick={() => handleSelectLabel(label.id)}
                             leftIcon={<div style={{ width: '8px', height: '8px', borderRadius: '50%', background: label.color }} />}
-                            rightElement={<span style={countBadgeStyle()}>{section.counts.labels[label.id] || 0}</span>}
+                            rightElement={<span style={countBadgeStyle()}>{labelCounts[label.id] || 0}</span>}
                           >
                             {label.name}
                           </SidebarItem>

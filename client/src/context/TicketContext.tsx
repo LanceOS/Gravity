@@ -7,17 +7,18 @@ export type {
   User,
   Project,
   Domain,
+  Label,
   Cycle,
   Ticket,
   Comment,
   CreateProjectInput,
 } from '../types/domain';
-import type { User, Project, Domain, Cycle, Ticket, Comment, CreateProjectInput } from '../types/domain';
+import type { User, Project, Domain, Label, Cycle, Ticket, Comment, CreateProjectInput } from '../types/domain';
 
 interface State {
   tickets: Ticket[];
   projects: Project[];
-  domains: Domain[];
+  labels: Label[];
   cycles: Cycle[];
   users: User[];
   comments: Comment[];
@@ -27,7 +28,8 @@ interface State {
     status: string;
     priority: string;
     projectId: string;
-    domainId: string;
+    labels: string[];
+    labelMode: 'all' | 'any';
     cycleId: string;
     assigneeId: string;
     search: string;
@@ -36,6 +38,19 @@ interface State {
   theme: 'dark' | 'coal-black' | 'coffee' | 'marble-blue';
   loading: boolean;
 }
+
+type CreateTicketInput = {
+  title: string;
+  description: string;
+  status: Ticket['status'];
+  priority: Ticket['priority'];
+  projectId: string;
+  labelIds?: string[];
+  cycleId: string | null;
+  assigneeId: string | null;
+  parentId: string | null;
+  domainId?: string | null;
+};
 
 type Action =
   | { type: 'SET_LOADING'; payload: boolean }
@@ -46,12 +61,12 @@ type Action =
     payload: {
       tickets: Ticket[];
       projects: Project[];
-      domains: Domain[];
+      labels: Label[];
       cycles: Cycle[];
       users: User[];
     };
   }
-  | { type: 'SET_PROJECT_DATA'; payload: { tickets: Ticket[]; domains: Domain[]; cycles: Cycle[] } }
+  | { type: 'SET_PROJECT_DATA'; payload: { tickets: Ticket[]; labels: Label[]; cycles: Cycle[] } }
   | { type: 'SET_TICKETS_RAW'; payload: Ticket[] }
   | { type: 'SET_COMMENTS_RAW'; payload: Comment[] }
   | { type: 'SET_ACTIVE_TICKET'; payload: Ticket | null }
@@ -69,7 +84,8 @@ const initialFilters = {
   status: '',
   priority: '',
   projectId: '',
-  domainId: '',
+  labels: [] as string[],
+  labelMode: 'any' as 'all' | 'any',
   cycleId: '',
   assigneeId: '',
   search: '',
@@ -115,7 +131,7 @@ function createInitialState(): State {
   return {
     tickets: [],
     projects: [],
-    domains: [],
+    labels: [],
     cycles: [],
     users: [],
     comments: [],
@@ -186,7 +202,7 @@ function ticketReducer(state: State, action: Action): State {
         ...state,
         tickets: [],
         projects: [],
-        domains: [],
+        labels: [],
         cycles: [],
         users: [],
         comments: [],
@@ -197,7 +213,7 @@ function ticketReducer(state: State, action: Action): State {
       return {
         ...state,
         tickets: [],
-        domains: [],
+        labels: [],
         cycles: [],
         comments: [],
         activeTicket: null,
@@ -212,7 +228,7 @@ function ticketReducer(state: State, action: Action): State {
       return {
         ...state,
         tickets: action.payload.tickets.map((t) => ({ ...t, status: canonicalizeStatus(t.status) })),
-        domains: action.payload.domains,
+        labels: action.payload.labels,
         cycles: action.payload.cycles,
       };
     case 'SET_TICKETS_RAW': {
@@ -298,8 +314,12 @@ interface TicketContextType extends State {
   setActiveProjectId: (id: string) => void;
   fetchInitialData: (userId?: string) => Promise<void>;
   fetchProjectData: (projId: string) => Promise<void>;
-  createDomain: (domain: { name: string; color?: string; projectId?: string }) => Promise<Domain | null>;
-  createTicket: (ticket: Omit<Ticket, 'id' | 'key' | 'prStatus' | 'prUrl' | 'createdAt' | 'updatedAt'>) => Promise<Ticket | null>;
+  createLabel: (label: { name: string; color?: string; description?: string; projectId?: string; sortOrder?: number }) => Promise<Label | null>;
+  updateLabel: (id: string, updates: Partial<Label>) => Promise<Label | null>;
+  deleteLabel: (id: string) => Promise<boolean>;
+  assignLabelToTicket: (ticketId: string, labelId: string) => Promise<boolean>;
+  unassignLabelFromTicket: (ticketId: string, labelId: string) => Promise<boolean>;
+  createTicket: (ticket: CreateTicketInput) => Promise<Ticket | null>;
   updateTicket: (id: string, updates: Partial<Ticket>) => Promise<void>;
   deleteTicket: (id: string) => Promise<void>;
   addComment: (ticketId: string, body: string) => Promise<void>;
@@ -397,7 +417,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       dispatch({
         type: 'SET_INITIAL_DATA',
-        payload: { tickets: [], projects, domains: [], cycles: [], users },
+        payload: { tickets: [], projects, labels: [], cycles: [], users },
       });
       loadedUserIdRef.current = userId;
     } catch (error) {
@@ -407,7 +427,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [clearWorkspaceData]);
 
-  // Fetch project-specific data (tickets, domains, cycles)
+  // Fetch project-specific data (tickets, labels, cycles)
   const fetchProjectData = useCallback(async (projId: string) => {
     if (!projId) return;
 
@@ -417,21 +437,21 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     try {
-      const [ticketsRes, domainsRes, cyclesRes] = await Promise.all([
+      const [ticketsRes, labelsRes, cyclesRes] = await Promise.all([
         fetch(`${API_URL}/tickets`, { headers: { 'X-Project-Id': projId } }),
-        fetch(`${API_URL}/domains`, { headers: { 'X-Project-Id': projId } }),
+        fetch(`${API_URL}/labels`, { headers: { 'X-Project-Id': projId } }),
         fetch(`${API_URL}/cycles`, { headers: { 'X-Project-Id': projId } }),
       ]);
 
-      const [tickets, domains, cycles] = await Promise.all([
+      const [tickets, labels, cycles] = await Promise.all([
         handleArrayResponse<Ticket>(ticketsRes, `Failed to load tickets for project ${projId}`),
-        handleArrayResponse<Domain>(domainsRes, `Failed to load domains for project ${projId}`),
+        handleArrayResponse<Label>(labelsRes, `Failed to load labels for project ${projId}`),
         handleArrayResponse<Cycle>(cyclesRes, `Failed to load cycles for project ${projId}`),
       ]);
 
       dispatch({
         type: 'SET_PROJECT_DATA',
-        payload: { tickets, domains, cycles }
+        payload: { tickets, labels, cycles }
       });
       loadedProjectIdRef.current = projId;
     } catch (e) {
@@ -444,7 +464,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (activeProjectId) {
       fetchProjectData(activeProjectId);
     }
-  }, [activeProjectId, fetchProjectData]);
+  }, [activeProjectId, fetchProjectData, state.labels]);
 
   useEffect(() => {
     let cancelled = false;
@@ -570,7 +590,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 payload: {
                   tickets: state.tickets,
                   projects: state.projects,
-                  domains: state.domains,
+                  labels: state.labels,
                   cycles: state.cycles,
                   users,
                 }
@@ -588,10 +608,10 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return () => {
       eventSource.close();
     };
-  }, [activeProjectId, state.activeTicket, state.tickets, state.projects, state.domains, state.cycles]);
+  }, [activeProjectId, state.activeTicket, state.tickets, state.projects, state.labels, state.cycles]);
 
   // 3. Create Ticket with project header
-  const createTicket = useCallback(async (ticketInput: any) => {
+  const createTicket = useCallback(async (ticketInput: CreateTicketInput) => {
     try {
       const response = await fetch(`${API_URL}/tickets`, {
         method: 'POST',
@@ -925,33 +945,118 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [state.currentUser, fetchInitialData, setActiveProjectId]);
 
-  const createDomain = useCallback(async (domainInput: { name: string; color?: string; projectId?: string }) => {
-    const projectId = domainInput.projectId || activeProjectId;
+  const createLabel = useCallback(async (labelInput: { name: string; color?: string; description?: string; projectId?: string; sortOrder?: number }) => {
+    const projectId = labelInput.projectId || activeProjectId;
     if (!projectId) {
       return null;
     }
 
+    const existingProjectLabels = state.labels.filter((label) => label.projectId === projectId);
+    const nextSortOrder =
+      labelInput.sortOrder ??
+      existingProjectLabels.reduce((maxSortOrder, label) => Math.max(maxSortOrder, Number(label.sortOrder ?? 0)), -1) + 1;
+
     try {
-      const response = await fetch(`${API_URL}/domains`, {
+      const response = await fetch(`${API_URL}/labels`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-Project-Id': projectId,
         },
         body: JSON.stringify({
-          name: domainInput.name,
-          color: domainInput.color || '#6B7280',
+          name: labelInput.name,
+          color: labelInput.color || '#6B7280',
+          description: labelInput.description || '',
+          sortOrder: nextSortOrder,
         }),
       });
 
-      const domain = await handleResponseJson(response, 'Failed to create domain');
+      const label = await handleResponseJson(response, 'Failed to create label');
       await fetchProjectData(projectId);
-      return domain;
+      return label;
     } catch (error) {
       console.error(error);
       throw error;
     }
   }, [activeProjectId, fetchProjectData]);
+
+  const updateLabel = useCallback(async (id: string, updates: Partial<Label>) => {
+    try {
+      const response = await fetch(`${API_URL}/labels/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updates),
+      });
+
+      const label = await handleResponseJson(response, 'Failed to update label');
+      if (activeProjectId) {
+        await fetchProjectData(activeProjectId);
+      }
+      return label;
+    } catch (error) {
+      console.error(error);
+      throw error;
+    }
+  }, [activeProjectId, fetchProjectData]);
+
+  const deleteLabel = useCallback(async (id: string) => {
+    try {
+      const response = await fetch(`${API_URL}/labels/${id}`, {
+        method: 'DELETE',
+      });
+
+      await handleResponseJson(response, 'Failed to delete label');
+      if (activeProjectId) {
+        await fetchProjectData(activeProjectId);
+      }
+      return true;
+    } catch (error) {
+      console.error(error);
+      return false;
+    }
+  }, [activeProjectId, fetchProjectData]);
+
+  const assignLabelToTicket = useCallback(async (ticketId: string, labelId: string) => {
+    try {
+      const response = await fetch(`${API_URL}/tickets/${ticketId}/labels`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ labelId }),
+      });
+
+      if (!response.ok) throw new Error('Failed to assign label');
+
+      if (activeProjectId) {
+        await refreshTicketsForProject(activeProjectId);
+      }
+      return true;
+    } catch (error) {
+      console.error(error);
+      return false;
+    }
+  }, [activeProjectId, refreshTicketsForProject]);
+
+  const unassignLabelFromTicket = useCallback(async (ticketId: string, labelId: string) => {
+    try {
+      const response = await fetch(`${API_URL}/tickets/${ticketId}/labels/${labelId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) throw new Error('Failed to unassign label');
+
+      if (activeProjectId) {
+        await refreshTicketsForProject(activeProjectId);
+      }
+      return true;
+    } catch (error) {
+      console.error(error);
+      return false;
+    }
+  }, [activeProjectId, refreshTicketsForProject]);
 
   const joinProject = useCallback(async (inviteCode: string) => {
     if (!state.currentUser) {
@@ -1059,7 +1164,11 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setActiveProjectId,
       fetchInitialData,
       fetchProjectData,
-      createDomain,
+      createLabel,
+      updateLabel,
+      deleteLabel,
+      assignLabelToTicket,
+      unassignLabelFromTicket,
       createTicket,
       updateTicket,
       deleteTicket,
@@ -1085,7 +1194,11 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setActiveProjectId,
       fetchInitialData,
       fetchProjectData,
-      createDomain,
+      createLabel,
+      updateLabel,
+      deleteLabel,
+      assignLabelToTicket,
+      unassignLabelFromTicket,
       createTicket,
       updateTicket,
       deleteTicket,

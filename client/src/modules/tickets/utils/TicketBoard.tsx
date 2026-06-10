@@ -1,6 +1,6 @@
 import { ArrowDown, ArrowRight, ArrowUp, Minus, ShieldAlert } from 'lucide-react';
 import type { ReactNode } from 'react';
-import type { Domain, Ticket } from '../../../context/TicketContext';
+import type { Ticket } from '../../../context/TicketContext';
 
 const PRIORITY_FILTER_VALUES: Array<[string, string]> = [
   ['', 'Any Priority'],
@@ -47,14 +47,6 @@ export function getPriorityColor(priority: Ticket['priority']) {
   }
 }
 
-export function getDomainMeta(domainById: Record<string, Domain>, domainId: string | null) {
-  if (!domainId) {
-    return { color: 'transparent', name: '' };
-  }
-
-  const domain = domainById[domainId];
-  return domain ? { color: domain.color, name: domain.name } : { color: 'transparent', name: '' };
-}
 
 export function getAssigneeAvatar(userAvatarById: Record<string, string>, assigneeId: string | null) {
   if (!assigneeId) {

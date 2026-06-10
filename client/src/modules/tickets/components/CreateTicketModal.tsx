@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import type { Ticket } from '../../../context/TicketContext';
-import { Button, Select, Modal, Alert, Textarea } from '@library';
+import { Button, Select, Modal, Alert, Textarea, Popover } from '@library';
 import { AlertCircle } from 'lucide-react';
 import type { CreateTicketModalProps } from '../types/CreateTicketModal';
 import { PRIORITY_OPTIONS, STATUS_OPTIONS } from '../utils/CreateTicketModal';
@@ -8,7 +8,7 @@ import { PRIORITY_OPTIONS, STATUS_OPTIONS } from '../utils/CreateTicketModal';
 export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
   onClose,
   projects,
-  domains,
+  labels,
   cycles,
   users,
   parentTicket,
@@ -23,7 +23,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
   const [status, setStatus] = useState<Ticket['status']>(initialStatus || 'todo');
   const [priority, setPriority] = useState<Ticket['priority']>('no_priority');
   const [assigneeId, setAssigneeId] = useState('');
-  const [domainId, setDomainId] = useState('');
+  const [labelIds, setLabelIds] = useState<string[]>([]);
   const [cycleId, setCycleId] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -52,7 +52,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
       status,
       priority,
       projectId,
-      domainId: domainId || null,
+      labelIds,
       cycleId: cycleId || null,
       assigneeId: assigneeId || null,
       parentId: parentId || null
@@ -63,7 +63,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
     } else {
       setFormError('Failed to create the ticket.');
     }
-  }, [title, description, status, priority, projectId, domainId, cycleId, assigneeId, parentId, onSubmitTicket, onClose]);
+  }, [title, description, status, priority, projectId, labelIds, cycleId, assigneeId, parentId, onSubmitTicket, onClose]);
 
   // Handle keyboard shortcut Esc to close
   useEffect(() => {
@@ -80,7 +80,6 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
 
   const projectOptions = projects.map((project) => ({ value: project.id, label: project.name }));
   const assigneeOptions = [{ value: '', label: 'Unassigned' }, ...users.map((user) => ({ value: user.id, label: user.name }))];
-  const domainOptions = [{ value: '', label: 'No Domain' }, ...domains.map((domain) => ({ value: domain.id, label: domain.name }))];
   const cycleOptions = [{ value: '', label: 'No Cycle' }, ...cycles.map((cycle) => ({ value: cycle.id, label: cycle.name }))];
 
   const modalTitle = parentTicket ? `Create Subtask for ${parentTicket.key}` : 'Create New Issue';
@@ -201,13 +200,89 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
           </div>
 
           <div>
-            <span className="label" style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-disabled)', marginBottom: '4px' }}>Domain</span>
-            <Select
-              value={domainId}
-              onValueChange={(nextDomainId: string) => setDomainId(nextDomainId)}
-              options={domainOptions}
-              aria-label="Select domain"
-            />
+            <span className="label" style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-disabled)', marginBottom: '4px' }}>Labels</span>
+            <Popover
+              align="left"
+              trigger={
+                <button
+                  type="button"
+                  className="clickable"
+                  style={{
+                    width: '100%',
+                    padding: '6px 10px',
+                    fontSize: '13px',
+                    background: 'var(--color-surface-card)',
+                    border: '1px solid var(--color-border-default)',
+                    borderRadius: '6px',
+                    color: labelIds.length > 0 ? 'var(--color-text-primary)' : 'var(--color-text-disabled)',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    minHeight: '34px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <span>
+                    {labelIds.length > 0
+                      ? `${labelIds.length} label${labelIds.length > 1 ? 's' : ''} selected`
+                      : 'Select labels'}
+                  </span>
+                </button>
+              }
+            >
+              <div style={{ width: '200px', padding: '10px', background: 'var(--color-surface-overlay)', borderRadius: '6px', border: '1px solid var(--color-border-default)', boxShadow: 'var(--shadow-md)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)', marginBottom: '4px' }}>
+                  Select Labels
+                </div>
+                <div style={{ maxHeight: '150px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  {labels.filter(l => l.projectId === projectId).length > 0 ? (
+                    labels.filter(l => l.projectId === projectId).map((l) => {
+                      const isChecked = labelIds.includes(l.id);
+                      return (
+                        <label
+                          key={l.id}
+                          className="clickable"
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            fontSize: '12px',
+                            color: 'var(--color-text-primary)',
+                            cursor: 'pointer',
+                            padding: '4px 6px',
+                            borderRadius: '4px',
+                            background: isChecked ? 'rgba(255,255,255,0.03)' : 'transparent',
+                            userSelect: 'none',
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => {
+                              if (isChecked) {
+                                setLabelIds(labelIds.filter((id) => id !== l.id));
+                              } else {
+                                setLabelIds([...labelIds, l.id]);
+                              }
+                            }}
+                            style={{ cursor: 'pointer' }}
+                          />
+                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: l.color, flexShrink: 0 }} />
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {l.name}
+                          </span>
+                        </label>
+                      );
+                    })
+                  ) : (
+                    <div style={{ fontSize: '11px', color: 'var(--color-text-disabled)', textAlign: 'center', padding: '8px 0' }}>
+                      No labels in this project
+                    </div>
+                  )}
+                </div>
+              </div>
+            </Popover>
           </div>
 
           <div>

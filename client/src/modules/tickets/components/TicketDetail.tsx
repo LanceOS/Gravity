@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import type { Ticket } from '../../../context/TicketContext';
-import { Button, Select, Textarea, MarkdownEditor, toast, ClickAwayListener, Portal, Accordion } from '@library';
+import { Button, Select, Textarea, MarkdownEditor, toast, ClickAwayListener, Portal, Accordion, Popover } from '@library';
 import generateBranchName from '../../../utils/branch';
 import TicketUtilities from './TicketUtilities';
 
@@ -70,14 +70,16 @@ function sanitizeTicketUrlBase(raw?: string): string {
 const TICKET_URL_BASE = sanitizeTicketUrlBase((typeof import.meta !== 'undefined' && (import.meta as unknown as { env?: Record<string, string | undefined> }).env?.VITE_TICKET_URL_BASE) || undefined);
 import { 
   CheckSquare, GitPullRequest, GitMerge, Send, Trash2,
-  Plus, Edit3, ChevronLeft, MoreHorizontal, Link, FileText, CornerLeftUp
+  Plus, Edit3, ChevronLeft, MoreHorizontal, Link, FileText, CornerLeftUp, X
 } from 'lucide-react';
 import { MarkdownContent } from './MarkdownContent';
 import { TicketRow } from './TicketRow';
 import { TicketRowMobile } from './TicketRowMobile';
-import { getPriorityIcon, getAssigneeAvatar, getDomainTag } from '../utils/TicketList';
+import { getPriorityIcon, getAssigneeAvatar } from '../utils/TicketList';
 import type { TicketDetailProps } from '../types/TicketDetail';
 import { PRIORITY_OPTIONS, STATUS_OPTIONS } from '../utils/TicketDetail';
+import { useTickets, type Label } from '../../../context/TicketContext';
+import { LabelBadge } from './LabelBadge';
 import './TicketDetail.css';
 
 export const TicketDetail: React.FC<TicketDetailProps> = ({
@@ -88,7 +90,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
   subtaskProgressPercent,
   users,
   projects,
-  domains,
+  labels,
   cycles,
   onSelectTicket,
   onUpdateTicket,
@@ -103,6 +105,28 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
 }) => {
   const [commentInput, setCommentInput] = useState('');
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+
+  const { assignLabelToTicket, unassignLabelFromTicket, createLabel: createLabelInContext } = useTickets();
+
+  const handleAssignLabel = useCallback(async (labelId: string) => {
+    await assignLabelToTicket(activeTicket.id, labelId);
+  }, [assignLabelToTicket, activeTicket.id]);
+
+  const handleUnassignLabel = useCallback(async (labelId: string) => {
+    await unassignLabelFromTicket(activeTicket.id, labelId);
+  }, [unassignLabelFromTicket, activeTicket.id]);
+
+  const handleCreateLabel = useCallback(async (name: string, color: string) => {
+    const newLabel = await createLabelInContext({
+      name,
+      color,
+      projectId: activeTicket.projectId,
+      description: '',
+    });
+    if (newLabel) {
+      await assignLabelToTicket(activeTicket.id, newLabel.id);
+    }
+  }, [createLabelInContext, assignLabelToTicket, activeTicket.id, activeTicket.projectId]);
 
   const [openMenuCommentId, setOpenMenuCommentId] = useState<string | null>(null);
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
@@ -159,7 +183,6 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
 
   const assigneeOptions = [{ value: '', label: 'Unassigned' }, ...users.map((user) => ({ value: user.id, label: user.name }))];
   const projectOptions = projects.map((project) => ({ value: project.id, label: project.name }));
-  const domainOptions = [{ value: '', label: 'No Domain' }, ...domains.map((domain) => ({ value: domain.id, label: domain.name }))];
   const cycleOptions = [{ value: '', label: 'No Cycle' }, ...cycles.map((cycle) => ({ value: cycle.id, label: cycle.name }))];
 
   const propertiesContent = (
@@ -221,14 +244,70 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
         </div>
       </div>
 
-      <div>
-        <span className="label">Domain</span>
-        <Select
-          value={activeTicket.domainId || ''}
-          onValueChange={(nextDomainId: string) => onUpdateTicket(activeTicket.id, { domainId: nextDomainId || null })}
-          options={domainOptions}
-          aria-label="Select ticket domain"
-        />
+      <div style={{ gridColumn: 'span 2' }}>
+        <span className="label" style={{ marginBottom: '8px', display: 'block' }}>Labels</span>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+          {activeTicket.labels && activeTicket.labels.length > 0 ? (
+            activeTicket.labels.map((l) => (
+              <LabelBadge
+                key={l.id}
+                label={l}
+                size="sm"
+                onRemove={() => handleUnassignLabel(l.id)}
+              />
+            ))
+          ) : (
+            <span style={{ fontSize: '12px', color: 'var(--color-text-disabled)', fontStyle: 'italic' }}>
+              No labels assigned
+            </span>
+          )}
+          
+          <Popover
+            align="left"
+            contentClassName="ticket-detail__label-popover"
+            trigger={
+              <button
+                type="button"
+                className="clickable"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '4px',
+                  padding: '2px 8px',
+                  borderRadius: '12px',
+                  background: 'var(--color-base100)',
+                  border: '1px dashed var(--color-border-default)',
+                  color: 'var(--color-text-secondary)',
+                  fontSize: '11px',
+                  fontWeight: 550,
+                  cursor: 'pointer',
+                  height: '20px',
+                  transition: 'all 150ms ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--color-primary)';
+                  e.currentTarget.style.color = 'var(--color-text-primary)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--color-border-default)';
+                  e.currentTarget.style.color = 'var(--color-text-secondary)';
+                }}
+              >
+                <Plus size={10} />
+                <span>Add Label</span>
+              </button>
+            }
+          >
+            <LabelManagerPopoverContent
+              activeTicket={activeTicket}
+              allLabels={labels}
+              onAssign={handleAssignLabel}
+              onUnassign={handleUnassignLabel}
+              onCreate={handleCreateLabel}
+            />
+          </Popover>
+        </div>
       </div>
 
       <div>
@@ -428,14 +507,12 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {(() => {
                     const userAvatarById = Object.fromEntries(users.map((u) => [u.id, u.avatar]));
-                    const domainById = Object.fromEntries(domains.map((d) => [d.id, d]));
                     return subtasks.map((sub) => {
                       const rowProps = {
                         ticket: sub,
                         onClick: onSelectTicket,
                         priorityIcon: getPriorityIcon(sub.priority),
                         assigneeAvatar: getAssigneeAvatar(userAvatarById, sub.assigneeId),
-                        domainTag: getDomainTag(domainById, sub.domainId),
                       };
                       return (
                         <React.Fragment key={sub.id}>
@@ -811,5 +888,183 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
 
 
     </>
+  );
+};
+
+interface LabelManagerPopoverContentProps {
+  activeTicket: Ticket;
+  allLabels: Label[];
+  onAssign: (id: string) => Promise<void>;
+  onUnassign: (id: string) => Promise<void>;
+  onCreate: (name: string, color: string) => Promise<void>;
+}
+
+const LabelManagerPopoverContent: React.FC<LabelManagerPopoverContentProps> = ({
+  activeTicket,
+  allLabels,
+  onAssign,
+  onUnassign,
+  onCreate,
+}) => {
+  const [search, setSearch] = useState('');
+  const [selectedColor, setSelectedColor] = useState('#3b82f6');
+  const [isCreating, setIsCreating] = useState(false);
+
+  const colors = [
+    '#ef4444', // Red
+    '#f97316', // Orange
+    '#f59e0b', // Amber/Yellow
+    '#10b981', // Green
+    '#3b82f6', // Blue
+    '#6366f1', // Indigo
+    '#8b5cf6', // Purple
+    '#ec4899', // Pink
+    '#6b7280', // Gray
+  ];
+
+  const projectLabels = useMemo(() => {
+    return allLabels.filter((l) => l.projectId === activeTicket.projectId);
+  }, [allLabels, activeTicket.projectId]);
+
+  const filteredLabels = useMemo(() => {
+    if (!search.trim()) return projectLabels;
+    return projectLabels.filter((l) =>
+      l.name.toLowerCase().includes(search.toLowerCase().trim())
+    );
+  }, [projectLabels, search]);
+
+  const assignedLabelIds = useMemo(() => {
+    return new Set(activeTicket.labels?.map((l) => l.id) || []);
+  }, [activeTicket.labels]);
+
+  const hasExactMatch = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return projectLabels.some((l) => l.name.toLowerCase() === term);
+  }, [projectLabels, search]);
+
+  const handleCreate = async () => {
+    if (!search.trim() || isCreating) return;
+    setIsCreating(true);
+    try {
+      await onCreate(search.trim(), selectedColor);
+      setSearch('');
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  return (
+    <div style={{ width: '220px', padding: '12px', background: 'var(--color-surface-overlay)', borderRadius: '8px', border: '1px solid var(--color-border-default)', boxShadow: 'var(--shadow-lg)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+      <div style={{ fontSize: '11px', fontWeight: 650, color: 'var(--color-text-disabled)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        Search or Create Label
+      </div>
+      
+      <input
+        type="text"
+        placeholder="Type to search or create..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        style={{
+          width: '100%',
+          padding: '6px 8px',
+          fontSize: '12px',
+          background: 'var(--color-base50)',
+          border: '1px solid var(--color-border-default)',
+          borderRadius: '4px',
+          color: 'var(--color-text-primary)',
+          outline: 'none',
+        }}
+        autoFocus
+      />
+      
+      <div style={{ maxHeight: '160px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px', margin: '4px 0' }}>
+        {filteredLabels.length > 0 ? (
+          filteredLabels.map((label) => {
+            const isAssigned = assignedLabelIds.has(label.id);
+            return (
+              <label
+                key={label.id}
+                className="clickable"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  fontSize: '12px',
+                  color: 'var(--color-text-primary)',
+                  cursor: 'pointer',
+                  padding: '4px 6px',
+                  borderRadius: '4px',
+                  background: isAssigned ? 'rgba(255,255,255,0.03)' : 'transparent',
+                  userSelect: 'none',
+                  transition: 'background 150ms ease',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
+                onMouseLeave={(e) => (e.currentTarget.style.background = isAssigned ? 'rgba(255,255,255,0.03)' : 'transparent')}
+              >
+                <input
+                  type="checkbox"
+                  checked={isAssigned}
+                  onChange={async () => {
+                    if (isAssigned) {
+                      await onUnassign(label.id);
+                    } else {
+                      await onAssign(label.id);
+                    }
+                  }}
+                  style={{ cursor: 'pointer' }}
+                />
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: label.color, flexShrink: 0 }} />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {label.name}
+                </span>
+              </label>
+            );
+          })
+        ) : (
+          <div style={{ fontSize: '11px', color: 'var(--color-text-disabled)', textAlign: 'center', padding: '8px 0' }}>
+            No matching labels
+          </div>
+        )}
+      </div>
+
+      {search.trim() && !hasExactMatch && (
+        <div style={{ borderTop: '1px solid var(--color-border-default)', paddingTop: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-text-disabled)' }}>
+            CREATE NEW LABEL:
+          </div>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px' }}>
+            {colors.map((color) => (
+              <button
+                key={color}
+                type="button"
+                onClick={() => setSelectedColor(color)}
+                style={{
+                  width: '20px',
+                  height: '20px',
+                  borderRadius: '50%',
+                  background: color,
+                  border: selectedColor === color ? '2px solid var(--color-text-primary)' : '1px solid rgba(0,0,0,0.2)',
+                  cursor: 'pointer',
+                  padding: 0,
+                  transform: selectedColor === color ? 'scale(1.1)' : 'none',
+                  transition: 'all 100ms ease',
+                }}
+              />
+            ))}
+          </div>
+          
+          <Button
+            size="sm"
+            variant="primary"
+            onClick={handleCreate}
+            disabled={isCreating}
+            style={{ width: '100%', fontSize: '11px', height: '24px', padding: '0 8px' }}
+          >
+            Create "{search.trim()}"
+          </Button>
+        </div>
+      )}
+    </div>
   );
 };

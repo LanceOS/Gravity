@@ -1,16 +1,18 @@
-import type { Cycle, Domain, Project, Ticket, User } from '../../../context/TicketContext';
+import type { Cycle, Label, Project, Ticket, User } from '../../../context/TicketContext';
 
 export interface TicketFilters {
   status: string;
   priority: string;
   projectId: string;
-  domainId: string;
+  domainId?: string;
+  labels?: string[];
+  labelMode?: 'all' | 'any';
   cycleId: string;
   assigneeId: string;
   search: string;
 }
 
-export type TicketListSort = 'created' | 'domain' | 'newest' | 'oldest' | 'priority_desc' | 'priority_asc' | 'updated_desc' | 'updated_asc';
+export type TicketListSort = 'created' | 'label' | 'newest' | 'oldest' | 'priority_desc' | 'priority_asc' | 'updated_desc' | 'updated_asc';
 
 export type TicketsByStatus = Record<Ticket['status'], Ticket[]>;
 
@@ -45,7 +47,20 @@ export function filterTickets(tickets: Ticket[], filters: TicketFilters): Ticket
       if (!priorities.includes(ticket.priority)) return false;
     }
     if (filters.projectId && ticket.projectId !== filters.projectId) return false;
+
     if (filters.domainId && ticket.domainId !== filters.domainId) return false;
+
+    if (filters.labels && filters.labels.length > 0) {
+      const mode = filters.labelMode || 'any';
+      if (mode === 'all') {
+        const hasAll = filters.labels.every((lId) => ticket.labelIds?.includes(lId));
+        if (!hasAll) return false;
+      } else {
+        const hasAny = filters.labels.some((lId) => ticket.labelIds?.includes(lId));
+        if (!hasAny) return false;
+      }
+    }
+    
     if (filters.cycleId && ticket.cycleId !== filters.cycleId) return false;
     if (filters.assigneeId && ticket.assigneeId !== filters.assigneeId) return false;
 
@@ -95,7 +110,7 @@ export function groupTicketsByStatus(tickets: Ticket[]): TicketsByStatus {
 
 export function sortTicketsForList(
   tickets: Ticket[],
-  domainById: Record<string, Domain>,
+  labelById: Record<string, Label>,
   sort: TicketListSort,
 ): Ticket[] {
   if (sort === 'created') {
@@ -105,15 +120,15 @@ export function sortTicketsForList(
   const priorityWeights = { urgent: 4, high: 3, medium: 2, low: 1, no_priority: 0 };
 
   return [...tickets].sort((first, second) => {
-    if (sort === 'domain') {
-      const firstDomain = first.domainId ? domainById[first.domainId] : undefined;
-      const secondDomain = second.domainId ? domainById[second.domainId] : undefined;
+    if (sort === 'label') {
+      const firstLabel = first.labelIds?.[0] ? labelById[first.labelIds[0]] : undefined;
+      const secondLabel = second.labelIds?.[0] ? labelById[second.labelIds[0]] : undefined;
 
-      if (firstDomain && !secondDomain) return -1;
-      if (!firstDomain && secondDomain) return 1;
-      if (firstDomain && secondDomain) {
-        const domainComparison = firstDomain.name.localeCompare(secondDomain.name);
-        if (domainComparison !== 0) return domainComparison;
+      if (firstLabel && !secondLabel) return -1;
+      if (!firstLabel && secondLabel) return 1;
+      if (firstLabel && secondLabel) {
+        const labelComparison = firstLabel.name.localeCompare(secondLabel.name);
+        if (labelComparison !== 0) return labelComparison;
       }
       return first.createdAt.localeCompare(second.createdAt);
     }
@@ -153,6 +168,7 @@ export function hasActiveTicketFilters(filters: TicketFilters): boolean {
       filters.priority ||
       filters.status ||
       filters.domainId ||
+      (filters.labels && filters.labels.length > 0) ||
       filters.cycleId ||
       filters.assigneeId
   );
@@ -162,14 +178,23 @@ export function getWorkspaceHeaderTitle(
   filters: TicketFilters,
   currentUser: User | null,
   projects: Project[],
-  domains: Domain[],
+  labels: Label[],
   cycles: Cycle[]
 ): string {
   if (filters.assigneeId === currentUser?.id) return 'My Issues';
 
+  if (filters.labels && filters.labels.length > 0) {
+    const labelNames = filters.labels
+      .map((lId) => labels.find((item) => item.id === lId)?.name)
+      .filter(Boolean);
+    if (labelNames.length > 0) {
+      return `${labelNames.join(', ')} Label${labelNames.length > 1 ? 's' : ''}`;
+    }
+    return 'Label Issues';
+  }
+
   if (filters.domainId) {
-    const domain = domains.find((item) => item.id === filters.domainId);
-    return domain ? `${domain.name} Domain` : 'Domain Issues';
+    return 'Label Issues';
   }
 
   if (filters.cycleId) {
