@@ -68,7 +68,9 @@ export class RustFS {
       return Buffer.from(arrayBuffer);
     } catch (err: any) {
       if (err.name === 'NoSuchKey' || err.name === 'NotFound') {
-        throw new Error(`ENOENT: no such file or directory, open '${key}'`);
+        const error = new Error(`ENOENT: no such file or directory, open '${key}'`);
+        (error as any).code = 'ENOENT';
+        throw error;
       }
       throw err;
     }

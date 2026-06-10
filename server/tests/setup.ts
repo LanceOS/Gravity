@@ -9,9 +9,59 @@ process.env.OLLAMA_DEFAULT_ENDPOINT = 'http://localhost:11434';
 process.env.ALLOW_ENV_AI_KEYS = 'true';
 process.env.ALLOW_DEV_AUTH_BYPASS = 'true';
 process.env.REDIS_ENABLED = 'false';
-process.env.RUSTFS_BASE_PATH = '/tmp/rustfs_test';
-
 const { afterEach, beforeAll, beforeEach, vi } = await import('vitest');
+
+const memfs = new Map<string, Buffer>();
+
+vi.mock('../src/lib/rustfs.js', () => {
+  return {
+    RustFS: {
+      getBucketPath: (projectId: string, userId: string, noteUuid: string) => `notes/${projectId}/${userId}/${noteUuid}`,
+      saveFile: async (bucketPath: string, filename: string, content: string | Buffer) => {
+        const key = `${bucketPath}/${filename}`;
+        memfs.set(key, Buffer.isBuffer(content) ? content : Buffer.from(content));
+      },
+      readFile: async (bucketPath: string, filename: string) => {
+        const key = `${bucketPath}/${filename}`;
+        const buf = memfs.get(key);
+        if (!buf) {
+          const err: any = new Error(`ENOENT: no such file or directory, open '${key}'`);
+          err.code = 'ENOENT';
+          throw err;
+        }
+        return buf;
+      },
+      readFileUtf8: async (bucketPath: string, filename: string) => {
+        const key = `${bucketPath}/${filename}`;
+        const buf = memfs.get(key);
+        if (!buf) {
+          const err: any = new Error(`ENOENT: no such file or directory, open '${key}'`);
+          err.code = 'ENOENT';
+          throw err;
+        }
+        return buf.toString('utf-8');
+      },
+      deleteFile: async (bucketPath: string, filename: string) => {
+        const key = `${bucketPath}/${filename}`;
+        memfs.delete(key);
+      },
+      deleteBucket: async (bucketPath: string) => {
+        const prefix = `${bucketPath}/`;
+        for (const key of memfs.keys()) {
+          if (key.startsWith(prefix)) memfs.delete(key);
+        }
+      },
+      listFiles: async (bucketPath: string) => {
+        const prefix = `${bucketPath}/`;
+        const files: string[] = [];
+        for (const key of memfs.keys()) {
+          if (key.startsWith(prefix)) files.push(key.substring(prefix.length));
+        }
+        return files;
+      }
+    }
+  };
+});
 const { initializeDatabase } = await import('../src/db/bootstrap.js');
 const { resetDatabase } = await import('./helpers/test-helpers.js');
 
