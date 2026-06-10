@@ -25,6 +25,8 @@ type MockTextInputProps = React.InputHTMLAttributes<HTMLInputElement> & {
 };
 
 type MockTextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
+  label?: string;
+  inputStyle?: React.CSSProperties;
   value: string;
   onChange: (event: ChangeEvent<HTMLTextAreaElement>) => void;
 };
@@ -61,7 +63,18 @@ vi.mock('@library', () => ({
     ) : null,
   Alert: ({ children }: { children: ReactNode }) => <div role="alert">{children}</div>,
   TextInput: ({ value, onChange, ...props }: MockTextInputProps) => <input value={value} onChange={onChange} {...props} />,
-  Textarea: ({ value, onChange, autoGrow, ...props }: any) => <textarea value={value} onChange={onChange} {...props} />,
+  Textarea: ({ label, value, onChange, inputStyle: _inputStyle, autoGrow: _autoGrow, ...props }: MockTextareaProps) => (
+    <div>
+      {label ? (
+        <label>
+          {label}
+          <textarea value={value} onChange={onChange} {...props} />
+        </label>
+      ) : (
+        <textarea value={value} onChange={onChange} {...props} />
+      )}
+    </div>
+  ),
   Popover: ({ trigger, children }: any) => (
     <div>
       {trigger}
@@ -158,7 +171,7 @@ describe('CreateTicketModal', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Please enter a ticket title.');
     expect(props.onSubmitTicket).not.toHaveBeenCalled();
 
-    await user.type(screen.getByPlaceholderText('Issue title'), '  Fix sync retries  ');
+    await user.type(screen.getByLabelText('Issue Title'), '  Fix sync retries  ');
     await user.type(screen.getByLabelText('Description'), '  Retry failed SSE subscription  ');
     await user.selectOptions(screen.getByLabelText('Select status'), 'in_review');
     await user.selectOptions(screen.getByLabelText('Select priority'), 'high');
@@ -216,7 +229,7 @@ describe('CreateTicketModal', () => {
     expect(screen.getByLabelText('Select project')).toHaveValue('project-2');
     expect(screen.getByLabelText('Select status')).toHaveValue('backlog');
 
-    await user.type(screen.getByPlaceholderText('Issue title'), 'Child task');
+    await user.type(screen.getByLabelText('Issue Title'), 'Child task');
     fireEvent.keyDown(window, { key: 'Enter', ctrlKey: true });
 
     await waitFor(() => {
