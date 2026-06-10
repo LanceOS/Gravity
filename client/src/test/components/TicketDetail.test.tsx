@@ -372,7 +372,7 @@ describe('TicketDetail', () => {
 
     await user.type(screen.getByPlaceholderText('Post updates, links, or mention PRs...'), 'Comment from test');
     expect(screen.getByPlaceholderText('Post updates, links, or mention PRs...')).toHaveAttribute('data-toolbar-mode', 'bubble');
-    expect(screen.getByPlaceholderText('Post updates, links, or mention PRs...')).toHaveAttribute('data-surface', 'compact');
+    expect(screen.getByPlaceholderText('Post updates, links, or mention PRs...')).toHaveAttribute('data-surface', 'bare');
     await user.click(screen.getByRole('button', { name: 'Comment' }));
     await waitFor(() => {
       expect(props.onAddComment).toHaveBeenCalledWith('ticket-1', expect.stringContaining('"type":"doc"'));
@@ -518,7 +518,7 @@ describe('TicketDetail', () => {
     expect(screen.queryByRole('button', { name: 'Edit Comment' })).not.toBeInTheDocument();
     const commentEditInput = screen.getByPlaceholderText('Edit comment...');
     expect(commentEditInput).toHaveAttribute('data-toolbar-mode', 'bubble');
-    expect(commentEditInput).toHaveAttribute('data-surface', 'compact');
+    expect(commentEditInput).toHaveAttribute('data-surface', 'bare');
     await user.clear(commentEditInput);
     await user.type(commentEditInput, 'PR is approved now.');
     await user.click(screen.getByRole('button', { name: 'Save' }));

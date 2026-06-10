@@ -10,10 +10,6 @@
   overflow: hidden;
 }
 
-.rich-text-editor--compact .rich-text-editor__editor {
-  padding: 8px 10px 10px;
-}
-
 .rich-text-editor--bare {
   height: auto;
   border: none;
@@ -32,7 +28,6 @@
 }
 
 .rich-text-editor--bare .rich-text-editor__editor {
-  padding: 0;
   min-height: var(--rich-text-editor-min-height, 40px);
   background: transparent;
 }
@@ -121,7 +116,7 @@
   width: 100%;
   height: 100%;
   min-height: var(--rich-text-editor-min-height, 180px);
-  padding: 12px 14px 14px;
+  padding: 0;
   outline: none;
   color: var(--color-text-primary);
   font-family: inherit;
@@ -212,8 +207,8 @@
 
 .rich-text-editor__placeholder {
   position: absolute;
-  top: 12px;
-  left: 14px;
+  top: 0;
+  left: 0;
   color: var(--color-text-disabled);
   opacity: 0.75;
   pointer-events: none;

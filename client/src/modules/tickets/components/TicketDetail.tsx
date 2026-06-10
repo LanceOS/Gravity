@@ -73,6 +73,7 @@ import {
   Plus, Edit3, ChevronLeft, MoreHorizontal, Link, FileText, CornerLeftUp
 } from 'lucide-react';
 import { MarkdownContent } from './MarkdownContent';
+import { CommentEditor } from './CommentEditor';
 import { TicketRow } from './TicketRow';
 import { TicketRowMobile } from './TicketRowMobile';
 import { getPriorityIcon, getAssigneeAvatar } from '../utils/TicketList';
@@ -716,14 +717,11 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                         >
                         {editingCommentId === comment.id ? (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
-                            <RichTextEditor
+                            <CommentEditor
                               value={editingCommentBody}
                               onChange={setEditingCommentBody}
                               placeholder="Edit comment..."
-                              minHeight="40px"
                               autoFocus
-                              surface="compact"
-                              toolbarMode="bubble"
                             />
                             <div style={{ display: 'flex', gap: '6px', alignSelf: 'flex-end' }}>
                               <Button
@@ -758,19 +756,15 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
               </div>
 
               <form onSubmit={handlePostComment} className="ticket-detail__comment-form">
-              <RichTextEditor
+              <CommentEditor
                 placeholder="Post updates, links, or mention PRs..."
                 value={commentInput}
                 onChange={setCommentInput}
-                minHeight="40px"
                 className="ticket-detail__comment-editor"
-                surface="compact"
-                toolbarMode="bubble"
               />
                 <Button
                   type="submit"
                   variant="primary"
-                  style={{ padding: '8px 16px', height: '34px' }}
                 >
                   <Send size={12} />
                   <span>Comment</span>

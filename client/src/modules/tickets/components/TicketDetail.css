@@ -72,9 +72,8 @@
 
 .ticket-detail__comment-form {
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: 10px;
-  margin-top: 12px;
   width: 100%;
 }
 
@@ -87,9 +86,6 @@
   width: 100%;
 }
 
-.ticket-detail__description-editor .rich-text-editor__editor {
-  min-height: 40px;
-}
 
 .ticket-detail__sidebar {
   width: 320px;
@@ -139,6 +135,7 @@
 
   .ticket-detail__comment-editor {
     width: 100%;
+    padding: 0;
   }
 
   .ticket-detail__sidebar {
