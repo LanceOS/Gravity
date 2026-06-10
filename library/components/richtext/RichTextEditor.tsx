@@ -24,6 +24,7 @@ export interface RichTextEditorProps {
   readOnly?: boolean;
   onBlur?: () => void;
   toolbarMode?: 'full' | 'bubble' | 'none';
+  style?: React.CSSProperties;
 }
 
 export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(function RichTextEditor(
@@ -38,6 +39,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
     readOnly = false,
     onBlur,
     toolbarMode = 'full',
+    style,
   },
   ref,
 ) {
@@ -74,7 +76,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
 
   return (
     <EditorContext.Provider value={{ view, state, readOnly, toolbarMode }}>
-      <div className={cn('rich-text-editor', `rich-text-editor--${surface}`, className)}>
+      <div className={cn('rich-text-editor', `rich-text-editor--${surface}`, className)} style={style}>
         {toolbarMode === 'full' && <Toolbar />}
         {toolbarMode === 'bubble' && <BubbleMenu />}
         <div className="rich-text-editor__content">

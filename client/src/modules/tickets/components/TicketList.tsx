@@ -2,7 +2,7 @@ import React from 'react';
 import type { Ticket } from '../../../context/TicketContext';
 import { Compass } from 'lucide-react';
 import { TicketRow } from './TicketRow';
-import { TicketRowMobile } from './TicketRowMobile';
+import { TicketRowMobile } from './TicketRowMobile/TicketRowMobile';
 
 import type { TicketListProps } from '../types/TicketList';
 import { getAssigneeAvatar, getPriorityIcon, getStatusLabel, getStatusColor } from '../utils/TicketList';
@@ -69,7 +69,7 @@ export const TicketList: React.FC<TicketListProps> = ({
                     return (
                       <React.Fragment key={ticket.id}>
                         <div className="ticket-list__row-desktop">
-                           <TicketRow {...rowProps} />
+                          <TicketRow {...rowProps} />
                         </div>
                         <div className="ticket-list__row-mobile">
                           <TicketRowMobile {...rowProps} />

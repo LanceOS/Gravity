@@ -8,6 +8,7 @@
   border-radius: var(--radius-md);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.018), rgba(255, 255, 255, 0.01));
   overflow: hidden;
+  font-size: 14px;
 }
 
 .rich-text-editor--bare {
@@ -120,7 +121,7 @@
   outline: none;
   color: var(--color-text-primary);
   font-family: inherit;
-  font-size: 14px;
+  font-size: inherit;
   line-height: 1.6;
   background: transparent;
 }
@@ -131,6 +132,10 @@
 
 .rich-text-editor__editor p {
   margin-bottom: 0.85em;
+}
+
+.rich-text-editor__editor p:last-child {
+  margin-bottom: 0;
 }
 
 .rich-text-editor__editor h1,

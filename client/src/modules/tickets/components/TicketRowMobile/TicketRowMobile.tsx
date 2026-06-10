@@ -1,7 +1,7 @@
 import { memo, useState, useCallback } from 'react';
 import { Paperclip } from 'lucide-react';
-import type { TicketRowProps } from '../types/TicketList';
-import { LabelBadge } from './LabelBadge';
+import type { TicketRowProps } from '../../types/TicketList';
+import { LabelBadge } from '../LabelBadge';
 import './TicketRowMobile.css';
 
 function TicketRowMobileImpl({ ticket, onClick, priorityIcon, assigneeAvatar }: TicketRowProps) {

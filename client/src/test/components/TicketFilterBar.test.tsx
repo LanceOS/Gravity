@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { TicketFilterBar } from '../../modules/tickets/components/TicketFilterBar';
+import { TicketFilterBar } from '../../modules/tickets/components/TicketFilterBar/TicketFilterBar';
 
 vi.mock('@library', () => ({
   Button: ({ children, onClick }: any) => <button onClick={onClick}>{children}</button>,

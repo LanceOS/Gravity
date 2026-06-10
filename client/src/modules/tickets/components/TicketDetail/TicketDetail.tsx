@@ -1,8 +1,8 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import type { Ticket } from '../../../context/TicketContext';
+import type { Ticket } from '../../../../context/TicketContext';
 import { Button, Select, MarkdownEditor, RichTextEditor, toast, ClickAwayListener, Portal, Accordion, Popover, createEmptyRichTextValue, isRichTextEmpty, serializeRichTextMarkdown } from '@library';
-import generateBranchName from '../../../utils/branch';
-import TicketUtilities from './TicketUtilities';
+import generateBranchName from '../../../../utils/branch';
+import TicketUtilities from '../TicketUtilities';
 
 const DEFAULT_TICKET_URL_BASE = 'https://tickets.placeholder.local';
 
@@ -72,16 +72,16 @@ import {
   GitPullRequest, GitMerge, Send, Trash2,
   Plus, Edit3, ChevronLeft, MoreHorizontal, Link, FileText, CornerLeftUp
 } from 'lucide-react';
-import { MarkdownContent } from './MarkdownContent';
-import { CommentEditor } from './CommentEditor';
-import { TicketRow } from './TicketRow';
-import { TicketRowMobile } from './TicketRowMobile';
-import { getPriorityIcon, getAssigneeAvatar } from '../utils/TicketList';
-import type { TicketDetailProps } from '../types/TicketDetail';
-import { PRIORITY_OPTIONS, STATUS_OPTIONS } from '../utils/TicketDetail';
-import { useTickets } from '../../../context/TicketContext';
-import { LabelBadge } from './LabelBadge';
-import { LabelManagerPopoverContent } from './LabelManagerPopoverContent';
+import { MarkdownContent } from '../MarkdownContent';
+import { CommentEditor } from '../CommentEditor/CommentEditor';
+import { TicketRow } from '../TicketRow';
+import { TicketRowMobile } from '../TicketRowMobile/TicketRowMobile';
+import { getPriorityIcon, getAssigneeAvatar } from '../../utils/TicketList';
+import type { TicketDetailProps } from '../../types/TicketDetail';
+import { PRIORITY_OPTIONS, STATUS_OPTIONS } from '../../utils/TicketDetail';
+import { useTickets } from '../../../../context/TicketContext';
+import { LabelBadge } from '../LabelBadge';
+import { LabelManagerPopoverContent } from '../LabelManagerPopoverContent';
 import './TicketDetail.css';
 
 export const TicketDetail: React.FC<TicketDetailProps> = ({
@@ -135,16 +135,44 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
   const [editingCommentBody, setEditingCommentBody] = useState<string>('');
   const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
 
-  const [isEditingDescription, setIsEditingDescription] = useState(false);
-  const [editingDescriptionBody, setEditingDescriptionBody] = useState('');
+  const [editingDescriptionBody, setEditingDescriptionBody] = useState(() => activeTicket.description || createEmptyRichTextValue());
+  const lastSavedDescriptionRef = useRef(activeTicket.description);
+  const prevDescriptionRef = useRef(activeTicket.description);
+  const descriptionTicketIdRef = useRef(activeTicket.id);
 
   const closeCommentMenu = useCallback(() => setOpenMenuCommentId(null), []);
 
   useEffect(() => {
-    if (isEditingDescription) {
-      setEditingDescriptionBody(activeTicket.description || createEmptyRichTextValue());
+    const isNewTicket = descriptionTicketIdRef.current !== activeTicket.id;
+    const nextDescription = activeTicket.description || createEmptyRichTextValue();
+
+    if (isNewTicket) {
+      descriptionTicketIdRef.current = activeTicket.id;
+      setEditingDescriptionBody(nextDescription);
+      lastSavedDescriptionRef.current = activeTicket.description;
+      prevDescriptionRef.current = activeTicket.description;
+    } else {
+      const wasSavedByUs = activeTicket.description === lastSavedDescriptionRef.current;
+      if (!wasSavedByUs && activeTicket.description !== prevDescriptionRef.current) {
+        setEditingDescriptionBody(nextDescription);
+        lastSavedDescriptionRef.current = activeTicket.description;
+        prevDescriptionRef.current = activeTicket.description;
+      } else {
+        prevDescriptionRef.current = activeTicket.description;
+      }
     }
-  }, [activeTicket.description, isEditingDescription]);
+  }, [activeTicket.id, activeTicket.description]);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (editingDescriptionBody !== lastSavedDescriptionRef.current) {
+        lastSavedDescriptionRef.current = editingDescriptionBody;
+        void onUpdateTicket(activeTicket.id, { description: editingDescriptionBody });
+      }
+    }, 1500);
+
+    return () => clearTimeout(timeoutId);
+  }, [editingDescriptionBody, activeTicket.id, onUpdateTicket]);
 
   const ticketLink = useMemo(() => customTicketLink || `${TICKET_URL_BASE}/${activeTicket.key}`, [customTicketLink, activeTicket.key]);
 
@@ -478,69 +506,19 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--color-border-default)', paddingBottom: '6px' }}>
                 <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase' }}>Description</span>
-                {!isEditingDescription && (
-                  <Button
-                    onClick={() => {
-                      setEditingDescriptionBody(activeTicket.description || createEmptyRichTextValue());
-                      setIsEditingDescription(true);
-                    }}
-                    variant="ghost"
-                    size="sm"
-                    style={{ marginLeft: 'auto', padding: '2px 8px', fontSize: '11px' }}
-                  >
-                    <Edit3 size={12} />
-                    <span>Edit</span>
-                  </Button>
-                )}
               </div>
 
-              {isEditingDescription ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
-                  <RichTextEditor
-                    key={`edit-${activeTicket.id}`}
-                    value={editingDescriptionBody}
-                    onChange={setEditingDescriptionBody}
-                    placeholder="Describe your issue..."
-                    className="ticket-detail__description-editor"
-                    surface="bare"
-                    toolbarMode="bubble"
-                    autoFocus
-                  />
-                  <div style={{ display: 'flex', gap: '6px', alignSelf: 'flex-start' }}>
-                    <Button
-                      onClick={async () => {
-                        await onUpdateTicket(activeTicket.id, { description: editingDescriptionBody });
-                        setIsEditingDescription(false);
-                      }}
-                      variant="primary"
-                      size="sm"
-                    >
-                      Save
-                    </Button>
-                    <Button
-                      onClick={() => setIsEditingDescription(false)}
-                      size="sm"
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div
-                  className="ticket-detail__description-content"
-                  style={{ minHeight: '60px', padding: '8px 0', fontSize: '13.5px', color: 'var(--color-text-secondary)', lineHeight: '1.6' }}
-                  onDoubleClick={() => {
-                    setEditingDescriptionBody(activeTicket.description || createEmptyRichTextValue());
-                    setIsEditingDescription(true);
-                  }}
-                >
-                  {activeTicket.description && !isRichTextEmpty(activeTicket.description) ? (
-                    <MarkdownContent text={activeTicket.description} />
-                  ) : (
-                    <span style={{ fontStyle: 'italic', color: 'var(--color-text-disabled)' }}>No description provided. Click Edit or double-click here to add one.</span>
-                  )}
-                </div>
-              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
+                <RichTextEditor
+                  key={`desc-${activeTicket.id}`}
+                  value={editingDescriptionBody}
+                  onChange={setEditingDescriptionBody}
+                  placeholder="Describe your issue..."
+                  className="ticket-detail__description-editor"
+                  surface="bare"
+                  toolbarMode="bubble"
+                />
+              </div>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

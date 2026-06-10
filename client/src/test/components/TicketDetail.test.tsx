@@ -9,7 +9,7 @@ import type {
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { TicketDetail } from '../../modules/tickets/components/TicketDetail';
+import { TicketDetail } from '../../modules/tickets/components/TicketDetail/TicketDetail';
 
 type MockButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   children?: ReactNode;
@@ -60,21 +60,21 @@ vi.mock('@library', async (importOriginal) => {
       type: 'doc',
       content: text
         ? [
-            {
-              type: 'paragraph',
-              content: [
-                {
-                  type: 'text',
-                  text,
-                },
-              ],
-            },
-          ]
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text,
+              },
+            ],
+          },
+        ]
         : [
-            {
-              type: 'paragraph',
-            },
-          ],
+          {
+            type: 'paragraph',
+          },
+        ],
     });
 
   const MockRichTextEditor = forwardRef<any, any>(function MockRichTextEditor(
@@ -100,8 +100,8 @@ vi.mock('@library', async (importOriginal) => {
     }, [value]);
 
     useImperativeHandle(ref, () => ({
-      focus: () => {},
-      insertImage: () => {},
+      focus: () => { },
+      insertImage: () => { },
     }), []);
 
     return (
@@ -338,7 +338,7 @@ describe('TicketDetail', () => {
   it('updates title and description, selects related subtasks, and posts comments', async () => {
     const user = userEvent.setup();
     const { props } = renderTicketDetail();
-    const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {});
+    const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => { });
 
     await user.click(screen.getByRole('button', { name: 'Back' }));
     expect(props.onClose).toHaveBeenCalledTimes(1);
@@ -481,7 +481,7 @@ describe('TicketDetail', () => {
     // Verify Ticket Key Display in attributes panel
     const sidebarKeyTitle = sidebar.getByText('Ticket Key');
     expect(sidebarKeyTitle).toBeInTheDocument();
-    
+
     const sidebarKeyVal = sidebar.getByText('GRA-101');
     expect(sidebarKeyVal).toBeInTheDocument();
 
@@ -493,7 +493,7 @@ describe('TicketDetail', () => {
 
     // Dropdown is not visible before opening
     expect(screen.queryByRole('button', { name: 'Grab Link' })).not.toBeInTheDocument();
-    
+
     // Open dropdown
     await user.click(commentOptionsBtn);
     expect(screen.getByRole('button', { name: 'Grab Link' })).toBeInTheDocument();
@@ -515,7 +515,7 @@ describe('TicketDetail', () => {
     // Open dropdown again to test inline editing
     await user.click(commentOptionsBtn);
     await user.click(screen.getByRole('button', { name: 'Edit Comment' }));
-    
+
     // Dropdown closes; inline edit textarea shown with the comment body
     expect(screen.queryByRole('button', { name: 'Edit Comment' })).not.toBeInTheDocument();
     const commentEditInput = screen.getByPlaceholderText('Edit comment...');

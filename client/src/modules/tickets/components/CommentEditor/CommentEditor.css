@@ -1,0 +1,40 @@
+.comment-editor-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.comment-editor-textarea {
+  width: 100%;
+  border: 1px solid var(--color-border-default) !important;
+  border-radius: var(--radius-md) !important;
+  padding: 8px 12px !important;
+  font-size: 13px !important;
+  line-height: 1.5 !important;
+  color: var(--color-text-primary) !important;
+  background: var(--color-surface-card) !important;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast) !important;
+  outline: none !important;
+  min-height: 36px !important;
+}
+
+.comment-editor-textarea:focus {
+  border-color: var(--color-primary) !important;
+  box-shadow: 0 0 0 2px rgba(var(--color-primary-rgb), 0.15) !important;
+}
+
+.comment-editor-textarea::placeholder {
+  color: var(--color-text-disabled) !important;
+}
+
+.comment-editor-preview {
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-card);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+  overflow-y: auto;
+}

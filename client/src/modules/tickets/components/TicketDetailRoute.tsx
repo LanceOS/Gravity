@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@library';
-import { TicketDetail } from './TicketDetail';
+import { TicketDetail } from './TicketDetail/TicketDetail';
 import type { Ticket, Comment, User, Project, Label, Cycle } from '../../../context/TicketContext';
 
 interface TicketDetailRouteProps {
