@@ -27,7 +27,7 @@ export class MetadataRepository {
     const excerpt = data.excerpt || '';
     const useSearchVector = typeof env.databaseUrl === 'string' && !env.databaseUrl.startsWith('pgmem://');
 
-    const insertValues: Record<string, unknown> = {
+    const insertValues: any = {
       id: data.id,
       projectId: data.projectId,
       userId: data.userId,
@@ -216,10 +216,32 @@ export class NotesRepository {
   }
 
   /**
+   * Saves an attached stream to the note's bucket.
+   */
+  static async saveAttachmentStream(
+    bucketPath: string,
+    filename: string,
+    stream: NodeJS.ReadableStream,
+    contentLength?: number
+  ): Promise<void> {
+    if (filename === 'body.md') {
+      throw new Error('Filename cannot be body.md');
+    }
+    await RustFS.saveFileStream(bucketPath, filename, stream, contentLength);
+  }
+
+  /**
    * Retrieves an attached file from the note's bucket.
    */
   static async getAttachment(bucketPath: string, filename: string): Promise<Buffer> {
     return await RustFS.readFile(bucketPath, filename);
+  }
+
+  /**
+   * Retrieves an attached file from the note's bucket as a stream.
+   */
+  static async getAttachmentStream(bucketPath: string, filename: string): Promise<NodeJS.ReadableStream> {
+    return await RustFS.streamFile(bucketPath, filename);
   }
 
   /**

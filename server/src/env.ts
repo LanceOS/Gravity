@@ -72,6 +72,10 @@ const envSchema = z.object({
     if (s === 'false' || s === '0' || s === '') return false;
     return v;
   }, z.boolean()).default(false),
+  RUSTFS_ENDPOINT: z.string().default('http://localhost:9000'),
+  RUSTFS_ACCESS_KEY: z.string().default('admin'),
+  RUSTFS_SECRET_KEY: z.string().default('password'),
+  RUSTFS_BUCKET: z.string().default('notes'),
 });
 
 const parsed = envSchema.parse(process.env);
@@ -129,4 +133,8 @@ export const env = {
   })(),
   trustedProxies: splitList(parsed.TRUSTED_PROXIES),
   csrfAllowHostFallback: parsed.CSRF_ALLOW_HOST_FALLBACK,
+  rustfsEndpoint: parsed.RUSTFS_ENDPOINT,
+  rustfsAccessKey: parsed.RUSTFS_ACCESS_KEY,
+  rustfsSecretKey: parsed.RUSTFS_SECRET_KEY,
+  rustfsBucket: parsed.RUSTFS_BUCKET,
 };
