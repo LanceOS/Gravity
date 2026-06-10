@@ -73,6 +73,47 @@
   overflow-y: auto;
   position: relative;
   border-bottom: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+}
+
+.note-editor__split-container {
+  display: flex;
+  flex: 1;
+  height: 100%;
+  overflow: hidden;
+}
+
+.note-editor__pane {
+  flex: 1;
+  height: 100%;
+  overflow-y: auto;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.note-editor__pane--left {
+  border-right: 1px solid var(--border-color);
+}
+
+.note-editor__pane--right {
+  background: var(--bg-surface);
+}
+
+.note-editor__raw-textarea {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: monospace;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  resize: none;
+  outline: none;
+  padding: 0;
 }
 
 .note-editor__title-input {
@@ -157,6 +198,53 @@
   margin-left: 0;
   color: var(--text-secondary);
   font-style: italic;
+}
+
+.note-editor__content .ProseMirror table {
+  border-collapse: collapse;
+  table-layout: fixed;
+  width: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+.note-editor__content .ProseMirror table td,
+.note-editor__content .ProseMirror table th {
+  min-width: 1em;
+  border: 1px solid var(--border-color);
+  padding: 3px 5px;
+  vertical-align: top;
+  box-sizing: border-box;
+  position: relative;
+}
+
+.note-editor__content .ProseMirror table th {
+  font-weight: bold;
+  text-align: left;
+  background-color: var(--bg-surface-elevated);
+}
+
+.note-editor__content .ProseMirror table .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background-color: var(--color-primary);
+  pointer-events: none;
+}
+
+.note-editor__content .ProseMirror table p {
+  margin: 0;
+}
+
+.note-editor__content .ProseMirror a {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.note-editor__content .ProseMirror a:hover {
+  text-decoration: underline;
 }
 
 .note-editor__content .ProseMirror img {

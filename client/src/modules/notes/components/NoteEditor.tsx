@@ -4,9 +4,15 @@ import StarterKit from '@tiptap/starter-kit';
 import { Markdown } from 'tiptap-markdown';
 import Image from '@tiptap/extension-image';
 import Placeholder from '@tiptap/extension-placeholder';
+import Link from '@tiptap/extension-link';
+import Table from '@tiptap/extension-table';
+import TableRow from '@tiptap/extension-table-row';
+import TableHeader from '@tiptap/extension-table-header';
+import TableCell from '@tiptap/extension-table-cell';
 import {
   Bold, Italic, Strikethrough, Heading1, Heading2,
-  List, ListOrdered, Code, Quote, ImageIcon, Network, Check
+  List, ListOrdered, Code, Quote, ImageIcon, Network, Check,
+  Link as LinkIcon, Table as TableIcon, Save, Columns, FileText, LayoutTemplate
 } from 'lucide-react';
 import { useNote } from '../hooks/useNote';
 import './NoteEditor.css';
@@ -22,8 +28,19 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [title, setTitle] = useState('');
   const titleRef = useRef(title);
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  type ViewMode = 'visual' | 'split' | 'markdown';
+  const [viewMode, setViewMode] = useState<ViewMode>('visual');
+  const [rawMarkdown, setRawMarkdown] = useState('');
+
+  const switchViewMode = (mode: ViewMode) => {
+    if (mode !== 'visual' && editor) {
+      setRawMarkdown(editor.storage.markdown.getMarkdown());
+    }
+    setViewMode(mode);
+  };
 
   const scheduleSave = useCallback(() => {
     if (saveTimeoutRef.current) {
@@ -50,10 +67,23 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
     try {
       const url = await uploadMedia(file);
       editor?.chain().focus().setImage({ src: url }).run();
+      if (viewMode !== 'visual') {
+        setRawMarkdown(editor?.storage.markdown.getMarkdown() || '');
+      }
       scheduleSave();
     } catch (err) {
       console.error('Failed to upload file:', err);
     }
+  };
+
+  const handleRawMarkdownChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newMarkdown = e.target.value;
+    setRawMarkdown(newMarkdown);
+    if (editor) {
+      const { from, to } = editor.state.selection;
+      editor.commands.setContent(newMarkdown);
+    }
+    scheduleSave();
   };
 
   const editor = useEditor({
@@ -61,17 +91,27 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
       StarterKit,
       Markdown,
       Image,
+      Link.configure({
+        openOnClick: false,
+      }),
+      Table.configure({
+        resizable: true,
+      }),
+      TableRow,
+      TableHeader,
+      TableCell,
       Placeholder.configure({
         placeholder: 'Body...',
       }),
     ],
+    editable: viewMode !== 'split',
     // Explicit document structure so tiptap-markdown never infers a heading node
     content: { type: 'doc', content: [{ type: 'paragraph' }] },
     onUpdate: () => {
       scheduleSave();
     },
     editorProps: {
-      handleDrop: (view, event, slice, moved) => {
+      handleDrop: (view: any, event: any, slice: any, moved: boolean) => {
         if (!moved && event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files.length > 0) {
           event.preventDefault();
           setIsDragging(false);
@@ -83,6 +123,12 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
       }
     }
   }, [noteId]); // Recreate if noteId changes.
+
+  useEffect(() => {
+    if (editor) {
+      editor.setEditable(viewMode !== 'split');
+    }
+  }, [viewMode, editor]);
 
   // Sync content when note initially loads
   const noteLoaded = useRef(false);
@@ -201,6 +247,38 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
             <span><Check size={12} style={{ display: 'inline', marginRight: 4 }} /> Saved {savedAt.toLocaleTimeString()}</span>
           ) : null}
         </div>
+        <div className="note-editor__toolbar" style={{ marginBottom: 0, gap: '8px' }}>
+          <button
+            className="note-editor__toolbar-btn"
+            onClick={triggerSave}
+            title="Save Now"
+            style={{ padding: '4px 8px', gap: '4px' }}
+          >
+            <Save size={16} /> Save
+          </button>
+          <div className="note-editor__toolbar-divider" />
+          <button
+            className={`note-editor__toolbar-btn ${viewMode === 'visual' ? 'note-editor__toolbar-btn--active' : ''}`}
+            onClick={() => switchViewMode('visual')}
+            title="Visual View"
+          >
+            <LayoutTemplate size={16} />
+          </button>
+          <button
+            className={`note-editor__toolbar-btn ${viewMode === 'split' ? 'note-editor__toolbar-btn--active' : ''}`}
+            onClick={() => switchViewMode('split')}
+            title="Split View"
+          >
+            <Columns size={16} />
+          </button>
+          <button
+            className={`note-editor__toolbar-btn ${viewMode === 'markdown' ? 'note-editor__toolbar-btn--active' : ''}`}
+            onClick={() => switchViewMode('markdown')}
+            title="Markdown View"
+          >
+            <FileText size={16} />
+          </button>
+        </div>
       </div>
 
       <div className="note-editor__toolbar">
@@ -222,8 +300,26 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
           className={`note-editor__toolbar-btn ${editor.isActive('strike') ? 'note-editor__toolbar-btn--active' : ''}`}
           onClick={() => editor.chain().focus().toggleStrike().run()}
           title="Strikethrough"
+          disabled={viewMode === 'markdown'}
         >
           <Strikethrough size={16} />
+        </button>
+        <button
+          className={`note-editor__toolbar-btn ${editor.isActive('link') ? 'note-editor__toolbar-btn--active' : ''}`}
+          onClick={() => {
+            if (editor.isActive('link')) {
+              editor.chain().focus().unsetLink().run();
+            } else {
+              const url = window.prompt('URL');
+              if (url) {
+                editor.chain().focus().setLink({ href: url }).run();
+              }
+            }
+          }}
+          title="Link"
+          disabled={viewMode === 'markdown'}
+        >
+          <LinkIcon size={16} />
         </button>
 
         <div className="note-editor__toolbar-divider" />
@@ -256,8 +352,20 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
           className={`note-editor__toolbar-btn ${editor.isActive('orderedList') ? 'note-editor__toolbar-btn--active' : ''}`}
           onClick={() => editor.chain().focus().toggleOrderedList().run()}
           title="Numbered List"
+          disabled={viewMode === 'markdown'}
         >
           <ListOrdered size={16} />
+        </button>
+
+        <div className="note-editor__toolbar-divider" />
+
+        <button
+          className={`note-editor__toolbar-btn ${editor.isActive('table') ? 'note-editor__toolbar-btn--active' : ''}`}
+          onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
+          title="Table"
+          disabled={viewMode === 'markdown'}
+        >
+          <TableIcon size={16} />
         </button>
 
         <div className="note-editor__toolbar-divider" />
@@ -297,6 +405,7 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
           className="note-editor__toolbar-btn"
           onClick={() => fileInputRef.current?.click()}
           title="Attach Diagram"
+          disabled={viewMode === 'markdown'}
         >
           <Network size={16} />
         </button>
@@ -309,8 +418,39 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
           placeholder="Title..."
           value={title}
           onChange={handleTitleChange}
+          style={viewMode !== 'visual' ? { paddingLeft: 16, paddingTop: 16 } : {}}
         />
-        <EditorContent editor={editor} />
+
+        {viewMode === 'visual' && (
+          <EditorContent editor={editor} />
+        )}
+
+        {viewMode === 'split' && (
+          <div className="note-editor__split-container">
+            <div className="note-editor__pane note-editor__pane--left" style={{ padding: 16 }}>
+              <textarea
+                className="note-editor__raw-textarea"
+                value={rawMarkdown}
+                onChange={handleRawMarkdownChange}
+                placeholder="Markdown..."
+              />
+            </div>
+            <div className="note-editor__pane note-editor__pane--right" style={{ padding: 16 }}>
+              <EditorContent editor={editor} />
+            </div>
+          </div>
+        )}
+
+        {viewMode === 'markdown' && (
+          <div className="note-editor__pane" style={{ padding: 16 }}>
+            <textarea
+              className="note-editor__raw-textarea"
+              value={rawMarkdown}
+              onChange={handleRawMarkdownChange}
+              placeholder="Markdown..."
+            />
+          </div>
+        )}
 
         <div className={`note-editor__drag-overlay ${isDragging ? 'note-editor__drag-overlay--active' : ''}`}>
           <div className="note-editor__drag-message">
