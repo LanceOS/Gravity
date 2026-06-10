@@ -48,10 +48,12 @@ export class RustFS {
    */
   static async saveFile(bucketPath: string, filename: string, content: string | Buffer): Promise<void> {
     const key = `${bucketPath}/${filename}`;
+    const bodyBuffer = typeof content === 'string' ? Buffer.from(content) : content;
     const command = new PutObjectCommand({
       Bucket: env.rustfsBucket,
       Key: key,
-      Body: content,
+      Body: bodyBuffer,
+      ContentLength: bodyBuffer.length,
     });
     
     try {

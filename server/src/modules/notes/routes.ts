@@ -13,7 +13,7 @@ export function createNotesRouter() {
 
   router.post('/notes', async (req, res) => {
     const projectId = getProjectIdFromRequest(req);
-    if (!projectId || !req.body?.title || !req.body?.body) {
+    if (!projectId || !req.body?.title || typeof req.body?.body !== 'string') {
       res.status(400).json({ error: 'Project ID, title, and body are required.' });
       return;
     }
