@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import type { Ticket } from '../../../context/TicketContext';
 import { Button, Select, MarkdownEditor, RichTextEditor, toast, ClickAwayListener, Portal, Accordion, Popover, createEmptyRichTextValue, isRichTextEmpty, serializeRichTextMarkdown } from '@library';
 import generateBranchName from '../../../utils/branch';
@@ -134,8 +134,22 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editingCommentBody, setEditingCommentBody] = useState<string>('');
   const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
+  const [descriptionDraft, setDescriptionDraft] = useState(() => activeTicket.description || createEmptyRichTextValue());
+  const descriptionDraftRef = useRef(descriptionDraft);
+  const descriptionTicketIdRef = useRef(activeTicket.id);
 
   const closeCommentMenu = useCallback(() => setOpenMenuCommentId(null), []);
+
+  useEffect(() => {
+    const nextDescription = activeTicket.description || createEmptyRichTextValue();
+    const isNewTicket = descriptionTicketIdRef.current !== activeTicket.id;
+
+    if (isNewTicket || nextDescription !== descriptionDraftRef.current) {
+      descriptionTicketIdRef.current = activeTicket.id;
+      descriptionDraftRef.current = nextDescription;
+      setDescriptionDraft(nextDescription);
+    }
+  }, [activeTicket.id, activeTicket.description]);
 
   const ticketLink = useMemo(() => customTicketLink || `${TICKET_URL_BASE}/${activeTicket.key}`, [customTicketLink, activeTicket.key]);
 
@@ -472,8 +486,12 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
               </div>
 
               <RichTextEditor
-                value={activeTicket.description || ''}
-                onChange={(newDesc) => onUpdateTicket(activeTicket.id, { description: newDesc })}
+                value={descriptionDraft}
+                onChange={(newDesc) => {
+                  descriptionDraftRef.current = newDesc;
+                  setDescriptionDraft(newDesc);
+                  void onUpdateTicket(activeTicket.id, { description: newDesc });
+                }}
                 placeholder="Describe your issue..."
                 className="ticket-detail__description-editor"
                 surface="bare"
