@@ -122,17 +122,17 @@ export function SidebarProjectsSection({
                         ))}
                       </SidebarGroup>
 
-                      <SidebarGroup label="Domains">
-                        {section.domains.map((domain) => (
+                      <SidebarGroup label="Labels">
+                        {section.labels.map((label) => (
                           <SidebarItem
-                            key={domain.id}
+                            key={label.id}
                             nested
-                            active={section.filters.domainId === domain.id}
-                            onClick={() => section.onSelectDomain(domain.id)}
-                            leftIcon={<div style={{ width: '8px', height: '8px', borderRadius: '50%', background: domain.color }} />}
-                            rightElement={<span style={countBadgeStyle()}>{section.counts.domains[domain.id] || 0}</span>}
+                            active={section.filters.labels?.includes(label.id)}
+                            onClick={() => section.onSelectLabel(label.id)}
+                            leftIcon={<div style={{ width: '8px', height: '8px', borderRadius: '50%', background: label.color }} />}
+                            rightElement={<span style={countBadgeStyle()}>{section.counts.labels[label.id] || 0}</span>}
                           >
-                            {domain.name}
+                            {label.name}
                           </SidebarItem>
                         ))}
                       </SidebarGroup>

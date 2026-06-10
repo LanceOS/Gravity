@@ -145,6 +145,23 @@ export async function initializeDatabase() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
+    CREATE TABLE IF NOT EXISTS labels (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      color TEXT NOT NULL DEFAULT '#6B7280',
+      description TEXT NOT NULL DEFAULT '',
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS ticket_labels (
+      ticket_id TEXT NOT NULL,
+      label_id TEXT NOT NULL,
+      PRIMARY KEY (ticket_id, label_id)
+    );
+
+
     CREATE TABLE IF NOT EXISTS cycles (
       id TEXT PRIMARY KEY,
       project_id TEXT NOT NULL,
@@ -264,11 +281,31 @@ export async function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS comments_ticket_id_idx ON comments (ticket_id);
     CREATE INDEX IF NOT EXISTS comments_user_id_idx ON comments (user_id);
     CREATE INDEX IF NOT EXISTS note_metadata_project_id_user_id_idx ON note_metadata (project_id, user_id);
+    CREATE INDEX IF NOT EXISTS labels_project_id_idx ON labels (project_id);
+    CREATE INDEX IF NOT EXISTS ticket_labels_label_id_idx ON ticket_labels (label_id);
   `);
 
   await pool.query(`
     ALTER TABLE tickets ADD COLUMN IF NOT EXISTS branch_name TEXT NOT NULL DEFAULT '';
   `);
+
+  // Migrate existing domain data to labels and ticket_labels
+  await pool.query(`
+    INSERT INTO labels (id, project_id, name, color, description, sort_order, created_at)
+    SELECT id, project_id, name, color, '', 0, created_at
+    FROM domains
+    ON CONFLICT (id) DO NOTHING;
+
+    INSERT INTO ticket_labels (ticket_id, label_id)
+    SELECT id AS ticket_id, domain_id AS label_id
+    FROM tickets
+    WHERE domain_id IS NOT NULL AND domain_id != ''
+    ON CONFLICT (ticket_id, label_id) DO NOTHING;
+  `).catch((err) => {
+    // eslint-disable-next-line no-console
+    console.error('Failed to run labels backfill migration:', err);
+  });
+
 
   // Ensure note_metadata has excerpt and full-text search vector columns/indexes
   await pool.query(`
