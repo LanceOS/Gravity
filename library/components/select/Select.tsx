@@ -123,7 +123,7 @@ export function Select({
 
     setMenuStyle({
       position: 'fixed',
-      zIndex: 1400,
+      zIndex: 1600,
       left: `${left}px`,
       top: openAbove ? `${Math.max(8, triggerRect.top - 4)}px` : `${triggerRect.bottom + 4}px`,
       transform: openAbove ? 'translateY(-100%)' : 'none',
