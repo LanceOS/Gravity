@@ -1,5 +1,5 @@
 import React, { useState, useDeferredValue, useTransition, useMemo } from 'react';
-import type { Ticket, Domain } from '../../../context/TicketContext';
+import type { Ticket, Label } from '../../../context/TicketContext';
 import { DenseVirtualList, DenseTextInput } from '@library';
 import { getPriorityIcon } from '../utils/TicketList';
 
@@ -7,14 +7,14 @@ interface DenseGridControllerProps {
   tickets: Ticket[];
   onSelectTicket: (ticket: Ticket) => void;
   userAvatarById: Record<string, string>;
-  domainById: Record<string, Domain>;
+  labelById: Record<string, Label>;
 }
 
 export const DenseGridController: React.FC<DenseGridControllerProps> = ({
   tickets,
   onSelectTicket,
   userAvatarById,
-  domainById,
+  labelById,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isPending] = useTransition();
@@ -124,7 +124,6 @@ export const DenseGridController: React.FC<DenseGridControllerProps> = ({
             buffer={8}
             renderRow={(t: Ticket, index: number, style: React.CSSProperties) => {
               const avatar = userAvatarById[t.assigneeId || ''];
-              const domain = t.domainId ? domainById[t.domainId] : null;
 
               return (
                 <div
@@ -172,23 +171,24 @@ export const DenseGridController: React.FC<DenseGridControllerProps> = ({
                     }}
                   >
                     {t.title}
-                    {domain && (
+                    {t.labels?.map((label) => (
                       <span
+                        key={label.id}
                         style={{
                           fontSize: '8px',
                           padding: '1px 4px',
                           borderRadius: '3px',
-                          backgroundColor: `${domain.color}15`,
-                          color: domain.color,
-                          border: `1px solid ${domain.color}30`,
+                          backgroundColor: `${label.color}15`,
+                          color: label.color,
+                          border: `1px solid ${label.color}30`,
                           fontFamily: 'var(--sans)',
                           textTransform: 'uppercase',
                           fontWeight: 600
                         }}
                       >
-                        {domain.name}
+                        {label.name}
                       </span>
-                    )}
+                    ))}
                   </span>
 
                   <span 

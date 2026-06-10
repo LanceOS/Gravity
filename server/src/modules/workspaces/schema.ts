@@ -116,6 +116,27 @@ export const domains = pgTable('domains', {
   projectIdIdx: index('domains_project_id_idx').on(table.projectId),
 }));
 
+export const labels = pgTable('labels', {
+  id: text('id').primaryKey(),
+  projectId: text('project_id').notNull(),
+  name: text('name').notNull(),
+  color: text('color').notNull().default('#6B7280'),
+  description: text('description').notNull().default(''),
+  sortOrder: integer('sort_order').notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  projectIdIdx: index('labels_project_id_idx').on(table.projectId),
+}));
+
+export const ticketLabels = pgTable('ticket_labels', {
+  ticketId: text('ticket_id').notNull(),
+  labelId: text('label_id').notNull(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.ticketId, table.labelId] }),
+  labelIdIdx: index('ticket_labels_label_id_idx').on(table.labelId),
+}));
+
+
 export const cycles = pgTable('cycles', {
   id: text('id').primaryKey(),
   projectId: text('project_id').notNull(),

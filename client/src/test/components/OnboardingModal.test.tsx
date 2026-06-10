@@ -94,7 +94,7 @@ describe('OnboardingModal', () => {
 
     await user.click(screen.getByRole('button', { name: /let's do it!/i }));
     await user.click(screen.getByRole('button', { name: 'Next' }));
-    expect(screen.getByText('Cycles & Specialized Domains')).toBeInTheDocument();
+    expect(screen.getByText('Cycles & Labels')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Next' }));
     expect(screen.getByText('Local Ollama AI Assistant')).toBeInTheDocument();

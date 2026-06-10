@@ -15,7 +15,7 @@ export function isProjectIssuesView(section: SidebarProjectSection) {
     activeContext !== 'notes'
     && filters.projectId === activeProjectId
     && !filters.assigneeId
-    && !filters.domainId
+    && (!filters.labels || filters.labels.length === 0)
     && !filters.cycleId
   );
 }
@@ -27,7 +27,7 @@ export function isMyIssuesView(section: SidebarProjectSection) {
     activeContext !== 'notes'
     && filters.projectId === activeProjectId
     && filters.assigneeId === currentUser.id
-    && !filters.domainId
+    && (!filters.labels || filters.labels.length === 0)
     && !filters.cycleId
   );
 }

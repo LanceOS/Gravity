@@ -141,14 +141,14 @@ function buildBreadcrumbs({
 
       if (domainId) {
         crumbs.push({
-          label: 'Domains',
+          label: 'Labels',
           to: domainsPath,
         });
         crumbs.push({
           label: getReadableLabel(domainId),
         });
       } else {
-        crumbs.push({ label: 'Domains' });
+        crumbs.push({ label: 'Labels' });
       }
 
       break;

@@ -5,13 +5,13 @@ import { TicketRow } from './TicketRow';
 import { TicketRowMobile } from './TicketRowMobile';
 
 import type { TicketListProps } from '../types/TicketList';
-import { getAssigneeAvatar, getDomainTag, getPriorityIcon, getStatusLabel, getStatusColor } from '../utils/TicketList';
+import { getAssigneeAvatar, getPriorityIcon, getStatusLabel, getStatusColor } from '../utils/TicketList';
 import { LIST_STATUS_ORDER } from '../utils/ticketView';
 
 export const TicketList: React.FC<TicketListProps> = ({
   filteredCount,
   groupedTickets,
-  domainById,
+  labelById,
   userAvatarById,
   onSelectTicket,
 }) => {
@@ -65,12 +65,11 @@ export const TicketList: React.FC<TicketListProps> = ({
                       onClick: onSelectTicket,
                       priorityIcon: getPriorityIcon(ticket.priority),
                       assigneeAvatar: getAssigneeAvatar(userAvatarById, ticket.assigneeId),
-                      domainTag: getDomainTag(domainById, ticket.domainId),
                     };
                     return (
                       <React.Fragment key={ticket.id}>
                         <div className="ticket-list__row-desktop">
-                          <TicketRow {...rowProps} />
+                           <TicketRow {...rowProps} />
                         </div>
                         <div className="ticket-list__row-mobile">
                           <TicketRowMobile {...rowProps} />

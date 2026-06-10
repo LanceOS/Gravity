@@ -1,7 +1,7 @@
 .popover-content {
   position: absolute;
   top: 100%;
-  z-index: 1000;
+  z-index: 1600;
   background-color: var(--color-surface-card);
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-md);

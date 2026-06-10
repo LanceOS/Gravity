@@ -102,9 +102,9 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
             <div style={iconContainerStyle}>
               <Layers size={40} color="var(--color-primary)" />
             </div>
-            <h3 style={stepTitleStyle}>Cycles & Specialized Domains</h3>
+            <h3 style={stepTitleStyle}>Cycles & Labels</h3>
             <p style={descriptionStyle}>
-              Organize your tickets into active sprint cycles and assign them to specialized technical domains like Frontend, Backend, DevOps, or Design. This ensures structured sorting and readability.
+              Organize your tickets into active sprint cycles and assign them to labels like Frontend, Backend, DevOps, or Design. This keeps ticket sorting structured and easy to scan.
             </p>
           </Stack>
         )}

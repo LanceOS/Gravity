@@ -1,14 +1,19 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { Ticket } from '../../../context/TicketContext';
-import { Button, Select, Modal, Alert, Textarea } from '@library';
+import { Button, Select, Modal, Alert, Textarea, Popover } from '@library';
 import { AlertCircle } from 'lucide-react';
 import type { CreateTicketModalProps } from '../types/CreateTicketModal';
 import { PRIORITY_OPTIONS, STATUS_OPTIONS } from '../utils/CreateTicketModal';
+import { useTickets } from '../../../context/TicketContext';
+import { LabelManagerPopoverContent } from './LabelManagerPopoverContent';
+import { LabelBadge } from './LabelBadge';
+import { Plus } from 'lucide-react';
+import './CreateTicketModal.css';
 
 export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
   onClose,
   projects,
-  domains,
+  labels,
   cycles,
   users,
   parentTicket,
@@ -23,14 +28,24 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
   const [status, setStatus] = useState<Ticket['status']>(initialStatus || 'todo');
   const [priority, setPriority] = useState<Ticket['priority']>('no_priority');
   const [assigneeId, setAssigneeId] = useState('');
-  const [domainId, setDomainId] = useState('');
+  const [labelIds, setLabelIds] = useState<string[]>([]);
   const [cycleId, setCycleId] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
+  const projectLabels = useMemo(
+    () => labels.filter((label) => label.projectId === projectId),
+    [labels, projectId],
+  );
+
+  const { createLabel } = useTickets();
 
   // `projectId` is initialized from props via useState above. The modal
   // component is mounted/unmounted when opened, so remounting will reset
   // the initial value. Removing the synchronous setState in an effect
   // avoids cascading renders.
+
+  useEffect(() => {
+    setLabelIds((currentLabelIds) => currentLabelIds.filter((labelId) => projectLabels.some((label) => label.id === labelId)));
+  }, [projectLabels]);
 
   const handleSubmit = useCallback(async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -52,7 +67,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
       status,
       priority,
       projectId,
-      domainId: domainId || null,
+      labelIds,
       cycleId: cycleId || null,
       assigneeId: assigneeId || null,
       parentId: parentId || null
@@ -63,7 +78,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
     } else {
       setFormError('Failed to create the ticket.');
     }
-  }, [title, description, status, priority, projectId, domainId, cycleId, assigneeId, parentId, onSubmitTicket, onClose]);
+  }, [title, description, status, priority, projectId, labelIds, cycleId, assigneeId, parentId, onSubmitTicket, onClose]);
 
   // Handle keyboard shortcut Esc to close
   useEffect(() => {
@@ -80,7 +95,6 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
 
   const projectOptions = projects.map((project) => ({ value: project.id, label: project.name }));
   const assigneeOptions = [{ value: '', label: 'Unassigned' }, ...users.map((user) => ({ value: user.id, label: user.name }))];
-  const domainOptions = [{ value: '', label: 'No Domain' }, ...domains.map((domain) => ({ value: domain.id, label: domain.name }))];
   const cycleOptions = [{ value: '', label: 'No Cycle' }, ...cycles.map((cycle) => ({ value: cycle.id, label: cycle.name }))];
 
   const modalTitle = parentTicket ? `Create Subtask for ${parentTicket.key}` : 'Create New Issue';
@@ -109,21 +123,23 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
       onClose={onClose}
       title={modalTitle}
       footer={modalFooter}
-      style={{ maxWidth: '600px', padding: 0 }}
+      style={{ maxWidth: '980px', padding: 0 }}
     >
-      <form onSubmit={(e) => { e.preventDefault(); void handleSubmit(); }} style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+      <form onSubmit={(e) => { e.preventDefault(); void handleSubmit(); }} className="create-ticket-modal">
         {formError && (
-          <div style={{ padding: '20px 20px 0 20px' }}>
+          <div className="create-ticket-modal__alert">
             <Alert type="error">
               {formError}
             </Alert>
           </div>
         )}
-        
-        <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          <div>
-            <Textarea 
-              placeholder="Issue title"
+        <div className="create-ticket-modal__layout">
+          <section className="create-ticket-modal__panel create-ticket-modal__panel--editor">
+            <div className="create-ticket-modal__panel-heading">Details</div>
+
+            <Textarea
+              label="Issue Title"
+              placeholder="Add a concise issue title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               onKeyDown={(e) => {
@@ -134,94 +150,153 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
               autoGrow
               autoFocus
               required
+              className="create-ticket-modal__title-input"
+              inputStyle={{
+                minHeight: '58px',
+                fontSize: '18px',
+                fontWeight: 600,
+                lineHeight: 1.35,
+              }}
             />
-          </div>
 
-          <div>
-            <Textarea 
-              aria-label="Description"
+            <Textarea
+              label="Description"
               placeholder="Add description... (markdown supported)"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               autoGrow
+              className="create-ticket-modal__description-input"
+              inputStyle={{
+                minHeight: '190px',
+                lineHeight: 1.55,
+              }}
             />
-          </div>
-        </div>
+          </section>
 
+          <aside className="create-ticket-modal__panel create-ticket-modal__panel--sidebar">
+            <div className="create-ticket-modal__panel-heading">Properties</div>
 
-        <div 
-          style={{
-            padding: '16px 20px',
-            background: 'var(--color-base50)',
-            borderTop: '1px solid var(--color-border-default)',
-            display: 'grid',
-            gridTemplateColumns: 'repeat(4, 1fr)',
-            gap: '12px'
-          }}
-        >
-          <div>
-            <span className="label" style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-disabled)', marginBottom: '4px' }}>Project</span>
             <Select
+              label="Project"
               value={projectId}
               onValueChange={(nextProjectId: string) => setProjectId(nextProjectId)}
               options={projectOptions}
               aria-label="Select project"
               disabled={!!parentId} // Sub-tasks lock to parent project
             />
-          </div>
 
-          <div>
-            <span className="label" style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-disabled)', marginBottom: '4px' }}>Status</span>
             <Select
+              label="Status"
               value={status}
               onValueChange={(nextStatus: string) => setStatus(nextStatus as Ticket['status'])}
               options={STATUS_OPTIONS}
               aria-label="Select status"
             />
-          </div>
 
-          <div>
-            <span className="label" style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-disabled)', marginBottom: '4px' }}>Priority</span>
             <Select
+              label="Priority"
               value={priority}
               onValueChange={(nextPriority: string) => setPriority(nextPriority as Ticket['priority'])}
               options={PRIORITY_OPTIONS}
               aria-label="Select priority"
             />
-          </div>
 
-          <div>
-            <span className="label" style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-disabled)', marginBottom: '4px' }}>Assignee</span>
             <Select
+              label="Assignee"
               value={assigneeId}
               onValueChange={(nextAssigneeId: string) => setAssigneeId(nextAssigneeId)}
               options={assigneeOptions}
               aria-label="Select assignee"
             />
-          </div>
 
-          <div>
-            <span className="label" style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-disabled)', marginBottom: '4px' }}>Domain</span>
-            <Select
-              value={domainId}
-              onValueChange={(nextDomainId: string) => setDomainId(nextDomainId)}
-              options={domainOptions}
-              aria-label="Select domain"
-            />
-          </div>
+            <div className="create-ticket-modal__field">
+              <span className="label" style={{ marginBottom: '8px', display: 'block' }}>Labels</span>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+                {labelIds.length > 0 && (
+                  labelIds.map((id) => {
+                    const label = labels.find((l) => l.id === id);
+                    if (!label) return null;
+                    return (
+                      <LabelBadge
+                        key={label.id}
+                        label={label}
+                        size="sm"
+                        onRemove={() => setLabelIds((prev) => prev.filter(lId => lId !== id))}
+                      />
+                    );
+                  })
+                )}
 
-          <div>
-            <span className="label" style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-disabled)', marginBottom: '4px' }}>Cycle</span>
+                <Popover
+                  align="left"
+                  style={{ display: 'block' }}
+                  contentClassName="ticket-detail__label-popover"
+                  trigger={
+                    <button
+                      type="button"
+                      className="clickable"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '4px',
+                        padding: '2px 8px',
+                        borderRadius: '12px',
+                        background: 'var(--color-base100)',
+                        border: '1px dashed var(--color-border-default)',
+                        color: 'var(--color-text-secondary)',
+                        fontSize: '11px',
+                        fontWeight: 550,
+                        cursor: 'pointer',
+                        height: '20px',
+                        transition: 'all 150ms ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = 'var(--color-primary)';
+                        e.currentTarget.style.color = 'var(--color-text-primary)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = 'var(--color-border-default)';
+                        e.currentTarget.style.color = 'var(--color-text-secondary)';
+                      }}
+                    >
+                      <Plus size={10} />
+                      <span>Add Label</span>
+                    </button>
+                  }
+                >
+                  <LabelManagerPopoverContent
+                    projectId={projectId}
+                    assignedLabelIds={new Set(labelIds)}
+                    allLabels={labels}
+                    onAssign={(id) => { setLabelIds((prev) => [...prev, id]); }}
+                    onUnassign={(id) => { setLabelIds((prev) => prev.filter(lId => lId !== id)); }}
+                    onCreate={async (name, color) => {
+                      const newLabel = await createLabel({
+                        name,
+                        color,
+                        projectId: projectId,
+                        description: '',
+                      });
+                      if (newLabel) {
+                        setLabelIds((prev) => [...prev, newLabel.id]);
+                      }
+                    }}
+                  />
+                </Popover>
+              </div>
+            </div>
+
             <Select
+              label="Cycle"
               value={cycleId}
               onValueChange={(nextCycleId: string) => setCycleId(nextCycleId)}
               options={cycleOptions}
               aria-label="Select cycle"
             />
-          </div>
+          </aside>
         </div>
       </form>
     </Modal>
   );
 };
-

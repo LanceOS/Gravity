@@ -6,11 +6,11 @@ import { Plus } from 'lucide-react';
 import { TicketCard } from './TicketCard';
 
 import type { TicketBoardProps } from '../types/TicketBoard';
-import { getAssigneeAvatar, getDomainMeta, getPriorityColor, getPriorityIcon } from '../utils/TicketBoard';
+import { getAssigneeAvatar, getPriorityColor, getPriorityIcon } from '../utils/TicketBoard';
 
 export const TicketBoard: React.FC<TicketBoardProps> = ({
   ticketsByColumn,
-  domainById,
+  labelById,
   userAvatarById,
   onMoveTicket,
   onSelectTicket,
@@ -73,7 +73,6 @@ export const TicketBoard: React.FC<TicketBoardProps> = ({
     return BOARD_COLUMNS.flatMap((col) => {
       const colTickets = ticketsByColumn[col.id] || [];
       return colTickets.map((ticket) => {
-        const domainMeta = getDomainMeta(domainById, ticket.domainId);
         return {
           id: ticket.id,
           status: ticket.status,
@@ -84,15 +83,13 @@ export const TicketBoard: React.FC<TicketBoardProps> = ({
               onDragStart={(e) => handleDragStart(e, ticket.id)}
               priorityIcon={getPriorityIcon(ticket.priority)}
               priorityColor={getPriorityColor(ticket.priority)}
-              domainColor={domainMeta.color}
-              domainName={domainMeta.name}
               assigneeAvatar={getAssigneeAvatar(userAvatarById, ticket.assigneeId)}
             />
           ),
         };
       });
     });
-  }, [ticketsByColumn, domainById, userAvatarById, onSelectTicket, handleDragStart]);
+  }, [ticketsByColumn, userAvatarById, onSelectTicket, handleDragStart]);
 
   const handleCardMove = useCallback((cardId: string, nextStatus: string) => {
     onMoveTicket(cardId, { status: nextStatus as Ticket['status'] });

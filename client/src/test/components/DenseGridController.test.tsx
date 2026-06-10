@@ -40,7 +40,16 @@ const tickets = [
     priority: 'high' as const,
     assigneeId: 'user-1',
     projectId: 'project-1',
-    domainId: 'domain-1',
+    labels: [
+      {
+        id: 'label-1',
+        name: 'Backend',
+        color: '#10b981',
+        description: '',
+        sortOrder: 0,
+        projectId: 'project-1',
+      },
+    ],
     cycleId: null,
     parentId: null,
     prStatus: 'none' as const,
@@ -57,7 +66,7 @@ const tickets = [
     priority: 'medium' as const,
     assigneeId: null,
     projectId: 'project-1',
-    domainId: null,
+    labels: [],
     cycleId: null,
     parentId: null,
     prStatus: 'open' as const,
@@ -74,7 +83,16 @@ const tickets = [
     priority: 'low' as const,
     assigneeId: 'user-2',
     projectId: 'project-1',
-    domainId: 'domain-2',
+    labels: [
+      {
+        id: 'label-2',
+        name: 'Search',
+        color: '#3b82f6',
+        description: '',
+        sortOrder: 0,
+        projectId: 'project-1',
+      },
+    ],
     cycleId: null,
     parentId: null,
     prStatus: 'merged' as const,
@@ -88,16 +106,22 @@ const userAvatarById = {
   'user-1': 'https://example.com/casey.png',
 };
 
-const domainById = {
-  'domain-1': {
-    id: 'domain-1',
+const labelById = {
+  'label-1': {
+    id: 'label-1',
     name: 'Backend',
     color: '#10b981',
+    description: '',
+    sortOrder: 0,
+    projectId: 'project-1',
   },
-  'domain-2': {
-    id: 'domain-2',
+  'label-2': {
+    id: 'label-2',
     name: 'Search',
     color: '#3b82f6',
+    description: '',
+    sortOrder: 0,
+    projectId: 'project-1',
   },
 };
 
@@ -106,7 +130,7 @@ function renderDenseGridController(overrides: Partial<Parameters<typeof DenseGri
     tickets,
     onSelectTicket: vi.fn(),
     userAvatarById,
-    domainById,
+    labelById,
     ...overrides,
   };
 

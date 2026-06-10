@@ -15,6 +15,13 @@
       "when": 1780343979548,
       "tag": "0001_breezy_agent_zero",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1781060750761,
+      "tag": "0002_safe_vampiro",
+      "breakpoints": true
     }
   ]
 }

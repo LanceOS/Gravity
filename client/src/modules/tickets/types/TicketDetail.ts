@@ -1,4 +1,4 @@
-import type { Comment, Cycle, Domain, Project, Ticket, User } from '../../../context/TicketContext';
+import type { Comment, Cycle, Label, Project, Ticket, User } from '../../../context/TicketContext';
 
 export interface TicketDetailProps {
   activeTicket: Ticket;
@@ -8,7 +8,7 @@ export interface TicketDetailProps {
   subtaskProgressPercent: number;
   users: User[];
   projects: Project[];
-  domains: Domain[];
+  labels: Label[];
   cycles: Cycle[];
   parentTicket?: Ticket | null;
   onSelectTicket: (ticket: Ticket | null) => void;

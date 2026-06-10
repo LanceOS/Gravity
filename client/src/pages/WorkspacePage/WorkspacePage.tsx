@@ -1,6 +1,6 @@
 import { useMemo, useCallback, useState } from 'react';
 import { Button } from '@library';
-import type { Comment, Cycle, Domain, Project, Ticket, User } from '../../context/TicketContext';
+import type { Comment, Cycle, Label, Project, Ticket, User } from '../../context/TicketContext';
 import type { TicketFilters, TicketListSort } from '../../modules/tickets/utils/ticketView';
 import { TicketBoard, TicketList, TicketFilterBar } from '../../modules/tickets';
 import { NotesList, NoteEditor } from '../../modules/notes';
@@ -27,7 +27,8 @@ interface WorkspacePageProps {
   activeView: 'board' | 'list';
   currentUser: User | null;
   cycles: Cycle[];
-  domains: Domain[];
+  labels?: Label[];
+  domains?: Label[];
   filters: TicketFilters;
   listSort: TicketListSort;
   projects: Project[];
@@ -53,7 +54,8 @@ export function WorkspacePage({
   activeView,
   currentUser,
   cycles,
-  domains,
+  labels: labelItems,
+  domains: domainItems,
   filters,
   listSort,
   projects,
@@ -69,24 +71,25 @@ export function WorkspacePage({
   onUpdateTicket,
 }: WorkspacePageProps) {
   const [isMcpOpen, setIsMcpOpen] = useState(false);
+  const labels = labelItems ?? domainItems ?? [];
   const filteredTickets = useMemo(() => filterTickets(tickets, filters), [tickets, filters]);
   const hasFiltersApplied = useMemo(() => hasActiveTicketFilters(filters), [filters]);
   const headerTitle = useMemo(
-    () => getWorkspaceHeaderTitle(filters, currentUser, projects, domains, cycles),
-    [filters, currentUser, projects, domains, cycles]
+    () => getWorkspaceHeaderTitle(filters, currentUser, projects, labels, cycles),
+    [filters, currentUser, projects, labels, cycles]
   );
   const userAvatarById = useMemo(
     () => Object.fromEntries(users.map((user) => [user.id, user.avatar])),
     [users]
   );
-  const domainById = useMemo(
-    () => Object.fromEntries(domains.map((domain) => [domain.id, domain])),
-    [domains]
+  const labelById = useMemo(
+    () => Object.fromEntries(labels.map((label) => [label.id, label])),
+    [labels]
   );
   const groupedTickets = useMemo(() => groupTicketsByStatus(filteredTickets), [filteredTickets]);
   const listSortedTickets = useMemo(
-    () => (activeView === 'list' ? sortTicketsForList(filteredTickets, domainById, listSort) : filteredTickets),
-    [activeView, filteredTickets, domainById, listSort]
+    () => (activeView === 'list' ? sortTicketsForList(filteredTickets, labelById, listSort) : filteredTickets),
+    [activeView, filteredTickets, labelById, listSort]
   );
   const listGroupedTickets = useMemo(
     () => (activeView === 'list' ? groupTicketsByStatus(listSortedTickets) : groupedTickets),
@@ -98,7 +101,7 @@ export function WorkspacePage({
       search: '',
       priority: '',
       status: '',
-      domainId: '',
+      labels: [],
       cycleId: '',
       assigneeId: '',
     });
@@ -164,7 +167,7 @@ export function WorkspacePage({
               <div style={{ marginLeft: 'auto' }}>
                 {activeNoteId ? (
                   <Button type="button" variant="secondary" onClick={() => window.history.back()}>
-                    Back to Notes
+                     Back to Notes
                   </Button>
                 ) : (
                   <Button type="button" variant="primary" onClick={handleCreateNote}>
@@ -186,7 +189,7 @@ export function WorkspacePage({
                 totalCount={tickets.length}
                 listSort={activeView === 'list' ? listSort : undefined}
                 onListSortChange={activeView === 'list' ? onSetListSort : undefined}
-                domains={Object.values(domainById)}
+                labels={Object.values(labelById)}
                 cycles={cycles}
                 users={users}
               />
@@ -217,7 +220,7 @@ export function WorkspacePage({
                   <div className="workspace-page__empty-state">
                     <div className="workspace-page__empty-state-title">No projects in this workspace yet</div>
                     <p className="workspace-page__empty-state-copy">
-                      Open Manage Projects to create the first project for this workspace. Once a project exists, tickets, domains, and cycles will become available here.
+                      Open Manage Projects to create the first project for this workspace. Once a project exists, tickets, labels, and cycles will become available here.
                     </p>
                     <div className="workspace-page__empty-state-actions">
                       <Button
@@ -234,7 +237,7 @@ export function WorkspacePage({
                   <WorkspaceViewContainer>
                     <TicketBoard
                       ticketsByColumn={groupedTickets}
-                      domainById={domainById}
+                      labelById={labelById}
                       userAvatarById={userAvatarById}
                       onMoveTicket={onUpdateTicket}
                       onSelectTicket={onSelectTicket}
@@ -246,7 +249,7 @@ export function WorkspacePage({
                     <TicketList
                       filteredCount={filteredTickets.length}
                       groupedTickets={listGroupedTickets}
-                      domainById={domainById}
+                      labelById={labelById}
                       userAvatarById={userAvatarById}
                       onSelectTicket={onSelectTicket}
                     />

@@ -21,6 +21,9 @@ export function SidebarProjectsSection({
   const showProjectIssues = isProjectIssuesView(section);
   const showMyIssues = isMyIssuesView(section);
   const showNotes = isNotesView(section);
+  const labels = section.labels ?? section.domains ?? [];
+  const labelCounts = section.counts.labels ?? section.counts.domains ?? {};
+  const handleSelectLabel = section.onSelectLabel ?? section.onSelectDomain ?? (() => {});
 
   return (
     <div style={{ marginTop: '4px' }}>
@@ -122,17 +125,17 @@ export function SidebarProjectsSection({
                         ))}
                       </SidebarGroup>
 
-                      <SidebarGroup label="Domains">
-                        {section.domains.map((domain) => (
+                      <SidebarGroup label="Labels">
+                        {labels.map((label) => (
                           <SidebarItem
-                            key={domain.id}
+                            key={label.id}
                             nested
-                            active={section.filters.domainId === domain.id}
-                            onClick={() => section.onSelectDomain(domain.id)}
-                            leftIcon={<div style={{ width: '8px', height: '8px', borderRadius: '50%', background: domain.color }} />}
-                            rightElement={<span style={countBadgeStyle()}>{section.counts.domains[domain.id] || 0}</span>}
+                            active={section.filters.labels?.includes(label.id)}
+                            onClick={() => handleSelectLabel(label.id)}
+                            leftIcon={<div style={{ width: '8px', height: '8px', borderRadius: '50%', background: label.color }} />}
+                            rightElement={<span style={countBadgeStyle()}>{labelCounts[label.id] || 0}</span>}
                           >
-                            {domain.name}
+                            {label.name}
                           </SidebarItem>
                         ))}
                       </SidebarGroup>

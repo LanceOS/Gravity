@@ -1,7 +1,7 @@
 import { and, asc, eq } from 'drizzle-orm';
 import { type Request, type Response, Router } from 'express';
 import { db } from '../../db/index.js';
-import { cycles, domains, projects, tickets, workspaceMembers } from '../../db/schema.js';
+import { cycles, domains, labels, ticketLabels, projects, tickets, workspaceMembers } from '../../db/schema.js';
 import { broadcastEvent } from '../../realtime.js';
 import { createId, getProjectIdFromRequest, normalizeIsoDate } from '../../lib/platform.js';
 import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
@@ -70,6 +70,8 @@ export function createTicketsRouter() {
         domainId: typeof req.query.domainId === 'string' ? req.query.domainId : undefined,
         assigneeId: typeof req.query.assigneeId === 'string' ? req.query.assigneeId : undefined,
         cycleId: typeof req.query.cycleId === 'string' ? req.query.cycleId : undefined,
+        labels: typeof req.query.labels === 'string' ? req.query.labels.split(',').filter(Boolean) : undefined,
+        labelMode: (req.query.labelMode === 'all' || req.query.labelMode === 'any') ? req.query.labelMode : undefined,
       });
       res.json(ticketList);
     } catch (error) {
@@ -101,6 +103,11 @@ export function createTicketsRouter() {
         cycleId: req.body.cycleId,
         assigneeId: req.body.assigneeId,
         parentId: req.body.parentId,
+        labelIds: Array.isArray(req.body.labelIds)
+          ? req.body.labelIds.map(String)
+          : typeof req.body.labelIds === 'string'
+            ? req.body.labelIds.split(',').filter(Boolean)
+            : undefined,
       });
 
       broadcastEvent('tickets-updated', { projectId, tickets: await listTickets(projectId) });
@@ -348,6 +355,16 @@ export function createTicketsRouter() {
   });
 
   router.get('/domains', async (req, res) => {
+    res.set('Warning', '299 - "Domains API is deprecated. Use Labels API instead."');
+    res.status(404).json({ error: 'Domains API is deprecated. Use Labels API instead.' });
+  });
+
+  router.post('/domains', async (req, res) => {
+    res.set('Warning', '299 - "Domains API is deprecated. Use Labels API instead."');
+    res.status(404).json({ error: 'Domains API is deprecated. Use Labels API instead.' });
+  });
+
+  router.get('/labels', async (req, res) => {
     const projectId = getProjectIdFromRequest(req);
     if (!projectId) {
       res.status(400).json({ error: 'Project ID is required.' });
@@ -361,17 +378,28 @@ export function createTicketsRouter() {
     }
 
     try {
-      const rows = await db.select().from(domains).where(eq(domains.projectId, projectId)).orderBy(asc(domains.createdAt));
-      res.json(rows.map((domain) => ({ id: domain.id, name: domain.name, color: domain.color })));
+      const rows = await db
+        .select({
+          id: labels.id,
+          projectId: labels.projectId,
+          name: labels.name,
+          color: labels.color,
+          description: labels.description,
+          sortOrder: labels.sortOrder,
+        })
+        .from(labels)
+        .where(eq(labels.projectId, projectId))
+        .orderBy(asc(labels.createdAt));
+      res.json(rows);
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load domains.' });
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load labels.' });
     }
   });
 
-  router.post('/domains', async (req, res) => {
+  router.post('/labels', async (req, res) => {
     const projectId = getProjectIdFromRequest(req);
     if (!projectId || !req.body?.name) {
-      res.status(400).json({ error: 'Project ID and domain name are required.' });
+      res.status(400).json({ error: 'Project ID and label name are required.' });
       return;
     }
 
@@ -383,19 +411,214 @@ export function createTicketsRouter() {
 
     try {
       const rows = await db
-        .insert(domains)
+        .insert(labels)
         .values({
-          id: createId('d'),
+          id: createId('l'),
           projectId,
           name: req.body.name,
           color: typeof req.body?.color === 'string' ? req.body.color : '#6B7280',
+          description: typeof req.body?.description === 'string' ? req.body.description : '',
+          sortOrder: typeof req.body?.sortOrder === 'number' ? req.body.sortOrder : 0,
           createdAt: new Date(),
         })
         .returning();
 
-      res.status(201).json({ id: rows[0].id, name: rows[0].name, color: rows[0].color });
+      res.status(201).json({
+        id: rows[0].id,
+        projectId: rows[0].projectId,
+        name: rows[0].name,
+        color: rows[0].color,
+        description: rows[0].description,
+        sortOrder: rows[0].sortOrder,
+      });
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create domain.' });
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create label.' });
+    }
+  });
+
+  router.put('/labels/:id', async (req, res) => {
+    const labelId = normalizeRouteParam(req.params.id);
+    if (!labelId) {
+      res.status(400).json({ error: 'Label ID is required.' });
+      return;
+    }
+
+    try {
+      const labelRows = await db.select().from(labels).where(eq(labels.id, labelId)).limit(1);
+      const labelRow = labelRows[0];
+      if (!labelRow) {
+        res.status(404).json({ error: 'Label not found.' });
+        return;
+      }
+
+      const auth = await authorizeProjectAccess(req, labelRow.projectId);
+      if (!auth.allowed) {
+        res.status(auth.status).json({ error: auth.error });
+        return;
+      }
+
+      const updates: any = {};
+      if (typeof req.body?.name === 'string') updates.name = req.body.name;
+      if (typeof req.body?.color === 'string') updates.color = req.body.color;
+      if (typeof req.body?.description === 'string') updates.description = req.body.description;
+      if (typeof req.body?.sortOrder === 'number') updates.sortOrder = req.body.sortOrder;
+
+      const rows = await db
+        .update(labels)
+        .set(updates)
+        .where(eq(labels.id, labelId))
+        .returning();
+
+      res.json({
+        id: rows[0].id,
+        projectId: rows[0].projectId,
+        name: rows[0].name,
+        color: rows[0].color,
+        description: rows[0].description,
+        sortOrder: rows[0].sortOrder,
+      });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to update label.' });
+    }
+  });
+
+  router.delete('/labels/:id', async (req, res) => {
+    const labelId = normalizeRouteParam(req.params.id);
+    if (!labelId) {
+      res.status(400).json({ error: 'Label ID is required.' });
+      return;
+    }
+
+    try {
+      const labelRows = await db.select().from(labels).where(eq(labels.id, labelId)).limit(1);
+      const labelRow = labelRows[0];
+      if (!labelRow) {
+        res.status(404).json({ error: 'Label not found.' });
+        return;
+      }
+
+      const auth = await authorizeProjectAccess(req, labelRow.projectId);
+      if (!auth.allowed) {
+        res.status(auth.status).json({ error: auth.error });
+        return;
+      }
+
+      await db.transaction(async (tx) => {
+        await tx.delete(ticketLabels).where(eq(ticketLabels.labelId, labelId));
+        await tx.delete(labels).where(eq(labels.id, labelId));
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to delete label.' });
+    }
+  });
+
+  router.get('/tickets/:id/labels', async (req, res) => {
+    const ticketId = normalizeRouteParam(req.params.id);
+    try {
+      const ticket = await getTicketById(ticketId);
+      if (!ticket) {
+        res.status(404).json({ error: 'Ticket not found.' });
+        return;
+      }
+
+      const auth = await authorizeProjectAccess(req, ticket.projectId);
+      if (!auth.allowed) {
+        res.status(auth.status).json({ error: auth.error });
+        return;
+      }
+
+      const rows = await db
+        .select({
+          id: labels.id,
+          projectId: labels.projectId,
+          name: labels.name,
+          color: labels.color,
+          description: labels.description,
+          sortOrder: labels.sortOrder,
+        })
+        .from(ticketLabels)
+        .innerJoin(labels, eq(labels.id, ticketLabels.labelId))
+        .where(eq(ticketLabels.ticketId, ticketId));
+
+      res.json(rows);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load ticket labels.' });
+    }
+  });
+
+  router.post('/tickets/:id/labels', async (req, res) => {
+    const ticketId = normalizeRouteParam(req.params.id);
+    const labelId = req.body?.labelId;
+    if (!labelId) {
+      res.status(400).json({ error: 'Label ID is required.' });
+      return;
+    }
+
+    try {
+      const ticket = await getTicketById(ticketId);
+      if (!ticket) {
+        res.status(404).json({ error: 'Ticket not found.' });
+        return;
+      }
+
+      const auth = await authorizeProjectAccess(req, ticket.projectId);
+      if (!auth.allowed) {
+        res.status(auth.status).json({ error: auth.error });
+        return;
+      }
+
+      const labelRows = await db.select().from(labels).where(eq(labels.id, labelId)).limit(1);
+      if (labelRows.length === 0) {
+        res.status(404).json({ error: 'Label not found.' });
+        return;
+      }
+
+      if (labelRows[0].projectId !== ticket.projectId) {
+        res.status(400).json({ error: 'Label does not belong to the ticket project.' });
+        return;
+      }
+
+      await db
+        .insert(ticketLabels)
+        .values({ ticketId, labelId })
+        .onConflictDoNothing();
+
+      broadcastEvent('tickets-updated', { projectId: ticket.projectId, tickets: await listTickets(ticket.projectId) });
+
+      res.status(201).json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to assign label to ticket.' });
+    }
+  });
+
+  router.delete('/tickets/:id/labels/:labelId', async (req, res) => {
+    const ticketId = normalizeRouteParam(req.params.id);
+    const labelId = normalizeRouteParam(req.params.labelId);
+
+    try {
+      const ticket = await getTicketById(ticketId);
+      if (!ticket) {
+        res.status(404).json({ error: 'Ticket not found.' });
+        return;
+      }
+
+      const auth = await authorizeProjectAccess(req, ticket.projectId);
+      if (!auth.allowed) {
+        res.status(auth.status).json({ error: auth.error });
+        return;
+      }
+
+      await db
+        .delete(ticketLabels)
+        .where(and(eq(ticketLabels.ticketId, ticketId), eq(ticketLabels.labelId, labelId)));
+
+      broadcastEvent('tickets-updated', { projectId: ticket.projectId, tickets: await listTickets(ticket.projectId) });
+
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to unassign label from ticket.' });
     }
   });
 

@@ -1,9 +1,10 @@
 import { memo, useState, useCallback } from 'react';
 import { Paperclip } from 'lucide-react';
 import type { TicketRowProps } from '../types/TicketList';
+import { LabelBadge } from './LabelBadge';
 import './TicketRowMobile.css';
 
-function TicketRowMobileImpl({ ticket, onClick, priorityIcon, assigneeAvatar, domainTag }: TicketRowProps) {
+function TicketRowMobileImpl({ ticket, onClick, priorityIcon, assigneeAvatar }: TicketRowProps) {
   const [isHovered, setIsHovered] = useState(false);
 
   const handleClick = useCallback(() => {
@@ -34,12 +35,12 @@ function TicketRowMobileImpl({ ticket, onClick, priorityIcon, assigneeAvatar, do
         </div>
       </div>
 
-      {/* Meta row: domain + sub-ticket indicator + date */}
+      {/* Meta row: labels + sub-ticket indicator + date */}
       <div className="ticket-row-mobile__meta">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          {ticket.domainId && domainTag && (
-            <div className="ticket-row-mobile__domain">{domainTag}</div>
-          )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+          {ticket.labels?.map((label) => (
+            <LabelBadge key={label.id} label={label} size="sm" />
+          ))}
           {ticket.parentId && (
             <span className="ticket-row-mobile__sub-tag">
               <Paperclip size={9} />
