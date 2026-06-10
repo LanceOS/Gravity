@@ -73,6 +73,10 @@
   overflow-y: auto;
   position: relative;
   border-bottom: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
 }
 
 .note-editor__title-input {
@@ -92,82 +96,9 @@
   color: var(--text-tertiary);
 }
 
-.note-editor__content .ProseMirror {
-  min-height: 100%;
-  outline: none;
-  color: var(--text-primary);
-  font-size: 1rem;
-  line-height: 1.6;
-}
-
-/* TipTap default styles */
-.note-editor__content .ProseMirror p.is-editor-empty:first-child::before,
-.note-editor__content .ProseMirror p.is-empty::before {
-  color: var(--text-tertiary);
-  content: attr(data-placeholder);
-  float: left;
-  height: 0;
-  pointer-events: none;
-}
-
-.note-editor__content .ProseMirror p {
-  margin-bottom: 1em;
-}
-
-.note-editor__content .ProseMirror h1,
-.note-editor__content .ProseMirror h2,
-.note-editor__content .ProseMirror h3 {
-  margin-top: 1.5em;
-  margin-bottom: 0.5em;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.note-editor__content .ProseMirror ul,
-.note-editor__content .ProseMirror ol {
-  padding-left: 1.5em;
-  margin-bottom: 1em;
-}
-
-.note-editor__content .ProseMirror code {
-  background: var(--bg-surface-elevated);
-  padding: 0.2em 0.4em;
-  border-radius: var(--radius-sm);
-  font-family: monospace;
-  font-size: 0.9em;
-}
-
-.note-editor__content .ProseMirror pre {
-  background: var(--bg-surface-elevated);
-  padding: var(--space-md);
-  border-radius: var(--radius-md);
-  overflow-x: auto;
-  margin-bottom: 1em;
-}
-
-.note-editor__content .ProseMirror pre code {
-  background: transparent;
-  padding: 0;
-  color: inherit;
-}
-
-.note-editor__content .ProseMirror blockquote {
-  border-left: 3px solid var(--color-primary);
-  padding-left: 1em;
-  margin-left: 0;
-  color: var(--text-secondary);
-  font-style: italic;
-}
-
-.note-editor__content .ProseMirror img {
-  max-width: 100%;
-  height: auto;
-  border-radius: var(--radius-md);
-  margin: 1em 0;
-}
-
-.note-editor__content .ProseMirror img.ProseMirror-selectednode {
-  outline: 2px solid var(--color-primary);
+.note-editor__body-editor {
+  flex: 1;
+  min-height: 0;
 }
 
 .note-editor__drag-overlay {

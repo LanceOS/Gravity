@@ -1,5 +1,5 @@
 import { useMemo, useCallback, useState } from 'react';
-import { Button } from '@library';
+import { Button, createEmptyRichTextValue } from '@library';
 import type { Comment, Cycle, Label, Project, Ticket, User } from '../../context/TicketContext';
 import type { TicketFilters, TicketListSort } from '../../modules/tickets/utils/ticketView';
 import { TicketBoard, TicketList, TicketFilterBar } from '../../modules/tickets';
@@ -118,7 +118,7 @@ export function WorkspacePage({
         },
         body: JSON.stringify({
           title: 'Untitled Note',
-          body: '',
+          body: createEmptyRichTextValue(),
         }),
       });
       if (response.ok) {

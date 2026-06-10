@@ -42,7 +42,7 @@ export default function TeamAllTasksView() {
         </div>
         <div className="placeholder-table-row">
           <div><code>GRV-83</code></div>
-          <div>Integrate TipTap editor alternative</div>
+          <div>Integrate ProseMirror editor alternative</div>
           <div>Jane Dev</div>
           <div style={{ color: '#10b981' }}>Done</div>
         </div>

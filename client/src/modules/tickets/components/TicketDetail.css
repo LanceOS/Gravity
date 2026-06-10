@@ -78,6 +78,11 @@
   width: 100%;
 }
 
+.ticket-detail__comment-editor {
+  flex: 1;
+  min-width: 0;
+}
+
 .ticket-detail__sidebar {
   width: 320px;
   flex-shrink: 0;

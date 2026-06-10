@@ -1,4 +1,5 @@
 import { Link as LinkIcon, GitBranch, FileText } from 'lucide-react';
+import { serializeRichTextMarkdown } from '@library';
 import type { TicketUtilitiesProps } from '../types/TicketUtilities';
 import './TicketUtilities.css';
 
@@ -34,7 +35,7 @@ export default function TicketUtilities({ ticketLink, generatedBranchName, descr
           type="button"
           aria-label="Copy as Markdown"
           title="Copy as Markdown"
-          onClick={() => void onCopy(description || '', 'Description copied')}
+          onClick={() => void onCopy(serializeRichTextMarkdown(description || ''), 'Description copied')}
           className="ticket-utilities__action ticket-utilities__copy-button clickable"
         >
           <FileText size={14} aria-hidden="true" focusable="false" />

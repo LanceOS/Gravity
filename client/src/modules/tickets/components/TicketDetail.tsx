@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import type { Ticket } from '../../../context/TicketContext';
-import { Button, Select, Textarea, MarkdownEditor, toast, ClickAwayListener, Portal, Accordion, Popover } from '@library';
+import { Button, Select, MarkdownEditor, RichTextEditor, toast, ClickAwayListener, Portal, Accordion, Popover, createEmptyRichTextValue, isRichTextEmpty, serializeRichTextMarkdown } from '@library';
 import generateBranchName from '../../../utils/branch';
 import TicketUtilities from './TicketUtilities';
 
@@ -104,7 +104,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
   parentTicket,
   ticketLink: customTicketLink,
 }) => {
-  const [commentInput, setCommentInput] = useState('');
+  const [commentInput, setCommentInput] = useState(createEmptyRichTextValue());
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
 
   const { assignLabelToTicket, unassignLabelFromTicket, createLabel: createLabelInContext } = useTickets();
@@ -167,9 +167,9 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
 
   const handlePostComment = (e: React.FormEvent) => {
     e.preventDefault();
-    if (commentInput.trim()) {
-      onAddComment(activeTicket.id, commentInput.trim());
-      setCommentInput('');
+    if (!isRichTextEmpty(commentInput)) {
+      onAddComment(activeTicket.id, commentInput);
+      setCommentInput(createEmptyRichTextValue());
     }
   };
 
@@ -470,10 +470,10 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                 <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase' }}>Description</span>
               </div>
 
-              <MarkdownEditor
+              <RichTextEditor
                 value={activeTicket.description || ''}
-                onSave={(newDesc) => onUpdateTicket(activeTicket.id, { description: newDesc })}
-                placeholder="Describe your issue using markdown..."
+                onChange={(newDesc) => onUpdateTicket(activeTicket.id, { description: newDesc })}
+                placeholder="Describe your issue..."
                 minHeight="120px"
                 className="markdown-content"
               />
@@ -654,7 +654,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    void copyToClipboard(comment.body, 'Comment copied');
+                                    void copyToClipboard(serializeRichTextMarkdown(comment.body), 'Comment copied');
                                     setOpenMenuCommentId(null);
                                   }}
                                   style={{
@@ -712,21 +712,21 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                           padding: '10px 14px',
                           lineHeight: '1.5'
                         }}
-                      >
+                        >
                         {editingCommentId === comment.id ? (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
-                            <Textarea
+                            <RichTextEditor
                               value={editingCommentBody}
-                              onChange={(e) => setEditingCommentBody(e.target.value)}
-                              style={{ fontSize: '13px', lineHeight: '1.5', fontFamily: 'inherit' }}
-                              autoGrow
+                              onChange={setEditingCommentBody}
+                              placeholder="Edit comment..."
+                              minHeight="120px"
                               autoFocus
                             />
                             <div style={{ display: 'flex', gap: '6px', alignSelf: 'flex-end' }}>
                               <Button
                                 onClick={async () => {
-                                  if (editingCommentBody.trim()) {
-                                    await onUpdateComment(activeTicket.id, comment.id, editingCommentBody.trim());
+                                  if (!isRichTextEmpty(editingCommentBody)) {
+                                    await onUpdateComment(activeTicket.id, comment.id, editingCommentBody);
                                     setEditingCommentId(null);
                                   }
                                 }}
@@ -755,12 +755,12 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
               </div>
 
               <form onSubmit={handlePostComment} className="ticket-detail__comment-form">
-                <Textarea
+                <RichTextEditor
                   placeholder="Post updates, links, or mention PRs..."
                   value={commentInput}
-                  onChange={(e) => setCommentInput(e.target.value)}
-                  style={{ flex: 1 }}
-                  autoGrow
+                  onChange={setCommentInput}
+                  minHeight="120px"
+                  className="ticket-detail__comment-editor"
                 />
                 <Button
                   type="submit"
@@ -894,4 +894,3 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
     </>
   );
 };
-
