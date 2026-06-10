@@ -6,6 +6,8 @@ import type { CreateTicketModalProps } from '../types/CreateTicketModal';
 import { PRIORITY_OPTIONS, STATUS_OPTIONS } from '../utils/CreateTicketModal';
 import { useTickets } from '../../../context/TicketContext';
 import { LabelManagerPopoverContent } from './LabelManagerPopoverContent';
+import { LabelBadge } from './LabelBadge';
+import { Plus } from 'lucide-react';
 import './CreateTicketModal.css';
 
 export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
@@ -208,43 +210,81 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
             />
 
             <div className="create-ticket-modal__field">
-              <span className="label">Labels</span>
-              <Popover
-                align="right"
-                style={{ display: 'block' }}
-                contentClassName="create-ticket-modal__labels-popover"
-                trigger={
-                  <button
-                    type="button"
-                    className="clickable create-ticket-modal__labels-trigger"
-                  >
-                    <span className="create-ticket-modal__labels-trigger-value">
-                      {labelIds.length > 0
-                        ? `${labelIds.length} label${labelIds.length > 1 ? 's' : ''} selected`
-                        : 'Select labels'}
-                    </span>
-                  </button>
-                }
-              >
-                <LabelManagerPopoverContent
-                  projectId={projectId}
-                  assignedLabelIds={new Set(labelIds)}
-                  allLabels={labels}
-                  onAssign={(id) => { setLabelIds((prev) => [...prev, id]); }}
-                  onUnassign={(id) => { setLabelIds((prev) => prev.filter(lId => lId !== id)); }}
-                  onCreate={async (name, color) => {
-                     const newLabel = await createLabel({
-                       name,
-                       color,
-                       projectId: projectId,
-                       description: '',
-                     });
-                     if (newLabel) {
-                       setLabelIds((prev) => [...prev, newLabel.id]);
-                     }
-                  }}
-                />
-              </Popover>
+              <span className="label" style={{ marginBottom: '8px', display: 'block' }}>Labels</span>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+                {labelIds.length > 0 && (
+                  labelIds.map((id) => {
+                    const label = labels.find((l) => l.id === id);
+                    if (!label) return null;
+                    return (
+                      <LabelBadge
+                        key={label.id}
+                        label={label}
+                        size="sm"
+                        onRemove={() => setLabelIds((prev) => prev.filter(lId => lId !== id))}
+                      />
+                    );
+                  })
+                )}
+
+                <Popover
+                  align="left"
+                  style={{ display: 'block' }}
+                  contentClassName="ticket-detail__label-popover"
+                  trigger={
+                    <button
+                      type="button"
+                      className="clickable"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '4px',
+                        padding: '2px 8px',
+                        borderRadius: '12px',
+                        background: 'var(--color-base100)',
+                        border: '1px dashed var(--color-border-default)',
+                        color: 'var(--color-text-secondary)',
+                        fontSize: '11px',
+                        fontWeight: 550,
+                        cursor: 'pointer',
+                        height: '20px',
+                        transition: 'all 150ms ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = 'var(--color-primary)';
+                        e.currentTarget.style.color = 'var(--color-text-primary)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = 'var(--color-border-default)';
+                        e.currentTarget.style.color = 'var(--color-text-secondary)';
+                      }}
+                    >
+                      <Plus size={10} />
+                      <span>Add Label</span>
+                    </button>
+                  }
+                >
+                  <LabelManagerPopoverContent
+                    projectId={projectId}
+                    assignedLabelIds={new Set(labelIds)}
+                    allLabels={labels}
+                    onAssign={(id) => { setLabelIds((prev) => [...prev, id]); }}
+                    onUnassign={(id) => { setLabelIds((prev) => prev.filter(lId => lId !== id)); }}
+                    onCreate={async (name, color) => {
+                      const newLabel = await createLabel({
+                        name,
+                        color,
+                        projectId: projectId,
+                        description: '',
+                      });
+                      if (newLabel) {
+                        setLabelIds((prev) => [...prev, newLabel.id]);
+                      }
+                    }}
+                  />
+                </Popover>
+              </div>
             </div>
 
             <Select
