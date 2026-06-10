@@ -228,11 +228,18 @@ export const TicketFilterBar: React.FC<TicketFilterBarProps> = ({
           align="right"
           contentClassName="ticket-filter-popover-content"
           trigger={
-            <Button variant="secondary" size="md" className="ticket-filter-bar__filter-btn">
-              <Filter size={16} />
-              <span>Filter</span>
+            <Button
+              variant="secondary"
+              size="md"
+              className="ticket-filter-bar__filter-btn"
+              style={{ paddingRight: '34px', minWidth: '112px' }}
+            >
+              <span className="ticket-filter-bar__filter-btn-content">
+                <Filter size={16} />
+                <span>Filter</span>
+              </span>
               {activeCount > 0 && (
-                <Badge variant="accent" style={{ marginLeft: 4 }}>
+                <Badge variant="accent" className="ticket-filter-bar__filter-badge">
                   {activeCount}
                 </Badge>
               )}

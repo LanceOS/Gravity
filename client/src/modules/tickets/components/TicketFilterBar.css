@@ -24,9 +24,24 @@
 }
 
 .ticket-filter-bar__filter-btn {
-  display: flex;
+  position: relative;
+  min-width: 112px;
+  white-space: nowrap;
+}
+
+.ticket-filter-bar__filter-btn-content {
+  display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+.ticket-filter-bar__filter-badge {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  margin-left: 0;
+  pointer-events: none;
 }
 
 .ticket-filter-bar__count {
