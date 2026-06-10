@@ -47,7 +47,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
     setLabelIds((currentLabelIds) => currentLabelIds.filter((labelId) => projectLabels.some((label) => label.id === labelId)));
   }, [projectLabels]);
 
-  const handleSubmit = useCallback(async (e?: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e?: React.SubmitEvent<HTMLFormElement>) => {
     if (e) e.preventDefault();
     setFormError(null);
 

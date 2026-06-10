@@ -13,7 +13,7 @@ export const AuthScreen: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     setErrorMsg('');
     if (isAuthSubmissionInvalid(isSignUp, name, email, password)) {

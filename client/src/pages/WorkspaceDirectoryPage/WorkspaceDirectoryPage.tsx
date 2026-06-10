@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, type FormEvent } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { ArrowRight, FolderPlus, Globe, KeyRound, LogOut, Server, Settings2, Users } from 'lucide-react';
 import {
   Button,
@@ -76,7 +76,7 @@ export function WorkspaceDirectoryPage({
 
   const workspaceCards = useMemo(() => workspaces.slice().sort((left, right) => left.name.localeCompare(right.name)), [workspaces]);
 
-  const handleCreateSubmit = async (event: FormEvent) => {
+  const handleCreateSubmit = async (event: React.SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     await onCreateWorkspace({
@@ -89,7 +89,7 @@ export function WorkspaceDirectoryPage({
     });
   };
 
-  const handleJoinSubmit = async (event: FormEvent) => {
+  const handleJoinSubmit = async (event: React.SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     await onRequestJoin(inviteCode, requestMessage);
   };

@@ -69,8 +69,8 @@ function sanitizeTicketUrlBase(raw?: string): string {
 
 const TICKET_URL_BASE = sanitizeTicketUrlBase((typeof import.meta !== 'undefined' && (import.meta as unknown as { env?: Record<string, string | undefined> }).env?.VITE_TICKET_URL_BASE) || undefined);
 import {
-  CheckSquare, GitPullRequest, GitMerge, Send, Trash2,
-  Plus, Edit3, ChevronLeft, MoreHorizontal, Link, FileText, CornerLeftUp, X
+  GitPullRequest, GitMerge, Send, Trash2,
+  Plus, Edit3, ChevronLeft, MoreHorizontal, Link, FileText, CornerLeftUp
 } from 'lucide-react';
 import { MarkdownContent } from './MarkdownContent';
 import { TicketRow } from './TicketRow';
@@ -78,7 +78,7 @@ import { TicketRowMobile } from './TicketRowMobile';
 import { getPriorityIcon, getAssigneeAvatar } from '../utils/TicketList';
 import type { TicketDetailProps } from '../types/TicketDetail';
 import { PRIORITY_OPTIONS, STATUS_OPTIONS } from '../utils/TicketDetail';
-import { useTickets, type Label } from '../../../context/TicketContext';
+import { useTickets } from '../../../context/TicketContext';
 import { LabelBadge } from './LabelBadge';
 import { LabelManagerPopoverContent } from './LabelManagerPopoverContent';
 import './TicketDetail.css';
@@ -144,7 +144,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
   );
 
   const copyToClipboard = useCallback(async (value: string, successMessage?: string) => {
-    const isDev = Boolean(typeof import.meta !== 'undefined' && (import.meta as unknown as { env?: Record<string, any> }).env?.DEV);
+    const isDev = Boolean(typeof import.meta !== 'undefined' && (import.meta as unknown as { env?: Record<string, unknown> }).env?.DEV);
 
     if (!navigator.clipboard?.writeText) {
       if (isDev && console && console.warn) {
@@ -163,9 +163,9 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
       }
       if (toast?.show) toast.show('Failed to copy', 'error');
     }
-  }, [toast]);
+  }, []);
 
-  const handlePostComment = (e: React.FormEvent) => {
+  const handlePostComment = (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!isRichTextEmpty(commentInput)) {
       onAddComment(activeTicket.id, commentInput);
@@ -474,7 +474,6 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                 value={activeTicket.description || ''}
                 onChange={(newDesc) => onUpdateTicket(activeTicket.id, { description: newDesc })}
                 placeholder="Describe your issue..."
-                minHeight="40px"
                 className="ticket-detail__description-editor"
                 surface="bare"
                 toolbarMode="bubble"
