@@ -37,7 +37,7 @@ const MCP_TOOL_GROUPS: { title: string; tools: McpToolMetadata[] }[] = [
       {
         name: 'update_ticket',
         label: 'Update Ticket',
-        description: 'Allows updating description, title, priority, cycle, domain, and status of existing tickets.',
+        description: 'Allows updating description, title, priority, cycle, label, and status of existing tickets.',
       },
     ],
   },

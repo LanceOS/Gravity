@@ -55,7 +55,7 @@ export function PlaceholderLayout({
     { label: 'Team Overview', path: '/workspaces/wsp-1/teams/team-1', icon: Users },
     { label: 'Team All Tasks', path: '/workspaces/wsp-1/teams/team-1/tasks', icon: ListTodo },
     { label: 'Team Cycle View', path: '/workspaces/wsp-1/teams/team-1/cycles/cycle-1', icon: Layers },
-    { label: 'Team Domain View', path: '/workspaces/wsp-1/teams/team-1/domains/dom-1', icon: Tag },
+    { label: 'Team Label View', path: '/workspaces/wsp-1/teams/team-1/domains/dom-1', icon: Tag },
     { label: 'Team Project Overview', path: '/workspaces/wsp-1/teams/team-1/projects/prj-1', icon: Folder },
     { label: 'Team Project Tickets', path: '/workspaces/wsp-1/teams/team-1/projects/prj-1/tickets', icon: ListTodo },
     

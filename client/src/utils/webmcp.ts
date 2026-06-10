@@ -49,7 +49,7 @@ export function registerWebMCPTools(actions: WebMCPActions): AbortController | n
           status: { type: 'string', enum: ['backlog', 'todo', 'in_progress', 'in_review', 'done', 'canceled'] },
           priority: { type: 'string', enum: ['no_priority', 'low', 'medium', 'high', 'urgent'] },
           projectId: { type: 'string', description: 'The project ID, e.g. p-gravity' },
-          domainId: { type: 'string', description: 'The domain ID, e.g. d-fe' }
+          domainId: { type: 'string', description: 'The label ID, e.g. l-fe' }
         },
         required: ['title', 'projectId']
       },
