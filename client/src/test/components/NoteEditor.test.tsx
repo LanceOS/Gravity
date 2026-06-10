@@ -1,29 +1,60 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 import { render, screen, fireEvent, act } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NoteEditor } from '../../modules/notes/components/NoteEditor';
 import { useNote } from '../../modules/notes/hooks/useNote';
 
-// Mock useNote hook
 vi.mock('../../modules/notes/hooks/useNote', () => ({
   useNote: vi.fn(),
 }));
 
-// Mock MDEditor
-vi.mock('@uiw/react-md-editor', () => ({
-  default: ({ value, onChange, textareaProps }: any) => (
-    <textarea
-      data-testid="md-editor"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      {...textareaProps}
-    />
-  ),
-}));
+vi.mock('@library', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@library')>();
+  const MockRichTextEditor = forwardRef<any, any>(function MockRichTextEditor(
+    { value, onChange, placeholder, className }: any,
+    ref,
+  ) {
+    const [internalValue, setInternalValue] = useState(value);
+
+    useEffect(() => {
+      setInternalValue(value);
+    }, [value]);
+
+    useImperativeHandle(ref, () => ({
+      focus: () => {},
+      insertImage: ({ src, alt, title }: { src: string; alt?: string; title?: string }) => {
+        const label = alt || title || 'image';
+        const nextValue = `${internalValue}${internalValue ? '\n' : ''}![${label}](${src})`;
+        setInternalValue(nextValue);
+        onChange(nextValue);
+      },
+    }), [internalValue, onChange]);
+
+    return (
+      <textarea
+        data-testid="rich-text-editor"
+        aria-label="Rich text editor"
+        placeholder={placeholder}
+        className={className}
+        value={internalValue}
+        onChange={(e) => {
+          setInternalValue(e.target.value);
+          onChange(e.target.value);
+        }}
+      />
+    );
+  });
+
+  return {
+    ...actual,
+    RichTextEditor: MockRichTextEditor,
+  };
+});
 
 describe('NoteEditor', () => {
   const mockSaveNote = vi.fn();
   const mockUploadMedia = vi.fn().mockResolvedValue('/image.png');
-  
+
   beforeEach(() => {
     vi.clearAllMocks();
     (useNote as any).mockReturnValue({
@@ -48,15 +79,15 @@ describe('NoteEditor', () => {
     expect(screen.getByText('Loading note...')).toBeInTheDocument();
   });
 
-  it('renders title input and editor content when loaded', () => {
+  it('renders the title input and rich text editor when loaded', () => {
     render(<NoteEditor projectId="proj-1" noteId="note-1" />);
     const titleInput = screen.getByPlaceholderText('Title...') as HTMLInputElement;
     expect(titleInput).toBeInTheDocument();
     expect(titleInput.value).toBe('Test Title');
-    expect(screen.getByTestId('md-editor')).toBeInTheDocument();
+    expect(screen.getByTestId('rich-text-editor')).toHaveValue('Test body');
   });
 
-  it('sets initial content and strips legacy empty H1', () => {
+  it('normalizes the legacy empty heading body on load', () => {
     (useNote as any).mockReturnValue({
       note: { id: 'note-1', title: 'Test Title', body: '# \n\nReal body' },
       loading: false,
@@ -64,24 +95,23 @@ describe('NoteEditor', () => {
       saveError: null,
       savedAt: null,
       saveNote: mockSaveNote,
+      uploadMedia: mockUploadMedia,
     });
-    
+
     render(<NoteEditor projectId="proj-1" noteId="note-1" />);
-    
-    // Expect md-editor to have 'Real body'
-    expect(screen.getByTestId('md-editor')).toHaveValue('Real body');
+
+    expect(screen.getByTestId('rich-text-editor')).toHaveValue('Real body');
   });
 
   it('updates title input and triggers debounced save', () => {
     render(<NoteEditor projectId="proj-1" noteId="note-1" />);
-    
+
     const titleInput = screen.getByPlaceholderText('Title...') as HTMLInputElement;
     fireEvent.change(titleInput, { target: { value: 'New Updated Title' } });
-    
+
     expect(titleInput.value).toBe('New Updated Title');
     expect(mockSaveNote).not.toHaveBeenCalled();
 
-    // Fast-forward 3 seconds
     act(() => {
       vi.advanceTimersByTime(3000);
     });
@@ -94,11 +124,10 @@ describe('NoteEditor', () => {
 
   it('triggers debounced save when editor content updates', () => {
     render(<NoteEditor projectId="proj-1" noteId="note-1" />);
-    
-    const mdEditor = screen.getByTestId('md-editor');
-    fireEvent.change(mdEditor, { target: { value: 'New body content' } });
 
-    // Fast forward
+    const richTextEditor = screen.getByTestId('rich-text-editor');
+    fireEvent.change(richTextEditor, { target: { value: 'New body content' } });
+
     act(() => {
       vi.advanceTimersByTime(3000);
     });
@@ -115,7 +144,10 @@ describe('NoteEditor', () => {
       saving: true,
       saveError: null,
       savedAt: null,
+      saveNote: mockSaveNote,
+      uploadMedia: mockUploadMedia,
     });
+
     render(<NoteEditor projectId="proj-1" noteId="note-1" />);
     expect(screen.getByText('Saving...')).toBeInTheDocument();
   });
@@ -126,7 +158,10 @@ describe('NoteEditor', () => {
       saving: false,
       saveError: 'Network Error',
       savedAt: null,
+      saveNote: mockSaveNote,
+      uploadMedia: mockUploadMedia,
     });
+
     render(<NoteEditor projectId="proj-1" noteId="note-1" />);
     expect(screen.getByText('Failed to save: Network Error')).toBeInTheDocument();
   });
@@ -138,23 +173,26 @@ describe('NoteEditor', () => {
       saving: false,
       saveError: null,
       savedAt: time,
+      saveNote: mockSaveNote,
+      uploadMedia: mockUploadMedia,
     });
+
     render(<NoteEditor projectId="proj-1" noteId="note-1" />);
     expect(screen.getByText(`Saved ${time.toLocaleTimeString()}`)).toBeInTheDocument();
   });
 
   it('handles drag and drop file uploads', async () => {
     render(<NoteEditor projectId="proj-1" noteId="note-1" />);
-    
-    const dropZone = screen.getByTestId('md-editor').parentElement?.parentElement!;
-    
+
+    const dropZone = screen.getByTestId('rich-text-editor').parentElement?.parentElement!;
+
     fireEvent.dragOver(dropZone);
     expect(screen.getByText('Drop image to attach')).toBeInTheDocument();
-    
+
     fireEvent.dragLeave(dropZone);
 
     const file = new File(['dummy content'], 'test.png', { type: 'image/png' });
-    
+
     await act(async () => {
       fireEvent.drop(dropZone, {
         dataTransfer: {
@@ -164,21 +202,20 @@ describe('NoteEditor', () => {
     });
 
     expect(mockUploadMedia).toHaveBeenCalledWith(file);
-    // Should insert image markdown syntax
-    expect(screen.getByTestId('md-editor')).toHaveValue('Test body\n![test.png](/image.png)');
+    expect(screen.getByTestId('rich-text-editor')).toHaveValue('Test body\n![test.png](/image.png)');
   });
 
   it('handles file input uploads via toolbar', async () => {
     render(<NoteEditor projectId="proj-1" noteId="note-1" />);
-    
+
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
     const file = new File(['dummy content'], 'test.png', { type: 'image/png' });
-    
+
     await act(async () => {
       fireEvent.change(fileInput, { target: { files: [file] } });
     });
 
     expect(mockUploadMedia).toHaveBeenCalledWith(file);
-    expect(screen.getByTestId('md-editor')).toHaveValue('Test body\n![test.png](/image.png)');
+    expect(screen.getByTestId('rich-text-editor')).toHaveValue('Test body\n![test.png](/image.png)');
   });
 });

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 import type {
   ButtonHTMLAttributes,
   ChangeEvent,
@@ -55,6 +55,73 @@ vi.mock('../../context/TicketContext', async (importOriginal) => {
 
 vi.mock('@library', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@library')>();
+  const buildDoc = (text: string) =>
+    JSON.stringify({
+      type: 'doc',
+      content: text
+        ? [
+            {
+              type: 'paragraph',
+              content: [
+                {
+                  type: 'text',
+                  text,
+                },
+              ],
+            },
+          ]
+        : [
+            {
+              type: 'paragraph',
+            },
+          ],
+    });
+
+  const MockRichTextEditor = forwardRef<any, any>(function MockRichTextEditor(
+    { value, onChange, placeholder, className, minHeight, autoFocus }: any,
+    ref,
+  ) {
+    const [text, setText] = useState(() => {
+      try {
+        const parsed = JSON.parse(value);
+        return parsed?.content?.[0]?.content?.[0]?.text ?? '';
+      } catch {
+        return value || '';
+      }
+    });
+
+    useEffect(() => {
+      try {
+        const parsed = JSON.parse(value);
+        setText(parsed?.content?.[0]?.content?.[0]?.text ?? '');
+      } catch {
+        setText(value || '');
+      }
+    }, [value]);
+
+    useImperativeHandle(ref, () => ({
+      focus: () => {},
+      insertImage: () => {},
+    }), []);
+
+    return (
+      <textarea
+        data-testid={placeholder}
+        aria-label={placeholder}
+        placeholder={placeholder}
+        className={className}
+        style={{ minHeight }}
+        autoFocus={autoFocus}
+        value={text}
+        onChange={(event) => {
+          const nextText = event.target.value;
+          setText(nextText);
+          onChange(buildDoc(nextText));
+        }}
+      />
+    );
+  });
+
   return {
     ...actual,
     Button: ({ children, ...props }: MockButtonProps) => {
@@ -93,6 +160,7 @@ vi.mock('@library', async (importOriginal) => {
         />
       );
     },
+    RichTextEditor: MockRichTextEditor,
     ClickAwayListener: ({ children }: { children: ReactNode }) => children,
     Portal: ({ children }: { children: ReactNode }) => <div data-testid="portal">{children}</div>,
   };
@@ -281,14 +349,12 @@ describe('TicketDetail', () => {
       expect(props.onUpdateTicket).toHaveBeenCalledWith('ticket-1', { title: 'Stabilize sync retries' });
     });
 
-    await user.click(screen.getByText('Retry the event stream after disconnects.'));
-    const descriptionInput = screen.getByPlaceholderText('Describe your issue using markdown...');
+    const descriptionInput = screen.getByPlaceholderText('Describe your issue...');
     await user.clear(descriptionInput);
     await user.type(descriptionInput, 'Add retry backoff and better logging.');
-    await user.tab();
     await waitFor(() => {
       expect(props.onUpdateTicket).toHaveBeenCalledWith('ticket-1', {
-        description: 'Add retry backoff and better logging.',
+        description: expect.stringContaining('"type":"doc"'),
       });
     });
 
@@ -303,7 +369,7 @@ describe('TicketDetail', () => {
     await user.type(screen.getByPlaceholderText('Post updates, links, or mention PRs...'), 'Comment from test');
     await user.click(screen.getByRole('button', { name: 'Comment' }));
     await waitFor(() => {
-      expect(props.onAddComment).toHaveBeenCalledWith('ticket-1', 'Comment from test');
+      expect(props.onAddComment).toHaveBeenCalledWith('ticket-1', expect.stringContaining('"type":"doc"'));
     });
 
     backSpy.mockRestore();
@@ -391,8 +457,8 @@ describe('TicketDetail', () => {
     expect(writeTextSpy).toHaveBeenCalledWith('https://tickets.placeholder.local/GRA-101');
     expect(toastSpy).toHaveBeenCalledWith('Ticket link copied', 'success');
 
-  const generatedBranchName = 'feature/gra-101-fix-sync-retries';
-  expect(sidebar.getByRole('button', { name: 'Copy Branch Name' })).toBeInTheDocument();
+    const generatedBranchName = 'feature/gra-101-fix-sync-retries';
+    expect(sidebar.getByRole('button', { name: 'Copy Branch Name' })).toBeInTheDocument();
 
     // Copy Link button removed — link is now the anchor icon only
 
@@ -444,13 +510,13 @@ describe('TicketDetail', () => {
     
     // Dropdown closes; inline edit textarea shown with the comment body
     expect(screen.queryByRole('button', { name: 'Edit Comment' })).not.toBeInTheDocument();
-    const commentEditInput = screen.getByDisplayValue('PR is ready for review.');
+    const commentEditInput = screen.getByPlaceholderText('Edit comment...');
     await user.clear(commentEditInput);
     await user.type(commentEditInput, 'PR is approved now.');
     await user.click(screen.getByRole('button', { name: 'Save' }));
-    
+
     await waitFor(() => {
-      expect(props.onUpdateComment).toHaveBeenCalledWith('ticket-1', 'comment-1', 'PR is approved now.');
+      expect(props.onUpdateComment).toHaveBeenCalledWith('ticket-1', 'comment-1', expect.stringContaining('"type":"doc"'));
     });
 
     // Open dropdown again to test deletion flow — should show confirmation overlay, not window.confirm

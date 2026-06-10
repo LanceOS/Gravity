@@ -17,11 +17,15 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 // ─── Stubs for heavy modules ─────────────────────────────────────────────────
-vi.mock('@library', () => ({
-  Button: ({ children, onClick, ...rest }: any) => (
-    <button type="button" onClick={onClick} {...rest}>{children}</button>
-  ),
-}));
+vi.mock('@library', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@library')>();
+  return {
+    ...actual,
+    Button: ({ children, onClick, ...rest }: any) => (
+      <button type="button" onClick={onClick} {...rest}>{children}</button>
+    ),
+  };
+});
 vi.mock('../../modules/tickets/components/TicketBoard', () => ({ TicketBoard: () => null }));
 vi.mock('../../modules/tickets/components/TicketList', () => ({ TicketList: () => null }));
 vi.mock('../../modules/tickets/components/TicketDetail', () => ({ TicketDetail: () => null }));
@@ -57,6 +61,7 @@ vi.mock('../../modules/notes', async () => {
 });
 
 import { WorkspacePage } from '../../pages/WorkspacePage/WorkspacePage';
+import { createEmptyRichTextValue } from '@library';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 const baseProject = {
@@ -163,6 +168,10 @@ describe('WorkspacePage – notes context', () => {
         '/api/v1/notes',
         expect.objectContaining({
           method: 'POST',
+          body: JSON.stringify({
+            title: 'Untitled Note',
+            body: createEmptyRichTextValue(),
+          }),
           headers: expect.objectContaining({ 'x-project-id': 'proj-1' }),
         }),
       ),
