@@ -68,7 +68,7 @@ function sanitizeTicketUrlBase(raw?: string): string {
 }
 
 const TICKET_URL_BASE = sanitizeTicketUrlBase((typeof import.meta !== 'undefined' && (import.meta as unknown as { env?: Record<string, string | undefined> }).env?.VITE_TICKET_URL_BASE) || undefined);
-import { 
+import {
   CheckSquare, GitPullRequest, GitMerge, Send, Trash2,
   Plus, Edit3, ChevronLeft, MoreHorizontal, Link, FileText, CornerLeftUp, X
 } from 'lucide-react';
@@ -200,7 +200,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
           {activeTicket.key}
         </span>
       </div>
-      
+
       <div>
         <span className="label">Status</span>
         <Select
@@ -212,39 +212,6 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
       </div>
 
       <div>
-        <span className="label">Priority</span>
-        <Select
-          value={activeTicket.priority}
-          onValueChange={(nextPriority: string) => onUpdateTicket(activeTicket.id, { priority: nextPriority as Ticket['priority'] })}
-          options={PRIORITY_OPTIONS}
-          aria-label="Select ticket priority"
-        />
-      </div>
-
-      <div>
-        <span className="label">Assignee</span>
-        <Select
-          value={activeTicket.assigneeId || ''}
-          onValueChange={(nextAssigneeId: string) => onUpdateTicket(activeTicket.id, { assigneeId: nextAssigneeId || null })}
-          options={assigneeOptions}
-          aria-label="Select ticket assignee"
-        />
-      </div>
-
-      <div>
-        <span className="label">Project</span>
-        <Select
-          value={activeTicket.projectId}
-          options={projectOptions}
-          aria-label="Select ticket project"
-          disabled
-        />
-        <div style={{ marginTop: '6px', fontSize: '11px', color: 'var(--color-text-disabled)', lineHeight: '1.4' }}>
-          Project moves are managed outside ticket details to keep ticket keys and related project data consistent.
-        </div>
-      </div>
-
-      <div style={{ gridColumn: 'span 2' }}>
         <span className="label" style={{ marginBottom: '8px', display: 'block' }}>Labels</span>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
           {activeTicket.labels && activeTicket.labels.length > 0 ? (
@@ -261,9 +228,9 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
               No labels assigned
             </span>
           )}
-          
+
           <Popover
-            align="left"
+            align="center"
             contentClassName="ticket-detail__label-popover"
             trigger={
               <button
@@ -311,6 +278,41 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
       </div>
 
       <div>
+        <span className="label">Priority</span>
+        <Select
+          value={activeTicket.priority}
+          onValueChange={(nextPriority: string) => onUpdateTicket(activeTicket.id, { priority: nextPriority as Ticket['priority'] })}
+          options={PRIORITY_OPTIONS}
+          aria-label="Select ticket priority"
+        />
+      </div>
+
+      <div>
+        <span className="label">Assignee</span>
+        <Select
+          value={activeTicket.assigneeId || ''}
+          onValueChange={(nextAssigneeId: string) => onUpdateTicket(activeTicket.id, { assigneeId: nextAssigneeId || null })}
+          options={assigneeOptions}
+          aria-label="Select ticket assignee"
+        />
+      </div>
+
+      <div>
+        <span className="label">Project</span>
+        <Select
+          value={activeTicket.projectId}
+          options={projectOptions}
+          aria-label="Select ticket project"
+          disabled
+        />
+        <div style={{ marginTop: '6px', fontSize: '11px', color: 'var(--color-text-disabled)', lineHeight: '1.4' }}>
+          Project moves are managed outside ticket details to keep ticket keys and related project data consistent.
+        </div>
+      </div>
+
+
+
+      <div>
         <span className="label">Cycle / Milestone</span>
         <Select
           value={activeTicket.cycleId || ''}
@@ -328,9 +330,9 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
 
         {activeTicket.prStatus !== 'none' ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '6px' }}>
-            <a 
-              href={activeTicket.prUrl || '#'} 
-              target="_blank" 
+            <a
+              href={activeTicket.prUrl || '#'}
+              target="_blank"
               rel="noreferrer"
               style={{
                 display: 'flex',
@@ -356,11 +358,11 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             </span>
           </div>
         ) : (
-          <div 
-            style={{ 
-              fontSize: '11px', 
-              color: 'var(--color-text-disabled)', 
-              background: 'rgba(255,255,255,0.01)', 
+          <div
+            style={{
+              fontSize: '11px',
+              color: 'var(--color-text-disabled)',
+              background: 'rgba(255,255,255,0.01)',
               border: '1px dashed var(--color-border-default)',
               borderRadius: '6px',
               padding: '10px',
@@ -377,411 +379,411 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
   return (
     <>
       <div className="ticket-detail">
-      <div className="ticket-detail__header">
-        <Button
-          onClick={() => onClose ? onClose() : window.history.back()}
-          variant="ghost"
-          size="sm"
-          className="ticket-detail__back-btn clickable"
-        >
-          <ChevronLeft size={16} />
-          <span className="ticket-detail__back-text">Back</span>
-        </Button>
+        <div className="ticket-detail__header">
+          <Button
+            onClick={() => onClose ? onClose() : window.history.back()}
+            variant="ghost"
+            size="sm"
+            className="ticket-detail__back-btn clickable"
+          >
+            <ChevronLeft size={16} />
+            <span className="ticket-detail__back-text">Back</span>
+          </Button>
 
-        <span className="ticket-detail__sep">/</span>
-        
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontFamily: 'var(--mono)', fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)', whiteSpace: 'nowrap' }}>
-            {activeTicket.key}
-          </span>
+          <span className="ticket-detail__sep">/</span>
 
-          {parentTicket ? (
-            <>
-              <span className="ticket-parent-ref">
-                <span className="ticket-parent-label">Sub ticket of</span>
-                <button
-                  type="button"
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)', whiteSpace: 'nowrap' }}>
+              {activeTicket.key}
+            </span>
+
+            {parentTicket ? (
+              <>
+                <span className="ticket-parent-ref">
+                  <span className="ticket-parent-label">Sub ticket of</span>
+                  <button
+                    type="button"
+                    onClick={() => onSelectTicket(parentTicket)}
+                    className="ticket-parent-btn clickable"
+                    aria-label={`${parentTicket.key} - ${parentTicket.title}`}
+                  >
+                    <span className="ticket-parent-key">{parentTicket.key}</span>
+                    <span className="ticket-parent-title">{` - ${parentTicket.title}`}</span>
+                  </button>
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="ticket-parent-mobile-btn"
                   onClick={() => onSelectTicket(parentTicket)}
-                  className="ticket-parent-btn clickable"
-                  aria-label={`${parentTicket.key} - ${parentTicket.title}`}
+                  aria-label={`Parent ticket: ${parentTicket.key}`}
+                  style={{ padding: '4px 10px', fontSize: '12.5px', height: '28px' }}
                 >
-                  <span className="ticket-parent-key">{parentTicket.key}</span>
-                  <span className="ticket-parent-title">{` - ${parentTicket.title}`}</span>
-                </button>
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="ticket-parent-mobile-btn"
-                onClick={() => onSelectTicket(parentTicket)}
-                aria-label={`Parent ticket: ${parentTicket.key}`}
-                style={{ padding: '4px 10px', fontSize: '12.5px', height: '28px' }}
-              >
-                <CornerLeftUp size={14} />
-                <span>Parent</span>
-              </Button>
-            </>
-          ) : null}
+                  <CornerLeftUp size={14} />
+                  <span>Parent</span>
+                </Button>
+              </>
+            ) : null}
+          </div>
+
+          <Button
+            onClick={handleDelete}
+            variant="danger"
+            size="sm"
+            className="ticket-detail__delete-btn"
+          >
+            <Trash2 size={14} />
+            <span>Delete Ticket</span>
+          </Button>
         </div>
 
-        <Button
-          onClick={handleDelete}
-          variant="danger"
-          size="sm"
-          className="ticket-detail__delete-btn"
-        >
-          <Trash2 size={14} />
-          <span>Delete Ticket</span>
-        </Button>
-      </div>
+        <div className="ticket-detail__body">
 
-      <div className="ticket-detail__body">
-        
-        <div className="ticket-detail__content">
-          
-          <div className="ticket-detail__accordion-mobile">
-            <Accordion
-              items={[
-                {
-                  id: 'ticket-details',
-                  title: 'Ticket Details',
-                  content: propertiesContent
-                }
-              ]}
-            />
-          </div>
+          <div className="ticket-detail__content">
 
-          <div>
-            <MarkdownEditor
-              value={activeTicket.title}
-              onSave={(newTitle) => onUpdateTicket(activeTicket.id, { title: newTitle })}
-              singleLine={true}
-              minHeight="auto"
-              className="ticket-title-editor"
-            />
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--color-border-default)', paddingBottom: '6px' }}>
-              <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase' }}>Description</span>
+            <div className="ticket-detail__accordion-mobile">
+              <Accordion
+                items={[
+                  {
+                    id: 'ticket-details',
+                    title: 'Ticket Details',
+                    content: propertiesContent
+                  }
+                ]}
+              />
             </div>
 
-            <MarkdownEditor
-              value={activeTicket.description || ''}
-              onSave={(newDesc) => onUpdateTicket(activeTicket.id, { description: newDesc })}
-              placeholder="Describe your issue using markdown..."
-              minHeight="120px"
-              className="markdown-content"
-            />
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--color-border-default)', paddingBottom: '6px' }}>
-              <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase' }}>
-                Sub-tasks Checklist
-              </span>
-              
-              <Button
-                onClick={() => onOpenCreateSubtask(activeTicket.id)}
-                variant="ghost"
-                size="sm"
-                style={{ marginLeft: 'auto', padding: '2px 8px', fontSize: '11px' }}
-              >
-                <Plus size={12} />
-                <span>Add Subtask</span>
-              </Button>
+            <div>
+              <MarkdownEditor
+                value={activeTicket.title}
+                onSave={(newTitle) => onUpdateTicket(activeTicket.id, { title: newTitle })}
+                singleLine={true}
+                minHeight="auto"
+                className="ticket-title-editor"
+              />
             </div>
 
-            {subtasks.length > 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ flex: 1, height: '4px', background: 'var(--color-border-default)', borderRadius: '2px', overflow: 'hidden' }}>
-                    <div style={{ width: `${subtaskProgressPercent}%`, height: '100%', background: 'var(--color-primary)', transition: 'width 0.2s ease' }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--color-border-default)', paddingBottom: '6px' }}>
+                <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase' }}>Description</span>
+              </div>
+
+              <MarkdownEditor
+                value={activeTicket.description || ''}
+                onSave={(newDesc) => onUpdateTicket(activeTicket.id, { description: newDesc })}
+                placeholder="Describe your issue using markdown..."
+                minHeight="120px"
+                className="markdown-content"
+              />
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--color-border-default)', paddingBottom: '6px' }}>
+                <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase' }}>
+                  Sub-tasks Checklist
+                </span>
+
+                <Button
+                  onClick={() => onOpenCreateSubtask(activeTicket.id)}
+                  variant="ghost"
+                  size="sm"
+                  style={{ marginLeft: 'auto', padding: '2px 8px', fontSize: '11px' }}
+                >
+                  <Plus size={12} />
+                  <span>Add Subtask</span>
+                </Button>
+              </div>
+
+              {subtasks.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ flex: 1, height: '4px', background: 'var(--color-border-default)', borderRadius: '2px', overflow: 'hidden' }}>
+                      <div style={{ width: `${subtaskProgressPercent}%`, height: '100%', background: 'var(--color-primary)', transition: 'width 0.2s ease' }} />
+                    </div>
+                    <span style={{ fontSize: '11px', color: 'var(--color-text-disabled)', whiteSpace: 'nowrap' }}>
+                      {completedSubtasks} of {subtasks.length} ({Math.round(subtaskProgressPercent)}%)
+                    </span>
                   </div>
-                  <span style={{ fontSize: '11px', color: 'var(--color-text-disabled)', whiteSpace: 'nowrap' }}>
-                    {completedSubtasks} of {subtasks.length} ({Math.round(subtaskProgressPercent)}%)
-                  </span>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {(() => {
+                      const userAvatarById = Object.fromEntries(users.map((u) => [u.id, u.avatar]));
+                      return subtasks.map((sub) => {
+                        const rowProps = {
+                          ticket: sub,
+                          onClick: onSelectTicket,
+                          priorityIcon: getPriorityIcon(sub.priority),
+                          assigneeAvatar: getAssigneeAvatar(userAvatarById, sub.assigneeId),
+                        };
+                        return (
+                          <React.Fragment key={sub.id}>
+                            <div className="ticket-list__row-desktop">
+                              <TicketRow {...rowProps} />
+                            </div>
+                            <div className="ticket-list__row-mobile">
+                              <TicketRowMobile {...rowProps} />
+                            </div>
+                          </React.Fragment>
+                        );
+                      });
+                    })()}
+                  </div>
+
                 </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {(() => {
-                    const userAvatarById = Object.fromEntries(users.map((u) => [u.id, u.avatar]));
-                    return subtasks.map((sub) => {
-                      const rowProps = {
-                        ticket: sub,
-                        onClick: onSelectTicket,
-                        priorityIcon: getPriorityIcon(sub.priority),
-                        assigneeAvatar: getAssigneeAvatar(userAvatarById, sub.assigneeId),
-                      };
-                      return (
-                        <React.Fragment key={sub.id}>
-                          <div className="ticket-list__row-desktop">
-                            <TicketRow {...rowProps} />
-                          </div>
-                          <div className="ticket-list__row-mobile">
-                            <TicketRowMobile {...rowProps} />
-                          </div>
-                        </React.Fragment>
-                      );
-                    });
-                  })()}
+              ) : (
+                <div style={{ fontSize: '12px', color: 'var(--color-text-disabled)', fontStyle: 'italic', padding: '8px 4px' }}>
+                  No sub-tasks defined. Break complex tasks down to improve trackability.
                 </div>
-
-              </div>
-            ) : (
-              <div style={{ fontSize: '12px', color: 'var(--color-text-disabled)', fontStyle: 'italic', padding: '8px 4px' }}>
-                No sub-tasks defined. Break complex tasks down to improve trackability.
-              </div>
-            )}
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
-            <div style={{ borderBottom: '1px solid var(--color-border-default)', paddingBottom: '6px' }}>
-              <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase' }}>
-                Activity Thread ({comments.length})
-              </span>
+              )}
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {comments.map((comment) => (
-                <div key={comment.id} id={`comment-${comment.id}`} style={{ display: 'flex', gap: '12px' }}>
-                  <img 
-                    src={comment.userAvatar || 'https://api.dicebear.com/7.x/bottts/svg?seed=guest'} 
-                    alt={comment.userName} 
-                    style={{ width: '24px', height: '24px', borderRadius: '50%', border: '1px solid var(--color-border-default)' }}
-                  />
-                  
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-primary)' }}>{comment.userName || 'Member'}</span>
-                        <span style={{ fontSize: '10px', color: 'var(--color-text-disabled)' }}>
-                          {new Date(comment.createdAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                        </span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
+              <div style={{ borderBottom: '1px solid var(--color-border-default)', paddingBottom: '6px' }}>
+                <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase' }}>
+                  Activity Thread ({comments.length})
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {comments.map((comment) => (
+                  <div key={comment.id} id={`comment-${comment.id}`} style={{ display: 'flex', gap: '12px' }}>
+                    <img
+                      src={comment.userAvatar || 'https://api.dicebear.com/7.x/bottts/svg?seed=guest'}
+                      alt={comment.userName}
+                      style={{ width: '24px', height: '24px', borderRadius: '50%', border: '1px solid var(--color-border-default)' }}
+                    />
+
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-primary)' }}>{comment.userName || 'Member'}</span>
+                          <span style={{ fontSize: '10px', color: 'var(--color-text-disabled)' }}>
+                            {new Date(comment.createdAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+
+                        <ClickAwayListener onClickAway={closeCommentMenu} active={openMenuCommentId === comment.id}>
+                          <div style={{ position: 'relative' }}>
+                            <button
+                              type="button"
+                              onClick={() => setOpenMenuCommentId(openMenuCommentId === comment.id ? null : comment.id)}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: openMenuCommentId === comment.id ? 'var(--color-text-secondary)' : 'var(--color-text-disabled)',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                padding: '4px',
+                                borderRadius: 'var(--radius-xs)',
+                                transition: 'color var(--transition-fast), background var(--transition-fast)'
+                              }}
+                              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-secondary)'; e.currentTarget.style.background = 'var(--color-base100)'; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.color = openMenuCommentId === comment.id ? 'var(--color-text-secondary)' : 'var(--color-text-disabled)'; e.currentTarget.style.background = 'none'; }}
+                              aria-label="Comment options"
+                            >
+                              <MoreHorizontal size={14} />
+                            </button>
+
+                            {openMenuCommentId === comment.id && (
+                              <div
+                                style={{
+                                  position: 'absolute',
+                                  top: 'calc(100% + 4px)',
+                                  right: 0,
+                                  zIndex: 200,
+                                  minWidth: '172px',
+                                  background: 'var(--color-surface-card)',
+                                  border: '1px solid var(--color-border-default)',
+                                  borderRadius: 'var(--radius-sm)',
+                                  boxShadow: 'var(--shadow-lg)',
+                                  padding: '4px',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '1px',
+                                }}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingCommentId(comment.id);
+                                    setEditingCommentBody(comment.body);
+                                    setOpenMenuCommentId(null);
+                                  }}
+                                  style={{
+                                    display: 'flex', alignItems: 'center', gap: '8px',
+                                    width: '100%', padding: '7px 10px',
+                                    background: 'none', border: 'none',
+                                    borderRadius: 'var(--radius-xs)',
+                                    color: 'var(--color-text-secondary)', cursor: 'pointer',
+                                    textAlign: 'left', fontSize: '12px',
+                                    transition: 'background var(--transition-fast)',
+                                  }}
+                                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-base100)'; }}
+                                  onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+                                >
+                                  <Edit3 size={13} style={{ color: 'var(--color-text-disabled)', flexShrink: 0 }} />
+                                  <span>Edit Comment</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const url = `${window.location.origin}${window.location.pathname}#comment-${comment.id}`;
+                                    void copyToClipboard(url, 'Comment link copied');
+                                    setOpenMenuCommentId(null);
+                                  }}
+                                  style={{
+                                    display: 'flex', alignItems: 'center', gap: '8px',
+                                    width: '100%', padding: '7px 10px',
+                                    background: 'none', border: 'none',
+                                    borderRadius: 'var(--radius-xs)',
+                                    color: 'var(--color-text-secondary)', cursor: 'pointer',
+                                    textAlign: 'left', fontSize: '12px',
+                                    transition: 'background var(--transition-fast)',
+                                  }}
+                                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-base100)'; }}
+                                  onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+                                >
+                                  <Link size={13} style={{ color: 'var(--color-text-disabled)', flexShrink: 0 }} />
+                                  <span>Grab Link</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    void copyToClipboard(comment.body, 'Comment copied');
+                                    setOpenMenuCommentId(null);
+                                  }}
+                                  style={{
+                                    display: 'flex', alignItems: 'center', gap: '8px',
+                                    width: '100%', padding: '7px 10px',
+                                    background: 'none', border: 'none',
+                                    borderRadius: 'var(--radius-xs)',
+                                    color: 'var(--color-text-secondary)', cursor: 'pointer',
+                                    textAlign: 'left', fontSize: '12px',
+                                    transition: 'background var(--transition-fast)',
+                                  }}
+                                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-base100)'; }}
+                                  onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+                                >
+                                  <FileText size={13} style={{ color: 'var(--color-text-disabled)', flexShrink: 0 }} />
+                                  <span>Copy Markdown</span>
+                                </button>
+
+                                <div style={{ height: '1px', background: 'var(--color-border-default)', margin: '3px 6px' }} />
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setDeletingCommentId(comment.id);
+                                    setOpenMenuCommentId(null);
+                                  }}
+                                  style={{
+                                    display: 'flex', alignItems: 'center', gap: '8px',
+                                    width: '100%', padding: '7px 10px',
+                                    background: 'none', border: 'none',
+                                    borderRadius: 'var(--radius-xs)',
+                                    color: 'var(--color-error)', cursor: 'pointer',
+                                    textAlign: 'left', fontSize: '12px',
+                                    transition: 'background var(--transition-fast)',
+                                  }}
+                                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-bg-error)'; }}
+                                  onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+                                >
+                                  <Trash2 size={13} style={{ flexShrink: 0 }} />
+                                  <span>Delete Comment</span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </ClickAwayListener>
                       </div>
 
-                      <ClickAwayListener onClickAway={closeCommentMenu} active={openMenuCommentId === comment.id}>
-                        <div style={{ position: 'relative' }}>
-                          <button
-                            type="button"
-                            onClick={() => setOpenMenuCommentId(openMenuCommentId === comment.id ? null : comment.id)}
-                            style={{
-                              background: 'none',
-                              border: 'none',
-                              color: openMenuCommentId === comment.id ? 'var(--color-text-secondary)' : 'var(--color-text-disabled)',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              padding: '4px',
-                              borderRadius: 'var(--radius-xs)',
-                              transition: 'color var(--transition-fast), background var(--transition-fast)'
-                            }}
-                            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-secondary)'; e.currentTarget.style.background = 'var(--color-base100)'; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.color = openMenuCommentId === comment.id ? 'var(--color-text-secondary)' : 'var(--color-text-disabled)'; e.currentTarget.style.background = 'none'; }}
-                            aria-label="Comment options"
-                          >
-                            <MoreHorizontal size={14} />
-                          </button>
-
-                          {openMenuCommentId === comment.id && (
-                            <div
-                              style={{
-                                position: 'absolute',
-                                top: 'calc(100% + 4px)',
-                                right: 0,
-                                zIndex: 200,
-                                minWidth: '172px',
-                                background: 'var(--color-surface-card)',
-                                border: '1px solid var(--color-border-default)',
-                                borderRadius: 'var(--radius-sm)',
-                                boxShadow: 'var(--shadow-lg)',
-                                padding: '4px',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '1px',
-                              }}
-                            >
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setEditingCommentId(comment.id);
-                                  setEditingCommentBody(comment.body);
-                                  setOpenMenuCommentId(null);
+                      <div
+                        style={{
+                          fontSize: '13px',
+                          color: 'var(--color-text-secondary)',
+                          background: 'var(--color-surface-card)',
+                          border: '1px solid var(--color-border-default)',
+                          borderRadius: '6px',
+                          padding: '10px 14px',
+                          lineHeight: '1.5'
+                        }}
+                      >
+                        {editingCommentId === comment.id ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
+                            <Textarea
+                              value={editingCommentBody}
+                              onChange={(e) => setEditingCommentBody(e.target.value)}
+                              style={{ fontSize: '13px', lineHeight: '1.5', fontFamily: 'inherit' }}
+                              autoGrow
+                              autoFocus
+                            />
+                            <div style={{ display: 'flex', gap: '6px', alignSelf: 'flex-end' }}>
+                              <Button
+                                onClick={async () => {
+                                  if (editingCommentBody.trim()) {
+                                    await onUpdateComment(activeTicket.id, comment.id, editingCommentBody.trim());
+                                    setEditingCommentId(null);
+                                  }
                                 }}
-                                style={{
-                                  display: 'flex', alignItems: 'center', gap: '8px',
-                                  width: '100%', padding: '7px 10px',
-                                  background: 'none', border: 'none',
-                                  borderRadius: 'var(--radius-xs)',
-                                  color: 'var(--color-text-secondary)', cursor: 'pointer',
-                                  textAlign: 'left', fontSize: '12px',
-                                  transition: 'background var(--transition-fast)',
-                                }}
-                                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-base100)'; }}
-                                onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+                                variant="primary"
+                                size="sm"
+                                style={{ padding: '2px 8px', fontSize: '11px' }}
                               >
-                                <Edit3 size={13} style={{ color: 'var(--color-text-disabled)', flexShrink: 0 }} />
-                                <span>Edit Comment</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const url = `${window.location.origin}${window.location.pathname}#comment-${comment.id}`;
-                                  void copyToClipboard(url, 'Comment link copied');
-                                  setOpenMenuCommentId(null);
-                                }}
-                                style={{
-                                  display: 'flex', alignItems: 'center', gap: '8px',
-                                  width: '100%', padding: '7px 10px',
-                                  background: 'none', border: 'none',
-                                  borderRadius: 'var(--radius-xs)',
-                                  color: 'var(--color-text-secondary)', cursor: 'pointer',
-                                  textAlign: 'left', fontSize: '12px',
-                                  transition: 'background var(--transition-fast)',
-                                }}
-                                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-base100)'; }}
-                                onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+                                Save
+                              </Button>
+                              <Button
+                                onClick={() => setEditingCommentId(null)}
+                                size="sm"
+                                style={{ padding: '2px 8px', fontSize: '11px' }}
                               >
-                                <Link size={13} style={{ color: 'var(--color-text-disabled)', flexShrink: 0 }} />
-                                <span>Grab Link</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  void copyToClipboard(comment.body, 'Comment copied');
-                                  setOpenMenuCommentId(null);
-                                }}
-                                style={{
-                                  display: 'flex', alignItems: 'center', gap: '8px',
-                                  width: '100%', padding: '7px 10px',
-                                  background: 'none', border: 'none',
-                                  borderRadius: 'var(--radius-xs)',
-                                  color: 'var(--color-text-secondary)', cursor: 'pointer',
-                                  textAlign: 'left', fontSize: '12px',
-                                  transition: 'background var(--transition-fast)',
-                                }}
-                                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-base100)'; }}
-                                onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
-                              >
-                                <FileText size={13} style={{ color: 'var(--color-text-disabled)', flexShrink: 0 }} />
-                                <span>Copy Markdown</span>
-                              </button>
-
-                              <div style={{ height: '1px', background: 'var(--color-border-default)', margin: '3px 6px' }} />
-
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setDeletingCommentId(comment.id);
-                                  setOpenMenuCommentId(null);
-                                }}
-                                style={{
-                                  display: 'flex', alignItems: 'center', gap: '8px',
-                                  width: '100%', padding: '7px 10px',
-                                  background: 'none', border: 'none',
-                                  borderRadius: 'var(--radius-xs)',
-                                  color: 'var(--color-error)', cursor: 'pointer',
-                                  textAlign: 'left', fontSize: '12px',
-                                  transition: 'background var(--transition-fast)',
-                                }}
-                                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-bg-error)'; }}
-                                onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
-                              >
-                                <Trash2 size={13} style={{ flexShrink: 0 }} />
-                                <span>Delete Comment</span>
-                              </button>
+                                Cancel
+                              </Button>
                             </div>
-                          )}
-                        </div>
-                      </ClickAwayListener>
-                    </div>
-                    
-                    <div 
-                      style={{ 
-                        fontSize: '13px', 
-                        color: 'var(--color-text-secondary)', 
-                        background: 'var(--color-surface-card)', 
-                        border: '1px solid var(--color-border-default)',
-                        borderRadius: '6px',
-                        padding: '10px 14px',
-                        lineHeight: '1.5'
-                      }}
-                    >
-                      {editingCommentId === comment.id ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
-                          <Textarea
-                            value={editingCommentBody}
-                            onChange={(e) => setEditingCommentBody(e.target.value)}
-                            style={{ fontSize: '13px', lineHeight: '1.5', fontFamily: 'inherit' }}
-                            autoGrow
-                            autoFocus
-                          />
-                          <div style={{ display: 'flex', gap: '6px', alignSelf: 'flex-end' }}>
-                            <Button
-                              onClick={async () => {
-                                if (editingCommentBody.trim()) {
-                                  await onUpdateComment(activeTicket.id, comment.id, editingCommentBody.trim());
-                                  setEditingCommentId(null);
-                                }
-                              }}
-                              variant="primary"
-                              size="sm"
-                              style={{ padding: '2px 8px', fontSize: '11px' }}
-                            >
-                              Save
-                            </Button>
-                            <Button
-                              onClick={() => setEditingCommentId(null)}
-                              size="sm"
-                              style={{ padding: '2px 8px', fontSize: '11px' }}
-                            >
-                              Cancel
-                            </Button>
                           </div>
-                        </div>
-                      ) : (
-                        <MarkdownContent text={comment.body} />
-                      )}
+                        ) : (
+                          <MarkdownContent text={comment.body} />
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
+
+              <form onSubmit={handlePostComment} className="ticket-detail__comment-form">
+                <Textarea
+                  placeholder="Post updates, links, or mention PRs..."
+                  value={commentInput}
+                  onChange={(e) => setCommentInput(e.target.value)}
+                  style={{ flex: 1 }}
+                  autoGrow
+                />
+                <Button
+                  type="submit"
+                  variant="primary"
+                  style={{ padding: '8px 16px', height: '34px' }}
+                >
+                  <Send size={12} />
+                  <span>Comment</span>
+                </Button>
+              </form>
+
             </div>
 
-            <form onSubmit={handlePostComment} className="ticket-detail__comment-form">
-              <Textarea 
-                placeholder="Post updates, links, or mention PRs..."
-                value={commentInput}
-                onChange={(e) => setCommentInput(e.target.value)}
-                style={{ flex: 1 }}
-                autoGrow
-              />
-              <Button
-                type="submit" 
-                variant="primary"
-                style={{ padding: '8px 16px', height: '34px' }}
-              >
-                <Send size={12} />
-                <span>Comment</span>
-              </Button>
-            </form>
-
           </div>
 
-        </div>
-
-        <div className="ticket-detail__sidebar" data-testid="desktop-sidebar">
-          <div style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-disabled)', marginBottom: '16px' }}>
-            Properties
+          <div className="ticket-detail__sidebar" data-testid="desktop-sidebar">
+            <div style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-disabled)', marginBottom: '16px' }}>
+              Properties
+            </div>
+            {propertiesContent}
           </div>
-          {propertiesContent}
+
+
+
         </div>
-
-
-
-      </div>
 
       </div>
 
@@ -954,11 +956,11 @@ const LabelManagerPopoverContent: React.FC<LabelManagerPopoverContentProps> = ({
   };
 
   return (
-    <div style={{ width: '220px', padding: '12px', background: 'var(--color-surface-overlay)', borderRadius: '8px', border: '1px solid var(--color-border-default)', boxShadow: 'var(--shadow-lg)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
       <div style={{ fontSize: '11px', fontWeight: 650, color: 'var(--color-text-disabled)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
         Search or Create Label
       </div>
-      
+
       <input
         type="text"
         placeholder="Type to search or create..."
@@ -976,7 +978,7 @@ const LabelManagerPopoverContent: React.FC<LabelManagerPopoverContentProps> = ({
         }}
         autoFocus
       />
-      
+
       <div style={{ maxHeight: '160px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px', margin: '4px 0' }}>
         {filteredLabels.length > 0 ? (
           filteredLabels.map((label) => {
@@ -1032,7 +1034,7 @@ const LabelManagerPopoverContent: React.FC<LabelManagerPopoverContentProps> = ({
           <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-text-disabled)' }}>
             CREATE NEW LABEL:
           </div>
-          
+
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px' }}>
             {colors.map((color) => (
               <button
@@ -1053,7 +1055,7 @@ const LabelManagerPopoverContent: React.FC<LabelManagerPopoverContentProps> = ({
               />
             ))}
           </div>
-          
+
           <Button
             size="sm"
             variant="primary"

@@ -93,7 +93,7 @@ export function LabelBadge({
           onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.6')}
           aria-label={`Remove label ${label.name}`}
         >
-          <X size={isSm ? 10 : 12} />
+          <X size={isSm ? 12 : 14} />
         </button>
       )}
     </span>

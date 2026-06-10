@@ -18,10 +18,10 @@ export interface PopoverProps {
 export function Popover({ trigger, children, isOpen: controlledIsOpen, onOpenChange, style, align = 'left', contentClassName = '' }: PopoverProps) {
   const [uncontrolledIsOpen, setUncontrolledIsOpen] = React.useState(false);
   const isCurrentlyOpen = controlledIsOpen !== undefined ? controlledIsOpen : uncontrolledIsOpen;
-  
+
   const triggerRef = React.useRef<HTMLDivElement>(null);
   const popoverRef = React.useRef<HTMLDivElement>(null);
-  
+
   const [renderState, setRenderState] = React.useState({
     isOpen: isCurrentlyOpen,
     shouldRender: isCurrentlyOpen,
@@ -48,31 +48,42 @@ export function Popover({ trigger, children, isOpen: controlledIsOpen, onOpenCha
 
   const syncPosition = React.useCallback(() => {
     if (!triggerRef.current || !popoverRef.current || !shouldRender) return;
-    
+
     const triggerRect = triggerRef.current.getBoundingClientRect();
     const popoverRect = popoverRef.current.getBoundingClientRect();
 
+    const GAP = 16;
+    const popoverWidth = popoverRect.width || 250;
+    const popoverHeight = popoverRect.height || 200;
+
     const spaceBelow = window.innerHeight - triggerRect.bottom;
     const spaceAbove = triggerRect.top;
-    
+
     // By default, open below. If not enough space below but enough above, flip it.
-    const estimatedHeight = popoverRect.height || 200;
-    const openAbove = spaceBelow < estimatedHeight && spaceAbove > spaceBelow;
+    const openAbove = spaceBelow < popoverHeight && spaceAbove > spaceBelow;
 
     let left = triggerRect.left;
     if (align === 'right') {
-      left = triggerRect.right - (popoverRect.width || 200);
+      left = triggerRect.right - popoverWidth;
     } else if (align === 'center') {
-      left = triggerRect.left + (triggerRect.width / 2) - ((popoverRect.width || 200) / 2);
+      left = triggerRect.left + (triggerRect.width / 2) - (popoverWidth / 2);
     }
 
-    // Keep within window bounds
-    left = Math.max(8, Math.min(left, window.innerWidth - (popoverRect.width || 250) - 8));
+    // Keep within window bounds horizontally
+    left = Math.max(GAP, Math.min(left, window.innerWidth - popoverWidth - GAP));
+
+    // Calculate vertical position
+    let top = openAbove ? triggerRect.top - popoverHeight - 4 : triggerRect.bottom + 4;
+
+    // Keep within window bounds vertically
+    top = Math.max(GAP, Math.min(top, window.innerHeight - popoverHeight - GAP));
 
     popoverRef.current.style.position = 'fixed';
     popoverRef.current.style.left = `${left}px`;
-    popoverRef.current.style.top = openAbove ? `${Math.max(8, triggerRect.top - estimatedHeight - 4)}px` : `${triggerRect.bottom + 4}px`;
+    popoverRef.current.style.top = `${top}px`;
     popoverRef.current.style.margin = '0';
+    popoverRef.current.style.maxHeight = `calc(100vh - ${GAP * 2}px)`;
+    popoverRef.current.style.overflowY = 'auto';
   }, [align, shouldRender]);
 
   React.useLayoutEffect(() => {
