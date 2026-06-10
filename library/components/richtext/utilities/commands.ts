@@ -81,6 +81,10 @@ export function buildInputRules() {
       wrappingInputRule(/^(\d+)\.\s$/, richTextSchema.nodes.ordered_list, (match) => ({
         order: Number(match[1]) || 1,
       })),
+      textblockTypeInputRule(/^```$/, richTextSchema.nodes.code_block),
+      new InputRule(/^---$/, (state, match, start, end) => {
+        return state.tr.replaceWith(start, end, richTextSchema.nodes.horizontal_rule.create());
+      }),
       // Inline formatting input rules
       inlineMarkInputRule(/(?:\*\*|__)([^*_]+)(?:\*\*|__)$/, richTextSchema.marks.strong, 2),
       inlineMarkInputRule(/(?:^|[^*_])(?:\*|_)([^*_]+)(?:\*|_)$/, richTextSchema.marks.em, 1),

@@ -87,18 +87,11 @@
   background: transparent;
   color: var(--text-primary);
   outline: none;
-  margin-top: 0;
-  margin-bottom: var(--space-lg);
   padding: 0;
 }
 
 .note-editor__title-input::placeholder {
   color: var(--text-tertiary);
-}
-
-.note-editor__body-editor {
-  flex: 1;
-  min-height: 0;
 }
 
 .note-editor__drag-overlay {

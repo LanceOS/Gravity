@@ -45,7 +45,7 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
     }
     saveTimeoutRef.current = setTimeout(() => {
       triggerSave();
-    }, 3000);
+    }, 1500);
   }, []);
 
   const triggerSave = useCallback(() => {
@@ -95,7 +95,7 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
       clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = setTimeout(() => {
         triggerSave();
-      }, 3000);
+      }, 1500);
     }
   }, [note, triggerSave]);
 
@@ -170,7 +170,7 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
       />
 
       <div className="note-editor__content">
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
           <input
             type="text"
             className="note-editor__title-input"
@@ -179,23 +179,16 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
             onChange={handleTitleChange}
             style={{ flex: 1 }}
           />
-          <button
-            className="note-editor__toolbar-btn"
-            onClick={() => fileInputRef.current?.click()}
-            title="Attach Image"
-          >
-            <ImageIcon size={16} />
-          </button>
         </div>
-        
+
         <RichTextEditor
           ref={editorRef}
           value={body}
           onChange={handleBodyChange}
           placeholder="Write your notes..."
           minHeight="calc(100vh - 200px)"
-          className="note-editor__body-editor"
-          toolbarMode="full"
+          toolbarMode="bubble"
+          surface='bare'
         />
 
         <div className={`note-editor__drag-overlay ${isDragging ? 'note-editor__drag-overlay--active' : ''}`}>
