@@ -137,19 +137,57 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
   const [descriptionDraft, setDescriptionDraft] = useState(() => activeTicket.description || createEmptyRichTextValue());
   const descriptionDraftRef = useRef(descriptionDraft);
   const descriptionTicketIdRef = useRef(activeTicket.id);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const closeCommentMenu = useCallback(() => setOpenMenuCommentId(null), []);
 
+  const triggerSaveDescription = useCallback(async (ticketId: string, content: string) => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
+    await onUpdateTicket(ticketId, { description: content });
+  }, [onUpdateTicket]);
+
+  const prevDescriptionRef = useRef(activeTicket.description);
+
   useEffect(() => {
+    // If ticket changes, save any pending draft for the previous ticket immediately
+    if (saveTimeoutRef.current && descriptionTicketIdRef.current && descriptionTicketIdRef.current !== activeTicket.id) {
+      const prevTicketId = descriptionTicketIdRef.current;
+      const prevDraft = descriptionDraftRef.current;
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+      void onUpdateTicket(prevTicketId, { description: prevDraft });
+    }
+
     const nextDescription = activeTicket.description || createEmptyRichTextValue();
     const isNewTicket = descriptionTicketIdRef.current !== activeTicket.id;
 
-    if (isNewTicket || nextDescription !== descriptionDraftRef.current) {
+    if (isNewTicket) {
       descriptionTicketIdRef.current = activeTicket.id;
+      descriptionDraftRef.current = nextDescription;
+      prevDescriptionRef.current = activeTicket.description;
+      setDescriptionDraft(nextDescription);
+    } else if (activeTicket.description !== prevDescriptionRef.current) {
+      // The description changed from the outside (backend sync, etc)
+      prevDescriptionRef.current = activeTicket.description;
       descriptionDraftRef.current = nextDescription;
       setDescriptionDraft(nextDescription);
     }
-  }, [activeTicket.id, activeTicket.description]);
+  }, [activeTicket.id, activeTicket.description, onUpdateTicket]);
+
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current && descriptionTicketIdRef.current) {
+        const lastTicketId = descriptionTicketIdRef.current;
+        const lastDraft = descriptionDraftRef.current;
+        clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
+        void onUpdateTicket(lastTicketId, { description: lastDraft });
+      }
+    };
+  }, [onUpdateTicket]);
 
   const ticketLink = useMemo(() => customTicketLink || `${TICKET_URL_BASE}/${activeTicket.key}`, [customTicketLink, activeTicket.key]);
 
@@ -488,9 +526,25 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
               <RichTextEditor
                 value={descriptionDraft}
                 onChange={(newDesc) => {
+                  // Only update the ref — do NOT call setDescriptionDraft here.
+                  // setDescriptionDraft would trigger a full TicketDetail re-render
+                  // on every keystroke, which React batches but still causes the
+                  // ProseMirror sync effect to fire and reset cursor position.
+                  // The editor owns its own content via ProseMirror; the ref is
+                  // all we need to track the latest value for saving.
                   descriptionDraftRef.current = newDesc;
-                  setDescriptionDraft(newDesc);
-                  void onUpdateTicket(activeTicket.id, { description: newDesc });
+
+                  if (saveTimeoutRef.current) {
+                    clearTimeout(saveTimeoutRef.current);
+                  }
+                  saveTimeoutRef.current = setTimeout(() => {
+                    void triggerSaveDescription(activeTicket.id, newDesc);
+                  }, 1000);
+                }}
+                onBlur={() => {
+                  if (saveTimeoutRef.current) {
+                    void triggerSaveDescription(activeTicket.id, descriptionDraftRef.current);
+                  }
                 }}
                 placeholder="Describe your issue..."
                 className="ticket-detail__description-editor"

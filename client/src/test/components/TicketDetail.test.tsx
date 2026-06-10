@@ -6,7 +6,7 @@ import type {
   SelectHTMLAttributes,
   TextareaHTMLAttributes,
 } from 'react';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { TicketDetail } from '../../modules/tickets/components/TicketDetail';
@@ -78,7 +78,7 @@ vi.mock('@library', async (importOriginal) => {
     });
 
   const MockRichTextEditor = forwardRef<any, any>(function MockRichTextEditor(
-    { value, onChange, placeholder, className, minHeight, autoFocus, toolbarMode, surface }: any,
+    { value, onChange, placeholder, className, minHeight, autoFocus, toolbarMode, surface, onBlur }: any,
     ref,
   ) {
     const [text, setText] = useState(() => {
@@ -120,6 +120,7 @@ vi.mock('@library', async (importOriginal) => {
           setText(nextText);
           onChange(buildDoc(nextText));
         }}
+        onBlur={onBlur}
       />
     );
   });
@@ -356,6 +357,7 @@ describe('TicketDetail', () => {
     expect(descriptionInput).toHaveAttribute('data-surface', 'bare');
     await user.clear(descriptionInput);
     await user.type(descriptionInput, 'Add retry backoff and better logging.');
+    fireEvent.blur(descriptionInput);
     await waitFor(() => {
       expect(props.onUpdateTicket).toHaveBeenCalledWith('ticket-1', {
         description: expect.stringContaining('"type":"doc"'),
