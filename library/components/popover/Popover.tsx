@@ -18,6 +18,8 @@ export interface PopoverProps {
 export function Popover({ trigger, children, isOpen: controlledIsOpen, onOpenChange, style, align = 'left', contentClassName = '' }: PopoverProps) {
   const [uncontrolledIsOpen, setUncontrolledIsOpen] = React.useState(false);
   const isCurrentlyOpen = controlledIsOpen !== undefined ? controlledIsOpen : uncontrolledIsOpen;
+  
+  const triggerRef = React.useRef<HTMLDivElement>(null);
   const popoverRef = React.useRef<HTMLDivElement>(null);
   
   const [renderState, setRenderState] = React.useState({
@@ -44,6 +46,57 @@ export function Popover({ trigger, children, isOpen: controlledIsOpen, onOpenCha
     }
   };
 
+  const syncPosition = React.useCallback(() => {
+    if (!triggerRef.current || !popoverRef.current || !shouldRender) return;
+    
+    const triggerRect = triggerRef.current.getBoundingClientRect();
+    const popoverRect = popoverRef.current.getBoundingClientRect();
+
+    const spaceBelow = window.innerHeight - triggerRect.bottom;
+    const spaceAbove = triggerRect.top;
+    
+    // By default, open below. If not enough space below but enough above, flip it.
+    const estimatedHeight = popoverRect.height || 200;
+    const openAbove = spaceBelow < estimatedHeight && spaceAbove > spaceBelow;
+
+    let left = triggerRect.left;
+    if (align === 'right') {
+      left = triggerRect.right - (popoverRect.width || 200);
+    } else if (align === 'center') {
+      left = triggerRect.left + (triggerRect.width / 2) - ((popoverRect.width || 200) / 2);
+    }
+
+    // Keep within window bounds
+    left = Math.max(8, Math.min(left, window.innerWidth - (popoverRect.width || 250) - 8));
+
+    popoverRef.current.style.position = 'fixed';
+    popoverRef.current.style.left = `${left}px`;
+    popoverRef.current.style.top = openAbove ? `${Math.max(8, triggerRect.top - estimatedHeight - 4)}px` : `${triggerRect.bottom + 4}px`;
+    popoverRef.current.style.margin = '0';
+  }, [align, shouldRender]);
+
+  React.useLayoutEffect(() => {
+    if (shouldRender) {
+      syncPosition();
+      window.addEventListener('resize', syncPosition);
+      window.addEventListener('scroll', syncPosition, true);
+    }
+    return () => {
+      window.removeEventListener('resize', syncPosition);
+      window.removeEventListener('scroll', syncPosition, true);
+    };
+  }, [shouldRender, syncPosition]);
+
+  React.useEffect(() => {
+    if (shouldRender && popoverRef.current) {
+      const resizeObserver = new ResizeObserver(() => {
+        syncPosition();
+      });
+      resizeObserver.observe(popoverRef.current);
+      return () => resizeObserver.disconnect();
+    }
+  }, [shouldRender, syncPosition]);
+
   const handleAnimationEnd = () => {
     if (!isCurrentlyOpen) {
       setRenderState((prev) => ({
@@ -56,7 +109,7 @@ export function Popover({ trigger, children, isOpen: controlledIsOpen, onOpenCha
 
   return (
     <ClickAwayListener onClickAway={() => setOpen(false)}>
-      <div style={{ position: 'relative', display: 'inline-block', ...style }}>
+      <div style={{ position: 'relative', display: 'inline-block', ...style }} ref={triggerRef}>
         <div
           onClick={() => setOpen(!isCurrentlyOpen)}
           className="clickable"
@@ -65,14 +118,17 @@ export function Popover({ trigger, children, isOpen: controlledIsOpen, onOpenCha
           {trigger}
         </div>
         {shouldRender && (
-          <div
-            ref={popoverRef}
-            role="dialog"
-            onAnimationEnd={handleAnimationEnd}
-            className={`popover-content popover-content--align-${align} ${isAnimatingOut ? 'lib-animate-fade-out-up' : 'lib-animate-fade-in-down'} ${contentClassName}`}
-          >
-            {children}
-          </div>
+          <Portal>
+            <div
+              ref={popoverRef}
+              role="dialog"
+              onAnimationEnd={handleAnimationEnd}
+              className={`popover-content popover-content--align-${align} ${isAnimatingOut ? 'lib-animate-fade-out-up' : 'lib-animate-fade-in-down'} ${contentClassName}`}
+              style={{ zIndex: 1700 }}
+            >
+              {children}
+            </div>
+          </Portal>
         )}
       </div>
     </ClickAwayListener>

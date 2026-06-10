@@ -17,7 +17,7 @@ export function ClickAwayListener({ children, onClickAway, active = true }: Clic
       if (target && typeof target.closest === 'function') {
         // Keep clicks inside the dropdown surface itself from dismissing it.
         // Dialogs elsewhere on the page should still count as outside clicks.
-        if (target.closest('[role="listbox"], [role="menu"], [role="tooltip"], .select-menu, .autocomplete-menu')) {
+        if (target.closest('[role="listbox"], [role="menu"], [role="tooltip"], .select-menu, .autocomplete-menu, .popover-content')) {
           return;
         }
       }
