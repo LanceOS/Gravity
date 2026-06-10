@@ -4,3 +4,5 @@ export * from './clickawaylistener';
 export * from './visuallyhidden';
 export * from './cn';
 export * from './dateHelpers';
+export * from './sanitizeHtml';
+export * from './richtext';

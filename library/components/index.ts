@@ -58,6 +58,7 @@ export * from './radiogroup';
 export * from './rangeslider';
 export * from './rating';
 export * from './result';
+export * from './richtext';
 export * from './scrollspy';
 export * from './searchinput';
 export * from './select';
