@@ -43,6 +43,7 @@ export interface RichTextEditorProps {
   placeholder?: string;
   className?: string;
   minHeight?: string | number;
+  surface?: 'default' | 'compact' | 'bare';
   autoFocus?: boolean;
   readOnly?: boolean;
   onBlur?: () => void;
@@ -250,6 +251,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
     placeholder = 'Start writing...',
     className,
     minHeight = '180px',
+    surface = 'default',
     autoFocus = false,
     readOnly = false,
     onBlur,
@@ -514,7 +516,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
   }, [readOnly, selectionKey, toolbarMode]);
 
   return (
-    <div className={cn('rich-text-editor', className)}>
+    <div className={cn('rich-text-editor', `rich-text-editor--${surface}`, className)}>
       {toolbarMode === 'full' && (
         <div className="rich-text-editor__toolbar" role="toolbar" aria-label="Text formatting">
           <div className="rich-text-editor__group">

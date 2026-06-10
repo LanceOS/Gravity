@@ -474,8 +474,9 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                 value={activeTicket.description || ''}
                 onChange={(newDesc) => onUpdateTicket(activeTicket.id, { description: newDesc })}
                 placeholder="Describe your issue..."
-                minHeight="120px"
+                minHeight="40px"
                 className="ticket-detail__description-editor"
+                surface="bare"
                 toolbarMode="bubble"
               />
             </div>
@@ -720,8 +721,9 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                               value={editingCommentBody}
                               onChange={setEditingCommentBody}
                               placeholder="Edit comment..."
-                              minHeight="120px"
+                              minHeight="40px"
                               autoFocus
+                              surface="compact"
                               toolbarMode="bubble"
                             />
                             <div style={{ display: 'flex', gap: '6px', alignSelf: 'flex-end' }}>
@@ -761,8 +763,9 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                 placeholder="Post updates, links, or mention PRs..."
                 value={commentInput}
                 onChange={setCommentInput}
-                minHeight="120px"
+                minHeight="40px"
                 className="ticket-detail__comment-editor"
+                surface="compact"
                 toolbarMode="bubble"
               />
                 <Button

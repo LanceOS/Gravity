@@ -78,7 +78,7 @@ vi.mock('@library', async (importOriginal) => {
     });
 
   const MockRichTextEditor = forwardRef<any, any>(function MockRichTextEditor(
-    { value, onChange, placeholder, className, minHeight, autoFocus, toolbarMode }: any,
+    { value, onChange, placeholder, className, minHeight, autoFocus, toolbarMode, surface }: any,
     ref,
   ) {
     const [text, setText] = useState(() => {
@@ -108,6 +108,7 @@ vi.mock('@library', async (importOriginal) => {
       <textarea
         data-testid={placeholder}
         data-toolbar-mode={toolbarMode || 'full'}
+        data-surface={surface || 'default'}
         aria-label={placeholder}
         placeholder={placeholder}
         className={className}
@@ -352,6 +353,7 @@ describe('TicketDetail', () => {
 
     const descriptionInput = screen.getByPlaceholderText('Describe your issue...');
     expect(descriptionInput).toHaveAttribute('data-toolbar-mode', 'bubble');
+    expect(descriptionInput).toHaveAttribute('data-surface', 'bare');
     await user.clear(descriptionInput);
     await user.type(descriptionInput, 'Add retry backoff and better logging.');
     await waitFor(() => {
@@ -370,6 +372,7 @@ describe('TicketDetail', () => {
 
     await user.type(screen.getByPlaceholderText('Post updates, links, or mention PRs...'), 'Comment from test');
     expect(screen.getByPlaceholderText('Post updates, links, or mention PRs...')).toHaveAttribute('data-toolbar-mode', 'bubble');
+    expect(screen.getByPlaceholderText('Post updates, links, or mention PRs...')).toHaveAttribute('data-surface', 'compact');
     await user.click(screen.getByRole('button', { name: 'Comment' }));
     await waitFor(() => {
       expect(props.onAddComment).toHaveBeenCalledWith('ticket-1', expect.stringContaining('"type":"doc"'));
@@ -515,6 +518,7 @@ describe('TicketDetail', () => {
     expect(screen.queryByRole('button', { name: 'Edit Comment' })).not.toBeInTheDocument();
     const commentEditInput = screen.getByPlaceholderText('Edit comment...');
     expect(commentEditInput).toHaveAttribute('data-toolbar-mode', 'bubble');
+    expect(commentEditInput).toHaveAttribute('data-surface', 'compact');
     await user.clear(commentEditInput);
     await user.type(commentEditInput, 'PR is approved now.');
     await user.click(screen.getByRole('button', { name: 'Save' }));

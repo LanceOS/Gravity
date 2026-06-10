@@ -165,6 +165,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
               placeholder="Add a description..."
               minHeight="190px"
               className="create-ticket-modal__description-editor"
+              surface="bare"
               toolbarMode="bubble"
             />
           </section>

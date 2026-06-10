@@ -52,7 +52,7 @@ vi.mock('@library', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@library')>();
 
   const MockRichTextEditor = forwardRef<any, any>(function MockRichTextEditor(
-    { value, onChange, placeholder, className, minHeight, toolbarMode }: any,
+    { value, onChange, placeholder, className, minHeight, toolbarMode, surface }: any,
     ref,
   ) {
     const [text, setText] = useState(() => {
@@ -82,6 +82,7 @@ vi.mock('@library', async (importOriginal) => {
       <textarea
         data-testid="rich-text-editor"
         data-toolbar-mode={toolbarMode || 'full'}
+        data-surface={surface || 'default'}
         aria-label="Rich text editor"
         placeholder={placeholder}
         className={className}
@@ -249,6 +250,7 @@ describe('CreateTicketModal', () => {
 
     expect(screen.getByText('Create New Issue')).toBeInTheDocument();
     expect(screen.getByTestId('rich-text-editor')).toHaveAttribute('data-toolbar-mode', 'bubble');
+    expect(screen.getByTestId('rich-text-editor')).toHaveAttribute('data-surface', 'bare');
 
     await user.click(screen.getByRole('button', { name: 'Create Issue' }));
     expect(screen.getByRole('alert')).toHaveTextContent('Please enter a ticket title.');
