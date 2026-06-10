@@ -14,6 +14,9 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         '@library': resolve(__dirname, '../library'),
+        'lucide-react': resolve(__dirname, 'node_modules/lucide-react'),
+        '@tiptap/core': resolve(__dirname, 'node_modules/@tiptap/core'),
+        '@tiptap/pm': resolve(__dirname, 'node_modules/@tiptap/pm'),
       },
     },
     server: {

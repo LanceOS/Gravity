@@ -198,9 +198,10 @@ export function createNotesRouter() {
 
     try {
       const noteId = normalizeRouteParam(req.params.noteId);
-      const filename = req.query.filename ? String(req.query.filename) : `upload-${Date.now()}`;
+      let rawFilename = req.query.filename ? String(req.query.filename) : `upload-${Date.now()}`;
+      const filename = rawFilename.replace(/[^a-zA-Z0-9_.-]/g, '_');
 
-      if (!FILENAME_REGEX.test(filename)) {
+      if (!filename || !FILENAME_REGEX.test(filename)) {
         res.status(400).json({ error: 'Invalid filename format.' });
         return;
       }
@@ -249,18 +250,6 @@ export function createNotesRouter() {
   });
 
   router.get('/notes/:noteId/media/:filename', async (req, res) => {
-    const projectId = getProjectIdFromRequest(req);
-    if (!projectId) {
-      res.status(400).json({ error: 'Project ID is required.' });
-      return;
-    }
-
-    const auth = await authorizeProjectAccess(req, projectId);
-    if (!auth.allowed) {
-      res.status(auth.status).json({ error: auth.error });
-      return;
-    }
-
     try {
       const noteId = normalizeRouteParam(req.params.noteId);
       const filename = normalizeRouteParam(req.params.filename);
@@ -271,8 +260,15 @@ export function createNotesRouter() {
       }
       
       const noteMeta = await MetadataRepository.getNoteMetadata(noteId);
-      if (!noteMeta || noteMeta.projectId !== projectId) {
+      if (!noteMeta) {
         res.status(404).json({ error: 'Note not found.' });
+        return;
+      }
+
+      const projectId = noteMeta.projectId;
+      const auth = await authorizeProjectAccess(req, projectId);
+      if (!auth.allowed) {
+        res.status(auth.status).json({ error: auth.error });
         return;
       }
 

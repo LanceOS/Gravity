@@ -32,6 +32,7 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
   const bodyRef = useRef(body);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   type ViewMode = 'visual' | 'split' | 'markdown';
   const [viewMode, setViewMode] = useState<ViewMode>('visual');
@@ -39,7 +40,7 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
 
   const switchViewMode = (mode: ViewMode) => {
     if (mode !== 'visual' && editor) {
-      setRawMarkdown(editor.storage.markdown.getMarkdown());
+      setRawMarkdown((editor.storage as any).markdown.getMarkdown());
     }
     setViewMode(mode);
   };
@@ -64,12 +65,39 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
     }
   }, [note, saveNote]);
 
+  const insertMarkdownAtCursor = (markdownText: string) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = textarea.value;
+    const before = text.substring(0, start);
+    const after = text.substring(end, text.length);
+
+    const newValue = before + markdownText + after;
+    setRawMarkdown(newValue);
+    bodyRef.current = newValue;
+
+    if (editor) {
+      editor.commands.setContent(newValue);
+    }
+
+    setTimeout(() => {
+      textarea.focus();
+      textarea.selectionStart = textarea.selectionEnd = start + markdownText.length;
+    }, 0);
+  };
+
   const handleFileUpload = async (file: File) => {
     try {
       const url = await uploadMedia(file);
-      editor?.chain().focus().setImage({ src: url }).run();
-      if (viewMode !== 'visual') {
-        setRawMarkdown(editor?.storage.markdown.getMarkdown() || '');
+      const markdownImage = `![${file.name}](${url})`;
+
+      if (viewMode === 'markdown' || viewMode === 'split') {
+        insertMarkdownAtCursor(markdownImage);
+      } else {
+        (editor?.chain().focus() as any).setImage({ src: url }).run();
       }
       scheduleSave();
     } catch (err) {
@@ -102,15 +130,12 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
       TableRow,
       TableHeader,
       TableCell,
-      Placeholder.configure({
-        placeholder: 'Body...',
-      }),
     ],
     editable: viewMode !== 'split',
     // Explicit document structure so tiptap-markdown never infers a heading node
     content: { type: 'doc', content: [{ type: 'paragraph' }] },
     onUpdate: ({ editor }) => {
-      bodyRef.current = editor.storage.markdown.getMarkdown();
+      bodyRef.current = (editor.storage as any).markdown.getMarkdown();
       scheduleSave();
     },
     editorProps: {
@@ -140,7 +165,7 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
   }, [noteId]);
 
   useEffect(() => {
-    if (!note || noteLoaded.current) return;
+    if (!note || !editor || noteLoaded.current) return;
     noteLoaded.current = true;
 
     const rawBody = note.body ?? '';
@@ -148,12 +173,15 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
     
     setBody(cleanedBody);
     bodyRef.current = cleanedBody;
+    
+    editor.commands.setContent(cleanedBody);
+    setRawMarkdown(cleanedBody);
 
-    if (!title && note.title && note.title !== 'Untitled Note') {
+    if (note.title && note.title !== 'Untitled Note') {
       setTitle(note.title);
       titleRef.current = note.title;
     }
-  }, [note]);
+  }, [note, editor]);
 
   useEffect(() => {
     if (saveTimeoutRef.current) {
@@ -285,11 +313,11 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
           className={`note-editor__toolbar-btn ${editor.isActive('link') ? 'note-editor__toolbar-btn--active' : ''}`}
           onClick={() => {
             if (editor.isActive('link')) {
-              editor.chain().focus().unsetLink().run();
+              (editor.chain().focus() as any).unsetLink().run();
             } else {
               const url = window.prompt('URL');
               if (url) {
-                editor.chain().focus().setLink({ href: url }).run();
+                (editor.chain().focus() as any).setLink({ href: url }).run();
               }
             }
           }}
@@ -338,7 +366,7 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
 
         <button
           className={`note-editor__toolbar-btn ${editor.isActive('table') ? 'note-editor__toolbar-btn--active' : ''}`}
-          onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
+          onClick={() => (editor.chain().focus() as any).insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
           title="Table"
           disabled={viewMode === 'markdown'}
         >
@@ -406,6 +434,7 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
           <div className="note-editor__split-container">
             <div className="note-editor__pane note-editor__pane--left" style={{ padding: 16 }}>
               <textarea
+                ref={textareaRef}
                 className="note-editor__raw-textarea"
                 value={rawMarkdown}
                 onChange={handleRawMarkdownChange}
@@ -421,6 +450,7 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
         {viewMode === 'markdown' && (
           <div className="note-editor__pane" style={{ padding: 16 }}>
             <textarea
+              ref={textareaRef}
               className="note-editor__raw-textarea"
               value={rawMarkdown}
               onChange={handleRawMarkdownChange}

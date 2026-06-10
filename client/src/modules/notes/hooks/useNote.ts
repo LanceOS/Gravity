@@ -55,7 +55,7 @@ export function useNote(projectId: string, noteId: string | null) {
         },
         body: JSON.stringify({
           ...updates,
-          version: note.version,
+          expectedVersion: note.version,
         }),
       });
 
