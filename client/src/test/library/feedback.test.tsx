@@ -155,6 +155,10 @@ describe('library feedback components', () => {
     expect(screen.getByRole('dialog')).toHaveTextContent('Popover body');
 
     fireEvent.mouseDown(document.body);
+    const dialog = screen.queryByRole('dialog');
+    if (dialog) {
+      fireEvent.animationEnd(dialog);
+    }
     await waitFor(() => {
       expect(screen.queryByText('Popover body')).not.toBeInTheDocument();
     });

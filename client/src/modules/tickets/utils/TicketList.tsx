@@ -1,6 +1,6 @@
 import { ArrowDown, ArrowRight, ArrowUp, Minus, ShieldAlert } from 'lucide-react';
 import type { ReactNode } from 'react';
-import type { Domain, Ticket } from '../../../context/TicketContext';
+import type { Ticket } from '../../../context/TicketContext';
 import type { TicketListSort } from './ticketView';
 
 export const PRIORITY_FILTER_OPTIONS = [
@@ -24,7 +24,7 @@ export const STATUS_FILTER_OPTIONS = [
 
 export const LIST_SORT_OPTIONS: Array<{ value: TicketListSort; label: string }> = [
   { value: 'created', label: 'Created Order' },
-  { value: 'domain', label: 'Domain' },
+  { value: 'label', label: 'Labels' },
   { value: 'newest', label: 'Newest first' },
   { value: 'oldest', label: 'Oldest first' },
   { value: 'priority_desc', label: 'Priority: high to low' },
@@ -60,26 +60,4 @@ export function getAssigneeAvatar(userAvatarById: Record<string, string>, assign
   }
 
   return userAvatarById[assigneeId] || null;
-}
-
-export function getDomainTag(domainById: Record<string, Domain>, domainId: string | null): ReactNode {
-  if (!domainId) {
-    return null;
-  }
-
-  const domain = domainById[domainId];
-  return domain ? (
-    <span
-      style={{
-        fontSize: '11px',
-        padding: '2px 6px',
-        borderRadius: '4px',
-        background: 'rgba(255,255,255,0.03)',
-        border: `1px solid ${domain.color}40`,
-        color: domain.color,
-      }}
-    >
-      {domain.name}
-    </span>
-  ) : null;
 }

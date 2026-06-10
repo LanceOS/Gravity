@@ -5,10 +5,10 @@ import { describe, it, expect } from 'vitest';
 import App from '../src/App';
 import { dbState } from './setup';
 
-console.log('E2E test module loaded: domain-filter-navigation');
+console.log('E2E test module loaded: label-filter-navigation');
 
-describe('Domain filter navigation E2E', () => {
-  it.only('navigates to domain-filtered view when clicking a domain from ticket detail', async () => {
+describe('Label filter navigation E2E', () => {
+  it('navigates to label-filtered view when clicking a label from ticket detail', async () => {
     const user = userEvent.setup();
 
     // Prepare mock DB state
@@ -16,9 +16,9 @@ describe('Domain filter navigation E2E', () => {
     dbState.accountSettings = { userId: dbState.currentUser.id, theme: 'dark', projectLayout: 'standard', notificationsEnabled: true } as any;
     dbState.workspaces = [{ id: 'wsp-1', name: 'E2E Workspace', defaultProjectId: 'prj-1', role: 'owner' }];
     dbState.projects = [{ id: 'prj-1', workspaceId: 'wsp-1', name: 'E2E Project', key: 'TST' }];
-    dbState.domains = [
-      { id: 'dom-frontend', projectId: 'prj-1', name: 'Frontend', slug: 'frontend' },
-      { id: 'dom-backend', projectId: 'prj-1', name: 'Backend', slug: 'backend' },
+    dbState.labels = [
+      { id: 'lbl-frontend', projectId: 'prj-1', name: 'Frontend', color: '#6B7280', description: '', sortOrder: 0 },
+      { id: 'lbl-backend', projectId: 'prj-1', name: 'Backend', color: '#6B7280', description: '', sortOrder: 0 },
     ];
 
     const now = new Date().toISOString();
@@ -31,7 +31,11 @@ describe('Domain filter navigation E2E', () => {
         status: 'todo',
         priority: 'medium',
         projectId: 'prj-1',
-        domainId: 'dom-frontend',
+        domainId: null,
+        labels: [
+          { id: 'lbl-frontend', projectId: 'prj-1', name: 'Frontend', color: '#6B7280', description: '', sortOrder: 0 }
+        ],
+        labelIds: ['lbl-frontend'],
         cycleId: null,
         assigneeId: null,
         parentId: null,
@@ -47,7 +51,11 @@ describe('Domain filter navigation E2E', () => {
         status: 'todo',
         priority: 'medium',
         projectId: 'prj-1',
-        domainId: 'dom-backend',
+        domainId: null,
+        labels: [
+          { id: 'lbl-backend', projectId: 'prj-1', name: 'Backend', color: '#6B7280', description: '', sortOrder: 0 }
+        ],
+        labelIds: ['lbl-backend'],
         cycleId: null,
         assigneeId: null,
         parentId: null,
@@ -68,21 +76,21 @@ describe('Domain filter navigation E2E', () => {
     // Open ticket detail
     await user.click(ticketCard);
 
-    // Ensure detail opened by checking ticket key
-    const ticketKey = await screen.findByText('TST-1');
-    expect(ticketKey).toBeInTheDocument();
+    // Ensure detail opened by checking for Back button
+    const backBtn = await screen.findByRole('button', { name: 'Back' });
+    expect(backBtn).toBeInTheDocument();
 
-    // Click the domain in the sidebar
-    const domainButton = await screen.findByRole('button', { name: 'Frontend' });
-    await user.click(domainButton);
+    // Click the label badge in the detail view
+    const labelBadge = await screen.findByRole('button', { name: /Frontend/i });
+    await user.click(labelBadge);
 
     // Detail should close
     await waitFor(() => {
-      expect(screen.queryByText('TST-1')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
     });
 
-    // Header should show domain title
-    const headerTitle = await screen.findByText('Frontend Domain', { selector: '.workspace-header__title' });
+    // Header should show label title
+    const headerTitle = await screen.findByText('Frontend Label', { selector: '.workspace-header__title' });
     expect(headerTitle).toBeInTheDocument();
 
     // Only frontend tickets should be visible
@@ -98,7 +106,7 @@ describe('Domain filter navigation E2E', () => {
     dbState.accountSettings = { userId: dbState.currentUser.id, theme: 'dark', projectLayout: 'standard', notificationsEnabled: true } as any;
     dbState.workspaces = [{ id: 'wsp-2', name: 'E2E Workspace 2', defaultProjectId: 'prj-2', role: 'owner' }];
     dbState.projects = [{ id: 'prj-2', workspaceId: 'wsp-2', name: 'E2E Project 2', key: 'TST' }];
-    dbState.domains = [{ id: 'dom-frontend', projectId: 'prj-2', name: 'Frontend', slug: 'frontend' }];
+    dbState.labels = [{ id: 'lbl-frontend', projectId: 'prj-2', name: 'Frontend', color: '#6B7280', description: '', sortOrder: 0 }];
 
     const now = new Date().toISOString();
     dbState.tickets = [
@@ -110,7 +118,11 @@ describe('Domain filter navigation E2E', () => {
         status: 'todo',
         priority: 'medium',
         projectId: 'prj-2',
-        domainId: 'dom-frontend',
+        domainId: null,
+        labels: [
+          { id: 'lbl-frontend', projectId: 'prj-2', name: 'Frontend', color: '#6B7280', description: '', sortOrder: 0 }
+        ],
+        labelIds: ['lbl-frontend'],
         cycleId: null,
         assigneeId: null,
         parentId: null,
@@ -129,16 +141,16 @@ describe('Domain filter navigation E2E', () => {
 
     await user.click(ticketCard);
 
-    // Detail opened
-    expect(await screen.findByText('TST-10')).toBeInTheDocument();
+    // Detail opened - verify back button is present
+    const backBtn = await screen.findByRole('button', { name: 'Back' });
+    expect(backBtn).toBeInTheDocument();
 
     // Click Back button inside detail
-    const backBtn = await screen.findByRole('button', { name: 'Back' });
     await user.click(backBtn);
 
     // Detail should close, header remains (project title or All Issues)
     await waitFor(() => {
-      expect(screen.queryByText('TST-10')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
     });
 
     // Header should display something meaningful (not the ticket key)
@@ -147,7 +159,7 @@ describe('Domain filter navigation E2E', () => {
     expect(header?.textContent).not.toContain('TST-10');
   });
 
-  it('clicking a domain from the list/board filters tickets correctly', async () => {
+  it('clicking a label from the list/board filters tickets correctly', async () => {
     const user = userEvent.setup();
 
     // Prepare mock DB state
@@ -155,9 +167,9 @@ describe('Domain filter navigation E2E', () => {
     dbState.accountSettings = { userId: dbState.currentUser.id, theme: 'dark', projectLayout: 'standard', notificationsEnabled: true } as any;
     dbState.workspaces = [{ id: 'wsp-3', name: 'E2E Workspace 3', defaultProjectId: 'prj-3', role: 'owner' }];
     dbState.projects = [{ id: 'prj-3', workspaceId: 'wsp-3', name: 'E2E Project 3', key: 'TST' }];
-    dbState.domains = [
-      { id: 'dom-frontend', projectId: 'prj-3', name: 'Frontend', slug: 'frontend' },
-      { id: 'dom-backend', projectId: 'prj-3', name: 'Backend', slug: 'backend' },
+    dbState.labels = [
+      { id: 'lbl-frontend', projectId: 'prj-3', name: 'Frontend', color: '#6B7280', description: '', sortOrder: 0 },
+      { id: 'lbl-backend', projectId: 'prj-3', name: 'Backend', color: '#6B7280', description: '', sortOrder: 0 },
     ];
 
     const now = new Date().toISOString();
@@ -170,7 +182,11 @@ describe('Domain filter navigation E2E', () => {
         status: 'todo',
         priority: 'medium',
         projectId: 'prj-3',
-        domainId: 'dom-frontend',
+        domainId: null,
+        labels: [
+          { id: 'lbl-frontend', projectId: 'prj-3', name: 'Frontend', color: '#6B7280', description: '', sortOrder: 0 }
+        ],
+        labelIds: ['lbl-frontend'],
         cycleId: null,
         assigneeId: null,
         parentId: null,
@@ -186,7 +202,11 @@ describe('Domain filter navigation E2E', () => {
         status: 'todo',
         priority: 'medium',
         projectId: 'prj-3',
-        domainId: 'dom-backend',
+        domainId: null,
+        labels: [
+          { id: 'lbl-backend', projectId: 'prj-3', name: 'Backend', color: '#6B7280', description: '', sortOrder: 0 }
+        ],
+        labelIds: ['lbl-backend'],
         cycleId: null,
         assigneeId: null,
         parentId: null,
@@ -204,12 +224,12 @@ describe('Domain filter navigation E2E', () => {
     expect(await screen.findByText('Frontend only ticket')).toBeInTheDocument();
     expect(await screen.findByText('Backend only ticket')).toBeInTheDocument();
 
-    // Click the Frontend domain in the sidebar
-    const domainButton = await screen.findByRole('button', { name: 'Frontend' });
-    await user.click(domainButton);
+    // Click the Frontend label in the sidebar
+    const labelButton = await screen.findByRole('button', { name: /Frontend/i });
+    await user.click(labelButton);
 
     // Header should update
-    expect(await screen.findByText('Frontend Domain', { selector: '.workspace-header__title' })).toBeInTheDocument();
+    expect(await screen.findByText('Frontend Label', { selector: '.workspace-header__title' })).toBeInTheDocument();
 
     // Only frontend ticket should be visible
     expect(screen.getByText('Frontend only ticket')).toBeInTheDocument();

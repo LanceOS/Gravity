@@ -33,6 +33,27 @@ services:
     networks:
       - gravity_backend_db_redis
 
+  rustfs:
+    image: docker.io/library/minio:RELEASE.2024-01-28T22-35-53Z
+    container_name: ${GRAVITY_RUSTFS_CONTAINER:-gravity_rustfs_dev}
+    restart: unless-stopped
+    command: server /data/rustfs --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${RUSTFS_ACCESS_KEY:-admin}
+      MINIO_ROOT_PASSWORD: ${RUSTFS_SECRET_KEY:-password}
+    volumes:
+      - gravity_rustfs_data:/data/rustfs
+    ports:
+      - "${RUSTFS_PORT:-9000}:9000"
+      - "${RUSTFS_CONSOLE_PORT:-9001}:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - gravity_backend_db_redis
+
   backend:
     build:
       context: .
@@ -43,6 +64,10 @@ services:
     environment:
       PORT: ${PORT:-8080}
       NODE_ENV: ${NODE_ENV:-production}
+      RUSTFS_ENDPOINT: ${RUSTFS_ENDPOINT:-http://rustfs:9000}
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:-admin}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:-password}
+      RUSTFS_BUCKET: ${RUSTFS_BUCKET:-notes}
       # Construct database and redis URLs dynamically to connect internally via service names
       DATABASE_URL: postgresql://${GRAVITY_POSTGRES_USER:-gravity_user}:${GRAVITY_POSTGRES_PASSWORD:-admin}@postgres:5432/${GRAVITY_POSTGRES_DB:-gravity_workspace}
       REDIS_URL: redis://default:${GRAVITY_REDIS_PASSWORD:-admin}@redis:6379
@@ -60,12 +85,16 @@ services:
       FEDERATION_SYNC_FAILURE_MAX_RETRIES: ${FEDERATION_SYNC_FAILURE_MAX_RETRIES:-5}
     expose:
       - "8080"
+    volumes:
+      - gravity_backend_data:/data/backend
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      rustfs:
         condition: service_healthy
     networks:
       - gravity_backend_db_redis
@@ -90,6 +119,8 @@ services:
 
 volumes:
   gravity_postgres_data:
+  gravity_rustfs_data:
+  gravity_backend_data:
 
 networks:
   gravity_frontend_backend:

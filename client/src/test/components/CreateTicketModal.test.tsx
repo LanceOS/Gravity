@@ -25,6 +25,9 @@ type MockTextInputProps = React.InputHTMLAttributes<HTMLInputElement> & {
 };
 
 type MockTextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
+  label?: string;
+  inputStyle?: React.CSSProperties;
+  autoGrow?: boolean;
   value: string;
   onChange: (event: ChangeEvent<HTMLTextAreaElement>) => void;
 };
@@ -61,7 +64,24 @@ vi.mock('@library', () => ({
     ) : null,
   Alert: ({ children }: { children: ReactNode }) => <div role="alert">{children}</div>,
   TextInput: ({ value, onChange, ...props }: MockTextInputProps) => <input value={value} onChange={onChange} {...props} />,
-  Textarea: ({ value, onChange, autoGrow, ...props }: any) => <textarea value={value} onChange={onChange} {...props} />,
+  Textarea: ({ label, value, onChange, inputStyle: _inputStyle, autoGrow: _autoGrow, ...props }: MockTextareaProps) => (
+    <div>
+      {label ? (
+        <label>
+          {label}
+          <textarea value={value} onChange={onChange} {...props} />
+        </label>
+      ) : (
+        <textarea value={value} onChange={onChange} {...props} />
+      )}
+    </div>
+  ),
+  Popover: ({ trigger, children }: any) => (
+    <div>
+      {trigger}
+      <div>{children}</div>
+    </div>
+  ),
 }));
 
 const projects = [
@@ -83,11 +103,12 @@ const projects = [
   },
 ];
 
-const domains = [
+const labels = [
   {
     id: 'domain-1',
     name: 'Platform',
     color: '#10b981',
+    projectId: 'project-1',
   },
 ];
 
@@ -115,7 +136,7 @@ function renderCreateTicketModal(overrides: Partial<Parameters<typeof CreateTick
   const props = {
     onClose: vi.fn(),
     projects,
-    domains,
+    labels,
     cycles,
     users,
     parentTicket: null,
@@ -151,12 +172,12 @@ describe('CreateTicketModal', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Please enter a ticket title.');
     expect(props.onSubmitTicket).not.toHaveBeenCalled();
 
-    await user.type(screen.getByPlaceholderText('Issue title'), '  Fix sync retries  ');
+    await user.type(screen.getByLabelText('Issue Title'), '  Fix sync retries  ');
     await user.type(screen.getByLabelText('Description'), '  Retry failed SSE subscription  ');
     await user.selectOptions(screen.getByLabelText('Select status'), 'in_review');
     await user.selectOptions(screen.getByLabelText('Select priority'), 'high');
     await user.selectOptions(screen.getByLabelText('Select assignee'), 'user-1');
-    await user.selectOptions(screen.getByLabelText('Select domain'), 'domain-1');
+    await user.click(screen.getByRole('checkbox', { name: 'Platform' }));
     await user.selectOptions(screen.getByLabelText('Select cycle'), 'cycle-1');
 
     await user.click(screen.getByRole('button', { name: 'Create Issue' }));
@@ -168,7 +189,7 @@ describe('CreateTicketModal', () => {
         status: 'in_review',
         priority: 'high',
         projectId: 'project-1',
-        domainId: 'domain-1',
+        labelIds: ['domain-1'],
         cycleId: 'cycle-1',
         assigneeId: 'user-1',
         parentId: null,
@@ -209,7 +230,7 @@ describe('CreateTicketModal', () => {
     expect(screen.getByLabelText('Select project')).toHaveValue('project-2');
     expect(screen.getByLabelText('Select status')).toHaveValue('backlog');
 
-    await user.type(screen.getByPlaceholderText('Issue title'), 'Child task');
+    await user.type(screen.getByLabelText('Issue Title'), 'Child task');
     fireEvent.keyDown(window, { key: 'Enter', ctrlKey: true });
 
     await waitFor(() => {
@@ -219,7 +240,7 @@ describe('CreateTicketModal', () => {
         status: 'backlog',
         priority: 'no_priority',
         projectId: 'project-2',
-        domainId: null,
+        labelIds: [],
         cycleId: null,
         assigneeId: null,
         parentId: 'ticket-1',

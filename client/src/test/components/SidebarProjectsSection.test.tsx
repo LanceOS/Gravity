@@ -9,20 +9,20 @@ function makeProps(overrides = {}) {
       projects: [
         { id: 'project-1', name: 'Proj 1', description: '', key: 'P1', status: 'active', workspaceId: 'w1' },
       ],
-      domains: [
-        { id: 'd-1', name: 'Domain One', color: '#ff0000' },
-        { id: 'd-2', name: 'Domain Two', color: '#00ff00' },
+      labels: [
+        { id: 'd-1', name: 'Label One', color: '#ff0000' },
+        { id: 'd-2', name: 'Label Two', color: '#00ff00' },
       ],
       cycles: [],
       currentUser: { id: 'user-1', name: 'A', email: 'a@b', avatar: '', role: 'owner' },
       activeProjectId: 'project-1',
-      filters: { status: '', priority: '', projectId: '', domainId: '', cycleId: '', assigneeId: '', search: '' },
-      counts: { myIssues: 0, activeProjectIssues: 0, domains: { 'd-1': 1, 'd-2': 2 }, cycles: {} },
+      filters: { status: '', priority: '', projectId: '', labels: [] as string[], cycleId: '', assigneeId: '', search: '' },
+      counts: { myIssues: 0, activeProjectIssues: 0, labels: { 'd-1': 1, 'd-2': 2 }, cycles: {} },
       onSelectProject: vi.fn(),
       onShowProjectIssues: vi.fn(),
       onShowMyIssues: vi.fn(),
       onSelectCycle: vi.fn(),
-      onSelectDomain: vi.fn(),
+      onSelectLabel: vi.fn(),
     },
     projectsCollapsed: false,
     collapsedProjects: {},
@@ -35,7 +35,7 @@ function makeProps(overrides = {}) {
 }
 
 describe('SidebarProjectsSection', () => {
-  it('calls onSelectDomain when a domain is clicked', async () => {
+  it('calls onSelectLabel when a label is clicked', async () => {
     const user = userEvent.setup();
     const props = makeProps();
 
@@ -44,8 +44,8 @@ describe('SidebarProjectsSection', () => {
       <SidebarProjectsSection {...props} />
     );
 
-    await user.click(screen.getByRole('button', { name: /Domain One/i }));
+    await user.click(screen.getByRole('button', { name: /Label One/i }));
 
-    expect(props.section.onSelectDomain).toHaveBeenCalledWith('d-1');
+    expect(props.section.onSelectLabel).toHaveBeenCalledWith('d-1');
   });
 });

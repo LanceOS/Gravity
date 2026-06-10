@@ -57,6 +57,42 @@
   }
 }
 
+@keyframes lib-fade-in-down {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes lib-fade-out-up {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes lib-fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(calc(-100% + 4px));
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(-100%);
+  }
+}
+
 @keyframes lib-slide-in-right {
   from {
     transform: translateX(100%);
@@ -101,6 +137,14 @@
 
 .lib-animate-fade-in {
   animation: lib-fade-in var(--transition-spring);
+}
+
+.lib-animate-fade-in-down {
+  animation: lib-fade-in-down var(--transition-spring) forwards;
+}
+
+.lib-animate-fade-out-up {
+  animation: lib-fade-out-up var(--transition-fast) forwards;
 }
 
 .lib-animate-slide-in-right {
@@ -321,7 +365,7 @@
 
 .select-menu {
   position: fixed;
-  z-index: 1400;
+  z-index: 1600;
   padding: 6px;
   box-sizing: border-box;
   border-radius: var(--radius-md);
@@ -335,6 +379,10 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+
+.select-menu--up {
+  animation-name: lib-fade-in-up;
 }
 
 .select-option {

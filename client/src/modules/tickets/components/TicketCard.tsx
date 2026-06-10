@@ -9,8 +9,6 @@ function TicketCardImpl({
   onDragStart,
   priorityIcon,
   priorityColor,
-  domainColor,
-  domainName,
   assigneeAvatar,
 }: TicketCardProps) {
   const [isHovered, setIsHovered] = useState(false);
@@ -87,16 +85,21 @@ function TicketCardImpl({
         <Flex align="center" gap="8px">
           <Flex align="center">{priorityIcon}</Flex>
 
-          {domainColor !== 'transparent' ? (
-            <div
-              title={domainName}
-              style={{
-                width: '6px',
-                height: '6px',
-                borderRadius: '50%',
-                background: domainColor,
-              }}
-            />
+          {ticket.labels && ticket.labels.length > 0 ? (
+            <Flex align="center" gap="4px" style={{ marginLeft: '4px' }}>
+              {ticket.labels.map((label) => (
+                <div
+                  key={label.id}
+                  title={label.name}
+                  style={{
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
+                    background: label.color,
+                  }}
+                />
+              ))}
+            </Flex>
           ) : null}
         </Flex>
 

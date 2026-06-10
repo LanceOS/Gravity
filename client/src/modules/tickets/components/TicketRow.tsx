@@ -1,8 +1,9 @@
 import { memo, useState, useCallback } from 'react';
 import { GitMerge, GitPullRequest, Paperclip } from 'lucide-react';
 import type { TicketRowProps } from '../types/TicketList';
+import { LabelBadge } from './LabelBadge';
 
-function TicketRowImpl({ ticket, onClick, priorityIcon, assigneeAvatar, domainTag }: TicketRowProps) {
+function TicketRowImpl({ ticket, onClick, priorityIcon, assigneeAvatar }: TicketRowProps) {
   const [isHovered, setIsHovered] = useState(false);
 
   const handleClick = useCallback(() => {
@@ -49,7 +50,11 @@ function TicketRowImpl({ ticket, onClick, priorityIcon, assigneeAvatar, domainTa
         {ticket.title}
       </span>
 
-      <div className="ticket-row-domain" style={{ flexShrink: 0 }}>{domainTag}</div>
+      <div className="ticket-row-domain" style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
+        {ticket.labels?.map((label) => (
+          <LabelBadge key={label.id} label={label} size="sm" />
+        ))}
+      </div>
 
       {ticket.prStatus !== 'none' ? (
         <a

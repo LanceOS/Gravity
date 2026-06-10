@@ -13,9 +13,11 @@
     "start": "node dist/index.js",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
+    "cleanup:orphaned-assets": "tsx src/jobs/cleanupOrphanedAssets.ts",
     "mcp": "tsx src/mcp/stdio.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1064.0",
     "better-auth": "^1.6.11",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
@@ -36,6 +38,6 @@
     "supertest": "^7.1.4",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3",
-    "vitest": "^3.2.4"
+    "vitest": "^4.1.8"
   }
 }

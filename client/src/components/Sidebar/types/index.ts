@@ -1,4 +1,4 @@
-import type { Cycle, Domain, Project, User } from '../../../context/TicketContext';
+import type { Cycle, Label, Project, User } from '../../../context/TicketContext';
 import type { TicketFilters } from '../../../modules/tickets/utils/ticketView';
 
 export interface SidebarWorkspaceOption {
@@ -18,13 +18,15 @@ export interface SidebarWorkspaceSection {
 export interface SidebarProjectCounts {
   myIssues: number;
   activeProjectIssues: number;
-  domains: Record<string, number>;
+  labels?: Record<string, number>;
+  domains?: Record<string, number>;
   cycles: Record<string, number>;
 }
 
 export interface SidebarProjectSection {
   projects: Project[];
-  domains: Domain[];
+  labels?: Label[];
+  domains?: Label[];
   cycles: Cycle[];
   currentUser: User;
   activeProjectId: string;
@@ -36,7 +38,8 @@ export interface SidebarProjectSection {
   onShowMyIssues: () => void;
   onShowNotes: () => void;
   onSelectCycle: (cycleId: string) => void;
-  onSelectDomain: (domainId: string) => void;
+  onSelectLabel?: (labelId: string) => void;
+  onSelectDomain?: (labelId: string) => void;
 }
 
 export interface SidebarToolSection {

@@ -1,4 +1,4 @@
-import type { Comment, Cycle, Domain, Project, Ticket, User } from '../../../context/TicketContext';
+import type { Comment, Cycle, Label, Project, Ticket, User } from '../../../context/TicketContext';
 
 export interface TicketDetailProps {
   activeTicket: Ticket;
@@ -8,7 +8,7 @@ export interface TicketDetailProps {
   subtaskProgressPercent: number;
   users: User[];
   projects: Project[];
-  domains: Domain[];
+  labels: Label[];
   cycles: Cycle[];
   parentTicket?: Ticket | null;
   onSelectTicket: (ticket: Ticket | null) => void;
@@ -17,8 +17,9 @@ export interface TicketDetailProps {
   onAddComment: (ticketId: string, body: string) => Promise<void>;
   onUpdateComment: (ticketId: string, commentId: string, body: string) => Promise<void>;
   onDeleteComment: (ticketId: string, commentId: string) => Promise<void>;
-  onClose: () => void;
+  onClose?: () => void;
   onOpenCreateSubtask: (parentId: string) => void;
+  ticketLink?: string;
 }
 
 export interface MarkdownTextProps {

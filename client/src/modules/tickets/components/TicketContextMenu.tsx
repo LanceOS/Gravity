@@ -27,10 +27,12 @@ export const TicketContextMenu: React.FC<TicketContextMenuProps> = ({ ticket, ch
     const { 
       users, 
       projects, 
-      domains, 
+      labels, 
       cycles, 
       updateTicket, 
-      deleteTicket 
+      deleteTicket,
+      assignLabelToTicket,
+      unassignLabelFromTicket
     } = context;
     // 1. Status Submenu
     const statusSubmenu: ContextMenuItem[] = STATUS_OPTIONS.map((opt) => {
@@ -115,42 +117,35 @@ export const TicketContextMenu: React.FC<TicketContextMenuProps> = ({ ticket, ch
       };
     });
 
-    // 5. Domain Submenu
-    const domainSubmenu: ContextMenuItem[] = [
-      {
-        label: 'No Domain',
-        icon: !ticket.domainId ? <Check size={12} style={{ color: 'var(--color-primary)' }} /> : <div style={{ width: 12 }} />,
-        onClick: () => {
-          if (ticket.domainId !== null) {
-            updateTicket(ticket.id, { domainId: null });
-          }
-        }
-      },
-      ...domains.map((d) => {
-        const isActive = ticket.domainId === d.id;
+    // 5. Labels Submenu
+    const labelSubmenu: ContextMenuItem[] = labels
+      .filter((l) => l.projectId === ticket.projectId)
+      .map((l) => {
+        const isAssigned = ticket.labels?.some((assigned) => assigned.id === l.id) || false;
         return {
-          label: d.name,
+          label: l.name,
           icon: (
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              {isActive ? <Check size={12} style={{ color: 'var(--color-primary)' }} /> : <div style={{ width: 12 }} />}
+              {isAssigned ? <Check size={12} style={{ color: 'var(--color-primary)' }} /> : <div style={{ width: 12 }} />}
               <div 
                 style={{ 
                   width: '6px', 
                   height: '6px', 
                   borderRadius: '50%', 
-                  backgroundColor: d.color || '#6B7280' 
+                  backgroundColor: l.color || '#6B7280' 
                 }} 
               />
             </div>
           ),
-          onClick: () => {
-            if (!isActive) {
-              updateTicket(ticket.id, { domainId: d.id });
+          onClick: async () => {
+            if (isAssigned) {
+              await unassignLabelFromTicket(ticket.id, l.id);
+            } else {
+              await assignLabelToTicket(ticket.id, l.id);
             }
           }
         };
-      })
-    ];
+      });
 
     // 6. Cycle Submenu
     const cycleSubmenu: ContextMenuItem[] = [
@@ -199,9 +194,9 @@ export const TicketContextMenu: React.FC<TicketContextMenuProps> = ({ ticket, ch
         children: projectSubmenu
       },
       {
-        label: 'Change Domain',
+        label: 'Labels',
         icon: <Tag size={13} style={{ color: 'var(--color-text-disabled)' }} />,
-        children: domainSubmenu
+        children: labelSubmenu
       },
       {
         label: 'Assign Cycle',

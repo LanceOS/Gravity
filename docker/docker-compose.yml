@@ -39,6 +39,29 @@ services:
     networks:
       - gravity_internal
 
+  rustfs:
+    image: minio/minio:RELEASE.2024-01-28T22-35-53Z
+    container_name: ${GRAVITY_RUSTFS_CONTAINER:-gravity_rustfs}
+    env_file:
+      - ../.env
+    restart: unless-stopped
+    command: server /data/rustfs --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${RUSTFS_ACCESS_KEY:-admin}
+      MINIO_ROOT_PASSWORD: ${RUSTFS_SECRET_KEY:-password}
+    volumes:
+      - gravity_rustfs_data:/data/rustfs
+    ports:
+      - "${RUSTFS_PORT:-9000}:9000"
+      - "${RUSTFS_CONSOLE_PORT:-9001}:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - gravity_internal
+
   backend:
     build:
       context: ..
@@ -56,15 +79,23 @@ services:
       TRUSTED_ORIGINS: ${GRAVITY_FRONTEND_PUBLIC_URL:-http://localhost:5173},${GRAVITY_BACKEND_PUBLIC_URL:-http://localhost:8080}
       OLLAMA_DEFAULT_ENDPOINT: ${OLLAMA_DEFAULT_ENDPOINT:-http://host.docker.internal:11434}
       NODE_ENV: ${NODE_ENV:-production}
+      RUSTFS_ENDPOINT: ${RUSTFS_ENDPOINT:-http://rustfs:9000}
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:-admin}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:-password}
+      RUSTFS_BUCKET: ${RUSTFS_BUCKET:-notes}
       PORT: ${GRAVITY_BACKEND_PORT:-8080}
     expose:
       - "8080"
+    volumes:
+      - gravity_backend_data:/data/backend
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      rustfs:
         condition: service_healthy
     networks:
       - gravity_internal
@@ -86,6 +117,8 @@ services:
 
 volumes:
   pgdata:
+  gravity_rustfs_data:
+  gravity_backend_data:
 
 networks:
   gravity_internal:

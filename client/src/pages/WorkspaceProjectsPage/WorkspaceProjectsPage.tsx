@@ -1,7 +1,7 @@
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@library';
 import { WorkspaceProjectPanel, WorkspaceHeader } from '../../modules/workspaces';
-import type { Domain, Project } from '../../context/TicketContext';
+import type { Label, Project } from '../../context/TicketContext';
 import '../WorkspacePage/WorkspacePage.css';
 import './WorkspaceProjectsPage.css';
 
@@ -10,14 +10,16 @@ interface WorkspaceProjectsPageProps {
   projects: Project[];
   activeProjectId: string;
   defaultProjectId: string | null;
-  domains: Domain[];
+  labels: Label[];
   projectCreateLoading: boolean;
   projectCreateError: string | null;
-  domainCreateLoading: boolean;
-  domainCreateError: string | null;
+  labelCreateLoading: boolean;
+  labelCreateError: string | null;
   onBackToWorkspace: () => void;
   onCreateProject: (project: { name: string; description: string; key: string }) => Promise<void>;
-  onCreateDomain: (domain: { projectId: string; name: string; color: string }) => Promise<void>;
+  onCreateLabel: (label: { projectId: string; name: string; color: string; description?: string; sortOrder?: number }) => Promise<void>;
+  onUpdateLabel: (labelId: string, updates: { name?: string; color?: string; description?: string; sortOrder?: number }) => Promise<void>;
+  onDeleteLabel: (labelId: string) => Promise<void>;
   onSelectProject: (projectId: string) => void;
 }
 
@@ -26,14 +28,16 @@ export function WorkspaceProjectsPage({
   projects,
   activeProjectId,
   defaultProjectId,
-  domains,
+  labels,
   projectCreateLoading,
   projectCreateError,
-  domainCreateLoading,
-  domainCreateError,
+  labelCreateLoading,
+  labelCreateError,
   onBackToWorkspace,
   onCreateProject,
-  onCreateDomain,
+  onCreateLabel,
+  onUpdateLabel,
+  onDeleteLabel,
   onSelectProject,
 }: WorkspaceProjectsPageProps) {
   return (
@@ -62,14 +66,16 @@ export function WorkspaceProjectsPage({
           projects={projects}
           activeProjectId={activeProjectId}
           defaultProjectId={defaultProjectId}
-          domains={domains}
+          labels={labels}
           projectCreateLoading={projectCreateLoading}
           projectCreateError={projectCreateError}
-          domainCreateLoading={domainCreateLoading}
-          domainCreateError={domainCreateError}
+          labelCreateLoading={labelCreateLoading}
+          labelCreateError={labelCreateError}
           onSelectProject={onSelectProject}
           onCreateProject={onCreateProject}
-          onCreateDomain={onCreateDomain}
+          onCreateLabel={onCreateLabel}
+          onUpdateLabel={onUpdateLabel}
+          onDeleteLabel={onDeleteLabel}
         />
       </div>
     </div>

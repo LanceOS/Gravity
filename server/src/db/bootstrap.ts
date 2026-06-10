@@ -145,6 +145,23 @@ export async function initializeDatabase() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
+    CREATE TABLE IF NOT EXISTS labels (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      color TEXT NOT NULL DEFAULT '#6B7280',
+      description TEXT NOT NULL DEFAULT '',
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS ticket_labels (
+      ticket_id TEXT NOT NULL,
+      label_id TEXT NOT NULL,
+      PRIMARY KEY (ticket_id, label_id)
+    );
+
+
     CREATE TABLE IF NOT EXISTS cycles (
       id TEXT PRIMARY KEY,
       project_id TEXT NOT NULL,
@@ -264,10 +281,65 @@ export async function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS comments_ticket_id_idx ON comments (ticket_id);
     CREATE INDEX IF NOT EXISTS comments_user_id_idx ON comments (user_id);
     CREATE INDEX IF NOT EXISTS note_metadata_project_id_user_id_idx ON note_metadata (project_id, user_id);
+    CREATE INDEX IF NOT EXISTS labels_project_id_idx ON labels (project_id);
+    CREATE INDEX IF NOT EXISTS ticket_labels_label_id_idx ON ticket_labels (label_id);
   `);
 
   await pool.query(`
     ALTER TABLE tickets ADD COLUMN IF NOT EXISTS branch_name TEXT NOT NULL DEFAULT '';
+  `);
+
+  // Migrate existing domain data to labels and ticket_labels
+  await pool.query(`
+    INSERT INTO labels (id, project_id, name, color, description, sort_order, created_at)
+    SELECT id, project_id, name, color, '', 0, created_at
+    FROM domains
+    ON CONFLICT (id) DO NOTHING;
+
+    INSERT INTO ticket_labels (ticket_id, label_id)
+    SELECT id AS ticket_id, domain_id AS label_id
+    FROM tickets
+    WHERE domain_id IS NOT NULL AND domain_id != ''
+    ON CONFLICT (ticket_id, label_id) DO NOTHING;
+  `).catch((err) => {
+    // eslint-disable-next-line no-console
+    console.error('Failed to run labels backfill migration:', err);
+  });
+
+
+  // Ensure note_metadata has excerpt and full-text search vector columns/indexes
+  await pool.query(`
+    ALTER TABLE note_metadata ADD COLUMN IF NOT EXISTS excerpt TEXT NOT NULL DEFAULT '';
+  `);
+  // Add search_vector column and indexes only when running against real Postgres.
+  if (!env.databaseUrl.startsWith('pgmem://')) {
+    await pool.query(`
+      ALTER TABLE note_metadata ADD COLUMN IF NOT EXISTS search_vector tsvector;
+    `);
+
+    // Backfill search_vector safely
+    await pool.query(`
+      UPDATE note_metadata
+      SET search_vector = to_tsvector('english', COALESCE(title, '') || ' ' || COALESCE(excerpt, ''))
+      WHERE search_vector IS NULL;
+    `);
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS note_metadata_search_idx ON note_metadata USING gin (search_vector);
+    `);
+  }
+  else {
+    // For pg-mem tests, create a fallback text column so Drizzle's INSERT
+    // statements (which may reference the column) succeed even though
+    // full-text features are unavailable in pg-mem.
+    await pool.query(`
+      ALTER TABLE note_metadata ADD COLUMN IF NOT EXISTS search_vector TEXT;
+    `);
+  }
+
+  // Ensure updated_at ordering index exists for note metadata (safe for pg-mem)
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS note_metadata_project_id_user_id_updated_at_idx ON note_metadata (project_id, user_id, updated_at);
   `);
 
   // Ensure `usage_count` exists for mcp_connection_tokens (backfill-safe)

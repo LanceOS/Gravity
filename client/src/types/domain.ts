@@ -1,3 +1,6 @@
+import type { Label } from './label';
+export type { Label };
+
 /**
  * Domain entity types — the canonical source of truth for the app's data model.
  *
@@ -55,7 +58,9 @@ export interface Ticket {
   priority: 'no_priority' | 'low' | 'medium' | 'high' | 'urgent';
   assigneeId: string | null;
   projectId: string;
-  domainId: string | null;
+  domainId?: string | null; // Keep for now during migration transition
+  labels?: Label[];
+  labelIds?: string[];
   cycleId: string | null;
   parentId: string | null;
   prStatus: 'open' | 'merged' | 'closed' | 'none';

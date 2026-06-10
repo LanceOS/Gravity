@@ -1,6 +1,6 @@
 import React from 'react';
 import { ChevronDown, Check } from 'lucide-react';
-import { ClickAwayListener } from '../../utilities';
+import { ClickAwayListener, Portal } from '../../utilities';
 import { cn } from '../../utilities';
 
 export interface SelectOption {
@@ -123,7 +123,7 @@ export function Select({
 
     setMenuStyle({
       position: 'fixed',
-      zIndex: 1400,
+      zIndex: 1600,
       left: `${left}px`,
       top: openAbove ? `${Math.max(8, triggerRect.top - 4)}px` : `${triggerRect.bottom + 4}px`,
       transform: openAbove ? 'translateY(-100%)' : 'none',
@@ -135,7 +135,7 @@ export function Select({
     });
   }, []);
 
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     if (!isOpen) {
       return;
     }
@@ -282,13 +282,14 @@ export function Select({
         {name ? <input type="hidden" name={name} value={selectedValue} disabled={disabled} readOnly /> : null}
 
         {isOpen && (
-          <div
-            id={menuId}
-            role="listbox"
-            aria-labelledby={label ? labelId : undefined}
-            className="select-menu scroll-container"
-            style={menuStyle}
-          >
+          <Portal>
+            <div
+              id={menuId}
+              role="listbox"
+              aria-labelledby={label ? labelId : undefined}
+              className={cn('select-menu scroll-container', menuStyle.transform === 'translateY(-100%)' && 'select-menu--up')}
+              style={menuStyle}
+            >
             {allOptions.map((opt, index) => {
               const isSelected = opt.value === selectedValue;
               const isActive = index === activeIndex;
@@ -321,7 +322,8 @@ export function Select({
                 </div>
               );
             })}
-          </div>
+            </div>
+          </Portal>
         )}
 
         {error && (

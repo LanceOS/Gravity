@@ -1,4 +1,4 @@
-import type { Cycle, Domain, Project, Ticket, User } from '../../../context/TicketContext';
+import type { Cycle, Label, Project, Ticket, User } from '../../../context/TicketContext';
 
 export interface CreateTicketInput {
   title: string;
@@ -6,7 +6,7 @@ export interface CreateTicketInput {
   status: Ticket['status'];
   priority: Ticket['priority'];
   projectId: string;
-  domainId: string | null;
+  labelIds: string[];
   cycleId: string | null;
   assigneeId: string | null;
   parentId: string | null;
@@ -15,7 +15,7 @@ export interface CreateTicketInput {
 export interface CreateTicketModalProps {
   onClose: () => void;
   projects: Project[];
-  domains: Domain[];
+  labels: Label[];
   cycles: Cycle[];
   users: User[];
   parentTicket: Ticket | null;

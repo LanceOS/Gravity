@@ -20,10 +20,13 @@ const project = {
   workspaceId: 'workspace-1',
 };
 
-const domain = {
-  id: 'domain-1',
+const label = {
+  id: 'label-1',
+  projectId: 'project-1',
   name: 'Platform',
   color: '#3b82f6',
+  description: '',
+  sortOrder: 0,
 };
 
 const cycle = {
@@ -39,7 +42,8 @@ const baseFilters: TicketFilters = {
   priority: '',
   status: '',
   projectId: 'project-1',
-  domainId: '',
+  labels: [],
+  labelMode: 'any',
   cycleId: '',
   assigneeId: '',
 };
@@ -51,23 +55,23 @@ describe('ticketView utils', () => {
     expect(hasActiveTicketFilters(baseFilters)).toBe(false);
   });
 
-  it('prioritizes domain and cycle titles over the current project context', () => {
+  it('prioritizes label and cycle titles over the current project context', () => {
     expect(
       getWorkspaceHeaderTitle(
-        { ...baseFilters, domainId: 'domain-1' },
+        { ...baseFilters, labels: ['label-1'] },
         currentUser,
         [project],
-        [domain],
+        [label],
         [cycle],
       )
-    ).toBe('Platform Domain');
+    ).toBe('Platform Label');
 
     expect(
       getWorkspaceHeaderTitle(
         { ...baseFilters, cycleId: 'cycle-1' },
         currentUser,
         [project],
-        [domain],
+        [label],
         [cycle],
       )
     ).toBe('Sprint 1');
@@ -82,7 +86,8 @@ describe('ticketView utils', () => {
       status: 'todo',
       priority: 'low',
       projectId: 'project-1',
-      domainId: '',
+      labels: [],
+      labelIds: [],
       cycleId: '',
       assigneeId: '',
       parentId: null,
@@ -107,7 +112,8 @@ describe('ticketView utils', () => {
       status: 'todo',
       priority: 'low',
       projectId: 'project-1',
-      domainId: '',
+      labels: [],
+      labelIds: [],
       cycleId: '',
       assigneeId: '',
       parentId: null,

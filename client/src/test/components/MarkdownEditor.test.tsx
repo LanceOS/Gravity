@@ -17,7 +17,7 @@ describe('MarkdownEditor', () => {
       />,
     );
 
-    const editor = container.querySelector('.ProseMirror');
+    const editor = container.querySelector('input[type="text"]');
 
     expect(editor).not.toBeNull();
     expect(queryByTitle('Bold')).not.toBeInTheDocument();
@@ -41,7 +41,7 @@ describe('MarkdownEditor', () => {
       />,
     );
 
-    const editor = container.querySelector('.ProseMirror');
+    const editor = container.querySelector('input[type="text"]');
 
     expect(editor).not.toBeNull();
 

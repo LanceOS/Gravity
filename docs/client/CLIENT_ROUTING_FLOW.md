@@ -1,57 +1,96 @@
 # Client Routing & Flow
 
 ## 1. Purpose and Scope
-This document explains how the React client handles routing, navigation flows, and layout composition. The application employs a custom section-based routing state inside a primary application shell instead of a traditional URL-based router like `react-router-dom`.
+This document explains the URL-based routing architecture of the React client using `react-router-dom`. The application integrates page-level URL paths with the application shell, providing shareable/bookmarkable URLs for settings, directory views, project lists, task boards, and notes.
 
 ## 2. Non-Goals or Boundary Limits
-- Server-side routing (e.g., Express routes) is not covered here.
+- Server-side API routing (Express routes) is not covered.
 - The detailed API state synchronization backing these routes is covered in [Client State Management](CLIENT_STATE_MANAGEMENT.md).
 
 ## 3. Entry Points
-- `client/src/pages/AppShellPage/AppShellPage.tsx`: The primary orchestrator component that handles all conditional rendering based on authentication and active sections.
+- `client/src/router/index.tsx`: Defines the `createBrowserRouter` configuration containing all application routes, redirect patterns, and authentication guards.
+- `client/src/pages/AppShellPage/AppShellPage.tsx`: The primary shell orchestrator that synchronizes its active view states (`activeSection`, `activeWorkspaceId`) with the active URL parameters.
 
-## 4. Flow Steps
-1. **Authentication Check**: 
-   - If `!currentUser`, the `AuthScreen` is rendered.
-   - If `loading` or workspaces are fetching, `LoadingPage` is rendered.
-2. **Onboarding Check**:
-   - If the user has not completed the tutorial (`currentUser.tutorial_completed === 0 || currentUser.tutorial_completed === false`), the `OnboardingModal` renders on top of the current screen.
-3. **Workspace Resolution**:
-   - The app reads `gravity_active_workspace:{userId}` from `localStorage`.
-   - If no workspaces exist, the user is locked to the `directory` section.
-4. **Section Rendering**:
-   - Based on `activeSection` state, one of the following is rendered:
-     - `'directory'`: `WorkspaceDirectoryPage`
-     - `'workspace'`: `WorkspaceLayout` wrapping `WorkspacePage`
-     - `'projects'`: `WorkspaceLayout` wrapping `WorkspaceProjectsPage`
-     - `'settings'`: `SettingsPage`
-     - `'account'`: `AccountPreferencesPage`
+## 4. Proposed Route Structure
 
-## 5. Data Stores and Resources
-- **Local Storage (`gravity_active_workspace`)**: Persists the user's last visited workspace across reloads.
-- **Local Storage (`gravity_pending_invite`)**: Temporarily stores an invite code when the app boots from a `?invite=...` URL parameter, so the invite can be processed post-login.
+The application supports the following URL structure:
 
-## 6. Interfaces and Contracts
-- `activeSection` state drives the top-level view:
-  ```typescript
-  type AppSection = 'directory' | 'workspace' | 'settings' | 'account' | 'projects';
-  ```
+### Workspace & Global Views
+- `/` - Home entry point (evaluates active workspace and redirects)
+- `/workspaces` - Workspace Directory (select, create, or join workspaces)
+- `/workspaces/:workspaceId` - Workspace Overview Dashboard
+- `/workspaces/:workspaceId/all` - Workspace-level All Tasks (consolidated backlog)
+- `/workspaces/:workspaceId/settings` - Workspace settings (invites, member approvals)
+- `/workspaces/:workspaceId/settings/export` - Export workspace tickets & notes
+- `/account` - Global user account settings & preferences
 
-## 7. Key Files and Modules
-- `client/src/pages/AppShellPage/AppShellPage.tsx`: The router logic.
-- `client/src/layouts/WorkspaceLayout/WorkspaceLayout.tsx`: The main layout wrapper providing the Sidebar, Workspace header, and right-hand drawer panels (e.g., AI Chat).
+### Team-scoped Views (Mock / Premium)
+- `/workspaces/:workspaceId/teams/:teamId` - Team overview dashboard
+- `/workspaces/:workspaceId/teams/:teamId/tasks` - Team backlog
+- `/workspaces/:workspaceId/teams/:teamId/views/:viewId` - Custom filtered team view
+- `/workspaces/:workspaceId/teams/:teamId/cycles/:cycleId` - Active team cycle burndown chart
+- `/workspaces/:workspaceId/teams/:teamId/domains/:domainId` - Domain-filtered team backlog
+- `/workspaces/:workspaceId/teams/:teamId/projects/:projectId` - Team project overview dashboard
 
-## 8. Permissions, Guards, or Tenant Boundaries
-- Users cannot navigate to `'workspace'`, `'settings'`, or `'projects'` if they do not belong to at least one workspace.
-- Invite links bypass standard workspace selection by capturing the `?invite=` query param and automatically resolving the workspace join request.
+### Individual (No Teams) Views
+- `/workspaces/:workspaceId/projects/:projectId/tickets` - Project-level tickets board/list
+- `/workspaces/:workspaceId/projects/:projectId/tickets/:ticketKey` - Ticket detail inspector
+- `/workspaces/:workspaceId/projects/:projectId/notes` - Project-level notes directory
+- `/workspaces/:workspaceId/projects/:projectId/notes/:noteId` - Rich-text note editor
 
-## 9. Failure Modes, Observability, or Operational Notes
-- If local storage contains an invalid `activeWorkspaceId`, the application gracefully falls back to the first available workspace in the user's list.
-- If all workspaces are deleted, the application falls back to the `'directory'` section.
+---
 
-## 10. Change Hazards, Invariants, or Migration Constraints
-- **URL Syncing**: Since the app uses state-based routing rather than standard URL paths, users cannot bookmark specific tickets or projects currently. Future migrations to a real router must preserve the invite query parameter logic.
+## 5. Routing Guards & Redirections
 
-## 11. Related Docs
+### Authentication Guard (`ProtectedRoute`)
+All authenticated paths are wrapped in a `<ProtectedRoute>` component. If the user session is loading, a loading page is displayed; if unauthenticated, the user is redirected to the Auth Screen module.
+
+### Home / Backward Compatibility Redirection
+- When a user lands on `/`, the `HomeRedirect` component runs:
+  1. Checks if the user is authenticated.
+  2. Resolves the user's last-active workspace ID from `localStorage`.
+  3. Redirects to `/workspaces/:workspaceId` if found; otherwise, redirects to the directory view at `/workspaces`.
+- Legacy entry point `/placeholder/:id` redirects to `/workspaces/:id` for backward compatibility.
+
+### Graceful Degradation for Team Project Routing
+Since teams are not yet fully implemented in the database/workspace models, any attempt to access team-scoped project paths automatically redirects to individual equivalents:
+- `/workspaces/:workspaceId/teams/:teamId/projects/:projectId/tickets` ➔ `/workspaces/:workspaceId/projects/:projectId/tickets`
+- `/workspaces/:workspaceId/teams/:teamId/projects/:projectId/tickets/:ticketKey` ➔ `/workspaces/:workspaceId/projects/:projectId/tickets/:ticketKey`
+- `/workspaces/:workspaceId/teams/:teamId/projects/:projectId/notes` ➔ `/workspaces/:workspaceId/projects/:projectId/notes`
+- `/workspaces/:workspaceId/teams/:teamId/projects/:projectId/notes/:noteId` ➔ `/workspaces/:workspaceId/projects/:projectId/notes/:noteId`
+
+General team-level views (e.g., cycles, custom views) render beautiful placeholder dashboards displaying a friendly alert explaining that teams are a premium feature, offering navigation fallback links.
+
+---
+
+## 6. App Shell Synchronization
+The `AppShellPage` synchronizes its internal section flags with URL parameters using a `useEffect` hook:
+```typescript
+const { workspaceId } = useParams();
+const { pathname } = useLocation();
+
+useEffect(() => {
+  if (pathname === '/workspaces' || pathname === '/workspaces/') {
+    setActiveSection('directory');
+  } else if (pathname === '/account' || pathname === '/account/') {
+    setActiveSection('account');
+  } else if (workspaceId) {
+    setActiveWorkspaceId(workspaceId);
+    if (pathname.includes('/settings')) {
+      setActiveSection('settings');
+    } else if (pathname.includes('/projects')) {
+      setActiveSection('projects');
+    } else {
+      setActiveSection('workspace');
+    }
+  }
+}, [pathname, workspaceId]);
+```
+
+This synchronization enables bookmarkable/shareable links while maintaining the underlying UI layout shell structure.
+
+---
+
+## 7. Related Docs
 - [Client Architecture Overview](CLIENT_ARCHITECTURE_OVERVIEW.md)
 - [Client State Management](CLIENT_STATE_MANAGEMENT.md)

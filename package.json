@@ -14,5 +14,10 @@
     "start:dev": "npm run -w server dev & npm run -w client dev",
     "sync-versions": "node ./scripts/sync-versions.js",
     "test": "npm run -w server test && npm run -w client test"
+  },
+  "dependencies": {
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-router-dom": "^6.30.4"
   }
 }

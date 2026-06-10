@@ -27,7 +27,9 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
 
   const [isDragging, setIsDragging] = useState(false);
   const [title, setTitle] = useState('');
+  const [body, setBody] = useState('');
   const titleRef = useRef(title);
+  const bodyRef = useRef(body);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -47,15 +49,14 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
       clearTimeout(saveTimeoutRef.current);
     }
     saveTimeoutRef.current = setTimeout(() => {
-      // Trigger save
       triggerSave();
     }, 3000);
   }, []);
 
   const triggerSave = useCallback(() => {
-    if (!editor || !note) return;
+    if (!note) return;
 
-    const currentBody = editor.storage.markdown.getMarkdown();
+    const currentBody = bodyRef.current;
     const currentTitle = titleRef.current.trim() || 'Untitled Note';
 
     if (currentBody !== note.body || currentTitle !== note.title) {
@@ -83,6 +84,7 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
       const { from, to } = editor.state.selection;
       editor.commands.setContent(newMarkdown);
     }
+    bodyRef.current = newMarkdown;
     scheduleSave();
   };
 
@@ -107,7 +109,8 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
     editable: viewMode !== 'split',
     // Explicit document structure so tiptap-markdown never infers a heading node
     content: { type: 'doc', content: [{ type: 'paragraph' }] },
-    onUpdate: () => {
+    onUpdate: ({ editor }) => {
+      bodyRef.current = editor.storage.markdown.getMarkdown();
       scheduleSave();
     },
     editorProps: {
@@ -133,66 +136,45 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
   // Sync content when note initially loads
   const noteLoaded = useRef(false);
   useEffect(() => {
-    // Reset the loaded flag whenever noteId changes so we reload fresh content.
     noteLoaded.current = false;
   }, [noteId]);
 
   useEffect(() => {
-    if (!note || !editor || noteLoaded.current) return;
+    if (!note || noteLoaded.current) return;
     noteLoaded.current = true;
 
     const rawBody = note.body ?? '';
-
-    // Strip a legacy empty-H1 line written by the old creation code ("# \n\n").
-    // We only strip lines that are JUST "# " (no real heading text) so we never
-    // destroy intentional user content.
     const cleanedBody = rawBody.replace(/^# ?\n/, '').trimStart();
+    
+    setBody(cleanedBody);
+    bodyRef.current = cleanedBody;
 
-    if (cleanedBody) {
-      editor.commands.setContent(cleanedBody);
-
-      // Belt-and-suspenders: if tiptap-markdown still produced a leading H1
-      // node that is empty (a legacy artifact), convert it to a paragraph.
-      const json = editor.getJSON();
-      const firstNode = json.content?.[0];
-      if (firstNode?.type === 'heading' && !firstNode.content?.length) {
-        editor.chain()
-          .setTextSelection(1)
-          .setParagraph()
-          .run();
-      }
-    }
-
-    // Place cursor at the very start of the body.
-    editor.commands.focus('start');
-
-    // Populate the title input from stored metadata.
     if (!title && note.title && note.title !== 'Untitled Note') {
       setTitle(note.title);
       titleRef.current = note.title;
     }
-  }, [editor, note]);
+  }, [note]);
 
-  // Update scheduleSave closure references
   useEffect(() => {
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = setTimeout(() => {
-        if (!editor || !note) return;
-        const currentBody = editor.storage.markdown.getMarkdown();
-        const currentTitle = titleRef.current.trim() || 'Untitled Note';
-
-        if (currentBody !== note.body || currentTitle !== note.title) {
-          saveNote({ title: currentTitle, body: currentBody });
-        }
+        triggerSave();
       }, 3000);
     }
-  }, [note, editor, saveNote]);
+  }, [note, triggerSave]);
 
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newTitle = e.target.value;
     setTitle(newTitle);
     titleRef.current = newTitle;
+    scheduleSave();
+  };
+
+  const handleBodyChange = (value?: string) => {
+    const newBody = value || '';
+    setBody(newBody);
+    bodyRef.current = newBody;
     scheduleSave();
   };
 
@@ -213,8 +195,6 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
   };
 
   const onDrop = (e: React.DragEvent) => {
-    // Drop is handled by TipTap if it happens in the editor,
-    // but this covers the entire container.
     e.preventDefault();
     setIsDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
@@ -226,16 +206,13 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
     return <div className="note-editor" style={{ padding: 24 }}>Loading note...</div>;
   }
 
-  if (!editor) {
-    return null;
-  }
-
   return (
     <div
       className="note-editor"
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
+      data-color-mode="dark"
     >
       <div className="note-editor__header">
         <div className="note-editor__status">

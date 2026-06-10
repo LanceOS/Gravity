@@ -10,16 +10,15 @@ export default function TicketUtilities({ ticketLink, generatedBranchName, descr
       </span>
 
       <div className="ticket-utilities__actions">
-        <a
-          href={ticketLink}
-          target="_blank"
-          rel="noreferrer"
-          aria-label="Ticket link"
-          title="Ticket Link"
-          className="ticket-utilities__action ticket-utilities__link clickable"
+        <button
+          type="button"
+          aria-label="Copy Ticket Link"
+          title="Copy Ticket Link"
+          onClick={() => void onCopy(ticketLink, 'Ticket link copied')}
+          className="ticket-utilities__action ticket-utilities__copy-button clickable"
         >
           <LinkIcon size={14} />
-        </a>
+        </button>
 
         <button
           type="button"

@@ -1,8 +1,8 @@
 import { useMemo, useCallback, useState } from 'react';
 import { Button } from '@library';
-import type { Comment, Cycle, Domain, Project, Ticket, User } from '../../context/TicketContext';
+import type { Comment, Cycle, Label, Project, Ticket, User } from '../../context/TicketContext';
 import type { TicketFilters, TicketListSort } from '../../modules/tickets/utils/ticketView';
-import { TicketBoard, TicketList, TicketDetail, TicketFilterBar } from '../../modules/tickets';
+import { TicketBoard, TicketList, TicketFilterBar } from '../../modules/tickets';
 import { NotesList, NoteEditor } from '../../modules/notes';
 import {
   filterTickets,
@@ -13,29 +13,27 @@ import {
 } from '../../modules/tickets/utils/ticketView';
 import { WorkspaceHeader } from '../../modules/workspaces';
 import { WorkspaceViewContainer } from '../../components/WorkspaceViewContainer';
+import { Breadcrumbs } from '../../components/Breadcrumbs/Breadcrumbs';
 import WorkspaceMcpModal from '../../modules/workspaces/components/WorkspaceMcpModal';
 import './WorkspacePage.css';
 
 interface WorkspacePageProps {
   workspaceId?: string;
+  workspaceName?: string;
+  pathname?: string;
   activeContext?: 'issues' | 'notes';
   activeNoteId?: string;
   activeTicket: Ticket | null;
   activeView: 'board' | 'list';
-  comments: Comment[];
   currentUser: User | null;
   cycles: Cycle[];
-  domains: Domain[];
+  labels?: Label[];
+  domains?: Label[];
   filters: TicketFilters;
   listSort: TicketListSort;
   projects: Project[];
   tickets: Ticket[];
   users: User[];
-  onAddComment: (ticketId: string, body: string) => Promise<void>;
-  onUpdateComment: (ticketId: string, commentId: string, body: string) => Promise<void>;
-  onDeleteComment: (ticketId: string, commentId: string) => Promise<void>;
-  onDeleteTicket: (ticketId: string) => Promise<void>;
-  onOpenCreateSubtask: (parentId: string) => void;
   onOpenCreateTicket: (initialStatus?: Ticket['status']) => void;
   onOpenProjectManager: () => void;
   onSelectTicket: (ticket: Ticket | null) => void;
@@ -48,24 +46,21 @@ interface WorkspacePageProps {
 
 export function WorkspacePage({
   workspaceId,
+  workspaceName,
+  pathname,
   activeContext = 'issues',
   activeNoteId,
   activeTicket,
   activeView,
-  comments,
   currentUser,
   cycles,
-  domains,
+  labels: labelItems,
+  domains: domainItems,
   filters,
   listSort,
   projects,
   tickets,
   users,
-  onAddComment,
-  onUpdateComment,
-  onDeleteComment,
-  onDeleteTicket,
-  onOpenCreateSubtask,
   onOpenCreateTicket,
   onOpenProjectManager,
   onSelectTicket,
@@ -76,45 +71,29 @@ export function WorkspacePage({
   onUpdateTicket,
 }: WorkspacePageProps) {
   const [isMcpOpen, setIsMcpOpen] = useState(false);
+  const labels = labelItems ?? domainItems ?? [];
   const filteredTickets = useMemo(() => filterTickets(tickets, filters), [tickets, filters]);
   const hasFiltersApplied = useMemo(() => hasActiveTicketFilters(filters), [filters]);
   const headerTitle = useMemo(
-    () => getWorkspaceHeaderTitle(filters, currentUser, projects, domains, cycles),
-    [filters, currentUser, projects, domains, cycles]
+    () => getWorkspaceHeaderTitle(filters, currentUser, projects, labels, cycles),
+    [filters, currentUser, projects, labels, cycles]
   );
   const userAvatarById = useMemo(
     () => Object.fromEntries(users.map((user) => [user.id, user.avatar])),
     [users]
   );
-  const domainById = useMemo(
-    () => Object.fromEntries(domains.map((domain) => [domain.id, domain])),
-    [domains]
+  const labelById = useMemo(
+    () => Object.fromEntries(labels.map((label) => [label.id, label])),
+    [labels]
   );
   const groupedTickets = useMemo(() => groupTicketsByStatus(filteredTickets), [filteredTickets]);
   const listSortedTickets = useMemo(
-    () => (activeView === 'list' ? sortTicketsForList(filteredTickets, domainById, listSort) : filteredTickets),
-    [activeView, filteredTickets, domainById, listSort]
+    () => (activeView === 'list' ? sortTicketsForList(filteredTickets, labelById, listSort) : filteredTickets),
+    [activeView, filteredTickets, labelById, listSort]
   );
   const listGroupedTickets = useMemo(
     () => (activeView === 'list' ? groupTicketsByStatus(listSortedTickets) : groupedTickets),
     [activeView, listSortedTickets, groupedTickets]
-  );
-  const detailSubtasks = useMemo(
-    () => (activeTicket ? tickets.filter((ticket) => ticket.parentId === activeTicket.id) : []),
-    [tickets, activeTicket]
-  );
-
-  const parentTicket = useMemo(
-    () => (activeTicket ? tickets.find((t) => t.id === activeTicket.parentId) || null : null),
-    [tickets, activeTicket]
-  );
-  const completedDetailSubtasks = useMemo(
-    () => detailSubtasks.filter((ticket) => ticket.status === 'done' || ticket.status === 'canceled').length,
-    [detailSubtasks]
-  );
-  const detailSubtaskProgressPercent = useMemo(
-    () => (detailSubtasks.length > 0 ? (completedDetailSubtasks / detailSubtasks.length) * 100 : 0),
-    [detailSubtasks, completedDetailSubtasks]
   );
   const handleClearFilters = useCallback(() => {
     onSetFilters({
@@ -122,7 +101,7 @@ export function WorkspacePage({
       search: '',
       priority: '',
       status: '',
-      domainId: '',
+      labels: [],
       cycleId: '',
       assigneeId: '',
     });
@@ -152,13 +131,25 @@ export function WorkspacePage({
   }, [filters.projectId, onSelectNote]);
 
   const displayTitle = activeContext === 'notes' ? 'Notes' : headerTitle;
+  const shouldShowBreadcrumbs = Boolean(pathname && workspaceId && pathname !== `/workspaces/${workspaceId}`);
 
   return (
     <div className="workspace-page">
       {projects.length > 0 ? (
         <WorkspaceHeader>
           <WorkspaceHeader.Top>
-            <WorkspaceHeader.Title>{displayTitle}</WorkspaceHeader.Title>
+            {shouldShowBreadcrumbs ? (
+              <Breadcrumbs
+                pathname={pathname || ''}
+                workspaceId={workspaceId || ''}
+                workspaceName={workspaceName}
+                projects={projects}
+                activeTicket={activeTicket}
+                activeNoteId={activeNoteId}
+              />
+            ) : (
+              <WorkspaceHeader.Title>{displayTitle}</WorkspaceHeader.Title>
+            )}
             {!activeTicket && activeContext === 'issues' && (
               <WorkspaceHeader.ViewToggle
                 activeView={activeView}
@@ -175,8 +166,8 @@ export function WorkspacePage({
             {!activeTicket && activeContext === 'notes' && (
               <div style={{ marginLeft: 'auto' }}>
                 {activeNoteId ? (
-                  <Button type="button" variant="secondary" onClick={() => onSelectNote?.('')}>
-                    Back to Notes
+                  <Button type="button" variant="secondary" onClick={() => window.history.back()}>
+                     Back to Notes
                   </Button>
                 ) : (
                   <Button type="button" variant="primary" onClick={handleCreateNote}>
@@ -198,7 +189,9 @@ export function WorkspacePage({
                 totalCount={tickets.length}
                 listSort={activeView === 'list' ? listSort : undefined}
                 onListSortChange={activeView === 'list' ? onSetListSort : undefined}
-                domains={Object.values(domainById)}
+                labels={Object.values(labelById)}
+                cycles={cycles}
+                users={users}
               />
             </WorkspaceHeader.Bottom>
           )}
@@ -206,7 +199,7 @@ export function WorkspacePage({
       ) : null}
 
       <div className="workspace-page__content">
-        <div className={`workspace-page__issues ${activeTicket ? 'workspace-page__issues--hidden' : ''}`}>
+        <div className="workspace-page__issues">
           <div className="workspace-page__issues-shell">
             <div className="workspace-page__issues-content">
 
@@ -227,7 +220,7 @@ export function WorkspacePage({
                   <div className="workspace-page__empty-state">
                     <div className="workspace-page__empty-state-title">No projects in this workspace yet</div>
                     <p className="workspace-page__empty-state-copy">
-                      Open Manage Projects to create the first project for this workspace. Once a project exists, tickets, domains, and cycles will become available here.
+                      Open Manage Projects to create the first project for this workspace. Once a project exists, tickets, labels, and cycles will become available here.
                     </p>
                     <div className="workspace-page__empty-state-actions">
                       <Button
@@ -244,7 +237,7 @@ export function WorkspacePage({
                   <WorkspaceViewContainer>
                     <TicketBoard
                       ticketsByColumn={groupedTickets}
-                      domainById={domainById}
+                      labelById={labelById}
                       userAvatarById={userAvatarById}
                       onMoveTicket={onUpdateTicket}
                       onSelectTicket={onSelectTicket}
@@ -256,43 +249,16 @@ export function WorkspacePage({
                     <TicketList
                       filteredCount={filteredTickets.length}
                       groupedTickets={listGroupedTickets}
-                      domainById={domainById}
+                      labelById={labelById}
                       userAvatarById={userAvatarById}
                       onSelectTicket={onSelectTicket}
                     />
                   </WorkspaceViewContainer>
                 )}
               </div>
-
             </div>
           </div>
         </div>
-
-
-        {activeTicket ? (
-          <div key={activeTicket.id} className="workspace-page__detail">
-            <TicketDetail
-              activeTicket={activeTicket}
-              comments={comments}
-              subtasks={detailSubtasks}
-              completedSubtasks={completedDetailSubtasks}
-              subtaskProgressPercent={detailSubtaskProgressPercent}
-              parentTicket={parentTicket}
-              users={users}
-              projects={projects}
-              domains={domains}
-              cycles={cycles}
-              onSelectTicket={onSelectTicket}
-              onUpdateTicket={onUpdateTicket}
-              onDeleteTicket={onDeleteTicket}
-              onAddComment={onAddComment}
-              onUpdateComment={onUpdateComment}
-              onDeleteComment={onDeleteComment}
-              onClose={() => onSelectTicket(null)}
-              onOpenCreateSubtask={onOpenCreateSubtask}
-            />
-          </div>
-        ) : null}
       </div>
       <WorkspaceMcpModal workspaceId={workspaceId} isOpen={isMcpOpen} onClose={() => setIsMcpOpen(false)} />
     </div>

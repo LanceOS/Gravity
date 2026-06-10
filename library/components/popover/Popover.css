@@ -1,0 +1,28 @@
+.popover-content {
+  position: absolute;
+  top: 100%;
+  z-index: 1600;
+  background-color: var(--color-surface-card);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-3);
+  min-width: 200px;
+  margin-top: 8px;
+  max-width: calc(100vw - 32px);
+}
+
+.popover-content--align-left {
+  left: 0;
+  right: auto;
+}
+
+.popover-content--align-right {
+  left: auto;
+  right: 0;
+}
+
+.popover-content--align-center {
+  left: 50%;
+  transform: translateX(-50%);
+}

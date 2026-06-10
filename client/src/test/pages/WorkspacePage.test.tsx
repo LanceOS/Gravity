@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 import { WorkspacePage } from '../../pages/WorkspacePage/WorkspacePage.tsx';
 import type { Cycle, Domain, Project, Ticket } from '../../context/TicketContext.tsx';
 
@@ -136,16 +137,15 @@ function renderWorkspacePage(overrides: Partial<Parameters<typeof WorkspacePage>
   const baseProps: Parameters<typeof WorkspacePage>[0] = {
     activeTicket: null,
     activeView: 'board' as const,
-    comments: [],
     currentUser,
     cycles: [cycle],
-    domains: [domain],
+    labels: [domain],
     filters: {
       search: '',
       priority: '',
       status: '',
       projectId: '',
-      domainId: '',
+      labels: [] as string[],
       cycleId: '',
       assigneeId: '',
     },
@@ -153,9 +153,6 @@ function renderWorkspacePage(overrides: Partial<Parameters<typeof WorkspacePage>
     projects: [project],
     tickets: [ticket, doneTicket, subtaskOpen, subtaskDone],
     users: [currentUser],
-    onAddComment: vi.fn().mockResolvedValue(undefined),
-    onDeleteTicket: vi.fn().mockResolvedValue(undefined),
-    onOpenCreateSubtask: vi.fn(),
     onOpenCreateTicket: vi.fn(),
     onOpenProjectManager: vi.fn(),
     onSelectTicket: vi.fn(),
@@ -163,14 +160,16 @@ function renderWorkspacePage(overrides: Partial<Parameters<typeof WorkspacePage>
     onSetListSort: vi.fn(),
     onSetView: vi.fn(),
     onUpdateTicket: vi.fn().mockResolvedValue(undefined),
-    onUpdateComment: vi.fn().mockResolvedValue(undefined),
-    onDeleteComment: vi.fn().mockResolvedValue(undefined),
   };
 
   const props = { ...baseProps, ...overrides };
 
   return {
-    ...render(<WorkspacePage {...props} />),
+    ...render(
+      <MemoryRouter initialEntries={['/workspaces/workspace-1/projects/project-1/tickets']}>
+        <WorkspacePage {...props} />
+      </MemoryRouter>
+    ),
     props,
   };
 }
@@ -195,7 +194,7 @@ describe('WorkspacePage', () => {
         priority: '',
         status: '',
         projectId: 'project-1',
-        domainId: '',
+        labels: [],
         cycleId: '',
         assigneeId: '',
       },
@@ -214,22 +213,10 @@ describe('WorkspacePage', () => {
       priority: '',
       status: '',
       projectId: 'project-1',
-      domainId: '',
+      labels: [],
       cycleId: '',
       assigneeId: '',
     });
-  });
-
-  it('renders the list view and passes subtask progress to the detail panel', async () => {
-    const user = userEvent.setup();
-    const { props } = renderWorkspacePage({
-      activeView: 'list',
-      activeTicket: ticket,
-    });
-
-    expect(screen.getByText('All Issues')).toBeInTheDocument();
-    expect(screen.getByText('TicketList 4')).toBeInTheDocument();
-    expect(screen.getByText('TicketDetail Fix billing edge case 2 1 50')).toBeInTheDocument();
   });
 
   it('shows cycle-scoped headers and clears cycle and assignee filters together', async () => {
@@ -240,7 +227,7 @@ describe('WorkspacePage', () => {
         priority: '',
         status: '',
         projectId: 'project-1',
-        domainId: '',
+        labels: [],
         cycleId: 'cycle-1',
         assigneeId: 'user-2',
       },
@@ -253,7 +240,7 @@ describe('WorkspacePage', () => {
       priority: '',
       status: '',
       projectId: 'project-1',
-      domainId: '',
+      labels: [],
       cycleId: '',
       assigneeId: '',
     });

@@ -16,6 +16,7 @@
   flex: 1 1 auto;
   background: var(--color-surface-app);
   overflow: hidden;
+  animation: lib-fade-in var(--transition-spring);
 }
 
 .ticket-detail__header {
@@ -91,10 +92,9 @@
 }
 
 .ticket-detail__properties-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 20px;
-  align-items: start;
 }
 
 @media (max-width: 768px) {
@@ -133,7 +133,10 @@
   }
 
   .ticket-detail__properties-grid {
-    grid-template-columns: 1fr;
     gap: 16px;
   }
+}
+
+.ticket-detail__label-popover {
+  width: 220px;
 }

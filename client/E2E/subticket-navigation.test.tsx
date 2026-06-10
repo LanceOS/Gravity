@@ -10,7 +10,7 @@ describe('Sub-ticket navigation E2E', () => {
     const user = userEvent.setup();
 
     // Seed mock DB
-    dbState.currentUser = { id: 'usr-1', name: 'E2E User', email: 'e2e@gravity.test' } as any;
+    dbState.currentUser = { id: 'usr-1', name: 'E2E User', email: 'e2e@gravity.test', tutorial_completed: 1 } as any;
     const workspace = { id: 'wsp-1', name: 'E2E Workspace', defaultProjectId: 'prj-1', role: 'owner' };
     const project = { id: 'prj-1', workspaceId: 'wsp-1', name: 'E2E Project', key: 'TST' };
     dbState.workspaces.push(workspace);
@@ -81,7 +81,7 @@ describe('Sub-ticket navigation E2E', () => {
     const detailContainerAfter = document.querySelector('.workspace-page__detail');
     expect(detailContainerAfter).toBeTruthy();
     await waitFor(() => {
-      expect(within(detailContainerAfter as Element).getByText(parentTicket.title, { selector: 'p' })).toBeInTheDocument();
+      expect(within(detailContainerAfter as Element).getByDisplayValue(parentTicket.title)).toBeInTheDocument();
     });
   });
 });
