@@ -131,22 +131,24 @@ describe('projects and tickets routes', () => {
       owner: { id: ownerApi.user.id, name: ownerApi.user.name, email: ownerApi.user.email, role: 'owner', avatarUrl: ownerApi.user.avatar }
     });
 
-    const createDomainResponse = await ownerApi.post('/api/v1/domains').send({
+    const domain = await seedDomain(project.id, { id: 'domain-1', name: 'Platform', color: '#0F766E' });
+
+    const createLabelResponse = await ownerApi.post('/api/v1/labels').send({
       projectId: project.id,
-      name: 'Platform',
+      name: 'Platform Label',
       color: '#0F766E',
     });
 
-    expect(createDomainResponse.status).toBe(201);
+    expect(createLabelResponse.status).toBe(201);
 
-    const listDomainsResponse = await ownerApi.get('/api/v1/domains').query({ projectId: project.id });
-    expect(listDomainsResponse.status).toBe(200);
-    expect(listDomainsResponse.body).toEqual([
-      {
-        id: createDomainResponse.body.id,
-        name: 'Platform',
+    const listLabelsResponse = await ownerApi.get('/api/v1/labels').query({ projectId: project.id });
+    expect(listLabelsResponse.status).toBe(200);
+    expect(listLabelsResponse.body).toEqual([
+      expect.objectContaining({
+        id: createLabelResponse.body.id,
+        name: 'Platform Label',
         color: '#0F766E',
-      },
+      }),
     ]);
 
     const createCycleResponse = await ownerApi.post('/api/v1/cycles').send({
@@ -171,7 +173,7 @@ describe('projects and tickets routes', () => {
       projectId: project.id,
       title: 'Ship server endpoint coverage',
       description: 'Cover every route with pg-mem-backed tests.',
-      domainId: createDomainResponse.body.id,
+      domainId: domain.id,
       cycleId: createCycleResponse.body.id,
       assigneeId: owner.id,
       priority: 'high',
@@ -181,7 +183,7 @@ describe('projects and tickets routes', () => {
     expect(createTicketResponse.body).toMatchObject({
       title: 'Ship server endpoint coverage',
       projectId: project.id,
-      domainId: createDomainResponse.body.id,
+      domainId: domain.id,
       cycleId: createCycleResponse.body.id,
       assigneeId: owner.id,
     });

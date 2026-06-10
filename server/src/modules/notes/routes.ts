@@ -28,6 +28,7 @@ export function createNotesRouter() {
       const created = await createNote(projectId, auth.userId, req.body.title, req.body.body);
       res.status(201).json(created);
     } catch (error) {
+      console.error('Error creating note:', error);
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create note.' });
     }
   });
