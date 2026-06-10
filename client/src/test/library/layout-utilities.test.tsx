@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -12,6 +12,7 @@ import {
   Grid,
   Masonry,
   Portal,
+  Select,
   SplitPane,
   Stack,
   VisuallyHidden,
@@ -36,6 +37,27 @@ function FocusTrapHarness() {
           </div>
         </FocusTrap>
       )}
+    </div>
+  );
+}
+
+function SelectHarness() {
+  const [value, setValue] = useState('todo');
+
+  return (
+    <div>
+      <div role="dialog" aria-label="Other dialog">
+        <button type="button">Inside other dialog</button>
+      </div>
+      <Select
+        label="Status"
+        value={value}
+        onValueChange={setValue}
+        options={[
+          { value: 'todo', label: 'Todo' },
+          { value: 'done', label: 'Done' },
+        ]}
+      />
     </div>
   );
 }
@@ -104,6 +126,9 @@ describe('library layout and utilities', () => {
     render(
       <div>
         <button type="button">Outside target</button>
+        <div role="dialog" aria-label="Other dialog">
+          <button type="button">Inside other dialog</button>
+        </div>
         <ClickAwayListener onClickAway={onClickAway}>
           <div>
             <button type="button">Inside target</button>
@@ -116,8 +141,11 @@ describe('library layout and utilities', () => {
     await user.click(screen.getByRole('button', { name: 'Inside target' }));
     expect(onClickAway).not.toHaveBeenCalled();
 
-    await user.click(screen.getByRole('button', { name: 'Outside target' }));
+    await user.click(screen.getByRole('button', { name: 'Inside other dialog' }));
     expect(onClickAway).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole('button', { name: 'Outside target' }));
+    expect(onClickAway).toHaveBeenCalledTimes(2);
 
     await user.click(screen.getByRole('button', { name: 'Open trap' }));
     expect(screen.getByRole('button', { name: 'First action' })).toHaveFocus();
@@ -130,5 +158,19 @@ describe('library layout and utilities', () => {
 
     await user.click(screen.getByRole('button', { name: 'Close trap' }));
     expect(screen.getByRole('button', { name: 'Open trap' })).toHaveFocus();
+  });
+
+  it('closes a select dropdown when clicking elsewhere in the page, even inside another dialog', async () => {
+    const user = userEvent.setup();
+
+    render(<SelectHarness />);
+
+    await user.click(screen.getByRole('button', { name: 'Status' }));
+    expect(screen.getByRole('listbox')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Inside other dialog' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    });
   });
 });

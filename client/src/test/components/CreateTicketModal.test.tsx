@@ -27,6 +27,7 @@ type MockTextInputProps = React.InputHTMLAttributes<HTMLInputElement> & {
 type MockTextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
   label?: string;
   inputStyle?: React.CSSProperties;
+  autoGrow?: boolean;
   value: string;
   onChange: (event: ChangeEvent<HTMLTextAreaElement>) => void;
 };
