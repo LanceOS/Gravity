@@ -37,48 +37,64 @@ type MockTextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
   onChange: (event: ChangeEvent<HTMLTextAreaElement>) => void;
 };
 
+const mockAssignLabel = vi.fn().mockResolvedValue(true);
+const mockUnassignLabel = vi.fn().mockResolvedValue(true);
+const mockCreateLabel = vi.fn().mockResolvedValue({ id: 'label-3', name: 'New Label', color: '#6B7280' });
+
+vi.mock('../../context/TicketContext', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../context/TicketContext')>();
+  return {
+    ...actual,
+    useTickets: () => ({
+      assignLabelToTicket: mockAssignLabel,
+      unassignLabelFromTicket: mockUnassignLabel,
+      createLabel: mockCreateLabel,
+    }),
+  };
+});
+
 vi.mock('@library', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@library')>();
   return {
     ...actual,
     Button: ({ children, ...props }: MockButtonProps) => {
-    const buttonProps = { ...props };
-    delete buttonProps.variant;
-    delete buttonProps.size;
-    return <button {...buttonProps}>{children}</button>;
-  },
-  Select: ({ options, onValueChange, ...props }: MockSelectProps) => (
-    <select {...props} onChange={(event) => onValueChange(event.target.value)}>
-      {options.map((option) => (
-        <option key={option.value} value={option.value}>
-          {option.label}
-        </option>
-      ))}
-    </select>
-  ),
-  TextInput: ({ value, onChange, ...props }: MockTextInputProps) => <input value={value} onChange={onChange} {...props} />,
-  Textarea: ({ value, onChange, autoGrow, inputStyle, ...props }: any) => <textarea value={value} onChange={onChange} {...props} />,
-  MarkdownEditor: ({ value, onSave, placeholder }: any) => {
-    const [editing, setEditing] = useState(false);
-    if (!editing) {
+      const buttonProps = { ...props };
+      delete buttonProps.variant;
+      delete buttonProps.size;
+      return <button {...buttonProps}>{children}</button>;
+    },
+    Select: ({ options, onValueChange, ...props }: MockSelectProps) => (
+      <select {...props} onChange={(event) => onValueChange(event.target.value)}>
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    ),
+    TextInput: ({ value, onChange, ...props }: MockTextInputProps) => <input value={value} onChange={onChange} {...props} />,
+    Textarea: ({ value, onChange, autoGrow, inputStyle, ...props }: any) => <textarea value={value} onChange={onChange} {...props} />,
+    MarkdownEditor: ({ value, onSave, placeholder }: any) => {
+      const [editing, setEditing] = useState(false);
+      if (!editing) {
+        return (
+          <div onClick={() => setEditing(true)}>{value || placeholder}</div>
+        );
+      }
       return (
-        <div onClick={() => setEditing(true)}>{value || placeholder}</div>
+        <textarea
+          placeholder={placeholder}
+          defaultValue={value}
+          onBlur={(e) => {
+            setEditing(false);
+            onSave(e.target.value);
+          }}
+          autoFocus
+        />
       );
-    }
-    return (
-      <textarea
-        placeholder={placeholder}
-        defaultValue={value}
-        onBlur={(e) => {
-          setEditing(false);
-          onSave(e.target.value);
-        }}
-        autoFocus
-      />
-    );
-  },
-  ClickAwayListener: ({ children }: { children: ReactNode }) => children,
-  Portal: ({ children }: { children: ReactNode }) => <div data-testid="portal">{children}</div>,
+    },
+    ClickAwayListener: ({ children }: { children: ReactNode }) => children,
+    Portal: ({ children }: { children: ReactNode }) => <div data-testid="portal">{children}</div>,
   };
 });
 
@@ -98,6 +114,17 @@ const activeTicket = {
   assigneeId: 'user-1',
   projectId: 'project-1',
   domainId: 'domain-1',
+  labels: [
+    {
+      id: 'domain-1',
+      projectId: 'project-1',
+      name: 'Platform',
+      color: '#10b981',
+      description: '',
+      sortOrder: 0,
+    }
+  ],
+  labelIds: ['domain-1'],
   cycleId: 'cycle-1',
   parentId: null,
   prStatus: 'open' as const,
@@ -172,16 +199,22 @@ const projects = [
   },
 ];
 
-const domains = [
+const labels = [
   {
     id: 'domain-1',
+    projectId: 'project-1',
     name: 'Platform',
     color: '#10b981',
+    description: '',
+    sortOrder: 0,
   },
   {
     id: 'domain-2',
+    projectId: 'project-1',
     name: 'Experience',
     color: '#3b82f6',
+    description: '',
+    sortOrder: 0,
   },
 ];
 
@@ -211,7 +244,7 @@ function renderTicketDetail(overrides: Partial<Parameters<typeof TicketDetail>[0
     subtaskProgressPercent: 50,
     users,
     projects,
-    domains,
+    labels,
     cycles,
     onSelectTicket: vi.fn(),
     onUpdateTicket: vi.fn().mockResolvedValue(undefined),
@@ -237,7 +270,7 @@ describe('TicketDetail', () => {
     const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {});
 
     await user.click(screen.getByRole('button', { name: 'Back' }));
-    expect(backSpy).toHaveBeenCalledTimes(1);
+    expect(props.onClose).toHaveBeenCalledTimes(1);
 
     await user.click(screen.getByText('Fix sync retries'));
     const titleInput = screen.getByDisplayValue('Fix sync retries');
@@ -297,8 +330,9 @@ describe('TicketDetail', () => {
       sidebar.getByText('Project moves are managed outside ticket details to keep ticket keys and related project data consistent.')
     ).toBeInTheDocument();
 
-    await user.selectOptions(sidebar.getByLabelText('Select ticket domain'), 'domain-2');
-    expect(props.onUpdateTicket).toHaveBeenCalledWith('ticket-1', { domainId: 'domain-2' });
+    await user.click(sidebar.getByRole('button', { name: 'Add Label' }));
+    await user.click(screen.getByLabelText('Experience'));
+    expect(mockAssignLabel).toHaveBeenCalledWith('ticket-1', 'domain-2');
 
     await user.selectOptions(sidebar.getByLabelText('Select ticket cycle'), 'cycle-2');
     expect(props.onUpdateTicket).toHaveBeenCalledWith('ticket-1', { cycleId: 'cycle-2' });
@@ -331,13 +365,10 @@ describe('TicketDetail', () => {
 
     const sidebar = within(screen.getByTestId('desktop-sidebar'));
 
-    expect(sidebar.getByRole('link', { name: 'Ticket link' })).toHaveAttribute(
-      'href',
-      'https://tickets.placeholder.local/GRA-101'
-    );
+    await user.click(sidebar.getByRole('button', { name: 'Copy Ticket Link' }));
+    expect(writeTextSpy).toHaveBeenCalledWith('https://tickets.placeholder.local/GRA-101');
+    expect(toastSpy).toHaveBeenCalledWith('Ticket link copied', 'success');
     expect(sidebar.getByRole('button', { name: 'Copy Branch Name' })).toBeInTheDocument();
-
-    // Copy Link button removed — link is now the anchor icon only
 
     await user.click(sidebar.getByRole('button', { name: 'Copy Branch Name' }));
     expect(writeTextSpy).toHaveBeenCalledWith('feature/gra-101-update-ticket');
@@ -346,8 +377,6 @@ describe('TicketDetail', () => {
     await user.click(sidebar.getByRole('button', { name: 'Copy as Markdown' }));
     expect(writeTextSpy).toHaveBeenCalledWith('');
     expect(toastSpy).toHaveBeenCalledWith('Description copied', 'success');
-
-    // Copy Ticket Key button removed — no action here
   });
 
   it('displays the ticket key in the right sidebar and handles comment actions dropdown/inline editing/deletion', async () => {
@@ -358,8 +387,9 @@ describe('TicketDetail', () => {
 
     const sidebar = within(screen.getByTestId('desktop-sidebar'));
 
-    const ticketLink = sidebar.getByRole('link', { name: 'Ticket link' });
-    expect(ticketLink).toHaveAttribute('href', 'https://tickets.placeholder.local/GRA-101');
+    await user.click(sidebar.getByRole('button', { name: 'Copy Ticket Link' }));
+    expect(writeTextSpy).toHaveBeenCalledWith('https://tickets.placeholder.local/GRA-101');
+    expect(toastSpy).toHaveBeenCalledWith('Ticket link copied', 'success');
 
   const generatedBranchName = 'feature/gra-101-fix-sync-retries';
   expect(sidebar.getByRole('button', { name: 'Copy Branch Name' })).toBeInTheDocument();

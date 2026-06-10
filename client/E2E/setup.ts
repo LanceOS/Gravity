@@ -25,7 +25,7 @@ if (!HTMLElement.prototype.scrollIntoView) {
 
 // In-memory mock database state for client E2E
 export interface MockState {
-  currentUser: { id: string; name: string; email: string } | null;
+  currentUser: { id: string; name: string; email: string; tutorial_completed?: number | boolean } | null;
   tutorialCompleted: boolean;
   workspaces: Array<{ id: string; name: string; defaultProjectId: string | null; role: string }>;
   projects: Array<{ id: string; workspaceId: string; name: string; key: string }>;
@@ -38,6 +38,8 @@ export interface MockState {
     priority: 'low' | 'medium' | 'high' | 'urgent';
     projectId: string;
     domainId: string | null;
+    labels?: Array<{ id: string; projectId: string; name: string; color: string; description: string; sortOrder: number }>;
+    labelIds?: string[];
     cycleId: string | null;
     assigneeId: string | null;
     parentId: string | null;
@@ -45,7 +47,7 @@ export interface MockState {
     prStatus: 'open' | 'merged' | 'closed' | 'none';
     prUrl: string | null;
   }>;
-  domains: Array<{ id: string; projectId: string; name: string; slug: string }>;
+  labels: Array<{ id: string; projectId: string; name: string; color: string; description: string; sortOrder: number }>;
   cycles: Array<{ id: string; projectId: string; name: string; number: number; active: boolean }>;
   comments: Array<{ id: string; ticketId: string; body: string; userId: string; createdAt: string }>;
   accountSettings: {
@@ -62,7 +64,7 @@ export let dbState: MockState = {
   workspaces: [],
   projects: [],
   tickets: [],
-  domains: [],
+  labels: [],
   cycles: [],
   comments: [],
   accountSettings: null,
@@ -75,7 +77,7 @@ export function resetMockDb() {
     workspaces: [],
     projects: [],
     tickets: [],
-    domains: [],
+    labels: [],
     cycles: [],
     comments: [],
     accountSettings: null,
@@ -215,20 +217,60 @@ globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
     return jsonResponse(201, project);
   }
 
-  // --- DOMAINS ---
-  if (url.startsWith('/api/v1/domains') && method === 'GET') {
-    return jsonResponse(200, dbState.domains);
+  // --- LABELS ---
+  if (url.startsWith('/api/v1/labels') && method === 'GET') {
+    return jsonResponse(200, dbState.labels);
   }
 
-  if (url.startsWith('/api/v1/domains') && method === 'POST') {
-    const domain = {
+  if (url.startsWith('/api/v1/labels') && method === 'POST') {
+    const label = {
       id: `dom-${Date.now()}`,
       projectId: body.projectId,
       name: body.name,
-      slug: body.name.toLowerCase().replace(/\s+/g, '-'),
+      color: body.color || '#6B7280',
+      description: body.description || '',
+      sortOrder: body.sortOrder || 0,
     };
-    dbState.domains.push(domain);
-    return jsonResponse(201, domain);
+    dbState.labels.push(label);
+    return jsonResponse(201, label);
+  }
+
+  // --- TICKET LABELS ---
+  if (url.match(/\/api\/v1\/tickets\/[^\/]+\/labels$/) && method === 'POST') {
+    const ticketId = url.split('/')[4];
+    const ticket = dbState.tickets.find(t => t.id === ticketId);
+    if (ticket) {
+      if (!ticket.labelIds) ticket.labelIds = [];
+      if (!ticket.labelIds.includes(body.labelId)) {
+        ticket.labelIds.push(body.labelId);
+      }
+      const label = dbState.labels.find(l => l.id === body.labelId);
+      if (label) {
+        if (!ticket.labels) ticket.labels = [];
+        if (!ticket.labels.some(l => l.id === label.id)) {
+          ticket.labels.push(label);
+        }
+      }
+      return jsonResponse(200, { success: true });
+    }
+    return jsonResponse(404, { error: 'Ticket not found' });
+  }
+
+  if (url.match(/\/api\/v1\/tickets\/[^\/]+\/labels\/[^\/]+$/) && method === 'DELETE') {
+    const parts = url.split('/');
+    const ticketId = parts[4];
+    const labelId = parts[6];
+    const ticket = dbState.tickets.find(t => t.id === ticketId);
+    if (ticket) {
+      if (ticket.labelIds) {
+        ticket.labelIds = ticket.labelIds.filter(id => id !== labelId);
+      }
+      if (ticket.labels) {
+        ticket.labels = ticket.labels.filter(l => l.id !== labelId);
+      }
+      return jsonResponse(200, { success: true });
+    }
+    return jsonResponse(404, { error: 'Ticket not found' });
   }
 
   // --- CYCLES ---

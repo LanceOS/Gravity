@@ -78,11 +78,16 @@ vi.mock('@library', () => ({
 }));
 
 vi.mock('../../modules/tickets/components/TicketCard', () => ({
-  TicketCard: ({ ticket, onClick, onDragStart, domainName, assigneeAvatar }: TicketCardProps) => (
-    <button type="button" draggable onClick={onClick} onDragStart={onDragStart}>
-      {`Card ${ticket.key} ${domainName || 'No domain'} ${assigneeAvatar || 'No avatar'}`}
-    </button>
-  ),
+  TicketCard: ({ ticket, onClick, onDragStart, assigneeAvatar }: any) => {
+    const labelsStr = ticket.labels && ticket.labels.length > 0
+      ? ticket.labels.map((l: any) => l.name).join(', ')
+      : 'No label';
+    return (
+      <button type="button" draggable onClick={onClick} onDragStart={onDragStart}>
+        {`Card ${ticket.key} ${labelsStr} ${assigneeAvatar || 'No avatar'}`}
+      </button>
+    );
+  },
 }));
 
 const backlogTicket = {
@@ -94,7 +99,8 @@ const backlogTicket = {
   priority: 'high' as const,
   assigneeId: 'user-1',
   projectId: 'project-1',
-  domainId: 'domain-1',
+  labelIds: ['domain-1'],
+  labels: [{ id: 'domain-1', name: 'Platform', color: '#10b981', projectId: 'project-1' }],
   cycleId: null,
   parentId: null,
   prStatus: 'none' as const,
@@ -112,7 +118,8 @@ const todoTicket = {
   priority: 'medium' as const,
   assigneeId: null,
   projectId: 'project-2',
-  domainId: null,
+  labelIds: [],
+  labels: [],
   cycleId: null,
   parentId: null,
   prStatus: 'none' as const,
@@ -131,11 +138,12 @@ function renderTicketBoard(overrides: Partial<Parameters<typeof TicketBoard>[0]>
       done: [],
       canceled: [],
     },
-    domainById: {
+    labelById: {
       'domain-1': {
         id: 'domain-1',
         name: 'Platform',
         color: '#10b981',
+        projectId: 'project-1',
       },
     },
     userAvatarById: {

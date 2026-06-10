@@ -18,10 +18,8 @@ describe('TicketUtilities', () => {
     );
 
     expect(screen.getByText('Ticket Utilities')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Ticket link' })).toHaveAttribute(
-      'href',
-      'https://tickets.placeholder.local/GRA-101'
-    );
+    await user.click(screen.getByRole('button', { name: 'Copy Ticket Link' }));
+    expect(onCopy).toHaveBeenCalledWith('https://tickets.placeholder.local/GRA-101', 'Ticket link copied');
 
     await user.click(screen.getByRole('button', { name: 'Copy Branch Name' }));
     expect(onCopy).toHaveBeenCalledWith('feature/gra-101-fix-sync-retries', 'Branch name copied');

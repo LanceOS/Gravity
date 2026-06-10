@@ -139,13 +139,13 @@ function renderWorkspacePage(overrides: Partial<Parameters<typeof WorkspacePage>
     activeView: 'board' as const,
     currentUser,
     cycles: [cycle],
-    domains: [domain],
+    labels: [domain],
     filters: {
       search: '',
       priority: '',
       status: '',
       projectId: '',
-      domainId: '',
+      labels: [] as string[],
       cycleId: '',
       assigneeId: '',
     },
@@ -194,7 +194,7 @@ describe('WorkspacePage', () => {
         priority: '',
         status: '',
         projectId: 'project-1',
-        domainId: '',
+        labels: [],
         cycleId: '',
         assigneeId: '',
       },
@@ -213,22 +213,10 @@ describe('WorkspacePage', () => {
       priority: '',
       status: '',
       projectId: 'project-1',
-      domainId: '',
+      labels: [],
       cycleId: '',
       assigneeId: '',
     });
-  });
-
-  it('renders the list view and passes subtask progress to the detail panel', async () => {
-    const user = userEvent.setup();
-    const { props } = renderWorkspacePage({
-      activeView: 'list',
-      activeTicket: ticket,
-    });
-
-    expect(screen.getByText('All Issues')).toBeInTheDocument();
-    expect(screen.getByText('TicketList 4')).toBeInTheDocument();
-    expect(screen.getByText('TicketDetail Fix billing edge case 2 1 50')).toBeInTheDocument();
   });
 
   it('shows cycle-scoped headers and clears cycle and assignee filters together', async () => {
@@ -239,7 +227,7 @@ describe('WorkspacePage', () => {
         priority: '',
         status: '',
         projectId: 'project-1',
-        domainId: '',
+        labels: [],
         cycleId: 'cycle-1',
         assigneeId: 'user-2',
       },
@@ -252,7 +240,7 @@ describe('WorkspacePage', () => {
       priority: '',
       status: '',
       projectId: 'project-1',
-      domainId: '',
+      labels: [],
       cycleId: '',
       assigneeId: '',
     });

@@ -13,7 +13,8 @@ describe('TicketRowMobile', () => {
     priority: 'high' as const,
     assigneeId: null,
     projectId: 'p1',
-    domainId: 'd1',
+    labelIds: ['d1'],
+    labels: [{ id: 'd1', name: 'Platform', color: '#10b981', projectId: 'p1' }],
     cycleId: null,
     parentId: 'parent-1',
     prStatus: 'none' as const,
@@ -26,7 +27,6 @@ describe('TicketRowMobile', () => {
     const user = userEvent.setup();
     const onClick = vi.fn();
     const priorityIcon = <span data-testid="priority-icon">🔥</span>;
-    const domainTag = <span data-testid="domain-tag">Platform</span>;
     const assigneeAvatar = 'avatar-url.png';
 
     render(
@@ -35,7 +35,6 @@ describe('TicketRowMobile', () => {
         onClick={onClick}
         priorityIcon={priorityIcon}
         assigneeAvatar={assigneeAvatar}
-        domainTag={domainTag}
       />
     );
 
@@ -48,7 +47,7 @@ describe('TicketRowMobile', () => {
     expect(avatar).toHaveAttribute('src', 'avatar-url.png');
 
     // Meta row
-    expect(screen.getByTestId('domain-tag')).toBeInTheDocument();
+    expect(screen.getByText('Platform')).toBeInTheDocument();
     expect(screen.getByText('Sub-ticket')).toBeInTheDocument();
 
     // Click
@@ -57,20 +56,19 @@ describe('TicketRowMobile', () => {
   });
 
   it('renders without assignee, domain, or parentId', () => {
-    const ticketWithoutMeta = { ...mockTicket, domainId: null, parentId: null };
+    const ticketWithoutMeta = { ...mockTicket, labelIds: [], labels: [], parentId: null };
     render(
       <TicketRowMobile
         ticket={ticketWithoutMeta}
         onClick={vi.fn()}
         priorityIcon={null as any}
         assigneeAvatar={null as any}
-        domainTag={null as any}
       />
     );
 
     expect(screen.getByText('Test mobile ticket row')).toBeInTheDocument();
     expect(screen.getByText('--')).toBeInTheDocument(); // Missing avatar placeholder
-    expect(screen.queryByTestId('domain-tag')).not.toBeInTheDocument();
+    expect(screen.queryByText('Platform')).not.toBeInTheDocument();
     expect(screen.queryByText('Sub-ticket')).not.toBeInTheDocument();
   });
 });
