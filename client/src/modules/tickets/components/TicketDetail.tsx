@@ -134,60 +134,17 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editingCommentBody, setEditingCommentBody] = useState<string>('');
   const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
-  const [descriptionDraft, setDescriptionDraft] = useState(() => activeTicket.description || createEmptyRichTextValue());
-  const descriptionDraftRef = useRef(descriptionDraft);
-  const descriptionTicketIdRef = useRef(activeTicket.id);
-  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const [editingDescriptionBody, setEditingDescriptionBody] = useState('');
 
   const closeCommentMenu = useCallback(() => setOpenMenuCommentId(null), []);
 
-  const triggerSaveDescription = useCallback(async (ticketId: string, content: string) => {
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-      saveTimeoutRef.current = null;
-    }
-    await onUpdateTicket(ticketId, { description: content });
-  }, [onUpdateTicket]);
-
-  const prevDescriptionRef = useRef(activeTicket.description);
-
   useEffect(() => {
-    // If ticket changes, save any pending draft for the previous ticket immediately
-    if (saveTimeoutRef.current && descriptionTicketIdRef.current && descriptionTicketIdRef.current !== activeTicket.id) {
-      const prevTicketId = descriptionTicketIdRef.current;
-      const prevDraft = descriptionDraftRef.current;
-      clearTimeout(saveTimeoutRef.current);
-      saveTimeoutRef.current = null;
-      void onUpdateTicket(prevTicketId, { description: prevDraft });
+    if (isEditingDescription) {
+      setEditingDescriptionBody(activeTicket.description || createEmptyRichTextValue());
     }
-
-    const nextDescription = activeTicket.description || createEmptyRichTextValue();
-    const isNewTicket = descriptionTicketIdRef.current !== activeTicket.id;
-
-    if (isNewTicket) {
-      descriptionTicketIdRef.current = activeTicket.id;
-      descriptionDraftRef.current = nextDescription;
-      prevDescriptionRef.current = activeTicket.description;
-      setDescriptionDraft(nextDescription);
-    } else if (activeTicket.description !== prevDescriptionRef.current) {
-      // The description changed from the outside (backend sync, etc)
-      prevDescriptionRef.current = activeTicket.description;
-      descriptionDraftRef.current = nextDescription;
-      setDescriptionDraft(nextDescription);
-    }
-  }, [activeTicket.id, activeTicket.description, onUpdateTicket]);
-
-  useEffect(() => {
-    return () => {
-      if (saveTimeoutRef.current && descriptionTicketIdRef.current) {
-        const lastTicketId = descriptionTicketIdRef.current;
-        const lastDraft = descriptionDraftRef.current;
-        clearTimeout(saveTimeoutRef.current);
-        saveTimeoutRef.current = null;
-        void onUpdateTicket(lastTicketId, { description: lastDraft });
-      }
-    };
-  }, [onUpdateTicket]);
+  }, [activeTicket.description, isEditingDescription]);
 
   const ticketLink = useMemo(() => customTicketLink || `${TICKET_URL_BASE}/${activeTicket.key}`, [customTicketLink, activeTicket.key]);
 
@@ -521,36 +478,69 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--color-border-default)', paddingBottom: '6px' }}>
                 <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase' }}>Description</span>
+                {!isEditingDescription && (
+                  <Button
+                    onClick={() => {
+                      setEditingDescriptionBody(activeTicket.description || createEmptyRichTextValue());
+                      setIsEditingDescription(true);
+                    }}
+                    variant="ghost"
+                    size="sm"
+                    style={{ marginLeft: 'auto', padding: '2px 8px', fontSize: '11px' }}
+                  >
+                    <Edit3 size={12} />
+                    <span>Edit</span>
+                  </Button>
+                )}
               </div>
 
-              <RichTextEditor
-                value={descriptionDraft}
-                onChange={(newDesc) => {
-                  // Only update the ref — do NOT call setDescriptionDraft here.
-                  // setDescriptionDraft would trigger a full TicketDetail re-render
-                  // on every keystroke, which React batches but still causes the
-                  // ProseMirror sync effect to fire and reset cursor position.
-                  // The editor owns its own content via ProseMirror; the ref is
-                  // all we need to track the latest value for saving.
-                  descriptionDraftRef.current = newDesc;
-
-                  if (saveTimeoutRef.current) {
-                    clearTimeout(saveTimeoutRef.current);
-                  }
-                  saveTimeoutRef.current = setTimeout(() => {
-                    void triggerSaveDescription(activeTicket.id, newDesc);
-                  }, 1000);
-                }}
-                onBlur={() => {
-                  if (saveTimeoutRef.current) {
-                    void triggerSaveDescription(activeTicket.id, descriptionDraftRef.current);
-                  }
-                }}
-                placeholder="Describe your issue..."
-                className="ticket-detail__description-editor"
-                surface="bare"
-                toolbarMode="bubble"
-              />
+              {isEditingDescription ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
+                  <RichTextEditor
+                    key={`edit-${activeTicket.id}`}
+                    value={editingDescriptionBody}
+                    onChange={setEditingDescriptionBody}
+                    placeholder="Describe your issue..."
+                    className="ticket-detail__description-editor"
+                    surface="bare"
+                    toolbarMode="bubble"
+                    autoFocus
+                  />
+                  <div style={{ display: 'flex', gap: '6px', alignSelf: 'flex-start' }}>
+                    <Button
+                      onClick={async () => {
+                        await onUpdateTicket(activeTicket.id, { description: editingDescriptionBody });
+                        setIsEditingDescription(false);
+                      }}
+                      variant="primary"
+                      size="sm"
+                    >
+                      Save
+                    </Button>
+                    <Button
+                      onClick={() => setIsEditingDescription(false)}
+                      size="sm"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  className="ticket-detail__description-content"
+                  style={{ minHeight: '60px', padding: '8px 0', fontSize: '13.5px', color: 'var(--color-text-secondary)', lineHeight: '1.6' }}
+                  onDoubleClick={() => {
+                    setEditingDescriptionBody(activeTicket.description || createEmptyRichTextValue());
+                    setIsEditingDescription(true);
+                  }}
+                >
+                  {activeTicket.description && !isRichTextEmpty(activeTicket.description) ? (
+                    <MarkdownContent text={activeTicket.description} />
+                  ) : (
+                    <span style={{ fontStyle: 'italic', color: 'var(--color-text-disabled)' }}>No description provided. Click Edit or double-click here to add one.</span>
+                  )}
+                </div>
+              )}
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -786,7 +776,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                           padding: '10px 14px',
                           lineHeight: '1.5'
                         }}
-                        >
+                      >
                         {editingCommentId === comment.id ? (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
                             <CommentEditor
@@ -828,12 +818,12 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
               </div>
 
               <form onSubmit={handlePostComment} className="ticket-detail__comment-form">
-              <CommentEditor
-                placeholder="Post updates, links, or mention PRs..."
-                value={commentInput}
-                onChange={setCommentInput}
-                className="ticket-detail__comment-editor"
-              />
+                <CommentEditor
+                  placeholder="Post updates, links, or mention PRs..."
+                  value={commentInput}
+                  onChange={setCommentInput}
+                  className="ticket-detail__comment-editor"
+                />
                 <Button
                   type="submit"
                   variant="primary"
