@@ -10,7 +10,9 @@ type WorkspaceProjectPanelMockProps = {
   defaultProjectId: string | null;
   onSelectProject: (projectId: string) => void;
   onCreateProject: (project: { name: string; description: string; key: string }) => void | Promise<void>;
-  onCreateDomain: (domain: { projectId: string; name: string; color: string }) => void | Promise<void>;
+  onCreateLabel: (label: { projectId: string; name: string; color: string; description?: string; sortOrder?: number }) => void | Promise<void>;
+  onUpdateLabel: (labelId: string, updates: { name?: string; color?: string; description?: string; sortOrder?: number }) => void | Promise<void>;
+  onDeleteLabel: (labelId: string) => void | Promise<void>;
 };
 
 vi.mock('../../modules/workspaces', () => ({
@@ -27,7 +29,9 @@ vi.mock('../../modules/workspaces', () => ({
     defaultProjectId,
     onSelectProject,
     onCreateProject,
-    onCreateDomain,
+    onCreateLabel,
+    onUpdateLabel,
+    onDeleteLabel,
   }: WorkspaceProjectPanelMockProps) => (
     <div>
       <div>{`WorkspaceProjectPanel ${workspaceName} ${activeProjectId} ${defaultProjectId}`}</div>
@@ -48,9 +52,26 @@ vi.mock('../../modules/workspaces', () => ({
       </button>
       <button
         type="button"
-        onClick={() => onCreateDomain({ projectId: activeProjectId ?? 'project-1', name: 'Platform', color: '#3b82f6' })}
+        onClick={() =>
+          onCreateLabel({
+            projectId: activeProjectId ?? 'project-1',
+            name: 'Platform',
+            color: '#3b82f6',
+            description: 'Project execution',
+            sortOrder: 1,
+          })
+        }
       >
-        Create domain
+        Create label
+      </button>
+      <button
+        type="button"
+        onClick={() => onUpdateLabel('label-1', { name: 'Platform Ops', color: '#3b82f6', description: 'Updated label' })}
+      >
+        Update label
+      </button>
+      <button type="button" onClick={() => onDeleteLabel('label-1')}>
+        Delete label
       </button>
     </div>
   ),
@@ -73,14 +94,16 @@ function renderWorkspaceProjectsPage(overrides: Partial<Parameters<typeof Worksp
     projects,
     activeProjectId: 'project-1',
     defaultProjectId: 'project-1',
-    domains: [],
+    labels: [],
     projectCreateLoading: false,
     projectCreateError: null,
-    domainCreateLoading: false,
-    domainCreateError: null,
+    labelCreateLoading: false,
+    labelCreateError: null,
     onBackToWorkspace: vi.fn(),
     onCreateProject: vi.fn().mockResolvedValue(undefined),
-    onCreateDomain: vi.fn().mockResolvedValue(undefined),
+    onCreateLabel: vi.fn().mockResolvedValue(undefined),
+    onUpdateLabel: vi.fn().mockResolvedValue(undefined),
+    onDeleteLabel: vi.fn().mockResolvedValue(undefined),
     onSelectProject: vi.fn(),
   };
 
@@ -113,11 +136,23 @@ describe('WorkspaceProjectsPage', () => {
       key: 'ORB',
     });
 
-    await user.click(screen.getByRole('button', { name: 'Create domain' }));
-    expect(props.onCreateDomain).toHaveBeenCalledWith({
+    await user.click(screen.getByRole('button', { name: 'Create label' }));
+    expect(props.onCreateLabel).toHaveBeenCalledWith({
       projectId: 'project-1',
       name: 'Platform',
       color: '#3b82f6',
+      description: 'Project execution',
+      sortOrder: 1,
     });
+
+    await user.click(screen.getByRole('button', { name: 'Update label' }));
+    expect(props.onUpdateLabel).toHaveBeenCalledWith('label-1', {
+      name: 'Platform Ops',
+      color: '#3b82f6',
+      description: 'Updated label',
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Delete label' }));
+    expect(props.onDeleteLabel).toHaveBeenCalledWith('label-1');
   });
 });

@@ -38,13 +38,15 @@ export function AppShellPage() {
     updateComment,
     deleteComment,
     comments,
-    createDomain,
+    createLabel,
+    updateLabel,
+    deleteLabel,
     createProject,
     createTicket,
     currentUser,
     cycles,
     deleteTicket,
-    domains,
+    labels = [],
     fetchInitialData,
     filters,
     loading,
@@ -124,8 +126,8 @@ export function AppShellPage() {
   }, [activeView, setView]);
   const [projectCreateLoading, setProjectCreateLoading] = useState(false);
   const [projectCreateError, setProjectCreateError] = useState<string | null>(null);
-  const [domainCreateLoading, setDomainCreateLoading] = useState(false);
-  const [domainCreateError, setDomainCreateError] = useState<string | null>(null);
+  const [labelCreateLoading, setLabelCreateLoading] = useState(false);
+  const [labelCreateError, setLabelCreateError] = useState<string | null>(null);
 
   const {
     workspaces,
@@ -160,12 +162,12 @@ export function AppShellPage() {
     () => openTickets.filter((ticket) => ticket.assigneeId === currentUser?.id).length,
     [openTickets, currentUser]
   );
-  const domainCounts = useMemo(
+  const labelCounts = useMemo(
     () =>
       Object.fromEntries(
-        domains.map((domain) => [domain.id, openTickets.filter((ticket) => ticket.domainId === domain.id).length])
+        labels.map((label) => [label.id, openTickets.filter((ticket) => ticket.labelIds?.includes(label.id)).length])
       ),
-    [domains, openTickets]
+    [labels, openTickets]
   );
   const cycleCounts = useMemo(
     () =>
@@ -217,7 +219,7 @@ export function AppShellPage() {
   const navigate = useNavigate();
 
   // Track last-applied URL filter values to avoid calling setFilters in a loop
-  const lastSyncedFilterParams = useRef({ domainId: '', cycleId: '', assigneeId: '', status: '', priority: '', search: '' });
+  const lastSyncedFilterParams = useRef({ labels: [] as string[], labelMode: 'any' as 'all' | 'any', cycleId: '', assigneeId: '', status: '', priority: '', search: '' });
 
   // URL-driven section, workspace, project, ticket, and filter syncing
   useEffect(() => {
@@ -277,7 +279,9 @@ export function AppShellPage() {
     }
 
     // Sync filters from URL search params — only call setFilters when URL params changed
-    const urlDomainId = searchParams.get('domainId') ?? '';
+    const urlLabelsStr = searchParams.get('labels') ?? '';
+    const urlLabels = urlLabelsStr.split(',').filter(Boolean);
+    const urlLabelMode = (searchParams.get('labelMode') as 'all' | 'any') ?? 'any';
     const urlCycleId = searchParams.get('cycleId') ?? '';
     const urlAssigneeId = searchParams.get('assigneeId') ?? '';
     const urlStatus = searchParams.get('status') ?? '';
@@ -285,8 +289,10 @@ export function AppShellPage() {
     const urlSearch = searchParams.get('q') ?? '';
 
     const last = lastSyncedFilterParams.current;
+    const labelsChanged = JSON.stringify(last.labels) !== JSON.stringify(urlLabels);
     if (
-      last.domainId !== urlDomainId ||
+      labelsChanged ||
+      last.labelMode !== urlLabelMode ||
       last.cycleId !== urlCycleId ||
       last.assigneeId !== urlAssigneeId ||
       last.status !== urlStatus ||
@@ -294,7 +300,8 @@ export function AppShellPage() {
       last.search !== urlSearch
     ) {
       lastSyncedFilterParams.current = {
-        domainId: urlDomainId,
+        labels: urlLabels,
+        labelMode: urlLabelMode,
         cycleId: urlCycleId,
         assigneeId: urlAssigneeId,
         status: urlStatus,
@@ -302,7 +309,8 @@ export function AppShellPage() {
         search: urlSearch
       };
       setFilters({
-        domainId: urlDomainId,
+        labels: urlLabels,
+        labelMode: urlLabelMode,
         cycleId: urlCycleId,
         assigneeId: urlAssigneeId,
         status: urlStatus,
@@ -494,7 +502,7 @@ export function AppShellPage() {
 
   useEffect(() => {
     setProjectCreateError(null);
-    setDomainCreateError(null);
+    setLabelCreateError(null);
   }, [activeWorkspaceId, activeProjectId]);
 
   useEffect(() => {
@@ -536,7 +544,7 @@ export function AppShellPage() {
     status: Ticket['status'];
     priority: Ticket['priority'];
     projectId: string;
-    domainId: string | null;
+    labelIds?: string[];
     cycleId: string | null;
     assigneeId: string | null;
     parentId: string | null;
@@ -584,7 +592,7 @@ export function AppShellPage() {
 
   const handleSelectWorkspace = (workspaceId: string) => {
     setActiveTicket(null);
-    setFilters({ assigneeId: '', domainId: '', cycleId: '' });
+    setFilters({ assigneeId: '', labels: [], cycleId: '' });
     navigate(`/workspaces/${workspaceId}`);
   };
 
@@ -632,29 +640,45 @@ export function AppShellPage() {
     }
   };
 
-  const handleCreateDomain = async (domainInput: { name: string; color: string }) => {
+  const handleCreateLabel = async (labelInput: { name: string; color: string; description?: string; sortOrder?: number }) => {
     if (!activeProjectId) {
       return;
     }
 
-    setDomainCreateLoading(true);
-    setDomainCreateError(null);
+    setLabelCreateLoading(true);
+    setLabelCreateError(null);
 
     try {
-      const domain = await createDomain({
-        ...domainInput,
+      const label = await createLabel({
+        ...labelInput,
         projectId: activeProjectId,
       });
 
-      if (!domain) {
-        throw new Error('Failed to create domain for this project.');
+      if (!label) {
+        throw new Error('Failed to create label for this project.');
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to create domain for this project.';
-      setDomainCreateError(message);
+      const message = error instanceof Error ? error.message : 'Failed to create label for this project.';
+      setLabelCreateError(message);
       throw error;
     } finally {
-      setDomainCreateLoading(false);
+      setLabelCreateLoading(false);
+    }
+  };
+
+  const handleUpdateLabel = async (
+    labelId: string,
+    updates: { name?: string; color?: string; description?: string; sortOrder?: number }
+  ) => {
+    setLabelCreateError(null);
+    await updateLabel(labelId, updates);
+  };
+
+  const handleDeleteLabel = async (labelId: string) => {
+    setLabelCreateError(null);
+    const deleted = await deleteLabel(labelId);
+    if (!deleted) {
+      throw new Error('Failed to delete label.');
     }
   };
 
@@ -676,12 +700,10 @@ export function AppShellPage() {
     navigate(`/workspaces/${activeWorkspaceId}/projects/${pid}/tickets?cycleId=${cycleId}`);
   };
 
-  const handleSelectDomain = (domainId: string) => {
+  const handleSelectLabel = (labelId: string) => {
     const pid = activeProjectId;
     if (!pid) return;
-    // GRAV-113: navigating to the domain-filtered URL closes any open ticket detail
-    // because the ticketKey disappears from the URL and the sync effect clears activeTicket.
-    navigate(`/workspaces/${activeWorkspaceId}/projects/${pid}/tickets?domainId=${domainId}`);
+    navigate(`/workspaces/${activeWorkspaceId}/projects/${pid}/tickets?labels=${labelId}`);
   };
 
   const handleShowNotes = () => {
@@ -726,7 +748,8 @@ export function AppShellPage() {
     const nextParams = new URLSearchParams(searchParams);
     const merged = { ...filters, ...updates };
 
-    if (merged.domainId) nextParams.set('domainId', merged.domainId); else nextParams.delete('domainId');
+    if (merged.labels && merged.labels.length > 0) nextParams.set('labels', merged.labels.join(',')); else nextParams.delete('labels');
+    if (merged.labelMode && merged.labelMode !== 'any') nextParams.set('labelMode', merged.labelMode); else nextParams.delete('labelMode');
     if (merged.cycleId) nextParams.set('cycleId', merged.cycleId); else nextParams.delete('cycleId');
     if (merged.assigneeId) nextParams.set('assigneeId', merged.assigneeId); else nextParams.delete('assigneeId');
     if (merged.status) nextParams.set('status', merged.status); else nextParams.delete('status');
@@ -863,7 +886,7 @@ export function AppShellPage() {
     },
     projects: {
       projects: activeWorkspaceProjects,
-      domains,
+      labels,
       cycles,
       currentUser,
       activeProjectId,
@@ -871,7 +894,7 @@ export function AppShellPage() {
       counts: {
         myIssues: myIssuesCount,
         activeProjectIssues: openTickets.length,
-        domains: domainCounts,
+        labels: labelCounts,
         cycles: cycleCounts,
       },
       activeContext,
@@ -880,7 +903,7 @@ export function AppShellPage() {
       onShowMyIssues: handleShowMyIssues,
       onShowNotes: handleShowNotes,
       onSelectCycle: handleSelectCycle,
-      onSelectDomain: handleSelectDomain,
+      onSelectLabel: handleSelectLabel,
     },
     tools: {
       onOpenOllama: handleToggleOllama,
@@ -911,7 +934,7 @@ export function AppShellPage() {
       tickets={tickets}
       users={users}
       projects={activeWorkspaceProjects}
-      domains={domains}
+      labels={labels}
       cycles={cycles}
       onSelectTicket={(ticket) => {
         if (ticket) {
@@ -987,14 +1010,16 @@ export function AppShellPage() {
               projects={activeWorkspaceProjects}
               activeProjectId={activeProjectId}
               defaultProjectId={activeWorkspace.defaultProjectId}
-              domains={domains}
+              labels={labels}
               projectCreateLoading={projectCreateLoading}
               projectCreateError={projectCreateError}
-              domainCreateLoading={domainCreateLoading}
-              domainCreateError={domainCreateError}
+              labelCreateLoading={labelCreateLoading}
+              labelCreateError={labelCreateError}
               onBackToWorkspace={() => navigate(`/workspaces/${activeWorkspaceId}`)}
               onCreateProject={handleCreateProject}
-              onCreateDomain={handleCreateDomain}
+              onCreateLabel={handleCreateLabel}
+              onUpdateLabel={handleUpdateLabel}
+              onDeleteLabel={handleDeleteLabel}
               onSelectProject={handleSelectProjectForManagement}
             />
           ) : ticketKey ? (
@@ -1009,7 +1034,7 @@ export function AppShellPage() {
               activeView={activeView}
               currentUser={currentUser}
               cycles={cycles}
-              domains={domains}
+              labels={labels}
               filters={filters}
               listSort={listSort}
               projects={activeWorkspaceProjects}
@@ -1041,7 +1066,7 @@ export function AppShellPage() {
         <CreateTicketModal
           onClose={() => setIsCreateModalOpen(false)}
           projects={activeWorkspaceProjects}
-          domains={domains}
+          labels={labels}
           cycles={cycles}
           users={users}
           parentTicket={parentTicket}

@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ChangeEvent, ReactNode } from 'react';
+import type { ButtonHTMLAttributes, ChangeEvent, ReactNode, TextareaHTMLAttributes } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -22,12 +22,27 @@ type MockTextInputProps = {
   required?: boolean;
 };
 
+type MockTextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
+  label: string;
+  value: string;
+  onChange: (event: ChangeEvent<HTMLTextAreaElement>) => void;
+  placeholder?: string;
+  disabled?: boolean;
+  rows?: number;
+};
+
 vi.mock('@library', () => ({
   Button: ({ children, loading, ...props }: MockButtonProps) => <button {...props}>{loading ? 'Loading' : children}</button>,
   TextInput: ({ label, value, onChange, ...props }: MockTextInputProps) => (
     <label>
       <span>{label}</span>
       <input value={value} onChange={onChange} {...props} />
+    </label>
+  ),
+  Textarea: ({ label, value, onChange, ...props }: MockTextareaProps) => (
+    <label>
+      <span>{label}</span>
+      <textarea value={value} onChange={onChange} {...props} />
     </label>
   ),
 }));
@@ -93,21 +108,25 @@ function renderWorkspaceProjectPanel(
     projects,
     activeProjectId: 'project-1',
     defaultProjectId: 'project-1',
-    domains: [
+    labels: [
       {
         id: 'domain-1',
         projectId: 'project-1',
         name: 'Platform',
         color: '#10b981',
+        description: '',
+        sortOrder: 0,
       },
     ],
     projectCreateLoading: false,
     projectCreateError: null,
-    domainCreateLoading: false,
-    domainCreateError: null,
+    labelCreateLoading: false,
+    labelCreateError: null,
     onSelectProject: vi.fn(),
     onCreateProject: vi.fn().mockResolvedValue(undefined),
-    onCreateDomain: vi.fn().mockResolvedValue(undefined),
+    onCreateLabel: vi.fn().mockResolvedValue(undefined),
+    onUpdateLabel: vi.fn().mockResolvedValue(undefined),
+    onDeleteLabel: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
 
@@ -119,6 +138,7 @@ function renderWorkspaceProjectPanel(
 
 describe('WorkspaceProjectPanel', () => {
   beforeEach(() => {
+    vi.restoreAllMocks();
     vi.clearAllMocks();
   });
 
@@ -162,17 +182,19 @@ describe('WorkspaceProjectPanel', () => {
     });
   });
 
-  it('selects a managed project and creates a domain for that project', async () => {
+  it('selects a managed project and creates a label with description and sort order', async () => {
     const user = userEvent.setup();
-    const orbitDomains = [
+    const orbitLabels = [
       {
         id: 'domain-2',
         projectId: 'project-2',
         name: 'Partner Ops',
         color: '#f97316',
+        description: '',
+        sortOrder: 0,
       },
     ];
-    const { props, rerender, container } = renderWorkspaceProjectPanel();
+    const { props, rerender } = renderWorkspaceProjectPanel();
 
     await waitFor(() => {
       expect(screen.getByText('ProjectSelectionRail project-1')).toBeInTheDocument();
@@ -187,39 +209,122 @@ describe('WorkspaceProjectPanel', () => {
         projects={projects}
         activeProjectId="project-2"
         defaultProjectId="project-1"
-        domains={orbitDomains}
+        labels={orbitLabels}
         projectCreateLoading={false}
         projectCreateError={null}
-        domainCreateLoading={false}
-        domainCreateError={null}
+        labelCreateLoading={false}
+        labelCreateError={null}
         onSelectProject={props.onSelectProject}
         onCreateProject={props.onCreateProject}
-        onCreateDomain={props.onCreateDomain}
+        onCreateLabel={props.onCreateLabel}
+        onUpdateLabel={props.onUpdateLabel}
+        onDeleteLabel={props.onDeleteLabel}
       />
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Orbit Delivery domains')).toBeInTheDocument();
+      expect(screen.getByText('Orbit Delivery labels')).toBeInTheDocument();
     });
 
-    await user.clear(screen.getByLabelText('Domain Name'));
-    await user.type(screen.getByLabelText('Domain Name'), '  Payments  ');
-    const colorInput = container.querySelector('input[type="color"]');
-    expect(colorInput).not.toBeNull();
-    fireEvent.change(colorInput as HTMLInputElement, { target: { value: '#ff0000' } });
-    await user.click(screen.getByRole('button', { name: 'Create Domain' }));
+    await user.clear(screen.getByLabelText('Label Name'));
+    await user.type(screen.getByLabelText('Label Name'), '  Payments  ');
+    await user.clear(screen.getByLabelText('Description'));
+    await user.type(screen.getByLabelText('Description'), '  Handles billing and collection flows.  ');
+
+    const colorInputs = screen.getAllByDisplayValue('#3b82f6');
+    expect(colorInputs.length).toBeGreaterThan(0);
+    fireEvent.change(colorInputs[0] as HTMLInputElement, { target: { value: '#ff0000' } });
+
+    await user.click(screen.getByRole('button', { name: 'Create Label' }));
 
     await waitFor(() => {
-      expect(props.onCreateDomain).toHaveBeenCalledWith({
+      expect(props.onCreateLabel).toHaveBeenCalledWith({
         projectId: 'project-2',
         name: 'Payments',
         color: '#ff0000',
+        description: 'Handles billing and collection flows.',
+        sortOrder: 1,
       });
     });
 
     await waitFor(() => {
-      expect(screen.getByLabelText('Domain Name')).toHaveValue('');
-      expect(colorInput).toHaveValue('#3b82f6');
+      expect(screen.getByLabelText('Label Name')).toHaveValue('');
+      expect(screen.getByLabelText('Description')).toHaveValue('');
+    });
+  });
+
+  it('opens a label editor, saves updates, and deletes the label', async () => {
+    const user = userEvent.setup();
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const orbitLabels = [
+      {
+        id: 'domain-2',
+        projectId: 'project-2',
+        name: 'Partner Ops',
+        color: '#f97316',
+        description: 'Ops work',
+        sortOrder: 0,
+      },
+    ];
+    const { props, rerender } = renderWorkspaceProjectPanel({ activeProjectId: 'project-2', labels: orbitLabels });
+
+    await waitFor(() => {
+      expect(screen.getByText('Orbit Delivery labels')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Partner Ops' }));
+
+    expect(screen.getByRole('heading', { name: 'Partner Ops' })).toBeInTheDocument();
+
+    const [editorNameInput] = screen.getAllByLabelText('Label Name');
+    const [editorDescriptionInput] = screen.getAllByLabelText('Description');
+    const colorInputs = screen.getAllByDisplayValue('#f97316');
+
+    await user.clear(editorNameInput);
+    await user.type(editorNameInput, 'Partner Success');
+    await user.clear(editorDescriptionInput);
+    await user.type(editorDescriptionInput, 'Updated ops label');
+    fireEvent.change(colorInputs[0] as HTMLInputElement, { target: { value: '#2563eb' } });
+
+    await user.click(screen.getByRole('button', { name: 'Save Label' }));
+
+    await waitFor(() => {
+      expect(props.onUpdateLabel).toHaveBeenCalledWith('domain-2', {
+        name: 'Partner Success',
+        color: '#2563eb',
+        description: 'Updated ops label',
+      });
+    });
+
+    rerender(
+      <WorkspaceProjectPanel
+        workspaceName="Gravity"
+        projects={projects}
+        activeProjectId="project-2"
+        defaultProjectId="project-1"
+        labels={orbitLabels}
+        projectCreateLoading={false}
+        projectCreateError={null}
+        labelCreateLoading={false}
+        labelCreateError={null}
+        onSelectProject={props.onSelectProject}
+        onCreateProject={props.onCreateProject}
+        onCreateLabel={props.onCreateLabel}
+        onUpdateLabel={props.onUpdateLabel}
+        onDeleteLabel={props.onDeleteLabel}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Partner Ops' }));
+    await user.click(screen.getByRole('button', { name: 'Delete Label' }));
+
+    await waitFor(() => {
+      expect(props.onDeleteLabel).toHaveBeenCalledWith('domain-2');
+      expect(confirmSpy).toHaveBeenCalled();
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: 'Delete Label' })).not.toBeInTheDocument();
     });
   });
 });
