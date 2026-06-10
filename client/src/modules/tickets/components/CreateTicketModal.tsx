@@ -4,6 +4,8 @@ import { Button, Select, Modal, Alert, Textarea, Popover } from '@library';
 import { AlertCircle } from 'lucide-react';
 import type { CreateTicketModalProps } from '../types/CreateTicketModal';
 import { PRIORITY_OPTIONS, STATUS_OPTIONS } from '../utils/CreateTicketModal';
+import { useTickets } from '../../../context/TicketContext';
+import { LabelManagerPopoverContent } from './LabelManagerPopoverContent';
 import './CreateTicketModal.css';
 
 export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
@@ -31,6 +33,8 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
     () => labels.filter((label) => label.projectId === projectId),
     [labels, projectId],
   );
+
+  const { createLabel } = useTickets();
 
   // `projectId` is initialized from props via useState above. The modal
   // component is mounted/unmounted when opened, so remounting will reset
@@ -207,6 +211,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
               <span className="label">Labels</span>
               <Popover
                 align="right"
+                style={{ display: 'block' }}
                 contentClassName="create-ticket-modal__labels-popover"
                 trigger={
                   <button
@@ -221,50 +226,24 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
                   </button>
                 }
               >
-                <div className="create-ticket-modal__labels-panel">
-                  <div className="create-ticket-modal__labels-panel-heading">
-                    Select Labels
-                  </div>
-
-                  <div className="create-ticket-modal__labels-list">
-                    {projectLabels.length > 0 ? (
-                      projectLabels.map((label) => {
-                        const isChecked = labelIds.includes(label.id);
-                        return (
-                          <label
-                            key={label.id}
-                            className="clickable create-ticket-modal__label-option"
-                            data-selected={isChecked ? 'true' : undefined}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={() => {
-                                if (isChecked) {
-                                  setLabelIds(labelIds.filter((id) => id !== label.id));
-                                } else {
-                                  setLabelIds([...labelIds, label.id]);
-                                }
-                              }}
-                            />
-                            <span
-                              className="create-ticket-modal__label-swatch"
-                              style={{ background: label.color }}
-                              aria-hidden="true"
-                            />
-                            <span className="create-ticket-modal__label-name">
-                              {label.name}
-                            </span>
-                          </label>
-                        );
-                      })
-                    ) : (
-                      <div className="create-ticket-modal__labels-empty">
-                        No labels in this project
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <LabelManagerPopoverContent
+                  projectId={projectId}
+                  assignedLabelIds={new Set(labelIds)}
+                  allLabels={labels}
+                  onAssign={(id) => { setLabelIds((prev) => [...prev, id]); }}
+                  onUnassign={(id) => { setLabelIds((prev) => prev.filter(lId => lId !== id)); }}
+                  onCreate={async (name, color) => {
+                     const newLabel = await createLabel({
+                       name,
+                       color,
+                       projectId: projectId,
+                       description: '',
+                     });
+                     if (newLabel) {
+                       setLabelIds((prev) => [...prev, newLabel.id]);
+                     }
+                  }}
+                />
               </Popover>
             </div>
 

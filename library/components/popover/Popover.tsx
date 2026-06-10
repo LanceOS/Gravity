@@ -120,20 +120,19 @@ export function Popover({ trigger, children, isOpen: controlledIsOpen, onOpenCha
 
   return (
     <ClickAwayListener onClickAway={() => setOpen(false)}>
-      <div style={{ position: 'relative', display: 'inline-block', ...style }} ref={triggerRef}>
-        <div
-          onClick={() => setOpen(!isCurrentlyOpen)}
-          className="clickable"
-          style={{ display: 'contents' }}
-        >
-          {trigger}
-        </div>
+      <div 
+        style={{ position: 'relative', display: 'inline-block', ...style }} 
+        ref={triggerRef}
+        onClick={() => setOpen(!isCurrentlyOpen)}
+      >
+        {trigger}
         {shouldRender && (
           <Portal>
             <div
               ref={popoverRef}
               role="dialog"
               onAnimationEnd={handleAnimationEnd}
+              onClick={(e) => e.stopPropagation()}
               className={`popover-content popover-content--align-${align} ${isAnimatingOut ? 'lib-animate-fade-out-up' : 'lib-animate-fade-in-down'} ${contentClassName}`}
               style={{ zIndex: 1700 }}
             >
