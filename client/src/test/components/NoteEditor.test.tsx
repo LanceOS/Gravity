@@ -86,7 +86,7 @@ describe('NoteEditor', () => {
     expect(titleInput).toBeInTheDocument();
     expect(titleInput.value).toBe('Test Title');
     expect(screen.getByTestId('rich-text-editor')).toHaveValue('Test body');
-    expect(screen.getByTestId('rich-text-editor')).toHaveAttribute('data-toolbar-mode', 'full');
+    expect(screen.getByTestId('rich-text-editor')).toHaveAttribute('data-toolbar-mode', 'bubble');
   });
 
   it('normalizes the legacy empty heading body on load', () => {

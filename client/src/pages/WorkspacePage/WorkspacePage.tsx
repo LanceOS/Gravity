@@ -6,6 +6,7 @@ import { TicketBoard, TicketList, TicketFilterBar } from '../../modules/tickets'
 import { NotesList, NoteEditor } from '../../modules/notes';
 import {
   filterTickets,
+  getWorkspaceHeaderTitle,
   groupTicketsByStatus,
   hasActiveTicketFilters,
   sortTicketsForList,
@@ -71,6 +72,10 @@ export function WorkspacePage({
   const labels = labelItems ?? domainItems ?? [];
   const filteredTickets = useMemo(() => filterTickets(tickets, filters), [tickets, filters]);
   const hasFiltersApplied = useMemo(() => hasActiveTicketFilters(filters), [filters]);
+  const headerTitle = useMemo(
+    () => getWorkspaceHeaderTitle(filters, currentUser, projects, labels, cycles),
+    [filters, currentUser, projects, labels, cycles]
+  );
   const userAvatarById = useMemo(
     () => Object.fromEntries(users.map((user) => [user.id, user.avatar])),
     [users]
@@ -130,7 +135,7 @@ export function WorkspacePage({
   if (activeContext === 'notes') {
     displayTitle = isNoteEditor ? (activeNoteTitle ? `Notes - ${activeNoteTitle}` : 'Notes') : 'Notes';
   } else {
-    displayTitle = isTicketEditor ? `Tickets - ${activeTicket.key}` : 'Tickets';
+    displayTitle = isTicketEditor ? `Tickets - ${activeTicket.key}` : headerTitle;
   }
 
   return (

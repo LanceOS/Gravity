@@ -45,6 +45,7 @@ export function NoteEditor({ projectId, noteId, onTitleChange }: NoteEditorProps
       clearTimeout(saveTimeoutRef.current);
     }
     saveTimeoutRef.current = setTimeout(() => {
+      saveTimeoutRef.current = null;
       triggerSave();
     }, 1500);
   }, []);
@@ -97,6 +98,7 @@ export function NoteEditor({ projectId, noteId, onTitleChange }: NoteEditorProps
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = setTimeout(() => {
+        saveTimeoutRef.current = null;
         triggerSave();
       }, 1500);
     }

@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { CheckSquare, Square } from 'lucide-react';
+import { isSafeHref } from '../../utilities/sanitizeHtml';
 
 export interface FormattedMarkdownProps {
   text: string;
@@ -7,30 +8,6 @@ export interface FormattedMarkdownProps {
   renderCustomToken?: (match: RegExpMatchArray, key: number) => React.ReactNode | null;
 }
 
-function isSafeUrl(url: string) {
-  const trimmedUrl = url.trim();
-
-  if (!trimmedUrl) {
-    return false;
-  }
-
-  if (trimmedUrl.startsWith('#') || trimmedUrl.startsWith('/') || trimmedUrl.startsWith('?')) {
-    return true;
-  }
-
-  try {
-    const parsedUrl = new URL(trimmedUrl, 'https://gravity.invalid');
-    const hasExplicitProtocol = /^[a-zA-Z][a-zA-Z\d+.-]*:/.test(trimmedUrl);
-
-    if (!hasExplicitProtocol) {
-      return true;
-    }
-
-    return ['http:', 'https:', 'mailto:', 'tel:'].includes(parsedUrl.protocol);
-  } catch {
-    return false;
-  }
-}
 
 function InlineFormattedText({ text, customTokenRegex, renderCustomToken }: FormattedMarkdownProps) {
   const parts: React.ReactNode[] = [];
@@ -77,7 +54,7 @@ function InlineFormattedText({ text, customTokenRegex, renderCustomToken }: Form
         </code>,
       );
     } else if (match[3] && match[4]) {
-      const safeHref = isSafeUrl(match[4]) ? match[4] : 'about:blank';
+      const safeHref = isSafeHref(match[4]) ? match[4] : 'about:blank';
       parts.push(
         <a
           key={keyIndex++}

@@ -9,5 +9,6 @@ export function sanitizeHtml(html: string): string {
 }
 
 export function isSafeHref(href: string): boolean {
-  return DOMPurify.isValidAttribute('a', 'href', href);
+  const normalized = href.replace(/[\s\t\r\n]/g, '');
+  return DOMPurify.isValidAttribute('a', 'href', normalized);
 }

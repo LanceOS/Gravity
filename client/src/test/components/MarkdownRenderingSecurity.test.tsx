@@ -38,4 +38,10 @@ describe('markdown link sanitization', () => {
 
     expect(screen.getByRole('link', { name: 'Click Me' })).toHaveAttribute('href', 'about:blank');
   });
+
+  it('blocks javascript links with tabs in AI markdown', () => {
+    render(<FormattedMarkdown text={"[Click Me](java\tscript:alert(1))"} />);
+
+    expect(screen.getByRole('link', { name: 'Click Me' })).toHaveAttribute('href', 'about:blank');
+  });
 });
