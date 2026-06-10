@@ -21,6 +21,18 @@ vi.mock('../src/lib/rustfs.js', () => {
         const key = `${bucketPath}/${filename}`;
         memfs.set(key, Buffer.isBuffer(content) ? content : Buffer.from(content));
       },
+      saveFileStream: async (bucketPath: string, filename: string, stream: NodeJS.ReadableStream) => {
+        const chunks: any[] = [];
+        for await (const chunk of stream) {
+          chunks.push(chunk);
+        }
+        const content = Buffer.concat(chunks);
+        if (content.length > 10 * 1024 * 1024) {
+          throw new Error('LIMIT_EXCEEDED');
+        }
+        const key = `${bucketPath}/${filename}`;
+        memfs.set(key, content);
+      },
       readFile: async (bucketPath: string, filename: string) => {
         const key = `${bucketPath}/${filename}`;
         const buf = memfs.get(key);
@@ -30,6 +42,17 @@ vi.mock('../src/lib/rustfs.js', () => {
           throw err;
         }
         return buf;
+      },
+      streamFile: async (bucketPath: string, filename: string) => {
+        const key = `${bucketPath}/${filename}`;
+        const buf = memfs.get(key);
+        if (!buf) {
+          const err: any = new Error(`ENOENT: no such file or directory, open '${key}'`);
+          err.code = 'ENOENT';
+          throw err;
+        }
+        const { Readable } = await import('node:stream');
+        return Readable.from(buf);
       },
       readFileUtf8: async (bucketPath: string, filename: string) => {
         const key = `${bucketPath}/${filename}`;

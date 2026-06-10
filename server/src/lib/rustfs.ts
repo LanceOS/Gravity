@@ -7,6 +7,23 @@ import {
   CreateBucketCommand,
 } from '@aws-sdk/client-s3';
 import { env } from '../env.js';
+import { Transform } from 'node:stream';
+
+class SizeLimitStream extends Transform {
+  private bytesRead = 0;
+  constructor(private limit: number) {
+    super();
+  }
+  _transform(chunk: any, encoding: string, callback: any) {
+    this.bytesRead += chunk.length;
+    if (this.bytesRead > this.limit) {
+      callback(new Error('LIMIT_EXCEEDED'));
+    } else {
+      this.push(chunk);
+      callback();
+    }
+  }
+}
 
 const s3Client = new S3Client({
   endpoint: env.rustfsEndpoint,
@@ -51,6 +68,39 @@ export class RustFS {
   }
 
   /**
+   * Saves a stream to the specified bucket path with size limiting.
+   */
+  static async saveFileStream(
+    bucketPath: string,
+    filename: string,
+    stream: NodeJS.ReadableStream,
+    contentLength?: number
+  ): Promise<void> {
+    const key = `${bucketPath}/${filename}`;
+    const limitStream = new SizeLimitStream(10 * 1024 * 1024);
+    stream.pipe(limitStream);
+
+    const command = new PutObjectCommand({
+      Bucket: env.rustfsBucket,
+      Key: key,
+      Body: limitStream,
+      ContentLength: contentLength,
+    });
+
+    try {
+      await s3Client.send(command);
+    } catch (err: any) {
+      if (err.name === 'NoSuchBucket') {
+        const createBucket = new CreateBucketCommand({ Bucket: env.rustfsBucket });
+        await s3Client.send(createBucket);
+        await s3Client.send(command);
+      } else {
+        throw err;
+      }
+    }
+  }
+
+  /**
    * Retrieves a file from the specified bucket path.
    */
   static async readFile(bucketPath: string, filename: string): Promise<Buffer> {
@@ -66,6 +116,31 @@ export class RustFS {
       }
       const arrayBuffer = await response.Body.transformToByteArray();
       return Buffer.from(arrayBuffer);
+    } catch (err: any) {
+      if (err.name === 'NoSuchKey' || err.name === 'NotFound') {
+        const error = new Error(`ENOENT: no such file or directory, open '${key}'`);
+        (error as any).code = 'ENOENT';
+        throw error;
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * Retrieves a file from the specified bucket path as a stream.
+   */
+  static async streamFile(bucketPath: string, filename: string): Promise<NodeJS.ReadableStream> {
+    const key = `${bucketPath}/${filename}`;
+    const command = new GetObjectCommand({
+      Bucket: env.rustfsBucket,
+      Key: key,
+    });
+    try {
+      const response = await s3Client.send(command);
+      if (!response.Body) {
+        throw new Error(`File ${key} not found or empty`);
+      }
+      return response.Body as NodeJS.ReadableStream;
     } catch (err: any) {
       if (err.name === 'NoSuchKey' || err.name === 'NotFound') {
         const error = new Error(`ENOENT: no such file or directory, open '${key}'`);

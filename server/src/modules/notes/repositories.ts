@@ -216,10 +216,32 @@ export class NotesRepository {
   }
 
   /**
+   * Saves an attached stream to the note's bucket.
+   */
+  static async saveAttachmentStream(
+    bucketPath: string,
+    filename: string,
+    stream: NodeJS.ReadableStream,
+    contentLength?: number
+  ): Promise<void> {
+    if (filename === 'body.md') {
+      throw new Error('Filename cannot be body.md');
+    }
+    await RustFS.saveFileStream(bucketPath, filename, stream, contentLength);
+  }
+
+  /**
    * Retrieves an attached file from the note's bucket.
    */
   static async getAttachment(bucketPath: string, filename: string): Promise<Buffer> {
     return await RustFS.readFile(bucketPath, filename);
+  }
+
+  /**
+   * Retrieves an attached file from the note's bucket as a stream.
+   */
+  static async getAttachmentStream(bucketPath: string, filename: string): Promise<NodeJS.ReadableStream> {
+    return await RustFS.streamFile(bucketPath, filename);
   }
 
   /**
