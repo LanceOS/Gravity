@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { db } from '../src/db/index.js';
-import { teams, projects, cycles, domains } from '../src/db/schema.js';
+import { teams, projects, cycles, domains, workspaceMembers } from '../src/db/schema.js';
 import { eq } from 'drizzle-orm';
 import { createAuthenticatedApi, seedWorkspaceFixture, seedTicket } from './helpers/test-helpers.js';
 
@@ -226,5 +226,68 @@ describe('teams integration tests', () => {
     expect(domainsRes.status).toBe(200);
     expect(domainsRes.body).toHaveLength(1);
     expect(domainsRes.body[0].name).toBe('Team Label 1');
+  });
+
+  it('requires workspace ownership to mutate teams', async () => {
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Team Mutation Owner',
+      email: 'team-mutation-owner@example.com',
+      role: 'owner',
+    });
+    const memberApi = await createAuthenticatedApi({
+      name: 'Team Mutation Member',
+      email: 'team-mutation-member@example.com',
+      role: 'member',
+    });
+
+    const owner = ownerApi.user;
+    const member = memberApi.user;
+    const { workspace } = await seedWorkspaceFixture({
+      owner: {
+        id: owner.id,
+        name: owner.name,
+        email: owner.email,
+        role: 'owner',
+        avatarUrl: owner.avatar,
+      },
+    });
+
+    await db.insert(workspaceMembers).values({
+      workspaceId: workspace.id,
+      userId: member.id,
+      role: 'member',
+      provisionedByValidationId: null,
+      createdAt: new Date(),
+    });
+
+    const ownerCreateRes = await ownerApi.post('/api/v1/teams').send({
+      workspaceId: workspace.id,
+      name: 'Owner Created Team',
+    });
+    expect(ownerCreateRes.status).toBe(201);
+    const teamId = ownerCreateRes.body.id;
+
+    const memberListRes = await memberApi.get('/api/v1/teams').query({ workspaceId: workspace.id });
+    expect(memberListRes.status).toBe(200);
+
+    const memberGetRes = await memberApi.get(`/api/v1/teams/${teamId}`);
+    expect(memberGetRes.status).toBe(200);
+
+    const memberCreateRes = await memberApi.post('/api/v1/teams').send({
+      workspaceId: workspace.id,
+      name: 'Member Created Team',
+    });
+    expect(memberCreateRes.status).toBe(403);
+    expect(memberCreateRes.body.error).toContain('Only workspace owners');
+
+    const memberPatchRes = await memberApi.patch(`/api/v1/teams/${teamId}`).send({
+      name: 'Member Renamed Team',
+    });
+    expect(memberPatchRes.status).toBe(403);
+    expect(memberPatchRes.body.error).toContain('Only workspace owners');
+
+    const memberDeleteRes = await memberApi.delete(`/api/v1/teams/${teamId}`);
+    expect(memberDeleteRes.status).toBe(403);
+    expect(memberDeleteRes.body.error).toContain('Only workspace owners');
   });
 });

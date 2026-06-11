@@ -6,7 +6,7 @@ export interface SidebarWorkspaceOption {
   name: string;
 }
 
-export type SidebarActiveArea = 'workspace' | 'settings' | 'account' | 'projects';
+export type SidebarActiveArea = 'workspace' | 'settings' | 'account' | 'projects' | 'teams';
 
 export interface SidebarWorkspaceSection {
   workspaces: SidebarWorkspaceOption[];
@@ -79,6 +79,7 @@ export interface SidebarUserMenuSection {
   activeArea?: SidebarActiveArea;
   showWorkspaceManagement?: boolean;
   workspaceManagementLabel?: string;
+  workspaceManagementArea?: SidebarActiveArea;
   onOpenWorkspaceDirectory: () => void;
   onOpenAccountPreferences: () => void;
   onOpenProjectManager: () => void;

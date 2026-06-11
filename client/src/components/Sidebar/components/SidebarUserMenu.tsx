@@ -20,6 +20,7 @@ export function SidebarUserMenu({
 }: SidebarUserMenuProps) {
   const showWorkspaceManagement = userMenu.showWorkspaceManagement ?? true;
   const workspaceManagementLabel = userMenu.workspaceManagementLabel ?? 'Manage Projects';
+  const workspaceManagementArea = userMenu.workspaceManagementArea ?? 'projects';
 
   return (
     <div
@@ -113,7 +114,7 @@ export function SidebarUserMenu({
               userMenu.onOpenProjectManager();
             }}
             className="clickable"
-            style={dropdownItemStyle(userMenu.activeArea, 'projects')}
+            style={dropdownItemStyle(userMenu.activeArea, workspaceManagementArea)}
           >
             <FolderTree size={14} color="var(--color-primary)" />
             <span>{workspaceManagementLabel}</span>

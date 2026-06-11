@@ -1,0 +1,328 @@
+.workspace-teams-page__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.workspace-teams-page__content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 28px 32px;
+}
+
+.workspace-teams-page__hero,
+.workspace-teams-page__create-card,
+.workspace-teams-page__team-card,
+.workspace-teams-page__feedback,
+.workspace-teams-page__empty {
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.workspace-teams-page__hero {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 22px 24px;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(circle at top left, rgba(59, 130, 246, 0.16), transparent 34%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0)),
+    var(--color-surface-card);
+  box-shadow: var(--shadow-sm);
+}
+
+.workspace-teams-page__eyebrow,
+.workspace-teams-page__section-kicker {
+  margin-bottom: 6px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+}
+
+.workspace-teams-page__hero h2,
+.workspace-teams-page__create-card h3,
+.workspace-teams-page__team-card h3 {
+  margin: 0;
+  color: var(--color-text-primary);
+  letter-spacing: -0.02em;
+}
+
+.workspace-teams-page__hero h2 {
+  font-size: 24px;
+  font-weight: 850;
+}
+
+.workspace-teams-page__hero p,
+.workspace-teams-page__create-card p,
+.workspace-teams-page__team-description {
+  margin: 8px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.workspace-teams-page__hero-stat {
+  min-width: 130px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 4px;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--color-primary);
+}
+
+.workspace-teams-page__hero-stat span {
+  font-size: 28px;
+  font-weight: 850;
+  color: var(--color-text-primary);
+}
+
+.workspace-teams-page__hero-stat small {
+  color: var(--color-text-disabled);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.workspace-teams-page__feedback {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+
+.workspace-teams-page__feedback--success {
+  border: 1px solid rgba(16, 185, 129, 0.22);
+  background: rgba(16, 185, 129, 0.08);
+  color: #34d399;
+}
+
+.workspace-teams-page__feedback--error {
+  border: 1px solid rgba(239, 68, 68, 0.22);
+  background: rgba(239, 68, 68, 0.08);
+  color: #f87171;
+}
+
+.workspace-teams-page__create-card {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.75fr) minmax(360px, 1.25fr);
+  gap: 20px;
+  margin-top: 18px;
+  padding: 18px;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-card);
+}
+
+.workspace-teams-page__form-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
+  gap: 12px;
+  align-items: end;
+}
+
+.workspace-teams-page__form-grid label,
+.workspace-teams-page__danger-zone label {
+  display: grid;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+}
+
+.workspace-teams-page input,
+.workspace-teams-page textarea,
+.workspace-teams-page select {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-app);
+  color: var(--color-text-primary);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.workspace-teams-page input,
+.workspace-teams-page select {
+  min-height: 36px;
+  padding: 0 10px;
+}
+
+.workspace-teams-page textarea {
+  min-height: 72px;
+  padding: 10px;
+  resize: vertical;
+}
+
+.workspace-teams-page input:focus,
+.workspace-teams-page textarea:focus,
+.workspace-teams-page select:focus {
+  border-color: var(--color-border-focus);
+  box-shadow: 0 0 0 2px var(--color-state-focus-ring);
+}
+
+.workspace-teams-page__color-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.workspace-teams-page__color-swatch {
+  width: 24px;
+  height: 24px;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.workspace-teams-page__color-swatch--active {
+  border-color: var(--color-text-primary);
+  box-shadow: 0 0 0 2px var(--color-border-focus);
+}
+
+.workspace-teams-page__team-grid {
+  max-width: 1180px;
+  margin: 18px auto 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.workspace-teams-page__team-card {
+  margin: 0;
+  padding: 18px;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-card);
+  box-shadow: var(--shadow-sm);
+}
+
+.workspace-teams-page__team-card-header,
+.workspace-teams-page__team-title-row,
+.workspace-teams-page__team-actions,
+.workspace-teams-page__metrics,
+.workspace-teams-page__danger-zone {
+  display: flex;
+  align-items: center;
+}
+
+.workspace-teams-page__team-card-header {
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.workspace-teams-page__team-title-row {
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.workspace-teams-page__team-title-row h3 {
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.workspace-teams-page__team-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.06);
+}
+
+.workspace-teams-page__team-actions {
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.workspace-teams-page__metrics {
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+.workspace-teams-page__metrics span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-full);
+  color: var(--color-text-secondary);
+  font-size: 11px;
+}
+
+.workspace-teams-page__project-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.workspace-teams-page__project-pill {
+  padding: 5px 8px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--color-text-primary);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.workspace-teams-page__muted {
+  color: var(--color-text-disabled);
+  font-size: 12px;
+}
+
+.workspace-teams-page__danger-zone {
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border-default);
+}
+
+.workspace-teams-page__danger-zone label {
+  flex: 1;
+}
+
+.workspace-teams-page__empty {
+  grid-column: 1 / -1;
+  display: grid;
+  place-items: center;
+  min-height: 180px;
+  border: 1px dashed var(--color-border-default);
+  border-radius: var(--radius-lg);
+  color: var(--color-text-disabled);
+  font-size: 13px;
+}
+
+@media (max-width: 980px) {
+  .workspace-teams-page__content {
+    padding: 16px;
+  }
+
+  .workspace-teams-page__hero,
+  .workspace-teams-page__create-card {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+
+  .workspace-teams-page__form-grid,
+  .workspace-teams-page__team-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-teams-page__danger-zone {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

@@ -58,6 +58,14 @@ export const router = createBrowserRouter([
     ),
   },
   {
+    path: '/workspaces/:workspaceId/teams',
+    element: (
+      <ProtectedRoute>
+        <AppShellPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
     path: '/account',
     element: (
       <ProtectedRoute>

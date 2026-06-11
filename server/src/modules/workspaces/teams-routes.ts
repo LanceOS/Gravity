@@ -3,7 +3,12 @@ import { db } from '../../db/index.js';
 import { cycles, domains, projects, teams } from '../../db/schema.js';
 import { eq } from 'drizzle-orm';
 import { createId } from '../../lib/platform.js';
-import { authorizeWorkspaceAccess, authorizeTeamAccess } from './services/membership.js';
+import {
+  authorizeWorkspaceAccess,
+  authorizeWorkspaceOwnerAccess,
+  authorizeTeamAccess,
+  authorizeTeamOwnerAccess,
+} from './services/membership.js';
 
 export function createTeamsRouter() {
   const router = Router();
@@ -17,7 +22,7 @@ export function createTeamsRouter() {
     }
 
     try {
-      const auth = await authorizeWorkspaceAccess(req, workspaceId);
+      const auth = await authorizeWorkspaceOwnerAccess(req, workspaceId);
       if (!auth.allowed) {
         res.status(auth.status).json({ error: auth.error });
         return;
@@ -92,7 +97,7 @@ export function createTeamsRouter() {
     const { name, description, color } = req.body ?? {};
 
     try {
-      const auth = await authorizeTeamAccess(req, teamId);
+      const auth = await authorizeTeamOwnerAccess(req, teamId);
       if (!auth.allowed) {
         res.status(auth.status).json({ error: auth.error });
         return;
@@ -118,7 +123,7 @@ export function createTeamsRouter() {
     const reassignTeamId = typeof req.query.reassignTeamId === 'string' ? req.query.reassignTeamId : undefined;
 
     try {
-      const auth = await authorizeTeamAccess(req, teamId);
+      const auth = await authorizeTeamOwnerAccess(req, teamId);
       if (!auth.allowed) {
         res.status(auth.status).json({ error: auth.error });
         return;

@@ -20,6 +20,7 @@ type WorkspaceLayoutMockProps = {
       onOpenProjectManager: () => void;
       showWorkspaceManagement?: boolean;
       workspaceManagementLabel?: string;
+      workspaceManagementArea?: string;
     };
     projects?: {
       onSelectLabel?: (labelId: string) => void;
@@ -198,7 +199,9 @@ vi.mock('../../pages/WorkspaceProjectsPage/WorkspaceProjectsPage', () => ({
   WorkspaceProjectsPage: () => <div>WorkspaceProjectsPage</div>,
 }));
 
-
+vi.mock('../../pages/WorkspaceTeamsPage/WorkspaceTeamsPage', () => ({
+  WorkspaceTeamsPage: () => <div>WorkspaceTeamsPage</div>,
+}));
 
 vi.mock('../../pages/AccountPreferencesPage/AccountPreferencesPage', () => ({
   AccountPreferencesPage: () => <div>AccountPreferencesPage</div>,
@@ -399,6 +402,7 @@ function renderAppShell({
           <Route path="/workspaces/:workspaceId/projects/:projectId/notes" element={<AppShellPage />} />
           <Route path="/workspaces/:workspaceId/projects/:projectId/notes/:noteId" element={<AppShellPage />} />
           <Route path="/workspaces/:workspaceId/all" element={<AppShellPage />} />
+          <Route path="/workspaces/:workspaceId/teams" element={<AppShellPage />} />
           <Route path="/workspaces/:workspaceId/teams/:teamId/tasks" element={<AppShellPage />} />
           <Route path="/workspaces/:workspaceId/teams/:teamId/views/:viewId" element={<AppShellPage />} />
           <Route path="/workspaces/:workspaceId/teams/:teamId/cycles/:cycleId" element={<AppShellPage />} />
@@ -677,7 +681,9 @@ describe('AppShellPage', () => {
     thirdRender.unmount();
   });
 
-  it('shows Manage Teams instead of Manage Projects for team workspace owners', async () => {
+  it('routes Manage Teams to the dedicated team manager for team workspace owners', async () => {
+    const user = userEvent.setup();
+
     renderAppShell({
       directory: buildWorkspaceDirectory({
         workspaces: [
@@ -703,6 +709,13 @@ describe('AppShellPage', () => {
       const menuState = screen.getByTestId('workspace-management-menu-state');
       expect(menuState).toHaveTextContent('Manage Teams');
       expect(menuState).toHaveAttribute('data-visible', 'true');
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Open project manager' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('location-display').textContent).toBe('/workspaces/workspace-1/teams');
+      expect(screen.getByText('WorkspaceTeamsPage')).toBeInTheDocument();
     });
   });
 

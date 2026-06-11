@@ -23,11 +23,12 @@ import { LoadingPage } from '../LoadingPage/LoadingPage';
 import { WorkspaceDirectoryPage } from '../WorkspaceDirectoryPage/WorkspaceDirectoryPage';
 import { WorkspacePage, type WorkspaceIssueView } from '../WorkspacePage/WorkspacePage';
 import { WorkspaceProjectsPage } from '../WorkspaceProjectsPage/WorkspaceProjectsPage';
+import { WorkspaceTeamsPage } from '../WorkspaceTeamsPage/WorkspaceTeamsPage';
 import { TicketDetailRoute } from '../../modules/tickets/components/TicketDetailRoute';
 import { WorkspaceMcpModal } from '../../modules/workspaces/components/WorkspaceMcpModal';
 import './AppShellPage.css';
 
-type AppSection = 'directory' | 'workspace' | 'settings' | 'account' | 'projects';
+type AppSection = 'directory' | 'workspace' | 'settings' | 'account' | 'projects' | 'teams';
 
 function getActiveWorkspaceStorageKey(userId: string) {
   return `gravity_active_workspace:${userId}`;
@@ -334,6 +335,9 @@ export function AppShellPage() {
     const isProjectsManagementPath =
       pathname === `/workspaces/${workspaceId}/projects` ||
       pathname === `/workspaces/${workspaceId}/projects/`;
+    const isTeamsManagementPath =
+      pathname === `/workspaces/${workspaceId}/teams` ||
+      pathname === `/workspaces/${workspaceId}/teams/`;
     const isNotesPath = pathname.includes('/notes');
     const isTicketsPath = pathname.includes('/tickets');
 
@@ -346,6 +350,13 @@ export function AppShellPage() {
 
     if (isProjectsManagementPath) {
       setActiveSection('projects');
+      setActiveTicket(null);
+      setActiveNoteId('');
+      return;
+    }
+
+    if (isTeamsManagementPath) {
+      setActiveSection('teams');
       setActiveTicket(null);
       setActiveNoteId('');
       return;
@@ -859,6 +870,14 @@ export function AppShellPage() {
     navigate(`/workspaces/${activeWorkspaceId}/projects`);
   };
 
+  const handleOpenTeamManager = () => {
+    if (!activeWorkspace) {
+      navigate('/workspaces');
+      return;
+    }
+    navigate(`/workspaces/${activeWorkspaceId}/teams`);
+  };
+
   const handleSetFilters = useCallback((updates: Partial<typeof filters>) => {
     const nextParams = new URLSearchParams(searchParams);
     const merged = { ...filters, ...updates };
@@ -1098,12 +1117,13 @@ export function AppShellPage() {
     },
     userMenu: {
       currentUser,
-      activeArea: activeSection === 'projects' ? 'projects' : 'workspace',
+      activeArea: activeSection === 'projects' || activeSection === 'teams' ? activeSection : 'workspace',
       showWorkspaceManagement: !isTeamWorkspace || isWorkspaceOwner,
       workspaceManagementLabel: isTeamWorkspace ? 'Manage Teams' : 'Manage Projects',
+      workspaceManagementArea: isTeamWorkspace ? 'teams' : 'projects',
       onOpenWorkspaceDirectory: () => navigate('/workspaces'),
       onOpenAccountPreferences: handleOpenAccountPreferences,
-      onOpenProjectManager: handleOpenProjectManager,
+      onOpenProjectManager: isTeamWorkspace ? handleOpenTeamManager : handleOpenProjectManager,
       onOpenSettings: handleOpenSettings,
       onOpenMcp: () => setIsMcpOpen(true),
       onSignOut: signOut,
@@ -1190,7 +1210,18 @@ export function AppShellPage() {
             </>
           }
         >
-          {activeSection === 'projects' ? (
+          {activeSection === 'teams' ? (
+            <WorkspaceTeamsPage
+              workspaceId={activeWorkspaceId}
+              workspaceName={activeWorkspace.name}
+              teams={sidebarTree?.teams ?? []}
+              loading={!sidebarTree}
+              onBackToWorkspace={() => navigate(`/workspaces/${activeWorkspaceId}`)}
+              onTeamsChanged={async () => {
+                await refreshWorkspaces();
+              }}
+            />
+          ) : activeSection === 'projects' ? (
             <WorkspaceProjectsPage
               workspaceName={activeWorkspace.name}
               projects={activeWorkspaceProjects}
