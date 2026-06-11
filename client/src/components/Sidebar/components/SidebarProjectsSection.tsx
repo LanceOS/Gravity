@@ -125,7 +125,7 @@ export function SidebarProjectsSection({
   const showNotes = isNotesView(section);
   const labels = section.labels ?? section.domains ?? [];
   const labelCounts = section.counts.labels ?? section.counts.domains ?? {};
-  const handleSelectLabel = section.onSelectLabel ?? section.onSelectDomain ?? (() => {});
+  const handleSelectLabel = section.onSelectLabel ?? (() => {});
 
   return (
     <div style={{ marginTop: '4px' }}>

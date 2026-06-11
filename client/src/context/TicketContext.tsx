@@ -362,6 +362,16 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   }, []);
 
+  const prevUserIdRef = useRef<string | undefined>(currentUser?.id);
+  useEffect(() => {
+    if (currentUser?.id !== prevUserIdRef.current) {
+      if (prevUserIdRef.current !== undefined && currentUser?.id !== undefined) {
+        queryClient.clear();
+      }
+      prevUserIdRef.current = currentUser?.id;
+    }
+  }, [currentUser?.id, queryClient]);
+
   // Set default active project once projects are loaded
   useEffect(() => {
     if (!currentUser) return;

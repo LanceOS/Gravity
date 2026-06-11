@@ -3,7 +3,7 @@ import { MessageSquare, X } from 'lucide-react';
 import { useParams, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../../utils/apiClient';
-import type { SidebarTree } from '../../types/domain';
+import type { SidebarTree, Cycle, Domain } from '../../types/domain';
 
 import { AuthScreen } from '../../modules/auth';
 import { CreateTicketModal } from '../../modules/tickets';

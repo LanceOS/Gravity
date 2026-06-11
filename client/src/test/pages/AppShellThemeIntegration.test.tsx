@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { ThemeProvider } from '../../modules/settings';
 import { AppShellPage } from '../../pages/AppShellPage/AppShellPage.tsx';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const mocks = vi.hoisted(() => ({
   useTickets: vi.fn(),
@@ -259,12 +260,22 @@ function renderAppShell() {
   mocks.useAccountSettings.mockReturnValue(buildAccountSettings());
   mocks.useWorkspaceSettings.mockReturnValue(buildWorkspaceSettings());
 
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  });
+
   return render(
-    <MemoryRouter initialEntries={['/workspaces/workspace-1']}>
-      <ThemeProvider>
-        <AppShellPage />
-      </ThemeProvider>
-    </MemoryRouter>
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={['/workspaces/workspace-1']}>
+        <ThemeProvider>
+          <AppShellPage />
+        </ThemeProvider>
+      </MemoryRouter>
+    </QueryClientProvider>
   );
 }
 

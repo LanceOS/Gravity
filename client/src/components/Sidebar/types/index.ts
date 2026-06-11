@@ -51,7 +51,6 @@ export interface SidebarProjectSection {
   onShowNotes: () => void;
   onSelectCycleLegacy?: (cycleId: string) => void;
   onSelectLabel?: (labelId: string) => void;
-  onSelectDomain?: (labelId: string) => void;
 }
 
 export interface SidebarToolSection {

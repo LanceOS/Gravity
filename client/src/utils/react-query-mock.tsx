@@ -258,11 +258,16 @@ export function useQuery<T>({ queryKey, queryFn, enabled = true, staleTime, gcTi
     return state.updatedAt ? Date.now() - state.updatedAt >= sTime : true;
   }, [state.updatedAt, staleTime]);
 
+  const queryFnRef = useRef(queryFn);
+  useEffect(() => {
+    queryFnRef.current = queryFn;
+  }, [queryFn]);
+
   const hasFetchedOnMount = useRef(false);
 
   const triggerFetch = useCallback(() => {
-    client.fetchQuery<T>(stableQueryKey, queryFn, { staleTime, gcTime }).catch(console.error);
-  }, [client, stableQueryKey, queryFn, staleTime, gcTime]);
+    client.fetchQuery<T>(stableQueryKey, queryFnRef.current, { staleTime, gcTime }).catch(console.error);
+  }, [client, stableQueryKey, staleTime, gcTime]);
 
   useEffect(() => {
     hasFetchedOnMount.current = true;

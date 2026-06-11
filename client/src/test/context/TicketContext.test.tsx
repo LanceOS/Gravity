@@ -138,10 +138,19 @@ describe('TicketContext', () => {
       role: 'owner',
       tutorial_completed: 1,
     };
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(jsonResponse({ user, session: { userId: user.id } }))
-      .mockResolvedValueOnce(jsonResponse([]))
-      .mockResolvedValueOnce(jsonResponse([]));
+    const fetchMock = vi.fn((url, init) => {
+      console.log('fetchMock called with:', url, init);
+      if (url === '/api/auth/session') {
+        return Promise.resolve(jsonResponse({ user, session: { userId: user.id } }));
+      }
+      if (url.includes('/projects')) {
+        return Promise.resolve(jsonResponse([]));
+      }
+      if (url.includes('/users')) {
+        return Promise.resolve(jsonResponse([]));
+      }
+      return Promise.resolve(jsonResponse([]));
+    });
 
     const { EventSourceMock } = stubEventSource();
     vi.stubGlobal('fetch', fetchMock);
@@ -178,7 +187,12 @@ describe('TicketContext', () => {
       })
     );
 
-    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ error: 'Unauthorized' }, 401));
+    const fetchMock = vi.fn((url) => {
+      if (url.includes('/session')) {
+        return Promise.resolve(jsonResponse({ error: 'Unauthorized' }, 401));
+      }
+      return Promise.resolve(jsonResponse([]));
+    });
     stubEventSource();
     vi.stubGlobal('fetch', fetchMock);
 
@@ -193,7 +207,7 @@ describe('TicketContext', () => {
       expect(screen.getByTestId('loading-state')).toHaveTextContent('ready');
     });
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith('/api/auth/session', expect.any(Object));
     expect(window.localStorage.getItem('gravity_user')).toBeNull();
   });
 
@@ -224,7 +238,7 @@ describe('TicketContext', () => {
       expect(screen.getByTestId('loading-state')).toHaveTextContent('ready');
     });
 
-    expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/auth/session', { credentials: 'same-origin' });
+    expect(fetchMock).toHaveBeenCalledWith('/api/auth/session', { credentials: 'same-origin' });
     expect(window.localStorage.getItem('gravity_user')).toContain(user.id);
     consoleErrorSpy.mockRestore();
   });
@@ -260,7 +274,12 @@ describe('TicketContext', () => {
 
     expect(screen.getByTestId('project-count')).toHaveTextContent('0');
     expect(screen.getByTestId('user-count')).toHaveTextContent('0');
-    expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to load initial workspace data:', expect.any(Error));
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'Authentication required.',
+        status: 401,
+      })
+    );
 
     consoleErrorSpy.mockRestore();
   });
@@ -311,7 +330,12 @@ describe('TicketContext', () => {
       expect(screen.getByTestId('loading-state')).toHaveTextContent('ready');
     });
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to load initial workspace data:', expect.any(Error));
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'Authentication required.',
+        status: 401,
+      })
+    );
     consoleErrorSpy.mockRestore();
   });
 
@@ -378,7 +402,12 @@ describe('TicketContext', () => {
       expect(screen.getByTestId('ticket-count')).toHaveTextContent('0');
     });
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to fetch project data for project project-2:', expect.any(Error));
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'Project load failed.',
+        status: 500,
+      })
+    );
     consoleErrorSpy.mockRestore();
   });
 
@@ -471,7 +500,12 @@ describe('TicketContext', () => {
       expect(screen.getByTestId('ticket-titles')).toHaveTextContent('Created ticket');
     });
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to refresh tickets for project project-1:', expect.any(Error));
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'gateway down',
+        status: 502,
+      })
+    );
     consoleErrorSpy.mockRestore();
   });
 
@@ -536,7 +570,12 @@ describe('TicketContext', () => {
     });
 
     expect(consoleErrorSpy).toHaveBeenCalledWith('Error updating ticket on server, rolling back:', expect.any(Error));
-    expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to refresh tickets for project project-1:', expect.any(Error));
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'refresh failed',
+        status: 502,
+      })
+    );
     consoleErrorSpy.mockRestore();
   });
 

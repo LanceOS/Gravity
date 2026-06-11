@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { WorkspacePage } from '../../pages/WorkspacePage/WorkspacePage.tsx';
 import type { Cycle, Domain, Project, Ticket } from '../../context/TicketContext.tsx';
 
@@ -134,6 +135,14 @@ const subtaskDone: Ticket = {
 };
 
 function renderWorkspacePage(overrides: Partial<Parameters<typeof WorkspacePage>[0]> = {}) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  });
+
   const baseProps: Parameters<typeof WorkspacePage>[0] = {
     activeTicket: null,
     activeView: 'board' as const,
@@ -166,9 +175,11 @@ function renderWorkspacePage(overrides: Partial<Parameters<typeof WorkspacePage>
 
   return {
     ...render(
-      <MemoryRouter initialEntries={['/workspaces/workspace-1/projects/project-1/tickets']}>
-        <WorkspacePage {...props} />
-      </MemoryRouter>
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/workspaces/workspace-1/projects/project-1/tickets']}>
+          <WorkspacePage {...props} />
+        </MemoryRouter>
+      </QueryClientProvider>
     ),
     props,
   };
