@@ -81,12 +81,28 @@ export function WorkspaceProjectPanel({
     event.preventDefault();
     if (!managedProject) return;
 
+    // Finding #9: Validate URL format before submitting.
+    const trimmedUrl = githubRepoUrl.trim();
+    if (trimmedUrl) {
+      try {
+        const parsed = new URL(trimmedUrl);
+        const pathParts = parsed.pathname.split('/').filter(Boolean);
+        if (parsed.protocol !== 'https:' || parsed.hostname !== 'github.com' || pathParts.length < 2) {
+          setSettingsFeedback({ type: 'error', message: 'URL must be a valid GitHub repository URL (e.g. https://github.com/owner/repo).' });
+          return;
+        }
+      } catch {
+        setSettingsFeedback({ type: 'error', message: 'Please enter a valid URL (e.g. https://github.com/owner/repo).' });
+        return;
+      }
+    }
+
     setIsProjectSettingsSaving(true);
     setSettingsFeedback(null);
 
     try {
       await onUpdateProject(managedProject.id, {
-        githubRepoUrl: githubRepoUrl.trim() || null,
+        githubRepoUrl: trimmedUrl || null,
       });
       setSettingsFeedback({ type: 'success', message: 'Project settings updated successfully.' });
     } catch (error) {
@@ -526,6 +542,9 @@ export function WorkspaceProjectPanel({
               onChange={(event) => setGithubRepoUrl(event.target.value)}
               placeholder="https://github.com/owner/repository"
               disabled={isProjectSettingsSaving}
+              type="url"
+              pattern="https://github\.com/.+/.+"
+              title="Must be a full HTTPS GitHub repository URL (https://github.com/owner/repo)"
             />
 
             <div className="workspace-page__project-form-actions workspace-page__project-form-actions--inline" style={{ minHeight: '36px' }}>

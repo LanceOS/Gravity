@@ -12,7 +12,6 @@ This feature is implemented across three layers:
 
 ## 2. Non-Goals or Boundary Limits
 
-- Does not verify GitHub webhook signatures (HMAC-SHA256). This is a future hardening concern.
 - Does not create or delete GitHub PRs or branches.
 - Does not support per-ticket branch overrides; ticket keys are parsed from the PR **title** and **branch name** by a regex pattern.
 - Multiple projects can link to the same repository, but a ticket will only be updated if it belongs to one of those linked projects.
@@ -46,9 +45,10 @@ In the target GitHub repository, the user must add a webhook with the following 
 |---|---|
 | Payload URL | `https://<your-gravity-host>/api/v1/webhooks/github` |
 | Content type | `application/json` |
+| Secret | The value of `GITHUB_WEBHOOK_SECRET` set on the server |
 | Events | **Pull requests** only |
 
-No secret verification is required by the current implementation, but the endpoint silently ignores all non-`pull_request` event types.
+The `GITHUB_WEBHOOK_SECRET` must be a cryptographically strong random string (e.g., `openssl rand -hex 32`). It is configured in the server's environment and is used for HMAC-SHA256 signature verification of every delivery.
 
 ### Step 3 — Automated Ticket Updates (Runtime)
 
@@ -60,9 +60,15 @@ x-github-event: pull_request
 Content-Type: application/json
 ```
 
-#### 3a. Validate the Event Type
+#### 3a. Validate the Event Type and Signature
 
-If `x-github-event` is not `pull_request`, the handler returns `200 OK` with a no-op message. All other event types are safely ignored.
+Before any other processing:
+
+1. The raw request body is read as a `Buffer` (via `express.raw()` mounted before the global JSON parser in `app.ts`).
+2. The `x-hub-signature-256` header is verified with `HMAC-SHA256(GITHUB_WEBHOOK_SECRET, rawBody)` using a timing-safe comparison (`crypto.timingSafeEqual`). Any mismatch returns `401 Unauthorized`.
+3. In production, if no `GITHUB_WEBHOOK_SECRET` is configured, the endpoint returns `503 Service Unavailable` rather than allowing unauthenticated deliveries.
+4. The raw buffer is parsed to JSON only after the signature passes.
+5. If `x-github-event` is not `pull_request`, the handler returns `200 OK`. All other event types are safely ignored.
 
 #### 3b. Resolve the Repository URL
 
@@ -79,10 +85,10 @@ If no URL can be resolved, the handler returns `400 Bad Request`.
 #### 3c. Match Against Linked Projects
 
 ```sql
-SELECT * FROM projects WHERE github_repo_url = $repoUrl
+SELECT id, created_by FROM projects WHERE github_repo_url = $repoUrl
 ```
 
-If no project rows are returned, the handler returns `200 OK` with a no-op message and stops processing. This prevents spurious updates from repositories not connected to any Gravity project.
+If no project rows are returned, the handler returns `200 OK` and stops. A **uniform `{ success: true }` response** is returned in all no-match cases to prevent repository URL and ticket key enumeration.
 
 #### 3d. Extract Ticket Keys from the PR
 
@@ -93,18 +99,17 @@ The handler searches for ticket key patterns (e.g. `CORE-123`, `bug-7`) in:
 
 Pattern: `/([A-Za-z]+)-\d+/g` — results are normalized to uppercase.
 
-Multiple keys may be extracted from a single PR (e.g., a branch named `feature/CORE-42-ui` with a title of `CORE-43: update styles`).
+Multiple keys may be extracted from a single PR. Processing is **capped at 10 keys per delivery** to prevent query-storm abuse from crafted PR titles with many pattern matches.
 
-#### 3e. Validate Ticket Ownership
+#### 3e. Batch Ticket Lookup
 
-For each key found, `getTicketByKey(key)` fetches the ticket from the database. The ticket is **skipped** if:
+All matched keys are resolved in a **single batched database query** (`WHERE key IN (...)`), rather than one query per key. This eliminates the N+1 query pattern from the original implementation.
 
-- It does not exist in the database.
-- Its `projectId` is not in the set of project IDs linked to the incoming repository URL.
+#### 3f. Validate Ticket Ownership
 
-This prevents tickets from other projects matching similar key patterns from being affected.
+The resolved tickets are filtered to those whose `projectId` is in the set of project IDs linked to the incoming repository URL. Tickets from other projects that happen to share a matching key pattern are silently skipped.
 
-#### 3f. Map PR Action to Ticket Status
+#### 3g. Map PR Action to Ticket Status
 
 The `action` field of the webhook payload drives the status transition:
 
@@ -120,28 +125,26 @@ The `action` field of the webhook payload drives the status transition:
 
 > **Note on closed, non-merged PRs**: If a PR is closed without being merged (e.g., abandoned), `prStatus` is set to `closed` but the ticket's `status` is intentionally left at its current value. This avoids regressing a ticket's workflow state for abandoned branches.
 
-#### 3g. Persist and Broadcast
+#### 3h. Sanitize Payload Values
+
+Before constructing the auto-comment:
+- `pr.number` is validated as a positive integer.
+- `pr.user.login` is stripped to alphanumeric + hyphen characters only (max 39 chars) — matching GitHub's actual username rules.
+- `prUrl` is validated as a `https://github.com/` URL before storage; invalid values are stored as empty string.
+
+#### 3i. Persist and Broadcast
 
 For each successfully updated ticket:
 
 1. `updateTicketRecord` writes the new `status`, `prStatus`, and `prUrl` to PostgreSQL.
-2. An automatic comment is added to the ticket timeline (authored by the ticket's assignee, or by the project owner if unassigned):
-   ```
-   GitHub PR update: #42 was opened by octocat (https://github.com/owner/repo/pull/42).
-   ```
+2. An automatic comment is added, authored by the ticket's assignee or the project creator (looked up from the already-loaded project data — no extra DB query).
 3. Two real-time SSE events are broadcast via `broadcastEvent`:
    - `comments-updated` — with the latest comment list for the ticket.
    - `tickets-updated` — with the full refreshed ticket list for the project.
 
-#### 3h. Response
+#### 3j. Response
 
-```json
-// One or more tickets updated:
-{ "success": true, "updatedTickets": ["CORE-42", "CORE-43"] }
-
-// No matching tickets found:
-{ "success": true, "message": "Webhook received but no matching tickets found" }
-```
+All code paths return the same uniform `{ "success": true }` regardless of whether any tickets were matched or updated. This prevents ticket key and repository URL enumeration.
 
 ---
 
@@ -163,7 +166,25 @@ ALTER TABLE projects ADD COLUMN IF NOT EXISTS github_repo_url TEXT;
 
 ---
 
-## 5. Key Files and Modules
+## 7. Security Controls
+
+| Control | Where enforced |
+|---|---|
+| HMAC-SHA256 signature verification | `lib/webhookSignature.ts` · `webhooks/routes.ts` |
+| Production hard-fail when secret absent | `webhooks/routes.ts` (returns 503) |
+| Per-IP rate limiting (60 req/min) | `webhooks/routes.ts` via `express-rate-limit` |
+| Batch key lookup (no N+1) | `webhooks/routes.ts` · `tickets` schema `WHERE key IN (...)` |
+| Key cap (max 10 per delivery) | `webhooks/routes.ts` constant `MAX_KEYS_PER_WEBHOOK` |
+| Payload value sanitization | `lib/webhookSignature.ts` `sanitizeGitHubLogin` + integer check |
+| `prUrl` URL validation | `lib/webhookSignature.ts` `isValidGitHubUrl` |
+| Uniform success response (no enumeration) | `webhooks/routes.ts` — single `res.json({ success: true })` |
+| Auth + membership on `PATCH /projects/:projectId` | `projects-routes.ts` |
+| Server-side GitHub URL format validation | `projects-routes.ts` + `lib/webhookSignature.ts` `isValidGitHubRepoUrl` |
+| Client-side GitHub URL format validation | `WorkspaceProjectPanel.tsx` `handleSaveProjectSettings` + `pattern` attr |
+
+---
+
+## 8. Key Files and Modules
 
 | File | Role |
 |---|---|
