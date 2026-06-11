@@ -36,22 +36,12 @@ export function createTicketsRouter() {
     return Array.isArray(value) ? value[0] ?? '' : value;
   }
 
-  async function ensureWorkspaceCanAccessTicket(ticketId: string, workspaceId: string) {
-    const ticket = await getTicketById(ticketId);
-    if (!ticket) {
-      return { allowed: false as const, reason: 'not_found' as const };
-    }
-
-    const ticketWorkspaceId = await getProjectWorkspaceId(ticket.projectId);
-    if (!ticketWorkspaceId || ticketWorkspaceId !== workspaceId) {
-      return { allowed: false as const, reason: 'forbidden' as const };
-    }
-
-    return { allowed: true as const, ticket };
-  }
-
-  router.get('/tickets', async (req, res) => {
-    const projectId = getProjectIdFromRequest(req);
+  async function withProjectAccess(
+    req: Request,
+    res: Response,
+    projectId: string | null | undefined,
+    handler: (projectId: string, userId: string) => Promise<void>
+  ) {
     if (!projectId) {
       res.status(400).json({ error: 'Project ID is required.' });
       return;
@@ -63,58 +53,80 @@ export function createTicketsRouter() {
       return;
     }
 
-    try {
-      const ticketList = await listTickets(projectId, {
-        status: typeof req.query.status === 'string' ? req.query.status : undefined,
-        priority: typeof req.query.priority === 'string' ? req.query.priority : undefined,
-        domainId: typeof req.query.domainId === 'string' ? req.query.domainId : undefined,
-        assigneeId: typeof req.query.assigneeId === 'string' ? req.query.assigneeId : undefined,
-        cycleId: typeof req.query.cycleId === 'string' ? req.query.cycleId : undefined,
-        labels: typeof req.query.labels === 'string' ? req.query.labels.split(',').filter(Boolean) : undefined,
-        labelMode: (req.query.labelMode === 'all' || req.query.labelMode === 'any') ? req.query.labelMode : undefined,
-      });
-      res.json(ticketList);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load tickets.' });
-    }
-  });
+    await handler(projectId, auth.userId);
+  }
 
-  router.post('/tickets', async (req, res) => {
-    const projectId = getProjectIdFromRequest(req);
-    if (!projectId || !req.body?.title) {
-      res.status(400).json({ error: 'Project ID and ticket title are required.' });
+  async function withTicketAccess(
+    req: Request,
+    res: Response,
+    ticketId: string,
+    handler: (ticket: any, userId: string) => Promise<void>
+  ) {
+    const ticket = await getTicketById(ticketId, getProjectIdFromRequest(req) || undefined);
+    if (!ticket) {
+      res.status(404).json({ error: 'Ticket not found.' });
       return;
     }
 
-    const auth = await authorizeProjectAccess(req, projectId);
+    const auth = await authorizeProjectAccess(req, ticket.projectId);
     if (!auth.allowed) {
       res.status(auth.status).json({ error: auth.error });
       return;
     }
 
-    try {
-      const created = await createTicketRecord({
-        title: req.body.title,
-        description: req.body.description,
-        status: req.body.status,
-        priority: req.body.priority,
-        projectId,
-        domainId: req.body.domainId,
-        cycleId: req.body.cycleId,
-        assigneeId: req.body.assigneeId,
-        parentId: req.body.parentId,
-        labelIds: Array.isArray(req.body.labelIds)
-          ? req.body.labelIds.map(String)
-          : typeof req.body.labelIds === 'string'
-            ? req.body.labelIds.split(',').filter(Boolean)
-            : undefined,
-      });
+    await handler(ticket, auth.userId);
+  }
 
-      broadcastEvent('tickets-updated', { projectId, tickets: await listTickets(projectId) });
-      res.status(201).json(created);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create ticket.' });
-    }
+  router.get('/tickets', async (req, res) => {
+    await withProjectAccess(req, res, getProjectIdFromRequest(req), async (projectId) => {
+      try {
+        const ticketList = await listTickets(projectId, {
+          status: typeof req.query.status === 'string' ? req.query.status : undefined,
+          priority: typeof req.query.priority === 'string' ? req.query.priority : undefined,
+          domainId: typeof req.query.domainId === 'string' ? req.query.domainId : undefined,
+          assigneeId: typeof req.query.assigneeId === 'string' ? req.query.assigneeId : undefined,
+          cycleId: typeof req.query.cycleId === 'string' ? req.query.cycleId : undefined,
+          labels: typeof req.query.labels === 'string' ? req.query.labels.split(',').filter(Boolean) : undefined,
+          labelMode: (req.query.labelMode === 'all' || req.query.labelMode === 'any') ? req.query.labelMode : undefined,
+        });
+        res.json(ticketList);
+      } catch (error) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load tickets.' });
+      }
+    });
+  });
+
+  router.post('/tickets', async (req, res) => {
+    await withProjectAccess(req, res, getProjectIdFromRequest(req), async (projectId) => {
+      if (!req.body?.title) {
+        res.status(400).json({ error: 'Ticket title is required.' });
+        return;
+      }
+
+      try {
+        const created = await createTicketRecord({
+          title: req.body.title,
+          description: req.body.description,
+          status: req.body.status,
+          priority: req.body.priority,
+          projectId,
+          domainId: req.body.domainId,
+          cycleId: req.body.cycleId,
+          assigneeId: req.body.assigneeId,
+          parentId: req.body.parentId,
+          labelIds: Array.isArray(req.body.labelIds)
+            ? req.body.labelIds.map(String)
+            : typeof req.body.labelIds === 'string'
+              ? req.body.labelIds.split(',').filter(Boolean)
+              : undefined,
+        });
+
+        broadcastEvent('tickets-updated', { projectId, tickets: await listTickets(projectId) });
+        res.status(201).json(created);
+      } catch (error) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create ticket.' });
+      }
+    });
   });
 
   router.get('/tickets/key/:ticketKey', async (req, res) => {
@@ -150,208 +162,130 @@ export function createTicketsRouter() {
   });
 
   router.get('/tickets/:ticketId', async (req, res) => {
-    try {
-      const ticketId = normalizeRouteParam(req.params.ticketId);
-      const ticket = await getTicketById(ticketId, getProjectIdFromRequest(req) || undefined);
-      if (!ticket) {
-        res.status(404).json({ error: 'Ticket not found.' });
-        return;
+    await withTicketAccess(req, res, normalizeRouteParam(req.params.ticketId), async (ticket) => {
+      try {
+        const ticketDetails = await getTicketDetails(ticket.id, ticket.projectId);
+        res.json(ticketDetails);
+      } catch (error) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load ticket.' });
       }
-
-      const auth = await authorizeProjectAccess(req, ticket.projectId);
-      if (!auth.allowed) {
-        res.status(auth.status).json({ error: auth.error });
-        return;
-      }
-
-      const ticketDetails = await getTicketDetails(ticket.id, ticket.projectId);
-      res.json(ticketDetails);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load ticket.' });
-    }
+    });
   });
 
   router.patch('/tickets/:ticketId', async (req, res) => {
-    const projectId = getProjectIdFromRequest(req);
-    if (!projectId) {
-      res.status(400).json({ error: 'Project ID is required.' });
-      return;
-    }
+    await withProjectAccess(req, res, getProjectIdFromRequest(req), async (projectId) => {
+      try {
+        const ticketId = normalizeRouteParam(req.params.ticketId);
+        const updated = await updateTicketRecord(ticketId, req.body ?? {}, projectId);
+        if (!updated) {
+          res.status(404).json({ error: 'Ticket not found.' });
+          return;
+        }
 
-    const auth = await authorizeProjectAccess(req, projectId);
-    if (!auth.allowed) {
-      res.status(auth.status).json({ error: auth.error });
-      return;
-    }
-
-    try {
-      const ticketId = normalizeRouteParam(req.params.ticketId);
-      const updated = await updateTicketRecord(ticketId, req.body ?? {}, projectId);
-      if (!updated) {
-        res.status(404).json({ error: 'Ticket not found.' });
-        return;
+        broadcastEvent('tickets-updated', { projectId, tickets: await listTickets(projectId) });
+        res.json(updated);
+      } catch (error) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to update ticket.' });
       }
-
-      broadcastEvent('tickets-updated', { projectId, tickets: await listTickets(projectId) });
-      res.json(updated);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to update ticket.' });
-    }
+    });
   });
 
   router.delete('/tickets/:ticketId', async (req, res) => {
-    const projectId = getProjectIdFromRequest(req);
-    if (!projectId) {
-      res.status(400).json({ error: 'Project ID is required.' });
-      return;
-    }
+    await withProjectAccess(req, res, getProjectIdFromRequest(req), async (projectId) => {
+      try {
+        const ticketId = normalizeRouteParam(req.params.ticketId);
+        const deleted = await deleteTicketRecord(ticketId, projectId);
+        if (!deleted) {
+          res.status(404).json({ error: 'Ticket not found.' });
+          return;
+        }
 
-    const auth = await authorizeProjectAccess(req, projectId);
-    if (!auth.allowed) {
-      res.status(auth.status).json({ error: auth.error });
-      return;
-    }
-
-    try {
-      const ticketId = normalizeRouteParam(req.params.ticketId);
-      const deleted = await deleteTicketRecord(ticketId, projectId);
-      if (!deleted) {
-        res.status(404).json({ error: 'Ticket not found.' });
-        return;
+        broadcastEvent('tickets-updated', { projectId, tickets: await listTickets(projectId) });
+        res.json({ success: true });
+      } catch (error) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to delete ticket.' });
       }
-
-      broadcastEvent('tickets-updated', { projectId, tickets: await listTickets(projectId) });
-      res.json({ success: true });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to delete ticket.' });
-    }
+    });
   });
 
   router.get('/tickets/:ticketId/comments', async (req, res) => {
-    try {
-      const ticketId = normalizeRouteParam(req.params.ticketId);
-      const ticket = await getTicketById(ticketId);
-      if (!ticket) {
-        res.status(404).json({ error: 'Ticket not found.' });
-        return;
+    await withTicketAccess(req, res, normalizeRouteParam(req.params.ticketId), async (ticket) => {
+      try {
+        res.json(await listComments(ticket.id));
+      } catch (error) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load comments.' });
       }
-
-      const auth = await authorizeProjectAccess(req, ticket.projectId);
-      if (!auth.allowed) {
-        res.status(auth.status).json({ error: auth.error });
-        return;
-      }
-
-      res.json(await listComments(ticketId));
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load comments.' });
-    }
+    });
   });
 
   router.post('/tickets/:ticketId/comments', async (req, res) => {
-    const ticketId = normalizeRouteParam(req.params.ticketId);
-    try {
-      const ticket = await getTicketById(ticketId);
-      if (!ticket) {
-        res.status(404).json({ error: 'Ticket not found.' });
-        return;
+    await withTicketAccess(req, res, normalizeRouteParam(req.params.ticketId), async (ticket, userId) => {
+      try {
+        const body =
+          typeof req.body?.content === 'string'
+            ? req.body.content
+            : typeof req.body?.body === 'string'
+              ? req.body.body
+              : '';
+
+        if (!body) {
+          res.status(400).json({ error: 'Comment body is required.' });
+          return;
+        }
+
+        const comment = await addCommentRecord(ticket.id, userId, body);
+        const allComments = await listComments(ticket.id);
+        broadcastEvent('comments-updated', { ticketId: ticket.id, comments: allComments });
+        res.status(201).json(comment);
+      } catch (error) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to add comment.' });
       }
-
-      const auth = await authorizeProjectAccess(req, ticket.projectId);
-      if (!auth.allowed) {
-        res.status(auth.status).json({ error: auth.error });
-        return;
-      }
-
-      const userId = auth.userId;
-      const body =
-        typeof req.body?.content === 'string'
-          ? req.body.content
-          : typeof req.body?.body === 'string'
-            ? req.body.body
-            : '';
-
-      if (!body) {
-        res.status(400).json({ error: 'Comment body is required.' });
-        return;
-      }
-
-      const comment = await addCommentRecord(ticketId, userId, body);
-      const allComments = await listComments(ticketId);
-      broadcastEvent('comments-updated', { ticketId, comments: allComments });
-      res.status(201).json(comment);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to add comment.' });
-    }
+    });
   });
 
   router.patch('/tickets/:ticketId/comments/:commentId', async (req, res) => {
-    const ticketId = normalizeRouteParam(req.params.ticketId);
-    const commentId = normalizeRouteParam(req.params.commentId);
-    
-    try {
-      const ticket = await getTicketById(ticketId);
-      if (!ticket) {
-        res.status(404).json({ error: 'Ticket not found.' });
-        return;
+    await withTicketAccess(req, res, normalizeRouteParam(req.params.ticketId), async (ticket) => {
+      try {
+        const commentId = normalizeRouteParam(req.params.commentId);
+        const body = typeof req.body?.body === 'string' ? req.body.body : '';
+
+        if (!body) {
+          res.status(400).json({ error: 'Comment body is required.' });
+          return;
+        }
+
+        const comment = await updateCommentRecord(commentId, ticket.id, body);
+        if (!comment) {
+          res.status(404).json({ error: 'Comment not found.' });
+          return;
+        }
+
+        const allComments = await listComments(ticket.id);
+        broadcastEvent('comments-updated', { ticketId: ticket.id, comments: allComments });
+        res.json(comment);
+      } catch (error) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to update comment.' });
       }
-
-      const auth = await authorizeProjectAccess(req, ticket.projectId);
-      if (!auth.allowed) {
-        res.status(auth.status).json({ error: auth.error });
-        return;
-      }
-
-      const body = typeof req.body?.body === 'string' ? req.body.body : '';
-
-      if (!body) {
-        res.status(400).json({ error: 'Comment body is required.' });
-        return;
-      }
-
-      const comment = await updateCommentRecord(commentId, ticketId, body);
-      if (!comment) {
-        res.status(404).json({ error: 'Comment not found.' });
-        return;
-      }
-
-      const allComments = await listComments(ticketId);
-      broadcastEvent('comments-updated', { ticketId, comments: allComments });
-      res.json(comment);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to update comment.' });
-    }
+    });
   });
 
   router.delete('/tickets/:ticketId/comments/:commentId', async (req, res) => {
-    const ticketId = normalizeRouteParam(req.params.ticketId);
-    const commentId = normalizeRouteParam(req.params.commentId);
+    await withTicketAccess(req, res, normalizeRouteParam(req.params.ticketId), async (ticket) => {
+      try {
+        const commentId = normalizeRouteParam(req.params.commentId);
+        const deleted = await deleteCommentRecord(commentId, ticket.id);
+        if (!deleted) {
+          res.status(404).json({ error: 'Comment not found.' });
+          return;
+        }
 
-    try {
-      const ticket = await getTicketById(ticketId);
-      if (!ticket) {
-        res.status(404).json({ error: 'Ticket not found.' });
-        return;
+        const allComments = await listComments(ticket.id);
+        broadcastEvent('comments-updated', { ticketId: ticket.id, comments: allComments });
+        res.json({ success: true });
+      } catch (error) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to delete comment.' });
       }
-
-      const auth = await authorizeProjectAccess(req, ticket.projectId);
-      if (!auth.allowed) {
-        res.status(auth.status).json({ error: auth.error });
-        return;
-      }
-
-      const deleted = await deleteCommentRecord(commentId, ticketId);
-      if (!deleted) {
-        res.status(404).json({ error: 'Comment not found.' });
-        return;
-      }
-
-      const allComments = await listComments(ticketId);
-      broadcastEvent('comments-updated', { ticketId, comments: allComments });
-      res.json({ success: true });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to delete comment.' });
-    }
+    });
   });
 
   router.get('/domains', async (req, res) => {
@@ -365,75 +299,60 @@ export function createTicketsRouter() {
   });
 
   router.get('/labels', async (req, res) => {
-    const projectId = getProjectIdFromRequest(req);
-    if (!projectId) {
-      res.status(400).json({ error: 'Project ID is required.' });
-      return;
-    }
-
-    const auth = await authorizeProjectAccess(req, projectId);
-    if (!auth.allowed) {
-      res.status(auth.status).json({ error: auth.error });
-      return;
-    }
-
-    try {
-      const rows = await db
-        .select({
-          id: labels.id,
-          projectId: labels.projectId,
-          name: labels.name,
-          color: labels.color,
-          description: labels.description,
-          sortOrder: labels.sortOrder,
-        })
-        .from(labels)
-        .where(eq(labels.projectId, projectId))
-        .orderBy(asc(labels.createdAt));
-      res.json(rows);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load labels.' });
-    }
+    await withProjectAccess(req, res, getProjectIdFromRequest(req), async (projectId) => {
+      try {
+        const rows = await db
+          .select({
+            id: labels.id,
+            projectId: labels.projectId,
+            name: labels.name,
+            color: labels.color,
+            description: labels.description,
+            sortOrder: labels.sortOrder,
+          })
+          .from(labels)
+          .where(eq(labels.projectId, projectId))
+          .orderBy(asc(labels.createdAt));
+        res.json(rows);
+      } catch (error) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load labels.' });
+      }
+    });
   });
 
   router.post('/labels', async (req, res) => {
-    const projectId = getProjectIdFromRequest(req);
-    if (!projectId || !req.body?.name) {
-      res.status(400).json({ error: 'Project ID and label name are required.' });
-      return;
-    }
+    await withProjectAccess(req, res, getProjectIdFromRequest(req), async (projectId) => {
+      if (!req.body?.name) {
+        res.status(400).json({ error: 'Label name is required.' });
+        return;
+      }
 
-    const auth = await authorizeProjectAccess(req, projectId);
-    if (!auth.allowed) {
-      res.status(auth.status).json({ error: auth.error });
-      return;
-    }
+      try {
+        const rows = await db
+          .insert(labels)
+          .values({
+            id: createId('l'),
+            projectId,
+            name: req.body.name,
+            color: typeof req.body?.color === 'string' ? req.body.color : '#6B7280',
+            description: typeof req.body?.description === 'string' ? req.body.description : '',
+            sortOrder: typeof req.body?.sortOrder === 'number' ? req.body.sortOrder : 0,
+            createdAt: new Date(),
+          })
+          .returning();
 
-    try {
-      const rows = await db
-        .insert(labels)
-        .values({
-          id: createId('l'),
-          projectId,
-          name: req.body.name,
-          color: typeof req.body?.color === 'string' ? req.body.color : '#6B7280',
-          description: typeof req.body?.description === 'string' ? req.body.description : '',
-          sortOrder: typeof req.body?.sortOrder === 'number' ? req.body.sortOrder : 0,
-          createdAt: new Date(),
-        })
-        .returning();
-
-      res.status(201).json({
-        id: rows[0].id,
-        projectId: rows[0].projectId,
-        name: rows[0].name,
-        color: rows[0].color,
-        description: rows[0].description,
-        sortOrder: rows[0].sortOrder,
-      });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create label.' });
-    }
+        res.status(201).json({
+          id: rows[0].id,
+          projectId: rows[0].projectId,
+          name: rows[0].name,
+          color: rows[0].color,
+          description: rows[0].description,
+          sortOrder: rows[0].sortOrder,
+        });
+      } catch (error) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create label.' });
+      }
+    });
   });
 
   router.put('/labels/:id', async (req, res) => {
@@ -515,165 +434,116 @@ export function createTicketsRouter() {
   });
 
   router.get('/tickets/:id/labels', async (req, res) => {
-    const ticketId = normalizeRouteParam(req.params.id);
-    try {
-      const ticket = await getTicketById(ticketId);
-      if (!ticket) {
-        res.status(404).json({ error: 'Ticket not found.' });
-        return;
+    await withTicketAccess(req, res, normalizeRouteParam(req.params.id), async (ticket) => {
+      try {
+        const rows = await db
+          .select({
+            id: labels.id,
+            projectId: labels.projectId,
+            name: labels.name,
+            color: labels.color,
+            description: labels.description,
+            sortOrder: labels.sortOrder,
+          })
+          .from(ticketLabels)
+          .innerJoin(labels, eq(labels.id, ticketLabels.labelId))
+          .where(eq(ticketLabels.ticketId, ticket.id));
+
+        res.json(rows);
+      } catch (error) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load ticket labels.' });
       }
-
-      const auth = await authorizeProjectAccess(req, ticket.projectId);
-      if (!auth.allowed) {
-        res.status(auth.status).json({ error: auth.error });
-        return;
-      }
-
-      const rows = await db
-        .select({
-          id: labels.id,
-          projectId: labels.projectId,
-          name: labels.name,
-          color: labels.color,
-          description: labels.description,
-          sortOrder: labels.sortOrder,
-        })
-        .from(ticketLabels)
-        .innerJoin(labels, eq(labels.id, ticketLabels.labelId))
-        .where(eq(ticketLabels.ticketId, ticketId));
-
-      res.json(rows);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load ticket labels.' });
-    }
+    });
   });
 
   router.post('/tickets/:id/labels', async (req, res) => {
-    const ticketId = normalizeRouteParam(req.params.id);
-    const labelId = req.body?.labelId;
-    if (!labelId) {
-      res.status(400).json({ error: 'Label ID is required.' });
-      return;
-    }
+    await withTicketAccess(req, res, normalizeRouteParam(req.params.id), async (ticket) => {
+      try {
+        const labelId = req.body?.labelId;
+        if (!labelId) {
+          res.status(400).json({ error: 'Label ID is required.' });
+          return;
+        }
 
-    try {
-      const ticket = await getTicketById(ticketId);
-      if (!ticket) {
-        res.status(404).json({ error: 'Ticket not found.' });
-        return;
+        const labelRows = await db.select().from(labels).where(eq(labels.id, labelId)).limit(1);
+        if (labelRows.length === 0) {
+          res.status(404).json({ error: 'Label not found.' });
+          return;
+        }
+
+        if (labelRows[0].projectId !== ticket.projectId) {
+          res.status(400).json({ error: 'Label does not belong to the ticket project.' });
+          return;
+        }
+
+        await db
+          .insert(ticketLabels)
+          .values({ ticketId: ticket.id, labelId })
+          .onConflictDoNothing();
+
+        broadcastEvent('tickets-updated', { projectId: ticket.projectId, tickets: await listTickets(ticket.projectId) });
+
+        res.status(201).json({ success: true });
+      } catch (error) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to assign label to ticket.' });
       }
-
-      const auth = await authorizeProjectAccess(req, ticket.projectId);
-      if (!auth.allowed) {
-        res.status(auth.status).json({ error: auth.error });
-        return;
-      }
-
-      const labelRows = await db.select().from(labels).where(eq(labels.id, labelId)).limit(1);
-      if (labelRows.length === 0) {
-        res.status(404).json({ error: 'Label not found.' });
-        return;
-      }
-
-      if (labelRows[0].projectId !== ticket.projectId) {
-        res.status(400).json({ error: 'Label does not belong to the ticket project.' });
-        return;
-      }
-
-      await db
-        .insert(ticketLabels)
-        .values({ ticketId, labelId })
-        .onConflictDoNothing();
-
-      broadcastEvent('tickets-updated', { projectId: ticket.projectId, tickets: await listTickets(ticket.projectId) });
-
-      res.status(201).json({ success: true });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to assign label to ticket.' });
-    }
+    });
   });
 
   router.delete('/tickets/:id/labels/:labelId', async (req, res) => {
-    const ticketId = normalizeRouteParam(req.params.id);
-    const labelId = normalizeRouteParam(req.params.labelId);
+    await withTicketAccess(req, res, normalizeRouteParam(req.params.id), async (ticket) => {
+      try {
+        const labelId = normalizeRouteParam(req.params.labelId);
+        await db
+          .delete(ticketLabels)
+          .where(and(eq(ticketLabels.ticketId, ticket.id), eq(ticketLabels.labelId, labelId)));
 
-    try {
-      const ticket = await getTicketById(ticketId);
-      if (!ticket) {
-        res.status(404).json({ error: 'Ticket not found.' });
-        return;
+        broadcastEvent('tickets-updated', { projectId: ticket.projectId, tickets: await listTickets(ticket.projectId) });
+
+        res.json({ success: true });
+      } catch (error) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to unassign label from ticket.' });
       }
-
-      const auth = await authorizeProjectAccess(req, ticket.projectId);
-      if (!auth.allowed) {
-        res.status(auth.status).json({ error: auth.error });
-        return;
-      }
-
-      await db
-        .delete(ticketLabels)
-        .where(and(eq(ticketLabels.ticketId, ticketId), eq(ticketLabels.labelId, labelId)));
-
-      broadcastEvent('tickets-updated', { projectId: ticket.projectId, tickets: await listTickets(ticket.projectId) });
-
-      res.json({ success: true });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to unassign label from ticket.' });
-    }
+    });
   });
 
   router.get('/cycles', async (req, res) => {
-    const projectId = getProjectIdFromRequest(req);
-    if (!projectId) {
-      res.status(400).json({ error: 'Project ID is required.' });
-      return;
-    }
-
-    const auth = await authorizeProjectAccess(req, projectId);
-    if (!auth.allowed) {
-      res.status(auth.status).json({ error: auth.error });
-      return;
-    }
-
-    try {
-      const rows = await db.select().from(cycles).where(eq(cycles.projectId, projectId)).orderBy(asc(cycles.startDate));
-      res.json(rows.map(mapCycle));
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load cycles.' });
-    }
+    await withProjectAccess(req, res, getProjectIdFromRequest(req), async (projectId) => {
+      try {
+        const rows = await db.select().from(cycles).where(eq(cycles.projectId, projectId)).orderBy(asc(cycles.startDate));
+        res.json(rows.map(mapCycle));
+      } catch (error) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load cycles.' });
+      }
+    });
   });
 
   router.post('/cycles', async (req, res) => {
-    const projectId = getProjectIdFromRequest(req);
-    if (!projectId || !req.body?.name || !req.body?.startDate || !req.body?.endDate) {
-      res.status(400).json({ error: 'Project ID, cycle name, startDate, and endDate are required.' });
-      return;
-    }
+    await withProjectAccess(req, res, getProjectIdFromRequest(req), async (projectId) => {
+      if (!req.body?.name || !req.body?.startDate || !req.body?.endDate) {
+        res.status(400).json({ error: 'Cycle name, startDate, and endDate are required.' });
+        return;
+      }
 
-    const auth = await authorizeProjectAccess(req, projectId);
-    if (!auth.allowed) {
-      res.status(auth.status).json({ error: auth.error });
-      return;
-    }
+      try {
+        const rows = await db
+          .insert(cycles)
+          .values({
+            id: createId('c'),
+            projectId,
+            name: req.body.name,
+            startDate: new Date(req.body.startDate),
+            endDate: new Date(req.body.endDate),
+            completed: Boolean(req.body?.completed),
+            createdAt: new Date(),
+          })
+          .returning();
 
-    try {
-      const rows = await db
-        .insert(cycles)
-        .values({
-          id: createId('c'),
-          projectId,
-          name: req.body.name,
-          startDate: new Date(req.body.startDate),
-          endDate: new Date(req.body.endDate),
-          completed: Boolean(req.body?.completed),
-          createdAt: new Date(),
-        })
-        .returning();
-
-      res.status(201).json(mapCycle(rows[0]));
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create cycle.' });
-    }
+        res.status(201).json(mapCycle(rows[0]));
+      } catch (error) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create cycle.' });
+      }
+    });
   });
 
   return router;
