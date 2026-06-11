@@ -1,3 +1,4 @@
+import { apiClient } from '../utils/apiClient';
 import React, { createContext, useContext, useReducer, useEffect, useCallback, useMemo } from 'react';
 
 // Domain entity types live in src/types/domain.ts.
@@ -406,13 +407,13 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     dispatch({ type: 'SET_LOADING', payload: true });
     try {
       const [projectsRes, usersRes] = await Promise.all([
-        fetch(`${API_URL}/projects?userId=${encodeURIComponent(userId)}`),
-        fetch(`${API_URL}/users`),
+        apiClient.get(`/projects`, { params: { userId } }),
+        apiClient.get(`/users`),
       ]);
 
       const [projects, users] = await Promise.all([
-        handleArrayResponse<Project>(projectsRes, 'Failed to load projects'),
-        handleArrayResponse<User>(usersRes, 'Failed to load users'),
+        projectsRes as unknown as Project[],
+        usersRes as unknown as User[],
       ]);
 
       dispatch({
@@ -438,15 +439,15 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     try {
       const [ticketsRes, labelsRes, cyclesRes] = await Promise.all([
-        fetch(`${API_URL}/tickets`, { headers: { 'X-Project-Id': projId } }),
-        fetch(`${API_URL}/labels`, { headers: { 'X-Project-Id': projId } }),
-        fetch(`${API_URL}/cycles`, { headers: { 'X-Project-Id': projId } }),
+        apiClient.get(`/tickets`, { projectId: projId }),
+        apiClient.get(`/labels`, { projectId: projId }),
+        apiClient.get(`/cycles`, { projectId: projId }),
       ]);
 
       const [tickets, labels, cycles] = await Promise.all([
-        handleArrayResponse<Ticket>(ticketsRes, `Failed to load tickets for project ${projId}`),
-        handleArrayResponse<Label>(labelsRes, `Failed to load labels for project ${projId}`),
-        handleArrayResponse<Cycle>(cyclesRes, `Failed to load cycles for project ${projId}`),
+        ticketsRes as unknown as Ticket[],
+        labelsRes as unknown as Label[],
+        cyclesRes as unknown as Cycle[],
       ]);
 
       dispatch({
@@ -464,7 +465,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (activeProjectId) {
       fetchProjectData(activeProjectId);
     }
-  }, [activeProjectId, fetchProjectData, state.labels]);
+  }, [activeProjectId, fetchProjectData]);
 
   useEffect(() => {
     let cancelled = false;
@@ -571,27 +572,26 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       try {
         const message = JSON.parse(event.data);
         if (message.type === 'tickets-updated') {
-          if (message.data.projectId === activeProjectId) {
+          if (message.data.projectId === activeProjectIdRef.current) {
             dispatch({ type: 'SET_TICKETS_RAW', payload: message.data.tickets });
           }
         } else if (message.type === 'comments-updated') {
           // Narrow updates strictly to current active ticket
-          const activeId = state.activeTicket?.id;
+          const activeId = stateRef.current.activeTicket?.id;
           if (activeId && activeId === message.data.ticketId) {
             dispatch({ type: 'SET_COMMENTS_RAW', payload: message.data.comments });
           }
         } else if (message.type === 'users-updated') {
           void (async () => {
             try {
-              const usersResponse = await fetch(`${API_URL}/users`);
-              const users = await handleArrayResponse<User>(usersResponse, 'Failed to refresh users');
+              const users = await apiClient.get<User[]>(`/users`);
               dispatch({
                 type: 'SET_INITIAL_DATA',
                 payload: {
-                  tickets: state.tickets,
-                  projects: state.projects,
-                  labels: state.labels,
-                  cycles: state.cycles,
+                  tickets: stateRef.current.tickets,
+                  projects: stateRef.current.projects,
+                  labels: stateRef.current.labels,
+                  cycles: stateRef.current.cycles,
                   users,
                 }
               });
@@ -608,7 +608,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return () => {
       eventSource.close();
     };
-  }, [activeProjectId, state.activeTicket, state.tickets, state.projects, state.labels, state.cycles]);
+  }, []);
 
   // 3. Create Ticket with project header
   const createTicket = useCallback(async (ticketInput: CreateTicketInput) => {
@@ -622,7 +622,6 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         body: JSON.stringify(ticketInput),
       });
 
-      if (!response.ok) throw new Error('Failed to create ticket');
       const createdTicket = await response.json();
 
       // Update local state if the ticket belongs to the current active project
@@ -671,7 +670,6 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         body: JSON.stringify(pendingBatch.updates),
       });
 
-      if (!response.ok) throw new Error('Failed to update ticket');
 
       inFlightTicketUpdateBatchesRef.current.delete(ticketId);
 
@@ -748,7 +746,6 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         method: 'DELETE',
         headers: { 'X-Project-Id': activeProjectId }
       });
-      if (!response.ok) throw new Error('Failed to delete ticket');
     } catch (e) {
       console.error('Failed to delete, rolling back:', e);
       dispatch({ type: 'SET_TICKETS_RAW', payload: originalTickets });
@@ -759,13 +756,8 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const fetchCommentsForTicket = useCallback(async (ticketId: string) => {
     if (!activeProjectId) return;
     try {
-      const response = await fetch(`${API_URL}/tickets/${ticketId}/comments`, {
-        headers: { 'X-Project-Id': activeProjectId }
-      });
-      if (response.ok) {
-        const commentsList = await response.json();
-        dispatch({ type: 'SET_COMMENTS_RAW', payload: commentsList });
-      }
+      const commentsList = await apiClient.get<Comment[]>(`/tickets/${ticketId}/comments`, { projectId: activeProjectId });
+      dispatch({ type: 'SET_COMMENTS_RAW', payload: commentsList });
     } catch (e) {
       console.error(e);
     }
@@ -811,7 +803,6 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         },
         body: JSON.stringify({ userId: state.currentUser.id, body }),
       });
-      if (!response.ok) throw new Error('Failed to post comment');
 
       const savedComment = (await response.json()) as Comment;
       dispatch({ type: 'REPLACE_COMMENT', payload: { optimisticId, comment: savedComment } });
@@ -827,15 +818,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     dispatch({ type: 'UPDATE_COMMENT_RAW', payload: { commentId, body } });
 
     try {
-      const response = await fetch(`${API_URL}/tickets/${ticketId}/comments/${commentId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Project-Id': activeProjectId,
-        },
-        body: JSON.stringify({ body }),
-      });
-      if (!response.ok) throw new Error('Failed to update comment');
+      const response = await apiClient.patch(`/tickets/${ticketId}/comments/${commentId}`, { body }, { projectId: activeProjectId });
     } catch (e) {
       console.error('Failed to update comment, rolling back:', e);
       dispatch({ type: 'SET_COMMENTS_RAW', payload: originalComments });
@@ -848,13 +831,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     dispatch({ type: 'DELETE_COMMENT_RAW', payload: { commentId } });
 
     try {
-      const response = await fetch(`${API_URL}/tickets/${ticketId}/comments/${commentId}`, {
-        method: 'DELETE',
-        headers: {
-          'X-Project-Id': activeProjectId,
-        },
-      });
-      if (!response.ok) throw new Error('Failed to delete comment');
+      const response = await apiClient.delete(`/tickets/${ticketId}/comments/${commentId}`, { projectId: activeProjectId });
     } catch (e) {
       console.error('Failed to delete comment, rolling back:', e);
       dispatch({ type: 'SET_COMMENTS_RAW', payload: originalComments });
@@ -862,52 +839,14 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [state.comments, activeProjectId]);
 
   // Reusable helper to safely parse HTTP responses and return descriptive errors for network failures
-  async function handleResponseJson(response: Response, fallbackError: string) {
-    let text = '';
-    try {
-      text = await response.text();
-    } catch (e) {
-      // Ignore error reading body
-    }
+  
 
-    if (!response.ok) {
-      let errorMessage = fallbackError;
-      try {
-        const parsed = text ? JSON.parse(text) : null;
-        errorMessage = parsed?.error || parsed?.message || fallbackError;
-      } catch {
-        // If response is HTML, it's likely a proxy/gateway/server error page
-        if (text.includes('<!DOCTYPE html>') || text.includes('<html') || text.includes('<body')) {
-          errorMessage = `${fallbackError}: Server returned an HTML page instead of JSON. The backend server might be down, crashed, or unreachable (Status ${response.status}).`;
-        } else if (text) {
-          errorMessage = `${fallbackError}: ${text.slice(0, 150)}`;
-        } else {
-          errorMessage = `${fallbackError} (Status ${response.status})`;
-        }
-      }
-      throw new Error(errorMessage);
-    }
-
-    try {
-      return text ? JSON.parse(text) : {};
-    } catch (e) {
-      throw new Error(`Invalid response format from server (Status ${response.status})`);
-    }
-  }
-
-  async function handleArrayResponse<T>(response: Response, fallbackError: string) {
-    const data = await handleResponseJson(response, fallbackError);
-    if (!Array.isArray(data)) {
-      throw new Error(`${fallbackError}: Expected an array response.`);
-    }
-
-    return data as T[];
-  }
+  
 
   async function refreshTicketsForProject(projectId: string, fallbackTickets?: Ticket[]) {
     try {
-      const response = await fetch(`${API_URL}/tickets`, { headers: { 'X-Project-Id': projectId } });
-      const tickets = await handleArrayResponse<Ticket>(response, `Failed to refresh tickets for project ${projectId}`);
+      const response = await apiClient.get(`/tickets`, { projectId: projectId });
+      const tickets = response as Ticket[];
       dispatch({ type: 'SET_TICKETS_RAW', payload: tickets });
       return tickets;
     } catch (error) {
@@ -925,17 +864,11 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     try {
-      const response = await fetch(`${API_URL}/projects`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...projectInput,
-          ownerId: state.currentUser.id,
-          status: projectInput.status || 'active',
-        }),
+      const project = await apiClient.post<Project>(`/projects`, {
+        ...projectInput,
+        ownerId: state.currentUser.id,
+        status: projectInput.status || 'active',
       });
-
-      const project = await handleResponseJson(response, 'Failed to create project');
       await fetchInitialData(state.currentUser.id);
       setActiveProjectId(project.id);
       return project;
@@ -957,21 +890,12 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       existingProjectLabels.reduce((maxSortOrder, label) => Math.max(maxSortOrder, Number(label.sortOrder ?? 0)), -1) + 1;
 
     try {
-      const response = await fetch(`${API_URL}/labels`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Project-Id': projectId,
-        },
-        body: JSON.stringify({
-          name: labelInput.name,
-          color: labelInput.color || '#6B7280',
-          description: labelInput.description || '',
-          sortOrder: nextSortOrder,
-        }),
-      });
-
-      const label = await handleResponseJson(response, 'Failed to create label');
+      const label = await apiClient.post<Label>(`/labels`, {
+        name: labelInput.name,
+        color: labelInput.color || '#6B7280',
+        description: labelInput.description || '',
+        sortOrder: nextSortOrder,
+      }, { projectId });
       await fetchProjectData(projectId);
       return label;
     } catch (error) {
@@ -982,15 +906,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const updateLabel = useCallback(async (id: string, updates: Partial<Label>) => {
     try {
-      const response = await fetch(`${API_URL}/labels/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(updates),
-      });
-
-      const label = await handleResponseJson(response, 'Failed to update label');
+      const label = await apiClient.put<Label>(`/labels/${id}`, updates);
       if (activeProjectId) {
         await fetchProjectData(activeProjectId);
       }
@@ -1003,11 +919,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const deleteLabel = useCallback(async (id: string) => {
     try {
-      const response = await fetch(`${API_URL}/labels/${id}`, {
-        method: 'DELETE',
-      });
-
-      await handleResponseJson(response, 'Failed to delete label');
+      await apiClient.delete(`/labels/${id}`);
       if (activeProjectId) {
         await fetchProjectData(activeProjectId);
       }
@@ -1020,15 +932,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const assignLabelToTicket = useCallback(async (ticketId: string, labelId: string) => {
     try {
-      const response = await fetch(`${API_URL}/tickets/${ticketId}/labels`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ labelId }),
-      });
-
-      if (!response.ok) throw new Error('Failed to assign label');
+      await apiClient.post(`/tickets/${ticketId}/labels`, { labelId });
 
       if (activeProjectId) {
         await refreshTicketsForProject(activeProjectId);
@@ -1042,11 +946,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const unassignLabelFromTicket = useCallback(async (ticketId: string, labelId: string) => {
     try {
-      const response = await fetch(`${API_URL}/tickets/${ticketId}/labels/${labelId}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) throw new Error('Failed to unassign label');
+      await apiClient.delete(`/tickets/${ticketId}/labels/${labelId}`);
 
       if (activeProjectId) {
         await refreshTicketsForProject(activeProjectId);
@@ -1064,13 +964,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     try {
-      const response = await fetch(`${API_URL}/projects/invite/accept`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ inviteCode, userId: state.currentUser.id }),
-      });
-
-      const data = await handleResponseJson(response, 'Failed to join project');
+      const data = await apiClient.post<{ project: Project }>(`/projects/invite/accept`, { inviteCode, userId: state.currentUser.id });
       await fetchInitialData(state.currentUser.id);
       setActiveProjectId(data.project.id);
       return data.project;
@@ -1090,7 +984,8 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await handleResponseJson(response, 'Sign in failed');
+      if (!response.ok) throw new Error('Sign in failed');
+      const data = await response.json();
       dispatch({ type: 'SET_USER', payload: data.user });
       return true;
     } catch (e) {
@@ -1108,7 +1003,8 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         body: JSON.stringify({ name, email, password }),
       });
 
-      const data = await handleResponseJson(response, 'Registration failed');
+      if (!response.ok) throw new Error('Registration failed');
+      const data = await response.json();
       dispatch({ type: 'SET_USER', payload: data.user });
       return true;
     } catch (e) {
