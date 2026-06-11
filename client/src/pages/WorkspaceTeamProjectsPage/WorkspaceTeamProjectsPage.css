@@ -1,0 +1,347 @@
+.workspace-team-projects-page__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.workspace-team-projects-page__content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 28px 32px;
+}
+
+.workspace-team-projects-page__hero,
+.workspace-team-projects-page__layout,
+.workspace-team-projects-page__feedback,
+.workspace-team-projects-page__empty-shell {
+  max-width: 1360px;
+  margin: 0 auto;
+}
+
+.workspace-team-projects-page__hero {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 22px 24px;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(circle at top right, rgba(20, 184, 166, 0.16), transparent 32%),
+    radial-gradient(circle at bottom left, rgba(59, 130, 246, 0.16), transparent 28%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0)),
+    var(--color-surface-card);
+  box-shadow: var(--shadow-sm);
+}
+
+.workspace-team-projects-page__eyebrow,
+.workspace-team-projects-page__section-kicker {
+  margin-bottom: 6px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+}
+
+.workspace-team-projects-page__hero h2,
+.workspace-team-projects-page__section-header h3 {
+  margin: 0;
+  color: var(--color-text-primary);
+  letter-spacing: -0.02em;
+}
+
+.workspace-team-projects-page__hero h2 {
+  font-size: 26px;
+  font-weight: 850;
+}
+
+.workspace-team-projects-page__hero p,
+.workspace-team-projects-page__section-header p,
+.workspace-team-projects-page__empty p,
+.workspace-team-projects-page__project-card-body p {
+  margin: 8px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.workspace-team-projects-page__hero-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+.workspace-team-projects-page__hero-pill,
+.workspace-team-projects-page__meta-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.workspace-team-projects-page__hero-stat {
+  min-width: 140px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 4px;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--color-primary);
+}
+
+.workspace-team-projects-page__hero-stat span {
+  font-size: 28px;
+  font-weight: 850;
+  color: var(--color-text-primary);
+}
+
+.workspace-team-projects-page__hero-stat small {
+  color: var(--color-text-disabled);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.workspace-team-projects-page__feedback {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+
+.workspace-team-projects-page__feedback--success {
+  border: 1px solid rgba(16, 185, 129, 0.22);
+  background: rgba(16, 185, 129, 0.08);
+  color: #34d399;
+}
+
+.workspace-team-projects-page__feedback--error {
+  border: 1px solid rgba(239, 68, 68, 0.22);
+  background: rgba(239, 68, 68, 0.08);
+  color: #f87171;
+}
+
+.workspace-team-projects-page__layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.9fr) minmax(0, 1.1fr);
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.workspace-team-projects-page__projects-card,
+.workspace-team-projects-page__editor-card,
+.workspace-team-projects-page__empty-shell,
+.workspace-team-projects-page__empty {
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-card);
+  box-shadow: var(--shadow-sm);
+}
+
+.workspace-team-projects-page__projects-card,
+.workspace-team-projects-page__editor-card {
+  padding: 18px;
+}
+
+.workspace-team-projects-page__section-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 14px;
+}
+
+.workspace-team-projects-page__project-list {
+  display: grid;
+  gap: 12px;
+}
+
+.workspace-team-projects-page__project-card {
+  width: 100%;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.02);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.workspace-team-projects-page__project-card:hover {
+  transform: translateY(-1px);
+  border-color: var(--color-border-focus);
+}
+
+.workspace-team-projects-page__project-card--active {
+  border-color: var(--color-border-focus);
+  box-shadow: 0 0 0 1px var(--color-border-focus);
+  background:
+    radial-gradient(circle at top left, rgba(59, 130, 246, 0.12), transparent 30%),
+    rgba(255, 255, 255, 0.03);
+}
+
+.workspace-team-projects-page__project-card-top,
+.workspace-team-projects-page__project-card-footer,
+.workspace-team-projects-page__status-group,
+.workspace-team-projects-page__actions-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.workspace-team-projects-page__project-card-top,
+.workspace-team-projects-page__project-card-footer {
+  justify-content: space-between;
+}
+
+.workspace-team-projects-page__project-key,
+.workspace-team-projects-page__project-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: var(--radius-full);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.workspace-team-projects-page__project-key {
+  border: 1px solid var(--color-border-default);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--color-text-secondary);
+}
+
+.workspace-team-projects-page__project-status--planned {
+  background: rgba(234, 179, 8, 0.12);
+  color: #facc15;
+}
+
+.workspace-team-projects-page__project-status--active {
+  background: rgba(16, 185, 129, 0.12);
+  color: #34d399;
+}
+
+.workspace-team-projects-page__project-status--completed {
+  background: rgba(99, 102, 241, 0.12);
+  color: #818cf8;
+}
+
+.workspace-team-projects-page__project-name {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.workspace-team-projects-page__project-card-footer {
+  color: var(--color-text-disabled);
+  font-size: 11px;
+}
+
+.workspace-team-projects-page__form {
+  display: grid;
+  gap: 16px;
+}
+
+.workspace-team-projects-page__field-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: 12px;
+  align-items: end;
+}
+
+.workspace-team-projects-page input,
+.workspace-team-projects-page textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-app);
+  color: var(--color-text-primary);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.workspace-team-projects-page input {
+  min-height: 36px;
+  padding: 0 10px;
+}
+
+.workspace-team-projects-page textarea {
+  min-height: 88px;
+  padding: 10px;
+  resize: vertical;
+}
+
+.workspace-team-projects-page input:focus,
+.workspace-team-projects-page textarea:focus {
+  border-color: var(--color-border-focus);
+  box-shadow: 0 0 0 2px var(--color-state-focus-ring);
+}
+
+.workspace-team-projects-page__status-group {
+  gap: 10px;
+}
+
+.workspace-team-projects-page__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.workspace-team-projects-page__actions-row {
+  justify-content: flex-end;
+}
+
+.workspace-team-projects-page__empty-shell,
+.workspace-team-projects-page__empty {
+  display: grid;
+  place-items: center;
+  min-height: 240px;
+  padding: 18px;
+  text-align: center;
+  color: var(--color-text-disabled);
+}
+
+.workspace-team-projects-page__empty-title {
+  color: var(--color-text-primary);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+@media (max-width: 1080px) {
+  .workspace-team-projects-page__layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 960px) {
+  .workspace-team-projects-page__content {
+    padding: 16px;
+  }
+
+  .workspace-team-projects-page__hero {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+
+  .workspace-team-projects-page__field-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -20,6 +20,7 @@ interface WorkspaceTeamsPageProps {
   teams: SidebarTeam[];
   loading?: boolean;
   onBackToWorkspace: () => void;
+  onManageProjects?: (teamId: string) => void;
   onTeamsChanged?: () => Promise<void> | void;
 }
 
@@ -62,6 +63,7 @@ export function WorkspaceTeamsPage({
   teams,
   loading = false,
   onBackToWorkspace,
+  onManageProjects,
   onTeamsChanged,
 }: WorkspaceTeamsPageProps) {
   const queryClient = useQueryClient();
@@ -362,9 +364,17 @@ export function WorkspaceTeamsPage({
                           </Button>
                         </>
                       ) : (
-                        <Button type="button" variant="secondary" size="sm" onClick={() => handleStartEdit(team)}>
-                          Edit
-                        </Button>
+                        <>
+                          <Button type="button" variant="secondary" size="sm" onClick={() => handleStartEdit(team)}>
+                            Edit
+                          </Button>
+                          {onManageProjects ? (
+                            <Button type="button" variant="ghost" size="sm" onClick={() => onManageProjects(team.id)}>
+                              <FolderKanban size={13} />
+                              <span>Manage Projects</span>
+                            </Button>
+                          ) : null}
+                        </>
                       )}
                     </div>
                   </div>

@@ -68,6 +68,7 @@ export type CreateProjectInput = {
   key: string;
   status?: Project['status'];
   workspaceId?: string;
+  teamId?: string;
 };
 
 export interface Domain {

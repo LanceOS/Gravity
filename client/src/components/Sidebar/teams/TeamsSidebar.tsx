@@ -96,7 +96,10 @@ export function TeamsSidebar({
           return (
             <div key={team.id} className="teams-sidebar__team">
               <SidebarItem
-                active={isTeamActive && (activeScope !== 'projects' || teamCollapsed || projectsCollapsed)}
+                active={
+                  isTeamActive &&
+                  (activeScope !== 'projects' || teamCollapsed || projectsCollapsed || (activeScope === 'projects' && !activeProjectId))
+                }
                 onClick={() => onToggleTeam(team.id)}
                 leftIcon={
                   <div className="teams-sidebar__team-icon">

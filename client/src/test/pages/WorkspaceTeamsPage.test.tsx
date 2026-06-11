@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkspaceTeamsPage } from '../../pages/WorkspaceTeamsPage/WorkspaceTeamsPage.tsx';
 import type { SidebarTeam, SidebarTree } from '../../types/domain.ts';
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 const apiMocks = vi.hoisted(() => ({
   post: vi.fn(),
   patch: vi.fn(),
@@ -70,6 +72,7 @@ function renderWorkspaceTeamsPage(overrides: Partial<Parameters<typeof Workspace
     workspaceName: 'Gravity',
     teams,
     onBackToWorkspace: vi.fn(),
+    onManageProjects: vi.fn(),
     onTeamsChanged: vi.fn(),
     ...overrides,
   };
@@ -107,7 +110,7 @@ describe('WorkspaceTeamsPage', () => {
     expect(screen.getByText('Team workspace')).toBeInTheDocument();
     expect(screen.getByText('Engineering')).toBeInTheDocument();
     expect(screen.getByText('GRA · Gravity Core')).toBeInTheDocument();
-    expect(screen.queryByText('Manage Projects')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Manage Projects' })).toHaveLength(2);
 
     await user.click(screen.getByRole('button', { name: 'Back to Workspace' }));
     expect(props.onBackToWorkspace).toHaveBeenCalledTimes(1);
@@ -190,6 +193,18 @@ describe('WorkspaceTeamsPage', () => {
       });
       expect(props.onTeamsChanged).toHaveBeenCalled();
     });
+  });
+
+  it('navigates to team project management from the team card', async () => {
+    const user = userEvent.setup();
+    const { props } = renderWorkspaceTeamsPage();
+
+    const engineeringCard = screen.getByText('Engineering').closest('article');
+    expect(engineeringCard).not.toBeNull();
+
+    await user.click(within(engineeringCard as HTMLElement).getByRole('button', { name: 'Manage Projects' }));
+
+    expect(props.onManageProjects).toHaveBeenCalledWith('team-engineering');
   });
 
   it('allows deleting the last team without reassignment', async () => {

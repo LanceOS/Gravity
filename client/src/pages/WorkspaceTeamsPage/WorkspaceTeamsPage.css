@@ -252,6 +252,8 @@
 .workspace-teams-page__team-actions {
   gap: 8px;
   flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .workspace-teams-page__team-card textarea {

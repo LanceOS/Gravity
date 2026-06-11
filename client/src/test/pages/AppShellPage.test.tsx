@@ -6,6 +6,8 @@ import { MemoryRouter, useLocation, Route, Routes } from 'react-router-dom';
 import { AppShellPage } from '../../pages/AppShellPage/AppShellPage.tsx';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 /** Helper: captures the current MemoryRouter URL from inside the tree. */
 function LocationDisplay() {
   const loc = useLocation();
@@ -201,6 +203,18 @@ vi.mock('../../pages/WorkspaceProjectsPage/WorkspaceProjectsPage', () => ({
 
 vi.mock('../../pages/WorkspaceTeamsPage/WorkspaceTeamsPage', () => ({
   WorkspaceTeamsPage: () => <div>WorkspaceTeamsPage</div>,
+}));
+
+vi.mock('../../pages/WorkspaceTeamProjectsPage/WorkspaceTeamProjectsPage', () => ({
+  WorkspaceTeamProjectsPage: ({ team, projects, onBackToTeams }: any) => (
+    <div>
+      <div>WorkspaceTeamProjectsPage</div>
+      <div data-testid="team-projects-state">{`${team?.name ?? 'none'} ${projects.length}`}</div>
+      <button type="button" onClick={onBackToTeams}>
+        Back to Teams
+      </button>
+    </div>
+  ),
 }));
 
 vi.mock('../../pages/AccountPreferencesPage/AccountPreferencesPage', () => ({
@@ -407,6 +421,7 @@ function renderAppShell({
           <Route path="/workspaces/:workspaceId/teams/:teamId/views/:viewId" element={<AppShellPage />} />
           <Route path="/workspaces/:workspaceId/teams/:teamId/cycles/:cycleId" element={<AppShellPage />} />
           <Route path="/workspaces/:workspaceId/teams/:teamId/domains/:domainId" element={<AppShellPage />} />
+          <Route path="/workspaces/:workspaceId/teams/:teamId/projects" element={<AppShellPage />} />
           <Route path="/workspaces/:workspaceId/teams/:teamId/projects/:projectId/tickets" element={<AppShellPage />} />
           <Route path="/workspaces/:workspaceId/teams/:teamId/projects/:projectId/tickets/:ticketKey" element={<AppShellPage />} />
           <Route path="/workspaces/:workspaceId" element={<AppShellPage />} />
@@ -716,6 +731,42 @@ describe('AppShellPage', () => {
     await waitFor(() => {
       expect(screen.getByTestId('location-display').textContent).toBe('/workspaces/workspace-1/teams');
       expect(screen.getByText('WorkspaceTeamsPage')).toBeInTheDocument();
+    });
+  });
+
+  it('routes team project management to the dedicated team projects page', async () => {
+    mockAggregateApiResponses();
+
+    renderAppShell({
+      tickets: buildUseTickets({
+        projects: aggregateProjects,
+        activeProjectId: 'project-1',
+      }),
+      directory: buildWorkspaceDirectory({
+        workspaces: [
+          {
+            id: 'workspace-1',
+            name: 'Gravity',
+            description: 'Main workspace',
+            key: 'GRA',
+            defaultProjectId: 'project-1',
+            hostUrl: 'http://localhost:8080',
+            joinMode: 'approval_required',
+            hierarchyMode: 'teams',
+            projectCount: 3,
+            memberCount: 1,
+            pendingJoinRequestCount: 0,
+            memberRole: 'owner',
+          },
+        ],
+      }),
+      initialEntries: ['/workspaces/workspace-1/teams/team-1/projects'],
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('WorkspaceTeamProjectsPage')).toBeInTheDocument();
+      expect(screen.getByTestId('team-projects-state')).toHaveTextContent('Engineering 2');
+      expect(screen.getByTestId('location-display').textContent).toBe('/workspaces/workspace-1/teams/team-1/projects');
     });
   });
 

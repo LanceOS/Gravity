@@ -23,12 +23,13 @@ import { LoadingPage } from '../LoadingPage/LoadingPage';
 import { WorkspaceDirectoryPage } from '../WorkspaceDirectoryPage/WorkspaceDirectoryPage';
 import { WorkspacePage, type WorkspaceIssueView } from '../WorkspacePage/WorkspacePage';
 import { WorkspaceProjectsPage } from '../WorkspaceProjectsPage/WorkspaceProjectsPage';
+import { WorkspaceTeamProjectsPage } from '../WorkspaceTeamProjectsPage/WorkspaceTeamProjectsPage';
 import { WorkspaceTeamsPage } from '../WorkspaceTeamsPage/WorkspaceTeamsPage';
 import { TicketDetailRoute } from '../../modules/tickets/components/TicketDetailRoute';
 import { WorkspaceMcpModal } from '../../modules/workspaces/components/WorkspaceMcpModal';
 import './AppShellPage.css';
 
-type AppSection = 'directory' | 'workspace' | 'settings' | 'account' | 'projects' | 'teams';
+type AppSection = 'directory' | 'workspace' | 'settings' | 'account' | 'projects' | 'teams' | 'team-projects';
 
 function getActiveWorkspaceStorageKey(userId: string) {
   return `gravity_active_workspace:${userId}`;
@@ -338,6 +339,10 @@ export function AppShellPage() {
     const isTeamsManagementPath =
       pathname === `/workspaces/${workspaceId}/teams` ||
       pathname === `/workspaces/${workspaceId}/teams/`;
+    const isTeamProjectsManagementPath = !!teamIdParam && (
+      pathname === `/workspaces/${workspaceId}/teams/${teamIdParam}/projects` ||
+      pathname === `/workspaces/${workspaceId}/teams/${teamIdParam}/projects/`
+    );
     const isNotesPath = pathname.includes('/notes');
     const isTicketsPath = pathname.includes('/tickets');
 
@@ -357,6 +362,13 @@ export function AppShellPage() {
 
     if (isTeamsManagementPath) {
       setActiveSection('teams');
+      setActiveTicket(null);
+      setActiveNoteId('');
+      return;
+    }
+
+    if (isTeamProjectsManagementPath) {
+      setActiveSection('team-projects');
       setActiveTicket(null);
       setActiveNoteId('');
       return;
@@ -876,6 +888,14 @@ export function AppShellPage() {
     navigate(`/workspaces/${activeWorkspaceId}/teams`);
   };
 
+  const handleOpenTeamProjectsManager = (teamId: string) => {
+    if (!activeWorkspace) {
+      navigate('/workspaces');
+      return;
+    }
+    navigate(`/workspaces/${activeWorkspaceId}/teams/${teamId}/projects`);
+  };
+
   const handleSetFilters = useCallback((updates: Partial<typeof filters>) => {
     const nextParams = new URLSearchParams(searchParams);
     const merged = { ...filters, ...updates };
@@ -1016,8 +1036,11 @@ export function AppShellPage() {
     sidebarTree?.teams?.find((team) => team.projects?.some((project) => project.id === (projectIdParam || activeProjectId)))?.id ||
     '';
   const sidebarActiveTeamId = teamIdParam || activeProjectTeamId;
+  const isTeamProjectsManager = activeSection === 'team-projects';
   const sidebarActiveScope: SidebarNavigationState['activeScope'] = isWorkspaceAllTasksPath
     ? 'workspace'
+    : isTeamProjectsManager
+      ? 'projects'
     : teamIdParam
       ? projectIdParam
         ? 'projects'
@@ -1032,13 +1055,16 @@ export function AppShellPage() {
   const sidebarNavigationState: SidebarNavigationState = {
     activeTeam: sidebarActiveTeamId,
     activeScope: sidebarActiveScope,
-    activeProject: sidebarActiveScope === 'projects' ? (projectIdParam || activeProjectId) : '',
+    activeProject: sidebarActiveScope === 'projects' && !isTeamProjectsManager ? (projectIdParam || activeProjectId) : '',
   };
   const sidebarActiveViewId = teamIdParam && sidebarActiveScope === 'views'
     ? (viewIdParam || 'all')
     : '';
   const activeTeam = sidebarTree?.teams?.find((team) => team.id === sidebarActiveTeamId);
   const activeTeamProjectIds = new Set(activeTeam?.projects?.map((project) => project.id) ?? []);
+  const teamProjectsForManager = teamIdParam
+    ? activeWorkspaceProjects.filter((project) => project.teamId === teamIdParam || activeTeamProjectIds.has(project.id))
+    : [];
   const isTimelineAggregatePath = isTeamAggregatePath && viewIdParam === 'timeline';
   const effectiveActiveView: WorkspaceIssueView = isTimelineAggregatePath
     ? 'timeline'
@@ -1061,7 +1087,7 @@ export function AppShellPage() {
     activeWorkspaceProjects[0]?.id ||
     '';
   const isTeamWorkspace = (sidebarTree?.hierarchyMode ?? activeWorkspace.hierarchyMode) === 'teams';
-  const showTeamsManager = activeSection === 'teams' || (isTeamWorkspace && activeSection === 'projects');
+  const isTeamsManager = activeSection === 'teams' || (isTeamWorkspace && activeSection === 'projects');
   const isWorkspaceOwner = activeWorkspace.memberRole === 'owner';
 
   const sidebarProps: SidebarProps = {
@@ -1116,7 +1142,7 @@ export function AppShellPage() {
     },
     userMenu: {
       currentUser,
-      activeArea: showTeamsManager ? 'teams' : activeSection === 'projects' ? 'projects' : 'workspace',
+      activeArea: isTeamsManager || isTeamProjectsManager ? 'teams' : activeSection === 'projects' ? 'projects' : 'workspace',
       showWorkspaceManagement: !isTeamWorkspace || isWorkspaceOwner,
       workspaceManagementLabel: isTeamWorkspace ? 'Manage Teams' : 'Manage Projects',
       workspaceManagementArea: isTeamWorkspace ? 'teams' : 'projects',
@@ -1209,16 +1235,29 @@ export function AppShellPage() {
             </>
           }
         >
-          {showTeamsManager ? (
+          {isTeamsManager ? (
             <WorkspaceTeamsPage
               workspaceId={activeWorkspaceId}
               workspaceName={activeWorkspace.name}
               teams={sidebarTree?.teams ?? []}
               loading={!sidebarTree}
               onBackToWorkspace={() => navigate(`/workspaces/${activeWorkspaceId}`)}
+              onManageProjects={handleOpenTeamProjectsManager}
               onTeamsChanged={async () => {
                 await refreshWorkspaces();
               }}
+            />
+          ) : isTeamProjectsManager ? (
+            <WorkspaceTeamProjectsPage
+              workspaceId={activeWorkspaceId}
+              workspaceName={activeWorkspace.name}
+              team={activeTeam ?? null}
+              projects={teamProjectsForManager}
+              activeProjectId={activeProjectId}
+              loading={!sidebarTree || !activeTeam}
+              onBackToTeams={() => navigate(`/workspaces/${activeWorkspaceId}/teams`)}
+              onCreateProject={createProject}
+              onUpdateProject={updateProject}
             />
           ) : activeSection === 'projects' ? (
             <WorkspaceProjectsPage
