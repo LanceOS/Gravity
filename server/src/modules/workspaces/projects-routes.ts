@@ -19,6 +19,7 @@ import {
 import { buildProjectKeyConflictMessage, mapProjectCreationError, projectKeyExists } from './utils/project-creation.js';
 import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
 import { isValidGitHubRepoUrl } from '../../lib/webhookSignature.js';
+import { authorizeWorkspaceAccess } from './services/membership.js';
 
 function mapProject(project: typeof projects.$inferSelect) {
   return {
@@ -87,12 +88,23 @@ export function createProjectsRouter() {
 
   router.post('/projects', async (req, res) => {
     const { name, description, key, status, ownerId, workspaceId, teamId } = req.body ?? {};
-    if (!name || !key || !ownerId) {
-      res.status(400).json({ error: 'Project name, key, and ownerId are required.' });
+    if (!name || !key) {
+      res.status(400).json({ error: 'Project name and key are required.' });
       return;
     }
 
     try {
+      const actorUserId = await resolveRequestActorUserId(req);
+      if (!actorUserId) {
+        res.status(401).json({ error: 'Authentication required.' });
+        return;
+      }
+
+      if (typeof ownerId === 'string' && ownerId !== actorUserId) {
+        res.status(403).json({ error: 'Forbidden.' });
+        return;
+      }
+
       const projectId = createId('p');
       const normalizedKey = normalizeEntityKey(key);
       if (await projectKeyExists(normalizedKey)) {
@@ -101,6 +113,14 @@ export function createProjectsRouter() {
       }
 
       let targetWorkspaceId = workspaceId as string | undefined;
+      if (targetWorkspaceId) {
+        const auth = await authorizeWorkspaceAccess(req, targetWorkspaceId);
+        if (!auth.allowed) {
+          res.status(auth.status ?? 403).json({ error: auth.error });
+          return;
+        }
+      }
+
       if (typeof teamId === 'string') {
         if (!targetWorkspaceId) {
           res.status(400).json({ error: 'teamId can only be provided when workspaceId is specified.' });
@@ -118,7 +138,7 @@ export function createProjectsRouter() {
         description,
         key: normalizedKey,
         status,
-        ownerId,
+        ownerId: actorUserId,
         workspaceId: targetWorkspaceId,
         teamId,
       });
