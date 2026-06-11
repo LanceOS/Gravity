@@ -649,6 +649,8 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
     const { owner, project } = await seedWorkspaceFixture({
       owner: { id: ownerApi.user.id, name: ownerApi.user.name, email: ownerApi.user.email, role: 'owner' }
     });
+    await db.update(projects).set({ githubRepoUrl: 'https://github.com/test/repo' }).where(eq(projects.id, project.id));
+
     const ticket = await seedTicket(project.id, {
       id: 'ticket-webhook-1',
       key: `${project.key}-7`,
@@ -666,6 +668,9 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
         merged: false,
         user: { login: 'octocat' },
       },
+      repository: {
+        html_url: 'https://github.com/test/repo',
+      },
     });
 
     expect(webhookResponse.status).toBe(200);
@@ -678,7 +683,7 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
     expect(ticketResponse.status).toBe(200);
     expect(ticketResponse.body).toMatchObject({
       id: ticket.id,
-      status: 'in_review',
+      status: 'in_progress',
       prStatus: 'open',
       prUrl: 'https://github.com/test/repo/pull/42',
     });

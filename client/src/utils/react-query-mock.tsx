@@ -197,6 +197,14 @@ export class QueryClient {
     return promise;
   }
 
+  public async prefetchQuery<T>(options: { queryKey: QueryKey; queryFn: () => Promise<T>; staleTime?: number; gcTime?: number }): Promise<void> {
+    try {
+      await this.fetchQuery(options.queryKey, options.queryFn, options);
+    } catch (e) {
+      // prefetchQuery ignores errors
+    }
+  }
+
   public clear() {
     this.cache.clear();
   }
@@ -244,9 +252,10 @@ export function useQuery<T>({ queryKey, queryFn, enabled = true, staleTime, gcTi
   );
 
   const isStale = useMemo(() => {
-    if (staleTime === Infinity) return false;
+    const sTime = staleTime ?? 0;
+    if (sTime === Infinity) return false;
     // For staleTime === 0, it's always stale if we have data.
-    return state.updatedAt ? Date.now() - state.updatedAt >= staleTime : true;
+    return state.updatedAt ? Date.now() - state.updatedAt >= sTime : true;
   }, [state.updatedAt, staleTime]);
 
   const hasFetchedOnMount = useRef(false);
@@ -302,7 +311,7 @@ export function useMutation<TData = any, TVariables = any, TContext = any>({
     variables: undefined as TVariables | undefined,
   });
 
-  const mutateAsync = useCallback(async (variables: TVariables): Promise<TData> => {
+  const mutateAsync = useCallback(async (variables: TVariables = undefined as any): Promise<TData> => {
     setState({
       data: undefined,
       error: null,

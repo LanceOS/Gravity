@@ -27,6 +27,7 @@ function mapProject(project: typeof projects.$inferSelect) {
     key: project.key,
     status: project.status,
     workspaceId: project.workspaceId,
+    githubRepoUrl: project.githubRepoUrl,
   };
 }
 
@@ -114,6 +115,7 @@ export function createProjectsRouter() {
         name: typeof req.body?.name === 'string' ? req.body.name : undefined,
         description: typeof req.body?.description === 'string' ? req.body.description : undefined,
         status: typeof req.body?.status === 'string' ? req.body.status : undefined,
+        githubRepoUrl: typeof req.body?.githubRepoUrl === 'string' || req.body?.githubRepoUrl === null ? req.body.githubRepoUrl : undefined,
       });
 
       if (!updatedProject) {

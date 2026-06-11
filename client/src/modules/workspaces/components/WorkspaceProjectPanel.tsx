@@ -21,6 +21,7 @@ export function WorkspaceProjectPanel({
   labelCreateError,
   onSelectProject,
   onCreateProject,
+  onUpdateProject,
   onCreateLabel,
   onUpdateLabel,
   onDeleteLabel,
@@ -64,6 +65,39 @@ export function WorkspaceProjectPanel({
 
     return managedProject?.id === activeProjectId;
   }, [activeProjectId, managedProject]);
+
+  const [githubRepoUrl, setGithubRepoUrl] = useState('');
+  const [isProjectSettingsSaving, setIsProjectSettingsSaving] = useState(false);
+  const [settingsFeedback, setSettingsFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  useEffect(() => {
+    if (managedProject) {
+      setGithubRepoUrl(managedProject.githubRepoUrl || '');
+      setSettingsFeedback(null);
+    }
+  }, [managedProject]);
+
+  const handleSaveProjectSettings = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!managedProject) return;
+
+    setIsProjectSettingsSaving(true);
+    setSettingsFeedback(null);
+
+    try {
+      await onUpdateProject(managedProject.id, {
+        githubRepoUrl: githubRepoUrl.trim() || null,
+      });
+      setSettingsFeedback({ type: 'success', message: 'Project settings updated successfully.' });
+    } catch (error) {
+      setSettingsFeedback({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Failed to update project settings.',
+      });
+    } finally {
+      setIsProjectSettingsSaving(false);
+    }
+  };
 
   const sortedLabels = useMemo(
     () =>
@@ -469,6 +503,50 @@ export function WorkspaceProjectPanel({
                 Create Label
               </Button>
             </div>
+          </form>
+        </section>
+      ) : null}
+
+      {managedProject ? (
+        <section className="workspace-page__project-domains">
+          <div className="workspace-page__project-domain-header">
+            <div>
+              <div className="workspace-page__projects-eyebrow">Project Settings</div>
+              <h3 className="workspace-page__project-manager-title">{managedProject.name} settings</h3>
+            </div>
+            <p className="workspace-page__project-browser-copy workspace-page__project-browser-copy--left">
+              Connect this project to a GitHub repository to enable automatic ticket status updates based on PR lifecycle.
+            </p>
+          </div>
+
+          <form className="workspace-page__domain-form" onSubmit={handleSaveProjectSettings} style={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'end', gap: '16px' }}>
+            <TextInput
+              label="GitHub Repository URL"
+              value={githubRepoUrl}
+              onChange={(event) => setGithubRepoUrl(event.target.value)}
+              placeholder="https://github.com/owner/repository"
+              disabled={isProjectSettingsSaving}
+            />
+
+            <div className="workspace-page__project-form-actions workspace-page__project-form-actions--inline" style={{ minHeight: '36px' }}>
+              <Button
+                type="submit"
+                variant="primary"
+                loading={isProjectSettingsSaving}
+                style={{ minHeight: '36px' }}
+              >
+                Save Settings
+              </Button>
+            </div>
+
+            {settingsFeedback ? (
+              <div
+                className={`workspace-page__project-feedback workspace-page__project-feedback--${settingsFeedback.type}`}
+                style={{ gridColumn: '1 / -1', marginTop: '8px' }}
+              >
+                {settingsFeedback.message}
+              </div>
+            ) : null}
           </form>
         </section>
       ) : null}

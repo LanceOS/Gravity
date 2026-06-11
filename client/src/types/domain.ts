@@ -25,6 +25,7 @@ export interface Project {
   key: string;
   status: 'planned' | 'active' | 'completed';
   workspaceId?: string | null;
+  githubRepoUrl?: string | null;
 }
 
 export type CreateProjectInput = {

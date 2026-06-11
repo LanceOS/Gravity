@@ -62,6 +62,7 @@ export function AppShellPage() {
     theme,
     tickets,
     updateTicket,
+    updateProject,
     users,
   } = useTickets();
 
@@ -1020,6 +1021,7 @@ export function AppShellPage() {
               labelCreateError={labelCreateError}
               onBackToWorkspace={() => navigate(`/workspaces/${activeWorkspaceId}`)}
               onCreateProject={handleCreateProject}
+              onUpdateProject={updateProject}
               onCreateLabel={handleCreateLabel}
               onUpdateLabel={handleUpdateLabel}
               onDeleteLabel={handleDeleteLabel}

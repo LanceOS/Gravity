@@ -24,6 +24,19 @@ export function createWebhookRouter() {
       return;
     }
 
+    const repoUrl = pr.base?.repo?.html_url || payload?.repository?.html_url;
+    if (!repoUrl) {
+      res.status(400).json({ error: 'Missing repository url' });
+      return;
+    }
+
+    const linkedProjects = await db.select().from(projects).where(eq(projects.githubRepoUrl, repoUrl));
+    if (linkedProjects.length === 0) {
+      res.json({ success: true, message: 'Webhook received but no matching projects found for this repository' });
+      return;
+    }
+    const linkedProjectIds = linkedProjects.map(p => p.id);
+
     const prTitle = pr.title || '';
     const prBranch = pr.head?.ref || '';
     const prUrl = pr.html_url || '';
@@ -43,7 +56,7 @@ export function createWebhookRouter() {
 
     for (const key of keysFound) {
       const ticket = await getTicketByKey(key);
-      if (!ticket) {
+      if (!ticket || !linkedProjectIds.includes(ticket.projectId)) {
         continue;
       }
 
@@ -51,6 +64,9 @@ export function createWebhookRouter() {
       let nextTicketStatus = ticket.status;
 
       if (action === 'opened' || action === 'reopened') {
+        nextPrStatus = 'open';
+        nextTicketStatus = 'in_progress';
+      } else if (action === 'review_requested' || action === 'ready_for_review') {
         nextPrStatus = 'open';
         nextTicketStatus = 'in_review';
       } else if (action === 'closed' && isMerged) {

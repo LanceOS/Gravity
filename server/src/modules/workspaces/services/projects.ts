@@ -38,6 +38,7 @@ export async function listProjectsWithDetails(userId: string, workspaceId?: stri
       key: projects.key,
       status: projects.status,
       workspaceId: projects.workspaceId,
+      githubRepoUrl: projects.githubRepoUrl,
     })
     .from(projects)
     .innerJoin(projectMembers, and(eq(projectMembers.projectId, projects.id), eq(projectMembers.userId, userId)));
@@ -157,13 +158,14 @@ export async function createProjectRecord(params: {
   return project;
 }
 
-export async function updateProjectRecord(projectId: string, params: { name?: string; description?: string; status?: string }) {
+export async function updateProjectRecord(projectId: string, params: { name?: string; description?: string; status?: string; githubRepoUrl?: string | null }) {
   const rows = await db
     .update(projects)
     .set({
       ...(typeof params.name === 'string' ? { name: params.name } : {}),
       ...(typeof params.description === 'string' ? { description: params.description } : {}),
       ...(typeof params.status === 'string' ? { status: params.status } : {}),
+      ...(typeof params.githubRepoUrl === 'string' || params.githubRepoUrl === null ? { githubRepoUrl: params.githubRepoUrl } : {}),
       updatedAt: new Date(),
     })
     .where(eq(projects.id, projectId))
