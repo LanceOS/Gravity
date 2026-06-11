@@ -60,6 +60,7 @@ export function TeamsSidebar({
   const activeScope = navigationState.activeScope;
   const activeProjectId = navigationState.activeProject;
   const activeViewId = section.activeViewId || (activeScope === 'views' ? 'all' : '');
+  const teams = section.teams ?? [];
 
   return (
     <div className="teams-sidebar">
@@ -74,7 +75,14 @@ export function TeamsSidebar({
       </SidebarGroup>
 
       <SidebarGroup label="Teams">
-        {section.teams!.map((team) => {
+        {teams.length === 0 ? (
+          <div className="teams-sidebar__empty-state">
+            <div className="teams-sidebar__empty-state-title">Create your first team</div>
+            <div className="teams-sidebar__empty-state-copy">
+              Teams organize projects, cycles, labels, and aggregate task views in this workspace.
+            </div>
+          </div>
+        ) : teams.map((team) => {
           const teamContainsActiveProject =
             !!activeProjectId && team.projects?.some((p) => p.id === activeProjectId);
           const isTeamActive = activeTeamId === team.id || teamContainsActiveProject;

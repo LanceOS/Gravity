@@ -25,7 +25,7 @@ export function SidebarProjectsSection({
   onToggleTeam,
   onToggleTeamProjects,
 }: SidebarProjectsSectionProps) {
-  if (section.hierarchyMode === 'teams' && section.teams && section.teams.length > 0) {
+  if (section.hierarchyMode === 'teams') {
     return (
       <TeamsSidebar
         section={section}

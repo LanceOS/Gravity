@@ -73,6 +73,26 @@
   font-size: 12px;
 }
 
+.teams-sidebar__empty-state {
+  margin-left: 12px;
+  padding: 8px 10px 8px 30px;
+  display: grid;
+  gap: 4px;
+  color: var(--color-text-secondary);
+}
+
+.teams-sidebar__empty-state-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.teams-sidebar__empty-state-copy {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--color-text-disabled);
+}
+
 /* ── Shared: colour dot used inside left-icon slots ─ */
 .teams-sidebar__domain-dot {
   width: 8px;
