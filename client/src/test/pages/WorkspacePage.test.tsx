@@ -197,6 +197,17 @@ describe('WorkspacePage', () => {
     expect(props.onOpenProjectManager).toHaveBeenCalledTimes(1);
   });
 
+  it('prompts team workspaces to create their first team when no projects exist', async () => {
+    const user = userEvent.setup();
+    const { props } = renderWorkspacePage({ projects: [], tickets: [], isTeamWorkspace: true });
+
+    expect(screen.getByText('Create your first team')).toBeInTheDocument();
+    expect(screen.queryByText('Manage Projects')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Create Team' }));
+    expect(props.onOpenProjectManager).toHaveBeenCalledTimes(1);
+  });
+
   it('renders the board view with filtered ticket counts and clears filters', async () => {
     const user = userEvent.setup();
     const { props } = renderWorkspacePage({

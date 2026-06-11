@@ -28,6 +28,7 @@ interface WorkspacePageProps {
   activeTicket: Ticket | null;
   activeView: WorkspaceIssueView;
   viewModeLocked?: boolean;
+  isTeamWorkspace?: boolean;
   currentUser: User | null;
   cycles: Cycle[];
   labels?: Label[];
@@ -90,6 +91,7 @@ export function WorkspacePage({
   activeTicket,
   activeView,
   viewModeLocked = false,
+  isTeamWorkspace = false,
   currentUser,
   cycles,
   labels: labelItems,
@@ -299,9 +301,13 @@ export function WorkspacePage({
                     <ErrorBoundary onReset={reset}>
                       {projects.length === 0 ? (
                         <div className="workspace-page__empty-state">
-                          <div className="workspace-page__empty-state-title">No projects in this workspace yet</div>
+                          <div className="workspace-page__empty-state-title">
+                            {isTeamWorkspace ? 'Create your first team' : 'No projects in this workspace yet'}
+                          </div>
                           <p className="workspace-page__empty-state-copy">
-                            Open Manage Projects to create the first project for this workspace. Once a project exists, tickets, labels, and cycles will become available here.
+                            {isTeamWorkspace
+                              ? 'Teams organize projects, cycles, labels, and aggregate task views in this workspace. Create the first team to start building out your workspace.'
+                              : 'Open Manage Projects to create the first project for this workspace. Once a project exists, tickets, labels, and cycles will become available here.'}
                           </p>
                           <div className="workspace-page__empty-state-actions">
                             <Button
@@ -310,7 +316,7 @@ export function WorkspacePage({
                               className="workspace-page__projects-button workspace-page__projects-button--primary"
                               onClick={onOpenProjectManager}
                             >
-                              Manage Projects
+                              {isTeamWorkspace ? 'Create Team' : 'Manage Projects'}
                             </Button>
                           </div>
                         </div>

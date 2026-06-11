@@ -148,6 +148,11 @@ export function createProjectsRouter() {
         inviteCode: project.inviteCode,
       });
     } catch (error) {
+      if (error instanceof Error && error.message === 'Team workspaces require a team before creating projects.') {
+        res.status(400).json({ error: 'Team workspaces require a team before creating projects.' });
+        return;
+      }
+
       const mapped = mapProjectCreationError(error, normalizeEntityKey(key));
       res.status(mapped.status).json({ error: mapped.message });
     }

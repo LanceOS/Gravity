@@ -1,8 +1,5 @@
-import { eq } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
-import { db } from '../src/db/index.js';
-import { projects, teams } from '../src/db/schema.js';
-import { api, createAuthenticatedApi, seedUser, seedWorkspaceFixture } from './helpers/test-helpers.js';
+import { api, createAuthenticatedApi, seedWorkspaceFixture } from './helpers/test-helpers.js';
 
 describe('workspaces routes', () => {
   it('creates, lists, and updates workspaces with settings and members', async () => {
@@ -21,8 +18,6 @@ describe('workspaces routes', () => {
         description: 'The main Gravity workspace.',
         key: 'GRV',
         ownerId: owner.id,
-        defaultProjectName: 'Gravity App',
-        defaultProjectKey: 'GRV',
       });
 
     expect(createResponse.status).toBe(201);
@@ -30,27 +25,17 @@ describe('workspaces routes', () => {
       name: 'Gravity Core',
       key: 'GRV',
       memberRole: 'owner',
-      projectCount: 1,
+      projectCount: 0,
       memberCount: 1,
     });
 
     const workspaceId = createResponse.body.workspace.id;
     const defaultProjectId = createResponse.body.workspace.defaultProjectId;
+    expect(defaultProjectId).toBeNull();
 
     const teamsResponse = await ownerApi.get('/api/v1/teams').query({ workspaceId });
     expect(teamsResponse.status).toBe(200);
-    expect(teamsResponse.body).toEqual([
-      expect.objectContaining({
-        workspaceId,
-        name: 'General',
-      }),
-    ]);
-
-    const defaultProjectRows = await db.select().from(projects).where(eq(projects.id, defaultProjectId)).limit(1);
-    expect(defaultProjectRows[0]?.teamId).toBe(teamsResponse.body[0].id);
-
-    const generalTeamRows = await db.select().from(teams).where(eq(teams.id, teamsResponse.body[0].id)).limit(1);
-    expect(generalTeamRows[0]?.workspaceId).toBe(workspaceId);
+    expect(teamsResponse.body).toEqual([]);
 
     const listResponse = await ownerApi.get('/api/v1/workspaces').query({ userId: owner.id });
     expect(listResponse.status).toBe(200);
@@ -58,7 +43,7 @@ describe('workspaces routes', () => {
       expect.objectContaining({
         id: workspaceId,
         name: 'Gravity Core',
-        projectCount: 1,
+        projectCount: 0,
         memberCount: 1,
       }),
     ]);
@@ -77,7 +62,7 @@ describe('workspaces routes', () => {
       workspaceId,
       joinMode: 'approval_required',
       hierarchyMode: 'flat',
-      defaultProjectId,
+      defaultProjectId: null,
     });
 
     const patchResponse = await ownerApi
@@ -177,7 +162,7 @@ describe('workspaces routes', () => {
       avatarUrl: 'https://example.com/grace.png',
     });
     const owner = ownerApi.user;
-    const { workspace, project } = await seedWorkspaceFixture({
+    const { workspace } = await seedWorkspaceFixture({
       owner: {
         id: owner.id,
         name: owner.name,

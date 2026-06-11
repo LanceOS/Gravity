@@ -145,6 +145,71 @@ export async function createProjectRecord(params: {
         createdAt: new Date(),
         updatedAt: new Date(),
       });
+    } else {
+      const settingsRows = await tx
+        .select({ hierarchyMode: workspaceSettings.hierarchyMode })
+        .from(workspaceSettings)
+        .where(eq(workspaceSettings.workspaceId, targetWorkspaceId))
+        .limit(1);
+
+      const hierarchyMode = settingsRows[0]?.hierarchyMode === 'teams' ? 'teams' : 'flat';
+      const teamRows = await tx
+        .select({ id: teams.id })
+        .from(teams)
+        .where(eq(teams.workspaceId, targetWorkspaceId))
+        .orderBy(asc(teams.createdAt));
+
+      let resolvedTeamId = params.teamId;
+      if (!resolvedTeamId) {
+        if (hierarchyMode === 'teams') {
+          if (teamRows.length === 1) {
+            resolvedTeamId = teamRows[0].id;
+          } else {
+            throw new Error('Team workspaces require a team before creating projects.');
+          }
+        } else if (teamRows.length === 0) {
+          resolvedTeamId = getDefaultTeamId(targetWorkspaceId);
+          await tx.insert(teams).values({
+            id: resolvedTeamId,
+            workspaceId: targetWorkspaceId,
+            name: DEFAULT_TEAM_NAME,
+            description: DEFAULT_TEAM_DESCRIPTION,
+            color: DEFAULT_TEAM_COLOR,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+        } else {
+          resolvedTeamId = teamRows[0].id;
+        }
+      }
+
+      if (!resolvedTeamId) {
+        throw new Error('A team is required to create a project.');
+      }
+
+      await tx.insert(projects).values({
+        id: projectId,
+        workspaceId: targetWorkspaceId,
+        teamId: resolvedTeamId,
+        name: params.name,
+        description: params.description ?? '',
+        key: normalizedKey,
+        status: params.status ?? 'active',
+        inviteCode: createProjectInviteCode(normalizedKey),
+        createdBy: params.ownerId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      await tx
+        .update(workspaces)
+        .set({ defaultProjectId: projectId })
+        .where(and(eq(workspaces.id, targetWorkspaceId), isNull(workspaces.defaultProjectId)));
+
+      await ensureWorkspaceMembership(targetWorkspaceId, params.ownerId, 'owner', undefined, tx);
+      await ensureProjectMembership(projectId, params.ownerId, 'owner', undefined, tx);
+      await addWorkspaceMembersToProject(targetWorkspaceId, projectId, tx);
+      return;
     }
 
     await tx.insert(projects).values({

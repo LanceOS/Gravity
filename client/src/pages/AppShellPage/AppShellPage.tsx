@@ -684,8 +684,6 @@ export function AppShellPage() {
     description: string;
     key: string;
     workspaceKey?: string;
-    defaultProjectName?: string;
-    defaultProjectKey?: string;
   }) => {
     const workspace = await createWorkspace(workspaceInput);
     if (!workspace || !currentUser) {
@@ -1063,6 +1061,7 @@ export function AppShellPage() {
     activeWorkspaceProjects[0]?.id ||
     '';
   const isTeamWorkspace = (sidebarTree?.hierarchyMode ?? activeWorkspace.hierarchyMode) === 'teams';
+  const showTeamsManager = activeSection === 'teams' || (isTeamWorkspace && activeSection === 'projects');
   const isWorkspaceOwner = activeWorkspace.memberRole === 'owner';
 
   const sidebarProps: SidebarProps = {
@@ -1117,7 +1116,7 @@ export function AppShellPage() {
     },
     userMenu: {
       currentUser,
-      activeArea: activeSection === 'projects' || activeSection === 'teams' ? activeSection : 'workspace',
+      activeArea: showTeamsManager ? 'teams' : activeSection === 'projects' ? 'projects' : 'workspace',
       showWorkspaceManagement: !isTeamWorkspace || isWorkspaceOwner,
       workspaceManagementLabel: isTeamWorkspace ? 'Manage Teams' : 'Manage Projects',
       workspaceManagementArea: isTeamWorkspace ? 'teams' : 'projects',
@@ -1210,7 +1209,7 @@ export function AppShellPage() {
             </>
           }
         >
-          {activeSection === 'teams' ? (
+          {showTeamsManager ? (
             <WorkspaceTeamsPage
               workspaceId={activeWorkspaceId}
               workspaceName={activeWorkspace.name}
@@ -1251,6 +1250,7 @@ export function AppShellPage() {
               activeTicket={activeTicket}
               activeView={effectiveActiveView}
               viewModeLocked={lockWorkspaceIssueView}
+              isTeamWorkspace={isTeamWorkspace}
               currentUser={currentUser}
               cycles={scopedCycles}
               labels={scopedLabels}
@@ -1260,7 +1260,7 @@ export function AppShellPage() {
               tickets={scopedTickets}
               users={users}
               onOpenCreateTicket={handleOpenCreateTicket}
-              onOpenProjectManager={handleOpenProjectManager}
+              onOpenProjectManager={isTeamWorkspace ? handleOpenTeamManager : handleOpenProjectManager}
               onSelectTicket={(ticket) => {
                 if (ticket) {
                   navigate(buildProjectScopedPath(ticket.projectId, 'tickets', ticket.key));

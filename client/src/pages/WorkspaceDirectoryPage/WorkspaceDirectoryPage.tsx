@@ -86,8 +86,6 @@ export function WorkspaceDirectoryPage({
       description: workspaceDescription,
       key: workspaceKey,
       workspaceKey: workspaceAccessKey,
-      defaultProjectName: workspaceName,
-      defaultProjectKey: workspaceKey,
       hierarchyMode,
     });
   };

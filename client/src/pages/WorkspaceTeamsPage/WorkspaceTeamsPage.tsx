@@ -308,7 +308,7 @@ export function WorkspaceTeamsPage({
           {loading ? (
             <div className="workspace-teams-page__empty">Loading teams...</div>
           ) : sortedTeams.length === 0 ? (
-            <div className="workspace-teams-page__empty">No teams have been created yet.</div>
+            <div className="workspace-teams-page__empty">Create your first team to get started.</div>
           ) : (
             sortedTeams.map((team) => {
               const isEditing = editingTeamId === team.id;

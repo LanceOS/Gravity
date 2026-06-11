@@ -112,6 +112,12 @@ describe('WorkspaceTeamsPage', () => {
     expect(props.onBackToWorkspace).toHaveBeenCalledTimes(1);
   });
 
+  it('prompts the owner to create the first team when none exist', () => {
+    renderWorkspaceTeamsPage({ teams: [] });
+
+    expect(screen.getByText('Create your first team to get started.')).toBeInTheDocument();
+  });
+
   it('creates, updates, and deletes teams through team APIs', async () => {
     const user = userEvent.setup();
     const { props, queryClient } = renderWorkspaceTeamsPage();
