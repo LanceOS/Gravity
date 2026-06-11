@@ -104,7 +104,8 @@ export class QueryClient {
     const oldData = state.data;
     const newData = typeof updater === 'function' ? (updater as Function)(oldData) : updater;
 
-    this.updateQueryState<T>(key, () => ({
+    this.updateQueryState<T>(key, (prev) => ({
+      ...prev,
       data: newData,
       status: 'success',
       updatedAt: Date.now(),
@@ -167,7 +168,8 @@ export class QueryClient {
 
     const promise = queryFn()
       .then(data => {
-        this.updateQueryState<T>(key, () => ({
+        this.updateQueryState<T>(key, (prev) => ({
+          ...prev,
           data,
           status: 'success',
           fetchStatus: 'idle',
@@ -177,16 +179,19 @@ export class QueryClient {
         return data;
       })
       .catch(error => {
-        this.updateQueryState<T>(key, () => ({
+        this.updateQueryState<T>(key, (prev) => ({
+          ...prev,
           error,
           status: 'error',
           fetchStatus: 'idle',
+          updatedAt: Date.now(),
           promise: null,
         }));
         throw error;
       });
 
-    this.updateQueryState<T>(key, () => ({
+    this.updateQueryState<T>(key, (prev) => ({
+      ...prev,
       promise,
     }));
     return promise;
@@ -226,45 +231,44 @@ interface UseQueryOptions<T> {
 export function useQuery<T>({ queryKey, queryFn, enabled = true, staleTime, gcTime }: UseQueryOptions<T>) {
   const client = useQueryClient();
 
+  const stableQueryKey = useMemo(() => queryKey, [JSON.stringify(queryKey)]);
+
   const getSnapshot = useCallback(() => {
-    return client.getOrCreateQuery<T>(queryKey, { staleTime, gcTime });
-  }, [client, queryKey, staleTime, gcTime]);
+    return client.getOrCreateQuery<T>(stableQueryKey, { staleTime, gcTime });
+  }, [client, stableQueryKey, staleTime, gcTime]);
 
   const state = useSyncExternalStore(
-    useCallback(cb => client.subscribe(queryKey, cb), [client, queryKey]),
+    useCallback(cb => client.subscribe(stableQueryKey, cb), [client, stableQueryKey]),
     getSnapshot,
     getSnapshot
   );
 
   const isStale = useMemo(() => {
-    if (!enabled) return false;
-    const now = Date.now();
-    return now - state.updatedAt > (staleTime ?? state.staleTime);
-  }, [state.updatedAt, staleTime, state.staleTime, enabled]);
+    if (staleTime === Infinity) return false;
+    // For staleTime === 0, it's always stale if we have data.
+    return state.updatedAt ? Date.now() - state.updatedAt >= staleTime : true;
+  }, [state.updatedAt, staleTime]);
+
+  const hasFetchedOnMount = useRef(false);
 
   const triggerFetch = useCallback(() => {
-    if (!enabled) return;
-    client.fetchQuery(queryKey, queryFn, { staleTime, gcTime }).catch(() => {});
-  }, [client, queryKey, queryFn, enabled, staleTime, gcTime]);
-
-  // Initiate fetch synchronously during render if needed
-  if (enabled && (state.status === 'pending' || isStale) && state.fetchStatus === 'idle') {
-    Promise.resolve().then(() => {
-      triggerFetch();
-    });
-  }
+    client.fetchQuery<T>(stableQueryKey, queryFn, { staleTime, gcTime }).catch(console.error);
+  }, [client, stableQueryKey, queryFn, staleTime, gcTime]);
 
   useEffect(() => {
-    if (enabled && (state.status === 'pending' || isStale)) {
-      triggerFetch();
+    hasFetchedOnMount.current = true;
+    if (enabled && state.fetchStatus === 'idle') {
+      const shouldFetch = state.status === 'pending' || isStale;
+      if (shouldFetch) {
+        triggerFetch();
+      }
     }
-  }, [enabled, queryKey, isStale, triggerFetch]);
+  }, [enabled, stableQueryKey, isStale, triggerFetch]);
 
   return {
     data: state.data,
     error: state.error,
-    status: state.status,
-    isLoading: state.status === 'pending',
+    isLoading: state.status === 'pending' && state.fetchStatus === 'fetching',
     isFetching: state.fetchStatus === 'fetching',
     isError: state.status === 'error',
     isSuccess: state.status === 'success',
@@ -381,8 +385,10 @@ export function useInfiniteQuery<TData = any>({
 }: UseInfiniteQueryOptions<TData>) {
   const client = useQueryClient();
 
+  const stableQueryKey = useMemo(() => queryKey, [JSON.stringify(queryKey)]);
+
   const getSnapshot = useCallback(() => {
-    const st = client.getOrCreateQuery<{ pages: TData[]; pageParams: any[] }>(queryKey, {
+    const st = client.getOrCreateQuery<{ pages: TData[]; pageParams: any[] }>(stableQueryKey, {
       staleTime: 0,
       gcTime: 5 * 60 * 1000,
     });
@@ -390,10 +396,10 @@ export function useInfiniteQuery<TData = any>({
       st.data = { pages: [], pageParams: [initialPageParam] };
     }
     return st;
-  }, [client, queryKey, initialPageParam]);
+  }, [client, stableQueryKey, initialPageParam]);
 
   const state = useSyncExternalStore(
-    useCallback(cb => client.subscribe(queryKey, cb), [client, queryKey]),
+    useCallback(cb => client.subscribe(stableQueryKey, cb), [client, stableQueryKey]),
     getSnapshot,
     getSnapshot
   );
@@ -406,14 +412,14 @@ export function useInfiniteQuery<TData = any>({
     if (isNext) {
       setIsFetchingNextPage(true);
     } else {
-      client.updateQueryState(queryKey, () => ({
+      client.updateQueryState(stableQueryKey, () => ({
         fetchStatus: 'fetching',
       }));
     }
 
     try {
       const data = await queryFn({ pageParam });
-      client.updateQueryState<{ pages: TData[]; pageParams: any[] }>(queryKey, (currentState) => {
+      client.updateQueryState<{ pages: TData[]; pageParams: any[] }>(stableQueryKey, (currentState) => {
         const currentData = currentState.data || { pages: [], pageParams: [] };
         let nextPages = [...currentData.pages];
         let nextParams = [...currentData.pageParams];
@@ -432,28 +438,23 @@ export function useInfiniteQuery<TData = any>({
         };
       });
     } catch (error) {
-      client.updateQueryState(queryKey, () => ({
+      client.updateQueryState(stableQueryKey, (prev) => ({
+        ...prev,
         error,
         status: 'error',
         fetchStatus: 'idle',
+        updatedAt: Date.now(),
       }));
     } finally {
       if (isNext) setIsFetchingNextPage(false);
     }
-  }, [client, queryKey, queryFn, enabled]);
-
-  // Initiate fetch synchronously during render if needed
-  if (enabled && state.data && state.data.pages.length === 0 && state.fetchStatus === 'idle') {
-    Promise.resolve().then(() => {
-      fetchPage(initialPageParam, false);
-    });
-  }
+  }, [client, stableQueryKey, queryFn, enabled]);
 
   useEffect(() => {
-    if (enabled && state.data && state.data.pages.length === 0) {
+    if (enabled && state.status === 'pending' && state.fetchStatus === 'idle') {
       fetchPage(initialPageParam, false);
     }
-  }, [enabled, queryKey, initialPageParam, fetchPage]);
+  }, [enabled, stableQueryKey, initialPageParam, fetchPage, state.status, state.fetchStatus]);
 
   const hasNextPage = useMemo(() => {
     if (!state.data || state.data.pages.length === 0) return false;
@@ -472,8 +473,7 @@ export function useInfiniteQuery<TData = any>({
   return {
     data: state.data,
     error: state.error,
-    status: state.status,
-    isLoading: state.status === 'pending',
+    isLoading: state.status === 'pending' && state.fetchStatus === 'fetching',
     isFetching: state.fetchStatus === 'fetching',
     isFetchingNextPage,
     isError: state.status === 'error',

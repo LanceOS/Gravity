@@ -119,8 +119,10 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
   useEffect(() => {
     if (settingsQuery.data) {
       setDraftSettings(settingsQuery.data);
+    } else {
+      setDraftSettings(null);
     }
-  }, [settingsQuery.data]);
+  }, [settingsQuery.data, activeWorkspaceId]);
 
   // Workspace Members Query
   const membersQuery = useQuery({

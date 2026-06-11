@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryClient, queryKeys } from '../../../utils/queryClient';
 import type { NoteMetadata } from '../types';
 
@@ -10,6 +10,7 @@ export interface Note extends NoteMetadata {
 export function useNote(projectId: string, noteId: string | null) {
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const client = useQueryClient();
 
   const noteQuery = useQuery<Note>({
     queryKey: queryKeys.note(noteId || ''),
@@ -56,12 +57,12 @@ export function useNote(projectId: string, noteId: string | null) {
       return response.json() as Promise<Note>;
     },
     onSuccess: (updated) => {
-      queryClient.setQueryData(queryKeys.note(noteId || ''), updated);
+      client.setQueryData(queryKeys.note(noteId || ''), updated);
       setSavedAt(new Date());
       setSaveError(null);
       
       // Invalidate the notes list to update title/metadata
-      queryClient.invalidateQueries({ queryKey: queryKeys.notes(projectId) });
+      client.invalidateQueries({ queryKey: queryKeys.notes(projectId) });
     },
     onError: (err: Error) => {
       setSaveError(err.message);
@@ -69,7 +70,11 @@ export function useNote(projectId: string, noteId: string | null) {
   });
 
   const saveNote = useCallback(async (updates: { title?: string; body?: string }) => {
-    await saveMutation.mutateAsync(updates);
+    try {
+      await saveMutation.mutateAsync(updates);
+    } catch (e) {
+      // Ignored here, handled by onError
+    }
   }, [saveMutation]);
 
   const uploadMedia = useCallback(async (file: File): Promise<string> => {
