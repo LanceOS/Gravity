@@ -309,9 +309,26 @@
   border-top: 1px solid var(--color-border-default);
 }
 
+.workspace-teams-page__danger-zone--last-team {
+  align-items: center;
+  justify-content: space-between;
+}
+
 .workspace-teams-page__reassign-field {
   min-width: 0;
   flex: 1 1 260px;
+}
+
+.workspace-teams-page__danger-note {
+  min-width: 0;
+  flex: 1 1 auto;
+  padding: 10px 12px;
+  border: 1px solid rgba(239, 68, 68, 0.22);
+  border-radius: var(--radius-sm);
+  background: rgba(239, 68, 68, 0.08);
+  color: #fca5a5;
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .workspace-teams-page__reassign-select {

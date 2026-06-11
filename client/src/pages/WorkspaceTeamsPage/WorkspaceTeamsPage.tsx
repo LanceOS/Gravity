@@ -196,10 +196,13 @@ export function WorkspaceTeamsPage({
   };
 
   const handleDeleteTeam = async (team: SidebarTeam) => {
+    const reassignOptions = sortedTeams.filter((candidate) => candidate.id !== team.id);
     const reassignTeamId = reassignTeamById[team.id] || undefined;
     const hasReferences = getTeamReferenceCount(team) > 0;
+    const canDeleteWithoutReassign = reassignOptions.length === 0;
+    const effectiveReassignTeamId = canDeleteWithoutReassign ? undefined : reassignTeamId;
 
-    if (hasReferences && !reassignTeamId) {
+    if (hasReferences && !effectiveReassignTeamId && !canDeleteWithoutReassign) {
       setFeedback({ type: 'error', message: 'Choose a reassignment team before deleting a team that owns work.' });
       return;
     }
@@ -208,9 +211,13 @@ export function WorkspaceTeamsPage({
     setFeedback(null);
 
     try {
-      await apiClient.delete(`/teams/${team.id}`, {
-        params: { reassignTeamId },
-      });
+      if (effectiveReassignTeamId) {
+        await apiClient.delete(`/teams/${team.id}`, {
+          params: { reassignTeamId: effectiveReassignTeamId },
+        });
+      } else {
+        await apiClient.delete(`/teams/${team.id}`);
+      }
       syncSidebarTreeDeletedTeam(team.id);
       setFeedback({ type: 'success', message: 'Team deleted.' });
       await refreshTeams();
@@ -315,7 +322,9 @@ export function WorkspaceTeamsPage({
               const referenceCount = getTeamReferenceCount(team);
               const reassignOptions = sortedTeams.filter((candidate) => candidate.id !== team.id);
               const selectedReassignTeamId = reassignTeamById[team.id] ?? '';
-              const deleteDisabled = referenceCount > 0 && !selectedReassignTeamId;
+              const showReassignField = referenceCount > 0 && reassignOptions.length > 0;
+              const showLastTeamWarning = referenceCount > 0 && reassignOptions.length === 0;
+              const deleteDisabled = referenceCount > 0 && reassignOptions.length > 0 && !selectedReassignTeamId;
 
               return (
                 <article key={team.id} className="workspace-teams-page__team-card">
@@ -406,8 +415,8 @@ export function WorkspaceTeamsPage({
                     )}
                   </div>
 
-                  <div className="workspace-teams-page__danger-zone">
-                    {referenceCount > 0 ? (
+                  <div className={showLastTeamWarning ? 'workspace-teams-page__danger-zone workspace-teams-page__danger-zone--last-team' : 'workspace-teams-page__danger-zone'}>
+                    {showReassignField ? (
                       <div className="workspace-teams-page__reassign-field">
                         <span id={`${team.id}-reassign-label`}>Reassign owned work before delete</span>
                         <Select
@@ -425,6 +434,11 @@ export function WorkspaceTeamsPage({
                           }}
                           style={{ width: '100%' }}
                         />
+                      </div>
+                    ) : null}
+                    {showLastTeamWarning ? (
+                      <div className="workspace-teams-page__danger-note">
+                        This is the last team in the workspace. Deleting it will permanently remove its projects and related work.
                       </div>
                     ) : null}
                     <div className="workspace-teams-page__delete-action">

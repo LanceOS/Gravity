@@ -93,6 +93,7 @@ function renderWorkspaceTeamsPage(overrides: Partial<Parameters<typeof Workspace
 
 describe('WorkspaceTeamsPage', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     apiMocks.post.mockResolvedValue({});
     apiMocks.patch.mockResolvedValue({});
     apiMocks.delete.mockResolvedValue({});
@@ -187,6 +188,28 @@ describe('WorkspaceTeamsPage', () => {
       expect(apiMocks.delete).toHaveBeenCalledWith('/teams/team-engineering', {
         params: { reassignTeamId: 'team-design' },
       });
+      expect(props.onTeamsChanged).toHaveBeenCalled();
+    });
+  });
+
+  it('allows deleting the last team without reassignment', async () => {
+    const user = userEvent.setup();
+    const { props } = renderWorkspaceTeamsPage({
+      teams: [teams[0]],
+    });
+
+    expect(
+      screen.getByText('This is the last team in the workspace. Deleting it will permanently remove its projects and related work.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Reassign owned work before delete/i })).not.toBeInTheDocument();
+
+    const deleteButton = screen.getByRole('button', { name: 'Delete Team' });
+    expect(deleteButton).toBeEnabled();
+
+    await user.click(deleteButton);
+
+    await waitFor(() => {
+      expect(apiMocks.delete).toHaveBeenCalledWith('/teams/team-engineering');
       expect(props.onTeamsChanged).toHaveBeenCalled();
     });
   });
