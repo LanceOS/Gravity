@@ -28,8 +28,15 @@ type WorkspaceLayoutMockProps = {
 };
 
 type WorkspacePageMockProps = {
+  activeView?: string;
+  filters?: {
+    projectId?: string;
+  };
   onSelectNote?: (noteId: string) => void;
   onDeleteTicket?: (ticketId: string) => void;
+  projects?: unknown[];
+  tickets?: unknown[];
+  viewModeLocked?: boolean;
 };
 
 const mocks = vi.hoisted(() => ({
@@ -146,9 +153,25 @@ vi.mock('../../pages/WorkspaceDirectoryPage/WorkspaceDirectoryPage', () => ({
 }));
 
 vi.mock('../../pages/WorkspacePage/WorkspacePage', () => ({
-  WorkspacePage: ({ onSelectNote, onDeleteTicket }: WorkspacePageMockProps) => (
+  WorkspacePage: ({
+    activeView,
+    filters,
+    onSelectNote,
+    onDeleteTicket,
+    projects = [],
+    tickets = [],
+    viewModeLocked,
+  }: WorkspacePageMockProps) => (
     <div>
       <div>WorkspacePage</div>
+      <div
+        data-testid="workspace-page-state"
+        data-active-view={activeView}
+        data-project-count={projects.length}
+        data-project-filter={filters?.projectId ?? ''}
+        data-ticket-count={tickets.length}
+        data-view-mode-locked={viewModeLocked ? 'true' : 'false'}
+      />
       {onSelectNote ? (
         <button type="button" onClick={() => onSelectNote('note-1')}>
           Open note
@@ -367,12 +390,158 @@ function renderAppShell({
           <Route path="/workspaces/:workspaceId/projects/:projectId/tickets" element={<AppShellPage />} />
           <Route path="/workspaces/:workspaceId/projects/:projectId/notes" element={<AppShellPage />} />
           <Route path="/workspaces/:workspaceId/projects/:projectId/notes/:noteId" element={<AppShellPage />} />
+          <Route path="/workspaces/:workspaceId/all" element={<AppShellPage />} />
+          <Route path="/workspaces/:workspaceId/teams/:teamId/tasks" element={<AppShellPage />} />
+          <Route path="/workspaces/:workspaceId/teams/:teamId/views/:viewId" element={<AppShellPage />} />
+          <Route path="/workspaces/:workspaceId/teams/:teamId/cycles/:cycleId" element={<AppShellPage />} />
+          <Route path="/workspaces/:workspaceId/teams/:teamId/domains/:domainId" element={<AppShellPage />} />
+          <Route path="/workspaces/:workspaceId/teams/:teamId/projects/:projectId/tickets" element={<AppShellPage />} />
+          <Route path="/workspaces/:workspaceId/teams/:teamId/projects/:projectId/tickets/:ticketKey" element={<AppShellPage />} />
           <Route path="/workspaces/:workspaceId" element={<AppShellPage />} />
           <Route path="*" element={<AppShellPage />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>
   );
+}
+
+const aggregateProjects = [
+  {
+    id: 'project-1',
+    name: 'Gravity Core',
+    key: 'GRA',
+    description: 'Primary project',
+    status: 'active',
+    workspaceId: 'workspace-1',
+    teamId: 'team-1',
+  },
+  {
+    id: 'project-2',
+    name: 'Gravity API',
+    key: 'API',
+    description: 'API project',
+    status: 'active',
+    workspaceId: 'workspace-1',
+    teamId: 'team-1',
+  },
+  {
+    id: 'project-3',
+    name: 'Design System',
+    key: 'DSN',
+    description: 'Design project',
+    status: 'active',
+    workspaceId: 'workspace-1',
+    teamId: 'team-2',
+  },
+];
+
+const aggregateSidebarTree = {
+  workspaceId: 'workspace-1',
+  hierarchyMode: 'teams',
+  teams: [
+    {
+      id: 'team-1',
+      name: 'Engineering',
+      description: '',
+      color: '#2563eb',
+      views: [
+        { id: 'all', name: 'All Tasks', type: 'all' },
+        { id: 'timeline', name: 'Timeline', type: 'timeline' },
+      ],
+      cycles: [],
+      domains: [],
+      projects: aggregateProjects.slice(0, 2),
+    },
+    {
+      id: 'team-2',
+      name: 'Design',
+      description: '',
+      color: '#f97316',
+      views: [
+        { id: 'all', name: 'All Tasks', type: 'all' },
+        { id: 'timeline', name: 'Timeline', type: 'timeline' },
+      ],
+      cycles: [],
+      domains: [],
+      projects: aggregateProjects.slice(2),
+    },
+  ],
+};
+
+const teamAggregateTickets = [
+  {
+    id: 'ticket-1',
+    key: 'GRA-1',
+    title: 'Team task one',
+    status: 'todo',
+    priority: 'medium',
+    projectId: 'project-1',
+    assigneeId: null,
+    cycleId: null,
+    parentId: null,
+    prStatus: 'none',
+    prUrl: null,
+    createdAt: '2026-06-01T10:00:00.000Z',
+    updatedAt: '2026-06-01T10:00:00.000Z',
+  },
+  {
+    id: 'ticket-2',
+    key: 'API-1',
+    title: 'Team task two',
+    status: 'in_progress',
+    priority: 'high',
+    projectId: 'project-2',
+    assigneeId: null,
+    cycleId: null,
+    parentId: null,
+    prStatus: 'none',
+    prUrl: null,
+    createdAt: '2026-06-02T10:00:00.000Z',
+    updatedAt: '2026-06-02T10:00:00.000Z',
+  },
+];
+
+const workspaceAggregateTickets = [
+  ...teamAggregateTickets,
+  {
+    id: 'ticket-3',
+    key: 'DSN-1',
+    title: 'Workspace task from another team',
+    status: 'backlog',
+    priority: 'low',
+    projectId: 'project-3',
+    assigneeId: null,
+    cycleId: null,
+    parentId: null,
+    prStatus: 'none',
+    prUrl: null,
+    createdAt: '2026-06-03T10:00:00.000Z',
+    updatedAt: '2026-06-03T10:00:00.000Z',
+  },
+];
+
+function mockAggregateApiResponses() {
+  mocks.fetch.mockImplementation((input: RequestInfo | URL) => {
+    const url = typeof input === 'string' ? input : input.toString();
+
+    if (url === '/api/v1/workspaces/workspace-1/sidebar') {
+      return Promise.resolve(jsonResponse(aggregateSidebarTree));
+    }
+
+    if (url === '/api/v1/tickets?teamId=team-1') {
+      return Promise.resolve(jsonResponse(teamAggregateTickets));
+    }
+
+    if (url === '/api/v1/tickets?workspaceId=workspace-1') {
+      return Promise.resolve(jsonResponse(workspaceAggregateTickets));
+    }
+
+    if (url === '/api/v1/cycles?teamId=team-1' || url === '/api/v1/domains?teamId=team-1') {
+      return Promise.resolve(jsonResponse([]));
+    }
+
+    return Promise.resolve(jsonResponse({ success: true, lastActiveAt: '2026-05-26T10:00:00.000Z' }));
+  });
 }
 
 describe('AppShellPage', () => {
@@ -572,6 +741,121 @@ describe('AppShellPage', () => {
       expect(screen.getByTestId('location-display').textContent).toBe(
         '/workspaces/workspace-1/projects/project-1/notes/note-1'
       );
+    });
+  });
+
+  it('renders team All Tasks using the active board/list preference across team projects', async () => {
+    mockAggregateApiResponses();
+
+    renderAppShell({
+      tickets: buildUseTickets({
+        activeView: 'board',
+        projects: aggregateProjects,
+        tickets: [],
+      }),
+      initialEntries: ['/workspaces/workspace-1/teams/team-1/tasks'],
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('workspace-page-state')).toHaveAttribute('data-active-view', 'board');
+      expect(screen.getByTestId('workspace-page-state')).toHaveAttribute('data-view-mode-locked', 'false');
+      expect(screen.getByTestId('workspace-page-state')).toHaveAttribute('data-project-count', '2');
+      expect(screen.getByTestId('workspace-page-state')).toHaveAttribute('data-project-filter', '');
+      expect(screen.getByTestId('workspace-page-state')).toHaveAttribute('data-ticket-count', '2');
+    });
+  });
+
+  it('does not special-case team Board routes and keeps Timeline as a locked aggregate view', async () => {
+    mockAggregateApiResponses();
+
+    const boardRender = renderAppShell({
+      tickets: buildUseTickets({
+        activeView: 'list',
+        projects: aggregateProjects,
+        tickets: [],
+      }),
+      initialEntries: ['/workspaces/workspace-1/teams/team-1/views/board'],
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('workspace-page-state')).toHaveAttribute('data-active-view', 'list');
+      expect(screen.getByTestId('workspace-page-state')).toHaveAttribute('data-view-mode-locked', 'false');
+      expect(screen.getByTestId('workspace-page-state')).toHaveAttribute('data-ticket-count', '2');
+    });
+
+    boardRender.unmount();
+    mockAggregateApiResponses();
+
+    renderAppShell({
+      tickets: buildUseTickets({
+        activeView: 'board',
+        projects: aggregateProjects,
+        tickets: [],
+      }),
+      initialEntries: ['/workspaces/workspace-1/teams/team-1/views/timeline'],
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('workspace-page-state')).toHaveAttribute('data-active-view', 'timeline');
+      expect(screen.getByTestId('workspace-page-state')).toHaveAttribute('data-view-mode-locked', 'true');
+      expect(screen.getByTestId('workspace-page-state')).toHaveAttribute('data-ticket-count', '2');
+    });
+  });
+
+  it('renders workspace All Tasks using the active board/list preference across all teams', async () => {
+    mockAggregateApiResponses();
+
+    renderAppShell({
+      tickets: buildUseTickets({
+        activeView: 'list',
+        projects: aggregateProjects,
+        tickets: [],
+      }),
+      initialEntries: ['/workspaces/workspace-1/all'],
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('workspace-page-state')).toHaveAttribute('data-active-view', 'list');
+      expect(screen.getByTestId('workspace-page-state')).toHaveAttribute('data-view-mode-locked', 'false');
+      expect(screen.getByTestId('workspace-page-state')).toHaveAttribute('data-project-count', '3');
+      expect(screen.getByTestId('workspace-page-state')).toHaveAttribute('data-project-filter', '');
+      expect(screen.getByTestId('workspace-page-state')).toHaveAttribute('data-ticket-count', '3');
+    });
+  });
+
+  it('keeps team project routes on project-scoped tickets instead of team aggregate tickets', async () => {
+    mockAggregateApiResponses();
+
+    renderAppShell({
+      tickets: buildUseTickets({
+        activeView: 'board',
+        projects: aggregateProjects,
+        tickets: [
+          {
+            id: 'ticket-project-only',
+            key: 'GRA-9',
+            title: 'Project scoped task',
+            status: 'todo',
+            priority: 'medium',
+            projectId: 'project-1',
+            assigneeId: null,
+            cycleId: null,
+            parentId: null,
+            prStatus: 'none',
+            prUrl: null,
+            createdAt: '2026-06-04T10:00:00.000Z',
+            updatedAt: '2026-06-04T10:00:00.000Z',
+          },
+        ],
+      }),
+      initialEntries: ['/workspaces/workspace-1/teams/team-1/projects/project-1/tickets'],
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('workspace-page-state')).toHaveAttribute('data-active-view', 'board');
+      expect(screen.getByTestId('workspace-page-state')).toHaveAttribute('data-view-mode-locked', 'false');
+      expect(screen.getByTestId('workspace-page-state')).toHaveAttribute('data-project-count', '2');
+      expect(screen.getByTestId('workspace-page-state')).toHaveAttribute('data-ticket-count', '1');
     });
   });
 

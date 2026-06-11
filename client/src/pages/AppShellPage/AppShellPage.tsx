@@ -21,7 +21,7 @@ import type { TicketListSort } from '../../modules/tickets/utils/ticketView';
 import { registerWebMCPTools } from '../../utils/webmcp';
 import { LoadingPage } from '../LoadingPage/LoadingPage';
 import { WorkspaceDirectoryPage } from '../WorkspaceDirectoryPage/WorkspaceDirectoryPage';
-import { WorkspacePage } from '../WorkspacePage/WorkspacePage';
+import { WorkspacePage, type WorkspaceIssueView } from '../WorkspacePage/WorkspacePage';
 import { WorkspaceProjectsPage } from '../WorkspaceProjectsPage/WorkspaceProjectsPage';
 import { TicketDetailRoute } from '../../modules/tickets/components/TicketDetailRoute';
 import { WorkspaceMcpModal } from '../../modules/workspaces/components/WorkspaceMcpModal';
@@ -255,19 +255,19 @@ export function AppShellPage() {
   const { data: teamTickets = [] } = useQuery<Ticket[]>({
     queryKey: ['teamTickets', teamIdParam],
     queryFn: () => apiClient.get<Ticket[]>('/tickets', { params: { teamId: teamIdParam } }),
-    enabled: !!teamIdParam && !!currentUser,
+    enabled: isTeamAggregatePath && !!currentUser,
   });
 
   const { data: teamCycles = [] } = useQuery<Cycle[]>({
     queryKey: ['teamCycles', teamIdParam],
     queryFn: () => apiClient.get<Cycle[]>('/cycles', { params: { teamId: teamIdParam } }),
-    enabled: !!teamIdParam && !!currentUser,
+    enabled: isTeamAggregatePath && !!currentUser,
   });
 
   const { data: teamDomains = [] } = useQuery<Domain[]>({
     queryKey: ['teamDomains', teamIdParam],
     queryFn: () => apiClient.get<Domain[]>('/domains', { params: { teamId: teamIdParam } }),
-    enabled: !!teamIdParam && !!currentUser,
+    enabled: isTeamAggregatePath && !!currentUser,
   });
 
   const handleSelectTeam = useCallback((teamId: string) => {
@@ -1022,16 +1022,21 @@ export function AppShellPage() {
     : '';
   const activeTeam = sidebarTree?.teams?.find((team) => team.id === sidebarActiveTeamId);
   const activeTeamProjectIds = new Set(activeTeam?.projects?.map((project) => project.id) ?? []);
+  const isTimelineAggregatePath = isTeamAggregatePath && viewIdParam === 'timeline';
+  const effectiveActiveView: WorkspaceIssueView = isTimelineAggregatePath
+    ? 'timeline'
+    : activeView;
+  const lockWorkspaceIssueView = isTimelineAggregatePath;
   const scopedProjects = teamIdParam
     ? activeWorkspaceProjects.filter((project) => project.teamId === teamIdParam || activeTeamProjectIds.has(project.id))
     : activeWorkspaceProjects;
   const scopedTickets = isWorkspaceAllTasksPath
     ? workspaceTickets
-    : teamIdParam
+    : isTeamAggregatePath
       ? teamTickets
       : tickets;
-  const scopedCycles = teamIdParam ? teamCycles : cycles;
-  const scopedLabels = teamIdParam ? teamDomains : labels;
+  const scopedCycles = isTeamAggregatePath ? teamCycles : cycles;
+  const scopedLabels = isTeamAggregatePath ? teamDomains : labels;
   const scopedFilters = shouldUseAggregateTicketScope ? { ...filters, projectId: '' } : filters;
   const createDefaultProjectId =
     activeProjectId ||
@@ -1209,7 +1214,8 @@ export function AppShellPage() {
               pathname={pathname}
               activeContext={activeContext}
               activeTicket={activeTicket}
-              activeView={activeView}
+              activeView={effectiveActiveView}
+              viewModeLocked={lockWorkspaceIssueView}
               currentUser={currentUser}
               cycles={scopedCycles}
               labels={scopedLabels}

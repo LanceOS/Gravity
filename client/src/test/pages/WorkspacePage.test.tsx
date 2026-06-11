@@ -258,4 +258,20 @@ describe('WorkspacePage', () => {
       assigneeId: '',
     });
   });
+
+  it('renders the timeline view with clickable task events', async () => {
+    const user = userEvent.setup();
+    const { props } = renderWorkspacePage({
+      activeView: 'timeline',
+      viewModeLocked: true,
+      tickets: [ticket, doneTicket],
+    });
+
+    expect(screen.getByText('Recent task activity')).toBeInTheDocument();
+    expect(screen.getByText('2 tasks')).toBeInTheDocument();
+    expect(screen.queryByRole('tablist', { name: 'View mode' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /GRA-1 Fix billing edge case/ }));
+    expect(props.onSelectTicket).toHaveBeenCalledWith(ticket);
+  });
 });
