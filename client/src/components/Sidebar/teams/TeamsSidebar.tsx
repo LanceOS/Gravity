@@ -70,8 +70,9 @@ export function TeamsSidebar({ section, collapsedTeamProjects, onToggleTeamProje
             !!activeProjectId && team.projects?.some((p) => p.id === activeProjectId);
           const isTeamActive = activeTeamId === team.id || teamContainsActiveProject;
           const projectsCollapsed = teamContainsActiveProject ? false : (collapsedTeamProjects[team.id] ?? false);
-          const teamViews = (team.views?.length ?? 0) > 0
-            ? team.views
+          const configuredTeamViews = team.views?.filter((view) => view.id !== 'board' && view.type !== 'board') ?? [];
+          const teamViews = configuredTeamViews.length > 0
+            ? configuredTeamViews
             : [{ id: 'all', name: 'All Tasks', type: 'all' }];
 
           return (

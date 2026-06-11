@@ -73,7 +73,10 @@ describe('SidebarProjectsSection', () => {
             name: 'Platform',
             description: '',
             color: '#3b82f6',
-            views: [{ id: 'all', name: 'All Tasks', type: 'all' }],
+            views: [
+              { id: 'all', name: 'All Tasks', type: 'all' },
+              { id: 'board', name: 'Board', type: 'board' },
+            ],
             cycles: [{ id: 'cycle-1', name: 'Sprint 1', startDate: '', endDate: '', completed: 0 }],
             domains: [{ id: 'domain-1', name: 'API', color: '#22c55e' }],
             projects: [
@@ -102,6 +105,7 @@ describe('SidebarProjectsSection', () => {
     expect(screen.getByText('Views')).toBeInTheDocument();
     expect(screen.getByText('Cycles')).toBeInTheDocument();
     expect(screen.getByText('Domains')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Board$/i })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Projects/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Proj 1/i })).toBeInTheDocument();
 
