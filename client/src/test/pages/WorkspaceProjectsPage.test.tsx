@@ -10,6 +10,7 @@ type WorkspaceProjectPanelMockProps = {
   defaultProjectId: string | null;
   onSelectProject: (projectId: string) => void;
   onCreateProject: (project: { name: string; description: string; key: string }) => void | Promise<void>;
+  onUpdateProject: (id: string, updates: Partial<Project>) => void | Promise<any>;
   onCreateLabel: (label: { projectId: string; name: string; color: string; description?: string; sortOrder?: number }) => void | Promise<void>;
   onUpdateLabel: (labelId: string, updates: { name?: string; color?: string; description?: string; sortOrder?: number }) => void | Promise<void>;
   onDeleteLabel: (labelId: string) => void | Promise<void>;
@@ -29,6 +30,7 @@ vi.mock('../../modules/workspaces', () => ({
     defaultProjectId,
     onSelectProject,
     onCreateProject,
+    onUpdateProject,
     onCreateLabel,
     onUpdateLabel,
     onDeleteLabel,
@@ -101,6 +103,7 @@ function renderWorkspaceProjectsPage(overrides: Partial<Parameters<typeof Worksp
     labelCreateError: null,
     onBackToWorkspace: vi.fn(),
     onCreateProject: vi.fn().mockResolvedValue(undefined),
+    onUpdateProject: vi.fn().mockResolvedValue(null),
     onCreateLabel: vi.fn().mockResolvedValue(undefined),
     onUpdateLabel: vi.fn().mockResolvedValue(undefined),
     onDeleteLabel: vi.fn().mockResolvedValue(undefined),

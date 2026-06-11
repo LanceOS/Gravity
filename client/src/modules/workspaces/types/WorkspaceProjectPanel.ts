@@ -12,6 +12,7 @@ export interface WorkspaceProjectPanelProps {
   labelCreateError: string | null;
   onSelectProject: (projectId: string) => void;
   onCreateProject: (project: { name: string; description: string; key: string }) => Promise<void>;
+  onUpdateProject: (id: string, updates: Partial<Project>) => Promise<Project | null>;
   onCreateLabel: (label: { projectId: string; name: string; color: string; description?: string; sortOrder?: number }) => Promise<void>;
   onUpdateLabel: (labelId: string, updates: { name?: string; color?: string; description?: string; sortOrder?: number }) => Promise<void>;
   onDeleteLabel: (labelId: string) => Promise<void>;

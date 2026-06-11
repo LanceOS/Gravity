@@ -124,6 +124,7 @@ function renderWorkspaceProjectPanel(
     labelCreateError: null,
     onSelectProject: vi.fn(),
     onCreateProject: vi.fn().mockResolvedValue(undefined),
+    onUpdateProject: vi.fn().mockResolvedValue(null),
     onCreateLabel: vi.fn().mockResolvedValue(undefined),
     onUpdateLabel: vi.fn().mockResolvedValue(undefined),
     onDeleteLabel: vi.fn().mockResolvedValue(undefined),
@@ -216,6 +217,7 @@ describe('WorkspaceProjectPanel', () => {
         labelCreateError={null}
         onSelectProject={props.onSelectProject}
         onCreateProject={props.onCreateProject}
+        onUpdateProject={props.onUpdateProject}
         onCreateLabel={props.onCreateLabel}
         onUpdateLabel={props.onUpdateLabel}
         onDeleteLabel={props.onDeleteLabel}
@@ -309,6 +311,7 @@ describe('WorkspaceProjectPanel', () => {
         labelCreateError={null}
         onSelectProject={props.onSelectProject}
         onCreateProject={props.onCreateProject}
+        onUpdateProject={props.onUpdateProject}
         onCreateLabel={props.onCreateLabel}
         onUpdateLabel={props.onUpdateLabel}
         onDeleteLabel={props.onDeleteLabel}

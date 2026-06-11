@@ -62,6 +62,7 @@ export function AppShellPage() {
     theme,
     tickets,
     updateTicket,
+    updateProject,
     users,
   } = useTickets();
 
@@ -970,8 +971,8 @@ export function AppShellPage() {
           invites={workspaceInvites}
           members={workspaceMembers}
           joinRequests={workspaceJoinRequests}
-          approveLoadingId={approveLoadingId}
-          revokeLoadingId={revokeLoadingId}
+          approveLoadingId={approveLoadingId || null}
+          revokeLoadingId={revokeLoadingId || null}
           deleteLoading={deleteLoading}
           deleteError={deleteError}
           onBackToWorkspace={() => navigate(`/workspaces/${activeWorkspaceId}`)}
@@ -1020,6 +1021,7 @@ export function AppShellPage() {
               labelCreateError={labelCreateError}
               onBackToWorkspace={() => navigate(`/workspaces/${activeWorkspaceId}`)}
               onCreateProject={handleCreateProject}
+              onUpdateProject={updateProject}
               onCreateLabel={handleCreateLabel}
               onUpdateLabel={handleUpdateLabel}
               onDeleteLabel={handleDeleteLabel}

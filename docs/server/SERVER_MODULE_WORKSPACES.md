@@ -54,3 +54,4 @@ Owns and mutates the following PostgreSQL tables via Drizzle ORM, defined locall
 ## 11. Related Docs
 - [SERVER_ARCHITECTURE_OVERVIEW.md](SERVER_ARCHITECTURE_OVERVIEW.md)
 - [SERVER_MODULE_TICKETS.md](SERVER_MODULE_TICKETS.md)
+- [GITHUB_INTEGRATION.md](GITHUB_INTEGRATION.md)

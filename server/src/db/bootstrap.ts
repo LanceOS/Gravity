@@ -124,6 +124,7 @@ export async function initializeDatabase() {
       status TEXT NOT NULL DEFAULT 'planned',
       invite_code TEXT NOT NULL UNIQUE,
       created_by TEXT NOT NULL,
+      github_repo_url TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
@@ -287,6 +288,7 @@ export async function initializeDatabase() {
 
   await pool.query(`
     ALTER TABLE tickets ADD COLUMN IF NOT EXISTS branch_name TEXT NOT NULL DEFAULT '';
+    ALTER TABLE projects ADD COLUMN IF NOT EXISTS github_repo_url TEXT;
   `);
 
   // Migrate existing domain data to labels and ticket_labels

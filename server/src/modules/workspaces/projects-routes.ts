@@ -18,6 +18,7 @@ import {
 } from './services/projects.js';
 import { buildProjectKeyConflictMessage, mapProjectCreationError, projectKeyExists } from './utils/project-creation.js';
 import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
+import { isValidGitHubRepoUrl } from '../../lib/webhookSignature.js';
 
 function mapProject(project: typeof projects.$inferSelect) {
   return {
@@ -27,6 +28,7 @@ function mapProject(project: typeof projects.$inferSelect) {
     key: project.key,
     status: project.status,
     workspaceId: project.workspaceId,
+    githubRepoUrl: project.githubRepoUrl,
   };
 }
 
@@ -110,10 +112,52 @@ export function createProjectsRouter() {
 
   router.patch('/projects/:projectId', async (req, res) => {
     try {
+      // Finding #2: Require authentication.
+      const actorUserId = await resolveRequestActorUserId(req);
+      if (!actorUserId) {
+        res.status(401).json({ error: 'Authentication required.' });
+        return;
+      }
+
+      // Finding #2: Require the actor to be a member of the project.
+      const membership = await db
+        .select({ projectId: projectMembers.projectId })
+        .from(projectMembers)
+        .where(
+          and(
+            eq(projectMembers.projectId, req.params.projectId),
+            eq(projectMembers.userId, actorUserId),
+          ),
+        )
+        .limit(1);
+
+      if (membership.length === 0) {
+        res.status(403).json({ error: 'Forbidden.' });
+        return;
+      }
+
+      // Finding #5: Validate githubRepoUrl is a proper GitHub HTTPS URL.
+      let validatedGithubRepoUrl: string | null | undefined = undefined;
+      if (typeof req.body?.githubRepoUrl === 'string') {
+        const trimmed = req.body.githubRepoUrl.trim();
+        if (trimmed === '') {
+          // Empty string means "clear the link".
+          validatedGithubRepoUrl = null;
+        } else if (!isValidGitHubRepoUrl(trimmed)) {
+          res.status(400).json({ error: 'githubRepoUrl must be a valid HTTPS GitHub repository URL (https://github.com/owner/repo).' });
+          return;
+        } else {
+          validatedGithubRepoUrl = trimmed;
+        }
+      } else if (req.body?.githubRepoUrl === null) {
+        validatedGithubRepoUrl = null;
+      }
+
       const updatedProject = await updateProjectRecord(req.params.projectId, {
         name: typeof req.body?.name === 'string' ? req.body.name : undefined,
         description: typeof req.body?.description === 'string' ? req.body.description : undefined,
         status: typeof req.body?.status === 'string' ? req.body.status : undefined,
+        githubRepoUrl: validatedGithubRepoUrl,
       });
 
       if (!updatedProject) {

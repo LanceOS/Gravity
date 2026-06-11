@@ -155,6 +155,7 @@ interface TicketContextType extends State {
   updateComment: (ticketId: string, commentId: string, body: string) => Promise<void>;
   deleteComment: (ticketId: string, commentId: string) => Promise<void>;
   createProject: (project: CreateProjectInput) => Promise<Project | null>;
+  updateProject: (id: string, updates: Partial<Project>) => Promise<Project | null>;
   joinProject: (inviteCode: string) => Promise<Project | null>;
   signIn: (email: string, password?: string) => Promise<boolean>;
   signUp: (name: string, email: string, password?: string) => Promise<boolean>;
@@ -763,6 +764,27 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [createProjectMutation]);
 
+  // Update Project
+  const updateProjectMutation = useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<Project> }) => {
+      return apiClient.patch<Project>(`/projects/${id}`, updates);
+    },
+    onSuccess: () => {
+      if (currentUser) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.projects(currentUser.id) });
+      }
+    },
+  });
+
+  const updateProject = useCallback(async (id: string, updates: Partial<Project>) => {
+    try {
+      return await updateProjectMutation.mutateAsync({ id, updates });
+    } catch (e) {
+      console.error(e);
+      throw e;
+    }
+  }, [updateProjectMutation]);
+
   // Create Label
   const createLabelMutation = useMutation({
     mutationFn: async (labelInput: { name: string; color?: string; description?: string; projectId?: string; sortOrder?: number }) => {
@@ -994,6 +1016,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       updateComment,
       deleteComment,
       createProject,
+      updateProject,
       joinProject,
       signIn,
       signUp,
@@ -1035,6 +1058,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       updateComment,
       deleteComment,
       createProject,
+      updateProject,
       joinProject,
       signIn,
       signUp,

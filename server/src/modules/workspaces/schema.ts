@@ -85,6 +85,7 @@ export const projects = pgTable('projects', {
   status: text('status').notNull().default('planned'),
   inviteCode: text('invite_code').notNull().unique(),
   createdBy: text('created_by').notNull(),
+  githubRepoUrl: text('github_repo_url'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({

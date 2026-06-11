@@ -32,7 +32,7 @@ export const ReactQueryDevtools: React.FC<ReactQueryDevtoolsProps> = ({ initialI
     return () => window.clearInterval(timer);
   }, [isOpen, queryClient]);
 
-  if (process.env.NODE_ENV === 'production') {
+  if (import.meta.env?.MODE === 'production') {
     return null;
   }
 
