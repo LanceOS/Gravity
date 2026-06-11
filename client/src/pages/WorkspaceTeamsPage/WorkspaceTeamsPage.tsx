@@ -358,16 +358,18 @@ export function WorkspaceTeamsPage({
                         </select>
                       </label>
                     ) : null}
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDeleteTeam(team)}
-                      disabled={deleteDisabled || savingAction === `delete:${team.id}`}
-                    >
-                      <Trash2 size={13} />
-                      <span>{savingAction === `delete:${team.id}` ? 'Deleting...' : 'Delete Team'}</span>
-                    </Button>
+                    <div className="workspace-teams-page__delete-action">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteTeam(team)}
+                        disabled={deleteDisabled || savingAction === `delete:${team.id}`}
+                      >
+                        <Trash2 size={13} />
+                        <span>{savingAction === `delete:${team.id}` ? 'Deleting...' : 'Delete Team'}</span>
+                      </Button>
+                    </div>
                   </div>
                 </article>
               );

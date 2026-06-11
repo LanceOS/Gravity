@@ -199,8 +199,11 @@
 }
 
 .workspace-teams-page__team-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
   margin: 0;
-  padding: 18px;
+  padding: 20px;
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-lg);
   background: var(--color-surface-card);
@@ -217,12 +220,19 @@
 }
 
 .workspace-teams-page__team-card-header {
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 14px;
+  gap: 16px;
 }
 
 .workspace-teams-page__team-title-row {
+  align-items: center;
   gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.workspace-teams-page__team-title-row input {
   min-width: 0;
   flex: 1;
 }
@@ -244,10 +254,18 @@
   flex: 0 0 auto;
 }
 
+.workspace-teams-page__team-card textarea {
+  min-height: 84px;
+}
+
+.workspace-teams-page__team-card .workspace-teams-page__team-description {
+  margin: 0;
+}
+
 .workspace-teams-page__metrics {
   gap: 8px;
   flex-wrap: wrap;
-  margin-top: 14px;
+  margin-top: 0;
 }
 
 .workspace-teams-page__metrics span {
@@ -265,7 +283,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 14px;
+  margin-top: 0;
 }
 
 .workspace-teams-page__project-pill {
@@ -283,15 +301,29 @@
 }
 
 .workspace-teams-page__danger-zone {
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 16px;
-  padding-top: 14px;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 16px;
+  margin-top: 2px;
+  padding-top: 16px;
   border-top: 1px solid var(--color-border-default);
 }
 
 .workspace-teams-page__danger-zone label {
-  flex: 1;
+  min-width: 0;
+  flex: 1 1 260px;
+}
+
+.workspace-teams-page__delete-action {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding-bottom: 1px;
+}
+
+.workspace-teams-page__delete-action button {
+  white-space: nowrap;
 }
 
 .workspace-teams-page__empty {
@@ -324,5 +356,14 @@
   .workspace-teams-page__danger-zone {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .workspace-teams-page__delete-action {
+    width: 100%;
+  }
+
+  .workspace-teams-page__delete-action button {
+    width: 100%;
+    justify-content: center;
   }
 }
