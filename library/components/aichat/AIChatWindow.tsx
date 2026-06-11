@@ -43,7 +43,7 @@ export function AIChatWindow({
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isGenerating]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!chatInput.trim() || isGenerating) return;
     onSendMessage(chatInput);

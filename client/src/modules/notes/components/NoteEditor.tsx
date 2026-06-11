@@ -1,33 +1,44 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import MDEditor from '@uiw/react-md-editor';
-import { Check, ImageIcon, Network } from 'lucide-react';
+import { Check, ImageIcon } from 'lucide-react';
+import {
+  RichTextEditor,
+  type RichTextEditorHandle,
+  createEmptyRichTextValue,
+  isRichTextDocumentJSON,
+} from '@library';
 import { useNote } from '../hooks/useNote';
 import './NoteEditor.css';
 
 interface NoteEditorProps {
   projectId: string;
   noteId: string;
+  onTitleChange?: (title: string) => void;
 }
 
-export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
+function normalizeLegacyNoteBody(rawBody: string): string {
+  try {
+    const parsed = JSON.parse(rawBody);
+    if (isRichTextDocumentJSON(parsed)) {
+      return rawBody;
+    }
+  } catch {
+    // Fall through to legacy markdown cleanup.
+  }
+
+  return rawBody.replace(/^# ?\n/, '').trimStart();
+}
+
+export function NoteEditor({ projectId, noteId, onTitleChange }: NoteEditorProps) {
   const { note, loading, saving, saveError, savedAt, saveNote, uploadMedia } = useNote(projectId, noteId);
 
   const [isDragging, setIsDragging] = useState(false);
   const [title, setTitle] = useState('');
-  const [body, setBody] = useState('');
-  const titleRef = useRef(title);
-  const bodyRef = useRef(body);
+  const [body, setBody] = useState(createEmptyRichTextValue());
+  const titleRef = useRef('');
+  const bodyRef = useRef(createEmptyRichTextValue());
+  const editorRef = useRef<RichTextEditorHandle | null>(null);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const scheduleSave = useCallback(() => {
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-    saveTimeoutRef.current = setTimeout(() => {
-      triggerSave();
-    }, 3000);
-  }, []);
 
   const triggerSave = useCallback(() => {
     if (!note) return;
@@ -40,14 +51,25 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
     }
   }, [note, saveNote]);
 
+  const triggerSaveRef = useRef(triggerSave);
+  useEffect(() => {
+    triggerSaveRef.current = triggerSave;
+  }, [triggerSave]);
+
+  const scheduleSave = useCallback(() => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    saveTimeoutRef.current = setTimeout(() => {
+      saveTimeoutRef.current = null;
+      triggerSaveRef.current();
+    }, 1500);
+  }, []);
+
   const handleFileUpload = async (file: File) => {
     try {
       const url = await uploadMedia(file);
-      const markdownImage = `![${file.name}](${url})`;
-      const newBody = bodyRef.current + '\n' + markdownImage;
-      setBody(newBody);
-      bodyRef.current = newBody;
-      scheduleSave();
+      editorRef.current?.insertImage({ src: url, alt: file.name, title: file.name });
     } catch (err) {
       console.error('Failed to upload file:', err);
     }
@@ -56,42 +78,39 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
   const noteLoaded = useRef(false);
   useEffect(() => {
     noteLoaded.current = false;
-  }, [noteId]);
+    setTitle('');
+    titleRef.current = '';
+    onTitleChange?.('');
+    setBody(createEmptyRichTextValue());
+    bodyRef.current = createEmptyRichTextValue();
+  }, [noteId, onTitleChange]);
 
   useEffect(() => {
     if (!note || noteLoaded.current) return;
     noteLoaded.current = true;
 
-    const rawBody = note.body ?? '';
-    const cleanedBody = rawBody.replace(/^# ?\n/, '').trimStart();
-    
-    setBody(cleanedBody);
-    bodyRef.current = cleanedBody;
+    const nextTitle = note.title ?? '';
+    const nextBody = normalizeLegacyNoteBody(note.body ?? createEmptyRichTextValue());
 
-    if (!title && note.title && note.title !== 'Untitled Note') {
-      setTitle(note.title);
-      titleRef.current = note.title;
-    }
-  }, [note]);
+    setTitle(nextTitle);
+    titleRef.current = nextTitle;
+    onTitleChange?.(nextTitle);
+    setBody(nextBody);
+    bodyRef.current = nextBody;
+  }, [note, onTitleChange]);
 
-  useEffect(() => {
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-      saveTimeoutRef.current = setTimeout(() => {
-        triggerSave();
-      }, 3000);
-    }
-  }, [note, triggerSave]);
+
 
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newTitle = e.target.value;
     setTitle(newTitle);
     titleRef.current = newTitle;
+    onTitleChange?.(newTitle);
     scheduleSave();
   };
 
   const handleBodyChange = (value?: string) => {
-    const newBody = value || '';
+    const newBody = value || createEmptyRichTextValue();
     setBody(newBody);
     bodyRef.current = newBody;
     scheduleSave();
@@ -154,7 +173,7 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
       />
 
       <div className="note-editor__content">
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
           <input
             type="text"
             className="note-editor__title-input"
@@ -163,23 +182,16 @@ export function NoteEditor({ projectId, noteId }: NoteEditorProps) {
             onChange={handleTitleChange}
             style={{ flex: 1 }}
           />
-          <button
-            className="note-editor__toolbar-btn"
-            onClick={() => fileInputRef.current?.click()}
-            title="Attach Image"
-          >
-            <ImageIcon size={16} />
-          </button>
         </div>
-        
-        <MDEditor
+
+        <RichTextEditor
+          ref={editorRef}
           value={body}
           onChange={handleBodyChange}
-          preview="live"
-          height="calc(100vh - 200px)"
-          textareaProps={{
-             placeholder: 'Write your notes in Markdown...'
-          }}
+          placeholder="Write your notes..."
+          minHeight="calc(100vh - 200px)"
+          toolbarMode="bubble"
+          surface='bare'
         />
 
         <div className={`note-editor__drag-overlay ${isDragging ? 'note-editor__drag-overlay--active' : ''}`}>

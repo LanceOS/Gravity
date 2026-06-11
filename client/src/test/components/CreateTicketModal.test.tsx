@@ -1,3 +1,4 @@
+import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 import type { ButtonHTMLAttributes, ChangeEvent, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -39,50 +40,131 @@ type MockModalProps = {
   footer?: ReactNode;
 };
 
-vi.mock('@library', () => ({
-  Button: ({ children, ...props }: MockButtonProps) => {
-    const buttonProps = { ...props };
-    delete buttonProps.variant;
-    return <button {...buttonProps}>{children}</button>;
-  },
-  Select: ({ options, onValueChange, ...props }: MockSelectProps) => (
-    <select {...props} onChange={(event) => onValueChange(event.target.value)}>
-      {options.map((option) => (
-        <option key={option.value} value={option.value}>
-          {option.label}
-        </option>
-      ))}
-    </select>
-  ),
-  Modal: ({ isOpen, title, children, footer }: MockModalProps) =>
-    isOpen ? (
-      <div>
-        <h2>{title}</h2>
-        <div>{children}</div>
-        <div>{footer}</div>
-      </div>
-    ) : null,
-  Alert: ({ children }: { children: ReactNode }) => <div role="alert">{children}</div>,
-  TextInput: ({ value, onChange, ...props }: MockTextInputProps) => <input value={value} onChange={onChange} {...props} />,
-  Textarea: ({ label, value, onChange, inputStyle: _inputStyle, autoGrow: _autoGrow, ...props }: MockTextareaProps) => (
-    <div>
-      {label ? (
-        <label>
-          {label}
-          <textarea value={value} onChange={onChange} {...props} />
-        </label>
-      ) : (
-        <textarea value={value} onChange={onChange} {...props} />
-      )}
-    </div>
-  ),
-  Popover: ({ trigger, children }: any) => (
-    <div>
-      {trigger}
-      <div>{children}</div>
-    </div>
-  ),
+const mockCreateLabel = vi.fn();
+
+vi.mock('../../context/TicketContext', () => ({
+  useTickets: () => ({
+    createLabel: mockCreateLabel,
+  }),
 }));
+
+vi.mock('@library', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@library')>();
+
+  const MockRichTextEditor = forwardRef<any, any>(function MockRichTextEditor(
+    { value, onChange, placeholder, className, minHeight, toolbarMode, surface }: any,
+    ref,
+  ) {
+    const [text, setText] = useState(() => {
+      try {
+        const parsed = JSON.parse(value);
+        return parsed?.content?.[0]?.content?.[0]?.text ?? '';
+      } catch {
+        return '';
+      }
+    });
+
+    useEffect(() => {
+      try {
+        const parsed = JSON.parse(value);
+        setText(parsed?.content?.[0]?.content?.[0]?.text ?? '');
+      } catch {
+        setText('');
+      }
+    }, [value]);
+
+    useImperativeHandle(ref, () => ({
+      focus: () => {},
+      insertImage: () => {},
+    }), []);
+
+    return (
+      <textarea
+        data-testid="rich-text-editor"
+        data-toolbar-mode={toolbarMode || 'full'}
+        data-surface={surface || 'default'}
+        aria-label="Rich text editor"
+        placeholder={placeholder}
+        className={className}
+        style={{ minHeight }}
+        value={text}
+        onChange={(event) => {
+          const nextText = event.target.value;
+          setText(nextText);
+          onChange(
+            JSON.stringify({
+              type: 'doc',
+              content: nextText
+                ? [
+                    {
+                      type: 'paragraph',
+                      content: [
+                        {
+                          type: 'text',
+                          text: nextText,
+                        },
+                      ],
+                    },
+                  ]
+                : [
+                    {
+                      type: 'paragraph',
+                    },
+                  ],
+            }),
+          );
+        }}
+      />
+    );
+  });
+
+  return {
+    ...actual,
+    Button: ({ children, ...props }: MockButtonProps) => {
+      const buttonProps = { ...props };
+      delete buttonProps.variant;
+      return <button {...buttonProps}>{children}</button>;
+    },
+    Select: ({ options, onValueChange, ...props }: MockSelectProps) => (
+      <select {...props} onChange={(event) => onValueChange(event.target.value)}>
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    ),
+    Modal: ({ isOpen, title, children, footer }: MockModalProps) =>
+      isOpen ? (
+        <div>
+          <h2>{title}</h2>
+          <div>{children}</div>
+          <div>{footer}</div>
+        </div>
+      ) : null,
+    Alert: ({ children }: { children: ReactNode }) => <div role="alert">{children}</div>,
+    TextInput: ({ value, onChange, ...props }: MockTextInputProps) => <input value={value} onChange={onChange} {...props} />,
+    Textarea: ({ label, value, onChange, inputStyle: _inputStyle, autoGrow: _autoGrow, ...props }: MockTextareaProps) => (
+      <div>
+        {label ? (
+          <label>
+            {label}
+            <textarea value={value} onChange={onChange} {...props} />
+          </label>
+        ) : (
+          <textarea value={value} onChange={onChange} {...props} />
+        )}
+      </div>
+    ),
+    Popover: ({ trigger, children }: any) => (
+      <div>
+        {trigger}
+        <div>{children}</div>
+      </div>
+    ),
+    RichTextEditor: MockRichTextEditor,
+  };
+});
 
 const projects = [
   {
@@ -167,13 +249,15 @@ describe('CreateTicketModal', () => {
     const { props } = renderCreateTicketModal();
 
     expect(screen.getByText('Create New Issue')).toBeInTheDocument();
+    expect(screen.getByTestId('rich-text-editor')).toHaveAttribute('data-toolbar-mode', 'bubble');
+    expect(screen.getByTestId('rich-text-editor')).toHaveAttribute('data-surface', 'bare');
 
     await user.click(screen.getByRole('button', { name: 'Create Issue' }));
     expect(screen.getByRole('alert')).toHaveTextContent('Please enter a ticket title.');
     expect(props.onSubmitTicket).not.toHaveBeenCalled();
 
     await user.type(screen.getByLabelText('Issue Title'), '  Fix sync retries  ');
-    await user.type(screen.getByLabelText('Description'), '  Retry failed SSE subscription  ');
+    await user.type(screen.getByPlaceholderText('Add a description...'), '  Retry failed SSE subscription  ');
     await user.selectOptions(screen.getByLabelText('Select status'), 'in_review');
     await user.selectOptions(screen.getByLabelText('Select priority'), 'high');
     await user.selectOptions(screen.getByLabelText('Select assignee'), 'user-1');
@@ -185,7 +269,7 @@ describe('CreateTicketModal', () => {
     await waitFor(() => {
       expect(props.onSubmitTicket).toHaveBeenCalledWith({
         title: 'Fix sync retries',
-        description: 'Retry failed SSE subscription',
+        description: expect.stringContaining('"type":"doc"'),
         status: 'in_review',
         priority: 'high',
         projectId: 'project-1',
@@ -236,7 +320,7 @@ describe('CreateTicketModal', () => {
     await waitFor(() => {
       expect(props.onSubmitTicket).toHaveBeenCalledWith({
         title: 'Child task',
-        description: '',
+        description: expect.stringContaining('"type":"doc"'),
         status: 'backlog',
         priority: 'no_priority',
         projectId: 'project-2',

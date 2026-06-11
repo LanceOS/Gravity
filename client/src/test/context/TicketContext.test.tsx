@@ -374,31 +374,61 @@ describe('TicketContext', () => {
       role: 'owner',
       tutorial_completed: 1,
     };
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(jsonResponse({ user, session: { userId: user.id } }))
-      .mockResolvedValueOnce(jsonResponse([{ id: 'project-1', name: 'Gravity Core', description: '', key: 'GRA', status: 'active', workspaceId: 'workspace-1' }]))
-      .mockResolvedValueOnce(jsonResponse([]))
-      .mockResolvedValueOnce(jsonResponse([]))
-      .mockResolvedValueOnce(jsonResponse([]))
-      .mockResolvedValueOnce(jsonResponse([]))
-      .mockResolvedValueOnce(jsonResponse({
-        id: 'ticket-2',
-        key: 'GRA-2',
-        title: 'Created ticket',
-        description: '',
-        status: 'todo',
-        priority: 'medium',
-        projectId: 'project-1',
-        domainId: null,
-        cycleId: null,
-        assigneeId: null,
-        parentId: null,
-        prStatus: 'none',
-        prUrl: null,
-        createdAt: '2026-05-02T00:00:00.000Z',
-        updatedAt: '2026-05-02T00:00:00.000Z',
-      }))
-      .mockResolvedValueOnce(jsonResponse({ error: 'gateway down' }, 502));
+    const createdTicket = {
+      id: 'ticket-2',
+      key: 'GRA-2',
+      title: 'Created ticket',
+      description: '',
+      status: 'todo',
+      priority: 'medium',
+      projectId: 'project-1',
+      domainId: null,
+      cycleId: null,
+      assigneeId: null,
+      parentId: null,
+      prStatus: 'none',
+      prUrl: null,
+      createdAt: '2026-05-02T00:00:00.000Z',
+      updatedAt: '2026-05-02T00:00:00.000Z',
+    };
+    let createdTicketPosted = false;
+    let refreshShouldFail = false;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? 'GET';
+
+      if (url === '/api/auth/session') {
+        return jsonResponse({ user, session: { userId: user.id } });
+      }
+
+      if (url === '/api/v1/projects?userId=user-session-1') {
+        return jsonResponse([{ id: 'project-1', name: 'Gravity Core', description: '', key: 'GRA', status: 'active', workspaceId: 'workspace-1' }]);
+      }
+
+      if (url === '/api/v1/users') {
+        return jsonResponse([]);
+      }
+
+      if (url === '/api/v1/tickets' && method === 'GET') {
+        if (!createdTicketPosted) {
+          return jsonResponse([]);
+        }
+
+        if (refreshShouldFail) {
+          return jsonResponse({ error: 'gateway down' }, 502);
+        }
+
+        return jsonResponse([]);
+      }
+
+      if (url === '/api/v1/tickets' && method === 'POST') {
+        createdTicketPosted = true;
+        refreshShouldFail = true;
+        return jsonResponse(createdTicket);
+      }
+
+      return jsonResponse([]);
+    });
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
 
     stubEventSource();

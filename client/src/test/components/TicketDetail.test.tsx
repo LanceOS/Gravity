@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 import type {
   ButtonHTMLAttributes,
   ChangeEvent,
@@ -6,10 +6,10 @@ import type {
   SelectHTMLAttributes,
   TextareaHTMLAttributes,
 } from 'react';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { TicketDetail } from '../../modules/tickets/components/TicketDetail';
+import { TicketDetail } from '../../modules/tickets/components/TicketDetail/TicketDetail';
 
 type MockButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   children?: ReactNode;
@@ -55,6 +55,76 @@ vi.mock('../../context/TicketContext', async (importOriginal) => {
 
 vi.mock('@library', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@library')>();
+  const buildDoc = (text: string) =>
+    JSON.stringify({
+      type: 'doc',
+      content: text
+        ? [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text,
+              },
+            ],
+          },
+        ]
+        : [
+          {
+            type: 'paragraph',
+          },
+        ],
+    });
+
+  const MockRichTextEditor = forwardRef<any, any>(function MockRichTextEditor(
+    { value, onChange, placeholder, className, minHeight, autoFocus, toolbarMode, surface, onBlur }: any,
+    ref,
+  ) {
+    const [text, setText] = useState(() => {
+      try {
+        const parsed = JSON.parse(value);
+        return parsed?.content?.[0]?.content?.[0]?.text ?? '';
+      } catch {
+        return value || '';
+      }
+    });
+
+    useEffect(() => {
+      try {
+        const parsed = JSON.parse(value);
+        setText(parsed?.content?.[0]?.content?.[0]?.text ?? '');
+      } catch {
+        setText(value || '');
+      }
+    }, [value]);
+
+    useImperativeHandle(ref, () => ({
+      focus: () => { },
+      insertImage: () => { },
+    }), []);
+
+    return (
+      <textarea
+        data-testid={placeholder}
+        data-toolbar-mode={toolbarMode || 'full'}
+        data-surface={surface || 'default'}
+        aria-label={placeholder}
+        placeholder={placeholder}
+        className={className}
+        style={{ minHeight }}
+        autoFocus={autoFocus}
+        value={text}
+        onChange={(event) => {
+          const nextText = event.target.value;
+          setText(nextText);
+          onChange(buildDoc(nextText));
+        }}
+        onBlur={onBlur}
+      />
+    );
+  });
+
   return {
     ...actual,
     Button: ({ children, ...props }: MockButtonProps) => {
@@ -93,6 +163,7 @@ vi.mock('@library', async (importOriginal) => {
         />
       );
     },
+    RichTextEditor: MockRichTextEditor,
     ClickAwayListener: ({ children }: { children: ReactNode }) => children,
     Portal: ({ children }: { children: ReactNode }) => <div data-testid="portal">{children}</div>,
   };
@@ -267,7 +338,7 @@ describe('TicketDetail', () => {
   it('updates title and description, selects related subtasks, and posts comments', async () => {
     const user = userEvent.setup();
     const { props } = renderTicketDetail();
-    const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {});
+    const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => { });
 
     await user.click(screen.getByRole('button', { name: 'Back' }));
     expect(props.onClose).toHaveBeenCalledTimes(1);
@@ -281,14 +352,15 @@ describe('TicketDetail', () => {
       expect(props.onUpdateTicket).toHaveBeenCalledWith('ticket-1', { title: 'Stabilize sync retries' });
     });
 
-    await user.click(screen.getByText('Retry the event stream after disconnects.'));
-    const descriptionInput = screen.getByPlaceholderText('Describe your issue using markdown...');
+    const descriptionInput = screen.getByPlaceholderText('Describe your issue...');
+    expect(descriptionInput).toHaveAttribute('data-toolbar-mode', 'bubble');
+    expect(descriptionInput).toHaveAttribute('data-surface', 'bare');
     await user.clear(descriptionInput);
     await user.type(descriptionInput, 'Add retry backoff and better logging.');
-    await user.tab();
+    fireEvent.blur(descriptionInput);
     await waitFor(() => {
       expect(props.onUpdateTicket).toHaveBeenCalledWith('ticket-1', {
-        description: 'Add retry backoff and better logging.',
+        description: expect.stringContaining('"type":"doc"'),
       });
     });
 
@@ -301,9 +373,11 @@ describe('TicketDetail', () => {
     expect(props.onSelectTicket).toHaveBeenCalledWith(subtaskOne);
 
     await user.type(screen.getByPlaceholderText('Post updates, links, or mention PRs...'), 'Comment from test');
+    expect(screen.getByPlaceholderText('Post updates, links, or mention PRs...')).toHaveAttribute('data-toolbar-mode', 'bubble');
+    expect(screen.getByPlaceholderText('Post updates, links, or mention PRs...')).toHaveAttribute('data-surface', 'bare');
     await user.click(screen.getByRole('button', { name: 'Comment' }));
     await waitFor(() => {
-      expect(props.onAddComment).toHaveBeenCalledWith('ticket-1', 'Comment from test');
+      expect(props.onAddComment).toHaveBeenCalledWith('ticket-1', expect.stringContaining('"type":"doc"'));
     });
 
     backSpy.mockRestore();
@@ -391,8 +465,8 @@ describe('TicketDetail', () => {
     expect(writeTextSpy).toHaveBeenCalledWith('https://tickets.placeholder.local/GRA-101');
     expect(toastSpy).toHaveBeenCalledWith('Ticket link copied', 'success');
 
-  const generatedBranchName = 'feature/gra-101-fix-sync-retries';
-  expect(sidebar.getByRole('button', { name: 'Copy Branch Name' })).toBeInTheDocument();
+    const generatedBranchName = 'feature/gra-101-fix-sync-retries';
+    expect(sidebar.getByRole('button', { name: 'Copy Branch Name' })).toBeInTheDocument();
 
     // Copy Link button removed — link is now the anchor icon only
 
@@ -407,7 +481,7 @@ describe('TicketDetail', () => {
     // Verify Ticket Key Display in attributes panel
     const sidebarKeyTitle = sidebar.getByText('Ticket Key');
     expect(sidebarKeyTitle).toBeInTheDocument();
-    
+
     const sidebarKeyVal = sidebar.getByText('GRA-101');
     expect(sidebarKeyVal).toBeInTheDocument();
 
@@ -419,7 +493,7 @@ describe('TicketDetail', () => {
 
     // Dropdown is not visible before opening
     expect(screen.queryByRole('button', { name: 'Grab Link' })).not.toBeInTheDocument();
-    
+
     // Open dropdown
     await user.click(commentOptionsBtn);
     expect(screen.getByRole('button', { name: 'Grab Link' })).toBeInTheDocument();
@@ -441,16 +515,18 @@ describe('TicketDetail', () => {
     // Open dropdown again to test inline editing
     await user.click(commentOptionsBtn);
     await user.click(screen.getByRole('button', { name: 'Edit Comment' }));
-    
+
     // Dropdown closes; inline edit textarea shown with the comment body
     expect(screen.queryByRole('button', { name: 'Edit Comment' })).not.toBeInTheDocument();
-    const commentEditInput = screen.getByDisplayValue('PR is ready for review.');
+    const commentEditInput = screen.getByPlaceholderText('Edit comment...');
+    expect(commentEditInput).toHaveAttribute('data-toolbar-mode', 'bubble');
+    expect(commentEditInput).toHaveAttribute('data-surface', 'bare');
     await user.clear(commentEditInput);
     await user.type(commentEditInput, 'PR is approved now.');
     await user.click(screen.getByRole('button', { name: 'Save' }));
-    
+
     await waitFor(() => {
-      expect(props.onUpdateComment).toHaveBeenCalledWith('ticket-1', 'comment-1', 'PR is approved now.');
+      expect(props.onUpdateComment).toHaveBeenCalledWith('ticket-1', 'comment-1', expect.stringContaining('"type":"doc"'));
     });
 
     // Open dropdown again to test deletion flow — should show confirmation overlay, not window.confirm

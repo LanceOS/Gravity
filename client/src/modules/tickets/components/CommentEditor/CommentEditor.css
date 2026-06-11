@@ -1,0 +1,44 @@
+.comment-editor-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+/* Override the default library rich text editor styles for the comment box */
+.comment-editor-container .rich-text-editor {
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-card);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  overflow: visible;
+  height: auto;
+}
+
+.comment-editor-container .rich-text-editor:focus-within {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(var(--color-primary-rgb), 0.15);
+}
+
+.comment-editor-container .rich-text-editor__editor {
+  padding: 8px 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--color-text-primary);
+  min-height: 40px;
+}
+
+.comment-editor-container .rich-text-editor__placeholder {
+  top: 8px;
+  left: 12px;
+  font-size: 13px;
+  color: var(--color-text-disabled);
+  opacity: 0.75;
+}
+
+.comment-editor-container .rich-text-editor__editor p {
+  margin-bottom: 0.5em;
+}
+
+.comment-editor-container .rich-text-editor__editor p:last-child {
+  margin-bottom: 0;
+}

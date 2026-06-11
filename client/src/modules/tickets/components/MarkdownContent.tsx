@@ -1,17 +1,17 @@
 import React, { useMemo } from 'react';
-import DOMPurify from 'dompurify';
 import { CheckSquare, Square } from 'lucide-react';
 import type { MarkdownTextProps } from '../types/TicketDetail';
 import { useTickets } from '../../../context/TicketContext';
 import { useTicketByKey } from '../../../hooks/useTicketByKey';
 import { getStatusColor } from '../utils/TicketDetail';
+import { renderRichTextHtml } from '@library';
 
 /**
  * @description A component that renders an interactive ticket link for a given ticket key.
  * It dynamically fetches ticket details (title and status) and displays them inline as a styled button.
  * Clicking the link navigates to the associated ticket and updates the active project context if needed.
  * @param {Object} props - The component props.
- * @param {string} props.ticketKey - The unique key of the ticket to link to (e.g., 'GRAV-1').
+ * @param {string} props.ticketKey - The unique ticket key, such as `GRA-123`.
  * @returns {JSX.Element} A React component rendering the inline ticket button.
  */
 export function TicketLink({ ticketKey }: { ticketKey: string }) {
@@ -20,15 +20,6 @@ export function TicketLink({ ticketKey }: { ticketKey: string }) {
   const localTicket = ticketMap.get(normalizedKey);
   const { ticketInfo } = useTicketByKey(normalizedKey);
 
-  /**
-   * @description Handles the click event on the ticket link button.
-   * It prevents the default action and updates the active project context. Only
-   * fully-hydrated tickets from the local ticket list are passed to
-   * `setActiveTicket`; partial ticket data from `useTicketByKey` is used only
-   * to locate the target project.
-   * @param {React.MouseEvent} e - The mouse event triggered by clicking the button.
-   * @returns {void}
-   */
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
 
@@ -76,7 +67,7 @@ export function TicketLink({ ticketKey }: { ticketKey: string }) {
               height: '8px',
               borderRadius: '50%',
               backgroundColor: getStatusColor(ticketInfo.status),
-              flexShrink: 0
+              flexShrink: 0,
             }}
           />
         )}
@@ -86,191 +77,234 @@ export function TicketLink({ ticketKey }: { ticketKey: string }) {
   );
 }
 
-/**
- * @description A utility component that parses a raw markdown string and replaces specific patterns
- * (like bold text, inline code, external links, and workspace ticket keys) with their corresponding React elements.
- * Employs a single-pass regex tokenizer for O(L) time complexity and sanitizes URLs to prevent XSS.
- * @param {MarkdownTextProps} props - The component props.
- * @param {string} props.text - The raw markdown text to be parsed and formatted.
- * @returns {JSX.Element} A React fragment containing the parsed and formatted text nodes.
- */
-function FormattedText({ text }: MarkdownTextProps) {
-  const { projects } = useTickets();
-  const parts: React.ReactNode[] = [];
-  let keyIndex = 0;
+function escapeRegex(value: string) {
+  return value.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+}
+
+function renderTextWithTicketLinks(text: string, ticketRegex: RegExp): React.ReactNode[] {
+  const nodes: React.ReactNode[] = [];
   let lastIndex = 0;
-
-  const ticketRegexPart = useMemo(() => {
-    const projectKeys = projects?.map(p => p.key).filter(Boolean) || [];
-    if (projectKeys.length === 0) return '$^';
-    const escapedKeys = projectKeys.map(k => k.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')).join('|');
-    return `(?:${escapedKeys})`;
-  }, [projects]);
-
-  const combinedRegex = useMemo(() => {
-    return new RegExp(
-      `\\*\\*([^*]+)\\*\\*|\`([^\`]+)\`|\\[([^\\]]+)\\]\\(([^)]+)\\)|\\b(${ticketRegexPart}-\\d+)\\b`,
-      'gi'
-    );
-  }, [ticketRegexPart]);
-
-  const isSafeUrl = (url: string) => {
-    // Rely on DOMPurify's battle-tested URL validation to prevent XSS
-    return DOMPurify.isValidAttribute('a', 'href', url);
-  };
-
-  const matches = Array.from(text.matchAll(combinedRegex));
+  let keyIndex = 0;
+  const matches = Array.from(text.matchAll(ticketRegex));
 
   for (const match of matches) {
     if (match.index !== undefined && match.index > lastIndex) {
-      parts.push(<span key={keyIndex++}>{text.substring(lastIndex, match.index)}</span>);
+      nodes.push(<React.Fragment key={`text-${keyIndex++}`}>{text.substring(lastIndex, match.index)}</React.Fragment>);
     }
 
     if (match[1]) {
-      parts.push(<strong key={keyIndex++} style={{ color: 'var(--color-text-primary)', fontWeight: 600 }}>{match[1]}</strong>);
-    } else if (match[2]) {
-      parts.push(<code key={keyIndex++} style={{ background: 'var(--color-base50)', padding: '1px 4px', borderRadius: '4px', fontSize: '11px', fontFamily: 'var(--mono)', color: 'var(--color-text-primary)' }}>{match[2]}</code>);
-    } else if (match[3] && match[4]) {
-      const safeHref = isSafeUrl(match[4]) ? match[4] : 'about:blank';
-      parts.push(<a key={keyIndex++} href={safeHref} target="_blank" rel="noreferrer" style={{ color: 'var(--color-primary)', textDecoration: 'none' }} className="clickable">{match[3]}</a>);
-    } else if (match[5]) {
-      parts.push(<TicketLink key={keyIndex++} ticketKey={match[5]} />);
+      nodes.push(<TicketLink key={`ticket-${keyIndex++}`} ticketKey={match[1]} />);
     }
 
     lastIndex = match.index! + match[0].length;
   }
 
   if (lastIndex < text.length) {
-    parts.push(<span key={keyIndex++}>{text.substring(lastIndex)}</span>);
+    nodes.push(<React.Fragment key={`text-${keyIndex++}`}>{text.substring(lastIndex)}</React.Fragment>);
   }
 
-  return <>{parts}</>;
+  return nodes;
 }
 
-/**
- * @description A lightweight markdown renderer component. It splits the input text by lines and parses
- * basic markdown elements like headers (h2, h3), unordered lists, and paragraphs.
- * It delegates inline text formatting to the FormattedText component.
- * @param {MarkdownTextProps} props - The component props.
- * @param {string} props.text - The full markdown string to render.
- * @returns {JSX.Element | null} A React fragment containing the rendered markdown blocks, or null if text is empty.
- */
-export function MarkdownContent({ text }: MarkdownTextProps) {
-  if (!text) {
+function renderNode(
+  node: ChildNode,
+  ticketRegex: RegExp,
+  keyPrefix: string,
+  skipTicketLinks: boolean,
+): React.ReactNode {
+  if (node.nodeType === Node.TEXT_NODE) {
+    const text = node.textContent || '';
+    return skipTicketLinks ? text : renderTextWithTicketLinks(text, ticketRegex);
+  }
+
+  if (node.nodeType !== Node.ELEMENT_NODE) {
     return null;
   }
 
-  const lines = text.split('\n');
-  const elements: React.ReactNode[] = [];
+  const element = node as HTMLElement;
+  const tag = element.tagName.toLowerCase();
+  const childSkip = skipTicketLinks || tag === 'a' || tag === 'code' || tag === 'pre';
+  const children = Array.from(element.childNodes).flatMap((child, index) => {
+    const rendered = renderNode(child, ticketRegex, `${keyPrefix}-${index}`, childSkip);
+    return Array.isArray(rendered) ? rendered : rendered == null ? [] : [rendered];
+  });
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-
-    // Headers (1-6 hashes)
-    const headingMatch = line.match(/^(#{1,6})\s+(.*)$/);
-    if (headingMatch) {
-      const level = headingMatch[1].length;
-      const content = headingMatch[2];
-      const headingTags = ['h2', 'h3', 'h4', 'h5', 'h6', 'h6'] as const;
-      const Tag = headingTags[level - 1];
-      
-      const fontSizes = { 1: '16px', 2: '14px', 3: '13px', 4: '12px', 5: '12px', 6: '12px' };
-      const fontSize = fontSizes[level as keyof typeof fontSizes] || '16px';
-      const margin = level === 1 ? '12px 0 6px' : '10px 0 4px';
-      
-      elements.push(
-        React.createElement(Tag, {
-          key: i,
-          style: { fontSize, fontWeight: 600, color: 'var(--color-text-primary)', margin }
-        }, <FormattedText text={content} />)
+  switch (tag) {
+    case 'p':
+      return (
+        <p key={keyPrefix} style={{ marginBottom: '10px', lineHeight: 1.6 }}>
+          {children}
+        </p>
       );
-      continue;
-    }
+    case 'h1':
+    case 'h2':
+    case 'h3':
+    case 'h4':
+    case 'h5':
+    case 'h6': {
+      const level = Number(tag.slice(1));
+      const sizeMap: Record<number, string> = {
+        1: '16px',
+        2: '15px',
+        3: '14px',
+        4: '13px',
+        5: '12px',
+        6: '12px',
+      };
 
-    // Blockquotes
-    if (line.trim().startsWith('> ')) {
-      const content = line.replace(/^\s*>\s+/, '');
-      elements.push(
-        <blockquote key={i} style={{ borderLeft: '3px solid var(--color-border-default)', paddingLeft: '12px', margin: '8px 0', color: 'var(--color-text-secondary)' }}>
-          <FormattedText text={content} />
+      return React.createElement(
+        tag,
+        {
+          key: keyPrefix,
+          style: {
+            fontSize: sizeMap[level] || '14px',
+            fontWeight: 700,
+            color: 'var(--color-text-primary)',
+            margin: level === 1 ? '12px 0 6px' : '10px 0 4px',
+          },
+        },
+        children,
+      );
+    }
+    case 'blockquote':
+      return (
+        <blockquote
+          key={keyPrefix}
+          style={{
+            borderLeft: '3px solid var(--color-border-default)',
+            paddingLeft: '12px',
+            margin: '8px 0',
+            color: 'var(--color-text-secondary)',
+          }}
+        >
+          {children}
         </blockquote>
       );
-      continue;
-    }
-
-    // Unordered lists and Task lists
-    if (line.trim().startsWith('* ') || line.trim().startsWith('- ')) {
-      const listItems: React.ReactNode[] = [];
-      let isTask = false;
-      
-      while (i < lines.length && (lines[i].trim().startsWith('* ') || lines[i].trim().startsWith('- '))) {
-        const currentLine = lines[i];
-        const content = currentLine.replace(/^\s*[*-]\s+/, '');
-        
-        // Task list check
-        const taskMatch = content.match(/^\[([ xX])\]\s+(.*)$/);
-        if (taskMatch) {
-          isTask = true;
-          const isChecked = taskMatch[1].toLowerCase() === 'x';
-          listItems.push(
-            <li key={i} style={{ listStyle: 'none', display: 'flex', alignItems: 'flex-start', gap: '8px', margin: '4px 0' }}>
-              {isChecked ? (
-                <CheckSquare size={16} color="var(--color-text-primary)" style={{ marginTop: '2px', flexShrink: 0 }} />
-              ) : (
-                <Square size={16} color="var(--color-text-disabled)" style={{ marginTop: '2px', flexShrink: 0 }} />
-              )}
-              <span><FormattedText text={taskMatch[2]} /></span>
-            </li>
-          );
-        } else {
-          listItems.push(
-            <li key={i} style={{ margin: '2px 0', fontSize: '13px' }}>
-              <FormattedText text={content} />
-            </li>
-          );
-        }
-        i++;
-      }
-      i--; // step back since outer loop will increment
-      
-      elements.push(
-        <ul key={`ul-${i}`} style={{ marginLeft: isTask ? '0' : '20px', paddingLeft: isTask ? '0' : '8px', marginBottom: '12px' }}>
-          {listItems}
+    case 'ul':
+      return (
+        <ul key={keyPrefix} style={{ marginLeft: '20px', paddingLeft: '8px', marginBottom: '12px' }}>
+          {children}
         </ul>
       );
-      continue;
-    }
-
-    // Numbered lists
-    const numberedMatch = line.trim().match(/^(\d+)\.\s+(.*)$/);
-    if (numberedMatch) {
-      const listItems: React.ReactNode[] = [];
-      while (i < lines.length && lines[i].trim().match(/^(\d+)\.\s+(.*)$/)) {
-        const m = lines[i].trim().match(/^(\d+)\.\s+(.*)$/);
-        listItems.push(
-          <li key={i} style={{ margin: '2px 0', fontSize: '13px' }}>
-            <FormattedText text={m![2]} />
-          </li>
-        );
-        i++;
-      }
-      i--; // step back
-      
-      elements.push(
-        <ol key={`ol-${i}`} style={{ marginLeft: '24px', paddingLeft: '8px', marginBottom: '12px' }}>
-          {listItems}
+    case 'ol':
+      return (
+        <ol key={keyPrefix} style={{ marginLeft: '24px', paddingLeft: '8px', marginBottom: '12px' }}>
+          {children}
         </ol>
       );
-      continue;
+    case 'li':
+      return (
+        <li key={keyPrefix} style={{ margin: '2px 0', fontSize: '13px' }}>
+          {children}
+        </li>
+      );
+    case 'strong':
+      return (
+        <strong key={keyPrefix} style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>
+          {children}
+        </strong>
+      );
+    case 'em':
+      return <em key={keyPrefix}>{children}</em>;
+    case 'code':
+      return (
+        <code
+          key={keyPrefix}
+          style={{
+            background: 'var(--color-base50)',
+            padding: '1px 4px',
+            borderRadius: '4px',
+            fontSize: '11.5px',
+            fontFamily: 'var(--mono)',
+            color: 'var(--color-text-primary)',
+          }}
+        >
+          {children}
+        </code>
+      );
+    case 'pre':
+      return (
+        <pre
+          key={keyPrefix}
+          style={{
+            background: 'var(--color-base50)',
+            border: '1px solid var(--color-border-default)',
+            borderRadius: '6px',
+            padding: '12px 14px',
+            overflowX: 'auto',
+            marginBottom: '12px',
+          }}
+        >
+          {children}
+        </pre>
+      );
+    case 'a': {
+      const href = element.getAttribute('href') || 'about:blank';
+      return (
+        <a
+          key={keyPrefix}
+          href={href}
+          target="_blank"
+          rel="noreferrer"
+          style={{ color: 'var(--color-primary)', textDecoration: 'none' }}
+          className="clickable"
+        >
+          {children}
+        </a>
+      );
+    }
+    case 'img':
+      return (
+        <img
+          key={keyPrefix}
+          src={element.getAttribute('src') || ''}
+          alt={element.getAttribute('alt') || ''}
+          title={element.getAttribute('title') || undefined}
+          style={{ maxWidth: '100%', height: 'auto', borderRadius: '6px', margin: '8px 0' }}
+        />
+      );
+    case 'br':
+      return <br key={keyPrefix} />;
+    default:
+      return <React.Fragment key={keyPrefix}>{children}</React.Fragment>;
+  }
+}
+
+export function MarkdownContent({ text }: MarkdownTextProps) {
+  const { projects } = useTickets();
+
+  const ticketRegex = useMemo(() => {
+    const projectKeys = projects?.map((project) => project.key).filter(Boolean) || [];
+    if (projectKeys.length === 0) {
+      return /$^/g;
     }
 
-    // Paragraphs
-    elements.push(
-      <p key={i} style={{ minHeight: '18px', margin: '4px 0' }}>
-        <FormattedText text={line} />
-      </p>
-    );
+    const escapedKeys = projectKeys.map(escapeRegex).join('|');
+    return new RegExp(`\\b(${escapedKeys}-\\d+)\\b`, 'gi');
+  }, [projects]);
+
+  const rendered = useMemo(() => {
+    if (!text) {
+      return null;
+    }
+
+    const html = renderRichTextHtml(text);
+    if (!html) {
+      return null;
+    }
+
+    const template = document.createElement('template');
+    template.innerHTML = html;
+
+    return Array.from(template.content.childNodes).flatMap((node, index) => {
+      const renderedNode = renderNode(node, ticketRegex, `richtext-${index}`, false);
+      return Array.isArray(renderedNode) ? renderedNode : renderedNode == null ? [] : [renderedNode];
+    });
+  }, [text, ticketRegex]);
+
+  if (!rendered || rendered.length === 0) {
+    return null;
   }
 
-  return <div className="markdown-content">{elements}</div>;
+  return <>{rendered}</>;
 }

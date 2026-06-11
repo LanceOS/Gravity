@@ -17,7 +17,7 @@ export const EmptyWorkspaceScreen: React.FC<EmptyWorkspaceScreenProps> = ({
   const [projectDescription, setProjectDescription] = useState('');
   const [inviteCode, setInviteCode] = useState('');
 
-  const handleCreateSubmit = async (event: React.FormEvent) => {
+  const handleCreateSubmit = async (event: React.SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     await onCreateProject({
       name: projectName,
@@ -26,7 +26,7 @@ export const EmptyWorkspaceScreen: React.FC<EmptyWorkspaceScreenProps> = ({
     });
   };
 
-  const handleJoinSubmit = async (event: React.FormEvent) => {
+  const handleJoinSubmit = async (event: React.SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     await onJoinProject(inviteCode);
   };

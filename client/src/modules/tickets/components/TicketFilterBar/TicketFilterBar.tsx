@@ -1,14 +1,14 @@
 import React from 'react';
 import { Filter } from 'lucide-react';
-import type { Ticket } from '../../../context/TicketContext';
-import type { TicketFilters, TicketListSort } from '../utils/ticketView';
+import type { Ticket } from '../../../../context/TicketContext';
+import type { TicketFilters, TicketListSort } from '../../utils/ticketView';
 import { Button, Select, DenseTextInput, Popover, Badge } from '@library';
 import {
   PRIORITY_FILTER_OPTIONS,
   STATUS_FILTER_OPTIONS,
   LIST_SORT_OPTIONS,
-} from '../utils/TicketList';
-import type { TicketFilterBarProps } from '../types/TicketFilterBar';
+} from '../../utils/TicketList';
+import type { TicketFilterBarProps } from '../../types/TicketFilterBar';
 import './TicketFilterBar.css';
 
 export const TicketFilterBar: React.FC<TicketFilterBarProps> = ({

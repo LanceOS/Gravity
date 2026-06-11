@@ -2,8 +2,63 @@ import { randomUUID } from 'node:crypto';
 import { MetadataRepository, NotesRepository } from '../repositories.js';
 import { RustFS } from '../../../lib/rustfs.js';
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function extractRichTextExcerpt(body: string): string | null {
+  try {
+    const parsed = JSON.parse(body);
+    if (!isRecord(parsed) || parsed.type !== 'doc' || !Array.isArray(parsed.content)) {
+      return null;
+    }
+
+    const fragments: string[] = [];
+
+    const visit = (node: unknown) => {
+      if (typeof node === 'string') {
+        fragments.push(node);
+        return;
+      }
+
+      if (!isRecord(node)) {
+        return;
+      }
+
+      if (typeof node.text === 'string' && node.text.length > 0) {
+        fragments.push(node.text);
+      }
+
+      if (node.type === 'hard_break') {
+        fragments.push(' ');
+      }
+
+      if (Array.isArray(node.content)) {
+        for (const child of node.content) {
+          visit(child);
+        }
+      }
+    };
+
+    for (const child of parsed.content) {
+      visit(child);
+    }
+
+    return fragments.join(' ').replace(/\s+/g, ' ').trim();
+  } catch {
+    return null;
+  }
+}
+
 function extractExcerpt(body: string, maxLength: number = 500): string {
-  // Strip simple markdown formatting
+  const richTextExcerpt = extractRichTextExcerpt(body);
+  if (richTextExcerpt !== null) {
+    return richTextExcerpt.length > maxLength
+      ? `${richTextExcerpt.substring(0, maxLength)}...`
+      : richTextExcerpt;
+  }
+
+  // Strip simple markdown formatting for legacy note bodies.
   const plainText = body
     .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // links
     .replace(/[#*`_~]/g, '') // formatting

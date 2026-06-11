@@ -140,7 +140,7 @@ export function WorkspaceProjectPanel({
     }
   };
 
-  const handleCreateLabel = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleCreateLabel = async (event: React.SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     setLabelFormError(null);
 
@@ -175,7 +175,7 @@ export function WorkspaceProjectPanel({
     setEditingLabelError(null);
   };
 
-  const handleUpdateLabel = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleUpdateLabel = async (event: React.SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (!editingLabelId || !editingLabelName.trim()) {

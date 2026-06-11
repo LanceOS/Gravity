@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import type { Ticket } from '../../../context/TicketContext';
-import { Button, Select, Modal, Alert, Textarea, Popover } from '@library';
+import type { Ticket } from '../../../../context/TicketContext';
+import { Button, Select, Modal, Alert, Textarea, Popover, RichTextEditor, createEmptyRichTextValue } from '@library';
 import { AlertCircle } from 'lucide-react';
-import type { CreateTicketModalProps } from '../types/CreateTicketModal';
-import { PRIORITY_OPTIONS, STATUS_OPTIONS } from '../utils/CreateTicketModal';
-import { useTickets } from '../../../context/TicketContext';
-import { LabelManagerPopoverContent } from './LabelManagerPopoverContent';
-import { LabelBadge } from './LabelBadge';
+import type { CreateTicketModalProps } from '../../types/CreateTicketModal';
+import { PRIORITY_OPTIONS, STATUS_OPTIONS } from '../../utils/CreateTicketModal';
+import { useTickets } from '../../../../context/TicketContext';
+import { LabelManagerPopoverContent } from '../LabelManagerPopoverContent';
+import { LabelBadge } from '../LabelBadge';
 import { Plus } from 'lucide-react';
 import './CreateTicketModal.css';
 
@@ -23,7 +23,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
   parentId,
 }) => {
   const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
+  const [description, setDescription] = useState(createEmptyRichTextValue());
   const [projectId, setProjectId] = useState(parentTicket ? parentTicket.projectId : defaultProjectId);
   const [status, setStatus] = useState<Ticket['status']>(initialStatus || 'todo');
   const [priority, setPriority] = useState<Ticket['priority']>('no_priority');
@@ -47,7 +47,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
     setLabelIds((currentLabelIds) => currentLabelIds.filter((labelId) => projectLabels.some((label) => label.id === labelId)));
   }, [projectLabels]);
 
-  const handleSubmit = useCallback(async (e?: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e?: React.SubmitEvent<HTMLFormElement>) => {
     if (e) e.preventDefault();
     setFormError(null);
 
@@ -63,7 +63,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
 
     const created = await onSubmitTicket({
       title: title.trim(),
-      description: description.trim(),
+      description,
       status,
       priority,
       projectId,
@@ -159,17 +159,14 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
               }}
             />
 
-            <Textarea
-              label="Description"
-              placeholder="Add description... (markdown supported)"
+            <RichTextEditor
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              autoGrow
-              className="create-ticket-modal__description-input"
-              inputStyle={{
-                minHeight: '190px',
-                lineHeight: 1.55,
-              }}
+              onChange={setDescription}
+              placeholder="Add a description..."
+              minHeight="190px"
+              className="create-ticket-modal__description-editor"
+              surface="bare"
+              toolbarMode="bubble"
             />
           </section>
 

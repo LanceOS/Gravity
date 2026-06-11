@@ -1,7 +1,7 @@
 import userEvent from '@testing-library/user-event';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import TicketUtilities from '../../modules/tickets/components/TicketUtilities';
+import TicketUtilities from '../../modules/tickets/components/TicketUtilities/TicketUtilities';
 
 describe('TicketUtilities', () => {
   it('renders the utility actions and forwards copy requests', async () => {

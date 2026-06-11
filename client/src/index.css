@@ -506,7 +506,7 @@ button.tool-submit-active {
   }
 }
 
-/* TipTap ProseMirror Editor Custom Stylings */
+/* ProseMirror editor custom stylings */
 .ProseMirror {
   outline: none !important;
   font-family: inherit;
@@ -540,7 +540,7 @@ button.tool-submit-active {
   color: var(--color-primary);
 }
 
-/* Placeholder styling inside TipTap */
+/* Placeholder styling inside the ProseMirror editor */
 .ProseMirror p.is-editor-empty:first-child::before {
   color: var(--color-text-disabled);
   content: attr(data-placeholder);
@@ -550,9 +550,11 @@ button.tool-submit-active {
   opacity: 0.7;
 }
 
-/* TipTap Bubble Formatting Menu */
+/* Rich text bubble formatting menu */
 .markdown-bubble-menu {
+  position: fixed;
   display: flex;
+  flex-wrap: wrap;
   background-color: var(--color-surface-card);
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-md);
@@ -562,7 +564,8 @@ button.tool-submit-active {
   align-items: center;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  z-index: 1000;
+  z-index: 1700;
+  max-width: min(420px, calc(100vw - 32px));
 }
 
 .bubble-menu-btn {

@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { TicketRowMobile } from '../../modules/tickets/components/TicketRowMobile';
+import { TicketRowMobile } from '../../modules/tickets/components/TicketRowMobile/TicketRowMobile';
 
 describe('TicketRowMobile', () => {
   const mockTicket = {
@@ -41,7 +41,7 @@ describe('TicketRowMobile', () => {
     // Main row
     expect(screen.getByText('Test mobile ticket row')).toBeInTheDocument();
     expect(screen.getByTestId('priority-icon')).toBeInTheDocument();
-    
+
     // Avatar
     const avatar = screen.getByRole('presentation', { hidden: true });
     expect(avatar).toHaveAttribute('src', 'avatar-url.png');

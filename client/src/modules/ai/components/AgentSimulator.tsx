@@ -63,7 +63,7 @@ export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
     }
   };
 
-  const handleRunSimulation = async (e: React.FormEvent) => {
+  const handleRunSimulation = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!prompt.trim() || isRunning) return;
 
@@ -247,4 +247,3 @@ export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
     </div>
   );
 };
-

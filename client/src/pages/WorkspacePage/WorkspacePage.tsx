@@ -1,5 +1,5 @@
 import { useMemo, useCallback, useState } from 'react';
-import { Button } from '@library';
+import { Button, createEmptyRichTextValue } from '@library';
 import type { Comment, Cycle, Label, Project, Ticket, User } from '../../context/TicketContext';
 import type { TicketFilters, TicketListSort } from '../../modules/tickets/utils/ticketView';
 import { TicketBoard, TicketList, TicketFilterBar } from '../../modules/tickets';
@@ -13,8 +13,6 @@ import {
 } from '../../modules/tickets/utils/ticketView';
 import { WorkspaceHeader } from '../../modules/workspaces';
 import { WorkspaceViewContainer } from '../../components/WorkspaceViewContainer';
-import { Breadcrumbs } from '../../components/Breadcrumbs/Breadcrumbs';
-import WorkspaceMcpModal from '../../modules/workspaces/components/WorkspaceMcpModal';
 import './WorkspacePage.css';
 
 interface WorkspacePageProps {
@@ -70,7 +68,7 @@ export function WorkspacePage({
   onSetView,
   onUpdateTicket,
 }: WorkspacePageProps) {
-  const [isMcpOpen, setIsMcpOpen] = useState(false);
+  const [activeNoteTitle, setActiveNoteTitle] = useState('');
   const labels = labelItems ?? domainItems ?? [];
   const filteredTickets = useMemo(() => filterTickets(tickets, filters), [tickets, filters]);
   const hasFiltersApplied = useMemo(() => hasActiveTicketFilters(filters), [filters]);
@@ -118,7 +116,7 @@ export function WorkspacePage({
         },
         body: JSON.stringify({
           title: 'Untitled Note',
-          body: '',
+          body: createEmptyRichTextValue(),
         }),
       });
       if (response.ok) {
@@ -130,37 +128,28 @@ export function WorkspacePage({
     }
   }, [filters.projectId, onSelectNote]);
 
-  const displayTitle = activeContext === 'notes' ? 'Notes' : headerTitle;
-  const shouldShowBreadcrumbs = Boolean(pathname && workspaceId && pathname !== `/workspaces/${workspaceId}`);
+  const isNoteEditor = activeContext === 'notes' && activeNoteId;
+  const isTicketEditor = activeContext === 'issues' && activeTicket;
+
+  let displayTitle = '';
+  if (activeContext === 'notes') {
+    displayTitle = isNoteEditor ? (activeNoteTitle ? `Notes - ${activeNoteTitle}` : 'Notes') : 'Notes';
+  } else {
+    displayTitle = isTicketEditor ? `Tickets - ${activeTicket.key}` : headerTitle;
+  }
 
   return (
     <div className="workspace-page">
       {projects.length > 0 ? (
         <WorkspaceHeader>
           <WorkspaceHeader.Top>
-            {shouldShowBreadcrumbs ? (
-              <Breadcrumbs
-                pathname={pathname || ''}
-                workspaceId={workspaceId || ''}
-                workspaceName={workspaceName}
-                projects={projects}
-                activeTicket={activeTicket}
-                activeNoteId={activeNoteId}
-              />
-            ) : (
-              <WorkspaceHeader.Title>{displayTitle}</WorkspaceHeader.Title>
-            )}
+            <WorkspaceHeader.Title>{displayTitle}</WorkspaceHeader.Title>
             {!activeTicket && activeContext === 'issues' && (
-              <WorkspaceHeader.ViewToggle
-                activeView={activeView}
-                onSetView={onSetView}
-              />
-            )}
-            {!activeTicket && activeContext === 'issues' && (
-              <div style={{ marginLeft: 12 }} className="workspace-header__mcp-btn">
-                <Button type="button" variant="secondary" onClick={() => setIsMcpOpen(true)}>
-                  Connect External AI
-                </Button>
+              <div style={{ marginLeft: 'auto' }}>
+                <WorkspaceHeader.ViewToggle
+                  activeView={activeView}
+                  onSetView={onSetView}
+                />
               </div>
             )}
             {!activeTicket && activeContext === 'notes' && (
@@ -207,7 +196,7 @@ export function WorkspacePage({
               <div className={activeContext !== 'notes' ? 'workspace-page__issues--hidden' : ''}>
                 <WorkspaceViewContainer>
                   {activeNoteId ? (
-                    <NoteEditor projectId={filters.projectId || ''} noteId={activeNoteId} />
+                    <NoteEditor projectId={filters.projectId || ''} noteId={activeNoteId} onTitleChange={setActiveNoteTitle} />
                   ) : (
                     <NotesList projectId={filters.projectId || ''} onSelectNote={onSelectNote || (() => { })} />
                   )}
@@ -260,7 +249,6 @@ export function WorkspacePage({
           </div>
         </div>
       </div>
-      <WorkspaceMcpModal workspaceId={workspaceId} isOpen={isMcpOpen} onClose={() => setIsMcpOpen(false)} />
     </div>
   );
 }

@@ -130,6 +130,18 @@ export function SidebarUserMenu({
         <div
           onClick={() => {
             onCloseUserDropdown();
+            userMenu.onOpenMcp();
+          }}
+          className="clickable"
+          style={dropdownItemStyle(userMenu.activeArea)}
+        >
+          <Settings2 size={14} color="var(--color-primary)" />
+          <span>Connect External AI</span>
+        </div>
+
+        <div
+          onClick={() => {
+            onCloseUserDropdown();
             userMenu.onSignOut();
           }}
           className="clickable"
