@@ -5,7 +5,7 @@ import { cycles, domains, labels, ticketLabels, projects, tickets, workspaceMemb
 import { broadcastEvent } from '../../realtime.js';
 import { createId, getProjectIdFromRequest, normalizeIsoDate } from '../../lib/platform.js';
 import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
-import { isWorkspaceMember, getProjectWorkspaceId, authorizeProjectAccess } from '../workspaces/services/membership.js';
+import { isWorkspaceMember, getProjectWorkspaceId, authorizeProjectAccess, authorizeTeamAccess } from '../workspaces/services/membership.js';
 import {
   addCommentRecord,
   createTicketRecord,
@@ -18,6 +18,21 @@ import {
   updateCommentRecord,
   deleteCommentRecord,
 } from './services/tickets.js';
+import {
+  ProjectScopeStrategy,
+  TeamScopeStrategy,
+  WorkspaceScopeStrategy,
+} from './services/scope-strategies.js';
+
+function mapDomain(domain: typeof domains.$inferSelect) {
+  return {
+    id: domain.id,
+    projectId: domain.projectId,
+    teamId: domain.teamId,
+    name: domain.name,
+    color: domain.color,
+  };
+}
 
 function mapCycle(cycle: typeof cycles.$inferSelect) {
   return {
@@ -78,22 +93,42 @@ export function createTicketsRouter() {
   }
 
   router.get('/tickets', async (req, res) => {
-    await withProjectAccess(req, res, getProjectIdFromRequest(req), async (projectId) => {
-      try {
-        const ticketList = await listTickets(projectId, {
-          status: typeof req.query.status === 'string' ? req.query.status : undefined,
-          priority: typeof req.query.priority === 'string' ? req.query.priority : undefined,
-          domainId: typeof req.query.domainId === 'string' ? req.query.domainId : undefined,
-          assigneeId: typeof req.query.assigneeId === 'string' ? req.query.assigneeId : undefined,
-          cycleId: typeof req.query.cycleId === 'string' ? req.query.cycleId : undefined,
-          labels: typeof req.query.labels === 'string' ? req.query.labels.split(',').filter(Boolean) : undefined,
-          labelMode: (req.query.labelMode === 'all' || req.query.labelMode === 'any') ? req.query.labelMode : undefined,
-        });
-        res.json(ticketList);
-      } catch (error) {
-        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load tickets.' });
-      }
-    });
+    const projectId = typeof req.query.projectId === 'string' ? req.query.projectId : getProjectIdFromRequest(req);
+    const teamId = typeof req.query.teamId === 'string' ? req.query.teamId : undefined;
+    const workspaceId = typeof req.query.workspaceId === 'string' ? req.query.workspaceId : undefined;
+
+    let strategy: ProjectScopeStrategy | TeamScopeStrategy | WorkspaceScopeStrategy;
+    if (projectId) {
+      strategy = new ProjectScopeStrategy(projectId);
+    } else if (teamId) {
+      strategy = new TeamScopeStrategy(teamId);
+    } else if (workspaceId) {
+      strategy = new WorkspaceScopeStrategy(workspaceId);
+    } else {
+      res.status(400).json({ error: 'Either projectId, teamId, or workspaceId is required.' });
+      return;
+    }
+
+    const auth = await strategy.authorize(req);
+    if (!auth.allowed) {
+      res.status(auth.status ?? 403).json({ error: auth.error });
+      return;
+    }
+
+    try {
+      const ticketList = await strategy.execute({
+        status: typeof req.query.status === 'string' ? req.query.status : undefined,
+        priority: typeof req.query.priority === 'string' ? req.query.priority : undefined,
+        domainId: typeof req.query.domainId === 'string' ? req.query.domainId : undefined,
+        assigneeId: typeof req.query.assigneeId === 'string' ? req.query.assigneeId : undefined,
+        cycleId: typeof req.query.cycleId === 'string' ? req.query.cycleId : undefined,
+        labels: typeof req.query.labels === 'string' ? req.query.labels.split(',').filter(Boolean) : undefined,
+        labelMode: (req.query.labelMode === 'all' || req.query.labelMode === 'any') ? req.query.labelMode : undefined,
+      });
+      res.json(ticketList);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load tickets.' });
+    }
   });
 
   router.post('/tickets', async (req, res) => {
@@ -289,13 +324,174 @@ export function createTicketsRouter() {
   });
 
   router.get('/domains', async (req, res) => {
-    res.set('Warning', '299 - "Domains API is deprecated. Use Labels API instead."');
-    res.status(404).json({ error: 'Domains API is deprecated. Use Labels API instead.' });
+    const teamId = typeof req.query.teamId === 'string' ? req.query.teamId : undefined;
+    const projectId = typeof req.query.projectId === 'string' ? req.query.projectId : getProjectIdFromRequest(req);
+
+    if (teamId) {
+      const auth = await authorizeTeamAccess(req, teamId);
+      if (!auth.allowed) {
+        res.status(auth.status ?? 403).json({ error: auth.error });
+        return;
+      }
+      try {
+        const rows = await db.select().from(domains).where(eq(domains.teamId, teamId)).orderBy(asc(domains.createdAt));
+        res.json(rows.map(mapDomain));
+      } catch (error) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load domains.' });
+      }
+    } else if (projectId) {
+      const auth = await authorizeProjectAccess(req, projectId);
+      if (!auth.allowed) {
+        res.status(auth.status ?? 403).json({ error: auth.error });
+        return;
+      }
+      try {
+        const projectRows = await db.select({ teamId: projects.teamId }).from(projects).where(eq(projects.id, projectId)).limit(1);
+        const teamIdOfProject = projectRows[0]?.teamId;
+        if (teamIdOfProject) {
+          const rows = await db.select().from(domains).where(eq(domains.teamId, teamIdOfProject)).orderBy(asc(domains.createdAt));
+          res.json(rows.map(mapDomain));
+        } else {
+          const rows = await db.select().from(domains).where(eq(domains.projectId, projectId)).orderBy(asc(domains.createdAt));
+          res.json(rows.map(mapDomain));
+        }
+      } catch (error) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load domains.' });
+      }
+    } else {
+      res.status(400).json({ error: 'Either teamId or projectId is required.' });
+    }
   });
 
   router.post('/domains', async (req, res) => {
-    res.set('Warning', '299 - "Domains API is deprecated. Use Labels API instead."');
-    res.status(404).json({ error: 'Domains API is deprecated. Use Labels API instead.' });
+    const { name, color, teamId } = req.body ?? {};
+    const projectId = req.body?.projectId || getProjectIdFromRequest(req);
+
+    if (!name) {
+      res.status(400).json({ error: 'Domain name is required.' });
+      return;
+    }
+
+    if (teamId) {
+      const auth = await authorizeTeamAccess(req, teamId);
+      if (!auth.allowed) {
+        res.status(auth.status ?? 403).json({ error: auth.error });
+        return;
+      }
+      try {
+        const rows = await db
+          .insert(domains)
+          .values({
+            id: createId('d'),
+            teamId,
+            name,
+            color: color ?? '#6B7280',
+            createdAt: new Date(),
+          })
+          .returning();
+        res.status(201).json(mapDomain(rows[0]));
+      } catch (error) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create domain.' });
+      }
+    } else if (projectId) {
+      const auth = await authorizeProjectAccess(req, projectId);
+      if (!auth.allowed) {
+        res.status(auth.status ?? 403).json({ error: auth.error });
+        return;
+      }
+      try {
+        const projectRows = await db.select({ teamId: projects.teamId }).from(projects).where(eq(projects.id, projectId)).limit(1);
+        const teamIdOfProject = projectRows[0]?.teamId;
+
+        const rows = await db
+          .insert(domains)
+          .values({
+            id: createId('d'),
+            projectId,
+            teamId: teamIdOfProject ?? null,
+            name,
+            color: color ?? '#6B7280',
+            createdAt: new Date(),
+          })
+          .returning();
+        res.status(201).json(mapDomain(rows[0]));
+      } catch (error) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create domain.' });
+      }
+    } else {
+      res.status(400).json({ error: 'Either teamId or projectId is required.' });
+    }
+  });
+
+  const handleDomainUpdate = async (req: Request, res: Response) => {
+    const domainId = normalizeRouteParam(req.params.domainId);
+    try {
+      const domainRows = await db.select().from(domains).where(eq(domains.id, domainId)).limit(1);
+      const domain = domainRows[0];
+      if (!domain) {
+        res.status(404).json({ error: 'Domain not found.' });
+        return;
+      }
+
+      let auth;
+      if (domain.teamId) {
+        auth = await authorizeTeamAccess(req, domain.teamId);
+      } else if (domain.projectId) {
+        auth = await authorizeProjectAccess(req, domain.projectId);
+      } else {
+        res.status(403).json({ error: 'Access denied.' });
+        return;
+      }
+
+      if (!auth.allowed) {
+        res.status(auth.status ?? 403).json({ error: auth.error });
+        return;
+      }
+
+      const updates: any = {};
+      if (typeof req.body?.name === 'string') updates.name = req.body.name;
+      if (typeof req.body?.color === 'string') updates.color = req.body.color;
+
+      const rows = await db.update(domains).set(updates).where(eq(domains.id, domainId)).returning();
+      res.json(mapDomain(rows[0]));
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to update domain.' });
+    }
+  };
+
+  router.put('/domains/:domainId', handleDomainUpdate);
+  router.patch('/domains/:domainId', handleDomainUpdate);
+
+  router.delete('/domains/:domainId', async (req, res) => {
+    const domainId = normalizeRouteParam(req.params.domainId);
+    try {
+      const domainRows = await db.select().from(domains).where(eq(domains.id, domainId)).limit(1);
+      const domain = domainRows[0];
+      if (!domain) {
+        res.status(404).json({ error: 'Domain not found.' });
+        return;
+      }
+
+      let auth;
+      if (domain.teamId) {
+        auth = await authorizeTeamAccess(req, domain.teamId);
+      } else if (domain.projectId) {
+        auth = await authorizeProjectAccess(req, domain.projectId);
+      } else {
+        res.status(403).json({ error: 'Access denied.' });
+        return;
+      }
+
+      if (!auth.allowed) {
+        res.status(auth.status ?? 403).json({ error: auth.error });
+        return;
+      }
+
+      await db.delete(domains).where(eq(domains.id, domainId));
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to delete domain.' });
+    }
   });
 
   router.get('/labels', async (req, res) => {
@@ -508,42 +704,107 @@ export function createTicketsRouter() {
   });
 
   router.get('/cycles', async (req, res) => {
-    await withProjectAccess(req, res, getProjectIdFromRequest(req), async (projectId) => {
+    const teamId = typeof req.query.teamId === 'string' ? req.query.teamId : undefined;
+    const projectId = typeof req.query.projectId === 'string' ? req.query.projectId : getProjectIdFromRequest(req);
+
+    if (teamId) {
+      const auth = await authorizeTeamAccess(req, teamId);
+      if (!auth.allowed) {
+        res.status(auth.status ?? 403).json({ error: auth.error });
+        return;
+      }
       try {
-        const rows = await db.select().from(cycles).where(eq(cycles.projectId, projectId)).orderBy(asc(cycles.startDate));
+        const rows = await db.select().from(cycles).where(eq(cycles.teamId, teamId)).orderBy(asc(cycles.startDate));
         res.json(rows.map(mapCycle));
       } catch (error) {
         res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load cycles.' });
       }
-    });
+    } else if (projectId) {
+      const auth = await authorizeProjectAccess(req, projectId);
+      if (!auth.allowed) {
+        res.status(auth.status ?? 403).json({ error: auth.error });
+        return;
+      }
+      try {
+        const projectRows = await db.select({ teamId: projects.teamId }).from(projects).where(eq(projects.id, projectId)).limit(1);
+        const teamIdOfProject = projectRows[0]?.teamId;
+        if (teamIdOfProject) {
+          const rows = await db.select().from(cycles).where(eq(cycles.teamId, teamIdOfProject)).orderBy(asc(cycles.startDate));
+          res.json(rows.map(mapCycle));
+        } else {
+          const rows = await db.select().from(cycles).where(eq(cycles.projectId, projectId)).orderBy(asc(cycles.startDate));
+          res.json(rows.map(mapCycle));
+        }
+      } catch (error) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load cycles.' });
+      }
+    } else {
+      res.status(400).json({ error: 'Either teamId or projectId is required.' });
+    }
   });
 
   router.post('/cycles', async (req, res) => {
-    await withProjectAccess(req, res, getProjectIdFromRequest(req), async (projectId) => {
-      if (!req.body?.name || !req.body?.startDate || !req.body?.endDate) {
-        res.status(400).json({ error: 'Cycle name, startDate, and endDate are required.' });
+    const { name, startDate, endDate, completed, teamId } = req.body ?? {};
+    const projectId = req.body?.projectId || getProjectIdFromRequest(req);
+
+    if (!name || !startDate || !endDate) {
+      res.status(400).json({ error: 'Cycle name, startDate, and endDate are required.' });
+      return;
+    }
+
+    if (teamId) {
+      const auth = await authorizeTeamAccess(req, teamId);
+      if (!auth.allowed) {
+        res.status(auth.status ?? 403).json({ error: auth.error });
         return;
       }
-
       try {
         const rows = await db
           .insert(cycles)
           .values({
             id: createId('c'),
-            projectId,
-            name: req.body.name,
-            startDate: new Date(req.body.startDate),
-            endDate: new Date(req.body.endDate),
-            completed: Boolean(req.body?.completed),
+            teamId,
+            name,
+            startDate: new Date(startDate),
+            endDate: new Date(endDate),
+            completed: Boolean(completed),
             createdAt: new Date(),
           })
           .returning();
-
         res.status(201).json(mapCycle(rows[0]));
       } catch (error) {
         res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create cycle.' });
       }
-    });
+    } else if (projectId) {
+      const auth = await authorizeProjectAccess(req, projectId);
+      if (!auth.allowed) {
+        res.status(auth.status ?? 403).json({ error: auth.error });
+        return;
+      }
+      try {
+        const projectRows = await db.select({ teamId: projects.teamId }).from(projects).where(eq(projects.id, projectId)).limit(1);
+        const teamIdOfProject = projectRows[0]?.teamId;
+
+        const rows = await db
+          .insert(cycles)
+          .values({
+            id: createId('c'),
+            projectId,
+            teamId: teamIdOfProject ?? null,
+            name,
+            startDate: new Date(startDate),
+            endDate: new Date(endDate),
+            completed: Boolean(completed),
+            createdAt: new Date(),
+          })
+          .returning();
+        res.status(201).json(mapCycle(rows[0]));
+      } catch (error) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create cycle.' });
+      }
+    } else {
+      res.status(400).json({ error: 'Either teamId or projectId is required.' });
+    }
   });
 
   return router;

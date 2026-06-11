@@ -1,6 +1,6 @@
 import { and, eq } from 'drizzle-orm';
 import { db } from '../../../db/index.js';
-import { workspaceMembers, projects } from '../schema.js';
+import { workspaceMembers, projects, teams } from '../schema.js';
 import type { Request } from 'express';
 import { resolveRequestActorUserId } from '../../auth/utils/request-auth.js';
 
@@ -41,6 +41,46 @@ export async function authorizeProjectAccess(req: Request, projectId: string) {
   const workspaceId = await getProjectWorkspaceId(projectId);
   if (!workspaceId) {
     return { allowed: false as const, error: 'Project not found.', status: 404 };
+  }
+  const isMember = await isWorkspaceMember(workspaceId, userId);
+  if (!isMember) {
+    return { allowed: false as const, error: 'Access denied: not a member of the workspace.', status: 403 };
+  }
+  return { allowed: true as const, userId };
+}
+
+/**
+ * Ensures the requester is authenticated and a member of the workspace.
+ */
+export async function authorizeWorkspaceAccess(req: Request, workspaceId: string) {
+  const userId = await resolveRequestActorUserId(req);
+  if (!userId) {
+    return { allowed: false as const, error: 'Authentication required.', status: 401 };
+  }
+  const isMember = await isWorkspaceMember(workspaceId, userId);
+  if (!isMember) {
+    return { allowed: false as const, error: 'Access denied: not a member of the workspace.', status: 403 };
+  }
+  return { allowed: true as const, userId };
+}
+
+/**
+ * Ensures the requester is authenticated and a member of the workspace that owns the team.
+ */
+export async function authorizeTeamAccess(req: Request, teamId: string) {
+  const userId = await resolveRequestActorUserId(req);
+  if (!userId) {
+    return { allowed: false as const, error: 'Authentication required.', status: 401 };
+  }
+  const teamRows = await db
+    .select({ workspaceId: teams.workspaceId })
+    .from(teams)
+    .where(eq(teams.id, teamId))
+    .limit(1);
+  
+  const workspaceId = teamRows[0]?.workspaceId;
+  if (!workspaceId) {
+    return { allowed: false as const, error: 'Team not found.', status: 404 };
   }
   const isMember = await isWorkspaceMember(workspaceId, userId);
   if (!isMember) {

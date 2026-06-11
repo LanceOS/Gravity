@@ -22,6 +22,13 @@
       "when": 1781060750761,
       "tag": "0002_safe_vampiro",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1781184101601,
+      "tag": "0003_opposite_hannibal_king",
+      "breakpoints": true
     }
   ]
 }

@@ -29,6 +29,7 @@ function mapProject(project: typeof projects.$inferSelect) {
     status: project.status,
     workspaceId: project.workspaceId,
     githubRepoUrl: project.githubRepoUrl,
+    teamId: project.teamId,
   };
 }
 
@@ -75,7 +76,7 @@ export function createProjectsRouter() {
   });
 
   router.post('/projects', async (req, res) => {
-    const { name, description, key, status, ownerId, workspaceId } = req.body ?? {};
+    const { name, description, key, status, ownerId, workspaceId, teamId } = req.body ?? {};
     if (!name || !key || !ownerId) {
       res.status(400).json({ error: 'Project name, key, and ownerId are required.' });
       return;
@@ -98,6 +99,7 @@ export function createProjectsRouter() {
         status,
         ownerId,
         workspaceId: targetWorkspaceId,
+        teamId,
       });
 
       res.status(201).json({
@@ -158,6 +160,7 @@ export function createProjectsRouter() {
         description: typeof req.body?.description === 'string' ? req.body.description : undefined,
         status: typeof req.body?.status === 'string' ? req.body.status : undefined,
         githubRepoUrl: validatedGithubRepoUrl,
+        teamId: typeof req.body?.teamId === 'string' ? req.body.teamId : undefined,
       });
 
       if (!updatedProject) {

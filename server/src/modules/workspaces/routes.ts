@@ -42,6 +42,7 @@ import { createRateLimiter } from '../../lib/rateLimit.js';
 import { createRedisRateLimiter } from '../../lib/rateLimitRedis.js';
 import { getRequestSourceIp } from '../../lib/request-ip.js';
 import { isWorkspaceMember } from './services/membership.js';
+import { getSidebarTree } from './services/sidebar.js';
 import { mapProjectCreationError } from './utils/project-creation.js';
 import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
 import { env } from '../../env.js';
@@ -250,6 +251,31 @@ export function createWorkspacesRouter() {
       res.json(workspaceList);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load workspaces.' });
+    }
+  });
+
+  router.get('/workspaces/:workspaceId/sidebar', async (req, res) => {
+    const workspaceId = getParamString(req.params.workspaceId);
+    if (!workspaceId) {
+      res.status(400).json({ error: 'workspaceId is required.' });
+      return;
+    }
+    const actorUserId = await resolveRequestActorUserId(req);
+    if (!actorUserId) {
+      res.status(401).json({ error: 'Authentication required.' });
+      return;
+    }
+    const isMember = await isWorkspaceMember(workspaceId, actorUserId);
+    if (!isMember) {
+      res.status(403).json({ error: 'Access denied: not a member of the workspace.' });
+      return;
+    }
+
+    try {
+      const sidebarTree = await getSidebarTree(workspaceId);
+      res.json(sidebarTree);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to retrieve sidebar tree.' });
     }
   });
 

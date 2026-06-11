@@ -29,6 +29,16 @@ export async function initializeDatabase() {
 
 
 
+    CREATE TABLE IF NOT EXISTS teams (
+      id TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
+      color TEXT NOT NULL DEFAULT '#6B7280',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
     CREATE TABLE IF NOT EXISTS workspaces (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -118,6 +128,7 @@ export async function initializeDatabase() {
     CREATE TABLE IF NOT EXISTS projects (
       id TEXT PRIMARY KEY,
       workspace_id TEXT NOT NULL,
+      team_id TEXT,
       name TEXT NOT NULL,
       description TEXT NOT NULL DEFAULT '',
       key TEXT NOT NULL UNIQUE,
@@ -140,7 +151,8 @@ export async function initializeDatabase() {
 
     CREATE TABLE IF NOT EXISTS domains (
       id TEXT PRIMARY KEY,
-      project_id TEXT NOT NULL,
+      project_id TEXT,
+      team_id TEXT,
       name TEXT NOT NULL,
       color TEXT NOT NULL DEFAULT '#6B7280',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -165,7 +177,8 @@ export async function initializeDatabase() {
 
     CREATE TABLE IF NOT EXISTS cycles (
       id TEXT PRIMARY KEY,
-      project_id TEXT NOT NULL,
+      project_id TEXT,
+      team_id TEXT,
       name TEXT NOT NULL,
       start_date TIMESTAMPTZ NOT NULL,
       end_date TIMESTAMPTZ NOT NULL,
@@ -289,7 +302,45 @@ export async function initializeDatabase() {
   await pool.query(`
     ALTER TABLE tickets ADD COLUMN IF NOT EXISTS branch_name TEXT NOT NULL DEFAULT '';
     ALTER TABLE projects ADD COLUMN IF NOT EXISTS github_repo_url TEXT;
+    ALTER TABLE projects ADD COLUMN IF NOT EXISTS team_id TEXT;
+    ALTER TABLE cycles ADD COLUMN IF NOT EXISTS team_id TEXT;
+    ALTER TABLE domains ADD COLUMN IF NOT EXISTS team_id TEXT;
+
+    ALTER TABLE cycles ALTER COLUMN project_id DROP NOT NULL;
+    ALTER TABLE domains ALTER COLUMN project_id DROP NOT NULL;
+
+    CREATE INDEX IF NOT EXISTS teams_workspace_id_idx ON teams (workspace_id);
+    CREATE INDEX IF NOT EXISTS projects_team_id_idx ON projects (team_id);
+    CREATE INDEX IF NOT EXISTS cycles_team_id_idx ON cycles (team_id);
+    CREATE INDEX IF NOT EXISTS domains_team_id_idx ON domains (team_id);
   `);
+
+  // Migrate/Bootstrap default teams and associate projects/cycles/domains
+  await pool.query(`
+    INSERT INTO teams (id, workspace_id, name, description, color, created_at, updated_at)
+    SELECT 'team-general-' || id, id, 'General', 'Default team for workspace', '#6B7280', NOW(), NOW()
+    FROM workspaces
+    ON CONFLICT (id) DO NOTHING;
+
+    UPDATE projects
+    SET team_id = 'team-general-' || workspace_id
+    WHERE team_id IS NULL OR team_id = '';
+
+    UPDATE cycles
+    SET team_id = projects.team_id
+    FROM projects
+    WHERE cycles.project_id = projects.id
+      AND (cycles.team_id IS NULL OR cycles.team_id = '');
+
+    UPDATE domains
+    SET team_id = projects.team_id
+    FROM projects
+    WHERE domains.project_id = projects.id
+      AND (domains.team_id IS NULL OR domains.team_id = '');
+  `).catch((err) => {
+    // eslint-disable-next-line no-console
+    console.error('Failed to run team migration:', err);
+  });
 
   // Migrate existing domain data to labels and ticket_labels
   await pool.query(`

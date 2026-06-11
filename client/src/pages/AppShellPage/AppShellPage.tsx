@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MessageSquare, X } from 'lucide-react';
 import { useParams, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { apiClient } from '../../utils/apiClient';
+import type { SidebarTree } from '../../types/domain';
 
 import { AuthScreen } from '../../modules/auth';
 import { CreateTicketModal } from '../../modules/tickets';
@@ -216,10 +219,51 @@ export function AppShellPage() {
     }
   }, [accountSettings?.projectLayout, accountSettings?.theme, setDensity, setDsTheme]);
 
-  const { workspaceId, projectId: projectIdParam, ticketKey, noteId } = useParams();
+  const { workspaceId, projectId: projectIdParam, teamId: teamIdParam, cycleId: cycleIdParam, domainId: domainIdParam, ticketKey, noteId } = useParams();
   const { pathname } = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+
+  // Teams-specific queries
+  const { data: sidebarTree, refetch: refetchSidebar } = useQuery<SidebarTree>({
+    queryKey: ['sidebarTree', activeWorkspaceId],
+    queryFn: () => apiClient.get<SidebarTree>(`/workspaces/${activeWorkspaceId}/sidebar`),
+    enabled: !!activeWorkspaceId && !!currentUser,
+  });
+
+  const { data: teamTickets = [] } = useQuery<Ticket[]>({
+    queryKey: ['teamTickets', teamIdParam],
+    queryFn: () => apiClient.get<Ticket[]>('/tickets', { params: { teamId: teamIdParam } }),
+    enabled: !!teamIdParam && !!currentUser,
+  });
+
+  const { data: teamCycles = [] } = useQuery<Cycle[]>({
+    queryKey: ['teamCycles', teamIdParam],
+    queryFn: () => apiClient.get<Cycle[]>('/cycles', { params: { teamId: teamIdParam } }),
+    enabled: !!teamIdParam && !!currentUser,
+  });
+
+  const { data: teamDomains = [] } = useQuery<Domain[]>({
+    queryKey: ['teamDomains', teamIdParam],
+    queryFn: () => apiClient.get<Domain[]>('/domains', { params: { teamId: teamIdParam } }),
+    enabled: !!teamIdParam && !!currentUser,
+  });
+
+  const handleSelectTeam = useCallback((teamId: string) => {
+    navigate(`/workspaces/${activeWorkspaceId}/teams/${teamId}/tasks`);
+  }, [activeWorkspaceId, navigate]);
+
+  const handleSelectCycle = useCallback((teamId: string, cycleId: string) => {
+    navigate(`/workspaces/${activeWorkspaceId}/teams/${teamId}/cycles/${cycleId}`);
+  }, [activeWorkspaceId, navigate]);
+
+  const handleSelectDomain = useCallback((teamId: string, domainId: string) => {
+    navigate(`/workspaces/${activeWorkspaceId}/teams/${teamId}/domains/${domainId}`);
+  }, [activeWorkspaceId, navigate]);
+
+  const handleSelectAllTasks = useCallback((teamId: string) => {
+    navigate(`/workspaces/${activeWorkspaceId}/teams/${teamId}/tasks`);
+  }, [activeWorkspaceId, navigate]);
 
   // Track last-applied URL filter values to avoid calling setFilters in a loop
   const lastSyncedFilterParams = useRef({ labels: [] as string[], labelMode: 'any' as 'all' | 'any', cycleId: '', assigneeId: '', status: '', priority: '', search: '' });
@@ -270,6 +314,8 @@ export function AppShellPage() {
     // Sync project from URL param when on a project-specific path
     if (projectIdParam) {
       setActiveProjectId(projectIdParam);
+    } else {
+      setActiveProjectId('');
     }
 
     // Sync notes context
@@ -283,9 +329,12 @@ export function AppShellPage() {
 
     // Sync filters from URL search params — only call setFilters when URL params changed
     const urlLabelsStr = searchParams.get('labels') ?? '';
-    const urlLabels = urlLabelsStr.split(',').filter(Boolean);
+    let urlLabels = urlLabelsStr.split(',').filter(Boolean);
+    if (domainIdParam) {
+      urlLabels = [domainIdParam];
+    }
     const urlLabelMode = (searchParams.get('labelMode') as 'all' | 'any') ?? 'any';
-    const urlCycleId = searchParams.get('cycleId') ?? '';
+    const urlCycleId = cycleIdParam || (searchParams.get('cycleId') ?? '');
     const urlAssigneeId = searchParams.get('assigneeId') ?? '';
     const urlStatus = searchParams.get('status') ?? '';
     const urlPriority = searchParams.get('priority') ?? '';
@@ -326,7 +375,7 @@ export function AppShellPage() {
     if (!ticketKey) {
       setActiveTicket(null);
     }
-  }, [pathname, workspaceId, projectIdParam, ticketKey, noteId, searchParams]);
+  }, [pathname, workspaceId, projectIdParam, teamIdParam, cycleIdParam, domainIdParam, ticketKey, noteId, searchParams]);
 
   // Resolve ticketKey URL param → Ticket object once tickets have loaded
   useEffect(() => {
@@ -888,6 +937,15 @@ export function AppShellPage() {
       onOpenWorkspaceDirectory: () => navigate('/workspaces'),
     },
     projects: {
+      teams: sidebarTree?.teams,
+      activeTeamId: teamIdParam,
+      activeCycleId: cycleIdParam,
+      activeDomainId: domainIdParam,
+      onSelectTeam: handleSelectTeam,
+      onSelectCycle: handleSelectCycle,
+      onSelectDomain: handleSelectDomain,
+      onSelectAllTasks: handleSelectAllTasks,
+
       projects: activeWorkspaceProjects,
       labels,
       cycles,
@@ -905,7 +963,7 @@ export function AppShellPage() {
       onShowProjectIssues: handleShowProjectIssues,
       onShowMyIssues: handleShowMyIssues,
       onShowNotes: handleShowNotes,
-      onSelectCycle: handleSelectCycle,
+      onSelectCycleLegacy: handleSelectCycle,
       onSelectLabel: handleSelectLabel,
     },
     tools: {
@@ -1038,12 +1096,12 @@ export function AppShellPage() {
               activeTicket={activeTicket}
               activeView={activeView}
               currentUser={currentUser}
-              cycles={cycles}
-              labels={labels}
+              cycles={teamIdParam ? teamCycles : cycles}
+              labels={teamIdParam ? teamDomains : labels}
               filters={filters}
               listSort={listSort}
               projects={activeWorkspaceProjects}
-              tickets={tickets}
+              tickets={teamIdParam ? teamTickets : tickets}
               users={users}
               onOpenCreateTicket={handleOpenCreateTicket}
               onOpenProjectManager={handleOpenProjectManager}

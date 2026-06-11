@@ -23,7 +23,18 @@ export interface SidebarProjectCounts {
   cycles: Record<string, number>;
 }
 
+import type { SidebarTeam } from '../../../types/domain';
+
 export interface SidebarProjectSection {
+  teams?: SidebarTeam[];
+  activeTeamId?: string;
+  activeCycleId?: string;
+  activeDomainId?: string;
+  onSelectTeam?: (teamId: string) => void;
+  onSelectCycle?: (teamId: string, cycleId: string) => void;
+  onSelectDomain?: (teamId: string, domainId: string) => void;
+  onSelectAllTasks?: (teamId: string) => void;
+
   projects: Project[];
   labels?: Label[];
   domains?: Label[];
@@ -37,7 +48,7 @@ export interface SidebarProjectSection {
   onShowProjectIssues: () => void;
   onShowMyIssues: () => void;
   onShowNotes: () => void;
-  onSelectCycle: (cycleId: string) => void;
+  onSelectCycleLegacy?: (cycleId: string) => void;
   onSelectLabel?: (labelId: string) => void;
   onSelectDomain?: (labelId: string) => void;
 }
