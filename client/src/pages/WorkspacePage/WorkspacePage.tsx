@@ -108,6 +108,7 @@ export function WorkspacePage({
       priority: '',
       status: '',
       labels: [],
+      domainId: '',
       cycleId: '',
       assigneeId: '',
     });

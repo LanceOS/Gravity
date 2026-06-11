@@ -3,64 +3,11 @@ import { lazy, Suspense } from 'react';
 import { AppShellPage } from '../pages/AppShellPage/AppShellPage';
 import { ProtectedRoute } from './ProtectedRoute';
 import { LoadingPage } from '../pages/LoadingPage/LoadingPage';
-import { useTickets } from '../context/TicketContext';
 
 // Lazy load placeholder views for code-splitting
-const WorkspaceAllTasksView = lazy(() => import('../pages/PlaceholderViews/WorkspaceAllTasksView'));
-const TeamOverviewView = lazy(() => import('../pages/PlaceholderViews/TeamOverviewView'));
-const TeamAllTasksView = lazy(() => import('../pages/PlaceholderViews/TeamAllTasksView'));
-const TeamSpecificViewView = lazy(() => import('../pages/PlaceholderViews/TeamSpecificViewView'));
-const TeamCycleViewView = lazy(() => import('../pages/PlaceholderViews/TeamCycleViewView'));
-const TeamDomainViewView = lazy(() => import('../pages/PlaceholderViews/TeamDomainViewView'));
-const ProjectOverviewView = lazy(() => import('../pages/PlaceholderViews/ProjectOverviewView'));
-const WorkspaceSettingsView = lazy(() => import('../pages/PlaceholderViews/WorkspaceSettingsView'));
 const WorkspaceExportView = lazy(() => import('../pages/PlaceholderViews/WorkspaceExportView'));
 const NotFoundView = lazy(() => import('../pages/PlaceholderViews/NotFoundView'));
 const PlaceholderPage = lazy(() => import('../pages/PlaceholderPage'));
-
-// --- Backward Compatibility Home Redirect ---
-function HomeRedirect() {
-  const { currentUser } = useTickets();
-  
-  if (!currentUser) {
-    // If not logged in, render AppShellPage which automatically presents the Auth screen
-    return <AppShellPage />;
-  }
-
-  const storedWorkspaceId = localStorage.getItem(`gravity_active_workspace:${currentUser.id}`);
-  if (storedWorkspaceId) {
-    return <Navigate to={`/workspaces/${storedWorkspaceId}`} replace />;
-  }
-
-  return <Navigate to="/workspaces" replace />;
-}
-
-// --- Legacy Placeholder Redirect ---
-function PlaceholderRedirect() {
-  const { id } = useParams();
-  return <Navigate to={`/workspaces/${id}`} replace />;
-}
-
-// --- Team to Project Graceful Degradation Guards ---
-function TeamProjectTicketListGuard() {
-  const { workspaceId, projectId } = useParams();
-  return <Navigate to={`/workspaces/${workspaceId}/projects/${projectId}/tickets`} replace />;
-}
-
-function TeamProjectTicketDetailGuard() {
-  const { workspaceId, projectId, ticketKey } = useParams();
-  return <Navigate to={`/workspaces/${workspaceId}/projects/${projectId}/tickets/${ticketKey}`} replace />;
-}
-
-function TeamProjectNotesListGuard() {
-  const { workspaceId, projectId } = useParams();
-  return <Navigate to={`/workspaces/${workspaceId}/projects/${projectId}/notes`} replace />;
-}
-
-function TeamProjectNoteDetailGuard() {
-  const { workspaceId, projectId, noteId } = useParams();
-  return <Navigate to={`/workspaces/${workspaceId}/projects/${projectId}/notes/${noteId}`} replace />;
-}
 
 function ProjectHomeGuard() {
   const { workspaceId, projectId } = useParams();
@@ -128,9 +75,7 @@ export const router = createBrowserRouter([
     path: '/workspaces/:workspaceId/all',
     element: (
       <ProtectedRoute>
-        <Suspense fallback={<LoadingPage />}>
-          <WorkspaceAllTasksView />
-        </Suspense>
+        <AppShellPage />
       </ProtectedRoute>
     ),
   },
@@ -184,45 +129,43 @@ export const router = createBrowserRouter([
     path: '/workspaces/:workspaceId/teams/:teamId/projects/:projectId',
     element: (
       <ProtectedRoute>
-        <Suspense fallback={<LoadingPage />}>
-          <ProjectOverviewView />
-        </Suspense>
+        <AppShellPage />
       </ProtectedRoute>
     ),
   },
-  // Team-level project ticket list (Degrades to individual project tickets)
+  // Team-level project ticket list
   {
     path: '/workspaces/:workspaceId/teams/:teamId/projects/:projectId/tickets',
     element: (
       <ProtectedRoute>
-        <TeamProjectTicketListGuard />
+        <AppShellPage />
       </ProtectedRoute>
     ),
   },
-  // Team-level project ticket detail (Degrades to individual ticket detail)
+  // Team-level project ticket detail
   {
     path: '/workspaces/:workspaceId/teams/:teamId/projects/:projectId/tickets/:ticketKey',
     element: (
       <ProtectedRoute>
-        <TeamProjectTicketDetailGuard />
+        <AppShellPage />
       </ProtectedRoute>
     ),
   },
-  // Team-level project notes list (Degrades to individual project notes)
+  // Team-level project notes list
   {
     path: '/workspaces/:workspaceId/teams/:teamId/projects/:projectId/notes',
     element: (
       <ProtectedRoute>
-        <TeamProjectNotesListGuard />
+        <AppShellPage />
       </ProtectedRoute>
     ),
   },
-  // Team-level project note detail (Degrades to individual note detail)
+  // Team-level project note detail
   {
     path: '/workspaces/:workspaceId/teams/:teamId/projects/:projectId/notes/:noteId',
     element: (
       <ProtectedRoute>
-        <TeamProjectNoteDetailGuard />
+        <AppShellPage />
       </ProtectedRoute>
     ),
   },

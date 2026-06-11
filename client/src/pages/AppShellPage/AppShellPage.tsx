@@ -9,7 +9,7 @@ import { AuthScreen } from '../../modules/auth';
 import { CreateTicketModal } from '../../modules/tickets';
 import { LocalAIChat } from '../../modules/ai';
 import { OnboardingModal } from '../../modules/onboarding';
-import type { SidebarProps } from '../../components/Sidebar';
+import type { SidebarNavigationState, SidebarProps } from '../../components/Sidebar';
 import { useTickets, type Ticket } from '../../context/TicketContext';
 import { useTheme, SettingsScreen as SettingsPage } from '../../modules/settings';
 import { useAccountSettings } from '../../hooks/useAccountSettings';
@@ -219,16 +219,37 @@ export function AppShellPage() {
     }
   }, [accountSettings?.projectLayout, accountSettings?.theme, setDensity, setDsTheme]);
 
-  const { workspaceId, projectId: projectIdParam, teamId: teamIdParam, cycleId: cycleIdParam, domainId: domainIdParam, ticketKey, noteId } = useParams();
+  const {
+    workspaceId,
+    projectId: projectIdParam,
+    teamId: teamIdParam,
+    viewId: viewIdParam,
+    cycleId: cycleIdParam,
+    domainId: domainIdParam,
+    ticketKey,
+    noteId,
+  } = useParams();
   const { pathname } = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const isWorkspaceAllTasksPath = !!workspaceId && (
+    pathname === `/workspaces/${workspaceId}/all` ||
+    pathname === `/workspaces/${workspaceId}/all/`
+  );
+  const isTeamAggregatePath = !!teamIdParam && !projectIdParam;
+  const shouldUseAggregateTicketScope = isWorkspaceAllTasksPath || isTeamAggregatePath;
 
   // Teams-specific queries
-  const { data: sidebarTree, refetch: refetchSidebar } = useQuery<SidebarTree>({
+  const { data: sidebarTree } = useQuery<SidebarTree>({
     queryKey: ['sidebarTree', activeWorkspaceId],
     queryFn: () => apiClient.get<SidebarTree>(`/workspaces/${activeWorkspaceId}/sidebar`),
     enabled: !!activeWorkspaceId && !!currentUser,
+  });
+
+  const { data: workspaceTickets = [] } = useQuery<Ticket[]>({
+    queryKey: ['workspaceTickets', activeWorkspaceId],
+    queryFn: () => apiClient.get<Ticket[]>('/tickets', { params: { workspaceId: activeWorkspaceId } }),
+    enabled: isWorkspaceAllTasksPath && !!activeWorkspaceId && !!currentUser,
   });
 
   const { data: teamTickets = [] } = useQuery<Ticket[]>({
@@ -253,6 +274,19 @@ export function AppShellPage() {
     navigate(`/workspaces/${activeWorkspaceId}/teams/${teamId}/tasks`);
   }, [activeWorkspaceId, navigate]);
 
+  const handleSelectWorkspaceAllTasks = useCallback(() => {
+    navigate(`/workspaces/${activeWorkspaceId}/all`);
+  }, [activeWorkspaceId, navigate]);
+
+  const handleSelectView = useCallback((teamId: string, viewId: string) => {
+    if (viewId === 'all') {
+      navigate(`/workspaces/${activeWorkspaceId}/teams/${teamId}/tasks`);
+      return;
+    }
+
+    navigate(`/workspaces/${activeWorkspaceId}/teams/${teamId}/views/${viewId}`);
+  }, [activeWorkspaceId, navigate]);
+
   const handleSelectCycle = useCallback((teamId: string, cycleId: string) => {
     navigate(`/workspaces/${activeWorkspaceId}/teams/${teamId}/cycles/${cycleId}`);
   }, [activeWorkspaceId, navigate]);
@@ -266,7 +300,16 @@ export function AppShellPage() {
   }, [activeWorkspaceId, navigate]);
 
   // Track last-applied URL filter values to avoid calling setFilters in a loop
-  const lastSyncedFilterParams = useRef({ labels: [] as string[], labelMode: 'any' as 'all' | 'any', cycleId: '', assigneeId: '', status: '', priority: '', search: '' });
+  const lastSyncedFilterParams = useRef({
+    labels: [] as string[],
+    labelMode: 'any' as 'all' | 'any',
+    cycleId: '',
+    domainId: '',
+    assigneeId: '',
+    status: '',
+    priority: '',
+    search: '',
+  });
 
   // URL-driven section, workspace, project, ticket, and filter syncing
   useEffect(() => {
@@ -314,7 +357,7 @@ export function AppShellPage() {
     // Sync project from URL param when on a project-specific path
     if (projectIdParam) {
       setActiveProjectId(projectIdParam);
-    } else {
+    } else if (!shouldUseAggregateTicketScope) {
       setActiveProjectId('');
     }
 
@@ -329,12 +372,10 @@ export function AppShellPage() {
 
     // Sync filters from URL search params — only call setFilters when URL params changed
     const urlLabelsStr = searchParams.get('labels') ?? '';
-    let urlLabels = urlLabelsStr.split(',').filter(Boolean);
-    if (domainIdParam) {
-      urlLabels = [domainIdParam];
-    }
+    const urlLabels = urlLabelsStr.split(',').filter(Boolean);
     const urlLabelMode = (searchParams.get('labelMode') as 'all' | 'any') ?? 'any';
     const urlCycleId = cycleIdParam || (searchParams.get('cycleId') ?? '');
+    const urlDomainId = domainIdParam || (searchParams.get('domainId') ?? '');
     const urlAssigneeId = searchParams.get('assigneeId') ?? '';
     const urlStatus = searchParams.get('status') ?? '';
     const urlPriority = searchParams.get('priority') ?? '';
@@ -346,6 +387,7 @@ export function AppShellPage() {
       labelsChanged ||
       last.labelMode !== urlLabelMode ||
       last.cycleId !== urlCycleId ||
+      last.domainId !== urlDomainId ||
       last.assigneeId !== urlAssigneeId ||
       last.status !== urlStatus ||
       last.priority !== urlPriority ||
@@ -355,6 +397,7 @@ export function AppShellPage() {
         labels: urlLabels,
         labelMode: urlLabelMode,
         cycleId: urlCycleId,
+        domainId: urlDomainId,
         assigneeId: urlAssigneeId,
         status: urlStatus,
         priority: urlPriority,
@@ -364,6 +407,7 @@ export function AppShellPage() {
         labels: urlLabels,
         labelMode: urlLabelMode,
         cycleId: urlCycleId,
+        domainId: urlDomainId,
         assigneeId: urlAssigneeId,
         status: urlStatus,
         priority: urlPriority,
@@ -375,7 +419,7 @@ export function AppShellPage() {
     if (!ticketKey) {
       setActiveTicket(null);
     }
-  }, [pathname, workspaceId, projectIdParam, teamIdParam, cycleIdParam, domainIdParam, ticketKey, noteId, searchParams]);
+  }, [pathname, workspaceId, projectIdParam, teamIdParam, cycleIdParam, domainIdParam, ticketKey, noteId, searchParams, shouldUseAggregateTicketScope]);
 
   // Resolve ticketKey URL param → Ticket object once tickets have loaded
   useEffect(() => {
@@ -550,7 +594,13 @@ export function AppShellPage() {
         setActiveProjectId(preferredProject.id);
       }
     }
-  }, [activeWorkspaceId, activeWorkspace?.defaultProjectId, activeWorkspaceProjects, activeProjectId, setActiveProjectId]);
+  }, [
+    activeWorkspaceId,
+    activeWorkspace?.defaultProjectId,
+    activeWorkspaceProjects,
+    activeProjectId,
+    setActiveProjectId,
+  ]);
 
   useEffect(() => {
     setProjectCreateError(null);
@@ -611,7 +661,7 @@ export function AppShellPage() {
     await deleteTicket(ticketId);
 
     if (deletedTicket && activeTicket?.id === ticketId) {
-      navigate(`/workspaces/${activeWorkspaceId}/projects/${deletedTicket.projectId}/tickets`, { replace: true });
+      navigate(buildProjectScopedPath(deletedTicket.projectId), { replace: true });
       return;
     }
 
@@ -644,14 +694,27 @@ export function AppShellPage() {
 
   const handleSelectWorkspace = (workspaceId: string) => {
     setActiveTicket(null);
-    setFilters({ assigneeId: '', labels: [], cycleId: '' });
+    setFilters({ assigneeId: '', labels: [], cycleId: '', domainId: '' });
     navigate(`/workspaces/${workspaceId}`);
   };
 
+  const buildProjectScopedPath = useCallback((
+    projectId: string,
+    scope: 'tickets' | 'notes' = 'tickets',
+    itemId?: string,
+  ) => {
+    const project = projects.find((item) => item.id === projectId);
+    const projectWorkspaceId = project?.workspaceId || activeWorkspaceId;
+    const projectTeamId = project?.teamId || teamIdParam;
+    const basePath = (sidebarTree?.hierarchyMode === 'teams' || !!teamIdParam) && projectTeamId
+      ? `/workspaces/${projectWorkspaceId}/teams/${projectTeamId}/projects/${projectId}/${scope}`
+      : `/workspaces/${projectWorkspaceId}/projects/${projectId}/${scope}`;
+
+    return itemId ? `${basePath}/${itemId}` : basePath;
+  }, [activeWorkspaceId, projects, sidebarTree?.hierarchyMode, teamIdParam]);
+
   const handleSelectProject = (projectId: string) => {
-    const project = projects.find((p) => p.id === projectId);
-    const wid = project?.workspaceId || activeWorkspaceId;
-    navigate(`/workspaces/${wid}/projects/${projectId}/tickets`);
+    navigate(buildProjectScopedPath(projectId));
   };
 
   const handleSelectProjectForManagement = (projectId: string) => {
@@ -737,31 +800,31 @@ export function AppShellPage() {
   const handleShowProjectIssues = () => {
     const pid = activeProjectId;
     if (!pid) return;
-    navigate(`/workspaces/${activeWorkspaceId}/projects/${pid}/tickets`);
+    navigate(buildProjectScopedPath(pid));
   };
 
   const handleShowMyIssues = () => {
     const pid = activeProjectId;
     if (!pid || !currentUser) return;
-    navigate(`/workspaces/${activeWorkspaceId}/projects/${pid}/tickets?assigneeId=${currentUser.id}`);
+    navigate(`${buildProjectScopedPath(pid)}?assigneeId=${currentUser.id}`);
   };
 
   const handleSelectCycleLegacy = (cycleId: string) => {
     const pid = activeProjectId;
     if (!pid) return;
-    navigate(`/workspaces/${activeWorkspaceId}/projects/${pid}/tickets?cycleId=${cycleId}`);
+    navigate(`${buildProjectScopedPath(pid)}?cycleId=${cycleId}`);
   };
 
   const handleSelectLabel = (labelId: string) => {
     const pid = activeProjectId;
     if (!pid) return;
-    navigate(`/workspaces/${activeWorkspaceId}/projects/${pid}/tickets?labels=${labelId}`);
+    navigate(`${buildProjectScopedPath(pid)}?labels=${labelId}`);
   };
 
   const handleShowNotes = () => {
     const pid = activeProjectId || projectIdParam;
     if (!pid) return;
-    navigate(`/workspaces/${activeWorkspaceId}/projects/${pid}/notes`);
+    navigate(buildProjectScopedPath(pid, 'notes'));
   };
 
   const handleSelectNote = (nextNoteId: string) => {
@@ -769,11 +832,11 @@ export function AppShellPage() {
     if (!pid) return;
 
     if (!nextNoteId) {
-      navigate(`/workspaces/${activeWorkspaceId}/projects/${pid}/notes`);
+      navigate(buildProjectScopedPath(pid, 'notes'));
       return;
     }
 
-    navigate(`/workspaces/${activeWorkspaceId}/projects/${pid}/notes/${nextNoteId}`);
+    navigate(buildProjectScopedPath(pid, 'notes', nextNoteId));
   };
 
   const handleOpenSettings = () => {
@@ -803,6 +866,7 @@ export function AppShellPage() {
     if (merged.labels && merged.labels.length > 0) nextParams.set('labels', merged.labels.join(',')); else nextParams.delete('labels');
     if (merged.labelMode && merged.labelMode !== 'any') nextParams.set('labelMode', merged.labelMode); else nextParams.delete('labelMode');
     if (merged.cycleId) nextParams.set('cycleId', merged.cycleId); else nextParams.delete('cycleId');
+    if (merged.domainId) nextParams.set('domainId', merged.domainId); else nextParams.delete('domainId');
     if (merged.assigneeId) nextParams.set('assigneeId', merged.assigneeId); else nextParams.delete('assigneeId');
     if (merged.status) nextParams.set('status', merged.status); else nextParams.delete('status');
     if (merged.priority) nextParams.set('priority', merged.priority); else nextParams.delete('priority');
@@ -929,6 +993,52 @@ export function AppShellPage() {
     return <LoadingPage />;
   }
 
+  const activeProject = projects.find((project) => project.id === (projectIdParam || activeProjectId));
+  const activeProjectTeamId =
+    activeProject?.teamId ||
+    sidebarTree?.teams?.find((team) => team.projects?.some((project) => project.id === (projectIdParam || activeProjectId)))?.id ||
+    '';
+  const sidebarActiveTeamId = teamIdParam || activeProjectTeamId;
+  const sidebarActiveScope: SidebarNavigationState['activeScope'] = isWorkspaceAllTasksPath
+    ? 'workspace'
+    : teamIdParam
+      ? projectIdParam
+        ? 'projects'
+        : cycleIdParam
+          ? 'cycles'
+          : domainIdParam
+            ? 'domains'
+            : 'views'
+      : projectIdParam || activeProjectId
+        ? 'projects'
+        : 'workspace';
+  const sidebarNavigationState: SidebarNavigationState = {
+    activeTeam: sidebarActiveTeamId,
+    activeScope: sidebarActiveScope,
+    activeProject: sidebarActiveScope === 'projects' ? (projectIdParam || activeProjectId) : '',
+  };
+  const sidebarActiveViewId = teamIdParam && sidebarActiveScope === 'views'
+    ? (viewIdParam || 'all')
+    : '';
+  const activeTeam = sidebarTree?.teams?.find((team) => team.id === sidebarActiveTeamId);
+  const activeTeamProjectIds = new Set(activeTeam?.projects?.map((project) => project.id) ?? []);
+  const scopedProjects = teamIdParam
+    ? activeWorkspaceProjects.filter((project) => project.teamId === teamIdParam || activeTeamProjectIds.has(project.id))
+    : activeWorkspaceProjects;
+  const scopedTickets = isWorkspaceAllTasksPath
+    ? workspaceTickets
+    : teamIdParam
+      ? teamTickets
+      : tickets;
+  const scopedCycles = teamIdParam ? teamCycles : cycles;
+  const scopedLabels = teamIdParam ? teamDomains : labels;
+  const scopedFilters = shouldUseAggregateTicketScope ? { ...filters, projectId: '' } : filters;
+  const createDefaultProjectId =
+    activeProjectId ||
+    scopedProjects[0]?.id ||
+    activeWorkspaceProjects[0]?.id ||
+    '';
+
   const sidebarProps: SidebarProps = {
     workspace: {
       workspaces: workspaces.map((workspace) => ({ id: workspace.id, name: workspace.name })),
@@ -939,10 +1049,14 @@ export function AppShellPage() {
     projects: {
       hierarchyMode: sidebarTree?.hierarchyMode,
       teams: sidebarTree?.teams,
-      activeTeamId: teamIdParam,
+      navigationState: sidebarNavigationState,
+      activeViewId: sidebarActiveViewId,
+      activeTeamId: sidebarActiveTeamId,
       activeCycleId: cycleIdParam,
       activeDomainId: domainIdParam,
+      onSelectWorkspaceAllTasks: handleSelectWorkspaceAllTasks,
       onSelectTeam: handleSelectTeam,
+      onSelectView: handleSelectView,
       onSelectCycle: handleSelectCycle,
       onSelectDomain: handleSelectDomain,
       onSelectAllTasks: handleSelectAllTasks,
@@ -1001,7 +1115,7 @@ export function AppShellPage() {
       cycles={cycles}
       onSelectTicket={(ticket) => {
         if (ticket) {
-          navigate(`/workspaces/${activeWorkspaceId}/projects/${ticket.projectId}/tickets/${ticket.key}`);
+          navigate(buildProjectScopedPath(ticket.projectId, 'tickets', ticket.key));
         }
       }}
       onUpdateTicket={updateTicket}
@@ -1097,20 +1211,20 @@ export function AppShellPage() {
               activeTicket={activeTicket}
               activeView={activeView}
               currentUser={currentUser}
-              cycles={teamIdParam ? teamCycles : cycles}
-              labels={teamIdParam ? teamDomains : labels}
-              filters={filters}
+              cycles={scopedCycles}
+              labels={scopedLabels}
+              filters={scopedFilters}
               listSort={listSort}
-              projects={activeWorkspaceProjects}
-              tickets={teamIdParam ? teamTickets : tickets}
+              projects={scopedProjects}
+              tickets={scopedTickets}
               users={users}
               onOpenCreateTicket={handleOpenCreateTicket}
               onOpenProjectManager={handleOpenProjectManager}
               onSelectTicket={(ticket) => {
                 if (ticket) {
-                  navigate(`/workspaces/${activeWorkspaceId}/projects/${ticket.projectId}/tickets/${ticket.key}`);
+                  navigate(buildProjectScopedPath(ticket.projectId, 'tickets', ticket.key));
                 } else if (activeProjectId) {
-                  navigate(`/workspaces/${activeWorkspaceId}/projects/${activeProjectId}/tickets`);
+                  navigate(buildProjectScopedPath(activeProjectId));
                 } else {
                   navigate(`/workspaces/${activeWorkspaceId}`);
                 }
@@ -1130,11 +1244,11 @@ export function AppShellPage() {
         <CreateTicketModal
           onClose={() => setIsCreateModalOpen(false)}
           projects={activeWorkspaceProjects}
-          labels={labels}
-          cycles={cycles}
+          labels={scopedLabels}
+          cycles={scopedCycles}
           users={users}
           parentTicket={parentTicket}
-          defaultProjectId={activeProjectId || activeWorkspaceProjects[0]?.id || ''}
+          defaultProjectId={createDefaultProjectId}
           onSubmitTicket={handleCreateTicketSubmit}
           initialStatus={createInitialStatus}
           parentId={createParentId}
