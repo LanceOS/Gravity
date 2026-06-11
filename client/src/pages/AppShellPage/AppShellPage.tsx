@@ -746,7 +746,7 @@ export function AppShellPage() {
     navigate(`/workspaces/${activeWorkspaceId}/projects/${pid}/tickets?assigneeId=${currentUser.id}`);
   };
 
-  const handleSelectCycle = (cycleId: string) => {
+  const handleSelectCycleLegacy = (cycleId: string) => {
     const pid = activeProjectId;
     if (!pid) return;
     navigate(`/workspaces/${activeWorkspaceId}/projects/${pid}/tickets?cycleId=${cycleId}`);
@@ -963,7 +963,7 @@ export function AppShellPage() {
       onShowProjectIssues: handleShowProjectIssues,
       onShowMyIssues: handleShowMyIssues,
       onShowNotes: handleShowNotes,
-      onSelectCycleLegacy: handleSelectCycle,
+      onSelectCycleLegacy: handleSelectCycleLegacy,
       onSelectLabel: handleSelectLabel,
     },
     tools: {
