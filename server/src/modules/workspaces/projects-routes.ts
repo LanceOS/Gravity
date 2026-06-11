@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import { Router } from 'express';
 import { db } from '../../db/index.js';
-import { cycles, domains, projectMembers, projects, workspaceMembers, workspaces, workspaceSettings } from '../../db/schema.js';
+import { cycles, domains, projectMembers, projects, teams, workspaceMembers, workspaces, workspaceSettings } from '../../db/schema.js';
 import {
   createId,
   normalizeEntityKey,
@@ -19,6 +19,7 @@ import {
 import { buildProjectKeyConflictMessage, mapProjectCreationError, projectKeyExists } from './utils/project-creation.js';
 import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
 import { isValidGitHubRepoUrl } from '../../lib/webhookSignature.js';
+import { authorizeWorkspaceAccess } from './services/membership.js';
 
 function mapProject(project: typeof projects.$inferSelect) {
   return {
@@ -46,6 +47,16 @@ function mapCycle(cycle: typeof cycles.$inferSelect) {
     completed: cycle.completed ? 1 : 0,
     isActive: !cycle.completed && now >= startTime && now <= endTime,
   };
+}
+
+async function teamBelongsToWorkspace(teamId: string, workspaceId: string) {
+  const teamRows = await db
+    .select({ id: teams.id })
+    .from(teams)
+    .where(and(eq(teams.id, teamId), eq(teams.workspaceId, workspaceId)))
+    .limit(1);
+
+  return teamRows.length > 0;
 }
 
 export function createProjectsRouter() {
@@ -77,12 +88,23 @@ export function createProjectsRouter() {
 
   router.post('/projects', async (req, res) => {
     const { name, description, key, status, ownerId, workspaceId, teamId } = req.body ?? {};
-    if (!name || !key || !ownerId) {
-      res.status(400).json({ error: 'Project name, key, and ownerId are required.' });
+    if (!name || !key) {
+      res.status(400).json({ error: 'Project name and key are required.' });
       return;
     }
 
     try {
+      const actorUserId = await resolveRequestActorUserId(req);
+      if (!actorUserId) {
+        res.status(401).json({ error: 'Authentication required.' });
+        return;
+      }
+
+      if (typeof ownerId === 'string' && ownerId !== actorUserId) {
+        res.status(403).json({ error: 'Forbidden.' });
+        return;
+      }
+
       const projectId = createId('p');
       const normalizedKey = normalizeEntityKey(key);
       if (await projectKeyExists(normalizedKey)) {
@@ -91,13 +113,32 @@ export function createProjectsRouter() {
       }
 
       let targetWorkspaceId = workspaceId as string | undefined;
+      if (targetWorkspaceId) {
+        const auth = await authorizeWorkspaceAccess(req, targetWorkspaceId);
+        if (!auth.allowed) {
+          res.status(auth.status ?? 403).json({ error: auth.error });
+          return;
+        }
+      }
+
+      if (typeof teamId === 'string') {
+        if (!targetWorkspaceId) {
+          res.status(400).json({ error: 'teamId can only be provided when workspaceId is specified.' });
+          return;
+        }
+
+        if (!(await teamBelongsToWorkspace(teamId, targetWorkspaceId))) {
+          res.status(400).json({ error: 'teamId must belong to the target workspace.' });
+          return;
+        }
+      }
 
       const project = await createProjectRecord({
         name,
         description,
         key: normalizedKey,
         status,
-        ownerId,
+        ownerId: actorUserId,
         workspaceId: targetWorkspaceId,
         teamId,
       });
@@ -138,6 +179,12 @@ export function createProjectsRouter() {
         return;
       }
 
+      const currentProject = await getProjectById(req.params.projectId);
+      if (!currentProject) {
+        res.status(404).json({ error: 'Project not found.' });
+        return;
+      }
+
       // Finding #5: Validate githubRepoUrl is a proper GitHub HTTPS URL.
       let validatedGithubRepoUrl: string | null | undefined = undefined;
       if (typeof req.body?.githubRepoUrl === 'string') {
@@ -153,6 +200,11 @@ export function createProjectsRouter() {
         }
       } else if (req.body?.githubRepoUrl === null) {
         validatedGithubRepoUrl = null;
+      }
+
+      if (typeof req.body?.teamId === 'string' && !(await teamBelongsToWorkspace(req.body.teamId, currentProject.workspaceId))) {
+        res.status(400).json({ error: 'teamId must belong to the project workspace.' });
+        return;
       }
 
       const updatedProject = await updateProjectRecord(req.params.projectId, {

@@ -13,6 +13,12 @@ import {
   normalizeEntityKey,
   normalizeIsoDate,
 } from '../../../lib/platform.js';
+import {
+  DEFAULT_TEAM_COLOR,
+  DEFAULT_TEAM_DESCRIPTION,
+  DEFAULT_TEAM_NAME,
+  getDefaultTeamId,
+} from '../utils/default-team.js';
 
 function mapCycle(cycle: typeof cycles.$inferSelect) {
   const now = Date.now();
@@ -51,7 +57,7 @@ export async function listProjectsWithDetails(userId: string, workspaceId?: stri
     key: string;
     status: string;
     workspaceId: string;
-    teamId: string | null;
+    teamId: string;
   }> = workspaceId
     ? await baseQuery.where(eq(projects.workspaceId, workspaceId)).orderBy(asc(projects.createdAt))
     : await baseQuery.orderBy(asc(projects.createdAt));
@@ -131,11 +137,11 @@ export async function createProjectRecord(params: {
         createdAt: new Date(),
       });
       await tx.insert(teams).values({
-        id: `team-general-${targetWorkspaceId}`,
+        id: getDefaultTeamId(targetWorkspaceId),
         workspaceId: targetWorkspaceId,
-        name: 'General',
-        description: 'Default team for workspace',
-        color: '#6B7280',
+        name: DEFAULT_TEAM_NAME,
+        description: DEFAULT_TEAM_DESCRIPTION,
+        color: DEFAULT_TEAM_COLOR,
         createdAt: new Date(),
         updatedAt: new Date(),
       });
@@ -144,7 +150,7 @@ export async function createProjectRecord(params: {
     await tx.insert(projects).values({
       id: projectId,
       workspaceId: targetWorkspaceId,
-      teamId: params.teamId || `team-general-${targetWorkspaceId}`,
+      teamId: params.teamId || getDefaultTeamId(targetWorkspaceId),
       name: params.name,
       description: params.description ?? '',
       key: normalizedKey,

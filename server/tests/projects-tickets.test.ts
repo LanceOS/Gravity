@@ -121,6 +121,54 @@ describe('projects and tickets routes', () => {
     });
   });
 
+  it('requires authentication and workspace membership to create projects', async () => {
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Project Owner',
+      email: 'project-owner@example.com',
+      role: 'owner',
+    });
+    const outsiderApi = await createAuthenticatedApi({
+      name: 'Workspace Outsider',
+      email: 'workspace-outsider@example.com',
+      role: 'member',
+    });
+
+    const { workspace } = await seedWorkspaceFixture({
+      owner: {
+        id: ownerApi.user.id,
+        name: ownerApi.user.name,
+        email: ownerApi.user.email,
+        role: 'owner',
+        avatarUrl: ownerApi.user.avatar,
+      },
+    });
+
+    const unauthenticatedResponse = await api().post('/api/v1/projects').send({
+      name: 'Unauthorized Project',
+      key: 'UNAUTH',
+      workspaceId: workspace.id,
+    });
+    expect(unauthenticatedResponse.status).toBe(401);
+    expect(unauthenticatedResponse.body).toEqual({ error: 'Authentication required.' });
+
+    const outsiderResponse = await outsiderApi.post('/api/v1/projects').send({
+      name: 'Forbidden Project',
+      key: 'FORBID',
+      workspaceId: workspace.id,
+    });
+    expect(outsiderResponse.status).toBe(403);
+    expect(outsiderResponse.body).toEqual({ error: 'Access denied: not a member of the workspace.' });
+
+    const spoofedOwnerResponse = await ownerApi.post('/api/v1/projects').send({
+      name: 'Spoofed Owner Project',
+      key: 'SPOOF',
+      workspaceId: workspace.id,
+      ownerId: outsiderApi.user.id,
+    });
+    expect(spoofedOwnerResponse.status).toBe(403);
+    expect(spoofedOwnerResponse.body).toEqual({ error: 'Forbidden.' });
+  });
+
   it('manages tickets, comments, domains, and cycles', async () => {
     const ownerApi = await createAuthenticatedApi({
       name: 'Test Owner',

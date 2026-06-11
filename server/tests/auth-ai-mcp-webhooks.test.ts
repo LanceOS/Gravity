@@ -4,6 +4,7 @@ import request from 'supertest';
 import { createApp } from '../src/app.js';
 import { db } from '../src/db/index.js';
 import { projects, tickets, workspaceMembers } from '../src/db/schema.js';
+import { getDefaultTeamId } from '../src/modules/workspaces/utils/default-team.js';
 import {
   api as baseApi,
   createAuthenticatedApi,
@@ -530,6 +531,7 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
     await db.insert(projects).values({
       id: 'project-2',
       workspaceId: workspace.id,
+      teamId: getDefaultTeamId(workspace.id),
       name: 'Secondary Project',
       description: 'Secondary delivery project',
       key: 'SEC',

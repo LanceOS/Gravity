@@ -1,4 +1,7 @@
+import { eq } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
+import { db } from '../src/db/index.js';
+import { projects, teams } from '../src/db/schema.js';
 import { api, createAuthenticatedApi, seedUser, seedWorkspaceFixture } from './helpers/test-helpers.js';
 
 describe('workspaces routes', () => {
@@ -33,6 +36,21 @@ describe('workspaces routes', () => {
 
     const workspaceId = createResponse.body.workspace.id;
     const defaultProjectId = createResponse.body.workspace.defaultProjectId;
+
+    const teamsResponse = await ownerApi.get('/api/v1/teams').query({ workspaceId });
+    expect(teamsResponse.status).toBe(200);
+    expect(teamsResponse.body).toEqual([
+      expect.objectContaining({
+        workspaceId,
+        name: 'General',
+      }),
+    ]);
+
+    const defaultProjectRows = await db.select().from(projects).where(eq(projects.id, defaultProjectId)).limit(1);
+    expect(defaultProjectRows[0]?.teamId).toBe(teamsResponse.body[0].id);
+
+    const generalTeamRows = await db.select().from(teams).where(eq(teams.id, teamsResponse.body[0].id)).limit(1);
+    expect(generalTeamRows[0]?.workspaceId).toBe(workspaceId);
 
     const listResponse = await ownerApi.get('/api/v1/workspaces').query({ userId: owner.id });
     expect(listResponse.status).toBe(200);
