@@ -1043,6 +1043,8 @@ export function AppShellPage() {
     scopedProjects[0]?.id ||
     activeWorkspaceProjects[0]?.id ||
     '';
+  const isTeamWorkspace = (sidebarTree?.hierarchyMode ?? activeWorkspace.hierarchyMode) === 'teams';
+  const isWorkspaceOwner = activeWorkspace.memberRole === 'owner';
 
   const sidebarProps: SidebarProps = {
     workspace: {
@@ -1097,6 +1099,8 @@ export function AppShellPage() {
     userMenu: {
       currentUser,
       activeArea: activeSection === 'projects' ? 'projects' : 'workspace',
+      showWorkspaceManagement: !isTeamWorkspace || isWorkspaceOwner,
+      workspaceManagementLabel: isTeamWorkspace ? 'Manage Teams' : 'Manage Projects',
       onOpenWorkspaceDirectory: () => navigate('/workspaces'),
       onOpenAccountPreferences: handleOpenAccountPreferences,
       onOpenProjectManager: handleOpenProjectManager,

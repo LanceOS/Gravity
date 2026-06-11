@@ -18,6 +18,9 @@ export function SidebarUserMenu({
   onCloseUserDropdown,
   profileRef,
 }: SidebarUserMenuProps) {
+  const showWorkspaceManagement = userMenu.showWorkspaceManagement ?? true;
+  const workspaceManagementLabel = userMenu.workspaceManagementLabel ?? 'Manage Projects';
+
   return (
     <div
       ref={profileRef}
@@ -103,17 +106,19 @@ export function SidebarUserMenu({
           <span>Account Preferences</span>
         </div>
 
-        <div
-          onClick={() => {
-            onCloseUserDropdown();
-            userMenu.onOpenProjectManager();
-          }}
-          className="clickable"
-          style={dropdownItemStyle(userMenu.activeArea, 'projects')}
-        >
-          <FolderTree size={14} color="var(--color-primary)" />
-          <span>Manage Projects</span>
-        </div>
+        {showWorkspaceManagement ? (
+          <div
+            onClick={() => {
+              onCloseUserDropdown();
+              userMenu.onOpenProjectManager();
+            }}
+            className="clickable"
+            style={dropdownItemStyle(userMenu.activeArea, 'projects')}
+          >
+            <FolderTree size={14} color="var(--color-primary)" />
+            <span>{workspaceManagementLabel}</span>
+          </div>
+        ) : null}
 
         <div
           onClick={() => {

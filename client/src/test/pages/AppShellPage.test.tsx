@@ -18,6 +18,8 @@ type WorkspaceLayoutMockProps = {
       onOpenSettings: () => void;
       onOpenAccountPreferences: () => void;
       onOpenProjectManager: () => void;
+      showWorkspaceManagement?: boolean;
+      workspaceManagementLabel?: string;
     };
     projects?: {
       onSelectLabel?: (labelId: string) => void;
@@ -135,6 +137,12 @@ vi.mock('../../layouts/WorkspaceLayout/WorkspaceLayout', () => ({
       <button type="button" onClick={sidebarProps.userMenu.onOpenProjectManager}>
         Open project manager
       </button>
+      <div
+        data-testid="workspace-management-menu-state"
+        data-visible={sidebarProps.userMenu.showWorkspaceManagement === false ? 'false' : 'true'}
+      >
+        {sidebarProps.userMenu.workspaceManagementLabel || 'Manage Projects'}
+      </div>
       <button type="button" onClick={() => sidebarProps.projects?.onSelectLabel?.('d-1')}>
         Select label
       </button>
@@ -667,6 +675,67 @@ describe('AppShellPage', () => {
     });
 
     thirdRender.unmount();
+  });
+
+  it('shows Manage Teams instead of Manage Projects for team workspace owners', async () => {
+    renderAppShell({
+      directory: buildWorkspaceDirectory({
+        workspaces: [
+          {
+            id: 'workspace-1',
+            name: 'Gravity',
+            description: 'Main workspace',
+            key: 'GRA',
+            defaultProjectId: 'project-1',
+            hostUrl: 'http://localhost:8080',
+            joinMode: 'approval_required',
+            hierarchyMode: 'teams',
+            projectCount: 1,
+            memberCount: 1,
+            pendingJoinRequestCount: 0,
+            memberRole: 'owner',
+          },
+        ],
+      }),
+    });
+
+    await waitFor(() => {
+      const menuState = screen.getByTestId('workspace-management-menu-state');
+      expect(menuState).toHaveTextContent('Manage Teams');
+      expect(menuState).toHaveAttribute('data-visible', 'true');
+    });
+  });
+
+  it('hides workspace management in team workspaces for non-owners', async () => {
+    const currentUser = makeCurrentUser({ role: 'member' });
+
+    renderAppShell({
+      tickets: buildUseTickets({ currentUser }),
+      directory: buildWorkspaceDirectory({
+        workspaces: [
+          {
+            id: 'workspace-1',
+            name: 'Gravity',
+            description: 'Main workspace',
+            key: 'GRA',
+            defaultProjectId: 'project-1',
+            hostUrl: 'http://localhost:8080',
+            joinMode: 'approval_required',
+            hierarchyMode: 'teams',
+            projectCount: 1,
+            memberCount: 1,
+            pendingJoinRequestCount: 0,
+            memberRole: 'member',
+          },
+        ],
+      }),
+    });
+
+    await waitFor(() => {
+      const menuState = screen.getByTestId('workspace-management-menu-state');
+      expect(menuState).toHaveTextContent('Manage Teams');
+      expect(menuState).toHaveAttribute('data-visible', 'false');
+    });
   });
 
   it('does not open the create-ticket modal when the active workspace has no projects', async () => {

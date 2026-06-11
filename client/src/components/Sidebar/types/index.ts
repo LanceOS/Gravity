@@ -77,6 +77,8 @@ export interface SidebarToolSection {
 export interface SidebarUserMenuSection {
   currentUser: User;
   activeArea?: SidebarActiveArea;
+  showWorkspaceManagement?: boolean;
+  workspaceManagementLabel?: string;
   onOpenWorkspaceDirectory: () => void;
   onOpenAccountPreferences: () => void;
   onOpenProjectManager: () => void;
