@@ -13,10 +13,36 @@ const MAX_KEYS_PER_WEBHOOK = 10;
 /** Ticket key pattern: one or more letters, a hyphen, one or more digits. */
 const TICKET_KEY_REGEX = /([A-Za-z]+)-(\d+)/g;
 
+// ── Finding #3: Simple per-IP rate limiter ────────────────────────────────────
+// Tracks request timestamps per IP. No external dependency required.
+const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
+const RATE_LIMIT_MAX_REQUESTS = 60;  // 60 deliveries/min is well above any realistic GitHub burst
+const rateLimitMap = new Map<string, number[]>();
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const cutoff = now - RATE_LIMIT_WINDOW_MS;
+  const timestamps = (rateLimitMap.get(ip) ?? []).filter((t) => t > cutoff);
+  if (timestamps.length >= RATE_LIMIT_MAX_REQUESTS) {
+    rateLimitMap.set(ip, timestamps);
+    return true;
+  }
+  timestamps.push(now);
+  rateLimitMap.set(ip, timestamps);
+  return false;
+}
+
 export function createWebhookRouter() {
   const router = Router();
 
   router.post('/webhooks/github', async (req, res) => {
+    // ── Finding #3: Per-IP rate limiting ─────────────────────────────────────
+    const clientIp = String(req.ip ?? req.socket?.remoteAddress ?? 'unknown');
+    if (isRateLimited(clientIp)) {
+      res.status(429).json({ error: 'Too many requests.' });
+      return;
+    }
+
     // ── Finding #1: HMAC-SHA256 signature verification ────────────────────────
     // `express.raw()` in app.ts runs before `express.json()` for this route,
     // so req.body is a Buffer containing the original bytes.
