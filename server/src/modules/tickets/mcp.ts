@@ -1,6 +1,7 @@
-import { eq } from 'drizzle-orm';
+import { eq, and, inArray } from 'drizzle-orm';
 import { db } from '../../db/index.js';
-import { projects } from '../../db/schema.js';
+import { projects, labels } from '../../db/schema.js';
+import { audit } from '../../lib/logger.js';
 import {
   addCommentRecord,
   createTicketRecord,
@@ -265,6 +266,118 @@ export class TicketTools {
   }
 
   /**
+   * @description Reads all labels currently assigned to a specific ticket.
+   * @param args Tool arguments containing the ticket key.
+   * @param context Trusted tool execution context.
+   * @return A list of human-readable label names assigned to the ticket.
+   * @throws When the ticket does not exist or belongs to another workspace.
+   */
+  async getTicketLabels(args: Record<string, unknown>, context: ToolExecutionContext) {
+    const ticketKey = String(args.ticketKey ?? '').toUpperCase();
+    const ticket = await getTicketByKey(ticketKey);
+    if (!ticket) {
+      throw new Error(`Ticket ${ticketKey} not found.`);
+    }
+
+    await this.assertProjectInWorkspace(ticket.projectId, context.workspaceId);
+
+    const labelNames = ticket.labels.map(l => l.name);
+    return { labels: labelNames };
+  }
+
+  /**
+   * @description Removes one or more labels from a ticket by name.
+   * @param args Tool arguments containing the ticket key and label names to remove.
+   * @param context Trusted tool execution context.
+   * @return The updated list of label names on the ticket.
+   * @throws When the ticket does not exist, belongs to another workspace, or label resolution fails.
+   */
+  async removeTicketLabels(args: Record<string, unknown>, context: ToolExecutionContext) {
+    const ticketKey = String(args.ticketKey ?? '').toUpperCase();
+    const ticket = await getTicketByKey(ticketKey);
+    if (!ticket) {
+      throw new Error(`Ticket ${ticketKey} not found.`);
+    }
+
+    await this.assertProjectInWorkspace(ticket.projectId, context.workspaceId);
+
+    const labelsToRemove = typeof args.labels === 'string'
+      ? args.labels.split(',').map(s => s.trim()).filter(Boolean)
+      : Array.isArray(args.labels)
+        ? args.labels.map(String)
+        : [];
+    if (labelsToRemove.length === 0) {
+      return { labels: ticket.labels.map(l => l.name) };
+    }
+
+    const currentLabels = ticket.labels;
+    const namesToRemoveSet = new Set(labelsToRemove);
+    const newLabelNames = currentLabels.map(l => l.name).filter(name => !namesToRemoveSet.has(name));
+
+    const resolvedLabels = newLabelNames.length > 0
+      ? await db.select({ id: labels.id, name: labels.name }).from(labels).where(and(eq(labels.projectId, ticket.projectId), inArray(labels.name, newLabelNames)))
+      : [];
+
+    const labelIds = resolvedLabels.map(l => l.id);
+    const updated = await updateTicketRecord(ticket.id, { labelIds }, ticket.projectId);
+    
+    audit('remove_ticket_labels', {
+      workspaceId: context.workspaceId,
+      actorUserId: context.actorUserId,
+      ticketKey,
+      removedLabels: labelsToRemove,
+      finalLabels: newLabelNames,
+    });
+
+    return { labels: updated?.labels.map(l => l.name) ?? [] };
+  }
+
+  /**
+   * @description Replaces all labels on a ticket with a new set of label names.
+   * @param args Tool arguments containing the ticket key and the new label names.
+   * @param context Trusted tool execution context.
+   * @return The updated list of label names on the ticket.
+   * @throws When the ticket does not exist, belongs to another workspace, or label resolution fails.
+   */
+  async setTicketLabels(args: Record<string, unknown>, context: ToolExecutionContext) {
+    const ticketKey = String(args.ticketKey ?? '').toUpperCase();
+    const ticket = await getTicketByKey(ticketKey);
+    if (!ticket) {
+      throw new Error(`Ticket ${ticketKey} not found.`);
+    }
+
+    await this.assertProjectInWorkspace(ticket.projectId, context.workspaceId);
+
+    const labelNames = typeof args.labels === 'string'
+      ? args.labels.split(',').map(s => s.trim()).filter(Boolean)
+      : Array.isArray(args.labels)
+        ? args.labels.map(String)
+        : [];
+    
+    const resolvedLabels = labelNames.length > 0
+      ? await db.select({ id: labels.id, name: labels.name }).from(labels).where(and(eq(labels.projectId, ticket.projectId), inArray(labels.name, labelNames)))
+      : [];
+
+    if (resolvedLabels.length !== labelNames.length) {
+      const foundNames = new Set(resolvedLabels.map(l => l.name));
+      const missing = labelNames.filter(n => !foundNames.has(n));
+      throw new Error(`The following labels do not exist in this project: ${missing.join(', ')}`);
+    }
+
+    const labelIds = resolvedLabels.map(l => l.id);
+    const updated = await updateTicketRecord(ticket.id, { labelIds }, ticket.projectId);
+
+    audit('set_ticket_labels', {
+      workspaceId: context.workspaceId,
+      actorUserId: context.actorUserId,
+      ticketKey,
+      newLabels: labelNames,
+    });
+
+    return { labels: updated?.labels.map(l => l.name) ?? [] };
+  }
+
+  /**
    * @description Resolves a ticket by key and rejects cross-workspace access
    * before the caller can read or mutate related ticket data.
    * @param args Tool arguments containing the ticket key.
@@ -318,6 +431,9 @@ export const ticketToolHandlers: Record<string, ToolHandler> = {
   read_comments: (args, context) => ticketTools.readComments(args, context),
   delete_comment: (args, context) => ticketTools.deleteComment(args, context),
   update_comment: (args, context) => ticketTools.updateComment(args, context),
+  get_ticket_labels: (args, context) => ticketTools.getTicketLabels(args, context),
+  remove_ticket_labels: (args, context) => ticketTools.removeTicketLabels(args, context),
+  set_ticket_labels: (args, context) => ticketTools.setTicketLabels(args, context),
 };
 
 export const ticketToolDefinitions: McpToolDefinition[] = [
@@ -477,6 +593,47 @@ export const ticketToolDefinitions: McpToolDefinition[] = [
         body: { type: 'string' },
       },
       required: ['ticketKey', 'commentId', 'body'],
+    },
+  },
+  {
+    name: 'get_ticket_labels',
+    description: 'Read all labels currently assigned to a specific ticket.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ticketKey: { type: 'string' },
+      },
+      required: ['ticketKey'],
+    },
+  },
+  {
+    name: 'remove_ticket_labels',
+    description: 'Remove one or more labels from a ticket. Only removes specified labels, leaves others intact.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ticketKey: { type: 'string' },
+        labels: {
+          type: 'string',
+          description: 'Comma-separated list of label names to remove.',
+        },
+      },
+      required: ['ticketKey', 'labels'],
+    },
+  },
+  {
+    name: 'set_ticket_labels',
+    description: 'Replace all labels on a ticket with a new set of labels.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ticketKey: { type: 'string' },
+        labels: {
+          type: 'string',
+          description: 'Comma-separated list of the exact label names to set on the ticket, replacing all existing labels.',
+        },
+      },
+      required: ['ticketKey', 'labels'],
     },
   },
 ];
