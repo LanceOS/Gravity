@@ -971,8 +971,8 @@ export function AppShellPage() {
           invites={workspaceInvites}
           members={workspaceMembers}
           joinRequests={workspaceJoinRequests}
-          approveLoadingId={approveLoadingId}
-          revokeLoadingId={revokeLoadingId}
+          approveLoadingId={approveLoadingId || null}
+          revokeLoadingId={revokeLoadingId || null}
           deleteLoading={deleteLoading}
           deleteError={deleteError}
           onBackToWorkspace={() => navigate(`/workspaces/${activeWorkspaceId}`)}
