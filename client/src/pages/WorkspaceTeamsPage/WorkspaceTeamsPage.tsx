@@ -430,7 +430,7 @@ export function WorkspaceTeamsPage({
                     <div className="workspace-teams-page__delete-action">
                       <Button
                         type="button"
-                        variant="ghost"
+                        variant="danger"
                         size="sm"
                         onClick={() => handleDeleteTeam(team)}
                         disabled={deleteDisabled || savingAction === `delete:${team.id}`}
