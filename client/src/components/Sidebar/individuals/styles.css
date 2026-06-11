@@ -1,0 +1,78 @@
+/* ── Root ─────────────────────────────────────────── */
+.individuals-sidebar {
+  margin-top: 4px;
+}
+
+/* ── "Projects" collapse toggle button ───────────── */
+.individuals-sidebar__group-toggle {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  width: 100%;
+  text-align: left;
+}
+
+.individuals-sidebar__group-toggle-label {
+  margin-left: 4px;
+}
+
+/* ── Project list ─────────────────────────────────── */
+.individuals-sidebar__project-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+}
+
+/* ── Per-project block ────────────────────────────── */
+.individuals-sidebar__project {
+  display: grid;
+  gap: 4px;
+}
+
+/* ── Project item label ───────────────────────────── */
+.individuals-sidebar__project-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── Animated accordion wrapper ──────────────────── */
+/* gridTemplateRows is set via inline style (dynamic: '1fr' / '0fr') */
+.individuals-sidebar__accordion {
+  display: grid;
+  transition: grid-template-rows var(--transition-normal);
+}
+
+.individuals-sidebar__accordion-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ── Sub-section content (Views / Cycles / Labels) ── */
+.individuals-sidebar__sub-content {
+  margin-left: 14px;
+  padding: 4px 0 4px 8px;
+  border-left: 1px solid var(--color-border-default);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* ── Shared: colour dot used inside left-icon slots ─ */
+.individuals-sidebar__label-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  /* background is set via inline style (dynamic label color) */
+}
+
+/* ── Completed cycle name ─────────────────────────── */
+.individuals-sidebar__cycle-name--completed {
+  text-decoration: line-through;
+}

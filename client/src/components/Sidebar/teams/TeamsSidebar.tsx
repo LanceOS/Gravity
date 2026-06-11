@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { CheckCircle, ChevronDown, ChevronRight, Database, FolderTree } from 'lucide-react';
 import { SidebarGroup, SidebarItem } from '@library';
 import type { SidebarProjectSection } from '../types';
+import './styles.css';
 
 interface TeamsSidebarProps {
   section: SidebarProjectSection;
@@ -15,7 +16,7 @@ export function TeamsSidebar({ section }: TeamsSidebarProps) {
   };
 
   return (
-    <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+    <div className="teams-sidebar">
       {section.teams!.map((team) => {
         const teamContainsActiveProject =
           !!section.activeProjectId && team.projects?.some((p) => p.id === section.activeProjectId);
@@ -24,22 +25,25 @@ export function TeamsSidebar({ section }: TeamsSidebarProps) {
         const isTeamActive = section.activeTeamId === team.id || teamContainsActiveProject;
 
         return (
-          <div key={team.id} style={{ display: 'grid', gap: '4px' }}>
+          <div key={team.id} className="teams-sidebar__team">
             {/* Team header row */}
             <SidebarItem
               active={isTeamActive && !section.activeProjectId}
               onClick={() => toggleTeam(team.id)}
               leftIcon={isCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: team.color || 'var(--color-primary)' }} />
-                <span style={{ fontWeight: '500' }}>{team.name}</span>
+              <div className="teams-sidebar__team-label">
+                <div
+                  className="teams-sidebar__team-color-dot"
+                  style={{ background: team.color || 'var(--color-primary)' }}
+                />
+                <span className="teams-sidebar__team-name">{team.name}</span>
               </div>
             </SidebarItem>
 
             {/* Collapsible sub-items */}
             {!isCollapsed && (
-              <div style={{ marginLeft: '12px', paddingLeft: '8px', borderLeft: '1px solid var(--color-border-default)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <div className="teams-sidebar__sub-items">
                 {/* Views */}
                 <SidebarGroup label="Views">
                   <SidebarItem
@@ -63,7 +67,9 @@ export function TeamsSidebar({ section }: TeamsSidebarProps) {
                         onClick={() => section.onSelectCycle?.(team.id, cycle.id)}
                         leftIcon={<CheckCircle size={13} color={cycle.completed ? 'var(--color-text-disabled)' : 'var(--color-primary)'} />}
                       >
-                        <span style={{ textDecoration: cycle.completed ? 'line-through' : 'none' }}>{cycle.name}</span>
+                        <span className={cycle.completed ? 'teams-sidebar__cycle-name--completed' : undefined}>
+                          {cycle.name}
+                        </span>
                       </SidebarItem>
                     ))}
                   </SidebarGroup>
@@ -78,7 +84,12 @@ export function TeamsSidebar({ section }: TeamsSidebarProps) {
                         nested
                         active={isTeamActive && section.activeDomainId === domain.id}
                         onClick={() => section.onSelectDomain?.(team.id, domain.id)}
-                        leftIcon={<div style={{ width: '8px', height: '8px', borderRadius: '50%', background: domain.color }} />}
+                        leftIcon={
+                          <div
+                            className="teams-sidebar__domain-dot"
+                            style={{ background: domain.color }}
+                          />
+                        }
                       >
                         {domain.name}
                       </SidebarItem>

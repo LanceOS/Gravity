@@ -2,6 +2,7 @@ import { CheckCircle, ChevronDown, ChevronRight, Database, FileText, FolderTree,
 import { SidebarGroup, SidebarItem } from '@library';
 import type { SidebarProjectSection } from '../types';
 import { countBadgeStyle, getProjectCollapsedState, isMyIssuesView, isNotesView, isProjectIssuesView } from '../utils';
+import './styles.css';
 
 interface IndividualsSidebarProps {
   section: SidebarProjectSection;
@@ -26,60 +27,46 @@ export function IndividualsSidebar({
   const handleSelectLabel = section.onSelectLabel ?? (() => { });
 
   return (
-    <div style={{ marginTop: '4px' }}>
+    <div className="individuals-sidebar">
       <SidebarGroup
         label={
           <button
             type="button"
             onClick={onToggleProjectsCollapsed}
             aria-expanded={!projectsCollapsed}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              cursor: 'pointer',
-              background: 'none',
-              border: 'none',
-              padding: 0,
-              font: 'inherit',
-              color: 'inherit',
-              width: '100%',
-              textAlign: 'left',
-            }}
+            className="individuals-sidebar__group-toggle"
           >
             {projectsCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
-            <span style={{ marginLeft: '4px' }}>Projects</span>
+            <span className="individuals-sidebar__group-toggle-label">Projects</span>
           </button>
         }
       >
         {!projectsCollapsed && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '4px' }}>
+          <div className="individuals-sidebar__project-list">
             {section.projects.map((project) => {
               const isActiveProject = project.id === section.activeProjectId;
               const isCollapsed = getProjectCollapsedState(collapsedProjects, project.id, section.activeProjectId);
 
               return (
-                <div key={project.id} style={{ display: 'grid', gap: '4px' }}>
+                <div key={project.id} className="individuals-sidebar__project">
                   <SidebarItem
                     active={isActiveProject}
                     onClick={() => onToggleProject(project.id)}
                     leftIcon={isActiveProject && !isCollapsed ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div className="individuals-sidebar__project-label">
                       <Database size={14} />
                       <span>{project.name}</span>
                     </div>
                   </SidebarItem>
 
-                  {/* Animated sub-section */}
+                  {/* Animated accordion — gridTemplateRows is dynamic so stays inline */}
                   <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateRows: isActiveProject && !isCollapsed ? '1fr' : '0fr',
-                      transition: 'grid-template-rows var(--transition-normal)',
-                    }}
+                    className="individuals-sidebar__accordion"
+                    style={{ gridTemplateRows: isActiveProject && !isCollapsed ? '1fr' : '0fr' }}
                   >
-                    <div style={{ overflow: 'hidden', minHeight: 0 }}>
-                      <div style={{ marginLeft: '14px', paddingLeft: '8px', borderLeft: '1px solid var(--color-border-default)', display: 'flex', flexDirection: 'column', gap: '4px', paddingTop: '4px', paddingBottom: '4px' }}>
+                    <div className="individuals-sidebar__accordion-inner">
+                      <div className="individuals-sidebar__sub-content">
                         <SidebarGroup label="Views">
                           <SidebarItem
                             nested
@@ -121,7 +108,9 @@ export function IndividualsSidebar({
                               leftIcon={<CheckCircle size={13} color={cycle.completed ? 'var(--color-text-disabled)' : 'var(--color-primary)'} />}
                               rightElement={<span style={countBadgeStyle()}>{section.counts.cycles[cycle.id] || 0}</span>}
                             >
-                              <span style={{ textDecoration: cycle.completed ? 'line-through' : 'none' }}>{cycle.name}</span>
+                              <span className={cycle.completed ? 'individuals-sidebar__cycle-name--completed' : undefined}>
+                                {cycle.name}
+                              </span>
                             </SidebarItem>
                           ))}
                         </SidebarGroup>
@@ -133,7 +122,12 @@ export function IndividualsSidebar({
                               nested
                               active={section.filters.labels?.includes(label.id)}
                               onClick={() => handleSelectLabel(label.id)}
-                              leftIcon={<div style={{ width: '8px', height: '8px', borderRadius: '50%', background: label.color }} />}
+                              leftIcon={
+                                <div
+                                  className="individuals-sidebar__label-dot"
+                                  style={{ background: label.color }}
+                                />
+                              }
                               rightElement={<span style={countBadgeStyle()}>{labelCounts[label.id] || 0}</span>}
                             >
                               {label.name}

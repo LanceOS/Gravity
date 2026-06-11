@@ -1,0 +1,55 @@
+/* ── Root ─────────────────────────────────────────── */
+.teams-sidebar {
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ── Per-team block ───────────────────────────────── */
+.teams-sidebar__team {
+  display: grid;
+  gap: 4px;
+}
+
+/* ── Team header label ────────────────────────────── */
+.teams-sidebar__team-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.teams-sidebar__team-color-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  /* background is set via inline style (dynamic team color) */
+}
+
+.teams-sidebar__team-name {
+  font-weight: 500;
+}
+
+/* ── Collapsible sub-section ──────────────────────── */
+.teams-sidebar__sub-items {
+  margin-left: 12px;
+  padding-left: 8px;
+  border-left: 1px solid var(--color-border-default);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* ── Shared: colour dot used inside left-icon slots ─ */
+.teams-sidebar__domain-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  /* background is set via inline style (dynamic domain color) */
+}
+
+/* ── Completed cycle name ─────────────────────────── */
+.teams-sidebar__cycle-name--completed {
+  text-decoration: line-through;
+}
