@@ -156,7 +156,7 @@ export function WorkspacePage({
               <div style={{ marginLeft: 'auto' }}>
                 {activeNoteId ? (
                   <Button type="button" variant="secondary" onClick={() => window.history.back()}>
-                     Back to Notes
+                    Back to Notes
                   </Button>
                 ) : (
                   <Button type="button" variant="primary" onClick={handleCreateNote}>
