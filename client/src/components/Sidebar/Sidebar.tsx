@@ -35,9 +35,11 @@ export function Sidebar({ projects, tools, userMenu }: SidebarProps) {
           projectsCollapsed={sidebarState.projectsCollapsed}
           collapsedProjects={sidebarState.collapsedProjects}
           collapsedTeamProjects={sidebarState.collapsedTeamProjects}
+          teamsCollapsed={sidebarState.teamsCollapsed}
           onToggleProjectsCollapsed={sidebarState.toggleProjectsCollapsed}
           onToggleProject={sidebarState.toggleProject}
           onToggleTeamProjects={sidebarState.toggleTeamProjects}
+          onToggleTeamsCollapsed={sidebarState.toggleTeamsCollapsed}
         />
       </SidebarContent>
 

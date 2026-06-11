@@ -36,6 +36,7 @@ export interface SidebarNavigationState {
 export interface SidebarProjectSection {
   hierarchyMode?: 'flat' | 'teams';
   teams?: SidebarTeam[];
+  teamsCollapsed?: boolean;
   navigationState?: SidebarNavigationState;
   activeViewId?: string;
   activeTeamId?: string;
@@ -47,6 +48,7 @@ export interface SidebarProjectSection {
   onSelectCycle?: (teamId: string, cycleId: string) => void;
   onSelectDomain?: (teamId: string, domainId: string) => void;
   onSelectAllTasks?: (teamId: string) => void;
+  onToggleTeamsCollapsed?: () => void;
 
   projects: Project[];
   labels?: Label[];

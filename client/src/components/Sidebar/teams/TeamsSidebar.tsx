@@ -5,8 +5,10 @@ import './styles.css';
 
 interface TeamsSidebarProps {
   section: SidebarProjectSection;
+  teamsCollapsed: boolean;
   collapsedTeamProjects: Record<string, boolean>;
   onToggleTeamProjects: (teamId: string) => void;
+  onToggleTeamsCollapsed: () => void;
 }
 
 function resolveNavigationState(section: SidebarProjectSection): SidebarNavigationState {
@@ -45,7 +47,13 @@ function resolveNavigationState(section: SidebarProjectSection): SidebarNavigati
   };
 }
 
-export function TeamsSidebar({ section, collapsedTeamProjects, onToggleTeamProjects }: TeamsSidebarProps) {
+export function TeamsSidebar({
+  section,
+  teamsCollapsed,
+  collapsedTeamProjects,
+  onToggleTeamProjects,
+  onToggleTeamsCollapsed,
+}: TeamsSidebarProps) {
   const navigationState = resolveNavigationState(section);
   const activeTeamId = navigationState.activeTeam;
   const activeScope = navigationState.activeScope;
@@ -64,8 +72,20 @@ export function TeamsSidebar({ section, collapsedTeamProjects, onToggleTeamProje
         </SidebarItem>
       </SidebarGroup>
 
-      <SidebarGroup label="Teams">
-        {section.teams!.map((team) => {
+      <SidebarGroup
+        label={
+          <button
+            type="button"
+            onClick={onToggleTeamsCollapsed}
+            aria-expanded={!teamsCollapsed}
+            className="teams-sidebar__group-toggle"
+          >
+            {teamsCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+            <span className="teams-sidebar__group-toggle-label">Teams</span>
+          </button>
+        }
+      >
+        {!teamsCollapsed && section.teams!.map((team) => {
           const teamContainsActiveProject =
             !!activeProjectId && team.projects?.some((p) => p.id === activeProjectId);
           const isTeamActive = activeTeamId === team.id || teamContainsActiveProject;
