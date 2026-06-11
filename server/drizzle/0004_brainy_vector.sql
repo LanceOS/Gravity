@@ -1,0 +1,1 @@
+ALTER TABLE "workspace_settings" ADD COLUMN "hierarchy_mode" text DEFAULT 'flat' NOT NULL;

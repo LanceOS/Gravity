@@ -288,7 +288,7 @@ export function createWorkspacesRouter() {
       return;
     }
 
-    const { name, description, key, workspaceKey, ownerId, defaultProjectName, defaultProjectKey } = req.body ?? {};
+    const { name, description, key, workspaceKey, ownerId, defaultProjectName, defaultProjectKey, hierarchyMode } = req.body ?? {};
     if (!name || !key) {
       res.status(400).json({ error: 'Workspace name and key are required.' });
       return;
@@ -324,7 +324,7 @@ export function createWorkspacesRouter() {
           workspaceId,
           hostUrl: '',
           joinMode: 'approval_required',
-          hierarchyMode: 'flat',
+          hierarchyMode: hierarchyMode === 'teams' ? 'teams' : 'flat',
           createdAt: new Date(),
           updatedAt: new Date(),
         });
@@ -475,7 +475,6 @@ export function createWorkspacesRouter() {
 
       const nextHostUrl = typeof req.body?.hostUrl === 'string' ? req.body.hostUrl : currentWorkspace.hostUrl;
       const nextJoinMode = req.body?.joinMode === 'auto_join' ? 'auto_join' : req.body?.joinMode === 'approval_required' ? 'approval_required' : null;
-      const nextHierarchyMode = req.body?.hierarchyMode === 'teams' ? 'teams' : req.body?.hierarchyMode === 'flat' ? 'flat' : null;
       const nextWorkspaceKey =
         typeof req.body?.workspaceKey === 'string' && req.body.workspaceKey.trim()
           ? req.body.workspaceKey.trim()
@@ -512,7 +511,6 @@ export function createWorkspacesRouter() {
           .set({
             hostUrl: nextHostUrl,
             ...(nextJoinMode ? { joinMode: nextJoinMode } : {}),
-            ...(nextHierarchyMode ? { hierarchyMode: nextHierarchyMode } : {}),
             ...(nextDisabledMcpTools !== undefined ? { disabledMcpTools: nextDisabledMcpTools } : {}),
             updatedAt: new Date(),
           })

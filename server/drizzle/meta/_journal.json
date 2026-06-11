@@ -29,6 +29,13 @@
       "when": 1781184101601,
       "tag": "0003_opposite_hannibal_king",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1781186996444,
+      "tag": "0004_brainy_vector",
+      "breakpoints": true
     }
   ]
 }

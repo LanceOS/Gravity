@@ -210,7 +210,6 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
           hostUrl: payload.hostUrl,
           joinMode: payload.joinMode,
           workspaceKey: payload.workspaceKey,
-          hierarchyMode: payload.hierarchyMode,
           disabledMcpTools: payload.disabledMcpTools || [],
         }),
       });

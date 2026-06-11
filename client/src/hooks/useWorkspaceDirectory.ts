@@ -24,6 +24,7 @@ export interface CreateWorkspaceInput {
   workspaceKey?: string;
   defaultProjectName?: string;
   defaultProjectKey?: string;
+  hierarchyMode?: 'teams' | 'flat';
 }
 
 

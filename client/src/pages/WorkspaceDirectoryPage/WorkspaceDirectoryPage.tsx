@@ -8,7 +8,8 @@ import {
   Stack,
   Card,
   Badge,
-  Alert
+  Alert,
+  Select
 } from '@library';
 import type { User } from '../../context/TicketContext';
 import type { CreateWorkspaceInput, WorkspaceSummary } from '../../hooks/useWorkspaceDirectory';
@@ -62,6 +63,7 @@ export function WorkspaceDirectoryPage({
   const [workspaceAccessKey, setWorkspaceAccessKey] = useState('');
   const [inviteCode, setInviteCode] = useState('');
   const [requestMessage, setRequestMessage] = useState('');
+  const [hierarchyMode, setHierarchyMode] = useState<'teams' | 'flat'>('flat');
 
   const [activeTab, setActiveTab] = useState<'create' | 'join'>('create');
   const [isMobile, setIsMobile] = useState(false);
@@ -86,6 +88,7 @@ export function WorkspaceDirectoryPage({
       workspaceKey: workspaceAccessKey,
       defaultProjectName: workspaceName,
       defaultProjectKey: workspaceKey,
+      hierarchyMode,
     });
   };
 
@@ -180,6 +183,16 @@ export function WorkspaceDirectoryPage({
               value={workspaceAccessKey}
               onChange={(event) => setWorkspaceAccessKey(event.target.value.toUpperCase())}
               placeholder="Optional (auto-generated)"
+            />
+
+            <Select
+              label="Organization Model"
+              value={hierarchyMode}
+              onValueChange={(val) => setHierarchyMode(val as 'teams' | 'flat')}
+              options={[
+                { value: 'flat', label: 'Flat (Projects directly under Workspace)' },
+                { value: 'teams', label: 'Team-based (Projects grouped by Teams)' },
+              ]}
             />
 
             <Textarea
