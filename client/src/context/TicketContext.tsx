@@ -29,6 +29,7 @@ interface State {
     status: string;
     priority: string;
     projectId: string;
+    domainId?: string;
     labels: string[];
     labelMode: 'all' | 'any';
     cycleId: string;
@@ -57,6 +58,7 @@ const initialFilters = {
   status: '',
   priority: '',
   projectId: '',
+  domainId: '',
   labels: [] as string[],
   labelMode: 'any' as 'all' | 'any',
   cycleId: '',

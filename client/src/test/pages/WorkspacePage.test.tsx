@@ -225,6 +225,7 @@ describe('WorkspacePage', () => {
       status: '',
       projectId: 'project-1',
       labels: [],
+      domainId: '',
       cycleId: '',
       assigneeId: '',
     });
@@ -252,6 +253,7 @@ describe('WorkspacePage', () => {
       status: '',
       projectId: 'project-1',
       labels: [],
+      domainId: '',
       cycleId: '',
       assigneeId: '',
     });

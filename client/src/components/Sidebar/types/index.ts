@@ -25,13 +25,25 @@ export interface SidebarProjectCounts {
 
 import type { SidebarTeam } from '../../../types/domain';
 
+export type SidebarScope = 'workspace' | 'views' | 'cycles' | 'domains' | 'projects';
+
+export interface SidebarNavigationState {
+  activeTeam: string;
+  activeScope: SidebarScope;
+  activeProject: string;
+}
+
 export interface SidebarProjectSection {
   hierarchyMode?: 'flat' | 'teams';
   teams?: SidebarTeam[];
+  navigationState?: SidebarNavigationState;
+  activeViewId?: string;
   activeTeamId?: string;
   activeCycleId?: string;
   activeDomainId?: string;
+  onSelectWorkspaceAllTasks?: () => void;
   onSelectTeam?: (teamId: string) => void;
+  onSelectView?: (teamId: string, viewId: string) => void;
   onSelectCycle?: (teamId: string, cycleId: string) => void;
   onSelectDomain?: (teamId: string, domainId: string) => void;
   onSelectAllTasks?: (teamId: string) => void;

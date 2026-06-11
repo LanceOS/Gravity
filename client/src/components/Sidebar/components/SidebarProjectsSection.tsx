@@ -6,19 +6,29 @@ interface SidebarProjectsSectionProps {
   section: SidebarProjectSection;
   projectsCollapsed: boolean;
   collapsedProjects: Record<string, boolean>;
+  collapsedTeamProjects: Record<string, boolean>;
   onToggleProjectsCollapsed: () => void;
   onToggleProject: (projectId: string) => void;
+  onToggleTeamProjects: (teamId: string) => void;
 }
 
 export function SidebarProjectsSection({
   section,
   projectsCollapsed,
   collapsedProjects,
+  collapsedTeamProjects,
   onToggleProjectsCollapsed,
   onToggleProject,
+  onToggleTeamProjects,
 }: SidebarProjectsSectionProps) {
   if (section.hierarchyMode === 'teams' && section.teams && section.teams.length > 0) {
-    return <TeamsSidebar section={section} />;
+    return (
+      <TeamsSidebar
+        section={section}
+        collapsedTeamProjects={collapsedTeamProjects}
+        onToggleTeamProjects={onToggleTeamProjects}
+      />
+    );
   }
 
   return (

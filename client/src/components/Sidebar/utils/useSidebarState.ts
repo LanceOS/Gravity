@@ -4,6 +4,7 @@ export function useSidebarState(activeProjectId: string, onSelectProject: (proje
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [projectsCollapsed, setProjectsCollapsed] = useState(false);
   const [collapsedProjects, setCollapsedProjects] = useState<Record<string, boolean>>({});
+  const [collapsedTeamProjects, setCollapsedTeamProjects] = useState<Record<string, boolean>>({});
   const profileRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -29,11 +30,15 @@ export function useSidebarState(activeProjectId: string, onSelectProject: (proje
 
   return {
     collapsedProjects,
+    collapsedTeamProjects,
     profileRef,
     projectsCollapsed,
     showUserDropdown,
     closeUserDropdown: () => setShowUserDropdown(false),
     toggleProject,
+    toggleTeamProjects: (teamId: string) => {
+      setCollapsedTeamProjects((previous) => ({ ...previous, [teamId]: !previous[teamId] }));
+    },
     toggleProjectsCollapsed: () => setProjectsCollapsed((previous) => !previous),
     toggleUserDropdown: () => setShowUserDropdown((previous) => !previous),
   };
