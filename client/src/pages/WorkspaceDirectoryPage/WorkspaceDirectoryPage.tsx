@@ -421,6 +421,7 @@ export function WorkspaceDirectoryPage({
                               <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
                                 {workspace.name}
                               </span>
+                              {workspace.hierarchyMode === 'teams' && <Badge variant="default">Team Workspace</Badge>}
                               {isActive && <Badge variant="accent">Active</Badge>}
                             </div>
                             {workspace.description && (
@@ -479,6 +480,7 @@ export function WorkspaceDirectoryPage({
                           <span style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
                             {workspace.name}
                           </span>
+                          {workspace.hierarchyMode === 'teams' && <Badge variant="default">Team Workspace</Badge>}
                           {isActive && <Badge variant="accent">Active</Badge>}
                         </div>
                         {workspace.description && (

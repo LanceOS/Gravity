@@ -3,7 +3,7 @@ import { GitMerge, GitPullRequest, Paperclip } from 'lucide-react';
 import type { TicketRowProps } from '../types/TicketList';
 import { LabelBadge } from './LabelBadge';
 
-function TicketRowImpl({ ticket, onClick, priorityIcon, assigneeAvatar }: TicketRowProps) {
+function TicketRowImpl({ ticket, onClick, priorityIcon, assigneeAvatar, projectName, projectColor }: TicketRowProps) {
   const [isHovered, setIsHovered] = useState(false);
 
   const handleClick = useCallback(() => {
@@ -34,6 +34,41 @@ function TicketRowImpl({ ticket, onClick, priorityIcon, assigneeAvatar }: Ticket
       <span className="ticket-row-key" style={{ fontFamily: 'var(--mono)', fontSize: '12px', color: 'var(--color-text-disabled)', width: '60px', flexShrink: 0 }}>
         {ticket.key}
       </span>
+
+      {projectName && (
+        <span
+          className="ticket-row-project"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '5px',
+            fontSize: '11px',
+            fontWeight: 500,
+            color: 'var(--color-text-secondary)',
+            background: 'var(--color-surface-overlay)',
+            border: '1px solid var(--color-border-default)',
+            borderRadius: '4px',
+            padding: '2px 7px',
+            flexShrink: 0,
+            maxWidth: '120px',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          <span
+            aria-hidden="true"
+            style={{
+              width: '6px',
+              height: '6px',
+              borderRadius: '50%',
+              background: projectColor || 'var(--color-primary)',
+              flexShrink: 0,
+            }}
+          />
+          {projectName}
+        </span>
+      )}
 
       <span
         className="ticket-row-title"

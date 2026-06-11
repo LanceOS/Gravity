@@ -1,0 +1,1 @@
+export { TeamsSidebar } from './TeamsSidebar';

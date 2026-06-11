@@ -15,6 +15,7 @@ export interface WorkspaceSummary {
   memberCount: number;
   pendingJoinRequestCount: number;
   memberRole?: string;
+  hierarchyMode?: 'flat' | 'teams';
 }
 
 export interface CreateWorkspaceInput {

@@ -69,6 +69,7 @@ export async function listProjectsWithDetails(userId: string, workspaceId?: stri
 
   const domainsByProject = new Map<string, Array<{ id: string; name: string; color: string }>>();
   for (const domain of domainRows) {
+    if (!domain.projectId) continue;
     const nextDomains = domainsByProject.get(domain.projectId) ?? [];
     nextDomains.push({ id: domain.id, name: domain.name, color: domain.color });
     domainsByProject.set(domain.projectId, nextDomains);
@@ -76,6 +77,7 @@ export async function listProjectsWithDetails(userId: string, workspaceId?: stri
 
   const cyclesByProject = new Map<string, Array<ReturnType<typeof mapCycle>>>();
   for (const cycle of cycleRows) {
+    if (!cycle.projectId) continue;
     const nextCycles = cyclesByProject.get(cycle.projectId) ?? [];
     nextCycles.push(mapCycle(cycle));
     cyclesByProject.set(cycle.projectId, nextCycles);

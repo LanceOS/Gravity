@@ -7,9 +7,14 @@ import { useSidebarState } from './utils';
 export function Sidebar({ projects, tools, userMenu }: SidebarProps) {
   const sidebarState = useSidebarState(projects.activeProjectId, projects.onSelectProject);
 
+  // Show the "New Ticket" header when there are projects — either in flat mode or via teams
+  const hasAnyProject =
+    projects.projects.length > 0 ||
+    (projects.teams ?? []).some((t) => t.projects && t.projects.length > 0);
+
   return (
     <LibSidebar>
-      {projects.projects.length > 0 ? (
+      {hasAnyProject ? (
         <SidebarHeader>
           <button
             type="button"

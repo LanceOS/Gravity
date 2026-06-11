@@ -242,6 +242,7 @@ export type WorkspaceRow = {
   workspaceHostUrl: string | null;
   settingsHostUrl: string | null;
   joinMode: string | null;
+  hierarchyMode: 'flat' | 'teams' | null;
 };
 
 export type WorkspaceSummary = {
@@ -256,6 +257,7 @@ export type WorkspaceSummary = {
   memberCount: number;
   pendingJoinRequestCount: number;
   memberRole?: string;
+  hierarchyMode?: 'flat' | 'teams';
 };
 
 export async function listWorkspaceSummaries(userId?: string): Promise<WorkspaceSummary[]> {
@@ -293,6 +295,7 @@ export async function listWorkspaceSummaries(userId?: string): Promise<Workspace
         workspaceHostUrl: workspaces.hostUrl,
         settingsHostUrl: workspaceSettings.hostUrl,
         joinMode: workspaceSettings.joinMode,
+        hierarchyMode: workspaceSettings.hierarchyMode,
       })
       .from(workspaces)
       .leftJoin(workspaceSettings, eq(workspaceSettings.workspaceId, workspaces.id));
@@ -350,6 +353,7 @@ export async function listWorkspaceSummaries(userId?: string): Promise<Workspace
       projectCount: projectCountByWorkspace.get(workspace.id) ?? 0,
       memberCount: memberCountByWorkspace.get(workspace.id) ?? 0,
       pendingJoinRequestCount: pendingJoinRequestCountByWorkspace.get(workspace.id) ?? 0,
+      hierarchyMode: workspace.hierarchyMode ?? 'flat',
       ...(memberRoleByWorkspace.has(workspace.id) ? { memberRole: memberRoleByWorkspace.get(workspace.id) } : {}),
     }));
   });

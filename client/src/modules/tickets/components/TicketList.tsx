@@ -13,9 +13,9 @@ export const TicketList: React.FC<TicketListProps> = ({
   groupedTickets,
   labelById,
   userAvatarById,
+  projectById,
   onSelectTicket,
 }) => {
-
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', flex: 1, overflow: 'hidden' }}>
@@ -60,11 +60,14 @@ export const TicketList: React.FC<TicketListProps> = ({
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {ticketsInGroup.map(ticket => {
+                    const project = projectById?.[ticket.projectId];
                     const rowProps = {
                       ticket,
                       onClick: onSelectTicket,
                       priorityIcon: getPriorityIcon(ticket.priority),
                       assigneeAvatar: getAssigneeAvatar(userAvatarById, ticket.assigneeId),
+                      projectName: project?.name,
+                      projectColor: undefined as string | undefined,
                     };
                     return (
                       <React.Fragment key={ticket.id}>

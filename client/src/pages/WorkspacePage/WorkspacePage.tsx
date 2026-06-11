@@ -86,6 +86,12 @@ export function WorkspacePage({
     () => Object.fromEntries(labels.map((label) => [label.id, label])),
     [labels]
   );
+  const projectById = useMemo(
+    () => Object.fromEntries(projects.map((p) => [p.id, p])),
+    [projects]
+  );
+  // Show project badge on rows when viewing multiple projects at once (no single-project filter)
+  const showProjectBadges = !filters.projectId && projects.length > 1;
   const groupedTickets = useMemo(() => groupTicketsByStatus(filteredTickets), [filteredTickets]);
   const listSortedTickets = useMemo(
     () => (activeView === 'list' ? sortTicketsForList(filteredTickets, labelById, listSort) : filteredTickets),
@@ -251,6 +257,7 @@ export function WorkspacePage({
                             groupedTickets={listGroupedTickets}
                             labelById={labelById}
                             userAvatarById={userAvatarById}
+                            projectById={showProjectBadges ? projectById : undefined}
                             onSelectTicket={onSelectTicket}
                           />
                         </WorkspaceViewContainer>
