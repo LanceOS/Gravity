@@ -14,10 +14,10 @@ type SidebarProjectsSectionMockProps = {
   section: SidebarProps['projects'];
   projectsCollapsed: boolean;
   collapsedProjects: Record<string, boolean>;
-  teamsCollapsed: boolean;
+  collapsedTeams: Record<string, boolean>;
   onToggleProjectsCollapsed: () => void;
   onToggleProject: (projectId: string) => void;
-  onToggleTeamsCollapsed: () => void;
+  onToggleTeam: (teamId: string) => void;
 };
 
 type SidebarAgentToolsMockProps = {
@@ -38,21 +38,25 @@ vi.mock('../../components/Sidebar/components', () => ({
     section,
     projectsCollapsed,
     collapsedProjects,
-    teamsCollapsed,
+    collapsedTeams,
     onToggleProjectsCollapsed,
     onToggleProject,
-    onToggleTeamsCollapsed,
+    onToggleTeam,
   }: SidebarProjectsSectionMockProps) => (
     <div>
       <div>{`ProjectsCollapsed ${String(projectsCollapsed)}`}</div>
-      <div>{`TeamsCollapsed ${String(teamsCollapsed)}`}</div>
+      <div>{`CurrentTeamCollapsed ${String(collapsedTeams[section.activeTeamId ?? 'team-1'] ?? false)}`}</div>
+      <div>{`OtherTeamCollapsed ${String(collapsedTeams['team-2'] ?? 'unset')}`}</div>
       <div>{`CurrentProjectCollapsed ${String(collapsedProjects[section.activeProjectId] ?? false)}`}</div>
       <div>{`OtherProjectCollapsed ${String(collapsedProjects['project-2'] ?? 'unset')}`}</div>
       <button type="button" onClick={onToggleProjectsCollapsed}>
         Toggle project list
       </button>
-      <button type="button" onClick={onToggleTeamsCollapsed}>
-        Toggle teams list
+      <button type="button" onClick={() => onToggleTeam(section.activeTeamId ?? 'team-1')}>
+        Toggle current team
+      </button>
+      <button type="button" onClick={() => onToggleTeam('team-2')}>
+        Select other team
       </button>
       <button type="button" onClick={() => onToggleProject(section.activeProjectId)}>
         Toggle current project
@@ -129,6 +133,7 @@ function renderSidebar(overrides: Partial<SidebarProps> = {}) {
         role: 'owner',
       },
       activeProjectId: 'project-1',
+      activeTeamId: 'team-1',
       filters: {
         status: '',
         priority: '',
@@ -145,6 +150,7 @@ function renderSidebar(overrides: Partial<SidebarProps> = {}) {
         cycles: {},
       },
       onSelectProject: vi.fn(),
+      onSelectTeam: vi.fn(),
       onShowProjectIssues: vi.fn(),
       onShowMyIssues: vi.fn(),
       onShowNotes: vi.fn(),
@@ -192,11 +198,15 @@ describe('Sidebar', () => {
     await user.click(screen.getByRole('button', { name: 'Toggle project list' }));
     expect(screen.getByText('ProjectsCollapsed true')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Toggle teams list' }));
-    expect(screen.getByText('TeamsCollapsed true')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Toggle current team' }));
+    expect(screen.getByText('CurrentTeamCollapsed true')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Toggle current project' }));
     expect(screen.getByText('CurrentProjectCollapsed true')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Select other team' }));
+    expect(props.projects.onSelectTeam).toHaveBeenCalledWith('team-2');
+    expect(screen.getByText('OtherTeamCollapsed false')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Select other project' }));
     expect(props.projects.onSelectProject).toHaveBeenCalledWith('project-2');

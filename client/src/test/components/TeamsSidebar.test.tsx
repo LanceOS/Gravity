@@ -84,38 +84,44 @@ function buildSection(overrides: Partial<SidebarProjectSection> = {}): SidebarPr
 }
 
 function TeamsSidebarHarness() {
-  const [teamsCollapsed, setTeamsCollapsed] = useState(false);
-  const section = buildSection();
+  const [activeTeamId, setActiveTeamId] = useState('team-1');
+  const [collapsedTeams, setCollapsedTeams] = useState<Record<string, boolean>>({});
+  const section = buildSection({ activeTeamId });
 
   return (
     <TeamsSidebar
       section={section}
-      teamsCollapsed={teamsCollapsed}
+      collapsedTeams={collapsedTeams}
       collapsedTeamProjects={{}}
+      onToggleTeam={(teamId) => {
+        if (teamId !== activeTeamId) {
+          setActiveTeamId(teamId);
+          setCollapsedTeams((current) => ({ ...current, [teamId]: false }));
+          return;
+        }
+
+        setCollapsedTeams((current) => ({ ...current, [teamId]: !current[teamId] }));
+      }}
       onToggleTeamProjects={vi.fn()}
-      onToggleTeamsCollapsed={() => setTeamsCollapsed((current) => !current)}
     />
   );
 }
 
 describe('TeamsSidebar', () => {
-  it('collapses and expands the teams list', async () => {
+  it('collapses and expands an individual team row', async () => {
     const user = userEvent.setup();
 
     render(<TeamsSidebarHarness />);
 
-    const teamsToggle = screen.getByRole('button', { name: 'Teams' });
-    expect(teamsToggle).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByText('Engineering')).toBeInTheDocument();
+    const engineeringToggle = screen.getByRole('button', { name: 'Engineering' });
+    expect(screen.getByText('Timeline')).toBeInTheDocument();
 
-    await user.click(teamsToggle);
+    await user.click(engineeringToggle);
 
-    expect(teamsToggle).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByText('Engineering')).not.toBeInTheDocument();
+    expect(screen.queryByText('Timeline')).not.toBeInTheDocument();
 
-    await user.click(teamsToggle);
+    await user.click(engineeringToggle);
 
-    expect(teamsToggle).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByText('Engineering')).toBeInTheDocument();
+    expect(screen.getByText('Timeline')).toBeInTheDocument();
   });
 });

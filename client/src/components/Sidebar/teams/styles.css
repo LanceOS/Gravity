@@ -19,6 +19,12 @@
   gap: 8px;
 }
 
+.teams-sidebar__team-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .teams-sidebar__team-color-dot {
   width: 8px;
   height: 8px;

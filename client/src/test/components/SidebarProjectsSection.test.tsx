@@ -27,8 +27,10 @@ function makeProps(overrides = {}) {
     projectsCollapsed: false,
     collapsedProjects: {},
     collapsedTeamProjects: {},
+    collapsedTeams: {},
     onToggleProjectsCollapsed: vi.fn(),
     onToggleProject: vi.fn(),
+    onToggleTeam: vi.fn(),
     onToggleTeamProjects: vi.fn(),
     ...overrides,
   };
