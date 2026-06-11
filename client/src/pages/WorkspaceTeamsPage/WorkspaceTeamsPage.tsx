@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, CalendarDays, FolderKanban, Save, Tags, Trash2, Users } from 'lucide-react';
-import { Button } from '@library';
+import { Button, Select } from '@library';
 import { apiClient } from '../../utils/apiClient';
 import { WorkspaceHeader } from '../../modules/workspaces';
 import type { SidebarTeam } from '../../types/domain';
@@ -343,20 +343,24 @@ export function WorkspaceTeamsPage({
 
                   <div className="workspace-teams-page__danger-zone">
                     {referenceCount > 0 ? (
-                      <label>
-                        <span>Reassign owned work before delete</span>
-                        <select
+                      <div className="workspace-teams-page__reassign-field">
+                        <span id={`${team.id}-reassign-label`}>Reassign owned work before delete</span>
+                        <Select
+                          aria-labelledby={`${team.id}-reassign-label`}
+                          className="workspace-teams-page__reassign-select"
                           value={selectedReassignTeamId}
-                          onChange={(event) => setReassignTeamById((current) => ({ ...current, [team.id]: event.target.value }))}
-                        >
-                          <option value="">Choose a team</option>
-                          {reassignOptions.map((candidate) => (
-                            <option key={candidate.id} value={candidate.id}>
-                              {candidate.name}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
+                          placeholder="Choose a team"
+                          options={reassignOptions.map((candidate) => ({
+                            value: candidate.id,
+                            label: candidate.name,
+                            color: candidate.color,
+                          }))}
+                          onValueChange={(nextTeamId) => {
+                            setReassignTeamById((current) => ({ ...current, [team.id]: nextTeamId }));
+                          }}
+                          style={{ width: '100%' }}
+                        />
+                      </div>
                     ) : null}
                     <div className="workspace-teams-page__delete-action">
                       <Button

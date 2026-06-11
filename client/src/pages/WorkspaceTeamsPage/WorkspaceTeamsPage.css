@@ -129,7 +129,7 @@
 }
 
 .workspace-teams-page__form-grid label,
-.workspace-teams-page__danger-zone label {
+.workspace-teams-page__reassign-field {
   display: grid;
   gap: 6px;
   font-size: 11px;
@@ -309,9 +309,15 @@
   border-top: 1px solid var(--color-border-default);
 }
 
-.workspace-teams-page__danger-zone label {
+.workspace-teams-page__reassign-field {
   min-width: 0;
   flex: 1 1 260px;
+}
+
+.workspace-teams-page__reassign-select {
+  min-height: 36px;
+  padding: 0 10px;
+  font-size: 13px;
 }
 
 .workspace-teams-page__delete-action {

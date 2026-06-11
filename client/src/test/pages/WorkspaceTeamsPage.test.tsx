@@ -138,10 +138,8 @@ describe('WorkspaceTeamsPage', () => {
       });
     });
 
-    await user.selectOptions(
-      within(engineeringCard as HTMLElement).getByLabelText('Reassign owned work before delete'),
-      'team-design'
-    );
+    await user.click(within(engineeringCard as HTMLElement).getByRole('button', { name: 'Reassign owned work before delete' }));
+    await user.click(screen.getByRole('option', { name: 'Design' }));
     await user.click(within(engineeringCard as HTMLElement).getByRole('button', { name: 'Delete Team' }));
 
     await waitFor(() => {
