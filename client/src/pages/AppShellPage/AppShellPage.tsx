@@ -937,6 +937,7 @@ export function AppShellPage() {
       onOpenWorkspaceDirectory: () => navigate('/workspaces'),
     },
     projects: {
+      hierarchyMode: sidebarTree?.hierarchyMode,
       teams: sidebarTree?.teams,
       activeTeamId: teamIdParam,
       activeCycleId: cycleIdParam,

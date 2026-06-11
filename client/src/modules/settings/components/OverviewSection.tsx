@@ -39,7 +39,7 @@ export function OverviewSection({
           onChange={(event) => onChangeSettings({ hostUrl: event.target.value })}
         />
 
-        <Grid columns={isMobile ? 1 : 2} gap="var(--space-md)">
+        <Grid columns={isMobile ? 1 : 3} gap="var(--space-md)">
           <Select
             label="Join Policy"
             value={settings.joinMode}
@@ -47,6 +47,16 @@ export function OverviewSection({
             options={[
               { value: 'approval_required', label: 'Owner Approval Required' },
               { value: 'auto_join', label: 'Auto Join' }
+            ]}
+          />
+
+          <Select
+            label="Workspace Structure"
+            value={settings.hierarchyMode}
+            onChange={(event) => onChangeSettings({ hierarchyMode: event.target.value as WorkspaceAdminSettings['hierarchyMode'] })}
+            options={[
+              { value: 'flat', label: 'Singular Workspace (Flat)' },
+              { value: 'teams', label: 'Team-based Workspace' }
             ]}
           />
 

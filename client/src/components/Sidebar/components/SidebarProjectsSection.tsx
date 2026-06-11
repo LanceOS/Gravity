@@ -25,7 +25,7 @@ export function SidebarProjectsSection({
     setCollapsedTeams((prev) => ({ ...prev, [teamId]: !prev[teamId] }));
   };
 
-  if (section.teams && section.teams.length > 0) {
+  if (section.hierarchyMode === 'teams' && section.teams && section.teams.length > 0) {
     return (
       <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
         {section.teams.map((team) => {

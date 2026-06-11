@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import { db } from '../../../db/index.js';
-import { teams, projects, cycles, domains } from '../schema.js';
+import { teams, projects, cycles, domains, workspaceSettings } from '../schema.js';
 import { normalizeIsoDate } from '../../../lib/platform.js';
 
 function mapCycle(cycle: typeof cycles.$inferSelect) {
@@ -19,6 +19,14 @@ function mapCycle(cycle: typeof cycles.$inferSelect) {
 }
 
 export async function getSidebarTree(workspaceId: string) {
+  // Fetch workspace settings to get hierarchyMode
+  const settingsRows = await db
+    .select({ hierarchyMode: workspaceSettings.hierarchyMode })
+    .from(workspaceSettings)
+    .where(eq(workspaceSettings.workspaceId, workspaceId))
+    .limit(1);
+  const hierarchyMode = settingsRows[0]?.hierarchyMode ?? 'flat';
+
   // 1. Fetch all teams in the workspace
   const workspaceTeams = await db
     .select()
@@ -108,6 +116,7 @@ export async function getSidebarTree(workspaceId: string) {
 
   return {
     workspaceId,
+    hierarchyMode,
     teams: teamTrees,
   };
 }

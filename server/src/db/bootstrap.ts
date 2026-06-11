@@ -71,6 +71,7 @@ export async function initializeDatabase() {
       workspace_id TEXT PRIMARY KEY,
       host_url TEXT NOT NULL DEFAULT '',
       join_mode TEXT NOT NULL DEFAULT 'approval_required',
+      hierarchy_mode TEXT NOT NULL DEFAULT 'flat',
       disabled_mcp_tools JSONB NOT NULL DEFAULT '[]'::jsonb,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -281,6 +282,7 @@ export async function initializeDatabase() {
 
 
     ALTER TABLE workspace_settings ADD COLUMN IF NOT EXISTS disabled_mcp_tools JSONB NOT NULL DEFAULT '[]'::jsonb;
+    ALTER TABLE workspace_settings ADD COLUMN IF NOT EXISTS hierarchy_mode TEXT NOT NULL DEFAULT 'flat';
 
 
     CREATE INDEX IF NOT EXISTS projects_workspace_id_idx ON projects (workspace_id);

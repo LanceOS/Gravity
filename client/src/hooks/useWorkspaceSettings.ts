@@ -9,6 +9,7 @@ export interface WorkspaceAdminSettings {
   key: string;
   hostUrl: string;
   joinMode: WorkspaceJoinMode;
+  hierarchyMode: 'flat' | 'teams';
   workspaceKey: string;
   disabledMcpTools: string[];
 }
@@ -64,6 +65,7 @@ const defaultSettings = (workspaceId: string): WorkspaceAdminSettings => ({
   key: '',
   hostUrl: '',
   joinMode: 'approval_required',
+  hierarchyMode: 'flat',
   workspaceKey: '',
   disabledMcpTools: [],
 });
@@ -108,6 +110,7 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
         key: data.key || '',
         hostUrl: data.hostUrl || '',
         joinMode: data.joinMode === 'auto_join' ? 'auto_join' : 'approval_required',
+        hierarchyMode: data.hierarchyMode === 'teams' ? 'teams' : 'flat',
         workspaceKey: data.workspaceKey || '',
         disabledMcpTools: Array.isArray(data.disabledMcpTools) ? data.disabledMcpTools : [],
       } as WorkspaceAdminSettings;
@@ -207,6 +210,7 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
           hostUrl: payload.hostUrl,
           joinMode: payload.joinMode,
           workspaceKey: payload.workspaceKey,
+          hierarchyMode: payload.hierarchyMode,
           disabledMcpTools: payload.disabledMcpTools || [],
         }),
       });
@@ -217,6 +221,7 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
         key: data.key || payload.key,
         hostUrl: data.hostUrl || '',
         joinMode: data.joinMode === 'auto_join' ? 'auto_join' : 'approval_required',
+        hierarchyMode: data.hierarchyMode === 'teams' ? 'teams' : 'flat',
         workspaceKey: data.workspaceKey || payload.workspaceKey,
         disabledMcpTools: Array.isArray(data.disabledMcpTools) ? data.disabledMcpTools : payload.disabledMcpTools || [],
       } as WorkspaceAdminSettings;

@@ -424,7 +424,7 @@ export async function getProjectByKeyPrefix(prefix: string) {
 export async function ensureWorkspaceSettingsRecord(workspaceId: string) {
   await db
     .insert(workspaceSettings)
-    .values({ workspaceId, hostUrl: '', joinMode: 'approval_required' })
+    .values({ workspaceId, hostUrl: '', joinMode: 'approval_required', hierarchyMode: 'flat' })
     .onConflictDoNothing({ target: workspaceSettings.workspaceId });
 }
 

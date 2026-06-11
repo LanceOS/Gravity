@@ -26,6 +26,7 @@ export interface SidebarProjectCounts {
 import type { SidebarTeam } from '../../../types/domain';
 
 export interface SidebarProjectSection {
+  hierarchyMode?: 'flat' | 'teams';
   teams?: SidebarTeam[];
   activeTeamId?: string;
   activeCycleId?: string;

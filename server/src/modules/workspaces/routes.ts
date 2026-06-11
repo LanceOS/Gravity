@@ -89,6 +89,7 @@ async function loadWorkspaceSettingsPayload(workspaceId: string) {
       workspaceHostUrl: workspaces.hostUrl,
       settingsHostUrl: workspaceSettings.hostUrl,
       joinMode: workspaceSettings.joinMode,
+      hierarchyMode: workspaceSettings.hierarchyMode,
       workspaceKey: workspaces.workspaceKey,
       defaultProjectId: workspaces.defaultProjectId,
       disabledMcpTools: workspaceSettings.disabledMcpTools,
@@ -108,6 +109,7 @@ async function loadWorkspaceSettingsPayload(workspaceId: string) {
     key: settings.key,
     hostUrl: settings.settingsHostUrl || settings.workspaceHostUrl || '',
     joinMode: settings.joinMode === 'auto_join' ? 'auto_join' : 'approval_required',
+    hierarchyMode: settings.hierarchyMode === 'teams' ? 'teams' : 'flat',
     workspaceKey: settings.workspaceKey,
     defaultProjectId: settings.defaultProjectId,
     disabledMcpTools: settings.disabledMcpTools || [],
@@ -322,6 +324,7 @@ export function createWorkspacesRouter() {
           workspaceId,
           hostUrl: '',
           joinMode: 'approval_required',
+          hierarchyMode: 'flat',
           createdAt: new Date(),
           updatedAt: new Date(),
         });
@@ -472,6 +475,7 @@ export function createWorkspacesRouter() {
 
       const nextHostUrl = typeof req.body?.hostUrl === 'string' ? req.body.hostUrl : currentWorkspace.hostUrl;
       const nextJoinMode = req.body?.joinMode === 'auto_join' ? 'auto_join' : req.body?.joinMode === 'approval_required' ? 'approval_required' : null;
+      const nextHierarchyMode = req.body?.hierarchyMode === 'teams' ? 'teams' : req.body?.hierarchyMode === 'flat' ? 'flat' : null;
       const nextWorkspaceKey =
         typeof req.body?.workspaceKey === 'string' && req.body.workspaceKey.trim()
           ? req.body.workspaceKey.trim()
@@ -508,6 +512,7 @@ export function createWorkspacesRouter() {
           .set({
             hostUrl: nextHostUrl,
             ...(nextJoinMode ? { joinMode: nextJoinMode } : {}),
+            ...(nextHierarchyMode ? { hierarchyMode: nextHierarchyMode } : {}),
             ...(nextDisabledMcpTools !== undefined ? { disabledMcpTools: nextDisabledMcpTools } : {}),
             updatedAt: new Date(),
           })

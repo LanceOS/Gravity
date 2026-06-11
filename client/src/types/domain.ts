@@ -47,6 +47,7 @@ export interface SidebarTeam {
 
 export interface SidebarTree {
   workspaceId: string;
+  hierarchyMode?: 'flat' | 'teams';
   teams: SidebarTeam[];
 }
 
