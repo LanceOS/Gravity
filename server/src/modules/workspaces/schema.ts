@@ -79,7 +79,7 @@ export const workspaceJoinRequests = pgTable('workspace_join_requests', {
 
 export const teams = pgTable('teams', {
   id: text('id').primaryKey(),
-  workspaceId: text('workspace_id').notNull(),
+  workspaceId: text('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
   description: text('description').notNull().default(''),
   color: text('color').notNull().default('#6B7280'),
@@ -92,7 +92,7 @@ export const teams = pgTable('teams', {
 export const projects = pgTable('projects', {
   id: text('id').primaryKey(),
   workspaceId: text('workspace_id').notNull(),
-  teamId: text('team_id'),
+  teamId: text('team_id').notNull().references(() => teams.id),
   name: text('name').notNull(),
   description: text('description').notNull().default(''),
   key: text('key').notNull().unique(),
@@ -125,7 +125,7 @@ export const projectMembers = pgTable(
 export const domains = pgTable('domains', {
   id: text('id').primaryKey(),
   projectId: text('project_id'),
-  teamId: text('team_id'),
+  teamId: text('team_id').notNull().references(() => teams.id),
   name: text('name').notNull(),
   color: text('color').notNull().default('#6B7280'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -158,7 +158,7 @@ export const ticketLabels = pgTable('ticket_labels', {
 export const cycles = pgTable('cycles', {
   id: text('id').primaryKey(),
   projectId: text('project_id'),
-  teamId: text('team_id'),
+  teamId: text('team_id').notNull().references(() => teams.id),
   name: text('name').notNull(),
   startDate: timestamp('start_date', { withTimezone: true }).notNull(),
   endDate: timestamp('end_date', { withTimezone: true }).notNull(),

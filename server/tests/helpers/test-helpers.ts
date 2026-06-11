@@ -20,6 +20,12 @@ import {
   teams,
 } from '../../src/db/schema.js';
 import { ensureUserDefaults, getUserById } from '../../src/lib/platform.js';
+import {
+  DEFAULT_TEAM_COLOR,
+  DEFAULT_TEAM_DESCRIPTION,
+  DEFAULT_TEAM_NAME,
+  getDefaultTeamId,
+} from '../../src/modules/workspaces/utils/default-team.js';
 import { env } from '../../src/env.js';
 
 type UserSeed = {
@@ -262,11 +268,11 @@ export async function seedWorkspaceFixture(seed: WorkspaceFixtureSeed = {}) {
   });
 
   await db.insert(teams).values({
-    id: `team-general-${workspace.id}`,
+    id: getDefaultTeamId(workspace.id),
     workspaceId: workspace.id,
-    name: 'General',
-    description: 'Default team for workspace',
-    color: '#6B7280',
+    name: DEFAULT_TEAM_NAME,
+    description: DEFAULT_TEAM_DESCRIPTION,
+    color: DEFAULT_TEAM_COLOR,
     createdAt: new Date(),
     updatedAt: new Date(),
   });
@@ -274,7 +280,7 @@ export async function seedWorkspaceFixture(seed: WorkspaceFixtureSeed = {}) {
   await db.insert(projects).values({
     id: project.id,
     workspaceId: workspace.id,
-    teamId: `team-general-${workspace.id}`,
+    teamId: getDefaultTeamId(workspace.id),
     name: project.name,
     description: project.description,
     key: project.key,
@@ -308,9 +314,16 @@ export async function seedDomain(projectId: string, overrides: Partial<{ id: str
     color: overrides.color ?? '#1D4ED8',
   };
 
+  const projectRows = await db.select({ teamId: projects.teamId }).from(projects).where(eq(projects.id, projectId)).limit(1);
+  const teamId = projectRows[0]?.teamId;
+  if (!teamId) {
+    throw new Error(`Project ${projectId} is missing a team assignment.`);
+  }
+
   await db.insert(domains).values({
     id: domain.id,
     projectId,
+    teamId,
     name: domain.name,
     color: domain.color,
     createdAt: new Date(),
@@ -331,9 +344,16 @@ export async function seedCycle(
     completed: overrides.completed ?? false,
   };
 
+  const projectRows = await db.select({ teamId: projects.teamId }).from(projects).where(eq(projects.id, projectId)).limit(1);
+  const teamId = projectRows[0]?.teamId;
+  if (!teamId) {
+    throw new Error(`Project ${projectId} is missing a team assignment.`);
+  }
+
   await db.insert(cycles).values({
     id: cycle.id,
     projectId,
+    teamId,
     name: cycle.name,
     startDate: cycle.startDate,
     endDate: cycle.endDate,

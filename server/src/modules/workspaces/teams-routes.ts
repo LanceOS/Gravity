@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../../db/index.js';
-import { teams, projects } from '../../db/schema.js';
-import { eq, and } from 'drizzle-orm';
+import { cycles, domains, projects, teams } from '../../db/schema.js';
+import { eq } from 'drizzle-orm';
 import { createId } from '../../lib/platform.js';
 import { authorizeWorkspaceAccess, authorizeTeamAccess } from './services/membership.js';
 
@@ -63,6 +63,29 @@ export function createTeamsRouter() {
     }
   });
 
+  // Get team details
+  router.get('/teams/:teamId', async (req, res) => {
+    const { teamId } = req.params;
+
+    try {
+      const auth = await authorizeTeamAccess(req, teamId);
+      if (!auth.allowed) {
+        res.status(auth.status).json({ error: auth.error });
+        return;
+      }
+
+      const teamRows = await db.select().from(teams).where(eq(teams.id, teamId)).limit(1);
+      if (teamRows.length === 0) {
+        res.status(404).json({ error: 'Team not found.' });
+        return;
+      }
+
+      res.json(teamRows[0]);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load team.' });
+    }
+  });
+
   // Update team
   router.patch('/teams/:teamId', async (req, res) => {
     const { teamId } = req.params;
@@ -101,38 +124,50 @@ export function createTeamsRouter() {
         return;
       }
 
-      // Check if there are projects referencing this team
-      const existingProjects = await db
-        .select({ id: projects.id })
-        .from(projects)
-        .where(eq(projects.teamId, teamId));
+      const currentTeamRows = await db.select().from(teams).where(eq(teams.id, teamId)).limit(1);
+      const currentTeam = currentTeamRows[0];
+      if (!currentTeam) {
+        res.status(404).json({ error: 'Team not found.' });
+        return;
+      }
 
-      if (existingProjects.length > 0) {
+      const [existingProjects, existingCycles, existingDomains] = await Promise.all([
+        db.select({ id: projects.id }).from(projects).where(eq(projects.teamId, teamId)),
+        db.select({ id: cycles.id }).from(cycles).where(eq(cycles.teamId, teamId)),
+        db.select({ id: domains.id }).from(domains).where(eq(domains.teamId, teamId)),
+      ]);
+
+      if (existingProjects.length > 0 || existingCycles.length > 0 || existingDomains.length > 0) {
         if (reassignTeamId) {
-          // Verify reassignTeamId exists and belongs to same workspace
+          if (reassignTeamId === teamId) {
+            res.status(400).json({ error: 'Reassignment target team must be different from the current team.' });
+            return;
+          }
+
           const targetTeamRows = await db.select().from(teams).where(eq(teams.id, reassignTeamId)).limit(1);
           if (targetTeamRows.length === 0) {
             res.status(400).json({ error: 'Reassignment target team not found.' });
             return;
           }
-          const currentTeamRows = await db.select().from(teams).where(eq(teams.id, teamId)).limit(1);
-          if (targetTeamRows[0].workspaceId !== currentTeamRows[0]?.workspaceId) {
+          if (targetTeamRows[0].workspaceId !== currentTeam.workspaceId) {
             res.status(400).json({ error: 'Reassignment target team must belong to the same workspace.' });
             return;
           }
 
-          // Reassign projects
-          await db
-            .update(projects)
-            .set({ teamId: reassignTeamId })
-            .where(eq(projects.teamId, teamId));
+          await db.transaction(async (tx) => {
+            await tx.update(projects).set({ teamId: reassignTeamId }).where(eq(projects.teamId, teamId));
+            await tx.update(cycles).set({ teamId: reassignTeamId }).where(eq(cycles.teamId, teamId));
+            await tx.update(domains).set({ teamId: reassignTeamId }).where(eq(domains.teamId, teamId));
+            await tx.delete(teams).where(eq(teams.id, teamId));
+          });
         } else {
-          res.status(400).json({ error: 'Cannot delete team: projects exist. Please reassign them first.' });
+          res.status(400).json({ error: 'Cannot delete team: projects, cycles, or domains still reference it. Please reassign them first.' });
           return;
         }
+      } else {
+        await db.delete(teams).where(eq(teams.id, teamId));
       }
 
-      await db.delete(teams).where(eq(teams.id, teamId));
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to delete team.' });

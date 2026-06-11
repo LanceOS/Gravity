@@ -18,6 +18,7 @@ import {
   workspaces,
   workspaceSettings,
   mcpConnectionTokens,
+  teams,
 } from '../../db/schema.js';
 import {
   addUserToWorkspaceProjects,
@@ -44,6 +45,12 @@ import { getRequestSourceIp } from '../../lib/request-ip.js';
 import { isWorkspaceMember } from './services/membership.js';
 import { getSidebarTree } from './services/sidebar.js';
 import { mapProjectCreationError } from './utils/project-creation.js';
+import {
+  DEFAULT_TEAM_COLOR,
+  DEFAULT_TEAM_DESCRIPTION,
+  DEFAULT_TEAM_NAME,
+  getDefaultTeamId,
+} from './utils/default-team.js';
 import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
 import { env } from '../../env.js';
 
@@ -336,11 +343,22 @@ export function createWorkspacesRouter() {
           createdAt: new Date(),
         });
 
+        await tx.insert(teams).values({
+          id: getDefaultTeamId(workspaceId),
+          workspaceId,
+          name: DEFAULT_TEAM_NAME,
+          description: DEFAULT_TEAM_DESCRIPTION,
+          color: DEFAULT_TEAM_COLOR,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+
         if (defaultProjectId && defaultProjectName) {
           const normalizedProjectKey = normalizeEntityKey(defaultProjectKey || defaultProjectName.slice(0, 3).toUpperCase());
           await tx.insert(projects).values({
             id: defaultProjectId,
             workspaceId,
+            teamId: getDefaultTeamId(workspaceId),
             name: defaultProjectName,
             description: '',
             key: normalizedProjectKey,
@@ -475,6 +493,12 @@ export function createWorkspacesRouter() {
 
       const nextHostUrl = typeof req.body?.hostUrl === 'string' ? req.body.hostUrl : currentWorkspace.hostUrl;
       const nextJoinMode = req.body?.joinMode === 'auto_join' ? 'auto_join' : req.body?.joinMode === 'approval_required' ? 'approval_required' : null;
+      const nextHierarchyMode =
+        req.body?.hierarchyMode === 'teams'
+          ? 'teams'
+          : req.body?.hierarchyMode === 'flat'
+            ? 'flat'
+            : null;
       const nextWorkspaceKey =
         typeof req.body?.workspaceKey === 'string' && req.body.workspaceKey.trim()
           ? req.body.workspaceKey.trim()
@@ -511,6 +535,7 @@ export function createWorkspacesRouter() {
           .set({
             hostUrl: nextHostUrl,
             ...(nextJoinMode ? { joinMode: nextJoinMode } : {}),
+            ...(nextHierarchyMode ? { hierarchyMode: nextHierarchyMode } : {}),
             ...(nextDisabledMcpTools !== undefined ? { disabledMcpTools: nextDisabledMcpTools } : {}),
             updatedAt: new Date(),
           })
@@ -1362,12 +1387,20 @@ export function createWorkspacesRouter() {
           select ${projects.id}
           from ${projects}
           where ${projects.workspaceId} = ${workspaceId}
+        ) or ${cycles.teamId} in (
+          select ${teams.id}
+          from ${teams}
+          where ${teams.workspaceId} = ${workspaceId}
         )`);
 
         await tx.delete(domains).where(sql`${domains.projectId} in (
           select ${projects.id}
           from ${projects}
           where ${projects.workspaceId} = ${workspaceId}
+        ) or ${domains.teamId} in (
+          select ${teams.id}
+          from ${teams}
+          where ${teams.workspaceId} = ${workspaceId}
         )`);
 
         await tx.delete(projectMembers).where(sql`${projectMembers.projectId} in (
@@ -1377,6 +1410,7 @@ export function createWorkspacesRouter() {
         )`);
 
         await tx.delete(projects).where(eq(projects.workspaceId, workspaceId));
+        await tx.delete(teams).where(eq(teams.workspaceId, workspaceId));
 
         await tx.delete(workspaceJoinRequests).where(eq(workspaceJoinRequests.workspaceId, workspaceId));
         await tx.delete(workspaceInvites).where(eq(workspaceInvites.workspaceId, workspaceId));

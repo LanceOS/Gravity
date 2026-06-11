@@ -44,6 +44,16 @@ function mapCycle(cycle: typeof cycles.$inferSelect) {
   };
 }
 
+async function getRequiredProjectTeamId(projectId: string) {
+  const projectRows = await db.select({ teamId: projects.teamId }).from(projects).where(eq(projects.id, projectId)).limit(1);
+  const teamId = projectRows[0]?.teamId;
+  if (!teamId) {
+    throw new Error(`Project ${projectId} is missing a team assignment.`);
+  }
+
+  return teamId;
+}
+
 export function createTicketsRouter() {
   const router = Router();
 
@@ -346,15 +356,9 @@ export function createTicketsRouter() {
         return;
       }
       try {
-        const projectRows = await db.select({ teamId: projects.teamId }).from(projects).where(eq(projects.id, projectId)).limit(1);
-        const teamIdOfProject = projectRows[0]?.teamId;
-        if (teamIdOfProject) {
-          const rows = await db.select().from(domains).where(eq(domains.teamId, teamIdOfProject)).orderBy(asc(domains.createdAt));
-          res.json(rows.map(mapDomain));
-        } else {
-          const rows = await db.select().from(domains).where(eq(domains.projectId, projectId)).orderBy(asc(domains.createdAt));
-          res.json(rows.map(mapDomain));
-        }
+        const teamIdOfProject = await getRequiredProjectTeamId(projectId);
+        const rows = await db.select().from(domains).where(eq(domains.teamId, teamIdOfProject)).orderBy(asc(domains.createdAt));
+        res.json(rows.map(mapDomain));
       } catch (error) {
         res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load domains.' });
       }
@@ -400,15 +404,14 @@ export function createTicketsRouter() {
         return;
       }
       try {
-        const projectRows = await db.select({ teamId: projects.teamId }).from(projects).where(eq(projects.id, projectId)).limit(1);
-        const teamIdOfProject = projectRows[0]?.teamId;
+        const teamIdOfProject = await getRequiredProjectTeamId(projectId);
 
         const rows = await db
           .insert(domains)
           .values({
             id: createId('d'),
             projectId,
-            teamId: teamIdOfProject ?? null,
+            teamId: teamIdOfProject,
             name,
             color: color ?? '#6B7280',
             createdAt: new Date(),
@@ -726,15 +729,9 @@ export function createTicketsRouter() {
         return;
       }
       try {
-        const projectRows = await db.select({ teamId: projects.teamId }).from(projects).where(eq(projects.id, projectId)).limit(1);
-        const teamIdOfProject = projectRows[0]?.teamId;
-        if (teamIdOfProject) {
-          const rows = await db.select().from(cycles).where(eq(cycles.teamId, teamIdOfProject)).orderBy(asc(cycles.startDate));
-          res.json(rows.map(mapCycle));
-        } else {
-          const rows = await db.select().from(cycles).where(eq(cycles.projectId, projectId)).orderBy(asc(cycles.startDate));
-          res.json(rows.map(mapCycle));
-        }
+        const teamIdOfProject = await getRequiredProjectTeamId(projectId);
+        const rows = await db.select().from(cycles).where(eq(cycles.teamId, teamIdOfProject)).orderBy(asc(cycles.startDate));
+        res.json(rows.map(mapCycle));
       } catch (error) {
         res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load cycles.' });
       }
@@ -782,15 +779,14 @@ export function createTicketsRouter() {
         return;
       }
       try {
-        const projectRows = await db.select({ teamId: projects.teamId }).from(projects).where(eq(projects.id, projectId)).limit(1);
-        const teamIdOfProject = projectRows[0]?.teamId;
+        const teamIdOfProject = await getRequiredProjectTeamId(projectId);
 
         const rows = await db
           .insert(cycles)
           .values({
             id: createId('c'),
             projectId,
-            teamId: teamIdOfProject ?? null,
+            teamId: teamIdOfProject,
             name,
             startDate: new Date(startDate),
             endDate: new Date(endDate),

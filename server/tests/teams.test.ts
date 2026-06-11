@@ -43,6 +43,14 @@ describe('teams integration tests', () => {
 
     const team1Id = createResponse.body.id;
 
+    const getResponse = await ownerApi.get(`/api/v1/teams/${team1Id}`);
+    expect(getResponse.status).toBe(200);
+    expect(getResponse.body).toMatchObject({
+      id: team1Id,
+      workspaceId: workspace.id,
+      name: 'Engineering Team',
+    });
+
     // 2. List Teams for Workspace
     const listResponse = await ownerApi.get('/api/v1/teams').query({ workspaceId: workspace.id });
     expect(listResponse.status).toBe(200);
@@ -85,10 +93,25 @@ describe('teams integration tests', () => {
     // Assign project to team1
     await db.update(projects).set({ teamId: team1Id }).where(eq(projects.id, project.id));
 
+    const cycleResponse = await ownerApi.post('/api/v1/cycles').send({
+      teamId: team1Id,
+      name: 'Engineering Sprint',
+      startDate: new Date('2026-06-01').toISOString(),
+      endDate: new Date('2026-06-08').toISOString(),
+    });
+    expect(cycleResponse.status).toBe(201);
+
+    const domainResponse = await ownerApi.post('/api/v1/domains').send({
+      teamId: team1Id,
+      name: 'Engineering Domain',
+      color: '#2563EB',
+    });
+    expect(domainResponse.status).toBe(201);
+
     // 5. Try deleting team1 (should block because a project is associated)
     const deleteBlockedResponse = await ownerApi.delete(`/api/v1/teams/${team1Id}`);
     expect(deleteBlockedResponse.status).toBe(400);
-    expect(deleteBlockedResponse.body.error).toContain('Cannot delete team: projects exist');
+    expect(deleteBlockedResponse.body.error).toContain('Cannot delete team: projects, cycles, or domains still reference it');
 
     // 6. Delete team1 with project reassignment to team2
     const deleteSuccessResponse = await ownerApi
@@ -101,6 +124,12 @@ describe('teams integration tests', () => {
     // Verify project is now assigned to team2
     const projectRows = await db.select().from(projects).where(eq(projects.id, project.id)).limit(1);
     expect(projectRows[0]?.teamId).toBe(team2Id);
+
+    const cycleRows = await db.select().from(cycles).where(eq(cycles.id, cycleResponse.body.id)).limit(1);
+    expect(cycleRows[0]?.teamId).toBe(team2Id);
+
+    const domainRows = await db.select().from(domains).where(eq(domains.id, domainResponse.body.id)).limit(1);
+    expect(domainRows[0]?.teamId).toBe(team2Id);
 
     // Verify team1 is deleted
     const team1Rows = await db.select().from(teams).where(eq(teams.id, team1Id)).limit(1);

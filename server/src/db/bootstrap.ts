@@ -3,6 +3,32 @@ import { auth } from '../modules/auth/auth.js';
 import { env } from '../env.js';
 import { pool } from './index.js';
 
+async function hasConstraint(constraintName: string) {
+  try {
+    const result = await pool.query(
+      `
+        SELECT 1
+        FROM information_schema.table_constraints
+        WHERE constraint_name = $1
+        LIMIT 1
+      `,
+      [constraintName],
+    );
+
+    return result.rowCount > 0;
+  } catch {
+    return false;
+  }
+}
+
+async function ensureConstraint(tableName: string, constraintName: string, definition: string) {
+  if (await hasConstraint(constraintName)) {
+    return;
+  }
+
+  await pool.query(`ALTER TABLE "${tableName}" ADD CONSTRAINT "${constraintName}" ${definition}`);
+}
+
 export async function initializeDatabase() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS user_profiles (
@@ -326,22 +352,89 @@ export async function initializeDatabase() {
 
     UPDATE projects
     SET team_id = 'team-general-' || workspace_id
-    WHERE team_id IS NULL OR team_id = '';
+    WHERE team_id IS NULL
+      OR team_id = ''
+      OR NOT EXISTS (
+        SELECT 1
+        FROM teams
+        WHERE teams.id = projects.team_id
+      );
 
     UPDATE cycles
     SET team_id = projects.team_id
     FROM projects
     WHERE cycles.project_id = projects.id
-      AND (cycles.team_id IS NULL OR cycles.team_id = '');
+      AND (
+        cycles.team_id IS NULL
+        OR cycles.team_id = ''
+        OR NOT EXISTS (
+          SELECT 1
+          FROM teams
+          WHERE teams.id = cycles.team_id
+        )
+      );
 
     UPDATE domains
     SET team_id = projects.team_id
     FROM projects
     WHERE domains.project_id = projects.id
-      AND (domains.team_id IS NULL OR domains.team_id = '');
+      AND (
+        domains.team_id IS NULL
+        OR domains.team_id = ''
+        OR NOT EXISTS (
+          SELECT 1
+          FROM teams
+          WHERE teams.id = domains.team_id
+        )
+      );
   `).catch((err) => {
     // eslint-disable-next-line no-console
     console.error('Failed to run team migration:', err);
+  });
+
+  await pool.query(`
+    ALTER TABLE projects ALTER COLUMN team_id SET NOT NULL;
+    ALTER TABLE cycles ALTER COLUMN team_id SET NOT NULL;
+    ALTER TABLE domains ALTER COLUMN team_id SET NOT NULL;
+  `).catch((err) => {
+    // eslint-disable-next-line no-console
+    console.error('Failed to enforce team ownership on workspace records:', err);
+  });
+
+  await ensureConstraint(
+    'teams',
+    'teams_workspace_id_workspaces_id_fk',
+    'FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("id") ON DELETE CASCADE',
+  ).catch((err) => {
+    // eslint-disable-next-line no-console
+    console.error('Failed to ensure teams workspace foreign key:', err);
+  });
+
+  await ensureConstraint(
+    'projects',
+    'projects_team_id_teams_id_fk',
+    'FOREIGN KEY ("team_id") REFERENCES "teams"("id") ON DELETE NO ACTION',
+  ).catch((err) => {
+    // eslint-disable-next-line no-console
+    console.error('Failed to ensure projects team foreign key:', err);
+  });
+
+  await ensureConstraint(
+    'cycles',
+    'cycles_team_id_teams_id_fk',
+    'FOREIGN KEY ("team_id") REFERENCES "teams"("id") ON DELETE NO ACTION',
+  ).catch((err) => {
+    // eslint-disable-next-line no-console
+    console.error('Failed to ensure cycles team foreign key:', err);
+  });
+
+  await ensureConstraint(
+    'domains',
+    'domains_team_id_teams_id_fk',
+    'FOREIGN KEY ("team_id") REFERENCES "teams"("id") ON DELETE NO ACTION',
+  ).catch((err) => {
+    // eslint-disable-next-line no-console
+    console.error('Failed to ensure domains team foreign key:', err);
   });
 
   // Migrate existing domain data to labels and ticket_labels

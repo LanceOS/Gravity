@@ -113,6 +113,7 @@ describe('WorkspaceDirectoryPage', () => {
       description: 'Internal product workspace',
       key: 'ACM',
       workspaceKey: 'PRIVATE',
+      hierarchyMode: 'flat',
       defaultProjectName: 'Acme Corp',
       defaultProjectKey: 'ACM',
     });
