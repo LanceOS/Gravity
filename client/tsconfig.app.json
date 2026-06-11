@@ -51,6 +51,12 @@
       ],
       "@library/*": [
         "../library/*"
+      ],
+      "@tanstack/react-query": [
+        "src/utils/react-query-mock.tsx"
+      ],
+      "@tanstack/react-query-devtools": [
+        "src/utils/react-query-devtools-mock.tsx"
       ]
     }
   },

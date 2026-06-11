@@ -1,19 +1,14 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useInfiniteQuery } from '@tanstack/react-query';
+import { queryKeys } from '../../../utils/queryClient';
 import type { NoteMetadata } from '../types';
 
 export function useNotes(projectId: string) {
-  const [notes, setNotes] = useState<NoteMetadata[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [offset, setOffset] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
   const limit = 20;
 
-  const fetchNotes = useCallback(async (currentOffset: number = 0, append: boolean = false) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await fetch(`/api/v1/notes?limit=${limit}&offset=${currentOffset}`, {
+  const query = useInfiniteQuery<NoteMetadata[]>({
+    queryKey: queryKeys.notes(projectId),
+    queryFn: async ({ pageParam = 0 }) => {
+      const response = await fetch(`/api/v1/notes?limit=${limit}&offset=${pageParam}`, {
         headers: {
           'x-project-id': projectId,
         },
@@ -23,40 +18,23 @@ export function useNotes(projectId: string) {
         throw new Error('Failed to load notes');
       }
 
-      const data = await response.json();
-      
-      setNotes((prev) => (append ? [...prev, ...data] : data));
-      setOffset(currentOffset + data.length);
-      setHasMore(data.length === limit);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [projectId, limit]);
+      return response.json();
+    },
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => {
+      if (lastPage.length < limit) return undefined;
+      return allPages.length * limit;
+    },
+    enabled: !!projectId,
+  });
 
-  useEffect(() => {
-    if (!projectId) return;
-    
-    // Reset state when project changes
-    setNotes([]);
-    setOffset(0);
-    setHasMore(true);
-    
-    fetchNotes(0, false);
-  }, [projectId, fetchNotes]);
-
-  const loadMore = useCallback(() => {
-    if (!loading && hasMore) {
-      fetchNotes(offset, true);
-    }
-  }, [loading, hasMore, offset, fetchNotes]);
+  const notes = query.data ? query.data.pages.flat() : [];
 
   return {
     notes,
-    loading,
-    error,
-    hasMore,
-    loadMore,
+    loading: query.isLoading || query.isFetchingNextPage || query.isFetching,
+    error: query.error ? (query.error as Error).message : null,
+    hasMore: query.hasNextPage,
+    loadMore: query.fetchNextPage,
   };
 }

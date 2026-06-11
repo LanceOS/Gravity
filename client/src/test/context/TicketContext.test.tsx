@@ -1,12 +1,29 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TicketProvider, useTickets } from '../../context/TicketContext.tsx';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import React from 'react';
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
     headers: { 'Content-Type': 'application/json' },
   });
+}
+
+function renderWithProvider(ui: React.ReactNode) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      {ui}
+    </QueryClientProvider>
+  );
 }
 
 function ContextProbe() {
@@ -129,7 +146,7 @@ describe('TicketContext', () => {
     const { EventSourceMock } = stubEventSource();
     vi.stubGlobal('fetch', fetchMock);
 
-    render(
+    renderWithProvider(
       <TicketProvider>
         <ContextProbe />
       </TicketProvider>
@@ -143,8 +160,8 @@ describe('TicketContext', () => {
     });
 
     expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/auth/session', { credentials: 'same-origin' });
-    expect(fetchMock).toHaveBeenNthCalledWith(2, `/api/v1/projects?userId=${encodeURIComponent(user.id)}`);
-    expect(fetchMock).toHaveBeenNthCalledWith(3, '/api/v1/users');
+    expect(fetchMock).toHaveBeenNthCalledWith(2, `/api/v1/projects?userId=${encodeURIComponent(user.id)}`, expect.any(Object));
+    expect(fetchMock).toHaveBeenNthCalledWith(3, '/api/v1/users', expect.any(Object));
     expect(EventSourceMock).toHaveBeenCalledWith('/api/v1/events/subscribe');
     expect(window.localStorage.getItem('gravity_user')).toContain(user.id);
   });
@@ -165,7 +182,7 @@ describe('TicketContext', () => {
     stubEventSource();
     vi.stubGlobal('fetch', fetchMock);
 
-    render(
+    renderWithProvider(
       <TicketProvider>
         <ContextProbe />
       </TicketProvider>
@@ -196,7 +213,7 @@ describe('TicketContext', () => {
     stubEventSource();
     vi.stubGlobal('fetch', fetchMock);
 
-    render(
+    renderWithProvider(
       <TicketProvider>
         <ContextProbe />
       </TicketProvider>
@@ -230,7 +247,7 @@ describe('TicketContext', () => {
     stubEventSource();
     vi.stubGlobal('fetch', fetchMock);
 
-    render(
+    renderWithProvider(
       <TicketProvider>
         <ContextProbe />
       </TicketProvider>
@@ -273,7 +290,7 @@ describe('TicketContext', () => {
 
     const user = await import('@testing-library/user-event').then((module) => module.default.setup());
 
-    render(
+    renderWithProvider(
       <TicketProvider>
         <ContextProbe />
       </TicketProvider>
@@ -345,7 +362,7 @@ describe('TicketContext', () => {
 
     const userEvent = await import('@testing-library/user-event').then((module) => module.default.setup());
 
-    render(
+    renderWithProvider(
       <TicketProvider>
         <ContextProbe />
       </TicketProvider>
@@ -436,7 +453,7 @@ describe('TicketContext', () => {
 
     const userEvent = await import('@testing-library/user-event').then((module) => module.default.setup());
 
-    render(
+    renderWithProvider(
       <TicketProvider>
         <ContextProbe />
       </TicketProvider>
@@ -501,7 +518,7 @@ describe('TicketContext', () => {
 
     const userEvent = await import('@testing-library/user-event').then((module) => module.default.setup());
 
-    render(
+    renderWithProvider(
       <TicketProvider>
         <ContextProbe />
       </TicketProvider>
@@ -578,7 +595,7 @@ describe('TicketContext', () => {
     stubEventSource();
     vi.stubGlobal('fetch', fetchMock);
 
-    render(
+    renderWithProvider(
       <TicketProvider>
         <ContextProbe />
       </TicketProvider>

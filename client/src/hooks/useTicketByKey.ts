@@ -1,59 +1,22 @@
-import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useTickets } from '../context/TicketContext';
-
-// Global cache for pending fetches to avoid duplicate concurrent calls for the same key
-const fetchCache: Record<string, Promise<any>> = {};
-// Global cache for resolved ticket details to avoid refetching during the app lifecycle
-const resolvedCache: Record<string, any> = {};
+import { queryKeys, CACHE_CONFIGS } from '../utils/queryClient';
 
 /**
  * @description A custom React hook that looks up and fetches ticket details by its key.
  * It first attempts to resolve the ticket from the local context list of tickets.
- * If not found, it checks if there is already a pending query or a resolved result for this key
- * globally, to deduplicate concurrent requests and avoid client-side N+1 fetch cascades.
+ * If not found, it leverages TanStack Query to fetch, cache, and deduplicate concurrent requests.
  * @param {string} ticketKey - The ticket key to search for (e.g. 'PROJ-1').
  * @returns {Object} An object containing the ticketInfo, loading state, and error (if any).
  */
 export function useTicketByKey(ticketKey: string) {
   const { ticketMap, currentUser } = useTickets();
-  const [ticketInfo, setTicketInfo] = useState<any | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-
   const normalizedKey = ticketKey.trim().toUpperCase();
-  const cacheKey = `${currentUser?.id ?? 'anonymous'}::${normalizedKey}`;
   const localTicket = ticketMap.get(normalizedKey);
 
-  useEffect(() => {
-    if (!normalizedKey) {
-      setTicketInfo(null);
-      setError(null);
-      setLoading(false);
-      return;
-    }
-
-    // 1. Resolve from local state immediately if available
-    if (localTicket) {
-      setTicketInfo(localTicket);
-      setError(null);
-      setLoading(false);
-      return;
-    }
-
-    // 2. Resolve from globally resolved cache if available
-    if (resolvedCache[cacheKey]) {
-      setTicketInfo(resolvedCache[cacheKey]);
-      setError(null);
-      setLoading(false);
-      return;
-    }
-
-    let active = true;
-    setLoading(true);
-    setError(null);
-
-    // 3. Initiate fetching or hook into existing pending query
-    if (!fetchCache[cacheKey]) {
+  const query = useQuery({
+    queryKey: queryKeys.ticket(normalizedKey, currentUser?.id),
+    queryFn: async () => {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
       };
@@ -61,65 +24,33 @@ export function useTicketByKey(ticketKey: string) {
         headers['X-User-Id'] = currentUser.id;
       }
 
-      fetchCache[cacheKey] = fetch(`/api/v1/tickets/key/${normalizedKey}`, { headers })
-        .then(async res => {
-          if (res.ok) return res.json();
-
-          let serverError: string | undefined;
-          try {
-            const errorBody = await res.json();
-            if (errorBody && typeof errorBody.error === 'string') {
-              serverError = errorBody.error;
-            }
-          } catch {
-            // Ignore JSON parsing failures and fall back to status-based messages.
+      const res = await fetch(`/api/v1/tickets/key/${normalizedKey}`, { headers });
+      if (!res.ok) {
+        let serverError: string | undefined;
+        try {
+          const errorBody = await res.json();
+          if (errorBody && typeof errorBody.error === 'string') {
+            serverError = errorBody.error;
           }
-
-          if (res.status === 401) {
-            throw new Error(serverError || 'Unauthorized');
-          }
-          if (res.status === 403) {
-            throw new Error(serverError || 'Forbidden');
-          }
-          if (res.status === 404) {
-            throw new Error(serverError || 'Ticket not found');
-          }
-
-          throw new Error(serverError || `Request failed with status ${res.status}`);
-        })
-        .then(data => {
-          resolvedCache[cacheKey] = data;
-          return data;
-        })
-        .finally(() => {
-          // Evict settled requests from the in-flight cache; successful results live in resolvedCache.
-          delete fetchCache[cacheKey];
-        });
-    }
-
-    fetchCache[cacheKey]
-      .then(data => {
-        if (active) {
-          setTicketInfo(data);
-          setError(null);
+        } catch {
+          // Ignore JSON parsing failures
         }
-      })
-      .catch(err => {
-        if (active) {
-          setError(err);
-          setTicketInfo(null);
-        }
-      })
-      .finally(() => {
-        if (active) {
-          setLoading(false);
-        }
-      });
 
-    return () => {
-      active = false;
-    };
-  }, [cacheKey, normalizedKey, localTicket, currentUser?.id]);
+        if (res.status === 401) throw new Error(serverError || 'Unauthorized');
+        if (res.status === 403) throw new Error(serverError || 'Forbidden');
+        if (res.status === 404) throw new Error(serverError || 'Ticket not found');
 
-  return { ticketInfo, loading, error };
+        throw new Error(serverError || `Request failed with status ${res.status}`);
+      }
+      return res.json();
+    },
+    enabled: !!normalizedKey && !localTicket,
+    ...CACHE_CONFIGS.ticketDetail,
+  });
+
+  return {
+    ticketInfo: localTicket || query.data || null,
+    loading: !localTicket && query.isLoading,
+    error: localTicket ? null : (query.error as Error | null),
+  };
 }
