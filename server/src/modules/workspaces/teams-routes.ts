@@ -1,14 +1,80 @@
 import { Router } from 'express';
 import { db } from '../../db/index.js';
-import { cycles, domains, projects, teams } from '../../db/schema.js';
-import { eq } from 'drizzle-orm';
-import { createId } from '../../lib/platform.js';
+import { comments, cycles, domains, labels, noteMetadata, projectMembers, projects, teams, ticketLabels, tickets, workspaces } from '../../db/schema.js';
+import { eq, inArray } from 'drizzle-orm';
+import { createId, invalidateWorkspaceCache } from '../../lib/platform.js';
+import { RustFS } from '../../lib/rustfs.js';
 import {
   authorizeWorkspaceAccess,
   authorizeWorkspaceOwnerAccess,
   authorizeTeamAccess,
   authorizeTeamOwnerAccess,
 } from './services/membership.js';
+
+async function deleteLastTeamWithOwnedWork(teamId: string, workspaceId: string) {
+  const projectRows = await db
+    .select({ id: projects.id })
+    .from(projects)
+    .where(eq(projects.teamId, teamId));
+
+  const projectIds = projectRows.map((row) => row.id);
+
+  let ticketRows: Array<{ id: string }> = [];
+  let labelRows: Array<{ id: string }> = [];
+  let noteRows: Array<{ bucketPath: string }> = [];
+
+  if (projectIds.length > 0) {
+    [ticketRows, labelRows, noteRows] = await Promise.all([
+      db.select({ id: tickets.id }).from(tickets).where(inArray(tickets.projectId, projectIds)),
+      db.select({ id: labels.id }).from(labels).where(inArray(labels.projectId, projectIds)),
+      db.select({ bucketPath: noteMetadata.bucketPath }).from(noteMetadata).where(inArray(noteMetadata.projectId, projectIds)),
+    ]);
+  }
+
+  const ticketIds = ticketRows.map((row) => row.id);
+  const labelIds = labelRows.map((row) => row.id);
+  const noteBucketPaths = [...new Set(noteRows.map((row) => row.bucketPath))];
+
+  await db.transaction(async (tx) => {
+    if (ticketIds.length > 0) {
+      await tx.delete(ticketLabels).where(inArray(ticketLabels.ticketId, ticketIds));
+      await tx.delete(comments).where(inArray(comments.ticketId, ticketIds));
+      await tx.delete(tickets).where(inArray(tickets.id, ticketIds));
+    }
+
+    if (labelIds.length > 0) {
+      await tx.delete(ticketLabels).where(inArray(ticketLabels.labelId, labelIds));
+      await tx.delete(labels).where(inArray(labels.id, labelIds));
+    }
+
+    if (projectIds.length > 0) {
+      await tx.delete(noteMetadata).where(inArray(noteMetadata.projectId, projectIds));
+      await tx.delete(projectMembers).where(inArray(projectMembers.projectId, projectIds));
+      await tx.delete(cycles).where(inArray(cycles.projectId, projectIds));
+      await tx.delete(cycles).where(eq(cycles.teamId, teamId));
+      await tx.delete(domains).where(inArray(domains.projectId, projectIds));
+      await tx.delete(domains).where(eq(domains.teamId, teamId));
+      await tx.delete(projects).where(inArray(projects.id, projectIds));
+    } else {
+      await tx.delete(cycles).where(eq(cycles.teamId, teamId));
+      await tx.delete(domains).where(eq(domains.teamId, teamId));
+    }
+
+    await tx.update(workspaces).set({ defaultProjectId: null }).where(eq(workspaces.id, workspaceId));
+    await tx.delete(teams).where(eq(teams.id, teamId));
+  });
+
+  const cleanupResults = await Promise.allSettled(noteBucketPaths.map((bucketPath) => RustFS.deleteBucket(bucketPath)));
+  for (const result of cleanupResults) {
+    if (result.status === 'rejected') {
+      // Best-effort cleanup keeps the database consistent even if object storage lags behind.
+      // eslint-disable-next-line no-console
+      console.error('Failed to delete note bucket during team deletion:', result.reason);
+    }
+  }
+
+  await invalidateWorkspaceCache(workspaceId);
+}
 
 export function createTeamsRouter() {
   const router = Router();
@@ -136,11 +202,17 @@ export function createTeamsRouter() {
         return;
       }
 
+      const workspaceTeamRows = await db
+        .select({ id: teams.id })
+        .from(teams)
+        .where(eq(teams.workspaceId, currentTeam.workspaceId));
+
       const [existingProjects, existingCycles, existingDomains] = await Promise.all([
         db.select({ id: projects.id }).from(projects).where(eq(projects.teamId, teamId)),
         db.select({ id: cycles.id }).from(cycles).where(eq(cycles.teamId, teamId)),
         db.select({ id: domains.id }).from(domains).where(eq(domains.teamId, teamId)),
       ]);
+      const isLastTeam = workspaceTeamRows.length <= 1;
 
       if (existingProjects.length > 0 || existingCycles.length > 0 || existingDomains.length > 0) {
         if (reassignTeamId) {
@@ -165,12 +237,16 @@ export function createTeamsRouter() {
             await tx.update(domains).set({ teamId: reassignTeamId }).where(eq(domains.teamId, teamId));
             await tx.delete(teams).where(eq(teams.id, teamId));
           });
+          await invalidateWorkspaceCache(currentTeam.workspaceId);
+        } else if (isLastTeam) {
+          await deleteLastTeamWithOwnedWork(teamId, currentTeam.workspaceId);
         } else {
           res.status(400).json({ error: 'Cannot delete team: projects, cycles, or domains still reference it. Please reassign them first.' });
           return;
         }
       } else {
         await db.delete(teams).where(eq(teams.id, teamId));
+        await invalidateWorkspaceCache(currentTeam.workspaceId);
       }
 
       res.json({ success: true });
