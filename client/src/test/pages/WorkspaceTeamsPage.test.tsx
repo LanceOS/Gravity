@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkspaceTeamsPage } from '../../pages/WorkspaceTeamsPage/WorkspaceTeamsPage.tsx';
-import type { SidebarTeam } from '../../types/domain.ts';
+import type { SidebarTeam, SidebarTree } from '../../types/domain.ts';
 
 const apiMocks = vi.hoisted(() => ({
   post: vi.fn(),
@@ -73,6 +73,12 @@ function renderWorkspaceTeamsPage(overrides: Partial<Parameters<typeof Workspace
     onTeamsChanged: vi.fn(),
     ...overrides,
   };
+  const initialSidebarTree: SidebarTree = {
+    workspaceId: props.workspaceId,
+    hierarchyMode: 'teams',
+    teams: props.teams,
+  };
+  queryClient.setQueryData(['sidebarTree', props.workspaceId], initialSidebarTree);
 
   return {
     ...render(
@@ -80,6 +86,7 @@ function renderWorkspaceTeamsPage(overrides: Partial<Parameters<typeof Workspace
         <WorkspaceTeamsPage {...props} />
       </QueryClientProvider>
     ),
+    queryClient,
     props,
   };
 }
@@ -107,7 +114,15 @@ describe('WorkspaceTeamsPage', () => {
 
   it('creates, updates, and deletes teams through team APIs', async () => {
     const user = userEvent.setup();
-    const { props } = renderWorkspaceTeamsPage();
+    const { props, queryClient } = renderWorkspaceTeamsPage();
+
+    apiMocks.post.mockResolvedValueOnce({
+      id: 'team-support',
+      workspaceId: 'workspace-1',
+      name: 'Support',
+      description: 'Customer escalation team',
+      color: '#3B82F6',
+    });
 
     await user.type(screen.getByPlaceholderText('Engineering'), 'Support');
     await user.type(screen.getByPlaceholderText('Owns product delivery and platform work'), 'Customer escalation team');
@@ -125,16 +140,36 @@ describe('WorkspaceTeamsPage', () => {
     const engineeringCard = screen.getByText('Engineering').closest('article');
     expect(engineeringCard).not.toBeNull();
 
+    apiMocks.patch.mockResolvedValueOnce({
+      id: 'team-engineering',
+      workspaceId: 'workspace-1',
+      name: 'Core Engineering',
+      description: 'Updated product platform ownership',
+      color: '#F97316',
+    });
+
     await user.click(within(engineeringCard as HTMLElement).getByRole('button', { name: 'Edit' }));
     await user.clear(within(engineeringCard as HTMLElement).getByLabelText('Team name'));
     await user.type(within(engineeringCard as HTMLElement).getByLabelText('Team name'), 'Core Engineering');
+    await user.clear(within(engineeringCard as HTMLElement).getByLabelText('Team description'));
+    await user.type(within(engineeringCard as HTMLElement).getByLabelText('Team description'), 'Updated product platform ownership');
+    await user.click(within(engineeringCard as HTMLElement).getByRole('button', { name: 'Use team color #F97316' }));
     await user.click(within(engineeringCard as HTMLElement).getByRole('button', { name: 'Save' }));
 
     await waitFor(() => {
       expect(apiMocks.patch).toHaveBeenCalledWith('/teams/team-engineering', {
         name: 'Core Engineering',
-        description: 'Builds the product platform',
-        color: '#3B82F6',
+        description: 'Updated product platform ownership',
+        color: '#F97316',
+      });
+    });
+
+    await waitFor(() => {
+      const sidebarTree = queryClient.getQueryData<SidebarTree>(['sidebarTree', 'workspace-1']);
+      expect(sidebarTree?.teams.find((team) => team.id === 'team-engineering')).toMatchObject({
+        name: 'Core Engineering',
+        description: 'Updated product platform ownership',
+        color: '#F97316',
       });
     });
 

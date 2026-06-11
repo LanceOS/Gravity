@@ -4,7 +4,7 @@ import { ArrowLeft, CalendarDays, FolderKanban, Save, Tags, Trash2, Users } from
 import { Button, Select } from '@library';
 import { apiClient } from '../../utils/apiClient';
 import { WorkspaceHeader } from '../../modules/workspaces';
-import type { SidebarTeam } from '../../types/domain';
+import type { SidebarTeam, SidebarTree, Team } from '../../types/domain';
 import '../WorkspacePage/WorkspacePage.css';
 import './WorkspaceTeamsPage.css';
 
@@ -26,6 +26,10 @@ interface WorkspaceTeamsPageProps {
 const DEFAULT_TEAM_COLOR = '#3B82F6';
 
 const COLOR_OPTIONS = ['#3B82F6', '#10B981', '#F97316', '#EC4899', '#8B5CF6', '#64748B'];
+const TEAM_VIEWS: SidebarTeam['views'] = [
+  { id: 'all', name: 'All Tasks', type: 'all' },
+  { id: 'timeline', name: 'Timeline', type: 'timeline' },
+];
 
 function getInitialDraft(): TeamDraft {
   return {
@@ -37,6 +41,19 @@ function getInitialDraft(): TeamDraft {
 
 function getTeamReferenceCount(team: SidebarTeam) {
   return (team.projects?.length ?? 0) + (team.cycles?.length ?? 0) + (team.domains?.length ?? 0);
+}
+
+function toSidebarTeam(team: Team): SidebarTeam {
+  return {
+    id: team.id,
+    name: team.name,
+    description: team.description,
+    color: team.color,
+    views: TEAM_VIEWS,
+    cycles: [],
+    domains: [],
+    projects: [],
+  };
 }
 
 export function WorkspaceTeamsPage({
@@ -65,6 +82,45 @@ export function WorkspaceTeamsPage({
     await onTeamsChanged?.();
   };
 
+  const syncSidebarTreeTeam = (teamId: string, updater: (currentTeam: SidebarTeam) => SidebarTeam) => {
+    queryClient.setQueryData<SidebarTree | undefined>(['sidebarTree', workspaceId], (current) => {
+      if (!current) {
+        return current;
+      }
+
+      return {
+        ...current,
+        teams: current.teams.map((team) => (team.id === teamId ? updater(team) : team)),
+      };
+    });
+  };
+
+  const syncSidebarTreeNewTeam = (team: Team) => {
+    queryClient.setQueryData<SidebarTree | undefined>(['sidebarTree', workspaceId], (current) => {
+      if (!current) {
+        return current;
+      }
+
+      return {
+        ...current,
+        teams: [...current.teams, toSidebarTeam(team)],
+      };
+    });
+  };
+
+  const syncSidebarTreeDeletedTeam = (teamId: string) => {
+    queryClient.setQueryData<SidebarTree | undefined>(['sidebarTree', workspaceId], (current) => {
+      if (!current) {
+        return current;
+      }
+
+      return {
+        ...current,
+        teams: current.teams.filter((team) => team.id !== teamId),
+      };
+    });
+  };
+
   const handleCreateTeam = async () => {
     const name = createDraft.name.trim();
     if (!name) {
@@ -76,12 +132,13 @@ export function WorkspaceTeamsPage({
     setFeedback(null);
 
     try {
-      await apiClient.post('/teams', {
+      const createdTeam = await apiClient.post<Team>('/teams', {
         workspaceId,
         name,
         description: createDraft.description.trim(),
         color: createDraft.color,
       });
+      syncSidebarTreeNewTeam(createdTeam);
       setCreateDraft(getInitialDraft());
       setFeedback({ type: 'success', message: 'Team created.' });
       await refreshTeams();
@@ -116,11 +173,15 @@ export function WorkspaceTeamsPage({
     setFeedback(null);
 
     try {
-      await apiClient.patch(`/teams/${teamId}`, {
+      const updatedTeam = await apiClient.patch<Team>(`/teams/${teamId}`, {
         name,
         description: editDraft.description.trim(),
         color: editDraft.color,
       });
+      syncSidebarTreeTeam(teamId, (currentTeam) => ({
+        ...currentTeam,
+        ...updatedTeam,
+      }));
       setEditingTeamId('');
       setFeedback({ type: 'success', message: 'Team updated.' });
       await refreshTeams();
@@ -150,6 +211,7 @@ export function WorkspaceTeamsPage({
       await apiClient.delete(`/teams/${team.id}`, {
         params: { reassignTeamId },
       });
+      syncSidebarTreeDeletedTeam(team.id);
       setFeedback({ type: 'success', message: 'Team deleted.' });
       await refreshTeams();
     } catch (error) {
@@ -259,7 +321,10 @@ export function WorkspaceTeamsPage({
                 <article key={team.id} className="workspace-teams-page__team-card">
                   <div className="workspace-teams-page__team-card-header">
                     <div className="workspace-teams-page__team-title-row">
-                      <span className="workspace-teams-page__team-color" style={{ background: team.color || DEFAULT_TEAM_COLOR }} />
+                      <span
+                        className="workspace-teams-page__team-color"
+                        style={{ background: (isEditing ? editDraft.color : team.color) || DEFAULT_TEAM_COLOR }}
+                      />
                       {isEditing ? (
                         <input
                           aria-label="Team name"
