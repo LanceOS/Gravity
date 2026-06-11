@@ -9,6 +9,7 @@ import { createWorkspacesRouter } from '../modules/workspaces/routes.js';
 import { createMcpRouter } from '../modules/mcp/index.js';
 import { createNotesRouter } from '../modules/notes/routes.js';
 import { createWebhookRouter } from '../modules/webhooks/routes.js';
+import { createTeamsRouter } from '../modules/workspaces/teams-routes.js';
 import { csrfProtect } from '../lib/csrf.js';
 import { subscribeToEvents } from '../realtime.js';
 
@@ -23,6 +24,7 @@ export function createApiRouter() {
   router.use(createUsersRouter());
   router.use(createSettingsRouter());
   router.use(createWorkspacesRouter());
+  router.use(createTeamsRouter());
   router.use(createProjectsRouter());
   router.use(createTicketsRouter());
   router.use(createAiRouter());

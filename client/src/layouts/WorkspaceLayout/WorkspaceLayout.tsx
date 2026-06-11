@@ -38,7 +38,7 @@ export function WorkspaceLayout({ sidebarProps, children, rightPanels, isMobile 
       onShowProjectIssues: wrapHandler(sidebarProps.projects.onShowProjectIssues),
       onShowMyIssues: wrapHandler(sidebarProps.projects.onShowMyIssues),
       onShowNotes: wrapHandler(sidebarProps.projects.onShowNotes),
-      onSelectCycle: wrapHandler(sidebarProps.projects.onSelectCycle),
+      onSelectCycle: sidebarProps.projects.onSelectCycle ? wrapHandler(sidebarProps.projects.onSelectCycle) : undefined,
     },
     tools: {
       ...sidebarProps.tools,

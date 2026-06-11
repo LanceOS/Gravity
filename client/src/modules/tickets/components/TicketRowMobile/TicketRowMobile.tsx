@@ -4,7 +4,7 @@ import type { TicketRowProps } from '../../types/TicketList';
 import { LabelBadge } from '../LabelBadge';
 import './TicketRowMobile.css';
 
-function TicketRowMobileImpl({ ticket, onClick, priorityIcon, assigneeAvatar }: TicketRowProps) {
+function TicketRowMobileImpl({ ticket, onClick, priorityIcon, assigneeAvatar, projectName }: TicketRowProps) {
   const [isHovered, setIsHovered] = useState(false);
 
   const handleClick = useCallback(() => {
@@ -35,9 +35,14 @@ function TicketRowMobileImpl({ ticket, onClick, priorityIcon, assigneeAvatar }: 
         </div>
       </div>
 
-      {/* Meta row: labels + sub-ticket indicator + date */}
+      {/* Meta row: project badge + labels + sub-ticket indicator + date */}
       <div className="ticket-row-mobile__meta">
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+          {projectName && (
+            <span style={{ fontSize: '10px', color: 'var(--color-text-secondary)', background: 'var(--color-surface-overlay)', border: '1px solid var(--color-border-default)', borderRadius: '3px', padding: '1px 5px' }}>
+              {projectName}
+            </span>
+          )}
           {ticket.labels?.map((label) => (
             <LabelBadge key={label.id} label={label} size="sm" />
           ))}

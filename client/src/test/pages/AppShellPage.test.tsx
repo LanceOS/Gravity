@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, useLocation, Route, Routes } from 'react-router-dom';
 import { AppShellPage } from '../../pages/AppShellPage/AppShellPage.tsx';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 /** Helper: captures the current MemoryRouter URL from inside the tree. */
 function LocationDisplay() {
@@ -349,18 +350,28 @@ function renderAppShell({
   mocks.useAccountSettings.mockReturnValue(account);
   mocks.useWorkspaceSettings.mockReturnValue(workspaceSettings);
 
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  });
+
   return render(
-    <MemoryRouter initialEntries={initialEntries}>
-      <LocationDisplay />
-      <Routes>
-        <Route path="/workspaces/:workspaceId/projects/:projectId/tickets/:ticketKey" element={<AppShellPage />} />
-        <Route path="/workspaces/:workspaceId/projects/:projectId/tickets" element={<AppShellPage />} />
-        <Route path="/workspaces/:workspaceId/projects/:projectId/notes" element={<AppShellPage />} />
-        <Route path="/workspaces/:workspaceId/projects/:projectId/notes/:noteId" element={<AppShellPage />} />
-        <Route path="/workspaces/:workspaceId" element={<AppShellPage />} />
-        <Route path="*" element={<AppShellPage />} />
-      </Routes>
-    </MemoryRouter>
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={initialEntries}>
+        <LocationDisplay />
+        <Routes>
+          <Route path="/workspaces/:workspaceId/projects/:projectId/tickets/:ticketKey" element={<AppShellPage />} />
+          <Route path="/workspaces/:workspaceId/projects/:projectId/tickets" element={<AppShellPage />} />
+          <Route path="/workspaces/:workspaceId/projects/:projectId/notes" element={<AppShellPage />} />
+          <Route path="/workspaces/:workspaceId/projects/:projectId/notes/:noteId" element={<AppShellPage />} />
+          <Route path="/workspaces/:workspaceId" element={<AppShellPage />} />
+          <Route path="*" element={<AppShellPage />} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>
   );
 }
 

@@ -18,6 +18,39 @@ export interface User {
   tutorial_completed?: number | boolean;
 }
 
+export interface Team {
+  id: string;
+  workspaceId: string;
+  name: string;
+  description: string;
+  color: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface SidebarView {
+  id: string;
+  name: string;
+  type: string;
+}
+
+export interface SidebarTeam {
+  id: string;
+  name: string;
+  description: string;
+  color: string;
+  views: SidebarView[];
+  cycles: Cycle[];
+  domains: Domain[];
+  projects: Project[];
+}
+
+export interface SidebarTree {
+  workspaceId: string;
+  hierarchyMode?: 'flat' | 'teams';
+  teams: SidebarTeam[];
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -26,6 +59,7 @@ export interface Project {
   status: 'planned' | 'active' | 'completed';
   workspaceId?: string | null;
   githubRepoUrl?: string | null;
+  teamId?: string | null;
 }
 
 export type CreateProjectInput = {

@@ -58,6 +58,7 @@ describe('workspaces routes', () => {
     expect(settingsResponse.body).toMatchObject({
       workspaceId,
       joinMode: 'approval_required',
+      hierarchyMode: 'flat',
       defaultProjectId,
     });
 
@@ -66,6 +67,7 @@ describe('workspaces routes', () => {
       .send({
         hostUrl: 'http://gravity.test',
         joinMode: 'auto_join',
+        hierarchyMode: 'teams',
         workspaceKey: 'WS-GRV-999999',
         defaultProjectId,
       });
@@ -75,6 +77,7 @@ describe('workspaces routes', () => {
       workspaceId,
       hostUrl: 'http://gravity.test',
       joinMode: 'auto_join',
+      hierarchyMode: 'teams',
       workspaceKey: 'WS-GRV-999999',
       defaultProjectId,
     });

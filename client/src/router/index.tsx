@@ -139,9 +139,7 @@ export const router = createBrowserRouter([
     path: '/workspaces/:workspaceId/teams/:teamId',
     element: (
       <ProtectedRoute>
-        <Suspense fallback={<LoadingPage />}>
-          <TeamOverviewView />
-        </Suspense>
+        <AppShellPage />
       </ProtectedRoute>
     ),
   },
@@ -150,9 +148,7 @@ export const router = createBrowserRouter([
     path: '/workspaces/:workspaceId/teams/:teamId/tasks',
     element: (
       <ProtectedRoute>
-        <Suspense fallback={<LoadingPage />}>
-          <TeamAllTasksView />
-        </Suspense>
+        <AppShellPage />
       </ProtectedRoute>
     ),
   },
@@ -161,9 +157,7 @@ export const router = createBrowserRouter([
     path: '/workspaces/:workspaceId/teams/:teamId/views/:viewId',
     element: (
       <ProtectedRoute>
-        <Suspense fallback={<LoadingPage />}>
-          <TeamSpecificViewView />
-        </Suspense>
+        <AppShellPage />
       </ProtectedRoute>
     ),
   },
@@ -172,9 +166,7 @@ export const router = createBrowserRouter([
     path: '/workspaces/:workspaceId/teams/:teamId/cycles/:cycleId',
     element: (
       <ProtectedRoute>
-        <Suspense fallback={<LoadingPage />}>
-          <TeamCycleViewView />
-        </Suspense>
+        <AppShellPage />
       </ProtectedRoute>
     ),
   },
@@ -183,9 +175,7 @@ export const router = createBrowserRouter([
     path: '/workspaces/:workspaceId/teams/:teamId/domains/:domainId',
     element: (
       <ProtectedRoute>
-        <Suspense fallback={<LoadingPage />}>
-          <TeamDomainViewView />
-        </Suspense>
+        <AppShellPage />
       </ProtectedRoute>
     ),
   },

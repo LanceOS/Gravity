@@ -42,6 +42,7 @@ import { createRateLimiter } from '../../lib/rateLimit.js';
 import { createRedisRateLimiter } from '../../lib/rateLimitRedis.js';
 import { getRequestSourceIp } from '../../lib/request-ip.js';
 import { isWorkspaceMember } from './services/membership.js';
+import { getSidebarTree } from './services/sidebar.js';
 import { mapProjectCreationError } from './utils/project-creation.js';
 import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
 import { env } from '../../env.js';
@@ -88,6 +89,7 @@ async function loadWorkspaceSettingsPayload(workspaceId: string) {
       workspaceHostUrl: workspaces.hostUrl,
       settingsHostUrl: workspaceSettings.hostUrl,
       joinMode: workspaceSettings.joinMode,
+      hierarchyMode: workspaceSettings.hierarchyMode,
       workspaceKey: workspaces.workspaceKey,
       defaultProjectId: workspaces.defaultProjectId,
       disabledMcpTools: workspaceSettings.disabledMcpTools,
@@ -107,6 +109,7 @@ async function loadWorkspaceSettingsPayload(workspaceId: string) {
     key: settings.key,
     hostUrl: settings.settingsHostUrl || settings.workspaceHostUrl || '',
     joinMode: settings.joinMode === 'auto_join' ? 'auto_join' : 'approval_required',
+    hierarchyMode: settings.hierarchyMode === 'teams' ? 'teams' : 'flat',
     workspaceKey: settings.workspaceKey,
     defaultProjectId: settings.defaultProjectId,
     disabledMcpTools: settings.disabledMcpTools || [],
@@ -253,6 +256,31 @@ export function createWorkspacesRouter() {
     }
   });
 
+  router.get('/workspaces/:workspaceId/sidebar', async (req, res) => {
+    const workspaceId = getParamString(req.params.workspaceId);
+    if (!workspaceId) {
+      res.status(400).json({ error: 'workspaceId is required.' });
+      return;
+    }
+    const actorUserId = await resolveRequestActorUserId(req);
+    if (!actorUserId) {
+      res.status(401).json({ error: 'Authentication required.' });
+      return;
+    }
+    const isMember = await isWorkspaceMember(workspaceId, actorUserId);
+    if (!isMember) {
+      res.status(403).json({ error: 'Access denied: not a member of the workspace.' });
+      return;
+    }
+
+    try {
+      const sidebarTree = await getSidebarTree(workspaceId);
+      res.json(sidebarTree);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to retrieve sidebar tree.' });
+    }
+  });
+
   router.post('/workspaces', async (req, res) => {
     const actorUserId = await resolveRequestActorUserId(req);
     if (!actorUserId) {
@@ -260,7 +288,7 @@ export function createWorkspacesRouter() {
       return;
     }
 
-    const { name, description, key, workspaceKey, ownerId, defaultProjectName, defaultProjectKey } = req.body ?? {};
+    const { name, description, key, workspaceKey, ownerId, defaultProjectName, defaultProjectKey, hierarchyMode } = req.body ?? {};
     if (!name || !key) {
       res.status(400).json({ error: 'Workspace name and key are required.' });
       return;
@@ -296,6 +324,7 @@ export function createWorkspacesRouter() {
           workspaceId,
           hostUrl: '',
           joinMode: 'approval_required',
+          hierarchyMode: hierarchyMode === 'teams' ? 'teams' : 'flat',
           createdAt: new Date(),
           updatedAt: new Date(),
         });

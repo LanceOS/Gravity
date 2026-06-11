@@ -15,6 +15,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // ─── Stubs for heavy modules ─────────────────────────────────────────────────
 vi.mock('@library', async (importOriginal) => {
@@ -114,31 +115,46 @@ function buildProps(overrides: Record<string, any> = {}) {
   };
 }
 
+function renderWorkspacePage(props: any) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <WorkspacePage {...props} />
+    </QueryClientProvider>
+  );
+}
+
 // ─── Tests ───────────────────────────────────────────────────────────────────
 describe('WorkspacePage – notes context', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('renders NotesList when activeNoteId is empty', () => {
-    render(<WorkspacePage {...buildProps()} />);
+    renderWorkspacePage(buildProps());
     expect(screen.getByTestId('notes-list')).toBeInTheDocument();
     expect(screen.queryByTestId('note-editor')).not.toBeInTheDocument();
   });
 
   it('renders NoteEditor instead of NotesList when activeNoteId is set', () => {
-    render(<WorkspacePage {...buildProps({ activeNoteId: 'note-abc' })} />);
+    renderWorkspacePage(buildProps({ activeNoteId: 'note-abc' }));
     expect(screen.getByTestId('note-editor')).toBeInTheDocument();
     expect(screen.getByTestId('note-editor').dataset.noteId).toBe('note-abc');
     expect(screen.queryByTestId('notes-list')).not.toBeInTheDocument();
   });
 
   it('shows "Create New Note" and hides "Back to Notes" when no note is active', () => {
-    render(<WorkspacePage {...buildProps()} />);
+    renderWorkspacePage(buildProps());
     expect(screen.getByRole('button', { name: /create new note/i })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /back to notes/i })).not.toBeInTheDocument();
   });
 
   it('shows "Back to Notes" and hides "Create New Note" when a note is active', () => {
-    render(<WorkspacePage {...buildProps({ activeNoteId: 'note-abc' })} />);
+    renderWorkspacePage(buildProps({ activeNoteId: 'note-abc' }));
     expect(screen.getByRole('button', { name: /back to notes/i })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /create new note/i })).not.toBeInTheDocument();
   });
@@ -146,7 +162,7 @@ describe('WorkspacePage – notes context', () => {
   it('uses browser back navigation when "Back to Notes" is clicked', async () => {
     const user = userEvent.setup();
     const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {});
-    render(<WorkspacePage {...buildProps({ activeNoteId: 'note-abc' })} />);
+    renderWorkspacePage(buildProps({ activeNoteId: 'note-abc' }));
     await user.click(screen.getByRole('button', { name: /back to notes/i }));
     expect(backSpy).toHaveBeenCalledTimes(1);
     backSpy.mockRestore();
@@ -160,7 +176,7 @@ describe('WorkspacePage – notes context', () => {
       json: async () => ({ id: 'note-new-123', title: 'Untitled Note' }),
     } as Response);
 
-    render(<WorkspacePage {...buildProps({ onSelectNote })} />);
+    renderWorkspacePage(buildProps({ onSelectNote }));
     await user.click(screen.getByRole('button', { name: /create new note/i }));
 
     await waitFor(() =>
@@ -189,7 +205,7 @@ describe('WorkspacePage – notes context', () => {
       json: async () => ({ error: 'Server error' }),
     } as Response);
 
-    render(<WorkspacePage {...buildProps({ onSelectNote })} />);
+    renderWorkspacePage(buildProps({ onSelectNote }));
     await user.click(screen.getByRole('button', { name: /create new note/i }));
 
     await waitFor(() => expect(fetchSpy).toHaveBeenCalled());

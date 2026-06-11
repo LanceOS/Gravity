@@ -15,6 +15,7 @@ export interface WorkspaceSummary {
   memberCount: number;
   pendingJoinRequestCount: number;
   memberRole?: string;
+  hierarchyMode?: 'flat' | 'teams';
 }
 
 export interface CreateWorkspaceInput {
@@ -24,6 +25,7 @@ export interface CreateWorkspaceInput {
   workspaceKey?: string;
   defaultProjectName?: string;
   defaultProjectKey?: string;
+  hierarchyMode?: 'teams' | 'flat';
 }
 
 

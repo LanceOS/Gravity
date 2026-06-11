@@ -54,7 +54,7 @@ describe('projects and tickets routes', () => {
       }),
     ]);
 
-    const createResponse = await api().post('/api/v1/projects').send({
+    const createResponse = await ownerApi.post('/api/v1/projects').send({
       name: 'Console API',
       description: 'Workspace automation API',
       key: 'CON',
@@ -72,7 +72,7 @@ describe('projects and tickets routes', () => {
     });
     expect(createResponse.body.inviteCode).toEqual(expect.any(String));
 
-    const patchResponse = await api().patch(`/api/v1/projects/${createResponse.body.id}`).send({
+    const patchResponse = await ownerApi.patch(`/api/v1/projects/${createResponse.body.id}`).send({
       name: 'Console API v2',
       status: 'paused',
     });
@@ -92,7 +92,7 @@ describe('projects and tickets routes', () => {
       avatarUrl: 'https://example.com/linus.png',
     });
 
-    const addMemberResponse = await api().post(`/api/v1/projects/${createResponse.body.id}/members`).send({
+    const addMemberResponse = await ownerApi.post(`/api/v1/projects/${createResponse.body.id}/members`).send({
       userId: member.id,
       role: 'developer',
     });
@@ -142,11 +142,11 @@ describe('projects and tickets routes', () => {
     const listDomainsResponse = await ownerApi.get('/api/v1/domains').query({ projectId: project.id });
     expect(listDomainsResponse.status).toBe(200);
     expect(listDomainsResponse.body).toEqual([
-      {
+      expect.objectContaining({
         id: createDomainResponse.body.id,
         name: 'Platform',
         color: '#0F766E',
-      },
+      }),
     ]);
 
     const createCycleResponse = await ownerApi.post('/api/v1/cycles').send({

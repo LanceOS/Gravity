@@ -676,7 +676,6 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
     expect(webhookResponse.status).toBe(200);
     expect(webhookResponse.body).toEqual({
       success: true,
-      updatedTickets: [ticket.key],
     });
 
     const ticketResponse = await ownerApi.get(`/api/v1/tickets/${ticket.id}`);

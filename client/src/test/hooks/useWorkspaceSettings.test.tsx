@@ -251,6 +251,7 @@ describe('useWorkspaceSettings', () => {
       key: '',
       hostUrl: '',
       joinMode: 'approval_required',
+      hierarchyMode: 'flat',
       workspaceKey: '',
       disabledMcpTools: [],
     });

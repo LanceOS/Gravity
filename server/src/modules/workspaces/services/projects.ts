@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import { db } from '../../../db/index.js';
-import { cycles, domains, projectMembers, projects, workspaceMembers, workspaces, workspaceSettings } from '../../../db/schema.js';
+import { cycles, domains, projectMembers, projects, workspaceMembers, workspaces, workspaceSettings, teams } from '../../../db/schema.js';
 import {
   addWorkspaceMembersToProject,
   createId,
@@ -39,6 +39,7 @@ export async function listProjectsWithDetails(userId: string, workspaceId?: stri
       status: projects.status,
       workspaceId: projects.workspaceId,
       githubRepoUrl: projects.githubRepoUrl,
+      teamId: projects.teamId,
     })
     .from(projects)
     .innerJoin(projectMembers, and(eq(projectMembers.projectId, projects.id), eq(projectMembers.userId, userId)));
@@ -50,6 +51,7 @@ export async function listProjectsWithDetails(userId: string, workspaceId?: stri
     key: string;
     status: string;
     workspaceId: string;
+    teamId: string | null;
   }> = workspaceId
     ? await baseQuery.where(eq(projects.workspaceId, workspaceId)).orderBy(asc(projects.createdAt))
     : await baseQuery.orderBy(asc(projects.createdAt));
@@ -67,6 +69,7 @@ export async function listProjectsWithDetails(userId: string, workspaceId?: stri
 
   const domainsByProject = new Map<string, Array<{ id: string; name: string; color: string }>>();
   for (const domain of domainRows) {
+    if (!domain.projectId) continue;
     const nextDomains = domainsByProject.get(domain.projectId) ?? [];
     nextDomains.push({ id: domain.id, name: domain.name, color: domain.color });
     domainsByProject.set(domain.projectId, nextDomains);
@@ -74,6 +77,7 @@ export async function listProjectsWithDetails(userId: string, workspaceId?: stri
 
   const cyclesByProject = new Map<string, Array<ReturnType<typeof mapCycle>>>();
   for (const cycle of cycleRows) {
+    if (!cycle.projectId) continue;
     const nextCycles = cyclesByProject.get(cycle.projectId) ?? [];
     nextCycles.push(mapCycle(cycle));
     cyclesByProject.set(cycle.projectId, nextCycles);
@@ -93,6 +97,7 @@ export async function createProjectRecord(params: {
   status?: string;
   ownerId: string;
   workspaceId?: string;
+  teamId?: string;
 }) {
   const projectId = createId('p');
   const normalizedKey = normalizeEntityKey(params.key);
@@ -125,11 +130,21 @@ export async function createProjectRecord(params: {
         role: 'owner',
         createdAt: new Date(),
       });
+      await tx.insert(teams).values({
+        id: `team-general-${targetWorkspaceId}`,
+        workspaceId: targetWorkspaceId,
+        name: 'General',
+        description: 'Default team for workspace',
+        color: '#6B7280',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
     }
 
     await tx.insert(projects).values({
       id: projectId,
       workspaceId: targetWorkspaceId,
+      teamId: params.teamId || `team-general-${targetWorkspaceId}`,
       name: params.name,
       description: params.description ?? '',
       key: normalizedKey,
@@ -158,7 +173,7 @@ export async function createProjectRecord(params: {
   return project;
 }
 
-export async function updateProjectRecord(projectId: string, params: { name?: string; description?: string; status?: string; githubRepoUrl?: string | null }) {
+export async function updateProjectRecord(projectId: string, params: { name?: string; description?: string; status?: string; githubRepoUrl?: string | null; teamId?: string }) {
   const rows = await db
     .update(projects)
     .set({
@@ -166,6 +181,7 @@ export async function updateProjectRecord(projectId: string, params: { name?: st
       ...(typeof params.description === 'string' ? { description: params.description } : {}),
       ...(typeof params.status === 'string' ? { status: params.status } : {}),
       ...(typeof params.githubRepoUrl === 'string' || params.githubRepoUrl === null ? { githubRepoUrl: params.githubRepoUrl } : {}),
+      ...(typeof params.teamId === 'string' ? { teamId: params.teamId } : {}),
       updatedAt: new Date(),
     })
     .where(eq(projects.id, projectId))

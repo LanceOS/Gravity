@@ -43,6 +43,7 @@ export const workspaceSettings = pgTable('workspace_settings', {
   workspaceId: text('workspace_id').primaryKey(),
   hostUrl: text('host_url').notNull().default(''),
   joinMode: text('join_mode').notNull().default('approval_required'),
+  hierarchyMode: text('hierarchy_mode').$type<'flat' | 'teams'>().notNull().default('flat'),
   disabledMcpTools: jsonb('disabled_mcp_tools').$type<string[]>().notNull().default([]),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -76,9 +77,22 @@ export const workspaceJoinRequests = pgTable('workspace_join_requests', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const teams = pgTable('teams', {
+  id: text('id').primaryKey(),
+  workspaceId: text('workspace_id').notNull(),
+  name: text('name').notNull(),
+  description: text('description').notNull().default(''),
+  color: text('color').notNull().default('#6B7280'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  workspaceIdIdx: index('teams_workspace_id_idx').on(table.workspaceId),
+}));
+
 export const projects = pgTable('projects', {
   id: text('id').primaryKey(),
   workspaceId: text('workspace_id').notNull(),
+  teamId: text('team_id'),
   name: text('name').notNull(),
   description: text('description').notNull().default(''),
   key: text('key').notNull().unique(),
@@ -90,6 +104,7 @@ export const projects = pgTable('projects', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   workspaceIdIdx: index('projects_workspace_id_idx').on(table.workspaceId),
+  teamIdIdx: index('projects_team_id_idx').on(table.teamId),
 }));
 
 export const projectMembers = pgTable(
@@ -109,12 +124,14 @@ export const projectMembers = pgTable(
 
 export const domains = pgTable('domains', {
   id: text('id').primaryKey(),
-  projectId: text('project_id').notNull(),
+  projectId: text('project_id'),
+  teamId: text('team_id'),
   name: text('name').notNull(),
   color: text('color').notNull().default('#6B7280'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   projectIdIdx: index('domains_project_id_idx').on(table.projectId),
+  teamIdIdx: index('domains_team_id_idx').on(table.teamId),
 }));
 
 export const labels = pgTable('labels', {
@@ -140,7 +157,8 @@ export const ticketLabels = pgTable('ticket_labels', {
 
 export const cycles = pgTable('cycles', {
   id: text('id').primaryKey(),
-  projectId: text('project_id').notNull(),
+  projectId: text('project_id'),
+  teamId: text('team_id'),
   name: text('name').notNull(),
   startDate: timestamp('start_date', { withTimezone: true }).notNull(),
   endDate: timestamp('end_date', { withTimezone: true }).notNull(),
@@ -148,4 +166,5 @@ export const cycles = pgTable('cycles', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   projectIdIdx: index('cycles_project_id_idx').on(table.projectId),
+  teamIdIdx: index('cycles_team_id_idx').on(table.teamId),
 }));

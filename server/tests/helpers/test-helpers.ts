@@ -17,6 +17,7 @@ import {
   workspaceMembers,
   workspaces,
   workspaceSettings,
+  teams,
 } from '../../src/db/schema.js';
 import { ensureUserDefaults, getUserById } from '../../src/lib/platform.js';
 import { env } from '../../src/env.js';
@@ -260,9 +261,20 @@ export async function seedWorkspaceFixture(seed: WorkspaceFixtureSeed = {}) {
     createdAt: new Date(),
   });
 
+  await db.insert(teams).values({
+    id: `team-general-${workspace.id}`,
+    workspaceId: workspace.id,
+    name: 'General',
+    description: 'Default team for workspace',
+    color: '#6B7280',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+
   await db.insert(projects).values({
     id: project.id,
     workspaceId: workspace.id,
+    teamId: `team-general-${workspace.id}`,
     name: project.name,
     description: project.description,
     key: project.key,
