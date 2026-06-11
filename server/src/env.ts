@@ -76,6 +76,7 @@ const envSchema = z.object({
   RUSTFS_ACCESS_KEY: z.string().default('admin'),
   RUSTFS_SECRET_KEY: z.string().default('password'),
   RUSTFS_BUCKET: z.string().default('notes'),
+  GITHUB_WEBHOOK_SECRET: z.string().optional(),
 });
 
 const parsed = envSchema.parse(process.env);
@@ -137,4 +138,5 @@ export const env = {
   rustfsAccessKey: parsed.RUSTFS_ACCESS_KEY,
   rustfsSecretKey: parsed.RUSTFS_SECRET_KEY,
   rustfsBucket: parsed.RUSTFS_BUCKET,
+  githubWebhookSecret: parsed.GITHUB_WEBHOOK_SECRET?.trim() || undefined,
 };

@@ -49,6 +49,11 @@ export function createApp() {
   app.use('/api/auth', createAuthCompatibilityRouter());
   app.all('/api/auth/*splat', toNodeHandler(auth));
 
+  // Capture raw body bytes on the GitHub webhook route BEFORE the JSON parser
+  // runs, so the HMAC-SHA256 signature verifier has access to the original bytes.
+  app.use('/api/v1/webhooks/github', express.raw({ type: 'application/json' }));
+
+  // All other routes use the standard JSON body parser.
   app.use(express.json({ limit: '1mb' }));
 
   app.use('/api/v1', createApiRouter());
