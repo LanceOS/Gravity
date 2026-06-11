@@ -26,11 +26,7 @@ UPDATE "projects"
 SET "team_id" = 'team-general-' || "workspace_id"
 WHERE "team_id" IS NULL
   OR "team_id" = ''
-  OR NOT EXISTS (
-    SELECT 1
-    FROM "teams"
-    WHERE "teams"."id" = "projects"."team_id"
-  );--> statement-breakpoint
+  OR "team_id" NOT IN (SELECT "id" FROM "teams");--> statement-breakpoint
 UPDATE "cycles"
 SET "team_id" = "projects"."team_id"
 FROM "projects"
@@ -38,11 +34,7 @@ WHERE "cycles"."project_id" = "projects"."id"
   AND (
     "cycles"."team_id" IS NULL
     OR "cycles"."team_id" = ''
-    OR NOT EXISTS (
-      SELECT 1
-      FROM "teams"
-      WHERE "teams"."id" = "cycles"."team_id"
-    )
+    OR "cycles"."team_id" NOT IN (SELECT "id" FROM "teams")
   );--> statement-breakpoint
 UPDATE "domains"
 SET "team_id" = "projects"."team_id"
@@ -51,11 +43,7 @@ WHERE "domains"."project_id" = "projects"."id"
   AND (
     "domains"."team_id" IS NULL
     OR "domains"."team_id" = ''
-    OR NOT EXISTS (
-      SELECT 1
-      FROM "teams"
-      WHERE "teams"."id" = "domains"."team_id"
-    )
+    OR "domains"."team_id" NOT IN (SELECT "id" FROM "teams")
   );--> statement-breakpoint
 ALTER TABLE "projects" ALTER COLUMN "team_id" SET NOT NULL;--> statement-breakpoint
 ALTER TABLE "cycles" ALTER COLUMN "team_id" SET NOT NULL;--> statement-breakpoint
