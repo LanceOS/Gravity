@@ -13,6 +13,8 @@ import {
 } from '../../modules/tickets/utils/ticketView';
 import { WorkspaceHeader } from '../../modules/workspaces';
 import { WorkspaceViewContainer } from '../../components/WorkspaceViewContainer';
+import { QueryErrorResetBoundary } from '@tanstack/react-query';
+import { ErrorBoundary } from '../../components/ErrorBoundary';
 import './WorkspacePage.css';
 
 interface WorkspacePageProps {
@@ -194,56 +196,68 @@ export function WorkspacePage({
 
               {/* Notes panel — always mounted, hidden when not in notes context */}
               <div className={activeContext !== 'notes' ? 'workspace-page__issues--hidden' : ''}>
-                <WorkspaceViewContainer>
-                  {activeNoteId ? (
-                    <NoteEditor projectId={filters.projectId || ''} noteId={activeNoteId} onTitleChange={setActiveNoteTitle} />
-                  ) : (
-                    <NotesList projectId={filters.projectId || ''} onSelectNote={onSelectNote || (() => { })} />
+                <QueryErrorResetBoundary>
+                  {({ reset }) => (
+                    <ErrorBoundary onReset={reset}>
+                      <WorkspaceViewContainer>
+                        {activeNoteId ? (
+                          <NoteEditor projectId={filters.projectId || ''} noteId={activeNoteId} onTitleChange={setActiveNoteTitle} />
+                        ) : (
+                          <NotesList projectId={filters.projectId || ''} onSelectNote={onSelectNote || (() => { })} />
+                        )}
+                      </WorkspaceViewContainer>
+                    </ErrorBoundary>
                   )}
-                </WorkspaceViewContainer>
+                </QueryErrorResetBoundary>
               </div>
 
               {/* Tickets panel — always mounted, hidden when in notes context */}
               <div className={activeContext === 'notes' ? 'workspace-page__issues--hidden' : ''}>
-                {projects.length === 0 ? (
-                  <div className="workspace-page__empty-state">
-                    <div className="workspace-page__empty-state-title">No projects in this workspace yet</div>
-                    <p className="workspace-page__empty-state-copy">
-                      Open Manage Projects to create the first project for this workspace. Once a project exists, tickets, labels, and cycles will become available here.
-                    </p>
-                    <div className="workspace-page__empty-state-actions">
-                      <Button
-                        type="button"
-                        variant="primary"
-                        className="workspace-page__projects-button workspace-page__projects-button--primary"
-                        onClick={onOpenProjectManager}
-                      >
-                        Manage Projects
-                      </Button>
-                    </div>
-                  </div>
-                ) : activeView === 'board' ? (
-                  <WorkspaceViewContainer>
-                    <TicketBoard
-                      ticketsByColumn={groupedTickets}
-                      labelById={labelById}
-                      userAvatarById={userAvatarById}
-                      onMoveTicket={onUpdateTicket}
-                      onSelectTicket={onSelectTicket}
-                      onOpenCreateTicket={onOpenCreateTicket}
-                    />
-                  </WorkspaceViewContainer>
-                ) : (
-                  <WorkspaceViewContainer>
-                    <TicketList
-                      filteredCount={filteredTickets.length}
-                      groupedTickets={listGroupedTickets}
-                      labelById={labelById}
-                      userAvatarById={userAvatarById}
-                      onSelectTicket={onSelectTicket}
-                    />
-                  </WorkspaceViewContainer>
-                )}
+                <QueryErrorResetBoundary>
+                  {({ reset }) => (
+                    <ErrorBoundary onReset={reset}>
+                      {projects.length === 0 ? (
+                        <div className="workspace-page__empty-state">
+                          <div className="workspace-page__empty-state-title">No projects in this workspace yet</div>
+                          <p className="workspace-page__empty-state-copy">
+                            Open Manage Projects to create the first project for this workspace. Once a project exists, tickets, labels, and cycles will become available here.
+                          </p>
+                          <div className="workspace-page__empty-state-actions">
+                            <Button
+                              type="button"
+                              variant="primary"
+                              className="workspace-page__projects-button workspace-page__projects-button--primary"
+                              onClick={onOpenProjectManager}
+                            >
+                              Manage Projects
+                            </Button>
+                          </div>
+                        </div>
+                      ) : activeView === 'board' ? (
+                        <WorkspaceViewContainer>
+                          <TicketBoard
+                            ticketsByColumn={groupedTickets}
+                            labelById={labelById}
+                            userAvatarById={userAvatarById}
+                            onMoveTicket={onUpdateTicket}
+                            onSelectTicket={onSelectTicket}
+                            onOpenCreateTicket={onOpenCreateTicket}
+                          />
+                        </WorkspaceViewContainer>
+                      ) : (
+                        <WorkspaceViewContainer>
+                          <TicketList
+                            filteredCount={filteredTickets.length}
+                            groupedTickets={listGroupedTickets}
+                            labelById={labelById}
+                            userAvatarById={userAvatarById}
+                            onSelectTicket={onSelectTicket}
+                          />
+                        </WorkspaceViewContainer>
+                      )}
+                    </ErrorBoundary>
+                  )}
+                </QueryErrorResetBoundary>
               </div>
             </div>
           </div>

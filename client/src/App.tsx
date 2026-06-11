@@ -2,14 +2,20 @@ import { RouterProvider } from 'react-router-dom';
 import { TicketProvider } from './context/TicketContext';
 import { ThemeProvider } from './modules/settings';
 import { router } from './router';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from './utils/queryClient';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <TicketProvider>
-        <RouterProvider router={router} />
-      </TicketProvider>
-    </ThemeProvider>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        <TicketProvider>
+          <RouterProvider router={router} />
+        </TicketProvider>
+      </ThemeProvider>
+      <ReactQueryDevtools initialIsOpen={false} />
+    </QueryClientProvider>
   );
 }
 

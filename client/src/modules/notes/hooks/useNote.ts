@@ -1,4 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { queryClient, queryKeys } from '../../../utils/queryClient';
 import type { NoteMetadata } from '../types';
 
 export interface Note extends NoteMetadata {
@@ -6,18 +8,12 @@ export interface Note extends NoteMetadata {
 }
 
 export function useNote(projectId: string, noteId: string | null) {
-  const [note, setNote] = useState<Note | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
-  const fetchNote = useCallback(async () => {
-    if (!noteId) return;
-    try {
-      setLoading(true);
-      setError(null);
+  const noteQuery = useQuery<Note>({
+    queryKey: queryKeys.note(noteId || ''),
+    queryFn: async () => {
       const response = await fetch(`/api/v1/notes/${noteId}`, {
         headers: {
           'x-project-id': projectId,
@@ -28,25 +24,16 @@ export function useNote(projectId: string, noteId: string | null) {
         throw new Error('Failed to load note');
       }
 
-      const data = await response.json();
-      setNote(data);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [projectId, noteId]);
+      return response.json();
+    },
+    enabled: !!noteId && !!projectId,
+  });
 
-  useEffect(() => {
-    fetchNote();
-  }, [fetchNote]);
+  const saveMutation = useMutation({
+    mutationFn: async (updates: { title?: string; body?: string }) => {
+      const currentNote = noteQuery.data;
+      if (!noteId || !currentNote) throw new Error('No active note');
 
-  const saveNote = useCallback(async (updates: { title?: string; body?: string }) => {
-    if (!noteId || !note) return;
-    try {
-      setSaving(true);
-      setSaveError(null);
-      
       const response = await fetch(`/api/v1/notes/${noteId}`, {
         method: 'PATCH',
         headers: {
@@ -55,7 +42,7 @@ export function useNote(projectId: string, noteId: string | null) {
         },
         body: JSON.stringify({
           ...updates,
-          version: note.version,
+          version: currentNote.version,
         }),
       });
 
@@ -66,15 +53,24 @@ export function useNote(projectId: string, noteId: string | null) {
         throw new Error('Failed to save note');
       }
 
-      const updated = await response.json();
-      setNote(updated);
+      return response.json() as Promise<Note>;
+    },
+    onSuccess: (updated) => {
+      queryClient.setQueryData(queryKeys.note(noteId || ''), updated);
       setSavedAt(new Date());
-    } catch (err: any) {
+      setSaveError(null);
+      
+      // Invalidate the notes list to update title/metadata
+      queryClient.invalidateQueries({ queryKey: queryKeys.notes(projectId) });
+    },
+    onError: (err: Error) => {
       setSaveError(err.message);
-    } finally {
-      setSaving(false);
-    }
-  }, [projectId, noteId, note]);
+    },
+  });
+
+  const saveNote = useCallback(async (updates: { title?: string; body?: string }) => {
+    await saveMutation.mutateAsync(updates);
+  }, [saveMutation]);
 
   const uploadMedia = useCallback(async (file: File): Promise<string> => {
     if (!noteId) throw new Error('No active note');
@@ -93,14 +89,14 @@ export function useNote(projectId: string, noteId: string | null) {
     }
 
     const data = await response.json();
-    return data.url; // e.g. /api/v1/notes/:noteId/media/something.png
+    return data.url;
   }, [projectId, noteId]);
 
   return {
-    note,
-    loading,
-    error,
-    saving,
+    note: noteQuery.data || null,
+    loading: noteQuery.isLoading,
+    error: noteQuery.error ? (noteQuery.error as Error).message : null,
+    saving: saveMutation.isPending,
     saveError,
     savedAt,
     saveNote,
