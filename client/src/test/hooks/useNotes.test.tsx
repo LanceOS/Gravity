@@ -1,6 +1,8 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useNotes } from '../../modules/notes/hooks/useNotes';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import React from 'react';
 
 describe('useNotes', () => {
   beforeEach(() => {
@@ -18,7 +20,11 @@ describe('useNotes', () => {
       json: async () => mockNotes,
     } as Response);
 
-    const { result } = renderHook(() => useNotes('proj-1'));
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    const { result } = renderHook(() => useNotes('proj-1'), { wrapper });
 
     expect(result.current.loading).toBe(true);
     expect(result.current.notes).toEqual([]);
@@ -42,7 +48,11 @@ describe('useNotes', () => {
       ok: false,
     } as Response);
 
-    const { result } = renderHook(() => useNotes('proj-1'));
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    const { result } = renderHook(() => useNotes('proj-1'), { wrapper });
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
@@ -66,7 +76,11 @@ describe('useNotes', () => {
         json: async () => secondPage,
       } as Response);
 
-    const { result } = renderHook(() => useNotes('proj-1'));
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    const { result } = renderHook(() => useNotes('proj-1'), { wrapper });
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
@@ -96,7 +110,11 @@ describe('useNotes', () => {
       json: async () => firstPage,
     } as Response);
 
-    const { result } = renderHook(() => useNotes('proj-1'));
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    const { result } = renderHook(() => useNotes('proj-1'), { wrapper });
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
@@ -117,8 +135,13 @@ describe('useNotes', () => {
       json: async () => [],
     } as Response);
 
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
     const { result, rerender } = renderHook(({ projectId }) => useNotes(projectId), {
       initialProps: { projectId: 'proj-1' },
+      wrapper,
     });
 
     await waitFor(() => {

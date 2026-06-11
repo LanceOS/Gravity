@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { queryClient, queryKeys, CACHE_CONFIGS } from '../utils/queryClient';
 import type { User } from '../context/TicketContext';
 import type { WorkspaceJoinMode } from './useWorkspaceDirectory';
 
@@ -82,343 +84,315 @@ function normalizeWorkspaceInvite(invite: Record<string, unknown>): WorkspaceInv
 }
 
 export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWorkspaceSettingsOptions) {
-  const [settings, setSettings] = useState<WorkspaceAdminSettings>(() => defaultSettings(activeWorkspaceId));
-  const [members, setMembers] = useState<WorkspaceMember[]>([]);
-  const [invites, setInvites] = useState<WorkspaceInvite[]>([]);
-  const [joinRequests, setJoinRequests] = useState<WorkspaceJoinRequest[]>([]);
-  const [settingsLoading, setSettingsLoading] = useState(false);
-  const [saveLoading, setSaveLoading] = useState(false);
+  const [draftSettings, setDraftSettings] = useState<WorkspaceAdminSettings | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [invitesLoading, setInvitesLoading] = useState(false);
-  const [inviteLoading, setInviteLoading] = useState(false);
+  const [saveErrorState, setSaveError] = useState<string | null>(null);
   const [inviteError, setInviteError] = useState<string | null>(null);
-  const [approveLoadingId, setApproveLoadingId] = useState<string | null>(null);
-  const [revokeLoadingId, setRevokeLoadingId] = useState<string | null>(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const refreshRequestIdRef = useRef(0);
+
+  const enabled = !!currentUser && !!activeWorkspaceId;
+
+  // --- Queries ---
+
+  // Workspace Settings Query
+  const settingsQuery = useQuery({
+    queryKey: queryKeys.workspaceSettings(activeWorkspaceId),
+    queryFn: async () => {
+      const res = await fetch(`/api/v1/workspaces/${activeWorkspaceId}/settings`, {
+        headers: { 'X-User-Id': currentUser!.id },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to load workspace settings.');
+      return {
+        workspaceId: data.workspaceId || activeWorkspaceId,
+        key: data.key || '',
+        hostUrl: data.hostUrl || '',
+        joinMode: data.joinMode === 'auto_join' ? 'auto_join' : 'approval_required',
+        workspaceKey: data.workspaceKey || '',
+        disabledMcpTools: Array.isArray(data.disabledMcpTools) ? data.disabledMcpTools : [],
+      } as WorkspaceAdminSettings;
+    },
+    enabled,
+  });
+
+  // Sync draft settings with query data
+  useEffect(() => {
+    if (settingsQuery.data) {
+      setDraftSettings(settingsQuery.data);
+    } else {
+      setDraftSettings(null);
+    }
+  }, [settingsQuery.data, activeWorkspaceId]);
+
+  // Workspace Members Query
+  const membersQuery = useQuery({
+    queryKey: queryKeys.workspaceMembers(activeWorkspaceId),
+    queryFn: async () => {
+      const res = await fetch(`/api/v1/workspaces/${activeWorkspaceId}/members`, {
+        headers: { 'X-User-Id': currentUser!.id },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to load workspace members.');
+      return (Array.isArray(data) ? data : []) as WorkspaceMember[];
+    },
+    enabled,
+    staleTime: CACHE_CONFIGS.workspaceMembers.staleTime,
+    gcTime: CACHE_CONFIGS.workspaceMembers.gcTime,
+  });
+
+  // Workspace Invites Query
+  const invitesQuery = useQuery({
+    queryKey: queryKeys.workspaceInvites(activeWorkspaceId),
+    queryFn: async () => {
+      const res = await fetch(`/api/v1/workspaces/${activeWorkspaceId}/invites`, {
+        headers: { 'X-User-Id': currentUser!.id },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to load workspace invites.');
+      return (Array.isArray(data) ? data.map((invite) => normalizeWorkspaceInvite(invite as Record<string, unknown>)) : []) as WorkspaceInvite[];
+    },
+    enabled,
+  });
+
+  // Workspace Join Requests Query
+  const joinRequestsQuery = useQuery({
+    queryKey: queryKeys.workspaceJoinRequests(activeWorkspaceId),
+    queryFn: async () => {
+      const res = await fetch(`/api/v1/workspaces/${activeWorkspaceId}/join-requests`, {
+        headers: { 'X-User-Id': currentUser!.id },
+      });
+      const data = await res.json();
+      if (res.status === 403) return [] as WorkspaceJoinRequest[];
+      if (!res.ok) throw new Error(data.error || 'Failed to load workspace join requests.');
+      return (Array.isArray(data) ? data : []) as WorkspaceJoinRequest[];
+    },
+    enabled,
+  });
+
+  // Combine query loading states
+  const settingsLoading =
+    settingsQuery.isLoading ||
+    membersQuery.isLoading ||
+    invitesQuery.isLoading ||
+    joinRequestsQuery.isLoading;
 
   const refreshWorkspaceAdmin = useCallback(async () => {
-    const requestId = ++refreshRequestIdRef.current;
-    const workspaceId = activeWorkspaceId;
+    await Promise.all([
+      settingsQuery.refetch(),
+      membersQuery.refetch(),
+      invitesQuery.refetch(),
+      joinRequestsQuery.refetch(),
+    ]);
+  }, [settingsQuery, membersQuery, invitesQuery, joinRequestsQuery]);
 
-    if (!currentUser || !activeWorkspaceId) {
-      setSettings(defaultSettings(workspaceId));
-      setMembers([]);
-      setInvites([]);
-      setJoinRequests([]);
-      setDeleteError(null);
-      setSaveError(null);
-      setInviteError(null);
-      return;
-    }
-
-    setSettingsLoading(true);
-    setInvitesLoading(true);
-    setSaveError(null);
-    setInviteError(null);
-
-    try {
-      const [settingsResponse, membersResponse, invitesResponse, joinRequestsResponse] = await Promise.all([
-        fetch(`/api/v1/workspaces/${activeWorkspaceId}/settings`, {
-          headers: { 'X-User-Id': currentUser.id },
-        }),
-        fetch(`/api/v1/workspaces/${activeWorkspaceId}/members`, {
-          headers: { 'X-User-Id': currentUser.id },
-        }),
-        fetch(`/api/v1/workspaces/${activeWorkspaceId}/invites`, {
-          headers: { 'X-User-Id': currentUser.id },
-        }),
-        fetch(`/api/v1/workspaces/${activeWorkspaceId}/join-requests`, {
-          headers: { 'X-User-Id': currentUser.id },
-        }),
-      ]);
-
-      const joinRequestsForbidden = joinRequestsResponse.status === 403;
-
-      const [settingsData, membersData, invitesData, joinRequestsData] = await Promise.all([
-        settingsResponse.json(),
-        membersResponse.json(),
-        invitesResponse.json(),
-        joinRequestsResponse.json(),
-      ]);
-
-      if (!settingsResponse.ok) {
-        throw new Error(settingsData.error || 'Failed to load workspace settings.');
-      }
-
-      if (!membersResponse.ok) {
-        throw new Error(membersData.error || 'Failed to load workspace members.');
-      }
-
-      if (!invitesResponse.ok) {
-        throw new Error(invitesData.error || 'Failed to load workspace invites.');
-      }
-
-      if (!joinRequestsResponse.ok && !joinRequestsForbidden) {
-        throw new Error(joinRequestsData.error || 'Failed to load workspace join requests.');
-      }
-
-      if (requestId !== refreshRequestIdRef.current) {
-        return;
-      }
-
-      setSettings({
-        workspaceId: settingsData.workspaceId || workspaceId,
-        key: settingsData.key || '',
-        hostUrl: settingsData.hostUrl || '',
-        joinMode: settingsData.joinMode === 'auto_join' ? 'auto_join' : 'approval_required',
-        workspaceKey: settingsData.workspaceKey || '',
-        disabledMcpTools: Array.isArray(settingsData.disabledMcpTools) ? settingsData.disabledMcpTools : [],
-      });
-      setMembers(Array.isArray(membersData) ? membersData : []);
-      setInvites(Array.isArray(invitesData) ? invitesData.map((invite) => normalizeWorkspaceInvite(invite as Record<string, unknown>)) : []);
-      setJoinRequests(!joinRequestsForbidden && Array.isArray(joinRequestsData) ? joinRequestsData : []);
-    } catch (refreshError) {
-      if (requestId !== refreshRequestIdRef.current) {
-        return;
-      }
-
-      const message = refreshError instanceof Error ? refreshError.message : 'Failed to load workspace administration data.';
-      setSaveError(message);
-      setSettings(defaultSettings(workspaceId));
-      setMembers([]);
-      setInvites([]);
-      setJoinRequests([]);
-    } finally {
-      if (requestId === refreshRequestIdRef.current) {
-        setSettingsLoading(false);
-        setInvitesLoading(false);
-      }
-    }
-  }, [activeWorkspaceId, currentUser]);
-
+  // --- Success timer helper ---
   useEffect(() => {
-    void refreshWorkspaceAdmin();
-  }, [refreshWorkspaceAdmin]);
-
-  useEffect(() => {
-    if (!saveSuccess) {
-      return undefined;
-    }
-
+    if (!saveSuccess) return undefined;
     const timer = window.setTimeout(() => setSaveSuccess(false), 2500);
     return () => window.clearTimeout(timer);
   }, [saveSuccess]);
 
-  const updateSettings = useCallback((updates: Partial<WorkspaceAdminSettings>) => {
-    setSettings((current) => ({ ...current, ...updates }));
-    setSaveSuccess(false);
-    setSaveError(null);
-  }, []);
+  // --- Mutations ---
 
-  const saveSettings = useCallback(async () => {
-    if (!currentUser || !activeWorkspaceId) {
-      return;
-    }
-
-    setSaveLoading(true);
-    setSaveError(null);
-    setSaveSuccess(false);
-
-    try {
+  // Save Settings Mutation
+  const saveSettingsMutation = useMutation({
+    mutationFn: async (payload: Partial<WorkspaceAdminSettings>) => {
       const response = await fetch(`/api/v1/workspaces/${activeWorkspaceId}/settings`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          'X-User-Id': currentUser.id,
+          'X-User-Id': currentUser!.id,
         },
         body: JSON.stringify({
-          hostUrl: settings.hostUrl,
-          joinMode: settings.joinMode,
-          workspaceKey: settings.workspaceKey,
-          disabledMcpTools: settings.disabledMcpTools || [],
+          hostUrl: payload.hostUrl,
+          joinMode: payload.joinMode,
+          workspaceKey: payload.workspaceKey,
+          disabledMcpTools: payload.disabledMcpTools || [],
         }),
       });
       const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to save workspace settings.');
-      }
-
-      setSettings({
+      if (!response.ok) throw new Error(data.error || 'Failed to save workspace settings.');
+      return {
         workspaceId: data.workspaceId || activeWorkspaceId,
-        key: data.key || settings.key,
+        key: data.key || payload.key,
         hostUrl: data.hostUrl || '',
         joinMode: data.joinMode === 'auto_join' ? 'auto_join' : 'approval_required',
-        workspaceKey: data.workspaceKey || settings.workspaceKey,
-        disabledMcpTools: Array.isArray(data.disabledMcpTools) ? data.disabledMcpTools : settings.disabledMcpTools || [],
-      });
+        workspaceKey: data.workspaceKey || payload.workspaceKey,
+        disabledMcpTools: Array.isArray(data.disabledMcpTools) ? data.disabledMcpTools : payload.disabledMcpTools || [],
+      } as WorkspaceAdminSettings;
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(queryKeys.workspaceSettings(activeWorkspaceId), data);
       setSaveSuccess(true);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to save workspace settings.';
-      setSaveError(message);
-    } finally {
-      setSaveLoading(false);
-    }
-  }, [activeWorkspaceId, currentUser, settings]);
+      setSaveError(null);
+    },
+    onError: (err: Error) => {
+      setSaveError(err.message || 'Failed to save workspace settings.');
+    },
+  });
 
-  const createInvite = useCallback(async (input: CreateWorkspaceInviteInput) => {
-    if (!currentUser || !activeWorkspaceId) {
-      return null;
-    }
-
-    setInviteLoading(true);
-    setInviteError(null);
-
-    try {
+  // Create Invite Mutation
+  const createInviteMutation = useMutation({
+    mutationFn: async (input: CreateWorkspaceInviteInput) => {
       const response = await fetch(`/api/v1/workspaces/${activeWorkspaceId}/invites`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-User-Id': currentUser.id,
+          'X-User-Id': currentUser!.id,
         },
         body: JSON.stringify({
-          createdBy: currentUser.id,
+          createdBy: currentUser!.id,
           label: input.label,
         }),
       });
       const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to create invite.');
-      }
-
-      await refreshWorkspaceAdmin();
+      if (!response.ok) throw new Error(data.error || 'Failed to create invite.');
       return normalizeWorkspaceInvite(data as Record<string, unknown>);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to create invite.';
-      setInviteError(message);
-      return null;
-    } finally {
-      setInviteLoading(false);
-    }
-  }, [activeWorkspaceId, currentUser, refreshWorkspaceAdmin]);
+    },
+    onSuccess: async () => {
+      await refreshWorkspaceAdmin();
+      setInviteError(null);
+    },
+    onError: (err: Error) => {
+      setInviteError(err.message || 'Failed to create invite.');
+    },
+  });
 
-  const revokeInvite = useCallback(async (inviteId: string) => {
-    if (!currentUser || !activeWorkspaceId) {
-      return false;
-    }
-
-    setRevokeLoadingId(inviteId);
-    setInviteError(null);
-
-    try {
+  // Revoke Invite Mutation
+  const revokeInviteMutation = useMutation({
+    mutationFn: async (inviteId: string) => {
       const response = await fetch(`/api/v1/workspaces/${activeWorkspaceId}/invites/${inviteId}/revoke`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-User-Id': currentUser.id,
+          'X-User-Id': currentUser!.id,
         },
       });
       const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to revoke invite.');
-      }
-
+      if (!response.ok) throw new Error(data.error || 'Failed to revoke invite.');
+    },
+    onSuccess: async () => {
       await refreshWorkspaceAdmin();
-      return true;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to revoke invite.';
-      setInviteError(message);
-      return false;
-    } finally {
-      setRevokeLoadingId(null);
-    }
-  }, [activeWorkspaceId, currentUser, refreshWorkspaceAdmin]);
+      setInviteError(null);
+    },
+    onError: (err: Error) => {
+      setInviteError(err.message || 'Failed to revoke invite.');
+    },
+  });
 
-  const approveJoinRequest = useCallback(async (requestId: string) => {
-    if (!currentUser || !activeWorkspaceId) {
-      return false;
-    }
-
-    setApproveLoadingId(requestId);
-    setInviteError(null);
-
-    try {
+  // Approve Join Request Mutation
+  const approveJoinRequestMutation = useMutation({
+    mutationFn: async (requestId: string) => {
       const response = await fetch(`/api/v1/workspaces/${activeWorkspaceId}/join-requests/${requestId}/approve`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-User-Id': currentUser.id,
+          'X-User-Id': currentUser!.id,
         },
       });
       const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to approve join request.');
-      }
-
+      if (!response.ok) throw new Error(data.error || 'Failed to approve join request.');
+    },
+    onSuccess: async () => {
       await refreshWorkspaceAdmin();
-      return true;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to approve join request.';
-      setInviteError(message);
-      return false;
-    } finally {
-      setApproveLoadingId(null);
-    }
-  }, [activeWorkspaceId, currentUser, refreshWorkspaceAdmin]);
+      setInviteError(null);
+    },
+    onError: (err: Error) => {
+      setInviteError(err.message || 'Failed to approve join request.');
+    },
+  });
 
-  const deleteWorkspace = useCallback(async () => {
-    if (!currentUser || !activeWorkspaceId) {
-      return false;
-    }
-
-    setDeleteLoading(true);
-    setDeleteError(null);
-
-    try {
+  // Delete Workspace Mutation
+  const deleteWorkspaceMutation = useMutation({
+    mutationFn: async () => {
       const response = await fetch(`/api/v1/workspaces/${activeWorkspaceId}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
-          'X-User-Id': currentUser.id,
+          'X-User-Id': currentUser!.id,
         },
       });
       const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to delete workspace.');
+    },
+    onError: (err: Error) => {
+      setDeleteError(err.message || 'Failed to delete workspace.');
+    },
+  });
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to delete workspace.');
-      }
+  // --- Exposed Callbacks ---
 
-      return true;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to delete workspace.';
-      setDeleteError(message);
-      return false;
-    } finally {
-      setDeleteLoading(false);
+  const updateSettings = useCallback((updates: Partial<WorkspaceAdminSettings>) => {
+    setDraftSettings((current) => (current ? { ...current, ...updates } : { ...defaultSettings(activeWorkspaceId), ...updates }));
+    setSaveSuccess(false);
+    setSaveError(null);
+  }, [activeWorkspaceId]);
+
+  const saveSettings = useCallback(async () => {
+    if (!draftSettings) return;
+    await saveSettingsMutation.mutateAsync(draftSettings);
+  }, [draftSettings, saveSettingsMutation]);
+
+  const createInvite = useCallback(async (input: CreateWorkspaceInviteInput) => {
+    try {
+      return await createInviteMutation.mutateAsync(input);
+    } catch {
+      return null;
     }
-  }, [activeWorkspaceId, currentUser]);
+  }, [createInviteMutation]);
+
+  const revokeInvite = useCallback(async (inviteId: string) => {
+    try {
+      await revokeInviteMutation.mutateAsync(inviteId);
+      return true;
+    } catch {
+      return false;
+    }
+  }, [revokeInviteMutation]);
+
+  const approveJoinRequest = useCallback(async (requestId: string) => {
+    try {
+      await approveJoinRequestMutation.mutateAsync(requestId);
+      return true;
+    } catch {
+      return false;
+    }
+  }, [approveJoinRequestMutation]);
+
+  const deleteWorkspace = useCallback(async () => {
+    try {
+      await deleteWorkspaceMutation.mutateAsync();
+      return true;
+    } catch {
+      return false;
+    }
+  }, [deleteWorkspaceMutation]);
 
   const clearDeleteError = useCallback(() => setDeleteError(null), []);
 
   const updateMemberActivity = useCallback((userId: string, lastActiveAt: string) => {
-    setMembers((current) =>
-      current.map((member) =>
-        member.id === userId ? { ...member, lastActiveAt } : member
-      )
+    queryClient.setQueryData<WorkspaceMember[]>(queryKeys.workspaceMembers(activeWorkspaceId), (old) =>
+      old ? old.map((m) => (m.id === userId ? { ...m, lastActiveAt } : m)) : []
     );
-  }, []);
+  }, [activeWorkspaceId]);
+
+  const saveError = settingsQuery.error?.message || saveSettingsMutation.error?.message || saveErrorState || null;
 
   return {
-    settings,
+    settings: draftSettings || defaultSettings(activeWorkspaceId),
     settingsLoading,
-    saveLoading,
+    saveLoading: saveSettingsMutation.isPending,
     saveSuccess,
     saveError,
-    members,
-    invites,
-    invitesLoading,
-    joinRequests,
-    inviteLoading,
+    members: membersQuery.data || [],
+    invites: invitesQuery.data || [],
+    invitesLoading: invitesQuery.isLoading,
+    joinRequests: joinRequestsQuery.data || [],
+    inviteLoading: createInviteMutation.isPending,
     inviteError,
-    approveLoadingId,
-    revokeLoadingId,
-    deleteLoading,
+    approveLoadingId: approveJoinRequestMutation.isPending ? approveJoinRequestMutation.variables : null,
+    revokeLoadingId: revokeInviteMutation.isPending ? revokeInviteMutation.variables : null,
+    deleteLoading: deleteWorkspaceMutation.isPending,
     deleteError,
     updateSettings,
     saveSettings,

@@ -1,6 +1,8 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useWorkspaceSettings } from '../../hooks/useWorkspaceSettings.ts';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import React from 'react';
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -85,11 +87,16 @@ describe('useWorkspaceSettings', () => {
 
     vi.stubGlobal('fetch', fetchMock);
 
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
     const { result } = renderHook(() =>
       useWorkspaceSettings({
         currentUser,
         activeWorkspaceId: 'workspace-1',
-      })
+      }),
+      { wrapper }
     );
 
     await waitFor(() => {
@@ -156,11 +163,16 @@ describe('useWorkspaceSettings', () => {
 
     vi.stubGlobal('fetch', fetchMock);
 
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
     const { result } = renderHook(() =>
       useWorkspaceSettings({
         currentUser,
         activeWorkspaceId: 'workspace-1',
-      })
+      }),
+      { wrapper }
     );
 
     await waitFor(() => {
@@ -209,13 +221,17 @@ describe('useWorkspaceSettings', () => {
 
     vi.stubGlobal('fetch', fetchMock);
 
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
     const { result, rerender } = renderHook(
       ({ activeWorkspaceId }) =>
         useWorkspaceSettings({
           currentUser,
           activeWorkspaceId,
         }),
-      { initialProps: { activeWorkspaceId: 'workspace-1' } }
+      { initialProps: { activeWorkspaceId: 'workspace-1' }, wrapper }
     );
 
     await waitFor(() => {
@@ -274,13 +290,17 @@ describe('useWorkspaceSettings', () => {
 
     vi.stubGlobal('fetch', fetchMock);
 
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
     const { result, rerender } = renderHook(
       ({ activeWorkspaceId }) =>
         useWorkspaceSettings({
           currentUser,
           activeWorkspaceId,
         }),
-      { initialProps: { activeWorkspaceId: 'workspace-1' } }
+      { initialProps: { activeWorkspaceId: 'workspace-1' }, wrapper }
     );
 
     rerender({ activeWorkspaceId: 'workspace-2' });

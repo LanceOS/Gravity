@@ -14,6 +14,8 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         '@library': resolve(__dirname, '../library'),
+        '@tanstack/react-query': resolve(__dirname, 'src/utils/react-query-mock.tsx'),
+        '@tanstack/react-query-devtools': resolve(__dirname, 'src/utils/react-query-devtools-mock.tsx'),
       },
     },
     server: {
