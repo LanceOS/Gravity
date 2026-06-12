@@ -122,7 +122,7 @@ describe('SidebarProjectsSection', () => {
     expect(screen.queryByRole('button', { name: /Proj 1/i })).not.toBeInTheDocument();
   });
 
-  it('shows a create-first-team prompt when a team workspace is empty', () => {
+  it('does not show a create-first-team prompt when a team workspace is empty', () => {
     render(
       // @ts-expect-error narrow props for test
       <SidebarProjectsSection
@@ -136,6 +136,6 @@ describe('SidebarProjectsSection', () => {
       />
     );
 
-    expect(screen.getByText('Create your first team')).toBeInTheDocument();
+    expect(screen.queryByText('Create your first team')).not.toBeInTheDocument();
   });
 });

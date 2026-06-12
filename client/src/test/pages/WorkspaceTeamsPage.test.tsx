@@ -109,8 +109,10 @@ describe('WorkspaceTeamsPage', () => {
     expect(screen.getByText('Manage Teams')).toBeInTheDocument();
     expect(screen.getByText('Team workspace')).toBeInTheDocument();
     expect(screen.getByText('Engineering')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Engineering/ }));
     expect(screen.getByText('GRA · Gravity Core')).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: 'Manage Projects' })).toHaveLength(2);
+    expect(screen.getAllByRole('button', { name: 'Manage Projects' })).toHaveLength(1);
 
     await user.click(screen.getByRole('button', { name: 'Back to Workspace' }));
     expect(props.onBackToWorkspace).toHaveBeenCalledTimes(1);
@@ -134,9 +136,13 @@ describe('WorkspaceTeamsPage', () => {
       color: '#3B82F6',
     });
 
-    await user.type(screen.getByPlaceholderText('Engineering'), 'Support');
-    await user.type(screen.getByPlaceholderText('Owns product delivery and platform work'), 'Customer escalation team');
-    await user.click(screen.getByRole('button', { name: 'Create Team' }));
+    // Create a new team via Modal
+    await user.click(screen.getByRole('button', { name: 'New Team' }));
+    
+    const dialog = screen.getByRole('dialog');
+    await user.type(within(dialog).getByLabelText('Team Name'), 'Support');
+    await user.type(within(dialog).getByLabelText('Description'), 'Customer escalation team');
+    await user.click(within(dialog).getByRole('button', { name: 'Create Team' }));
 
     await waitFor(() => {
       expect(apiMocks.post).toHaveBeenCalledWith('/teams', {
@@ -147,8 +153,8 @@ describe('WorkspaceTeamsPage', () => {
       });
     });
 
-    const engineeringCard = screen.getByText('Engineering').closest('article');
-    expect(engineeringCard).not.toBeNull();
+    // Update the selected team (Select Engineering explicitly)
+    await user.click(screen.getByRole('button', { name: /Engineering/ }));
 
     apiMocks.patch.mockResolvedValueOnce({
       id: 'team-engineering',
@@ -158,13 +164,12 @@ describe('WorkspaceTeamsPage', () => {
       color: '#F97316',
     });
 
-    await user.click(within(engineeringCard as HTMLElement).getByRole('button', { name: 'Edit' }));
-    await user.clear(within(engineeringCard as HTMLElement).getByLabelText('Team name'));
-    await user.type(within(engineeringCard as HTMLElement).getByLabelText('Team name'), 'Core Engineering');
-    await user.clear(within(engineeringCard as HTMLElement).getByLabelText('Team description'));
-    await user.type(within(engineeringCard as HTMLElement).getByLabelText('Team description'), 'Updated product platform ownership');
-    await user.click(within(engineeringCard as HTMLElement).getByRole('button', { name: 'Use team color #F97316' }));
-    await user.click(within(engineeringCard as HTMLElement).getByRole('button', { name: 'Save' }));
+    await user.clear(screen.getByLabelText('Team name'));
+    await user.type(screen.getByLabelText('Team name'), 'Core Engineering');
+    await user.clear(screen.getByLabelText('Team description'));
+    await user.type(screen.getByLabelText('Team description'), 'Updated product platform ownership');
+    await user.click(screen.getByRole('button', { name: 'Use team color #F97316' }));
+    await user.click(screen.getByRole('button', { name: 'Save Team' }));
 
     await waitFor(() => {
       expect(apiMocks.patch).toHaveBeenCalledWith('/teams/team-engineering', {
@@ -183,9 +188,10 @@ describe('WorkspaceTeamsPage', () => {
       });
     });
 
-    await user.click(within(engineeringCard as HTMLElement).getByRole('button', { name: 'Reassign owned work before delete' }));
+    // Delete the selected team
+    await user.click(screen.getByRole('button', { name: 'Reassign owned work before delete' }));
     await user.click(screen.getByRole('option', { name: 'Design' }));
-    await user.click(within(engineeringCard as HTMLElement).getByRole('button', { name: 'Delete Team' }));
+    await user.click(screen.getByRole('button', { name: 'Delete Team' }));
 
     await waitFor(() => {
       expect(apiMocks.delete).toHaveBeenCalledWith('/teams/team-engineering', {
@@ -199,10 +205,9 @@ describe('WorkspaceTeamsPage', () => {
     const user = userEvent.setup();
     const { props } = renderWorkspaceTeamsPage();
 
-    const engineeringCard = screen.getByText('Engineering').closest('article');
-    expect(engineeringCard).not.toBeNull();
-
-    await user.click(within(engineeringCard as HTMLElement).getByRole('button', { name: 'Manage Projects' }));
+    // Select Engineering explicitly
+    await user.click(screen.getByRole('button', { name: /Engineering/ }));
+    await user.click(screen.getByRole('button', { name: 'Manage Projects' }));
 
     expect(props.onManageProjects).toHaveBeenCalledWith('team-engineering');
   });

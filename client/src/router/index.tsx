@@ -132,6 +132,15 @@ export const router = createBrowserRouter([
       </ProtectedRoute>
     ),
   },
+  // Team projects list page
+  {
+    path: '/workspaces/:workspaceId/teams/:teamId/projects',
+    element: (
+      <ProtectedRoute>
+        <AppShellPage />
+      </ProtectedRoute>
+    ),
+  },
   // Team project overview
   {
     path: '/workspaces/:workspaceId/teams/:teamId/projects/:projectId',

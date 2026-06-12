@@ -63,6 +63,8 @@ export interface SidebarProjectSection {
   onShowNotes: () => void;
   onSelectCycleLegacy?: (cycleId: string) => void;
   onSelectLabel?: (labelId: string) => void;
+  isWorkspaceOwner?: boolean;
+  onOpenTeamManager?: () => void;
 }
 
 export interface SidebarToolSection {

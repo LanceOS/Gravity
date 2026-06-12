@@ -1,4 +1,4 @@
-import { CheckCircle, ChevronDown, ChevronRight, Database, FolderTree } from 'lucide-react';
+import { CheckCircle, ChevronDown, ChevronRight, Database, FolderTree, Plus } from 'lucide-react';
 import { SidebarGroup, SidebarItem } from '@library';
 import type { SidebarNavigationState, SidebarProjectSection } from '../types';
 import { getTeamCollapsedState } from '../utils';
@@ -74,15 +74,25 @@ export function TeamsSidebar({
         </SidebarItem>
       </SidebarGroup>
 
-      <SidebarGroup label="Teams">
-        {teams.length === 0 ? (
-          <div className="teams-sidebar__empty-state">
-            <div className="teams-sidebar__empty-state-title">Create your first team</div>
-            <div className="teams-sidebar__empty-state-copy">
-              Teams organize projects, cycles, labels, and aggregate task views in this workspace.
-            </div>
+      <SidebarGroup
+        label={
+          <div className="teams-sidebar__header">
+            <span>Teams</span>
+            {section.isWorkspaceOwner && (
+              <button
+                type="button"
+                className="teams-sidebar__add-team-btn"
+                onClick={section.onOpenTeamManager}
+                title="Manage Teams"
+                aria-label="Manage Teams"
+              >
+                <Plus size={14} />
+              </button>
+            )}
           </div>
-        ) : teams.map((team) => {
+        }
+      >
+        {teams.map((team) => {
           const teamContainsActiveProject =
             !!activeProjectId && team.projects?.some((p) => p.id === activeProjectId);
           const isTeamActive = activeTeamId === team.id || teamContainsActiveProject;

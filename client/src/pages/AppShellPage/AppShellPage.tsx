@@ -1131,6 +1131,8 @@ export function AppShellPage() {
       onShowNotes: handleShowNotes,
       onSelectCycleLegacy: handleSelectCycleLegacy,
       onSelectLabel: handleSelectLabel,
+      isWorkspaceOwner,
+      onOpenTeamManager: handleOpenTeamManager,
     },
     tools: {
       onOpenOllama: handleToggleOllama,

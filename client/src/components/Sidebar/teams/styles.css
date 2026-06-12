@@ -105,3 +105,32 @@
 .teams-sidebar__cycle-name--completed {
   text-decoration: line-through;
 }
+
+/* ── Teams Header and Add Team Button ────────────── */
+.teams-sidebar__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.teams-sidebar__add-team-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  padding: 0;
+  margin-right: 4px;
+}
+
+.teams-sidebar__add-team-btn:hover {
+  background: var(--color-base100);
+  color: var(--color-text-primary);
+}
