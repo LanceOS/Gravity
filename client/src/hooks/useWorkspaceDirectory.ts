@@ -54,7 +54,9 @@ export function useWorkspaceDirectory({ currentUser, setCurrentUser }: UseWorksp
       return [];
     }
 
-    setLoading(true);
+    if (resolvedUserId !== requestedUserId) {
+      setLoading(true);
+    }
     setError(null);
 
     try {

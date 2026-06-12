@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, CalendarDays, FolderKanban, Save, Tags, Trash2, Users, Sparkles } from 'lucide-react';
 import { Button, Select, TextInput, Textarea, Modal } from '@library';
@@ -97,17 +97,23 @@ export function WorkspaceTeamsPage({
     }
   }, [selectedTeamId, sortedTeams]);
 
+  const prevSelectedTeamIdRef = useRef<string | null>(null);
+
   // Sync editDraft
   useEffect(() => {
     if (!selectedTeam) {
       return;
     }
-    setEditDraft({
-      name: selectedTeam.name,
-      description: selectedTeam.description ?? '',
-      color: selectedTeam.color || DEFAULT_TEAM_COLOR,
-    });
-    setFeedback(null);
+    
+    if (prevSelectedTeamIdRef.current !== selectedTeam.id) {
+      setEditDraft({
+        name: selectedTeam.name,
+        description: selectedTeam.description ?? '',
+        color: selectedTeam.color || DEFAULT_TEAM_COLOR,
+      });
+      setFeedback(null);
+      prevSelectedTeamIdRef.current = selectedTeam.id;
+    }
   }, [selectedTeam]);
 
   const refreshTeams = async () => {
@@ -187,7 +193,7 @@ export function WorkspaceTeamsPage({
     }
   };
 
-  const handleUpdateTeam = async (teamId: string) => {
+  const handleUpdateTeam = (teamId: string) => {
     const name = editDraft.name.trim();
     if (!name) {
       setFeedback({ type: 'error', message: 'Team name is required.' });
@@ -197,26 +203,35 @@ export function WorkspaceTeamsPage({
     setSavingAction(`update:${teamId}`);
     setFeedback(null);
 
-    try {
-      const updatedTeam = await apiClient.patch<Team>(`/teams/${teamId}`, {
-        name,
-        description: editDraft.description.trim(),
-        color: editDraft.color,
+    const description = editDraft.description.trim();
+    const color = editDraft.color;
+
+    // Optimistically update the cache
+    syncSidebarTreeTeam(teamId, (currentTeam) => ({
+      ...currentTeam,
+      name,
+      description,
+      color,
+    }));
+    
+    setFeedback({ type: 'success', message: 'Team updated.' });
+    setSavingAction('');
+
+    // Make the request in the background
+    apiClient
+      .patch<Team>(`/teams/${teamId}`, { name, description, color })
+      .then(() => {
+        // Silently reload components by invalidating the query
+        void queryClient.invalidateQueries({ queryKey: ['sidebarTree', workspaceId] });
+      })
+      .catch((error) => {
+        // Revert cache on failure by refetching
+        void queryClient.invalidateQueries({ queryKey: ['sidebarTree', workspaceId] });
+        setFeedback({
+          type: 'error',
+          message: error instanceof Error ? error.message : 'Failed to update team.',
+        });
       });
-      syncSidebarTreeTeam(teamId, (currentTeam) => ({
-        ...currentTeam,
-        ...updatedTeam,
-      }));
-      setFeedback({ type: 'success', message: 'Team updated.' });
-      await refreshTeams();
-    } catch (error) {
-      setFeedback({
-        type: 'error',
-        message: error instanceof Error ? error.message : 'Failed to update team.',
-      });
-    } finally {
-      setSavingAction('');
-    }
   };
 
   const handleDeleteTeam = async (team: SidebarTeam) => {
@@ -273,11 +288,11 @@ export function WorkspaceTeamsPage({
   }, [isCreateModalOpen, createDraft]);
 
   const createModalFooter = (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-      <span style={{ fontSize: '11px', color: 'var(--color-text-disabled)' }}>
+    <div className="workspace-teams-page__modal-footer">
+      <span className="workspace-teams-page__modal-hint">
         Ctrl/Cmd + Enter creates the team.
       </span>
-      <div style={{ display: 'flex', gap: '8px' }}>
+      <div className="workspace-teams-page__modal-actions">
         <Button type="button" variant="secondary" onClick={() => setIsCreateModalOpen(false)} disabled={savingAction === 'create'}>
           Cancel
         </Button>

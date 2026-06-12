@@ -90,7 +90,17 @@ const projects = [
   },
 ];
 
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
 function renderWorkspaceTeamProjectsPage(overrides: Partial<Parameters<typeof WorkspaceTeamProjectsPage>[0]> = {}) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  });
+
   const props: Parameters<typeof WorkspaceTeamProjectsPage>[0] = {
     workspaceId: 'workspace-1',
     workspaceName: 'Gravity',
@@ -114,7 +124,11 @@ function renderWorkspaceTeamProjectsPage(overrides: Partial<Parameters<typeof Wo
   };
 
   return {
-    ...render(<WorkspaceTeamProjectsPage {...props} />),
+    ...render(
+      <QueryClientProvider client={queryClient}>
+        <WorkspaceTeamProjectsPage {...props} />
+      </QueryClientProvider>
+    ),
     props,
   };
 }

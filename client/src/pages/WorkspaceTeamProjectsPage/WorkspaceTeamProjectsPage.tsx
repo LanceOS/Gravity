@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, FolderKanban, Save, Sparkles } from 'lucide-react';
 import { Button, TextInput, Textarea } from '@library';
 import { WorkspaceHeader } from '../../modules/workspaces';
 import { ProjectCreateOverlay } from '../../modules/workspaces/components/ProjectCreateOverlay';
 import { PROJECT_LIFECYCLE_OPTIONS, PROJECT_STATUS_LABELS, sanitizeProjectKey } from '../../modules/workspaces/utils/WorkspaceProjectPanel';
-import type { CreateProjectInput, Project, SidebarTeam } from '../../types/domain';
+import type { CreateProjectInput, Project, SidebarTeam, SidebarTree } from '../../types/domain';
 import '../WorkspacePage/WorkspacePage.css';
 import './WorkspaceTeamProjectsPage.css';
 
@@ -71,6 +72,7 @@ export function WorkspaceTeamProjectsPage({
   onCreateProject,
   onUpdateProject,
 }: WorkspaceTeamProjectsPageProps) {
+  const queryClient = useQueryClient();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [projectCreateLoading, setProjectCreateLoading] = useState(false);
   const [projectCreateError, setProjectCreateError] = useState<string | null>(null);
@@ -121,14 +123,19 @@ export function WorkspaceTeamProjectsPage({
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [activeProjectId, selectedProjectId, sortedProjects]);
 
+  const prevSelectedProjectIdRef = useRef<string | null>(null);
+
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect */
     if (!selectedProject) {
       return;
     }
 
-    setProjectDraft(getProjectDraft(selectedProject));
-    setFeedback(null);
+    if (prevSelectedProjectIdRef.current !== selectedProject.id) {
+      setProjectDraft(getProjectDraft(selectedProject));
+      setFeedback(null);
+      prevSelectedProjectIdRef.current = selectedProject.id;
+    }
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [selectedProject]);
 
@@ -151,6 +158,22 @@ export function WorkspaceTeamProjectsPage({
       });
 
       if (createdProject) {
+        queryClient.setQueryData<SidebarTree | undefined>(['sidebarTree', workspaceId], (current) => {
+          if (!current) return current;
+          return {
+            ...current,
+            teams: current.teams.map((t) => {
+              if (t.id === team?.id) {
+                return {
+                  ...t,
+                  projects: [...(t.projects || []), createdProject],
+                };
+              }
+              return t;
+            }),
+          };
+        });
+        void queryClient.invalidateQueries({ queryKey: ['sidebarTree', workspaceId] });
         setSelectedProjectId(createdProject.id);
       }
 
@@ -163,7 +186,7 @@ export function WorkspaceTeamProjectsPage({
     }
   };
 
-  const handleSaveProject = async (event: FormEvent<HTMLFormElement>) => {
+  const handleSaveProject = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (!selectedProject) {
@@ -179,27 +202,48 @@ export function WorkspaceTeamProjectsPage({
     setSavingProjectId(selectedProject.id);
     setFeedback(null);
 
-    try {
-      const updatedProject = await onUpdateProject(selectedProject.id, {
-        name: projectDraft.name.trim(),
-        description: projectDraft.description.trim(),
-        githubRepoUrl: githubRepoUrl || null,
-        status: projectDraft.status,
-      });
+    // Provide optimistic feedback
+    setFeedback({ type: 'success', message: 'Project updated.' });
+    setSavingProjectId('');
 
-      if (updatedProject) {
-        setSelectedProjectId(updatedProject.id);
-      }
+    // Optimistically update the sidebar tree
+    queryClient.setQueryData<SidebarTree | undefined>(['sidebarTree', workspaceId], (current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        teams: current.teams.map((t) => {
+          if (t.id === team?.id) {
+            return {
+              ...t,
+              projects: t.projects?.map((p) =>
+                p.id === selectedProject.id ? { ...p, name: projectDraft.name.trim() } : p
+              ),
+            };
+          }
+          return t;
+        }),
+      };
+    });
 
-      setFeedback({ type: 'success', message: 'Project updated.' });
-    } catch (error) {
-      setFeedback({
-        type: 'error',
-        message: error instanceof Error ? error.message : 'Failed to update project.',
+    onUpdateProject(selectedProject.id, {
+      name: projectDraft.name.trim(),
+      description: projectDraft.description.trim(),
+      githubRepoUrl: githubRepoUrl || null,
+      status: projectDraft.status,
+    })
+      .then((updatedProject) => {
+        if (updatedProject) {
+          setSelectedProjectId(updatedProject.id);
+        }
+        void queryClient.invalidateQueries({ queryKey: ['sidebarTree', workspaceId] });
+      })
+      .catch((error) => {
+        void queryClient.invalidateQueries({ queryKey: ['sidebarTree', workspaceId] });
+        setFeedback({
+          type: 'error',
+          message: error instanceof Error ? error.message : 'Failed to update project.',
+        });
       });
-    } finally {
-      setSavingProjectId('');
-    }
   };
 
   const handleSelectProject = (projectId: string) => {
