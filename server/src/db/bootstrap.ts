@@ -2,6 +2,7 @@ import { getMigrations } from 'better-auth/db/migration';
 import { auth } from '../modules/auth/auth.js';
 import { env } from '../env.js';
 import { pool } from './index.js';
+import { mergeDuplicateTeamLabels } from './label-migration.js';
 
 async function hasConstraint(constraintName: string) {
   try {
@@ -13,6 +14,45 @@ async function hasConstraint(constraintName: string) {
         LIMIT 1
       `,
       [constraintName],
+    );
+
+    return (result.rowCount ?? 0) > 0;
+  } catch {
+    return false;
+  }
+}
+
+async function hasTable(tableName: string) {
+  try {
+    const result = await pool.query(
+      `
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name = $1
+        LIMIT 1
+      `,
+      [tableName],
+    );
+
+    return (result.rowCount ?? 0) > 0;
+  } catch {
+    return false;
+  }
+}
+
+async function hasColumn(tableName: string, columnName: string) {
+  try {
+    const result = await pool.query(
+      `
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = $1
+          AND column_name = $2
+        LIMIT 1
+      `,
+      [tableName, columnName],
     );
 
     return (result.rowCount ?? 0) > 0;
@@ -176,18 +216,11 @@ export async function initializeDatabase() {
       PRIMARY KEY (project_id, user_id)
     );
 
-    CREATE TABLE IF NOT EXISTS domains (
-      id TEXT PRIMARY KEY,
-      project_id TEXT,
-      team_id TEXT,
-      name TEXT NOT NULL,
-      color TEXT NOT NULL DEFAULT '#6B7280',
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
+
 
     CREATE TABLE IF NOT EXISTS labels (
       id TEXT PRIMARY KEY,
-      project_id TEXT NOT NULL,
+      team_id TEXT NOT NULL,
       name TEXT NOT NULL,
       color TEXT NOT NULL DEFAULT '#6B7280',
       description TEXT NOT NULL DEFAULT '',
@@ -204,8 +237,7 @@ export async function initializeDatabase() {
 
     CREATE TABLE IF NOT EXISTS cycles (
       id TEXT PRIMARY KEY,
-      project_id TEXT,
-      team_id TEXT,
+      team_id TEXT NOT NULL,
       name TEXT NOT NULL,
       start_date TIMESTAMPTZ NOT NULL,
       end_date TIMESTAMPTZ NOT NULL,
@@ -222,7 +254,6 @@ export async function initializeDatabase() {
       priority TEXT NOT NULL DEFAULT 'no_priority',
       assignee_id TEXT,
       project_id TEXT NOT NULL,
-      domain_id TEXT,
       cycle_id TEXT,
       parent_id TEXT,
       pr_status TEXT NOT NULL DEFAULT 'none',
@@ -313,17 +344,15 @@ export async function initializeDatabase() {
 
     CREATE INDEX IF NOT EXISTS projects_workspace_id_idx ON projects (workspace_id);
     CREATE INDEX IF NOT EXISTS project_members_user_id_idx ON project_members (user_id);
-    CREATE INDEX IF NOT EXISTS domains_project_id_idx ON domains (project_id);
-    CREATE INDEX IF NOT EXISTS cycles_project_id_idx ON cycles (project_id);
+    CREATE INDEX IF NOT EXISTS cycles_team_id_idx ON cycles (team_id);
     CREATE INDEX IF NOT EXISTS tickets_project_id_idx ON tickets (project_id);
     CREATE INDEX IF NOT EXISTS tickets_assignee_id_idx ON tickets (assignee_id);
-    CREATE INDEX IF NOT EXISTS tickets_domain_id_idx ON tickets (domain_id);
     CREATE INDEX IF NOT EXISTS tickets_cycle_id_idx ON tickets (cycle_id);
     CREATE INDEX IF NOT EXISTS tickets_parent_id_idx ON tickets (parent_id);
     CREATE INDEX IF NOT EXISTS comments_ticket_id_idx ON comments (ticket_id);
     CREATE INDEX IF NOT EXISTS comments_user_id_idx ON comments (user_id);
     CREATE INDEX IF NOT EXISTS note_metadata_project_id_user_id_idx ON note_metadata (project_id, user_id);
-    CREATE INDEX IF NOT EXISTS labels_project_id_idx ON labels (project_id);
+    CREATE INDEX IF NOT EXISTS labels_team_id_idx ON labels (team_id);
     CREATE INDEX IF NOT EXISTS ticket_labels_label_id_idx ON ticket_labels (label_id);
   `);
 
@@ -332,58 +361,150 @@ export async function initializeDatabase() {
     ALTER TABLE projects ADD COLUMN IF NOT EXISTS github_repo_url TEXT;
     ALTER TABLE projects ADD COLUMN IF NOT EXISTS team_id TEXT;
     ALTER TABLE cycles ADD COLUMN IF NOT EXISTS team_id TEXT;
-    ALTER TABLE domains ADD COLUMN IF NOT EXISTS team_id TEXT;
-
-    ALTER TABLE cycles ALTER COLUMN project_id DROP NOT NULL;
-    ALTER TABLE domains ALTER COLUMN project_id DROP NOT NULL;
+    ALTER TABLE labels ADD COLUMN IF NOT EXISTS team_id TEXT;
 
     CREATE INDEX IF NOT EXISTS teams_workspace_id_idx ON teams (workspace_id);
     CREATE INDEX IF NOT EXISTS projects_team_id_idx ON projects (team_id);
     CREATE INDEX IF NOT EXISTS cycles_team_id_idx ON cycles (team_id);
-    CREATE INDEX IF NOT EXISTS domains_team_id_idx ON domains (team_id);
+    CREATE INDEX IF NOT EXISTS labels_team_id_idx ON labels (team_id);
   `);
 
-  // Migrate/Bootstrap default teams and associate projects/cycles/domains
+  // Migrate/Bootstrap default teams and preserve legacy domains as team labels.
+  const hasProjectsTable = await hasTable('projects');
+  const hasCyclesTable = await hasTable('cycles');
+  const hasLabelsTable = await hasTable('labels');
+  const hasDomainsTable = await hasTable('domains');
+  const hasTicketsTable = await hasTable('tickets');
+
+  const cyclesHaveProjectId = hasCyclesTable && await hasColumn('cycles', 'project_id');
+  const labelsHaveProjectId = hasLabelsTable && await hasColumn('labels', 'project_id');
+  const ticketsHaveDomainId = hasTicketsTable && await hasColumn('tickets', 'domain_id');
+
   await pool.query(`
     INSERT INTO teams (id, workspace_id, name, description, color, created_at, updated_at)
     SELECT 'team-general-' || id, id, 'General', 'Default team for workspace', '#6B7280', NOW(), NOW()
     FROM workspaces
     ON CONFLICT (id) DO NOTHING;
-
-    UPDATE projects
-    SET team_id = 'team-general-' || workspace_id
-    WHERE team_id IS NULL
-      OR team_id = ''
-      OR team_id NOT IN (SELECT id FROM teams);
-
-    UPDATE cycles
-    SET team_id = projects.team_id
-    FROM projects
-    WHERE cycles.project_id = projects.id
-      AND (
-        cycles.team_id IS NULL
-        OR cycles.team_id = ''
-        OR cycles.team_id NOT IN (SELECT id FROM teams)
-      );
-
-    UPDATE domains
-    SET team_id = projects.team_id
-    FROM projects
-    WHERE domains.project_id = projects.id
-      AND (
-        domains.team_id IS NULL
-        OR domains.team_id = ''
-        OR domains.team_id NOT IN (SELECT id FROM teams)
-      );
   `).catch((err) => {
     // eslint-disable-next-line no-console
-    console.error('Failed to run team migration:', err);
+    console.error('Failed to bootstrap default teams:', err);
   });
+
+  if (hasProjectsTable) {
+    await pool.query(`
+      UPDATE projects
+      SET team_id = 'team-general-' || workspace_id
+      WHERE team_id IS NULL
+        OR team_id = ''
+        OR team_id NOT IN (SELECT id FROM teams);
+    `).catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error('Failed to backfill project team assignments:', err);
+    });
+  }
+
+  if (hasCyclesTable && hasProjectsTable && cyclesHaveProjectId) {
+    await pool.query(`
+      UPDATE cycles
+      SET team_id = projects.team_id
+      FROM projects
+      WHERE cycles.project_id = projects.id
+        AND (
+          cycles.team_id IS NULL
+          OR cycles.team_id = ''
+          OR cycles.team_id NOT IN (SELECT id FROM teams)
+        );
+    `).catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error('Failed to backfill cycle team assignments:', err);
+    });
+  }
+
+  if (hasLabelsTable && hasProjectsTable && labelsHaveProjectId) {
+    await pool.query(`
+      UPDATE labels
+      SET team_id = projects.team_id
+      FROM projects
+      WHERE labels.project_id = projects.id
+        AND (labels.team_id IS NULL OR labels.team_id = '');
+    `).catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error('Failed to run labels team backfill:', err);
+    });
+  }
+
+  if (hasDomainsTable && hasLabelsTable && hasProjectsTable) {
+    if (labelsHaveProjectId) {
+      await pool.query(`
+        ALTER TABLE labels ALTER COLUMN project_id DROP NOT NULL;
+      `).catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error('Failed to relax legacy label project_id constraint:', err);
+      });
+    }
+
+    if (labelsHaveProjectId) {
+      await pool.query(`
+        INSERT INTO labels (id, project_id, team_id, name, color, description, sort_order, created_at)
+        SELECT domains.id, domains.project_id, COALESCE(domains.team_id, projects.team_id), domains.name, domains.color, '', 0, domains.created_at
+        FROM domains
+        LEFT JOIN projects ON domains.project_id = projects.id
+        WHERE COALESCE(domains.team_id, projects.team_id) IS NOT NULL
+        ON CONFLICT (id) DO NOTHING;
+      `).catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error('Failed to migrate domains into labels:', err);
+      });
+    } else {
+      await pool.query(`
+        INSERT INTO labels (id, team_id, name, color, description, sort_order, created_at)
+        SELECT domains.id, COALESCE(domains.team_id, projects.team_id), domains.name, domains.color, '', 0, domains.created_at
+        FROM domains
+        LEFT JOIN projects ON domains.project_id = projects.id
+        WHERE COALESCE(domains.team_id, projects.team_id) IS NOT NULL
+        ON CONFLICT (id) DO NOTHING;
+      `).catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error('Failed to migrate domains into labels:', err);
+      });
+    }
+
+    if (ticketsHaveDomainId) {
+      await pool.query(`
+        INSERT INTO ticket_labels (ticket_id, label_id)
+        SELECT tickets.id, domains.id
+        FROM tickets
+        INNER JOIN domains ON domains.id = tickets.domain_id
+        LEFT JOIN projects ON domains.project_id = projects.id
+        WHERE tickets.domain_id IS NOT NULL
+          AND tickets.domain_id <> ''
+          AND COALESCE(domains.team_id, projects.team_id) IS NOT NULL
+        ON CONFLICT (ticket_id, label_id) DO NOTHING;
+      `).catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error('Failed to migrate ticket domain assignments into ticket labels:', err);
+      });
+    }
+  }
+
+  if (hasLabelsTable) {
+    await mergeDuplicateTeamLabels(pool).catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error('Failed to merge duplicate labels during team migration:', err);
+    });
+
+    await pool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS labels_team_name_unique_idx ON labels (team_id, name);
+    `).catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error('Failed to ensure unique team label names:', err);
+    });
+  }
 
   await pool.query(`
     ALTER TABLE projects ALTER COLUMN team_id SET NOT NULL;
     ALTER TABLE cycles ALTER COLUMN team_id SET NOT NULL;
-    ALTER TABLE domains ALTER COLUMN team_id SET NOT NULL;
+    ALTER TABLE labels ALTER COLUMN team_id SET NOT NULL;
   `).catch((err) => {
     // eslint-disable-next-line no-console
     console.error('Failed to enforce team ownership on workspace records:', err);
@@ -417,29 +538,12 @@ export async function initializeDatabase() {
   });
 
   await ensureConstraint(
-    'domains',
-    'domains_team_id_teams_id_fk',
-    'FOREIGN KEY ("team_id") REFERENCES "teams"("id") ON DELETE NO ACTION',
+    'labels',
+    'labels_team_id_teams_id_fk',
+    'FOREIGN KEY ("team_id") REFERENCES "teams"("id") ON DELETE CASCADE',
   ).catch((err) => {
     // eslint-disable-next-line no-console
-    console.error('Failed to ensure domains team foreign key:', err);
-  });
-
-  // Migrate existing domain data to labels and ticket_labels
-  await pool.query(`
-    INSERT INTO labels (id, project_id, name, color, description, sort_order, created_at)
-    SELECT id, project_id, name, color, '', 0, created_at
-    FROM domains
-    ON CONFLICT (id) DO NOTHING;
-
-    INSERT INTO ticket_labels (ticket_id, label_id)
-    SELECT id AS ticket_id, domain_id AS label_id
-    FROM tickets
-    WHERE domain_id IS NOT NULL AND domain_id != ''
-    ON CONFLICT (ticket_id, label_id) DO NOTHING;
-  `).catch((err) => {
-    // eslint-disable-next-line no-console
-    console.error('Failed to run labels backfill migration:', err);
+    console.error('Failed to ensure labels team foreign key:', err);
   });
 
 

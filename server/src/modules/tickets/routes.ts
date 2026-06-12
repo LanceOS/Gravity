@@ -1,7 +1,7 @@
 import { and, asc, eq } from 'drizzle-orm';
 import { type Request, type Response, Router } from 'express';
 import { db } from '../../db/index.js';
-import { cycles, domains, labels, ticketLabels, projects, tickets, workspaceMembers } from '../../db/schema.js';
+import { cycles, labels, ticketLabels, projects, tickets } from '../../db/schema.js';
 import { broadcastEvent } from '../../realtime.js';
 import { createId, getProjectIdFromRequest, normalizeIsoDate } from '../../lib/platform.js';
 import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
@@ -24,13 +24,14 @@ import {
   WorkspaceScopeStrategy,
 } from './services/scope-strategies.js';
 
-function mapDomain(domain: typeof domains.$inferSelect) {
+function mapLabel(label: typeof labels.$inferSelect) {
   return {
-    id: domain.id,
-    projectId: domain.projectId,
-    teamId: domain.teamId,
-    name: domain.name,
-    color: domain.color,
+    id: label.id,
+    teamId: label.teamId,
+    name: label.name,
+    color: label.color,
+    description: label.description,
+    sortOrder: label.sortOrder,
   };
 }
 
@@ -52,6 +53,20 @@ async function getRequiredProjectTeamId(projectId: string) {
   }
 
   return teamId;
+}
+
+function normalizeLabelName(name: string) {
+  return name.trim();
+}
+
+async function ensureLabelNameAvailable(teamId: string, name: string, excludeLabelId?: string) {
+  const rows = await db
+    .select({ id: labels.id, name: labels.name })
+    .from(labels)
+    .where(eq(labels.teamId, teamId));
+
+  const normalizedName = normalizeLabelName(name);
+  return rows.find((row) => row.id !== excludeLabelId && normalizeLabelName(row.name) === normalizedName) ?? null;
 }
 
 export function createTicketsRouter() {
@@ -129,7 +144,6 @@ export function createTicketsRouter() {
       const ticketList = await strategy.execute({
         status: typeof req.query.status === 'string' ? req.query.status : undefined,
         priority: typeof req.query.priority === 'string' ? req.query.priority : undefined,
-        domainId: typeof req.query.domainId === 'string' ? req.query.domainId : undefined,
         assigneeId: typeof req.query.assigneeId === 'string' ? req.query.assigneeId : undefined,
         cycleId: typeof req.query.cycleId === 'string' ? req.query.cycleId : undefined,
         labels: typeof req.query.labels === 'string' ? req.query.labels.split(',').filter(Boolean) : undefined,
@@ -155,7 +169,6 @@ export function createTicketsRouter() {
           status: req.body.status,
           priority: req.body.priority,
           projectId,
-          domainId: req.body.domainId,
           cycleId: req.body.cycleId,
           assigneeId: req.body.assigneeId,
           parentId: req.body.parentId,
@@ -333,225 +346,98 @@ export function createTicketsRouter() {
     });
   });
 
-  router.get('/domains', async (req, res) => {
-    const teamId = typeof req.query.teamId === 'string' ? req.query.teamId : undefined;
+  router.get('/labels', async (req, res) => {
     const projectId = typeof req.query.projectId === 'string' ? req.query.projectId : getProjectIdFromRequest(req);
+    const teamId = typeof req.query.teamId === 'string' ? req.query.teamId : (projectId ? await getRequiredProjectTeamId(projectId) : undefined);
 
-    if (teamId) {
-      const auth = await authorizeTeamAccess(req, teamId);
-      if (!auth.allowed) {
-        res.status(auth.status ?? 403).json({ error: auth.error });
-        return;
-      }
-      try {
-        const rows = await db.select().from(domains).where(eq(domains.teamId, teamId)).orderBy(asc(domains.createdAt));
-        res.json(rows.map(mapDomain));
-      } catch (error) {
-        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load domains.' });
-      }
-    } else if (projectId) {
-      const auth = await authorizeProjectAccess(req, projectId);
-      if (!auth.allowed) {
-        res.status(auth.status ?? 403).json({ error: auth.error });
-        return;
-      }
-      try {
-        const teamIdOfProject = await getRequiredProjectTeamId(projectId);
-        const rows = await db.select().from(domains).where(eq(domains.teamId, teamIdOfProject)).orderBy(asc(domains.createdAt));
-        res.json(rows.map(mapDomain));
-      } catch (error) {
-        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load domains.' });
-      }
-    } else {
+    if (!teamId) {
       res.status(400).json({ error: 'Either teamId or projectId is required.' });
-    }
-  });
-
-  router.post('/domains', async (req, res) => {
-    const { name, color, teamId } = req.body ?? {};
-    const projectId = req.body?.projectId || getProjectIdFromRequest(req);
-
-    if (!name) {
-      res.status(400).json({ error: 'Domain name is required.' });
       return;
     }
 
-    if (teamId) {
-      const auth = await authorizeTeamAccess(req, teamId);
-      if (!auth.allowed) {
-        res.status(auth.status ?? 403).json({ error: auth.error });
-        return;
-      }
-      try {
-        const rows = await db
-          .insert(domains)
-          .values({
-            id: createId('d'),
-            teamId,
-            name,
-            color: color ?? '#6B7280',
-            createdAt: new Date(),
-          })
-          .returning();
-        res.status(201).json(mapDomain(rows[0]));
-      } catch (error) {
-        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create domain.' });
-      }
-    } else if (projectId) {
-      const auth = await authorizeProjectAccess(req, projectId);
-      if (!auth.allowed) {
-        res.status(auth.status ?? 403).json({ error: auth.error });
-        return;
-      }
-      try {
-        const teamIdOfProject = await getRequiredProjectTeamId(projectId);
+    const auth = typeof req.query.teamId === 'string'
+      ? await authorizeTeamAccess(req, teamId)
+      : await authorizeProjectAccess(req, projectId as string);
 
-        const rows = await db
-          .insert(domains)
-          .values({
-            id: createId('d'),
-            projectId,
-            teamId: teamIdOfProject,
-            name,
-            color: color ?? '#6B7280',
-            createdAt: new Date(),
-          })
-          .returning();
-        res.status(201).json(mapDomain(rows[0]));
-      } catch (error) {
-        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create domain.' });
-      }
-    } else {
-      res.status(400).json({ error: 'Either teamId or projectId is required.' });
+    if (!auth.allowed) {
+      res.status(auth.status ?? 403).json({ error: auth.error });
+      return;
     }
-  });
 
-  const handleDomainUpdate = async (req: Request, res: Response) => {
-    const domainId = normalizeRouteParam(req.params.domainId);
     try {
-      const domainRows = await db.select().from(domains).where(eq(domains.id, domainId)).limit(1);
-      const domain = domainRows[0];
-      if (!domain) {
-        res.status(404).json({ error: 'Domain not found.' });
-        return;
-      }
+      const rows = await db
+        .select({
+          id: labels.id,
+          teamId: labels.teamId,
+          name: labels.name,
+          color: labels.color,
+          description: labels.description,
+          sortOrder: labels.sortOrder,
+        })
+        .from(labels)
+        .where(eq(labels.teamId, teamId))
+        .orderBy(asc(labels.createdAt));
 
-      let auth;
-      if (domain.teamId) {
-        auth = await authorizeTeamAccess(req, domain.teamId);
-      } else if (domain.projectId) {
-        auth = await authorizeProjectAccess(req, domain.projectId);
-      } else {
-        res.status(403).json({ error: 'Access denied.' });
-        return;
-      }
-
-      if (!auth.allowed) {
-        res.status(auth.status ?? 403).json({ error: auth.error });
-        return;
-      }
-
-      const updates: any = {};
-      if (typeof req.body?.name === 'string') updates.name = req.body.name;
-      if (typeof req.body?.color === 'string') updates.color = req.body.color;
-
-      const rows = await db.update(domains).set(updates).where(eq(domains.id, domainId)).returning();
-      res.json(mapDomain(rows[0]));
+      res.json(rows);
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to update domain.' });
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load labels.' });
     }
-  };
-
-  router.put('/domains/:domainId', handleDomainUpdate);
-  router.patch('/domains/:domainId', handleDomainUpdate);
-
-  router.delete('/domains/:domainId', async (req, res) => {
-    const domainId = normalizeRouteParam(req.params.domainId);
-    try {
-      const domainRows = await db.select().from(domains).where(eq(domains.id, domainId)).limit(1);
-      const domain = domainRows[0];
-      if (!domain) {
-        res.status(404).json({ error: 'Domain not found.' });
-        return;
-      }
-
-      let auth;
-      if (domain.teamId) {
-        auth = await authorizeTeamAccess(req, domain.teamId);
-      } else if (domain.projectId) {
-        auth = await authorizeProjectAccess(req, domain.projectId);
-      } else {
-        res.status(403).json({ error: 'Access denied.' });
-        return;
-      }
-
-      if (!auth.allowed) {
-        res.status(auth.status ?? 403).json({ error: auth.error });
-        return;
-      }
-
-      await db.delete(domains).where(eq(domains.id, domainId));
-      res.json({ success: true });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to delete domain.' });
-    }
-  });
-
-  router.get('/labels', async (req, res) => {
-    await withProjectAccess(req, res, getProjectIdFromRequest(req), async (projectId) => {
-      try {
-        const rows = await db
-          .select({
-            id: labels.id,
-            projectId: labels.projectId,
-            name: labels.name,
-            color: labels.color,
-            description: labels.description,
-            sortOrder: labels.sortOrder,
-          })
-          .from(labels)
-          .where(eq(labels.projectId, projectId))
-          .orderBy(asc(labels.createdAt));
-        res.json(rows);
-      } catch (error) {
-        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load labels.' });
-      }
-    });
   });
 
   router.post('/labels', async (req, res) => {
-    await withProjectAccess(req, res, getProjectIdFromRequest(req), async (projectId) => {
-      if (!req.body?.name) {
-        res.status(400).json({ error: 'Label name is required.' });
+    const body = req.body ?? {};
+    const projectId = typeof body.projectId === 'string' ? body.projectId : getProjectIdFromRequest(req);
+    const bodyTeamId = typeof body.teamId === 'string' ? body.teamId : undefined;
+    const resolvedTeamId = bodyTeamId ?? (projectId ? await getRequiredProjectTeamId(projectId) : undefined);
+
+    if (!resolvedTeamId) {
+      res.status(400).json({ error: 'Either teamId or projectId is required.' });
+      return;
+    }
+
+    const auth = bodyTeamId
+      ? await authorizeTeamAccess(req, resolvedTeamId)
+      : await authorizeProjectAccess(req, projectId as string);
+
+    if (!auth.allowed) {
+      res.status(auth.status ?? 403).json({ error: auth.error });
+      return;
+    }
+
+    const labelName = typeof body.name === 'string' ? normalizeLabelName(body.name) : '';
+    if (!labelName) {
+      res.status(400).json({ error: 'Label name is required.' });
+      return;
+    }
+
+    const duplicate = await ensureLabelNameAvailable(resolvedTeamId, labelName);
+    if (duplicate) {
+      res.status(409).json({ error: 'Label name already exists in this team.' });
+      return;
+    }
+
+    try {
+      const rows = await db
+        .insert(labels)
+        .values({
+          id: createId('l'),
+          teamId: resolvedTeamId,
+          name: labelName,
+          color: typeof body.color === 'string' ? body.color : '#6B7280',
+          description: typeof body.description === 'string' ? body.description : '',
+          sortOrder: typeof body.sortOrder === 'number' ? body.sortOrder : 0,
+          createdAt: new Date(),
+        })
+        .returning();
+
+      res.status(201).json(mapLabel(rows[0]));
+    } catch (error) {
+      if (error instanceof Error && /unique/i.test(error.message)) {
+        res.status(409).json({ error: 'Label name already exists in this team.' });
         return;
       }
-
-      try {
-        const rows = await db
-          .insert(labels)
-          .values({
-            id: createId('l'),
-            projectId,
-            name: req.body.name,
-            color: typeof req.body?.color === 'string' ? req.body.color : '#6B7280',
-            description: typeof req.body?.description === 'string' ? req.body.description : '',
-            sortOrder: typeof req.body?.sortOrder === 'number' ? req.body.sortOrder : 0,
-            createdAt: new Date(),
-          })
-          .returning();
-
-        res.status(201).json({
-          id: rows[0].id,
-          projectId: rows[0].projectId,
-          name: rows[0].name,
-          color: rows[0].color,
-          description: rows[0].description,
-          sortOrder: rows[0].sortOrder,
-        });
-      } catch (error) {
-        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create label.' });
-      }
-    });
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create label.' });
+    }
   });
 
   router.put('/labels/:id', async (req, res) => {
@@ -569,14 +455,28 @@ export function createTicketsRouter() {
         return;
       }
 
-      const auth = await authorizeProjectAccess(req, labelRow.projectId);
+      const auth = await authorizeTeamAccess(req, labelRow.teamId);
       if (!auth.allowed) {
-        res.status(auth.status).json({ error: auth.error });
+        res.status(auth.status ?? 403).json({ error: auth.error });
         return;
       }
 
       const updates: any = {};
-      if (typeof req.body?.name === 'string') updates.name = req.body.name;
+      if (typeof req.body?.name === 'string') {
+        const normalizedName = normalizeLabelName(req.body.name);
+        if (!normalizedName) {
+          res.status(400).json({ error: 'Label name is required.' });
+          return;
+        }
+
+        const duplicate = await ensureLabelNameAvailable(labelRow.teamId, normalizedName, labelId);
+        if (duplicate) {
+          res.status(409).json({ error: 'Label name already exists in this team.' });
+          return;
+        }
+
+        updates.name = normalizedName;
+      }
       if (typeof req.body?.color === 'string') updates.color = req.body.color;
       if (typeof req.body?.description === 'string') updates.description = req.body.description;
       if (typeof req.body?.sortOrder === 'number') updates.sortOrder = req.body.sortOrder;
@@ -587,14 +487,7 @@ export function createTicketsRouter() {
         .where(eq(labels.id, labelId))
         .returning();
 
-      res.json({
-        id: rows[0].id,
-        projectId: rows[0].projectId,
-        name: rows[0].name,
-        color: rows[0].color,
-        description: rows[0].description,
-        sortOrder: rows[0].sortOrder,
-      });
+      res.json(mapLabel(rows[0]));
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to update label.' });
     }
@@ -615,9 +508,9 @@ export function createTicketsRouter() {
         return;
       }
 
-      const auth = await authorizeProjectAccess(req, labelRow.projectId);
+      const auth = await authorizeTeamAccess(req, labelRow.teamId);
       if (!auth.allowed) {
-        res.status(auth.status).json({ error: auth.error });
+        res.status(auth.status ?? 403).json({ error: auth.error });
         return;
       }
 
@@ -638,7 +531,7 @@ export function createTicketsRouter() {
         const rows = await db
           .select({
             id: labels.id,
-            projectId: labels.projectId,
+            teamId: labels.teamId,
             name: labels.name,
             color: labels.color,
             description: labels.description,
@@ -670,8 +563,9 @@ export function createTicketsRouter() {
           return;
         }
 
-        if (labelRows[0].projectId !== ticket.projectId) {
-          res.status(400).json({ error: 'Label does not belong to the ticket project.' });
+        const teamId = await getRequiredProjectTeamId(ticket.projectId);
+        if (labelRows[0].teamId !== teamId) {
+          res.status(400).json({ error: 'Label does not belong to the ticket team.' });
           return;
         }
 
@@ -749,57 +643,42 @@ export function createTicketsRouter() {
       return;
     }
 
-    if (teamId) {
-      const auth = await authorizeTeamAccess(req, teamId);
-      if (!auth.allowed) {
-        res.status(auth.status ?? 403).json({ error: auth.error });
-        return;
-      }
-      try {
-        const rows = await db
-          .insert(cycles)
-          .values({
-            id: createId('c'),
-            teamId,
-            name,
-            startDate: new Date(startDate),
-            endDate: new Date(endDate),
-            completed: Boolean(completed),
-            createdAt: new Date(),
-          })
-          .returning();
-        res.status(201).json(mapCycle(rows[0]));
-      } catch (error) {
-        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create cycle.' });
-      }
-    } else if (projectId) {
-      const auth = await authorizeProjectAccess(req, projectId);
-      if (!auth.allowed) {
-        res.status(auth.status ?? 403).json({ error: auth.error });
-        return;
-      }
-      try {
-        const teamIdOfProject = await getRequiredProjectTeamId(projectId);
+    const targetTeamId = typeof teamId === 'string'
+      ? teamId
+      : projectId
+        ? await getRequiredProjectTeamId(projectId)
+        : undefined;
 
-        const rows = await db
-          .insert(cycles)
-          .values({
-            id: createId('c'),
-            projectId,
-            teamId: teamIdOfProject,
-            name,
-            startDate: new Date(startDate),
-            endDate: new Date(endDate),
-            completed: Boolean(completed),
-            createdAt: new Date(),
-          })
-          .returning();
-        res.status(201).json(mapCycle(rows[0]));
-      } catch (error) {
-        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create cycle.' });
-      }
-    } else {
+    if (!targetTeamId) {
       res.status(400).json({ error: 'Either teamId or projectId is required.' });
+      return;
+    }
+
+    const auth = typeof teamId === 'string'
+      ? await authorizeTeamAccess(req, targetTeamId)
+      : await authorizeProjectAccess(req, projectId as string);
+
+    if (!auth.allowed) {
+      res.status(auth.status ?? 403).json({ error: auth.error });
+      return;
+    }
+
+    try {
+      const rows = await db
+        .insert(cycles)
+        .values({
+          id: createId('c'),
+          teamId: targetTeamId,
+          name,
+          startDate: new Date(startDate),
+          endDate: new Date(endDate),
+          completed: Boolean(completed),
+          createdAt: new Date(),
+        })
+        .returning();
+      res.status(201).json(mapCycle(rows[0]));
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create cycle.' });
     }
   });
 

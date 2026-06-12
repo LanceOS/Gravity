@@ -1,4 +1,4 @@
-import { boolean, index, integer, jsonb, pgTable, primaryKey, text, timestamp } from 'drizzle-orm/pg-core';
+import { boolean, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
 
 export const workspaces = pgTable('workspaces', {
   id: text('id').primaryKey(),
@@ -122,28 +122,17 @@ export const projectMembers = pgTable(
   }),
 );
 
-export const domains = pgTable('domains', {
-  id: text('id').primaryKey(),
-  projectId: text('project_id'),
-  teamId: text('team_id').notNull().references(() => teams.id),
-  name: text('name').notNull(),
-  color: text('color').notNull().default('#6B7280'),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-}, (table) => ({
-  projectIdIdx: index('domains_project_id_idx').on(table.projectId),
-  teamIdIdx: index('domains_team_id_idx').on(table.teamId),
-}));
-
 export const labels = pgTable('labels', {
   id: text('id').primaryKey(),
-  projectId: text('project_id').notNull(),
+  teamId: text('team_id').notNull().references(() => teams.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
   color: text('color').notNull().default('#6B7280'),
   description: text('description').notNull().default(''),
   sortOrder: integer('sort_order').notNull().default(0),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
-  projectIdIdx: index('labels_project_id_idx').on(table.projectId),
+  teamIdIdx: index('labels_team_id_idx').on(table.teamId),
+  teamIdNameUniqueIdx: uniqueIndex('labels_team_name_unique_idx').on(table.teamId, table.name),
 }));
 
 export const ticketLabels = pgTable('ticket_labels', {
@@ -157,14 +146,12 @@ export const ticketLabels = pgTable('ticket_labels', {
 
 export const cycles = pgTable('cycles', {
   id: text('id').primaryKey(),
-  projectId: text('project_id'),
-  teamId: text('team_id').notNull().references(() => teams.id),
+  teamId: text('team_id').notNull().references(() => teams.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
   startDate: timestamp('start_date', { withTimezone: true }).notNull(),
   endDate: timestamp('end_date', { withTimezone: true }).notNull(),
   completed: boolean('completed').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
-  projectIdIdx: index('cycles_project_id_idx').on(table.projectId),
   teamIdIdx: index('cycles_team_id_idx').on(table.teamId),
 }));
