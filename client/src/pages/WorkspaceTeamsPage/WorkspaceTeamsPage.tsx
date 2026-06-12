@@ -32,6 +32,67 @@ const TEAM_VIEWS: SidebarTeam['views'] = [
   { id: 'timeline', name: 'Timeline', type: 'timeline' },
 ];
 
+interface DangerZoneProps {
+  selectedTeam: SidebarTeam;
+  sortedTeams: SidebarTeam[];
+  reassignTeamById: Record<string, string>;
+  savingAction: string;
+  onReassignChange: (teamId: string, reassignId: string) => void;
+  onDelete: (team: SidebarTeam) => void;
+}
+
+function DangerZone({ selectedTeam, sortedTeams, reassignTeamById, savingAction, onReassignChange, onDelete }: DangerZoneProps) {
+  const referenceCount = getTeamReferenceCount(selectedTeam);
+  const reassignOptions = sortedTeams.filter((candidate) => candidate.id !== selectedTeam.id);
+  const selectedReassignTeamId = reassignTeamById[selectedTeam.id] ?? '';
+  const showReassignField = referenceCount > 0 && reassignOptions.length > 0;
+  const showLastTeamWarning = referenceCount > 0 && reassignOptions.length === 0;
+  const deleteDisabled = referenceCount > 0 && reassignOptions.length > 0 && !selectedReassignTeamId;
+
+  return (
+    <>
+      {showReassignField ? (
+        <div className="workspace-teams-page__reassign-field">
+          <span id={`${selectedTeam.id}-reassign-label`} className="workspace-teams-page__reassign-label">
+            Reassign owned work before delete
+          </span>
+          <Select
+            aria-labelledby={`${selectedTeam.id}-reassign-label`}
+            className="workspace-teams-page__reassign-select workspace-teams-page__reassign-select--full"
+            value={selectedReassignTeamId}
+            placeholder="Choose a team"
+            options={reassignOptions.map((candidate) => ({
+              value: candidate.id,
+              label: candidate.name,
+              color: candidate.color,
+            }))}
+            onValueChange={(nextTeamId) => onReassignChange(selectedTeam.id, nextTeamId)}
+          />
+        </div>
+      ) : null}
+
+      {showLastTeamWarning ? (
+        <div className="workspace-teams-page__danger-note">
+          This is the last team in the workspace. Deleting it will permanently remove its projects and related work.
+        </div>
+      ) : null}
+
+      <div className="workspace-teams-page__danger-delete-row">
+        <Button
+          type="button"
+          variant="danger"
+          size="sm"
+          onClick={() => onDelete(selectedTeam)}
+          disabled={deleteDisabled || savingAction === `delete:${selectedTeam.id}`}
+        >
+          <Trash2 size={13} />
+          <span>{savingAction === `delete:${selectedTeam.id}` ? 'Deleting...' : 'Delete Team'}</span>
+        </Button>
+      </div>
+    </>
+  );
+}
+
 function getInitialDraft(): TeamDraft {
   return {
     name: '',
@@ -121,6 +182,10 @@ export function WorkspaceTeamsPage({
     await onTeamsChanged?.();
   };
 
+  // Keep a ref to the latest handleCreateTeam so the keyboard shortcut always
+  // calls the current version without needing to re-register the listener.
+  const handleCreateTeamRef = useRef<() => Promise<void>>(async () => undefined);
+
   const syncSidebarTreeTeam = (teamId: string, updater: (currentTeam: SidebarTeam) => SidebarTeam) => {
     queryClient.setQueryData<SidebarTree | undefined>(['sidebarTree', workspaceId], (current) => {
       if (!current) {
@@ -192,6 +257,10 @@ export function WorkspaceTeamsPage({
       setSavingAction('');
     }
   };
+
+  // Always point the ref at the latest handleCreateTeam.
+  handleCreateTeamRef.current = handleCreateTeam;
+
 
   const handleUpdateTeam = (teamId: string) => {
     const name = editDraft.name.trim();
@@ -271,7 +340,9 @@ export function WorkspaceTeamsPage({
     }
   };
 
-  // Keyboard shortcut listener for the Create Modal
+  // Keyboard shortcut listener for the Create Modal.
+  // Uses a ref so the handler always reads the latest state without needing
+  // to re-register on every render.
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (!isCreateModalOpen) return;
@@ -280,12 +351,12 @@ export function WorkspaceTeamsPage({
       }
       if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
         event.preventDefault();
-        void handleCreateTeam();
+        void handleCreateTeamRef.current();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isCreateModalOpen, createDraft]);
+  }, [isCreateModalOpen]);
 
   const createModalFooter = (
     <div className="workspace-teams-page__modal-footer">
@@ -297,7 +368,7 @@ export function WorkspaceTeamsPage({
           Cancel
         </Button>
         <Button type="button" variant="primary" onClick={handleCreateTeam} disabled={savingAction === 'create'}>
-          <Users size={14} style={{ marginRight: '6px' }} />
+          <span className="workspace-teams-page__modal-btn-icon"><Users size={14} /></span>
           <span>{savingAction === 'create' ? 'Creating...' : 'Create Team'}</span>
         </Button>
       </div>
@@ -485,7 +556,7 @@ export function WorkspaceTeamsPage({
                             )}
                           </div>
                           {onManageProjects ? (
-                            <div style={{ marginTop: '8px' }}>
+                            <div className="workspace-teams-page__manage-projects-btn">
                               <Button
                                 type="button"
                                 variant="secondary"
@@ -508,65 +579,21 @@ export function WorkspaceTeamsPage({
                         </div>
 
                         {/* Danger Zone */}
-                        <div className="workspace-teams-page__danger-zone-wrapper">
-                          <span className="workspace-teams-page__danger-zone-title">Danger Zone</span>
-                          <div className="workspace-teams-page__danger-zone-content">
-                            {(() => {
-                              const referenceCount = getTeamReferenceCount(selectedTeam);
-                              const reassignOptions = sortedTeams.filter((candidate) => candidate.id !== selectedTeam.id);
-                              const selectedReassignTeamId = reassignTeamById[selectedTeam.id] ?? '';
-                              const showReassignField = referenceCount > 0 && reassignOptions.length > 0;
-                              const showLastTeamWarning = referenceCount > 0 && reassignOptions.length === 0;
-                              const deleteDisabled = referenceCount > 0 && reassignOptions.length > 0 && !selectedReassignTeamId;
-
-                              return (
-                                <>
-                                  {showReassignField ? (
-                                    <div className="workspace-teams-page__reassign-field">
-                                      <span id={`${selectedTeam.id}-reassign-label`} style={{ display: 'block', marginBottom: '4px', fontSize: '11px', color: 'var(--color-text-secondary)' }}>
-                                        Reassign owned work before delete
-                                      </span>
-                                      <Select
-                                        aria-labelledby={`${selectedTeam.id}-reassign-label`}
-                                        className="workspace-teams-page__reassign-select"
-                                        value={selectedReassignTeamId}
-                                        placeholder="Choose a team"
-                                        options={reassignOptions.map((candidate) => ({
-                                          value: candidate.id,
-                                          label: candidate.name,
-                                          color: candidate.color,
-                                        }))}
-                                        onValueChange={(nextTeamId) => {
-                                          setReassignTeamById((current) => ({ ...current, [selectedTeam.id]: nextTeamId }));
-                                        }}
-                                        style={{ width: '100%' }}
-                                      />
-                                    </div>
-                                  ) : null}
-
-                                  {showLastTeamWarning ? (
-                                    <div className="workspace-teams-page__danger-note">
-                                      This is the last team in the workspace. Deleting it will permanently remove its projects and related work.
-                                    </div>
-                                  ) : null}
-
-                                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '12px' }}>
-                                    <Button
-                                      type="button"
-                                      variant="danger"
-                                      size="sm"
-                                      onClick={() => handleDeleteTeam(selectedTeam)}
-                                      disabled={deleteDisabled || savingAction === `delete:${selectedTeam.id}`}
-                                    >
-                                      <Trash2 size={13} />
-                                      <span>{savingAction === `delete:${selectedTeam.id}` ? 'Deleting...' : 'Delete Team'}</span>
-                                    </Button>
-                                  </div>
-                                </>
-                              );
-                            })()}
-                          </div>
-                        </div>
+                         <div className="workspace-teams-page__danger-zone-wrapper">
+                           <span className="workspace-teams-page__danger-zone-title">Danger Zone</span>
+                           <div className="workspace-teams-page__danger-zone-content">
+                             <DangerZone
+                               selectedTeam={selectedTeam}
+                               sortedTeams={sortedTeams}
+                               reassignTeamById={reassignTeamById}
+                               savingAction={savingAction}
+                               onReassignChange={(teamId, reassignId) =>
+                                 setReassignTeamById((current) => ({ ...current, [teamId]: reassignId }))
+                               }
+                               onDelete={handleDeleteTeam}
+                             />
+                           </div>
+                         </div>
                       </div>
                     </div>
 
@@ -607,7 +634,7 @@ export function WorkspaceTeamsPage({
               e.preventDefault();
               void handleCreateTeam();
             }}
-            style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}
+            className="workspace-teams-page__modal-form"
           >
             <TextInput
               label="Team Name"
@@ -628,8 +655,8 @@ export function WorkspaceTeamsPage({
               disabled={savingAction === 'create'}
             />
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-primary)' }}>Team Color</span>
+            <div className="workspace-teams-page__color-section">
+              <span className="workspace-teams-page__color-label">Team Color</span>
               <div className="workspace-teams-page__color-row" aria-label="Team color">
                 {COLOR_OPTIONS.map((color) => (
                   <button

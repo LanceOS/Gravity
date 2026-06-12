@@ -57,6 +57,7 @@ export async function listProjectsWithDetails(userId: string, workspaceId?: stri
     key: string;
     status: string;
     workspaceId: string;
+    githubRepoUrl: string | null;
     teamId: string;
   }> = workspaceId
     ? await baseQuery.where(eq(projects.workspaceId, workspaceId)).orderBy(asc(projects.createdAt))

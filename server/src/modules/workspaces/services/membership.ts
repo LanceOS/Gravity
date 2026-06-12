@@ -135,5 +135,6 @@ export async function authorizeTeamOwnerAccess(req: Request, teamId: string) {
     return { allowed: false as const, error: 'Only workspace owners can manage teams.', status: 403 };
   }
 
-  return { allowed: true as const, userId };
+  // Return workspaceId so callers can avoid a redundant round-trip to look it up again.
+  return { allowed: true as const, userId, workspaceId };
 }

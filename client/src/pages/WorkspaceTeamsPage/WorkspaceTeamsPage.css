@@ -541,3 +541,38 @@
     justify-content: flex-end;
   }
 }
+
+/* ── Styles replacing removed inline styles ─────────────────────── */
+
+.workspace-teams-page__reassign-label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+.workspace-teams-page__reassign-select--full {
+  width: 100%;
+}
+
+.workspace-teams-page__danger-delete-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.workspace-teams-page__manage-projects-btn {
+  margin-top: 8px;
+}
+
+.workspace-teams-page__modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.workspace-teams-page__modal-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 6px;
+}

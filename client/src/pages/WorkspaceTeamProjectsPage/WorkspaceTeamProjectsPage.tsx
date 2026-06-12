@@ -202,11 +202,7 @@ export function WorkspaceTeamProjectsPage({
     setSavingProjectId(selectedProject.id);
     setFeedback(null);
 
-    // Provide optimistic feedback
-    setFeedback({ type: 'success', message: 'Project updated.' });
-    setSavingProjectId('');
-
-    // Optimistically update the sidebar tree
+    // Optimistically update the sidebar tree while the request is in-flight.
     queryClient.setQueryData<SidebarTree | undefined>(['sidebarTree', workspaceId], (current) => {
       if (!current) return current;
       return {
@@ -235,6 +231,7 @@ export function WorkspaceTeamProjectsPage({
         if (updatedProject) {
           setSelectedProjectId(updatedProject.id);
         }
+        setFeedback({ type: 'success', message: 'Project updated.' });
         void queryClient.invalidateQueries({ queryKey: ['sidebarTree', workspaceId] });
       })
       .catch((error) => {
@@ -243,6 +240,9 @@ export function WorkspaceTeamProjectsPage({
           type: 'error',
           message: error instanceof Error ? error.message : 'Failed to update project.',
         });
+      })
+      .finally(() => {
+        setSavingProjectId('');
       });
   };
 

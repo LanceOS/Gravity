@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../../db/index.js';
 import { comments, cycles, domains, labels, noteMetadata, projectMembers, projects, teams, ticketLabels, tickets, workspaces } from '../../db/schema.js';
-import { eq, inArray } from 'drizzle-orm';
+import { eq, inArray, or } from 'drizzle-orm';
 import { createId, invalidateWorkspaceCache } from '../../lib/platform.js';
 import { RustFS } from '../../lib/rustfs.js';
 import {
@@ -50,10 +50,9 @@ async function deleteLastTeamWithOwnedWork(teamId: string, workspaceId: string) 
     if (projectIds.length > 0) {
       await tx.delete(noteMetadata).where(inArray(noteMetadata.projectId, projectIds));
       await tx.delete(projectMembers).where(inArray(projectMembers.projectId, projectIds));
-      await tx.delete(cycles).where(inArray(cycles.projectId, projectIds));
-      await tx.delete(cycles).where(eq(cycles.teamId, teamId));
-      await tx.delete(domains).where(inArray(domains.projectId, projectIds));
-      await tx.delete(domains).where(eq(domains.teamId, teamId));
+      // Combine both project-scoped and team-scoped deletions into one query each.
+      await tx.delete(cycles).where(or(inArray(cycles.projectId, projectIds), eq(cycles.teamId, teamId)));
+      await tx.delete(domains).where(or(inArray(domains.projectId, projectIds), eq(domains.teamId, teamId)));
       await tx.delete(projects).where(inArray(projects.id, projectIds));
     } else {
       await tx.delete(cycles).where(eq(cycles.teamId, teamId));
@@ -169,11 +168,10 @@ export function createTeamsRouter() {
         return;
       }
 
-      const updates: any = {};
+      const updates: Partial<typeof teams.$inferInsert> & { updatedAt: Date } = { updatedAt: new Date() };
       if (typeof name === 'string') updates.name = name;
       if (typeof description === 'string') updates.description = description;
       if (typeof color === 'string') updates.color = color;
-      updates.updatedAt = new Date();
 
       await db.update(teams).set(updates).where(eq(teams.id, teamId));
       const updated = await db.select().from(teams).where(eq(teams.id, teamId)).limit(1);
@@ -195,17 +193,13 @@ export function createTeamsRouter() {
         return;
       }
 
-      const currentTeamRows = await db.select().from(teams).where(eq(teams.id, teamId)).limit(1);
-      const currentTeam = currentTeamRows[0];
-      if (!currentTeam) {
-        res.status(404).json({ error: 'Team not found.' });
-        return;
-      }
+      // auth already validated the team exists and returns its workspaceId — no need for a second lookup.
+      const { workspaceId } = auth;
 
       const workspaceTeamRows = await db
         .select({ id: teams.id })
         .from(teams)
-        .where(eq(teams.workspaceId, currentTeam.workspaceId));
+        .where(eq(teams.workspaceId, workspaceId));
 
       const [existingProjects, existingCycles, existingDomains] = await Promise.all([
         db.select({ id: projects.id }).from(projects).where(eq(projects.teamId, teamId)),
@@ -226,7 +220,7 @@ export function createTeamsRouter() {
             res.status(400).json({ error: 'Reassignment target team not found.' });
             return;
           }
-          if (targetTeamRows[0].workspaceId !== currentTeam.workspaceId) {
+          if (targetTeamRows[0].workspaceId !== workspaceId) {
             res.status(400).json({ error: 'Reassignment target team must belong to the same workspace.' });
             return;
           }
@@ -237,16 +231,16 @@ export function createTeamsRouter() {
             await tx.update(domains).set({ teamId: reassignTeamId }).where(eq(domains.teamId, teamId));
             await tx.delete(teams).where(eq(teams.id, teamId));
           });
-          await invalidateWorkspaceCache(currentTeam.workspaceId);
+          await invalidateWorkspaceCache(workspaceId);
         } else if (isLastTeam) {
-          await deleteLastTeamWithOwnedWork(teamId, currentTeam.workspaceId);
+          await deleteLastTeamWithOwnedWork(teamId, workspaceId);
         } else {
           res.status(400).json({ error: 'Cannot delete team: projects, cycles, or domains still reference it. Please reassign them first.' });
           return;
         }
       } else {
         await db.delete(teams).where(eq(teams.id, teamId));
-        await invalidateWorkspaceCache(currentTeam.workspaceId);
+        await invalidateWorkspaceCache(workspaceId);
       }
 
       res.json({ success: true });
