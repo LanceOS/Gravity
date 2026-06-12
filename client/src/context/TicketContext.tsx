@@ -761,6 +761,9 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     },
     onSuccess: (project) => {
       if (currentUser) {
+        queryClient.setQueryData<Project[]>(queryKeys.projects(currentUser.id), (old) => {
+          return old ? [...old, project] : [project];
+        });
         queryClient.invalidateQueries({ queryKey: queryKeys.projects(currentUser.id) });
         setActiveProjectId(project.id);
       }
@@ -781,7 +784,25 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<Project> }) => {
       return apiClient.patch<Project>(`/projects/${id}`, updates);
     },
-    onSuccess: () => {
+    onMutate: async ({ id, updates }) => {
+      if (!currentUser) return;
+      const queryKey = queryKeys.projects(currentUser.id);
+      const previousProjects = queryClient.getQueryData<Project[]>(queryKey);
+
+      if (previousProjects) {
+        queryClient.setQueryData<Project[]>(queryKey, (old) =>
+          old ? old.map((p) => (p.id === id ? { ...p, ...updates } : p)) : []
+        );
+      }
+
+      return { previousProjects };
+    },
+    onError: (err, variables, context: any) => {
+      if (currentUser && context?.previousProjects) {
+        queryClient.setQueryData(queryKeys.projects(currentUser.id), context.previousProjects);
+      }
+    },
+    onSettled: () => {
       if (currentUser) {
         queryClient.invalidateQueries({ queryKey: queryKeys.projects(currentUser.id) });
       }

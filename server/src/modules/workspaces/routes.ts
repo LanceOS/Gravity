@@ -23,7 +23,6 @@ import {
 import {
   addUserToWorkspaceProjects,
   createId,
-  createProjectInviteCode,
   createWorkspaceAccessKey,
   createWorkspaceInviteCode,
   ensureProjectMembership,
@@ -44,13 +43,6 @@ import { createRedisRateLimiter } from '../../lib/rateLimitRedis.js';
 import { getRequestSourceIp } from '../../lib/request-ip.js';
 import { isWorkspaceMember } from './services/membership.js';
 import { getSidebarTree } from './services/sidebar.js';
-import { mapProjectCreationError } from './utils/project-creation.js';
-import {
-  DEFAULT_TEAM_COLOR,
-  DEFAULT_TEAM_DESCRIPTION,
-  DEFAULT_TEAM_NAME,
-  getDefaultTeamId,
-} from './utils/default-team.js';
 import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
 import { env } from '../../env.js';
 
@@ -295,7 +287,7 @@ export function createWorkspacesRouter() {
       return;
     }
 
-    const { name, description, key, workspaceKey, ownerId, defaultProjectName, defaultProjectKey, hierarchyMode } = req.body ?? {};
+    const { name, description, key, workspaceKey, ownerId, hierarchyMode } = req.body ?? {};
     if (!name || !key) {
       res.status(400).json({ error: 'Workspace name and key are required.' });
       return;
@@ -312,8 +304,6 @@ export function createWorkspacesRouter() {
       const normalizedWorkspaceKey = normalizeEntityKey(key);
       const resolvedWorkspaceAccessKey = workspaceKey?.trim() || createWorkspaceAccessKey(normalizedWorkspaceKey);
 
-      const defaultProjectId = defaultProjectName ? createId('p') : null;
-
       await db.transaction(async (tx) => {
         await tx.insert(workspaces).values({
           id: workspaceId,
@@ -322,7 +312,7 @@ export function createWorkspacesRouter() {
           key: normalizedWorkspaceKey,
           workspaceKey: resolvedWorkspaceAccessKey,
           hostUrl: '',
-          defaultProjectId,
+          defaultProjectId: null,
           createdBy: effectiveOwnerId,
           createdAt: new Date(),
         });
@@ -342,55 +332,13 @@ export function createWorkspacesRouter() {
           role: 'owner',
           createdAt: new Date(),
         });
-
-        await tx.insert(teams).values({
-          id: getDefaultTeamId(workspaceId),
-          workspaceId,
-          name: DEFAULT_TEAM_NAME,
-          description: DEFAULT_TEAM_DESCRIPTION,
-          color: DEFAULT_TEAM_COLOR,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
-
-        if (defaultProjectId && defaultProjectName) {
-          const normalizedProjectKey = normalizeEntityKey(defaultProjectKey || defaultProjectName.slice(0, 3).toUpperCase());
-          await tx.insert(projects).values({
-            id: defaultProjectId,
-            workspaceId,
-            teamId: getDefaultTeamId(workspaceId),
-            name: defaultProjectName,
-            description: '',
-            key: normalizedProjectKey,
-            status: 'active',
-            inviteCode: createProjectInviteCode(normalizedProjectKey),
-            createdBy: effectiveOwnerId,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          });
-
-          await tx.insert(projectMembers).values({
-            projectId: defaultProjectId,
-            userId: effectiveOwnerId,
-            role: 'owner',
-            createdAt: new Date(),
-          });
-        }
       });
 
       await invalidateUserWorkspacesCache(effectiveOwnerId);
       const workspace = await getWorkspaceSummary(workspaceId, effectiveOwnerId);
       res.status(201).json({ workspace });
     } catch (error) {
-      const normalizedDefaultProjectKey =
-        typeof defaultProjectKey === 'string' && defaultProjectKey.trim().length > 0
-          ? normalizeEntityKey(defaultProjectKey)
-          : typeof defaultProjectName === 'string' && defaultProjectName.trim().length > 0
-            ? normalizeEntityKey(defaultProjectName)
-            : normalizeEntityKey(key);
-      const mappedProjectCreationError = mapProjectCreationError(error, normalizedDefaultProjectKey);
-
-      res.status(mappedProjectCreationError.status).json({ error: mappedProjectCreationError.message });
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create workspace.' });
     }
   });
 

@@ -15,7 +15,7 @@ async function hasConstraint(constraintName: string) {
       [constraintName],
     );
 
-    return result.rowCount > 0;
+    return (result.rowCount ?? 0) > 0;
   } catch {
     return false;
   }
@@ -354,11 +354,7 @@ export async function initializeDatabase() {
     SET team_id = 'team-general-' || workspace_id
     WHERE team_id IS NULL
       OR team_id = ''
-      OR NOT EXISTS (
-        SELECT 1
-        FROM teams
-        WHERE teams.id = projects.team_id
-      );
+      OR team_id NOT IN (SELECT id FROM teams);
 
     UPDATE cycles
     SET team_id = projects.team_id
@@ -367,11 +363,7 @@ export async function initializeDatabase() {
       AND (
         cycles.team_id IS NULL
         OR cycles.team_id = ''
-        OR NOT EXISTS (
-          SELECT 1
-          FROM teams
-          WHERE teams.id = cycles.team_id
-        )
+        OR cycles.team_id NOT IN (SELECT id FROM teams)
       );
 
     UPDATE domains
@@ -381,11 +373,7 @@ export async function initializeDatabase() {
       AND (
         domains.team_id IS NULL
         OR domains.team_id = ''
-        OR NOT EXISTS (
-          SELECT 1
-          FROM teams
-          WHERE teams.id = domains.team_id
-        )
+        OR domains.team_id NOT IN (SELECT id FROM teams)
       );
   `).catch((err) => {
     // eslint-disable-next-line no-console

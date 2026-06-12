@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { db } from '../src/db/index.js';
-import { teams, projects, cycles, domains } from '../src/db/schema.js';
+import { RustFS } from '../src/lib/rustfs.js';
+import { teams, projects, cycles, domains, labels, noteMetadata, ticketLabels, tickets, workspaceMembers, workspaces } from '../src/db/schema.js';
 import { eq } from 'drizzle-orm';
 import { createAuthenticatedApi, seedWorkspaceFixture, seedTicket } from './helpers/test-helpers.js';
 
@@ -136,6 +137,131 @@ describe('teams integration tests', () => {
     expect(team1Rows).toHaveLength(0);
   });
 
+  it('deletes the last team and its owned work when no reassignment target exists', async () => {
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Last Team Owner',
+      email: 'last-team-owner@example.com',
+      role: 'owner',
+    });
+
+    const createWorkspaceResponse = await ownerApi.post('/api/v1/workspaces').send({
+      name: 'Team Workspace',
+      description: 'Starts empty',
+      key: 'TWX',
+      hierarchyMode: 'teams',
+    });
+
+    expect(createWorkspaceResponse.status).toBe(201);
+    const workspace = createWorkspaceResponse.body.workspace;
+
+    const createTeamResponse = await ownerApi
+      .post('/api/v1/teams')
+      .send({
+        workspaceId: workspace.id,
+        name: 'Platform Team',
+        description: 'Owns the core platform',
+        color: '#3B82F6',
+      });
+    expect(createTeamResponse.status).toBe(201);
+    const teamId = createTeamResponse.body.id;
+
+    const createProjectResponse = await ownerApi
+      .post('/api/v1/projects')
+      .send({
+        workspaceId: workspace.id,
+        teamId,
+        name: 'Platform Project',
+        key: 'PLT',
+        description: 'Primary platform delivery project',
+        status: 'active',
+      });
+    expect(createProjectResponse.status).toBe(201);
+    const projectId = createProjectResponse.body.id;
+
+    const cycleResponse = await ownerApi.post('/api/v1/cycles').send({
+      teamId,
+      name: 'Platform Sprint',
+      startDate: new Date('2026-06-01').toISOString(),
+      endDate: new Date('2026-06-08').toISOString(),
+    });
+    expect(cycleResponse.status).toBe(201);
+
+    const domainResponse = await ownerApi.post('/api/v1/domains').send({
+      teamId,
+      name: 'Platform Label',
+      color: '#2563EB',
+    });
+    expect(domainResponse.status).toBe(201);
+
+    const ticketResponse = await ownerApi
+      .post('/api/v1/tickets')
+      .set('X-Project-Id', projectId)
+      .send({
+        title: 'Ship platform milestone',
+        description: 'Make sure the core path stays green.',
+      });
+    expect(ticketResponse.status).toBe(201);
+    const ticketId = ticketResponse.body.id;
+
+    const labelResponse = await ownerApi
+      .post('/api/v1/labels')
+      .set('X-Project-Id', projectId)
+      .send({
+        name: 'Critical',
+        color: '#DC2626',
+      });
+    expect(labelResponse.status).toBe(201);
+    const labelId = labelResponse.body.id;
+
+    const ticketLabelResponse = await ownerApi
+      .post(`/api/v1/tickets/${ticketId}/labels`)
+      .send({ labelId });
+    expect(ticketLabelResponse.status).toBe(201);
+
+    const noteResponse = await ownerApi
+      .post('/api/v1/notes')
+      .set('X-Project-Id', projectId)
+      .send({
+        title: 'Runbook',
+        body: '# Runbook\nDelete-safe notes.',
+      });
+    expect(noteResponse.status).toBe(201);
+    const noteBucketPath = noteResponse.body.bucketPath as string;
+
+    const deleteResponse = await ownerApi.delete(`/api/v1/teams/${teamId}`);
+    expect(deleteResponse.status).toBe(200);
+    expect(deleteResponse.body).toEqual({ success: true });
+
+    const workspaceRows = await db.select().from(workspaces).where(eq(workspaces.id, workspace.id)).limit(1);
+    expect(workspaceRows[0]?.defaultProjectId).toBeNull();
+
+    const teamRows = await db.select().from(teams).where(eq(teams.id, teamId)).limit(1);
+    expect(teamRows).toHaveLength(0);
+
+    const projectRows = await db.select().from(projects).where(eq(projects.id, projectId)).limit(1);
+    expect(projectRows).toHaveLength(0);
+
+    const cycleRows = await db.select().from(cycles).where(eq(cycles.id, cycleResponse.body.id)).limit(1);
+    expect(cycleRows).toHaveLength(0);
+
+    const domainRows = await db.select().from(domains).where(eq(domains.id, domainResponse.body.id)).limit(1);
+    expect(domainRows).toHaveLength(0);
+
+    const ticketRows = await db.select().from(tickets).where(eq(tickets.id, ticketId)).limit(1);
+    expect(ticketRows).toHaveLength(0);
+
+    const labelRows = await db.select().from(labels).where(eq(labels.id, labelId)).limit(1);
+    expect(labelRows).toHaveLength(0);
+
+    const ticketLabelRows = await db.select().from(ticketLabels).where(eq(ticketLabels.ticketId, ticketId)).limit(1);
+    expect(ticketLabelRows).toHaveLength(0);
+
+    const noteRows = await db.select().from(noteMetadata).where(eq(noteMetadata.projectId, projectId)).limit(1);
+    expect(noteRows).toHaveLength(0);
+
+    expect(await RustFS.listFiles(noteBucketPath)).toHaveLength(0);
+  });
+
   it('queries team-scoped cycles, domains, and tickets via scope strategies', async () => {
     const ownerApi = await createAuthenticatedApi({
       name: 'Ticket Scoper',
@@ -226,5 +352,68 @@ describe('teams integration tests', () => {
     expect(domainsRes.status).toBe(200);
     expect(domainsRes.body).toHaveLength(1);
     expect(domainsRes.body[0].name).toBe('Team Label 1');
+  });
+
+  it('requires workspace ownership to mutate teams', async () => {
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Team Mutation Owner',
+      email: 'team-mutation-owner@example.com',
+      role: 'owner',
+    });
+    const memberApi = await createAuthenticatedApi({
+      name: 'Team Mutation Member',
+      email: 'team-mutation-member@example.com',
+      role: 'member',
+    });
+
+    const owner = ownerApi.user;
+    const member = memberApi.user;
+    const { workspace } = await seedWorkspaceFixture({
+      owner: {
+        id: owner.id,
+        name: owner.name,
+        email: owner.email,
+        role: 'owner',
+        avatarUrl: owner.avatar,
+      },
+    });
+
+    await db.insert(workspaceMembers).values({
+      workspaceId: workspace.id,
+      userId: member.id,
+      role: 'member',
+      provisionedByValidationId: null,
+      createdAt: new Date(),
+    });
+
+    const ownerCreateRes = await ownerApi.post('/api/v1/teams').send({
+      workspaceId: workspace.id,
+      name: 'Owner Created Team',
+    });
+    expect(ownerCreateRes.status).toBe(201);
+    const teamId = ownerCreateRes.body.id;
+
+    const memberListRes = await memberApi.get('/api/v1/teams').query({ workspaceId: workspace.id });
+    expect(memberListRes.status).toBe(200);
+
+    const memberGetRes = await memberApi.get(`/api/v1/teams/${teamId}`);
+    expect(memberGetRes.status).toBe(200);
+
+    const memberCreateRes = await memberApi.post('/api/v1/teams').send({
+      workspaceId: workspace.id,
+      name: 'Member Created Team',
+    });
+    expect(memberCreateRes.status).toBe(403);
+    expect(memberCreateRes.body.error).toContain('Only workspace owners');
+
+    const memberPatchRes = await memberApi.patch(`/api/v1/teams/${teamId}`).send({
+      name: 'Member Renamed Team',
+    });
+    expect(memberPatchRes.status).toBe(403);
+    expect(memberPatchRes.body.error).toContain('Only workspace owners');
+
+    const memberDeleteRes = await memberApi.delete(`/api/v1/teams/${teamId}`);
+    expect(memberDeleteRes.status).toBe(403);
+    expect(memberDeleteRes.body.error).toContain('Only workspace owners');
   });
 });

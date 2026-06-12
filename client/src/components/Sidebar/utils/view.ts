@@ -8,6 +8,14 @@ export function getProjectCollapsedState(
   return collapsedProjects[projectId] ?? projectId !== activeProjectId;
 }
 
+export function getTeamCollapsedState(
+  collapsedTeams: Record<string, boolean>,
+  teamId: string,
+  activeTeamId: string,
+) {
+  return collapsedTeams[teamId] ?? teamId !== activeTeamId;
+}
+
 export function isProjectIssuesView(section: SidebarProjectSection) {
   const { activeProjectId, filters, activeContext } = section;
 

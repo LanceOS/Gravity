@@ -1,8 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 
-export function useSidebarState(activeProjectId: string, onSelectProject: (projectId: string) => void) {
+export function useSidebarState(
+  activeProjectId: string,
+  activeTeamId: string,
+  onSelectProject: (projectId: string) => void,
+  onSelectTeam?: (teamId: string) => void,
+) {
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [projectsCollapsed, setProjectsCollapsed] = useState(false);
+  const [collapsedTeams, setCollapsedTeams] = useState<Record<string, boolean>>({});
   const [collapsedProjects, setCollapsedProjects] = useState<Record<string, boolean>>({});
   const [collapsedTeamProjects, setCollapsedTeamProjects] = useState<Record<string, boolean>>({});
   const profileRef = useRef<HTMLDivElement>(null);
@@ -28,14 +34,26 @@ export function useSidebarState(activeProjectId: string, onSelectProject: (proje
     setCollapsedProjects((previous) => ({ ...previous, [projectId]: !previous[projectId] }));
   };
 
+  const toggleTeam = (teamId: string) => {
+    if (teamId !== activeTeamId) {
+      onSelectTeam?.(teamId);
+      setCollapsedTeams((previous) => ({ ...previous, [teamId]: false }));
+      return;
+    }
+
+    setCollapsedTeams((previous) => ({ ...previous, [teamId]: !previous[teamId] }));
+  };
+
   return {
     collapsedProjects,
+    collapsedTeams,
     collapsedTeamProjects,
     profileRef,
     projectsCollapsed,
     showUserDropdown,
     closeUserDropdown: () => setShowUserDropdown(false),
     toggleProject,
+    toggleTeam,
     toggleTeamProjects: (teamId: string) => {
       setCollapsedTeamProjects((previous) => ({ ...previous, [teamId]: !previous[teamId] }));
     },

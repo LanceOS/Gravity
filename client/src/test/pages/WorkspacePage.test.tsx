@@ -197,6 +197,17 @@ describe('WorkspacePage', () => {
     expect(props.onOpenProjectManager).toHaveBeenCalledTimes(1);
   });
 
+  it('prompts team workspaces to create their first team when no projects exist', async () => {
+    const user = userEvent.setup();
+    const { props } = renderWorkspacePage({ projects: [], tickets: [], isTeamWorkspace: true });
+
+    expect(screen.getByText('Create your first team')).toBeInTheDocument();
+    expect(screen.queryByText('Manage Projects')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Create Team' }));
+    expect(props.onOpenProjectManager).toHaveBeenCalledTimes(1);
+  });
+
   it('renders the board view with filtered ticket counts and clears filters', async () => {
     const user = userEvent.setup();
     const { props } = renderWorkspacePage({
@@ -257,5 +268,21 @@ describe('WorkspacePage', () => {
       cycleId: '',
       assigneeId: '',
     });
+  });
+
+  it('renders the timeline view with clickable task events', async () => {
+    const user = userEvent.setup();
+    const { props } = renderWorkspacePage({
+      activeView: 'timeline',
+      viewModeLocked: true,
+      tickets: [ticket, doneTicket],
+    });
+
+    expect(screen.getByText('Recent task activity')).toBeInTheDocument();
+    expect(screen.getByText('2 tasks')).toBeInTheDocument();
+    expect(screen.queryByRole('tablist', { name: 'View mode' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /GRA-1 Fix billing edge case/ }));
+    expect(props.onSelectTicket).toHaveBeenCalledWith(ticket);
   });
 });

@@ -94,7 +94,6 @@ export async function getSidebarTree(workspaceId: string) {
       color: team.color,
       views: [
         { id: 'all', name: 'All Tasks', type: 'all' },
-        { id: 'board', name: 'Board', type: 'board' },
         { id: 'timeline', name: 'Timeline', type: 'timeline' },
       ],
       cycles: teamCycles.map(mapCycle),

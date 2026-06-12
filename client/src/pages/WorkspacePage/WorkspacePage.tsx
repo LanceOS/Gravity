@@ -1,5 +1,5 @@
 import { useMemo, useCallback, useState } from 'react';
-import { Button, createEmptyRichTextValue } from '@library';
+import { Button, Timeline, createEmptyRichTextValue } from '@library';
 import type { Comment, Cycle, Label, Project, Ticket, User } from '../../context/TicketContext';
 import type { TicketFilters, TicketListSort } from '../../modules/tickets/utils/ticketView';
 import { TicketBoard, TicketList, TicketFilterBar } from '../../modules/tickets';
@@ -17,6 +17,8 @@ import { QueryErrorResetBoundary } from '@tanstack/react-query';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
 import './WorkspacePage.css';
 
+export type WorkspaceIssueView = 'board' | 'list' | 'timeline';
+
 interface WorkspacePageProps {
   workspaceId?: string;
   workspaceName?: string;
@@ -24,7 +26,9 @@ interface WorkspacePageProps {
   activeContext?: 'issues' | 'notes';
   activeNoteId?: string;
   activeTicket: Ticket | null;
-  activeView: 'board' | 'list';
+  activeView: WorkspaceIssueView;
+  viewModeLocked?: boolean;
+  isTeamWorkspace?: boolean;
   currentUser: User | null;
   cycles: Cycle[];
   labels?: Label[];
@@ -44,6 +48,40 @@ interface WorkspacePageProps {
   onUpdateTicket: (id: string, updates: Partial<Ticket>) => Promise<void>;
 }
 
+const STATUS_LABELS: Record<Ticket['status'], string> = {
+  backlog: 'Backlog',
+  todo: 'Todo',
+  in_progress: 'In Progress',
+  in_review: 'In Review',
+  done: 'Done',
+  canceled: 'Canceled',
+};
+
+const PRIORITY_LABELS: Record<Ticket['priority'], string> = {
+  no_priority: 'No priority',
+  low: 'Low',
+  medium: 'Medium',
+  high: 'High',
+  urgent: 'Urgent',
+};
+
+function formatTimelineDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return 'No date';
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(date);
+}
+
+function getTicketProjectName(ticket: Ticket, projectById: Record<string, Project>) {
+  return projectById[ticket.projectId]?.name || (ticket as Ticket & { projectName?: string }).projectName || '';
+}
+
 export function WorkspacePage({
   workspaceId,
   workspaceName,
@@ -52,6 +90,8 @@ export function WorkspacePage({
   activeNoteId,
   activeTicket,
   activeView,
+  viewModeLocked = false,
+  isTeamWorkspace = false,
   currentUser,
   cycles,
   labels: labelItems,
@@ -100,6 +140,40 @@ export function WorkspacePage({
   const listGroupedTickets = useMemo(
     () => (activeView === 'list' ? groupTicketsByStatus(listSortedTickets) : groupedTickets),
     [activeView, listSortedTickets, groupedTickets]
+  );
+  const timelineTickets = useMemo(
+    () =>
+      [...filteredTickets].sort((first, second) =>
+        (second.updatedAt || second.createdAt).localeCompare(first.updatedAt || first.createdAt)
+      ),
+    [filteredTickets]
+  );
+  const timelineEvents = useMemo(
+    () =>
+      timelineTickets.map((ticket) => {
+        const projectName = getTicketProjectName(ticket, projectById);
+        const meta = [
+          projectName,
+          STATUS_LABELS[ticket.status],
+          PRIORITY_LABELS[ticket.priority],
+        ].filter(Boolean);
+
+        return {
+          time: formatTimelineDate(ticket.updatedAt || ticket.createdAt),
+          title: (
+            <button
+              type="button"
+              className="workspace-page__timeline-ticket"
+              onClick={() => onSelectTicket(ticket)}
+            >
+              <span className="workspace-page__timeline-key">{ticket.key}</span>
+              <span>{ticket.title}</span>
+            </button>
+          ),
+          description: meta.join(' - '),
+        };
+      }),
+    [onSelectTicket, projectById, timelineTickets]
   );
   const handleClearFilters = useCallback(() => {
     onSetFilters({
@@ -155,10 +229,12 @@ export function WorkspacePage({
             <WorkspaceHeader.Title>{displayTitle}</WorkspaceHeader.Title>
             {!activeTicket && activeContext === 'issues' && (
               <div style={{ marginLeft: 'auto' }}>
-                <WorkspaceHeader.ViewToggle
-                  activeView={activeView}
-                  onSetView={onSetView}
-                />
+                {!viewModeLocked ? (
+                  <WorkspaceHeader.ViewToggle
+                    activeView={activeView}
+                    onSetView={onSetView}
+                  />
+                ) : null}
               </div>
             )}
             {!activeTicket && activeContext === 'notes' && (
@@ -225,9 +301,13 @@ export function WorkspacePage({
                     <ErrorBoundary onReset={reset}>
                       {projects.length === 0 ? (
                         <div className="workspace-page__empty-state">
-                          <div className="workspace-page__empty-state-title">No projects in this workspace yet</div>
+                          <div className="workspace-page__empty-state-title">
+                            {isTeamWorkspace ? 'Create your first team' : 'No projects in this workspace yet'}
+                          </div>
                           <p className="workspace-page__empty-state-copy">
-                            Open Manage Projects to create the first project for this workspace. Once a project exists, tickets, labels, and cycles will become available here.
+                            {isTeamWorkspace
+                              ? 'Teams organize projects, cycles, labels, and aggregate task views in this workspace. Create the first team to start building out your workspace.'
+                              : 'Open Manage Projects to create the first project for this workspace. Once a project exists, tickets, labels, and cycles will become available here.'}
                           </p>
                           <div className="workspace-page__empty-state-actions">
                             <Button
@@ -236,10 +316,31 @@ export function WorkspacePage({
                               className="workspace-page__projects-button workspace-page__projects-button--primary"
                               onClick={onOpenProjectManager}
                             >
-                              Manage Projects
+                              {isTeamWorkspace ? 'Create Team' : 'Manage Projects'}
                             </Button>
                           </div>
                         </div>
+                      ) : activeView === 'timeline' ? (
+                        <WorkspaceViewContainer>
+                          <div className="workspace-page__timeline-shell">
+                            <div className="workspace-page__timeline-header">
+                              <div>
+                                <div className="workspace-page__timeline-eyebrow">Timeline</div>
+                                <h2 className="workspace-page__timeline-title">Recent task activity</h2>
+                              </div>
+                              <span className="workspace-page__timeline-count">
+                                {filteredTickets.length} {filteredTickets.length === 1 ? 'task' : 'tasks'}
+                              </span>
+                            </div>
+                            {timelineEvents.length > 0 ? (
+                              <Timeline events={timelineEvents} />
+                            ) : (
+                              <div className="workspace-page__timeline-empty">
+                                No tasks match the current filters.
+                              </div>
+                            )}
+                          </div>
+                        </WorkspaceViewContainer>
                       ) : activeView === 'board' ? (
                         <WorkspaceViewContainer>
                           <TicketBoard

@@ -6,7 +6,7 @@ export interface SidebarWorkspaceOption {
   name: string;
 }
 
-export type SidebarActiveArea = 'workspace' | 'settings' | 'account' | 'projects';
+export type SidebarActiveArea = 'workspace' | 'settings' | 'account' | 'projects' | 'teams';
 
 export interface SidebarWorkspaceSection {
   workspaces: SidebarWorkspaceOption[];
@@ -63,6 +63,8 @@ export interface SidebarProjectSection {
   onShowNotes: () => void;
   onSelectCycleLegacy?: (cycleId: string) => void;
   onSelectLabel?: (labelId: string) => void;
+  isWorkspaceOwner?: boolean;
+  onOpenTeamManager?: () => void;
 }
 
 export interface SidebarToolSection {
@@ -77,6 +79,9 @@ export interface SidebarToolSection {
 export interface SidebarUserMenuSection {
   currentUser: User;
   activeArea?: SidebarActiveArea;
+  showWorkspaceManagement?: boolean;
+  workspaceManagementLabel?: string;
+  workspaceManagementArea?: SidebarActiveArea;
   onOpenWorkspaceDirectory: () => void;
   onOpenAccountPreferences: () => void;
   onOpenProjectManager: () => void;

@@ -1,11 +1,14 @@
-import { CheckCircle, ChevronDown, ChevronRight, Database, FolderTree } from 'lucide-react';
+import { CheckCircle, ChevronDown, ChevronRight, Database, FolderTree, Plus } from 'lucide-react';
 import { SidebarGroup, SidebarItem } from '@library';
 import type { SidebarNavigationState, SidebarProjectSection } from '../types';
+import { getTeamCollapsedState } from '../utils';
 import './styles.css';
 
 interface TeamsSidebarProps {
   section: SidebarProjectSection;
+  collapsedTeams: Record<string, boolean>;
   collapsedTeamProjects: Record<string, boolean>;
+  onToggleTeam: (teamId: string) => void;
   onToggleTeamProjects: (teamId: string) => void;
 }
 
@@ -45,12 +48,19 @@ function resolveNavigationState(section: SidebarProjectSection): SidebarNavigati
   };
 }
 
-export function TeamsSidebar({ section, collapsedTeamProjects, onToggleTeamProjects }: TeamsSidebarProps) {
+export function TeamsSidebar({
+  section,
+  collapsedTeams,
+  collapsedTeamProjects,
+  onToggleTeam,
+  onToggleTeamProjects,
+}: TeamsSidebarProps) {
   const navigationState = resolveNavigationState(section);
   const activeTeamId = navigationState.activeTeam;
   const activeScope = navigationState.activeScope;
   const activeProjectId = navigationState.activeProject;
   const activeViewId = section.activeViewId || (activeScope === 'views' ? 'all' : '');
+  const teams = section.teams ?? [];
 
   return (
     <div className="teams-sidebar">
@@ -64,33 +74,51 @@ export function TeamsSidebar({ section, collapsedTeamProjects, onToggleTeamProje
         </SidebarItem>
       </SidebarGroup>
 
-      <SidebarGroup label="Teams">
-        {section.teams!.map((team) => {
+      <SidebarGroup
+        label={
+          <div className="teams-sidebar__header">
+            <span>Teams</span>
+            {section.isWorkspaceOwner && (
+              <button
+                type="button"
+                className="teams-sidebar__add-team-btn"
+                onClick={section.onOpenTeamManager}
+                title="Manage Teams"
+                aria-label="Manage Teams"
+              >
+                <Plus size={14} />
+              </button>
+            )}
+          </div>
+        }
+      >
+        {teams.map((team) => {
           const teamContainsActiveProject =
             !!activeProjectId && team.projects?.some((p) => p.id === activeProjectId);
           const isTeamActive = activeTeamId === team.id || teamContainsActiveProject;
+          const teamCollapsed = getTeamCollapsedState(collapsedTeams, team.id, activeTeamId);
           const projectsCollapsed = teamContainsActiveProject ? false : (collapsedTeamProjects[team.id] ?? false);
-          const teamViews = (team.views?.length ?? 0) > 0
-            ? team.views
+          const configuredTeamViews = team.views?.filter((view) => view.id !== 'board' && view.type !== 'board') ?? [];
+          const teamViews = configuredTeamViews.length > 0
+            ? configuredTeamViews
             : [{ id: 'all', name: 'All Tasks', type: 'all' }];
 
           return (
             <div key={team.id} className="teams-sidebar__team">
               <SidebarItem
-                active={isTeamActive && activeScope !== 'projects'}
-                onClick={() => {
-                  if (section.onSelectTeam) {
-                    section.onSelectTeam(team.id);
-                    return;
-                  }
-
-                  section.onSelectAllTasks?.(team.id);
-                }}
+                active={
+                  isTeamActive &&
+                  (activeScope !== 'projects' || teamCollapsed || projectsCollapsed || (activeScope === 'projects' && !activeProjectId))
+                }
+                onClick={() => onToggleTeam(team.id)}
                 leftIcon={
-                  <div
-                    className="teams-sidebar__team-color-dot"
-                    style={{ background: team.color || 'var(--color-primary)' }}
-                  />
+                  <div className="teams-sidebar__team-icon">
+                    {teamCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+                    <div
+                      className="teams-sidebar__team-color-dot"
+                      style={{ background: team.color || 'var(--color-primary)' }}
+                    />
+                  </div>
                 }
               >
                 <div className="teams-sidebar__team-label">
@@ -98,103 +126,105 @@ export function TeamsSidebar({ section, collapsedTeamProjects, onToggleTeamProje
                 </div>
               </SidebarItem>
 
-              <div className="teams-sidebar__sub-items">
-                <SidebarGroup label="Views">
-                  {teamViews.map((view) => (
-                    <SidebarItem
-                      key={view.id}
-                      nested
-                      active={isTeamActive && activeScope === 'views' && activeViewId === view.id}
-                      onClick={() => {
-                        if (view.id === 'all') {
-                          section.onSelectAllTasks?.(team.id);
-                          return;
-                        }
-
-                        section.onSelectView?.(team.id, view.id);
-                      }}
-                      leftIcon={<FolderTree size={13} />}
-                    >
-                      {view.name}
-                    </SidebarItem>
-                  ))}
-                </SidebarGroup>
-
-                <SidebarGroup label="Cycles">
-                  {team.cycles && team.cycles.length > 0 ? (
-                    team.cycles.map((cycle) => (
+              {!teamCollapsed ? (
+                <div className="teams-sidebar__sub-items">
+                  <SidebarGroup label="Views">
+                    {teamViews.map((view) => (
                       <SidebarItem
-                        key={cycle.id}
+                        key={view.id}
                         nested
-                        active={isTeamActive && activeScope === 'cycles' && section.activeCycleId === cycle.id}
-                        onClick={() => section.onSelectCycle?.(team.id, cycle.id)}
-                        leftIcon={<CheckCircle size={13} color={cycle.completed ? 'var(--color-text-disabled)' : 'var(--color-primary)'} />}
-                      >
-                        <span className={cycle.completed ? 'teams-sidebar__cycle-name--completed' : undefined}>
-                          {cycle.name}
-                        </span>
-                      </SidebarItem>
-                    ))
-                  ) : (
-                    <div className="teams-sidebar__empty">No cycles</div>
-                  )}
-                </SidebarGroup>
+                        active={isTeamActive && activeScope === 'views' && activeViewId === view.id}
+                        onClick={() => {
+                          if (view.id === 'all') {
+                            section.onSelectAllTasks?.(team.id);
+                            return;
+                          }
 
-                <SidebarGroup label="Domains">
-                  {team.domains && team.domains.length > 0 ? (
-                    team.domains.map((domain) => (
-                      <SidebarItem
-                        key={domain.id}
-                        nested
-                        active={isTeamActive && activeScope === 'domains' && section.activeDomainId === domain.id}
-                        onClick={() => section.onSelectDomain?.(team.id, domain.id)}
-                        leftIcon={
-                          <div
-                            className="teams-sidebar__domain-dot"
-                            style={{ background: domain.color }}
-                          />
-                        }
+                          section.onSelectView?.(team.id, view.id);
+                        }}
+                        leftIcon={<FolderTree size={13} />}
                       >
-                        {domain.name}
+                        {view.name}
                       </SidebarItem>
-                    ))
-                  ) : (
-                    <div className="teams-sidebar__empty">No domains</div>
-                  )}
-                </SidebarGroup>
+                    ))}
+                  </SidebarGroup>
 
-                <SidebarGroup
-                  label={
-                    <button
-                      type="button"
-                      onClick={() => onToggleTeamProjects(team.id)}
-                      aria-expanded={!projectsCollapsed}
-                      className="teams-sidebar__group-toggle"
-                    >
-                      {projectsCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
-                      <span className="teams-sidebar__group-toggle-label">Projects</span>
-                    </button>
-                  }
-                >
-                  {!projectsCollapsed && (
-                    team.projects && team.projects.length > 0 ? (
-                      team.projects.map((project) => (
+                  <SidebarGroup label="Cycles">
+                    {team.cycles && team.cycles.length > 0 ? (
+                      team.cycles.map((cycle) => (
                         <SidebarItem
-                          key={project.id}
+                          key={cycle.id}
                           nested
-                          active={isTeamActive && activeScope === 'projects' && project.id === activeProjectId}
-                          onClick={() => section.onSelectProject(project.id)}
-                          leftIcon={<Database size={13} />}
+                          active={isTeamActive && activeScope === 'cycles' && section.activeCycleId === cycle.id}
+                          onClick={() => section.onSelectCycle?.(team.id, cycle.id)}
+                          leftIcon={<CheckCircle size={13} color={cycle.completed ? 'var(--color-text-disabled)' : 'var(--color-primary)'} />}
                         >
-                          {project.name}
+                          <span className={cycle.completed ? 'teams-sidebar__cycle-name--completed' : undefined}>
+                            {cycle.name}
+                          </span>
                         </SidebarItem>
                       ))
                     ) : (
-                      <div className="teams-sidebar__empty">No projects</div>
-                    )
-                  )}
-                </SidebarGroup>
-              </div>
+                      <div className="teams-sidebar__empty">No cycles</div>
+                    )}
+                  </SidebarGroup>
+
+                  <SidebarGroup label="Domains">
+                    {team.domains && team.domains.length > 0 ? (
+                      team.domains.map((domain) => (
+                        <SidebarItem
+                          key={domain.id}
+                          nested
+                          active={isTeamActive && activeScope === 'domains' && section.activeDomainId === domain.id}
+                          onClick={() => section.onSelectDomain?.(team.id, domain.id)}
+                          leftIcon={
+                            <div
+                              className="teams-sidebar__domain-dot"
+                              style={{ background: domain.color }}
+                            />
+                          }
+                        >
+                          {domain.name}
+                        </SidebarItem>
+                      ))
+                    ) : (
+                      <div className="teams-sidebar__empty">No domains</div>
+                    )}
+                  </SidebarGroup>
+
+                  <SidebarGroup
+                    label={
+                      <button
+                        type="button"
+                        onClick={() => onToggleTeamProjects(team.id)}
+                        aria-expanded={!projectsCollapsed}
+                        className="teams-sidebar__group-toggle"
+                      >
+                        {projectsCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+                        <span className="teams-sidebar__group-toggle-label">Projects</span>
+                      </button>
+                    }
+                  >
+                    {!projectsCollapsed && (
+                      team.projects && team.projects.length > 0 ? (
+                        team.projects.map((project) => (
+                          <SidebarItem
+                            key={project.id}
+                            nested
+                            active={isTeamActive && activeScope === 'projects' && project.id === activeProjectId}
+                            onClick={() => section.onSelectProject(project.id)}
+                            leftIcon={<Database size={13} />}
+                          >
+                            {project.name}
+                          </SidebarItem>
+                        ))
+                      ) : (
+                        <div className="teams-sidebar__empty">No projects</div>
+                      )
+                    )}
+                  </SidebarGroup>
+                </div>
+              ) : null}
             </div>
           );
         })}

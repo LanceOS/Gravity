@@ -21,13 +21,15 @@ import type { TicketListSort } from '../../modules/tickets/utils/ticketView';
 import { registerWebMCPTools } from '../../utils/webmcp';
 import { LoadingPage } from '../LoadingPage/LoadingPage';
 import { WorkspaceDirectoryPage } from '../WorkspaceDirectoryPage/WorkspaceDirectoryPage';
-import { WorkspacePage } from '../WorkspacePage/WorkspacePage';
+import { WorkspacePage, type WorkspaceIssueView } from '../WorkspacePage/WorkspacePage';
 import { WorkspaceProjectsPage } from '../WorkspaceProjectsPage/WorkspaceProjectsPage';
+import { WorkspaceTeamProjectsPage } from '../WorkspaceTeamProjectsPage/WorkspaceTeamProjectsPage';
+import { WorkspaceTeamsPage } from '../WorkspaceTeamsPage/WorkspaceTeamsPage';
 import { TicketDetailRoute } from '../../modules/tickets/components/TicketDetailRoute';
 import { WorkspaceMcpModal } from '../../modules/workspaces/components/WorkspaceMcpModal';
 import './AppShellPage.css';
 
-type AppSection = 'directory' | 'workspace' | 'settings' | 'account' | 'projects';
+type AppSection = 'directory' | 'workspace' | 'settings' | 'account' | 'projects' | 'teams' | 'team-projects';
 
 function getActiveWorkspaceStorageKey(userId: string) {
   return `gravity_active_workspace:${userId}`;
@@ -255,19 +257,19 @@ export function AppShellPage() {
   const { data: teamTickets = [] } = useQuery<Ticket[]>({
     queryKey: ['teamTickets', teamIdParam],
     queryFn: () => apiClient.get<Ticket[]>('/tickets', { params: { teamId: teamIdParam } }),
-    enabled: !!teamIdParam && !!currentUser,
+    enabled: isTeamAggregatePath && !!currentUser,
   });
 
   const { data: teamCycles = [] } = useQuery<Cycle[]>({
     queryKey: ['teamCycles', teamIdParam],
     queryFn: () => apiClient.get<Cycle[]>('/cycles', { params: { teamId: teamIdParam } }),
-    enabled: !!teamIdParam && !!currentUser,
+    enabled: isTeamAggregatePath && !!currentUser,
   });
 
   const { data: teamDomains = [] } = useQuery<Domain[]>({
     queryKey: ['teamDomains', teamIdParam],
     queryFn: () => apiClient.get<Domain[]>('/domains', { params: { teamId: teamIdParam } }),
-    enabled: !!teamIdParam && !!currentUser,
+    enabled: isTeamAggregatePath && !!currentUser,
   });
 
   const handleSelectTeam = useCallback((teamId: string) => {
@@ -334,6 +336,13 @@ export function AppShellPage() {
     const isProjectsManagementPath =
       pathname === `/workspaces/${workspaceId}/projects` ||
       pathname === `/workspaces/${workspaceId}/projects/`;
+    const isTeamsManagementPath =
+      pathname === `/workspaces/${workspaceId}/teams` ||
+      pathname === `/workspaces/${workspaceId}/teams/`;
+    const isTeamProjectsManagementPath = !!teamIdParam && (
+      pathname === `/workspaces/${workspaceId}/teams/${teamIdParam}/projects` ||
+      pathname === `/workspaces/${workspaceId}/teams/${teamIdParam}/projects/`
+    );
     const isNotesPath = pathname.includes('/notes');
     const isTicketsPath = pathname.includes('/tickets');
 
@@ -346,6 +355,20 @@ export function AppShellPage() {
 
     if (isProjectsManagementPath) {
       setActiveSection('projects');
+      setActiveTicket(null);
+      setActiveNoteId('');
+      return;
+    }
+
+    if (isTeamsManagementPath) {
+      setActiveSection('teams');
+      setActiveTicket(null);
+      setActiveNoteId('');
+      return;
+    }
+
+    if (isTeamProjectsManagementPath) {
+      setActiveSection('team-projects');
       setActiveTicket(null);
       setActiveNoteId('');
       return;
@@ -673,8 +696,6 @@ export function AppShellPage() {
     description: string;
     key: string;
     workspaceKey?: string;
-    defaultProjectName?: string;
-    defaultProjectKey?: string;
   }) => {
     const workspace = await createWorkspace(workspaceInput);
     if (!workspace || !currentUser) {
@@ -859,6 +880,22 @@ export function AppShellPage() {
     navigate(`/workspaces/${activeWorkspaceId}/projects`);
   };
 
+  const handleOpenTeamManager = () => {
+    if (!activeWorkspace) {
+      navigate('/workspaces');
+      return;
+    }
+    navigate(`/workspaces/${activeWorkspaceId}/teams`);
+  };
+
+  const handleOpenTeamProjectsManager = (teamId: string) => {
+    if (!activeWorkspace) {
+      navigate('/workspaces');
+      return;
+    }
+    navigate(`/workspaces/${activeWorkspaceId}/teams/${teamId}/projects`);
+  };
+
   const handleSetFilters = useCallback((updates: Partial<typeof filters>) => {
     const nextParams = new URLSearchParams(searchParams);
     const merged = { ...filters, ...updates };
@@ -999,8 +1036,11 @@ export function AppShellPage() {
     sidebarTree?.teams?.find((team) => team.projects?.some((project) => project.id === (projectIdParam || activeProjectId)))?.id ||
     '';
   const sidebarActiveTeamId = teamIdParam || activeProjectTeamId;
+  const isTeamProjectsManager = activeSection === 'team-projects';
   const sidebarActiveScope: SidebarNavigationState['activeScope'] = isWorkspaceAllTasksPath
     ? 'workspace'
+    : isTeamProjectsManager
+      ? 'projects'
     : teamIdParam
       ? projectIdParam
         ? 'projects'
@@ -1015,29 +1055,40 @@ export function AppShellPage() {
   const sidebarNavigationState: SidebarNavigationState = {
     activeTeam: sidebarActiveTeamId,
     activeScope: sidebarActiveScope,
-    activeProject: sidebarActiveScope === 'projects' ? (projectIdParam || activeProjectId) : '',
+    activeProject: sidebarActiveScope === 'projects' && !isTeamProjectsManager ? (projectIdParam || activeProjectId) : '',
   };
   const sidebarActiveViewId = teamIdParam && sidebarActiveScope === 'views'
     ? (viewIdParam || 'all')
     : '';
   const activeTeam = sidebarTree?.teams?.find((team) => team.id === sidebarActiveTeamId);
   const activeTeamProjectIds = new Set(activeTeam?.projects?.map((project) => project.id) ?? []);
+  const teamProjectsForManager = teamIdParam
+    ? activeWorkspaceProjects.filter((project) => project.teamId === teamIdParam || activeTeamProjectIds.has(project.id))
+    : [];
+  const isTimelineAggregatePath = isTeamAggregatePath && viewIdParam === 'timeline';
+  const effectiveActiveView: WorkspaceIssueView = isTimelineAggregatePath
+    ? 'timeline'
+    : activeView;
+  const lockWorkspaceIssueView = isTimelineAggregatePath;
   const scopedProjects = teamIdParam
     ? activeWorkspaceProjects.filter((project) => project.teamId === teamIdParam || activeTeamProjectIds.has(project.id))
     : activeWorkspaceProjects;
   const scopedTickets = isWorkspaceAllTasksPath
     ? workspaceTickets
-    : teamIdParam
+    : isTeamAggregatePath
       ? teamTickets
       : tickets;
-  const scopedCycles = teamIdParam ? teamCycles : cycles;
-  const scopedLabels = teamIdParam ? teamDomains : labels;
+  const scopedCycles = isTeamAggregatePath ? teamCycles : cycles;
+  const scopedLabels = isTeamAggregatePath ? teamDomains : labels;
   const scopedFilters = shouldUseAggregateTicketScope ? { ...filters, projectId: '' } : filters;
   const createDefaultProjectId =
     activeProjectId ||
     scopedProjects[0]?.id ||
     activeWorkspaceProjects[0]?.id ||
     '';
+  const isTeamWorkspace = (sidebarTree?.hierarchyMode ?? activeWorkspace.hierarchyMode) === 'teams';
+  const isTeamsManager = activeSection === 'teams' || (isTeamWorkspace && activeSection === 'projects');
+  const isWorkspaceOwner = activeWorkspace.memberRole === 'owner';
 
   const sidebarProps: SidebarProps = {
     workspace: {
@@ -1080,6 +1131,8 @@ export function AppShellPage() {
       onShowNotes: handleShowNotes,
       onSelectCycleLegacy: handleSelectCycleLegacy,
       onSelectLabel: handleSelectLabel,
+      isWorkspaceOwner,
+      onOpenTeamManager: handleOpenTeamManager,
     },
     tools: {
       onOpenOllama: handleToggleOllama,
@@ -1091,10 +1144,13 @@ export function AppShellPage() {
     },
     userMenu: {
       currentUser,
-      activeArea: activeSection === 'projects' ? 'projects' : 'workspace',
+      activeArea: isTeamsManager || isTeamProjectsManager ? 'teams' : activeSection === 'projects' ? 'projects' : 'workspace',
+      showWorkspaceManagement: !isTeamWorkspace || isWorkspaceOwner,
+      workspaceManagementLabel: isTeamWorkspace ? 'Manage Teams' : 'Manage Projects',
+      workspaceManagementArea: isTeamWorkspace ? 'teams' : 'projects',
       onOpenWorkspaceDirectory: () => navigate('/workspaces'),
       onOpenAccountPreferences: handleOpenAccountPreferences,
-      onOpenProjectManager: handleOpenProjectManager,
+      onOpenProjectManager: isTeamWorkspace ? handleOpenTeamManager : handleOpenProjectManager,
       onOpenSettings: handleOpenSettings,
       onOpenMcp: () => setIsMcpOpen(true),
       onSignOut: signOut,
@@ -1181,7 +1237,31 @@ export function AppShellPage() {
             </>
           }
         >
-          {activeSection === 'projects' ? (
+          {isTeamsManager ? (
+            <WorkspaceTeamsPage
+              workspaceId={activeWorkspaceId}
+              workspaceName={activeWorkspace.name}
+              teams={sidebarTree?.teams ?? []}
+              loading={!sidebarTree}
+              onBackToWorkspace={() => navigate(`/workspaces/${activeWorkspaceId}`)}
+              onManageProjects={handleOpenTeamProjectsManager}
+              onTeamsChanged={async () => {
+                await refreshWorkspaces();
+              }}
+            />
+          ) : isTeamProjectsManager ? (
+            <WorkspaceTeamProjectsPage
+              workspaceId={activeWorkspaceId}
+              workspaceName={activeWorkspace.name}
+              team={activeTeam ?? null}
+              projects={teamProjectsForManager}
+              activeProjectId={activeProjectId}
+              loading={!sidebarTree || !activeTeam}
+              onBackToTeams={() => navigate(`/workspaces/${activeWorkspaceId}/teams`)}
+              onCreateProject={createProject}
+              onUpdateProject={updateProject}
+            />
+          ) : activeSection === 'projects' ? (
             <WorkspaceProjectsPage
               workspaceName={activeWorkspace.name}
               projects={activeWorkspaceProjects}
@@ -1209,7 +1289,9 @@ export function AppShellPage() {
               pathname={pathname}
               activeContext={activeContext}
               activeTicket={activeTicket}
-              activeView={activeView}
+              activeView={effectiveActiveView}
+              viewModeLocked={lockWorkspaceIssueView}
+              isTeamWorkspace={isTeamWorkspace}
               currentUser={currentUser}
               cycles={scopedCycles}
               labels={scopedLabels}
@@ -1219,7 +1301,7 @@ export function AppShellPage() {
               tickets={scopedTickets}
               users={users}
               onOpenCreateTicket={handleOpenCreateTicket}
-              onOpenProjectManager={handleOpenProjectManager}
+              onOpenProjectManager={isTeamWorkspace ? handleOpenTeamManager : handleOpenProjectManager}
               onSelectTicket={(ticket) => {
                 if (ticket) {
                   navigate(buildProjectScopedPath(ticket.projectId, 'tickets', ticket.key));

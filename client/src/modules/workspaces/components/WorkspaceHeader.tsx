@@ -15,7 +15,7 @@ interface WorkspaceHeaderTitleProps {
 }
 
 interface WorkspaceHeaderViewToggleProps {
-  activeView: 'board' | 'list';
+  activeView: 'board' | 'list' | 'timeline';
   onSetView: (view: 'board' | 'list') => void;
 }
 

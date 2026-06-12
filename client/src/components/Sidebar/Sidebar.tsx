@@ -5,7 +5,12 @@ import type { SidebarProps } from './types';
 import { useSidebarState } from './utils';
 
 export function Sidebar({ projects, tools, userMenu }: SidebarProps) {
-  const sidebarState = useSidebarState(projects.activeProjectId, projects.onSelectProject);
+  const sidebarState = useSidebarState(
+    projects.activeProjectId,
+    projects.activeTeamId ?? '',
+    projects.onSelectProject,
+    projects.onSelectTeam,
+  );
 
   // Show the "New Ticket" header when there are projects — either in flat mode or via teams
   const hasAnyProject =
@@ -35,8 +40,10 @@ export function Sidebar({ projects, tools, userMenu }: SidebarProps) {
           projectsCollapsed={sidebarState.projectsCollapsed}
           collapsedProjects={sidebarState.collapsedProjects}
           collapsedTeamProjects={sidebarState.collapsedTeamProjects}
+          collapsedTeams={sidebarState.collapsedTeams}
           onToggleProjectsCollapsed={sidebarState.toggleProjectsCollapsed}
           onToggleProject={sidebarState.toggleProject}
+          onToggleTeam={sidebarState.toggleTeam}
           onToggleTeamProjects={sidebarState.toggleTeamProjects}
         />
       </SidebarContent>

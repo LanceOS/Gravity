@@ -7,8 +7,10 @@ interface SidebarProjectsSectionProps {
   projectsCollapsed: boolean;
   collapsedProjects: Record<string, boolean>;
   collapsedTeamProjects: Record<string, boolean>;
+  collapsedTeams: Record<string, boolean>;
   onToggleProjectsCollapsed: () => void;
   onToggleProject: (projectId: string) => void;
+  onToggleTeam: (teamId: string) => void;
   onToggleTeamProjects: (teamId: string) => void;
 }
 
@@ -17,15 +19,19 @@ export function SidebarProjectsSection({
   projectsCollapsed,
   collapsedProjects,
   collapsedTeamProjects,
+  collapsedTeams,
   onToggleProjectsCollapsed,
   onToggleProject,
+  onToggleTeam,
   onToggleTeamProjects,
 }: SidebarProjectsSectionProps) {
-  if (section.hierarchyMode === 'teams' && section.teams && section.teams.length > 0) {
+  if (section.hierarchyMode === 'teams') {
     return (
       <TeamsSidebar
         section={section}
+        collapsedTeams={collapsedTeams}
         collapsedTeamProjects={collapsedTeamProjects}
+        onToggleTeam={onToggleTeam}
         onToggleTeamProjects={onToggleTeamProjects}
       />
     );

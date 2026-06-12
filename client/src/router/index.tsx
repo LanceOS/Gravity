@@ -58,6 +58,14 @@ export const router = createBrowserRouter([
     ),
   },
   {
+    path: '/workspaces/:workspaceId/teams',
+    element: (
+      <ProtectedRoute>
+        <AppShellPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
     path: '/account',
     element: (
       <ProtectedRoute>
@@ -118,6 +126,15 @@ export const router = createBrowserRouter([
   // Domain-filtered view
   {
     path: '/workspaces/:workspaceId/teams/:teamId/domains/:domainId',
+    element: (
+      <ProtectedRoute>
+        <AppShellPage />
+      </ProtectedRoute>
+    ),
+  },
+  // Team projects list page
+  {
+    path: '/workspaces/:workspaceId/teams/:teamId/projects',
     element: (
       <ProtectedRoute>
         <AppShellPage />
