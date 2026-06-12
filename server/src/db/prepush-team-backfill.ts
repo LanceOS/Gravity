@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 import pg from 'pg';
+import { mergeDuplicateTeamLabels } from './label-migration.js';
 
 dotenv.config();
 
@@ -22,6 +23,26 @@ async function tableExists(tableName: string) {
     `public.${tableName}`,
   ]);
   return result.rows[0]?.exists ?? false;
+}
+
+async function columnExists(tableName: string, columnName: string) {
+  try {
+    const result = await pool.query(
+      `
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = $1
+          AND column_name = $2
+        LIMIT 1
+      `,
+      [tableName, columnName],
+    );
+
+    return (result.rowCount ?? 0) > 0;
+  } catch {
+    return false;
+  }
 }
 
 async function main() {
@@ -66,7 +87,14 @@ async function main() {
   }
 
   const hasCycles = await tableExists('cycles');
-  if (hasCycles && hasProjects) {
+  const hasLabels = await tableExists('labels');
+  const hasDomains = await tableExists('domains');
+  const hasTickets = await tableExists('tickets');
+  const cyclesHaveProjectId = hasCycles && await columnExists('cycles', 'project_id');
+  const labelsHaveProjectId = hasLabels && await columnExists('labels', 'project_id');
+  const ticketsHaveDomainId = hasTickets && await columnExists('tickets', 'domain_id');
+
+  if (hasCycles && hasProjects && cyclesHaveProjectId) {
     await pool.query(`
       ALTER TABLE cycles ADD COLUMN IF NOT EXISTS team_id TEXT;
       CREATE INDEX IF NOT EXISTS cycles_team_id_idx ON cycles (team_id);
@@ -83,21 +111,70 @@ async function main() {
     `);
   }
 
-  const hasDomains = await tableExists('domains');
-  if (hasDomains && hasProjects) {
+  if (hasLabels && hasProjects && labelsHaveProjectId) {
     await pool.query(`
-      ALTER TABLE domains ADD COLUMN IF NOT EXISTS team_id TEXT;
-      CREATE INDEX IF NOT EXISTS domains_team_id_idx ON domains (team_id);
+      ALTER TABLE labels ADD COLUMN IF NOT EXISTS team_id TEXT;
+      CREATE INDEX IF NOT EXISTS labels_team_id_idx ON labels (team_id);
 
-      UPDATE domains
+      UPDATE labels
       SET team_id = projects.team_id
       FROM projects
-      WHERE domains.project_id = projects.id
+      WHERE labels.project_id = projects.id
         AND (
-          domains.team_id IS NULL
-          OR domains.team_id = ''
-          OR domains.team_id NOT IN (SELECT id FROM teams)
+          labels.team_id IS NULL
+          OR labels.team_id = ''
+          OR labels.team_id NOT IN (SELECT id FROM teams)
         );
+    `);
+  }
+
+  if (hasDomains && hasLabels && hasProjects) {
+    if (labelsHaveProjectId) {
+      await pool.query(`
+        ALTER TABLE labels ALTER COLUMN project_id DROP NOT NULL;
+      `);
+    }
+
+    if (labelsHaveProjectId) {
+      await pool.query(`
+        INSERT INTO labels (id, project_id, team_id, name, color, description, sort_order, created_at)
+        SELECT domains.id, domains.project_id, COALESCE(domains.team_id, projects.team_id), domains.name, domains.color, '', 0, domains.created_at
+        FROM domains
+        LEFT JOIN projects ON domains.project_id = projects.id
+        WHERE COALESCE(domains.team_id, projects.team_id) IS NOT NULL
+        ON CONFLICT (id) DO NOTHING;
+      `);
+    } else {
+      await pool.query(`
+        INSERT INTO labels (id, team_id, name, color, description, sort_order, created_at)
+        SELECT domains.id, COALESCE(domains.team_id, projects.team_id), domains.name, domains.color, '', 0, domains.created_at
+        FROM domains
+        LEFT JOIN projects ON domains.project_id = projects.id
+        WHERE COALESCE(domains.team_id, projects.team_id) IS NOT NULL
+        ON CONFLICT (id) DO NOTHING;
+      `);
+    }
+
+    if (ticketsHaveDomainId) {
+      await pool.query(`
+        INSERT INTO ticket_labels (ticket_id, label_id)
+        SELECT tickets.id, domains.id
+        FROM tickets
+        INNER JOIN domains ON domains.id = tickets.domain_id
+        LEFT JOIN projects ON domains.project_id = projects.id
+        WHERE tickets.domain_id IS NOT NULL
+          AND tickets.domain_id <> ''
+          AND COALESCE(domains.team_id, projects.team_id) IS NOT NULL
+        ON CONFLICT (ticket_id, label_id) DO NOTHING;
+      `);
+    }
+  }
+
+  if (hasLabels) {
+    await mergeDuplicateTeamLabels(pool);
+
+    await pool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS labels_team_name_unique_idx ON labels (team_id, name);
     `);
   }
 

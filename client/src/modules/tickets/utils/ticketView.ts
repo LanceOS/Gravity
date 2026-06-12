@@ -4,6 +4,7 @@ export interface TicketFilters {
   status: string;
   priority: string;
   projectId: string;
+  labelId?: string;
   domainId?: string;
   labels?: string[];
   labelMode?: 'all' | 'any';
@@ -37,6 +38,8 @@ export const LIST_STATUS_ORDER: Ticket['status'][] = [
 ];
 
 export function filterTickets(tickets: Ticket[], filters: TicketFilters): Ticket[] {
+  const selectedLabelId = filters.labelId ?? filters.domainId;
+
   return tickets.filter((ticket) => {
     if (filters.status) {
       const statuses = filters.status.split(',').map(s => s.trim());
@@ -48,7 +51,7 @@ export function filterTickets(tickets: Ticket[], filters: TicketFilters): Ticket
     }
     if (filters.projectId && ticket.projectId !== filters.projectId) return false;
 
-    if (filters.domainId && ticket.domainId !== filters.domainId) return false;
+    if (selectedLabelId && !ticket.labelIds?.includes(selectedLabelId)) return false;
 
     if (filters.labels && filters.labels.length > 0) {
       const mode = filters.labelMode || 'any';
@@ -167,6 +170,7 @@ export function hasActiveTicketFilters(filters: TicketFilters): boolean {
     filters.search ||
       filters.priority ||
       filters.status ||
+      filters.labelId ||
       filters.domainId ||
       (filters.labels && filters.labels.length > 0) ||
       filters.cycleId ||
@@ -193,7 +197,7 @@ export function getWorkspaceHeaderTitle(
     return 'Label Issues';
   }
 
-  if (filters.domainId) {
+  if (filters.labelId || filters.domainId) {
     return 'Label Issues';
   }
 

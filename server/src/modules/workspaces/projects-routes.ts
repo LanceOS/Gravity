@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import { Router } from 'express';
 import { db } from '../../db/index.js';
-import { cycles, domains, projectMembers, projects, teams, workspaceMembers, workspaces, workspaceSettings } from '../../db/schema.js';
+import { cycles, projectMembers, projects, teams, workspaceMembers, workspaces, workspaceSettings } from '../../db/schema.js';
 import {
   createId,
   normalizeEntityKey,

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../../db/index.js';
-import { comments, cycles, domains, labels, noteMetadata, projectMembers, projects, teams, ticketLabels, tickets, workspaces } from '../../db/schema.js';
-import { eq, inArray, or } from 'drizzle-orm';
+import { comments, cycles, labels, noteMetadata, projectMembers, projects, teams, ticketLabels, tickets, workspaces } from '../../db/schema.js';
+import { asc, eq, inArray } from 'drizzle-orm';
 import { createId, invalidateWorkspaceCache } from '../../lib/platform.js';
 import { RustFS } from '../../lib/rustfs.js';
 import {
@@ -24,11 +24,14 @@ async function deleteLastTeamWithOwnedWork(teamId: string, workspaceId: string) 
   let noteRows: Array<{ bucketPath: string }> = [];
 
   if (projectIds.length > 0) {
-    [ticketRows, labelRows, noteRows] = await Promise.all([
+    [ticketRows, noteRows] = await Promise.all([
       db.select({ id: tickets.id }).from(tickets).where(inArray(tickets.projectId, projectIds)),
-      db.select({ id: labels.id }).from(labels).where(inArray(labels.projectId, projectIds)),
       db.select({ bucketPath: noteMetadata.bucketPath }).from(noteMetadata).where(inArray(noteMetadata.projectId, projectIds)),
     ]);
+  }
+
+  if (labelRows.length === 0) {
+    labelRows = await db.select({ id: labels.id }).from(labels).where(eq(labels.teamId, teamId));
   }
 
   const ticketIds = ticketRows.map((row) => row.id);
@@ -50,14 +53,11 @@ async function deleteLastTeamWithOwnedWork(teamId: string, workspaceId: string) 
     if (projectIds.length > 0) {
       await tx.delete(noteMetadata).where(inArray(noteMetadata.projectId, projectIds));
       await tx.delete(projectMembers).where(inArray(projectMembers.projectId, projectIds));
-      // Combine both project-scoped and team-scoped deletions into one query each.
-      await tx.delete(cycles).where(or(inArray(cycles.projectId, projectIds), eq(cycles.teamId, teamId)));
-      await tx.delete(domains).where(or(inArray(domains.projectId, projectIds), eq(domains.teamId, teamId)));
       await tx.delete(projects).where(inArray(projects.id, projectIds));
-    } else {
-      await tx.delete(cycles).where(eq(cycles.teamId, teamId));
-      await tx.delete(domains).where(eq(domains.teamId, teamId));
+
     }
+
+    await tx.delete(cycles).where(eq(cycles.teamId, teamId));
 
     await tx.update(workspaces).set({ defaultProjectId: null }).where(eq(workspaces.id, workspaceId));
     await tx.delete(teams).where(eq(teams.id, teamId));
@@ -73,6 +73,50 @@ async function deleteLastTeamWithOwnedWork(teamId: string, workspaceId: string) 
   }
 
   await invalidateWorkspaceCache(workspaceId);
+}
+
+async function mergeTeamLabels(tx: any, sourceTeamId: string, targetTeamId: string) {
+  const sourceLabels = await tx
+    .select()
+    .from(labels)
+    .where(eq(labels.teamId, sourceTeamId))
+    .orderBy(asc(labels.createdAt));
+
+  const targetLabels = await tx
+    .select()
+    .from(labels)
+    .where(eq(labels.teamId, targetTeamId))
+    .orderBy(asc(labels.createdAt));
+
+  const targetByName = new Map<string, typeof labels.$inferSelect>();
+  for (const label of targetLabels) {
+    targetByName.set(label.name, label);
+  }
+
+  for (const sourceLabel of sourceLabels) {
+    const normalizedName = sourceLabel.name;
+    const existingTarget = targetByName.get(normalizedName);
+
+    if (existingTarget) {
+      const sourceTicketLabels = await tx
+        .select({ ticketId: ticketLabels.ticketId })
+        .from(ticketLabels)
+        .where(eq(ticketLabels.labelId, sourceLabel.id));
+
+      if (sourceTicketLabels.length > 0) {
+        await tx
+          .insert(ticketLabels)
+          .values(sourceTicketLabels.map((row: { ticketId: string }) => ({ ticketId: row.ticketId, labelId: existingTarget.id })))
+          .onConflictDoNothing();
+      }
+
+      await tx.delete(ticketLabels).where(eq(ticketLabels.labelId, sourceLabel.id));
+      await tx.delete(labels).where(eq(labels.id, sourceLabel.id));
+    } else {
+      await tx.update(labels).set({ teamId: targetTeamId }).where(eq(labels.id, sourceLabel.id));
+      targetByName.set(normalizedName, { ...sourceLabel, teamId: targetTeamId });
+    }
+  }
 }
 
 export function createTeamsRouter() {
@@ -201,14 +245,14 @@ export function createTeamsRouter() {
         .from(teams)
         .where(eq(teams.workspaceId, workspaceId));
 
-      const [existingProjects, existingCycles, existingDomains] = await Promise.all([
+      const [existingProjects, existingCycles, existingLabels] = await Promise.all([
         db.select({ id: projects.id }).from(projects).where(eq(projects.teamId, teamId)),
         db.select({ id: cycles.id }).from(cycles).where(eq(cycles.teamId, teamId)),
-        db.select({ id: domains.id }).from(domains).where(eq(domains.teamId, teamId)),
+        db.select({ id: labels.id }).from(labels).where(eq(labels.teamId, teamId)),
       ]);
       const isLastTeam = workspaceTeamRows.length <= 1;
 
-      if (existingProjects.length > 0 || existingCycles.length > 0 || existingDomains.length > 0) {
+      if (existingProjects.length > 0 || existingCycles.length > 0 || existingLabels.length > 0) {
         if (reassignTeamId) {
           if (reassignTeamId === teamId) {
             res.status(400).json({ error: 'Reassignment target team must be different from the current team.' });
@@ -228,14 +272,14 @@ export function createTeamsRouter() {
           await db.transaction(async (tx) => {
             await tx.update(projects).set({ teamId: reassignTeamId }).where(eq(projects.teamId, teamId));
             await tx.update(cycles).set({ teamId: reassignTeamId }).where(eq(cycles.teamId, teamId));
-            await tx.update(domains).set({ teamId: reassignTeamId }).where(eq(domains.teamId, teamId));
+            await mergeTeamLabels(tx, teamId, reassignTeamId);
             await tx.delete(teams).where(eq(teams.id, teamId));
           });
           await invalidateWorkspaceCache(workspaceId);
         } else if (isLastTeam) {
           await deleteLastTeamWithOwnedWork(teamId, workspaceId);
         } else {
-          res.status(400).json({ error: 'Cannot delete team: projects, cycles, or domains still reference it. Please reassign them first.' });
+          res.status(400).json({ error: 'Cannot delete team: projects, cycles, or labels still reference it. Please reassign them first.' });
           return;
         }
       } else {

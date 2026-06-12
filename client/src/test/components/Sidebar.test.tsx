@@ -123,7 +123,7 @@ function renderSidebar(overrides: Partial<SidebarProps> = {}) {
           workspaceId: 'workspace-1',
         },
       ],
-      domains: [],
+      labels: [],
       cycles: [],
       currentUser: {
         id: 'user-1',
@@ -138,7 +138,7 @@ function renderSidebar(overrides: Partial<SidebarProps> = {}) {
         status: '',
         priority: '',
         projectId: '',
-        domainId: '',
+        labelId: '',
         cycleId: '',
         assigneeId: '',
         search: '',
@@ -146,7 +146,7 @@ function renderSidebar(overrides: Partial<SidebarProps> = {}) {
       counts: {
         myIssues: 1,
         activeProjectIssues: 2,
-        domains: {},
+        labels: {},
         cycles: {},
       },
       onSelectProject: vi.fn(),
@@ -155,7 +155,7 @@ function renderSidebar(overrides: Partial<SidebarProps> = {}) {
       onShowMyIssues: vi.fn(),
       onShowNotes: vi.fn(),
       onSelectCycle: vi.fn(),
-      onSelectDomain: vi.fn(),
+      onSelectTeamLabel: vi.fn(),
     },
     tools: {
       onOpenOllama: vi.fn(),

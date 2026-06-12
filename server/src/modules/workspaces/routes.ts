@@ -6,9 +6,10 @@ import {
   authUsers,
   comments,
   cycles,
-  domains,
+  labels,
   projectMembers,
   projects,
+  ticketLabels,
   tickets,
   userProfiles,
   workspaceInvites,
@@ -1331,21 +1332,14 @@ export function createWorkspacesRouter() {
           where ${projects.workspaceId} = ${workspaceId}
         )`);
 
-        await tx.delete(cycles).where(sql`${cycles.projectId} in (
-          select ${projects.id}
-          from ${projects}
-          where ${projects.workspaceId} = ${workspaceId}
-        ) or ${cycles.teamId} in (
-          select ${teams.id}
-          from ${teams}
+        await tx.delete(ticketLabels).where(sql`${ticketLabels.labelId} in (
+          select ${labels.id}
+          from ${labels}
+          inner join ${teams} on ${labels.teamId} = ${teams.id}
           where ${teams.workspaceId} = ${workspaceId}
         )`);
 
-        await tx.delete(domains).where(sql`${domains.projectId} in (
-          select ${projects.id}
-          from ${projects}
-          where ${projects.workspaceId} = ${workspaceId}
-        ) or ${domains.teamId} in (
+        await tx.delete(cycles).where(sql`${cycles.teamId} in (
           select ${teams.id}
           from ${teams}
           where ${teams.workspaceId} = ${workspaceId}

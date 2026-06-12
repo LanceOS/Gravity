@@ -182,7 +182,7 @@ export function WorkspacePage({
       priority: '',
       status: '',
       labels: [],
-      domainId: '',
+      labelId: '',
       cycleId: '',
       assigneeId: '',
     });

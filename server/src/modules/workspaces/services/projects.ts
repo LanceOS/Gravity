@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import { db } from '../../../db/index.js';
-import { cycles, domains, projectMembers, projects, workspaceMembers, workspaces, workspaceSettings, teams } from '../../../db/schema.js';
+import { cycles, projectMembers, projects, workspaceMembers, workspaces, workspaceSettings, teams } from '../../../db/schema.js';
 import {
   addWorkspaceMembersToProject,
   createId,
@@ -69,31 +69,10 @@ export async function listProjectsWithDetails(userId: string, workspaceId?: stri
     return [];
   }
 
-  const [domainRows, cycleRows] = await Promise.all([
-    db.select().from(domains).where(inArray(domains.projectId, projectIds)).orderBy(asc(domains.createdAt)),
-    db.select().from(cycles).where(inArray(cycles.projectId, projectIds)).orderBy(asc(cycles.startDate)),
-  ]);
-
-  const domainsByProject = new Map<string, Array<{ id: string; name: string; color: string }>>();
-  for (const domain of domainRows) {
-    if (!domain.projectId) continue;
-    const nextDomains = domainsByProject.get(domain.projectId) ?? [];
-    nextDomains.push({ id: domain.id, name: domain.name, color: domain.color });
-    domainsByProject.set(domain.projectId, nextDomains);
-  }
-
-  const cyclesByProject = new Map<string, Array<ReturnType<typeof mapCycle>>>();
-  for (const cycle of cycleRows) {
-    if (!cycle.projectId) continue;
-    const nextCycles = cyclesByProject.get(cycle.projectId) ?? [];
-    nextCycles.push(mapCycle(cycle));
-    cyclesByProject.set(cycle.projectId, nextCycles);
-  }
-
   return projectRows.map((project) => ({
     ...project,
-    domains: domainsByProject.get(project.id) ?? [],
-    cycles: cyclesByProject.get(project.id) ?? [],
+    domains: [],
+    cycles: [],
   }));
 }
 

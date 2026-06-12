@@ -135,9 +135,9 @@ function buildBreadcrumbs({
       break;
     }
 
-    if (segment === 'domains') {
+    if (segment === 'labels' || segment === 'domains') {
       const domainId = remainder[index + 1];
-      const domainsPath = `${currentBase}/domains`;
+      const domainsPath = `${currentBase}/labels`;
 
       if (domainId) {
         crumbs.push({

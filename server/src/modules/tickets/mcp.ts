@@ -26,6 +26,16 @@ function parseDateArg(value: unknown, fieldName: string): Date | undefined {
   return d;
 }
 
+async function getProjectTeamId(projectId: string) {
+  const rows = await db
+    .select({ teamId: projects.teamId })
+    .from(projects)
+    .where(eq(projects.id, projectId))
+    .limit(1);
+
+  return rows[0]?.teamId ?? null;
+}
+
 /**
  * @description Ticket-focused MCP handlers. Each method re-checks that the
  * target project or ticket belongs to the caller's trusted workspace before
@@ -314,8 +324,9 @@ export class TicketTools {
     const namesToRemoveSet = new Set(labelsToRemove);
     const newLabelNames = currentLabels.map(l => l.name).filter(name => !namesToRemoveSet.has(name));
 
-    const resolvedLabels = newLabelNames.length > 0
-      ? await db.select({ id: labels.id, name: labels.name }).from(labels).where(and(eq(labels.projectId, ticket.projectId), inArray(labels.name, newLabelNames)))
+    const teamId = await getProjectTeamId(ticket.projectId);
+    const resolvedLabels = newLabelNames.length > 0 && teamId
+      ? await db.select({ id: labels.id, name: labels.name }).from(labels).where(and(eq(labels.teamId, teamId), inArray(labels.name, newLabelNames)))
       : [];
 
     const labelIds = resolvedLabels.map(l => l.id);
@@ -354,8 +365,9 @@ export class TicketTools {
         ? args.labels.map(String)
         : [];
     
-    const resolvedLabels = labelNames.length > 0
-      ? await db.select({ id: labels.id, name: labels.name }).from(labels).where(and(eq(labels.projectId, ticket.projectId), inArray(labels.name, labelNames)))
+    const teamId = await getProjectTeamId(ticket.projectId);
+    const resolvedLabels = labelNames.length > 0 && teamId
+      ? await db.select({ id: labels.id, name: labels.name }).from(labels).where(and(eq(labels.teamId, teamId), inArray(labels.name, labelNames)))
       : [];
 
     if (resolvedLabels.length !== labelNames.length) {

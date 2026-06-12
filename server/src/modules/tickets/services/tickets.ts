@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '../../../db/index.js';
-import { authUsers, comments, tickets, userProfiles, projects, domains, cycles, labels, ticketLabels } from '../../../db/schema.js';
+import { authUsers, comments, tickets, userProfiles, projects, cycles, labels, ticketLabels } from '../../../db/schema.js';
 import { createId, getProjectByKeyPrefix, nextTicketKey, normalizeIsoDate } from '../../../lib/platform.js';
 import generateBranchName from '../utils/branch.js';
 
@@ -9,7 +9,6 @@ type TicketRecord = typeof tickets.$inferSelect;
 export type TicketFilters = {
   status?: string;
   priority?: string;
-  domainId?: string;
   assigneeId?: string;
   cycleId?: string;
   labels?: string[];
@@ -28,9 +27,6 @@ function buildTicketFilterConditions(projectIds: string[], filters: TicketFilter
     // Normalize incoming priority filter to canonical DB values
     const p = canonicalizePriority(filters.priority);
     conditions.push(eq(tickets.priority, p));
-  }
-  if (filters.domainId) {
-    conditions.push(eq(tickets.domainId, filters.domainId));
   }
   if (filters.assigneeId) {
     conditions.push(eq(tickets.assigneeId, filters.assigneeId));
@@ -77,7 +73,6 @@ function mapTicket(record: TicketRecord, labelRows: any[] = []) {
     priority: canonicalizePriority(record.priority),
     assigneeId: record.assigneeId,
     projectId: record.projectId,
-    domainId: record.domainId,
     cycleId: record.cycleId,
     parentId: record.parentId,
     isSubtask: record.parentId !== null,
@@ -88,7 +83,7 @@ function mapTicket(record: TicketRecord, labelRows: any[] = []) {
     updatedAt: normalizeIsoDate(record.updatedAt),
     labels: sortedLabels.map((label) => ({
       id: String(label.id),
-      projectId: label.projectId ? String(label.projectId) : undefined,
+      teamId: String(label.teamId),
       name: String(label.name),
       color: String(label.color),
       description: String(label.description ?? ''),
@@ -96,6 +91,16 @@ function mapTicket(record: TicketRecord, labelRows: any[] = []) {
     })),
     labelIds: sortedLabels.map((label) => String(label.id)),
   };
+}
+
+async function getProjectTeamId(projectId: string) {
+  const rows = await db
+    .select({ teamId: projects.teamId })
+    .from(projects)
+    .where(eq(projects.id, projectId))
+    .limit(1);
+
+  return rows[0]?.teamId ?? null;
 }
 
 // Normalize status strings to canonical DB/application values.
@@ -194,7 +199,7 @@ export async function listTickets(projectId: string, filters: TicketFilters = {}
       ticketId: ticketLabels.ticketId,
       label: {
         id: labels.id,
-        projectId: labels.projectId,
+        teamId: labels.teamId,
         name: labels.name,
         color: labels.color,
         description: labels.description,
@@ -240,7 +245,7 @@ export async function listWorkspaceTickets(projectIds: string[], filters: Ticket
       ticketId: ticketLabels.ticketId,
       label: {
         id: labels.id,
-        projectId: labels.projectId,
+        teamId: labels.teamId,
         name: labels.name,
         color: labels.color,
         description: labels.description,
@@ -321,7 +326,6 @@ export async function getTicketDetails(ticketId: string, projectId?: string) {
     subtasks,
     assigneeResult,
     projectResult,
-    domainResult,
     cycleResult,
     labelResult
   ] = await Promise.all([
@@ -342,16 +346,13 @@ export async function getTicketDetails(ticketId: string, projectId?: string) {
           .limit(1)
       : Promise.resolve([]),
     db.select().from(projects).where(eq(projects.id, ticket.projectId)).limit(1),
-    ticket.domainId
-      ? db.select().from(domains).where(eq(domains.id, ticket.domainId)).limit(1)
-      : Promise.resolve([]),
     ticket.cycleId
       ? db.select().from(cycles).where(eq(cycles.id, ticket.cycleId)).limit(1)
       : Promise.resolve([]),
     db
       .select({
         id: labels.id,
-        projectId: labels.projectId,
+        teamId: labels.teamId,
         name: labels.name,
         color: labels.color,
         description: labels.description,
@@ -382,15 +383,6 @@ export async function getTicketDetails(ticketId: string, projectId?: string) {
       }
     : null;
 
-  const domainRow = domainResult[0];
-  const domain = domainRow
-    ? {
-        id: domainRow.id,
-        name: domainRow.name,
-        color: domainRow.color,
-      }
-    : null;
-
   const cycleRow = cycleResult[0];
   const cycle = cycleRow
     ? {
@@ -410,7 +402,7 @@ export async function getTicketDetails(ticketId: string, projectId?: string) {
           ticketId: ticketLabels.ticketId,
           label: {
             id: labels.id,
-            projectId: labels.projectId,
+            teamId: labels.teamId,
             name: labels.name,
             color: labels.color,
             description: labels.description,
@@ -435,7 +427,6 @@ export async function getTicketDetails(ticketId: string, projectId?: string) {
     subtasks: subtasks.map((s) => mapTicket(s, labelsBySubtaskId.get(s.id) || [])),
     assignee,
     project,
-    domain,
     cycle,
     labels: labelResult,
   };
@@ -452,7 +443,6 @@ export async function createTicketRecord(input: {
   status?: string;
   priority?: string;
   projectId: string;
-  domainId?: string | null;
   cycleId?: string | null;
   assigneeId?: string | null;
   parentId?: string | null;
@@ -473,7 +463,6 @@ export async function createTicketRecord(input: {
         status: canonicalizeStatus(input.status ?? 'todo'),
         priority: canonicalizePriority(input.priority ?? 'no_priority'),
         projectId: input.projectId,
-        domainId: input.domainId ?? null,
         cycleId: input.cycleId ?? null,
         assigneeId: input.assigneeId ?? null,
         parentId: input.parentId ?? null,
@@ -486,23 +475,30 @@ export async function createTicketRecord(input: {
       .returning();
 
     const ticketRow = rows[0];
+    const projectRows = await tx
+      .select({ teamId: projects.teamId })
+      .from(projects)
+      .where(eq(projects.id, input.projectId))
+      .limit(1);
+    const teamId = projectRows[0]?.teamId;
+
     const uniqueLabelIds = [...new Set((input.labelIds ?? []).filter(Boolean))];
-    const createdLabels = uniqueLabelIds.length > 0
+    const createdLabels = uniqueLabelIds.length > 0 && teamId
       ? await tx
           .select({
             id: labels.id,
-            projectId: labels.projectId,
+            teamId: labels.teamId,
             name: labels.name,
             color: labels.color,
             description: labels.description,
             sortOrder: labels.sortOrder,
           })
           .from(labels)
-          .where(and(eq(labels.projectId, input.projectId), inArray(labels.id, uniqueLabelIds)))
+          .where(and(eq(labels.teamId, teamId), inArray(labels.id, uniqueLabelIds)))
       : [];
 
     if (uniqueLabelIds.length > 0 && createdLabels.length !== uniqueLabelIds.length) {
-      throw new Error('One or more labels were not found for this project.');
+      throw new Error('One or more labels were not found for this team.');
     }
 
     if (createdLabels.length > 0) {
@@ -525,7 +521,6 @@ export async function updateTicketRecord(
     status: string;
     priority: string;
     assigneeId: string | null;
-    domainId: string | null;
     cycleId: string | null;
     parentId: string | null;
     labelIds: string[];
@@ -542,7 +537,6 @@ export async function updateTicketRecord(
     ...(updates.status !== undefined ? { status: canonicalizeStatus(updates.status as string) } : {}),
     ...(updates.priority !== undefined ? { priority: canonicalizePriority(updates.priority as string) } : {}),
     ...(updates.assigneeId !== undefined ? { assigneeId: updates.assigneeId } : {}),
-    ...(updates.domainId !== undefined ? { domainId: updates.domainId } : {}),
     ...(updates.cycleId !== undefined ? { cycleId: updates.cycleId } : {}),
     ...(updates.parentId !== undefined ? { parentId: updates.parentId } : {}),
     ...(updates.prStatus !== undefined ? { prStatus: canonicalizePrStatus(updates.prStatus as string) } : {}),
@@ -578,23 +572,32 @@ export async function updateTicketRecord(
     }
 
     if (updates.labelIds !== undefined) {
+      const resolvedProjectId = projectId ?? rows[0]?.projectId;
+      const teamId = resolvedProjectId
+        ? await getProjectTeamId(resolvedProjectId)
+        : null;
+
+      if (!teamId && updates.labelIds.length > 0) {
+        throw new Error('Unable to resolve the ticket team for label assignment.');
+      }
+
       const uniqueLabelIds = [...new Set(updates.labelIds.filter(Boolean))];
       const resolvedLabels = uniqueLabelIds.length > 0
         ? await tx
             .select({
               id: labels.id,
-              projectId: labels.projectId,
+              teamId: labels.teamId,
               name: labels.name,
               color: labels.color,
               description: labels.description,
               sortOrder: labels.sortOrder,
             })
             .from(labels)
-            .where(projectId ? and(eq(labels.projectId, projectId), inArray(labels.id, uniqueLabelIds)) : inArray(labels.id, uniqueLabelIds))
+            .where(and(eq(labels.teamId, teamId ?? ''), inArray(labels.id, uniqueLabelIds)))
         : [];
 
-      if (projectId && uniqueLabelIds.length > 0 && resolvedLabels.length !== uniqueLabelIds.length) {
-        throw new Error('One or more labels were not found for this project.');
+      if (teamId && uniqueLabelIds.length > 0 && resolvedLabels.length !== uniqueLabelIds.length) {
+        throw new Error('One or more labels were not found for this team.');
       }
 
       await tx.delete(ticketLabels).where(eq(ticketLabels.ticketId, ticketId));
@@ -608,7 +611,7 @@ export async function updateTicketRecord(
     const updatedLabels = await tx
       .select({
         id: labels.id,
-        projectId: labels.projectId,
+        teamId: labels.teamId,
         name: labels.name,
         color: labels.color,
         description: labels.description,

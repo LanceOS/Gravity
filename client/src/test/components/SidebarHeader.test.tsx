@@ -20,18 +20,18 @@ describe('Sidebar', () => {
         }}
         projects={{
           projects: [],
-          domains: [],
+          labels: [],
           cycles: [],
           currentUser: { id: 'user-1', name: 'Test User' } as never,
           activeProjectId: '',
           filters: {} as never,
-          counts: { myIssues: 0, activeProjectIssues: 0, domains: {}, cycles: {} },
+          counts: { myIssues: 0, activeProjectIssues: 0, labels: {}, cycles: {} },
           onSelectProject: vi.fn(),
           onShowProjectIssues: vi.fn(),
           onShowMyIssues: vi.fn(),
           onShowNotes: vi.fn(),
           onSelectCycle: vi.fn(),
-          onSelectDomain: vi.fn(),
+          onSelectTeamLabel: vi.fn(),
         }}
         tools={{
           onOpenOllama: vi.fn(),

@@ -3,7 +3,7 @@ import React, { createContext, useContext, useEffect, useCallback, useMemo, useS
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys, CACHE_CONFIGS } from '../utils/queryClient';
 
-// Domain entity types live in src/types/domain.ts.
+// Shared entity types live in src/types/domain.ts.
 export type {
   User,
   Project,
@@ -29,6 +29,7 @@ interface State {
     status: string;
     priority: string;
     projectId: string;
+    labelId?: string;
     domainId?: string;
     labels: string[];
     labelMode: 'all' | 'any';
@@ -51,6 +52,7 @@ type CreateTicketInput = {
   cycleId: string | null;
   assigneeId: string | null;
   parentId: string | null;
+  labelId?: string | null;
   domainId?: string | null;
 };
 
@@ -58,7 +60,7 @@ const initialFilters = {
   status: '',
   priority: '',
   projectId: '',
-  domainId: '',
+  labelId: '',
   labels: [] as string[],
   labelMode: 'any' as 'all' | 'any',
   cycleId: '',

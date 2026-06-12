@@ -9,7 +9,6 @@ export const tickets = pgTable('tickets', {
   priority: text('priority').notNull().default('no_priority'),
   assigneeId: text('assignee_id'),
   projectId: text('project_id').notNull(),
-  domainId: text('domain_id'),
   cycleId: text('cycle_id'),
   parentId: text('parent_id'),
   prStatus: text('pr_status').notNull().default('none'),
@@ -20,7 +19,6 @@ export const tickets = pgTable('tickets', {
 }, (table) => ({
   projectIdIdx: index('tickets_project_id_idx').on(table.projectId),
   assigneeIdIdx: index('tickets_assignee_id_idx').on(table.assigneeId),
-  domainIdIdx: index('tickets_domain_id_idx').on(table.domainId),
   cycleIdIdx: index('tickets_cycle_id_idx').on(table.cycleId),
   parentIdIdx: index('tickets_parent_id_idx').on(table.parentId),
 }));

@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import { db } from '../../../db/index.js';
-import { teams, projects, cycles, domains, workspaceSettings } from '../schema.js';
+import { teams, projects, cycles, labels, workspaceSettings } from '../schema.js';
 import { normalizeIsoDate } from '../../../lib/platform.js';
 
 function mapCycle(cycle: typeof cycles.$inferSelect) {
@@ -48,9 +48,9 @@ export async function getSidebarTree(workspaceId: string) {
     ? await db.select().from(cycles).where(inArray(cycles.teamId, teamIds)).orderBy(asc(cycles.startDate))
     : [];
 
-  // 4. Fetch all domains in the workspace teams
-  const domainRows = teamIds.length > 0
-    ? await db.select().from(domains).where(inArray(domains.teamId, teamIds)).orderBy(asc(domains.createdAt))
+  // 4. Fetch all labels in the workspace teams
+  const labelRows = teamIds.length > 0
+    ? await db.select().from(labels).where(inArray(labels.teamId, teamIds)).orderBy(asc(labels.createdAt))
     : [];
 
   // Group by teamId
@@ -72,12 +72,12 @@ export async function getSidebarTree(workspaceId: string) {
     }
   }
 
-  const domainsByTeam = new Map<string, Array<typeof domains.$inferSelect>>();
-  for (const domain of domainRows) {
-    if (domain.teamId) {
-      const list = domainsByTeam.get(domain.teamId) ?? [];
-      list.push(domain);
-      domainsByTeam.set(domain.teamId, list);
+  const labelsByTeam = new Map<string, Array<typeof labels.$inferSelect>>();
+  for (const label of labelRows) {
+    if (label.teamId) {
+      const list = labelsByTeam.get(label.teamId) ?? [];
+      list.push(label);
+      labelsByTeam.set(label.teamId, list);
     }
   }
 
@@ -85,7 +85,7 @@ export async function getSidebarTree(workspaceId: string) {
   const teamTrees = workspaceTeams.map((team) => {
     const teamProjects = projectsByTeam.get(team.id) ?? [];
     const teamCycles = cyclesByTeam.get(team.id) ?? [];
-    const teamDomains = domainsByTeam.get(team.id) ?? [];
+    const teamLabels = labelsByTeam.get(team.id) ?? [];
 
     return {
       id: team.id,
@@ -97,10 +97,12 @@ export async function getSidebarTree(workspaceId: string) {
         { id: 'timeline', name: 'Timeline', type: 'timeline' },
       ],
       cycles: teamCycles.map(mapCycle),
-      domains: teamDomains.map((d) => ({
-        id: d.id,
-        name: d.name,
-        color: d.color,
+      labels: teamLabels.map((l) => ({
+        id: l.id,
+        name: l.name,
+        color: l.color,
+        description: l.description,
+        sortOrder: l.sortOrder,
       })),
       projects: teamProjects.map((p) => ({
         id: p.id,

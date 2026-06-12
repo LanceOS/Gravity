@@ -33,10 +33,10 @@ function resolveNavigationState(section: SidebarProjectSection): SidebarNavigati
     };
   }
 
-  if (section.activeDomainId) {
+  if (section.activeLabelId ?? section.activeDomainId) {
     return {
       activeTeam: section.activeTeamId ?? '',
-      activeScope: 'domains',
+      activeScope: 'labels',
       activeProject: '',
     };
   }
@@ -99,6 +99,7 @@ export function TeamsSidebar({
           const teamCollapsed = getTeamCollapsedState(collapsedTeams, team.id, activeTeamId);
           const projectsCollapsed = teamContainsActiveProject ? false : (collapsedTeamProjects[team.id] ?? false);
           const configuredTeamViews = team.views?.filter((view) => view.id !== 'board' && view.type !== 'board') ?? [];
+          const teamLabels = team.labels ?? team.domains ?? [];
           const teamViews = configuredTeamViews.length > 0
             ? configuredTeamViews
             : [{ id: 'all', name: 'All Tasks', type: 'all' }];
@@ -169,26 +170,26 @@ export function TeamsSidebar({
                     )}
                   </SidebarGroup>
 
-                  <SidebarGroup label="Domains">
-                    {team.domains && team.domains.length > 0 ? (
-                      team.domains.map((domain) => (
+                  <SidebarGroup label="Labels">
+                    {teamLabels.length > 0 ? (
+                      teamLabels.map((label) => (
                         <SidebarItem
-                          key={domain.id}
+                          key={label.id}
                           nested
-                          active={isTeamActive && activeScope === 'domains' && section.activeDomainId === domain.id}
-                          onClick={() => section.onSelectDomain?.(team.id, domain.id)}
+                          active={isTeamActive && activeScope === 'labels' && (section.activeLabelId ?? section.activeDomainId) === label.id}
+                          onClick={() => (section.onSelectTeamLabel ?? section.onSelectDomain)?.(team.id, label.id)}
                           leftIcon={
                             <div
-                              className="teams-sidebar__domain-dot"
-                              style={{ background: domain.color }}
+                              className="teams-sidebar__label-dot"
+                              style={{ background: label.color }}
                             />
                           }
                         >
-                          {domain.name}
+                          {label.name}
                         </SidebarItem>
                       ))
                     ) : (
-                      <div className="teams-sidebar__empty">No domains</div>
+                      <div className="teams-sidebar__empty">No labels</div>
                     )}
                   </SidebarGroup>
 

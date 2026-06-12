@@ -4,13 +4,13 @@ import { PlaceholderLayout } from './PlaceholderLayout';
 
 export default function TeamDomainViewView() {
   const params = useParams();
-  const { workspaceId, teamId, domainId } = params;
+  const { workspaceId, teamId, domainId: labelId } = params;
 
   return (
     <PlaceholderLayout
-      breadcrumbs={[{ label: 'Teams' }, { label: teamId || 'Team' }, { label: 'Labels' }, { label: domainId || 'Label' }]}
-      title={`Label Filtered: ${domainId}`}
-      description={`Task tickets within label ${domainId} assigned to team ${teamId}.`}
+      breadcrumbs={[{ label: 'Teams' }, { label: teamId || 'Team' }, { label: 'Labels' }, { label: labelId || 'Label' }]}
+      title={`Label Filtered: ${labelId}`}
+      description={`Task tickets within label ${labelId} assigned to team ${teamId}.`}
       params={params}
       degradation={{
         message: 'This workspace does not currently use team labels. Falling back to workspace all tasks.',
@@ -31,13 +31,13 @@ export default function TeamDomainViewView() {
         <div className="placeholder-table-row">
           <div><code>GRV-90</code></div>
           <div>Refactor CSS imports with cascades</div>
-          <div>{domainId}</div>
+          <div>{labelId}</div>
           <div style={{ color: '#ef4444' }}>Todo</div>
         </div>
         <div className="placeholder-table-row">
           <div><code>GRV-91</code></div>
           <div>Add label validation layers in auth</div>
-          <div>{domainId}</div>
+          <div>{labelId}</div>
           <div style={{ color: '#10b981' }}>Done</div>
         </div>
       </div>

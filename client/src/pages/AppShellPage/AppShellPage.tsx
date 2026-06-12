@@ -3,7 +3,7 @@ import { MessageSquare, X } from 'lucide-react';
 import { useParams, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../../utils/apiClient';
-import type { SidebarTree, Cycle, Domain } from '../../types/domain';
+import type { SidebarTree, Cycle, Label } from '../../types/domain';
 
 import { AuthScreen } from '../../modules/auth';
 import { CreateTicketModal } from '../../modules/tickets';
@@ -227,10 +227,12 @@ export function AppShellPage() {
     teamId: teamIdParam,
     viewId: viewIdParam,
     cycleId: cycleIdParam,
-    domainId: domainIdParam,
+    labelId: labelIdParam,
+    domainId: legacyDomainIdParam,
     ticketKey,
     noteId,
   } = useParams();
+  const activeLabelIdParam = labelIdParam || legacyDomainIdParam;
   const { pathname } = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -266,9 +268,9 @@ export function AppShellPage() {
     enabled: isTeamAggregatePath && !!currentUser,
   });
 
-  const { data: teamDomains = [] } = useQuery<Domain[]>({
-    queryKey: ['teamDomains', teamIdParam],
-    queryFn: () => apiClient.get<Domain[]>('/domains', { params: { teamId: teamIdParam } }),
+  const { data: teamLabels = [] } = useQuery<Label[]>({
+    queryKey: ['teamLabels', teamIdParam],
+    queryFn: () => apiClient.get<Label[]>('/labels', { params: { teamId: teamIdParam } }),
     enabled: isTeamAggregatePath && !!currentUser,
   });
 
@@ -293,8 +295,8 @@ export function AppShellPage() {
     navigate(`/workspaces/${activeWorkspaceId}/teams/${teamId}/cycles/${cycleId}`);
   }, [activeWorkspaceId, navigate]);
 
-  const handleSelectDomain = useCallback((teamId: string, domainId: string) => {
-    navigate(`/workspaces/${activeWorkspaceId}/teams/${teamId}/domains/${domainId}`);
+  const handleSelectTeamLabel = useCallback((teamId: string, labelId: string) => {
+    navigate(`/workspaces/${activeWorkspaceId}/teams/${teamId}/labels/${labelId}`);
   }, [activeWorkspaceId, navigate]);
 
   const handleSelectAllTasks = useCallback((teamId: string) => {
@@ -306,7 +308,7 @@ export function AppShellPage() {
     labels: [] as string[],
     labelMode: 'any' as 'all' | 'any',
     cycleId: '',
-    domainId: '',
+    labelId: '',
     assigneeId: '',
     status: '',
     priority: '',
@@ -394,15 +396,16 @@ export function AppShellPage() {
     }
 
     // Sync filters from URL search params — only call setFilters when URL params changed
-    const urlLabelsStr = searchParams.get('labels') ?? '';
-    const urlLabels = urlLabelsStr.split(',').filter(Boolean);
+    const searchLabelsStr = searchParams.get('labels') ?? '';
+    const searchLabels = searchLabelsStr.split(',').filter(Boolean);
     const urlLabelMode = (searchParams.get('labelMode') as 'all' | 'any') ?? 'any';
     const urlCycleId = cycleIdParam || (searchParams.get('cycleId') ?? '');
-    const urlDomainId = domainIdParam || (searchParams.get('domainId') ?? '');
+    const urlLabelId = activeLabelIdParam || (searchParams.get('labelId') ?? searchParams.get('domainId') ?? '');
     const urlAssigneeId = searchParams.get('assigneeId') ?? '';
     const urlStatus = searchParams.get('status') ?? '';
     const urlPriority = searchParams.get('priority') ?? '';
     const urlSearch = searchParams.get('q') ?? '';
+    const urlLabels = urlLabelId ? [urlLabelId] : searchLabels;
 
     const last = lastSyncedFilterParams.current;
     const labelsChanged = JSON.stringify(last.labels) !== JSON.stringify(urlLabels);
@@ -410,7 +413,7 @@ export function AppShellPage() {
       labelsChanged ||
       last.labelMode !== urlLabelMode ||
       last.cycleId !== urlCycleId ||
-      last.domainId !== urlDomainId ||
+      last.labelId !== urlLabelId ||
       last.assigneeId !== urlAssigneeId ||
       last.status !== urlStatus ||
       last.priority !== urlPriority ||
@@ -420,7 +423,7 @@ export function AppShellPage() {
         labels: urlLabels,
         labelMode: urlLabelMode,
         cycleId: urlCycleId,
-        domainId: urlDomainId,
+        labelId: urlLabelId,
         assigneeId: urlAssigneeId,
         status: urlStatus,
         priority: urlPriority,
@@ -430,7 +433,7 @@ export function AppShellPage() {
         labels: urlLabels,
         labelMode: urlLabelMode,
         cycleId: urlCycleId,
-        domainId: urlDomainId,
+        labelId: urlLabelId,
         assigneeId: urlAssigneeId,
         status: urlStatus,
         priority: urlPriority,
@@ -442,7 +445,7 @@ export function AppShellPage() {
     if (!ticketKey) {
       setActiveTicket(null);
     }
-  }, [pathname, workspaceId, projectIdParam, teamIdParam, cycleIdParam, domainIdParam, ticketKey, noteId, searchParams, shouldUseAggregateTicketScope]);
+  }, [pathname, workspaceId, projectIdParam, teamIdParam, cycleIdParam, activeLabelIdParam, ticketKey, noteId, searchParams, shouldUseAggregateTicketScope]);
 
   // Resolve ticketKey URL param → Ticket object once tickets have loaded
   useEffect(() => {
@@ -715,7 +718,7 @@ export function AppShellPage() {
 
   const handleSelectWorkspace = (workspaceId: string) => {
     setActiveTicket(null);
-    setFilters({ assigneeId: '', labels: [], cycleId: '', domainId: '' });
+    setFilters({ assigneeId: '', labels: [], cycleId: '', labelId: '' });
     navigate(`/workspaces/${workspaceId}`);
   };
 
@@ -903,7 +906,8 @@ export function AppShellPage() {
     if (merged.labels && merged.labels.length > 0) nextParams.set('labels', merged.labels.join(',')); else nextParams.delete('labels');
     if (merged.labelMode && merged.labelMode !== 'any') nextParams.set('labelMode', merged.labelMode); else nextParams.delete('labelMode');
     if (merged.cycleId) nextParams.set('cycleId', merged.cycleId); else nextParams.delete('cycleId');
-    if (merged.domainId) nextParams.set('domainId', merged.domainId); else nextParams.delete('domainId');
+    if (merged.labelId) nextParams.set('labelId', merged.labelId); else nextParams.delete('labelId');
+    nextParams.delete('domainId');
     if (merged.assigneeId) nextParams.set('assigneeId', merged.assigneeId); else nextParams.delete('assigneeId');
     if (merged.status) nextParams.set('status', merged.status); else nextParams.delete('status');
     if (merged.priority) nextParams.set('priority', merged.priority); else nextParams.delete('priority');
@@ -1037,7 +1041,7 @@ export function AppShellPage() {
     '';
   const sidebarActiveTeamId = teamIdParam || activeProjectTeamId;
   const isTeamProjectsManager = activeSection === 'team-projects';
-  const sidebarActiveScope: SidebarNavigationState['activeScope'] = isWorkspaceAllTasksPath
+    const sidebarActiveScope: SidebarNavigationState['activeScope'] = isWorkspaceAllTasksPath
     ? 'workspace'
     : isTeamProjectsManager
       ? 'projects'
@@ -1046,8 +1050,8 @@ export function AppShellPage() {
         ? 'projects'
         : cycleIdParam
           ? 'cycles'
-          : domainIdParam
-            ? 'domains'
+          : activeLabelIdParam
+            ? 'labels'
             : 'views'
       : projectIdParam || activeProjectId
         ? 'projects'
@@ -1079,7 +1083,7 @@ export function AppShellPage() {
       ? teamTickets
       : tickets;
   const scopedCycles = isTeamAggregatePath ? teamCycles : cycles;
-  const scopedLabels = isTeamAggregatePath ? teamDomains : labels;
+  const scopedLabels = isTeamAggregatePath ? teamLabels : labels;
   const scopedFilters = shouldUseAggregateTicketScope ? { ...filters, projectId: '' } : filters;
   const createDefaultProjectId =
     activeProjectId ||
@@ -1104,12 +1108,12 @@ export function AppShellPage() {
       activeViewId: sidebarActiveViewId,
       activeTeamId: sidebarActiveTeamId,
       activeCycleId: cycleIdParam,
-      activeDomainId: domainIdParam,
+      activeLabelId: activeLabelIdParam,
       onSelectWorkspaceAllTasks: handleSelectWorkspaceAllTasks,
       onSelectTeam: handleSelectTeam,
       onSelectView: handleSelectView,
       onSelectCycle: handleSelectCycle,
-      onSelectDomain: handleSelectDomain,
+      onSelectTeamLabel: handleSelectTeamLabel,
       onSelectAllTasks: handleSelectAllTasks,
 
       projects: activeWorkspaceProjects,

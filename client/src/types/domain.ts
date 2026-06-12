@@ -2,7 +2,7 @@ import type { Label } from './label';
 export type { Label };
 
 /**
- * Domain entity types — the canonical source of truth for the app's data model.
+ * Shared entity types for the app's data model.
  *
  * These types reflect the backend API contract and are intentionally decoupled
  * from React context machinery. Import from here (or from `src/context/TicketContext`
@@ -41,6 +41,7 @@ export interface SidebarTeam {
   color: string;
   views: SidebarView[];
   cycles: Cycle[];
+  labels?: Label[];
   domains: Domain[];
   projects: Project[];
 }
