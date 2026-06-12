@@ -420,7 +420,7 @@ function renderAppShell({
           <Route path="/workspaces/:workspaceId/teams/:teamId/tasks" element={<AppShellPage />} />
           <Route path="/workspaces/:workspaceId/teams/:teamId/views/:viewId" element={<AppShellPage />} />
           <Route path="/workspaces/:workspaceId/teams/:teamId/cycles/:cycleId" element={<AppShellPage />} />
-          <Route path="/workspaces/:workspaceId/teams/:teamId/domains/:domainId" element={<AppShellPage />} />
+          <Route path="/workspaces/:workspaceId/teams/:teamId/labels/:labelId" element={<AppShellPage />} />
           <Route path="/workspaces/:workspaceId/teams/:teamId/projects" element={<AppShellPage />} />
           <Route path="/workspaces/:workspaceId/teams/:teamId/projects/:projectId/tickets" element={<AppShellPage />} />
           <Route path="/workspaces/:workspaceId/teams/:teamId/projects/:projectId/tickets/:ticketKey" element={<AppShellPage />} />
@@ -476,7 +476,7 @@ const aggregateSidebarTree = {
         { id: 'timeline', name: 'Timeline', type: 'timeline' },
       ],
       cycles: [],
-      domains: [],
+      labels: [],
       projects: aggregateProjects.slice(0, 2),
     },
     {
@@ -489,7 +489,7 @@ const aggregateSidebarTree = {
         { id: 'timeline', name: 'Timeline', type: 'timeline' },
       ],
       cycles: [],
-      domains: [],
+      labels: [],
       projects: aggregateProjects.slice(2),
     },
   ],
@@ -563,7 +563,7 @@ function mockAggregateApiResponses() {
       return Promise.resolve(jsonResponse(workspaceAggregateTickets));
     }
 
-    if (url === '/api/v1/cycles?teamId=team-1' || url === '/api/v1/domains?teamId=team-1') {
+    if (url === '/api/v1/cycles?teamId=team-1' || url === '/api/v1/labels?teamId=team-1') {
       return Promise.resolve(jsonResponse([]));
     }
 

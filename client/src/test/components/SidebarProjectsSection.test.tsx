@@ -68,7 +68,7 @@ describe('SidebarProjectsSection', () => {
         activeViewId: 'all',
         activeTeamId: 'team-1',
         activeCycleId: '',
-        activeDomainId: '',
+        activeLabelId: '',
         teams: [
           {
             id: 'team-1',
@@ -80,7 +80,7 @@ describe('SidebarProjectsSection', () => {
               { id: 'board', name: 'Board', type: 'board' },
             ],
             cycles: [{ id: 'cycle-1', name: 'Sprint 1', startDate: '', endDate: '', completed: 0 }],
-            domains: [{ id: 'domain-1', name: 'API', color: '#22c55e' }],
+            labels: [{ id: 'label-1', name: 'API', color: '#22c55e' }],
             projects: [
               { id: 'project-1', name: 'Proj 1', description: '', key: 'P1', status: 'active', workspaceId: 'w1' },
             ],
@@ -90,7 +90,7 @@ describe('SidebarProjectsSection', () => {
         onSelectTeam: vi.fn(),
         onSelectAllTasks: vi.fn(),
         onSelectCycle: vi.fn(),
-        onSelectDomain: vi.fn(),
+        onSelectTeamLabel: vi.fn(),
         onSelectProject: vi.fn(),
       },
     });
@@ -106,7 +106,7 @@ describe('SidebarProjectsSection', () => {
     expect(screen.getByText('Platform')).toBeInTheDocument();
     expect(screen.getByText('Views')).toBeInTheDocument();
     expect(screen.getByText('Cycles')).toBeInTheDocument();
-    expect(screen.getByText('Domains')).toBeInTheDocument();
+    expect(screen.getByText('Labels')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Board$/i })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Projects/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Proj 1/i })).toBeInTheDocument();

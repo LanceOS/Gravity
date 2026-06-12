@@ -102,7 +102,8 @@ function getInitialDraft(): TeamDraft {
 }
 
 function getTeamReferenceCount(team: SidebarTeam) {
-  return (team.projects?.length ?? 0) + (team.cycles?.length ?? 0) + (team.domains?.length ?? 0);
+  const teamLabels = team.labels ?? team.domains ?? [];
+  return (team.projects?.length ?? 0) + (team.cycles?.length ?? 0) + teamLabels.length;
 }
 
 function toSidebarTeam(team: Team): SidebarTeam {
@@ -113,6 +114,7 @@ function toSidebarTeam(team: Team): SidebarTeam {
     color: team.color,
     views: TEAM_VIEWS,
     cycles: [],
+    labels: [],
     domains: [],
     projects: [],
   };
@@ -472,7 +474,7 @@ export function WorkspaceTeamsPage({
                           <div className="workspace-teams-page__team-metrics">
                             <span><FolderKanban size={11} />{team.projects?.length ?? 0}</span>
                             <span><CalendarDays size={11} />{team.cycles?.length ?? 0}</span>
-                            <span><Tags size={11} />{team.domains?.length ?? 0}</span>
+                            <span><Tags size={11} />{(team.labels ?? team.domains ?? []).length}</span>
                           </div>
                           <span className="workspace-teams-page__team-card-item-action-text">{isSelected ? 'Selected' : 'Click to edit'}</span>
                         </div>
@@ -574,7 +576,7 @@ export function WorkspaceTeamsPage({
                           <span className="workspace-teams-page__meta-label">Team Stats</span>
                           <div className="workspace-teams-page__meta">
                             <span className="workspace-teams-page__meta-pill">Cycles: {selectedTeam.cycles?.length ?? 0}</span>
-                            <span className="workspace-teams-page__meta-pill">Labels: {selectedTeam.domains?.length ?? 0}</span>
+                            <span className="workspace-teams-page__meta-pill">Labels: {(selectedTeam.labels ?? selectedTeam.domains ?? []).length}</span>
                           </div>
                         </div>
 

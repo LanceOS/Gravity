@@ -14,6 +14,11 @@ function ProjectHomeGuard() {
   return <Navigate to={`/workspaces/${workspaceId}/projects/${projectId}/tickets`} replace />;
 }
 
+function TeamLabelRedirect() {
+  const { workspaceId, teamId, domainId } = useParams();
+  return <Navigate to={`/workspaces/${workspaceId}/teams/${teamId}/labels/${domainId}`} replace />;
+}
+
 export const router = createBrowserRouter([
   {
     path: '/',
@@ -123,9 +128,18 @@ export const router = createBrowserRouter([
       </ProtectedRoute>
     ),
   },
-  // Domain-filtered view
+  // Legacy compatibility route for label-filtered views
   {
     path: '/workspaces/:workspaceId/teams/:teamId/domains/:domainId',
+    element: (
+      <ProtectedRoute>
+        <TeamLabelRedirect />
+      </ProtectedRoute>
+    ),
+  },
+  // Label-filtered view
+  {
+    path: '/workspaces/:workspaceId/teams/:teamId/labels/:labelId',
     element: (
       <ProtectedRoute>
         <AppShellPage />

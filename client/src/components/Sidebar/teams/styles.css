@@ -94,11 +94,12 @@
 }
 
 /* ── Shared: colour dot used inside left-icon slots ─ */
+.teams-sidebar__label-dot,
 .teams-sidebar__domain-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  /* background is set via inline style (dynamic domain color) */
+  /* background is set via inline style (dynamic label color) */
 }
 
 /* ── Completed cycle name ─────────────────────────── */
