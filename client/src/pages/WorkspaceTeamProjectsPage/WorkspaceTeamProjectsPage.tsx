@@ -279,14 +279,16 @@ export function WorkspaceTeamProjectsPage({
         <section className="workspace-team-projects-page__hero">
           <div>
             <div className="workspace-team-projects-page__eyebrow">Team projects</div>
-            <h2>{team?.name ?? 'Loading team...'}</h2>
-            <p>
+            <div className="workspace-team-projects-page__hero-header">
+              <h2>{team?.name ?? 'Loading team...'}</h2>
+              <div className="workspace-team-projects-page__hero-meta">
+                <span className="workspace-team-projects-page__hero-pill">{sortedProjects.length} projects</span>
+                <span className="workspace-team-projects-page__hero-pill">{workspaceName}</span>
+              </div>
+            </div>
+            <p className="workspace-team-projects-page__hero-description">
               {team?.description || 'Create and refine the projects owned by this team without leaving team management.'}
             </p>
-            <div className="workspace-team-projects-page__hero-meta">
-              <span className="workspace-team-projects-page__hero-pill">{sortedProjects.length} projects</span>
-              <span className="workspace-team-projects-page__hero-pill">{workspaceName}</span>
-            </div>
           </div>
 
           <div className="workspace-team-projects-page__hero-stat">
@@ -368,49 +370,53 @@ export function WorkspaceTeamProjectsPage({
                   </div>
 
                   <form className="workspace-team-projects-page__form" aria-label="Project editor" onSubmit={handleSaveProject}>
-                    <div className="workspace-team-projects-page__field-grid">
-                      <TextInput
-                        label="Project Name"
-                        value={projectDraft.name}
-                        onChange={(event) => setProjectDraft((draft) => ({ ...draft, name: event.target.value }))}
-                        placeholder="Core Platform"
-                        required
+                    <div className="workspace-team-projects-page__form-fields">
+                      <div className="workspace-team-projects-page__field-grid">
+                        <TextInput
+                          label="Project Name"
+                          value={projectDraft.name}
+                          onChange={(event) => setProjectDraft((draft) => ({ ...draft, name: event.target.value }))}
+                          placeholder="Core Platform"
+                          required
+                        />
+
+                        <TextInput
+                          label="GitHub Repository URL"
+                          value={projectDraft.githubRepoUrl}
+                          onChange={(event) => setProjectDraft((draft) => ({ ...draft, githubRepoUrl: event.target.value }))}
+                          placeholder="https://github.com/owner/repo"
+                        />
+                      </div>
+
+                      <Textarea
+                        label="Description"
+                        value={projectDraft.description}
+                        onChange={(event) => setProjectDraft((draft) => ({ ...draft, description: event.target.value }))}
+                        placeholder="Describe what this project owns."
+                        className="workspace-team-projects-page__description-field"
+                        autoGrow={false}
+                        inputStyle={{ resize: 'none' }}
                       />
 
-                      <TextInput
-                        label="GitHub Repository URL"
-                        value={projectDraft.githubRepoUrl}
-                        onChange={(event) => setProjectDraft((draft) => ({ ...draft, githubRepoUrl: event.target.value }))}
-                        placeholder="https://github.com/owner/repo"
-                      />
-                    </div>
+                      <div className="workspace-team-projects-page__status-group" aria-label="Project status">
+                        {PROJECT_LIFECYCLE_OPTIONS.map((option) => (
+                          <Button
+                            key={option.value}
+                            type="button"
+                            size="sm"
+                            variant={projectDraft.status === option.value ? 'primary' : 'secondary'}
+                            onClick={() => setProjectDraft((draft) => ({ ...draft, status: option.value as Project['status'] }))}
+                          >
+                            {option.label}
+                          </Button>
+                        ))}
+                      </div>
 
-                    <Textarea
-                      label="Description"
-                      value={projectDraft.description}
-                      onChange={(event) => setProjectDraft((draft) => ({ ...draft, description: event.target.value }))}
-                      placeholder="Describe what this project owns."
-                      rows={4}
-                    />
-
-                    <div className="workspace-team-projects-page__status-group" aria-label="Project status">
-                      {PROJECT_LIFECYCLE_OPTIONS.map((option) => (
-                        <Button
-                          key={option.value}
-                          type="button"
-                          size="sm"
-                          variant={projectDraft.status === option.value ? 'primary' : 'secondary'}
-                          onClick={() => setProjectDraft((draft) => ({ ...draft, status: option.value as Project['status'] }))}
-                        >
-                          {option.label}
-                        </Button>
-                      ))}
-                    </div>
-
-                    <div className="workspace-team-projects-page__meta">
-                      <span className="workspace-team-projects-page__meta-pill">Key: {selectedProject.key}</span>
-                      <span className="workspace-team-projects-page__meta-pill">Team: {team?.name ?? 'Team'}</span>
-                      <span className="workspace-team-projects-page__meta-pill">Workspace: {workspaceName}</span>
+                      <div className="workspace-team-projects-page__meta">
+                        <span className="workspace-team-projects-page__meta-pill">Key: {selectedProject.key}</span>
+                        <span className="workspace-team-projects-page__meta-pill">Team: {team?.name ?? 'Team'}</span>
+                        <span className="workspace-team-projects-page__meta-pill">Workspace: {workspaceName}</span>
+                      </div>
                     </div>
 
                     <div className="workspace-team-projects-page__actions-row">

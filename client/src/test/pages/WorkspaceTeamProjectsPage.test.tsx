@@ -15,7 +15,7 @@ vi.mock('@library', () => ({
       <input value={value} onChange={onChange} {...props} />
     </label>
   ),
-  Textarea: ({ label, value, onChange, ...props }: any) => (
+  Textarea: ({ label, value, onChange, autoGrow, inputStyle, ...props }: any) => (
     <label>
       <span>{label}</span>
       <textarea value={value} onChange={onChange} {...props} />
