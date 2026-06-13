@@ -30,16 +30,20 @@ interface ContextMenuContextType {
 
 const ContextMenuContext = React.createContext<ContextMenuContextType | null>(null);
 
-interface MenuLevelContextType {
+export const MenuLevelContext = React.createContext<{
   level: number;
   activeSubmenuId: string | null;
   setActiveSubmenuId: (id: string | null) => void;
-}
-
-const MenuLevelContext = React.createContext<MenuLevelContextType>({
+  requestSubmenuOpen: (id: string) => void;
+  requestSubmenuClose: () => void;
+  cancelSubmenuClose: () => void;
+}>({
   level: 0,
   activeSubmenuId: null,
   setActiveSubmenuId: () => {},
+  requestSubmenuOpen: () => {},
+  requestSubmenuClose: () => {},
+  cancelSubmenuClose: () => {},
 });
 
 // ----------------------------------------------------
@@ -56,7 +60,7 @@ export interface ContextMenuRootProps {
 export function ContextMenuRoot({ children, trigger, content, items }: ContextMenuRootProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [coords, setCoords] = React.useState({ x: 0, y: 0 });
-  const menuRef = React.useRef<HTMLDivElement>(null);
+  const [menuElement, setMenuElement] = React.useState<HTMLDivElement | null>(null);
   const [activeSubmenuId, setActiveSubmenuId] = React.useState<string | null>(null);
 
   const handleContextMenu = (e: React.MouseEvent) => {
@@ -73,8 +77,8 @@ export function ContextMenuRoot({ children, trigger, content, items }: ContextMe
 
   // Handle positioning adjustments (edge-flipping)
   React.useLayoutEffect(() => {
-    if (!isOpen || !menuRef.current) return;
-    const menuRect = menuRef.current.getBoundingClientRect();
+    if (!isOpen || !menuElement) return;
+    const menuRect = menuElement.getBoundingClientRect();
     const { x, y } = coords;
     
     let left = x;
@@ -89,21 +93,21 @@ export function ContextMenuRoot({ children, trigger, content, items }: ContextMe
       top = Math.max(8, window.innerHeight - menuRect.height - 8);
     }
 
-    menuRef.current.style.left = `${left}px`;
-    menuRef.current.style.top = `${top}px`;
-  }, [isOpen, coords]);
+    menuElement.style.left = `${left}px`;
+    menuElement.style.top = `${top}px`;
+  }, [isOpen, coords, menuElement]);
 
   // Focus the first item when menu opens
   React.useEffect(() => {
-    if (isOpen && menuRef.current) {
-      const firstItem = menuRef.current.querySelector('[data-menu-level="0"]') as HTMLElement | null;
+    if (isOpen && menuElement) {
+      const firstItem = menuElement.querySelector('[data-menu-level="0"]') as HTMLElement | null;
       if (firstItem) {
         firstItem.focus();
       } else {
-        menuRef.current.focus();
+        menuElement.focus();
       }
     }
-  }, [isOpen]);
+  }, [isOpen, menuElement]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
@@ -118,7 +122,7 @@ export function ContextMenuRoot({ children, trigger, content, items }: ContextMe
     }
 
     const itemsList = Array.from(
-      menuRef.current?.querySelectorAll('[data-menu-level="0"]') || []
+      menuElement?.querySelectorAll('[data-menu-level="0"]') || []
     ) as HTMLElement[];
     if (itemsList.length === 0) return;
 
@@ -140,9 +144,36 @@ export function ContextMenuRoot({ children, trigger, content, items }: ContextMe
   const actualContent = content || (trigger ? children : null);
 
   const contextValue = React.useMemo(() => ({ closeMenu }), [closeMenu]);
+  const timeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const requestSubmenuOpen = React.useCallback((id: string) => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
+      setActiveSubmenuId(id);
+    }, 100);
+  }, []);
+
+  const requestSubmenuClose = React.useCallback(() => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
+      setActiveSubmenuId(null);
+    }, 200);
+  }, []);
+
+  const cancelSubmenuClose = React.useCallback(() => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+  }, []);
+
   const levelValue = React.useMemo(
-    () => ({ level: 0, activeSubmenuId, setActiveSubmenuId }),
-    [activeSubmenuId]
+    () => ({
+      level: 0,
+      activeSubmenuId,
+      setActiveSubmenuId,
+      requestSubmenuOpen,
+      requestSubmenuClose,
+      cancelSubmenuClose,
+    }),
+    [activeSubmenuId, requestSubmenuOpen, requestSubmenuClose, cancelSubmenuClose]
   );
 
   // Helper function to render legacy ContextMenuItem array
@@ -175,10 +206,10 @@ export function ContextMenuRoot({ children, trigger, content, items }: ContextMe
         </div>
         {isOpen && (
           <Portal>
-            <ClickAwayListener onClickAway={closeMenu}>
-              <FocusTrap>
+            <FocusTrap>
+              <ClickAwayListener onClickAway={closeMenu}>
                 <div
-                  ref={menuRef}
+                  ref={setMenuElement}
                   role="menu"
                   aria-label="Context Menu"
                   tabIndex={-1}
@@ -192,8 +223,8 @@ export function ContextMenuRoot({ children, trigger, content, items }: ContextMe
                 >
                   {items && items.length > 0 ? renderLegacyItems(items) : actualContent}
                 </div>
-              </FocusTrap>
-            </ClickAwayListener>
+              </ClickAwayListener>
+            </FocusTrap>
           </Portal>
         )}
       </MenuLevelContext.Provider>
@@ -223,12 +254,17 @@ export function ContextMenuItemComponent({
   closeOnClick = true,
 }: ContextMenuItemProps) {
   const rootContext = React.useContext(ContextMenuContext);
-  const { level, activeSubmenuId, setActiveSubmenuId } = React.useContext(MenuLevelContext);
+  const {
+    level,
+    activeSubmenuId,
+    setActiveSubmenuId,
+    requestSubmenuOpen,
+    requestSubmenuClose,
+    cancelSubmenuClose,
+  } = React.useContext(MenuLevelContext);
   const itemRef = React.useRef<HTMLButtonElement>(null);
   const itemId = useId();
-
-  const openTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-  const closeTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isHovered, setIsHovered] = React.useState(false);
 
   // Extract submenu child from children
   const childrenArray = React.Children.toArray(children);
@@ -248,37 +284,20 @@ export function ContextMenuItemComponent({
   const hasSubmenu = !!submenu;
   const isSubmenuOpen = activeSubmenuId === itemId;
 
-  // Cleanup timeouts
-  React.useEffect(() => {
-    return () => {
-      if (openTimeoutRef.current) clearTimeout(openTimeoutRef.current);
-      if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
-    };
-  }, []);
-
   const handleMouseEnter = () => {
     if (disabled) return;
-    if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
+    setIsHovered(true);
     
     if (hasSubmenu) {
-      openTimeoutRef.current = setTimeout(() => {
-        setActiveSubmenuId(itemId);
-      }, 100);
+      requestSubmenuOpen(itemId);
     } else {
-      openTimeoutRef.current = setTimeout(() => {
-        setActiveSubmenuId(null);
-      }, 100);
+      requestSubmenuClose();
     }
   };
 
   const handleMouseLeave = () => {
-    if (openTimeoutRef.current) clearTimeout(openTimeoutRef.current);
-    
-    if (hasSubmenu && isSubmenuOpen) {
-      closeTimeoutRef.current = setTimeout(() => {
-        setActiveSubmenuId(null);
-      }, 200);
-    }
+    setIsHovered(false);
+    requestSubmenuClose();
   };
 
   const handleItemClick = (e: React.MouseEvent) => {
@@ -339,6 +358,7 @@ export function ContextMenuItemComponent({
         data-menu-level={level}
         tabIndex={-1}
         className={`context-menu-item ${danger ? 'context-menu-item--danger' : ''}`}
+        data-highlighted={isSubmenuOpen || isHovered ? 'true' : undefined}
         onClick={handleItemClick}
         onKeyDown={handleKeyDown}
       >
@@ -351,14 +371,8 @@ export function ContextMenuItemComponent({
 
       {isSubmenuOpen && submenu && (
         <div
-          onMouseEnter={() => {
-            if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
-          }}
-          onMouseLeave={() => {
-            closeTimeoutRef.current = setTimeout(() => {
-              setActiveSubmenuId(null);
-            }, 200);
-          }}
+          onMouseEnter={cancelSubmenuClose}
+          onMouseLeave={requestSubmenuClose}
         >
           {React.cloneElement(submenu as React.ReactElement<any>, {
             parentItemRef: itemRef,
@@ -385,15 +399,15 @@ export interface ContextMenuSubMenuProps {
 export function ContextMenuSubMenu({ children, parentItemRef, onClose }: ContextMenuSubMenuProps) {
   const { level } = React.useContext(MenuLevelContext);
   const [activeSubmenuId, setActiveSubmenuId] = React.useState<string | null>(null);
-  const submenuRef = React.useRef<HTMLDivElement>(null);
+  const [submenuElement, setSubmenuElement] = React.useState<HTMLDivElement | null>(null);
 
   const subLevel = level + 1;
 
   // Position adjacent to parent item with edge-flipping logic
   React.useLayoutEffect(() => {
-    if (!submenuRef.current || !parentItemRef?.current) return;
+    if (!submenuElement || !parentItemRef?.current) return;
     const parentRect = parentItemRef.current.getBoundingClientRect();
-    const subRect = submenuRef.current.getBoundingClientRect();
+    const subRect = submenuElement.getBoundingClientRect();
 
     // Default position: opens to the right of the parent item, aligned with its top
     let left = parentRect.right + 2;
@@ -410,23 +424,23 @@ export function ContextMenuSubMenu({ children, parentItemRef, onClose }: Context
       top = Math.max(8, window.innerHeight - subRect.height - 8);
     }
 
-    submenuRef.current.style.left = `${left}px`;
-    submenuRef.current.style.top = `${top}px`;
-  }, [parentItemRef]);
+    submenuElement.style.left = `${left}px`;
+    submenuElement.style.top = `${top}px`;
+  }, [parentItemRef, submenuElement]);
 
   // Focus the first item in this submenu on mount
   React.useEffect(() => {
-    if (submenuRef.current) {
-      const firstItem = submenuRef.current.querySelector(
+    if (submenuElement) {
+      const firstItem = submenuElement.querySelector(
         `[data-menu-level="${subLevel}"]`
       ) as HTMLElement | null;
       if (firstItem) {
         firstItem.focus();
       } else {
-        submenuRef.current.focus();
+        submenuElement.focus();
       }
     }
-  }, [subLevel]);
+  }, [subLevel, submenuElement]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowLeft' || e.key === 'Escape') {
@@ -437,7 +451,7 @@ export function ContextMenuSubMenu({ children, parentItemRef, onClose }: Context
     }
 
     const itemsList = Array.from(
-      submenuRef.current?.querySelectorAll(`[data-menu-level="${subLevel}"]`) || []
+      submenuElement?.querySelectorAll(`[data-menu-level="${subLevel}"]`) || []
     ) as HTMLElement[];
     if (itemsList.length === 0) return;
 
@@ -454,16 +468,43 @@ export function ContextMenuSubMenu({ children, parentItemRef, onClose }: Context
     }
   };
 
+  const timeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const requestSubmenuOpen = React.useCallback((id: string) => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
+      setActiveSubmenuId(id);
+    }, 100);
+  }, []);
+
+  const requestSubmenuClose = React.useCallback(() => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
+      setActiveSubmenuId(null);
+    }, 200);
+  }, []);
+
+  const cancelSubmenuClose = React.useCallback(() => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+  }, []);
+
   const levelValue = React.useMemo(
-    () => ({ level: subLevel, activeSubmenuId, setActiveSubmenuId }),
-    [subLevel, activeSubmenuId]
+    () => ({
+      level: subLevel,
+      activeSubmenuId,
+      setActiveSubmenuId,
+      requestSubmenuOpen,
+      requestSubmenuClose,
+      cancelSubmenuClose,
+    }),
+    [subLevel, activeSubmenuId, requestSubmenuOpen, requestSubmenuClose, cancelSubmenuClose]
   );
 
   return (
     <Portal>
       <MenuLevelContext.Provider value={levelValue}>
         <div
-          ref={submenuRef}
+          ref={setSubmenuElement}
           role="menu"
           aria-label="Submenu"
           tabIndex={-1}

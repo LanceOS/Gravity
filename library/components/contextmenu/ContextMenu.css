@@ -38,7 +38,7 @@
 .context-menu-item:hover,
 .context-menu-item:focus-visible,
 .context-menu-item[data-highlighted="true"] {
-  background-color: var(--color-base100);
+  background-color: var(--color-state-hover-overlay);
   color: var(--color-text-primary);
 }
 
