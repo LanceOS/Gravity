@@ -347,24 +347,24 @@ export function createTicketsRouter() {
   });
 
   router.get('/labels', async (req, res) => {
-    const projectId = typeof req.query.projectId === 'string' ? req.query.projectId : getProjectIdFromRequest(req);
-    const teamId = typeof req.query.teamId === 'string' ? req.query.teamId : (projectId ? await getRequiredProjectTeamId(projectId) : undefined);
-
-    if (!teamId) {
-      res.status(400).json({ error: 'Either teamId or projectId is required.' });
-      return;
-    }
-
-    const auth = typeof req.query.teamId === 'string'
-      ? await authorizeTeamAccess(req, teamId)
-      : await authorizeProjectAccess(req, projectId as string);
-
-    if (!auth.allowed) {
-      res.status(auth.status ?? 403).json({ error: auth.error });
-      return;
-    }
-
     try {
+      const projectId = typeof req.query.projectId === 'string' ? req.query.projectId : getProjectIdFromRequest(req);
+      const teamId = typeof req.query.teamId === 'string' ? req.query.teamId : (projectId ? await getRequiredProjectTeamId(projectId).catch(() => undefined) : undefined);
+
+      if (!teamId) {
+        res.status(400).json({ error: 'Either teamId or projectId is required, or project not found.' });
+        return;
+      }
+
+      const auth = typeof req.query.teamId === 'string'
+        ? await authorizeTeamAccess(req, teamId)
+        : await authorizeProjectAccess(req, projectId as string);
+
+      if (!auth.allowed) {
+        res.status(auth.status ?? 403).json({ error: auth.error });
+        return;
+      }
+
       const rows = await db
         .select({
           id: labels.id,
@@ -385,24 +385,25 @@ export function createTicketsRouter() {
   });
 
   router.post('/labels', async (req, res) => {
-    const body = req.body ?? {};
-    const projectId = typeof body.projectId === 'string' ? body.projectId : getProjectIdFromRequest(req);
-    const bodyTeamId = typeof body.teamId === 'string' ? body.teamId : undefined;
-    const resolvedTeamId = bodyTeamId ?? (projectId ? await getRequiredProjectTeamId(projectId) : undefined);
+    try {
+      const body = req.body ?? {};
+      const projectId = typeof body.projectId === 'string' ? body.projectId : getProjectIdFromRequest(req);
+      const bodyTeamId = typeof body.teamId === 'string' ? body.teamId : undefined;
+      const resolvedTeamId = bodyTeamId ?? (projectId ? await getRequiredProjectTeamId(projectId).catch(() => undefined) : undefined);
 
-    if (!resolvedTeamId) {
-      res.status(400).json({ error: 'Either teamId or projectId is required.' });
-      return;
-    }
+      if (!resolvedTeamId) {
+        res.status(400).json({ error: 'Either teamId or projectId is required, or project not found.' });
+        return;
+      }
 
-    const auth = bodyTeamId
-      ? await authorizeTeamAccess(req, resolvedTeamId)
-      : await authorizeProjectAccess(req, projectId as string);
+      const auth = bodyTeamId
+        ? await authorizeTeamAccess(req, resolvedTeamId)
+        : await authorizeProjectAccess(req, projectId as string);
 
-    if (!auth.allowed) {
-      res.status(auth.status ?? 403).json({ error: auth.error });
-      return;
-    }
+      if (!auth.allowed) {
+        res.status(auth.status ?? 403).json({ error: auth.error });
+        return;
+      }
 
     const labelName = typeof body.name === 'string' ? normalizeLabelName(body.name) : '';
     if (!labelName) {
@@ -604,33 +605,33 @@ export function createTicketsRouter() {
     const teamId = typeof req.query.teamId === 'string' ? req.query.teamId : undefined;
     const projectId = typeof req.query.projectId === 'string' ? req.query.projectId : getProjectIdFromRequest(req);
 
-    if (teamId) {
-      const auth = await authorizeTeamAccess(req, teamId);
-      if (!auth.allowed) {
-        res.status(auth.status ?? 403).json({ error: auth.error });
-        return;
-      }
-      try {
+    try {
+      if (teamId) {
+        const auth = await authorizeTeamAccess(req, teamId);
+        if (!auth.allowed) {
+          res.status(auth.status ?? 403).json({ error: auth.error });
+          return;
+        }
         const rows = await db.select().from(cycles).where(eq(cycles.teamId, teamId)).orderBy(asc(cycles.startDate));
         res.json(rows.map(mapCycle));
-      } catch (error) {
-        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load cycles.' });
-      }
-    } else if (projectId) {
-      const auth = await authorizeProjectAccess(req, projectId);
-      if (!auth.allowed) {
-        res.status(auth.status ?? 403).json({ error: auth.error });
-        return;
-      }
-      try {
-        const teamIdOfProject = await getRequiredProjectTeamId(projectId);
+      } else if (projectId) {
+        const auth = await authorizeProjectAccess(req, projectId);
+        if (!auth.allowed) {
+          res.status(auth.status ?? 403).json({ error: auth.error });
+          return;
+        }
+        const teamIdOfProject = await getRequiredProjectTeamId(projectId).catch(() => undefined);
+        if (!teamIdOfProject) {
+          res.status(400).json({ error: 'Project not found or missing team assignment.' });
+          return;
+        }
         const rows = await db.select().from(cycles).where(eq(cycles.teamId, teamIdOfProject)).orderBy(asc(cycles.startDate));
         res.json(rows.map(mapCycle));
-      } catch (error) {
-        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load cycles.' });
+      } else {
+        res.status(400).json({ error: 'Either teamId or projectId is required.' });
       }
-    } else {
-      res.status(400).json({ error: 'Either teamId or projectId is required.' });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load cycles.' });
     }
   });
 

@@ -377,18 +377,6 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [currentUser?.id, queryClient]);
 
-  // Set default active project once projects are loaded
-  useEffect(() => {
-    if (!currentUser) return;
-
-    if (projects.length > 0 && !activeProjectId) {
-      setActiveProjectId(projects[0].id);
-    }
-
-    if (activeProjectId && !projects.some((project) => project.id === activeProjectId)) {
-      setActiveProjectId('');
-    }
-  }, [currentUser, projects, activeProjectId, setActiveProjectId]);
 
   // Sync stored user with local storage
   useEffect(() => {
