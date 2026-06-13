@@ -23,6 +23,7 @@ import { LoadingPage } from '../LoadingPage/LoadingPage';
 import { WorkspaceDirectoryPage } from '../WorkspaceDirectoryPage/WorkspaceDirectoryPage';
 import { WorkspacePage, type WorkspaceIssueView } from '../WorkspacePage/WorkspacePage';
 import { WorkspaceProjectsPage } from '../WorkspaceProjectsPage/WorkspaceProjectsPage';
+import { WorkspaceProjectsListPage } from '../WorkspaceProjectsListPage/WorkspaceProjectsListPage';
 import { WorkspaceTeamProjectsPage } from '../WorkspaceTeamProjectsPage/WorkspaceTeamProjectsPage';
 import { WorkspaceTeamsPage } from '../WorkspaceTeamsPage/WorkspaceTeamsPage';
 import { TicketDetailRoute } from '../../modules/tickets/components/TicketDetailRoute';
@@ -81,6 +82,7 @@ export function AppShellPage() {
   const [isOllamaOpen, setIsOllamaOpen] = useState(false);
   const [isMcpOpen, setIsMcpOpen] = useState(false);
   const [isOllamaClosing, setIsOllamaClosing] = useState(false);
+  const [sidebarActiveScope, setSidebarActiveScope] = useState<SidebarNavigationState['activeScope']>('workspace');
   const [ollamaCloseTimer, setOllamaCloseTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -280,8 +282,16 @@ export function AppShellPage() {
   }, [activeWorkspaceId, navigate]);
 
   const handleSelectWorkspaceAllTasks = useCallback(() => {
+    setSidebarActiveScope('workspace');
     navigate(`/workspaces/${activeWorkspaceId}/all`);
-  }, [activeWorkspaceId, navigate]);
+  }, [activeWorkspaceId, navigate, setSidebarActiveScope]);
+
+  const handleSelectWorkspaceProjects = useCallback(() => {
+    setActiveTicket(null);
+    setActiveNoteId('');
+    setActiveSection('workspace');
+    setSidebarActiveScope('workspace-projects');
+  }, [setActiveNoteId, setActiveSection, setActiveTicket, setSidebarActiveScope]);
 
   const handleSelectView = useCallback((teamId: string, viewId: string) => {
     if (viewId === 'all') {
@@ -322,12 +332,14 @@ export function AppShellPage() {
       setActiveSection('directory');
       setActiveTicket(null);
       setActiveNoteId('');
+      setSidebarActiveScope('workspace');
       return;
     }
 
     if (pathname === '/account' || pathname === '/account/') {
       setActiveSection('account');
       setActiveNoteId('');
+      setSidebarActiveScope('workspace');
       return;
     }
 
@@ -353,6 +365,7 @@ export function AppShellPage() {
       setActiveSection('settings');
       setActiveTicket(null);
       setActiveNoteId('');
+      setSidebarActiveScope('workspace');
       return;
     }
 
@@ -360,6 +373,7 @@ export function AppShellPage() {
       setActiveSection('projects');
       setActiveTicket(null);
       setActiveNoteId('');
+      setSidebarActiveScope('projects');
       return;
     }
 
@@ -367,6 +381,7 @@ export function AppShellPage() {
       setActiveSection('teams');
       setActiveTicket(null);
       setActiveNoteId('');
+      setSidebarActiveScope('workspace');
       return;
     }
 
@@ -374,11 +389,22 @@ export function AppShellPage() {
       setActiveSection('team-projects');
       setActiveTicket(null);
       setActiveNoteId('');
+      setSidebarActiveScope('projects');
       return;
     }
 
     // Workspace-level views (project routes, notes, tickets)
     setActiveSection('workspace');
+
+    const nextSidebarScope: SidebarNavigationState['activeScope'] = teamIdParam
+      ? (projectIdParam
+        ? 'projects'
+        : cycleIdParam
+          ? 'cycles'
+          : activeLabelIdParam
+            ? 'labels'
+            : 'views')
+      : (projectIdParam ? 'projects' : 'workspace');
 
     // Sync project from URL param when on a project-specific path
     if (projectIdParam) {
@@ -386,6 +412,8 @@ export function AppShellPage() {
     } else if (!shouldUseAggregateTicketScope) {
       setActiveProjectId('');
     }
+
+    setSidebarActiveScope(isWorkspaceAllTasksPath ? 'workspace' : nextSidebarScope);
 
     // Sync notes context
     if (isNotesPath) {
@@ -746,6 +774,7 @@ export function AppShellPage() {
     const project = projects.find((p) => p.id === projectId);
     const wid = project?.workspaceId || activeWorkspaceId;
     setActiveProjectId(projectId);
+    setSidebarActiveScope('projects');
     navigate(`/workspaces/${wid}/projects`);
   };
 
@@ -1042,21 +1071,6 @@ export function AppShellPage() {
     '';
   const sidebarActiveTeamId = teamIdParam || activeProjectTeamId;
   const isTeamProjectsManager = activeSection === 'team-projects';
-    const sidebarActiveScope: SidebarNavigationState['activeScope'] = isWorkspaceAllTasksPath
-    ? 'workspace'
-    : isTeamProjectsManager
-      ? 'projects'
-    : teamIdParam
-      ? projectIdParam
-        ? 'projects'
-        : cycleIdParam
-          ? 'cycles'
-          : activeLabelIdParam
-            ? 'labels'
-            : 'views'
-      : projectIdParam || activeProjectId
-        ? 'projects'
-        : 'workspace';
   const sidebarNavigationState: SidebarNavigationState = {
     activeTeam: sidebarActiveTeamId,
     activeScope: sidebarActiveScope,
@@ -1111,6 +1125,7 @@ export function AppShellPage() {
       activeCycleId: cycleIdParam,
       activeLabelId: activeLabelIdParam,
       onSelectWorkspaceAllTasks: handleSelectWorkspaceAllTasks,
+      onSelectWorkspaceProjects: handleSelectWorkspaceProjects,
       onSelectTeam: handleSelectTeam,
       onSelectView: handleSelectView,
       onSelectCycle: handleSelectCycle,
@@ -1242,7 +1257,9 @@ export function AppShellPage() {
             </>
           }
         >
-          {isTeamsManager ? (
+          {sidebarActiveScope === 'workspace-projects' ? (
+            <WorkspaceProjectsListPage />
+          ) : isTeamsManager ? (
             <WorkspaceTeamsPage
               workspaceId={activeWorkspaceId}
               workspaceName={activeWorkspace.name}

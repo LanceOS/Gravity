@@ -38,6 +38,24 @@
 }
 
 /* ── Collapsible sub-section ──────────────────────── */
+.teams-sidebar__sub-items-container {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 0.25s ease-out, opacity 0.25s ease-out;
+  opacity: 1;
+}
+
+.teams-sidebar__sub-items-container--collapsed {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.teams-sidebar__sub-items-wrapper {
+  overflow: hidden;
+  min-height: 0;
+}
+
 .teams-sidebar__sub-items {
   margin-left: 12px;
   padding-left: 8px;

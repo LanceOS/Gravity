@@ -25,7 +25,7 @@ export interface SidebarProjectCounts {
 
 import type { SidebarTeam } from '../../../types/domain';
 
-export type SidebarScope = 'workspace' | 'views' | 'cycles' | 'labels' | 'domains' | 'projects';
+export type SidebarScope = 'workspace' | 'workspace-projects' | 'views' | 'cycles' | 'labels' | 'domains' | 'projects';
 
 export interface SidebarNavigationState {
   activeTeam: string;
@@ -43,6 +43,7 @@ export interface SidebarProjectSection {
   activeLabelId?: string;
   activeDomainId?: string;
   onSelectWorkspaceAllTasks?: () => void;
+  onSelectWorkspaceProjects?: () => void;
   onSelectTeam?: (teamId: string) => void;
   onSelectView?: (teamId: string, viewId: string) => void;
   onSelectCycle?: (teamId: string, cycleId: string) => void;

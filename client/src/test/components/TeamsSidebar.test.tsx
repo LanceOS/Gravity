@@ -43,6 +43,7 @@ function buildSection(overrides: Partial<SidebarProjectSection> = {}): SidebarPr
     activeCycleId: '',
     activeLabelId: '',
     onSelectWorkspaceAllTasks: vi.fn(),
+    onSelectWorkspaceProjects: vi.fn(),
     onSelectTeam: vi.fn(),
     onSelectView: vi.fn(),
     onSelectCycle: vi.fn(),
@@ -118,10 +119,29 @@ describe('TeamsSidebar', () => {
 
     await user.click(engineeringToggle);
 
-    expect(screen.queryByText('Timeline')).not.toBeInTheDocument();
+    expect(screen.getByText('Timeline')).not.toBeVisible();
 
     await user.click(engineeringToggle);
 
-    expect(screen.getByText('Timeline')).toBeInTheDocument();
+    expect(screen.getByText('Timeline')).toBeVisible();
+  });
+
+  it('opens the workspace projects list when the workspace Projects tab is clicked', async () => {
+    const user = userEvent.setup();
+    const onSelectWorkspaceProjects = vi.fn();
+
+    render(
+      <TeamsSidebar
+        section={buildSection({ onSelectWorkspaceProjects })}
+        collapsedTeams={{}}
+        collapsedTeamProjects={{}}
+        onToggleTeam={vi.fn()}
+        onToggleTeamProjects={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getAllByRole('button', { name: 'Projects' })[0]);
+
+    expect(onSelectWorkspaceProjects).toHaveBeenCalledTimes(1);
   });
 });
