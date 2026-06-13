@@ -1,0 +1,69 @@
+.context-menu-container {
+  position: fixed;
+  z-index: 2000;
+  padding: 4px;
+  background-color: var(--color-surface-card);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  min-width: 160px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  outline: none;
+  animation: lib-fade-in var(--transition-fast);
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--color-text-primary);
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+  outline: none;
+  box-sizing: border-box;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+  user-select: none;
+}
+
+.context-menu-item:hover,
+.context-menu-item:focus-visible,
+.context-menu-item[data-highlighted="true"] {
+  background-color: var(--color-base100);
+  color: var(--color-text-primary);
+}
+
+.context-menu-item[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.context-menu-item--danger {
+  color: var(--color-text-error);
+}
+
+.context-menu-item--danger:hover,
+.context-menu-item--danger:focus-visible,
+.context-menu-item--danger[data-highlighted="true"] {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: var(--color-text-error);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .context-menu-container {
+    transition: none !important;
+    animation: none !important;
+  }
+  .context-menu-item {
+    transition: none !important;
+  }
+}
