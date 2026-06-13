@@ -1210,6 +1210,8 @@ export function AppShellPage() {
       isOllamaOpen,
       onOpenSimulator: () => { },
       onOpenCreateTicket: () => handleOpenCreateTicket(),
+      onOpenCreateProject: handleOpenCreateProject,
+      onOpenCreateLabel: handleOpenCreateLabel,
       agentIntegration: accountSettings.agentIntegration,
       aiProvider: accountSettings.aiProvider,
     },

@@ -529,11 +529,14 @@ ContextMenuSubMenu.displayName = 'ContextMenuSubMenu';
 // ContextMenu Export Namespace
 // ----------------------------------------------------
 
-export function ContextMenu({ children, items }: ContextMenuProps) {
+const ContextMenuBase = function ContextMenu({ children, items }: ContextMenuProps) {
   return <ContextMenuRoot items={items}>{children}</ContextMenuRoot>;
-}
+};
 
-ContextMenu.Root = ContextMenuRoot;
-ContextMenu.Item = ContextMenuItemComponent;
-ContextMenu.SubMenu = ContextMenuSubMenu;
+export const ContextMenu = Object.assign(ContextMenuBase, {
+  Root: ContextMenuRoot,
+  Item: ContextMenuItemComponent,
+  SubMenu: ContextMenuSubMenu,
+});
+
 export default ContextMenu;

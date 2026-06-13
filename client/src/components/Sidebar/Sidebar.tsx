@@ -34,40 +34,39 @@ export function Sidebar({ projects, tools, userMenu }: SidebarProps) {
         </SidebarHeader>
       ) : null}
 
-      <ContextMenu>
-        <ContextMenu.Trigger>
-          <SidebarContent>
-            <SidebarProjectsSection
-              section={projects}
-              projectsCollapsed={sidebarState.projectsCollapsed}
-              collapsedProjects={sidebarState.collapsedProjects}
-              collapsedTeamProjects={sidebarState.collapsedTeamProjects}
-              collapsedTeams={sidebarState.collapsedTeams}
-              onToggleProjectsCollapsed={sidebarState.toggleProjectsCollapsed}
-              onToggleProject={sidebarState.toggleProject}
-              onToggleTeam={sidebarState.toggleTeam}
-              onToggleTeamProjects={sidebarState.toggleTeamProjects}
-            />
-          </SidebarContent>
-        </ContextMenu.Trigger>
-        <ContextMenu.Portal>
-          <ContextMenu.Content>
-            <ContextMenu.Item icon={<CheckSquare />} onClick={tools.onOpenCreateTicket}>
+      <ContextMenu.Root
+        content={
+          <>
+            <ContextMenu.Item icon={<CheckSquare size={14} />} onClick={tools.onOpenCreateTicket}>
               New Task
             </ContextMenu.Item>
             {tools.onOpenCreateLabel && (
-              <ContextMenu.Item icon={<Tag />} onClick={tools.onOpenCreateLabel}>
+              <ContextMenu.Item icon={<Tag size={14} />} onClick={tools.onOpenCreateLabel}>
                 New Label
               </ContextMenu.Item>
             )}
             {tools.onOpenCreateProject && (
-              <ContextMenu.Item icon={<FolderPlus />} onClick={tools.onOpenCreateProject}>
+              <ContextMenu.Item icon={<FolderPlus size={14} />} onClick={tools.onOpenCreateProject}>
                 New Project
               </ContextMenu.Item>
             )}
-          </ContextMenu.Content>
-        </ContextMenu.Portal>
-      </ContextMenu>
+          </>
+        }
+      >
+        <SidebarContent>
+          <SidebarProjectsSection
+            section={projects}
+            projectsCollapsed={sidebarState.projectsCollapsed}
+            collapsedProjects={sidebarState.collapsedProjects}
+            collapsedTeamProjects={sidebarState.collapsedTeamProjects}
+            collapsedTeams={sidebarState.collapsedTeams}
+            onToggleProjectsCollapsed={sidebarState.toggleProjectsCollapsed}
+            onToggleProject={sidebarState.toggleProject}
+            onToggleTeam={sidebarState.toggleTeam}
+            onToggleTeamProjects={sidebarState.toggleTeamProjects}
+          />
+        </SidebarContent>
+      </ContextMenu.Root>
 
       <SidebarFooter>
         <SidebarUserMenu
