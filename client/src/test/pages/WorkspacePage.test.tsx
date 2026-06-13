@@ -159,11 +159,13 @@ function renderWorkspacePage(overrides: Partial<Parameters<typeof WorkspacePage>
       assigneeId: '',
     },
     listSort: 'created' as const,
+    pathname: '/workspaces/workspace-1',
     projects: [project],
     tickets: [ticket, doneTicket, subtaskOpen, subtaskDone],
     users: [currentUser],
     onOpenCreateTicket: vi.fn(),
     onOpenProjectManager: vi.fn(),
+    onOpenTeamProjectManager: vi.fn(),
     onSelectTicket: vi.fn(),
     onSetFilters: vi.fn(),
     onSetListSort: vi.fn(),
@@ -199,13 +201,36 @@ describe('WorkspacePage', () => {
 
   it('prompts team workspaces to create their first team when no projects exist', async () => {
     const user = userEvent.setup();
-    const { props } = renderWorkspacePage({ projects: [], tickets: [], isTeamWorkspace: true });
+    const { props } = renderWorkspacePage({
+      projects: [],
+      tickets: [],
+      isTeamWorkspace: true,
+      pathname: '/workspaces/workspace-1',
+    });
 
     expect(screen.getByText('Create your first team')).toBeInTheDocument();
     expect(screen.queryByText('Manage Projects')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Create Team' }));
     expect(props.onOpenProjectManager).toHaveBeenCalledTimes(1);
+  });
+
+  it('prompts team-scoped routes to create a project when no projects exist', async () => {
+    const user = userEvent.setup();
+    const { props } = renderWorkspacePage({
+      projects: [],
+      tickets: [],
+      isTeamWorkspace: true,
+      pathname: '/workspaces/workspace-1/teams/team-1/tasks',
+    });
+
+    expect(screen.getByText('No projects in this team yet')).toBeInTheDocument();
+    expect(
+      screen.getByText('Create a project for this team to start organizing work, tickets, and milestones.')
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Create Project' }));
+    expect(props.onOpenTeamProjectManager).toHaveBeenCalledTimes(1);
   });
 
   it('renders the board view with filtered ticket counts and clears filters', async () => {
@@ -236,7 +261,7 @@ describe('WorkspacePage', () => {
       status: '',
       projectId: 'project-1',
       labels: [],
-      domainId: '',
+      labelId: '',
       cycleId: '',
       assigneeId: '',
     });
@@ -264,7 +289,7 @@ describe('WorkspacePage', () => {
       status: '',
       projectId: 'project-1',
       labels: [],
-      domainId: '',
+      labelId: '',
       cycleId: '',
       assigneeId: '',
     });

@@ -40,6 +40,7 @@ interface WorkspacePageProps {
   users: User[];
   onOpenCreateTicket: (initialStatus?: Ticket['status']) => void;
   onOpenProjectManager: () => void;
+  onOpenTeamProjectManager?: () => void;
   onSelectTicket: (ticket: Ticket | null) => void;
   onSelectNote?: (noteId: string) => void;
   onSetFilters: (filters: Partial<TicketFilters>) => void;
@@ -103,6 +104,7 @@ export function WorkspacePage({
   users,
   onOpenCreateTicket,
   onOpenProjectManager,
+  onOpenTeamProjectManager,
   onSelectTicket,
   onSelectNote,
   onSetFilters,
@@ -122,6 +124,7 @@ export function WorkspacePage({
     () => Object.fromEntries(users.map((user) => [user.id, user.avatar])),
     [users]
   );
+  const isTeamScopedRoute = !!pathname && pathname.includes('/teams/');
   const labelById = useMemo(
     () => Object.fromEntries(labels.map((label) => [label.id, label])),
     [labels]
@@ -302,10 +305,16 @@ export function WorkspacePage({
                       {projects.length === 0 ? (
                         <div className="workspace-page__empty-state">
                           <div className="workspace-page__empty-state-title">
-                            {isTeamWorkspace ? 'Create your first team' : 'No projects in this workspace yet'}
+                            {isTeamWorkspace && isTeamScopedRoute
+                              ? 'No projects in this team yet'
+                              : isTeamWorkspace
+                                ? 'Create your first team'
+                                : 'No projects in this workspace yet'}
                           </div>
                           <p className="workspace-page__empty-state-copy">
-                            {isTeamWorkspace
+                            {isTeamWorkspace && isTeamScopedRoute
+                              ? 'Create a project for this team to start organizing work, tickets, and milestones.'
+                              : isTeamWorkspace
                               ? 'Teams organize projects, cycles, labels, and aggregate task views in this workspace. Create the first team to start building out your workspace.'
                               : 'Open Manage Projects to create the first project for this workspace. Once a project exists, tickets, labels, and cycles will become available here.'}
                           </p>
@@ -314,9 +323,13 @@ export function WorkspacePage({
                               type="button"
                               variant="primary"
                               className="workspace-page__projects-button workspace-page__projects-button--primary"
-                              onClick={onOpenProjectManager}
+                              onClick={
+                                isTeamWorkspace && isTeamScopedRoute
+                                  ? (onOpenTeamProjectManager ?? onOpenProjectManager)
+                                  : onOpenProjectManager
+                              }
                             >
-                              {isTeamWorkspace ? 'Create Team' : 'Manage Projects'}
+                              {isTeamWorkspace && isTeamScopedRoute ? 'Create Project' : isTeamWorkspace ? 'Create Team' : 'Manage Projects'}
                             </Button>
                           </div>
                         </div>

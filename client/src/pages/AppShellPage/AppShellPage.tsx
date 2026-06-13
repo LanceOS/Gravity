@@ -1101,6 +1101,14 @@ export function AppShellPage() {
     sidebarTree?.teams?.find((team) => team.projects?.some((project) => project.id === (projectIdParam || activeProjectId)))?.id ||
     '';
   const sidebarActiveTeamId = teamIdParam || activeProjectTeamId;
+  const handleOpenCurrentTeamProjectsManager = () => {
+    if (sidebarActiveTeamId) {
+      handleOpenTeamProjectsManager(sidebarActiveTeamId);
+      return;
+    }
+
+    handleOpenTeamManager();
+  };
   const isTeamProjectsManager = activeSection === 'team-projects';
   const sidebarNavigationState: SidebarNavigationState = {
     activeTeam: sidebarActiveTeamId,
@@ -1371,6 +1379,7 @@ export function AppShellPage() {
               onSetListSort={setListSort}
               onSetView={setView}
               onUpdateTicket={updateTicket}
+              onOpenTeamProjectManager={handleOpenCurrentTeamProjectsManager}
             />
           )}
         </WorkspaceLayout>
