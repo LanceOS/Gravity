@@ -51,6 +51,7 @@ export function AppShellPage() {
     createTicket,
     currentUser,
     cycles,
+    deleteProject,
     deleteTicket,
     labels = [],
     fetchInitialData,
@@ -1264,6 +1265,7 @@ export function AppShellPage() {
               onBackToTeams={() => navigate(`/workspaces/${activeWorkspaceId}/teams`)}
               onCreateProject={createProject}
               onUpdateProject={updateProject}
+              onDeleteProject={deleteProject}
             />
           ) : activeSection === 'projects' ? (
             <WorkspaceProjectsPage

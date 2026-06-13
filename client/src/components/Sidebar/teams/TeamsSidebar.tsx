@@ -86,7 +86,7 @@ export function TeamsSidebar({
                 title="Manage Teams"
                 aria-label="Manage Teams"
               >
-                <Plus size={14} />
+                <Plus size={16} />
               </button>
             )}
           </div>

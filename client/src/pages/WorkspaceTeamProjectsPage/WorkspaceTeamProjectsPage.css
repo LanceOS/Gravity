@@ -366,7 +366,13 @@
 }
 
 .workspace-team-projects-page__actions-row {
-  justify-content: flex-end;
+  justify-content: space-between;
+}
+
+.workspace-team-projects-page__actions-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .workspace-team-projects-page__empty-shell,

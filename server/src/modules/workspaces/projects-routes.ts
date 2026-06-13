@@ -15,6 +15,7 @@ import {
   acceptProjectInvite,
   getProjectById,
   addProjectMemberRecord,
+  deleteProjectRecord,
 } from './services/projects.js';
 import { buildProjectKeyConflictMessage, mapProjectCreationError, projectKeyExists } from './utils/project-creation.js';
 import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
@@ -272,6 +273,58 @@ export function createProjectsRouter() {
       res.status(201).json({ success: true });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to add project member.' });
+    }
+  });
+
+  router.delete('/projects/:projectId', async (req, res) => {
+    try {
+      const actorUserId = await resolveRequestActorUserId(req);
+      if (!actorUserId) {
+        res.status(401).json({ error: 'Authentication required.' });
+        return;
+      }
+
+      const currentProject = await getProjectById(req.params.projectId);
+      if (!currentProject) {
+        res.status(404).json({ error: 'Project not found.' });
+        return;
+      }
+
+      const membership = await db
+        .select({ role: projectMembers.role })
+        .from(projectMembers)
+        .where(
+          and(
+            eq(projectMembers.projectId, req.params.projectId),
+            eq(projectMembers.userId, actorUserId),
+          ),
+        )
+        .limit(1);
+
+      const workspaceMembership = await db
+        .select({ role: workspaceMembers.role })
+        .from(workspaceMembers)
+        .where(
+          and(
+            eq(workspaceMembers.workspaceId, currentProject.workspaceId),
+            eq(workspaceMembers.userId, actorUserId),
+          ),
+        )
+        .limit(1);
+
+      const isProjectOwner = membership[0]?.role === 'owner';
+      const isWorkspaceAdminOrOwner = workspaceMembership[0] && ['admin', 'owner'].includes(workspaceMembership[0].role);
+
+      if (!isProjectOwner && !isWorkspaceAdminOrOwner) {
+        res.status(403).json({ error: 'Only a project owner or workspace admin can delete a project.' });
+        return;
+      }
+
+      await deleteProjectRecord(req.params.projectId, currentProject.workspaceId);
+
+      res.status(200).json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to delete project.' });
     }
   });
 
