@@ -61,10 +61,10 @@ function renderWorkspaceProjectsListPage(overrides: Partial<Record<string, unkno
     setActiveProjectId,
     setActiveTicket,
     ...render(
-      <MemoryRouter initialEntries={['/workspaces/workspace-1']}>
+      <MemoryRouter initialEntries={['/workspaces/workspace-1/projects/list']}>
         <LocationDisplay />
         <Routes>
-          <Route path="/workspaces/:workspaceId" element={<WorkspaceProjectsListPage />} />
+          <Route path="/workspaces/:workspaceId/projects/list" element={<WorkspaceProjectsListPage />} />
         </Routes>
       </MemoryRouter>
     ),

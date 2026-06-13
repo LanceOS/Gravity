@@ -423,6 +423,7 @@ function renderAppShell({
           <Route path="/workspaces/:workspaceId/projects/:projectId/tickets" element={<AppShellPage />} />
           <Route path="/workspaces/:workspaceId/projects/:projectId/notes" element={<AppShellPage />} />
           <Route path="/workspaces/:workspaceId/projects/:projectId/notes/:noteId" element={<AppShellPage />} />
+          <Route path="/workspaces/:workspaceId/projects/list" element={<AppShellPage />} />
           <Route path="/workspaces/:workspaceId/all" element={<AppShellPage />} />
           <Route path="/workspaces/:workspaceId/teams" element={<AppShellPage />} />
           <Route path="/workspaces/:workspaceId/teams/:teamId/tasks" element={<AppShellPage />} />
@@ -720,7 +721,7 @@ describe('AppShellPage', () => {
       expect(screen.getByText('WorkspaceProjectsListPage')).toBeInTheDocument();
     });
 
-    expect(screen.getByTestId('location-display').textContent).toBe('/workspaces/workspace-1');
+    expect(screen.getByTestId('location-display').textContent).toBe('/workspaces/workspace-1/projects/list');
   });
 
   it('routes Manage Teams to the dedicated team manager for team workspace owners', async () => {

@@ -243,8 +243,13 @@ export function AppShellPage() {
     pathname === `/workspaces/${workspaceId}/all` ||
     pathname === `/workspaces/${workspaceId}/all/`
   );
+  const isWorkspaceProjectsListPath = !!workspaceId && (
+    pathname === `/workspaces/${workspaceId}/projects/list` ||
+    pathname === `/workspaces/${workspaceId}/projects/list/`
+  );
   const isTeamAggregatePath = !!teamIdParam && !projectIdParam;
   const shouldUseAggregateTicketScope = isWorkspaceAllTasksPath || isTeamAggregatePath;
+  const shouldKeepActiveProjectSelection = isWorkspaceAllTasksPath || isWorkspaceProjectsListPath || isTeamAggregatePath;
 
   // Teams-specific queries
   const { data: sidebarTree } = useQuery<SidebarTree>({
@@ -287,11 +292,16 @@ export function AppShellPage() {
   }, [activeWorkspaceId, navigate, setSidebarActiveScope]);
 
   const handleSelectWorkspaceProjects = useCallback(() => {
+    if (!activeWorkspaceId) {
+      return;
+    }
+
     setActiveTicket(null);
     setActiveNoteId('');
     setActiveSection('workspace');
     setSidebarActiveScope('workspace-projects');
-  }, [setActiveNoteId, setActiveSection, setActiveTicket, setSidebarActiveScope]);
+    navigate(`/workspaces/${activeWorkspaceId}/projects/list`);
+  }, [activeWorkspaceId, navigate, setActiveNoteId, setActiveSection, setActiveTicket, setSidebarActiveScope]);
 
   const handleSelectView = useCallback((teamId: string, viewId: string) => {
     if (viewId === 'all') {
@@ -409,11 +419,17 @@ export function AppShellPage() {
     // Sync project from URL param when on a project-specific path
     if (projectIdParam) {
       setActiveProjectId(projectIdParam);
-    } else if (!shouldUseAggregateTicketScope) {
+    } else if (!shouldKeepActiveProjectSelection) {
       setActiveProjectId('');
     }
 
-    setSidebarActiveScope(isWorkspaceAllTasksPath ? 'workspace' : nextSidebarScope);
+    setSidebarActiveScope(
+      isWorkspaceAllTasksPath
+        ? 'workspace'
+        : isWorkspaceProjectsListPath
+          ? 'workspace-projects'
+          : nextSidebarScope
+    );
 
     // Sync notes context
     if (isNotesPath) {
@@ -474,7 +490,22 @@ export function AppShellPage() {
     if (!ticketKey) {
       setActiveTicket(null);
     }
-  }, [pathname, workspaceId, projectIdParam, teamIdParam, cycleIdParam, activeLabelIdParam, ticketKey, noteId, searchParams, shouldUseAggregateTicketScope]);
+  }, [
+    pathname,
+    workspaceId,
+    projectIdParam,
+    teamIdParam,
+    cycleIdParam,
+    activeLabelIdParam,
+    ticketKey,
+    noteId,
+    searchParams,
+    isWorkspaceAllTasksPath,
+    isWorkspaceProjectsListPath,
+    isTeamAggregatePath,
+    shouldUseAggregateTicketScope,
+    shouldKeepActiveProjectSelection,
+  ]);
 
   // Resolve ticketKey URL param → Ticket object once tickets have loaded
   useEffect(() => {
