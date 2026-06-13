@@ -75,6 +75,8 @@ export interface SidebarToolSection {
   isOllamaOpen?: boolean;
   onOpenSimulator: () => void;
   onOpenCreateTicket: () => void;
+  onOpenCreateProject?: () => void;
+  onOpenCreateLabel?: () => void;
   agentIntegration?: 'ollama' | 'third_party';
   aiProvider?: 'openai' | 'anthropic' | 'gemini' | 'deepseek';
 }

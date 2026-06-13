@@ -1,5 +1,5 @@
-import { Sparkles } from 'lucide-react';
-import { Sidebar as LibSidebar, SidebarHeader, SidebarContent, SidebarFooter } from '@library';
+import { Sparkles, CheckSquare, Tag, FolderPlus } from 'lucide-react';
+import { Sidebar as LibSidebar, SidebarHeader, SidebarContent, SidebarFooter, ContextMenu } from '@library';
 import { SidebarProjectsSection, SidebarUserMenu } from './components';
 import type { SidebarProps } from './types';
 import { useSidebarState } from './utils';
@@ -34,19 +34,40 @@ export function Sidebar({ projects, tools, userMenu }: SidebarProps) {
         </SidebarHeader>
       ) : null}
 
-      <SidebarContent>
-        <SidebarProjectsSection
-          section={projects}
-          projectsCollapsed={sidebarState.projectsCollapsed}
-          collapsedProjects={sidebarState.collapsedProjects}
-          collapsedTeamProjects={sidebarState.collapsedTeamProjects}
-          collapsedTeams={sidebarState.collapsedTeams}
-          onToggleProjectsCollapsed={sidebarState.toggleProjectsCollapsed}
-          onToggleProject={sidebarState.toggleProject}
-          onToggleTeam={sidebarState.toggleTeam}
-          onToggleTeamProjects={sidebarState.toggleTeamProjects}
-        />
-      </SidebarContent>
+      <ContextMenu>
+        <ContextMenu.Trigger>
+          <SidebarContent>
+            <SidebarProjectsSection
+              section={projects}
+              projectsCollapsed={sidebarState.projectsCollapsed}
+              collapsedProjects={sidebarState.collapsedProjects}
+              collapsedTeamProjects={sidebarState.collapsedTeamProjects}
+              collapsedTeams={sidebarState.collapsedTeams}
+              onToggleProjectsCollapsed={sidebarState.toggleProjectsCollapsed}
+              onToggleProject={sidebarState.toggleProject}
+              onToggleTeam={sidebarState.toggleTeam}
+              onToggleTeamProjects={sidebarState.toggleTeamProjects}
+            />
+          </SidebarContent>
+        </ContextMenu.Trigger>
+        <ContextMenu.Portal>
+          <ContextMenu.Content>
+            <ContextMenu.Item icon={<CheckSquare />} onClick={tools.onOpenCreateTicket}>
+              New Task
+            </ContextMenu.Item>
+            {tools.onOpenCreateLabel && (
+              <ContextMenu.Item icon={<Tag />} onClick={tools.onOpenCreateLabel}>
+                New Label
+              </ContextMenu.Item>
+            )}
+            {tools.onOpenCreateProject && (
+              <ContextMenu.Item icon={<FolderPlus />} onClick={tools.onOpenCreateProject}>
+                New Project
+              </ContextMenu.Item>
+            )}
+          </ContextMenu.Content>
+        </ContextMenu.Portal>
+      </ContextMenu>
 
       <SidebarFooter>
         <SidebarUserMenu
