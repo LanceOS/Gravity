@@ -29,6 +29,7 @@ interface WorkspacePageProps {
   activeView: WorkspaceIssueView;
   viewModeLocked?: boolean;
   isTeamWorkspace?: boolean;
+  hasTeams?: boolean;
   currentUser: User | null;
   cycles: Cycle[];
   labels?: Label[];
@@ -40,6 +41,7 @@ interface WorkspacePageProps {
   users: User[];
   onOpenCreateTicket: (initialStatus?: Ticket['status']) => void;
   onOpenProjectManager: () => void;
+  onOpenTeamManager?: () => void;
   onOpenTeamProjectManager?: () => void;
   onSelectTicket: (ticket: Ticket | null) => void;
   onSelectNote?: (noteId: string) => void;
@@ -93,6 +95,7 @@ export function WorkspacePage({
   activeView,
   viewModeLocked = false,
   isTeamWorkspace = false,
+  hasTeams = false,
   currentUser,
   cycles,
   labels: labelItems,
@@ -104,6 +107,7 @@ export function WorkspacePage({
   users,
   onOpenCreateTicket,
   onOpenProjectManager,
+  onOpenTeamManager,
   onOpenTeamProjectManager,
   onSelectTicket,
   onSelectNote,
@@ -216,6 +220,36 @@ export function WorkspacePage({
 
   const isNoteEditor = activeContext === 'notes' && activeNoteId;
   const isTicketEditor = activeContext === 'issues' && activeTicket;
+  const showTeamScopedProjectEmptyState = isTeamWorkspace && isTeamScopedRoute;
+  const showTeamWorkspaceTaskEmptyState = isTeamWorkspace && !showTeamScopedProjectEmptyState && hasTeams;
+  const emptyStateTitle = showTeamScopedProjectEmptyState
+    ? 'No projects in this team yet'
+    : showTeamWorkspaceTaskEmptyState
+      ? 'No tasks in this workspace yet'
+      : isTeamWorkspace
+        ? 'Create your first team'
+        : 'No projects in this workspace yet';
+  const emptyStateCopy = showTeamScopedProjectEmptyState
+    ? 'Create a project for this team to start organizing work, tickets, and milestones.'
+    : showTeamWorkspaceTaskEmptyState
+      ? 'Teams and projects are ready, but there are no tasks yet. Create a project or open Manage Projects to start tracking work.'
+      : isTeamWorkspace
+        ? 'Teams organize projects, cycles, labels, and aggregate task views in this workspace. Create the first team to start building out your workspace.'
+        : 'Open Manage Projects to create the first project for this workspace. Once a project exists, tickets, labels, and cycles will become available here.';
+  const emptyStateActionLabel = showTeamScopedProjectEmptyState
+    ? 'Create Project'
+    : showTeamWorkspaceTaskEmptyState
+      ? 'Manage Projects'
+      : isTeamWorkspace
+        ? 'Create Team'
+        : 'Manage Projects';
+  const emptyStateActionHandler = showTeamScopedProjectEmptyState
+    ? (onOpenTeamProjectManager ?? onOpenProjectManager)
+    : showTeamWorkspaceTaskEmptyState
+      ? onOpenProjectManager
+      : isTeamWorkspace
+        ? (onOpenTeamManager ?? onOpenProjectManager)
+        : onOpenProjectManager;
 
   let displayTitle = '';
   if (activeContext === 'notes') {
@@ -304,32 +338,16 @@ export function WorkspacePage({
                     <ErrorBoundary onReset={reset}>
                       {projects.length === 0 ? (
                         <div className="workspace-page__empty-state">
-                          <div className="workspace-page__empty-state-title">
-                            {isTeamWorkspace && isTeamScopedRoute
-                              ? 'No projects in this team yet'
-                              : isTeamWorkspace
-                                ? 'Create your first team'
-                                : 'No projects in this workspace yet'}
-                          </div>
-                          <p className="workspace-page__empty-state-copy">
-                            {isTeamWorkspace && isTeamScopedRoute
-                              ? 'Create a project for this team to start organizing work, tickets, and milestones.'
-                              : isTeamWorkspace
-                              ? 'Teams organize projects, cycles, labels, and aggregate task views in this workspace. Create the first team to start building out your workspace.'
-                              : 'Open Manage Projects to create the first project for this workspace. Once a project exists, tickets, labels, and cycles will become available here.'}
-                          </p>
+                          <div className="workspace-page__empty-state-title">{emptyStateTitle}</div>
+                          <p className="workspace-page__empty-state-copy">{emptyStateCopy}</p>
                           <div className="workspace-page__empty-state-actions">
                             <Button
                               type="button"
                               variant="primary"
                               className="workspace-page__projects-button workspace-page__projects-button--primary"
-                              onClick={
-                                isTeamWorkspace && isTeamScopedRoute
-                                  ? (onOpenTeamProjectManager ?? onOpenProjectManager)
-                                  : onOpenProjectManager
-                              }
+                              onClick={emptyStateActionHandler}
                             >
-                              {isTeamWorkspace && isTeamScopedRoute ? 'Create Project' : isTeamWorkspace ? 'Create Team' : 'Manage Projects'}
+                              {emptyStateActionLabel}
                             </Button>
                           </div>
                         </div>

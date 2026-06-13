@@ -165,6 +165,7 @@ function renderWorkspacePage(overrides: Partial<Parameters<typeof WorkspacePage>
     users: [currentUser],
     onOpenCreateTicket: vi.fn(),
     onOpenProjectManager: vi.fn(),
+    onOpenTeamManager: vi.fn(),
     onOpenTeamProjectManager: vi.fn(),
     onSelectTicket: vi.fn(),
     onSetFilters: vi.fn(),
@@ -206,13 +207,14 @@ describe('WorkspacePage', () => {
       tickets: [],
       isTeamWorkspace: true,
       pathname: '/workspaces/workspace-1',
+      hasTeams: false,
     });
 
     expect(screen.getByText('Create your first team')).toBeInTheDocument();
     expect(screen.queryByText('Manage Projects')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Create Team' }));
-    expect(props.onOpenProjectManager).toHaveBeenCalledTimes(1);
+    expect(props.onOpenTeamManager).toHaveBeenCalledTimes(1);
   });
 
   it('prompts team-scoped routes to create a project when no projects exist', async () => {
@@ -231,6 +233,25 @@ describe('WorkspacePage', () => {
 
     await user.click(screen.getByRole('button', { name: 'Create Project' }));
     expect(props.onOpenTeamProjectManager).toHaveBeenCalledTimes(1);
+  });
+
+  it('prompts team workspaces with teams but no tasks to manage projects', async () => {
+    const user = userEvent.setup();
+    const { props } = renderWorkspacePage({
+      projects: [],
+      tickets: [],
+      isTeamWorkspace: true,
+      pathname: '/workspaces/workspace-1',
+      hasTeams: true,
+    });
+
+    expect(screen.getByText('No tasks in this workspace yet')).toBeInTheDocument();
+    expect(
+      screen.getByText('Teams and projects are ready, but there are no tasks yet. Create a project or open Manage Projects to start tracking work.')
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Manage Projects' }));
+    expect(props.onOpenProjectManager).toHaveBeenCalledTimes(1);
   });
 
   it('renders the board view with filtered ticket counts and clears filters', async () => {

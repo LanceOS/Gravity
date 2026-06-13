@@ -1354,6 +1354,7 @@ export function AppShellPage() {
               activeView={effectiveActiveView}
               viewModeLocked={lockWorkspaceIssueView}
               isTeamWorkspace={isTeamWorkspace}
+              hasTeams={!!(sidebarTree?.teams?.length)}
               currentUser={currentUser}
               cycles={scopedCycles}
               labels={scopedLabels}
@@ -1363,7 +1364,8 @@ export function AppShellPage() {
               tickets={scopedTickets}
               users={users}
               onOpenCreateTicket={handleOpenCreateTicket}
-              onOpenProjectManager={isTeamWorkspace ? handleOpenTeamManager : handleOpenProjectManager}
+              onOpenProjectManager={handleOpenProjectManager}
+              onOpenTeamManager={handleOpenTeamManager}
               onSelectTicket={(ticket) => {
                 if (ticket) {
                   navigate(buildProjectScopedPath(ticket.projectId, 'tickets', ticket.key));
