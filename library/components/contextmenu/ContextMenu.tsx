@@ -65,6 +65,7 @@ export function ContextMenuRoot({ children, trigger, content, items }: ContextMe
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setCoords({ x: e.clientX, y: e.clientY });
     setActiveSubmenuId(null);
     setIsOpen(true);

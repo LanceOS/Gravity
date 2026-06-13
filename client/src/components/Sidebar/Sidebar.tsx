@@ -38,7 +38,7 @@ export function Sidebar({ projects, tools, userMenu }: SidebarProps) {
         content={
           <>
             <ContextMenu.Item icon={<CheckSquare size={14} />} onClick={tools.onOpenCreateTicket}>
-              New Task
+              New Ticket
             </ContextMenu.Item>
             {tools.onOpenCreateLabel && (
               <ContextMenu.Item icon={<Tag size={14} />} onClick={tools.onOpenCreateLabel}>
