@@ -26,6 +26,7 @@ type WorkspaceLayoutMockProps = {
     };
     projects?: {
       onSelectLabel?: (labelId: string) => void;
+      onSelectWorkspaceProjects?: () => void;
     };
   };
   children?: ReactNode;
@@ -140,6 +141,9 @@ vi.mock('../../layouts/WorkspaceLayout/WorkspaceLayout', () => ({
       <button type="button" onClick={sidebarProps.userMenu.onOpenProjectManager}>
         Open project manager
       </button>
+      <button type="button" onClick={() => sidebarProps.projects?.onSelectWorkspaceProjects?.()}>
+        Open workspace projects
+      </button>
       <div
         data-testid="workspace-management-menu-state"
         data-visible={sidebarProps.userMenu.showWorkspaceManagement === false ? 'false' : 'true'}
@@ -199,6 +203,10 @@ vi.mock('../../pages/WorkspacePage/WorkspacePage', () => ({
 
 vi.mock('../../pages/WorkspaceProjectsPage/WorkspaceProjectsPage', () => ({
   WorkspaceProjectsPage: () => <div>WorkspaceProjectsPage</div>,
+}));
+
+vi.mock('../../pages/WorkspaceProjectsListPage/WorkspaceProjectsListPage', () => ({
+  WorkspaceProjectsListPage: () => <div>WorkspaceProjectsListPage</div>,
 }));
 
 vi.mock('../../pages/WorkspaceTeamsPage/WorkspaceTeamsPage', () => ({
@@ -415,6 +423,7 @@ function renderAppShell({
           <Route path="/workspaces/:workspaceId/projects/:projectId/tickets" element={<AppShellPage />} />
           <Route path="/workspaces/:workspaceId/projects/:projectId/notes" element={<AppShellPage />} />
           <Route path="/workspaces/:workspaceId/projects/:projectId/notes/:noteId" element={<AppShellPage />} />
+          <Route path="/workspaces/:workspaceId/projects/list" element={<AppShellPage />} />
           <Route path="/workspaces/:workspaceId/all" element={<AppShellPage />} />
           <Route path="/workspaces/:workspaceId/teams" element={<AppShellPage />} />
           <Route path="/workspaces/:workspaceId/teams/:teamId/tasks" element={<AppShellPage />} />
@@ -694,6 +703,25 @@ describe('AppShellPage', () => {
     });
 
     thirdRender.unmount();
+  });
+
+  it('switches to the workspace projects list when the workspace Projects tab is selected', async () => {
+    const user = userEvent.setup();
+
+    renderAppShell();
+
+    await waitFor(() => {
+      expect(screen.getByText('WorkspaceLayout')).toBeInTheDocument();
+      expect(screen.getByText('WorkspacePage')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Open workspace projects' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('WorkspaceProjectsListPage')).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId('location-display').textContent).toBe('/workspaces/workspace-1/projects/list');
   });
 
   it('routes Manage Teams to the dedicated team manager for team workspace owners', async () => {

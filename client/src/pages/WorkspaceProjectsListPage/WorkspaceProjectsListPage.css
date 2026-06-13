@@ -1,0 +1,265 @@
+.workspace-projects-list-page {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.workspace-projects-list-page__shell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+  padding: 22px 28px 30px;
+}
+
+.workspace-projects-list-page__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.workspace-projects-list-page__eyebrow {
+  margin-bottom: 6px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+}
+
+.workspace-projects-list-page__subtitle {
+  margin: 0;
+  max-width: 760px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--color-text-disabled);
+}
+
+.workspace-projects-list-page__count {
+  flex: 0 0 auto;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border-focus);
+  background: var(--color-state-selected-bg);
+  color: var(--color-primary);
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+}
+
+.workspace-projects-list-page__table {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.workspace-projects-list-page__table-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px;
+  gap: 12px;
+  padding: 0 16px;
+  color: var(--color-text-disabled);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.workspace-projects-list-page__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.workspace-projects-list-page__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-card);
+  color: var(--color-text-primary);
+  text-align: left;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.workspace-projects-list-page__row:hover {
+  transform: translateY(-1px);
+  border-color: var(--color-border-focus);
+  background: var(--color-surface-overlay);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12);
+}
+
+.workspace-projects-list-page__row:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+
+.workspace-projects-list-page__row--active {
+  border-color: var(--color-border-focus);
+  background: var(--color-state-selected-bg);
+  box-shadow: 0 0 0 1px var(--color-border-focus);
+}
+
+.workspace-projects-list-page__project-copy {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  flex: 1 1 auto;
+}
+
+.workspace-projects-list-page__project-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.workspace-projects-list-page__project-title {
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-projects-list-page__project-key {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border-default);
+  background: var(--color-base100);
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--mono);
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+.workspace-projects-list-page__project-description {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--color-text-disabled);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.workspace-projects-list-page__project-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.workspace-projects-list-page__project-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border-default);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.workspace-projects-list-page__project-status--planned {
+  background: rgba(148, 163, 184, 0.12);
+  color: #94a3b8;
+}
+
+.workspace-projects-list-page__project-status--active {
+  background: rgba(59, 130, 246, 0.12);
+  color: #60a5fa;
+}
+
+.workspace-projects-list-page__project-status--completed {
+  background: rgba(16, 185, 129, 0.12);
+  color: #34d399;
+}
+
+.workspace-projects-list-page__project-chevron {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-text-disabled);
+}
+
+.workspace-projects-list-page__empty {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  min-height: 240px;
+  padding: 32px 24px;
+  border: 1px dashed var(--color-border-default);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-card);
+  color: var(--color-text-disabled);
+  text-align: center;
+}
+
+.workspace-projects-list-page__empty-icon {
+  color: var(--color-border-focus);
+}
+
+.workspace-projects-list-page__empty-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.workspace-projects-list-page__empty-copy {
+  max-width: 420px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+@media (max-width: 960px) {
+  .workspace-projects-list-page__shell {
+    padding: 16px;
+  }
+
+  .workspace-projects-list-page__header {
+    flex-direction: column;
+  }
+
+  .workspace-projects-list-page__table-header {
+    display: none;
+  }
+
+  .workspace-projects-list-page__row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .workspace-projects-list-page__project-meta {
+    width: 100%;
+    justify-content: space-between;
+  }
+}

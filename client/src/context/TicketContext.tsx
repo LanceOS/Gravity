@@ -160,6 +160,7 @@ interface TicketContextType extends State {
   deleteComment: (ticketId: string, commentId: string) => Promise<void>;
   createProject: (project: CreateProjectInput) => Promise<Project | null>;
   updateProject: (id: string, updates: Partial<Project>) => Promise<Project | null>;
+  deleteProject: (id: string) => Promise<void>;
   joinProject: (inviteCode: string) => Promise<Project | null>;
   signIn: (email: string, password?: string) => Promise<boolean>;
   signUp: (name: string, email: string, password?: string) => Promise<boolean>;
@@ -376,18 +377,6 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [currentUser?.id, queryClient]);
 
-  // Set default active project once projects are loaded
-  useEffect(() => {
-    if (!currentUser) return;
-
-    if (projects.length > 0 && !activeProjectId) {
-      setActiveProjectId(projects[0].id);
-    }
-
-    if (activeProjectId && !projects.some((project) => project.id === activeProjectId)) {
-      setActiveProjectId('');
-    }
-  }, [currentUser, projects, activeProjectId, setActiveProjectId]);
 
   // Sync stored user with local storage
   useEffect(() => {
@@ -820,6 +809,49 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [updateProjectMutation]);
 
+  // Delete Project
+  const deleteProjectMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiClient.delete(`/projects/${id}`);
+    },
+    onMutate: async (id) => {
+      if (!currentUser) return;
+      const queryKey = queryKeys.projects(currentUser.id);
+      const previousProjects = queryClient.getQueryData<Project[]>(queryKey);
+
+      if (previousProjects) {
+        queryClient.setQueryData<Project[]>(queryKey, (old) =>
+          old ? old.filter((p) => p.id !== id) : []
+        );
+      }
+
+      if (activeProjectIdRef.current === id) {
+        setActiveProjectId('');
+      }
+
+      return { previousProjects };
+    },
+    onError: (err, id, context: any) => {
+      if (currentUser && context?.previousProjects) {
+        queryClient.setQueryData(queryKeys.projects(currentUser.id), context.previousProjects);
+      }
+    },
+    onSettled: () => {
+      if (currentUser) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.projects(currentUser.id) });
+      }
+    },
+  });
+
+  const deleteProject = useCallback(async (id: string) => {
+    try {
+      await deleteProjectMutation.mutateAsync(id);
+    } catch (e) {
+      console.error(e);
+      throw e;
+    }
+  }, [deleteProjectMutation]);
+
   // Create Label
   const createLabelMutation = useMutation({
     mutationFn: async (labelInput: { name: string; color?: string; description?: string; projectId?: string; sortOrder?: number }) => {
@@ -1052,6 +1084,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       deleteComment,
       createProject,
       updateProject,
+      deleteProject,
       joinProject,
       signIn,
       signUp,

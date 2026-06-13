@@ -1,6 +1,6 @@
-import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { db } from '../../../db/index.js';
-import { cycles, projectMembers, projects, workspaceMembers, workspaces, workspaceSettings, teams } from '../../../db/schema.js';
+import { comments, cycles, projectMembers, projects, teams, ticketLabels, tickets, workspaceMembers, workspaces, workspaceSettings } from '../../../db/schema.js';
 import {
   addWorkspaceMembersToProject,
   createId,
@@ -269,4 +269,38 @@ export async function addProjectMemberRecord(projectId: string, workspaceId: str
 
   await invalidateWorkspaceCache(workspaceId);
   await invalidateUserWorkspacesCache(userId);
+}
+
+export async function deleteProjectRecord(projectId: string, workspaceId: string) {
+  await db.transaction(async (tx) => {
+    // 1. Delete comments belonging to tickets in this project
+    await tx.delete(comments).where(sql`${comments.ticketId} in (
+      select ${tickets.id}
+      from ${tickets}
+      where ${tickets.projectId} = ${projectId}
+    )`);
+
+    // 2. Delete ticket labels belonging to tickets in this project
+    await tx.delete(ticketLabels).where(sql`${ticketLabels.ticketId} in (
+      select ${tickets.id}
+      from ${tickets}
+      where ${tickets.projectId} = ${projectId}
+    )`);
+
+    // 3. Delete tickets in this project
+    await tx.delete(tickets).where(eq(tickets.projectId, projectId));
+
+    // 4. Delete project members
+    await tx.delete(projectMembers).where(eq(projectMembers.projectId, projectId));
+
+    // 5. Check if it's the default project for the workspace
+    await tx.update(workspaces)
+      .set({ defaultProjectId: null })
+      .where(and(eq(workspaces.id, workspaceId), eq(workspaces.defaultProjectId, projectId)));
+
+    // 6. Delete project
+    await tx.delete(projects).where(eq(projects.id, projectId));
+  });
+
+  await invalidateWorkspaceCache(workspaceId);
 }

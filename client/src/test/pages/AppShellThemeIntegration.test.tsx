@@ -77,6 +77,10 @@ vi.mock('../../pages/WorkspaceProjectsPage/WorkspaceProjectsPage', () => ({
   WorkspaceProjectsPage: () => <div>WorkspaceProjectsPage</div>,
 }));
 
+vi.mock('../../pages/WorkspaceProjectsListPage/WorkspaceProjectsListPage', () => ({
+  WorkspaceProjectsListPage: () => <div>WorkspaceProjectsListPage</div>,
+}));
+
 vi.mock('../../modules/settings', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../modules/settings')>();
   return {

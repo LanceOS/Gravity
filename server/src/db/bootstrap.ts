@@ -344,7 +344,6 @@ export async function initializeDatabase() {
 
     CREATE INDEX IF NOT EXISTS projects_workspace_id_idx ON projects (workspace_id);
     CREATE INDEX IF NOT EXISTS project_members_user_id_idx ON project_members (user_id);
-    CREATE INDEX IF NOT EXISTS cycles_team_id_idx ON cycles (team_id);
     CREATE INDEX IF NOT EXISTS tickets_project_id_idx ON tickets (project_id);
     CREATE INDEX IF NOT EXISTS tickets_assignee_id_idx ON tickets (assignee_id);
     CREATE INDEX IF NOT EXISTS tickets_cycle_id_idx ON tickets (cycle_id);
@@ -352,7 +351,6 @@ export async function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS comments_ticket_id_idx ON comments (ticket_id);
     CREATE INDEX IF NOT EXISTS comments_user_id_idx ON comments (user_id);
     CREATE INDEX IF NOT EXISTS note_metadata_project_id_user_id_idx ON note_metadata (project_id, user_id);
-    CREATE INDEX IF NOT EXISTS labels_team_id_idx ON labels (team_id);
     CREATE INDEX IF NOT EXISTS ticket_labels_label_id_idx ON ticket_labels (label_id);
   `);
 
@@ -500,6 +498,15 @@ export async function initializeDatabase() {
       console.error('Failed to ensure unique team label names:', err);
     });
   }
+
+  // Clean up any orphaned records that didn't receive a team_id
+  await pool.query(`
+    DELETE FROM labels WHERE team_id IS NULL OR team_id = '';
+    DELETE FROM cycles WHERE team_id IS NULL OR team_id = '';
+  `).catch((err) => {
+    // eslint-disable-next-line no-console
+    console.error('Failed to clean up orphaned records without team_id:', err);
+  });
 
   await pool.query(`
     ALTER TABLE projects ALTER COLUMN team_id SET NOT NULL;

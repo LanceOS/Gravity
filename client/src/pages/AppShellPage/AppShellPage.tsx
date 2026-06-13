@@ -23,6 +23,7 @@ import { LoadingPage } from '../LoadingPage/LoadingPage';
 import { WorkspaceDirectoryPage } from '../WorkspaceDirectoryPage/WorkspaceDirectoryPage';
 import { WorkspacePage, type WorkspaceIssueView } from '../WorkspacePage/WorkspacePage';
 import { WorkspaceProjectsPage } from '../WorkspaceProjectsPage/WorkspaceProjectsPage';
+import { WorkspaceProjectsListPage } from '../WorkspaceProjectsListPage/WorkspaceProjectsListPage';
 import { WorkspaceTeamProjectsPage } from '../WorkspaceTeamProjectsPage/WorkspaceTeamProjectsPage';
 import { WorkspaceTeamsPage } from '../WorkspaceTeamsPage/WorkspaceTeamsPage';
 import { TicketDetailRoute } from '../../modules/tickets/components/TicketDetailRoute';
@@ -51,6 +52,7 @@ export function AppShellPage() {
     createTicket,
     currentUser,
     cycles,
+    deleteProject,
     deleteTicket,
     labels = [],
     fetchInitialData,
@@ -80,6 +82,7 @@ export function AppShellPage() {
   const [isOllamaOpen, setIsOllamaOpen] = useState(false);
   const [isMcpOpen, setIsMcpOpen] = useState(false);
   const [isOllamaClosing, setIsOllamaClosing] = useState(false);
+  const [sidebarActiveScope, setSidebarActiveScope] = useState<SidebarNavigationState['activeScope']>('workspace');
   const [ollamaCloseTimer, setOllamaCloseTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -240,8 +243,13 @@ export function AppShellPage() {
     pathname === `/workspaces/${workspaceId}/all` ||
     pathname === `/workspaces/${workspaceId}/all/`
   );
+  const isWorkspaceProjectsListPath = !!workspaceId && (
+    pathname === `/workspaces/${workspaceId}/projects/list` ||
+    pathname === `/workspaces/${workspaceId}/projects/list/`
+  );
   const isTeamAggregatePath = !!teamIdParam && !projectIdParam;
   const shouldUseAggregateTicketScope = isWorkspaceAllTasksPath || isTeamAggregatePath;
+  const shouldKeepActiveProjectSelection = isWorkspaceAllTasksPath || isWorkspaceProjectsListPath || isTeamAggregatePath;
 
   // Teams-specific queries
   const { data: sidebarTree } = useQuery<SidebarTree>({
@@ -279,8 +287,21 @@ export function AppShellPage() {
   }, [activeWorkspaceId, navigate]);
 
   const handleSelectWorkspaceAllTasks = useCallback(() => {
+    setSidebarActiveScope('workspace');
     navigate(`/workspaces/${activeWorkspaceId}/all`);
-  }, [activeWorkspaceId, navigate]);
+  }, [activeWorkspaceId, navigate, setSidebarActiveScope]);
+
+  const handleSelectWorkspaceProjects = useCallback(() => {
+    if (!activeWorkspaceId) {
+      return;
+    }
+
+    setActiveTicket(null);
+    setActiveNoteId('');
+    setActiveSection('workspace');
+    setSidebarActiveScope('workspace-projects');
+    navigate(`/workspaces/${activeWorkspaceId}/projects/list`);
+  }, [activeWorkspaceId, navigate, setActiveNoteId, setActiveSection, setActiveTicket, setSidebarActiveScope]);
 
   const handleSelectView = useCallback((teamId: string, viewId: string) => {
     if (viewId === 'all') {
@@ -321,12 +342,14 @@ export function AppShellPage() {
       setActiveSection('directory');
       setActiveTicket(null);
       setActiveNoteId('');
+      setSidebarActiveScope('workspace');
       return;
     }
 
     if (pathname === '/account' || pathname === '/account/') {
       setActiveSection('account');
       setActiveNoteId('');
+      setSidebarActiveScope('workspace');
       return;
     }
 
@@ -352,6 +375,7 @@ export function AppShellPage() {
       setActiveSection('settings');
       setActiveTicket(null);
       setActiveNoteId('');
+      setSidebarActiveScope('workspace');
       return;
     }
 
@@ -359,6 +383,7 @@ export function AppShellPage() {
       setActiveSection('projects');
       setActiveTicket(null);
       setActiveNoteId('');
+      setSidebarActiveScope('projects');
       return;
     }
 
@@ -366,6 +391,7 @@ export function AppShellPage() {
       setActiveSection('teams');
       setActiveTicket(null);
       setActiveNoteId('');
+      setSidebarActiveScope('workspace');
       return;
     }
 
@@ -373,18 +399,37 @@ export function AppShellPage() {
       setActiveSection('team-projects');
       setActiveTicket(null);
       setActiveNoteId('');
+      setSidebarActiveScope('projects');
       return;
     }
 
     // Workspace-level views (project routes, notes, tickets)
     setActiveSection('workspace');
 
+    const nextSidebarScope: SidebarNavigationState['activeScope'] = teamIdParam
+      ? (projectIdParam
+        ? 'projects'
+        : cycleIdParam
+          ? 'cycles'
+          : activeLabelIdParam
+            ? 'labels'
+            : 'views')
+      : (projectIdParam ? 'projects' : 'workspace');
+
     // Sync project from URL param when on a project-specific path
     if (projectIdParam) {
       setActiveProjectId(projectIdParam);
-    } else if (!shouldUseAggregateTicketScope) {
+    } else if (!shouldKeepActiveProjectSelection) {
       setActiveProjectId('');
     }
+
+    setSidebarActiveScope(
+      isWorkspaceAllTasksPath
+        ? 'workspace'
+        : isWorkspaceProjectsListPath
+          ? 'workspace-projects'
+          : nextSidebarScope
+    );
 
     // Sync notes context
     if (isNotesPath) {
@@ -445,7 +490,22 @@ export function AppShellPage() {
     if (!ticketKey) {
       setActiveTicket(null);
     }
-  }, [pathname, workspaceId, projectIdParam, teamIdParam, cycleIdParam, activeLabelIdParam, ticketKey, noteId, searchParams, shouldUseAggregateTicketScope]);
+  }, [
+    pathname,
+    workspaceId,
+    projectIdParam,
+    teamIdParam,
+    cycleIdParam,
+    activeLabelIdParam,
+    ticketKey,
+    noteId,
+    searchParams,
+    isWorkspaceAllTasksPath,
+    isWorkspaceProjectsListPath,
+    isTeamAggregatePath,
+    shouldUseAggregateTicketScope,
+    shouldKeepActiveProjectSelection,
+  ]);
 
   // Resolve ticketKey URL param → Ticket object once tickets have loaded
   useEffect(() => {
@@ -745,6 +805,7 @@ export function AppShellPage() {
     const project = projects.find((p) => p.id === projectId);
     const wid = project?.workspaceId || activeWorkspaceId;
     setActiveProjectId(projectId);
+    setSidebarActiveScope('projects');
     navigate(`/workspaces/${wid}/projects`);
   };
 
@@ -1040,22 +1101,15 @@ export function AppShellPage() {
     sidebarTree?.teams?.find((team) => team.projects?.some((project) => project.id === (projectIdParam || activeProjectId)))?.id ||
     '';
   const sidebarActiveTeamId = teamIdParam || activeProjectTeamId;
+  const handleOpenCurrentTeamProjectsManager = () => {
+    if (sidebarActiveTeamId) {
+      handleOpenTeamProjectsManager(sidebarActiveTeamId);
+      return;
+    }
+
+    handleOpenTeamManager();
+  };
   const isTeamProjectsManager = activeSection === 'team-projects';
-    const sidebarActiveScope: SidebarNavigationState['activeScope'] = isWorkspaceAllTasksPath
-    ? 'workspace'
-    : isTeamProjectsManager
-      ? 'projects'
-    : teamIdParam
-      ? projectIdParam
-        ? 'projects'
-        : cycleIdParam
-          ? 'cycles'
-          : activeLabelIdParam
-            ? 'labels'
-            : 'views'
-      : projectIdParam || activeProjectId
-        ? 'projects'
-        : 'workspace';
   const sidebarNavigationState: SidebarNavigationState = {
     activeTeam: sidebarActiveTeamId,
     activeScope: sidebarActiveScope,
@@ -1110,6 +1164,7 @@ export function AppShellPage() {
       activeCycleId: cycleIdParam,
       activeLabelId: activeLabelIdParam,
       onSelectWorkspaceAllTasks: handleSelectWorkspaceAllTasks,
+      onSelectWorkspaceProjects: handleSelectWorkspaceProjects,
       onSelectTeam: handleSelectTeam,
       onSelectView: handleSelectView,
       onSelectCycle: handleSelectCycle,
@@ -1241,7 +1296,9 @@ export function AppShellPage() {
             </>
           }
         >
-          {isTeamsManager ? (
+          {sidebarActiveScope === 'workspace-projects' ? (
+            <WorkspaceProjectsListPage />
+          ) : isTeamsManager ? (
             <WorkspaceTeamsPage
               workspaceId={activeWorkspaceId}
               workspaceName={activeWorkspace.name}
@@ -1264,6 +1321,7 @@ export function AppShellPage() {
               onBackToTeams={() => navigate(`/workspaces/${activeWorkspaceId}/teams`)}
               onCreateProject={createProject}
               onUpdateProject={updateProject}
+              onDeleteProject={deleteProject}
             />
           ) : activeSection === 'projects' ? (
             <WorkspaceProjectsPage
@@ -1296,6 +1354,7 @@ export function AppShellPage() {
               activeView={effectiveActiveView}
               viewModeLocked={lockWorkspaceIssueView}
               isTeamWorkspace={isTeamWorkspace}
+              hasTeams={!!(sidebarTree?.teams?.length)}
               currentUser={currentUser}
               cycles={scopedCycles}
               labels={scopedLabels}
@@ -1305,7 +1364,8 @@ export function AppShellPage() {
               tickets={scopedTickets}
               users={users}
               onOpenCreateTicket={handleOpenCreateTicket}
-              onOpenProjectManager={isTeamWorkspace ? handleOpenTeamManager : handleOpenProjectManager}
+              onOpenProjectManager={handleOpenProjectManager}
+              onOpenTeamManager={handleOpenTeamManager}
               onSelectTicket={(ticket) => {
                 if (ticket) {
                   navigate(buildProjectScopedPath(ticket.projectId, 'tickets', ticket.key));
@@ -1321,6 +1381,7 @@ export function AppShellPage() {
               onSetListSort={setListSort}
               onSetView={setView}
               onUpdateTicket={updateTicket}
+              onOpenTeamProjectManager={handleOpenCurrentTeamProjectsManager}
             />
           )}
         </WorkspaceLayout>

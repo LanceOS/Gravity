@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, FolderKanban, Save, Sparkles } from 'lucide-react';
-import { Button, TextInput, Textarea } from '@library';
+import { ArrowLeft, FolderKanban, Save, Sparkles, Trash } from 'lucide-react';
+import { Button, TextInput, Textarea, Modal } from '@library';
 import { WorkspaceHeader } from '../../modules/workspaces';
 import { ProjectCreateOverlay } from '../../modules/workspaces/components/ProjectCreateOverlay';
 import { PROJECT_LIFECYCLE_OPTIONS, PROJECT_STATUS_LABELS, sanitizeProjectKey } from '../../modules/workspaces/utils/WorkspaceProjectPanel';
@@ -26,6 +26,7 @@ interface WorkspaceTeamProjectsPageProps {
   onBackToTeams: () => void;
   onCreateProject: (project: CreateProjectInput) => Promise<Project | null>;
   onUpdateProject: (id: string, updates: Partial<Project>) => Promise<Project | null>;
+  onDeleteProject?: (id: string) => Promise<void>;
 }
 
 function getProjectDraft(project?: Project | null): ProjectDraft {
@@ -71,14 +72,17 @@ export function WorkspaceTeamProjectsPage({
   onBackToTeams,
   onCreateProject,
   onUpdateProject,
+  onDeleteProject,
 }: WorkspaceTeamProjectsPageProps) {
   const queryClient = useQueryClient();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [projectCreateLoading, setProjectCreateLoading] = useState(false);
   const [projectCreateError, setProjectCreateError] = useState<string | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState('');
   const [projectDraft, setProjectDraft] = useState<ProjectDraft>(getProjectDraft());
   const [savingProjectId, setSavingProjectId] = useState('');
+  const [deletingProjectId, setDeletingProjectId] = useState('');
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const lastSyncedActiveProjectId = useRef(activeProjectId);
 
@@ -251,6 +255,57 @@ export function WorkspaceTeamProjectsPage({
     setFeedback(null);
   };
 
+  const handleDeleteProject = () => {
+    if (!selectedProject || !onDeleteProject) return;
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!selectedProject || !onDeleteProject) return;
+
+    const projectId = selectedProject.id;
+    setIsDeleteModalOpen(false);
+    setDeletingProjectId(projectId);
+    setFeedback(null);
+
+    // Optimistically update sidebar tree
+    queryClient.setQueryData<SidebarTree | undefined>(['sidebarTree', workspaceId], (current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        teams: current.teams.map((t) => {
+          if (t.id === team?.id) {
+            return {
+              ...t,
+              projects: (t.projects || []).filter((p) => p.id !== projectId),
+            };
+          }
+          return t;
+        }),
+      };
+    });
+
+    setFeedback({ type: 'success', message: 'Project deleted successfully.' });
+
+    const remainingProjects = sortedProjects.filter(p => p.id !== projectId);
+    if (remainingProjects.length > 0) {
+      setSelectedProjectId(remainingProjects[0].id);
+    } else {
+      setSelectedProjectId('');
+    }
+
+    // Fire and forget
+    onDeleteProject(projectId).catch((error) => {
+      setFeedback({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Failed to delete project.',
+      });
+      void queryClient.invalidateQueries({ queryKey: ['sidebarTree', workspaceId] });
+    }).finally(() => {
+      setDeletingProjectId('');
+    });
+  };
+
   const handleResetDraft = () => {
     setProjectDraft(getProjectDraft(selectedProject));
     setFeedback(null);
@@ -420,20 +475,38 @@ export function WorkspaceTeamProjectsPage({
                     </div>
 
                     <div className="workspace-team-projects-page__actions-row">
-                      <Button
-                        type="submit"
-                        variant="primary"
-                        size="sm"
-                        loading={savingProjectId === selectedProject.id}
-                        disabled={savingProjectId === selectedProject.id}
-                      >
-                        <Save size={13} />
-                        <span>Save Project</span>
-                      </Button>
+                      <div className="workspace-team-projects-page__actions-left">
+                        <Button
+                          type="submit"
+                          variant="primary"
+                          size="sm"
+                          loading={savingProjectId === selectedProject.id}
+                          disabled={savingProjectId === selectedProject.id || deletingProjectId === selectedProject.id}
+                        >
+                          <Save size={13} />
+                          <span>Save Project</span>
+                        </Button>
 
-                      <Button type="button" variant="secondary" size="sm" onClick={handleResetDraft}>
-                        Reset
-                      </Button>
+                        <Button type="button" variant="secondary" size="sm" onClick={handleResetDraft} disabled={savingProjectId === selectedProject.id || deletingProjectId === selectedProject.id}>
+                          Reset
+                        </Button>
+                      </div>
+
+                      {onDeleteProject && (
+                        <div className="workspace-team-projects-page__actions-right" style={{ marginLeft: 'auto' }}>
+                          <Button
+                            type="button"
+                            variant="danger"
+                            size="sm"
+                            loading={deletingProjectId === selectedProject.id}
+                            disabled={savingProjectId === selectedProject.id || deletingProjectId === selectedProject.id}
+                            onClick={handleDeleteProject}
+                          >
+                            <Trash size={13} />
+                            <span>Delete</span>
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </form>
                 </>
@@ -448,14 +521,39 @@ export function WorkspaceTeamProjectsPage({
         )}
       </div>
 
-      {isCreateModalOpen ? (
+      {isCreateModalOpen && (
         <ProjectCreateOverlay
           loading={projectCreateLoading}
           errorMessage={projectCreateError}
           onClose={() => setIsCreateModalOpen(false)}
           onSubmitProject={handleCreateProject}
         />
-      ) : null}
+      )}
+
+      {isDeleteModalOpen && selectedProject && (
+        <Modal
+          isOpen={isDeleteModalOpen}
+          onClose={() => setIsDeleteModalOpen(false)}
+          title="Delete Project"
+        >
+          <div style={{ padding: '16px 20px', color: 'var(--color-text-secondary)', fontSize: '14px', lineHeight: 1.5 }}>
+            <p>
+              Are you sure you want to delete the project <strong>{selectedProject.name}</strong>?
+            </p>
+            <p style={{ marginTop: 8 }}>
+              This action is permanent and will delete all associated tickets and comments.
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px' }}>
+              <Button variant="secondary" onClick={() => setIsDeleteModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button variant="danger" onClick={handleConfirmDelete}>
+                Delete Project
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
