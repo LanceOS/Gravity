@@ -176,8 +176,8 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
   const dependencyTicketIds = useMemo(() => new Set(dependencyLinks.map((dependency) => dependency.id)), [dependencyLinks]);
   const blockerTicketIds = useMemo(() => new Set(blockerLinks.map((blocker) => blocker.id)), [blockerLinks]);
   const relatedTicketIds = useMemo(() => {
-    return new Set([...dependencyTicketIds, ...blockerTicketIds]);
-  }, [dependencyTicketIds, blockerTicketIds]);
+    return new Set(activeTicketDetail?.relatedTicketIds || []);
+  }, [activeTicketDetail?.relatedTicketIds]);
   const isCompatibleRelationCandidate = useCallback((ticketId: string) => {
     return ticketId !== activeTicket.id && !relatedTicketIds.has(ticketId);
   }, [activeTicket.id, relatedTicketIds]);

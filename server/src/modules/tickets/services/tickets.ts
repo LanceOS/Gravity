@@ -109,6 +109,32 @@ function mapRelatedTicket(record: RelatedTicketRecord) {
   };
 }
 
+function collectRelatedTicketIds({
+  dependencies,
+  blockers,
+  blockedTicket,
+}: {
+  dependencies: Array<ReturnType<typeof mapRelatedTicket>>;
+  blockers: Array<ReturnType<typeof mapRelatedTicket>>;
+  blockedTicket: ReturnType<typeof mapRelatedTicket> | null;
+}) {
+  const relatedTicketIds = new Set<string>();
+
+  for (const dependency of dependencies) {
+    relatedTicketIds.add(dependency.id);
+  }
+
+  for (const blocker of blockers) {
+    relatedTicketIds.add(blocker.id);
+  }
+
+  if (blockedTicket) {
+    relatedTicketIds.add(blockedTicket.id);
+  }
+
+  return Array.from(relatedTicketIds);
+}
+
 async function getProjectScope(projectId: string) {
   const rows = await db
     .select({
@@ -330,6 +356,11 @@ export async function getTicketRelationsByKey(ticketKey: string) {
     blockedTicket,
     dependencies: dependenciesResult,
     blockers: blockersResult,
+    relatedTicketIds: collectRelatedTicketIds({
+      dependencies: dependenciesResult,
+      blockers: blockersResult,
+      blockedTicket,
+    }),
   };
 }
 
@@ -565,6 +596,11 @@ export async function getTicketDetails(ticketId: string, projectId?: string) {
     blockedTicket,
     dependencies,
     blockers,
+    relatedTicketIds: collectRelatedTicketIds({
+      dependencies,
+      blockers,
+      blockedTicket,
+    }),
   };
 }
 

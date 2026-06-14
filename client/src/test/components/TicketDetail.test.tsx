@@ -10,6 +10,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { TicketDetail } from '../../modules/tickets/components/TicketDetail/TicketDetail';
+import type { Ticket } from '../../types/domain';
 
 type MockButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   children?: ReactNode;
@@ -334,12 +335,41 @@ const defaultContextTickets = [
   blockerSearchTicket,
 ];
 
+function withRelatedTicketIds(ticket: Ticket): Ticket {
+  const relatedTicketIds = new Set<string>();
+
+  for (const dependency of ticket.dependencies || []) {
+    if (dependency?.id) {
+      relatedTicketIds.add(dependency.id);
+    }
+  }
+
+  for (const blocker of ticket.blockers || []) {
+    if (blocker?.id) {
+      relatedTicketIds.add(blocker.id);
+    }
+  }
+
+  if (ticket.blockedTicket?.id) {
+    relatedTicketIds.add(ticket.blockedTicket.id);
+  }
+
+  return {
+    ...ticket,
+    relatedTicketIds: Array.from(relatedTicketIds),
+  };
+}
+
 function renderTicketDetail(overrides: Partial<Parameters<typeof TicketDetail>[0]> = {}, contextTickets = defaultContextTickets) {
   mockTickets = contextTickets;
+  const activeTicketDetail = overrides.activeTicketDetail ? withRelatedTicketIds(overrides.activeTicketDetail) : overrides.activeTicketDetail ?? null;
+  const normalizedOverrides = {
+    ...overrides,
+    activeTicketDetail,
+  };
 
   const props = {
     activeTicket,
-    activeTicketDetail: null,
     comments,
     subtasks: [subtaskOne, subtaskTwo],
     availableTickets: contextTickets,
@@ -361,7 +391,7 @@ function renderTicketDetail(overrides: Partial<Parameters<typeof TicketDetail>[0
     onRemoveDependency: vi.fn().mockResolvedValue(true),
     onAddBlocker: vi.fn().mockResolvedValue(true),
     onRemoveBlocker: vi.fn().mockResolvedValue(true),
-    ...overrides,
+    ...normalizedOverrides,
   };
 
   return {

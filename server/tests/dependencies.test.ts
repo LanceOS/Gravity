@@ -126,6 +126,7 @@ describe('ticket relationship routes', () => {
       expect.objectContaining({ id: t3.id, key: t3.key, title: t3.title }),
       expect.objectContaining({ id: t4.id, key: t4.key, title: t4.title }),
     ]));
+    expect(relationSnapshotResponse.body.relatedTicketIds).toEqual(expect.arrayContaining([t2.id, t3.id, t4.id]));
 
     const t3DetailsAfterAdd = await ownerApi
       .get(`/api/v1/tickets/${t3.id}`)

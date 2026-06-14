@@ -62,10 +62,11 @@ type CreateTicketInput = {
 
 type TicketRelation = NonNullable<Ticket['dependencies']>[number];
 type TicketRelationKey = 'dependencies' | 'blockers';
+type TicketDetailQueryKey = ReturnType<typeof queryKeys.ticketDetail>;
 
 type TicketRelationMutationContext = {
-  ticketDetailKey: readonly ['ticket-detail', string];
-  relatedDetailKey: readonly ['ticket-detail', string];
+  ticketDetailKey: TicketDetailQueryKey;
+  relatedDetailKey: TicketDetailQueryKey;
   previousTicketDetail: Ticket | undefined;
   previousRelatedDetail: Ticket | undefined;
   hadTicketDetail: boolean;
@@ -140,10 +141,6 @@ function canonicalizeStatus(status: string | undefined | null): Ticket['status']
 }
 
 const TICKET_UPDATE_DEBOUNCE_MS = 250;
-
-function ticketDetailQueryKey(ticketId: string) {
-  return ['ticket-detail', ticketId] as const;
-}
 
 function toTicketRelation(ticket: Pick<Ticket, 'id' | 'key' | 'title' | 'projectId'>): TicketRelation {
   return {
@@ -356,7 +353,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Active Ticket Detail (includes dependency and blocker relations)
   const activeTicketDetailQuery = useQuery({
-    queryKey: ticketDetailQueryKey(activeTicketId || ''),
+    queryKey: queryKeys.ticketDetail(activeTicketId || ''),
     queryFn: () => apiClient.get<Ticket>(`/tickets/${activeTicketId}`, { projectId: activeTicketProjectId }),
     enabled: !!activeTicketId && !!activeTicketProjectId && !!currentUser,
     ...CACHE_CONFIGS.ticketDetail,
@@ -869,7 +866,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return matchingTicket;
     }
 
-    const ticketDetails = queryClient.getQueriesData<Ticket>({ queryKey: ['ticket-detail'] });
+    const ticketDetails = queryClient.getQueriesData<Ticket>({ queryKey: queryKeys.ticketDetails() });
     for (const [, cachedTicket] of ticketDetails) {
       if (cachedTicket?.id === ticketId) {
         return cachedTicket;
@@ -902,7 +899,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [findTicketInCache]);
 
   const hasCachedTicketRelation = useCallback((ticketId: string, relationKey: TicketRelationKey, relatedTicketId: string) => {
-    const cachedDetail = queryClient.getQueryData<Ticket>(ticketDetailQueryKey(ticketId));
+    const cachedDetail = queryClient.getQueryData<Ticket>(queryKeys.ticketDetail(ticketId));
     return Boolean(cachedDetail?.[relationKey]?.some((relation) => relation.id === relatedTicketId));
   }, [queryClient]);
 
@@ -919,7 +916,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, []);
 
   const restoreTicketDetailSnapshot = useCallback((
-    queryKey: readonly ['ticket-detail', string],
+    queryKey: TicketDetailQueryKey,
     hadSnapshot: boolean,
     snapshot: Ticket | undefined
   ) => {
@@ -944,8 +941,8 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     reciprocalRelationKey: TicketRelationKey;
     action: 'add' | 'remove';
   }): Promise<TicketRelationMutationContext> => {
-    const ticketDetailKey = ticketDetailQueryKey(ticketId);
-    const relatedDetailKey = ticketDetailQueryKey(relatedTicketId);
+    const ticketDetailKey = queryKeys.ticketDetail(ticketId);
+    const relatedDetailKey = queryKeys.ticketDetail(relatedTicketId);
 
     await Promise.all([
       queryClient.cancelQueries({ queryKey: ticketDetailKey }),
