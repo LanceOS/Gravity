@@ -173,18 +173,58 @@ function removeTicketRelation(relations: TicketRelation[] | undefined, relatedTi
   return (relations ?? []).filter((relation) => relation.id !== relatedTicketId);
 }
 
+function collectRelatedTicketIds({
+  dependencies,
+  blockers,
+  blockedTicket,
+}: {
+  dependencies: TicketRelation[] | undefined;
+  blockers: TicketRelation[] | undefined;
+  blockedTicket: TicketRelation | null | undefined;
+}) {
+  const relatedTicketIds = new Set<string>();
+
+  for (const dependency of dependencies ?? []) {
+    relatedTicketIds.add(dependency.id);
+  }
+
+  for (const blocker of blockers ?? []) {
+    relatedTicketIds.add(blocker.id);
+  }
+
+  if (blockedTicket) {
+    relatedTicketIds.add(blockedTicket.id);
+  }
+
+  return Array.from(relatedTicketIds);
+}
+
 function patchTicketRelation(
   ticket: Ticket,
   relationKey: TicketRelationKey,
   relatedTicket: TicketRelation,
   action: 'add' | 'remove'
 ): Ticket {
-  return {
+  const nextTicket = {
     ...ticket,
     [relationKey]:
       action === 'add'
         ? addTicketRelation(ticket[relationKey], relatedTicket)
         : removeTicketRelation(ticket[relationKey], relatedTicket.id),
+  };
+
+  const blockedTicket = relationKey === 'blockers'
+    ? nextTicket.blockers?.[0] ?? null
+    : nextTicket.blockedTicket ?? null;
+
+  return {
+    ...nextTicket,
+    blockedTicket,
+    relatedTicketIds: collectRelatedTicketIds({
+      dependencies: nextTicket.dependencies,
+      blockers: nextTicket.blockers,
+      blockedTicket,
+    }),
   };
 }
 
