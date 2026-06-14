@@ -145,23 +145,27 @@ export const TicketContextMenu: React.FC<TicketContextMenuProps> = ({ ticket, ch
       <ContextMenu.Item icon={<Folder size={13} style={{ color: 'var(--color-text-disabled)' }} />}>
         Move to Project
         <ContextMenu.SubMenu>
-          {projects.map((p) => {
-            const isActive = ticket.projectId === p.id;
-            return (
-              <ContextMenu.Item
-                key={p.id}
-                icon={isActive ? <Check size={12} style={{ color: 'var(--color-primary)' }} /> : <div style={{ width: 12 }} />}
-                onClick={async () => {
-                  if (!isActive) {
-                    await updateTicket(ticket.id, { projectId: p.id });
-                    toast.show(`Moved to project ${p.name}`, 'success');
-                  }
-                }}
-              >
-                {p.name}
-              </ContextMenu.Item>
-            );
-          })}
+          {projects.length === 0 ? (
+            <ContextMenu.Item disabled>No projects available</ContextMenu.Item>
+          ) : (
+            projects.map((p) => {
+              const isActive = ticket.projectId === p.id;
+              return (
+                <ContextMenu.Item
+                  key={p.id}
+                  icon={isActive ? <Check size={12} style={{ color: 'var(--color-primary)' }} /> : <div style={{ width: 12 }} />}
+                  onClick={async () => {
+                    if (!isActive) {
+                      await updateTicket(ticket.id, { projectId: p.id });
+                      toast.show(`Moved to project ${p.name}`, 'success');
+                    }
+                  }}
+                >
+                  {p.name}
+                </ContextMenu.Item>
+              );
+            })
+          )}
         </ContextMenu.SubMenu>
       </ContextMenu.Item>
 

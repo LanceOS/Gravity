@@ -11,6 +11,7 @@ import {
   hasActiveTicketFilters,
   sortTicketsForList,
 } from '../../modules/tickets/utils/ticketView';
+import { getStatusColor, getPriorityIcon } from '../../modules/tickets/utils/TicketList';
 import { WorkspaceHeader } from '../../modules/workspaces';
 import { WorkspaceViewContainer } from '../../components/WorkspaceViewContainer';
 import { QueryErrorResetBoundary } from '@tanstack/react-query';
@@ -329,7 +330,12 @@ export function WorkspacePage({
                             {Object.entries(STATUS_LABELS).map(([value, label]) => (
                               <ContextMenu.Item
                                 key={value}
-                                icon={filters.status === value ? <Check size={12} style={{ color: 'var(--color-primary)' }} /> : <div style={{ width: 12 }} />}
+                                icon={
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    {filters.status === value ? <Check size={12} style={{ color: 'var(--color-primary)' }} /> : <div style={{ width: 12 }} />}
+                                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: getStatusColor(value as Ticket['status']) }} />
+                                  </div>
+                                }
                                 onClick={() => onSetFilters({ ...filters, status: filters.status === value ? '' : value as Ticket['status'] })}
                               >
                                 {label}
@@ -343,7 +349,12 @@ export function WorkspacePage({
                             {Object.entries(PRIORITY_LABELS).map(([value, label]) => (
                               <ContextMenu.Item
                                 key={value}
-                                icon={filters.priority === value ? <Check size={12} style={{ color: 'var(--color-primary)' }} /> : <div style={{ width: 12 }} />}
+                                icon={
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    {filters.priority === value ? <Check size={12} style={{ color: 'var(--color-primary)' }} /> : <div style={{ width: 12 }} />}
+                                    {getPriorityIcon(value as Ticket['priority'])}
+                                  </div>
+                                }
                                 onClick={() => onSetFilters({ ...filters, priority: filters.priority === value ? '' : value as Ticket['priority'] })}
                               >
                                 {label}
@@ -354,43 +365,71 @@ export function WorkspacePage({
                         <ContextMenu.Item icon={<UserIcon size={14} />}>
                           Assignee
                           <ContextMenu.SubMenu>
-                            {users.map(u => (
-                              <ContextMenu.Item
-                                key={u.id}
-                                icon={filters.assigneeId === u.id ? <Check size={12} style={{ color: 'var(--color-primary)' }} /> : <div style={{ width: 12 }} />}
-                                onClick={() => onSetFilters({ ...filters, assigneeId: filters.assigneeId === u.id ? '' : u.id })}
-                              >
-                                {u.name}
-                              </ContextMenu.Item>
-                            ))}
+                            {users.length === 0 ? (
+                              <ContextMenu.Item disabled>No Assignees</ContextMenu.Item>
+                            ) : (
+                              users.map(u => (
+                                <ContextMenu.Item
+                                  key={u.id}
+                                  icon={
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                      {filters.assigneeId === u.id ? <Check size={12} style={{ color: 'var(--color-primary)' }} /> : <div style={{ width: 12 }} />}
+                                      {u.avatar && (
+                                        <img
+                                          src={u.avatar}
+                                          alt=""
+                                          style={{ width: '14px', height: '14px', borderRadius: '50%', objectFit: 'cover' }}
+                                        />
+                                      )}
+                                    </div>
+                                  }
+                                  onClick={() => onSetFilters({ ...filters, assigneeId: filters.assigneeId === u.id ? '' : u.id })}
+                                >
+                                  {u.name}
+                                </ContextMenu.Item>
+                              ))
+                            )}
                           </ContextMenu.SubMenu>
                         </ContextMenu.Item>
                         <ContextMenu.Item icon={<Tag size={14} />}>
                           Label
                           <ContextMenu.SubMenu>
-                            {labels.map(l => (
-                              <ContextMenu.Item
-                                key={l.id}
-                                icon={filters.labelId === l.id ? <Check size={12} style={{ color: 'var(--color-primary)' }} /> : <div style={{ width: 12 }} />}
-                                onClick={() => onSetFilters({ ...filters, labelId: filters.labelId === l.id ? '' : l.id })}
-                              >
-                                {l.name}
-                              </ContextMenu.Item>
-                            ))}
+                            {labels.length === 0 ? (
+                              <ContextMenu.Item disabled>No Labels</ContextMenu.Item>
+                            ) : (
+                              labels.map(l => (
+                                <ContextMenu.Item
+                                  key={l.id}
+                                  icon={
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                      {filters.labelId === l.id ? <Check size={12} style={{ color: 'var(--color-primary)' }} /> : <div style={{ width: 12 }} />}
+                                      <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: l.color || '#6B7280' }} />
+                                    </div>
+                                  }
+                                  onClick={() => onSetFilters({ ...filters, labelId: filters.labelId === l.id ? '' : l.id })}
+                                >
+                                  {l.name}
+                                </ContextMenu.Item>
+                              ))
+                            )}
                           </ContextMenu.SubMenu>
                         </ContextMenu.Item>
                         <ContextMenu.Item icon={<Calendar size={14} />}>
                           Cycle
                           <ContextMenu.SubMenu>
-                            {cycles.map(c => (
-                              <ContextMenu.Item
-                                key={c.id}
-                                icon={filters.cycleId === c.id ? <Check size={12} style={{ color: 'var(--color-primary)' }} /> : <div style={{ width: 12 }} />}
-                                onClick={() => onSetFilters({ ...filters, cycleId: filters.cycleId === c.id ? '' : c.id })}
-                              >
-                                {c.name}
-                              </ContextMenu.Item>
-                            ))}
+                            {cycles.length === 0 ? (
+                              <ContextMenu.Item disabled>No Cycles</ContextMenu.Item>
+                            ) : (
+                              cycles.map(c => (
+                                <ContextMenu.Item
+                                  key={c.id}
+                                  icon={filters.cycleId === c.id ? <Check size={12} style={{ color: 'var(--color-primary)' }} /> : <div style={{ width: 12 }} />}
+                                  onClick={() => onSetFilters({ ...filters, cycleId: filters.cycleId === c.id ? '' : c.id })}
+                                >
+                                  {c.name}
+                                </ContextMenu.Item>
+                              ))
+                            )}
                           </ContextMenu.SubMenu>
                         </ContextMenu.Item>
                       </ContextMenu.SubMenu>
