@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, asc, eq, sql } from 'drizzle-orm';
 import { db } from '../../db/index.js';
 import { noteMetadata } from './schema.js';
 import { RustFS } from '../../lib/rustfs.js';
@@ -62,7 +62,8 @@ export class MetadataRepository {
     projectId: string,
     userId: string,
     limit: number = 20,
-    offset: number = 0
+    offset: number = 0,
+    sortDirection: 'desc' | 'asc' = 'desc'
   ): Promise<NoteListItem[]> {
     return await db
       .select({
@@ -75,7 +76,7 @@ export class MetadataRepository {
       })
       .from(noteMetadata)
       .where(and(eq(noteMetadata.projectId, projectId), eq(noteMetadata.userId, userId)))
-      .orderBy(desc(noteMetadata.updatedAt))
+      .orderBy(sortDirection === 'desc' ? desc(noteMetadata.updatedAt) : asc(noteMetadata.updatedAt))
       .limit(limit)
       .offset(offset);
   }
@@ -88,7 +89,8 @@ export class MetadataRepository {
     userId: string,
     query: string,
     limit: number = 20,
-    offset: number = 0
+    offset: number = 0,
+    sortDirection: 'desc' | 'asc' = 'desc'
   ): Promise<NoteListItem[]> {
     const useSearchVector = typeof env.databaseUrl === 'string' && !env.databaseUrl.startsWith('pgmem://');
 
@@ -137,7 +139,7 @@ export class MetadataRepository {
           sql`(${noteMetadata.title} ILIKE ${likeQuery} OR ${noteMetadata.excerpt} ILIKE ${likeQuery})`
         )
       )
-      .orderBy(desc(noteMetadata.updatedAt))
+      .orderBy(sortDirection === 'desc' ? desc(noteMetadata.updatedAt) : asc(noteMetadata.updatedAt))
       .limit(limit)
       .offset(offset);
   }

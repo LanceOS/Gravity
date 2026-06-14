@@ -176,12 +176,12 @@ export async function deleteNote(noteId: string, projectId: string) {
   return true;
 }
 
-export async function listNotes(projectId: string, userId: string, limit: number = 50, offset: number = 0) {
-  return await MetadataRepository.listNotesMetadata(projectId, userId, limit, offset);
+export async function listNotes(projectId: string, userId: string, limit: number = 50, offset: number = 0, sortDirection: 'desc' | 'asc' = 'desc') {
+  return await MetadataRepository.listNotesMetadata(projectId, userId, limit, offset, sortDirection);
 }
 
-export async function searchNotes(projectId: string, userId: string, query: string, limit: number = 50, offset: number = 0) {
-  return await MetadataRepository.searchNotesMetadata(projectId, userId, query, limit, offset);
+export async function searchNotes(projectId: string, userId: string, query: string, limit: number = 50, offset: number = 0, sortDirection: 'desc' | 'asc' = 'desc') {
+  return await MetadataRepository.searchNotesMetadata(projectId, userId, query, limit, offset, sortDirection);
 }
 
 export async function cleanupNoteMedia(noteId: string, projectId: string) {

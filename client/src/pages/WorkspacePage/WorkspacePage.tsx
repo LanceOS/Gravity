@@ -16,7 +16,7 @@ import { WorkspaceHeader } from '../../modules/workspaces';
 import { WorkspaceViewContainer } from '../../components/WorkspaceViewContainer';
 import { QueryErrorResetBoundary } from '@tanstack/react-query';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
-import { Plus, Filter, Activity, Check, User as UserIcon, Tag, Calendar } from 'lucide-react';
+import { Plus, Filter, Activity, Check, User as UserIcon, Tag, Calendar, ArrowDown, ArrowUp } from 'lucide-react';
 import './WorkspacePage.css';
 
 export type WorkspaceIssueView = 'board' | 'list' | 'timeline';
@@ -119,6 +119,7 @@ export function WorkspacePage({
   onUpdateTicket,
 }: WorkspacePageProps) {
   const [activeNoteTitle, setActiveNoteTitle] = useState('');
+  const [notesSort, setNotesSort] = useState<'desc' | 'asc'>('desc');
   const labels = labelItems ?? domainItems ?? [];
   const filteredTickets = useMemo(() => filterTickets(tickets, filters), [tickets, filters]);
   const hasFiltersApplied = useMemo(() => hasActiveTicketFilters(filters), [filters]);
@@ -435,6 +436,29 @@ export function WorkspacePage({
                       </ContextMenu.SubMenu>
                     </ContextMenu.Item>
                   </>
+                ) : activeContext === 'notes' && !activeNoteId ? (
+                  <>
+                    <ContextMenu.Item icon={<Plus size={14} />} onClick={handleCreateNote}>
+                      Create New Note
+                    </ContextMenu.Item>
+                    <ContextMenu.Item icon={<Filter size={14} />}>
+                      Filter By
+                      <ContextMenu.SubMenu>
+                        <ContextMenu.Item
+                          icon={notesSort === 'desc' ? <Check size={12} style={{ color: 'var(--color-primary)' }} /> : <ArrowDown size={14} />}
+                          onClick={() => setNotesSort('desc')}
+                        >
+                          Newest
+                        </ContextMenu.Item>
+                        <ContextMenu.Item
+                          icon={notesSort === 'asc' ? <Check size={12} style={{ color: 'var(--color-primary)' }} /> : <ArrowUp size={14} />}
+                          onClick={() => setNotesSort('asc')}
+                        >
+                          Oldest
+                        </ContextMenu.Item>
+                      </ContextMenu.SubMenu>
+                    </ContextMenu.Item>
+                  </>
                 ) : null
               }
             >
@@ -448,7 +472,7 @@ export function WorkspacePage({
                           {activeNoteId ? (
                             <NoteEditor projectId={filters.projectId || ''} noteId={activeNoteId} onTitleChange={setActiveNoteTitle} />
                           ) : (
-                            <NotesList projectId={filters.projectId || ''} onSelectNote={onSelectNote || (() => { })} />
+                            <NotesList projectId={filters.projectId || ''} onSelectNote={onSelectNote || (() => { })} sortDirection={notesSort} />
                           )}
                         </WorkspaceViewContainer>
                       </ErrorBoundary>

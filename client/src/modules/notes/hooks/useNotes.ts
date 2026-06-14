@@ -2,13 +2,13 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import { queryKeys } from '../../../utils/queryClient';
 import type { NoteMetadata } from '../types';
 
-export function useNotes(projectId: string) {
+export function useNotes(projectId: string, sortDirection: 'desc' | 'asc' = 'desc') {
   const limit = 20;
 
   const query = useInfiniteQuery<NoteMetadata[]>({
-    queryKey: queryKeys.notes(projectId),
+    queryKey: [...queryKeys.notes(projectId), sortDirection],
     queryFn: async ({ pageParam = 0 }) => {
-      const response = await fetch(`/api/v1/notes?limit=${limit}&offset=${pageParam}`, {
+      const response = await fetch(`/api/v1/notes?limit=${limit}&offset=${pageParam}&sort=${sortDirection}`, {
         headers: {
           'x-project-id': projectId,
         },
