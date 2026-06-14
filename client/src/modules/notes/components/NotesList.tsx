@@ -1,4 +1,4 @@
-import { Button } from '@library';
+import { Button, Skeleton } from '@library';
 import { useNotes } from '../hooks/useNotes';
 import './NotesList.css';
 
@@ -12,7 +12,18 @@ export function NotesList({ projectId, onSelectNote, sortDirection = 'desc' }: N
   const { notes, loading, error, hasMore, loadMore } = useNotes(projectId, sortDirection);
 
   if (loading && notes.length === 0) {
-    return <div className="notes-list__empty">Loading notes...</div>;
+    return (
+      <div className="notes-list">
+        <div className="notes-list__items">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="notes-list__item" style={{ cursor: 'default' }}>
+              <Skeleton variant="text" width="60%" height={18} />
+              <Skeleton variant="text" width={80} height={14} style={{ marginLeft: 'auto' }} />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   }
 
   if (error && notes.length === 0) {

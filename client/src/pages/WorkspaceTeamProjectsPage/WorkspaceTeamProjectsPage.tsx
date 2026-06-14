@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, FolderKanban, Save, Sparkles, Trash } from 'lucide-react';
-import { Button, TextInput, Textarea, Modal } from '@library';
+import { Button, TextInput, Textarea, Modal, Skeleton } from '@library';
 import { WorkspaceHeader } from '../../modules/workspaces';
 import { ProjectCreateOverlay } from '../../modules/workspaces/components/ProjectCreateOverlay';
 import { PROJECT_LIFECYCLE_OPTIONS, PROJECT_STATUS_LABELS, sanitizeProjectKey } from '../../modules/workspaces/utils/WorkspaceProjectPanel';
@@ -360,7 +360,24 @@ export function WorkspaceTeamProjectsPage({
         ) : null}
 
         {loading ? (
-          <div className="workspace-team-projects-page__empty-shell">Loading team projects...</div>
+          <div className="workspace-team-projects-page__layout">
+            <div className="workspace-team-projects-page__projects-card" style={{ padding: 'var(--space-lg) var(--space-md)' }}>
+              <Skeleton variant="text" width="40%" height={20} style={{ marginBottom: 'var(--space-md)' }} />
+              <div className="workspace-team-projects-page__project-list">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="workspace-team-projects-page__project-card" style={{ cursor: 'default' }}>
+                    <Skeleton variant="text" width="30%" height={14} style={{ marginBottom: 'var(--space-xs)' }} />
+                    <Skeleton variant="text" width="60%" height={18} />
+                    <Skeleton variant="text" width="80%" height={12} />
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="workspace-team-projects-page__editor-card" style={{ padding: 'var(--space-md)' }}>
+              <Skeleton variant="text" width="30%" height={20} style={{ marginBottom: 'var(--space-md)' }} />
+              <Skeleton variant="rect" width="100%" height={150} />
+            </div>
+          </div>
         ) : (
           <div className="workspace-team-projects-page__layout">
             <section className="workspace-team-projects-page__projects-card" aria-label="Team projects">

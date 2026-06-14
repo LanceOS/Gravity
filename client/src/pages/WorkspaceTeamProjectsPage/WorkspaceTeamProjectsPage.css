@@ -9,8 +9,8 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding: 24px 28px 24px;
-  gap: 20px;
+  padding: var(--space-lg) var(--space-lg);
+  gap: var(--space-md);
 }
 
 .workspace-team-projects-page__hero,
@@ -42,8 +42,8 @@
   display: flex;
   align-items: stretch;
   justify-content: space-between;
-  gap: 20px;
-  padding: 16px 20px;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-md);
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-lg);
   background: var(--color-surface-card);
@@ -110,7 +110,7 @@
   padding: 4px 8px;
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-full);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--color-state-hover-overlay);
   color: var(--color-text-secondary);
   font-size: 11px;
   font-weight: 700;
@@ -124,7 +124,7 @@
   gap: 4px;
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--color-state-hover-overlay);
   color: var(--color-primary);
 }
 
@@ -149,22 +149,22 @@
 }
 
 .workspace-team-projects-page__feedback--success {
-  border: 1px solid rgba(16, 185, 129, 0.22);
-  background: rgba(16, 185, 129, 0.08);
-  color: #34d399;
+  border: 1px solid var(--color-success);
+  background: var(--color-success-light);
+  color: var(--color-text-success);
 }
 
 .workspace-team-projects-page__feedback--error {
-  border: 1px solid rgba(239, 68, 68, 0.22);
-  background: rgba(239, 68, 68, 0.08);
-  color: #f87171;
+  border: 1px solid var(--color-error);
+  background: var(--color-error-light);
+  color: var(--color-text-error);
 }
 
 .workspace-team-projects-page__layout {
   display: flex;
   flex-direction: column-reverse;
-  gap: 18px;
-  margin-top: 18px;
+  gap: var(--space-md);
+  margin-top: var(--space-md);
   flex: 1;
   min-height: 0;
 }
@@ -174,7 +174,7 @@
     display: grid;
     grid-template-columns: 340px 1fr;
     align-items: stretch;
-    gap: 24px;
+    gap: var(--space-lg);
     margin-top: 0;
   }
 }
@@ -193,41 +193,41 @@
 }
 
 .workspace-team-projects-page__projects-card {
-  padding: 24px 18px;
+  padding: var(--space-lg) var(--space-md);
 }
 
 .workspace-team-projects-page__editor-card {
-  padding: 18px;
+  padding: var(--space-md);
 }
 
 .workspace-team-projects-page__section-header {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  margin-bottom: 14px;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-sm);
   flex-shrink: 0;
 }
 
 .workspace-team-projects-page__project-list {
   display: grid;
   align-content: start;
-  gap: 12px;
+  gap: var(--space-sm);
   overflow-y: auto;
-  padding-right: 8px;
+  padding-right: var(--space-xs);
   flex: 1;
 }
 
 .workspace-team-projects-page__project-card {
   width: 100%;
   display: grid;
-  gap: 12px;
-  padding: 18px 14px;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--color-state-hover-overlay);
   text-align: left;
   cursor: pointer;
-  transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+  transition: border-color 0.18s ease, transform 0.18s ease, background-color 0.18s ease;
 }
 
 .workspace-team-projects-page__project-card:hover {
@@ -236,8 +236,7 @@
 
 .workspace-team-projects-page__project-card--active {
   border-color: var(--color-border-focus);
-  box-shadow: 0 0 0 1px var(--color-border-focus);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--color-state-selected-bg);
 }
 
 .workspace-team-projects-page__project-card-top,
@@ -269,23 +268,23 @@
 
 .workspace-team-projects-page__project-key {
   border: 1px solid var(--color-border-default);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--color-state-hover-overlay);
   color: var(--color-text-secondary);
 }
 
 .workspace-team-projects-page__project-status--planned {
-  background: rgba(234, 179, 8, 0.12);
-  color: #facc15;
+  background: var(--color-bg-warning);
+  color: var(--color-text-warning);
 }
 
 .workspace-team-projects-page__project-status--active {
-  background: rgba(16, 185, 129, 0.12);
-  color: #34d399;
+  background: var(--color-bg-success);
+  color: var(--color-text-success);
 }
 
 .workspace-team-projects-page__project-status--completed {
-  background: rgba(99, 102, 241, 0.12);
-  color: #818cf8;
+  background: var(--color-bg-info);
+  color: var(--color-text-info);
 }
 
 .workspace-team-projects-page__project-name {
@@ -361,7 +360,7 @@
 .workspace-team-projects-page input:focus,
 .workspace-team-projects-page textarea:focus {
   border-color: var(--color-border-focus);
-  box-shadow: 0 0 0 2px var(--color-state-focus-ring);
+  outline: 2px solid var(--color-state-focus-ring);
 }
 
 .workspace-team-projects-page__status-group {

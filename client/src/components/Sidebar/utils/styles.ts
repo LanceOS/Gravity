@@ -6,7 +6,7 @@ export const countBadgeStyle = (): CSSProperties => ({
   marginLeft: 'auto',
   fontSize: '10px',
   color: 'var(--color-text-disabled)',
-  background: 'rgba(255,255,255,0.03)',
+  background: 'var(--color-state-hover-overlay)',
   padding: '1px 5px',
   borderRadius: '4px',
 });
@@ -20,7 +20,7 @@ export const agentButtonStyle = (extras: CSSProperties = {}): CSSProperties => (
   borderRadius: '4px',
   fontSize: '11px',
   fontWeight: 500,
-  background: 'rgba(255,255,255,0.03)',
+  background: 'var(--color-state-hover-overlay)',
   border: '1px solid var(--color-border-default)',
   color: 'var(--color-text-primary)',
   textAlign: 'left',
@@ -37,6 +37,6 @@ export const dropdownItemStyle = (active: SidebarActiveArea | undefined, area?: 
   cursor: 'pointer',
   fontSize: '12px',
   color: area && active === area ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-  background: area && active === area ? 'rgba(59, 130, 246, 0.08)' : 'transparent',
-  border: area && active === area ? '1px solid rgba(59, 130, 246, 0.18)' : '1px solid transparent',
+  background: area && active === area ? 'var(--color-state-selected-bg)' : 'transparent',
+  border: area && active === area ? '1px solid var(--color-border-focus)' : '1px solid transparent',
 });

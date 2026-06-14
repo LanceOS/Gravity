@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, CalendarDays, FolderKanban, Save, Tags, Trash2, Users, Sparkles } from 'lucide-react';
-import { Button, Select, TextInput, Textarea, Modal } from '@library';
+import { Button, Select, TextInput, Textarea, Modal, Skeleton } from '@library';
 import { apiClient } from '../../utils/apiClient';
 import { WorkspaceHeader } from '../../modules/workspaces';
 import type { SidebarTeam, SidebarTree, Team } from '../../types/domain';
@@ -176,7 +176,7 @@ export function WorkspaceTeamsPage({
     if (!selectedTeam) {
       return;
     }
-    
+
     if (prevSelectedTeamIdRef.current !== selectedTeam.id) {
       setEditDraft({
         name: selectedTeam.name,
@@ -293,7 +293,7 @@ export function WorkspaceTeamsPage({
       description,
       color,
     }));
-    
+
     setFeedback({ type: 'success', message: 'Team updated.' });
     setSavingAction('');
 
@@ -434,7 +434,24 @@ export function WorkspaceTeamsPage({
         ) : null}
 
         {loading ? (
-          <div className="workspace-teams-page__empty-shell">Loading teams...</div>
+          <div className="workspace-teams-page__layout">
+            <div className="workspace-teams-page__teams-card" style={{ padding: 'var(--space-lg) var(--space-md)' }}>
+              <Skeleton variant="text" width="40%" height={20} style={{ marginBottom: 'var(--space-md)' }} />
+              <div className="workspace-teams-page__team-list">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="workspace-teams-page__team-card-item" style={{ cursor: 'default' }}>
+                    <Skeleton variant="text" width="50%" height={18} />
+                    <Skeleton variant="text" width="80%" height={14} />
+                    <Skeleton variant="text" width="60%" height={12} />
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="workspace-teams-page__editor-card" style={{ padding: 'var(--space-md)' }}>
+              <Skeleton variant="text" width="30%" height={20} style={{ marginBottom: 'var(--space-md)' }} />
+              <Skeleton variant="rect" width="100%" height={150} />
+            </div>
+          </div>
         ) : (
           <div className="workspace-teams-page__layout">
             <section className="workspace-teams-page__teams-card" aria-label="Teams roster">
@@ -590,21 +607,21 @@ export function WorkspaceTeamsPage({
                         </div>
 
                         {/* Danger Zone */}
-                         <div className="workspace-teams-page__danger-zone-wrapper">
-                           <span className="workspace-teams-page__danger-zone-title">Danger Zone</span>
-                           <div className="workspace-teams-page__danger-zone-content">
-                             <DangerZone
-                               selectedTeam={selectedTeam}
-                               sortedTeams={sortedTeams}
-                               reassignTeamById={reassignTeamById}
-                               savingAction={savingAction}
-                               onReassignChange={(teamId, reassignId) =>
-                                 setReassignTeamById((current) => ({ ...current, [teamId]: reassignId }))
-                               }
-                               onDelete={handleDeleteTeam}
-                             />
-                           </div>
-                         </div>
+                        <div className="workspace-teams-page__danger-zone-wrapper">
+                          <span className="workspace-teams-page__danger-zone-title">Danger Zone</span>
+                          <div className="workspace-teams-page__danger-zone-content">
+                            <DangerZone
+                              selectedTeam={selectedTeam}
+                              sortedTeams={sortedTeams}
+                              reassignTeamById={reassignTeamById}
+                              savingAction={savingAction}
+                              onReassignChange={(teamId, reassignId) =>
+                                setReassignTeamById((current) => ({ ...current, [teamId]: reassignId }))
+                              }
+                              onDelete={handleDeleteTeam}
+                            />
+                          </div>
+                        </div>
                       </div>
                     </div>
 

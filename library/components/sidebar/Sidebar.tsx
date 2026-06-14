@@ -132,7 +132,7 @@ export function SidebarItem({
     gap: '10px',
     borderRadius: '6px',
     color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-    background: active ? 'var(--color-border-default)' : isHovered ? 'rgba(255,255,255,0.03)' : 'transparent',
+    background: active ? 'var(--color-state-selected-bg)' : isHovered ? 'var(--color-state-hover-overlay)' : 'transparent',
     fontWeight: 400,
     cursor: 'pointer',
     border: 'none',
