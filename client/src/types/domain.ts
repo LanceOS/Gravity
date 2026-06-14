@@ -42,7 +42,6 @@ export interface SidebarTeam {
   views: SidebarView[];
   cycles: Cycle[];
   labels?: Label[];
-  domains: Domain[];
   projects: Project[];
 }
 

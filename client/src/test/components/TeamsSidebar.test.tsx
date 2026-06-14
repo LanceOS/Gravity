@@ -20,7 +20,6 @@ function buildSection(overrides: Partial<SidebarProjectSection> = {}): SidebarPr
         ],
         cycles: [],
         labels: [],
-        domains: [],
         projects: [
           {
             id: 'project-1',

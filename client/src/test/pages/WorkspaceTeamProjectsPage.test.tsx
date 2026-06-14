@@ -63,7 +63,7 @@ const team = {
   color: '#3B82F6',
   views: [],
   cycles: [],
-  domains: [],
+  labels: [],
   projects: [],
 };
 

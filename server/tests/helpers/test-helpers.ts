@@ -10,6 +10,7 @@ import {
   cycles,
   projectMembers,
   projects,
+  ticketLabels,
   tickets,
   userProfiles,
   workspaceInvites,
@@ -349,6 +350,7 @@ export async function seedTicket(
     priority: string;
     assigneeId: string | null;
     domainId: string | null;
+    labelIds: string[];
     cycleId: string | null;
     parentId: string | null;
     prStatus: string;
@@ -367,6 +369,7 @@ export async function seedTicket(
     priority: overrides.priority ?? 'medium',
     assigneeId: overrides.assigneeId ?? null,
     domainId: overrides.domainId ?? null,
+    labelIds: overrides.labelIds ?? [],
     cycleId: overrides.cycleId ?? null,
     parentId: overrides.parentId ?? null,
     prStatus: overrides.prStatus ?? 'none',
@@ -390,6 +393,15 @@ export async function seedTicket(
     createdAt: new Date(),
     updatedAt: new Date(),
   });
+
+  if (ticket.labelIds.length > 0) {
+    await db.insert(ticketLabels).values(
+      ticket.labelIds.map((labelId) => ({
+        ticketId: ticket.id,
+        labelId,
+      }))
+    );
+  }
 
   return ticket;
 }

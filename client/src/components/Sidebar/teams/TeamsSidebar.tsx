@@ -33,7 +33,7 @@ function resolveNavigationState(section: SidebarProjectSection): SidebarNavigati
     };
   }
 
-  if (section.activeLabelId ?? section.activeDomainId) {
+  if (section.activeLabelId) {
     return {
       activeTeam: section.activeTeamId ?? '',
       activeScope: 'labels',
@@ -106,7 +106,7 @@ export function TeamsSidebar({
           const teamCollapsed = getTeamCollapsedState(collapsedTeams, team.id, activeTeamId);
           const projectsCollapsed = teamContainsActiveProject ? false : (collapsedTeamProjects[team.id] ?? false);
           const configuredTeamViews = team.views?.filter((view) => view.id !== 'board' && view.type !== 'board') ?? [];
-          const teamLabels = team.labels ?? team.domains ?? [];
+          const teamLabels = team.labels ?? [];
           const teamViews = configuredTeamViews.length > 0
             ? configuredTeamViews
             : [{ id: 'all', name: 'All Tasks', type: 'all' }];
@@ -189,8 +189,8 @@ export function TeamsSidebar({
                           <SidebarItem
                             key={label.id}
                             nested
-                            active={isTeamActive && activeScope === 'labels' && (section.activeLabelId ?? section.activeDomainId) === label.id}
-                            onClick={() => (section.onSelectTeamLabel ?? section.onSelectDomain)?.(team.id, label.id)}
+                            active={isTeamActive && activeScope === 'labels' && section.activeLabelId === label.id}
+                            onClick={() => section.onSelectTeamLabel?.(team.id, label.id)}
                             leftIcon={
                               <div
                                 className="teams-sidebar__label-dot"
