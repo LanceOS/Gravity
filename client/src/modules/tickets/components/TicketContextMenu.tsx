@@ -1,4 +1,4 @@
-import React, { useContext } from 'react';
+import React, { useContext, useMemo } from 'react';
 import { TicketContext, type Ticket } from '../../../context/TicketContext';
 import { ContextMenu, toast } from '@library';
 import {
@@ -32,19 +32,23 @@ export const TicketContextMenu: React.FC<TicketContextMenuProps> = ({ ticket, ch
     labels,
     cycles,
     updateTicket,
+    moveTicket,
     deleteTicket,
     assignLabelToTicket,
     unassignLabelFromTicket,
   } = context;
 
-  // Filter labels belonging to the same project as the ticket
-  const ticketLabels = labels.filter((l) => l.projectId === ticket.projectId || !l.projectId);
+  const ticketLabels = useMemo(
+    () => labels.filter((l) => l.projectId === ticket.projectId || !l.projectId),
+    [labels, ticket.projectId]
+  );
 
-  // Filter projects belonging to the same workspace as the ticket's current project
-  const currentProject = projects.find((p) => p.id === ticket.projectId);
-  const workspaceProjects = currentProject?.workspaceId
-    ? projects.filter((p) => p.workspaceId === currentProject.workspaceId)
-    : projects;
+  const workspaceProjects = useMemo(() => {
+    const currentProject = projects.find((p) => p.id === ticket.projectId);
+    return currentProject?.workspaceId
+      ? projects.filter((p) => p.workspaceId === currentProject.workspaceId)
+      : projects;
+  }, [projects, ticket.projectId]);
 
   const menuContent = (
     <>
@@ -162,8 +166,10 @@ export const TicketContextMenu: React.FC<TicketContextMenuProps> = ({ ticket, ch
                   icon={isActive ? <Check size={12} style={{ color: 'var(--color-primary)' }} /> : <div style={{ width: 12 }} />}
                   onClick={async () => {
                     if (!isActive) {
-                      await updateTicket(ticket.id, { projectId: p.id });
-                      toast.show(`Moved to project ${p.name}`, 'success');
+                      const moved = await moveTicket(ticket.id, ticket.projectId, p.id);
+                      if (moved) {
+                        toast.show(`Moved to project ${p.name}`, 'success');
+                      }
                     }
                   }}
                 >

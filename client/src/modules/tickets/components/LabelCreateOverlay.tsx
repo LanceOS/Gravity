@@ -77,7 +77,7 @@ export function LabelCreateOverlay({
         <Button type="button" onClick={handleClose} disabled={loading}>
           Cancel
         </Button>
-        <Button type="submit" variant="primary" disabled={loading} onClick={() => void handleSubmit()}>
+        <Button type="submit" variant="primary" disabled={loading}>
           <Tag size={14} style={{ marginRight: '6px' }} />
           <span>{loading ? 'Creating Label...' : 'Create Label'}</span>
         </Button>

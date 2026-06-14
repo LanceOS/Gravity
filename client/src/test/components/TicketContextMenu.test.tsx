@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { TicketContextMenu } from '../../modules/tickets/components/TicketContextMenu';
@@ -8,10 +8,12 @@ const ticket: Ticket = {
   id: 'ticket-1',
   key: 'GRA-1',
   title: 'Test ticket',
+  description: '',
   status: 'todo',
   priority: 'low',
   projectId: 'project-1',
   assigneeId: null,
+  cycleId: null,
   parentId: null,
   prStatus: 'none',
   prUrl: null,
@@ -50,6 +52,7 @@ describe('TicketContextMenu', () => {
   it('filters projects by workspace for Move to Project', async () => {
     const user = userEvent.setup();
     const updateTicketMock = vi.fn();
+    const moveTicketMock = vi.fn();
 
     render(
       <TicketContext.Provider value={{
@@ -58,6 +61,7 @@ describe('TicketContextMenu', () => {
         cycles: [],
         users: [],
         updateTicket: updateTicketMock,
+        moveTicket: moveTicketMock,
         deleteTicket: vi.fn(),
         assignLabelToTicket: vi.fn(),
         unassignLabelFromTicket: vi.fn(),
@@ -80,6 +84,7 @@ describe('TicketContextMenu', () => {
     expect(screen.queryByText('Other Workspace Project')).not.toBeInTheDocument();
 
     await user.click(screen.getByText('Orbit Delivery'));
-    expect(updateTicketMock).toHaveBeenCalledWith('ticket-1', { projectId: 'project-2' });
+    expect(moveTicketMock).toHaveBeenCalledWith('ticket-1', 'project-1', 'project-2');
+    expect(updateTicketMock).not.toHaveBeenCalledWith('ticket-1', { projectId: 'project-2' });
   });
 });

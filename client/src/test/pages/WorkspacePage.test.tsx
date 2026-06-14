@@ -408,7 +408,15 @@ describe('WorkspacePage', () => {
       activeContext: 'notes',
       tickets: [],
       projects: [project],
-      filters: { projectId: 'project-1' },
+      filters: {
+        search: '',
+        priority: '',
+        status: '',
+        projectId: 'project-1',
+        labels: [],
+        cycleId: '',
+        assigneeId: '',
+      },
       onSelectNote,
     });
 

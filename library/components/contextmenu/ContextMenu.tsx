@@ -456,10 +456,12 @@ export function ContextMenuSubMenu({ children, parentItemRef, onClose }: Context
 
     if (e.key === 'ArrowDown') {
       e.preventDefault();
+      e.stopPropagation();
       const nextIndex = (currentIndex + 1) % itemsList.length;
       itemsList[nextIndex].focus();
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
+      e.stopPropagation();
       const prevIndex = (currentIndex - 1 + itemsList.length) % itemsList.length;
       itemsList[prevIndex].focus();
     }

@@ -11,12 +11,11 @@ import {
   hasActiveTicketFilters,
   sortTicketsForList,
 } from '../../modules/tickets/utils/ticketView';
-import { getStatusColor, getPriorityIcon } from '../../modules/tickets/utils/TicketList';
 import { WorkspaceHeader } from '../../modules/workspaces';
 import { WorkspaceViewContainer } from '../../components/WorkspaceViewContainer';
 import { QueryErrorResetBoundary } from '@tanstack/react-query';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
-import { Plus, Filter, Activity, Check, User as UserIcon, Tag, Calendar, ArrowDown, ArrowUp, FolderKanban } from 'lucide-react';
+import { WorkspacePageContextMenu } from './WorkspacePageContextMenu';
 import './WorkspacePage.css';
 
 export type WorkspaceIssueView = 'board' | 'list' | 'timeline';
@@ -317,167 +316,21 @@ export function WorkspacePage({
           <div className="workspace-page__issues-shell">
             <ContextMenu.Root
               content={
-                activeContext === 'issues' && !activeTicket ? (
-                  <>
-                    <ContextMenu.Item icon={<Plus size={14} />} onClick={() => onOpenCreateTicket()}>
-                      New Ticket
-                    </ContextMenu.Item>
-                    <ContextMenu.Item icon={<Filter size={14} />}>
-                      Filter By
-                      <ContextMenu.SubMenu>
-                        <ContextMenu.Item icon={<FolderKanban size={14} />}>
-                          Project
-                          <ContextMenu.SubMenu>
-                            {projects.length === 0 ? (
-                              <ContextMenu.Item disabled>No Projects</ContextMenu.Item>
-                            ) : (
-                              projects.map(p => (
-                                <ContextMenu.Item
-                                  key={p.id}
-                                  icon={filters.projectId === p.id ? <Check size={12} style={{ color: 'var(--color-primary)' }} /> : <div style={{ width: 12 }} />}
-                                  onClick={() => onSetFilters({ ...filters, projectId: filters.projectId === p.id ? '' : p.id })}
-                                >
-                                  {p.name}
-                                </ContextMenu.Item>
-                              ))
-                            )}
-                          </ContextMenu.SubMenu>
-                        </ContextMenu.Item>
-                        <ContextMenu.Item icon={<Activity size={14} />}>
-                          Status
-                          <ContextMenu.SubMenu>
-                            {Object.entries(STATUS_LABELS).map(([value, label]) => (
-                              <ContextMenu.Item
-                                key={value}
-                                icon={
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                    {filters.status === value ? <Check size={12} style={{ color: 'var(--color-primary)' }} /> : <div style={{ width: 12 }} />}
-                                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: getStatusColor(value as Ticket['status']) }} />
-                                  </div>
-                                }
-                                onClick={() => onSetFilters({ ...filters, status: filters.status === value ? '' : value as Ticket['status'] })}
-                              >
-                                {label}
-                              </ContextMenu.Item>
-                            ))}
-                          </ContextMenu.SubMenu>
-                        </ContextMenu.Item>
-                        <ContextMenu.Item icon={<Activity size={14} />}>
-                          Priority
-                          <ContextMenu.SubMenu>
-                            {Object.entries(PRIORITY_LABELS).map(([value, label]) => (
-                              <ContextMenu.Item
-                                key={value}
-                                icon={
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                    {filters.priority === value ? <Check size={12} style={{ color: 'var(--color-primary)' }} /> : <div style={{ width: 12 }} />}
-                                    {getPriorityIcon(value as Ticket['priority'])}
-                                  </div>
-                                }
-                                onClick={() => onSetFilters({ ...filters, priority: filters.priority === value ? '' : value as Ticket['priority'] })}
-                              >
-                                {label}
-                              </ContextMenu.Item>
-                            ))}
-                          </ContextMenu.SubMenu>
-                        </ContextMenu.Item>
-                        <ContextMenu.Item icon={<UserIcon size={14} />}>
-                          Assignee
-                          <ContextMenu.SubMenu>
-                            {users.length === 0 ? (
-                              <ContextMenu.Item disabled>No Assignees</ContextMenu.Item>
-                            ) : (
-                              users.map(u => (
-                                <ContextMenu.Item
-                                  key={u.id}
-                                  icon={
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                      {filters.assigneeId === u.id ? <Check size={12} style={{ color: 'var(--color-primary)' }} /> : <div style={{ width: 12 }} />}
-                                      {u.avatar && (
-                                        <img
-                                          src={u.avatar}
-                                          alt=""
-                                          style={{ width: '14px', height: '14px', borderRadius: '50%', objectFit: 'cover' }}
-                                        />
-                                      )}
-                                    </div>
-                                  }
-                                  onClick={() => onSetFilters({ ...filters, assigneeId: filters.assigneeId === u.id ? '' : u.id })}
-                                >
-                                  {u.name}
-                                </ContextMenu.Item>
-                              ))
-                            )}
-                          </ContextMenu.SubMenu>
-                        </ContextMenu.Item>
-                        <ContextMenu.Item icon={<Tag size={14} />}>
-                          Label
-                          <ContextMenu.SubMenu>
-                            {labels.length === 0 ? (
-                              <ContextMenu.Item disabled>No Labels</ContextMenu.Item>
-                            ) : (
-                              labels.map(l => (
-                                <ContextMenu.Item
-                                  key={l.id}
-                                  icon={
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                      {filters.labelId === l.id ? <Check size={12} style={{ color: 'var(--color-primary)' }} /> : <div style={{ width: 12 }} />}
-                                      <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: l.color || '#6B7280' }} />
-                                    </div>
-                                  }
-                                  onClick={() => onSetFilters({ ...filters, labelId: filters.labelId === l.id ? '' : l.id })}
-                                >
-                                  {l.name}
-                                </ContextMenu.Item>
-                              ))
-                            )}
-                          </ContextMenu.SubMenu>
-                        </ContextMenu.Item>
-                        <ContextMenu.Item icon={<Calendar size={14} />}>
-                          Cycle
-                          <ContextMenu.SubMenu>
-                            {cycles.length === 0 ? (
-                              <ContextMenu.Item disabled>No Cycles</ContextMenu.Item>
-                            ) : (
-                              cycles.map(c => (
-                                <ContextMenu.Item
-                                  key={c.id}
-                                  icon={filters.cycleId === c.id ? <Check size={12} style={{ color: 'var(--color-primary)' }} /> : <div style={{ width: 12 }} />}
-                                  onClick={() => onSetFilters({ ...filters, cycleId: filters.cycleId === c.id ? '' : c.id })}
-                                >
-                                  {c.name}
-                                </ContextMenu.Item>
-                              ))
-                            )}
-                          </ContextMenu.SubMenu>
-                        </ContextMenu.Item>
-                      </ContextMenu.SubMenu>
-                    </ContextMenu.Item>
-                  </>
-                ) : activeContext === 'notes' && !activeNoteId ? (
-                  <>
-                    <ContextMenu.Item icon={<Plus size={14} />} onClick={handleCreateNote}>
-                      Create New Note
-                    </ContextMenu.Item>
-                    <ContextMenu.Item icon={<Filter size={14} />}>
-                      Filter By
-                      <ContextMenu.SubMenu>
-                        <ContextMenu.Item
-                          icon={notesSort === 'desc' ? <Check size={12} style={{ color: 'var(--color-primary)' }} /> : <ArrowDown size={14} />}
-                          onClick={() => setNotesSort('desc')}
-                        >
-                          Newest
-                        </ContextMenu.Item>
-                        <ContextMenu.Item
-                          icon={notesSort === 'asc' ? <Check size={12} style={{ color: 'var(--color-primary)' }} /> : <ArrowUp size={14} />}
-                          onClick={() => setNotesSort('asc')}
-                        >
-                          Oldest
-                        </ContextMenu.Item>
-                      </ContextMenu.SubMenu>
-                    </ContextMenu.Item>
-                  </>
-                ) : null
+                <WorkspacePageContextMenu
+                  activeContext={activeContext}
+                  activeTicket={activeTicket}
+                  activeNoteId={activeNoteId}
+                  filters={filters}
+                  projects={projects}
+                  labels={labels}
+                  cycles={cycles}
+                  users={users}
+                  notesSort={notesSort}
+                  onOpenCreateTicket={onOpenCreateTicket}
+                  onCreateNote={handleCreateNote}
+                  onSetFilters={onSetFilters}
+                  setNotesSort={setNotesSort}
+                />
               }
             >
               <div className="workspace-page__issues-content">

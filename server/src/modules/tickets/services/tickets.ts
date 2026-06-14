@@ -93,14 +93,18 @@ function mapTicket(record: TicketRecord, labelRows: any[] = []) {
   };
 }
 
-async function getProjectTeamId(projectId: string) {
+async function getProjectScope(projectId: string) {
   const rows = await db
-    .select({ teamId: projects.teamId })
+    .select({
+      id: projects.id,
+      workspaceId: projects.workspaceId,
+      teamId: projects.teamId,
+    })
     .from(projects)
     .where(eq(projects.id, projectId))
     .limit(1);
 
-  return rows[0]?.teamId ?? null;
+  return rows[0] ?? null;
 }
 
 // Normalize status strings to canonical DB/application values.
@@ -528,35 +532,63 @@ export async function updateTicketRecord(
     prUrl: string | null;
     createdAt: Date;
     updatedAt: Date;
+    projectId: string;
   }>,
   projectId?: string,
 ) {
+  const existingRows = await db
+    .select()
+    .from(tickets)
+    .where(projectId ? and(eq(tickets.id, ticketId), eq(tickets.projectId, projectId)) : eq(tickets.id, ticketId))
+    .limit(1);
+  const existingTicket = existingRows[0];
+  if (!existingTicket) {
+    return null;
+  }
+
+  const sourceProject = await getProjectScope(existingTicket.projectId);
+  if (!sourceProject) {
+    throw new Error(`Project ${existingTicket.projectId} is missing.`);
+  }
+
+  const requestedProjectId = typeof updates.projectId === 'string' ? updates.projectId.trim() : '';
+  const isProjectMove = requestedProjectId.length > 0 && requestedProjectId !== existingTicket.projectId;
+  const targetProject = isProjectMove ? await getProjectScope(requestedProjectId) : sourceProject;
+  if (isProjectMove && !targetProject) {
+    throw new Error('TARGET_PROJECT_NOT_FOUND');
+  }
+  if (isProjectMove && targetProject.workspaceId !== sourceProject.workspaceId) {
+    throw new Error('TICKET_MOVE_CROSS_WORKSPACE');
+  }
+
+  const teamChanged = isProjectMove && targetProject.teamId !== sourceProject.teamId;
+  const nextCycleId = teamChanged ? null : updates.cycleId;
+  const nextLabelIds = teamChanged
+    ? []
+    : updates.labelIds !== undefined
+      ? [...new Set(updates.labelIds.filter(Boolean))]
+      : undefined;
+
   const payload = {
     ...(updates.title !== undefined ? { title: sanitizeTitle(updates.title as string) } : {}),
     ...(updates.description !== undefined ? { description: updates.description } : {}),
     ...(updates.status !== undefined ? { status: canonicalizeStatus(updates.status as string) } : {}),
     ...(updates.priority !== undefined ? { priority: canonicalizePriority(updates.priority as string) } : {}),
     ...(updates.assigneeId !== undefined ? { assigneeId: updates.assigneeId } : {}),
-    ...(updates.cycleId !== undefined ? { cycleId: updates.cycleId } : {}),
+    ...((updates.cycleId !== undefined || teamChanged) ? { cycleId: nextCycleId } : {}),
     ...(updates.parentId !== undefined ? { parentId: updates.parentId } : {}),
     ...(updates.prStatus !== undefined ? { prStatus: canonicalizePrStatus(updates.prStatus as string) } : {}),
     ...(updates.prUrl !== undefined ? { prUrl: updates.prUrl } : {}),
     ...(updates.createdAt !== undefined ? { createdAt: updates.createdAt } : {}),
+    ...(isProjectMove ? { projectId: targetProject.id } : {}),
     updatedAt: updates.updatedAt ?? new Date(),
   };
 
-  // If the title changed, regenerate the branch name using the existing ticket key
+  // If the title changed, regenerate the branch name using the existing ticket key.
   if (updates.title !== undefined) {
     const sanitizedTitle = sanitizeTitle(updates.title as string);
-    const keyRows = await db
-      .select({ key: tickets.key })
-      .from(tickets)
-      .where(projectId ? and(eq(tickets.id, ticketId), eq(tickets.projectId, projectId)) : eq(tickets.id, ticketId))
-      .limit(1);
-
-    const existingKey = keyRows[0]?.key;
-    if (existingKey) {
-      (payload as any).branchName = generateBranchName(existingKey, sanitizedTitle);
+    if (existingTicket.key) {
+      (payload as any).branchName = generateBranchName(existingTicket.key, sanitizedTitle);
     }
   }
 
@@ -571,18 +603,15 @@ export async function updateTicketRecord(
       return null;
     }
 
-    if (updates.labelIds !== undefined) {
-      const resolvedProjectId = projectId ?? rows[0]?.projectId;
-      const teamId = resolvedProjectId
-        ? await getProjectTeamId(resolvedProjectId)
-        : null;
+    if (updates.labelIds !== undefined || teamChanged) {
+      const labelIdsForTicket = nextLabelIds ?? [];
+      const teamId = targetProject.teamId;
 
-      if (!teamId && updates.labelIds.length > 0) {
+      if (!teamId && labelIdsForTicket.length > 0) {
         throw new Error('Unable to resolve the ticket team for label assignment.');
       }
 
-      const uniqueLabelIds = [...new Set(updates.labelIds.filter(Boolean))];
-      const resolvedLabels = uniqueLabelIds.length > 0
+      const resolvedLabels = labelIdsForTicket.length > 0
         ? await tx
             .select({
               id: labels.id,
@@ -593,10 +622,10 @@ export async function updateTicketRecord(
               sortOrder: labels.sortOrder,
             })
             .from(labels)
-            .where(and(eq(labels.teamId, teamId ?? ''), inArray(labels.id, uniqueLabelIds)))
+            .where(and(eq(labels.teamId, teamId ?? ''), inArray(labels.id, labelIdsForTicket)))
         : [];
 
-      if (teamId && uniqueLabelIds.length > 0 && resolvedLabels.length !== uniqueLabelIds.length) {
+      if (teamId && labelIdsForTicket.length > 0 && resolvedLabels.length !== labelIdsForTicket.length) {
         throw new Error('One or more labels were not found for this team.');
       }
 
