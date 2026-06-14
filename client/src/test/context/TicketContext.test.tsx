@@ -316,6 +316,8 @@ describe('TicketContext', () => {
       </TicketProvider>
     );
 
+    await user.click(await screen.findByRole('button', { name: 'Select project 1' }));
+
     await waitFor(() => {
       expect(screen.getByTestId('project-count')).toHaveTextContent('1');
       expect(screen.getByTestId('user-count')).toHaveTextContent('1');
