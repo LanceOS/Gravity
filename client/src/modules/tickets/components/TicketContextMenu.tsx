@@ -279,14 +279,14 @@ export const TicketContextMenu: React.FC<TicketContextMenuProps> = ({ ticket, ch
             <ContextMenu.SubMenu>
               <TicketAssignmentSubMenu
                 title="Assign as Dependency"
-                description="Choose the ticket that should depend on this ticket."
+                description="Choose the ticket this ticket should depend on."
                 searchPlaceholder="Type to search tickets..."
                 tickets={assignableTickets}
                 emptyStateLabel="No matching tickets"
                 onSelectTicket={async (selectedTicket) => {
                   const success = await addTicketDependency(ticket.id, selectedTicket.id);
                   if (success) {
-                    toast.show(`Assigned ${selectedTicket.key} as a dependency`, 'success');
+                    toast.show(`${ticket.key} now depends on ${selectedTicket.key}`, 'success');
                   } else {
                     toast.show(`Failed to assign ${selectedTicket.key} as a dependency`, 'error');
                   }
@@ -307,7 +307,7 @@ export const TicketContextMenu: React.FC<TicketContextMenuProps> = ({ ticket, ch
                 onSelectTicket={async (selectedTicket) => {
                   const success = await addTicketBlocker(ticket.id, selectedTicket.id);
                   if (success) {
-                    toast.show(`Assigned ${selectedTicket.key} as a blocker`, 'success');
+                    toast.show(`${selectedTicket.key} now blocks ${ticket.key}`, 'success');
                   } else {
                     toast.show(`Failed to assign ${selectedTicket.key} as a blocker`, 'error');
                   }
