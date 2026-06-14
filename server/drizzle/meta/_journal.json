@@ -50,6 +50,13 @@
       "when": 1781408422680,
       "tag": "0006_chubby_whistler",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1781409797605,
+      "tag": "0007_add_ticket_dependencies",
+      "breakpoints": true
     }
   ]
 }

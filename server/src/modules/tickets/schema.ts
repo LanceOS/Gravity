@@ -1,4 +1,4 @@
-import { index, pgTable, text, timestamp } from 'drizzle-orm/pg-core';
+import { index, pgTable, primaryKey, text, timestamp } from 'drizzle-orm/pg-core';
 
 export const tickets = pgTable('tickets', {
   id: text('id').primaryKey(),
@@ -23,6 +23,19 @@ export const tickets = pgTable('tickets', {
   cycleIdIdx: index('tickets_cycle_id_idx').on(table.cycleId),
   parentIdIdx: index('tickets_parent_id_idx').on(table.parentId),
   blockedTicketIdIdx: index('tickets_blocked_ticket_id_idx').on(table.blockedTicketId),
+}));
+
+export const ticketDependencies = pgTable('ticket_dependencies', {
+  ticketId: text('ticket_id')
+    .notNull()
+    .references(() => tickets.id, { onDelete: 'cascade' }),
+  blockedTicketId: text('blocked_ticket_id')
+    .notNull()
+    .references(() => tickets.id, { onDelete: 'cascade' }),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.ticketId, table.blockedTicketId] }),
+  ticketIdIdx: index('ticket_dependencies_ticket_id_idx').on(table.ticketId),
+  blockedTicketIdIdx: index('ticket_dependencies_blocked_ticket_id_idx').on(table.blockedTicketId),
 }));
 
 export const comments = pgTable('comments', {
