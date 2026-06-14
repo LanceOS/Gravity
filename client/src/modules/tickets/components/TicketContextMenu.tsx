@@ -19,9 +19,10 @@ import { TicketAssignmentSubMenu } from './TicketAssignmentSubMenu';
 interface TicketContextMenuProps {
   ticket: Ticket;
   children: React.ReactNode;
+  availableTickets?: Ticket[];
 }
 
-export const TicketContextMenu: React.FC<TicketContextMenuProps> = ({ ticket, children }) => {
+export const TicketContextMenu: React.FC<TicketContextMenuProps> = ({ ticket, children, availableTickets }) => {
   const context = useContext(TicketContext);
 
   if (!context) {
@@ -49,8 +50,8 @@ export const TicketContextMenu: React.FC<TicketContextMenuProps> = ({ ticket, ch
   );
 
   const assignableTickets = useMemo(
-    () => tickets.filter((candidate) => candidate.id !== ticket.id && candidate.projectId === ticket.projectId),
-    [tickets, ticket.id, ticket.projectId]
+    () => (availableTickets ?? tickets).filter((candidate) => candidate.id !== ticket.id && candidate.projectId === ticket.projectId),
+    [availableTickets, tickets, ticket.id, ticket.projectId]
   );
 
   const workspaceProjects = useMemo(() => {

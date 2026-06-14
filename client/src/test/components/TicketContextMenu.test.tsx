@@ -113,10 +113,17 @@ describe('TicketContextMenu', () => {
     const user = userEvent.setup();
     const addTicketDependencyMock = vi.fn().mockResolvedValue(true);
     const addTicketBlockerMock = vi.fn().mockResolvedValue(true);
+    const unrelatedProjectTicket: Ticket = {
+      ...ticket,
+      id: 'ticket-9',
+      key: 'OTH-9',
+      title: 'Unrelated project ticket',
+      projectId: 'project-2',
+    };
 
     render(
       <TicketContext.Provider value={{
-        tickets: [ticket, dependencyTargetTicket, blockerTargetTicket],
+        tickets: [ticket, unrelatedProjectTicket],
         projects: [project1],
         labels: [],
         cycles: [],
@@ -131,7 +138,10 @@ describe('TicketContextMenu', () => {
         removeTicketDependency: vi.fn(),
         removeTicketBlocker: vi.fn(),
       } as any}>
-        <TicketContextMenu ticket={ticket}>
+        <TicketContextMenu
+          ticket={ticket}
+          availableTickets={[ticket, dependencyTargetTicket, blockerTargetTicket]}
+        >
           <div data-testid="ticket-trigger">Trigger Context Menu</div>
         </TicketContextMenu>
       </TicketContext.Provider>

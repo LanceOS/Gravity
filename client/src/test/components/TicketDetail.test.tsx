@@ -342,6 +342,7 @@ function renderTicketDetail(overrides: Partial<Parameters<typeof TicketDetail>[0
     activeTicketDetail: null,
     comments,
     subtasks: [subtaskOne, subtaskTwo],
+    availableTickets: contextTickets,
     completedSubtasks: 1,
     subtaskProgressPercent: 50,
     users,

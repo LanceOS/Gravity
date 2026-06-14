@@ -5,6 +5,7 @@ import type { TicketsByStatus } from '../utils/ticketView';
 export interface TicketListProps {
   filteredCount: number;
   groupedTickets: TicketsByStatus;
+  availableTickets?: Ticket[];
   labelById?: Record<string, Label>;
   domainById?: Record<string, Label>;
   userAvatarById: Record<string, string>;

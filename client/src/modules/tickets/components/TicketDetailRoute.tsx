@@ -97,6 +97,7 @@ export const TicketDetailRoute: React.FC<TicketDetailRouteProps> = ({
         activeTicketDetail={activeTicketDetail}
         comments={comments}
         subtasks={detailSubtasks}
+        availableTickets={tickets}
         completedSubtasks={completedDetailSubtasks}
         subtaskProgressPercent={detailSubtaskProgressPercent}
         parentTicket={parentTicket}

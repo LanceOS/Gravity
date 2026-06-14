@@ -90,6 +90,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
   activeTicketDetail,
   comments,
   subtasks,
+  availableTickets,
   completedSubtasks,
   subtaskProgressPercent,
   users,
@@ -114,7 +115,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
   const [commentInput, setCommentInput] = useState(createEmptyRichTextValue());
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
 
-  const { assignLabelToTicket, unassignLabelFromTicket, createLabel: createLabelInContext, tickets } = useTickets();
+  const { assignLabelToTicket, unassignLabelFromTicket, createLabel: createLabelInContext } = useTickets();
 
   const handleAssignLabel = useCallback(async (labelId: string) => {
     await assignLabelToTicket(activeTicket.id, labelId);
@@ -176,17 +177,15 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
   const blockerTicketIds = useMemo(() => new Set(blockerLinks.map((blocker) => blocker.id)), [blockerLinks]);
 
   const ticketOptions = useMemo(() => {
-    return tickets
-      ? tickets
-          .filter((ticket) => ticket.id !== activeTicket.id)
-          .map((ticket) => ({
-            id: ticket.id,
-            label: ticket.key,
-            description: ticket.title,
-            searchText: [ticket.key, ticket.title].filter(Boolean).join(' '),
-          }))
-      : [];
-  }, [tickets, activeTicket.id]);
+    return availableTickets
+      .filter((ticket) => ticket.id !== activeTicket.id)
+      .map((ticket) => ({
+        id: ticket.id,
+        label: ticket.key,
+        description: ticket.title,
+        searchText: [ticket.key, ticket.title].filter(Boolean).join(' '),
+      }));
+  }, [availableTickets, activeTicket.id]);
 
   const handleCreateLabel = useCallback(async (name: string, color: string) => {
     const newLabel = await createLabelInContext({
@@ -628,7 +627,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
   );
   return (
     <>
-      <TicketContextMenu ticket={activeTicket}>
+      <TicketContextMenu ticket={activeTicket} availableTickets={availableTickets}>
         <div className="ticket-detail">
           <div className="ticket-detail__header">
           <Button

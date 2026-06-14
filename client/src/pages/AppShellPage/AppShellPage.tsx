@@ -291,6 +291,11 @@ export function AppShellPage() {
     enabled: isTeamAggregatePath && !!currentUser,
   });
 
+  const routeScopedTickets = useMemo(
+    () => (isWorkspaceAllTasksPath ? workspaceTickets : isTeamAggregatePath ? teamTickets : tickets),
+    [isWorkspaceAllTasksPath, workspaceTickets, isTeamAggregatePath, teamTickets, tickets]
+  );
+
   const handleSelectTeam = useCallback((teamId: string) => {
     navigate(`/workspaces/${activeWorkspaceId}/teams/${teamId}/tasks`);
   }, [activeWorkspaceId, navigate]);
@@ -521,10 +526,10 @@ export function AppShellPage() {
     if (!ticketKey) return;
     // Only update if the active ticket doesn't already match the URL key
     if (activeTicket?.key === ticketKey) return;
-    const resolved = tickets.find((t) => t.key === ticketKey) ?? null;
+    const resolved = routeScopedTickets.find((t) => t.key === ticketKey) ?? null;
     setActiveTicket(resolved);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ticketKey, tickets]);
+  }, [ticketKey, routeScopedTickets]);
 
   // Root path routing redirect
   useEffect(() => {
@@ -1150,11 +1155,7 @@ export function AppShellPage() {
   const scopedProjects = teamIdParam
     ? activeWorkspaceProjects.filter((project) => project.teamId === teamIdParam || activeTeamProjectIds.has(project.id))
     : activeWorkspaceProjects;
-  const scopedTickets = isWorkspaceAllTasksPath
-    ? workspaceTickets
-    : isTeamAggregatePath
-      ? teamTickets
-      : tickets;
+  const scopedTickets = routeScopedTickets;
   const scopedCycles = isTeamAggregatePath ? teamCycles : cycles;
   const scopedLabels = isTeamAggregatePath ? teamLabels : labels;
   const scopedFilters = shouldUseAggregateTicketScope ? { ...filters, projectId: '' } : filters;
@@ -1244,7 +1245,7 @@ export function AppShellPage() {
     },
   };
 
-  const resolvedTicketForRoute = ticketKey ? tickets.find((t) => t.key === ticketKey) || null : activeTicket;
+  const resolvedTicketForRoute = ticketKey ? routeScopedTickets.find((t) => t.key === ticketKey) || null : activeTicket;
 
   const ticketDetailComponent = ticketKey ? (
     <TicketDetailRoute
@@ -1252,7 +1253,7 @@ export function AppShellPage() {
       activeTicket={resolvedTicketForRoute}
       activeTicketDetail={activeTicketDetail}
       comments={comments}
-      tickets={tickets}
+      tickets={routeScopedTickets}
       users={users}
       projects={activeWorkspaceProjects}
       labels={labels}

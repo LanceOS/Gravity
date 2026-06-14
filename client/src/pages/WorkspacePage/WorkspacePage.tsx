@@ -396,6 +396,7 @@ export function WorkspacePage({
                           <WorkspaceViewContainer>
                             <TicketBoard
                               ticketsByColumn={groupedTickets}
+                              availableTickets={filteredTickets}
                               labelById={labelById}
                               userAvatarById={userAvatarById}
                               onMoveTicket={onUpdateTicket}
@@ -408,6 +409,7 @@ export function WorkspacePage({
                             <TicketList
                               filteredCount={filteredTickets.length}
                               groupedTickets={listGroupedTickets}
+                              availableTickets={filteredTickets}
                               labelById={labelById}
                               userAvatarById={userAvatarById}
                               projectById={showProjectBadges ? projectById : undefined}

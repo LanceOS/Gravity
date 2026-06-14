@@ -4,6 +4,7 @@ export interface TicketDetailProps {
   activeTicket: Ticket;
   comments: Comment[];
   subtasks: Ticket[];
+  availableTickets: Ticket[];
   completedSubtasks: number;
   subtaskProgressPercent: number;
   users: User[];

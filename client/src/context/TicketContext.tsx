@@ -274,18 +274,19 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Comments
   const activeTicketId = activeTicket?.id;
+  const activeTicketProjectId = activeTicket?.projectId || activeProjectId;
   const commentsQuery = useQuery({
     queryKey: queryKeys.comments(activeTicketId || ''),
-    queryFn: () => apiClient.get<Comment[]>(`/tickets/${activeTicketId}/comments`, { projectId: activeProjectId }),
-    enabled: !!activeTicketId && !!activeProjectId && !!currentUser,
+    queryFn: () => apiClient.get<Comment[]>(`/tickets/${activeTicketId}/comments`, { projectId: activeTicketProjectId }),
+    enabled: !!activeTicketId && !!activeTicketProjectId && !!currentUser,
   });
   const comments = commentsQuery.data || [];
 
   // Active Ticket Detail (includes dependency and blocker relations)
   const activeTicketDetailQuery = useQuery({
     queryKey: ['ticket-detail', activeTicketId],
-    queryFn: () => apiClient.get<Ticket>(`/tickets/${activeTicketId}`, { projectId: activeProjectId }),
-    enabled: !!activeTicketId && !!activeProjectId && !!currentUser,
+    queryFn: () => apiClient.get<Ticket>(`/tickets/${activeTicketId}`, { projectId: activeTicketProjectId }),
+    enabled: !!activeTicketId && !!activeTicketProjectId && !!currentUser,
   });
   const activeTicketDetail = activeTicketDetailQuery.data || null;
 
@@ -767,20 +768,32 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     await deleteCommentMutation.mutateAsync({ ticketId, commentId });
   }, [deleteCommentMutation]);
 
+  const getTicketProjectIdForMutation = useCallback((ticketId: string) => {
+    if (activeTicketRef.current?.id === ticketId) {
+      return activeTicketRef.current.projectId;
+    }
+
+    const matchingTicket = tickets.find((ticket) => ticket.id === ticketId);
+    return matchingTicket?.projectId || activeProjectIdRef.current;
+  }, [tickets]);
+
   // Ticket Dependency Actions
   const addTicketDependencyMutation = useMutation({
-    mutationFn: async ({ ticketId, dependencyId }: { ticketId: string; dependencyId: string }) => {
-      return apiClient.post<{ success: boolean }>(`/tickets/${ticketId}/dependencies`, { dependencyId }, { projectId: activeProjectIdRef.current });
+    mutationFn: async ({ ticketId, dependencyId, projectId }: { ticketId: string; dependencyId: string; projectId: string }) => {
+      return apiClient.post<{ success: boolean }>(`/tickets/${ticketId}/dependencies`, { dependencyId }, { projectId });
     },
-    onSettled: (data, err, { ticketId }) => {
+    onSettled: (data, err, { ticketId, projectId }) => {
       queryClient.invalidateQueries({ queryKey: ['ticket-detail', ticketId] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.tickets(activeProjectIdRef.current) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.tickets(projectId) });
+      queryClient.invalidateQueries({ queryKey: ['workspaceTickets'] });
+      queryClient.invalidateQueries({ queryKey: ['teamTickets'] });
     },
   });
 
   const addTicketDependency = useCallback(async (ticketId: string, dependencyId: string) => {
     try {
-      const res = await addTicketDependencyMutation.mutateAsync({ ticketId, dependencyId });
+      const projectId = getTicketProjectIdForMutation(ticketId);
+      const res = await addTicketDependencyMutation.mutateAsync({ ticketId, dependencyId, projectId });
       return res.success;
     } catch (e) {
       console.error(e);
@@ -789,41 +802,47 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
       return false;
     }
-  }, [addTicketDependencyMutation]);
+  }, [addTicketDependencyMutation, getTicketProjectIdForMutation]);
 
   const removeTicketDependencyMutation = useMutation({
-    mutationFn: async ({ ticketId, dependencyId }: { ticketId: string; dependencyId: string }) => {
-      return apiClient.delete<{ success: boolean }>(`/tickets/${ticketId}/dependencies/${dependencyId}`, { projectId: activeProjectIdRef.current });
+    mutationFn: async ({ ticketId, dependencyId, projectId }: { ticketId: string; dependencyId: string; projectId: string }) => {
+      return apiClient.delete<{ success: boolean }>(`/tickets/${ticketId}/dependencies/${dependencyId}`, { projectId });
     },
-    onSettled: (data, err, { ticketId }) => {
+    onSettled: (data, err, { ticketId, projectId }) => {
       queryClient.invalidateQueries({ queryKey: ['ticket-detail', ticketId] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.tickets(activeProjectIdRef.current) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.tickets(projectId) });
+      queryClient.invalidateQueries({ queryKey: ['workspaceTickets'] });
+      queryClient.invalidateQueries({ queryKey: ['teamTickets'] });
     },
   });
 
   const removeTicketDependency = useCallback(async (ticketId: string, dependencyId: string) => {
     try {
-      const res = await removeTicketDependencyMutation.mutateAsync({ ticketId, dependencyId });
+      const projectId = getTicketProjectIdForMutation(ticketId);
+      const res = await removeTicketDependencyMutation.mutateAsync({ ticketId, dependencyId, projectId });
       return res.success;
     } catch (e) {
       console.error(e);
       return false;
     }
-  }, [removeTicketDependencyMutation]);
+  }, [removeTicketDependencyMutation, getTicketProjectIdForMutation]);
 
   const addTicketBlockerMutation = useMutation({
-    mutationFn: async ({ ticketId, blockerId }: { ticketId: string; blockerId: string }) => {
-      return apiClient.post<{ success: boolean }>(`/tickets/${ticketId}/blockers`, { blockerId }, { projectId: activeProjectIdRef.current });
+    mutationFn: async ({ ticketId, blockerId, projectId }: { ticketId: string; blockerId: string; projectId: string }) => {
+      return apiClient.post<{ success: boolean }>(`/tickets/${ticketId}/blockers`, { blockerId }, { projectId });
     },
-    onSettled: (data, err, { ticketId }) => {
+    onSettled: (data, err, { ticketId, projectId }) => {
       queryClient.invalidateQueries({ queryKey: ['ticket-detail', ticketId] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.tickets(activeProjectIdRef.current) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.tickets(projectId) });
+      queryClient.invalidateQueries({ queryKey: ['workspaceTickets'] });
+      queryClient.invalidateQueries({ queryKey: ['teamTickets'] });
     },
   });
 
   const addTicketBlocker = useCallback(async (ticketId: string, blockerId: string) => {
     try {
-      const res = await addTicketBlockerMutation.mutateAsync({ ticketId, blockerId });
+      const projectId = getTicketProjectIdForMutation(ticketId);
+      const res = await addTicketBlockerMutation.mutateAsync({ ticketId, blockerId, projectId });
       return res.success;
     } catch (e) {
       console.error(e);
@@ -832,27 +851,30 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
       return false;
     }
-  }, [addTicketBlockerMutation]);
+  }, [addTicketBlockerMutation, getTicketProjectIdForMutation]);
 
   const removeTicketBlockerMutation = useMutation({
-    mutationFn: async ({ ticketId, blockerId }: { ticketId: string; blockerId: string }) => {
-      return apiClient.delete<{ success: boolean }>(`/tickets/${ticketId}/blockers/${blockerId}`, { projectId: activeProjectIdRef.current });
+    mutationFn: async ({ ticketId, blockerId, projectId }: { ticketId: string; blockerId: string; projectId: string }) => {
+      return apiClient.delete<{ success: boolean }>(`/tickets/${ticketId}/blockers/${blockerId}`, { projectId });
     },
-    onSettled: (data, err, { ticketId }) => {
+    onSettled: (data, err, { ticketId, projectId }) => {
       queryClient.invalidateQueries({ queryKey: ['ticket-detail', ticketId] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.tickets(activeProjectIdRef.current) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.tickets(projectId) });
+      queryClient.invalidateQueries({ queryKey: ['workspaceTickets'] });
+      queryClient.invalidateQueries({ queryKey: ['teamTickets'] });
     },
   });
 
   const removeTicketBlocker = useCallback(async (ticketId: string, blockerId: string) => {
     try {
-      const res = await removeTicketBlockerMutation.mutateAsync({ ticketId, blockerId });
+      const projectId = getTicketProjectIdForMutation(ticketId);
+      const res = await removeTicketBlockerMutation.mutateAsync({ ticketId, blockerId, projectId });
       return res.success;
     } catch (e) {
       console.error(e);
       return false;
     }
-  }, [removeTicketBlockerMutation]);
+  }, [removeTicketBlockerMutation, getTicketProjectIdForMutation]);
 
   // Create Project
   const createProjectMutation = useMutation({
