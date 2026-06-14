@@ -18,6 +18,20 @@ import {
   VisuallyHidden,
 } from '@library';
 
+function createRect(top: number, left: number, width: number, height: number): DOMRect {
+  return {
+    top,
+    left,
+    width,
+    height,
+    right: left + width,
+    bottom: top + height,
+    x: left,
+    y: top,
+    toJSON: () => ({}),
+  } as DOMRect;
+}
+
 function FocusTrapHarness() {
   const [open, setOpen] = useState(false);
 
@@ -172,5 +186,58 @@ describe('library layout and utilities', () => {
     await waitFor(() => {
       expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
     });
+  });
+
+  it('keeps the select menu 4px from the trigger when it opens above', async () => {
+    const user = userEvent.setup();
+    const originalInnerWidth = window.innerWidth;
+    const originalInnerHeight = window.innerHeight;
+    const triggerRect = createRect(120, 20, 200, 40);
+    const menuRect = createRect(0, 0, 180, 200);
+    let triggerElement: HTMLButtonElement | null = null;
+
+    Object.defineProperty(window, 'innerWidth', {
+      configurable: true,
+      value: 500,
+    });
+
+    Object.defineProperty(window, 'innerHeight', {
+      configurable: true,
+      value: 260,
+    });
+
+    const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this === triggerElement) {
+        return triggerRect;
+      }
+
+      if (this.getAttribute('role') === 'listbox') {
+        return menuRect;
+      }
+
+      return createRect(0, 0, 0, 0);
+    });
+
+    try {
+      render(<SelectHarness />);
+
+      triggerElement = screen.getByRole('button', { name: 'Status' }) as HTMLButtonElement;
+      await user.click(triggerElement);
+
+      const listbox = screen.getByRole('listbox');
+      await waitFor(() => {
+        expect(listbox).toHaveStyle({ top: '8px', maxHeight: '108px' });
+      });
+    } finally {
+      rectSpy.mockRestore();
+      Object.defineProperty(window, 'innerWidth', {
+        configurable: true,
+        value: originalInnerWidth,
+      });
+      Object.defineProperty(window, 'innerHeight', {
+        configurable: true,
+        value: originalInnerHeight,
+      });
+    }
   });
 });

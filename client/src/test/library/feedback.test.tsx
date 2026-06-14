@@ -17,6 +17,20 @@ import {
   toast,
 } from '@library';
 
+function createRect(top: number, left: number, width: number, height: number): DOMRect {
+  return {
+    top,
+    left,
+    width,
+    height,
+    right: left + width,
+    bottom: top + height,
+    x: left,
+    y: top,
+    toJSON: () => ({}),
+  } as DOMRect;
+}
+
 describe('library feedback components', () => {
   it('renders modal, drawer, and static feedback surfaces', () => {
     const onModalClose = vi.fn();
@@ -162,5 +176,62 @@ describe('library feedback components', () => {
     await waitFor(() => {
       expect(screen.queryByText('Popover body')).not.toBeInTheDocument();
     });
+  });
+
+  it('keeps the popover at least 4px from the trigger when it opens above', async () => {
+    const user = userEvent.setup();
+    const originalInnerWidth = window.innerWidth;
+    const originalInnerHeight = window.innerHeight;
+    const triggerRect = createRect(120, 40, 200, 40);
+    const popoverRect = createRect(0, 0, 220, 200);
+    let triggerElement: HTMLDivElement | null = null;
+
+    Object.defineProperty(window, 'innerWidth', {
+      configurable: true,
+      value: 500,
+    });
+
+    Object.defineProperty(window, 'innerHeight', {
+      configurable: true,
+      value: 260,
+    });
+
+    const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this === triggerElement) {
+        return triggerRect;
+      }
+
+      if (this.getAttribute('role') === 'dialog') {
+        return popoverRect;
+      }
+
+      return createRect(0, 0, 0, 0);
+    });
+
+    try {
+      render(
+        <Popover trigger={<button type="button">Open popover</button>}>
+          <span>Popover body</span>
+        </Popover>
+      );
+
+      triggerElement = screen.getByRole('button', { name: 'Open popover' }).parentElement as HTMLDivElement;
+      await user.click(screen.getByRole('button', { name: 'Open popover' }));
+
+      const dialog = screen.getByRole('dialog');
+      await waitFor(() => {
+        expect(dialog).toHaveStyle({ top: '16px', maxHeight: '100px' });
+      });
+    } finally {
+      rectSpy.mockRestore();
+      Object.defineProperty(window, 'innerWidth', {
+        configurable: true,
+        value: originalInnerWidth,
+      });
+      Object.defineProperty(window, 'innerHeight', {
+        configurable: true,
+        value: originalInnerHeight,
+      });
+    }
   });
 });
