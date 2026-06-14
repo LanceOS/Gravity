@@ -81,7 +81,7 @@ import type { TicketDetailProps } from '../../types/TicketDetail';
 import { PRIORITY_OPTIONS, STATUS_OPTIONS } from '../../utils/TicketDetail';
 import { useTickets } from '../../../../context/TicketContext';
 import { LabelBadge } from '../LabelBadge';
-import { LabelManagerPopoverContent } from '../LabelManagerPopoverContent';
+import { SearchableOptionPickerPopoverContent } from '../SearchableOptionPickerPopoverContent';
 import { TicketContextMenu } from '../TicketContextMenu';
 import './TicketDetail.css';
 
@@ -160,33 +160,33 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
 
   const dependencyLinks = activeTicketDetail?.dependencies || [];
   const blockerLinks = activeTicketDetail?.blockers || (activeTicketDetail?.blockedTicket ? [activeTicketDetail.blockedTicket] : []);
+  const labelOptions = useMemo(() => {
+    return labels
+      .filter((label) => label.projectId === activeTicket.projectId || !label.projectId)
+      .map((label) => ({
+        id: label.id,
+        label: label.name,
+        description: label.description || undefined,
+        color: label.color,
+        searchText: [label.name, label.description].filter(Boolean).join(' '),
+      }));
+  }, [labels, activeTicket.projectId]);
 
-  const relatedTicketIds = useMemo(() => {
-    const ids = new Set<string>();
-    for (const dependency of dependencyLinks) {
-      ids.add(dependency.id);
-    }
-    for (const blocker of blockerLinks) {
-      ids.add(blocker.id);
-    }
-    return ids;
-  }, [dependencyLinks, blockerLinks]);
+  const dependencyTicketIds = useMemo(() => new Set(dependencyLinks.map((dependency) => dependency.id)), [dependencyLinks]);
+  const blockerTicketIds = useMemo(() => new Set(blockerLinks.map((blocker) => blocker.id)), [blockerLinks]);
 
-  const availableTicketsForDependency = useMemo(() => {
+  const ticketOptions = useMemo(() => {
     return tickets
-      ? tickets.filter((ticket) =>
-          ticket.id !== activeTicket.id && !relatedTicketIds.has(ticket.id)
-        )
+      ? tickets
+          .filter((ticket) => ticket.id !== activeTicket.id)
+          .map((ticket) => ({
+            id: ticket.id,
+            label: ticket.key,
+            description: ticket.title,
+            searchText: [ticket.key, ticket.title].filter(Boolean).join(' '),
+          }))
       : [];
-  }, [tickets, activeTicket.id, relatedTicketIds]);
-
-  const availableTicketsForBlocker = useMemo(() => {
-    return tickets
-      ? tickets.filter((ticket) =>
-          ticket.id !== activeTicket.id && !relatedTicketIds.has(ticket.id)
-        )
-      : [];
-  }, [tickets, activeTicket.id, relatedTicketIds]);
+  }, [tickets, activeTicket.id]);
 
   const handleCreateLabel = useCallback(async (name: string, color: string) => {
     const newLabel = await createLabelInContext({
@@ -199,6 +199,67 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
       await assignLabelToTicket(activeTicket.id, newLabel.id);
     }
   }, [createLabelInContext, assignLabelToTicket, activeTicket.id, activeTicket.projectId]);
+
+  const handleToggleLabel = useCallback(async (labelId: string, isSelected: boolean) => {
+    if (isSelected) {
+      await handleUnassignLabel(labelId);
+      return;
+    }
+
+    await handleAssignLabel(labelId);
+  }, [handleAssignLabel, handleUnassignLabel]);
+
+  const handleToggleDependency = useCallback(async (dependencyId: string, isSelected: boolean) => {
+    if (isSelected) {
+      await handleRemoveDependency(dependencyId);
+      return;
+    }
+
+    await handleAddDependency(dependencyId);
+  }, [handleAddDependency, handleRemoveDependency]);
+
+  const handleToggleBlocker = useCallback(async (blockerId: string, isSelected: boolean) => {
+    if (isSelected) {
+      await handleRemoveBlocker(blockerId);
+      return;
+    }
+
+    await handleAddBlocker(blockerId);
+  }, [handleAddBlocker, handleRemoveBlocker]);
+
+  const renderAddRelationTrigger = (buttonLabel: string) => (
+    <button
+      type="button"
+      className="clickable"
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '4px',
+        padding: '2px 8px',
+        borderRadius: '12px',
+        background: 'var(--color-base100)',
+        border: '1px dashed var(--color-border-default)',
+        color: 'var(--color-text-secondary)',
+        fontSize: '11px',
+        fontWeight: 550,
+        cursor: 'pointer',
+        height: '20px',
+        transition: 'all 150ms ease',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = 'var(--color-primary)';
+        e.currentTarget.style.color = 'var(--color-text-primary)';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = 'var(--color-border-default)';
+        e.currentTarget.style.color = 'var(--color-text-secondary)';
+      }}
+    >
+      <Plus size={10} />
+      <span>{buttonLabel}</span>
+    </button>
+  );
 
   const [openMenuCommentId, setOpenMenuCommentId] = useState<string | null>(null);
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
@@ -348,47 +409,17 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
           <Popover
             align="center"
             contentClassName="ticket-detail__label-popover"
-            trigger={
-              <button
-                type="button"
-                className="clickable"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '4px',
-                  padding: '2px 8px',
-                  borderRadius: '12px',
-                  background: 'var(--color-base100)',
-                  border: '1px dashed var(--color-border-default)',
-                  color: 'var(--color-text-secondary)',
-                  fontSize: '11px',
-                  fontWeight: 550,
-                  cursor: 'pointer',
-                  height: '20px',
-                  transition: 'all 150ms ease',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = 'var(--color-primary)';
-                  e.currentTarget.style.color = 'var(--color-text-primary)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = 'var(--color-border-default)';
-                  e.currentTarget.style.color = 'var(--color-text-secondary)';
-                }}
-              >
-                <Plus size={10} />
-                <span>Add Label</span>
-              </button>
-            }
+            trigger={renderAddRelationTrigger('Add Label')}
           >
-            <LabelManagerPopoverContent
-              projectId={activeTicket.projectId}
-              assignedLabelIds={new Set(activeTicket.labels?.map((l) => l.id) || [])}
-              allLabels={labels}
-              onAssign={handleAssignLabel}
-              onUnassign={handleUnassignLabel}
+            <SearchableOptionPickerPopoverContent
+              title="Search or Create Label"
+              searchPlaceholder="Type to search or create..."
+              options={labelOptions}
+              selectedIds={new Set(activeTicket.labels?.map((l) => l.id) || [])}
+              onToggle={handleToggleLabel}
               onCreate={handleCreateLabel}
+              createHeading="CREATE NEW LABEL:"
+              emptyStateLabel="No matching labels"
             />
           </Popover>
         </div>
@@ -444,7 +475,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
           <Link size={12} />
           <span>Dependencies</span>
         </span>
-        
+
         {dependencyLinks.length > 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '8px' }}>
             {dependencyLinks.map((dep: any) => (
@@ -471,18 +502,21 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
           </div>
         )}
 
-        <Select
-          value=""
-          onValueChange={handleAddDependency}
-          options={[
-            { value: '', label: '+ Add Dependency...' },
-            ...availableTicketsForDependency.map(t => ({
-              value: t.id,
-              label: `${t.key} - ${t.title}`
-            }))
-          ]}
-          aria-label="Add ticket dependency"
-        />
+        <Popover
+          align="left"
+          style={{ display: 'block' }}
+          contentClassName="ticket-detail__label-popover"
+          trigger={renderAddRelationTrigger('Add Dependency')}
+        >
+          <SearchableOptionPickerPopoverContent
+            title="Search Tickets"
+            searchPlaceholder="Type to search tickets..."
+            options={ticketOptions}
+            selectedIds={dependencyTicketIds}
+            onToggle={handleToggleDependency}
+            emptyStateLabel="No matching tickets"
+          />
+        </Popover>
 
         <div style={{ marginTop: '16px', borderTop: '1px dashed var(--color-border-default)', paddingTop: '12px' }}>
           <span className="label" style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '8px' }}>
@@ -519,18 +553,21 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
           )}
 
           {canManageBlockers && (
-            <Select
-              value=""
-              onValueChange={handleAddBlocker}
-              options={[
-                { value: '', label: '+ Add Blocker...' },
-                ...availableTicketsForBlocker.map((ticket) => ({
-                  value: ticket.id,
-                  label: `${ticket.key} - ${ticket.title}`,
-                })),
-              ]}
-              aria-label="Add ticket blocker"
-            />
+            <Popover
+              align="left"
+              style={{ display: 'block' }}
+              contentClassName="ticket-detail__label-popover"
+              trigger={renderAddRelationTrigger('Add Blocker')}
+            >
+              <SearchableOptionPickerPopoverContent
+                title="Search Tickets"
+                searchPlaceholder="Type to search tickets..."
+                options={ticketOptions}
+                selectedIds={blockerTicketIds}
+                onToggle={handleToggleBlocker}
+                emptyStateLabel="No matching tickets"
+              />
+            </Popover>
           )}
         </div>
       </div>

@@ -152,7 +152,8 @@
 }
 
 .ticket-detail__label-popover {
-  width: 220px;
+  width: 340px;
+  max-width: calc(100vw - 32px);
 }
 
 /* Ticket Dependency System Styling */
