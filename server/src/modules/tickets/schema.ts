@@ -11,6 +11,7 @@ export const tickets = pgTable('tickets', {
   projectId: text('project_id').notNull(),
   cycleId: text('cycle_id'),
   parentId: text('parent_id'),
+  blockedTicketId: text('blocked_ticket_id'),
   prStatus: text('pr_status').notNull().default('none'),
   prUrl: text('pr_url'),
   branchName: text('branch_name').notNull().default(''),
@@ -21,6 +22,7 @@ export const tickets = pgTable('tickets', {
   assigneeIdIdx: index('tickets_assignee_id_idx').on(table.assigneeId),
   cycleIdIdx: index('tickets_cycle_id_idx').on(table.cycleId),
   parentIdIdx: index('tickets_parent_id_idx').on(table.parentId),
+  blockedTicketIdIdx: index('tickets_blocked_ticket_id_idx').on(table.blockedTicketId),
 }));
 
 export const comments = pgTable('comments', {

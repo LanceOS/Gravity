@@ -11,6 +11,7 @@ export interface TicketDetailProps {
   labels: Label[];
   cycles: Cycle[];
   parentTicket?: Ticket | null;
+  activeTicketDetail: Ticket | null;
   onSelectTicket: (ticket: Ticket | null) => void;
   onUpdateTicket: (id: string, updates: Partial<Ticket>) => Promise<void>;
   onDeleteTicket: (ticketId: string) => Promise<void>;
@@ -19,6 +20,8 @@ export interface TicketDetailProps {
   onDeleteComment: (ticketId: string, commentId: string) => Promise<void>;
   onClose?: () => void;
   onOpenCreateSubtask: (parentId: string) => void;
+  onAddDependency: (ticketId: string, dependencyId: string) => Promise<boolean>;
+  onRemoveDependency: (ticketId: string, dependencyId: string) => Promise<boolean>;
   ticketLink?: string;
 }
 

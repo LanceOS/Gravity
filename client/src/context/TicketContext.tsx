@@ -3,6 +3,7 @@ import React, { createContext, useContext, useEffect, useCallback, useMemo, useS
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys, CACHE_CONFIGS } from '../utils/queryClient';
 import { useMoveTicket } from './useMoveTicket';
+import { toast } from '@library';
 
 // Shared entity types live in src/types/domain.ts.
 export type {
@@ -172,6 +173,9 @@ interface TicketContextType extends State {
   setCurrentUser: (user: User | null) => void;
   setTheme: (theme: 'dark' | 'coal-black' | 'coffee' | 'marble-blue') => void;
   setActiveTicket: (ticket: Ticket | null) => void;
+  activeTicketDetail: Ticket | null;
+  addTicketDependency: (ticketId: string, dependencyId: string) => Promise<boolean>;
+  removeTicketDependency: (ticketId: string, dependencyId: string) => Promise<boolean>;
   setView: (view: 'list' | 'board') => void;
   setFilters: (filters: Partial<State['filters']>) => void;
   resetFilters: () => void;
@@ -274,6 +278,14 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     enabled: !!activeTicketId && !!activeProjectId && !!currentUser,
   });
   const comments = commentsQuery.data || [];
+
+  // Active Ticket Detail (includes dependencies and blockedTicket relations)
+  const activeTicketDetailQuery = useQuery({
+    queryKey: ['ticket-detail', activeTicketId],
+    queryFn: () => apiClient.get<Ticket>(`/tickets/${activeTicketId}`, { projectId: activeProjectId }),
+    enabled: !!activeTicketId && !!activeProjectId && !!currentUser,
+  });
+  const activeTicketDetail = activeTicketDetailQuery.data || null;
 
   // Global loading state combining react-query status
   const loading =
@@ -753,6 +765,50 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     await deleteCommentMutation.mutateAsync({ ticketId, commentId });
   }, [deleteCommentMutation]);
 
+  // Ticket Dependency Actions
+  const addTicketDependencyMutation = useMutation({
+    mutationFn: async ({ ticketId, dependencyId }: { ticketId: string; dependencyId: string }) => {
+      return apiClient.post<{ success: boolean }>(`/tickets/${ticketId}/dependencies`, { dependencyId }, { projectId: activeProjectIdRef.current });
+    },
+    onSettled: (data, err, { ticketId }) => {
+      queryClient.invalidateQueries({ queryKey: ['ticket-detail', ticketId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.tickets(activeProjectIdRef.current) });
+    },
+  });
+
+  const addTicketDependency = useCallback(async (ticketId: string, dependencyId: string) => {
+    try {
+      const res = await addTicketDependencyMutation.mutateAsync({ ticketId, dependencyId });
+      return res.success;
+    } catch (e) {
+      console.error(e);
+      if (e instanceof Error && toast?.show) {
+        toast.show(e.message, 'error');
+      }
+      return false;
+    }
+  }, [addTicketDependencyMutation]);
+
+  const removeTicketDependencyMutation = useMutation({
+    mutationFn: async ({ ticketId, dependencyId }: { ticketId: string; dependencyId: string }) => {
+      return apiClient.delete<{ success: boolean }>(`/tickets/${ticketId}/dependencies/${dependencyId}`, { projectId: activeProjectIdRef.current });
+    },
+    onSettled: (data, err, { ticketId }) => {
+      queryClient.invalidateQueries({ queryKey: ['ticket-detail', ticketId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.tickets(activeProjectIdRef.current) });
+    },
+  });
+
+  const removeTicketDependency = useCallback(async (ticketId: string, dependencyId: string) => {
+    try {
+      const res = await removeTicketDependencyMutation.mutateAsync({ ticketId, dependencyId });
+      return res.success;
+    } catch (e) {
+      console.error(e);
+      return false;
+    }
+  }, [removeTicketDependencyMutation]);
+
   // Create Project
   const createProjectMutation = useMutation({
     mutationFn: async (projectInput: CreateProjectInput) => {
@@ -1075,6 +1131,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       users,
       comments,
       activeTicket,
+      activeTicketDetail,
       activeView,
       filters,
       currentUser,
@@ -1096,6 +1153,8 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       addComment,
       updateComment,
       deleteComment,
+      addTicketDependency,
+      removeTicketDependency,
       createProject,
       updateProject,
       deleteProject,

@@ -43,6 +43,13 @@
       "when": 1781230576575,
       "tag": "0005_ordinary_franklin_storm",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1781408422680,
+      "tag": "0006_chubby_whistler",
+      "breakpoints": true
     }
   ]
 }

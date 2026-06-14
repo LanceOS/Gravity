@@ -256,6 +256,7 @@ export async function initializeDatabase() {
       project_id TEXT NOT NULL,
       cycle_id TEXT,
       parent_id TEXT,
+      blocked_ticket_id TEXT,
       pr_status TEXT NOT NULL DEFAULT 'none',
       pr_url TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -348,6 +349,7 @@ export async function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS tickets_assignee_id_idx ON tickets (assignee_id);
     CREATE INDEX IF NOT EXISTS tickets_cycle_id_idx ON tickets (cycle_id);
     CREATE INDEX IF NOT EXISTS tickets_parent_id_idx ON tickets (parent_id);
+    CREATE INDEX IF NOT EXISTS tickets_blocked_ticket_id_idx ON tickets (blocked_ticket_id);
     CREATE INDEX IF NOT EXISTS comments_ticket_id_idx ON comments (ticket_id);
     CREATE INDEX IF NOT EXISTS comments_user_id_idx ON comments (user_id);
     CREATE INDEX IF NOT EXISTS note_metadata_project_id_user_id_idx ON note_metadata (project_id, user_id);
@@ -356,6 +358,7 @@ export async function initializeDatabase() {
 
   await pool.query(`
     ALTER TABLE tickets ADD COLUMN IF NOT EXISTS branch_name TEXT NOT NULL DEFAULT '';
+    ALTER TABLE tickets ADD COLUMN IF NOT EXISTS blocked_ticket_id TEXT;
     ALTER TABLE projects ADD COLUMN IF NOT EXISTS github_repo_url TEXT;
     ALTER TABLE projects ADD COLUMN IF NOT EXISTS team_id TEXT;
     ALTER TABLE cycles ADD COLUMN IF NOT EXISTS team_id TEXT;

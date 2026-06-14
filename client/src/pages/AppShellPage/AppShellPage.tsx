@@ -73,6 +73,9 @@ export function AppShellPage() {
     updateTicket,
     updateProject,
     users,
+    activeTicketDetail,
+    addTicketDependency,
+    removeTicketDependency,
   } = useTickets();
 
   const [activeSection, setActiveSection] = useState<AppSection>('workspace');
@@ -1243,6 +1246,7 @@ export function AppShellPage() {
     <TicketDetailRoute
       activeWorkspaceId={activeWorkspaceId}
       activeTicket={resolvedTicketForRoute}
+      activeTicketDetail={activeTicketDetail}
       comments={comments}
       tickets={tickets}
       users={users}
@@ -1260,6 +1264,8 @@ export function AppShellPage() {
       onUpdateComment={updateComment}
       onDeleteComment={deleteComment}
       onOpenCreateSubtask={handleOpenCreateSubtask}
+      onAddDependency={addTicketDependency}
+      onRemoveDependency={removeTicketDependency}
     />
   ) : null;
 

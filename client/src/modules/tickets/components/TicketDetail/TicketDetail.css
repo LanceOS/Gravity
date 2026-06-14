@@ -154,3 +154,46 @@
 .ticket-detail__label-popover {
   width: 220px;
 }
+
+/* Ticket Dependency System Styling */
+.ticket-dependency-warning {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(249, 115, 22, 0.04) 100%);
+  border: 1px solid rgba(239, 68, 68, 0.22);
+  border-radius: var(--radius-sm, 6px);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  color: var(--color-error, #ef4444);
+  font-size: 13px;
+  font-weight: 500;
+  margin-top: 16px;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.03);
+  transition: all 0.2s ease-in-out;
+  animation: lib-fade-in 0.25s ease-out;
+}
+
+.ticket-dependency-warning:hover {
+  border-color: rgba(239, 68, 68, 0.35);
+  box-shadow: 0 6px 16px rgba(239, 68, 68, 0.06);
+}
+
+.ticket-dependency-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ticket-dependency-link {
+  color: var(--color-error, #ef4444);
+  text-decoration: none;
+  font-weight: 600;
+  border-bottom: 1px dashed rgba(239, 68, 68, 0.35);
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.ticket-dependency-link:hover {
+  color: var(--color-text-primary, #ffffff);
+  border-bottom-color: var(--color-text-primary, #ffffff);
+}

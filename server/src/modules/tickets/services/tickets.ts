@@ -75,6 +75,7 @@ function mapTicket(record: TicketRecord, labelRows: any[] = []) {
     projectId: record.projectId,
     cycleId: record.cycleId,
     parentId: record.parentId,
+    blockedTicketId: record.blockedTicketId,
     isSubtask: record.parentId !== null,
     prStatus: canonicalizePrStatus(record.prStatus),
     prUrl: record.prUrl,
@@ -331,7 +332,9 @@ export async function getTicketDetails(ticketId: string, projectId?: string) {
     assigneeResult,
     projectResult,
     cycleResult,
-    labelResult
+    labelResult,
+    blockedTicketResult,
+    dependenciesResult
   ] = await Promise.all([
     listComments(ticket.id),
     db.select().from(tickets).where(eq(tickets.parentId, ticket.id)),
@@ -365,6 +368,27 @@ export async function getTicketDetails(ticketId: string, projectId?: string) {
       .from(ticketLabels)
       .innerJoin(labels, eq(labels.id, ticketLabels.labelId))
       .where(eq(ticketLabels.ticketId, ticket.id)),
+    ticket.blockedTicketId
+      ? db
+          .select({
+            id: tickets.id,
+            key: tickets.key,
+            title: tickets.title,
+            projectId: tickets.projectId,
+          })
+          .from(tickets)
+          .where(eq(tickets.id, ticket.blockedTicketId))
+          .limit(1)
+      : Promise.resolve([]),
+    db
+      .select({
+        id: tickets.id,
+        key: tickets.key,
+        title: tickets.title,
+        projectId: tickets.projectId,
+      })
+      .from(tickets)
+      .where(eq(tickets.blockedTicketId, ticket.id)),
   ]);
 
   const userRow = assigneeResult[0];
@@ -425,6 +449,9 @@ export async function getTicketDetails(ticketId: string, projectId?: string) {
     labelsBySubtaskId.set(row.ticketId, list);
   }
 
+  const blockedTicket = blockedTicketResult[0] || null;
+  const dependencies = dependenciesResult;
+
   return {
     ...ticket,
     comments: ticketComments,
@@ -433,6 +460,8 @@ export async function getTicketDetails(ticketId: string, projectId?: string) {
     project,
     cycle,
     labels: labelResult,
+    blockedTicket,
+    dependencies,
   };
 }
 
