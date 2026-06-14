@@ -27,6 +27,7 @@ type WorkspaceLayoutMockProps = {
     projects?: {
       onSelectLabel?: (labelId: string) => void;
       onSelectWorkspaceProjects?: () => void;
+      onOpenCreateTeam?: () => void;
     };
   };
   children?: ReactNode;
@@ -152,6 +153,9 @@ vi.mock('../../layouts/WorkspaceLayout/WorkspaceLayout', () => ({
       </div>
       <button type="button" onClick={() => sidebarProps.projects?.onSelectLabel?.('d-1')}>
         Select label
+      </button>
+      <button type="button" onClick={() => sidebarProps.projects?.onOpenCreateTeam?.()}>
+        Open create team
       </button>
       {children}
       {rightPanels}
@@ -1080,5 +1084,40 @@ describe('AppShellPage', () => {
 
     // Restore window.innerWidth
     window.innerWidth = originalInnerWidth;
+  });
+
+  it('routes to teams page with create=true flag when onOpenCreateTeam is called', async () => {
+    const user = userEvent.setup();
+
+    renderAppShell({
+      directory: buildWorkspaceDirectory({
+        workspaces: [
+          {
+            id: 'workspace-1',
+            name: 'Gravity',
+            description: 'Main workspace',
+            key: 'GRA',
+            defaultProjectId: 'project-1',
+            hostUrl: 'http://localhost:8080',
+            joinMode: 'approval_required',
+            hierarchyMode: 'teams',
+            projectCount: 1,
+            memberCount: 1,
+            pendingJoinRequestCount: 0,
+            memberRole: 'owner',
+          },
+        ],
+      }),
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('WorkspaceLayout')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Open create team' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('location-display').textContent).toBe('/workspaces/workspace-1/teams?create=true');
+    });
   });
 });
