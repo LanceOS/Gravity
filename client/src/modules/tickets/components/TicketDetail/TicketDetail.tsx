@@ -82,6 +82,7 @@ import { PRIORITY_OPTIONS, STATUS_OPTIONS } from '../../utils/TicketDetail';
 import { useTickets } from '../../../../context/TicketContext';
 import { LabelBadge } from '../LabelBadge';
 import { LabelManagerPopoverContent } from '../LabelManagerPopoverContent';
+import { TicketContextMenu } from '../TicketContextMenu';
 import './TicketDetail.css';
 
 export const TicketDetail: React.FC<TicketDetailProps> = ({
@@ -425,8 +426,9 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
   );
   return (
     <>
-      <div className="ticket-detail">
-        <div className="ticket-detail__header">
+      <TicketContextMenu ticket={activeTicket}>
+        <div className="ticket-detail">
+          <div className="ticket-detail__header">
           <Button
             onClick={() => onClose ? onClose() : window.history.back()}
             variant="ghost"
@@ -835,6 +837,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
         </div>
 
       </div>
+      </TicketContextMenu>
 
       {isDeleteConfirmOpen && (
         <Portal>
