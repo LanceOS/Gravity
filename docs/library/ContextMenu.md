@@ -88,3 +88,16 @@ When the menu or a submenu opens, it calculates its bounding box relative to `wi
 - **ArrowLeft**: Closes the current submenu and returns focus to the parent.
 - **Enter / Space**: Triggers the selected item.
 - **Escape / Tab**: Closes the entire context menu.
+
+## Usage Instances
+
+The `ContextMenu` is heavily utilized throughout the Gravity app to provide quick actions without cluttering the UI:
+
+- **Tickets**: 
+  - Right-clicking a ticket opens the `TicketContextMenu` offering quick actions like assigning members, modifying priority, and moving the ticket to another project.
+- **Sidebar**:
+  - Right-clicking the main workspace sidebar provides quick creation actions (e.g., "New Ticket", "New Label", "New Project").
+- **Workspace Filtering**:
+  - Clicking "Filter By" in the workspace header utilizes a deeply nested `ContextMenu` to filter tickets by status, priority, and assignees (rendering their avatars/icons inline).
+- **Notes**:
+  - Right-clicking in the Notes view offers quick actions to "Create New Note" and to instantly sort notes by "Newest" or "Oldest" (with full-stack pagination support).

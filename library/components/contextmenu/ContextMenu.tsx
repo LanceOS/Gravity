@@ -265,8 +265,6 @@ export function ContextMenuItemComponent({
   } = React.useContext(MenuLevelContext);
   const itemRef = React.useRef<HTMLButtonElement>(null);
   const itemId = useId();
-  const [isHovered, setIsHovered] = React.useState(false);
-
   // Extract submenu child from children
   const childrenArray = React.Children.toArray(children);
   const submenu = childrenArray.find(
@@ -287,7 +285,6 @@ export function ContextMenuItemComponent({
 
   const handleMouseEnter = () => {
     if (disabled) return;
-    setIsHovered(true);
     
     if (hasSubmenu) {
       requestSubmenuOpen(itemId);
@@ -297,7 +294,6 @@ export function ContextMenuItemComponent({
   };
 
   const handleMouseLeave = () => {
-    setIsHovered(false);
     requestSubmenuClose();
   };
 
@@ -359,7 +355,7 @@ export function ContextMenuItemComponent({
         data-menu-level={level}
         tabIndex={-1}
         className={`context-menu-item ${danger ? 'context-menu-item--danger' : ''}`}
-        data-highlighted={isSubmenuOpen || isHovered ? 'true' : undefined}
+        data-highlighted={isSubmenuOpen ? 'true' : undefined}
         onClick={handleItemClick}
         onKeyDown={handleKeyDown}
       >
