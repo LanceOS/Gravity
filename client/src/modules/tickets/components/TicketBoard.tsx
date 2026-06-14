@@ -11,6 +11,7 @@ import { getAssigneeAvatar, getPriorityColor, getPriorityIcon } from '../utils/T
 
 export const TicketBoard: React.FC<TicketBoardProps> = ({
   ticketsByColumn,
+  availableTickets,
   labelById,
   userAvatarById,
   onMoveTicket,
@@ -78,7 +79,7 @@ export const TicketBoard: React.FC<TicketBoardProps> = ({
           id: ticket.id,
           status: ticket.status,
           content: (
-            <TicketContextMenu ticket={ticket}>
+            <TicketContextMenu ticket={ticket} availableTickets={availableTickets}>
               <TicketCard
                 ticket={ticket}
                 onClick={() => onSelectTicket(ticket)}
@@ -92,7 +93,7 @@ export const TicketBoard: React.FC<TicketBoardProps> = ({
         };
       });
     });
-  }, [ticketsByColumn, userAvatarById, onSelectTicket, handleDragStart]);
+  }, [availableTickets, ticketsByColumn, userAvatarById, onSelectTicket, handleDragStart]);
 
   const handleCardMove = useCallback((cardId: string, nextStatus: string) => {
     onMoveTicket(cardId, { status: nextStatus as Ticket['status'] });

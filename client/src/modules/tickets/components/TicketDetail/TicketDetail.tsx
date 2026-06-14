@@ -81,14 +81,17 @@ import type { TicketDetailProps } from '../../types/TicketDetail';
 import { PRIORITY_OPTIONS, STATUS_OPTIONS } from '../../utils/TicketDetail';
 import { useTickets } from '../../../../context/TicketContext';
 import { LabelBadge } from '../LabelBadge';
-import { LabelManagerPopoverContent } from '../LabelManagerPopoverContent';
+import { SearchableOptionPickerPopoverContent } from '../SearchableOptionPickerPopoverContent';
 import { TicketContextMenu } from '../TicketContextMenu';
+import { TicketRelationsSection } from './TicketRelationsSection';
 import './TicketDetail.css';
 
 export const TicketDetail: React.FC<TicketDetailProps> = ({
   activeTicket,
+  activeTicketDetail,
   comments,
   subtasks,
+  availableTickets,
   completedSubtasks,
   subtaskProgressPercent,
   users,
@@ -103,6 +106,10 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
   onDeleteComment,
   onClose,
   onOpenCreateSubtask,
+  onAddDependency,
+  onRemoveDependency,
+  onAddBlocker,
+  onRemoveBlocker,
   parentTicket,
   ticketLink: customTicketLink,
 }) => {
@@ -119,6 +126,18 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
     await unassignLabelFromTicket(activeTicket.id, labelId);
   }, [unassignLabelFromTicket, activeTicket.id]);
 
+  const labelOptions = useMemo(() => {
+    return labels
+      .filter((label) => label.projectId === activeTicket.projectId || !label.projectId)
+      .map((label) => ({
+        id: label.id,
+        label: label.name,
+        description: label.description || undefined,
+        color: label.color,
+        searchText: [label.name, label.description].filter(Boolean).join(' '),
+      }));
+  }, [labels, activeTicket.projectId]);
+
   const handleCreateLabel = useCallback(async (name: string, color: string) => {
     const newLabel = await createLabelInContext({
       name,
@@ -130,6 +149,25 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
       await assignLabelToTicket(activeTicket.id, newLabel.id);
     }
   }, [createLabelInContext, assignLabelToTicket, activeTicket.id, activeTicket.projectId]);
+
+  const handleToggleLabel = useCallback(async (labelId: string, isSelected: boolean) => {
+    if (isSelected) {
+      await handleUnassignLabel(labelId);
+      return;
+    }
+
+    await handleAssignLabel(labelId);
+  }, [handleAssignLabel, handleUnassignLabel]);
+
+  const renderAddRelationTrigger = (buttonLabel: string) => (
+    <button
+      type="button"
+      className="ticket-detail__inline-trigger"
+    >
+      <Plus size={10} />
+      <span>{buttonLabel}</span>
+    </button>
+  );
 
   const [openMenuCommentId, setOpenMenuCommentId] = useState<string | null>(null);
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
@@ -279,47 +317,17 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
           <Popover
             align="center"
             contentClassName="ticket-detail__label-popover"
-            trigger={
-              <button
-                type="button"
-                className="clickable"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '4px',
-                  padding: '2px 8px',
-                  borderRadius: '12px',
-                  background: 'var(--color-base100)',
-                  border: '1px dashed var(--color-border-default)',
-                  color: 'var(--color-text-secondary)',
-                  fontSize: '11px',
-                  fontWeight: 550,
-                  cursor: 'pointer',
-                  height: '20px',
-                  transition: 'all 150ms ease',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = 'var(--color-primary)';
-                  e.currentTarget.style.color = 'var(--color-text-primary)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = 'var(--color-border-default)';
-                  e.currentTarget.style.color = 'var(--color-text-secondary)';
-                }}
-              >
-                <Plus size={10} />
-                <span>Add Label</span>
-              </button>
-            }
+            trigger={renderAddRelationTrigger('Add Label')}
           >
-            <LabelManagerPopoverContent
-              projectId={activeTicket.projectId}
-              assignedLabelIds={new Set(activeTicket.labels?.map((l) => l.id) || [])}
-              allLabels={labels}
-              onAssign={handleAssignLabel}
-              onUnassign={handleUnassignLabel}
+            <SearchableOptionPickerPopoverContent
+              title="Search or Create Label"
+              searchPlaceholder="Type to search or create..."
+              options={labelOptions}
+              selectedIds={new Set(activeTicket.labels?.map((l) => l.id) || [])}
+              onToggle={handleToggleLabel}
               onCreate={handleCreateLabel}
+              createHeading="CREATE NEW LABEL:"
+              emptyStateLabel="No matching labels"
             />
           </Popover>
         </div>
@@ -369,6 +377,19 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
           aria-label="Select ticket cycle"
         />
       </div>
+
+      <TicketRelationsSection
+        activeTicket={activeTicket}
+        activeTicketDetail={activeTicketDetail}
+        availableTickets={availableTickets}
+        parentTicket={parentTicket}
+        users={users}
+        onSelectTicket={onSelectTicket}
+        onAddDependency={onAddDependency}
+        onRemoveDependency={onRemoveDependency}
+        onAddBlocker={onAddBlocker}
+        onRemoveBlocker={onRemoveBlocker}
+      />
 
       <div style={{ gridColumn: '1 / -1', borderTop: '1px solid var(--color-border-default)', paddingTop: '16px', marginTop: '8px' }}>
         <span className="label" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -426,7 +447,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
   );
   return (
     <>
-      <TicketContextMenu ticket={activeTicket}>
+      <TicketContextMenu ticket={activeTicket} availableTickets={availableTickets}>
         <div className="ticket-detail">
           <div className="ticket-detail__header">
           <Button
@@ -512,7 +533,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
               />
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--color-border-default)', paddingBottom: '6px' }}>
                 <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase' }}>Description</span>
               </div>
@@ -531,7 +552,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
               </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--color-border-default)', paddingBottom: '6px' }}>
                 <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase' }}>
                   Sub-tasks Checklist
@@ -592,7 +613,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
               )}
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
               <div style={{ borderBottom: '1px solid var(--color-border-default)', paddingBottom: '6px' }}>
                 <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase' }}>
                   Activity Thread ({comments.length})

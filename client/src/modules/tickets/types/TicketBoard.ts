@@ -4,6 +4,7 @@ import type { TicketsByStatus } from '../utils/ticketView';
 
 export interface TicketBoardProps {
   ticketsByColumn: TicketsByStatus;
+  availableTickets?: Ticket[];
   labelById?: Record<string, Label>;
   domainById?: Record<string, Label>;
   userAvatarById: Record<string, string>;

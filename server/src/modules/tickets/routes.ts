@@ -9,14 +9,21 @@ import { isWorkspaceMember, getProjectWorkspaceId, authorizeProjectAccess, autho
 import {
   addCommentRecord,
   createTicketRecord,
+  createTicketDependencyRelation,
   getTicketById,
+  getTicketByKey,
+  getTicketRelationsByKey,
   deleteTicketRecord,
+  hasTicketDependencyRelation,
   getTicketDetails,
   listComments,
   listTickets,
+  listTicketBlockers,
+  listTicketDependencies,
   updateTicketRecord,
   updateCommentRecord,
   deleteCommentRecord,
+  removeTicketDependencyRelation,
 } from './services/tickets.js';
 import {
   ProjectScopeStrategy,
@@ -102,7 +109,10 @@ export function createTicketsRouter() {
     ticketId: string,
     handler: (ticket: any, userId: string) => Promise<void>
   ) {
-    const ticket = await getTicketById(ticketId, getProjectIdFromRequest(req) || undefined);
+    // Ticket IDs are globally unique, so look them up directly instead of
+    // requiring the caller to send a matching project scope header. That keeps
+    // relation actions working even when the UI's project context is stale.
+    const ticket = await getTicketById(ticketId);
     if (!ticket) {
       res.status(404).json({ error: 'Ticket not found.' });
       return;
@@ -190,18 +200,7 @@ export function createTicketsRouter() {
   router.get('/tickets/key/:ticketKey', async (req, res) => {
     try {
       const ticketKey = normalizeRouteParam(req.params.ticketKey).trim().toUpperCase();
-      const ticketRows = await db
-        .select({
-          id: tickets.id,
-          key: tickets.key,
-          title: tickets.title,
-          status: tickets.status,
-          projectId: tickets.projectId,
-        })
-        .from(tickets)
-        .where(eq(tickets.key, ticketKey))
-        .limit(1);
-      const ticket = ticketRows[0];
+      const ticket = await getTicketByKey(ticketKey);
       if (!ticket) {
         res.status(404).json({ error: 'Ticket not found.' });
         return;
@@ -213,7 +212,27 @@ export function createTicketsRouter() {
         return;
       }
 
-      res.json(ticket);
+      const includeRelations = typeof req.query.include === 'string'
+        && req.query.include.split(',').map((value) => value.trim()).includes('relations');
+
+      if (includeRelations) {
+        const ticketRelations = await getTicketRelationsByKey(ticketKey);
+        if (!ticketRelations) {
+          res.status(404).json({ error: 'Ticket not found.' });
+          return;
+        }
+
+        res.json(ticketRelations);
+        return;
+      }
+
+      res.json({
+        id: ticket.id,
+        key: ticket.key,
+        title: ticket.title,
+        status: ticket.status,
+        projectId: ticket.projectId,
+      });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load ticket.' });
     }
@@ -699,6 +718,200 @@ export function createTicketsRouter() {
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create cycle.' });
     }
+  });
+
+  router.get('/tickets/:ticketId/dependencies', async (req, res) => {
+    await withTicketAccess(req, res, normalizeRouteParam(req.params.ticketId), async (ticket) => {
+      try {
+        const rows = await listTicketDependencies(ticket.id);
+        res.json(rows);
+      } catch (error) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to list dependencies.' });
+      }
+    });
+  });
+
+  router.post('/tickets/:ticketId/dependencies', async (req, res) => {
+    await withTicketAccess(req, res, normalizeRouteParam(req.params.ticketId), async (ticket) => {
+      const dependencyId = req.body?.dependencyId;
+      if (!dependencyId) {
+        res.status(400).json({ error: 'Dependency ID is required.' });
+        return;
+      }
+
+      if (dependencyId === ticket.id) {
+        res.status(400).json({ error: 'A ticket cannot depend on itself.' });
+        return;
+      }
+
+      const dependencyTicket = await getTicketById(dependencyId);
+      if (!dependencyTicket) {
+        res.status(404).json({ error: 'Dependency ticket not found.' });
+        return;
+      }
+
+      const depAuth = await authorizeProjectAccess(req, dependencyTicket.projectId);
+      if (!depAuth.allowed) {
+        res.status(depAuth.status).json({ error: depAuth.error });
+        return;
+      }
+
+      if (await hasTicketDependencyRelation(ticket.id, dependencyId)) {
+        res.status(400).json({ error: 'This ticket already blocks the selected ticket.' });
+        return;
+      }
+
+      if (await hasTicketDependencyRelation(dependencyId, ticket.id)) {
+        res.status(400).json({ error: 'Circular dependency detected: this ticket already depends on the selected ticket.' });
+        return;
+      }
+
+      try {
+        await createTicketDependencyRelation(ticket.id, dependencyId);
+
+        broadcastEvent('tickets-updated', { projectId: ticket.projectId });
+        if (dependencyTicket.projectId !== ticket.projectId) {
+          broadcastEvent('tickets-updated', { projectId: dependencyTicket.projectId });
+        }
+
+        res.status(201).json({ success: true });
+      } catch (error) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to add dependency.' });
+      }
+    });
+  });
+
+  router.delete('/tickets/:ticketId/dependencies/:dependencyId', async (req, res) => {
+    await withTicketAccess(req, res, normalizeRouteParam(req.params.ticketId), async (ticket) => {
+      const dependencyId = normalizeRouteParam(req.params.dependencyId);
+
+      const dependencyTicket = await getTicketById(dependencyId);
+      if (!dependencyTicket) {
+        res.status(404).json({ error: 'Dependency ticket not found.' });
+        return;
+      }
+
+      const depAuth = await authorizeProjectAccess(req, dependencyTicket.projectId);
+      if (!depAuth.allowed) {
+        res.status(depAuth.status).json({ error: depAuth.error });
+        return;
+      }
+
+      if (!(await hasTicketDependencyRelation(ticket.id, dependencyId))) {
+        res.status(400).json({ error: 'Ticket is not a dependency of this ticket.' });
+        return;
+      }
+
+      try {
+        await removeTicketDependencyRelation(ticket.id, dependencyId);
+
+        broadcastEvent('tickets-updated', { projectId: ticket.projectId });
+        if (dependencyTicket.projectId !== ticket.projectId) {
+          broadcastEvent('tickets-updated', { projectId: dependencyTicket.projectId });
+        }
+
+        res.json({ success: true });
+      } catch (error) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to remove dependency.' });
+      }
+    });
+  });
+
+  router.get('/tickets/:ticketId/blockers', async (req, res) => {
+    await withTicketAccess(req, res, normalizeRouteParam(req.params.ticketId), async (ticket) => {
+      try {
+        const rows = await listTicketBlockers(ticket.id);
+        res.json(rows);
+      } catch (error) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to list blockers.' });
+      }
+    });
+  });
+
+  router.post('/tickets/:ticketId/blockers', async (req, res) => {
+    await withTicketAccess(req, res, normalizeRouteParam(req.params.ticketId), async (ticket) => {
+      const blockerId = req.body?.blockerId;
+      if (!blockerId) {
+        res.status(400).json({ error: 'Blocker ID is required.' });
+        return;
+      }
+
+      if (blockerId === ticket.id) {
+        res.status(400).json({ error: 'A ticket cannot block itself.' });
+        return;
+      }
+
+      const blockerTicket = await getTicketById(blockerId);
+      if (!blockerTicket) {
+        res.status(404).json({ error: 'Blocker ticket not found.' });
+        return;
+      }
+
+      const blockerAuth = await authorizeProjectAccess(req, blockerTicket.projectId);
+      if (!blockerAuth.allowed) {
+        res.status(blockerAuth.status).json({ error: blockerAuth.error });
+        return;
+      }
+
+      if (await hasTicketDependencyRelation(blockerId, ticket.id)) {
+        res.status(400).json({ error: 'This ticket already has the selected blocker.' });
+        return;
+      }
+
+      if (await hasTicketDependencyRelation(ticket.id, blockerId)) {
+        res.status(400).json({ error: 'Circular dependency detected: this ticket already blocks the selected ticket.' });
+        return;
+      }
+
+      try {
+        await createTicketDependencyRelation(blockerId, ticket.id);
+
+        broadcastEvent('tickets-updated', { projectId: ticket.projectId });
+        if (blockerTicket.projectId !== ticket.projectId) {
+          broadcastEvent('tickets-updated', { projectId: blockerTicket.projectId });
+        }
+
+        res.status(201).json({ success: true });
+      } catch (error) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to add blocker.' });
+      }
+    });
+  });
+
+  router.delete('/tickets/:ticketId/blockers/:blockerId', async (req, res) => {
+    await withTicketAccess(req, res, normalizeRouteParam(req.params.ticketId), async (ticket) => {
+      const blockerId = normalizeRouteParam(req.params.blockerId);
+
+      const blockerTicket = await getTicketById(blockerId);
+      if (!blockerTicket) {
+        res.status(404).json({ error: 'Blocker ticket not found.' });
+        return;
+      }
+
+      const blockerAuth = await authorizeProjectAccess(req, blockerTicket.projectId);
+      if (!blockerAuth.allowed) {
+        res.status(blockerAuth.status).json({ error: blockerAuth.error });
+        return;
+      }
+
+      if (!(await hasTicketDependencyRelation(blockerId, ticket.id))) {
+        res.status(400).json({ error: 'Ticket is not a blocker of this ticket.' });
+        return;
+      }
+
+      try {
+        await removeTicketDependencyRelation(blockerId, ticket.id);
+
+        broadcastEvent('tickets-updated', { projectId: ticket.projectId });
+        if (blockerTicket.projectId !== ticket.projectId) {
+          broadcastEvent('tickets-updated', { projectId: blockerTicket.projectId });
+        }
+
+        res.json({ success: true });
+      } catch (error) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to remove blocker.' });
+      }
+    });
   });
 
   return router;

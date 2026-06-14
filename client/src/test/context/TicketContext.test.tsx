@@ -106,6 +106,58 @@ function ContextProbe() {
   );
 }
 
+function RelationProbe() {
+  const {
+    activeTicket,
+    activeTicketDetail,
+    currentUser,
+    tickets,
+    setActiveProjectId,
+    setActiveTicket,
+    addTicketDependency,
+    removeTicketDependency,
+  } = useTickets();
+
+  React.useEffect(() => {
+    if (currentUser) {
+      setActiveProjectId('project-1');
+    }
+  }, [currentUser, setActiveProjectId]);
+
+  React.useEffect(() => {
+    const ticket = tickets.find((item) => item.id === 'ticket-1');
+    if (ticket && activeTicket?.id !== ticket.id) {
+      setActiveTicket(ticket);
+    }
+  }, [activeTicket?.id, setActiveTicket, tickets]);
+
+  return (
+    <div>
+      <div data-testid="dependency-keys">
+        {activeTicketDetail?.dependencies?.map((ticket) => ticket.key).join('|') ?? ''}
+      </div>
+      <button
+        type="button"
+        disabled={!activeTicket}
+        onClick={() => {
+          void addTicketDependency('ticket-1', 'ticket-2');
+        }}
+      >
+        Add dependency
+      </button>
+      <button
+        type="button"
+        disabled={!activeTicket}
+        onClick={() => {
+          void removeTicketDependency('ticket-1', 'ticket-2');
+        }}
+      >
+        Remove dependency
+      </button>
+    </div>
+  );
+}
+
 describe('TicketContext', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -514,6 +566,120 @@ describe('TicketContext', () => {
       })
     );
     consoleErrorSpy.mockRestore();
+  });
+
+  it('optimistically updates ticket dependencies while the server request runs in the background', async () => {
+    const user = {
+      id: 'user-session-1',
+      name: 'Ada Lovelace',
+      email: 'ada@example.com',
+      avatar: '',
+      role: 'owner',
+      tutorial_completed: 1,
+    };
+    const sourceTicket = {
+      id: 'ticket-1',
+      key: 'GRA-1',
+      title: 'Seed ticket',
+      description: '',
+      status: 'todo',
+      priority: 'medium',
+      projectId: 'project-1',
+      domainId: null,
+      cycleId: null,
+      assigneeId: null,
+      parentId: null,
+      prStatus: 'none',
+      prUrl: null,
+      createdAt: '2026-05-01T00:00:00.000Z',
+      updatedAt: '2026-05-01T00:00:00.000Z',
+    };
+    const dependencyTicket = {
+      ...sourceTicket,
+      id: 'ticket-2',
+      key: 'GRA-2',
+      title: 'Dependency target',
+    };
+    const pendingRequests: {
+      resolveDetailRequest?: (response: Response) => void;
+      resolveDependencyPost?: (response: Response) => void;
+    } = {};
+
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? 'GET';
+
+      if (url === '/api/auth/session') {
+        return Promise.resolve(jsonResponse({ user, session: { userId: user.id } }));
+      }
+
+      if (url === '/api/v1/projects?userId=user-session-1') {
+        return Promise.resolve(jsonResponse([{ id: 'project-1', name: 'Gravity Core', description: '', key: 'GRA', status: 'active', workspaceId: 'workspace-1' }]));
+      }
+
+      if (url === '/api/v1/users' || url === '/api/v1/labels' || url === '/api/v1/cycles') {
+        return Promise.resolve(jsonResponse([]));
+      }
+
+      if (url === '/api/v1/tickets' && method === 'GET') {
+        return Promise.resolve(jsonResponse([sourceTicket, dependencyTicket]));
+      }
+
+      if (url === '/api/v1/tickets/ticket-1' && method === 'GET') {
+        return new Promise<Response>((resolve) => {
+          pendingRequests.resolveDetailRequest = resolve;
+        });
+      }
+
+      if (url === '/api/v1/tickets/ticket-1/dependencies' && method === 'POST') {
+        return new Promise<Response>((resolve) => {
+          pendingRequests.resolveDependencyPost = resolve;
+        });
+      }
+
+      return Promise.resolve(jsonResponse([]));
+    });
+
+    stubEventSource();
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderWithProvider(
+      <TicketProvider>
+        <RelationProbe />
+      </TicketProvider>
+    );
+
+    const addButton = await screen.findByRole('button', { name: 'Add dependency' });
+    await waitFor(() => expect(addButton).not.toBeDisabled());
+
+    fireEvent.click(addButton);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('dependency-keys')).toHaveTextContent('GRA-2');
+    });
+    await waitFor(() => {
+      expect(pendingRequests.resolveDependencyPost).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove dependency' }));
+    expect(screen.getByTestId('dependency-keys')).toHaveTextContent('GRA-2');
+    expect(fetchMock.mock.calls.some(([url, init]) => (
+      String(url) === '/api/v1/tickets/ticket-1/dependencies/ticket-2' && init?.method === 'DELETE'
+    ))).toBe(false);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/tickets/ticket-1/dependencies',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ dependencyId: 'ticket-2' }),
+      })
+    );
+
+    pendingRequests.resolveDetailRequest?.(jsonResponse({ ...sourceTicket, dependencies: [], blockers: [] }));
+    await Promise.resolve();
+    expect(screen.getByTestId('dependency-keys')).toHaveTextContent('GRA-2');
+
+    pendingRequests.resolveDependencyPost?.(jsonResponse({ success: true }, 201));
   });
 
   it('rolls back to the original tickets when update rollback refresh fails', async () => {

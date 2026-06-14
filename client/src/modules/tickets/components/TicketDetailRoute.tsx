@@ -13,6 +13,7 @@ interface TicketDetailRouteProps {
   projects: Project[];
   labels: Label[];
   cycles: Cycle[];
+  activeTicketDetail: Ticket | null;
   onSelectTicket: (ticket: Ticket | null) => void;
   onUpdateTicket: (id: string, updates: Partial<Ticket>) => Promise<void>;
   onDeleteTicket: (ticketId: string) => Promise<void>;
@@ -20,11 +21,16 @@ interface TicketDetailRouteProps {
   onUpdateComment: (ticketId: string, commentId: string, body: string) => Promise<void>;
   onDeleteComment: (ticketId: string, commentId: string) => Promise<void>;
   onOpenCreateSubtask: (parentId: string) => void;
+  onAddDependency: (ticketId: string, dependencyId: string) => Promise<boolean>;
+  onRemoveDependency: (ticketId: string, dependencyId: string) => Promise<boolean>;
+  onAddBlocker?: (ticketId: string, blockerId: string) => Promise<boolean>;
+  onRemoveBlocker?: (ticketId: string, blockerId: string) => Promise<boolean>;
 }
 
 export const TicketDetailRoute: React.FC<TicketDetailRouteProps> = ({
   activeWorkspaceId,
   activeTicket,
+  activeTicketDetail,
   comments,
   tickets,
   users,
@@ -38,6 +44,10 @@ export const TicketDetailRoute: React.FC<TicketDetailRouteProps> = ({
   onUpdateComment,
   onDeleteComment,
   onOpenCreateSubtask,
+  onAddDependency,
+  onRemoveDependency,
+  onAddBlocker,
+  onRemoveBlocker,
 }) => {
   const navigate = useNavigate();
   const { workspaceId, projectId, ticketKey } = useParams();
@@ -84,8 +94,10 @@ export const TicketDetailRoute: React.FC<TicketDetailRouteProps> = ({
     <>
       <TicketDetail
         activeTicket={activeTicket}
+        activeTicketDetail={activeTicketDetail}
         comments={comments}
         subtasks={detailSubtasks}
+        availableTickets={tickets}
         completedSubtasks={completedDetailSubtasks}
         subtaskProgressPercent={detailSubtaskProgressPercent}
         parentTicket={parentTicket}
@@ -100,6 +112,10 @@ export const TicketDetailRoute: React.FC<TicketDetailRouteProps> = ({
         onUpdateComment={onUpdateComment}
         onDeleteComment={onDeleteComment}
         onOpenCreateSubtask={onOpenCreateSubtask}
+        onAddDependency={onAddDependency}
+        onRemoveDependency={onRemoveDependency}
+        onAddBlocker={onAddBlocker}
+        onRemoveBlocker={onRemoveBlocker}
         ticketLink={ticketLink}
         onClose={() => navigate(`/workspaces/${activeWorkspaceId}/projects/${activeTicket.projectId}/tickets`)}
       />

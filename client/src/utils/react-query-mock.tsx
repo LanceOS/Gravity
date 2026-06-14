@@ -11,10 +11,16 @@ type QueryState<T = any> = {
   fetchStatus: 'fetching' | 'idle';
   updatedAt: number;
   promise: Promise<T> | null;
+  fetchId: number;
   staleTime: number;
   gcTime: number;
   timerId: number | null; // For garbage collection
   subscribers: Set<() => void>;
+};
+
+type QueryFilters = {
+  queryKey?: QueryKey;
+  exact?: boolean;
 };
 
 // --- Helper Functions ---
@@ -37,6 +43,16 @@ function isKeyMatch(queryKey: QueryKey, targetKey: QueryKey): boolean {
     }
   }
   return true;
+}
+
+function isExactKeyMatch(queryKey: QueryKey, targetKey: QueryKey): boolean {
+  return serializeKey(queryKey) === serializeKey(targetKey);
+}
+
+function matchesFilters(queryKey: QueryKey, filters?: QueryFilters): boolean {
+  const targetKey = filters?.queryKey;
+  if (!targetKey) return true;
+  return filters?.exact ? isExactKeyMatch(queryKey, targetKey) : isKeyMatch(queryKey, targetKey);
 }
 
 // --- QueryClient ---
@@ -62,6 +78,7 @@ export class QueryClient {
         fetchStatus: 'idle',
         updatedAt: 0,
         promise: null,
+        fetchId: 0,
         staleTime: options.staleTime ?? defaultStaleTime,
         gcTime: options.gcTime ?? defaultGcTime,
         timerId: null,
@@ -99,6 +116,19 @@ export class QueryClient {
     return this.cache.get(serialized)?.data as T | undefined;
   }
 
+  public getQueriesData<T>(filters?: QueryFilters): Array<[QueryKey, T | undefined]> {
+    const results: Array<[QueryKey, T | undefined]> = [];
+
+    for (const [serialized, state] of this.cache.entries()) {
+      const queryKey = JSON.parse(serialized) as QueryKey;
+      if (matchesFilters(queryKey, filters)) {
+        results.push([queryKey, state.data as T | undefined]);
+      }
+    }
+
+    return results;
+  }
+
   public setQueryData<T>(key: QueryKey, updater: T | ((old: T | undefined) => T)): T {
     const state = this.getOrCreateQuery<T>(key);
     const oldData = state.data;
@@ -113,14 +143,38 @@ export class QueryClient {
     return newData;
   }
 
-  public invalidateQueries(filters?: { queryKey?: QueryKey }) {
-    const targetKey = filters?.queryKey;
+  public invalidateQueries(filters?: QueryFilters) {
     for (const [serialized, state] of this.cache.entries()) {
       const queryKey = JSON.parse(serialized) as QueryKey;
-      if (!targetKey || isKeyMatch(queryKey, targetKey)) {
+      if (matchesFilters(queryKey, filters)) {
         this.updateQueryState(queryKey, () => ({
           updatedAt: 0,
         }));
+      }
+    }
+  }
+
+  public cancelQueries(filters?: QueryFilters): Promise<void> {
+    for (const [serialized] of this.cache.entries()) {
+      const queryKey = JSON.parse(serialized) as QueryKey;
+      if (matchesFilters(queryKey, filters)) {
+        this.updateQueryState(queryKey, (state) => ({
+          promise: null,
+          fetchStatus: 'idle',
+          fetchId: state.fetchId + 1,
+        }));
+      }
+    }
+
+    return Promise.resolve();
+  }
+
+  public removeQueries(filters?: QueryFilters) {
+    for (const [serialized, state] of this.cache.entries()) {
+      const queryKey = JSON.parse(serialized) as QueryKey;
+      if (matchesFilters(queryKey, filters)) {
+        this.cache.delete(serialized);
+        state.subscribers.forEach(cb => cb());
       }
     }
   }
@@ -162,12 +216,20 @@ export class QueryClient {
       return state.promise;
     }
 
+    const fetchId = state.fetchId + 1;
+
     this.updateQueryState<T>(key, () => ({
       fetchStatus: 'fetching',
+      fetchId,
     }));
 
     const promise = queryFn()
       .then(data => {
+        const latestState = this.cache.get(serializeKey(key));
+        if (latestState?.fetchId !== fetchId) {
+          return data;
+        }
+
         this.updateQueryState<T>(key, (prev) => ({
           ...prev,
           data,
@@ -179,6 +241,11 @@ export class QueryClient {
         return data;
       })
       .catch(error => {
+        const latestState = this.cache.get(serializeKey(key));
+        if (latestState?.fetchId !== fetchId) {
+          throw error;
+        }
+
         this.updateQueryState<T>(key, (prev) => ({
           ...prev,
           error,

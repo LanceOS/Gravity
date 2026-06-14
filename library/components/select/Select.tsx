@@ -1,7 +1,6 @@
 import React from 'react';
 import { ChevronDown, Check } from 'lucide-react';
-import { ClickAwayListener, Portal } from '../../utilities';
-import { cn } from '../../utilities';
+import { ClickAwayListener, Portal, cn, getDropdownPosition } from '../../utilities';
 
 export interface SelectOption {
   value: string;
@@ -96,6 +95,7 @@ export function Select({
   const menuId = `${selectId}-menu`;
   const errorId = `${selectId}-error`;
   const triggerRef = React.useRef<HTMLButtonElement | null>(null);
+  const menuRef = React.useRef<HTMLDivElement | null>(null);
   const [isOpen, setIsOpen] = React.useState(false);
   const [activeIndex, setActiveIndex] = React.useState(-1);
   const [menuStyle, setMenuStyle] = React.useState<React.CSSProperties>({});
@@ -111,29 +111,42 @@ export function Select({
   const firstEnabledIndex = getFirstEnabledSelectIndex(allOptions);
 
   const syncMenuPosition = React.useCallback(() => {
-    if (!triggerRef.current) {
+    if (!triggerRef.current || !menuRef.current) {
       return;
     }
 
     const triggerRect = triggerRef.current.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - triggerRect.bottom;
-    const spaceAbove = triggerRect.top;
-    const openAbove = spaceBelow < 220 && spaceAbove > spaceBelow;
-    const left = Math.max(8, Math.min(triggerRect.left, window.innerWidth - triggerRect.width - 8));
+    const menuRect = menuRef.current.getBoundingClientRect();
+    const { left, top, maxHeight } = getDropdownPosition({
+      triggerRect,
+      floatingRect: menuRect,
+      align: 'left',
+      gap: 4,
+      viewportPadding: 8,
+      fallbackWidth: triggerRect.width,
+      fallbackHeight: 240,
+    });
 
     setMenuStyle({
       position: 'fixed',
       zIndex: 1600,
       left: `${left}px`,
-      top: openAbove ? `${Math.max(8, triggerRect.top - 4)}px` : `${triggerRect.bottom + 4}px`,
-      transform: openAbove ? 'translateY(-100%)' : 'none',
+      top: `${top}px`,
       width: 'max-content',
       minWidth: `${triggerRect.width}px`,
       maxWidth: 'calc(100vw - 16px)',
       boxSizing: 'border-box',
-      maxHeight: '240px',
+      maxHeight: `${maxHeight}px`,
     });
   }, []);
+
+  const setMenuElement = React.useCallback((node: HTMLDivElement | null) => {
+    menuRef.current = node;
+
+    if (node) {
+      syncMenuPosition();
+    }
+  }, [syncMenuPosition]);
 
   React.useLayoutEffect(() => {
     if (!isOpen) {
@@ -284,10 +297,11 @@ export function Select({
         {isOpen && (
           <Portal>
             <div
+              ref={setMenuElement}
               id={menuId}
               role="listbox"
               aria-labelledby={label ? labelId : undefined}
-              className={cn('select-menu scroll-container', menuStyle.transform === 'translateY(-100%)' && 'select-menu--up')}
+              className={cn('select-menu scroll-container')}
               style={menuStyle}
             >
             {allOptions.map((opt, index) => {

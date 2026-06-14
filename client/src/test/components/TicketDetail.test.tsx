@@ -10,6 +10,8 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { TicketDetail } from '../../modules/tickets/components/TicketDetail/TicketDetail';
+import type { Ticket } from '../../types/domain';
+import type { TicketWithRelations } from '../../modules/tickets/utils/ticketRelations';
 
 type MockButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   children?: ReactNode;
@@ -40,6 +42,7 @@ type MockTextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
 const mockAssignLabel = vi.fn().mockResolvedValue(true);
 const mockUnassignLabel = vi.fn().mockResolvedValue(true);
 const mockCreateLabel = vi.fn().mockResolvedValue({ id: 'label-3', name: 'New Label', color: '#6B7280' });
+let mockTickets: Array<{ id: string; key: string; title: string; projectId: string }> = [];
 
 vi.mock('../../context/TicketContext', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../context/TicketContext')>();
@@ -49,6 +52,7 @@ vi.mock('../../context/TicketContext', async (importOriginal) => {
       assignLabelToTicket: mockAssignLabel,
       unassignLabelFromTicket: mockUnassignLabel,
       createLabel: mockCreateLabel,
+      tickets: mockTickets,
     }),
   };
 });
@@ -222,6 +226,24 @@ const subtaskTwo = {
   parentId: 'ticket-1',
 };
 
+const dependencySearchTicket = {
+  ...activeTicket,
+  id: 'ticket-6',
+  key: 'GRA-106',
+  title: 'Searchable dependency target',
+  status: 'todo' as const,
+  parentId: null,
+};
+
+const blockerSearchTicket = {
+  ...activeTicket,
+  id: 'ticket-7',
+  key: 'GRA-107',
+  title: 'Searchable blocker target',
+  status: 'todo' as const,
+  parentId: null,
+};
+
 const comments = [
   {
     id: 'comment-1',
@@ -306,11 +328,52 @@ const cycles = [
   },
 ];
 
-function renderTicketDetail(overrides: Partial<Parameters<typeof TicketDetail>[0]> = {}) {
+const defaultContextTickets = [
+  activeTicket,
+  subtaskOne,
+  subtaskTwo,
+  dependencySearchTicket,
+  blockerSearchTicket,
+];
+
+function withRelatedTicketIds(ticket: Ticket): TicketWithRelations {
+  const relatedTicketIds = new Set<string>();
+
+  for (const dependency of ticket.dependencies || []) {
+    if (dependency?.id) {
+      relatedTicketIds.add(dependency.id);
+    }
+  }
+
+  for (const blocker of ticket.blockers || []) {
+    if (blocker?.id) {
+      relatedTicketIds.add(blocker.id);
+    }
+  }
+
+  if (ticket.blockedTicket?.id) {
+    relatedTicketIds.add(ticket.blockedTicket.id);
+  }
+
+  return {
+    ...ticket,
+    relatedTicketIds: Array.from(relatedTicketIds),
+  };
+}
+
+function renderTicketDetail(overrides: Partial<Parameters<typeof TicketDetail>[0]> = {}, contextTickets = defaultContextTickets) {
+  mockTickets = contextTickets;
+  const activeTicketDetail = overrides.activeTicketDetail ? withRelatedTicketIds(overrides.activeTicketDetail) : overrides.activeTicketDetail ?? null;
+  const normalizedOverrides = {
+    ...overrides,
+    activeTicketDetail,
+  };
+
   const props = {
     activeTicket,
     comments,
     subtasks: [subtaskOne, subtaskTwo],
+    availableTickets: contextTickets,
     completedSubtasks: 1,
     subtaskProgressPercent: 50,
     users,
@@ -325,7 +388,11 @@ function renderTicketDetail(overrides: Partial<Parameters<typeof TicketDetail>[0
     onDeleteComment: vi.fn().mockResolvedValue(undefined),
     onClose: vi.fn(),
     onOpenCreateSubtask: vi.fn(),
-    ...overrides,
+    onAddDependency: vi.fn().mockResolvedValue(true),
+    onRemoveDependency: vi.fn().mockResolvedValue(true),
+    onAddBlocker: vi.fn().mockResolvedValue(true),
+    onRemoveBlocker: vi.fn().mockResolvedValue(true),
+    ...normalizedOverrides,
   };
 
   return {
@@ -339,6 +406,8 @@ describe('TicketDetail', () => {
     const user = userEvent.setup();
     const { props } = renderTicketDetail();
     const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => { });
+
+    expect(screen.queryByText('Relations')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Back' }));
     expect(props.onClose).toHaveBeenCalledTimes(1);
@@ -421,6 +490,124 @@ describe('TicketDetail', () => {
     await user.click(screen.getAllByRole('button', { name: 'Delete Ticket' })[1]);
     await waitFor(() => {
       expect(props.onDeleteTicket).toHaveBeenCalledWith('ticket-1');
+    });
+  });
+
+  it('renders blocker relationships and allows removing them', async () => {
+    const user = userEvent.setup();
+    const blockerTicket = {
+      ...activeTicket,
+      id: 'ticket-4',
+      key: 'GRA-104',
+      title: 'Coordinate upstream fix',
+      projectId: 'project-1',
+      status: 'todo' as const,
+      parentId: null,
+    };
+    const dependentTicket = {
+      ...activeTicket,
+      id: 'ticket-5',
+      key: 'GRA-105',
+      title: 'Ship dependent rollout',
+      projectId: 'project-1',
+      status: 'todo' as const,
+      parentId: null,
+    };
+
+    const { props } = renderTicketDetail({
+      activeTicketDetail: {
+        ...activeTicket,
+        blockers: [blockerTicket],
+        dependencies: [dependentTicket],
+      },
+    }, [...defaultContextTickets, blockerTicket, dependentTicket]);
+
+    const sidebar = within(screen.getByTestId('desktop-sidebar'));
+    expect(sidebar.getByRole('button', { name: 'Add Dependency' })).toBeInTheDocument();
+    expect(sidebar.getByRole('button', { name: 'Add Blocker' })).toBeInTheDocument();
+    expect(sidebar.getByText('Blocked by')).toBeInTheDocument();
+    expect(sidebar.getByText('Blocks')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'GRA-104 - Coordinate upstream fix' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'GRA-105 - Ship dependent rollout' })).toBeInTheDocument();
+    expect(screen.getAllByText('Casey Carter').length).toBeGreaterThan(0);
+
+    await user.click(sidebar.getByRole('button', { name: 'Add Dependency' }));
+    const dependencySearch = screen.getByPlaceholderText('Type to search tickets...');
+    await user.type(dependencySearch, 'Searchable dependency target');
+    await user.click(screen.getByRole('button', { name: /GRA-106/ }));
+    await waitFor(() => {
+      expect(props.onAddDependency).toHaveBeenCalledWith('ticket-1', 'ticket-6');
+    });
+
+    await user.click(sidebar.getByRole('button', { name: 'Add Blocker' }));
+    const blockerSearch = screen.getAllByPlaceholderText('Type to search tickets...')[1] as HTMLInputElement;
+    await user.type(blockerSearch, 'Searchable blocker target');
+    await user.click(screen.getByRole('button', { name: /GRA-107/ }));
+    await waitFor(() => {
+      expect(props.onAddBlocker).toHaveBeenCalledWith('ticket-1', 'ticket-7');
+    });
+
+    await user.click(sidebar.getByRole('button', { name: 'GRA-104 - Coordinate upstream fix' }));
+    expect(props.onSelectTicket).toHaveBeenCalledWith(blockerTicket);
+
+    await user.click(sidebar.getByRole('button', { name: 'Remove blocker GRA-104' }));
+    expect(props.onRemoveBlocker).toHaveBeenCalledWith('ticket-1', 'ticket-4');
+  });
+
+  it('hides incompatible relation candidates from add relation pickers', async () => {
+    const user = userEvent.setup();
+    const blockerTicket = {
+      ...activeTicket,
+      id: 'ticket-4',
+      key: 'GRA-104',
+      title: 'Coordinate upstream fix',
+      projectId: 'project-1',
+      status: 'todo' as const,
+      parentId: null,
+    };
+    const dependentTicket = {
+      ...activeTicket,
+      id: 'ticket-5',
+      key: 'GRA-105',
+      title: 'Ship dependent rollout',
+      projectId: 'project-1',
+      status: 'todo' as const,
+      parentId: null,
+    };
+
+    const { props } = renderTicketDetail({
+      activeTicketDetail: {
+        ...activeTicket,
+        blockers: [blockerTicket],
+        dependencies: [dependentTicket],
+      },
+    }, [...defaultContextTickets, blockerTicket, dependentTicket]);
+
+    const sidebar = within(screen.getByTestId('desktop-sidebar'));
+
+    await user.click(sidebar.getByRole('button', { name: 'Add Dependency' }));
+    const dependencySearch = screen.getByPlaceholderText('Type to search tickets...');
+    await user.type(dependencySearch, 'Coordinate upstream fix');
+    expect(screen.queryByRole('checkbox', { name: /GRA-104/ })).not.toBeInTheDocument();
+    await user.clear(dependencySearch);
+    await user.type(dependencySearch, 'Searchable dependency target');
+    expect(screen.getByRole('button', { name: /GRA-106/ })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /GRA-106/ }));
+    await waitFor(() => {
+      expect(props.onAddDependency).toHaveBeenCalledWith('ticket-1', 'ticket-6');
+    });
+
+    await user.click(sidebar.getByRole('button', { name: 'Add Blocker' }));
+    const blockerSearchInputs = screen.getAllByPlaceholderText('Type to search tickets...');
+    const blockerSearch = blockerSearchInputs[blockerSearchInputs.length - 1] as HTMLInputElement;
+    await user.type(blockerSearch, 'Ship dependent rollout');
+    expect(screen.queryByRole('checkbox', { name: /GRA-105/ })).not.toBeInTheDocument();
+    await user.clear(blockerSearch);
+    await user.type(blockerSearch, 'Searchable blocker target');
+    expect(screen.getByRole('button', { name: /GRA-107/ })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /GRA-107/ }));
+    await waitFor(() => {
+      expect(props.onAddBlocker).toHaveBeenCalledWith('ticket-1', 'ticket-7');
     });
   });
 
@@ -571,9 +758,13 @@ describe('TicketDetail', () => {
     };
 
     const { props } = renderTicketDetail({ activeTicket: childTicket, parentTicket, onSelectTicket: vi.fn() });
+    const sidebar = within(screen.getByTestId('desktop-sidebar'));
 
     expect(screen.getByText('Sub ticket of')).toBeInTheDocument();
-    const parentBtn = screen.getByRole('button', { name: 'GRA-100 - Parent Ticket Title' });
+    expect(sidebar.getByText('Relations')).toBeInTheDocument();
+    expect(sidebar.getByText('Sub-ticket of')).toBeInTheDocument();
+    expect(screen.getAllByText('Casey Carter').length).toBeGreaterThan(0);
+    const parentBtn = screen.getAllByRole('button', { name: 'GRA-100 - Parent Ticket Title' })[0];
     await user.click(parentBtn);
     expect(props.onSelectTicket).toHaveBeenCalledWith(parentTicket);
   });

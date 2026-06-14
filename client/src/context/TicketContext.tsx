@@ -3,6 +3,9 @@ import React, { createContext, useContext, useEffect, useCallback, useMemo, useS
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys, CACHE_CONFIGS } from '../utils/queryClient';
 import { useMoveTicket } from './useMoveTicket';
+import { useTicketRelationActions } from '../hooks/useTicketRelationActions';
+import type { TicketWithRelations } from '../modules/tickets/utils/ticketRelations';
+import { toast } from '@library';
 
 // Shared entity types live in src/types/domain.ts.
 export type {
@@ -126,6 +129,7 @@ function canonicalizeStatus(status: string | undefined | null): Ticket['status']
   return 'todo';
 }
 
+
 const TICKET_UPDATE_DEBOUNCE_MS = 250;
 
 type TicketUpdateBatch = {
@@ -172,6 +176,11 @@ interface TicketContextType extends State {
   setCurrentUser: (user: User | null) => void;
   setTheme: (theme: 'dark' | 'coal-black' | 'coffee' | 'marble-blue') => void;
   setActiveTicket: (ticket: Ticket | null) => void;
+  activeTicketDetail: TicketWithRelations | null;
+  addTicketDependency: (ticketId: string, dependencyId: string) => Promise<boolean>;
+  removeTicketDependency: (ticketId: string, dependencyId: string) => Promise<boolean>;
+  addTicketBlocker: (ticketId: string, blockerId: string) => Promise<boolean>;
+  removeTicketBlocker: (ticketId: string, blockerId: string) => Promise<boolean>;
   setView: (view: 'list' | 'board') => void;
   setFilters: (filters: Partial<State['filters']>) => void;
   resetFilters: () => void;
@@ -268,12 +277,28 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Comments
   const activeTicketId = activeTicket?.id;
+  const activeTicketProjectId = activeTicket?.projectId || activeProjectId;
   const commentsQuery = useQuery({
     queryKey: queryKeys.comments(activeTicketId || ''),
-    queryFn: () => apiClient.get<Comment[]>(`/tickets/${activeTicketId}/comments`, { projectId: activeProjectId }),
-    enabled: !!activeTicketId && !!activeProjectId && !!currentUser,
+    queryFn: () => apiClient.get<Comment[]>(`/tickets/${activeTicketId}/comments`, { projectId: activeTicketProjectId }),
+    enabled: !!activeTicketId && !!activeTicketProjectId && !!currentUser,
   });
   const comments = commentsQuery.data || [];
+
+  const {
+    activeTicketDetail,
+    addTicketDependency,
+    removeTicketDependency,
+    addTicketBlocker,
+    removeTicketBlocker,
+  } = useTicketRelationActions({
+    queryClient,
+    tickets,
+    activeTicket,
+    activeTicketId,
+    activeTicketProjectId,
+    isAuthenticated: !!currentUser,
+  });
 
   // Global loading state combining react-query status
   const loading =
@@ -1075,6 +1100,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       users,
       comments,
       activeTicket,
+      activeTicketDetail,
       activeView,
       filters,
       currentUser,
@@ -1096,6 +1122,10 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       addComment,
       updateComment,
       deleteComment,
+      addTicketDependency,
+      removeTicketDependency,
+      addTicketBlocker,
+      removeTicketBlocker,
       createProject,
       updateProject,
       deleteProject,
@@ -1119,6 +1149,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       users,
       comments,
       activeTicket,
+      activeTicketDetail,
       activeView,
       filters,
       currentUser,
@@ -1140,8 +1171,11 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       addComment,
       updateComment,
       deleteComment,
+      addTicketDependency,
+      removeTicketDependency,
       createProject,
       updateProject,
+      deleteProject,
       joinProject,
       signIn,
       signUp,
@@ -1152,6 +1186,8 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setView,
       setFilters,
       resetFilters,
+      addTicketBlocker,
+      removeTicketBlocker,
       ticketMap,
     ]
   );

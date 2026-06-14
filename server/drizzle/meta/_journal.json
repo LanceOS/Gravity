@@ -43,6 +43,27 @@
       "when": 1781230576575,
       "tag": "0005_ordinary_franklin_storm",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1781408422680,
+      "tag": "0006_chubby_whistler",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1781409797605,
+      "tag": "0007_add_ticket_dependencies",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1781413349715,
+      "tag": "0008_condemned_steve_rogers",
+      "breakpoints": true
     }
   ]
 }

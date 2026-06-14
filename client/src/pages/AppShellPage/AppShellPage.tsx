@@ -2,8 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MessageSquare, X } from 'lucide-react';
 import { useParams, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { apiClient } from '../../utils/apiClient';
 import type { SidebarTree, Cycle, Label } from '../../types/domain';
+import { apiClient } from '../../utils/apiClient';
+import { useTicketRelationsSnapshot } from '../../hooks/useTicketRelationsSnapshot';
 
 import { AuthScreen } from '../../modules/auth';
 import { CreateTicketModal } from '../../modules/tickets';
@@ -73,6 +74,11 @@ export function AppShellPage() {
     updateTicket,
     updateProject,
     users,
+    activeTicketDetail,
+    addTicketDependency,
+    removeTicketDependency,
+    addTicketBlocker,
+    removeTicketBlocker,
   } = useTickets();
 
   const [activeSection, setActiveSection] = useState<AppSection>('workspace');
@@ -254,6 +260,7 @@ export function AppShellPage() {
   const isTeamAggregatePath = !!teamIdParam && !projectIdParam;
   const shouldUseAggregateTicketScope = isWorkspaceAllTasksPath || isTeamAggregatePath;
   const shouldKeepActiveProjectSelection = isWorkspaceAllTasksPath || isWorkspaceProjectsListPath || isTeamAggregatePath;
+  useTicketRelationsSnapshot(ticketKey, currentUser?.id);
 
   // Teams-specific queries
   const { data: sidebarTree } = useQuery<SidebarTree>({
@@ -285,6 +292,11 @@ export function AppShellPage() {
     queryFn: () => apiClient.get<Label[]>('/labels', { params: { teamId: teamIdParam } }),
     enabled: isTeamAggregatePath && !!currentUser,
   });
+
+  const routeScopedTickets = useMemo(
+    () => (isWorkspaceAllTasksPath ? workspaceTickets : isTeamAggregatePath ? teamTickets : tickets),
+    [isWorkspaceAllTasksPath, workspaceTickets, isTeamAggregatePath, teamTickets, tickets]
+  );
 
   const handleSelectTeam = useCallback((teamId: string) => {
     navigate(`/workspaces/${activeWorkspaceId}/teams/${teamId}/tasks`);
@@ -516,10 +528,10 @@ export function AppShellPage() {
     if (!ticketKey) return;
     // Only update if the active ticket doesn't already match the URL key
     if (activeTicket?.key === ticketKey) return;
-    const resolved = tickets.find((t) => t.key === ticketKey) ?? null;
+    const resolved = routeScopedTickets.find((t) => t.key === ticketKey) ?? null;
     setActiveTicket(resolved);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ticketKey, tickets]);
+  }, [ticketKey, routeScopedTickets]);
 
   // Root path routing redirect
   useEffect(() => {
@@ -702,6 +714,8 @@ export function AppShellPage() {
       createTicket,
       updateTicket,
       addComment,
+      addBlocker: addTicketBlocker,
+      removeBlocker: removeTicketBlocker,
       getTickets: () => tickets,
       getUsers: () => users,
       getProjects: () => projects,
@@ -712,7 +726,7 @@ export function AppShellPage() {
         controller.abort();
       }
     };
-  }, [tickets, users, projects, createTicket, updateTicket, addComment]);
+  }, [tickets, users, projects, createTicket, updateTicket, addComment, addTicketBlocker, removeTicketBlocker]);
 
   const handleOpenCreateTicket = (initialStatus?: Ticket['status']) => {
     if (activeWorkspaceProjects.length === 0) {
@@ -1143,11 +1157,7 @@ export function AppShellPage() {
   const scopedProjects = teamIdParam
     ? activeWorkspaceProjects.filter((project) => project.teamId === teamIdParam || activeTeamProjectIds.has(project.id))
     : activeWorkspaceProjects;
-  const scopedTickets = isWorkspaceAllTasksPath
-    ? workspaceTickets
-    : isTeamAggregatePath
-      ? teamTickets
-      : tickets;
+  const scopedTickets = routeScopedTickets;
   const scopedCycles = isTeamAggregatePath ? teamCycles : cycles;
   const scopedLabels = isTeamAggregatePath ? teamLabels : labels;
   const scopedFilters = shouldUseAggregateTicketScope ? { ...filters, projectId: '' } : filters;
@@ -1237,14 +1247,15 @@ export function AppShellPage() {
     },
   };
 
-  const resolvedTicketForRoute = ticketKey ? tickets.find((t) => t.key === ticketKey) || null : activeTicket;
+  const resolvedTicketForRoute = ticketKey ? routeScopedTickets.find((t) => t.key === ticketKey) || null : activeTicket;
 
   const ticketDetailComponent = ticketKey ? (
     <TicketDetailRoute
       activeWorkspaceId={activeWorkspaceId}
       activeTicket={resolvedTicketForRoute}
+      activeTicketDetail={activeTicketDetail}
       comments={comments}
-      tickets={tickets}
+      tickets={routeScopedTickets}
       users={users}
       projects={activeWorkspaceProjects}
       labels={labels}
@@ -1260,6 +1271,10 @@ export function AppShellPage() {
       onUpdateComment={updateComment}
       onDeleteComment={deleteComment}
       onOpenCreateSubtask={handleOpenCreateSubtask}
+      onAddDependency={addTicketDependency}
+      onRemoveDependency={removeTicketDependency}
+      onAddBlocker={addTicketBlocker}
+      onRemoveBlocker={removeTicketBlocker}
     />
   ) : null;
 
