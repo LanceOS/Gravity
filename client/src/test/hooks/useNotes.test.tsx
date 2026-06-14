@@ -38,7 +38,7 @@ describe('useNotes', () => {
     // Assuming limit is 20 and we returned 2 items, hasMore should be false
     expect(result.current.hasMore).toBe(false);
 
-    expect(fetchSpy).toHaveBeenCalledWith('/api/v1/notes?limit=20&offset=0', {
+    expect(fetchSpy).toHaveBeenCalledWith('/api/v1/notes?limit=20&offset=0&sort=desc', {
       headers: { 'x-project-id': 'proj-1' },
     });
   });
@@ -97,7 +97,7 @@ describe('useNotes', () => {
     });
 
     expect(result.current.hasMore).toBe(false);
-    expect(fetchSpy).toHaveBeenLastCalledWith('/api/v1/notes?limit=20&offset=20', {
+    expect(fetchSpy).toHaveBeenLastCalledWith('/api/v1/notes?limit=20&offset=20&sort=desc', {
       headers: { 'x-project-id': 'proj-1' },
     });
   });

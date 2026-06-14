@@ -42,8 +42,8 @@ describe('NotesList', () => {
       loadMore: vi.fn(),
     });
 
-    render(<NotesList projectId="proj-1" onSelectNote={onSelectNoteMock} />);
-    expect(screen.getByText('Loading notes...')).toBeInTheDocument();
+    const { container } = render(<NotesList projectId="proj-1" onSelectNote={onSelectNoteMock} />);
+    expect(container.querySelector('.lib-skeleton-pulse')).toBeInTheDocument();
   });
 
   it('shows empty state when no notes exist', () => {
