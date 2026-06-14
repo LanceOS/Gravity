@@ -102,6 +102,7 @@ export interface Ticket {
   blockedTicketId?: string | null;
   blockedTicket?: { id: string; key: string; title: string; projectId: string } | null;
   dependencies?: Array<{ id: string; key: string; title: string; projectId: string }>;
+  blockers?: Array<{ id: string; key: string; title: string; projectId: string }>;
   prStatus: 'open' | 'merged' | 'closed' | 'none';
   prUrl: string | null;
   branchName?: string;

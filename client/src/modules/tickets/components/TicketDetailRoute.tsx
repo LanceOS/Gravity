@@ -23,6 +23,8 @@ interface TicketDetailRouteProps {
   onOpenCreateSubtask: (parentId: string) => void;
   onAddDependency: (ticketId: string, dependencyId: string) => Promise<boolean>;
   onRemoveDependency: (ticketId: string, dependencyId: string) => Promise<boolean>;
+  onAddBlocker?: (ticketId: string, blockerId: string) => Promise<boolean>;
+  onRemoveBlocker?: (ticketId: string, blockerId: string) => Promise<boolean>;
 }
 
 export const TicketDetailRoute: React.FC<TicketDetailRouteProps> = ({
@@ -44,6 +46,8 @@ export const TicketDetailRoute: React.FC<TicketDetailRouteProps> = ({
   onOpenCreateSubtask,
   onAddDependency,
   onRemoveDependency,
+  onAddBlocker,
+  onRemoveBlocker,
 }) => {
   const navigate = useNavigate();
   const { workspaceId, projectId, ticketKey } = useParams();
@@ -109,6 +113,8 @@ export const TicketDetailRoute: React.FC<TicketDetailRouteProps> = ({
         onOpenCreateSubtask={onOpenCreateSubtask}
         onAddDependency={onAddDependency}
         onRemoveDependency={onRemoveDependency}
+        onAddBlocker={onAddBlocker}
+        onRemoveBlocker={onRemoveBlocker}
         ticketLink={ticketLink}
         onClose={() => navigate(`/workspaces/${activeWorkspaceId}/projects/${activeTicket.projectId}/tickets`)}
       />

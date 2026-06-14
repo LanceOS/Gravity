@@ -76,6 +76,8 @@ export function AppShellPage() {
     activeTicketDetail,
     addTicketDependency,
     removeTicketDependency,
+    addTicketBlocker,
+    removeTicketBlocker,
   } = useTickets();
 
   const [activeSection, setActiveSection] = useState<AppSection>('workspace');
@@ -705,6 +707,8 @@ export function AppShellPage() {
       createTicket,
       updateTicket,
       addComment,
+      addBlocker: addTicketBlocker,
+      removeBlocker: removeTicketBlocker,
       getTickets: () => tickets,
       getUsers: () => users,
       getProjects: () => projects,
@@ -715,7 +719,7 @@ export function AppShellPage() {
         controller.abort();
       }
     };
-  }, [tickets, users, projects, createTicket, updateTicket, addComment]);
+  }, [tickets, users, projects, createTicket, updateTicket, addComment, addTicketBlocker, removeTicketBlocker]);
 
   const handleOpenCreateTicket = (initialStatus?: Ticket['status']) => {
     if (activeWorkspaceProjects.length === 0) {
@@ -1266,6 +1270,8 @@ export function AppShellPage() {
       onOpenCreateSubtask={handleOpenCreateSubtask}
       onAddDependency={addTicketDependency}
       onRemoveDependency={removeTicketDependency}
+      onAddBlocker={addTicketBlocker}
+      onRemoveBlocker={removeTicketBlocker}
     />
   ) : null;
 

@@ -309,6 +309,7 @@ const cycles = [
 function renderTicketDetail(overrides: Partial<Parameters<typeof TicketDetail>[0]> = {}) {
   const props = {
     activeTicket,
+    activeTicketDetail: null,
     comments,
     subtasks: [subtaskOne, subtaskTwo],
     completedSubtasks: 1,
@@ -325,6 +326,10 @@ function renderTicketDetail(overrides: Partial<Parameters<typeof TicketDetail>[0
     onDeleteComment: vi.fn().mockResolvedValue(undefined),
     onClose: vi.fn(),
     onOpenCreateSubtask: vi.fn(),
+    onAddDependency: vi.fn().mockResolvedValue(true),
+    onRemoveDependency: vi.fn().mockResolvedValue(true),
+    onAddBlocker: vi.fn().mockResolvedValue(true),
+    onRemoveBlocker: vi.fn().mockResolvedValue(true),
     ...overrides,
   };
 
@@ -422,6 +427,43 @@ describe('TicketDetail', () => {
     await waitFor(() => {
       expect(props.onDeleteTicket).toHaveBeenCalledWith('ticket-1');
     });
+  });
+
+  it('renders blocker relationships and allows removing them', async () => {
+    const user = userEvent.setup();
+    const blockerTicket = {
+      id: 'ticket-4',
+      key: 'GRA-104',
+      title: 'Coordinate upstream fix',
+      projectId: 'project-1',
+    };
+    const dependentTicket = {
+      id: 'ticket-5',
+      key: 'GRA-105',
+      title: 'Ship dependent rollout',
+      projectId: 'project-1',
+    };
+
+    const { props } = renderTicketDetail({
+      activeTicketDetail: {
+        ...activeTicket,
+        blockers: [blockerTicket],
+        dependencies: [dependentTicket],
+      },
+    });
+
+    const sidebar = within(screen.getByTestId('desktop-sidebar'));
+    expect(sidebar.getByLabelText('Add ticket blocker')).toBeInTheDocument();
+    expect(sidebar.getByLabelText('Add ticket dependency')).toBeInTheDocument();
+
+    await user.click(sidebar.getByText('GRA-104'));
+    expect(props.onSelectTicket).toHaveBeenCalledWith(blockerTicket);
+
+    await user.click(sidebar.getByRole('button', { name: 'Remove blocker GRA-104' }));
+    expect(props.onRemoveBlocker).toHaveBeenCalledWith('ticket-1', 'ticket-4');
+
+    expect(screen.getByText('This ticket is blocked by:')).toBeInTheDocument();
+    expect(screen.getByText('This ticket blocks:')).toBeInTheDocument();
   });
 
   it('copies sidebar utility values for ticket link, branch name, markdown description, and ticket key', async () => {

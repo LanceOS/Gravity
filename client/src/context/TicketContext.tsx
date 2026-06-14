@@ -176,6 +176,8 @@ interface TicketContextType extends State {
   activeTicketDetail: Ticket | null;
   addTicketDependency: (ticketId: string, dependencyId: string) => Promise<boolean>;
   removeTicketDependency: (ticketId: string, dependencyId: string) => Promise<boolean>;
+  addTicketBlocker: (ticketId: string, blockerId: string) => Promise<boolean>;
+  removeTicketBlocker: (ticketId: string, blockerId: string) => Promise<boolean>;
   setView: (view: 'list' | 'board') => void;
   setFilters: (filters: Partial<State['filters']>) => void;
   resetFilters: () => void;
@@ -279,7 +281,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   });
   const comments = commentsQuery.data || [];
 
-  // Active Ticket Detail (includes dependencies and blockedTicket relations)
+  // Active Ticket Detail (includes dependency and blocker relations)
   const activeTicketDetailQuery = useQuery({
     queryKey: ['ticket-detail', activeTicketId],
     queryFn: () => apiClient.get<Ticket>(`/tickets/${activeTicketId}`, { projectId: activeProjectId }),
@@ -809,6 +811,49 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [removeTicketDependencyMutation]);
 
+  const addTicketBlockerMutation = useMutation({
+    mutationFn: async ({ ticketId, blockerId }: { ticketId: string; blockerId: string }) => {
+      return apiClient.post<{ success: boolean }>(`/tickets/${ticketId}/blockers`, { blockerId }, { projectId: activeProjectIdRef.current });
+    },
+    onSettled: (data, err, { ticketId }) => {
+      queryClient.invalidateQueries({ queryKey: ['ticket-detail', ticketId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.tickets(activeProjectIdRef.current) });
+    },
+  });
+
+  const addTicketBlocker = useCallback(async (ticketId: string, blockerId: string) => {
+    try {
+      const res = await addTicketBlockerMutation.mutateAsync({ ticketId, blockerId });
+      return res.success;
+    } catch (e) {
+      console.error(e);
+      if (e instanceof Error && toast?.show) {
+        toast.show(e.message, 'error');
+      }
+      return false;
+    }
+  }, [addTicketBlockerMutation]);
+
+  const removeTicketBlockerMutation = useMutation({
+    mutationFn: async ({ ticketId, blockerId }: { ticketId: string; blockerId: string }) => {
+      return apiClient.delete<{ success: boolean }>(`/tickets/${ticketId}/blockers/${blockerId}`, { projectId: activeProjectIdRef.current });
+    },
+    onSettled: (data, err, { ticketId }) => {
+      queryClient.invalidateQueries({ queryKey: ['ticket-detail', ticketId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.tickets(activeProjectIdRef.current) });
+    },
+  });
+
+  const removeTicketBlocker = useCallback(async (ticketId: string, blockerId: string) => {
+    try {
+      const res = await removeTicketBlockerMutation.mutateAsync({ ticketId, blockerId });
+      return res.success;
+    } catch (e) {
+      console.error(e);
+      return false;
+    }
+  }, [removeTicketBlockerMutation]);
+
   // Create Project
   const createProjectMutation = useMutation({
     mutationFn: async (projectInput: CreateProjectInput) => {
@@ -1155,6 +1200,8 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       deleteComment,
       addTicketDependency,
       removeTicketDependency,
+      addTicketBlocker,
+      removeTicketBlocker,
       createProject,
       updateProject,
       deleteProject,
@@ -1211,6 +1258,8 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setView,
       setFilters,
       resetFilters,
+      addTicketBlocker,
+      removeTicketBlocker,
       ticketMap,
     ]
   );

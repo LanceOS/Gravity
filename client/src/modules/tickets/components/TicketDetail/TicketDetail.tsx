@@ -87,6 +87,7 @@ import './TicketDetail.css';
 
 export const TicketDetail: React.FC<TicketDetailProps> = ({
   activeTicket,
+  activeTicketDetail,
   comments,
   subtasks,
   completedSubtasks,
@@ -103,13 +104,17 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
   onDeleteComment,
   onClose,
   onOpenCreateSubtask,
+  onAddDependency,
+  onRemoveDependency,
+  onAddBlocker,
+  onRemoveBlocker,
   parentTicket,
   ticketLink: customTicketLink,
 }) => {
   const [commentInput, setCommentInput] = useState(createEmptyRichTextValue());
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
 
-  const { assignLabelToTicket, unassignLabelFromTicket, createLabel: createLabelInContext } = useTickets();
+  const { assignLabelToTicket, unassignLabelFromTicket, createLabel: createLabelInContext, tickets } = useTickets();
 
   const handleAssignLabel = useCallback(async (labelId: string) => {
     await assignLabelToTicket(activeTicket.id, labelId);
@@ -118,6 +123,70 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
   const handleUnassignLabel = useCallback(async (labelId: string) => {
     await unassignLabelFromTicket(activeTicket.id, labelId);
   }, [unassignLabelFromTicket, activeTicket.id]);
+
+  const handleAddDependency = useCallback(async (dependencyId: string) => {
+    if (!dependencyId) return;
+    const success = await onAddDependency(activeTicket.id, dependencyId);
+    if (success && toast?.show) {
+      toast.show('Dependency added successfully', 'success');
+    }
+  }, [onAddDependency, activeTicket.id]);
+
+  const handleRemoveDependency = useCallback(async (dependencyId: string) => {
+    const success = await onRemoveDependency(activeTicket.id, dependencyId);
+    if (success && toast?.show) {
+      toast.show('Dependency removed', 'success');
+    }
+  }, [onRemoveDependency, activeTicket.id]);
+
+  const handleAddBlocker = useCallback(async (blockerId: string) => {
+    if (!onAddBlocker) return;
+    if (!blockerId) return;
+    const success = await onAddBlocker(activeTicket.id, blockerId);
+    if (success && toast?.show) {
+      toast.show('Blocker added successfully', 'success');
+    }
+  }, [onAddBlocker, activeTicket.id]);
+
+  const handleRemoveBlocker = useCallback(async (blockerId: string) => {
+    if (!onRemoveBlocker) return;
+    const success = await onRemoveBlocker(activeTicket.id, blockerId);
+    if (success && toast?.show) {
+      toast.show('Blocker removed', 'success');
+    }
+  }, [onRemoveBlocker, activeTicket.id]);
+
+  const canManageBlockers = typeof onAddBlocker === 'function' && typeof onRemoveBlocker === 'function';
+
+  const dependencyLinks = activeTicketDetail?.dependencies || [];
+  const blockerLinks = activeTicketDetail?.blockers || (activeTicketDetail?.blockedTicket ? [activeTicketDetail.blockedTicket] : []);
+
+  const relatedTicketIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const dependency of dependencyLinks) {
+      ids.add(dependency.id);
+    }
+    for (const blocker of blockerLinks) {
+      ids.add(blocker.id);
+    }
+    return ids;
+  }, [dependencyLinks, blockerLinks]);
+
+  const availableTicketsForDependency = useMemo(() => {
+    return tickets
+      ? tickets.filter((ticket) =>
+          ticket.id !== activeTicket.id && !relatedTicketIds.has(ticket.id)
+        )
+      : [];
+  }, [tickets, activeTicket.id, relatedTicketIds]);
+
+  const availableTicketsForBlocker = useMemo(() => {
+    return tickets
+      ? tickets.filter((ticket) =>
+          ticket.id !== activeTicket.id && !relatedTicketIds.has(ticket.id)
+        )
+      : [];
+  }, [tickets, activeTicket.id, relatedTicketIds]);
 
   const handleCreateLabel = useCallback(async (name: string, color: string) => {
     const newLabel = await createLabelInContext({
@@ -370,6 +439,102 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
         />
       </div>
 
+      <div style={{ borderTop: '1px solid var(--color-border-default)', paddingTop: '16px', marginTop: '8px' }}>
+        <span className="label" style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '8px' }}>
+          <Link size={12} />
+          <span>Dependencies</span>
+        </span>
+        
+        {dependencyLinks.length > 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '8px' }}>
+            {dependencyLinks.map((dep: any) => (
+              <div key={dep.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-base100)', padding: '4px 8px', borderRadius: '4px', fontSize: '12px' }}>
+                <span className="clickable" style={{ color: 'var(--color-primary)', fontWeight: 500, cursor: 'pointer' }} onClick={() => onSelectTicket(dep)}>
+                  {dep.key}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveDependency(dep.id)}
+                  style={{ background: 'none', border: 'none', color: 'var(--color-text-disabled)', cursor: 'pointer', display: 'flex', padding: '2px' }}
+                  onMouseEnter={e => e.currentTarget.style.color = 'var(--color-error)'}
+                  onMouseLeave={e => e.currentTarget.style.color = 'var(--color-text-disabled)'}
+                  aria-label={`Remove dependency ${dep.key}`}
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ fontSize: '11px', color: 'var(--color-text-disabled)', fontStyle: 'italic', marginBottom: '8px' }}>
+            No dependencies
+          </div>
+        )}
+
+        <Select
+          value=""
+          onValueChange={handleAddDependency}
+          options={[
+            { value: '', label: '+ Add Dependency...' },
+            ...availableTicketsForDependency.map(t => ({
+              value: t.id,
+              label: `${t.key} - ${t.title}`
+            }))
+          ]}
+          aria-label="Add ticket dependency"
+        />
+
+        <div style={{ marginTop: '16px', borderTop: '1px dashed var(--color-border-default)', paddingTop: '12px' }}>
+          <span className="label" style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '8px' }}>
+            <Link size={12} />
+            <span>Blockers</span>
+          </span>
+
+          {blockerLinks.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '8px' }}>
+              {blockerLinks.map((blocker: any) => (
+                <div key={blocker.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-base100)', padding: '4px 8px', borderRadius: '4px', fontSize: '12px' }}>
+                  <span className="clickable" style={{ color: 'var(--color-primary)', fontWeight: 500, cursor: 'pointer' }} onClick={() => onSelectTicket(blocker)}>
+                    {blocker.key}
+                  </span>
+                  {canManageBlockers && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveBlocker(blocker.id)}
+                      style={{ background: 'none', border: 'none', color: 'var(--color-text-disabled)', cursor: 'pointer', display: 'flex', padding: '2px' }}
+                      onMouseEnter={e => e.currentTarget.style.color = 'var(--color-error)'}
+                      onMouseLeave={e => e.currentTarget.style.color = 'var(--color-text-disabled)'}
+                      aria-label={`Remove blocker ${blocker.key}`}
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ fontSize: '11px', color: 'var(--color-text-disabled)', fontStyle: 'italic', marginBottom: '8px' }}>
+              No blockers
+            </div>
+          )}
+
+          {canManageBlockers && (
+            <Select
+              value=""
+              onValueChange={handleAddBlocker}
+              options={[
+                { value: '', label: '+ Add Blocker...' },
+                ...availableTicketsForBlocker.map((ticket) => ({
+                  value: ticket.id,
+                  label: `${ticket.key} - ${ticket.title}`,
+                })),
+              ]}
+              aria-label="Add ticket blocker"
+            />
+          )}
+        </div>
+      </div>
+
       <div style={{ gridColumn: '1 / -1', borderTop: '1px solid var(--color-border-default)', paddingTop: '16px', marginTop: '8px' }}>
         <span className="label" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           <GitPullRequest size={12} />
@@ -591,6 +756,56 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                 </div>
               )}
             </div>
+
+            {/* Warning / Destructive style relation block */}
+            {activeTicketDetail && (blockerLinks.length > 0 || dependencyLinks.length > 0) && (
+              <div className="ticket-dependency-warning">
+                {blockerLinks.length > 0 && (
+                  <div className="ticket-dependency-item">
+                    <span style={{ display: 'inline-flex', alignItems: 'center' }}>⚠️</span>
+                    <span>
+                      This ticket is blocked by:
+                    </span>
+                  </div>
+                )}
+
+                {blockerLinks.length > 0 && (
+                  <ul style={{ margin: 0, paddingLeft: '24px', listStyleType: 'disc', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {blockerLinks.map((blocker: any) => (
+                      <li key={blocker.id}>
+                        <span
+                          className="ticket-dependency-link"
+                          onClick={() => onSelectTicket(blocker)}
+                        >
+                          {blocker.key} - {blocker.title}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {dependencyLinks.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div className="ticket-dependency-item">
+                      <span style={{ display: 'inline-flex', alignItems: 'center' }}>⚠️</span>
+                      <span>This ticket blocks:</span>
+                    </div>
+                    <ul style={{ margin: 0, paddingLeft: '24px', listStyleType: 'disc', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      {dependencyLinks.map((dep: any) => (
+                        <li key={dep.id}>
+                          <span 
+                            className="ticket-dependency-link"
+                            onClick={() => onSelectTicket(dep)}
+                          >
+                            {dep.key} - {dep.title}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
               <div style={{ borderBottom: '1px solid var(--color-border-default)', paddingBottom: '6px' }}>
