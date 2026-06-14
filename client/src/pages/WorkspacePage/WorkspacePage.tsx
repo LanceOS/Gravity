@@ -16,7 +16,7 @@ import { WorkspaceHeader } from '../../modules/workspaces';
 import { WorkspaceViewContainer } from '../../components/WorkspaceViewContainer';
 import { QueryErrorResetBoundary } from '@tanstack/react-query';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
-import { Plus, Filter, Activity, Check, User as UserIcon, Tag, Calendar, ArrowDown, ArrowUp } from 'lucide-react';
+import { Plus, Filter, Activity, Check, User as UserIcon, Tag, Calendar, ArrowDown, ArrowUp, FolderKanban } from 'lucide-react';
 import './WorkspacePage.css';
 
 export type WorkspaceIssueView = 'board' | 'list' | 'timeline';
@@ -325,6 +325,24 @@ export function WorkspacePage({
                     <ContextMenu.Item icon={<Filter size={14} />}>
                       Filter By
                       <ContextMenu.SubMenu>
+                        <ContextMenu.Item icon={<FolderKanban size={14} />}>
+                          Project
+                          <ContextMenu.SubMenu>
+                            {projects.length === 0 ? (
+                              <ContextMenu.Item disabled>No Projects</ContextMenu.Item>
+                            ) : (
+                              projects.map(p => (
+                                <ContextMenu.Item
+                                  key={p.id}
+                                  icon={filters.projectId === p.id ? <Check size={12} style={{ color: 'var(--color-primary)' }} /> : <div style={{ width: 12 }} />}
+                                  onClick={() => onSetFilters({ ...filters, projectId: filters.projectId === p.id ? '' : p.id })}
+                                >
+                                  {p.name}
+                                </ContextMenu.Item>
+                              ))
+                            )}
+                          </ContextMenu.SubMenu>
+                        </ContextMenu.Item>
                         <ContextMenu.Item icon={<Activity size={14} />}>
                           Status
                           <ContextMenu.SubMenu>

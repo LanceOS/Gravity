@@ -68,6 +68,7 @@ export interface SidebarProjectSection {
   onSelectLabel?: (labelId: string) => void;
   isWorkspaceOwner?: boolean;
   onOpenTeamManager?: () => void;
+  onOpenCreateTeam?: () => void;
 }
 
 export interface SidebarToolSection {

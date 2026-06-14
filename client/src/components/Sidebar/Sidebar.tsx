@@ -1,4 +1,4 @@
-import { Sparkles, CheckSquare, Tag, FolderPlus } from 'lucide-react';
+import { Sparkles, CheckSquare, Tag, FolderPlus, Users } from 'lucide-react';
 import { Sidebar as LibSidebar, SidebarHeader, SidebarContent, SidebarFooter, ContextMenu } from '@library';
 import { SidebarProjectsSection, SidebarUserMenu } from './components';
 import type { SidebarProps } from './types';
@@ -48,6 +48,11 @@ export function Sidebar({ projects, tools, userMenu }: SidebarProps) {
             {tools.onOpenCreateProject && (
               <ContextMenu.Item icon={<FolderPlus size={14} />} onClick={tools.onOpenCreateProject}>
                 New Project
+              </ContextMenu.Item>
+            )}
+            {projects.hierarchyMode === 'teams' && projects.onOpenCreateTeam && (
+              <ContextMenu.Item icon={<Users size={14} />} onClick={projects.onOpenCreateTeam}>
+                New Team
               </ContextMenu.Item>
             )}
           </>

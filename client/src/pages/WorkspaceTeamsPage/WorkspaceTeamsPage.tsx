@@ -138,6 +138,16 @@ export function WorkspaceTeamsPage({
   const [savingAction, setSavingAction] = useState('');
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('create') === 'true') {
+      setIsCreateModalOpen(true);
+      // Clean up the URL so a refresh doesn't reopen it
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, []);
+
   const sortedTeams = useMemo(
     () => [...teams].sort((first, second) => first.name.localeCompare(second.name)),
     [teams]

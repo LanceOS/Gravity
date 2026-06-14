@@ -1204,6 +1204,13 @@ export function AppShellPage() {
       onSelectLabel: handleSelectLabel,
       isWorkspaceOwner,
       onOpenTeamManager: handleOpenTeamManager,
+      onOpenCreateTeam: () => {
+        if (!activeWorkspace) {
+          navigate('/workspaces');
+          return;
+        }
+        navigate(`/workspaces/${activeWorkspace.id}/teams?create=true`);
+      },
     },
     tools: {
       onOpenOllama: handleToggleOllama,
