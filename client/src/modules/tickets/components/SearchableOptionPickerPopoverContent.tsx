@@ -137,6 +137,7 @@ export const SearchableOptionPickerPopoverContent: React.FC<SearchableOptionPick
             return (
               <label
                 key={option.id}
+                htmlFor={`option-${option.id}`}
                 className="clickable"
                 style={{
                   display: 'flex',
@@ -160,12 +161,25 @@ export const SearchableOptionPickerPopoverContent: React.FC<SearchableOptionPick
                 data-selected={isSelected}
               >
                 <input
+                  id={`option-${option.id}`}
                   type="checkbox"
                   checked={isSelected}
                   onChange={async () => {
                     await onToggle(option.id, isSelected);
                   }}
-                  style={{ cursor: 'pointer' }}
+                  style={{
+                    cursor: 'pointer',
+                    width: '10px',
+                    height: '10px',
+                    border: `1px solid ${isSelected ? 'var(--color-text-primary)' : 'var(--color-text-disabled)'}`,
+                    borderRadius: '3px',
+                    background: isSelected ? 'var(--color-text-primary)' : 'transparent',
+                    appearance: 'none',
+                    WebkitAppearance: 'none',
+                    MozAppearance: 'none',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
                 />
                 {option.color ? (
                   <span

@@ -16,6 +16,8 @@ import { STATUS_OPTIONS, PRIORITY_OPTIONS } from '../utils/TicketDetail';
 import { getPriorityIcon } from '../utils/TicketBoard';
 import { TicketAssignmentSubMenu } from './TicketAssignmentSubMenu';
 
+const EMPTY_ARRAY: never[] = [];
+
 interface TicketContextMenuProps {
   ticket: Ticket;
   children: React.ReactNode;
@@ -24,25 +26,11 @@ interface TicketContextMenuProps {
 
 export const TicketContextMenu: React.FC<TicketContextMenuProps> = ({ ticket, children, availableTickets }) => {
   const context = useContext(TicketContext);
-
-  if (!context) {
-    return <>{children}</>;
-  }
-
-  const {
-    tickets,
-    users,
-    projects,
-    labels,
-    cycles,
-    updateTicket,
-    moveTicket,
-    deleteTicket,
-    addTicketDependency,
-    addTicketBlocker,
-    assignLabelToTicket,
-    unassignLabelFromTicket,
-  } = context;
+  const tickets = context?.tickets ?? EMPTY_ARRAY;
+  const users = context?.users ?? EMPTY_ARRAY;
+  const projects = context?.projects ?? EMPTY_ARRAY;
+  const labels = context?.labels ?? EMPTY_ARRAY;
+  const cycles = context?.cycles ?? EMPTY_ARRAY;
 
   const ticketLabels = useMemo(
     () => labels.filter((l) => l.projectId === ticket.projectId || !l.projectId),
@@ -60,6 +48,20 @@ export const TicketContextMenu: React.FC<TicketContextMenuProps> = ({ ticket, ch
       ? projects.filter((p) => p.workspaceId === currentProject.workspaceId)
       : projects;
   }, [projects, ticket.projectId]);
+
+  if (!context) {
+    return <>{children}</>;
+  }
+
+  const {
+    updateTicket,
+    moveTicket,
+    deleteTicket,
+    addTicketDependency,
+    addTicketBlocker,
+    assignLabelToTicket,
+    unassignLabelFromTicket,
+  } = context;
 
   const menuContent = (
     <>
