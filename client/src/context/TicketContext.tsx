@@ -997,9 +997,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [restoreTicketDetailSnapshot]);
 
-  const invalidateTicketRelationQueries = useCallback((ticketId: string, relatedTicketId: string, projectId?: string) => {
-    queryClient.invalidateQueries({ queryKey: ticketDetailQueryKey(ticketId) });
-    queryClient.invalidateQueries({ queryKey: ticketDetailQueryKey(relatedTicketId) });
+  const invalidateTicketRelationQueries = useCallback((projectId?: string) => {
     invalidateTicketsQueries(projectId);
     queryClient.invalidateQueries({ queryKey: ['workspaceTickets'] });
     queryClient.invalidateQueries({ queryKey: ['teamTickets'] });
@@ -1022,7 +1020,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     },
     onSettled: (_data, _err, { ticketId, dependencyId, projectId }) => {
       clearPendingTicketRelationAdd(ticketId, 'dependencies', dependencyId);
-      invalidateTicketRelationQueries(ticketId, dependencyId, projectId);
+      invalidateTicketRelationQueries(projectId);
     },
   });
 
@@ -1060,7 +1058,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       handleTicketRelationMutationError(context, 'Failed to remove dependency');
     },
     onSettled: (_data, _err, { ticketId, dependencyId, projectId }) => {
-      invalidateTicketRelationQueries(ticketId, dependencyId, projectId);
+      invalidateTicketRelationQueries(projectId);
     },
   });
 
@@ -1099,7 +1097,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     },
     onSettled: (_data, _err, { ticketId, blockerId, projectId }) => {
       clearPendingTicketRelationAdd(ticketId, 'blockers', blockerId);
-      invalidateTicketRelationQueries(ticketId, blockerId, projectId);
+      invalidateTicketRelationQueries(projectId);
     },
   });
 
@@ -1137,7 +1135,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       handleTicketRelationMutationError(context, 'Failed to remove blocker');
     },
     onSettled: (_data, _err, { ticketId, blockerId, projectId }) => {
-      invalidateTicketRelationQueries(ticketId, blockerId, projectId);
+      invalidateTicketRelationQueries(projectId);
     },
   });
 

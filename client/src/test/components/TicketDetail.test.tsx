@@ -523,6 +523,55 @@ describe('TicketDetail', () => {
     expect(props.onRemoveBlocker).toHaveBeenCalledWith('ticket-1', 'ticket-4');
   });
 
+  it('does not remove selected relations from add relation pickers', async () => {
+    const user = userEvent.setup();
+    const blockerTicket = {
+      ...activeTicket,
+      id: 'ticket-4',
+      key: 'GRA-104',
+      title: 'Coordinate upstream fix',
+      projectId: 'project-1',
+      status: 'todo' as const,
+      parentId: null,
+    };
+    const dependentTicket = {
+      ...activeTicket,
+      id: 'ticket-5',
+      key: 'GRA-105',
+      title: 'Ship dependent rollout',
+      projectId: 'project-1',
+      status: 'todo' as const,
+      parentId: null,
+    };
+
+    const { props } = renderTicketDetail({
+      activeTicketDetail: {
+        ...activeTicket,
+        blockers: [blockerTicket],
+        dependencies: [dependentTicket],
+      },
+    }, [...defaultContextTickets, blockerTicket, dependentTicket]);
+
+    const sidebar = within(screen.getByTestId('desktop-sidebar'));
+
+    await user.click(sidebar.getByRole('button', { name: 'Add Dependency' }));
+    const dependencySearch = screen.getByPlaceholderText('Type to search tickets...');
+    await user.type(dependencySearch, 'Ship dependent rollout');
+    await user.click(screen.getByRole('checkbox', { name: /GRA-105/ }));
+
+    expect(props.onRemoveDependency).not.toHaveBeenCalled();
+    expect(props.onAddDependency).not.toHaveBeenCalled();
+
+    await user.click(sidebar.getByRole('button', { name: 'Add Blocker' }));
+    const blockerSearchInputs = screen.getAllByPlaceholderText('Type to search tickets...');
+    const blockerSearch = blockerSearchInputs[blockerSearchInputs.length - 1] as HTMLInputElement;
+    await user.type(blockerSearch, 'Coordinate upstream fix');
+    await user.click(screen.getByRole('checkbox', { name: /GRA-104/ }));
+
+    expect(props.onRemoveBlocker).not.toHaveBeenCalled();
+    expect(props.onAddBlocker).not.toHaveBeenCalled();
+  });
+
   it('copies sidebar utility values for ticket link, branch name, markdown description, and ticket key', async () => {
     const user = userEvent.setup();
     renderTicketDetail({

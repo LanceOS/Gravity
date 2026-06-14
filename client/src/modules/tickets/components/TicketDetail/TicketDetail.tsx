@@ -285,21 +285,19 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
 
   const handleToggleDependency = useCallback(async (dependencyId: string, isSelected: boolean) => {
     if (isSelected) {
-      await handleRemoveDependency(dependencyId);
       return;
     }
 
     await handleAddDependency(dependencyId);
-  }, [handleAddDependency, handleRemoveDependency]);
+  }, [handleAddDependency]);
 
   const handleToggleBlocker = useCallback(async (blockerId: string, isSelected: boolean) => {
     if (isSelected) {
-      await handleRemoveBlocker(blockerId);
       return;
     }
 
     await handleAddBlocker(blockerId);
-  }, [handleAddBlocker, handleRemoveBlocker]);
+  }, [handleAddBlocker]);
 
   const renderAddRelationTrigger = (buttonLabel: string) => (
     <button
