@@ -304,31 +304,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
   const renderAddRelationTrigger = (buttonLabel: string) => (
     <button
       type="button"
-      className="clickable"
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '4px',
-        padding: '2px 8px',
-        borderRadius: '12px',
-        background: 'var(--color-base100)',
-        border: '1px dashed var(--color-border-default)',
-        color: 'var(--color-text-secondary)',
-        fontSize: '11px',
-        fontWeight: 550,
-        cursor: 'pointer',
-        height: '20px',
-        transition: 'all 150ms ease',
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = 'var(--color-primary)';
-        e.currentTarget.style.color = 'var(--color-text-primary)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = 'var(--color-border-default)';
-        e.currentTarget.style.color = 'var(--color-text-secondary)';
-      }}
+      className="ticket-detail__inline-trigger"
     >
       <Plus size={10} />
       <span>{buttonLabel}</span>
@@ -788,7 +764,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
               />
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--color-border-default)', paddingBottom: '6px' }}>
                 <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase' }}>Description</span>
               </div>
@@ -807,60 +783,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
               </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {configurationEntries.length > 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--color-border-default)', paddingBottom: '6px' }}>
-                    <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase' }}>
-                      Configurations
-                    </span>
-                  </div>
-
-                  <div className="ticket-configurations">
-                    {configurationEntries.map((entry) => (
-                      <div key={entry.id} className="ticket-configurations__card">
-                        <div className="ticket-configurations__row">
-                          <span className="ticket-configurations__label">Relation</span>
-                          <span className="ticket-configurations__value">{entry.relation}</span>
-                        </div>
-
-                        <div className="ticket-configurations__row">
-                          <span className="ticket-configurations__label">Ticket</span>
-                          <button
-                            type="button"
-                            className="ticket-configurations__ticket clickable"
-                            onClick={() => onSelectTicket(entry.resolvedTicket)}
-                            disabled={!entry.resolvedTicket}
-                            aria-label={`${entry.key} - ${entry.title}`}
-                          >
-                            <span className="ticket-configurations__ticket-key">{entry.key}</span>
-                            <span className="ticket-configurations__ticket-title">{entry.title}</span>
-                          </button>
-                        </div>
-
-                        <div className="ticket-configurations__row">
-                          <span className="ticket-configurations__label">Assignee</span>
-                          <span className="ticket-configurations__assignee">
-                            {entry.assigneeAvatar ? (
-                              <img
-                                src={entry.assigneeAvatar}
-                                alt=""
-                                className="ticket-configurations__assignee-avatar"
-                              />
-                            ) : (
-                              <span className="ticket-configurations__assignee-fallback" aria-hidden="true">
-                                {entry.assigneeName.charAt(0).toUpperCase()}
-                              </span>
-                            )}
-                            <span>{entry.assigneeName}</span>
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--color-border-default)', paddingBottom: '6px' }}>
                 <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase' }}>
                   Sub-tasks Checklist
@@ -921,7 +844,59 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
               )}
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {configurationEntries.length > 0 ? (
+                <section className="ticket-relations">
+                  <div className="ticket-relations__header">
+                    <span className="ticket-relations__title">Relations</span>
+
+                    <span className="ticket-relations__count">
+                      {configurationEntries.length}
+                    </span>
+                  </div>
+
+                  <div className="ticket-relations__items">
+                    {configurationEntries.map((entry) => (
+                      <button
+                        key={entry.id}
+                        type="button"
+                        className="ticket-configurations__line"
+                        onClick={() => {
+                          if (entry.resolvedTicket) {
+                            onSelectTicket(entry.resolvedTicket);
+                          }
+                        }}
+                        disabled={!entry.resolvedTicket}
+                        aria-label={`${entry.key} - ${entry.title}`}
+                      >
+                        <span className="ticket-configurations__relation">{entry.relation}</span>
+
+                        <span className="ticket-configurations__ticket-key">{entry.key}</span>
+
+                        <span className="ticket-configurations__ticket-title">{entry.title}</span>
+
+                        <span className="ticket-configurations__assignee">
+                          {entry.assigneeAvatar ? (
+                            <img
+                              src={entry.assigneeAvatar}
+                              alt=""
+                              className="ticket-configurations__assignee-avatar"
+                            />
+                          ) : (
+                            <span className="ticket-configurations__assignee-fallback" aria-hidden="true">
+                              {entry.assigneeName.charAt(0).toUpperCase()}
+                            </span>
+                          )}
+                          <span className="ticket-configurations__assignee-name">{entry.assigneeName}</span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
               <div style={{ borderBottom: '1px solid var(--color-border-default)', paddingBottom: '6px' }}>
                 <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase' }}>
                   Activity Thread ({comments.length})
