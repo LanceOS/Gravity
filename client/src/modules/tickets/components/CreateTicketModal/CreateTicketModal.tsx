@@ -5,7 +5,7 @@ import { AlertCircle } from 'lucide-react';
 import type { CreateTicketModalProps } from '../../types/CreateTicketModal';
 import { PRIORITY_OPTIONS, STATUS_OPTIONS } from '../../utils/CreateTicketModal';
 import { useTickets } from '../../../../context/TicketContext';
-import { LabelManagerPopoverContent } from '../LabelManagerPopoverContent';
+import { SearchableOptionPickerPopoverContent } from '../SearchableOptionPickerPopoverContent';
 import { LabelBadge } from '../LabelBadge';
 import { Plus } from 'lucide-react';
 import './CreateTicketModal.css';
@@ -96,6 +96,13 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
   const projectOptions = projects.map((project) => ({ value: project.id, label: project.name }));
   const assigneeOptions = [{ value: '', label: 'Unassigned' }, ...users.map((user) => ({ value: user.id, label: user.name }))];
   const cycleOptions = [{ value: '', label: 'No Cycle' }, ...cycles.map((cycle) => ({ value: cycle.id, label: cycle.name }))];
+  const labelOptions = useMemo(() => projectLabels.map((label) => ({
+    id: label.id,
+    label: label.name,
+    description: label.description || undefined,
+    color: label.color,
+    searchText: [label.name, label.description].filter(Boolean).join(' '),
+  })), [projectLabels]);
 
   const modalTitle = parentTicket ? `Create Subtask for ${parentTicket.key}` : 'Create New Issue';
 
@@ -227,7 +234,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
                 <Popover
                   align="left"
                   style={{ display: 'block' }}
-                  contentClassName="ticket-detail__label-popover"
+                  contentClassName="create-ticket-modal__labels-popover"
                   trigger={
                     <button
                       type="button"
@@ -261,13 +268,21 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
                       <span>Add Label</span>
                     </button>
                   }
-                >
-                  <LabelManagerPopoverContent
-                    projectId={projectId}
-                    assignedLabelIds={new Set(labelIds)}
-                    allLabels={labels}
-                    onAssign={(id) => { setLabelIds((prev) => [...prev, id]); }}
-                    onUnassign={(id) => { setLabelIds((prev) => prev.filter(lId => lId !== id)); }}
+                  >
+                  <SearchableOptionPickerPopoverContent
+                    title="Search or Create Label"
+                    searchPlaceholder="Type to search or create..."
+                    options={labelOptions}
+                    selectedIds={new Set(labelIds)}
+                    onToggle={(id, isSelected) => {
+                      setLabelIds((prev) => (
+                        isSelected
+                          ? prev.filter((labelId) => labelId !== id)
+                          : prev.includes(id)
+                            ? prev
+                            : [...prev, id]
+                      ));
+                    }}
                     onCreate={async (name, color) => {
                       const newLabel = await createLabel({
                         name,
@@ -276,9 +291,11 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
                         description: '',
                       });
                       if (newLabel) {
-                        setLabelIds((prev) => [...prev, newLabel.id]);
+                        setLabelIds((prev) => (prev.includes(newLabel.id) ? prev : [...prev, newLabel.id]));
                       }
                     }}
+                    createHeading="CREATE NEW LABEL:"
+                    emptyStateLabel="No matching labels"
                   />
                 </Popover>
               </div>

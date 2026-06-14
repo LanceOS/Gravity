@@ -97,7 +97,7 @@
 
 .create-ticket-modal__labels-popover {
   z-index: 1700;
-  width: 250px;
+  width: 320px;
   max-width: calc(100vw - 32px);
   padding: 10px;
 }
@@ -178,6 +178,6 @@
   }
 
   .create-ticket-modal__labels-popover {
-    width: min(250px, calc(100vw - 32px));
+    width: min(320px, calc(100vw - 32px));
   }
 }

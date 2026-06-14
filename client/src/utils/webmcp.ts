@@ -9,6 +9,8 @@ interface WebMCPActions {
   createTicket: (payload: any) => Promise<any>;
   updateTicket: (id: string, updates: any) => Promise<void>;
   addComment: (ticketId: string, body: string) => Promise<void>;
+  addBlocker: (ticketId: string, blockerId: string) => Promise<boolean>;
+  removeBlocker: (ticketId: string, blockerId: string) => Promise<boolean>;
   getTickets: () => any[];
   getUsers: () => any[];
   getProjects: () => any[];
@@ -84,7 +86,43 @@ export function registerWebMCPTools(actions: WebMCPActions): AbortController | n
       }
     }, { signal });
 
-    // Tool 4: add-comment
+    // Tool 4: add-blocker
+    nav.modelContext.registerTool({
+      name: 'add-blocker',
+      description: 'Add a blocker ticket relationship to an existing ticket.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          ticketId: { type: 'string', description: 'The database ID of the ticket' },
+          blockerId: { type: 'string', description: 'The database ID of the blocking ticket' }
+        },
+        required: ['ticketId', 'blockerId']
+      },
+      async execute(args: any) {
+        const success = await actions.addBlocker(args.ticketId, args.blockerId);
+        return success ? `Blocker ${args.blockerId} added to ticket ${args.ticketId}.` : 'Failed to add blocker';
+      }
+    }, { signal });
+
+    // Tool 5: remove-blocker
+    nav.modelContext.registerTool({
+      name: 'remove-blocker',
+      description: 'Remove a blocker relationship from an existing ticket.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          ticketId: { type: 'string', description: 'The database ID of the ticket' },
+          blockerId: { type: 'string', description: 'The database ID of the blocking ticket' }
+        },
+        required: ['ticketId', 'blockerId']
+      },
+      async execute(args: any) {
+        const success = await actions.removeBlocker(args.ticketId, args.blockerId);
+        return success ? `Blocker ${args.blockerId} removed from ticket ${args.ticketId}.` : 'Failed to remove blocker';
+      }
+    }, { signal });
+
+    // Tool 6: add-comment
     nav.modelContext.registerTool({
       name: 'add-comment',
       description: 'Post a comment on a ticket.',

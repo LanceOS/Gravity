@@ -3,6 +3,7 @@ import React, { createContext, useContext, useEffect, useCallback, useMemo, useS
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys, CACHE_CONFIGS } from '../utils/queryClient';
 import { useMoveTicket } from './useMoveTicket';
+import { toast } from '@library';
 
 // Shared entity types live in src/types/domain.ts.
 export type {
@@ -57,6 +58,18 @@ type CreateTicketInput = {
   parentId: string | null;
   labelId?: string | null;
   domainId?: string | null;
+};
+
+type TicketRelation = NonNullable<Ticket['dependencies']>[number];
+type TicketRelationKey = 'dependencies' | 'blockers';
+
+type TicketRelationMutationContext = {
+  ticketDetailKey: readonly ['ticket-detail', string];
+  relatedDetailKey: readonly ['ticket-detail', string];
+  previousTicketDetail: Ticket | undefined;
+  previousRelatedDetail: Ticket | undefined;
+  hadTicketDetail: boolean;
+  hadRelatedDetail: boolean;
 };
 
 const initialFilters = {
@@ -128,6 +141,64 @@ function canonicalizeStatus(status: string | undefined | null): Ticket['status']
 
 const TICKET_UPDATE_DEBOUNCE_MS = 250;
 
+function ticketDetailQueryKey(ticketId: string) {
+  return ['ticket-detail', ticketId] as const;
+}
+
+function toTicketRelation(ticket: Pick<Ticket, 'id' | 'key' | 'title' | 'projectId'>): TicketRelation {
+  return {
+    id: ticket.id,
+    key: ticket.key,
+    title: ticket.title,
+    projectId: ticket.projectId,
+  };
+}
+
+function fallbackTicketRelation(ticketId: string): TicketRelation {
+  return {
+    id: ticketId,
+    key: '...',
+    title: 'Loading ticket...',
+    projectId: '',
+  };
+}
+
+function addTicketRelation(relations: TicketRelation[] | undefined, relatedTicket: TicketRelation) {
+  const nextRelations = relations ?? [];
+  if (nextRelations.some((relation) => relation.id === relatedTicket.id)) {
+    return nextRelations;
+  }
+
+  return [...nextRelations, relatedTicket];
+}
+
+function removeTicketRelation(relations: TicketRelation[] | undefined, relatedTicketId: string) {
+  return (relations ?? []).filter((relation) => relation.id !== relatedTicketId);
+}
+
+function patchTicketRelation(
+  ticket: Ticket,
+  relationKey: TicketRelationKey,
+  relatedTicket: TicketRelation,
+  action: 'add' | 'remove'
+): Ticket {
+  return {
+    ...ticket,
+    [relationKey]:
+      action === 'add'
+        ? addTicketRelation(ticket[relationKey], relatedTicket)
+        : removeTicketRelation(ticket[relationKey], relatedTicket.id),
+  };
+}
+
+function getTicketRelationMutationKey(ticketId: string, relationKey: TicketRelationKey, relatedTicketId: string) {
+  return `${ticketId}:${relationKey}:${relatedTicketId}`;
+}
+
+function isDuplicateTicketRelationError(error: unknown) {
+  return error instanceof Error && error.message.startsWith('This ticket already ');
+}
+
 type TicketUpdateBatch = {
   originalTickets: Ticket[];
   projectId: string;
@@ -172,6 +243,11 @@ interface TicketContextType extends State {
   setCurrentUser: (user: User | null) => void;
   setTheme: (theme: 'dark' | 'coal-black' | 'coffee' | 'marble-blue') => void;
   setActiveTicket: (ticket: Ticket | null) => void;
+  activeTicketDetail: Ticket | null;
+  addTicketDependency: (ticketId: string, dependencyId: string) => Promise<boolean>;
+  removeTicketDependency: (ticketId: string, dependencyId: string) => Promise<boolean>;
+  addTicketBlocker: (ticketId: string, blockerId: string) => Promise<boolean>;
+  removeTicketBlocker: (ticketId: string, blockerId: string) => Promise<boolean>;
   setView: (view: 'list' | 'board') => void;
   setFilters: (filters: Partial<State['filters']>) => void;
   resetFilters: () => void;
@@ -197,6 +273,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const activeTicketRef = useRef(activeTicket);
   const pendingTicketUpdateBatchesRef = useRef(new Map<string, TicketUpdateBatch>());
   const inFlightTicketUpdateBatchesRef = useRef(new Map<string, InFlightTicketUpdateBatch>());
+  const pendingTicketRelationAddsRef = useRef(new Set<string>());
 
   useEffect(() => {
     activeProjectIdRef.current = activeProjectId;
@@ -215,6 +292,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
       pendingTicketUpdateBatchesRef.current.clear();
       inFlightTicketUpdateBatchesRef.current.clear();
+      pendingTicketRelationAddsRef.current.clear();
     };
   }, []);
 
@@ -268,12 +346,21 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Comments
   const activeTicketId = activeTicket?.id;
+  const activeTicketProjectId = activeTicket?.projectId || activeProjectId;
   const commentsQuery = useQuery({
     queryKey: queryKeys.comments(activeTicketId || ''),
-    queryFn: () => apiClient.get<Comment[]>(`/tickets/${activeTicketId}/comments`, { projectId: activeProjectId }),
-    enabled: !!activeTicketId && !!activeProjectId && !!currentUser,
+    queryFn: () => apiClient.get<Comment[]>(`/tickets/${activeTicketId}/comments`, { projectId: activeTicketProjectId }),
+    enabled: !!activeTicketId && !!activeTicketProjectId && !!currentUser,
   });
   const comments = commentsQuery.data || [];
+
+  // Active Ticket Detail (includes dependency and blocker relations)
+  const activeTicketDetailQuery = useQuery({
+    queryKey: ['ticket-detail', activeTicketId],
+    queryFn: () => apiClient.get<Ticket>(`/tickets/${activeTicketId}`, { projectId: activeTicketProjectId }),
+    enabled: !!activeTicketId && !!activeTicketProjectId && !!currentUser,
+  });
+  const activeTicketDetail = activeTicketDetailQuery.data || null;
 
   // Global loading state combining react-query status
   const loading =
@@ -753,6 +840,324 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     await deleteCommentMutation.mutateAsync({ ticketId, commentId });
   }, [deleteCommentMutation]);
 
+  const getTicketProjectIdForMutation = useCallback((ticketId: string) => {
+    if (activeTicketRef.current?.id === ticketId) {
+      return activeTicketRef.current.projectId;
+    }
+
+    const matchingTicket = tickets.find((ticket) => ticket.id === ticketId);
+    return matchingTicket?.projectId;
+  }, [tickets]);
+
+  const invalidateTicketsQueries = useCallback((projectId?: string) => {
+    if (projectId) {
+      queryClient.invalidateQueries({ queryKey: queryKeys.tickets(projectId) });
+      return;
+    }
+
+    queryClient.invalidateQueries({ queryKey: ['tickets'] });
+  }, [queryClient]);
+
+  const findTicketInCache = useCallback((ticketId: string): Ticket | undefined => {
+    if (activeTicketRef.current?.id === ticketId) {
+      return activeTicketRef.current;
+    }
+
+    const matchingTicket = tickets.find((ticket) => ticket.id === ticketId);
+    if (matchingTicket) {
+      return matchingTicket;
+    }
+
+    const ticketDetails = queryClient.getQueriesData<Ticket>({ queryKey: ['ticket-detail'] });
+    for (const [, cachedTicket] of ticketDetails) {
+      if (cachedTicket?.id === ticketId) {
+        return cachedTicket;
+      }
+    }
+
+    const ticketLists = [
+      ...queryClient.getQueriesData<Ticket[]>({ queryKey: ['tickets'] }),
+      ...queryClient.getQueriesData<Ticket[]>({ queryKey: ['workspaceTickets'] }),
+      ...queryClient.getQueriesData<Ticket[]>({ queryKey: ['teamTickets'] }),
+    ];
+
+    for (const [, cachedTickets] of ticketLists) {
+      if (!Array.isArray(cachedTickets)) {
+        continue;
+      }
+
+      const cachedTicket = cachedTickets.find((ticket) => ticket.id === ticketId);
+      if (cachedTicket) {
+        return cachedTicket;
+      }
+    }
+
+    return undefined;
+  }, [queryClient, tickets]);
+
+  const getCachedTicketRelation = useCallback((ticketId: string) => {
+    const cachedTicket = findTicketInCache(ticketId);
+    return cachedTicket ? toTicketRelation(cachedTicket) : fallbackTicketRelation(ticketId);
+  }, [findTicketInCache]);
+
+  const hasCachedTicketRelation = useCallback((ticketId: string, relationKey: TicketRelationKey, relatedTicketId: string) => {
+    const cachedDetail = queryClient.getQueryData<Ticket>(ticketDetailQueryKey(ticketId));
+    return Boolean(cachedDetail?.[relationKey]?.some((relation) => relation.id === relatedTicketId));
+  }, [queryClient]);
+
+  const isPendingTicketRelationAdd = useCallback((ticketId: string, relationKey: TicketRelationKey, relatedTicketId: string) => {
+    return pendingTicketRelationAddsRef.current.has(getTicketRelationMutationKey(ticketId, relationKey, relatedTicketId));
+  }, []);
+
+  const markPendingTicketRelationAdd = useCallback((ticketId: string, relationKey: TicketRelationKey, relatedTicketId: string) => {
+    pendingTicketRelationAddsRef.current.add(getTicketRelationMutationKey(ticketId, relationKey, relatedTicketId));
+  }, []);
+
+  const clearPendingTicketRelationAdd = useCallback((ticketId: string, relationKey: TicketRelationKey, relatedTicketId: string) => {
+    pendingTicketRelationAddsRef.current.delete(getTicketRelationMutationKey(ticketId, relationKey, relatedTicketId));
+  }, []);
+
+  const restoreTicketDetailSnapshot = useCallback((
+    queryKey: readonly ['ticket-detail', string],
+    hadSnapshot: boolean,
+    snapshot: Ticket | undefined
+  ) => {
+    if (hadSnapshot && snapshot) {
+      queryClient.setQueryData<Ticket>(queryKey, snapshot);
+      return;
+    }
+
+    queryClient.removeQueries({ queryKey, exact: true });
+  }, [queryClient]);
+
+  const optimisticallyPatchTicketRelation = useCallback(async ({
+    ticketId,
+    relatedTicketId,
+    relationKey,
+    reciprocalRelationKey,
+    action,
+  }: {
+    ticketId: string;
+    relatedTicketId: string;
+    relationKey: TicketRelationKey;
+    reciprocalRelationKey: TicketRelationKey;
+    action: 'add' | 'remove';
+  }): Promise<TicketRelationMutationContext> => {
+    const ticketDetailKey = ticketDetailQueryKey(ticketId);
+    const relatedDetailKey = ticketDetailQueryKey(relatedTicketId);
+
+    await Promise.all([
+      queryClient.cancelQueries({ queryKey: ticketDetailKey }),
+      queryClient.cancelQueries({ queryKey: relatedDetailKey }),
+    ]);
+
+    const previousTicketDetail = queryClient.getQueryData<Ticket>(ticketDetailKey);
+    const previousRelatedDetail = queryClient.getQueryData<Ticket>(relatedDetailKey);
+    const ticketDetail = previousTicketDetail ?? findTicketInCache(ticketId);
+    const relatedDetail = previousRelatedDetail ?? findTicketInCache(relatedTicketId);
+    const relatedTicket = getCachedTicketRelation(relatedTicketId);
+    const ticketRelation = getCachedTicketRelation(ticketId);
+
+    if (ticketDetail) {
+      queryClient.setQueryData<Ticket>(
+        ticketDetailKey,
+        patchTicketRelation(ticketDetail, relationKey, relatedTicket, action)
+      );
+    }
+
+    if (relatedDetail) {
+      queryClient.setQueryData<Ticket>(
+        relatedDetailKey,
+        patchTicketRelation(relatedDetail, reciprocalRelationKey, ticketRelation, action)
+      );
+    }
+
+    return {
+      ticketDetailKey,
+      relatedDetailKey,
+      previousTicketDetail,
+      previousRelatedDetail,
+      hadTicketDetail: previousTicketDetail !== undefined,
+      hadRelatedDetail: previousRelatedDetail !== undefined,
+    };
+  }, [findTicketInCache, getCachedTicketRelation, queryClient]);
+
+  const handleTicketRelationMutationError = useCallback((context: TicketRelationMutationContext | undefined, message: string, shouldRollback = true) => {
+    if (!shouldRollback) {
+      return;
+    }
+
+    if (context) {
+      restoreTicketDetailSnapshot(context.ticketDetailKey, context.hadTicketDetail, context.previousTicketDetail);
+      restoreTicketDetailSnapshot(context.relatedDetailKey, context.hadRelatedDetail, context.previousRelatedDetail);
+    }
+
+    if (toast?.show) {
+      toast.show(message, 'error');
+    }
+  }, [restoreTicketDetailSnapshot]);
+
+  const invalidateTicketRelationQueries = useCallback((projectId?: string) => {
+    invalidateTicketsQueries(projectId);
+    queryClient.invalidateQueries({ queryKey: ['workspaceTickets'] });
+    queryClient.invalidateQueries({ queryKey: ['teamTickets'] });
+  }, [invalidateTicketsQueries, queryClient]);
+
+  // Ticket Dependency Actions
+  const addTicketDependencyMutation = useMutation({
+    mutationFn: async ({ ticketId, dependencyId, projectId }: { ticketId: string; dependencyId: string; projectId?: string }) => {
+      return apiClient.post<{ success: boolean }>(`/tickets/${ticketId}/dependencies`, { dependencyId }, { projectId });
+    },
+    onMutate: ({ ticketId, dependencyId }) => optimisticallyPatchTicketRelation({
+      ticketId,
+      relatedTicketId: dependencyId,
+      relationKey: 'dependencies',
+      reciprocalRelationKey: 'blockers',
+      action: 'add',
+    }),
+    onError: (error, _variables, context) => {
+      handleTicketRelationMutationError(context, 'Failed to add dependency', !isDuplicateTicketRelationError(error));
+    },
+    onSettled: (_data, _err, { ticketId, dependencyId, projectId }) => {
+      clearPendingTicketRelationAdd(ticketId, 'dependencies', dependencyId);
+      invalidateTicketRelationQueries(projectId);
+    },
+  });
+
+  const addTicketDependency = useCallback(async (ticketId: string, dependencyId: string) => {
+    try {
+      if (hasCachedTicketRelation(ticketId, 'dependencies', dependencyId)) {
+        return true;
+      }
+
+      const projectId = getTicketProjectIdForMutation(ticketId);
+      markPendingTicketRelationAdd(ticketId, 'dependencies', dependencyId);
+      addTicketDependencyMutation.mutate({ ticketId, dependencyId, projectId });
+      return true;
+    } catch (e) {
+      console.error(e);
+      if (e instanceof Error && toast?.show) {
+        toast.show(e.message, 'error');
+      }
+      return false;
+    }
+  }, [addTicketDependencyMutation, getTicketProjectIdForMutation, hasCachedTicketRelation, markPendingTicketRelationAdd]);
+
+  const removeTicketDependencyMutation = useMutation({
+    mutationFn: async ({ ticketId, dependencyId, projectId }: { ticketId: string; dependencyId: string; projectId?: string }) => {
+      return apiClient.delete<{ success: boolean }>(`/tickets/${ticketId}/dependencies/${dependencyId}`, { projectId });
+    },
+    onMutate: ({ ticketId, dependencyId }) => optimisticallyPatchTicketRelation({
+      ticketId,
+      relatedTicketId: dependencyId,
+      relationKey: 'dependencies',
+      reciprocalRelationKey: 'blockers',
+      action: 'remove',
+    }),
+    onError: (_err, _variables, context) => {
+      handleTicketRelationMutationError(context, 'Failed to remove dependency');
+    },
+    onSettled: (_data, _err, { ticketId, dependencyId, projectId }) => {
+      invalidateTicketRelationQueries(projectId);
+    },
+  });
+
+  const removeTicketDependency = useCallback(async (ticketId: string, dependencyId: string) => {
+    try {
+      if (isPendingTicketRelationAdd(ticketId, 'dependencies', dependencyId)) {
+        return true;
+      }
+
+      if (!hasCachedTicketRelation(ticketId, 'dependencies', dependencyId)) {
+        return true;
+      }
+
+      const projectId = getTicketProjectIdForMutation(ticketId);
+      removeTicketDependencyMutation.mutate({ ticketId, dependencyId, projectId });
+      return true;
+    } catch (e) {
+      console.error(e);
+      return false;
+    }
+  }, [getTicketProjectIdForMutation, hasCachedTicketRelation, isPendingTicketRelationAdd, removeTicketDependencyMutation]);
+
+  const addTicketBlockerMutation = useMutation({
+    mutationFn: async ({ ticketId, blockerId, projectId }: { ticketId: string; blockerId: string; projectId?: string }) => {
+      return apiClient.post<{ success: boolean }>(`/tickets/${ticketId}/blockers`, { blockerId }, { projectId });
+    },
+    onMutate: ({ ticketId, blockerId }) => optimisticallyPatchTicketRelation({
+      ticketId,
+      relatedTicketId: blockerId,
+      relationKey: 'blockers',
+      reciprocalRelationKey: 'dependencies',
+      action: 'add',
+    }),
+    onError: (error, _variables, context) => {
+      handleTicketRelationMutationError(context, 'Failed to add blocker', !isDuplicateTicketRelationError(error));
+    },
+    onSettled: (_data, _err, { ticketId, blockerId, projectId }) => {
+      clearPendingTicketRelationAdd(ticketId, 'blockers', blockerId);
+      invalidateTicketRelationQueries(projectId);
+    },
+  });
+
+  const addTicketBlocker = useCallback(async (ticketId: string, blockerId: string) => {
+    try {
+      if (hasCachedTicketRelation(ticketId, 'blockers', blockerId)) {
+        return true;
+      }
+
+      const projectId = getTicketProjectIdForMutation(ticketId);
+      markPendingTicketRelationAdd(ticketId, 'blockers', blockerId);
+      addTicketBlockerMutation.mutate({ ticketId, blockerId, projectId });
+      return true;
+    } catch (e) {
+      console.error(e);
+      if (e instanceof Error && toast?.show) {
+        toast.show(e.message, 'error');
+      }
+      return false;
+    }
+  }, [addTicketBlockerMutation, getTicketProjectIdForMutation, hasCachedTicketRelation, markPendingTicketRelationAdd]);
+
+  const removeTicketBlockerMutation = useMutation({
+    mutationFn: async ({ ticketId, blockerId, projectId }: { ticketId: string; blockerId: string; projectId?: string }) => {
+      return apiClient.delete<{ success: boolean }>(`/tickets/${ticketId}/blockers/${blockerId}`, { projectId });
+    },
+    onMutate: ({ ticketId, blockerId }) => optimisticallyPatchTicketRelation({
+      ticketId,
+      relatedTicketId: blockerId,
+      relationKey: 'blockers',
+      reciprocalRelationKey: 'dependencies',
+      action: 'remove',
+    }),
+    onError: (_err, _variables, context) => {
+      handleTicketRelationMutationError(context, 'Failed to remove blocker');
+    },
+    onSettled: (_data, _err, { ticketId, blockerId, projectId }) => {
+      invalidateTicketRelationQueries(projectId);
+    },
+  });
+
+  const removeTicketBlocker = useCallback(async (ticketId: string, blockerId: string) => {
+    try {
+      if (isPendingTicketRelationAdd(ticketId, 'blockers', blockerId)) {
+        return true;
+      }
+
+      if (!hasCachedTicketRelation(ticketId, 'blockers', blockerId)) {
+        return true;
+      }
+
+      const projectId = getTicketProjectIdForMutation(ticketId);
+      removeTicketBlockerMutation.mutate({ ticketId, blockerId, projectId });
+      return true;
+    } catch (e) {
+      console.error(e);
+      return false;
+    }
+  }, [getTicketProjectIdForMutation, hasCachedTicketRelation, isPendingTicketRelationAdd, removeTicketBlockerMutation]);
+
   // Create Project
   const createProjectMutation = useMutation({
     mutationFn: async (projectInput: CreateProjectInput) => {
@@ -1075,6 +1480,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       users,
       comments,
       activeTicket,
+      activeTicketDetail,
       activeView,
       filters,
       currentUser,
@@ -1096,6 +1502,10 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       addComment,
       updateComment,
       deleteComment,
+      addTicketDependency,
+      removeTicketDependency,
+      addTicketBlocker,
+      removeTicketBlocker,
       createProject,
       updateProject,
       deleteProject,
@@ -1119,6 +1529,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       users,
       comments,
       activeTicket,
+      activeTicketDetail,
       activeView,
       filters,
       currentUser,
@@ -1140,8 +1551,11 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       addComment,
       updateComment,
       deleteComment,
+      addTicketDependency,
+      removeTicketDependency,
       createProject,
       updateProject,
+      deleteProject,
       joinProject,
       signIn,
       signUp,
@@ -1152,6 +1566,8 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setView,
       setFilters,
       resetFilters,
+      addTicketBlocker,
+      removeTicketBlocker,
       ticketMap,
     ]
   );

@@ -256,10 +256,17 @@ export async function initializeDatabase() {
       project_id TEXT NOT NULL,
       cycle_id TEXT,
       parent_id TEXT,
+      blocked_ticket_id TEXT,
       pr_status TEXT NOT NULL DEFAULT 'none',
       pr_url TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS ticket_dependencies (
+      ticket_id TEXT NOT NULL REFERENCES tickets (id) ON DELETE CASCADE,
+      blocked_ticket_id TEXT NOT NULL REFERENCES tickets (id) ON DELETE CASCADE,
+      PRIMARY KEY (ticket_id, blocked_ticket_id)
     );
 
     CREATE TABLE IF NOT EXISTS comments (
@@ -348,6 +355,9 @@ export async function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS tickets_assignee_id_idx ON tickets (assignee_id);
     CREATE INDEX IF NOT EXISTS tickets_cycle_id_idx ON tickets (cycle_id);
     CREATE INDEX IF NOT EXISTS tickets_parent_id_idx ON tickets (parent_id);
+    CREATE INDEX IF NOT EXISTS tickets_blocked_ticket_id_idx ON tickets (blocked_ticket_id);
+    CREATE INDEX IF NOT EXISTS ticket_dependencies_ticket_id_idx ON ticket_dependencies (ticket_id);
+    CREATE INDEX IF NOT EXISTS ticket_dependencies_blocked_ticket_id_idx ON ticket_dependencies (blocked_ticket_id);
     CREATE INDEX IF NOT EXISTS comments_ticket_id_idx ON comments (ticket_id);
     CREATE INDEX IF NOT EXISTS comments_user_id_idx ON comments (user_id);
     CREATE INDEX IF NOT EXISTS note_metadata_project_id_user_id_idx ON note_metadata (project_id, user_id);
@@ -356,6 +366,7 @@ export async function initializeDatabase() {
 
   await pool.query(`
     ALTER TABLE tickets ADD COLUMN IF NOT EXISTS branch_name TEXT NOT NULL DEFAULT '';
+    ALTER TABLE tickets ADD COLUMN IF NOT EXISTS blocked_ticket_id TEXT;
     ALTER TABLE projects ADD COLUMN IF NOT EXISTS github_repo_url TEXT;
     ALTER TABLE projects ADD COLUMN IF NOT EXISTS team_id TEXT;
     ALTER TABLE cycles ADD COLUMN IF NOT EXISTS team_id TEXT;
@@ -366,6 +377,17 @@ export async function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS cycles_team_id_idx ON cycles (team_id);
     CREATE INDEX IF NOT EXISTS labels_team_id_idx ON labels (team_id);
   `);
+
+  await pool.query(`
+    INSERT INTO ticket_dependencies (ticket_id, blocked_ticket_id)
+    SELECT blocked_ticket_id, id
+    FROM tickets
+    WHERE blocked_ticket_id IS NOT NULL
+    ON CONFLICT (ticket_id, blocked_ticket_id) DO NOTHING;
+  `).catch((err) => {
+    // eslint-disable-next-line no-console
+    console.error('Failed to backfill ticket dependency relations:', err);
+  });
 
   // Migrate/Bootstrap default teams and preserve legacy domains as team labels.
   const hasProjectsTable = await hasTable('projects');

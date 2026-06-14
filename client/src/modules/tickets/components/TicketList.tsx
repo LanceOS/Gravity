@@ -12,6 +12,7 @@ import { LIST_STATUS_ORDER } from '../utils/ticketView';
 export const TicketList: React.FC<TicketListProps> = ({
   filteredCount,
   groupedTickets,
+  availableTickets,
   labelById,
   userAvatarById,
   projectById,
@@ -73,7 +74,7 @@ export const TicketList: React.FC<TicketListProps> = ({
                     return (
                       <React.Fragment key={ticket.id}>
                         <div className="ticket-list__row-desktop">
-                          <TicketContextMenu ticket={ticket}>
+                          <TicketContextMenu ticket={ticket} availableTickets={availableTickets}>
                             <TicketRow {...rowProps} />
                           </TicketContextMenu>
                         </div>

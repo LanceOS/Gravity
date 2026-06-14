@@ -1,8 +1,6 @@
 import React from 'react';
 import { X, AlertCircle, Info, CheckCircle2, AlertTriangle } from 'lucide-react';
-import { Portal } from '../../utilities';
-import { FocusTrap } from '../../utilities';
-import { ClickAwayListener } from '../../utilities';
+import { ClickAwayListener, FocusTrap, Portal, getDropdownPosition } from '../../utilities';
 import './Popover.css';
 
 export interface PopoverProps {
@@ -51,40 +49,31 @@ export function Popover({ trigger, children, isOpen: controlledIsOpen, onOpenCha
 
     const triggerRect = triggerRef.current.getBoundingClientRect();
     const popoverRect = popoverRef.current.getBoundingClientRect();
-
-    const GAP = 16;
-    const popoverWidth = popoverRect.width || 250;
-    const popoverHeight = popoverRect.height || 200;
-
-    const spaceBelow = window.innerHeight - triggerRect.bottom;
-    const spaceAbove = triggerRect.top;
-
-    // By default, open below. If not enough space below but enough above, flip it.
-    const openAbove = spaceBelow < popoverHeight && spaceAbove > spaceBelow;
-
-    let left = triggerRect.left;
-    if (align === 'right') {
-      left = triggerRect.right - popoverWidth;
-    } else if (align === 'center') {
-      left = triggerRect.left + (triggerRect.width / 2) - (popoverWidth / 2);
-    }
-
-    // Keep within window bounds horizontally
-    left = Math.max(GAP, Math.min(left, window.innerWidth - popoverWidth - GAP));
-
-    // Calculate vertical position
-    let top = openAbove ? triggerRect.top - popoverHeight - 4 : triggerRect.bottom + 4;
-
-    // Keep within window bounds vertically
-    top = Math.max(GAP, Math.min(top, window.innerHeight - popoverHeight - GAP));
+    const { left, top, maxHeight } = getDropdownPosition({
+      triggerRect,
+      floatingRect: popoverRect,
+      align,
+      gap: 4,
+      viewportPadding: 16,
+      fallbackWidth: 250,
+      fallbackHeight: 200,
+    });
 
     popoverRef.current.style.position = 'fixed';
     popoverRef.current.style.left = `${left}px`;
     popoverRef.current.style.top = `${top}px`;
     popoverRef.current.style.margin = '0';
-    popoverRef.current.style.maxHeight = `calc(100vh - ${GAP * 2}px)`;
+    popoverRef.current.style.maxHeight = `${maxHeight}px`;
     popoverRef.current.style.overflowY = 'auto';
   }, [align, shouldRender]);
+
+  const setPopoverElement = React.useCallback((node: HTMLDivElement | null) => {
+    popoverRef.current = node;
+
+    if (node) {
+      syncPosition();
+    }
+  }, [syncPosition]);
 
   React.useLayoutEffect(() => {
     if (shouldRender) {
@@ -100,6 +89,10 @@ export function Popover({ trigger, children, isOpen: controlledIsOpen, onOpenCha
 
   React.useEffect(() => {
     if (shouldRender && popoverRef.current) {
+      if (typeof ResizeObserver === 'undefined') {
+        return undefined;
+      }
+
       const resizeObserver = new ResizeObserver(() => {
         syncPosition();
       });
@@ -129,7 +122,7 @@ export function Popover({ trigger, children, isOpen: controlledIsOpen, onOpenCha
         {shouldRender && (
           <Portal>
             <div
-              ref={popoverRef}
+              ref={setPopoverElement}
               role="dialog"
               onAnimationEnd={handleAnimationEnd}
               onClick={(e) => e.stopPropagation()}
