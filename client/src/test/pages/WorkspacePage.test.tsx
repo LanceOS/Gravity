@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
@@ -45,6 +45,12 @@ vi.mock('../../modules/tickets', () => ({
   ),
   TicketDetail: ({ activeTicket, subtasks, completedSubtasks, subtaskProgressPercent }: TicketDetailMockProps) => (
     <div>{`TicketDetail ${activeTicket.title} ${subtasks.length} ${completedSubtasks} ${Math.round(subtaskProgressPercent)}`}</div>
+  ),
+}));
+
+vi.mock('../../modules/notes/components/NotesList', () => ({
+  NotesList: ({ sortDirection }: { sortDirection: 'desc' | 'asc' }) => (
+    <div>{`NotesList ${sortDirection}`}</div>
   ),
 }));
 
@@ -330,5 +336,106 @@ describe('WorkspacePage', () => {
 
     await user.click(screen.getByRole('button', { name: /GRA-1 Fix billing edge case/ }));
     expect(props.onSelectTicket).toHaveBeenCalledWith(ticket);
+  });
+
+  it('allows filtering by project through context menu', async () => {
+    const user = userEvent.setup();
+    const { props, container } = renderWorkspacePage({
+      activeView: 'list',
+      tickets: [ticket],
+      projects: [
+        { id: 'project-1', name: 'Gravity Core', description: '', key: 'GRA', status: 'active', workspaceId: 'ws-1' },
+        { id: 'project-2', name: 'Orbit Delivery', description: '', key: 'ORB', status: 'active', workspaceId: 'ws-1' },
+      ],
+    });
+
+    const listElement = screen.getByText(/TicketList/);
+    fireEvent.contextMenu(listElement);
+
+    const filterByOption = await screen.findByText('Filter By');
+    await user.hover(filterByOption);
+
+    const projectOption = await screen.findByText('Project');
+    await user.hover(projectOption);
+
+    const project1Option = await screen.findByText('Gravity Core');
+    await user.click(project1Option);
+
+    expect(props.onSetFilters).toHaveBeenCalledWith({
+      ...props.filters,
+      projectId: 'project-1',
+    });
+  });
+
+  it('allows sorting notes through context menu in notes view', async () => {
+    const user = userEvent.setup();
+    const { container } = renderWorkspacePage({
+      activeContext: 'notes',
+      tickets: [],
+      projects: [project],
+    });
+
+    const listElement = screen.getByText(/NotesList/);
+    fireEvent.contextMenu(listElement);
+
+    const filterByOption = await screen.findByText('Filter By');
+    await user.hover(filterByOption);
+
+    const oldestOption = await screen.findByText('Oldest');
+    await user.click(oldestOption);
+
+    expect(screen.getByText('NotesList asc')).toBeInTheDocument();
+    
+    fireEvent.contextMenu(listElement);
+    const filterByOption2 = await screen.findByText('Filter By');
+    await user.hover(filterByOption2);
+
+    const newestOption = await screen.findByText('Newest');
+    await user.click(newestOption);
+
+    expect(screen.getByText('NotesList desc')).toBeInTheDocument();
+  });
+
+  it('allows creating a new note through context menu in notes view', async () => {
+    const user = userEvent.setup();
+    const onSelectNote = vi.fn();
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ id: 'note-new-123', title: 'Untitled Note' }),
+    } as Response);
+
+    const { container } = renderWorkspacePage({
+      activeContext: 'notes',
+      tickets: [],
+      projects: [project],
+      filters: {
+        search: '',
+        priority: '',
+        status: '',
+        projectId: 'project-1',
+        labels: [],
+        cycleId: '',
+        assigneeId: '',
+      },
+      onSelectNote,
+    });
+
+    const listElement = screen.getByText(/NotesList/);
+    fireEvent.contextMenu(listElement);
+
+    const createNoteOption = await screen.findByRole('menuitem', { name: 'Create New Note' });
+    await user.click(createNoteOption);
+
+    await waitFor(() =>
+      expect(fetchSpy).toHaveBeenCalledWith(
+        '/api/v1/notes',
+        expect.objectContaining({
+          method: 'POST',
+        })
+      )
+    );
+    await waitFor(() => expect(onSelectNote).toHaveBeenCalledWith('note-new-123'));
+
+    fetchSpy.mockRestore();
   });
 });

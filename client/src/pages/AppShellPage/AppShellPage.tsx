@@ -9,6 +9,8 @@ import { AuthScreen } from '../../modules/auth';
 import { CreateTicketModal } from '../../modules/tickets';
 import { LocalAIChat } from '../../modules/ai';
 import { OnboardingModal } from '../../modules/onboarding';
+import { ProjectCreateOverlay } from '../../modules/workspaces/components/ProjectCreateOverlay';
+import { LabelCreateOverlay } from '../../modules/tickets/components/LabelCreateOverlay';
 import type { SidebarNavigationState, SidebarProps } from '../../components/Sidebar';
 import { useTickets, type Ticket } from '../../context/TicketContext';
 import { useTheme, SettingsScreen as SettingsPage } from '../../modules/settings';
@@ -79,6 +81,8 @@ export function AppShellPage() {
   const [activeNoteId, setActiveNoteId] = useState<string>('');
   const [workspaceReady, setWorkspaceReady] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
+  const [isCreateLabelModalOpen, setIsCreateLabelModalOpen] = useState(false);
   const [isOllamaOpen, setIsOllamaOpen] = useState(false);
   const [isMcpOpen, setIsMcpOpen] = useState(false);
   const [isOllamaClosing, setIsOllamaClosing] = useState(false);
@@ -720,6 +724,14 @@ export function AppShellPage() {
     setIsCreateModalOpen(true);
   };
 
+  const handleOpenCreateProject = () => {
+    setIsCreateProjectModalOpen(true);
+  };
+
+  const handleOpenCreateLabel = () => {
+    setIsCreateLabelModalOpen(true);
+  };
+
   const handleOpenCreateSubtask = (parentId: string) => {
     setCreateParentId(parentId);
     setCreateInitialStatus(undefined);
@@ -1192,12 +1204,21 @@ export function AppShellPage() {
       onSelectLabel: handleSelectLabel,
       isWorkspaceOwner,
       onOpenTeamManager: handleOpenTeamManager,
+      onOpenCreateTeam: () => {
+        if (!activeWorkspace) {
+          navigate('/workspaces');
+          return;
+        }
+        navigate(`/workspaces/${activeWorkspace.id}/teams?create=true`);
+      },
     },
     tools: {
       onOpenOllama: handleToggleOllama,
       isOllamaOpen,
       onOpenSimulator: () => { },
       onOpenCreateTicket: () => handleOpenCreateTicket(),
+      onOpenCreateProject: handleOpenCreateProject,
+      onOpenCreateLabel: handleOpenCreateLabel,
       agentIntegration: accountSettings.agentIntegration,
       aiProvider: accountSettings.aiProvider,
     },
@@ -1405,6 +1426,30 @@ export function AppShellPage() {
       {onboarding}
       {isMcpOpen ? (
         <WorkspaceMcpModal workspaceId={activeWorkspaceId} isOpen={isMcpOpen} onClose={() => setIsMcpOpen(false)} />
+      ) : null}
+
+      {isCreateProjectModalOpen ? (
+        <ProjectCreateOverlay
+          loading={projectCreateLoading}
+          errorMessage={projectCreateError}
+          onClose={() => setIsCreateProjectModalOpen(false)}
+          onSubmitProject={async (p) => {
+            await createProject(p);
+            setIsCreateProjectModalOpen(false);
+          }}
+        />
+      ) : null}
+
+      {isCreateLabelModalOpen ? (
+        <LabelCreateOverlay
+          loading={labelCreateLoading}
+          errorMessage={labelCreateError}
+          onClose={() => setIsCreateLabelModalOpen(false)}
+          onSubmitLabel={async (l) => {
+            await createLabel({ ...l, projectId: activeProjectId });
+            setIsCreateLabelModalOpen(false);
+          }}
+        />
       ) : null}
     </>
   );

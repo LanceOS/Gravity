@@ -3,7 +3,6 @@ import {
   api,
   createAuthenticatedApi,
   seedCycle,
-  seedDomain,
   seedTicket,
   seedUser,
   seedWorkspaceFixture,
@@ -27,13 +26,6 @@ describe('projects and tickets routes', () => {
         avatarUrl: owner.avatar,
       },
     });
-    const domain = await seedDomain(project.id, { id: 'domain-1', name: 'Frontend', color: '#2563EB' });
-    const cycle = await seedCycle(project.id, {
-      id: 'cycle-1',
-      name: 'Sprint 7',
-      startDate: new Date('2025-01-03T00:00:00.000Z'),
-      endDate: new Date('2025-01-10T00:00:00.000Z'),
-    });
 
     const listResponse = await ownerApi
       .get('/api/v1/projects')
@@ -44,13 +36,6 @@ describe('projects and tickets routes', () => {
         id: project.id,
         name: project.name,
         workspaceId: workspace.id,
-        domains: [{ id: domain.id, name: domain.name, color: domain.color }],
-        cycles: [
-          expect.objectContaining({
-            id: cycle.id,
-            name: cycle.name,
-          }),
-        ],
       }),
     ]);
 
@@ -169,29 +154,29 @@ describe('projects and tickets routes', () => {
     expect(spoofedOwnerResponse.body).toEqual({ error: 'Forbidden.' });
   });
 
-  it('manages tickets, comments, domains, and cycles', async () => {
+  it('manages tickets, comments, labels, and cycles', async () => {
     const ownerApi = await createAuthenticatedApi({
       name: 'Test Owner',
       email: 'test@example.com',
       role: 'owner',
     });
-    const { owner, workspace, project } = await seedWorkspaceFixture({
+    const { owner, project } = await seedWorkspaceFixture({
       owner: { id: ownerApi.user.id, name: ownerApi.user.name, email: ownerApi.user.email, role: 'owner', avatarUrl: ownerApi.user.avatar }
     });
 
-    const createDomainResponse = await ownerApi.post('/api/v1/domains').send({
+    const createLabelResponse = await ownerApi.post('/api/v1/labels').send({
       projectId: project.id,
       name: 'Platform',
       color: '#0F766E',
     });
 
-    expect(createDomainResponse.status).toBe(201);
+    expect(createLabelResponse.status).toBe(201);
 
-    const listDomainsResponse = await ownerApi.get('/api/v1/domains').query({ projectId: project.id });
-    expect(listDomainsResponse.status).toBe(200);
-    expect(listDomainsResponse.body).toEqual([
+    const listLabelsResponse = await ownerApi.get('/api/v1/labels').query({ projectId: project.id });
+    expect(listLabelsResponse.status).toBe(200);
+    expect(listLabelsResponse.body).toEqual([
       expect.objectContaining({
-        id: createDomainResponse.body.id,
+        id: createLabelResponse.body.id,
         name: 'Platform',
         color: '#0F766E',
       }),
@@ -219,7 +204,7 @@ describe('projects and tickets routes', () => {
       projectId: project.id,
       title: 'Ship server endpoint coverage',
       description: 'Cover every route with pg-mem-backed tests.',
-      domainId: createDomainResponse.body.id,
+      labelIds: [createLabelResponse.body.id],
       cycleId: createCycleResponse.body.id,
       assigneeId: owner.id,
       priority: 'high',
@@ -229,7 +214,14 @@ describe('projects and tickets routes', () => {
     expect(createTicketResponse.body).toMatchObject({
       title: 'Ship server endpoint coverage',
       projectId: project.id,
-      domainId: createDomainResponse.body.id,
+      labelIds: [createLabelResponse.body.id],
+      labels: [
+        expect.objectContaining({
+          id: createLabelResponse.body.id,
+          name: 'Platform',
+          color: '#0F766E',
+        }),
+      ],
       cycleId: createCycleResponse.body.id,
       assigneeId: owner.id,
     });

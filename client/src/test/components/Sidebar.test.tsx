@@ -229,4 +229,37 @@ describe('Sidebar', () => {
     fireEvent.mouseDown(document.body);
     expect(screen.getByText('UserDropdown closed')).toBeInTheDocument();
   });
+
+  it('renders flat workspace context menu and hides New Team', async () => {
+    const user = userEvent.setup();
+    const { props, rerender, container } = renderSidebar();
+    
+    rerender(<Sidebar {...props} projects={{ ...props.projects, hierarchyMode: 'flat', onOpenCreateTeam: vi.fn() }} />);
+
+    const triggerElement = screen.getByRole('button', { name: 'Toggle project list' });
+    fireEvent.contextMenu(triggerElement);
+    
+    // Check context menu opens
+    expect(await screen.findByRole('menu')).toBeInTheDocument();
+    
+    // "New Team" should not be rendered
+    expect(screen.queryByText('New Team')).not.toBeInTheDocument();
+  });
+
+  it('renders teams workspace context menu and shows New Team', async () => {
+    const user = userEvent.setup();
+    const onOpenCreateTeamMock = vi.fn();
+    const { props, rerender, container } = renderSidebar();
+
+    rerender(<Sidebar {...props} projects={{ ...props.projects, hierarchyMode: 'teams', onOpenCreateTeam: onOpenCreateTeamMock }} />);
+
+    const triggerElement = screen.getByRole('button', { name: 'Toggle project list' });
+    fireEvent.contextMenu(triggerElement);
+    
+    const newTeamOption = await screen.findByText('New Team');
+    expect(newTeamOption).toBeInTheDocument();
+
+    await user.click(newTeamOption);
+    expect(onOpenCreateTeamMock).toHaveBeenCalledTimes(1);
+  });
 });

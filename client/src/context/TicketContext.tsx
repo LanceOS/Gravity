@@ -2,6 +2,7 @@ import { apiClient } from '../utils/apiClient';
 import React, { createContext, useContext, useEffect, useCallback, useMemo, useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys, CACHE_CONFIGS } from '../utils/queryClient';
+import { useMoveTicket } from './useMoveTicket';
 
 // Shared entity types live in src/types/domain.ts.
 export type {
@@ -41,6 +42,8 @@ interface State {
   theme: 'dark' | 'coal-black' | 'coffee' | 'marble-blue';
   loading: boolean;
 }
+
+export type TicketFiltersState = State['filters'];
 
 type CreateTicketInput = {
   title: string;
@@ -155,6 +158,7 @@ interface TicketContextType extends State {
   createTicket: (ticket: CreateTicketInput) => Promise<Ticket | null>;
   updateTicket: (id: string, updates: Partial<Ticket>) => Promise<void>;
   deleteTicket: (id: string) => Promise<void>;
+  moveTicket: (id: string, sourceProjectId: string, targetProjectId: string) => Promise<boolean>;
   addComment: (ticketId: string, body: string) => Promise<void>;
   updateComment: (ticketId: string, commentId: string, body: string) => Promise<void>;
   deleteComment: (ticketId: string, commentId: string) => Promise<void>;
@@ -455,6 +459,15 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return null;
     }
   }, [createTicketMutation]);
+
+  const moveTicket = useMoveTicket({
+    queryClient,
+    activeProjectIdRef,
+    activeTicketRef,
+    setActiveProjectIdState,
+    setFiltersState,
+    setActiveTicket,
+  });
 
   // Update Ticket (Debounced)
   const updateTicketMutation = useMutation({
@@ -856,7 +869,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const createLabelMutation = useMutation({
     mutationFn: async (labelInput: { name: string; color?: string; description?: string; projectId?: string; sortOrder?: number }) => {
       const projectId = labelInput.projectId || activeProjectIdRef.current;
-      const existingProjectLabels = labels.filter((label) => label.projectId === projectId);
+      const existingProjectLabels = labels.filter((label) => label.projectId === projectId || !label.projectId);
       const nextSortOrder =
         labelInput.sortOrder ??
         existingProjectLabels.reduce((maxSortOrder, label) => Math.max(maxSortOrder, Number(label.sortOrder ?? 0)), -1) + 1;
@@ -1079,6 +1092,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       createTicket,
       updateTicket,
       deleteTicket,
+      moveTicket,
       addComment,
       updateComment,
       deleteComment,
@@ -1122,6 +1136,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       createTicket,
       updateTicket,
       deleteTicket,
+      moveTicket,
       addComment,
       updateComment,
       deleteComment,

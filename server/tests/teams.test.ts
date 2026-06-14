@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { db } from '../src/db/index.js';
 import { RustFS } from '../src/lib/rustfs.js';
-import { teams, projects, cycles, domains, labels, noteMetadata, ticketLabels, tickets, workspaceMembers, workspaces } from '../src/db/schema.js';
+import { teams, projects, cycles, labels, noteMetadata, ticketLabels, tickets, workspaceMembers, workspaces } from '../src/db/schema.js';
 import { eq } from 'drizzle-orm';
 import { createAuthenticatedApi, seedWorkspaceFixture, seedTicket } from './helpers/test-helpers.js';
 
@@ -102,17 +102,17 @@ describe('teams integration tests', () => {
     });
     expect(cycleResponse.status).toBe(201);
 
-    const domainResponse = await ownerApi.post('/api/v1/domains').send({
+    const labelResponse = await ownerApi.post('/api/v1/labels').send({
       teamId: team1Id,
-      name: 'Engineering Domain',
+      name: 'Engineering Label',
       color: '#2563EB',
     });
-    expect(domainResponse.status).toBe(201);
+    expect(labelResponse.status).toBe(201);
 
     // 5. Try deleting team1 (should block because a project is associated)
     const deleteBlockedResponse = await ownerApi.delete(`/api/v1/teams/${team1Id}`);
     expect(deleteBlockedResponse.status).toBe(400);
-    expect(deleteBlockedResponse.body.error).toContain('Cannot delete team: projects, cycles, or domains still reference it');
+    expect(deleteBlockedResponse.body.error).toContain('Cannot delete team: projects, cycles, or labels still reference it');
 
     // 6. Delete team1 with project reassignment to team2
     const deleteSuccessResponse = await ownerApi
@@ -129,8 +129,8 @@ describe('teams integration tests', () => {
     const cycleRows = await db.select().from(cycles).where(eq(cycles.id, cycleResponse.body.id)).limit(1);
     expect(cycleRows[0]?.teamId).toBe(team2Id);
 
-    const domainRows = await db.select().from(domains).where(eq(domains.id, domainResponse.body.id)).limit(1);
-    expect(domainRows[0]?.teamId).toBe(team2Id);
+    const labelRows = await db.select().from(labels).where(eq(labels.id, labelResponse.body.id)).limit(1);
+    expect(labelRows[0]?.teamId).toBe(team2Id);
 
     // Verify team1 is deleted
     const team1Rows = await db.select().from(teams).where(eq(teams.id, team1Id)).limit(1);
@@ -186,12 +186,12 @@ describe('teams integration tests', () => {
     });
     expect(cycleResponse.status).toBe(201);
 
-    const domainResponse = await ownerApi.post('/api/v1/domains').send({
+    const teamLabelResponse = await ownerApi.post('/api/v1/labels').send({
       teamId,
       name: 'Platform Label',
       color: '#2563EB',
     });
-    expect(domainResponse.status).toBe(201);
+    expect(teamLabelResponse.status).toBe(201);
 
     const ticketResponse = await ownerApi
       .post('/api/v1/tickets')
@@ -203,15 +203,15 @@ describe('teams integration tests', () => {
     expect(ticketResponse.status).toBe(201);
     const ticketId = ticketResponse.body.id;
 
-    const labelResponse = await ownerApi
+    const criticalLabelResponse = await ownerApi
       .post('/api/v1/labels')
       .set('X-Project-Id', projectId)
       .send({
         name: 'Critical',
         color: '#DC2626',
       });
-    expect(labelResponse.status).toBe(201);
-    const labelId = labelResponse.body.id;
+    expect(criticalLabelResponse.status).toBe(201);
+    const labelId = criticalLabelResponse.body.id;
 
     const ticketLabelResponse = await ownerApi
       .post(`/api/v1/tickets/${ticketId}/labels`)
@@ -244,8 +244,11 @@ describe('teams integration tests', () => {
     const cycleRows = await db.select().from(cycles).where(eq(cycles.id, cycleResponse.body.id)).limit(1);
     expect(cycleRows).toHaveLength(0);
 
-    const domainRows = await db.select().from(domains).where(eq(domains.id, domainResponse.body.id)).limit(1);
-    expect(domainRows).toHaveLength(0);
+    const teamLabelRows = await db.select().from(labels).where(eq(labels.id, teamLabelResponse.body.id)).limit(1);
+    expect(teamLabelRows).toHaveLength(0);
+
+    const criticalLabelRows = await db.select().from(labels).where(eq(labels.id, criticalLabelResponse.body.id)).limit(1);
+    expect(criticalLabelRows).toHaveLength(0);
 
     const ticketRows = await db.select().from(tickets).where(eq(tickets.id, ticketId)).limit(1);
     expect(ticketRows).toHaveLength(0);
@@ -262,7 +265,7 @@ describe('teams integration tests', () => {
     expect(await RustFS.listFiles(noteBucketPath)).toHaveLength(0);
   });
 
-  it('queries team-scoped cycles, domains, and tickets via scope strategies', async () => {
+  it('queries team-scoped cycles, labels, and tickets via scope strategies', async () => {
     const ownerApi = await createAuthenticatedApi({
       name: 'Ticket Scoper',
       email: 'ticket-scoper@example.com',
@@ -305,16 +308,16 @@ describe('teams integration tests', () => {
     expect(cycleRes.status).toBe(201);
     const cycleId = cycleRes.body.id;
 
-    // Create team domain
-    const domainRes = await ownerApi
-      .post('/api/v1/domains')
+    // Create team label
+    const labelRes = await ownerApi
+      .post('/api/v1/labels')
       .send({
         teamId,
         name: 'Team Label 1',
         color: '#EAB308',
       });
-    expect(domainRes.status).toBe(201);
-    const domainId = domainRes.body.id;
+    expect(labelRes.status).toBe(201);
+    const labelId = labelRes.body.id;
 
     // Seed tickets
     const ticket1 = await seedTicket(project.id, {
@@ -322,7 +325,7 @@ describe('teams integration tests', () => {
       key: `${project.key}-1`,
       title: 'Task 1 in QA',
       cycleId,
-      domainId,
+      labelIds: [labelId],
     });
     const ticket2 = await seedTicket(project.id, {
       id: 'ticket-qa-2',
@@ -347,11 +350,11 @@ describe('teams integration tests', () => {
     expect(cyclesRes.body).toHaveLength(1);
     expect(cyclesRes.body[0].name).toBe('Team Sprint 1');
 
-    // Query team domains
-    const domainsRes = await ownerApi.get('/api/v1/domains').query({ teamId });
-    expect(domainsRes.status).toBe(200);
-    expect(domainsRes.body).toHaveLength(1);
-    expect(domainsRes.body[0].name).toBe('Team Label 1');
+    // Query team labels
+    const labelsRes = await ownerApi.get('/api/v1/labels').query({ teamId });
+    expect(labelsRes.status).toBe(200);
+    expect(labelsRes.body).toHaveLength(1);
+    expect(labelsRes.body[0].name).toBe('Team Label 1');
   });
 
   it('requires workspace ownership to mutate teams', async () => {

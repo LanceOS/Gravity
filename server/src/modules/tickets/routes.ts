@@ -240,9 +240,24 @@ export function createTicketsRouter() {
           return;
         }
 
-        broadcastEvent('tickets-updated', { projectId, tickets: await listTickets(projectId) });
+        if (updated.projectId !== projectId) {
+          broadcastEvent('tickets-updated', { projectId });
+          broadcastEvent('tickets-updated', { projectId: updated.projectId });
+        } else {
+          broadcastEvent('tickets-updated', { projectId, tickets: await listTickets(projectId) });
+        }
         res.json(updated);
       } catch (error) {
+        if (error instanceof Error) {
+          if (error.message === 'TARGET_PROJECT_NOT_FOUND') {
+            res.status(404).json({ error: 'Target project not found.' });
+            return;
+          }
+          if (error.message === 'TICKET_MOVE_CROSS_WORKSPACE') {
+            res.status(400).json({ error: 'Tickets can only be moved within the same workspace.' });
+            return;
+          }
+        }
         res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to update ticket.' });
       }
     });
@@ -439,6 +454,9 @@ export function createTicketsRouter() {
       }
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create label.' });
     }
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Internal Server Error' });
+  }
   });
 
   router.put('/labels/:id', async (req, res) => {

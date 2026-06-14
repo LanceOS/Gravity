@@ -54,7 +54,8 @@ export function createNotesRouter() {
     try {
       const limit = Number(req.query.limit) || 50;
       const offset = Number(req.query.offset) || 0;
-      const notesList = await searchNotes(projectId, auth.userId, query, limit, offset);
+      const sort = (req.query.sort === 'asc' ? 'asc' : 'desc') as 'desc' | 'asc';
+      const notesList = await searchNotes(projectId, auth.userId, query, limit, offset, sort);
       res.json(notesList);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to search notes.' });
@@ -77,7 +78,8 @@ export function createNotesRouter() {
     try {
       const limit = Number(req.query.limit) || 50;
       const offset = Number(req.query.offset) || 0;
-      const notesList = await listNotes(projectId, auth.userId, limit, offset);
+      const sort = (req.query.sort === 'asc' ? 'asc' : 'desc') as 'desc' | 'asc';
+      const notesList = await listNotes(projectId, auth.userId, limit, offset, sort);
       res.json(notesList);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load notes.' });

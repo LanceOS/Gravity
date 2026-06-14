@@ -35,7 +35,7 @@ const teams: SidebarTeam[] = [
     color: '#3B82F6',
     views: [],
     cycles: [{ id: 'cycle-1', name: 'Sprint 1', startDate: '', endDate: '', completed: 0 }],
-    domains: [{ id: 'domain-1', name: 'Platform', color: '#10B981' }],
+    labels: [{ id: 'label-1', name: 'Platform', color: '#10B981' }],
     projects: [
       {
         id: 'project-1',
@@ -54,7 +54,7 @@ const teams: SidebarTeam[] = [
     color: '#EC4899',
     views: [],
     cycles: [],
-    domains: [],
+    labels: [],
     projects: [],
   },
 ];

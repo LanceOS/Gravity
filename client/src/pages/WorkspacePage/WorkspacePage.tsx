@@ -1,5 +1,5 @@
 import { useMemo, useCallback, useState } from 'react';
-import { Button, Timeline, createEmptyRichTextValue } from '@library';
+import { Button, Timeline, createEmptyRichTextValue, ContextMenu } from '@library';
 import type { Comment, Cycle, Label, Project, Ticket, User } from '../../context/TicketContext';
 import type { TicketFilters, TicketListSort } from '../../modules/tickets/utils/ticketView';
 import { TicketBoard, TicketList, TicketFilterBar } from '../../modules/tickets';
@@ -15,6 +15,7 @@ import { WorkspaceHeader } from '../../modules/workspaces';
 import { WorkspaceViewContainer } from '../../components/WorkspaceViewContainer';
 import { QueryErrorResetBoundary } from '@tanstack/react-query';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
+import { WorkspacePageContextMenu } from './WorkspacePageContextMenu';
 import './WorkspacePage.css';
 
 export type WorkspaceIssueView = 'board' | 'list' | 'timeline';
@@ -117,6 +118,7 @@ export function WorkspacePage({
   onUpdateTicket,
 }: WorkspacePageProps) {
   const [activeNoteTitle, setActiveNoteTitle] = useState('');
+  const [notesSort, setNotesSort] = useState<'desc' | 'asc'>('desc');
   const labels = labelItems ?? domainItems ?? [];
   const filteredTickets = useMemo(() => filterTickets(tickets, filters), [tickets, filters]);
   const hasFiltersApplied = useMemo(() => hasActiveTicketFilters(filters), [filters]);
@@ -312,94 +314,113 @@ export function WorkspacePage({
       <div className="workspace-page__content">
         <div className="workspace-page__issues">
           <div className="workspace-page__issues-shell">
-            <div className="workspace-page__issues-content">
-
-              {/* Notes panel — always mounted, hidden when not in notes context */}
-              <div className={activeContext !== 'notes' ? 'workspace-page__issues--hidden' : ''}>
-                <QueryErrorResetBoundary>
-                  {({ reset }) => (
-                    <ErrorBoundary onReset={reset}>
-                      <WorkspaceViewContainer>
-                        {activeNoteId ? (
-                          <NoteEditor projectId={filters.projectId || ''} noteId={activeNoteId} onTitleChange={setActiveNoteTitle} />
-                        ) : (
-                          <NotesList projectId={filters.projectId || ''} onSelectNote={onSelectNote || (() => { })} />
-                        )}
-                      </WorkspaceViewContainer>
-                    </ErrorBoundary>
-                  )}
-                </QueryErrorResetBoundary>
-              </div>
-
-              {/* Tickets panel — always mounted, hidden when in notes context */}
-              <div className={activeContext === 'notes' ? 'workspace-page__issues--hidden' : ''}>
-                <QueryErrorResetBoundary>
-                  {({ reset }) => (
-                    <ErrorBoundary onReset={reset}>
-                      {projects.length === 0 ? (
-                        <div className="workspace-page__empty-state">
-                          <div className="workspace-page__empty-state-title">{emptyStateTitle}</div>
-                          <p className="workspace-page__empty-state-copy">{emptyStateCopy}</p>
-                          <div className="workspace-page__empty-state-actions">
-                            <Button
-                              type="button"
-                              variant="primary"
-                              className="workspace-page__projects-button workspace-page__projects-button--primary"
-                              onClick={emptyStateActionHandler}
-                            >
-                              {emptyStateActionLabel}
-                            </Button>
-                          </div>
-                        </div>
-                      ) : activeView === 'timeline' ? (
+            <ContextMenu.Root
+              content={
+                <WorkspacePageContextMenu
+                  activeContext={activeContext}
+                  activeTicket={activeTicket}
+                  activeNoteId={activeNoteId}
+                  filters={filters}
+                  projects={projects}
+                  labels={labels}
+                  cycles={cycles}
+                  users={users}
+                  notesSort={notesSort}
+                  onOpenCreateTicket={onOpenCreateTicket}
+                  onCreateNote={handleCreateNote}
+                  onSetFilters={onSetFilters}
+                  setNotesSort={setNotesSort}
+                />
+              }
+            >
+              <div className="workspace-page__issues-content">
+                {/* Notes panel — always mounted, hidden when not in notes context */}
+                <div className={activeContext !== 'notes' ? 'workspace-page__issues--hidden' : ''}>
+                  <QueryErrorResetBoundary>
+                    {({ reset }) => (
+                      <ErrorBoundary onReset={reset}>
                         <WorkspaceViewContainer>
-                          <div className="workspace-page__timeline-shell">
-                            <div className="workspace-page__timeline-header">
-                              <div>
-                                <div className="workspace-page__timeline-eyebrow">Timeline</div>
-                                <h2 className="workspace-page__timeline-title">Recent task activity</h2>
-                              </div>
-                              <span className="workspace-page__timeline-count">
-                                {filteredTickets.length} {filteredTickets.length === 1 ? 'task' : 'tasks'}
-                              </span>
+                          {activeNoteId ? (
+                            <NoteEditor projectId={filters.projectId || ''} noteId={activeNoteId} onTitleChange={setActiveNoteTitle} />
+                          ) : (
+                            <NotesList projectId={filters.projectId || ''} onSelectNote={onSelectNote || (() => { })} sortDirection={notesSort} />
+                          )}
+                        </WorkspaceViewContainer>
+                      </ErrorBoundary>
+                    )}
+                  </QueryErrorResetBoundary>
+                </div>
+
+                {/* Tickets panel — always mounted, hidden when in notes context */}
+                <div className={activeContext === 'notes' ? 'workspace-page__issues--hidden' : ''}>
+                  <QueryErrorResetBoundary>
+                    {({ reset }) => (
+                      <ErrorBoundary onReset={reset}>
+                        {projects.length === 0 ? (
+                          <div className="workspace-page__empty-state">
+                            <div className="workspace-page__empty-state-title">{emptyStateTitle}</div>
+                            <p className="workspace-page__empty-state-copy">{emptyStateCopy}</p>
+                            <div className="workspace-page__empty-state-actions">
+                              <Button
+                                type="button"
+                                variant="primary"
+                                className="workspace-page__projects-button workspace-page__projects-button--primary"
+                                onClick={emptyStateActionHandler}
+                              >
+                                {emptyStateActionLabel}
+                              </Button>
                             </div>
-                            {timelineEvents.length > 0 ? (
-                              <Timeline events={timelineEvents} />
-                            ) : (
-                              <div className="workspace-page__timeline-empty">
-                                No tasks match the current filters.
-                              </div>
-                            )}
                           </div>
-                        </WorkspaceViewContainer>
-                      ) : activeView === 'board' ? (
-                        <WorkspaceViewContainer>
-                          <TicketBoard
-                            ticketsByColumn={groupedTickets}
-                            labelById={labelById}
-                            userAvatarById={userAvatarById}
-                            onMoveTicket={onUpdateTicket}
-                            onSelectTicket={onSelectTicket}
-                            onOpenCreateTicket={onOpenCreateTicket}
-                          />
-                        </WorkspaceViewContainer>
-                      ) : (
-                        <WorkspaceViewContainer>
-                          <TicketList
-                            filteredCount={filteredTickets.length}
-                            groupedTickets={listGroupedTickets}
-                            labelById={labelById}
-                            userAvatarById={userAvatarById}
-                            projectById={showProjectBadges ? projectById : undefined}
-                            onSelectTicket={onSelectTicket}
-                          />
-                        </WorkspaceViewContainer>
-                      )}
-                    </ErrorBoundary>
-                  )}
-                </QueryErrorResetBoundary>
+                        ) : activeView === 'timeline' ? (
+                          <WorkspaceViewContainer>
+                            <div className="workspace-page__timeline-shell">
+                              <div className="workspace-page__timeline-header">
+                                <div>
+                                  <div className="workspace-page__timeline-eyebrow">Timeline</div>
+                                  <h2 className="workspace-page__timeline-title">Recent task activity</h2>
+                                </div>
+                                <span className="workspace-page__timeline-count">
+                                  {filteredTickets.length} {filteredTickets.length === 1 ? 'task' : 'tasks'}
+                                </span>
+                              </div>
+                              {timelineEvents.length > 0 ? (
+                                <Timeline events={timelineEvents} />
+                              ) : (
+                                <div className="workspace-page__timeline-empty">
+                                  No tasks match the current filters.
+                                </div>
+                              )}
+                            </div>
+                          </WorkspaceViewContainer>
+                        ) : activeView === 'board' ? (
+                          <WorkspaceViewContainer>
+                            <TicketBoard
+                              ticketsByColumn={groupedTickets}
+                              labelById={labelById}
+                              userAvatarById={userAvatarById}
+                              onMoveTicket={onUpdateTicket}
+                              onSelectTicket={onSelectTicket}
+                              onOpenCreateTicket={onOpenCreateTicket}
+                            />
+                          </WorkspaceViewContainer>
+                        ) : (
+                          <WorkspaceViewContainer>
+                            <TicketList
+                              filteredCount={filteredTickets.length}
+                              groupedTickets={listGroupedTickets}
+                              labelById={labelById}
+                              userAvatarById={userAvatarById}
+                              projectById={showProjectBadges ? projectById : undefined}
+                              onSelectTicket={onSelectTicket}
+                            />
+                          </WorkspaceViewContainer>
+                        )}
+                      </ErrorBoundary>
+                    )}
+                  </QueryErrorResetBoundary>
+                </div>
               </div>
-            </div>
+            </ContextMenu.Root>
           </div>
         </div>
       </div>

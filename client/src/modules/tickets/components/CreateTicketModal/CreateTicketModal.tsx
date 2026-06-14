@@ -32,7 +32,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
   const [cycleId, setCycleId] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const projectLabels = useMemo(
-    () => labels.filter((label) => label.projectId === projectId),
+    () => labels.filter((label) => label.projectId === projectId || !label.projectId),
     [labels, projectId],
   );
 

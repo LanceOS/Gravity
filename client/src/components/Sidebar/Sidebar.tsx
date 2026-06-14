@@ -1,5 +1,5 @@
-import { Sparkles } from 'lucide-react';
-import { Sidebar as LibSidebar, SidebarHeader, SidebarContent, SidebarFooter } from '@library';
+import { Sparkles, CheckSquare, Tag, FolderPlus, Users } from 'lucide-react';
+import { Sidebar as LibSidebar, SidebarHeader, SidebarContent, SidebarFooter, ContextMenu } from '@library';
 import { SidebarProjectsSection, SidebarUserMenu } from './components';
 import type { SidebarProps } from './types';
 import { useSidebarState } from './utils';
@@ -34,19 +34,44 @@ export function Sidebar({ projects, tools, userMenu }: SidebarProps) {
         </SidebarHeader>
       ) : null}
 
-      <SidebarContent>
-        <SidebarProjectsSection
-          section={projects}
-          projectsCollapsed={sidebarState.projectsCollapsed}
-          collapsedProjects={sidebarState.collapsedProjects}
-          collapsedTeamProjects={sidebarState.collapsedTeamProjects}
-          collapsedTeams={sidebarState.collapsedTeams}
-          onToggleProjectsCollapsed={sidebarState.toggleProjectsCollapsed}
-          onToggleProject={sidebarState.toggleProject}
-          onToggleTeam={sidebarState.toggleTeam}
-          onToggleTeamProjects={sidebarState.toggleTeamProjects}
-        />
-      </SidebarContent>
+      <ContextMenu.Root
+        content={
+          <>
+            <ContextMenu.Item icon={<CheckSquare size={14} />} onClick={tools.onOpenCreateTicket}>
+              New Ticket
+            </ContextMenu.Item>
+            {tools.onOpenCreateLabel && (
+              <ContextMenu.Item icon={<Tag size={14} />} onClick={tools.onOpenCreateLabel}>
+                New Label
+              </ContextMenu.Item>
+            )}
+            {tools.onOpenCreateProject && (
+              <ContextMenu.Item icon={<FolderPlus size={14} />} onClick={tools.onOpenCreateProject}>
+                New Project
+              </ContextMenu.Item>
+            )}
+            {projects.hierarchyMode === 'teams' && projects.onOpenCreateTeam && (
+              <ContextMenu.Item icon={<Users size={14} />} onClick={projects.onOpenCreateTeam}>
+                New Team
+              </ContextMenu.Item>
+            )}
+          </>
+        }
+      >
+        <SidebarContent>
+          <SidebarProjectsSection
+            section={projects}
+            projectsCollapsed={sidebarState.projectsCollapsed}
+            collapsedProjects={sidebarState.collapsedProjects}
+            collapsedTeamProjects={sidebarState.collapsedTeamProjects}
+            collapsedTeams={sidebarState.collapsedTeams}
+            onToggleProjectsCollapsed={sidebarState.toggleProjectsCollapsed}
+            onToggleProject={sidebarState.toggleProject}
+            onToggleTeam={sidebarState.toggleTeam}
+            onToggleTeamProjects={sidebarState.toggleTeamProjects}
+          />
+        </SidebarContent>
+      </ContextMenu.Root>
 
       <SidebarFooter>
         <SidebarUserMenu

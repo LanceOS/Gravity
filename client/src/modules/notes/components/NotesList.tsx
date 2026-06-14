@@ -5,10 +5,11 @@ import './NotesList.css';
 interface NotesListProps {
   projectId: string;
   onSelectNote: (noteId: string) => void;
+  sortDirection?: 'desc' | 'asc';
 }
 
-export function NotesList({ projectId, onSelectNote }: NotesListProps) {
-  const { notes, loading, error, hasMore, loadMore } = useNotes(projectId);
+export function NotesList({ projectId, onSelectNote, sortDirection = 'desc' }: NotesListProps) {
+  const { notes, loading, error, hasMore, loadMore } = useNotes(projectId, sortDirection);
 
   if (loading && notes.length === 0) {
     return <div className="notes-list__empty">Loading notes...</div>;

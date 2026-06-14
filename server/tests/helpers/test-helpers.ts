@@ -8,9 +8,9 @@ import { db, pool } from '../../src/db/index.js';
 import {
   authUsers,
   cycles,
-  domains,
   projectMembers,
   projects,
+  ticketLabels,
   tickets,
   userProfiles,
   workspaceInvites,
@@ -307,31 +307,6 @@ export async function seedWorkspaceFixture(seed: WorkspaceFixtureSeed = {}) {
   return { owner, workspace, project };
 }
 
-export async function seedDomain(projectId: string, overrides: Partial<{ id: string; name: string; color: string }> = {}) {
-  const domain = {
-    id: overrides.id ?? 'domain-1',
-    name: overrides.name ?? 'Platform',
-    color: overrides.color ?? '#1D4ED8',
-  };
-
-  const projectRows = await db.select({ teamId: projects.teamId }).from(projects).where(eq(projects.id, projectId)).limit(1);
-  const teamId = projectRows[0]?.teamId;
-  if (!teamId) {
-    throw new Error(`Project ${projectId} is missing a team assignment.`);
-  }
-
-  await db.insert(domains).values({
-    id: domain.id,
-    projectId,
-    teamId,
-    name: domain.name,
-    color: domain.color,
-    createdAt: new Date(),
-  });
-
-  return domain;
-}
-
 export async function seedCycle(
   projectId: string,
   overrides: Partial<{ id: string; name: string; startDate: Date; endDate: Date; completed: boolean }> = {},
@@ -375,6 +350,7 @@ export async function seedTicket(
     priority: string;
     assigneeId: string | null;
     domainId: string | null;
+    labelIds: string[];
     cycleId: string | null;
     parentId: string | null;
     prStatus: string;
@@ -393,6 +369,7 @@ export async function seedTicket(
     priority: overrides.priority ?? 'medium',
     assigneeId: overrides.assigneeId ?? null,
     domainId: overrides.domainId ?? null,
+    labelIds: overrides.labelIds ?? [],
     cycleId: overrides.cycleId ?? null,
     parentId: overrides.parentId ?? null,
     prStatus: overrides.prStatus ?? 'none',
@@ -416,6 +393,15 @@ export async function seedTicket(
     createdAt: new Date(),
     updatedAt: new Date(),
   });
+
+  if (ticket.labelIds.length > 0) {
+    await db.insert(ticketLabels).values(
+      ticket.labelIds.map((labelId) => ({
+        ticketId: ticket.id,
+        labelId,
+      }))
+    );
+  }
 
   return ticket;
 }

@@ -25,7 +25,7 @@ export interface SidebarProjectCounts {
 
 import type { SidebarTeam } from '../../../types/domain';
 
-export type SidebarScope = 'workspace' | 'workspace-projects' | 'views' | 'cycles' | 'labels' | 'domains' | 'projects';
+export type SidebarScope = 'workspace' | 'workspace-projects' | 'views' | 'cycles' | 'labels' | 'projects';
 
 export interface SidebarNavigationState {
   activeTeam: string;
@@ -41,14 +41,12 @@ export interface SidebarProjectSection {
   activeTeamId?: string;
   activeCycleId?: string;
   activeLabelId?: string;
-  activeDomainId?: string;
   onSelectWorkspaceAllTasks?: () => void;
   onSelectWorkspaceProjects?: () => void;
   onSelectTeam?: (teamId: string) => void;
   onSelectView?: (teamId: string, viewId: string) => void;
   onSelectCycle?: (teamId: string, cycleId: string) => void;
   onSelectTeamLabel?: (teamId: string, labelId: string) => void;
-  onSelectDomain?: (teamId: string, domainId: string) => void;
   onSelectAllTasks?: (teamId: string) => void;
 
   projects: Project[];
@@ -68,6 +66,7 @@ export interface SidebarProjectSection {
   onSelectLabel?: (labelId: string) => void;
   isWorkspaceOwner?: boolean;
   onOpenTeamManager?: () => void;
+  onOpenCreateTeam?: () => void;
 }
 
 export interface SidebarToolSection {
@@ -75,6 +74,8 @@ export interface SidebarToolSection {
   isOllamaOpen?: boolean;
   onOpenSimulator: () => void;
   onOpenCreateTicket: () => void;
+  onOpenCreateProject?: () => void;
+  onOpenCreateLabel?: () => void;
   agentIntegration?: 'ollama' | 'third_party';
   aiProvider?: 'openai' | 'anthropic' | 'gemini' | 'deepseek';
 }

@@ -4,6 +4,7 @@ import { BOARD_COLUMNS } from '../utils/ticketView';
 import { Button, KanbanBoard, Flex } from '@library';
 import { Plus } from 'lucide-react';
 import { TicketCard } from './TicketCard';
+import { TicketContextMenu } from './TicketContextMenu';
 
 import type { TicketBoardProps } from '../types/TicketBoard';
 import { getAssigneeAvatar, getPriorityColor, getPriorityIcon } from '../utils/TicketBoard';
@@ -77,14 +78,16 @@ export const TicketBoard: React.FC<TicketBoardProps> = ({
           id: ticket.id,
           status: ticket.status,
           content: (
-            <TicketCard
-              ticket={ticket}
-              onClick={() => onSelectTicket(ticket)}
-              onDragStart={(e) => handleDragStart(e, ticket.id)}
-              priorityIcon={getPriorityIcon(ticket.priority)}
-              priorityColor={getPriorityColor(ticket.priority)}
-              assigneeAvatar={getAssigneeAvatar(userAvatarById, ticket.assigneeId)}
-            />
+            <TicketContextMenu ticket={ticket}>
+              <TicketCard
+                ticket={ticket}
+                onClick={() => onSelectTicket(ticket)}
+                onDragStart={(e) => handleDragStart(e, ticket.id)}
+                priorityIcon={getPriorityIcon(ticket.priority)}
+                priorityColor={getPriorityColor(ticket.priority)}
+                assigneeAvatar={getAssigneeAvatar(userAvatarById, ticket.assigneeId)}
+              />
+            </TicketContextMenu>
           ),
         };
       });
