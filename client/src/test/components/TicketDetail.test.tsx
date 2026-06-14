@@ -376,6 +376,8 @@ describe('TicketDetail', () => {
     const { props } = renderTicketDetail();
     const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => { });
 
+    expect(screen.queryByText('Configurations')).not.toBeInTheDocument();
+
     await user.click(screen.getByRole('button', { name: 'Back' }));
     expect(props.onClose).toHaveBeenCalledTimes(1);
 
@@ -492,6 +494,12 @@ describe('TicketDetail', () => {
     const sidebar = within(screen.getByTestId('desktop-sidebar'));
     expect(sidebar.getByRole('button', { name: 'Add Dependency' })).toBeInTheDocument();
     expect(sidebar.getByRole('button', { name: 'Add Blocker' })).toBeInTheDocument();
+    expect(screen.getByText('Configurations')).toBeInTheDocument();
+    expect(screen.getByText('Blocked by')).toBeInTheDocument();
+    expect(screen.getByText('Blocks')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'GRA-104 - Coordinate upstream fix' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'GRA-105 - Ship dependent rollout' })).toBeInTheDocument();
+    expect(screen.getAllByText('Casey Carter').length).toBeGreaterThan(0);
 
     await user.click(sidebar.getByRole('button', { name: 'Add Dependency' }));
     const dependencySearch = screen.getByPlaceholderText('Type to search tickets...');
@@ -514,9 +522,6 @@ describe('TicketDetail', () => {
 
     await user.click(sidebar.getByRole('button', { name: 'Remove blocker GRA-104' }));
     expect(props.onRemoveBlocker).toHaveBeenCalledWith('ticket-1', 'ticket-4');
-
-    expect(screen.getByText('This ticket is blocked by:')).toBeInTheDocument();
-    expect(screen.getByText('This ticket blocks:')).toBeInTheDocument();
   });
 
   it('copies sidebar utility values for ticket link, branch name, markdown description, and ticket key', async () => {
@@ -668,7 +673,10 @@ describe('TicketDetail', () => {
     const { props } = renderTicketDetail({ activeTicket: childTicket, parentTicket, onSelectTicket: vi.fn() });
 
     expect(screen.getByText('Sub ticket of')).toBeInTheDocument();
-    const parentBtn = screen.getByRole('button', { name: 'GRA-100 - Parent Ticket Title' });
+    expect(screen.getByText('Configurations')).toBeInTheDocument();
+    expect(screen.getByText('Sub-ticket of')).toBeInTheDocument();
+    expect(screen.getAllByText('Casey Carter').length).toBeGreaterThan(0);
+    const parentBtn = screen.getAllByRole('button', { name: 'GRA-100 - Parent Ticket Title' })[0];
     await user.click(parentBtn);
     expect(props.onSelectTicket).toHaveBeenCalledWith(parentTicket);
   });

@@ -175,6 +175,14 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
 
   const dependencyTicketIds = useMemo(() => new Set(dependencyLinks.map((dependency) => dependency.id)), [dependencyLinks]);
   const blockerTicketIds = useMemo(() => new Set(blockerLinks.map((blocker) => blocker.id)), [blockerLinks]);
+  const availableTicketsById = useMemo(() => {
+    const ticketMap = new Map(availableTickets.map((ticket) => [ticket.id, ticket]));
+    if (parentTicket) {
+      ticketMap.set(parentTicket.id, parentTicket);
+    }
+    return ticketMap;
+  }, [availableTickets, parentTicket]);
+  const usersById = useMemo(() => new Map(users.map((user) => [user.id, user])), [users]);
 
   const ticketOptions = useMemo(() => {
     return availableTickets
@@ -186,6 +194,73 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
         searchText: [ticket.key, ticket.title].filter(Boolean).join(' '),
       }));
   }, [availableTickets, activeTicket.id]);
+
+  const configurationEntries = useMemo(() => {
+    const resolveAssignee = (ticket: Ticket | null) => {
+      if (!ticket?.assigneeId) {
+        return { name: 'Unassigned', avatar: '' };
+      }
+
+      const assignee = usersById.get(ticket.assigneeId);
+      return {
+        name: assignee?.name || 'Unknown member',
+        avatar: assignee?.avatar || '',
+      };
+    };
+
+    const entries: Array<{
+      id: string;
+      relation: string;
+      key: string;
+      title: string;
+      assigneeName: string;
+      assigneeAvatar: string;
+      resolvedTicket: Ticket | null;
+    }> = [];
+
+    if (parentTicket) {
+      const assignee = resolveAssignee(parentTicket);
+      entries.push({
+        id: `parent-${parentTicket.id}`,
+        relation: 'Sub-ticket of',
+        key: parentTicket.key,
+        title: parentTicket.title,
+        assigneeName: assignee.name,
+        assigneeAvatar: assignee.avatar,
+        resolvedTicket: parentTicket,
+      });
+    }
+
+    blockerLinks.forEach((blocker) => {
+      const resolvedTicket = availableTicketsById.get(blocker.id) || null;
+      const assignee = resolveAssignee(resolvedTicket);
+      entries.push({
+        id: `blocker-${blocker.id}`,
+        relation: 'Blocked by',
+        key: blocker.key,
+        title: blocker.title,
+        assigneeName: assignee.name,
+        assigneeAvatar: assignee.avatar,
+        resolvedTicket,
+      });
+    });
+
+    dependencyLinks.forEach((dependency) => {
+      const resolvedTicket = availableTicketsById.get(dependency.id) || null;
+      const assignee = resolveAssignee(resolvedTicket);
+      entries.push({
+        id: `dependency-${dependency.id}`,
+        relation: 'Blocks',
+        key: dependency.key,
+        title: dependency.title,
+        assigneeName: assignee.name,
+        assigneeAvatar: assignee.avatar,
+        resolvedTicket,
+      });
+    });
+
+    return entries;
+  }, [availableTicketsById, blockerLinks, dependencyLinks, parentTicket, usersById]);
 
   const handleCreateLabel = useCallback(async (name: string, color: string) => {
     const newLabel = await createLabelInContext({
@@ -733,6 +808,59 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {configurationEntries.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--color-border-default)', paddingBottom: '6px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase' }}>
+                      Configurations
+                    </span>
+                  </div>
+
+                  <div className="ticket-configurations">
+                    {configurationEntries.map((entry) => (
+                      <div key={entry.id} className="ticket-configurations__card">
+                        <div className="ticket-configurations__row">
+                          <span className="ticket-configurations__label">Relation</span>
+                          <span className="ticket-configurations__value">{entry.relation}</span>
+                        </div>
+
+                        <div className="ticket-configurations__row">
+                          <span className="ticket-configurations__label">Ticket</span>
+                          <button
+                            type="button"
+                            className="ticket-configurations__ticket clickable"
+                            onClick={() => onSelectTicket(entry.resolvedTicket)}
+                            disabled={!entry.resolvedTicket}
+                            aria-label={`${entry.key} - ${entry.title}`}
+                          >
+                            <span className="ticket-configurations__ticket-key">{entry.key}</span>
+                            <span className="ticket-configurations__ticket-title">{entry.title}</span>
+                          </button>
+                        </div>
+
+                        <div className="ticket-configurations__row">
+                          <span className="ticket-configurations__label">Assignee</span>
+                          <span className="ticket-configurations__assignee">
+                            {entry.assigneeAvatar ? (
+                              <img
+                                src={entry.assigneeAvatar}
+                                alt=""
+                                className="ticket-configurations__assignee-avatar"
+                              />
+                            ) : (
+                              <span className="ticket-configurations__assignee-fallback" aria-hidden="true">
+                                {entry.assigneeName.charAt(0).toUpperCase()}
+                              </span>
+                            )}
+                            <span>{entry.assigneeName}</span>
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
               <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--color-border-default)', paddingBottom: '6px' }}>
                 <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase' }}>
                   Sub-tasks Checklist
@@ -792,56 +920,6 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                 </div>
               )}
             </div>
-
-            {/* Warning / Destructive style relation block */}
-            {activeTicketDetail && (blockerLinks.length > 0 || dependencyLinks.length > 0) && (
-              <div className="ticket-dependency-warning">
-                {blockerLinks.length > 0 && (
-                  <div className="ticket-dependency-item">
-                    <span style={{ display: 'inline-flex', alignItems: 'center' }}>⚠️</span>
-                    <span>
-                      This ticket is blocked by:
-                    </span>
-                  </div>
-                )}
-
-                {blockerLinks.length > 0 && (
-                  <ul style={{ margin: 0, paddingLeft: '24px', listStyleType: 'disc', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    {blockerLinks.map((blocker: any) => (
-                      <li key={blocker.id}>
-                        <span
-                          className="ticket-dependency-link"
-                          onClick={() => onSelectTicket(blocker)}
-                        >
-                          {blocker.key} - {blocker.title}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-
-                {dependencyLinks.length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <div className="ticket-dependency-item">
-                      <span style={{ display: 'inline-flex', alignItems: 'center' }}>⚠️</span>
-                      <span>This ticket blocks:</span>
-                    </div>
-                    <ul style={{ margin: 0, paddingLeft: '24px', listStyleType: 'disc', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      {dependencyLinks.map((dep: any) => (
-                        <li key={dep.id}>
-                          <span 
-                            className="ticket-dependency-link"
-                            onClick={() => onSelectTicket(dep)}
-                          >
-                            {dep.key} - {dep.title}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            )}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
               <div style={{ borderBottom: '1px solid var(--color-border-default)', paddingBottom: '6px' }}>
