@@ -19,6 +19,7 @@ export interface SearchableOptionPickerPopoverContentProps {
   createHeading?: string;
   createButtonLabel?: (name: string) => string;
   emptyStateLabel?: string;
+  showCheckbox?: boolean;
 }
 
 const CREATE_COLORS = [
@@ -58,6 +59,7 @@ export const SearchableOptionPickerPopoverContent: React.FC<SearchableOptionPick
   createHeading = 'CREATE NEW ITEM:',
   createButtonLabel,
   emptyStateLabel = 'No matching items',
+  showCheckbox = true,
 }) => {
   const [search, setSearch] = useState('');
   const [selectedColor, setSelectedColor] = useState(CREATE_COLORS[4]);
@@ -133,6 +135,78 @@ export const SearchableOptionPickerPopoverContent: React.FC<SearchableOptionPick
           filteredOptions.map((option) => {
             const isSelected = selectedIds.has(option.id);
             const defaultBackground = isSelected ? 'rgba(255,255,255,0.03)' : 'transparent';
+            const rowStyle = {
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '12px',
+              color: 'var(--color-text-primary)',
+              cursor: 'pointer',
+              padding: '4px 6px',
+              borderRadius: '4px',
+              background: defaultBackground,
+              userSelect: 'none',
+              transition: 'background 150ms ease',
+            } as const;
+
+            const rowLabel = (
+              <>
+                {option.color ? (
+                  <span
+                    style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: option.color,
+                      flexShrink: 0,
+                    }}
+                  />
+                ) : null}
+                <span style={{ display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0, flex: 1 }}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {option.label}
+                  </span>
+                  {option.description ? (
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--color-text-disabled)', fontSize: '11px' }}>
+                      {option.description}
+                    </span>
+                  ) : null}
+                </span>
+              </>
+            );
+
+            if (!showCheckbox) {
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  className="clickable"
+                  aria-pressed={isSelected}
+                  aria-label={option.description ? `${option.label} - ${option.description}` : option.label}
+                  style={{
+                    ...rowStyle,
+                    width: '100%',
+                    border: 'none',
+                    textAlign: 'left',
+                    appearance: 'none',
+                    WebkitAppearance: 'none',
+                    MozAppearance: 'none',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = defaultBackground;
+                  }}
+                  data-selected={isSelected}
+                  onClick={() => {
+                    void onToggle(option.id, isSelected);
+                  }}
+                >
+                  {rowLabel}
+                </button>
+              );
+            }
 
             return (
               <label
@@ -140,17 +214,7 @@ export const SearchableOptionPickerPopoverContent: React.FC<SearchableOptionPick
                 htmlFor={`option-${option.id}`}
                 className="clickable"
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  fontSize: '12px',
-                  color: 'var(--color-text-primary)',
-                  cursor: 'pointer',
-                  padding: '4px 6px',
-                  borderRadius: '4px',
-                  background: defaultBackground,
-                  userSelect: 'none',
-                  transition: 'background 150ms ease',
+                  ...rowStyle,
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
@@ -181,27 +245,7 @@ export const SearchableOptionPickerPopoverContent: React.FC<SearchableOptionPick
                     boxSizing: 'border-box',
                   }}
                 />
-                {option.color ? (
-                  <span
-                    style={{
-                      width: '8px',
-                      height: '8px',
-                      borderRadius: '50%',
-                      background: option.color,
-                      flexShrink: 0,
-                    }}
-                  />
-                ) : null}
-                <span style={{ display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0, flex: 1 }}>
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {option.label}
-                  </span>
-                  {option.description ? (
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--color-text-disabled)', fontSize: '11px' }}>
-                      {option.description}
-                    </span>
-                  ) : null}
-                </span>
+                {rowLabel}
               </label>
             );
           })

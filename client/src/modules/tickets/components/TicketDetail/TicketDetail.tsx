@@ -569,6 +569,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             selectedIds={dependencyTicketIds}
             onToggle={handleToggleDependency}
             emptyStateLabel="No matching tickets"
+            showCheckbox={false}
           />
         </Popover>
 
@@ -620,6 +621,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                 selectedIds={blockerTicketIds}
                 onToggle={handleToggleBlocker}
                 emptyStateLabel="No matching tickets"
+                showCheckbox={false}
               />
             </Popover>
           )}

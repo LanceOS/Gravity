@@ -533,7 +533,7 @@ describe('TicketDetail', () => {
     await user.click(sidebar.getByRole('button', { name: 'Add Dependency' }));
     const dependencySearch = screen.getByPlaceholderText('Type to search tickets...');
     await user.type(dependencySearch, 'Searchable dependency target');
-    await user.click(screen.getByRole('checkbox', { name: /GRA-106/ }));
+    await user.click(screen.getByRole('button', { name: /GRA-106/ }));
     await waitFor(() => {
       expect(props.onAddDependency).toHaveBeenCalledWith('ticket-1', 'ticket-6');
     });
@@ -541,7 +541,7 @@ describe('TicketDetail', () => {
     await user.click(sidebar.getByRole('button', { name: 'Add Blocker' }));
     const blockerSearch = screen.getAllByPlaceholderText('Type to search tickets...')[1] as HTMLInputElement;
     await user.type(blockerSearch, 'Searchable blocker target');
-    await user.click(screen.getByRole('checkbox', { name: /GRA-107/ }));
+    await user.click(screen.getByRole('button', { name: /GRA-107/ }));
     await waitFor(() => {
       expect(props.onAddBlocker).toHaveBeenCalledWith('ticket-1', 'ticket-7');
     });
@@ -590,8 +590,8 @@ describe('TicketDetail', () => {
     expect(screen.queryByRole('checkbox', { name: /GRA-104/ })).not.toBeInTheDocument();
     await user.clear(dependencySearch);
     await user.type(dependencySearch, 'Searchable dependency target');
-    expect(screen.getByRole('checkbox', { name: /GRA-106/ })).toBeInTheDocument();
-    await user.click(screen.getByRole('checkbox', { name: /GRA-106/ }));
+    expect(screen.getByRole('button', { name: /GRA-106/ })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /GRA-106/ }));
     await waitFor(() => {
       expect(props.onAddDependency).toHaveBeenCalledWith('ticket-1', 'ticket-6');
     });
@@ -603,8 +603,8 @@ describe('TicketDetail', () => {
     expect(screen.queryByRole('checkbox', { name: /GRA-105/ })).not.toBeInTheDocument();
     await user.clear(blockerSearch);
     await user.type(blockerSearch, 'Searchable blocker target');
-    expect(screen.getByRole('checkbox', { name: /GRA-107/ })).toBeInTheDocument();
-    await user.click(screen.getByRole('checkbox', { name: /GRA-107/ }));
+    expect(screen.getByRole('button', { name: /GRA-107/ })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /GRA-107/ }));
     await waitFor(() => {
       expect(props.onAddBlocker).toHaveBeenCalledWith('ticket-1', 'ticket-7');
     });
