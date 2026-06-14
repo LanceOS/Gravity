@@ -10,9 +10,11 @@ import {
   CheckSquare,
   Trash2,
   Calendar,
+  Link,
 } from 'lucide-react';
 import { STATUS_OPTIONS, PRIORITY_OPTIONS } from '../utils/TicketDetail';
 import { getPriorityIcon } from '../utils/TicketBoard';
+import { TicketAssignmentSubMenu } from './TicketAssignmentSubMenu';
 
 interface TicketContextMenuProps {
   ticket: Ticket;
@@ -27,6 +29,7 @@ export const TicketContextMenu: React.FC<TicketContextMenuProps> = ({ ticket, ch
   }
 
   const {
+    tickets,
     users,
     projects,
     labels,
@@ -34,6 +37,8 @@ export const TicketContextMenu: React.FC<TicketContextMenuProps> = ({ ticket, ch
     updateTicket,
     moveTicket,
     deleteTicket,
+    addTicketDependency,
+    addTicketBlocker,
     assignLabelToTicket,
     unassignLabelFromTicket,
   } = context;
@@ -41,6 +46,11 @@ export const TicketContextMenu: React.FC<TicketContextMenuProps> = ({ ticket, ch
   const ticketLabels = useMemo(
     () => labels.filter((l) => l.projectId === ticket.projectId || !l.projectId),
     [labels, ticket.projectId]
+  );
+
+  const assignableTickets = useMemo(
+    () => tickets.filter((candidate) => candidate.id !== ticket.id && candidate.projectId === ticket.projectId),
+    [tickets, ticket.id, ticket.projectId]
   );
 
   const workspaceProjects = useMemo(() => {
@@ -260,10 +270,58 @@ export const TicketContextMenu: React.FC<TicketContextMenuProps> = ({ ticket, ch
         </ContextMenu.SubMenu>
       </ContextMenu.Item>
 
+      {/* 7. Assign As Submenu */}
+      <ContextMenu.Item icon={<Link size={13} style={{ color: 'var(--color-text-disabled)' }} />}>
+        Assign As
+        <ContextMenu.SubMenu>
+          <ContextMenu.Item>
+            Dependency
+            <ContextMenu.SubMenu>
+              <TicketAssignmentSubMenu
+                title="Assign as Dependency"
+                description="Choose the ticket that should depend on this ticket."
+                searchPlaceholder="Type to search tickets..."
+                tickets={assignableTickets}
+                emptyStateLabel="No matching tickets"
+                onSelectTicket={async (selectedTicket) => {
+                  const success = await addTicketDependency(ticket.id, selectedTicket.id);
+                  if (success) {
+                    toast.show(`Assigned ${selectedTicket.key} as a dependency`, 'success');
+                  } else {
+                    toast.show(`Failed to assign ${selectedTicket.key} as a dependency`, 'error');
+                  }
+                }}
+              />
+            </ContextMenu.SubMenu>
+          </ContextMenu.Item>
+
+          <ContextMenu.Item>
+            Blocker
+            <ContextMenu.SubMenu>
+              <TicketAssignmentSubMenu
+                title="Assign as Blocker"
+                description="Choose the ticket that should block this ticket."
+                searchPlaceholder="Type to search tickets..."
+                tickets={assignableTickets}
+                emptyStateLabel="No matching tickets"
+                onSelectTicket={async (selectedTicket) => {
+                  const success = await addTicketBlocker(ticket.id, selectedTicket.id);
+                  if (success) {
+                    toast.show(`Assigned ${selectedTicket.key} as a blocker`, 'success');
+                  } else {
+                    toast.show(`Failed to assign ${selectedTicket.key} as a blocker`, 'error');
+                  }
+                }}
+              />
+            </ContextMenu.SubMenu>
+          </ContextMenu.Item>
+        </ContextMenu.SubMenu>
+      </ContextMenu.Item>
+
       {/* Divider */}
       <div className="lib-divider" style={{ margin: '4px 0' }} />
 
-      {/* 7. Delete Option */}
+      {/* 8. Delete Option */}
       <ContextMenu.Item
         danger
         icon={<Trash2 size={13} />}
