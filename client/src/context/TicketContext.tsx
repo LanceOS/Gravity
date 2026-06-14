@@ -356,9 +356,10 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Active Ticket Detail (includes dependency and blocker relations)
   const activeTicketDetailQuery = useQuery({
-    queryKey: ['ticket-detail', activeTicketId],
+    queryKey: ticketDetailQueryKey(activeTicketId || ''),
     queryFn: () => apiClient.get<Ticket>(`/tickets/${activeTicketId}`, { projectId: activeTicketProjectId }),
     enabled: !!activeTicketId && !!activeTicketProjectId && !!currentUser,
+    ...CACHE_CONFIGS.ticketDetail,
   });
   const activeTicketDetail = activeTicketDetailQuery.data || null;
 
@@ -1032,7 +1033,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       const projectId = getTicketProjectIdForMutation(ticketId);
       markPendingTicketRelationAdd(ticketId, 'dependencies', dependencyId);
-      addTicketDependencyMutation.mutate({ ticketId, dependencyId, projectId });
+      await addTicketDependencyMutation.mutateAsync({ ticketId, dependencyId, projectId });
       return true;
     } catch (e) {
       console.error(e);
@@ -1073,7 +1074,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
 
       const projectId = getTicketProjectIdForMutation(ticketId);
-      removeTicketDependencyMutation.mutate({ ticketId, dependencyId, projectId });
+      await removeTicketDependencyMutation.mutateAsync({ ticketId, dependencyId, projectId });
       return true;
     } catch (e) {
       console.error(e);
@@ -1109,7 +1110,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       const projectId = getTicketProjectIdForMutation(ticketId);
       markPendingTicketRelationAdd(ticketId, 'blockers', blockerId);
-      addTicketBlockerMutation.mutate({ ticketId, blockerId, projectId });
+      await addTicketBlockerMutation.mutateAsync({ ticketId, blockerId, projectId });
       return true;
     } catch (e) {
       console.error(e);
@@ -1150,7 +1151,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
 
       const projectId = getTicketProjectIdForMutation(ticketId);
-      removeTicketBlockerMutation.mutate({ ticketId, blockerId, projectId });
+      await removeTicketBlockerMutation.mutateAsync({ ticketId, blockerId, projectId });
       return true;
     } catch (e) {
       console.error(e);

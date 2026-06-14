@@ -523,7 +523,7 @@ describe('TicketDetail', () => {
     expect(props.onRemoveBlocker).toHaveBeenCalledWith('ticket-1', 'ticket-4');
   });
 
-  it('does not remove selected relations from add relation pickers', async () => {
+  it('hides incompatible relation candidates from add relation pickers', async () => {
     const user = userEvent.setup();
     const blockerTicket = {
       ...activeTicket,
@@ -556,20 +556,28 @@ describe('TicketDetail', () => {
 
     await user.click(sidebar.getByRole('button', { name: 'Add Dependency' }));
     const dependencySearch = screen.getByPlaceholderText('Type to search tickets...');
-    await user.type(dependencySearch, 'Ship dependent rollout');
-    await user.click(screen.getByRole('checkbox', { name: /GRA-105/ }));
-
-    expect(props.onRemoveDependency).not.toHaveBeenCalled();
-    expect(props.onAddDependency).not.toHaveBeenCalled();
+    await user.type(dependencySearch, 'Coordinate upstream fix');
+    expect(screen.queryByRole('checkbox', { name: /GRA-104/ })).not.toBeInTheDocument();
+    await user.clear(dependencySearch);
+    await user.type(dependencySearch, 'Searchable dependency target');
+    expect(screen.getByRole('checkbox', { name: /GRA-106/ })).toBeInTheDocument();
+    await user.click(screen.getByRole('checkbox', { name: /GRA-106/ }));
+    await waitFor(() => {
+      expect(props.onAddDependency).toHaveBeenCalledWith('ticket-1', 'ticket-6');
+    });
 
     await user.click(sidebar.getByRole('button', { name: 'Add Blocker' }));
     const blockerSearchInputs = screen.getAllByPlaceholderText('Type to search tickets...');
     const blockerSearch = blockerSearchInputs[blockerSearchInputs.length - 1] as HTMLInputElement;
-    await user.type(blockerSearch, 'Coordinate upstream fix');
-    await user.click(screen.getByRole('checkbox', { name: /GRA-104/ }));
-
-    expect(props.onRemoveBlocker).not.toHaveBeenCalled();
-    expect(props.onAddBlocker).not.toHaveBeenCalled();
+    await user.type(blockerSearch, 'Ship dependent rollout');
+    expect(screen.queryByRole('checkbox', { name: /GRA-105/ })).not.toBeInTheDocument();
+    await user.clear(blockerSearch);
+    await user.type(blockerSearch, 'Searchable blocker target');
+    expect(screen.getByRole('checkbox', { name: /GRA-107/ })).toBeInTheDocument();
+    await user.click(screen.getByRole('checkbox', { name: /GRA-107/ }));
+    await waitFor(() => {
+      expect(props.onAddBlocker).toHaveBeenCalledWith('ticket-1', 'ticket-7');
+    });
   });
 
   it('copies sidebar utility values for ticket link, branch name, markdown description, and ticket key', async () => {

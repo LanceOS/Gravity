@@ -175,6 +175,12 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
 
   const dependencyTicketIds = useMemo(() => new Set(dependencyLinks.map((dependency) => dependency.id)), [dependencyLinks]);
   const blockerTicketIds = useMemo(() => new Set(blockerLinks.map((blocker) => blocker.id)), [blockerLinks]);
+  const relatedTicketIds = useMemo(() => {
+    return new Set([...dependencyTicketIds, ...blockerTicketIds]);
+  }, [dependencyTicketIds, blockerTicketIds]);
+  const isCompatibleRelationCandidate = useCallback((ticketId: string) => {
+    return ticketId !== activeTicket.id && !relatedTicketIds.has(ticketId);
+  }, [activeTicket.id, relatedTicketIds]);
   const availableTicketsById = useMemo(() => {
     const ticketMap = new Map(availableTickets.map((ticket) => [ticket.id, ticket]));
     if (parentTicket) {
@@ -186,14 +192,14 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
 
   const ticketOptions = useMemo(() => {
     return availableTickets
-      .filter((ticket) => ticket.id !== activeTicket.id)
+      .filter((ticket) => isCompatibleRelationCandidate(ticket.id))
       .map((ticket) => ({
         id: ticket.id,
         label: ticket.key,
         description: ticket.title,
         searchText: [ticket.key, ticket.title].filter(Boolean).join(' '),
       }));
-  }, [availableTickets, activeTicket.id]);
+  }, [availableTickets, isCompatibleRelationCandidate]);
 
   const configurationEntries = useMemo(() => {
     const resolveAssignee = (ticket: Ticket | null) => {
@@ -284,20 +290,20 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
   }, [handleAssignLabel, handleUnassignLabel]);
 
   const handleToggleDependency = useCallback(async (dependencyId: string, isSelected: boolean) => {
-    if (isSelected) {
+    if (isSelected || !isCompatibleRelationCandidate(dependencyId)) {
       return;
     }
 
     await handleAddDependency(dependencyId);
-  }, [handleAddDependency]);
+  }, [handleAddDependency, isCompatibleRelationCandidate]);
 
   const handleToggleBlocker = useCallback(async (blockerId: string, isSelected: boolean) => {
-    if (isSelected) {
+    if (isSelected || !isCompatibleRelationCandidate(blockerId)) {
       return;
     }
 
     await handleAddBlocker(blockerId);
-  }, [handleAddBlocker]);
+  }, [handleAddBlocker, isCompatibleRelationCandidate]);
 
   const renderAddRelationTrigger = (buttonLabel: string) => (
     <button

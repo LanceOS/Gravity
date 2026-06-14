@@ -299,6 +299,40 @@ export async function getTicketByKey(ticketKey: string) {
   return rows[0] ? mapTicket(rows[0]) : null;
 }
 
+export async function getTicketRelationsByKey(ticketKey: string) {
+  const ticket = await getTicketByKey(ticketKey);
+  if (!ticket) {
+    return null;
+  }
+
+  const [dependenciesResult, blockersResult] = await Promise.all([
+    listTicketDependencies(ticket.id),
+    listTicketBlockers(ticket.id),
+  ]);
+
+  let blockedTicket: ReturnType<typeof mapRelatedTicket> | null = blockersResult[0] ?? null;
+  if (!blockedTicket && ticket.blockedTicketId) {
+    const legacyBlockedRows = await db
+      .select({
+        id: tickets.id,
+        key: tickets.key,
+        title: tickets.title,
+        projectId: tickets.projectId,
+      })
+      .from(tickets)
+      .where(eq(tickets.id, ticket.blockedTicketId))
+      .limit(1);
+    blockedTicket = legacyBlockedRows[0] ? mapRelatedTicket(legacyBlockedRows[0]) : null;
+  }
+
+  return {
+    ...ticket,
+    blockedTicket,
+    dependencies: dependenciesResult,
+    blockers: blockersResult,
+  };
+}
+
 export async function listTicketDependencies(ticketId: string) {
   const rows = await db
     .select({

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MessageSquare, X } from 'lucide-react';
 import { useParams, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../utils/apiClient';
 import type { SidebarTree, Cycle, Label } from '../../types/domain';
+import { CACHE_CONFIGS, queryKeys } from '../../utils/queryClient';
 
 import { AuthScreen } from '../../modules/auth';
 import { CreateTicketModal } from '../../modules/tickets';
@@ -79,6 +80,7 @@ export function AppShellPage() {
     addTicketBlocker,
     removeTicketBlocker,
   } = useTickets();
+  const queryClient = useQueryClient();
 
   const [activeSection, setActiveSection] = useState<AppSection>('workspace');
   const [activeWorkspaceId, setActiveWorkspaceId] = useState('');
@@ -248,6 +250,7 @@ export function AppShellPage() {
   const { pathname } = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const normalizedTicketKey = ticketKey?.trim().toUpperCase() ?? '';
   const isWorkspaceAllTasksPath = !!workspaceId && (
     pathname === `/workspaces/${workspaceId}/all` ||
     pathname === `/workspaces/${workspaceId}/all/`
@@ -259,6 +262,34 @@ export function AppShellPage() {
   const isTeamAggregatePath = !!teamIdParam && !projectIdParam;
   const shouldUseAggregateTicketScope = isWorkspaceAllTasksPath || isTeamAggregatePath;
   const shouldKeepActiveProjectSelection = isWorkspaceAllTasksPath || isWorkspaceProjectsListPath || isTeamAggregatePath;
+
+  const ticketRelationsByKeyQuery = useQuery<Ticket | null>({
+    queryKey: queryKeys.ticketRelations(normalizedTicketKey, currentUser?.id),
+    queryFn: () => apiClient.get<Ticket>(`/tickets/key/${normalizedTicketKey}`, { params: { include: 'relations' } }),
+    enabled: !!normalizedTicketKey && !!currentUser?.id,
+    ...CACHE_CONFIGS.ticketDetail,
+  });
+
+  useEffect(() => {
+    const detail = ticketRelationsByKeyQuery.data;
+    if (!detail?.id) {
+      return;
+    }
+
+    queryClient.setQueryData<Ticket>(['ticket-detail', detail.id], (existing) => {
+      if (!existing) {
+        return detail;
+      }
+
+      return {
+        ...existing,
+        ...detail,
+        blockedTicket: detail.blockedTicket ?? existing.blockedTicket ?? null,
+        dependencies: detail.dependencies ?? existing.dependencies,
+        blockers: detail.blockers ?? existing.blockers,
+      };
+    });
+  }, [queryClient, ticketRelationsByKeyQuery.data]);
 
   // Teams-specific queries
   const { data: sidebarTree } = useQuery<SidebarTree>({

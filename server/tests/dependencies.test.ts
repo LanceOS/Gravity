@@ -67,7 +67,7 @@ describe('ticket relationship routes', () => {
     // 2. Add T2 as a dependency of T1 (T1 blocks T2)
     const addDepResponse = await ownerApi
       .post(`/api/v1/tickets/${t1.id}/dependencies`)
-      .set('x-project-id', project.id)
+      .set('x-project-id', 'project-does-not-matter')
       .send({ dependencyId: t2.id });
     expect(addDepResponse.status).toBe(201);
     expect(addDepResponse.body).toEqual({ success: true });
@@ -111,6 +111,18 @@ describe('ticket relationship routes', () => {
     expect(t1DetailsAfterBlockers.status).toBe(200);
     expect(t1DetailsAfterBlockers.body.blockers).toHaveLength(2);
     expect(t1DetailsAfterBlockers.body.blockers).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: t3.id, key: t3.key, title: t3.title }),
+      expect.objectContaining({ id: t4.id, key: t4.key, title: t4.title }),
+    ]));
+
+    const relationSnapshotResponse = await ownerApi
+      .get(`/api/v1/tickets/key/${t1.key}`)
+      .query({ include: 'relations' });
+    expect(relationSnapshotResponse.status).toBe(200);
+    expect(relationSnapshotResponse.body.dependencies).toEqual([
+      expect.objectContaining({ id: t2.id, key: t2.key, title: t2.title }),
+    ]);
+    expect(relationSnapshotResponse.body.blockers).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: t3.id, key: t3.key, title: t3.title }),
       expect.objectContaining({ id: t4.id, key: t4.key, title: t4.title }),
     ]));

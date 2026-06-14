@@ -11,6 +11,8 @@ import {
   createTicketRecord,
   createTicketDependencyRelation,
   getTicketById,
+  getTicketByKey,
+  getTicketRelationsByKey,
   deleteTicketRecord,
   hasTicketDependencyRelation,
   getTicketDetails,
@@ -107,7 +109,10 @@ export function createTicketsRouter() {
     ticketId: string,
     handler: (ticket: any, userId: string) => Promise<void>
   ) {
-    const ticket = await getTicketById(ticketId, getProjectIdFromRequest(req) || undefined);
+    // Ticket IDs are globally unique, so look them up directly instead of
+    // requiring the caller to send a matching project scope header. That keeps
+    // relation actions working even when the UI's project context is stale.
+    const ticket = await getTicketById(ticketId);
     if (!ticket) {
       res.status(404).json({ error: 'Ticket not found.' });
       return;
@@ -195,18 +200,7 @@ export function createTicketsRouter() {
   router.get('/tickets/key/:ticketKey', async (req, res) => {
     try {
       const ticketKey = normalizeRouteParam(req.params.ticketKey).trim().toUpperCase();
-      const ticketRows = await db
-        .select({
-          id: tickets.id,
-          key: tickets.key,
-          title: tickets.title,
-          status: tickets.status,
-          projectId: tickets.projectId,
-        })
-        .from(tickets)
-        .where(eq(tickets.key, ticketKey))
-        .limit(1);
-      const ticket = ticketRows[0];
+      const ticket = await getTicketByKey(ticketKey);
       if (!ticket) {
         res.status(404).json({ error: 'Ticket not found.' });
         return;
@@ -218,7 +212,27 @@ export function createTicketsRouter() {
         return;
       }
 
-      res.json(ticket);
+      const includeRelations = typeof req.query.include === 'string'
+        && req.query.include.split(',').map((value) => value.trim()).includes('relations');
+
+      if (includeRelations) {
+        const ticketRelations = await getTicketRelationsByKey(ticketKey);
+        if (!ticketRelations) {
+          res.status(404).json({ error: 'Ticket not found.' });
+          return;
+        }
+
+        res.json(ticketRelations);
+        return;
+      }
+
+      res.json({
+        id: ticket.id,
+        key: ticket.key,
+        title: ticket.title,
+        status: ticket.status,
+        projectId: ticket.projectId,
+      });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load ticket.' });
     }
