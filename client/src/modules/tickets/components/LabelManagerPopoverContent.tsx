@@ -36,7 +36,7 @@ export const LabelManagerPopoverContent: React.FC<LabelManagerPopoverContentProp
   ];
 
   const projectLabels = useMemo(() => {
-    return allLabels.filter((l) => l.projectId === projectId);
+    return allLabels.filter((l) => l.projectId === projectId || !l.projectId);
   }, [allLabels, projectId]);
 
   const filteredLabels = useMemo(() => {

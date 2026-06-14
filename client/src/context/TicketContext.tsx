@@ -856,7 +856,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const createLabelMutation = useMutation({
     mutationFn: async (labelInput: { name: string; color?: string; description?: string; projectId?: string; sortOrder?: number }) => {
       const projectId = labelInput.projectId || activeProjectIdRef.current;
-      const existingProjectLabels = labels.filter((label) => label.projectId === projectId);
+      const existingProjectLabels = labels.filter((label) => label.projectId === projectId || !label.projectId);
       const nextSortOrder =
         labelInput.sortOrder ??
         existingProjectLabels.reduce((maxSortOrder, label) => Math.max(maxSortOrder, Number(label.sortOrder ?? 0)), -1) + 1;

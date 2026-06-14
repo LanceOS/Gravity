@@ -38,7 +38,13 @@ export const TicketContextMenu: React.FC<TicketContextMenuProps> = ({ ticket, ch
   } = context;
 
   // Filter labels belonging to the same project as the ticket
-  const ticketLabels = labels.filter((l) => l.projectId === ticket.projectId);
+  const ticketLabels = labels.filter((l) => l.projectId === ticket.projectId || !l.projectId);
+
+  // Filter projects belonging to the same workspace as the ticket's current project
+  const currentProject = projects.find((p) => p.id === ticket.projectId);
+  const workspaceProjects = currentProject?.workspaceId
+    ? projects.filter((p) => p.workspaceId === currentProject.workspaceId)
+    : projects;
 
   const menuContent = (
     <>
@@ -145,10 +151,10 @@ export const TicketContextMenu: React.FC<TicketContextMenuProps> = ({ ticket, ch
       <ContextMenu.Item icon={<Folder size={13} style={{ color: 'var(--color-text-disabled)' }} />}>
         Move to Project
         <ContextMenu.SubMenu>
-          {projects.length === 0 ? (
+          {workspaceProjects.length === 0 ? (
             <ContextMenu.Item disabled>No projects available</ContextMenu.Item>
           ) : (
-            projects.map((p) => {
+            workspaceProjects.map((p) => {
               const isActive = ticket.projectId === p.id;
               return (
                 <ContextMenu.Item
