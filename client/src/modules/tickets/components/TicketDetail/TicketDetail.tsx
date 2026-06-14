@@ -83,6 +83,7 @@ import { useTickets } from '../../../../context/TicketContext';
 import { LabelBadge } from '../LabelBadge';
 import { SearchableOptionPickerPopoverContent } from '../SearchableOptionPickerPopoverContent';
 import { TicketContextMenu } from '../TicketContextMenu';
+import { TicketRelationsSection } from './TicketRelationsSection';
 import './TicketDetail.css';
 
 export const TicketDetail: React.FC<TicketDetailProps> = ({
@@ -125,42 +126,6 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
     await unassignLabelFromTicket(activeTicket.id, labelId);
   }, [unassignLabelFromTicket, activeTicket.id]);
 
-  const handleAddDependency = useCallback(async (dependencyId: string) => {
-    if (!dependencyId) return;
-    const success = await onAddDependency(activeTicket.id, dependencyId);
-    if (success && toast?.show) {
-      toast.show('Dependency added successfully', 'success');
-    }
-  }, [onAddDependency, activeTicket.id]);
-
-  const handleRemoveDependency = useCallback(async (dependencyId: string) => {
-    const success = await onRemoveDependency(activeTicket.id, dependencyId);
-    if (success && toast?.show) {
-      toast.show('Dependency removed', 'success');
-    }
-  }, [onRemoveDependency, activeTicket.id]);
-
-  const handleAddBlocker = useCallback(async (blockerId: string) => {
-    if (!onAddBlocker) return;
-    if (!blockerId) return;
-    const success = await onAddBlocker(activeTicket.id, blockerId);
-    if (success && toast?.show) {
-      toast.show('Blocker added successfully', 'success');
-    }
-  }, [onAddBlocker, activeTicket.id]);
-
-  const handleRemoveBlocker = useCallback(async (blockerId: string) => {
-    if (!onRemoveBlocker) return;
-    const success = await onRemoveBlocker(activeTicket.id, blockerId);
-    if (success && toast?.show) {
-      toast.show('Blocker removed', 'success');
-    }
-  }, [onRemoveBlocker, activeTicket.id]);
-
-  const canManageBlockers = typeof onAddBlocker === 'function' && typeof onRemoveBlocker === 'function';
-
-  const dependencyLinks = activeTicketDetail?.dependencies || [];
-  const blockerLinks = activeTicketDetail?.blockers || (activeTicketDetail?.blockedTicket ? [activeTicketDetail.blockedTicket] : []);
   const labelOptions = useMemo(() => {
     return labels
       .filter((label) => label.projectId === activeTicket.projectId || !label.projectId)
@@ -172,101 +137,6 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
         searchText: [label.name, label.description].filter(Boolean).join(' '),
       }));
   }, [labels, activeTicket.projectId]);
-
-  const dependencyTicketIds = useMemo(() => new Set(dependencyLinks.map((dependency) => dependency.id)), [dependencyLinks]);
-  const blockerTicketIds = useMemo(() => new Set(blockerLinks.map((blocker) => blocker.id)), [blockerLinks]);
-  const relatedTicketIds = useMemo(() => {
-    return new Set(activeTicketDetail?.relatedTicketIds || []);
-  }, [activeTicketDetail?.relatedTicketIds]);
-  const isCompatibleRelationCandidate = useCallback((ticketId: string) => {
-    return ticketId !== activeTicket.id && !relatedTicketIds.has(ticketId);
-  }, [activeTicket.id, relatedTicketIds]);
-  const availableTicketsById = useMemo(() => {
-    const ticketMap = new Map(availableTickets.map((ticket) => [ticket.id, ticket]));
-    if (parentTicket) {
-      ticketMap.set(parentTicket.id, parentTicket);
-    }
-    return ticketMap;
-  }, [availableTickets, parentTicket]);
-  const usersById = useMemo(() => new Map(users.map((user) => [user.id, user])), [users]);
-
-  const ticketOptions = useMemo(() => {
-    return availableTickets
-      .filter((ticket) => isCompatibleRelationCandidate(ticket.id))
-      .map((ticket) => ({
-        id: ticket.id,
-        label: ticket.key,
-        description: ticket.title,
-        searchText: [ticket.key, ticket.title].filter(Boolean).join(' '),
-      }));
-  }, [availableTickets, isCompatibleRelationCandidate]);
-
-  const configurationEntries = useMemo(() => {
-    const resolveAssignee = (ticket: Ticket | null) => {
-      if (!ticket?.assigneeId) {
-        return { name: 'Unassigned', avatar: '' };
-      }
-
-      const assignee = usersById.get(ticket.assigneeId);
-      return {
-        name: assignee?.name || 'Unknown member',
-        avatar: assignee?.avatar || '',
-      };
-    };
-
-    const entries: Array<{
-      id: string;
-      relation: string;
-      key: string;
-      title: string;
-      assigneeName: string;
-      assigneeAvatar: string;
-      resolvedTicket: Ticket | null;
-    }> = [];
-
-    if (parentTicket) {
-      const assignee = resolveAssignee(parentTicket);
-      entries.push({
-        id: `parent-${parentTicket.id}`,
-        relation: 'Sub-ticket of',
-        key: parentTicket.key,
-        title: parentTicket.title,
-        assigneeName: assignee.name,
-        assigneeAvatar: assignee.avatar,
-        resolvedTicket: parentTicket,
-      });
-    }
-
-    blockerLinks.forEach((blocker) => {
-      const resolvedTicket = availableTicketsById.get(blocker.id) || null;
-      const assignee = resolveAssignee(resolvedTicket);
-      entries.push({
-        id: `blocker-${blocker.id}`,
-        relation: 'Blocked by',
-        key: blocker.key,
-        title: blocker.title,
-        assigneeName: assignee.name,
-        assigneeAvatar: assignee.avatar,
-        resolvedTicket,
-      });
-    });
-
-    dependencyLinks.forEach((dependency) => {
-      const resolvedTicket = availableTicketsById.get(dependency.id) || null;
-      const assignee = resolveAssignee(resolvedTicket);
-      entries.push({
-        id: `dependency-${dependency.id}`,
-        relation: 'Blocks',
-        key: dependency.key,
-        title: dependency.title,
-        assigneeName: assignee.name,
-        assigneeAvatar: assignee.avatar,
-        resolvedTicket,
-      });
-    });
-
-    return entries;
-  }, [availableTicketsById, blockerLinks, dependencyLinks, parentTicket, usersById]);
 
   const handleCreateLabel = useCallback(async (name: string, color: string) => {
     const newLabel = await createLabelInContext({
@@ -288,22 +158,6 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
 
     await handleAssignLabel(labelId);
   }, [handleAssignLabel, handleUnassignLabel]);
-
-  const handleToggleDependency = useCallback(async (dependencyId: string, isSelected: boolean) => {
-    if (isSelected || !isCompatibleRelationCandidate(dependencyId)) {
-      return;
-    }
-
-    await handleAddDependency(dependencyId);
-  }, [handleAddDependency, isCompatibleRelationCandidate]);
-
-  const handleToggleBlocker = useCallback(async (blockerId: string, isSelected: boolean) => {
-    if (isSelected || !isCompatibleRelationCandidate(blockerId)) {
-      return;
-    }
-
-    await handleAddBlocker(blockerId);
-  }, [handleAddBlocker, isCompatibleRelationCandidate]);
 
   const renderAddRelationTrigger = (buttonLabel: string) => (
     <button
@@ -524,109 +378,18 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
         />
       </div>
 
-      <div style={{ borderTop: '1px solid var(--color-border-default)', paddingTop: '16px', marginTop: '8px' }}>
-        <span className="label" style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '8px' }}>
-          <Link size={12} />
-          <span>Dependencies</span>
-        </span>
-
-        {dependencyLinks.length > 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '8px' }}>
-            {dependencyLinks.map((dep: any) => (
-              <div key={dep.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-base100)', padding: '4px 8px', borderRadius: '4px', fontSize: '12px' }}>
-                <span className="clickable" style={{ color: 'var(--color-primary)', fontWeight: 500, cursor: 'pointer' }} onClick={() => onSelectTicket(dep)}>
-                  {dep.key}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => handleRemoveDependency(dep.id)}
-                  style={{ background: 'none', border: 'none', color: 'var(--color-text-disabled)', cursor: 'pointer', display: 'flex', padding: '2px' }}
-                  onMouseEnter={e => e.currentTarget.style.color = 'var(--color-error)'}
-                  onMouseLeave={e => e.currentTarget.style.color = 'var(--color-text-disabled)'}
-                  aria-label={`Remove dependency ${dep.key}`}
-                >
-                  <Trash2 size={12} />
-                </button>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div style={{ fontSize: '11px', color: 'var(--color-text-disabled)', fontStyle: 'italic', marginBottom: '8px' }}>
-            No dependencies
-          </div>
-        )}
-
-        <Popover
-          align="left"
-          style={{ display: 'block' }}
-          contentClassName="ticket-detail__label-popover"
-          trigger={renderAddRelationTrigger('Add Dependency')}
-        >
-          <SearchableOptionPickerPopoverContent
-            title="Search Tickets"
-            searchPlaceholder="Type to search tickets..."
-            options={ticketOptions}
-            selectedIds={dependencyTicketIds}
-            onToggle={handleToggleDependency}
-            emptyStateLabel="No matching tickets"
-            showCheckbox={false}
-          />
-        </Popover>
-
-        <div style={{ marginTop: '16px', borderTop: '1px dashed var(--color-border-default)', paddingTop: '12px' }}>
-          <span className="label" style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '8px' }}>
-            <Link size={12} />
-            <span>Blockers</span>
-          </span>
-
-          {blockerLinks.length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '8px' }}>
-              {blockerLinks.map((blocker: any) => (
-                <div key={blocker.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-base100)', padding: '4px 8px', borderRadius: '4px', fontSize: '12px' }}>
-                  <span className="clickable" style={{ color: 'var(--color-primary)', fontWeight: 500, cursor: 'pointer' }} onClick={() => onSelectTicket(blocker)}>
-                    {blocker.key}
-                  </span>
-                  {canManageBlockers && (
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveBlocker(blocker.id)}
-                      style={{ background: 'none', border: 'none', color: 'var(--color-text-disabled)', cursor: 'pointer', display: 'flex', padding: '2px' }}
-                      onMouseEnter={e => e.currentTarget.style.color = 'var(--color-error)'}
-                      onMouseLeave={e => e.currentTarget.style.color = 'var(--color-text-disabled)'}
-                      aria-label={`Remove blocker ${blocker.key}`}
-                    >
-                      <Trash2 size={12} />
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div style={{ fontSize: '11px', color: 'var(--color-text-disabled)', fontStyle: 'italic', marginBottom: '8px' }}>
-              No blockers
-            </div>
-          )}
-
-          {canManageBlockers && (
-            <Popover
-              align="left"
-              style={{ display: 'block' }}
-              contentClassName="ticket-detail__label-popover"
-              trigger={renderAddRelationTrigger('Add Blocker')}
-            >
-              <SearchableOptionPickerPopoverContent
-                title="Search Tickets"
-                searchPlaceholder="Type to search tickets..."
-                options={ticketOptions}
-                selectedIds={blockerTicketIds}
-                onToggle={handleToggleBlocker}
-                emptyStateLabel="No matching tickets"
-                showCheckbox={false}
-              />
-            </Popover>
-          )}
-        </div>
-      </div>
+      <TicketRelationsSection
+        activeTicket={activeTicket}
+        activeTicketDetail={activeTicketDetail}
+        availableTickets={availableTickets}
+        parentTicket={parentTicket}
+        users={users}
+        onSelectTicket={onSelectTicket}
+        onAddDependency={onAddDependency}
+        onRemoveDependency={onRemoveDependency}
+        onAddBlocker={onAddBlocker}
+        onRemoveBlocker={onRemoveBlocker}
+      />
 
       <div style={{ gridColumn: '1 / -1', borderTop: '1px solid var(--color-border-default)', paddingTop: '16px', marginTop: '8px' }}>
         <span className="label" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -848,58 +611,6 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                   No sub-tasks defined. Break complex tasks down to improve trackability.
                 </div>
               )}
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              {configurationEntries.length > 0 ? (
-                <section className="ticket-relations">
-                  <div className="ticket-relations__header">
-                    <span className="ticket-relations__title">Relations</span>
-
-                    <span className="ticket-relations__count">
-                      {configurationEntries.length}
-                    </span>
-                  </div>
-
-                  <div className="ticket-relations__items">
-                    {configurationEntries.map((entry) => (
-                      <button
-                        key={entry.id}
-                        type="button"
-                        className="ticket-configurations__line"
-                        onClick={() => {
-                          if (entry.resolvedTicket) {
-                            onSelectTicket(entry.resolvedTicket);
-                          }
-                        }}
-                        disabled={!entry.resolvedTicket}
-                        aria-label={`${entry.key} - ${entry.title}`}
-                      >
-                        <span className="ticket-configurations__relation">{entry.relation}</span>
-
-                        <span className="ticket-configurations__ticket-key">{entry.key}</span>
-
-                        <span className="ticket-configurations__ticket-title">{entry.title}</span>
-
-                        <span className="ticket-configurations__assignee">
-                          {entry.assigneeAvatar ? (
-                            <img
-                              src={entry.assigneeAvatar}
-                              alt=""
-                              className="ticket-configurations__assignee-avatar"
-                            />
-                          ) : (
-                            <span className="ticket-configurations__assignee-fallback" aria-hidden="true">
-                              {entry.assigneeName.charAt(0).toUpperCase()}
-                            </span>
-                          )}
-                          <span className="ticket-configurations__assignee-name">{entry.assigneeName}</span>
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </section>
-              ) : null}
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>

@@ -11,6 +11,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { TicketDetail } from '../../modules/tickets/components/TicketDetail/TicketDetail';
 import type { Ticket } from '../../types/domain';
+import type { TicketWithRelations } from '../../modules/tickets/utils/ticketRelations';
 
 type MockButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   children?: ReactNode;
@@ -335,7 +336,7 @@ const defaultContextTickets = [
   blockerSearchTicket,
 ];
 
-function withRelatedTicketIds(ticket: Ticket): Ticket {
+function withRelatedTicketIds(ticket: Ticket): TicketWithRelations {
   const relatedTicketIds = new Set<string>();
 
   for (const dependency of ticket.dependencies || []) {
@@ -524,8 +525,8 @@ describe('TicketDetail', () => {
     const sidebar = within(screen.getByTestId('desktop-sidebar'));
     expect(sidebar.getByRole('button', { name: 'Add Dependency' })).toBeInTheDocument();
     expect(sidebar.getByRole('button', { name: 'Add Blocker' })).toBeInTheDocument();
-    expect(screen.getByText('Blocked by')).toBeInTheDocument();
-    expect(screen.getByText('Blocks')).toBeInTheDocument();
+    expect(sidebar.getByText('Blocked by')).toBeInTheDocument();
+    expect(sidebar.getByText('Blocks')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'GRA-104 - Coordinate upstream fix' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'GRA-105 - Ship dependent rollout' })).toBeInTheDocument();
     expect(screen.getAllByText('Casey Carter').length).toBeGreaterThan(0);
@@ -546,7 +547,7 @@ describe('TicketDetail', () => {
       expect(props.onAddBlocker).toHaveBeenCalledWith('ticket-1', 'ticket-7');
     });
 
-    await user.click(sidebar.getByText('GRA-104'));
+    await user.click(sidebar.getByRole('button', { name: 'GRA-104 - Coordinate upstream fix' }));
     expect(props.onSelectTicket).toHaveBeenCalledWith(blockerTicket);
 
     await user.click(sidebar.getByRole('button', { name: 'Remove blocker GRA-104' }));
@@ -757,10 +758,11 @@ describe('TicketDetail', () => {
     };
 
     const { props } = renderTicketDetail({ activeTicket: childTicket, parentTicket, onSelectTicket: vi.fn() });
+    const sidebar = within(screen.getByTestId('desktop-sidebar'));
 
     expect(screen.getByText('Sub ticket of')).toBeInTheDocument();
-    expect(screen.getByText('Relations')).toBeInTheDocument();
-    expect(screen.getByText('Sub-ticket of')).toBeInTheDocument();
+    expect(sidebar.getByText('Relations')).toBeInTheDocument();
+    expect(sidebar.getByText('Sub-ticket of')).toBeInTheDocument();
     expect(screen.getAllByText('Casey Carter').length).toBeGreaterThan(0);
     const parentBtn = screen.getAllByRole('button', { name: 'GRA-100 - Parent Ticket Title' })[0];
     await user.click(parentBtn);
