@@ -62,6 +62,7 @@ function ContextProbe() {
       <div data-testid="ticket-titles">{tickets.map((ticket) => ticket.title).join('|')}</div>
       <div data-testid="ticket-statuses">{tickets.map((ticket) => ticket.status).join('|')}</div>
       <button type="button" onClick={switchUser}>Switch user</button>
+      <button type="button" onClick={() => setActiveProjectId('project-1')}>Select project 1</button>
       <button type="button" onClick={() => setActiveProjectId('project-2')}>Switch project</button>
       <button
         type="button"
@@ -392,6 +393,8 @@ describe('TicketContext', () => {
       </TicketProvider>
     );
 
+    await userEvent.click(await screen.findByRole('button', { name: 'Select project 1' }));
+
     await waitFor(() => {
       expect(screen.getByTestId('ticket-count')).toHaveTextContent('1');
     });
@@ -488,6 +491,8 @@ describe('TicketContext', () => {
       </TicketProvider>
     );
 
+    await userEvent.click(await screen.findByRole('button', { name: 'Select project 1' }));
+
     await waitFor(() => {
       expect(screen.getByTestId('active-project-id')).toHaveTextContent('project-1');
       expect(screen.getByTestId('ticket-count')).toHaveTextContent('0');
@@ -557,6 +562,8 @@ describe('TicketContext', () => {
         <ContextProbe />
       </TicketProvider>
     );
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Select project 1' }));
 
     await waitFor(() => {
       expect(screen.getByTestId('ticket-count')).toHaveTextContent('1');
@@ -639,6 +646,8 @@ describe('TicketContext', () => {
         <ContextProbe />
       </TicketProvider>
     );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Select project 1' }));
 
     await waitFor(() => {
       expect(screen.getByTestId('ticket-count')).toHaveTextContent('1');
