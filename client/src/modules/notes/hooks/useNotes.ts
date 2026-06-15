@@ -1,3 +1,4 @@
+import { useCallback, useMemo } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { CACHE_CONFIGS, queryKeys } from '../../../utils/queryClient';
 import type { NoteMetadata } from '../types';
@@ -33,13 +34,21 @@ export function useNotes(projectId: string, sortDirection: 'desc' | 'asc' = 'des
     enabled: !!projectId,
   });
 
-  const notes = query.data ? query.data.pages.flat() : [];
+  const notes = useMemo(() => query.data?.pages.flat() ?? [], [query.data]);
+
+  const loadMore = useCallback(() => {
+    if (!query.hasNextPage || query.isFetchingNextPage) {
+      return Promise.resolve();
+    }
+
+    return query.fetchNextPage();
+  }, [query.fetchNextPage, query.hasNextPage, query.isFetchingNextPage]);
 
   return {
     notes,
     loading: query.isLoading || query.isFetchingNextPage || query.isFetching,
     error: query.error ? (query.error as Error).message : null,
     hasMore: query.hasNextPage,
-    loadMore: query.fetchNextPage,
+    loadMore,
   };
 }
