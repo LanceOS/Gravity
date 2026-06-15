@@ -3,6 +3,7 @@ export { WorkspaceMcpModal } from './components/WorkspaceMcpModal';
 export { WorkspaceHeader } from './components/WorkspaceHeader';
 export { ProjectCreateOverlay } from '../workspaceProjectsPanel/components/ProjectCreateOverlay';
 export { WorkspaceProjectPanelPage as WorkspaceProjectPanel } from '../workspaceProjectsPanel/screens/WorkspaceProjectPanelPage';
+export { WorkspaceTeamProjectsPanel } from '../workspaceTeamProjectsPanel';
 export {
   useActiveWorkspaceStorage,
   useWorkspaceCreateLabelDialog,

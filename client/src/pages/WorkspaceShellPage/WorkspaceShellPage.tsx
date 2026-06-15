@@ -16,7 +16,6 @@ import { apiClient } from '../../utils/apiClient';
 import type { Cycle, Label, SidebarTree } from '../../types/domain';
 import { WorkspacePage } from '../WorkspacePage/WorkspacePage';
 import { WorkspaceProjectsListPage } from '../WorkspaceProjectsListPage/WorkspaceProjectsListPage';
-import { WorkspaceTeamProjectsPage } from '../WorkspaceTeamProjectsPage/WorkspaceTeamProjectsPage';
 import { WorkspaceTeamsPage } from '../WorkspaceTeamsPage/WorkspaceTeamsPage';
 import { useAccountSettings } from '../../hooks/useAccountSettings';
 import { useWorkspaceDirectory } from '../../hooks/useWorkspaceDirectory';
@@ -45,6 +44,7 @@ import {
   useWorkspaceSidebarCounts,
   WorkspaceHeader,
   WorkspaceProjectPanel,
+  WorkspaceTeamProjectsPanel,
 } from '../../modules/workspaces';
 import '../../modules/workspaceProjectsPanel/styles/WorkspaceProjectsPage.css';
 import '../WorkspacePage/WorkspacePage.css';
@@ -432,11 +432,6 @@ export function WorkspaceShellPage() {
     sidebarTree?.teams?.find((team) => team.projects?.some((project) => project.id === (projectIdParam || activeProjectId)))?.id ||
     '';
   const sidebarActiveTeamId = route.teamIdParam || activeProjectTeamId;
-  const activeTeam = sidebarTree?.teams?.find((team) => team.id === sidebarActiveTeamId);
-  const activeTeamProjectIds = new Set(activeTeam?.projects?.map((project) => project.id) ?? []);
-  const teamProjectsForManager = teamIdParam
-    ? activeWorkspaceProjects.filter((project) => project.teamId === teamIdParam || activeTeamProjectIds.has(project.id))
-    : [];
   const isTeamProjectsManager = activeSection === 'team-projects';
   const isTeamWorkspace = (sidebarTree?.hierarchyMode ?? activeWorkspace.hierarchyMode) === 'teams';
   const isTeamsManager = activeSection === 'teams' || (isTeamWorkspace && activeSection === 'projects');
@@ -602,17 +597,16 @@ export function WorkspaceShellPage() {
             }}
           />
         ) : isTeamProjectsManager ? (
-          <WorkspaceTeamProjectsPage
+          <WorkspaceTeamProjectsPanel
             workspaceId={activeWorkspaceId}
             workspaceName={activeWorkspace.name}
-            team={activeTeam ?? null}
-            projects={teamProjectsForManager}
+            projects={activeWorkspaceProjects}
+            teamId={teamIdParam}
+            sidebarTree={sidebarTree}
             activeProjectId={activeProjectId}
-            loading={!sidebarTree || !activeTeam}
             onBackToTeams={() => navigate(`/workspaces/${activeWorkspaceId}/teams`)}
             onCreateProject={async (project) => {
               await handleCreateProject(project);
-              return null;
             }}
             onUpdateProject={updateProject}
             onDeleteProject={deleteProject}
