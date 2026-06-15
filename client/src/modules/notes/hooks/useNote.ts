@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { CACHE_CONFIGS, queryClient, queryKeys } from '../../../utils/queryClient';
+import { CACHE_CONFIGS, queryKeys } from '../../../utils/queryClient';
 import { apiClient, ApiError } from '../../../utils/apiClient';
 import type { NoteMetadata } from '../types';
 
