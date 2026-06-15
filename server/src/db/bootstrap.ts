@@ -221,6 +221,7 @@ export async function initializeDatabase() {
     CREATE TABLE IF NOT EXISTS labels (
       id TEXT PRIMARY KEY,
       team_id TEXT NOT NULL,
+      project_id TEXT,
       name TEXT NOT NULL,
       color TEXT NOT NULL DEFAULT '#6B7280',
       description TEXT NOT NULL DEFAULT '',
@@ -371,11 +372,19 @@ export async function initializeDatabase() {
     ALTER TABLE projects ADD COLUMN IF NOT EXISTS team_id TEXT;
     ALTER TABLE cycles ADD COLUMN IF NOT EXISTS team_id TEXT;
     ALTER TABLE labels ADD COLUMN IF NOT EXISTS team_id TEXT;
+    ALTER TABLE labels ADD COLUMN IF NOT EXISTS project_id TEXT;
+    ALTER TABLE labels ALTER COLUMN project_id DROP NOT NULL;
 
     CREATE INDEX IF NOT EXISTS teams_workspace_id_idx ON teams (workspace_id);
     CREATE INDEX IF NOT EXISTS projects_team_id_idx ON projects (team_id);
     CREATE INDEX IF NOT EXISTS cycles_team_id_idx ON cycles (team_id);
     CREATE INDEX IF NOT EXISTS labels_team_id_idx ON labels (team_id);
+    CREATE INDEX IF NOT EXISTS labels_project_id_idx ON labels (project_id);
+
+    DROP INDEX IF EXISTS labels_team_name_unique_idx;
+    DROP INDEX IF EXISTS labels_project_name_unique_idx;
+    CREATE UNIQUE INDEX IF NOT EXISTS labels_team_name_unique_idx ON labels (team_id, name) WHERE project_id IS NULL;
+    CREATE UNIQUE INDEX IF NOT EXISTS labels_project_name_unique_idx ON labels (project_id, name) WHERE project_id IS NOT NULL;
   `);
 
   await pool.query(`
@@ -453,6 +462,72 @@ export async function initializeDatabase() {
     });
   }
 
+  if (hasLabelsTable && hasProjectsTable && labelsHaveProjectId) {
+    await pool.query(`
+      INSERT INTO labels (id, project_id, team_id, name, color, description, sort_order, created_at)
+      SELECT
+        labels.id || ':' || projects.id,
+        projects.id,
+        projects.team_id,
+        labels.name,
+        labels.color,
+        labels.description,
+        labels.sort_order,
+        labels.created_at
+      FROM labels
+      INNER JOIN projects ON projects.team_id = labels.team_id
+      INNER JOIN workspace_settings ON workspace_settings.workspace_id = projects.workspace_id
+      WHERE labels.project_id IS NULL
+        AND workspace_settings.hierarchy_mode = 'flat'
+      ON CONFLICT (id) DO NOTHING;
+    `).catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error('Failed to clone flat workspace labels into projects:', err);
+    });
+
+    await pool.query(`
+      INSERT INTO ticket_labels (ticket_id, label_id)
+      SELECT ticket_labels.ticket_id, ticket_labels.label_id || ':' || tickets.project_id
+      FROM ticket_labels
+      INNER JOIN tickets ON tickets.id = ticket_labels.ticket_id
+      INNER JOIN projects ON projects.id = tickets.project_id
+      INNER JOIN workspace_settings ON workspace_settings.workspace_id = projects.workspace_id
+      INNER JOIN labels ON labels.id = ticket_labels.label_id
+      WHERE labels.project_id IS NULL
+        AND workspace_settings.hierarchy_mode = 'flat'
+      ON CONFLICT (ticket_id, label_id) DO NOTHING;
+    `).catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error('Failed to clone ticket label links for flat workspaces:', err);
+    });
+
+    await pool.query(`
+      DELETE FROM ticket_labels
+      USING tickets, projects, workspace_settings, labels
+      WHERE ticket_labels.ticket_id = tickets.id
+        AND tickets.project_id = projects.id
+        AND workspace_settings.workspace_id = projects.workspace_id
+        AND workspace_settings.hierarchy_mode = 'flat'
+        AND ticket_labels.label_id = labels.id
+        AND labels.project_id IS NULL;
+    `).catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error('Failed to clear shared flat workspace ticket labels:', err);
+    });
+
+    await pool.query(`
+      DELETE FROM labels
+      USING projects, workspace_settings
+      WHERE labels.project_id IS NULL
+        AND labels.team_id = projects.team_id
+        AND workspace_settings.workspace_id = projects.workspace_id
+        AND workspace_settings.hierarchy_mode = 'flat';
+    `).catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error('Failed to remove shared flat workspace labels:', err);
+    });
+  }
+
   if (hasDomainsTable && hasLabelsTable && hasProjectsTable) {
     if (labelsHaveProjectId) {
       await pool.query(`
@@ -507,6 +582,72 @@ export async function initializeDatabase() {
     }
   }
 
+  if (hasLabelsTable && hasProjectsTable && labelsHaveProjectId) {
+    await pool.query(`
+      INSERT INTO labels (id, project_id, team_id, name, color, description, sort_order, created_at)
+      SELECT
+        labels.id || ':' || projects.id,
+        projects.id,
+        projects.team_id,
+        labels.name,
+        labels.color,
+        labels.description,
+        labels.sort_order,
+        labels.created_at
+      FROM labels
+      INNER JOIN projects ON projects.team_id = labels.team_id
+      INNER JOIN workspace_settings ON workspace_settings.workspace_id = projects.workspace_id
+      WHERE labels.project_id IS NULL
+        AND workspace_settings.hierarchy_mode = 'flat'
+      ON CONFLICT (id) DO NOTHING;
+    `).catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error('Failed to clone flat workspace labels into projects:', err);
+    });
+
+    await pool.query(`
+      INSERT INTO ticket_labels (ticket_id, label_id)
+      SELECT ticket_labels.ticket_id, ticket_labels.label_id || ':' || tickets.project_id
+      FROM ticket_labels
+      INNER JOIN tickets ON tickets.id = ticket_labels.ticket_id
+      INNER JOIN projects ON projects.id = tickets.project_id
+      INNER JOIN workspace_settings ON workspace_settings.workspace_id = projects.workspace_id
+      INNER JOIN labels ON labels.id = ticket_labels.label_id
+      WHERE labels.project_id IS NULL
+        AND workspace_settings.hierarchy_mode = 'flat'
+      ON CONFLICT (ticket_id, label_id) DO NOTHING;
+    `).catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error('Failed to clone ticket label links for flat workspaces:', err);
+    });
+
+    await pool.query(`
+      DELETE FROM ticket_labels
+      USING tickets, projects, workspace_settings, labels
+      WHERE ticket_labels.ticket_id = tickets.id
+        AND tickets.project_id = projects.id
+        AND workspace_settings.workspace_id = projects.workspace_id
+        AND workspace_settings.hierarchy_mode = 'flat'
+        AND ticket_labels.label_id = labels.id
+        AND labels.project_id IS NULL;
+    `).catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error('Failed to clear shared flat workspace ticket labels:', err);
+    });
+
+    await pool.query(`
+      DELETE FROM labels
+      USING projects, workspace_settings
+      WHERE labels.project_id IS NULL
+        AND labels.team_id = projects.team_id
+        AND workspace_settings.workspace_id = projects.workspace_id
+        AND workspace_settings.hierarchy_mode = 'flat';
+    `).catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error('Failed to remove shared flat workspace labels:', err);
+    });
+  }
+
   if (hasLabelsTable) {
     await mergeDuplicateTeamLabels(pool).catch((err) => {
       // eslint-disable-next-line no-console
@@ -514,7 +655,8 @@ export async function initializeDatabase() {
     });
 
     await pool.query(`
-      CREATE UNIQUE INDEX IF NOT EXISTS labels_team_name_unique_idx ON labels (team_id, name);
+      CREATE UNIQUE INDEX IF NOT EXISTS labels_team_name_unique_idx ON labels (team_id, name) WHERE project_id IS NULL;
+      CREATE UNIQUE INDEX IF NOT EXISTS labels_project_name_unique_idx ON labels (project_id, name) WHERE project_id IS NOT NULL;
     `).catch((err) => {
       // eslint-disable-next-line no-console
       console.error('Failed to ensure unique team label names:', err);
@@ -564,6 +706,15 @@ export async function initializeDatabase() {
   ).catch((err) => {
     // eslint-disable-next-line no-console
     console.error('Failed to ensure cycles team foreign key:', err);
+  });
+
+  await ensureConstraint(
+    'labels',
+    'labels_project_id_projects_id_fk',
+    'FOREIGN KEY ("project_id") REFERENCES "projects"("id") ON DELETE CASCADE',
+  ).catch((err) => {
+    // eslint-disable-next-line no-console
+    console.error('Failed to ensure labels project foreign key:', err);
   });
 
   await ensureConstraint(

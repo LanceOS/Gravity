@@ -1,6 +1,6 @@
-import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { db } from '../../../db/index.js';
-import { authUsers, comments, tickets, ticketDependencies, userProfiles, projects, cycles, labels, ticketLabels } from '../../../db/schema.js';
+import { authUsers, comments, tickets, ticketDependencies, userProfiles, projects, cycles, labels, ticketLabels, workspaceSettings } from '../../../db/schema.js';
 import { createId, getProjectByKeyPrefix, nextTicketKey, normalizeIsoDate } from '../../../lib/platform.js';
 import generateBranchName from '../utils/branch.js';
 
@@ -11,6 +11,16 @@ type RelatedTicketRecord = {
   title: string;
   projectId: string;
 };
+
+const labelSelectFields = {
+  id: labels.id,
+  teamId: labels.teamId,
+  projectId: labels.projectId,
+  name: labels.name,
+  color: labels.color,
+  description: labels.description,
+  sortOrder: labels.sortOrder,
+} as const;
 
 export type TicketFilters = {
   status?: string;
@@ -93,6 +103,7 @@ function mapTicket(record: TicketRecord, labelRows: any[] = []) {
     labels: sortedLabels.map((label) => ({
       id: String(label.id),
       teamId: String(label.teamId),
+      projectId: label.projectId ? String(label.projectId) : undefined,
       name: String(label.name),
       color: String(label.color),
       description: String(label.description ?? ''),
@@ -137,18 +148,37 @@ function collectRelatedTicketIds({
   return Array.from(relatedTicketIds);
 }
 
-async function getProjectScope(projectId: string) {
+export type ProjectScope = {
+  id: string;
+  workspaceId: string;
+  teamId: string;
+  hierarchyMode: 'flat' | 'teams';
+};
+
+export async function getProjectScope(projectId: string): Promise<ProjectScope | null> {
   const rows = await db
     .select({
       id: projects.id,
       workspaceId: projects.workspaceId,
       teamId: projects.teamId,
+      hierarchyMode: workspaceSettings.hierarchyMode,
     })
     .from(projects)
+    .leftJoin(workspaceSettings, eq(workspaceSettings.workspaceId, projects.workspaceId))
     .where(eq(projects.id, projectId))
     .limit(1);
 
-  return rows[0] ?? null;
+  const row = rows[0];
+  if (!row) {
+    return null;
+  }
+
+  return {
+    id: row.id,
+    workspaceId: row.workspaceId,
+    teamId: row.teamId,
+    hierarchyMode: row.hierarchyMode === 'teams' ? 'teams' : 'flat',
+  };
 }
 
 // Normalize status strings to canonical DB/application values.
@@ -255,14 +285,7 @@ export async function listTickets(projectId: string, filters: TicketFilters = {}
   const allLabels = await db
     .select({
       ticketId: ticketLabels.ticketId,
-      label: {
-        id: labels.id,
-        teamId: labels.teamId,
-        name: labels.name,
-        color: labels.color,
-        description: labels.description,
-        sortOrder: labels.sortOrder,
-      },
+      label: labelSelectFields,
     })
     .from(ticketLabels)
     .innerJoin(labels, eq(labels.id, ticketLabels.labelId))
@@ -311,14 +334,7 @@ export async function listWorkspaceTickets(projectIds: string[], filters: Ticket
   const allLabels = await db
     .select({
       ticketId: ticketLabels.ticketId,
-      label: {
-        id: labels.id,
-        teamId: labels.teamId,
-        name: labels.name,
-        color: labels.color,
-        description: labels.description,
-        sortOrder: labels.sortOrder,
-      },
+      label: labelSelectFields,
     })
     .from(ticketLabels)
     .innerJoin(labels, eq(labels.id, ticketLabels.labelId))
@@ -518,12 +534,7 @@ export async function getTicketDetails(ticketId: string, projectId?: string) {
       : Promise.resolve([]),
     db
       .select({
-        id: labels.id,
-        teamId: labels.teamId,
-        name: labels.name,
-        color: labels.color,
-        description: labels.description,
-        sortOrder: labels.sortOrder,
+        ...labelSelectFields,
       })
       .from(ticketLabels)
       .innerJoin(labels, eq(labels.id, ticketLabels.labelId))
@@ -569,14 +580,7 @@ export async function getTicketDetails(ticketId: string, projectId?: string) {
     ? await db
         .select({
           ticketId: ticketLabels.ticketId,
-          label: {
-            id: labels.id,
-            teamId: labels.teamId,
-            name: labels.name,
-            color: labels.color,
-            description: labels.description,
-            sortOrder: labels.sortOrder,
-          }
+          label: labelSelectFields,
         })
         .from(ticketLabels)
         .innerJoin(labels, eq(labels.id, ticketLabels.labelId))
@@ -670,29 +674,38 @@ export async function createTicketRecord(input: {
 
     const ticketRow = rows[0];
     const projectRows = await tx
-      .select({ teamId: projects.teamId })
+      .select({
+        teamId: projects.teamId,
+        hierarchyMode: workspaceSettings.hierarchyMode,
+      })
       .from(projects)
+      .leftJoin(workspaceSettings, eq(workspaceSettings.workspaceId, projects.workspaceId))
       .where(eq(projects.id, input.projectId))
       .limit(1);
-    const teamId = projectRows[0]?.teamId;
+    const projectScope = projectRows[0];
+    if (!projectScope) {
+      throw new Error(`Project ${input.projectId} is missing.`);
+    }
+    const hierarchyMode = projectScope.hierarchyMode === 'teams' ? 'teams' : 'flat';
 
     const uniqueLabelIds = [...new Set((input.labelIds ?? []).filter(Boolean))];
-    const createdLabels = uniqueLabelIds.length > 0 && teamId
+    const createdLabels = uniqueLabelIds.length > 0
       ? await tx
           .select({
-            id: labels.id,
-            teamId: labels.teamId,
-            name: labels.name,
-            color: labels.color,
-            description: labels.description,
-            sortOrder: labels.sortOrder,
+            ...labelSelectFields,
           })
           .from(labels)
-          .where(and(eq(labels.teamId, teamId), inArray(labels.id, uniqueLabelIds)))
+          .where(
+            hierarchyMode === 'flat'
+              ? and(eq(labels.projectId, input.projectId), inArray(labels.id, uniqueLabelIds))
+              : and(eq(labels.teamId, projectScope.teamId), isNull(labels.projectId), inArray(labels.id, uniqueLabelIds)),
+          )
       : [];
 
     if (uniqueLabelIds.length > 0 && createdLabels.length !== uniqueLabelIds.length) {
-      throw new Error('One or more labels were not found for this team.');
+      throw new Error(hierarchyMode === 'flat'
+        ? 'One or more labels were not found for this project.'
+        : 'One or more labels were not found for this team.');
     }
 
     if (createdLabels.length > 0) {
@@ -752,11 +765,12 @@ export async function updateTicketRecord(
   }
 
   const teamChanged = isProjectMove && targetProject.teamId !== sourceProject.teamId;
+  const projectLabelScopeChanged = isProjectMove && sourceProject.hierarchyMode === 'flat';
   const nextCycleId = teamChanged ? null : updates.cycleId;
-  const nextLabelIds = teamChanged
-    ? []
-    : updates.labelIds !== undefined
-      ? [...new Set(updates.labelIds.filter(Boolean))]
+  const nextLabelIds = updates.labelIds !== undefined
+    ? [...new Set(updates.labelIds.filter(Boolean))]
+    : projectLabelScopeChanged || teamChanged
+      ? []
       : undefined;
 
   const payload = {
@@ -793,30 +807,25 @@ export async function updateTicketRecord(
       return null;
     }
 
-    if (updates.labelIds !== undefined || teamChanged) {
+    if (updates.labelIds !== undefined || projectLabelScopeChanged || teamChanged) {
       const labelIdsForTicket = nextLabelIds ?? [];
-      const teamId = targetProject.teamId;
-
-      if (!teamId && labelIdsForTicket.length > 0) {
-        throw new Error('Unable to resolve the ticket team for label assignment.');
-      }
-
       const resolvedLabels = labelIdsForTicket.length > 0
         ? await tx
             .select({
-              id: labels.id,
-              teamId: labels.teamId,
-              name: labels.name,
-              color: labels.color,
-              description: labels.description,
-              sortOrder: labels.sortOrder,
+              ...labelSelectFields,
             })
             .from(labels)
-            .where(and(eq(labels.teamId, teamId ?? ''), inArray(labels.id, labelIdsForTicket)))
+            .where(
+              targetProject.hierarchyMode === 'flat'
+                ? and(eq(labels.projectId, targetProject.id), inArray(labels.id, labelIdsForTicket))
+                : and(eq(labels.teamId, targetProject.teamId), isNull(labels.projectId), inArray(labels.id, labelIdsForTicket)),
+            )
         : [];
 
-      if (teamId && labelIdsForTicket.length > 0 && resolvedLabels.length !== labelIdsForTicket.length) {
-        throw new Error('One or more labels were not found for this team.');
+      if (labelIdsForTicket.length > 0 && resolvedLabels.length !== labelIdsForTicket.length) {
+        throw new Error(targetProject.hierarchyMode === 'flat'
+          ? 'One or more labels were not found for this project.'
+          : 'One or more labels were not found for this team.');
       }
 
       await tx.delete(ticketLabels).where(eq(ticketLabels.ticketId, ticketId));
@@ -829,12 +838,7 @@ export async function updateTicketRecord(
 
     const updatedLabels = await tx
       .select({
-        id: labels.id,
-        teamId: labels.teamId,
-        name: labels.name,
-        color: labels.color,
-        description: labels.description,
-        sortOrder: labels.sortOrder,
+        ...labelSelectFields,
       })
       .from(ticketLabels)
       .innerJoin(labels, eq(labels.id, ticketLabels.labelId))

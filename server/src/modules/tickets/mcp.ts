@@ -1,4 +1,4 @@
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and, inArray, isNull } from 'drizzle-orm';
 import { db } from '../../db/index.js';
 import { projects, labels } from '../../db/schema.js';
 import { audit } from '../../lib/logger.js';
@@ -13,8 +13,8 @@ import {
   listWorkspaceTickets,
   updateCommentRecord,
   updateTicketRecord,
+  getProjectScope,
 } from './services/tickets.js';
-import { getProjectTeamId } from '../workspaces/services/membership.js';
 import { ToolExecutionContext, ToolHandler } from '../mcp/tool-handlers/types.js';
 import { McpToolDefinition } from '../mcp/types.js';
 
@@ -315,9 +315,17 @@ export class TicketTools {
     const namesToRemoveSet = new Set(labelsToRemove);
     const newLabelNames = currentLabels.map(l => l.name).filter(name => !namesToRemoveSet.has(name));
 
-    const teamId = await getProjectTeamId(ticket.projectId);
-    const resolvedLabels = newLabelNames.length > 0 && teamId
-      ? await db.select({ id: labels.id, name: labels.name }).from(labels).where(and(eq(labels.teamId, teamId), inArray(labels.name, newLabelNames)))
+    const projectScope = await getProjectScope(ticket.projectId);
+    if (!projectScope) {
+      throw new Error(`Project ${ticket.projectId} not found.`);
+    }
+
+    const resolvedLabels = newLabelNames.length > 0
+      ? await db.select({ id: labels.id, name: labels.name }).from(labels).where(
+          projectScope.hierarchyMode === 'flat'
+            ? and(eq(labels.projectId, ticket.projectId), inArray(labels.name, newLabelNames))
+            : and(eq(labels.teamId, projectScope.teamId), isNull(labels.projectId), inArray(labels.name, newLabelNames)),
+        )
       : [];
 
     const labelIds = resolvedLabels.map(l => l.id);
@@ -356,15 +364,24 @@ export class TicketTools {
         ? args.labels.map(String)
         : [];
     
-    const teamId = await getProjectTeamId(ticket.projectId);
-    const resolvedLabels = labelNames.length > 0 && teamId
-      ? await db.select({ id: labels.id, name: labels.name }).from(labels).where(and(eq(labels.teamId, teamId), inArray(labels.name, labelNames)))
+    const projectScope = await getProjectScope(ticket.projectId);
+    if (!projectScope) {
+      throw new Error(`Project ${ticket.projectId} not found.`);
+    }
+    const scopeLabel = projectScope.hierarchyMode === 'flat' ? 'project' : 'team';
+
+    const resolvedLabels = labelNames.length > 0
+      ? await db.select({ id: labels.id, name: labels.name }).from(labels).where(
+          projectScope.hierarchyMode === 'flat'
+            ? and(eq(labels.projectId, ticket.projectId), inArray(labels.name, labelNames))
+            : and(eq(labels.teamId, projectScope.teamId), isNull(labels.projectId), inArray(labels.name, labelNames)),
+        )
       : [];
 
     if (resolvedLabels.length !== labelNames.length) {
       const foundNames = new Set(resolvedLabels.map(l => l.name));
       const missing = labelNames.filter(n => !foundNames.has(n));
-      throw new Error(`The following labels do not exist in this project: ${missing.join(', ')}`);
+      throw new Error(`The following labels do not exist in this ${scopeLabel}: ${missing.join(', ')}`);
     }
 
     const labelIds = resolvedLabels.map(l => l.id);

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../../db/index.js';
 import { comments, cycles, labels, noteMetadata, projectMembers, projects, teams, ticketLabels, tickets, workspaces } from '../../db/schema.js';
-import { asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import { createId, WorkspaceCacheInvalidationReason, invalidateWorkspaceCache } from '../../lib/platform.js';
 import { RustFS } from '../../lib/rustfs.js';
 import {
@@ -83,13 +83,13 @@ async function mergeTeamLabels(tx: any, sourceTeamId: string, targetTeamId: stri
   const sourceLabels = await tx
     .select()
     .from(labels)
-    .where(eq(labels.teamId, sourceTeamId))
+    .where(and(eq(labels.teamId, sourceTeamId), isNull(labels.projectId)))
     .orderBy(asc(labels.createdAt));
 
   const targetLabels = await tx
     .select()
     .from(labels)
-    .where(eq(labels.teamId, targetTeamId))
+    .where(and(eq(labels.teamId, targetTeamId), isNull(labels.projectId)))
     .orderBy(asc(labels.createdAt));
 
   const targetByName = new Map<string, typeof labels.$inferSelect>();
@@ -255,7 +255,7 @@ export function createTeamsRouter() {
       const [existingProjects, existingCycles, existingLabels] = await Promise.all([
         db.select({ id: projects.id }).from(projects).where(eq(projects.teamId, teamId)),
         db.select({ id: cycles.id }).from(cycles).where(eq(cycles.teamId, teamId)),
-        db.select({ id: labels.id }).from(labels).where(eq(labels.teamId, teamId)),
+        db.select({ id: labels.id }).from(labels).where(and(eq(labels.teamId, teamId), isNull(labels.projectId))),
       ]);
       const existingProjectIds = existingProjects.map((project) => project.id);
       const isLastTeam = workspaceTeamRows.length <= 1;
@@ -281,6 +281,9 @@ export function createTeamsRouter() {
             await tx.update(projects).set({ teamId: reassignTeamId }).where(eq(projects.teamId, teamId));
             await tx.update(cycles).set({ teamId: reassignTeamId }).where(eq(cycles.teamId, teamId));
             await mergeTeamLabels(tx, teamId, reassignTeamId);
+            if (existingProjectIds.length > 0) {
+              await tx.update(labels).set({ teamId: reassignTeamId }).where(inArray(labels.projectId, existingProjectIds));
+            }
             await tx.delete(teams).where(eq(teams.id, teamId));
           });
           if (existingProjectIds.length > 0) {

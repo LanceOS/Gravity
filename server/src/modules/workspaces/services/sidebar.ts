@@ -1,4 +1,4 @@
-import { asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import { db } from '../../../db/index.js';
 import { teams, projects, cycles, labels, workspaceSettings } from '../schema.js';
 import * as cache from '../../../lib/cache.js';
@@ -76,13 +76,14 @@ export async function getSidebarTree(workspaceId: string) {
             .select({
               id: labels.id,
               teamId: labels.teamId,
+              projectId: labels.projectId,
               name: labels.name,
               color: labels.color,
               description: labels.description,
               sortOrder: labels.sortOrder,
             })
             .from(labels)
-            .where(inArray(labels.teamId, teamIds))
+            .where(and(inArray(labels.teamId, teamIds), isNull(labels.projectId)))
             .orderBy(asc(labels.createdAt)),
         ])
       : [[], []];
