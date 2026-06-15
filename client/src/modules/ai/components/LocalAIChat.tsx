@@ -65,9 +65,9 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
     }
 
     queryClient
-      .fetchQuery({
-        queryKey: queryKeys.mcpTools(workspaceId),
-        queryFn: () =>
+      .fetchQuery(
+        queryKeys.mcpTools(workspaceId),
+        () =>
           apiClient.post<{ result?: { tools?: any[] } }>('/mcp/sse', {
             jsonrpc: '2.0',
             id: 1,
@@ -77,9 +77,11 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
               'X-Workspace-Id': workspaceId,
             },
           }),
-        staleTime: CACHE_CONFIGS.aiTools.staleTime,
-        gcTime: CACHE_CONFIGS.aiTools.gcTime,
-      })
+        {
+          staleTime: CACHE_CONFIGS.aiTools.staleTime,
+          gcTime: CACHE_CONFIGS.aiTools.gcTime,
+        },
+      )
       .then((data) => {
         setMcpTools(data.result?.tools ?? []);
       })
@@ -102,17 +104,19 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
     }
 
     try {
-      const data = await queryClient.fetchQuery({
-        queryKey: queryKeys.ollamaModels(urlToTest),
-        queryFn: () =>
+      const data = await queryClient.fetchQuery(
+        queryKeys.ollamaModels(urlToTest),
+        () =>
           apiClient.get<{ models?: string[]; connected?: boolean }>('/ai/ollama/models', {
             params: {
               ollamaUrl: urlToTest,
             },
           }),
-        staleTime: CACHE_CONFIGS.aiModels.staleTime,
-        gcTime: CACHE_CONFIGS.aiModels.gcTime,
-      });
+        {
+          staleTime: CACHE_CONFIGS.aiModels.staleTime,
+          gcTime: CACHE_CONFIGS.aiModels.gcTime,
+        }
+      );
 
       const nextModels = Array.isArray(data.models)
         ? data.models.filter((m): m is string => typeof m === 'string' && m.length > 0)
