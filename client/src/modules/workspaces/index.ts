@@ -10,6 +10,7 @@ export {
   useWorkspaceShellNavigation,
   useWorkspaceSidebarCounts,
 } from './shell';
+export { getActiveWorkspaceStorageKey } from './shell';
 export {
   PROJECT_LIFECYCLE_OPTIONS,
   PROJECT_STATUS_LABELS,

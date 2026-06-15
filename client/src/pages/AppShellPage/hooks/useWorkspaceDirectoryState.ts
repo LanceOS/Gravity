@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { getActiveWorkspaceStorageKey } from './useWorkspaceLifecycle';
+import { getActiveWorkspaceStorageKey } from '../../modules/workspaces/shell';
 import type { WorkspaceSummary } from '../../../hooks/useWorkspaceDirectory';
 
 interface UseWorkspaceDirectoryStateArgs {

@@ -2,10 +2,7 @@ import { useEffect, type Dispatch, type SetStateAction } from 'react';
 import type { User, Project } from '../../../types/domain';
 import type { WorkspaceSummary } from '../../../hooks/useWorkspaceDirectory';
 import type { AppSection } from '../AppShellPage.types';
-
-export function getActiveWorkspaceStorageKey(userId: string) {
-  return `gravity_active_workspace:${userId}`;
-}
+import { getActiveWorkspaceStorageKey } from '../../../modules/workspaces/shell';
 
 interface UseActiveWorkspaceSelectionArgs {
   currentUser: User | null;
