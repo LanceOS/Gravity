@@ -245,6 +245,10 @@ export async function updateProjectRecord(projectId: string, params: { name?: st
     .where(eq(projects.id, projectId))
     .returning();
 
+  if (rows[0]) {
+    await invalidateWorkspaceCache(rows[0].workspaceId);
+  }
+
   return rows[0] ?? null;
 }
 
