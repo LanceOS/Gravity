@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useOpenDialog } from '../../../hooks/useOpenDialog';
 
 interface UseWorkspaceCreateProjectDialogArgs {
   setIsCreateProjectModalOpen: (open: boolean) => void;
@@ -11,9 +11,8 @@ interface UseWorkspaceCreateProjectDialogResult {
 export function useWorkspaceCreateProjectDialog({
   setIsCreateProjectModalOpen,
 }: UseWorkspaceCreateProjectDialogArgs): UseWorkspaceCreateProjectDialogResult {
-  const handleOpenCreateProject = useCallback(() => {
-    setIsCreateProjectModalOpen(true);
-  }, [setIsCreateProjectModalOpen]);
+  const { open } = useOpenDialog({ setIsOpen: setIsCreateProjectModalOpen });
+  const handleOpenCreateProject = open;
 
   return { handleOpenCreateProject };
 }

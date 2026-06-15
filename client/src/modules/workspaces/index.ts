@@ -6,7 +6,6 @@ export { WorkspaceTeamsPage } from '../workspaceTeamsPage';
 export { WorkspaceProjectPanelPage as WorkspaceProjectPanel } from '../workspaceProjectsPanel/screens/WorkspaceProjectPanelPage';
 export { WorkspaceTeamProjectsPanel } from '../workspaceTeamProjectsPanel';
 export {
-  useActiveWorkspaceStorage,
   useWorkspaceCreateLabelDialog,
   useWorkspaceShellCommands,
   useWorkspaceShellFilters,

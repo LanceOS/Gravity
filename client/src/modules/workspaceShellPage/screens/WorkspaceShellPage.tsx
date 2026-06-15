@@ -35,7 +35,6 @@ import type { AppSection } from '../types/AppShell';
 import { LoadingPage } from '../../loadingPage';
 import { queryClient, queryKeys } from '../../../utils/queryClient';
 import {
-  useActiveWorkspaceStorage,
   useWorkspaceCreateLabelDialog,
   useWorkspaceCreateProjectDialog,
   useWorkspaceCreateTicketDialog,
@@ -283,11 +282,6 @@ export function WorkspaceShellPage() {
     addComment,
     addTicketBlocker,
     removeTicketBlocker,
-  });
-
-  useActiveWorkspaceStorage({
-    currentUser,
-    activeWorkspaceId,
   });
 
   const {

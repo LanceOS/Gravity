@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
+import { type Dispatch, type SetStateAction } from 'react';
+import { useListSelection } from '../../../hooks/useListSelection';
 import type { SidebarTeam } from '../../../types/domain';
 
 interface UseWorkspaceTeamsPageSelectionArgs {
@@ -14,28 +15,11 @@ export interface UseWorkspaceTeamsPageSelectionResult {
 export function useWorkspaceTeamsPageSelection({
   teams,
 }: UseWorkspaceTeamsPageSelectionArgs): UseWorkspaceTeamsPageSelectionResult {
-  const [selectedTeamId, setSelectedTeamId] = useState('');
-
-  const selectedTeam = useMemo(
-    () => teams.find((team) => team.id === selectedTeamId) ?? null,
-    [teams, selectedTeamId],
-  );
-
-  useEffect(() => {
-    if (teams.length === 0) {
-      setSelectedTeamId('');
-      return;
-    }
-
-    const selectedExists = teams.some((team) => team.id === selectedTeamId);
-    if (!selectedExists) {
-      setSelectedTeamId(teams[0].id);
-    }
-  }, [selectedTeamId, teams]);
+  const { selectedItemId, setSelectedItemId, selectedItem } = useListSelection<SidebarTeam>({ items: teams });
 
   return {
-    selectedTeamId,
-    setSelectedTeamId,
-    selectedTeam,
+    selectedTeamId: selectedItemId,
+    setSelectedTeamId: setSelectedItemId,
+    selectedTeam: selectedItem,
   };
 }
