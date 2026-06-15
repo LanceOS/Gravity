@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 import { AuthScreen } from '../../modules/auth';
@@ -8,7 +8,8 @@ import { useWorkspaceDirectory } from '../../hooks/useWorkspaceDirectory';
 import { LoadingPage } from '../LoadingPage/LoadingPage';
 import { WorkspaceDirectoryPage } from '../WorkspaceDirectoryPage/WorkspaceDirectoryPage';
 import { WorkspaceShellPage } from '../WorkspaceShellPage/WorkspaceShellPage';
-import { getActiveWorkspaceStorageKey, usePendingWorkspaceInvite } from './hooks/useWorkspaceLifecycle';
+import { usePendingWorkspaceInvite } from './hooks/useWorkspaceLifecycle';
+import { useWorkspaceDirectoryState } from './hooks/useWorkspaceDirectoryState';
 import './AppShellPage.css';
 
 export function AppShellPage() {
@@ -48,65 +49,18 @@ function AppShellLandingPage() {
   } = useWorkspaceDirectory({ currentUser, setCurrentUser });
   const workspacesResolvedForCurrentUser = !currentUser || workspacesResolvedUserId === currentUser.id;
 
-  const [activeWorkspaceId, setActiveWorkspaceId] = useState('');
-  const [workspaceReady, setWorkspaceReady] = useState(false);
+  const { activeWorkspaceId, workspaceReady } = useWorkspaceDirectoryState({
+    currentUser,
+    workspaces,
+    workspacesLoading,
+    workspacesResolvedForCurrentUser,
+  });
 
   usePendingWorkspaceInvite({
     currentUser,
     requestJoinByInvite,
     refreshWorkspaces,
   });
-
-  useEffect(() => {
-    if (!currentUser) {
-      setWorkspaceReady(false);
-      setActiveWorkspaceId('');
-      return;
-    }
-
-    if (!workspacesResolvedForCurrentUser || workspacesLoading) {
-      return;
-    }
-
-    if (workspaces.length === 0) {
-      setWorkspaceReady(true);
-      setActiveWorkspaceId('');
-      return;
-    }
-
-    const storageKey = getActiveWorkspaceStorageKey(currentUser.id);
-    const storedWorkspaceId = window.localStorage.getItem(storageKey);
-    const nextWorkspaceId =
-      storedWorkspaceId && workspaces.some((workspace) => workspace.id === storedWorkspaceId)
-        ? storedWorkspaceId
-        : workspaces[0].id;
-
-    if (nextWorkspaceId !== activeWorkspaceId) {
-      setActiveWorkspaceId(nextWorkspaceId);
-    }
-
-    setWorkspaceReady(true);
-  }, [
-    activeWorkspaceId,
-    currentUser,
-    workspaces,
-    workspacesLoading,
-    workspacesResolvedForCurrentUser,
-  ]);
-
-  useEffect(() => {
-    if (!currentUser || typeof window === 'undefined') {
-      return;
-    }
-
-    const storageKey = getActiveWorkspaceStorageKey(currentUser.id);
-    if (!activeWorkspaceId) {
-      window.localStorage.removeItem(storageKey);
-      return;
-    }
-
-    window.localStorage.setItem(storageKey, activeWorkspaceId);
-  }, [activeWorkspaceId, currentUser]);
 
   useEffect(() => {
     if (pathname !== '/' || !workspaceReady) {

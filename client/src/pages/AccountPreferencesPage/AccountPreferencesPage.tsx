@@ -39,6 +39,7 @@ import {
 import { useTheme } from '../../modules/settings';
 import { useTickets } from '../../context/TicketContext';
 import { LoadingPage } from '../LoadingPage/LoadingPage';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
 type SettingsCategoryId = 'general' | 'providers' | 'ollama' | 'onboarding';
 
@@ -644,16 +645,9 @@ export function AccountPreferencesPage({
   onRemoveCredential,
 }: AccountPreferencesPageProps) {
   const [activeCategory, setActiveCategory] = useState<SettingsCategoryId>('general');
-  const [isMobile, setIsMobile] = useState(false);
+  const isMobile = useIsMobile();
 
   const activeCategoryMeta = SETTINGS_CATEGORIES.find((category) => category.id === activeCategory) || SETTINGS_CATEGORIES[0];
-
-  useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth <= 768);
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
 
   useEffect(() => {
     if (activeCategory !== 'providers') {

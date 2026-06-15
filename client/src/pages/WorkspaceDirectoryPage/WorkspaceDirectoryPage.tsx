@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { ArrowRight, FolderPlus, Globe, KeyRound, LogOut, Server, Settings2, Users } from 'lucide-react';
 import {
   Button,
@@ -13,6 +13,7 @@ import {
 } from '@library';
 import type { User } from '../../context/TicketContext';
 import type { CreateWorkspaceInput, WorkspaceSummary } from '../../hooks/useWorkspaceDirectory';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
 interface WorkspaceDirectoryPageProps {
   currentUser: User;
@@ -66,15 +67,8 @@ export function WorkspaceDirectoryPage({
   const [hierarchyMode, setHierarchyMode] = useState<'teams' | 'flat'>('flat');
 
   const [activeTab, setActiveTab] = useState<'create' | 'join'>('create');
-  const [isMobile, setIsMobile] = useState(false);
   const [isCreateJoinOpen, setIsCreateJoinOpen] = useState(false);
-
-  useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth <= 768);
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  const isMobile = useIsMobile();
 
   const workspaceCards = useMemo(() => workspaces.slice().sort((left, right) => left.name.localeCompare(right.name)), [workspaces]);
 

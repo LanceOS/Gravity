@@ -3,8 +3,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, CalendarDays, FolderKanban, Save, Tags, Trash2, Users, Sparkles } from 'lucide-react';
 import { Button, Select, TextInput, Textarea, Modal, Skeleton } from '@library';
 import { apiClient } from '../../utils/apiClient';
+import { addSidebarTeam, removeSidebarTeam, updateSidebarTeam } from '../../utils/sidebarTreeMutations';
 import { WorkspaceHeader } from '../../modules/workspaces';
-import type { SidebarTeam, SidebarTree, Team } from '../../types/domain';
+import type { SidebarTeam, Team } from '../../types/domain';
 import '../WorkspacePage/WorkspacePage.css';
 import './WorkspaceTeamsPage.css';
 
@@ -197,45 +198,6 @@ export function WorkspaceTeamsPage({
   // calls the current version without needing to re-register the listener.
   const handleCreateTeamRef = useRef<() => Promise<void>>(async () => undefined);
 
-  const syncSidebarTreeTeam = (teamId: string, updater: (currentTeam: SidebarTeam) => SidebarTeam) => {
-    queryClient.setQueryData<SidebarTree | undefined>(['sidebarTree', workspaceId], (current) => {
-      if (!current) {
-        return current;
-      }
-
-      return {
-        ...current,
-        teams: current.teams.map((team) => (team.id === teamId ? updater(team) : team)),
-      };
-    });
-  };
-
-  const syncSidebarTreeNewTeam = (team: Team) => {
-    queryClient.setQueryData<SidebarTree | undefined>(['sidebarTree', workspaceId], (current) => {
-      if (!current) {
-        return current;
-      }
-
-      return {
-        ...current,
-        teams: [...current.teams, toSidebarTeam(team)],
-      };
-    });
-  };
-
-  const syncSidebarTreeDeletedTeam = (teamId: string) => {
-    queryClient.setQueryData<SidebarTree | undefined>(['sidebarTree', workspaceId], (current) => {
-      if (!current) {
-        return current;
-      }
-
-      return {
-        ...current,
-        teams: current.teams.filter((team) => team.id !== teamId),
-      };
-    });
-  };
-
   const handleCreateTeam = async () => {
     const name = createDraft.name.trim();
     if (!name) {
@@ -253,7 +215,7 @@ export function WorkspaceTeamsPage({
         description: createDraft.description.trim(),
         color: createDraft.color,
       });
-      syncSidebarTreeNewTeam(createdTeam);
+      addSidebarTeam(queryClient, workspaceId, toSidebarTeam(createdTeam));
       setCreateDraft(getInitialDraft());
       setFeedback({ type: 'success', message: 'Team created.' });
       setIsCreateModalOpen(false);
@@ -287,7 +249,7 @@ export function WorkspaceTeamsPage({
     const color = editDraft.color;
 
     // Optimistically update the cache
-    syncSidebarTreeTeam(teamId, (currentTeam) => ({
+    updateSidebarTeam(queryClient, workspaceId, teamId, (currentTeam) => ({
       ...currentTeam,
       name,
       description,
@@ -337,7 +299,7 @@ export function WorkspaceTeamsPage({
       } else {
         await apiClient.delete(`/teams/${team.id}`);
       }
-      syncSidebarTreeDeletedTeam(team.id);
+      removeSidebarTeam(queryClient, workspaceId, team.id);
       setSelectedTeamId('');
       setFeedback({ type: 'success', message: 'Team deleted.' });
       await refreshTeams();

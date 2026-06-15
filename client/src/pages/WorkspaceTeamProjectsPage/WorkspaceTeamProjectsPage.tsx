@@ -9,7 +9,8 @@ import {
   WorkspaceHeader,
   sanitizeProjectKey,
 } from '../../modules/workspaces';
-import type { CreateProjectInput, Project, SidebarTeam, SidebarTree } from '../../types/domain';
+import type { CreateProjectInput, Project, SidebarTeam } from '../../types/domain';
+import { addProjectToTeam, removeProjectFromTeam, updateProjectInTeam } from '../../utils/sidebarTreeMutations';
 import '../WorkspacePage/WorkspacePage.css';
 import './WorkspaceTeamProjectsPage.css';
 
@@ -166,21 +167,7 @@ export function WorkspaceTeamProjectsPage({
       });
 
       if (createdProject) {
-        queryClient.setQueryData<SidebarTree | undefined>(['sidebarTree', workspaceId], (current) => {
-          if (!current) return current;
-          return {
-            ...current,
-            teams: current.teams.map((t) => {
-              if (t.id === team?.id) {
-                return {
-                  ...t,
-                  projects: [...(t.projects || []), createdProject],
-                };
-              }
-              return t;
-            }),
-          };
-        });
+        addProjectToTeam(queryClient, workspaceId, team.id, createdProject);
         void queryClient.invalidateQueries({ queryKey: ['sidebarTree', workspaceId] });
         setSelectedProjectId(createdProject.id);
       }
@@ -211,23 +198,13 @@ export function WorkspaceTeamProjectsPage({
     setFeedback(null);
 
     // Optimistically update the sidebar tree while the request is in-flight.
-    queryClient.setQueryData<SidebarTree | undefined>(['sidebarTree', workspaceId], (current) => {
-      if (!current) return current;
-      return {
-        ...current,
-        teams: current.teams.map((t) => {
-          if (t.id === team?.id) {
-            return {
-              ...t,
-              projects: t.projects?.map((p) =>
-                p.id === selectedProject.id ? { ...p, name: projectDraft.name.trim() } : p
-              ),
-            };
-          }
-          return t;
-        }),
-      };
-    });
+    updateProjectInTeam(queryClient, workspaceId, team.id, selectedProject.id, (project) => ({
+      ...project,
+      name: projectDraft.name.trim(),
+      description: projectDraft.description.trim(),
+      githubRepoUrl: githubRepoUrl || null,
+      status: projectDraft.status,
+    }));
 
     onUpdateProject(selectedProject.id, {
       name: projectDraft.name.trim(),
@@ -273,21 +250,7 @@ export function WorkspaceTeamProjectsPage({
     setFeedback(null);
 
     // Optimistically update sidebar tree
-    queryClient.setQueryData<SidebarTree | undefined>(['sidebarTree', workspaceId], (current) => {
-      if (!current) return current;
-      return {
-        ...current,
-        teams: current.teams.map((t) => {
-          if (t.id === team?.id) {
-            return {
-              ...t,
-              projects: (t.projects || []).filter((p) => p.id !== projectId),
-            };
-          }
-          return t;
-        }),
-      };
-    });
+    removeProjectFromTeam(queryClient, workspaceId, team.id, projectId);
 
     setFeedback({ type: 'success', message: 'Project deleted successfully.' });
 
