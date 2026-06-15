@@ -21,6 +21,7 @@ import {
 } from '../utils/default-team.js';
 import {
   invalidateProjectWorkspaceCache,
+  invalidateProjectMembershipCache,
   invalidateWorkspaceMembershipCache,
 } from './membership.js';
 
@@ -225,6 +226,7 @@ export async function createProjectRecord(params: {
   if (project) {
     await invalidateWorkspaceCache(project.workspaceId);
     await invalidateWorkspaceMembershipCache(project.workspaceId, params.ownerId);
+    await invalidateProjectMembershipCache(project.id, params.ownerId);
   }
   return project;
 }
@@ -266,6 +268,7 @@ export async function acceptProjectInvite(projectId: string, workspaceId: string
   await invalidateUserWorkspacesCache(userId);
   await invalidateWorkspaceMembershipCache(workspaceId, userId);
   await invalidateProjectWorkspaceCache(projectId);
+  await invalidateProjectMembershipCache(projectId, userId);
 }
 
 export async function addProjectMemberRecord(projectId: string, workspaceId: string, userId: string, role: string) {
@@ -278,9 +281,11 @@ export async function addProjectMemberRecord(projectId: string, workspaceId: str
   await invalidateUserWorkspacesCache(userId);
   await invalidateWorkspaceMembershipCache(workspaceId, userId);
   await invalidateProjectWorkspaceCache(projectId);
+  await invalidateProjectMembershipCache(projectId, userId);
 }
 
 export async function deleteProjectRecord(projectId: string, workspaceId: string) {
+  const membershipRows = await db.select({ userId: projectMembers.userId }).from(projectMembers).where(eq(projectMembers.projectId, projectId));
   await db.transaction(async (tx) => {
     // 1. Delete comments belonging to tickets in this project
     await tx.delete(comments).where(sql`${comments.ticketId} in (
@@ -313,4 +318,5 @@ export async function deleteProjectRecord(projectId: string, workspaceId: string
 
   await invalidateWorkspaceCache(workspaceId);
   await invalidateProjectWorkspaceCache(projectId);
+  await invalidateProjectMembershipCache(projectId, membershipRows.map((member) => member.userId));
 }

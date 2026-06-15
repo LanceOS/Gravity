@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import { Router } from 'express';
 import { db } from '../../db/index.js';
-import { cycles, projectMembers, projects, teams, workspaceMembers, workspaces, workspaceSettings } from '../../db/schema.js';
+import { cycles, projects, teams, workspaces, workspaceSettings } from '../../db/schema.js';
 import {
   createId,
   normalizeEntityKey,
@@ -20,7 +20,11 @@ import {
 import { buildProjectKeyConflictMessage, mapProjectCreationError, projectKeyExists } from './utils/project-creation.js';
 import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
 import { isValidGitHubRepoUrl } from '../../lib/webhookSignature.js';
-import { authorizeWorkspaceAccess } from './services/membership.js';
+import {
+  authorizeProjectMemberAccess,
+  authorizeProjectOwnerOrWorkspaceAdminAccess,
+  authorizeWorkspaceAccess,
+} from './services/membership.js';
 
 function mapProject(project: typeof projects.$inferSelect) {
   return {
@@ -161,32 +165,14 @@ export function createProjectsRouter() {
 
   router.patch('/projects/:projectId', async (req, res) => {
     try {
-      // Finding #2: Require authentication.
-      const actorUserId = await resolveRequestActorUserId(req);
-      if (!actorUserId) {
-        res.status(401).json({ error: 'Authentication required.' });
+      const auth = await authorizeProjectMemberAccess(req, req.params.projectId);
+      if (!auth.allowed) {
+        res.status(auth.status).json({ error: auth.error });
         return;
       }
 
-      // Finding #2: Require the actor to be a member of the project.
-      const membership = await db
-        .select({ projectId: projectMembers.projectId })
-        .from(projectMembers)
-        .where(
-          and(
-            eq(projectMembers.projectId, req.params.projectId),
-            eq(projectMembers.userId, actorUserId),
-          ),
-        )
-        .limit(1);
-
-      if (membership.length === 0) {
-        res.status(403).json({ error: 'Forbidden.' });
-        return;
-      }
-
-      const currentProject = await getProjectById(req.params.projectId);
-      if (!currentProject) {
+      const project = await getProjectById(req.params.projectId);
+      if (!project) {
         res.status(404).json({ error: 'Project not found.' });
         return;
       }
@@ -208,7 +194,7 @@ export function createProjectsRouter() {
         validatedGithubRepoUrl = null;
       }
 
-      if (typeof req.body?.teamId === 'string' && !(await teamBelongsToWorkspace(req.body.teamId, currentProject.workspaceId))) {
+      if (typeof req.body?.teamId === 'string' && !(await teamBelongsToWorkspace(req.body.teamId, project.workspaceId))) {
         res.status(400).json({ error: 'teamId must belong to the project workspace.' });
         return;
       }
@@ -278,45 +264,15 @@ export function createProjectsRouter() {
 
   router.delete('/projects/:projectId', async (req, res) => {
     try {
-      const actorUserId = await resolveRequestActorUserId(req);
-      if (!actorUserId) {
-        res.status(401).json({ error: 'Authentication required.' });
+      const auth = await authorizeProjectOwnerOrWorkspaceAdminAccess(req, req.params.projectId);
+      if (!auth.allowed) {
+        res.status(auth.status).json({ error: auth.error });
         return;
       }
 
       const currentProject = await getProjectById(req.params.projectId);
       if (!currentProject) {
         res.status(404).json({ error: 'Project not found.' });
-        return;
-      }
-
-      const membership = await db
-        .select({ role: projectMembers.role })
-        .from(projectMembers)
-        .where(
-          and(
-            eq(projectMembers.projectId, req.params.projectId),
-            eq(projectMembers.userId, actorUserId),
-          ),
-        )
-        .limit(1);
-
-      const workspaceMembership = await db
-        .select({ role: workspaceMembers.role })
-        .from(workspaceMembers)
-        .where(
-          and(
-            eq(workspaceMembers.workspaceId, currentProject.workspaceId),
-            eq(workspaceMembers.userId, actorUserId),
-          ),
-        )
-        .limit(1);
-
-      const isProjectOwner = membership[0]?.role === 'owner';
-      const isWorkspaceAdminOrOwner = workspaceMembership[0] && ['admin', 'owner'].includes(workspaceMembership[0].role);
-
-      if (!isProjectOwner && !isWorkspaceAdminOrOwner) {
-        res.status(403).json({ error: 'Only a project owner or workspace admin can delete a project.' });
         return;
       }
 

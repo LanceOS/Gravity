@@ -1,12 +1,13 @@
 import { and, eq } from 'drizzle-orm';
 import { db } from '../../../db/index.js';
-import { workspaceMembers, projects, teams } from '../schema.js';
+import { workspaceMembers, projects, projectMembers, teams } from '../schema.js';
 import type { Request } from 'express';
 import * as cache from '../../../lib/cache.js';
 import { resolveRequestActorUserId } from '../../auth/utils/request-auth.js';
 
 const WORKSPACE_MEMBERSHIP_TTL_SECONDS = 45;
 const PROJECT_WORKSPACE_TTL_SECONDS = 120;
+const PROJECT_MEMBERSHIP_TTL_SECONDS = 45;
 const TEAM_WORKSPACE_TTL_SECONDS = 120;
 
 function uniqueStringArray(values: string[]) {
@@ -70,6 +71,36 @@ export async function getWorkspaceMemberRole(workspaceId: string, userId: string
   return getWorkspaceMemberRoleCached(workspaceId, userId);
 }
 
+async function getProjectMemberRoleCached(projectId: string, userId: string): Promise<string | null> {
+  return cache.wrap(cache.CacheKeys.memberships.projectMember(projectId, userId), PROJECT_MEMBERSHIP_TTL_SECONDS, async () => {
+    const membershipRows = await db
+      .select({ role: projectMembers.role })
+      .from(projectMembers)
+      .where(and(eq(projectMembers.projectId, projectId), eq(projectMembers.userId, userId)))
+      .limit(1);
+
+    return membershipRows[0]?.role ?? null;
+  });
+}
+
+export async function isProjectMember(projectId: string, userId: string): Promise<boolean> {
+  const role = await getProjectMemberRoleCached(projectId, userId);
+  return role !== null;
+}
+
+export async function getProjectMemberRole(projectId: string, userId: string): Promise<string | null> {
+  return getProjectMemberRoleCached(projectId, userId);
+}
+
+export async function invalidateProjectMembershipCaches(projectId: string, userIds: string[]): Promise<void> {
+  const uniqueUserIds = uniqueStringArray(userIds);
+  if (uniqueUserIds.length === 0) {
+    return;
+  }
+
+  await cache.delMany(uniqueUserIds.map((userId) => cache.CacheKeys.memberships.projectMember(projectId, userId)));
+}
+
 /**
  * Gets the workspace ID associated with a project, if the project exists.
  */
@@ -116,6 +147,21 @@ export async function invalidateProjectWorkspaceCache(projectId: string): Promis
   await cache.del(cache.CacheKeys.memberships.projectWorkspace(projectId));
 }
 
+export async function invalidateProjectMembershipCache(projectId: string, userId?: string): Promise<void> {
+  if (userId) {
+    await invalidateProjectMembershipCaches(projectId, [userId]);
+    return;
+  }
+
+  const rows = await db.select({ userId: projectMembers.userId }).from(projectMembers).where(eq(projectMembers.projectId, projectId));
+
+  if (rows.length === 0) {
+    return;
+  }
+
+  await invalidateProjectMembershipCaches(projectId, rows.map((member) => member.userId));
+}
+
 export async function invalidateTeamWorkspaceCache(teamId: string): Promise<void> {
   await cache.del(cache.CacheKeys.memberships.teamWorkspace(teamId));
 }
@@ -137,6 +183,39 @@ export async function authorizeProjectAccess(req: Request, projectId: string) {
     return { allowed: false as const, error: 'Access denied: not a member of the workspace.', status: 403 };
   }
   return { allowed: true as const, userId };
+}
+
+export async function authorizeProjectMemberAccess(req: Request, projectId: string) {
+  const userId = await resolveRequestActorUserId(req);
+  if (!userId) {
+    return { allowed: false as const, error: 'Authentication required.', status: 401 };
+  }
+
+  const workspaceId = await getProjectWorkspaceId(projectId);
+  if (!workspaceId) {
+    return { allowed: false as const, error: 'Project not found.', status: 404 };
+  }
+
+  const projectRole = await getProjectMemberRole(projectId, userId);
+  if (!projectRole) {
+    return { allowed: false as const, error: 'Access denied: not a member of the project.', status: 403 };
+  }
+
+  return { allowed: true as const, userId, workspaceId, projectId, projectRole };
+}
+
+export async function authorizeProjectOwnerOrWorkspaceAdminAccess(req: Request, projectId: string) {
+  const auth = await authorizeProjectMemberAccess(req, projectId);
+  if (!auth.allowed) {
+    return auth;
+  }
+
+  const workspaceRole = await getWorkspaceMemberRole(auth.workspaceId, auth.userId);
+  if (auth.projectRole === 'owner' || workspaceRole === 'admin' || workspaceRole === 'owner') {
+    return auth;
+  }
+
+  return { allowed: false as const, error: 'Only a project owner or workspace admin can manage this project.', status: 403 };
 }
 
 /**
