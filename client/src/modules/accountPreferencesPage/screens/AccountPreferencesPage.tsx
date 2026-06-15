@@ -110,7 +110,12 @@ function AccountPreferencesPageContent() {
             </Alert>
           )}
 
-          {(isMobile || activeCategory === 'general') && <GeneralSettingsSection />}
+          {(isMobile || activeCategory === 'general') && (
+            <GeneralSettingsSection
+              settings={settings}
+              onChangeSettings={onChangeSettings}
+            />
+          )}
 
           {(isMobile || activeCategory === 'providers') && (
             <Stack gap="var(--space-md)">

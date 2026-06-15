@@ -5,9 +5,20 @@ import { AGENT_INTEGRATION_OPTIONS, PROJECT_LAYOUT_OPTIONS, THEME_OPTIONS, VIEW_
 import { useAccountPreferencesSettingsContext } from '../../../../context/accountPreferencesPage/accountPreferencesPageContextHooks';
 import type { WorkspaceSettings } from '../../../../utils/settings';
 
-export function GeneralSettingsSection() {
-  const { settings, onChangeSettings } = useAccountPreferencesSettingsContext();
+interface GeneralSettingsSectionProps {
+  settings?: WorkspaceSettings;
+  onChangeSettings?: (updates: Partial<WorkspaceSettings>) => void;
+}
+
+export function GeneralSettingsSection({
+  settings: runtimeSettings,
+  onChangeSettings: runtimeOnChangeSettings,
+}: GeneralSettingsSectionProps = {}) {
+  const { settings: contextSettings, onChangeSettings: contextOnChangeSettings } = useAccountPreferencesSettingsContext();
   const isMobile = useIsMobile();
+
+  const settings = runtimeSettings ?? contextSettings;
+  const onChangeSettings = runtimeOnChangeSettings ?? contextOnChangeSettings;
 
   return (
     <Card className="account-preferences-page__section-card">
