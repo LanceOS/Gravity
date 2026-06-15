@@ -403,6 +403,46 @@ export function WorkspaceShellPage() {
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, [activeWorkspaceProjects.length, handleOpenCreateTicket]);
 
+  const isTeamProjectsManager = activeSection === 'team-projects';
+  const isTeamWorkspace = (sidebarTree?.hierarchyMode ?? activeWorkspace?.hierarchyMode ?? 'workspace') === 'teams';
+  const isTeamsManager = activeSection === 'teams' || (isTeamWorkspace && activeSection === 'projects');
+  const isWorkspaceOwner = activeWorkspace?.memberRole === 'owner';
+
+  const activeProjectTeamId =
+    activeProject?.teamId ||
+    sidebarTree?.teams?.find((team) => team.projects?.some((project) => project.id === (projectIdParam || activeProjectId)))?.id ||
+    '';
+  const sidebarActiveTeamId = route.teamIdParam || activeProjectTeamId;
+
+  const handleOpenCurrentTeamProjectsManager = useCallback(() => {
+    if (sidebarActiveTeamId) {
+      handleOpenTeamProjectsManager(sidebarActiveTeamId);
+      return;
+    }
+
+    handleOpenTeamManager();
+  }, [sidebarActiveTeamId, handleOpenTeamManager, handleOpenTeamProjectsManager]);
+
+  const sidebarNavigationState: SidebarNavigationState = useMemo(() => ({
+    activeTeam: sidebarActiveTeamId,
+    activeScope:
+      route.teamIdParam
+        ? route.projectIdParam
+          ? 'projects'
+          : route.cycleIdParam
+            ? 'cycles'
+            : route.activeLabelIdParam
+              ? 'labels'
+              : 'views'
+        : route.projectIdParam
+          ? 'projects'
+          : 'workspace',
+    activeProject:
+      activeSection === 'projects' || activeSection === 'team-projects' || activeSection === 'workspace'
+        ? (projectIdParam || activeProjectId)
+        : '',
+  }), [activeSection, activeProjectId, projectIdParam, route.activeLabelIdParam, route.cycleIdParam, route.projectIdParam, route.teamIdParam, sidebarActiveTeamId]);
+
   if (loading || workspacesLoading || !workspacesResolvedForCurrentUser) {
     return <LoadingPage />;
   }
@@ -436,39 +476,6 @@ export function WorkspaceShellPage() {
     sidebarTree?.teams?.find((team) => team.projects?.some((project) => project.id === (projectIdParam || activeProjectId)))?.id ||
     '';
   const sidebarActiveTeamId = route.teamIdParam || activeProjectTeamId;
-  const isTeamProjectsManager = activeSection === 'team-projects';
-  const isTeamWorkspace = (sidebarTree?.hierarchyMode ?? activeWorkspace.hierarchyMode) === 'teams';
-  const isTeamsManager = activeSection === 'teams' || (isTeamWorkspace && activeSection === 'projects');
-  const isWorkspaceOwner = activeWorkspace.memberRole === 'owner';
-
-  const handleOpenCurrentTeamProjectsManager = useCallback(() => {
-    if (sidebarActiveTeamId) {
-      handleOpenTeamProjectsManager(sidebarActiveTeamId);
-      return;
-    }
-
-    handleOpenTeamManager();
-  }, [sidebarActiveTeamId, handleOpenTeamManager, handleOpenTeamProjectsManager]);
-
-  const sidebarNavigationState: SidebarNavigationState = useMemo(() => ({
-    activeTeam: sidebarActiveTeamId,
-    activeScope:
-      route.teamIdParam
-        ? route.projectIdParam
-          ? 'projects'
-          : route.cycleIdParam
-            ? 'cycles'
-            : route.activeLabelIdParam
-              ? 'labels'
-              : 'views'
-        : route.projectIdParam
-          ? 'projects'
-          : 'workspace',
-    activeProject:
-      activeSection === 'projects' || activeSection === 'team-projects' || activeSection === 'workspace'
-        ? (projectIdParam || activeProjectId)
-        : '',
-  }), [activeSection, activeProjectId, route.activeLabelIdParam, route.cycleIdParam, route.projectIdParam, route.teamIdParam, sidebarActiveTeamId, projectIdParam]);
 
   const sidebarActiveViewId =
     route.teamIdParam && sidebarNavigationState.activeScope === 'views'
