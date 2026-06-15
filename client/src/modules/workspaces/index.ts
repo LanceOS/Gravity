@@ -1,8 +1,8 @@
 export { EmptyWorkspaceScreen } from './components/EmptyWorkspaceScreen';
-export { ProjectCreateOverlay } from './components/ProjectCreateOverlay';
 export { WorkspaceMcpModal } from './components/WorkspaceMcpModal';
 export { WorkspaceHeader } from './components/WorkspaceHeader';
-export { WorkspaceProjectPanel } from './components/WorkspaceProjectPanel';
+export { ProjectCreateOverlay } from '../workspaceProjects/components/ProjectCreateOverlay';
+export { WorkspaceProjectPanel } from '../workspaceProjects/components/WorkspaceProjectPanel';
 export {
   useActiveWorkspaceStorage,
   useWorkspaceCreateLabelDialog,
@@ -17,5 +17,9 @@ export { getActiveWorkspaceStorageKey } from './utils';
 export {
   PROJECT_LIFECYCLE_OPTIONS,
   PROJECT_STATUS_LABELS,
+  DEFAULT_LABEL_COLOR,
+  createProjectSettingsFeedback,
+  getNextLabelSortOrder,
   sanitizeProjectKey,
-} from './utils/WorkspaceProjectPanel';
+  validateGithubRepoUrl,
+} from '../workspaceProjects/utils/WorkspaceProjectPanel';
