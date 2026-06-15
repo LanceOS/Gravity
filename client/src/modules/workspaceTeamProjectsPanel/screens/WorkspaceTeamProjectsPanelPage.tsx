@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { ProjectCreateOverlay } from '../../workspaceProjectsPanel/components/ProjectCreateOverlay';
+import { ProjectCreateOverlay } from '../../../components/WorkspaceProjectPanel';
 import { removeProjectFromTeam, updateProjectInTeam } from '../../../utils/sidebarTreeMutations';
 import { sanitizeProjectKey, validateGithubRepoUrl } from '../../../utils/project';
 import '../../workspacePage/styles/WorkspacePage.css';
@@ -8,11 +8,14 @@ import '../styles/WorkspaceTeamProjectsPage.css';
 import { WorkspaceManagementLayout } from '../../../layouts/WorkspaceManagementLayout/WorkspaceManagementLayout';
 import { WorkspaceTeamProjectsDeleteModal } from '../components/WorkspaceTeamProjectsDeleteModal';
 import { WorkspaceTeamProjectsEditorSection } from '../components/WorkspaceTeamProjectsEditorSection';
-import { WorkspaceTeamProjectsFeedback } from '../components/WorkspaceTeamProjectsFeedback';
-import { WorkspaceTeamProjectsHeaderActions } from '../components/WorkspaceTeamProjectsHeaderActions';
-import { WorkspaceTeamProjectsHero } from '../components/WorkspaceTeamProjectsHero';
-import { WorkspaceTeamProjectsLoadingSkeleton } from '../components/WorkspaceTeamProjectsLoadingSkeleton';
 import { WorkspaceTeamProjectsProjectListSection } from '../components/WorkspaceTeamProjectsProjectListSection';
+import {
+  WorkspaceManagementFeedback,
+  WorkspaceManagementHeaderActions,
+  WorkspaceManagementHero,
+  WorkspaceManagementLoadingSkeleton,
+} from '../../../components/WorkspaceManagementPage';
+import { FolderKanban } from 'lucide-react';
 import {
   createWorkspaceTeamProjectsPanelFeedback,
 } from '../utils/WorkspaceTeamProjectsPanelUtils';
@@ -205,23 +208,40 @@ export function WorkspaceTeamProjectsPanelPage({
       pageClassName="workspace-team-projects-page"
       contentClassName="workspace-team-projects-page__content"
       actions={
-        <WorkspaceTeamProjectsHeaderActions
-          onBackToTeams={onBackToTeams}
-          onOpenCreateProject={() => setIsCreateModalOpen(true)}
-          canCreateProject={!!team}
+        <WorkspaceManagementHeaderActions
+          classNamePrefix="workspace-team-projects-page"
+          onBack={onBackToTeams}
+          backLabel="Back to Teams"
+          onCreate={() => setIsCreateModalOpen(true)}
+          createLabel="New Project"
+          canCreate={!!team}
         />
       }
       hero={
-        <WorkspaceTeamProjectsHero
-          teamName={team?.name}
-          teamDescription={team?.description}
-          workspaceName={workspaceName}
-          projectCount={sortedProjects.length}
+        <WorkspaceManagementHero
+          classNamePrefix="workspace-team-projects-page"
+          eyebrow="Team projects"
+          title={team?.name ?? 'Loading team...'}
+          metaItems={[`${sortedProjects.length} projects`, workspaceName]}
+          description={team?.description || 'Create and refine the projects owned by this team without leaving team management.'}
+          StatIcon={FolderKanban}
+          statValue={sortedProjects.length}
+          statSingularLabel="project"
+          statPluralLabel="projects"
         />
       }
-      feedback={<WorkspaceTeamProjectsFeedback feedback={feedback} />}
+      feedback={<WorkspaceManagementFeedback classNamePrefix="workspace-team-projects-page" feedback={feedback} />}
       loading={loading}
-      loadingNode={<WorkspaceTeamProjectsLoadingSkeleton />}
+      loadingNode={
+        <WorkspaceManagementLoadingSkeleton
+          layoutClassName="workspace-team-projects-page__layout"
+          cardClassName="workspace-team-projects-page__projects-card"
+          listClassName="workspace-team-projects-page__project-list"
+          itemClassName="workspace-team-projects-page__project-card"
+          itemLineWidths={['30%', '60%', '80%']}
+          editorCardClassName="workspace-team-projects-page__editor-card"
+        />
+      }
     >
       <div className="workspace-team-projects-page__layout">
         <WorkspaceTeamProjectsProjectListSection

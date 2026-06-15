@@ -6,14 +6,17 @@ import type { SidebarTeam, Team } from '../../../types/domain';
 import '../../workspacePage/styles/WorkspacePage.css';
 import '../styles/WorkspaceTeamsPage.css';
 import { WorkspaceManagementLayout } from '../../../layouts/WorkspaceManagementLayout/WorkspaceManagementLayout';
+import {
+  WorkspaceManagementFeedback,
+  WorkspaceManagementHeaderActions,
+  WorkspaceManagementHero,
+  WorkspaceManagementLoadingSkeleton,
+} from '../../../components/WorkspaceManagementPage';
 
 import { WorkspaceTeamsCreateTeamModal } from '../components/WorkspaceTeamsCreateTeamModal';
-import { WorkspaceTeamsFeedback } from '../components/WorkspaceTeamsFeedback';
-import { WorkspaceTeamsHeaderActions } from '../components/WorkspaceTeamsHeaderActions';
-import { WorkspaceTeamsHero } from '../components/WorkspaceTeamsHero';
-import { WorkspaceTeamsLoadingSkeleton } from '../components/WorkspaceTeamsLoadingSkeleton';
 import { WorkspaceTeamsTeamEditorSection } from '../components/WorkspaceTeamsTeamEditorSection';
 import { WorkspaceTeamsTeamListSection } from '../components/WorkspaceTeamsTeamListSection';
+import { Users } from 'lucide-react';
 import { getTeamReferenceCount, getInitialDraft, toSidebarTeam } from '../utils/WorkspaceTeamsPage';
 import { useWorkspaceTeamsPageDraft } from '../hooks/useWorkspaceTeamsPageDraft';
 import { useWorkspaceTeamsPageSelection } from '../hooks/useWorkspaceTeamsPageSelection';
@@ -222,15 +225,38 @@ export function WorkspaceTeamsPage({
       pageClassName="workspace-teams-page"
       contentClassName="workspace-teams-page__content"
       actions={
-        <WorkspaceTeamsHeaderActions
-          onBackToWorkspace={onBackToWorkspace}
-          onOpenCreateTeam={() => setIsCreateModalOpen(true)}
+        <WorkspaceManagementHeaderActions
+          classNamePrefix="workspace-teams-page"
+          onBack={onBackToWorkspace}
+          backLabel="Back to Workspace"
+          onCreate={() => setIsCreateModalOpen(true)}
+          createLabel="New Team"
         />
       }
-      hero={<WorkspaceTeamsHero workspaceName={workspaceName} teamCount={sortedTeams.length} />}
-      feedback={<WorkspaceTeamsFeedback feedback={feedback} />}
+      hero={
+        <WorkspaceManagementHero
+          classNamePrefix="workspace-teams-page"
+          eyebrow="Team workspace"
+          title={workspaceName}
+          metaItems={[`${sortedTeams.length} teams`, workspaceName]}
+          description="Manage the teams that organize projects, cycles, labels, and aggregate task views in this workspace."
+          StatIcon={Users}
+          statValue={sortedTeams.length}
+          statSingularLabel="team"
+          statPluralLabel="teams"
+        />
+      }
+      feedback={<WorkspaceManagementFeedback classNamePrefix="workspace-teams-page" feedback={feedback} />}
       loading={loading}
-      loadingNode={<WorkspaceTeamsLoadingSkeleton />}
+      loadingNode={
+        <WorkspaceManagementLoadingSkeleton
+          layoutClassName="workspace-teams-page__layout"
+          cardClassName="workspace-teams-page__teams-card"
+          listClassName="workspace-teams-page__team-list"
+          itemClassName="workspace-teams-page__team-card-item"
+          editorCardClassName="workspace-teams-page__editor-card"
+        />
+      }
     >
       <div className="workspace-teams-page__layout">
         <WorkspaceTeamsTeamListSection teams={sortedTeams} selectedTeamId={selectedTeamId} onSelectTeam={handleSelectTeam} />
