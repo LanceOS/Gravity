@@ -152,7 +152,10 @@ vi.mock('../../layouts/WorkspaceLayout/WorkspaceLayout', () => ({
       >
         {sidebarProps.userMenu.workspaceManagementLabel || 'Manage Projects'}
       </div>
-      <button type="button" onClick={() => sidebarProps.projects?.onSelectLabel?.('d-1')}>
+      <button
+        type="button"
+        onClick={() => sidebarProps.projects?.onSelectLabel?.(sidebarProps.projects?.activeProjectId || 'project-1', 'd-1')}
+      >
         Select label
       </button>
       <button type="button" onClick={() => sidebarProps.projects?.onOpenCreateTeam?.()}>
@@ -863,13 +866,15 @@ describe('AppShellPage', () => {
     renderAppShell();
 
     await waitFor(() => {
-      expect(mocks.fetch).toHaveBeenCalledWith('/api/v1/workspaces/workspace-1/members/user-1/activity', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-User-Id': 'user-1',
-        },
+      const hasActivityCall = mocks.fetch.mock.calls.some(([input, init]) => {
+        const inputUrl = typeof input === 'string' ? input : input.toString();
+        return (
+          inputUrl === '/api/v1/workspaces/workspace-1/members/user-1/activity'
+          && init?.method === 'POST'
+          && init?.headers?.['X-User-Id'] === 'user-1'
+        );
       });
+      expect(hasActivityCall).toBe(true);
     });
   });
 

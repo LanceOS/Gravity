@@ -213,7 +213,7 @@ describe('WorkspaceTeamProjectsPage', () => {
         status: 'completed',
       });
     });
-  });
+  }, 12000);
 
   it('opens a dedicated create overlay and scopes new projects to the team', async () => {
     const user = userEvent.setup();

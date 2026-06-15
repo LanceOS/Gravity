@@ -48,6 +48,12 @@ const projectOtherWorkspace: Project = {
   workspaceId: 'workspace-2',
 };
 
+const projectById = new Map([
+  ['project-1', project1],
+  ['project-2', project2],
+  ['project-3', projectOtherWorkspace],
+]);
+
 const dependencyTargetTicket: Ticket = {
   ...ticket,
   id: 'ticket-2',
@@ -77,6 +83,7 @@ describe('TicketContextMenu', () => {
         labels: [],
         cycles: [],
         users: [],
+        projectById,
         updateTicket: updateTicketMock,
         moveTicket: moveTicketMock,
         deleteTicket: vi.fn(),
@@ -128,6 +135,7 @@ describe('TicketContextMenu', () => {
         labels: [],
         cycles: [],
         users: [],
+        projectById,
         updateTicket: vi.fn(),
         moveTicket: vi.fn(),
         deleteTicket: vi.fn(),

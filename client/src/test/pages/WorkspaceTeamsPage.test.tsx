@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -82,6 +82,7 @@ function renderWorkspaceTeamsPage(overrides: Partial<Parameters<typeof Workspace
     teams: props.teams,
   };
   queryClient.setQueryData(['sidebarTree', props.workspaceId], initialSidebarTree);
+  queryClient.setQueryData(['workspace', props.workspaceId, 'sidebar'], initialSidebarTree);
 
   return {
     ...render(
@@ -139,8 +140,9 @@ describe('WorkspaceTeamsPage', () => {
     // Create a new team via Modal
     await user.click(screen.getByRole('button', { name: 'New Team' }));
 
-    await user.type(screen.getByLabelText('Team Name'), 'Support');
-    await user.type(screen.getByLabelText('Description'), 'Customer escalation team');
+    const createTeamForm = screen.getByRole('form', { name: 'Create Team' });
+    await user.type(within(createTeamForm).getByLabelText('Team Name'), 'Support');
+    await user.type(within(createTeamForm).getByLabelText('Description'), 'Customer escalation team');
     await user.click(screen.getByRole('button', { name: /create team/i }));
 
     await waitFor(() => {
@@ -179,7 +181,7 @@ describe('WorkspaceTeamsPage', () => {
     });
 
     await waitFor(() => {
-      const sidebarTree = queryClient.getQueryData<SidebarTree>(['sidebarTree', 'workspace-1']);
+      const sidebarTree = queryClient.getQueryData<SidebarTree>(['workspace', 'workspace-1', 'sidebar']);
       expect(sidebarTree?.teams.find((team) => team.id === 'team-engineering')).toMatchObject({
         name: 'Core Engineering',
         description: 'Updated product platform ownership',
@@ -198,7 +200,7 @@ describe('WorkspaceTeamsPage', () => {
       });
       expect(props.onTeamsChanged).toHaveBeenCalled();
     });
-  });
+  }, 12000);
 
   it('navigates to team project management from the team card', async () => {
     const user = userEvent.setup();

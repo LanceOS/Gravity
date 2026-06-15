@@ -293,9 +293,12 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     queryKey: queryKeys.projects(currentUser?.id),
     queryFn: () => apiClient.get<Project[]>(`/projects`, { params: { userId: currentUser?.id } }),
     enabled: !!currentUser?.id,
+    onError: (error) => {
+      console.error(error);
+    },
     ...CACHE_CONFIGS.metadata,
   });
-  const projects = projectsQuery.data || [];
+  const projects = Array.isArray(projectsQuery.data) ? projectsQuery.data : [];
   const projectLookup = useMemo(() => {
     const lookup = new Map<string, { workspaceId: string; teamId: string | null }>();
     projects.forEach((project) => {

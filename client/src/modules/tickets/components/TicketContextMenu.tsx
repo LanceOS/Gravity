@@ -40,11 +40,13 @@ export const TicketContextMenu: React.FC<TicketContextMenuProps> = ({ ticket, ch
     assignLabelToTicket,
     unassignLabelFromTicket,
   } = context;
+  const safeProjects = useMemo(() => (Array.isArray(projects) ? projects : []), [projects]);
   const sourceTickets = availableTickets ?? tickets;
   const safeLabelsByProject = labelsByProject ?? new Map<string, Label[]>();
   const safeTicketsByProject = ticketsByProject ?? new Map<string, Ticket[]>();
   const safeGlobalLabels = globalLabels ?? EMPTY_LABELS;
   const safeProjectById = projectById ?? new Map<string, Project>();
+  const safeProjectsByWorkspaceId = projectsByWorkspaceId ?? new Map<string, Project[]>();
 
   const ticketLabels = useMemo(() => {
     const projectLabels = safeLabelsByProject.get(ticket.projectId);
@@ -67,14 +69,36 @@ export const TicketContextMenu: React.FC<TicketContextMenuProps> = ({ ticket, ch
     return projectTickets.filter((candidate) => candidate.id !== ticket.id);
   }, [availableTickets, safeTicketsByProject, sourceTickets, ticket.id, ticket.projectId]);
 
-  const workspaceProjects = useMemo(() => {
+  const ticketWorkspaceId = useMemo(() => {
     const ticketProject = safeProjectById.get(ticket.projectId);
-    if (!ticketProject?.workspaceId) {
-      return projects;
+    if (ticketProject?.workspaceId) {
+      return ticketProject.workspaceId;
     }
 
-    return projectsByWorkspaceId.get(ticketProject.workspaceId) || projects;
-  }, [projects, projectsByWorkspaceId, safeProjectById, ticket.projectId]);
+    return safeProjects.find((project) => project.id === ticket.projectId)?.workspaceId;
+  }, [projects, safeProjectById, ticket.projectId]);
+
+  const safeProjectsByWorkspaceIdFallback = useMemo(() => {
+    const map = new Map<string, Project[]>();
+    for (const project of safeProjects) {
+      const workspaceId = project.workspaceId || '';
+      const current = map.get(workspaceId);
+      if (current) {
+        current.push(project);
+      } else {
+        map.set(workspaceId, [project]);
+      }
+    }
+    return map;
+  }, [safeProjects]);
+
+  const workspaceProjects = useMemo(() => {
+    if (!ticketWorkspaceId) {
+      return safeProjects;
+    }
+
+    return safeProjectsByWorkspaceId.get(ticketWorkspaceId) || safeProjectsByWorkspaceIdFallback.get(ticketWorkspaceId) || safeProjects;
+  }, [safeProjectsByWorkspaceId, safeProjectsByWorkspaceIdFallback, safeProjects, ticketWorkspaceId]);
 
   const assignedLabelIds = useMemo(() => new Set(ticket.labels?.map((assignedLabel) => assignedLabel.id) || EMPTY_USER_IDS), [ticket.labels]);
 

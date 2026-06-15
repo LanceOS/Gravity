@@ -70,6 +70,7 @@ export function WorkspaceTeamsCreateTeamModal({
           event.preventDefault();
           onCreateTeam();
         }}
+        aria-label="Create Team"
         className="workspace-teams-page__modal-form"
       >
         <TextInput
