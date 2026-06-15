@@ -2,6 +2,7 @@ import { useEffect, type Dispatch, type SetStateAction } from 'react';
 import type { User, Project } from '../../../types/domain';
 import type { WorkspaceSummary } from '../../../hooks/useWorkspaceDirectory';
 import type { AppSection } from '../types/AppShell';
+import { useQueryCacheString } from '../../../hooks/useQueryCacheString';
 import {
   workspaceDirectoryService as defaultWorkspaceDirectoryService,
   type WorkspaceDirectoryService,
