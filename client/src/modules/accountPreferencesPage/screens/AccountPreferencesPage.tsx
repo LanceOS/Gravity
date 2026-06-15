@@ -11,6 +11,7 @@ import { AccountPreferencesSidebar } from '../layout/AccountPreferencesSidebar';
 import { AccountPreferencesPageProps } from '../types';
 import {
   useAccountPreferencesCategoryContext,
+  useAccountPreferencesNavigationContext,
   useAccountPreferencesRuntimeContext,
 } from '../../../context/accountPreferencesPage/accountPreferencesPageContextHooks';
 import { AccountPreferencesPageProviders } from './AccountPreferencesPageProviders';
@@ -25,11 +26,10 @@ function AccountPreferencesPageContent() {
     saveError,
     hasChanges,
     saveSuccess,
-    onBack,
-    onOpenDirectory,
     onSaveSettings,
     saveLoading,
   } = useAccountPreferencesRuntimeContext();
+  const { onBack, onOpenDirectory } = useAccountPreferencesNavigationContext();
 
   const activeCategoryMeta =
     categories.find((category) => category.id === activeCategory) || categories[0];
