@@ -33,11 +33,13 @@ import { useWorkspaceViewMode } from '../AppShellPage/hooks/useWorkspaceViewMode
 import type { AppSection } from '../AppShellPage/AppShellPage.types';
 import { LoadingPage } from '../LoadingPage/LoadingPage';
 import { queryClient, queryKeys } from '../../utils/queryClient';
-import { useActiveWorkspaceStorage } from './hooks/useActiveWorkspaceStorage';
-import { useWorkspaceShellCommands } from './hooks/useWorkspaceShellCommands';
-import { useWorkspaceShellFilters } from './hooks/useWorkspaceShellFilters';
-import { useWorkspaceShellNavigation } from './hooks/useWorkspaceShellNavigation';
-import { useWorkspaceSidebarCounts } from './hooks/useWorkspaceSidebarCounts';
+import {
+  useActiveWorkspaceStorage,
+  useWorkspaceShellCommands,
+  useWorkspaceShellFilters,
+  useWorkspaceShellNavigation,
+  useWorkspaceSidebarCounts,
+} from '../../modules/workspaces/shell';
 
 interface WorkspaceMember {
   id: string;
