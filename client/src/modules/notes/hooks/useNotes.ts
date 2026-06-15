@@ -1,5 +1,5 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { queryKeys } from '../../../utils/queryClient';
+import { CACHE_CONFIGS, queryKeys } from '../../../utils/queryClient';
 import type { NoteMetadata } from '../types';
 
 export function useNotes(projectId: string, sortDirection: 'desc' | 'asc' = 'desc') {
@@ -21,6 +21,8 @@ export function useNotes(projectId: string, sortDirection: 'desc' | 'asc' = 'des
       return response.json();
     },
     initialPageParam: 0,
+    staleTime: CACHE_CONFIGS.metadata.staleTime,
+    gcTime: CACHE_CONFIGS.metadata.gcTime,
     getNextPageParam: (lastPage, allPages) => {
       if (lastPage.length < limit) return undefined;
       return allPages.length * limit;

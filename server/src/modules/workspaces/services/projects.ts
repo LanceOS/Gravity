@@ -19,6 +19,10 @@ import {
   DEFAULT_TEAM_NAME,
   getDefaultTeamId,
 } from '../utils/default-team.js';
+import {
+  invalidateProjectWorkspaceCache,
+  invalidateWorkspaceMembershipCache,
+} from './membership.js';
 
 function mapCycle(cycle: typeof cycles.$inferSelect) {
   const now = Date.now();
@@ -220,6 +224,7 @@ export async function createProjectRecord(params: {
   const project = rows[0];
   if (project) {
     await invalidateWorkspaceCache(project.workspaceId);
+    await invalidateWorkspaceMembershipCache(project.workspaceId, params.ownerId);
   }
   return project;
 }
@@ -259,6 +264,8 @@ export async function acceptProjectInvite(projectId: string, workspaceId: string
 
   await invalidateWorkspaceCache(workspaceId);
   await invalidateUserWorkspacesCache(userId);
+  await invalidateWorkspaceMembershipCache(workspaceId, userId);
+  await invalidateProjectWorkspaceCache(projectId);
 }
 
 export async function addProjectMemberRecord(projectId: string, workspaceId: string, userId: string, role: string) {
@@ -269,6 +276,8 @@ export async function addProjectMemberRecord(projectId: string, workspaceId: str
 
   await invalidateWorkspaceCache(workspaceId);
   await invalidateUserWorkspacesCache(userId);
+  await invalidateWorkspaceMembershipCache(workspaceId, userId);
+  await invalidateProjectWorkspaceCache(projectId);
 }
 
 export async function deleteProjectRecord(projectId: string, workspaceId: string) {
@@ -303,4 +312,5 @@ export async function deleteProjectRecord(projectId: string, workspaceId: string
   });
 
   await invalidateWorkspaceCache(workspaceId);
+  await invalidateProjectWorkspaceCache(projectId);
 }

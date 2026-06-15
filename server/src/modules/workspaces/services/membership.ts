@@ -2,42 +2,122 @@ import { and, eq } from 'drizzle-orm';
 import { db } from '../../../db/index.js';
 import { workspaceMembers, projects, teams } from '../schema.js';
 import type { Request } from 'express';
+import * as cache from '../../../lib/cache.js';
 import { resolveRequestActorUserId } from '../../auth/utils/request-auth.js';
+
+const WORKSPACE_MEMBERSHIP_TTL_SECONDS = 45;
+const PROJECT_WORKSPACE_TTL_SECONDS = 120;
+const TEAM_WORKSPACE_TTL_SECONDS = 120;
+
+function uniqueStringArray(values: string[]) {
+  return [...new Set(values)];
+}
+
+async function getWorkspaceMemberRoleCached(workspaceId: string, userId: string): Promise<string | null> {
+  const rolePromiseKey = cache.CacheKeys.memberships.workspaceRole(workspaceId, userId);
+  return cache.wrap(rolePromiseKey, WORKSPACE_MEMBERSHIP_TTL_SECONDS, async () => {
+    const membershipRows = await db
+      .select({ role: workspaceMembers.role })
+      .from(workspaceMembers)
+      .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, userId)))
+      .limit(1);
+
+    return membershipRows[0]?.role ?? null;
+  });
+}
+
+async function getProjectWorkspaceIdCached(projectId: string): Promise<string | null> {
+  return cache.wrap(cache.CacheKeys.memberships.projectWorkspace(projectId), PROJECT_WORKSPACE_TTL_SECONDS, async () => {
+    const projectRows = await db
+      .select({ workspaceId: projects.workspaceId })
+      .from(projects)
+      .where(eq(projects.id, projectId))
+      .limit(1);
+
+    return projectRows[0]?.workspaceId ?? null;
+  });
+}
+
+async function getTeamWorkspaceIdCached(teamId: string): Promise<string | null> {
+  return cache.wrap(cache.CacheKeys.memberships.teamWorkspace(teamId), TEAM_WORKSPACE_TTL_SECONDS, async () => {
+    const teamRows = await db
+      .select({ workspaceId: teams.workspaceId })
+      .from(teams)
+      .where(eq(teams.id, teamId))
+      .limit(1);
+
+    return teamRows[0]?.workspaceId ?? null;
+  });
+}
 
 /**
  * Checks if a user is a member of a specific workspace.
  */
 export async function isWorkspaceMember(workspaceId: string, userId: string): Promise<boolean> {
-  const membershipRows = await db
-    .select({ role: workspaceMembers.role })
-    .from(workspaceMembers)
-    .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, userId)))
-    .limit(1);
-    
-  return membershipRows.length > 0;
+  const memberPromiseKey = cache.CacheKeys.memberships.workspaceMember(workspaceId, userId);
+  return cache.wrap(memberPromiseKey, WORKSPACE_MEMBERSHIP_TTL_SECONDS, async () => {
+    const membershipRows = await db
+      .select({ role: workspaceMembers.role })
+      .from(workspaceMembers)
+      .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, userId)))
+      .limit(1);
+
+    return membershipRows.length > 0;
+  });
 }
 
 export async function getWorkspaceMemberRole(workspaceId: string, userId: string): Promise<string | null> {
-  const membershipRows = await db
-    .select({ role: workspaceMembers.role })
-    .from(workspaceMembers)
-    .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, userId)))
-    .limit(1);
-
-  return membershipRows[0]?.role ?? null;
+  return getWorkspaceMemberRoleCached(workspaceId, userId);
 }
 
 /**
  * Gets the workspace ID associated with a project, if the project exists.
  */
 export async function getProjectWorkspaceId(projectId: string): Promise<string | null> {
-  const projectRows = await db
-    .select({ workspaceId: projects.workspaceId })
-    .from(projects)
-    .where(eq(projects.id, projectId))
-    .limit(1);
-    
-  return projectRows[0]?.workspaceId ?? null;
+  return getProjectWorkspaceIdCached(projectId);
+}
+
+export async function invalidateWorkspaceMembershipCaches(workspaceId: string, userIds: string[]): Promise<void> {
+  const uniqueUserIds = uniqueStringArray(userIds);
+  if (uniqueUserIds.length === 0) {
+    return;
+  }
+
+  await cache.delMany(
+    uniqueUserIds.flatMap((userId) => [
+      cache.CacheKeys.memberships.workspaceRole(workspaceId, userId),
+      cache.CacheKeys.memberships.workspaceMember(workspaceId, userId),
+    ]),
+  );
+}
+
+export async function invalidateWorkspaceMembershipCache(workspaceId: string, userId?: string): Promise<void> {
+  if (userId) {
+    await invalidateWorkspaceMembershipCaches(workspaceId, [userId]);
+    return;
+  }
+
+  const rows = await db
+    .select({ userId: workspaceMembers.userId })
+    .from(workspaceMembers)
+    .where(eq(workspaceMembers.workspaceId, workspaceId));
+
+  if (rows.length === 0) {
+    return;
+  }
+
+  await invalidateWorkspaceMembershipCaches(
+    workspaceId,
+    rows.map((membership) => membership.userId),
+  );
+}
+
+export async function invalidateProjectWorkspaceCache(projectId: string): Promise<void> {
+  await cache.del(cache.CacheKeys.memberships.projectWorkspace(projectId));
+}
+
+export async function invalidateTeamWorkspaceCache(teamId: string): Promise<void> {
+  await cache.del(cache.CacheKeys.memberships.teamWorkspace(teamId));
 }
 
 /**
@@ -96,13 +176,7 @@ export async function authorizeTeamAccess(req: Request, teamId: string) {
   if (!userId) {
     return { allowed: false as const, error: 'Authentication required.', status: 401 };
   }
-  const teamRows = await db
-    .select({ workspaceId: teams.workspaceId })
-    .from(teams)
-    .where(eq(teams.id, teamId))
-    .limit(1);
-  
-  const workspaceId = teamRows[0]?.workspaceId;
+  const workspaceId = await getTeamWorkspaceIdCached(teamId);
   if (!workspaceId) {
     return { allowed: false as const, error: 'Team not found.', status: 404 };
   }
@@ -119,13 +193,7 @@ export async function authorizeTeamOwnerAccess(req: Request, teamId: string) {
     return { allowed: false as const, error: 'Authentication required.', status: 401 };
   }
 
-  const teamRows = await db
-    .select({ workspaceId: teams.workspaceId })
-    .from(teams)
-    .where(eq(teams.id, teamId))
-    .limit(1);
-
-  const workspaceId = teamRows[0]?.workspaceId;
+  const workspaceId = await getTeamWorkspaceIdCached(teamId);
   if (!workspaceId) {
     return { allowed: false as const, error: 'Team not found.', status: 404 };
   }

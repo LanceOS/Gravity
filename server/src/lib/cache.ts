@@ -9,6 +9,14 @@ export const CacheKeys = {
     all: () => 'all-workspaces' as CacheKey,
     byUser: (userId: string) => `user-workspaces:${userId}` as CacheKey,
   },
+  memberships: {
+    workspaceRole: (workspaceId: string, userId: string) =>
+      `membership:workspace:${workspaceId}:user:${userId}:role` as CacheKey,
+    workspaceMember: (workspaceId: string, userId: string) =>
+      `membership:workspace:${workspaceId}:user:${userId}:member` as CacheKey,
+    projectWorkspace: (projectId: string) => `membership:project:${projectId}:workspace` as CacheKey,
+    teamWorkspace: (teamId: string) => `membership:team:${teamId}:workspace` as CacheKey,
+  },
 };
 
 const inFlightRequests = new Map<string, Promise<any>>();

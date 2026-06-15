@@ -9,6 +9,7 @@ import {
   authorizeWorkspaceOwnerAccess,
   authorizeTeamAccess,
   authorizeTeamOwnerAccess,
+  invalidateTeamWorkspaceCache,
 } from './services/membership.js';
 
 async function deleteLastTeamWithOwnedWork(teamId: string, workspaceId: string) {
@@ -62,6 +63,7 @@ async function deleteLastTeamWithOwnedWork(teamId: string, workspaceId: string) 
     await tx.update(workspaces).set({ defaultProjectId: null }).where(eq(workspaces.id, workspaceId));
     await tx.delete(teams).where(eq(teams.id, teamId));
   });
+  await invalidateTeamWorkspaceCache(teamId);
 
   const cleanupResults = await Promise.allSettled(noteBucketPaths.map((bucketPath) => RustFS.deleteBucket(bucketPath)));
   for (const result of cleanupResults) {
@@ -149,6 +151,7 @@ export function createTeamsRouter() {
       });
 
       const newTeam = await db.select().from(teams).where(eq(teams.id, teamId)).limit(1);
+      await invalidateTeamWorkspaceCache(teamId);
       res.status(201).json(newTeam[0]);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create team.' });
@@ -276,6 +279,7 @@ export function createTeamsRouter() {
             await tx.delete(teams).where(eq(teams.id, teamId));
           });
           await invalidateWorkspaceCache(workspaceId);
+          await invalidateTeamWorkspaceCache(teamId);
         } else if (isLastTeam) {
           await deleteLastTeamWithOwnedWork(teamId, workspaceId);
         } else {
@@ -285,6 +289,7 @@ export function createTeamsRouter() {
       } else {
         await db.delete(teams).where(eq(teams.id, teamId));
         await invalidateWorkspaceCache(workspaceId);
+        await invalidateTeamWorkspaceCache(teamId);
       }
 
       res.json({ success: true });

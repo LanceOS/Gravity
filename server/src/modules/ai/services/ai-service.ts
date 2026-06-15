@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { CredentialManager } from '../../auth/kms/credential-manager.js';
 import { OpenAiProvider } from '../providers/openai-provider.js';
 import { AnthropicProvider } from '../providers/anthropic-provider.js';
@@ -7,6 +8,8 @@ import { ChatOptions, IAiProvider } from '../types.js';
 import { env } from '../../../env.js';
 import { chooseBestMcpModel } from '../utils/utils.js';
 
+export type AiProviderMap = Record<string, IAiProvider>;
+
 const PROVIDER_ENV_TOKEN_NAMES: Record<string, string> = {
   openai: 'OPENAI_API_KEY',
   anthropic: 'ANTHROPIC_API_KEY',
@@ -14,17 +17,30 @@ const PROVIDER_ENV_TOKEN_NAMES: Record<string, string> = {
   deepseek: 'DEEPSEEK_API_KEY',
 };
 
+function createDefaultAiProviders(): AiProviderMap {
+  return {
+    openai: new OpenAiProvider(false),
+    deepseek: new OpenAiProvider(true),
+    anthropic: new AnthropicProvider(),
+    gemini: new GeminiProvider(),
+    ollama: new OllamaProvider(),
+  };
+}
+
+function hashCredential(apiKey: string): string {
+  return createHash('sha256').update(apiKey).digest('hex').slice(0, 16);
+}
+
 export class AiService {
   private readonly providers: Record<string, IAiProvider>;
+  private readonly modelCache = new Map<string, { models: string[]; fetchedAt: number }>();
+  private readonly modelCacheTtlMs = 10 * 60 * 1000;
 
-  constructor(private readonly credentialManager: CredentialManager) {
-    this.providers = {
-      openai: new OpenAiProvider(false),
-      deepseek: new OpenAiProvider(true),
-      anthropic: new AnthropicProvider(),
-      gemini: new GeminiProvider(),
-      ollama: new OllamaProvider(),
-    };
+  constructor(
+    private readonly credentialManager: CredentialManager,
+    providers: AiProviderMap = createDefaultAiProviders(),
+  ) {
+    this.providers = providers;
   }
 
   getOllamaProvider(): OllamaProvider {
@@ -140,7 +156,15 @@ export class AiService {
     if (!providerInst.fetchModels) {
       throw new Error(`fetchModels is not supported by provider ${provider}`);
     }
+
+    const modelCacheKey = `${lower}:${hashCredential(apiKey)}`;
+    const cachedModels = this.modelCache.get(modelCacheKey);
+    if (cachedModels && Date.now() - cachedModels.fetchedAt < this.modelCacheTtlMs) {
+      return chooseBestMcpModel(lower, cachedModels.models);
+    }
+
     const models = await providerInst.fetchModels(apiKey);
+    this.modelCache.set(modelCacheKey, { models, fetchedAt: Date.now() });
     return chooseBestMcpModel(lower, models);
   }
 }

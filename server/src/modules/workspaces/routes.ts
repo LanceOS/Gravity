@@ -42,7 +42,11 @@ import { csrfProtect } from '../../lib/csrf.js';
 import { createRateLimiter } from '../../lib/rateLimit.js';
 import { createRedisRateLimiter } from '../../lib/rateLimitRedis.js';
 import { getRequestSourceIp } from '../../lib/request-ip.js';
-import { isWorkspaceMember } from './services/membership.js';
+import {
+  isWorkspaceMember,
+  invalidateWorkspaceMembershipCache,
+  invalidateWorkspaceMembershipCaches,
+} from './services/membership.js';
 import { getSidebarTree } from './services/sidebar.js';
 import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
 import { env } from '../../env.js';
@@ -336,6 +340,7 @@ export function createWorkspacesRouter() {
       });
 
       await invalidateUserWorkspacesCache(effectiveOwnerId);
+      await invalidateWorkspaceMembershipCache(workspaceId, effectiveOwnerId);
       const workspace = await getWorkspaceSummary(workspaceId, effectiveOwnerId);
       res.status(201).json({ workspace });
     } catch (error) {
@@ -1152,6 +1157,7 @@ export function createWorkspacesRouter() {
       if (autoJoin) {
         await ensureWorkspaceMembership(workspaceId, userId, 'member');
         await addUserToWorkspaceProjects(workspaceId, userId);
+        await invalidateWorkspaceMembershipCache(workspaceId, userId);
       }
 
       await invalidateWorkspaceCache(workspaceId);
@@ -1276,6 +1282,7 @@ export function createWorkspacesRouter() {
       if (request.requestingUserId) {
         await ensureWorkspaceMembership(workspaceId, request.requestingUserId, 'member');
         await addUserToWorkspaceProjects(workspaceId, request.requestingUserId);
+        await invalidateWorkspaceMembershipCache(workspaceId, request.requestingUserId);
       }
 
       await invalidateWorkspaceCache(workspaceId);
@@ -1307,11 +1314,10 @@ export function createWorkspacesRouter() {
 
     try {
       const membershipRows = await db
-        .select()
+        .select({ userId: workspaceMembers.userId, role: workspaceMembers.role })
         .from(workspaceMembers)
-        .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, actorUserId)))
-        .limit(1);
-      const membership = membershipRows[0];
+        .where(eq(workspaceMembers.workspaceId, workspaceId));
+      const membership = membershipRows.find((row) => row.userId === actorUserId);
       
       if (!membership || membership.role !== 'owner') {
         res.status(403).json({ error: 'Only a workspace owner can delete the workspace.' });
@@ -1362,6 +1368,11 @@ export function createWorkspacesRouter() {
         
         await tx.delete(workspaces).where(eq(workspaces.id, workspaceId));
       });
+      const workspaceUserIds = [...new Set(membershipRows.map((member) => member.userId))];
+      await Promise.all([
+        invalidateWorkspaceMembershipCaches(workspaceId, workspaceUserIds),
+        ...workspaceUserIds.map((memberUserId) => invalidateUserWorkspacesCache(memberUserId)),
+      ]);
 
       res.status(200).json({ success: true });
     } catch (error) {
