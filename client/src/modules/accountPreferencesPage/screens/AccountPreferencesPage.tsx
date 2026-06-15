@@ -13,6 +13,7 @@ import {
   useAccountPreferencesCategoryContext,
   useAccountPreferencesCloudContext,
   useAccountPreferencesNavigationContext,
+  useAccountPreferencesOnboardingContext,
   useAccountPreferencesOllamaContext,
   useAccountPreferencesRuntimeContext,
   useAccountPreferencesSettingsContext,
@@ -42,6 +43,7 @@ function AccountPreferencesPageContent() {
     onRemoveCredential,
     savedCredentials,
   } = useAccountPreferencesCloudContext();
+  const { tutorialResult, onResetTutorial } = useAccountPreferencesOnboardingContext();
   const { ollamaModels, ollamaModelsLoading, onRefreshOllamaModels } = useAccountPreferencesOllamaContext();
 
   const activeCategoryMeta =
@@ -151,7 +153,12 @@ function AccountPreferencesPageContent() {
             />
           )}
 
-          {(isMobile || activeCategory === 'onboarding') && <OnboardingSection />}
+          {(isMobile || activeCategory === 'onboarding') && (
+            <OnboardingSection
+              tutorialResult={tutorialResult}
+              onResetTutorial={onResetTutorial}
+            />
+          )}
 
           {isMobile && (
             <div className="account-preferences-page__mobile-save">

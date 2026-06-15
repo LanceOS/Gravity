@@ -2,9 +2,22 @@ import { Button, Stack, Card } from '@library';
 
 import { StatusNotice } from '../StatusNotice';
 import { useAccountPreferencesOnboardingContext } from '../../../../context/accountPreferencesPage/accountPreferencesPageContextHooks';
+import { type StatusMessage } from '../../types';
 
-export function OnboardingSection() {
-  const { tutorialResult, onResetTutorial } = useAccountPreferencesOnboardingContext();
+interface OnboardingSectionProps {
+  tutorialResult?: StatusMessage | null;
+  onResetTutorial?: () => void;
+}
+
+export function OnboardingSection({
+  tutorialResult: runtimeTutorialResult,
+  onResetTutorial: runtimeOnResetTutorial,
+}: OnboardingSectionProps = {}) {
+  const { tutorialResult: contextTutorialResult, onResetTutorial: contextOnResetTutorial } =
+    useAccountPreferencesOnboardingContext();
+
+  const tutorialResult = runtimeTutorialResult ?? contextTutorialResult;
+  const onResetTutorial = runtimeOnResetTutorial ?? contextOnResetTutorial;
 
   return (
     <Card className="account-preferences-page__section-card">
