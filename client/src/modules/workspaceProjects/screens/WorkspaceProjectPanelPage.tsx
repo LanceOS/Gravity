@@ -12,7 +12,12 @@ import { ProjectCreateOverlay } from '../components/ProjectCreateOverlay';
 import { ProjectSelectionRail } from '../components/ProjectSelectionRail';
 import { WorkspaceProjectCurrentProjectSection } from '../components/WorkspaceProjectCurrentProjectSection';
 import { WorkspaceProjectHeader } from '../components/WorkspaceProjectHeader';
-import { WorkspaceProjectLabelsSection } from '../components/WorkspaceProjectLabelsSection';
+import { WorkspaceProjectLabelCreateForm } from '../components/WorkspaceProjectLabelCreateForm';
+import { WorkspaceProjectLabelEditor } from '../components/WorkspaceProjectLabelEditor';
+import { WorkspaceProjectLabelList } from '../components/WorkspaceProjectLabelList';
+import { WorkspaceProjectLabelNoSelectionMessage } from '../components/WorkspaceProjectLabelNoSelectionMessage';
+import { WorkspaceProjectLabelSectionErrors } from '../components/WorkspaceProjectLabelSectionErrors';
+import { WorkspaceProjectLabelSectionHeader } from '../components/WorkspaceProjectLabelSectionHeader';
 import { WorkspaceProjectSettingsSection } from '../components/WorkspaceProjectSettingsSection';
 import type { Label } from '../../../context/TicketContext';
 
@@ -254,45 +259,46 @@ export function WorkspaceProjectPanelPage({
       />
 
       {managedProject ? (
-        <WorkspaceProjectLabelsSection
-          managedProjectName={managedProject.name}
-          labelFormError={labelFormError}
-          labelCreateError={labelCreateError}
-          sections={{
-            list: {
-              labels: sortedLabels,
-              activeLabelId: editingLabelId,
-              onSelectLabel: handleStartEditingLabel,
-              managedProjectName: managedProject.name,
-            },
-            editor: {
-              activeLabel,
-              editingLabelName,
-              editingLabelColor,
-              editingLabelDescription,
-              isLabelBusy,
-              editingLabelLoading,
-              editingLabelError,
-              onEditingLabelNameChange: setEditingLabelName,
-              onEditingLabelColorChange: setEditingLabelColor,
-              onEditingLabelDescriptionChange: setEditingLabelDescription,
-              onSaveLabel: handleUpdateLabel,
-              onDeleteLabel: handleDeleteLabel,
-              onCancelEdit: clearLabelEditor,
-            },
-            create: {
-              labelName,
-              labelColor,
-              labelDescription,
-              isLabelBusy,
-              labelCreateLoading,
-              onLabelNameChange: setLabelName,
-              onLabelColorChange: setLabelColor,
-              onLabelDescriptionChange: setLabelDescription,
-              onSubmit: handleCreateLabel,
-            },
-          }}
-        />
+        <section className="workspace-page__project-domains">
+          <WorkspaceProjectLabelSectionHeader managedProjectName={managedProject.name} />
+          <WorkspaceProjectLabelSectionErrors labelFormError={labelFormError} labelCreateError={labelCreateError} />
+          <WorkspaceProjectLabelList
+            labels={sortedLabels}
+            activeLabelId={editingLabelId}
+            onSelectLabel={handleStartEditingLabel}
+            managedProjectName={managedProject.name}
+          />
+          {activeLabel ? (
+            <WorkspaceProjectLabelEditor
+              activeLabel={activeLabel}
+              editingLabelName={editingLabelName}
+              editingLabelColor={editingLabelColor}
+              editingLabelDescription={editingLabelDescription}
+              isLabelBusy={isLabelBusy}
+              editingLabelLoading={editingLabelLoading}
+              editingLabelError={editingLabelError}
+              onEditingLabelNameChange={setEditingLabelName}
+              onEditingLabelColorChange={setEditingLabelColor}
+              onEditingLabelDescriptionChange={setEditingLabelDescription}
+              onSaveLabel={handleUpdateLabel}
+              onDeleteLabel={handleDeleteLabel}
+              onCancelEdit={clearLabelEditor}
+            />
+          ) : (
+            <WorkspaceProjectLabelNoSelectionMessage />
+          )}
+          <WorkspaceProjectLabelCreateForm
+            labelName={labelName}
+            labelColor={labelColor}
+            labelDescription={labelDescription}
+            isLabelBusy={isLabelBusy}
+            labelCreateLoading={labelCreateLoading}
+            onLabelNameChange={setLabelName}
+            onLabelColorChange={setLabelColor}
+            onLabelDescriptionChange={setLabelDescription}
+            onSubmit={handleCreateLabel}
+          />
+        </section>
       ) : null}
 
       {managedProject ? (
