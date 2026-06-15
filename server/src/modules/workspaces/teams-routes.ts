@@ -151,6 +151,7 @@ export function createTeamsRouter() {
       });
 
       const newTeam = await db.select().from(teams).where(eq(teams.id, teamId)).limit(1);
+      await invalidateWorkspaceCache(workspaceId);
       await invalidateTeamWorkspaceCache(teamId);
       res.status(201).json(newTeam[0]);
     } catch (error) {
@@ -221,6 +222,7 @@ export function createTeamsRouter() {
       if (typeof color === 'string') updates.color = color;
 
       await db.update(teams).set(updates).where(eq(teams.id, teamId));
+      await invalidateWorkspaceCache(auth.workspaceId);
       const updated = await db.select().from(teams).where(eq(teams.id, teamId)).limit(1);
       res.json(updated[0]);
     } catch (error) {
