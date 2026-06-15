@@ -5,28 +5,60 @@ import { useIsMobile } from '../../../../hooks/useIsMobile';
 import {
   getProviderOption,
   type AIProvider,
+  type WorkspaceSettings,
 } from '../../../../utils/settings';
 import { CLOUD_PROVIDER_OPTIONS, isStoredApiKey } from '../../utils/accountPreferences';
 import { StatusNotice } from '../StatusNotice';
+import type { StatusMessage } from '../../types';
 import {
   useAccountPreferencesCloudContext,
   useAccountPreferencesRuntimeContext,
   useAccountPreferencesSettingsContext,
 } from '../../../../context/accountPreferencesPage/accountPreferencesPageContextHooks';
 
-export function CloudProviderSection() {
-  const { settings, onChangeSettings } = useAccountPreferencesSettingsContext();
-  const {
-    hasProviderChanges,
-    testing,
-    testResult,
-    onTestApiKey,
-  } = useAccountPreferencesCloudContext();
-  const { saveLoading, onSaveSettings } = useAccountPreferencesRuntimeContext();
-  const isMobile = useIsMobile();
+interface CloudProviderSectionProps {
+  settings?: WorkspaceSettings;
+  onChangeSettings?: (updates: Partial<WorkspaceSettings>) => void;
+  saveLoading?: boolean;
+  hasProviderChanges?: boolean;
+  testing?: boolean;
+  testResult?: StatusMessage | null;
+  onSaveSettings?: () => void;
+  onTestApiKey?: () => void;
+  isMobile?: boolean;
+}
 
-  const providerOption = useMemo(() => getProviderOption(settings.aiProvider), [settings.aiProvider]);
-  const hasStoredApiKey = isStoredApiKey(settings.apiKey);
+export function CloudProviderSection({
+  settings: runtimeSettings,
+  onChangeSettings: runtimeOnChangeSettings,
+  saveLoading: runtimeSaveLoading,
+  hasProviderChanges: runtimeHasProviderChanges,
+  testing: runtimeTesting,
+  testResult: runtimeTestResult,
+  onSaveSettings: runtimeOnSaveSettings,
+  onTestApiKey: runtimeOnTestApiKey,
+  isMobile: runtimeIsMobile,
+}: CloudProviderSectionProps = {}) {
+  const { settings, onChangeSettings } = useAccountPreferencesSettingsContext();
+  const { hasProviderChanges, testing, testResult, onTestApiKey } = useAccountPreferencesCloudContext();
+  const { saveLoading, onSaveSettings } = useAccountPreferencesRuntimeContext();
+  const isMobileFromContext = useIsMobile();
+
+  const resolvedSettings = runtimeSettings ?? settings;
+  const resolvedOnChangeSettings = runtimeOnChangeSettings ?? onChangeSettings;
+  const resolvedSaveLoading = runtimeSaveLoading ?? saveLoading;
+  const resolvedHasProviderChanges = runtimeHasProviderChanges ?? hasProviderChanges;
+  const resolvedTesting = runtimeTesting ?? testing;
+  const resolvedTestResult = runtimeTestResult ?? testResult;
+  const resolvedOnSaveSettings = runtimeOnSaveSettings ?? onSaveSettings;
+  const resolvedOnTestApiKey = runtimeOnTestApiKey ?? onTestApiKey;
+  const isMobile = runtimeIsMobile ?? isMobileFromContext;
+
+  const providerOption = useMemo(
+    () => getProviderOption(resolvedSettings.aiProvider),
+    [resolvedSettings.aiProvider]
+  );
+  const hasStoredApiKey = isStoredApiKey(resolvedSettings.apiKey);
 
   return (
     <Card className="account-preferences-page__section-card">
@@ -41,8 +73,8 @@ export function CloudProviderSection() {
         <Grid columns={isMobile ? 1 : '1.5fr 3fr'} gap="var(--space-md)">
           <Select
             label="Provider"
-            value={settings.aiProvider}
-            onChange={(event) => onChangeSettings({ aiProvider: event.target.value as AIProvider })}
+            value={resolvedSettings.aiProvider}
+            onChange={(event) => resolvedOnChangeSettings({ aiProvider: event.target.value as AIProvider })}
             options={CLOUD_PROVIDER_OPTIONS}
           />
 
@@ -50,23 +82,23 @@ export function CloudProviderSection() {
             label={providerOption.keyLabel}
             type="password"
             autoComplete="new-password"
-            value={hasStoredApiKey ? '' : settings.apiKey}
+            value={hasStoredApiKey ? '' : resolvedSettings.apiKey}
             placeholder={hasStoredApiKey ? 'Stored in KMS. Enter a new key to replace.' : providerOption.keyPlaceholder}
-            onChange={(event) => onChangeSettings({ apiKey: event.target.value })}
+            onChange={(event) => resolvedOnChangeSettings({ apiKey: event.target.value })}
           />
         </Grid>
 
         <div className="account-preferences-page__action-row">
-          <Button variant="default" onClick={onTestApiKey} loading={testing}>
+          <Button variant="default" onClick={resolvedOnTestApiKey} loading={resolvedTesting}>
             Test {providerOption.label}
           </Button>
-          <Button variant="accent" onClick={onSaveSettings} loading={saveLoading} disabled={!hasProviderChanges}>
+          <Button variant="accent" onClick={resolvedOnSaveSettings} loading={resolvedSaveLoading} disabled={!resolvedHasProviderChanges}>
             Save Key
           </Button>
         </div>
 
-        {testResult && (
-          <StatusNotice message={testResult} tone={testResult.success ? 'success' : 'error'} />
+        {resolvedTestResult && (
+          <StatusNotice message={resolvedTestResult} tone={resolvedTestResult.success ? 'success' : 'error'} />
         )}
 
         <Alert type="warning">
