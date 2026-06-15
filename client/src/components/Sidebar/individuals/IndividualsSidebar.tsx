@@ -151,7 +151,7 @@ export function IndividualsSidebar(props: IndividualsSidebarProps) {
                           <SidebarItem
                             key={label.id}
                             nested
-                            active={section.filters.labels?.includes(label.id)}
+                            active={project.id === section.activeProjectId && section.filters.labels?.includes(label.id)}
                             onClick={() => handleSelectLabel(project.id, label.id)}
                             leftIcon={
                               <div
