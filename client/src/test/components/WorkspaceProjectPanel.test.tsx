@@ -68,9 +68,6 @@ vi.mock('../../components/WorkspaceProjectPanel', () => ({
       </button>
     </div>
   ),
-}));
-
-vi.mock('../../components/WorkspaceProjectPanel', () => ({
   ProjectSelectionRail: ({ selectedProjectId, onSelectProject }: ProjectSelectionRailProps) => (
     <div>
       <div>{`ProjectSelectionRail ${selectedProjectId ?? 'none'}`}</div>
@@ -328,6 +325,82 @@ describe('WorkspaceProjectPanel', () => {
 
     await waitFor(() => {
       expect(screen.queryByRole('button', { name: 'Delete Label' })).not.toBeInTheDocument();
+    });
+  });
+
+  it('scopes labels to the managed project and clears label selection when project changes', async () => {
+    const user = userEvent.setup();
+    const { props, rerender } = renderWorkspaceProjectPanel({
+      activeProjectId: 'project-1',
+      labels: [
+        {
+          id: 'domain-1',
+          projectId: 'project-1',
+          name: 'Shared',
+          color: '#10b981',
+          description: '',
+          sortOrder: 0,
+        },
+        {
+          id: 'domain-2',
+          projectId: 'project-2',
+          name: 'Shared',
+          color: '#ef4444',
+          description: '',
+          sortOrder: 0,
+        },
+      ],
+    });
+
+    const [project1SharedLabel] = screen.getAllByRole('button', { name: 'Shared' });
+    await user.click(project1SharedLabel);
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Shared' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Save Label' })).toBeInTheDocument();
+    });
+
+    rerender(
+      <WorkspaceProjectPanel
+        workspaceName="Gravity"
+        projects={projects}
+        activeProjectId="project-2"
+        defaultProjectId="project-1"
+        labels={[
+          {
+            id: 'domain-1',
+            projectId: 'project-1',
+            name: 'Shared',
+            color: '#10b981',
+            description: '',
+            sortOrder: 0,
+          },
+          {
+            id: 'domain-2',
+            projectId: 'project-2',
+            name: 'Shared',
+            color: '#ef4444',
+            description: '',
+            sortOrder: 0,
+          },
+        ]}
+        projectCreateLoading={false}
+        projectCreateError={null}
+        labelCreateLoading={false}
+        labelCreateError={null}
+        onSelectProject={props.onSelectProject}
+        onCreateProject={props.onCreateProject}
+        onUpdateProject={props.onUpdateProject}
+        onCreateLabel={props.onCreateLabel}
+        onUpdateLabel={props.onUpdateLabel}
+        onDeleteLabel={props.onDeleteLabel}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Orbit Delivery labels' })).toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: 'Shared' })).not.toBeInTheDocument();
+      expect(screen.getAllByRole('button', { name: 'Shared' })).toHaveLength(1);
     });
   });
 });

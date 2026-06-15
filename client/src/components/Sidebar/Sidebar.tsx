@@ -63,7 +63,7 @@ export function Sidebar({ projects, tools, userMenu }: SidebarProps) {
       >
         <SidebarContent>
           <SidebarProvider section={projects} viewModel={sidebarViewModel}>
-            <SidebarProjectsSection />
+            <SidebarProjectsSection section={projects} />
           </SidebarProvider>
         </SidebarContent>
       </ContextMenu.Root>

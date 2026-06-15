@@ -59,9 +59,12 @@ export function IndividualsSidebar(props: IndividualsSidebarProps) {
             const isProjectIssueRoute = isActiveProject && showProjectIssues;
             const isProjectMyIssueRoute = isActiveProject && showMyIssues;
             const isProjectNotesRoute = isActiveProject && showNotes;
-            const projectCounts = countsByProject[project.id];
-            const projectLabels = dedupeLabelsById(section.labelsByProject?.get(project.id) ?? []);
-            const projectLabelCounts = projectCounts?.labels ?? labelCounts;
+              const projectCounts = countsByProject[project.id];
+              const rawProjectLabels = section.labelsByProject?.get(project.id) ?? section.labels ?? [];
+              const projectLabels = dedupeLabelsById(
+                rawProjectLabels.filter((label) => !label.projectId || label.projectId === project.id),
+              );
+              const projectLabelCounts = projectCounts?.labels ?? labelCounts;
             const projectCycleCounts = projectCounts?.cycles ?? section.counts.cycles;
 
             return (

@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { WorkspaceTeamsPage } from '../../pages/WorkspaceTeamsPage/WorkspaceTeamsPage.tsx';
+import { WorkspaceTeamsPage } from '../../modules/workspaceTeamsPage/screens/WorkspaceTeamsPage.tsx';
 import type { SidebarTeam, SidebarTree } from '../../types/domain.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */

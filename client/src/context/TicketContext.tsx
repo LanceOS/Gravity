@@ -1073,6 +1073,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         existingProjectLabels.reduce((maxSortOrder, label) => Math.max(maxSortOrder, Number(label.sortOrder ?? 0)), -1) + 1;
 
       return apiClient.post<Label>(`/labels`, {
+        projectId,
         name: labelInput.name,
         color: labelInput.color || '#6B7280',
         description: labelInput.description || '',

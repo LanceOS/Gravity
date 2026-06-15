@@ -115,6 +115,7 @@ export function useAppShellRouteSync({
     );
     const isNotesPath = pathname.includes('/notes');
     const isTicketsPath = pathname.includes('/tickets');
+    const isManagementPath = isProjectsManagementPath || isTeamProjectsManagementPath;
 
     if (isSettingsPath) {
       setActiveSection('settings');
@@ -162,7 +163,7 @@ export function useAppShellRouteSync({
 
     if (projectIdParam) {
       setActiveProjectId(projectIdParam);
-    } else if (!shouldKeepActiveProjectSelection) {
+    } else if (!shouldKeepActiveProjectSelection && !isManagementPath) {
       setActiveProjectId('');
     }
 

@@ -172,8 +172,8 @@ export function WorkspaceShellPage() {
   const setProjectCreateError = (message: string | null) => {
     setProjectCreateErrorState({ workspaceId: activeWorkspaceId, message });
   };
-  const setLabelCreateError = (message: string | null) => {
-    setLabelCreateErrorState({ projectId: activeProjectId, message });
+  const setLabelCreateError = (message: string | null, projectId: string = activeProjectId) => {
+    setLabelCreateErrorState({ projectId, message });
   };
 
   const { data: sidebarTree } = useQuery<SidebarTree>({

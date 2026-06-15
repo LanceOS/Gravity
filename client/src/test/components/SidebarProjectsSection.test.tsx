@@ -50,7 +50,7 @@ describe('SidebarProjectsSection', () => {
 
     await user.click(screen.getByRole('button', { name: /Label One/i }));
 
-    expect(props.section.onSelectLabel).toHaveBeenCalledWith('d-1');
+    expect(props.section.onSelectLabel).toHaveBeenCalledWith('project-1', 'd-1');
   });
 
   it('renders teams as primary navigation with scoped tabs and collapsible projects', async () => {

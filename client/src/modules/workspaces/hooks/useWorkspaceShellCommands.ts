@@ -34,7 +34,7 @@ interface UseWorkspaceShellCommandsArgs {
     color: string;
     description?: string;
     sortOrder?: number;
-    projectId: string;
+    projectId?: string;
   }) => Promise<{ id: string } | null | undefined>;
   updateLabel: (labelId: string, updates: { name?: string; color?: string; description?: string; sortOrder?: number }) => Promise<unknown>;
   deleteLabel: (labelId: string) => Promise<boolean | null>;
@@ -42,7 +42,7 @@ interface UseWorkspaceShellCommandsArgs {
   setProjectCreateLoading: (loading: boolean) => void;
   setProjectCreateError: (message: string | null) => void;
   setLabelCreateLoading: (loading: boolean) => void;
-  setLabelCreateError: (message: string | null) => void;
+  setLabelCreateError: (message: string | null, projectId?: string) => void;
   navigate: (to: string, options?: { replace?: boolean }) => void;
   buildProjectScopedPath: (projectId: string, scope?: 'tickets' | 'notes', itemId?: string) => string;
 }
@@ -66,6 +66,7 @@ interface UseWorkspaceShellCommandsResult {
     color: string;
     description?: string;
     sortOrder?: number;
+    projectId?: string;
   }) => Promise<void>;
   handleUpdateLabel: (
     labelId: string,
@@ -82,7 +83,6 @@ interface UseWorkspaceShellCommandsResult {
 export function useWorkspaceShellCommands({
   activeWorkspaceId,
   currentUser,
-  tickets,
   ticketsById,
   activeTicket,
   activeProjectId,
@@ -171,18 +171,19 @@ export function useWorkspaceShellCommands({
   );
 
   const handleCreateLabel = useCallback(
-    async (labelInput: { name: string; color: string; description?: string; sortOrder?: number }) => {
-      if (!activeProjectId) {
+    async (labelInput: { name: string; color: string; description?: string; sortOrder?: number; projectId?: string }) => {
+      const projectId = labelInput.projectId || activeProjectId;
+      if (!projectId) {
         return;
       }
 
       setLabelCreateLoading(true);
-      setLabelCreateError(null);
+      setLabelCreateError(null, projectId);
 
       try {
         const label = await createLabel({
           ...labelInput,
-          projectId: activeProjectId,
+          projectId,
         });
 
         if (!label) {
@@ -190,7 +191,7 @@ export function useWorkspaceShellCommands({
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Failed to create label for this project.';
-        setLabelCreateError(message);
+        setLabelCreateError(message, projectId);
         throw error;
       } finally {
         setLabelCreateLoading(false);
