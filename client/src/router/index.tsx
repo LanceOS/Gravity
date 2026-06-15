@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate, useParams } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import { AccountPreferencesPageRoute } from '../pages/AccountPreferencesPage/AccountPreferencesPage';
 import { AppShellPage } from '../pages/AppShellPage/AppShellPage';
+import { WorkspaceSettingsPageRoute } from '../pages/WorkspaceSettingsPage/WorkspaceSettingsPage';
 import { ProtectedRoute } from './ProtectedRoute';
 import { LoadingPage } from '../pages/LoadingPage/LoadingPage';
 
@@ -51,7 +52,7 @@ export const router = createBrowserRouter([
     path: '/workspaces/:workspaceId/settings',
     element: (
       <ProtectedRoute>
-        <AppShellPage />
+        <WorkspaceSettingsPageRoute />
       </ProtectedRoute>
     ),
   },

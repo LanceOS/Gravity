@@ -7,7 +7,7 @@ import { AuthScreen } from '../../modules/auth';
 import type { TicketFilters, TicketListSort } from '../../modules/tickets';
 import { TicketDetailRoute, type WorkspaceIssueView } from '../../modules/tickets';
 import { OnboardingModal } from '../../modules/onboarding';
-import { useTheme, SettingsScreen as SettingsPage } from '../../modules/settings';
+import { useTheme } from '../../modules/settings';
 import type { Ticket } from '../../context/TicketContext';
 import { useTickets } from '../../context/TicketContext';
 import { apiClient } from '../../utils/apiClient';
@@ -19,7 +19,6 @@ import { WorkspaceTeamProjectsPage } from '../WorkspaceTeamProjectsPage/Workspac
 import { WorkspaceTeamsPage } from '../WorkspaceTeamsPage/WorkspaceTeamsPage';
 import { useAccountSettings } from '../../hooks/useAccountSettings';
 import { useWorkspaceDirectory } from '../../hooks/useWorkspaceDirectory';
-import { useWorkspaceSettings } from '../../hooks/useWorkspaceSettings';
 import { AppShellOverlays } from '../AppShellPage/components/AppShellOverlays';
 import { useAppShellRoute } from '../AppShellPage/hooks/useAppShellRoute';
 import { useAppShellRouteSync } from '../AppShellPage/hooks/useAppShellRouteSync';
@@ -34,6 +33,8 @@ import { useOllamaPanel } from '../AppShellPage/hooks/useOllamaPanel';
 import { useWorkspaceViewMode } from '../AppShellPage/hooks/useWorkspaceViewMode';
 import type { AppSection } from '../AppShellPage/AppShellPage.types';
 import { LoadingPage } from '../LoadingPage/LoadingPage';
+import { queryClient, queryKeys } from '../../utils/queryClient';
+import type { WorkspaceMember } from '../../hooks/useWorkspaceSettings';
 
 export function WorkspaceShellPage() {
   const {
@@ -215,34 +216,15 @@ export function WorkspaceShellPage() {
     }
   }, [accountSettings, setDensity, setDsTheme]);
 
-  const {
-    settings,
-    settingsLoading,
-    saveLoading: settingsSaveLoading,
-    saveSuccess: settingsSaveSuccess,
-    saveError: settingsSaveError,
-    members: workspaceMembers,
-    invites: workspaceInvites,
-    invitesLoading: workspaceInvitesLoading,
-    joinRequests: workspaceJoinRequests,
-    inviteLoading: workspaceInviteLoading,
-    inviteError: workspaceInviteError,
-    approveLoadingId,
-    revokeLoadingId,
-    updateSettings,
-    saveSettings,
-    createInvite,
-    revokeInvite,
-    approveJoinRequest,
-    deleteWorkspace,
-    deleteLoading,
-    deleteError,
-    clearDeleteError,
-    updateMemberActivity,
-  } = useWorkspaceSettings({
-    currentUser,
-    activeWorkspaceId,
-  });
+  const updateMemberActivity = useCallback((userId: string, lastActiveAt: string) => {
+    if (!activeWorkspaceId) {
+      return;
+    }
+
+    queryClient.setQueryData<WorkspaceMember[]>(queryKeys.workspaceMembers(activeWorkspaceId), (old) =>
+      old ? old.map((member) => (member.id === userId ? { ...member, lastActiveAt } : member)) : []
+    );
+  }, [activeWorkspaceId]);
 
   usePendingWorkspaceInvite({
     currentUser,
@@ -554,19 +536,6 @@ export function WorkspaceShellPage() {
     [filters, searchParams, setSearchParams]
   );
 
-  const handleCreateInvite = async (input: { label: string }) => Boolean(await createInvite(input));
-  const handleRevokeInvite = async (inviteId: string) => Boolean(await revokeInvite(inviteId));
-  const handleApproveJoinRequest = async (requestId: string) => Boolean(await approveJoinRequest(requestId));
-
-  const handleDeleteWorkspace = useCallback(async () => {
-    const success = await deleteWorkspace();
-    if (success) {
-      setActiveWorkspaceId('');
-      navigate('/workspaces');
-      await refreshWorkspaces();
-    }
-  }, [deleteWorkspace, navigate, refreshWorkspaces]);
-
   const handleOpenWorkspaceDirectory = () => {
     navigate('/workspaces');
   };
@@ -781,42 +750,6 @@ export function WorkspaceShellPage() {
       onSignOut: signOut,
     },
   };
-
-  if (activeSection === 'settings') {
-    return (
-      <>
-        <SettingsPage
-          currentUser={currentUser}
-          workspace={activeWorkspace!}
-          settings={settings}
-          settingsLoading={settingsLoading}
-          saveLoading={settingsSaveLoading}
-          saveSuccess={settingsSaveSuccess}
-          saveError={settingsSaveError}
-          inviteError={workspaceInviteError}
-          invitesLoading={workspaceInvitesLoading}
-          inviteLoading={workspaceInviteLoading}
-          invites={workspaceInvites}
-          members={workspaceMembers}
-          joinRequests={workspaceJoinRequests}
-          approveLoadingId={approveLoadingId || null}
-          revokeLoadingId={revokeLoadingId || null}
-          deleteLoading={deleteLoading}
-          deleteError={deleteError}
-          onBackToWorkspace={() => navigate(`/workspaces/${activeWorkspaceId}`)}
-          onOpenDirectory={() => navigate('/workspaces')}
-          onChangeSettings={updateSettings}
-          onSaveSettings={saveSettings}
-          onCreateInvite={handleCreateInvite}
-          onRevokeInvite={handleRevokeInvite}
-          onApproveJoinRequest={handleApproveJoinRequest}
-          onDeleteWorkspace={handleDeleteWorkspace}
-          onClearDeleteError={clearDeleteError}
-        />
-        {onboarding}
-      </>
-    );
-  }
 
   const createDefaultProjectId =
     activeProjectId || scopedProjects[0]?.id || activeWorkspaceProjects[0]?.id || '';
