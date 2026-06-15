@@ -30,7 +30,6 @@ import {
 } from '../hooks/useWorkspaceLifecycle';
 import { useOllamaPanel } from '../hooks/useOllamaPanel';
 import { useWorkspaceViewMode } from '../hooks/useWorkspaceViewMode';
-import { useWorkspaceDirectoryState } from '../hooks/useWorkspaceDirectoryState';
 import type { AppSection } from '../types/AppShell';
 import { LoadingPage } from '../../loadingPage';
 import { queryClient, queryKeys } from '../../../utils/queryClient';

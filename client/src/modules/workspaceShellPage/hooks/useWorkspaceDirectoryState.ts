@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useState } from 'react';
 
 import type { WorkspaceSummary } from '../../../hooks/useWorkspaceDirectory';
-import { useQueryCacheString } from '../../../hooks/useQueryCacheString';
+import { useWorkspaceSelectionState } from './useWorkspaceSelectionState';
 
 interface UseWorkspaceDirectoryStateArgs {
   currentUser: { id: string } | null;
@@ -24,56 +24,16 @@ export function useWorkspaceDirectoryState({
 }: UseWorkspaceDirectoryStateArgs): UseWorkspaceDirectoryStateResult {
   const [activeWorkspaceId, setActiveWorkspaceId] = useState('');
   const [workspaceReady, setWorkspaceReady] = useState(false);
-  const cachedWorkspaceIdKey = useMemo(
-    () => (currentUser ? (['workspaceShell', 'activeWorkspaceId', { userId: currentUser.id }] as const) : null),
-    [currentUser?.id]
-  );
-  const { readValue, writeValue } = useQueryCacheString({ key: cachedWorkspaceIdKey });
 
-  useEffect(() => {
-    if (!currentUser) {
-      setWorkspaceReady(false);
-      setActiveWorkspaceId('');
-      return;
-    }
-
-    if (!workspacesResolvedForCurrentUser || workspacesLoading) {
-      return;
-    }
-
-    if (workspaces.length === 0) {
-      setWorkspaceReady(true);
-      setActiveWorkspaceId('');
-      return;
-    }
-
-    const storedWorkspaceId = readValue();
-    const nextWorkspaceId =
-      storedWorkspaceId && workspaces.some((workspace) => workspace.id === storedWorkspaceId)
-        ? storedWorkspaceId
-        : workspaces[0].id;
-
-    if (nextWorkspaceId !== activeWorkspaceId) {
-      setActiveWorkspaceId(nextWorkspaceId);
-    }
-
-    setWorkspaceReady(true);
-  }, [
-    activeWorkspaceId,
+  useWorkspaceSelectionState({
     currentUser,
-    readValue,
     workspaces,
     workspacesLoading,
     workspacesResolvedForCurrentUser,
-  ]);
-
-  useEffect(() => {
-    if (!currentUser) {
-      return;
-    }
-
-    writeValue(activeWorkspaceId || null);
-  }, [activeWorkspaceId, currentUser, writeValue]);
+    activeWorkspaceId,
+    setActiveWorkspaceId,
+    setWorkspaceReady,
+  });
 
   return {
     activeWorkspaceId,

@@ -1,12 +1,12 @@
-import { useEffect, useMemo, type Dispatch, type SetStateAction } from 'react';
+import { useEffect, type Dispatch, type SetStateAction } from 'react';
 import type { User, Project } from '../../../types/domain';
 import type { WorkspaceSummary } from '../../../hooks/useWorkspaceDirectory';
 import type { AppSection } from '../types/AppShell';
-import { useQueryCacheString } from '../../../hooks/useQueryCacheString';
 import {
   workspaceDirectoryService as defaultWorkspaceDirectoryService,
   type WorkspaceDirectoryService,
 } from '../../../services/workspaceDirectoryService';
+import { useWorkspaceSelectionState } from './useWorkspaceSelectionState';
 
 interface UseActiveWorkspaceSelectionArgs {
   currentUser: User | null;
@@ -29,67 +29,21 @@ export function useActiveWorkspaceSelection({
   setWorkspaceReady,
   setActiveSection,
 }: UseActiveWorkspaceSelectionArgs) {
-  const cachedWorkspaceIdKey = useMemo(
-    () =>
-      currentUser ? (['workspaceShell', 'activeWorkspaceId', { userId: currentUser.id }] as const) : null,
-    [currentUser?.id]
-  );
-  const { readValue, writeValue } = useQueryCacheString({
-    key: cachedWorkspaceIdKey,
-  });
-
-  useEffect(() => {
-    if (!currentUser) {
-      setActiveSection('workspace');
-      setActiveWorkspaceId('');
-      setWorkspaceReady(false);
-      return;
-    }
-
-    if (!workspacesResolvedForCurrentUser || workspacesLoading) {
-      return;
-    }
-
-    if (workspaces.length === 0) {
-      setActiveWorkspaceId('');
-      setWorkspaceReady(true);
-      setActiveSection((current) => (current === 'account' ? current : 'directory'));
-      return;
-    }
-
-    if (!activeWorkspaceId || !workspaces.some((workspace) => workspace.id === activeWorkspaceId)) {
-      const storedWorkspaceId =
-        readValue();
-      const nextWorkspaceId =
-        storedWorkspaceId && workspaces.some((workspace) => workspace.id === storedWorkspaceId)
-          ? storedWorkspaceId
-          : workspaces[0].id;
-
-      if (nextWorkspaceId !== activeWorkspaceId) {
-        setActiveWorkspaceId(nextWorkspaceId);
-      }
-    }
-
-    setWorkspaceReady(true);
-  }, [
-    activeWorkspaceId,
+  useWorkspaceSelectionState({
     currentUser,
-    setActiveSection,
-    setActiveWorkspaceId,
-    setWorkspaceReady,
-    readValue,
     workspaces,
     workspacesLoading,
     workspacesResolvedForCurrentUser,
-  ]);
-
-  useEffect(() => {
-    if (!currentUser || typeof window === 'undefined') {
-      return;
-    }
-
-    writeValue(activeWorkspaceId || null);
-  }, [currentUser, activeWorkspaceId, writeValue]);
+    activeWorkspaceId,
+    setActiveWorkspaceId,
+    setWorkspaceReady,
+    onUserSignOut: () => {
+      setActiveSection('workspace');
+    },
+    onNoWorkspaces: () => {
+      setActiveSection((current) => (current === 'account' ? current : 'directory'));
+    },
+  });
 }
 
 interface UsePendingWorkspaceInviteArgs {
