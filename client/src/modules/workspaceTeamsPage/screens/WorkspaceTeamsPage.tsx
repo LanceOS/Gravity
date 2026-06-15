@@ -450,6 +450,15 @@ export function WorkspaceTeamsPage({
             </form>
           )}
         </WorkspaceManagementEditorSection>
+
+        <WorkspaceTeamsCreateTeamModal
+          isOpen={isCreateModalOpen}
+          savingAction={savingAction}
+          createDraft={createDraft}
+          onClose={() => setIsCreateModalOpen(false)}
+          onDraftChange={setCreateDraft}
+          onCreateTeam={() => void handleCreateTeamRef.current()}
+        />
       </div>
     </WorkspaceManagementLayout>
   );

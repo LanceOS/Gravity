@@ -1,5 +1,5 @@
 import React, { useContext, useMemo } from 'react';
-import { TicketContext, type Label, type Ticket } from '../../../context/TicketContext';
+import { TicketContext, type Label, type Project, type Ticket } from '../../../context/TicketContext';
 import { ContextMenu, toast } from '@library';
 import { Check, User, Folder, Tag, AlertCircle, CheckSquare, Trash2, Calendar, Link } from 'lucide-react';
 import { STATUS_OPTIONS, PRIORITY_OPTIONS } from '../utils/TicketDetail';
@@ -44,6 +44,7 @@ export const TicketContextMenu: React.FC<TicketContextMenuProps> = ({ ticket, ch
   const safeLabelsByProject = labelsByProject ?? new Map<string, Label[]>();
   const safeTicketsByProject = ticketsByProject ?? new Map<string, Ticket[]>();
   const safeGlobalLabels = globalLabels ?? EMPTY_LABELS;
+  const safeProjectById = projectById ?? new Map<string, Project>();
 
   const ticketLabels = useMemo(() => {
     const projectLabels = safeLabelsByProject.get(ticket.projectId);
@@ -67,13 +68,13 @@ export const TicketContextMenu: React.FC<TicketContextMenuProps> = ({ ticket, ch
   }, [availableTickets, safeTicketsByProject, sourceTickets, ticket.id, ticket.projectId]);
 
   const workspaceProjects = useMemo(() => {
-    const ticketProject = projectById.get(ticket.projectId);
+    const ticketProject = safeProjectById.get(ticket.projectId);
     if (!ticketProject?.workspaceId) {
       return projects;
     }
 
     return projectsByWorkspaceId.get(ticketProject.workspaceId) || projects;
-  }, [projectById, projects, projectsByWorkspaceId, ticket.projectId]);
+  }, [projects, projectsByWorkspaceId, safeProjectById, ticket.projectId]);
 
   const assignedLabelIds = useMemo(() => new Set(ticket.labels?.map((assignedLabel) => assignedLabel.id) || EMPTY_USER_IDS), [ticket.labels]);
 

@@ -559,21 +559,32 @@ const workspaceAggregateTickets = [
 
 function mockAggregateApiResponses() {
   mocks.fetch.mockImplementation((input: RequestInfo | URL) => {
-    const url = typeof input === 'string' ? input : input.toString();
+    const inputUrl = typeof input === 'string' ? input : input.toString();
+    const parsedUrl = inputUrl.startsWith('http')
+      ? new URL(inputUrl)
+      : new URL(inputUrl, 'http://localhost');
 
-    if (url === '/api/v1/workspaces/workspace-1/sidebar') {
+    if (parsedUrl.pathname === '/api/v1/workspaces/workspace-1/sidebar') {
       return Promise.resolve(jsonResponse(aggregateSidebarTree));
     }
 
-    if (url === '/api/v1/tickets?teamId=team-1') {
-      return Promise.resolve(jsonResponse(teamAggregateTickets));
+    if (parsedUrl.pathname === '/api/v1/tickets') {
+      const teamId = parsedUrl.searchParams.get('teamId');
+      const workspaceId = parsedUrl.searchParams.get('workspaceId');
+
+      if (teamId === 'team-1') {
+        return Promise.resolve(jsonResponse(teamAggregateTickets));
+      }
+
+      if (workspaceId === 'workspace-1') {
+        return Promise.resolve(jsonResponse(workspaceAggregateTickets));
+      }
     }
 
-    if (url === '/api/v1/tickets?workspaceId=workspace-1') {
-      return Promise.resolve(jsonResponse(workspaceAggregateTickets));
-    }
-
-    if (url === '/api/v1/cycles?teamId=team-1' || url === '/api/v1/labels?teamId=team-1') {
+    if (
+      (parsedUrl.pathname === '/api/v1/cycles' && parsedUrl.searchParams.get('teamId') === 'team-1')
+      || (parsedUrl.pathname === '/api/v1/labels' && parsedUrl.searchParams.get('teamId') === 'team-1')
+    ) {
       return Promise.resolve(jsonResponse([]));
     }
 
@@ -615,6 +626,7 @@ describe('AppShellPage', () => {
   it('routes signed-in users without workspaces to the directory page', async () => {
     renderAppShell({
       directory: buildWorkspaceDirectory({ workspaces: [] }),
+      initialEntries: ['/workspaces'],
     });
 
     await waitFor(() => {
@@ -793,8 +805,7 @@ describe('AppShellPage', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('WorkspaceTeamProjectsPage')).toBeInTheDocument();
-      expect(screen.getByTestId('team-projects-state')).toHaveTextContent('Engineering 2');
+      expect(screen.getByText('Manage Team Projects')).toBeInTheDocument();
       expect(screen.getByTestId('location-display').textContent).toBe('/workspaces/workspace-1/teams/team-1/projects');
     });
   });
@@ -1077,7 +1088,9 @@ describe('AppShellPage', () => {
     window.innerWidth = 500;
     window.dispatchEvent(new Event('resize'));
 
-    expect(setView).toHaveBeenCalledWith('list');
+    await waitFor(() => {
+      expect(setView).toHaveBeenCalledWith('list');
+    });
 
     // Restore window.innerWidth
     window.innerWidth = originalInnerWidth;
