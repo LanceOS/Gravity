@@ -15,7 +15,7 @@ import {
 } from '../contexts/accountPreferencesPageContexts';
 import { AccountPreferencesPageProviders } from './AccountPreferencesPageProviders';
 import { SettingsPageLayout } from '../../../layouts/SettingsPageLayout/SettingsPageLayout';
-import './styles/accountPreferencesPage.css';
+import '../styles/accountPreferencesPage.css';
 
 function AccountPreferencesPageContent() {
   const isMobile = useIsMobile();
