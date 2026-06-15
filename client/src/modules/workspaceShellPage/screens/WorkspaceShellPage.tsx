@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
 import type { SidebarNavigationState, SidebarProps } from '../../../components/Sidebar';
 import { WorkspaceLayout } from '../../../layouts/WorkspaceLayout/WorkspaceLayout';
@@ -56,6 +56,8 @@ interface WorkspaceMember {
   createdAt: string;
   lastActiveAt?: string | null;
 }
+
+const AGGREGATE_TICKETS_PAGE_SIZE = 120;
 
 export function WorkspaceShellPage() {
   const {
@@ -133,6 +135,8 @@ export function WorkspaceShellPage() {
     isTeamAggregatePath,
     shouldUseAggregateTicketScope,
   } = route;
+  const shouldUseAggregateTicketPagination = isWorkspaceAllTasksPath || isTeamAggregatePath;
+  const isAggregateDetailRoute = shouldUseAggregateTicketPagination && !!route.ticketKey;
   const {
     workspaces,
     loading: workspacesLoading,
@@ -173,21 +177,145 @@ export function WorkspaceShellPage() {
     gcTime: CACHE_CONFIGS.workspaceSidebar.gcTime,
   });
 
-  const { data: workspaceTickets = [] } = useQuery<Ticket[]>({
-    queryKey: ['workspaceTickets', activeWorkspaceId],
-    queryFn: () => apiClient.get<Ticket[]>('/tickets', { params: { workspaceId: activeWorkspaceId } }),
-    enabled: isWorkspaceAllTasksPath && !!activeWorkspaceId && !!currentUser,
+  const aggregateScopeLabels = useMemo(() => {
+    if (filters.labels.length > 0) {
+      return [...filters.labels];
+    }
+
+    const labelId = filters.labelId || filters.domainId;
+    return labelId ? [labelId] : [];
+  }, [filters.domainId, filters.labelId, filters.labels]);
+
+  const aggregateQueryParams = useMemo(
+    () => ({
+      status: filters.status || undefined,
+      priority: filters.priority || undefined,
+      assigneeId: filters.assigneeId || undefined,
+      cycleId: filters.cycleId || undefined,
+      labels: aggregateScopeLabels.length > 0 ? aggregateScopeLabels.join(',') : undefined,
+      labelMode: aggregateScopeLabels.length > 0 ? filters.labelMode : undefined,
+    }),
+    [aggregateScopeLabels, filters.assigneeId, filters.cycleId, filters.labelMode, filters.priority, filters.status]
+  );
+
+  const {
+    data: workspaceAggregatePages,
+    fetchNextPage: fetchWorkspaceAggregateNextPage,
+    hasNextPage: workspaceAggregateHasNextPage,
+    isFetchingNextPage: workspaceAggregateIsFetchingNextPage,
+  } = useInfiniteQuery<Ticket[]>({
+    queryKey: ['workspaceTickets', activeWorkspaceId, aggregateQueryParams, 'paged'],
+    queryFn: ({ pageParam = 0 }) =>
+      apiClient.get<Ticket[]>('/tickets', {
+        params: {
+          workspaceId: activeWorkspaceId,
+          ...aggregateQueryParams,
+          limit: `${AGGREGATE_TICKETS_PAGE_SIZE}`,
+          offset: `${pageParam}`,
+        },
+      }),
+    getNextPageParam: (lastPage, allPages) =>
+      lastPage.length < AGGREGATE_TICKETS_PAGE_SIZE
+        ? undefined
+        : allPages.length * AGGREGATE_TICKETS_PAGE_SIZE,
+    initialPageParam: 0,
+    enabled: isWorkspaceAllTasksPath && !isAggregateDetailRoute && !!activeWorkspaceId && !!currentUser,
     staleTime: CACHE_CONFIGS.ticketsList.staleTime,
     gcTime: CACHE_CONFIGS.ticketsList.gcTime,
   });
 
-  const { data: teamTickets = [] } = useQuery<Ticket[]>({
-    queryKey: ['teamTickets', route.teamIdParam],
-    queryFn: () => apiClient.get<Ticket[]>('/tickets', { params: { teamId: route.teamIdParam } }),
-    enabled: isTeamAggregatePath && !!currentUser,
+  const {
+    data: teamAggregatePages,
+    fetchNextPage: fetchTeamAggregateNextPage,
+    hasNextPage: teamAggregateHasNextPage,
+    isFetchingNextPage: teamAggregateIsFetchingNextPage,
+  } = useInfiniteQuery<Ticket[]>({
+    queryKey: ['teamTickets', route.teamIdParam, aggregateQueryParams, 'paged'],
+    queryFn: ({ pageParam = 0 }) =>
+      apiClient.get<Ticket[]>('/tickets', {
+        params: {
+          teamId: route.teamIdParam,
+          ...aggregateQueryParams,
+          limit: `${AGGREGATE_TICKETS_PAGE_SIZE}`,
+          offset: `${pageParam}`,
+        },
+      }),
+    getNextPageParam: (lastPage, allPages) =>
+      lastPage.length < AGGREGATE_TICKETS_PAGE_SIZE
+        ? undefined
+        : allPages.length * AGGREGATE_TICKETS_PAGE_SIZE,
+    initialPageParam: 0,
+    enabled: isTeamAggregatePath && !isAggregateDetailRoute && !!route.teamIdParam && !!currentUser,
     staleTime: CACHE_CONFIGS.ticketsList.staleTime,
     gcTime: CACHE_CONFIGS.ticketsList.gcTime,
   });
+
+  const { data: routeAggregateTicket } = useQuery<Ticket | null>({
+    queryKey: ['ticketByKey', route.ticketKey],
+    queryFn: () => apiClient.get<Ticket | null>(`/tickets/key/${route.ticketKey}`),
+    enabled: isAggregateDetailRoute && !!route.ticketKey && !!currentUser,
+    staleTime: CACHE_CONFIGS.ticketDetail.staleTime,
+    gcTime: CACHE_CONFIGS.ticketDetail.gcTime,
+  });
+
+  const { data: routeAggregateProjectTickets = [] } = useQuery<Ticket[]>({
+    queryKey: queryKeys.tickets(routeAggregateTicket?.projectId || ''),
+    queryFn: () => apiClient.get<Ticket[]>('/tickets', {
+      projectId: routeAggregateTicket?.projectId,
+    }),
+    enabled: isAggregateDetailRoute && !!routeAggregateTicket?.projectId && !!currentUser,
+    staleTime: CACHE_CONFIGS.ticketsList.staleTime,
+    gcTime: CACHE_CONFIGS.ticketsList.gcTime,
+  });
+
+  const routeAggregateDetailTickets = useMemo(
+    () => (routeAggregateTicket && routeAggregateProjectTickets.length === 0
+      ? [routeAggregateTicket]
+      : routeAggregateProjectTickets),
+    [routeAggregateTicket, routeAggregateProjectTickets]
+  );
+
+  const workspaceAggregateTickets = useMemo(
+    () => workspaceAggregatePages?.pages.flat() || [],
+    [workspaceAggregatePages?.pages]
+  );
+  const teamAggregateTickets = useMemo(
+    () => teamAggregatePages?.pages.flat() || [],
+    [teamAggregatePages?.pages]
+  );
+
+  const aggregateWorkspaceHasMoreRows = isWorkspaceAllTasksPath && !isAggregateDetailRoute
+    ? workspaceAggregateHasNextPage
+    : false;
+  const aggregateTeamHasMoreRows = isTeamAggregatePath && !isAggregateDetailRoute
+    ? teamAggregateHasNextPage
+    : false;
+  const aggregateIsLoadingMoreRows = isWorkspaceAllTasksPath && !isAggregateDetailRoute
+    ? workspaceAggregateIsFetchingNextPage
+    : isTeamAggregatePath && !isAggregateDetailRoute
+      ? teamAggregateIsFetchingNextPage
+      : false;
+
+  const aggregateLoadMoreRows = useCallback(() => {
+    if (isWorkspaceAllTasksPath && !isAggregateDetailRoute && workspaceAggregateHasNextPage) {
+      void fetchWorkspaceAggregateNextPage();
+      return;
+    }
+
+    if (isTeamAggregatePath && !isAggregateDetailRoute && teamAggregateHasNextPage) {
+      void fetchTeamAggregateNextPage();
+    }
+  }, [
+    fetchTeamAggregateNextPage,
+    fetchWorkspaceAggregateNextPage,
+    isAggregateDetailRoute,
+    isTeamAggregatePath,
+    isWorkspaceAllTasksPath,
+    teamAggregateHasNextPage,
+    workspaceAggregateHasNextPage,
+  ]);
+
+  const aggregateHasMoreRows = isWorkspaceAllTasksPath ? aggregateWorkspaceHasMoreRows : aggregateTeamHasMoreRows;
 
   const { data: teamCycles = [] } = useQuery<Cycle[]>({
     queryKey: ['teamCycles', route.teamIdParam],
@@ -206,8 +334,25 @@ export function WorkspaceShellPage() {
   });
 
   const routeScopedTickets = useMemo(
-    () => (isWorkspaceAllTasksPath ? workspaceTickets : isTeamAggregatePath ? teamTickets : tickets),
-    [isTeamAggregatePath, isWorkspaceAllTasksPath, teamTickets, tickets, workspaceTickets]
+    () =>
+      isWorkspaceAllTasksPath
+        ? isAggregateDetailRoute
+          ? routeAggregateDetailTickets
+          : workspaceAggregateTickets
+        : isTeamAggregatePath
+          ? isAggregateDetailRoute
+            ? routeAggregateDetailTickets
+            : teamAggregateTickets
+          : tickets,
+    [
+      isAggregateDetailRoute,
+      isTeamAggregatePath,
+      isWorkspaceAllTasksPath,
+      teamAggregateTickets,
+      tickets,
+      workspaceAggregateTickets,
+      routeAggregateDetailTickets,
+    ]
   );
   const activeProject = useMemo(
     () => projects.find((project) => project.id === (projectIdParam || activeProjectId)),
@@ -403,16 +548,62 @@ export function WorkspaceShellPage() {
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, [activeWorkspaceProjects.length, handleOpenCreateTicket]);
 
-  const isTeamProjectsManager = activeSection === 'team-projects';
-  const isTeamWorkspace = (sidebarTree?.hierarchyMode ?? activeWorkspace?.hierarchyMode ?? 'workspace') === 'teams';
-  const isTeamsManager = activeSection === 'teams' || (isTeamWorkspace && activeSection === 'projects');
-  const isWorkspaceOwner = activeWorkspace?.memberRole === 'owner';
+  const {
+    isTeamProjectsManager,
+    isTeamWorkspace,
+    isTeamsManager,
+    isWorkspaceOwner,
+    sidebarActiveTeamId,
+    sidebarNavigationState,
+  } = useMemo(() => {
+    const activeProjectTeamId =
+      activeProject?.teamId ||
+      sidebarTree?.teams?.find((team) => team.projects?.some((project) => project.id === (projectIdParam || activeProjectId)))?.id ||
+      '';
 
-  const activeProjectTeamId =
-    activeProject?.teamId ||
-    sidebarTree?.teams?.find((team) => team.projects?.some((project) => project.id === (projectIdParam || activeProjectId)))?.id ||
-    '';
-  const sidebarActiveTeamId = route.teamIdParam || activeProjectTeamId;
+    const resolvedSidebarActiveTeamId = route.teamIdParam || activeProjectTeamId;
+    const resolvedIsTeamWorkspace = (sidebarTree?.hierarchyMode ?? activeWorkspace?.hierarchyMode ?? 'workspace') === 'teams';
+    const resolvedIsWorkspaceOwner = activeWorkspace?.memberRole === 'owner';
+
+    return {
+      isTeamProjectsManager: activeSection === 'team-projects',
+      isTeamWorkspace: resolvedIsTeamWorkspace,
+      isTeamsManager: activeSection === 'teams' || (resolvedIsTeamWorkspace && activeSection === 'projects'),
+      isWorkspaceOwner: resolvedIsWorkspaceOwner,
+      sidebarActiveTeamId: resolvedSidebarActiveTeamId,
+      sidebarNavigationState: {
+        activeTeam: resolvedSidebarActiveTeamId,
+        activeScope:
+          route.teamIdParam
+            ? route.projectIdParam
+              ? 'projects'
+              : route.cycleIdParam
+                ? 'cycles'
+                : route.activeLabelIdParam
+                  ? 'labels'
+                  : 'views'
+            : route.projectIdParam
+              ? 'projects'
+              : 'workspace',
+        activeProject:
+          activeSection === 'projects' || activeSection === 'team-projects' || activeSection === 'workspace'
+            ? (projectIdParam || activeProjectId)
+            : '',
+      } as SidebarNavigationState,
+    };
+  }, [
+    activeSection,
+    activeProject,
+    activeProjectId,
+    activeWorkspace?.hierarchyMode,
+    activeWorkspace?.memberRole,
+    projectIdParam,
+    route.activeLabelIdParam,
+    route.cycleIdParam,
+    route.projectIdParam,
+    route.teamIdParam,
+    sidebarTree,
+  ]);
 
   const handleOpenCurrentTeamProjectsManager = useCallback(() => {
     if (sidebarActiveTeamId) {
@@ -422,26 +613,6 @@ export function WorkspaceShellPage() {
 
     handleOpenTeamManager();
   }, [sidebarActiveTeamId, handleOpenTeamManager, handleOpenTeamProjectsManager]);
-
-  const sidebarNavigationState: SidebarNavigationState = useMemo(() => ({
-    activeTeam: sidebarActiveTeamId,
-    activeScope:
-      route.teamIdParam
-        ? route.projectIdParam
-          ? 'projects'
-          : route.cycleIdParam
-            ? 'cycles'
-            : route.activeLabelIdParam
-              ? 'labels'
-              : 'views'
-        : route.projectIdParam
-          ? 'projects'
-          : 'workspace',
-    activeProject:
-      activeSection === 'projects' || activeSection === 'team-projects' || activeSection === 'workspace'
-        ? (projectIdParam || activeProjectId)
-        : '',
-  }), [activeSection, activeProjectId, projectIdParam, route.activeLabelIdParam, route.cycleIdParam, route.projectIdParam, route.teamIdParam, sidebarActiveTeamId]);
 
   if (loading || workspacesLoading || !workspacesResolvedForCurrentUser) {
     return <LoadingPage />;
@@ -466,10 +637,21 @@ export function WorkspaceShellPage() {
   const scopedProjects = teamIdParam
     ? activeWorkspaceProjects.filter((project) => project.teamId === teamIdParam || teamIdParam === project.teamId)
     : activeWorkspaceProjects;
-  const scopedTickets = isWorkspaceAllTasksPath ? workspaceTickets : isTeamAggregatePath ? teamTickets : tickets;
+  const scopedTickets = isWorkspaceAllTasksPath
+    ? isAggregateDetailRoute
+      ? routeAggregateDetailTickets
+      : workspaceAggregateTickets
+      : isTeamAggregatePath
+        ? isAggregateDetailRoute
+          ? routeAggregateDetailTickets
+          : teamAggregateTickets
+        : tickets;
   const scopedCycles = isTeamAggregatePath ? teamCycles : cycles;
   const scopedLabels = isTeamAggregatePath ? teamLabels : labels;
-  const scopedFilters = shouldUseAggregateTicketScope ? { ...filters, projectId: '' } : filters;
+  const scopedFilters = useMemo(
+    () => (shouldUseAggregateTicketScope ? { ...filters, projectId: '' } : filters),
+    [filters, shouldUseAggregateTicketScope]
+  );
 
   const sidebarActiveViewId =
     route.teamIdParam && sidebarNavigationState.activeScope === 'views'
@@ -708,6 +890,9 @@ export function WorkspaceShellPage() {
             onSetView={setView}
             onUpdateTicket={updateTicket}
             onOpenTeamProjectManager={handleOpenCurrentTeamProjectsManager}
+            onLoadMoreTickets={shouldUseAggregateTicketPagination ? aggregateLoadMoreRows : undefined}
+            hasMoreTickets={shouldUseAggregateTicketPagination ? aggregateHasMoreRows : false}
+            isLoadingMoreTickets={shouldUseAggregateTicketPagination ? aggregateIsLoadingMoreRows : false}
           />
         )}
       </WorkspaceLayout>

@@ -15,6 +15,20 @@ type SyncedFilterParams = {
   search: string;
 };
 
+function areStringArraysEqual(a: string[], b: string[]) {
+  if (a.length !== b.length) {
+    return false;
+  }
+
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i] !== b[i]) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 interface UseAppShellRouteSyncArgs {
   route: AppShellRouteState;
   activeTicket: Ticket | null;
@@ -180,7 +194,7 @@ export function useAppShellRouteSync({
     const urlLabels = urlLabelId ? [urlLabelId] : searchLabels;
 
     const last = lastSyncedFilterParams.current;
-    const labelsChanged = JSON.stringify(last.labels) !== JSON.stringify(urlLabels);
+    const labelsChanged = !areStringArraysEqual(last.labels, urlLabels);
     if (
       labelsChanged ||
       last.labelMode !== urlLabelMode ||

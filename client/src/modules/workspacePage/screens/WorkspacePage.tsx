@@ -6,6 +6,7 @@ import {
   getWorkspaceHeaderTitle,
   groupTicketsByStatus,
   hasActiveTicketFilters,
+  type TicketsByStatus,
   sortTicketsForList,
   TicketBoard,
   TicketFilterBar,
@@ -54,6 +55,9 @@ interface WorkspacePageProps {
   onSetListSort: (sort: TicketListSort) => void;
   onSetView: (view: 'board' | 'list') => void;
   onUpdateTicket: (id: string, updates: Partial<Ticket>) => Promise<void>;
+  onLoadMoreTickets?: () => void;
+  hasMoreTickets?: boolean;
+  isLoadingMoreTickets?: boolean;
 }
 
 const STATUS_LABELS: Record<Ticket['status'], string> = {
@@ -63,6 +67,15 @@ const STATUS_LABELS: Record<Ticket['status'], string> = {
   in_review: 'In Review',
   done: 'Done',
   canceled: 'Canceled',
+};
+
+const EMPTY_TICKETS_BY_STATUS: TicketsByStatus = {
+  backlog: [],
+  todo: [],
+  in_progress: [],
+  in_review: [],
+  done: [],
+  canceled: [],
 };
 
 const PRIORITY_LABELS: Record<Ticket['priority'], string> = {
@@ -117,6 +130,9 @@ export function WorkspacePage({
   onSelectTicket,
   onSelectNote,
   onSetFilters,
+  onLoadMoreTickets,
+  hasMoreTickets,
+  isLoadingMoreTickets,
   onSetListSort,
   onSetView,
   onUpdateTicket,
@@ -135,6 +151,8 @@ export function WorkspacePage({
     [users]
   );
   const isTeamScopedRoute = !!pathname && pathname.includes('/teams/');
+  const isTimelineView = activeView === 'timeline';
+  const isListView = activeView === 'list';
   const labelById = useMemo(
     () => Object.fromEntries(labels.map((label) => [label.id, label])),
     [labels]
@@ -145,48 +163,53 @@ export function WorkspacePage({
   );
   // Show project badge on rows when viewing multiple projects at once (no single-project filter)
   const showProjectBadges = !filters.projectId && projects.length > 1;
-  const groupedTickets = useMemo(() => groupTicketsByStatus(filteredTickets), [filteredTickets]);
+  const groupedTickets = useMemo(
+    () => (isTimelineView ? EMPTY_TICKETS_BY_STATUS : groupTicketsByStatus(filteredTickets)),
+    [filteredTickets, isTimelineView]
+  );
   const listSortedTickets = useMemo(
-    () => (activeView === 'list' ? sortTicketsForList(filteredTickets, labelById, listSort) : filteredTickets),
-    [activeView, filteredTickets, labelById, listSort]
+    () => (isListView ? sortTicketsForList(filteredTickets, labelById, listSort) : filteredTickets),
+    [filteredTickets, isListView, labelById, listSort]
   );
   const listGroupedTickets = useMemo(
-    () => (activeView === 'list' ? groupTicketsByStatus(listSortedTickets) : groupedTickets),
-    [activeView, listSortedTickets, groupedTickets]
-  );
-  const timelineTickets = useMemo(
-    () =>
-      [...filteredTickets].sort((first, second) =>
-        (second.updatedAt || second.createdAt).localeCompare(first.updatedAt || first.createdAt)
-      ),
-    [filteredTickets]
+    () => (isListView ? groupTicketsByStatus(listSortedTickets) : groupedTickets),
+    [isListView, listSortedTickets, groupedTickets]
   );
   const timelineEvents = useMemo(
-    () =>
-      timelineTickets.map((ticket) => {
-        const projectName = getTicketProjectName(ticket, projectById);
-        const meta = [
-          projectName,
-          STATUS_LABELS[ticket.status],
-          PRIORITY_LABELS[ticket.priority],
-        ].filter(Boolean);
+    () => {
+      if (!isTimelineView) {
+        return [];
+      }
 
-        return {
-          time: formatTimelineDate(ticket.updatedAt || ticket.createdAt),
-          title: (
-            <button
-              type="button"
-              className="workspace-page__timeline-ticket"
-              onClick={() => onSelectTicket(ticket)}
-            >
-              <span className="workspace-page__timeline-key">{ticket.key}</span>
-              <span>{ticket.title}</span>
-            </button>
-          ),
-          description: meta.join(' - '),
-        };
-      }),
-    [onSelectTicket, projectById, timelineTickets]
+      return [...filteredTickets]
+        .sort((first, second) =>
+          (second.updatedAt || second.createdAt).localeCompare(first.updatedAt || first.createdAt)
+        )
+        .map((ticket) => {
+          const projectName = getTicketProjectName(ticket, projectById);
+          const meta = [
+            projectName,
+            STATUS_LABELS[ticket.status],
+            PRIORITY_LABELS[ticket.priority],
+          ].filter(Boolean);
+
+          return {
+            time: formatTimelineDate(ticket.updatedAt || ticket.createdAt),
+            title: (
+              <button
+                type="button"
+                className="workspace-page__timeline-ticket"
+                onClick={() => onSelectTicket(ticket)}
+              >
+                <span className="workspace-page__timeline-key">{ticket.key}</span>
+                <span>{ticket.title}</span>
+              </button>
+            ),
+            description: meta.join(' - '),
+          };
+        });
+    },
+    [filteredTickets, isTimelineView, onSelectTicket, projectById]
   );
   const handleClearFilters = useCallback(() => {
     onSetFilters({
@@ -398,11 +421,13 @@ export function WorkspacePage({
                             <TicketBoard
                               ticketsByColumn={groupedTickets}
                               availableTickets={filteredTickets}
-                              labelById={labelById}
                               userAvatarById={userAvatarById}
                               onMoveTicket={onUpdateTicket}
                               onSelectTicket={onSelectTicket}
                               onOpenCreateTicket={onOpenCreateTicket}
+                              onLoadMore={onLoadMoreTickets}
+                              hasMoreRows={hasMoreTickets}
+                              isLoadingMoreRows={isLoadingMoreTickets}
                             />
                           </WorkspaceViewContainer>
                         ) : (
@@ -411,10 +436,12 @@ export function WorkspacePage({
                               filteredCount={filteredTickets.length}
                               groupedTickets={listGroupedTickets}
                               availableTickets={filteredTickets}
-                              labelById={labelById}
                               userAvatarById={userAvatarById}
                               projectById={showProjectBadges ? projectById : undefined}
                               onSelectTicket={onSelectTicket}
+                              onLoadMore={onLoadMoreTickets}
+                              hasMoreRows={hasMoreTickets}
+                              isLoadingMoreRows={isLoadingMoreTickets}
                             />
                           </WorkspaceViewContainer>
                         )}

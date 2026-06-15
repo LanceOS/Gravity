@@ -1,16 +1,17 @@
 import type { DragEvent, ReactNode } from 'react';
-import type { Label, Ticket } from '../../../context/TicketContext';
+import type { Ticket } from '../../../context/TicketContext';
 import type { TicketsByStatus } from '../utils/ticketView';
 
 export interface TicketBoardProps {
   ticketsByColumn: TicketsByStatus;
   availableTickets?: Ticket[];
-  labelById?: Record<string, Label>;
-  domainById?: Record<string, Label>;
   userAvatarById: Record<string, string>;
   onMoveTicket: (ticketId: string, updates: Partial<Ticket>) => Promise<void>;
   onSelectTicket: (ticket: Ticket) => void;
   onOpenCreateTicket: (initialStatus?: Ticket['status']) => void;
+  onLoadMore?: () => void;
+  hasMoreRows?: boolean;
+  isLoadingMoreRows?: boolean;
 }
 
 export interface TicketCardProps {

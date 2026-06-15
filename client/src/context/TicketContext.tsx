@@ -129,6 +129,25 @@ function canonicalizeStatus(status: string | undefined | null): Ticket['status']
   return 'todo';
 }
 
+function hasEquivalentTicketFields(left: Ticket, right: Ticket) {
+  return (
+    left.id === right.id &&
+    left.key === right.key &&
+    left.title === right.title &&
+    left.description === right.description &&
+    left.status === right.status &&
+    left.priority === right.priority &&
+    left.projectId === right.projectId &&
+    left.assigneeId === right.assigneeId &&
+    left.cycleId === right.cycleId &&
+    left.parentId === right.parentId &&
+    left.prStatus === right.prStatus &&
+    left.prUrl === right.prUrl &&
+    left.branchName === right.branchName &&
+    left.updatedAt === right.updatedAt
+  );
+}
+
 
 const TICKET_UPDATE_DEBOUNCE_MS = 250;
 
@@ -236,6 +255,35 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     enabled: !!currentUser?.id,
   });
   const projects = projectsQuery.data || [];
+  const projectLookup = useMemo(() => {
+    const lookup = new Map<string, { workspaceId: string; teamId: string | null }>();
+    projects.forEach((project) => {
+      lookup.set(project.id, {
+        workspaceId: project.workspaceId,
+        teamId: project.teamId || null,
+      });
+    });
+    return lookup;
+  }, [projects]);
+
+  const invalidateAggregateTicketQueries = useCallback((projectId?: string) => {
+    if (!projectId) return;
+
+    const metadata = projectLookup.get(projectId);
+    if (!metadata) {
+      queryClient.invalidateQueries({ queryKey: ['workspaceTickets'] });
+      queryClient.invalidateQueries({ queryKey: ['teamTickets'] });
+      return;
+    }
+
+    if (metadata.workspaceId) {
+      queryClient.invalidateQueries({ queryKey: ['workspaceTickets', metadata.workspaceId] });
+    }
+
+    if (metadata.teamId) {
+      queryClient.invalidateQueries({ queryKey: ['teamTickets', metadata.teamId] });
+    }
+  }, [projectLookup]);
 
   // Users List
   const usersQuery = useQuery({
@@ -313,7 +361,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => {
     if (activeTicket) {
       const latest = tickets.find(t => t.id === activeTicket.id);
-      if (latest && JSON.stringify(latest) !== JSON.stringify(activeTicket)) {
+      if (latest && !hasEquivalentTicketFields(latest, activeTicket)) {
         setActiveTicket(latest);
       }
     }
@@ -426,9 +474,10 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     eventSource.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data);
-        if (message.type === 'tickets-updated') {
-          if (message.data.projectId === activeProjectIdRef.current) {
+    if (message.type === 'tickets-updated') {
+          if (message.data.projectId) {
             queryClient.invalidateQueries({ queryKey: queryKeys.tickets(message.data.projectId) });
+            invalidateAggregateTicketQueries(message.data.projectId);
           }
         } else if (message.type === 'comments-updated') {
           const activeId = activeTicketRef.current?.id;
@@ -446,7 +495,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return () => {
       eventSource.close();
     };
-  }, []);
+  }, [invalidateAggregateTicketQueries]);
 
   // --- Mutations ---
 
@@ -470,9 +519,11 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           old ? [...old, createdTicket] : [createdTicket]
         );
       }
+      invalidateAggregateTicketQueries(ticketInput.projectId);
     },
     onSettled: (data, error, ticketInput) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.tickets(ticketInput.projectId) });
+      invalidateAggregateTicketQueries(ticketInput.projectId);
     },
   });
 
@@ -492,6 +543,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setActiveProjectIdState,
     setFiltersState,
     setActiveTicket,
+    invalidateAggregateTicketQueries,
   });
 
   // Update Ticket (Debounced)
@@ -511,6 +563,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     onSettled: (data, error, { projectId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.tickets(projectId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.ticket(data?.key || '') });
+      invalidateAggregateTicketQueries(projectId);
     },
   });
 
@@ -652,6 +705,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     onSettled: () => {
       const projId = activeProjectIdRef.current;
       queryClient.invalidateQueries({ queryKey: queryKeys.tickets(projId) });
+      invalidateAggregateTicketQueries(projId);
     },
   });
 
@@ -927,6 +981,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.labels(activeProjectIdRef.current) });
+      invalidateAggregateTicketQueries(activeProjectIdRef.current);
     },
   });
 
@@ -946,6 +1001,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.labels(activeProjectIdRef.current) });
+      invalidateAggregateTicketQueries(activeProjectIdRef.current);
     },
   });
 
@@ -966,6 +1022,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.tickets(activeProjectIdRef.current) });
+      invalidateAggregateTicketQueries(activeProjectIdRef.current);
     },
   });
 
@@ -986,6 +1043,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.tickets(activeProjectIdRef.current) });
+      invalidateAggregateTicketQueries(activeProjectIdRef.current);
     },
   });
 

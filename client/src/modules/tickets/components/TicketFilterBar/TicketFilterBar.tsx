@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Filter } from 'lucide-react';
 import type { Ticket } from '../../../../context/TicketContext';
 import type { TicketFilters, TicketListSort } from '../../utils/ticketView';
@@ -36,6 +36,23 @@ export const TicketFilterBar: React.FC<TicketFilterBarProps> = ({
   ].filter(Boolean).length;
 
   const hasActivePopoverFilters = activeCount > 0;
+  const [searchValue, setSearchValue] = useState(filters.search);
+
+  useEffect(() => {
+    setSearchValue(filters.search);
+  }, [filters.search]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      if (searchValue !== filters.search) {
+        onFilterChange({ search: searchValue });
+      }
+    }, 220);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [filters.search, onFilterChange, searchValue]);
 
   const handleClearPopoverFilters = () => {
     onFilterChange({
@@ -217,8 +234,8 @@ export const TicketFilterBar: React.FC<TicketFilterBarProps> = ({
       <div className="ticket-filter-bar__search">
         <DenseTextInput
           placeholder="Search tickets by title, body, ID, or branch..."
-          value={filters.search}
-          onChange={(e) => onFilterChange({ search: e.target.value })}
+          value={searchValue}
+          onChange={(e) => setSearchValue(e.target.value)}
         />
       </div>
 

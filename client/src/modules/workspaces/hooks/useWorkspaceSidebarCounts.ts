@@ -21,31 +21,37 @@ export function useWorkspaceSidebarCounts({
   cycles,
   currentUserId,
 }: UseWorkspaceSidebarCountsArgs): UseWorkspaceSidebarCountsResult {
-  const openTickets = useMemo(
-    () => tickets.filter((ticket) => ticket.status !== 'done' && ticket.status !== 'canceled'),
-    [tickets]
-  );
+  const counts = useMemo(() => {
+    const openTickets: Ticket[] = [];
+    const labelCounts: Record<string, number> = Object.fromEntries(labels.map((label) => [label.id, 0]));
+    const cycleCounts: Record<string, number> = Object.fromEntries(cycles.map((cycle) => [cycle.id, 0]));
+    let myIssuesCount = 0;
 
-  const myIssuesCount = useMemo(
-    () => openTickets.filter((ticket) => ticket.assigneeId === currentUserId).length,
-    [currentUserId, openTickets]
-  );
+    for (const ticket of tickets) {
+      if (ticket.status === 'done' || ticket.status === 'canceled') {
+        continue;
+      }
 
-  const labelCounts = useMemo(
-    () =>
-      Object.fromEntries(
-        labels.map((label) => [label.id, openTickets.filter((ticket) => ticket.labelIds?.includes(label.id)).length])
-      ),
-    [labels, openTickets]
-  );
+      openTickets.push(ticket);
+      if (ticket.assigneeId === currentUserId) {
+        myIssuesCount += 1;
+      }
 
-  const cycleCounts = useMemo(
-    () =>
-      Object.fromEntries(
-        cycles.map((cycle) => [cycle.id, openTickets.filter((ticket) => ticket.cycleId === cycle.id).length])
-      ),
-    [cycles, openTickets]
-  );
+      if (ticket.cycleId) {
+        cycleCounts[ticket.cycleId] = (cycleCounts[ticket.cycleId] ?? 0) + 1;
+      }
 
-  return { openTickets, myIssuesCount, labelCounts, cycleCounts };
+      if (ticket.labelIds?.length) {
+        for (const labelId of ticket.labelIds) {
+          if (labelCounts[labelId] !== undefined) {
+            labelCounts[labelId] += 1;
+          }
+        }
+      }
+    }
+
+    return { openTickets, myIssuesCount, labelCounts, cycleCounts };
+  }, [tickets, labels, cycles, currentUserId]);
+
+  return counts;
 }

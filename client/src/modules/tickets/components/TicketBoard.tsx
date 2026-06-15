@@ -1,4 +1,4 @@
-import React, { DragEvent, useCallback, useMemo } from 'react';
+import React, { DragEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import type { Ticket } from '../../../context/TicketContext';
 import { BOARD_COLUMNS } from '../utils/ticketView';
 import { Button, KanbanBoard, Flex } from '@library';
@@ -9,21 +9,52 @@ import { TicketContextMenu } from './TicketContextMenu';
 import type { TicketBoardProps } from '../types/TicketBoard';
 import { getAssigneeAvatar, getPriorityColor, getPriorityIcon } from '../utils/TicketBoard';
 
-export const TicketBoard: React.FC<TicketBoardProps> = ({
+const INITIAL_CARDS_PER_COLUMN = 40;
+const LOAD_MORE_CARDS = 40;
+
+export const TicketBoard = React.memo(({
   ticketsByColumn,
   availableTickets,
-  labelById,
   userAvatarById,
   onMoveTicket,
   onSelectTicket,
   onOpenCreateTicket,
-}) => {
+  onLoadMore,
+  hasMoreRows,
+  isLoadingMoreRows,
+}: TicketBoardProps) => {
   const handleDragStart = useCallback((event: DragEvent, ticketId: string) => {
     event.dataTransfer.setData('text/plain', ticketId);
   }, []);
 
+  const [visibleByColumn, setVisibleByColumn] = useState<Record<string, number>>(() =>
+    Object.fromEntries(BOARD_COLUMNS.map((column) => [column.id, INITIAL_CARDS_PER_COLUMN])) as Record<string, number>
+  );
+
+  const visibleByColumnSnapshot = useMemo(() => ticketsByColumn, [ticketsByColumn]);
+  const hasMoreRowsValue = hasMoreRows || false;
+  const loadingMoreRows = isLoadingMoreRows || false;
+
+  useEffect(() => {
+    setVisibleByColumn(Object.fromEntries(BOARD_COLUMNS.map((column) => [column.id, INITIAL_CARDS_PER_COLUMN])) as Record<string, number>);
+  }, [visibleByColumnSnapshot]);
+
+  const handleLoadMoreColumn = useCallback((columnId: string, totalInColumn: number) => {
+    setVisibleByColumn((previous) => {
+      const currentLimit = previous[columnId] ?? INITIAL_CARDS_PER_COLUMN;
+      const nextLimit = Math.min(totalInColumn, currentLimit + LOAD_MORE_CARDS);
+      if (nextLimit === currentLimit) {
+        return previous;
+      }
+      return { ...previous, [columnId]: nextLimit };
+    });
+  }, []);
+
   const renderColumnHeader = useCallback((columnId: string, title: string, count: number) => {
     const col = BOARD_COLUMNS.find((c) => c.id === columnId);
+    const columnCount = visibleByColumn[columnId] ?? INITIAL_CARDS_PER_COLUMN;
+    const fullColumnTickets = ticketsByColumn[columnId] || [];
+    const hasMoreInColumn = fullColumnTickets.length > columnCount;
     return (
       <Flex
         align="center"
@@ -67,13 +98,32 @@ export const TicketBoard: React.FC<TicketBoardProps> = ({
         >
           <Plus size={14} />
         </Button>
+        {hasMoreInColumn ? (
+          <Button
+            onClick={() => handleLoadMoreColumn(columnId, fullColumnTickets.length)}
+            variant="ghost"
+            size="sm"
+            style={{
+              color: 'var(--color-text-disabled)',
+              border: '1px dashed var(--color-border-default)',
+              marginLeft: '6px',
+              padding: '0 6px',
+              minHeight: '22px',
+            }}
+            disabled={loadingMoreRows}
+          >
+            {loadingMoreRows ? '...' : 'Show'}
+          </Button>
+        ) : null}
       </Flex>
     );
-  }, [onOpenCreateTicket]);
+  }, [handleLoadMoreColumn, onOpenCreateTicket, ticketsByColumn, visibleByColumn, loadingMoreRows]);
 
   const formattedCards = useMemo(() => {
     return BOARD_COLUMNS.flatMap((col) => {
-      const colTickets = ticketsByColumn[col.id] || [];
+      const fullTickets = ticketsByColumn[col.id] || [];
+      const visibleCount = visibleByColumn[col.id] ?? INITIAL_CARDS_PER_COLUMN;
+      const colTickets = fullTickets.slice(0, visibleCount);
       return colTickets.map((ticket) => {
         return {
           id: ticket.id,
@@ -93,7 +143,7 @@ export const TicketBoard: React.FC<TicketBoardProps> = ({
         };
       });
     });
-  }, [availableTickets, ticketsByColumn, userAvatarById, onSelectTicket, handleDragStart]);
+  }, [availableTickets, ticketsByColumn, userAvatarById, onSelectTicket, handleDragStart, visibleByColumn]);
 
   const handleCardMove = useCallback((cardId: string, nextStatus: string) => {
     onMoveTicket(cardId, { status: nextStatus as Ticket['status'] });
@@ -111,7 +161,13 @@ export const TicketBoard: React.FC<TicketBoardProps> = ({
           renderColumnHeader={renderColumnHeader}
         />
       </div>
-
+      {hasMoreRowsValue ? (
+        <div style={{ padding: '8px 12px', borderTop: '1px solid var(--color-border-default)' }}>
+          <Button variant="secondary" onClick={onLoadMore} disabled={!onLoadMore || loadingMoreRows}>
+            {loadingMoreRows ? 'Loading more tickets…' : 'Load more tickets'}
+          </Button>
+        </div>
+      ) : null}
     </Flex>
   );
-};
+});

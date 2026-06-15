@@ -23,27 +23,36 @@ export { BOARD_COLUMNS, LIST_STATUS_ORDER };
 
 export function filterTickets(tickets: Ticket[], filters: TicketFilters): Ticket[] {
   const selectedLabelId = filters.labelId ?? filters.domainId;
+  const statusFilters = filters.status
+    ? new Set(filters.status.split(',').map((status) => status.trim()).filter(Boolean))
+    : null;
+  const priorityFilters = filters.priority
+    ? new Set(filters.priority.split(',').map((priority) => priority.trim()).filter(Boolean))
+    : null;
+  const normalizedSearch = normalizeSearchTerm(filters.search);
+  const normalizedSearchToken = normalizedSearch.length > 0 ? normalizeSearchToken(normalizedSearch) : '';
+  const normalizedLabelIds = (filters.labels || []).filter(Boolean);
+  const useAllLabelMode = (filters.labelMode || 'any') === 'all';
+  const useLabelsFilter = normalizedLabelIds.length > 0;
 
   return tickets.filter((ticket) => {
-    if (filters.status) {
-      const statuses = filters.status.split(',').map(s => s.trim());
-      if (!statuses.includes(ticket.status)) return false;
+    if (statusFilters && !statusFilters.has(ticket.status)) {
+      return false;
     }
-    if (filters.priority) {
-      const priorities = filters.priority.split(',').map(p => p.trim());
-      if (!priorities.includes(ticket.priority)) return false;
+    if (priorityFilters && !priorityFilters.has(ticket.priority)) {
+      return false;
     }
     if (filters.projectId && ticket.projectId !== filters.projectId) return false;
 
     if (selectedLabelId && !ticket.labelIds?.includes(selectedLabelId)) return false;
 
-    if (filters.labels && filters.labels.length > 0) {
+    if (useLabelsFilter) {
       const mode = filters.labelMode || 'any';
-      if (mode === 'all') {
-        const hasAll = filters.labels.every((lId) => ticket.labelIds?.includes(lId));
+      if (mode === 'all' || useAllLabelMode) {
+        const hasAll = normalizedLabelIds.every((lId) => ticket.labelIds?.includes(lId));
         if (!hasAll) return false;
       } else {
-        const hasAny = filters.labels.some((lId) => ticket.labelIds?.includes(lId));
+        const hasAny = normalizedLabelIds.some((lId) => ticket.labelIds?.includes(lId));
         if (!hasAny) return false;
       }
     }
@@ -51,22 +60,36 @@ export function filterTickets(tickets: Ticket[], filters: TicketFilters): Ticket
     if (filters.cycleId && ticket.cycleId !== filters.cycleId) return false;
     if (filters.assigneeId && ticket.assigneeId !== filters.assigneeId) return false;
 
-    if (filters.search) {
-      const searchLower = normalizeSearchTerm(filters.search);
-      const normalizedSearch = normalizeSearchToken(searchLower);
-      const hasNormalizedSearch = normalizedSearch.length > 0;
-
+    if (normalizedSearch) {
       const title = ticket.title?.toLowerCase() ?? '';
       const key = ticket.key?.toLowerCase() ?? '';
       const desc = ticket.description?.toLowerCase() ?? '';
       const branch = ticket.branchName?.toLowerCase() ?? '';
 
-      const titleMatch = title.includes(searchLower) || (hasNormalizedSearch && title.replace(/[^a-z0-9]+/g, '').includes(normalizedSearch));
-      const keyMatch = key.includes(searchLower) || (hasNormalizedSearch && key.replace(/[^a-z0-9]+/g, '').includes(normalizedSearch));
-      const descMatch = desc.includes(searchLower) || (hasNormalizedSearch && desc.replace(/[^a-z0-9]+/g, '').includes(normalizedSearch));
-      const branchMatch = branch.includes(searchLower) || (hasNormalizedSearch && branch.replace(/[^a-z0-9]+/g, '').includes(normalizedSearch));
+      const titleMatch = title.includes(normalizedSearch);
+      const keyMatch = key.includes(normalizedSearch);
+      const descMatch = desc.includes(normalizedSearch);
+      const branchMatch = branch.includes(normalizedSearch);
 
-      return titleMatch || keyMatch || descMatch || branchMatch;
+      if (!titleMatch && !keyMatch && !descMatch && !branchMatch) {
+        if (!normalizedSearchToken.length) {
+          return false;
+        }
+
+        const normalizedTitle = title.replace(/[^a-z0-9]+/g, '');
+        const normalizedKey = key.replace(/[^a-z0-9]+/g, '');
+        const normalizedDesc = desc.replace(/[^a-z0-9]+/g, '');
+        const normalizedBranch = branch.replace(/[^a-z0-9]+/g, '');
+
+        const normalizedMatch = normalizedTitle.includes(normalizedSearchToken)
+          || normalizedKey.includes(normalizedSearchToken)
+          || normalizedDesc.includes(normalizedSearchToken)
+          || normalizedBranch.includes(normalizedSearchToken);
+
+        if (!normalizedMatch) return false;
+      }
+
+      return true;
     }
 
     return true;
