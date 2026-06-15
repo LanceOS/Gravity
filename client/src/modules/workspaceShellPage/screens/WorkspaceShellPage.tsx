@@ -19,7 +19,7 @@ import { WorkspaceProjectsListPage } from '../../workspaceProjectsListPage';
 import { WorkspaceTeamsPage } from '../../workspaceTeamsPage';
 import { useAccountSettings } from '../../../hooks/useAccountSettings';
 import { useWorkspaceDirectory } from '../../../hooks/useWorkspaceDirectory';
-import { AppShellOverlays } from '../../../pages/AppShellPage/components/AppShellOverlays';
+import { AppShellOverlays } from '../components/AppShellOverlays';
 import { useAppShellRoute } from '../hooks/useAppShellRoute';
 import { useAppShellRouteSync } from '../hooks/useAppShellRouteSync';
 import { useWebMcpRegistration } from '../hooks/useWebMcpRegistration';
@@ -32,7 +32,7 @@ import { useOllamaPanel } from '../hooks/useOllamaPanel';
 import { useWorkspaceViewMode } from '../hooks/useWorkspaceViewMode';
 import { useWorkspaceDirectoryState } from '../hooks/useWorkspaceDirectoryState';
 import type { AppSection } from '../types/AppShell';
-import { LoadingPage } from '../../../pages/LoadingPage/LoadingPage';
+import { LoadingPage } from '../../loadingPage';
 import { queryClient, queryKeys } from '../../../utils/queryClient';
 import {
   useActiveWorkspaceStorage,
