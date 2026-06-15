@@ -246,11 +246,11 @@ export function useAppShellRouteSync({
 
   useEffect(() => {
     if (!route.ticketKey) return;
-    if (activeTicket?.key === route.ticketKey) return;
-
     const normalizedRouteTicketKey = route.ticketKey.toUpperCase();
+    if ((activeTicket?.key || '').toUpperCase() === normalizedRouteTicketKey) return;
+
     const resolved = routeScopedTicketByKey.get(normalizedRouteTicketKey)
-      ?? routeScopedTickets.find((ticket) => ticket.key === route.ticketKey)
+      ?? routeScopedTickets.find((ticket) => ticket.key.toUpperCase() === normalizedRouteTicketKey)
       ?? null;
     setActiveTicket(resolved);
   }, [activeTicket?.key, route.ticketKey, routeScopedTicketByKey, routeScopedTickets, setActiveTicket]);
