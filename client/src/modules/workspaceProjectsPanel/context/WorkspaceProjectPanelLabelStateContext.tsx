@@ -1,4 +1,4 @@
-import { type PropsWithChildren } from 'react';
+import { type JSX, type PropsWithChildren } from 'react';
 
 import type { UseWorkspaceProjectPanelLabelStateArgs } from '../hooks/useWorkspaceProjectPanelLabelState';
 import { useWorkspaceProjectPanelLabelState } from '../hooks';

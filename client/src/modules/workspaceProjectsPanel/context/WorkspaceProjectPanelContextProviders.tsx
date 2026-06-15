@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react';
+import { type JSX, type ReactNode } from 'react';
 
 import type { Label, Project } from '../../../context/TicketContext';
 import type { WorkspaceProjectPanelProps } from '../types/WorkspaceProjectPanel';

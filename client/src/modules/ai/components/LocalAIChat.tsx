@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useState } from 'react';
+import React, { useEffect, useEffectEvent, useState } from 'react';
 import { useTickets } from '../../../context/TicketContext';
 import { FileText, ListPlus, Sparkles, Wifi, WifiOff } from 'lucide-react';
 import { DenseTextInput, AIChatWindow } from '@library';

@@ -1,4 +1,4 @@
-import { createContext, useContext, type PropsWithChildren } from 'react';
+import { createContext, type PropsWithChildren, useContext, type JSX } from 'react';
 
 import type { UseWorkspaceProjectPanelProjectStateArgs, UseWorkspaceProjectPanelProjectStateResult } from '../hooks/useWorkspaceProjectPanelProjectState';
 import { useWorkspaceProjectPanelProjectState } from '../hooks';

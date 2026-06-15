@@ -455,6 +455,8 @@ interface UseInfiniteQueryOptions<TData> {
   initialPageParam?: any;
   getNextPageParam: (lastPage: TData, allPages: TData[]) => any | undefined;
   enabled?: boolean;
+  staleTime?: number;
+  gcTime?: number;
 }
 
 export function useInfiniteQuery<TData = any>({
@@ -463,6 +465,8 @@ export function useInfiniteQuery<TData = any>({
   initialPageParam,
   getNextPageParam,
   enabled = true,
+  staleTime,
+  gcTime,
 }: UseInfiniteQueryOptions<TData>) {
   const client = useQueryClient();
 
@@ -470,8 +474,8 @@ export function useInfiniteQuery<TData = any>({
 
   const getSnapshot = useCallback(() => {
     const st = client.getOrCreateQuery<{ pages: TData[]; pageParams: any[] }>(stableQueryKey, {
-      staleTime: 0,
-      gcTime: 5 * 60 * 1000,
+      staleTime: staleTime ?? 0,
+      gcTime: gcTime ?? 5 * 60 * 1000,
     });
     if (!st.data) {
       st.data = { pages: [], pageParams: [initialPageParam] };

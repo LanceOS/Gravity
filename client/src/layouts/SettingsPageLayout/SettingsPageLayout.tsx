@@ -1,5 +1,5 @@
 import { DashboardLayout } from '../../components/DashboardLayout/DashboardLayout';
-import type { ReactNode } from 'react';
+import { type JSX, type ReactNode } from 'react';
 
 interface SettingsPageLayoutProps {
   headerLeftContent: ReactNode;

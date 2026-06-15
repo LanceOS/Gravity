@@ -97,7 +97,13 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
   const userId = currentUser?.id;
 
   const buildHeaders = useCallback(() => {
-    return userId ? { 'X-User-Id': userId } : {};
+    const headers: Record<string, string> = {};
+
+    if (userId) {
+      headers['X-User-Id'] = userId;
+    }
+
+    return headers;
   }, [userId]);
 
   // --- Queries ---
