@@ -25,11 +25,11 @@ interface UseWorkspaceShellNavigationResult {
   buildProjectScopedPath: (projectId: string, scope?: 'tickets' | 'notes', itemId?: string) => string;
   handleSelectProject: (projectId: string) => void;
   handleSelectProjectForManagement: (projectId: string) => void;
-  handleShowProjectIssues: () => void;
-  handleShowMyIssues: () => void;
-  handleSelectCycleLegacy: (cycleId: string) => void;
-  handleSelectLabel: (labelId: string) => void;
-  handleShowNotes: () => void;
+  handleShowProjectIssues: (projectId?: string) => void;
+  handleShowMyIssues: (projectId?: string) => void;
+  handleSelectCycleLegacy: (projectId: string, cycleId: string) => void;
+  handleSelectLabel: (projectId: string, labelId: string) => void;
+  handleShowNotes: (projectId?: string) => void;
   handleSelectNote: (nextNoteId: string) => void;
   handleSelectTicket: (ticket: Ticket | null) => void;
   handleOpenSettings: () => void;
@@ -76,8 +76,12 @@ export function useWorkspaceShellNavigation({
   }, [projects]);
 
   const handleSelectProject = useCallback((projectId: string) => {
+    if (projectId === activeProjectId) {
+      return;
+    }
+
     navigate(buildProjectScopedPathCallback(projectId));
-  }, [buildProjectScopedPathCallback, navigate]);
+  }, [activeProjectId, buildProjectScopedPathCallback, navigate]);
 
   const handleSelectProjectForManagement = useCallback(
     (projectId: string) => {
@@ -89,21 +93,21 @@ export function useWorkspaceShellNavigation({
     [activeWorkspaceId, navigate, projectWorkspaceById, setActiveProjectId, setSidebarActiveScope]
   );
 
-  const handleShowProjectIssues = useCallback(() => {
-    const pid = activeProjectId;
+  const handleShowProjectIssues = useCallback((projectId?: string) => {
+    const pid = projectId || activeProjectId;
     if (!pid) return;
     navigate(buildProjectScopedPathCallback(pid));
   }, [activeProjectId, buildProjectScopedPathCallback, navigate]);
 
-  const handleShowMyIssues = useCallback(() => {
-    const pid = activeProjectId;
+  const handleShowMyIssues = useCallback((projectId?: string) => {
+    const pid = projectId || activeProjectId;
     if (!pid || !currentUser) return;
     navigate(`${buildProjectScopedPathCallback(pid)}?assigneeId=${currentUser.id}`);
   }, [activeProjectId, buildProjectScopedPathCallback, currentUser, navigate]);
 
   const handleSelectCycleLegacy = useCallback(
-    (cycleId: string) => {
-      const pid = activeProjectId;
+    (projectId: string, cycleId: string) => {
+      const pid = projectId || activeProjectId;
       if (!pid) return;
       navigate(`${buildProjectScopedPathCallback(pid)}?cycleId=${cycleId}`);
     },
@@ -111,16 +115,16 @@ export function useWorkspaceShellNavigation({
   );
 
   const handleSelectLabel = useCallback(
-    (labelId: string) => {
-      const pid = activeProjectId;
+    (projectId: string, labelId: string) => {
+      const pid = projectId || activeProjectId;
       if (!pid) return;
       navigate(`${buildProjectScopedPathCallback(pid)}?labels=${labelId}`);
     },
     [activeProjectId, buildProjectScopedPathCallback, navigate]
   );
 
-  const handleShowNotes = useCallback(() => {
-    const pid = activeProjectId || route.projectIdParam;
+  const handleShowNotes = useCallback((projectId?: string) => {
+    const pid = projectId || activeProjectId || route.projectIdParam;
     if (!pid) return;
     navigate(buildProjectScopedPathCallback(pid, 'notes'));
   }, [activeProjectId, buildProjectScopedPathCallback, navigate, route.projectIdParam]);

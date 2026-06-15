@@ -1,15 +1,16 @@
 import { CheckCircle, ChevronDown, ChevronRight, Database, FolderTree, Plus } from 'lucide-react';
 import { SidebarGroup, SidebarItem } from '@library';
+import { useOptionalSidebarContext } from '../context/SidebarContext';
 import type { SidebarNavigationState, SidebarProjectSection } from '../types';
 import { getTeamCollapsedState } from '../utils';
 import './styles.css';
 
 interface TeamsSidebarProps {
-  section: SidebarProjectSection;
-  collapsedTeams: Record<string, boolean>;
-  collapsedTeamProjects: Record<string, boolean>;
-  onToggleTeam: (teamId: string) => void;
-  onToggleTeamProjects: (teamId: string) => void;
+  section?: SidebarProjectSection;
+  collapsedTeams?: Record<string, boolean>;
+  collapsedTeamProjects?: Record<string, boolean>;
+  onToggleTeam?: (teamId: string) => void;
+  onToggleTeamProjects?: (teamId: string) => void;
 }
 
 function resolveNavigationState(section: SidebarProjectSection): SidebarNavigationState {
@@ -48,13 +49,18 @@ function resolveNavigationState(section: SidebarProjectSection): SidebarNavigati
   };
 }
 
-export function TeamsSidebar({
-  section,
-  collapsedTeams,
-  collapsedTeamProjects,
-  onToggleTeam,
-  onToggleTeamProjects,
-}: TeamsSidebarProps) {
+export function TeamsSidebar(props: TeamsSidebarProps) {
+  const context = useOptionalSidebarContext();
+  const section = props.section ?? context?.section;
+  const collapsedTeams = props.collapsedTeams ?? context?.collapsedTeams ?? {};
+  const collapsedTeamProjects = props.collapsedTeamProjects ?? context?.collapsedTeamProjects ?? {};
+  const toggleTeam = props.onToggleTeam ?? context?.toggleTeam;
+  const toggleTeamProjects = props.onToggleTeamProjects ?? context?.toggleTeamProjects;
+
+  if (!section || !toggleTeam || !toggleTeamProjects) {
+    throw new Error('TeamsSidebar requires sidebar props or SidebarProvider context');
+  }
+
   const navigationState = resolveNavigationState(section);
   const activeTeamId = navigationState.activeTeam;
   const activeScope = navigationState.activeScope;
@@ -118,7 +124,7 @@ export function TeamsSidebar({
                   isTeamActive &&
                   (activeScope !== 'projects' || teamCollapsed || projectsCollapsed || (activeScope === 'projects' && !activeProjectId))
                 }
-                onClick={() => onToggleTeam(team.id)}
+                onClick={() => toggleTeam(team.id)}
                 leftIcon={
                   <div className="teams-sidebar__team-icon">
                     {teamCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
@@ -210,7 +216,7 @@ export function TeamsSidebar({
                       label={
                         <button
                           type="button"
-                          onClick={() => onToggleTeamProjects(team.id)}
+                          onClick={() => toggleTeamProjects(team.id)}
                           aria-expanded={!projectsCollapsed}
                           className="teams-sidebar__group-toggle"
                         >

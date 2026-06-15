@@ -1,15 +1,18 @@
 import { Sparkles, CheckSquare, Tag, FolderPlus, Users } from 'lucide-react';
 import { Sidebar as LibSidebar, SidebarHeader, SidebarContent, SidebarFooter, ContextMenu } from '@library';
 import { SidebarProjectsSection, SidebarUserMenu } from './components';
+import { SidebarProvider } from './context/SidebarContext';
+import { useSidebarViewModel } from './hooks/useSidebarViewModel';
 import type { SidebarProps } from './types';
-import { useSidebarState } from './utils';
 
 export function Sidebar({ projects, tools, userMenu }: SidebarProps) {
-  const sidebarState = useSidebarState(
+  const sidebarViewModel = useSidebarViewModel(
     projects.activeProjectId,
     projects.activeTeamId ?? '',
     projects.onSelectProject,
     projects.onSelectTeam,
+    projects.onPrefetchProject,
+    projects.onHasCachedProjectData,
   );
 
   // Show the "New Ticket" header when there are projects — either in flat mode or via teams
@@ -59,27 +62,19 @@ export function Sidebar({ projects, tools, userMenu }: SidebarProps) {
         }
       >
         <SidebarContent>
-          <SidebarProjectsSection
-            section={projects}
-            projectsCollapsed={sidebarState.projectsCollapsed}
-            collapsedProjects={sidebarState.collapsedProjects}
-            collapsedTeamProjects={sidebarState.collapsedTeamProjects}
-            collapsedTeams={sidebarState.collapsedTeams}
-            onToggleProjectsCollapsed={sidebarState.toggleProjectsCollapsed}
-            onToggleProject={sidebarState.toggleProject}
-            onToggleTeam={sidebarState.toggleTeam}
-            onToggleTeamProjects={sidebarState.toggleTeamProjects}
-          />
+          <SidebarProvider section={projects} viewModel={sidebarViewModel}>
+            <SidebarProjectsSection />
+          </SidebarProvider>
         </SidebarContent>
       </ContextMenu.Root>
 
       <SidebarFooter>
         <SidebarUserMenu
           userMenu={userMenu}
-          showUserDropdown={sidebarState.showUserDropdown}
-          onToggleUserDropdown={sidebarState.toggleUserDropdown}
-          onCloseUserDropdown={sidebarState.closeUserDropdown}
-          profileRef={sidebarState.profileRef}
+          showUserDropdown={sidebarViewModel.showUserDropdown}
+          onToggleUserDropdown={sidebarViewModel.toggleUserDropdown}
+          onCloseUserDropdown={sidebarViewModel.closeUserDropdown}
+          profileRef={sidebarViewModel.profileRef}
         />
       </SidebarFooter>
     </LibSidebar>
