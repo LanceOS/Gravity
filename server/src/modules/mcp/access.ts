@@ -1,7 +1,5 @@
-import { and, eq } from 'drizzle-orm';
-import { db } from '../../db/index.js';
-import { workspaceMembers } from '../../db/schema.js';
 import type { McpContext } from './types.js';
+import { isWorkspaceMember } from '../workspaces/services/membership.js';
 
 /**
  * @description Enforces the shared workspace membership check used by non-HTTP
@@ -20,19 +18,8 @@ export async function assertMcpWorkspaceAccess(context: McpContext) {
     throw new Error('Authenticated user is required.');
   }
 
-  // Workspace membership is the source of truth for MCP tool access.
-  const membershipRows = await db
-    .select({ role: workspaceMembers.role })
-    .from(workspaceMembers)
-    .where(
-      and(
-        eq(workspaceMembers.workspaceId, context.workspaceId),
-        eq(workspaceMembers.userId, context.actorUserId),
-      ),
-    )
-    .limit(1);
-
-  if (membershipRows.length === 0) {
+  const isMember = await isWorkspaceMember(context.workspaceId, context.actorUserId);
+  if (!isMember) {
     throw new Error('Unauthorized workspace access.');
   }
 }
