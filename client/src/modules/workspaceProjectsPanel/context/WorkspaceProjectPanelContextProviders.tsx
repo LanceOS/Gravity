@@ -11,15 +11,10 @@ type WorkspaceProjectPanelContextProvidersProps = {
   projects: Project[];
   activeProjectId: string;
   labels: Label[];
+  confirmDeleteLabel?: (message: string) => boolean | Promise<boolean>;
 } & Pick<
   WorkspaceProjectPanelProps,
-  | 'onSelectProject'
-  | 'onCreateProject'
-  | 'onUpdateProject'
-  | 'onCreateLabel'
-  | 'onUpdateLabel'
-  | 'onDeleteLabel'
-  | 'confirmDeleteLabel'
+  'onSelectProject' | 'onCreateProject' | 'onUpdateProject' | 'onCreateLabel' | 'onUpdateLabel' | 'onDeleteLabel'
 >;
 
 export function WorkspaceProjectPanelContextProviders({
