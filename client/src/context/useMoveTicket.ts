@@ -27,6 +27,7 @@ interface UseMoveTicketArgs {
   setActiveProjectIdState: React.Dispatch<React.SetStateAction<string>>;
   setFiltersState: React.Dispatch<React.SetStateAction<TicketFiltersState>>;
   setActiveTicket: React.Dispatch<React.SetStateAction<Ticket | null>>;
+  invalidateAggregateTicketQueries?: (projectId?: string) => void;
 }
 
 const API_URL = '/api/v1';
@@ -38,6 +39,7 @@ export function useMoveTicket({
   setActiveProjectIdState,
   setFiltersState,
   setActiveTicket,
+  invalidateAggregateTicketQueries,
 }: UseMoveTicketArgs) {
   const moveTicketMutation = useMutation({
     mutationFn: async ({ id, sourceProjectId, targetProjectId }: MoveTicketVariables) => {
@@ -127,6 +129,9 @@ export function useMoveTicket({
     onSettled: (movedTicket, error, { sourceProjectId, targetProjectId }, context) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.tickets(sourceProjectId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.tickets(targetProjectId) });
+
+      invalidateAggregateTicketQueries?.(sourceProjectId);
+      invalidateAggregateTicketQueries?.(targetProjectId);
 
       const ticketKey = context?.ticketKey || movedTicket?.key || '';
       if (ticketKey) {

@@ -19,6 +19,8 @@ export type TicketFilters = {
   cycleId?: string;
   labels?: string[];
   labelMode?: 'all' | 'any';
+  limit?: number;
+  offset?: number;
 };
 
 function buildTicketFilterConditions(projectIds: string[], filters: TicketFilters = {}) {
@@ -228,12 +230,22 @@ export function canonicalizeBranchName(name?: string | null): string {
 }
 
 export async function listTickets(projectId: string, filters: TicketFilters = {}) {
-  const rows = await db
+  let query = db
     .select({ ticket: tickets, projectName: projects.name })
     .from(tickets)
     .innerJoin(projects, eq(projects.id, tickets.projectId))
     .where(and(...buildTicketFilterConditions([projectId], filters)))
     .orderBy(asc(tickets.createdAt));
+
+  if (typeof filters.limit === 'number' && filters.limit > 0) {
+    query = query.limit(filters.limit);
+  }
+
+  if (typeof filters.offset === 'number' && filters.offset >= 0) {
+    query = query.offset(filters.offset);
+  }
+
+  const rows = await query;
 
   if (rows.length === 0) {
     return [];
@@ -274,12 +286,22 @@ export async function listWorkspaceTickets(projectIds: string[], filters: Ticket
     return [];
   }
 
-  const rows = await db
+  let query = db
     .select({ ticket: tickets, projectName: projects.name })
     .from(tickets)
     .innerJoin(projects, eq(projects.id, tickets.projectId))
     .where(and(...buildTicketFilterConditions(projectIds, filters)))
     .orderBy(asc(tickets.createdAt));
+
+  if (typeof filters.limit === 'number' && filters.limit > 0) {
+    query = query.limit(filters.limit);
+  }
+
+  if (typeof filters.offset === 'number' && filters.offset >= 0) {
+    query = query.offset(filters.offset);
+  }
+
+  const rows = await query;
 
   if (rows.length === 0) {
     return [];

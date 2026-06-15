@@ -5,6 +5,7 @@ export interface TicketDetailProps {
   comments: Comment[];
   subtasks: Ticket[];
   availableTickets: Ticket[];
+  ticketsById?: Map<string, Ticket>;
   completedSubtasks: number;
   subtaskProgressPercent: number;
   users: User[];

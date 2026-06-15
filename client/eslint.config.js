@@ -19,4 +19,27 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    files: [
+      'src/pages/**/*.{ts,tsx}',
+      'src/components/**/*.{ts,tsx}',
+      'src/layouts/**/*.{ts,tsx}',
+      'src/router/**/*.{ts,tsx}',
+    ],
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [
+          {
+            group: [
+              '../modules/*/*',
+              '../../modules/*/*',
+              '../../../modules/*/*',
+              '../../../../modules/*/*',
+            ],
+            message: 'Import from a module public API barrel (for example, ../../modules/tickets) instead of reaching into module internals.',
+          },
+        ],
+      }],
+    },
+  },
 ])

@@ -10,7 +10,7 @@ import type {
 
 export type SettingsCategoryId = 'overview' | 'access' | 'members' | 'requests' | 'mcp_tools';
 
-export interface SettingsScreenProps {
+export interface SettingsScreenData {
   currentUser: User;
   workspace: WorkspaceSummary;
   settings: WorkspaceAdminSettings;
@@ -26,6 +26,9 @@ export interface SettingsScreenProps {
   joinRequests: WorkspaceJoinRequest[];
   approveLoadingId: string | null;
   revokeLoadingId: string | null;
+}
+
+export interface SettingsScreenActions {
   onBackToWorkspace: () => void;
   onOpenDirectory: () => void;
   onChangeSettings: (updates: Partial<WorkspaceAdminSettings>) => void;
@@ -38,3 +41,5 @@ export interface SettingsScreenProps {
   onDeleteWorkspace?: () => Promise<void>;
   onClearDeleteError?: () => void;
 }
+
+export interface SettingsScreenProps extends SettingsScreenData, SettingsScreenActions {}

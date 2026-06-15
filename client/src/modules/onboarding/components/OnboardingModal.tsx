@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useTickets } from '../../../context/TicketContext';
+import { apiClient } from '../../../utils/apiClient';
 import { 
   Sparkles, Database, Layers, CheckCircle, Terminal, 
   ChevronRight, ChevronLeft, Check, HelpCircle
@@ -13,15 +14,14 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
   const [step, setStep] = useState(0); // 0: Question, 1-4: Tour steps
 
   const handleSkip = async () => {
+    if (!currentUser?.id) {
+      onComplete();
+      return;
+    }
+
     try {
-      const res = await fetch(`/api/v1/users/${currentUser?.id}/tutorial`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ completed: true })
-      });
-      if (res.ok) {
-        onComplete();
-      }
+      await apiClient.patch(`/users/${currentUser.id}/tutorial`, { completed: true });
+      onComplete();
     } catch (e) {
       console.error(e);
       onComplete(); // fallback

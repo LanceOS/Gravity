@@ -1,13 +1,6 @@
 import React from 'react';
 import { Card, Stack, Switch, Alert } from '@library';
-import type { WorkspaceSummary } from '../../../hooks/useWorkspaceDirectory';
-import type { WorkspaceAdminSettings } from '../../../hooks/useWorkspaceSettings';
-
-interface McpToolsSectionProps {
-  workspace: WorkspaceSummary;
-  settings: WorkspaceAdminSettings;
-  onChangeSettings: (updates: Partial<WorkspaceAdminSettings>) => void;
-}
+import { useSettingsScreenContext } from '../../../context/settings/useSettingsScreenContext';
 
 interface McpToolMetadata {
   name: string;
@@ -78,11 +71,9 @@ const MCP_TOOL_GROUPS: { title: string; tools: McpToolMetadata[] }[] = [
   },
 ];
 
-export function McpToolsSection({
-  workspace,
-  settings,
-  onChangeSettings,
-}: McpToolsSectionProps) {
+export function McpToolsSection(): JSX.Element {
+  const { workspace, settings, onChangeSettings } = useSettingsScreenContext();
+
   const isOwner = workspace.memberRole === 'owner';
   const disabledTools = settings.disabledMcpTools || [];
 

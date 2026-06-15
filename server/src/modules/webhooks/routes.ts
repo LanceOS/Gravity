@@ -5,7 +5,7 @@ import { projects, tickets } from '../../db/schema.js';
 import { env } from '../../env.js';
 import { verifyGitHubWebhookSignature, isValidGitHubUrl, sanitizeGitHubLogin } from '../../lib/webhookSignature.js';
 import { broadcastEvent } from '../../realtime.js';
-import { addCommentRecord, listComments, listTickets, updateTicketRecord } from '../tickets/services/tickets.js';
+import { addCommentRecord, updateTicketRecord } from '../tickets/services/tickets.js';
 
 /** Maximum number of ticket keys to process from a single webhook delivery. */
 const MAX_KEYS_PER_WEBHOOK = 10;
@@ -199,15 +199,11 @@ export function createWebhookRouter() {
         const commentBody = `GitHub PR update: #${prNumber} was ${eventDescription} by ${prAuthor}${prUrl ? ` (${prUrl})` : ''}.`;
 
         await addCommentRecord(updated.id, commentUserId, commentBody);
-        broadcastEvent('comments-updated', {
-          ticketId: updated.id,
-          comments: await listComments(updated.id),
-        });
+        broadcastEvent('comments-updated', { ticketId: updated.id });
       }
 
       broadcastEvent('tickets-updated', {
         projectId: updated.projectId,
-        tickets: await listTickets(updated.projectId),
       });
     }
 

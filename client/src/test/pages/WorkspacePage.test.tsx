@@ -22,31 +22,48 @@ type TicketDetailMockProps = {
   subtaskProgressPercent: number;
 };
 
-vi.mock('../../modules/tickets', () => ({
-  TicketBoard: () => (
-    <div>
-      <div>TicketBoard Mock</div>
-    </div>
-  ),
-  TicketFilterBar: ({
-    hasActiveFilters,
-    onClearFilters,
-  }: {
-    hasActiveFilters: boolean;
-    onClearFilters: () => void;
-  }) =>
-    hasActiveFilters ? (
-      <button type="button" onClick={onClearFilters}>
-        Clear board filters
-      </button>
-    ) : null,
-  TicketList: ({ filteredCount }: TicketListMockProps) => (
-    <div>{`TicketList ${filteredCount}`}</div>
-  ),
-  TicketDetail: ({ activeTicket, subtasks, completedSubtasks, subtaskProgressPercent }: TicketDetailMockProps) => (
-    <div>{`TicketDetail ${activeTicket.title} ${subtasks.length} ${completedSubtasks} ${Math.round(subtaskProgressPercent)}`}</div>
-  ),
-}));
+vi.mock('../../modules/tickets', async () => {
+  const ticketView = await vi.importActual<typeof import('../../modules/tickets/utils/ticketView')>(
+    '../../modules/tickets/utils/ticketView'
+  );
+  const ticketDetail = await vi.importActual<typeof import('../../modules/tickets/utils/TicketDetail')>(
+    '../../modules/tickets/utils/TicketDetail'
+  );
+  const ticketBoard = await vi.importActual<typeof import('../../modules/tickets/utils/TicketBoard')>(
+    '../../modules/tickets/utils/TicketBoard'
+  );
+
+  return {
+    ...ticketView,
+    getPriorityIcon: ticketBoard.getPriorityIcon,
+    getStatusColor: ticketDetail.getStatusColor,
+    PRIORITY_OPTIONS: ticketDetail.PRIORITY_OPTIONS,
+    STATUS_OPTIONS: ticketDetail.STATUS_OPTIONS,
+    TicketBoard: () => (
+      <div>
+        <div>TicketBoard Mock</div>
+      </div>
+    ),
+    TicketFilterBar: ({
+      hasActiveFilters,
+      onClearFilters,
+    }: {
+      hasActiveFilters: boolean;
+      onClearFilters: () => void;
+    }) =>
+      hasActiveFilters ? (
+        <button type="button" onClick={onClearFilters}>
+          Clear board filters
+        </button>
+      ) : null,
+    TicketList: ({ filteredCount }: TicketListMockProps) => (
+      <div>{`TicketList ${filteredCount}`}</div>
+    ),
+    TicketDetail: ({ activeTicket, subtasks, completedSubtasks, subtaskProgressPercent }: TicketDetailMockProps) => (
+      <div>{`TicketDetail ${activeTicket.title} ${subtasks.length} ${completedSubtasks} ${Math.round(subtaskProgressPercent)}`}</div>
+    ),
+  };
+});
 
 vi.mock('../../modules/notes/components/NotesList', () => ({
   NotesList: ({ sortDirection }: { sortDirection: 'desc' | 'asc' }) => (

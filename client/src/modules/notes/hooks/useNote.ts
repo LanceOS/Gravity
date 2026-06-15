@@ -1,63 +1,48 @@
 import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { queryClient, queryKeys } from '../../../utils/queryClient';
-import type { NoteMetadata } from '../types';
+import { CACHE_CONFIGS, queryKeys } from '../../../utils/queryClient';
+import { ApiError } from '../../../utils/apiClient';
+import type { Note } from '../types';
+import { notesService, type NotesService } from '../services/notesService';
 
-export interface Note extends NoteMetadata {
-  body: string;
+interface UseNoteOptions {
+  notesService?: NotesService;
 }
 
-export function useNote(projectId: string, noteId: string | null) {
+export function useNote(projectId: string, noteId: string | null, { notesService: clientNotesService = notesService }: UseNoteOptions = {}) {
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const client = useQueryClient();
 
   const noteQuery = useQuery<Note>({
-    queryKey: queryKeys.note(noteId || ''),
+    queryKey: queryKeys.note(noteId || '', projectId),
     queryFn: async () => {
-      const response = await fetch(`/api/v1/notes/${noteId}`, {
-        headers: {
-          'x-project-id': projectId,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to load note');
-      }
-
-      return response.json();
+      if (!noteId || !projectId) throw new Error('No active note/project');
+      return clientNotesService.getNote(projectId, noteId);
     },
+    staleTime: CACHE_CONFIGS.metadata.staleTime,
     enabled: !!noteId && !!projectId,
   });
 
   const saveMutation = useMutation({
     mutationFn: async (updates: { title?: string; body?: string }) => {
       const currentNote = noteQuery.data;
-      if (!noteId || !currentNote) throw new Error('No active note');
+      if (!noteId || !projectId || !currentNote) throw new Error('No active note');
 
-      const response = await fetch(`/api/v1/notes/${noteId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-project-id': projectId,
-        },
-        body: JSON.stringify({
+      try {
+        return await clientNotesService.updateNote(projectId, noteId, {
           ...updates,
           version: currentNote.version,
-        }),
-      });
-
-      if (!response.ok) {
-        if (response.status === 409) {
+        });
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 409) {
           throw new Error('Version conflict. Please refresh the note.');
         }
-        throw new Error('Failed to save note');
+        throw err;
       }
-
-      return response.json() as Promise<Note>;
     },
     onSuccess: (updated) => {
-      client.setQueryData(queryKeys.note(noteId || ''), updated);
+      client.setQueryData(queryKeys.note(noteId || '', projectId), updated);
       setSavedAt(new Date());
       setSaveError(null);
       
@@ -78,24 +63,12 @@ export function useNote(projectId: string, noteId: string | null) {
   }, [saveMutation]);
 
   const uploadMedia = useCallback(async (file: File): Promise<string> => {
-    if (!noteId) throw new Error('No active note');
-    
-    const response = await fetch(`/api/v1/notes/${noteId}/media?filename=${encodeURIComponent(file.name)}`, {
-      method: 'POST',
-      headers: {
-        'x-project-id': projectId,
-        'Content-Type': file.type || 'application/octet-stream',
-      },
-      body: file,
-    });
+    if (!noteId || !projectId) throw new Error('No active note');
 
-    if (!response.ok) {
-      throw new Error('Failed to upload media');
-    }
+    const response = await clientNotesService.uploadMedia(projectId, noteId, file);
 
-    const data = await response.json();
-    return data.url;
-  }, [projectId, noteId]);
+    return response.url;
+  }, [clientNotesService, noteId, projectId]);
 
   return {
     note: noteQuery.data || null,

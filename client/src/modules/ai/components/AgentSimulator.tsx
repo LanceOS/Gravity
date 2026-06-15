@@ -1,9 +1,20 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useTickets } from '../../../context/TicketContext';
-import { Terminal, X, Play, Loader2, Sparkles, AlertCircle, ArrowRight } from 'lucide-react';
+import { Terminal, X, Play, Loader2, Sparkles, AlertCircle } from 'lucide-react';
 import type { AgentLogEntry, AgentSimulatorProps } from '../types/AgentSimulator';
 import { delay, getInitialAgentLogs } from '../utils/AgentSimulator';
 import { Button, Textarea } from '@library';
+import { apiClient } from '../../../utils/apiClient';
+
+type McpToolResult = Record<string, unknown>;
+
+function parseToolResultText(text: string): McpToolResult | string {
+  try {
+    return JSON.parse(text) as McpToolResult;
+  } catch {
+    return text;
+  }
+}
 
 export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
   const { fetchInitialData } = useTickets();
@@ -27,22 +38,18 @@ export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
     await delay(1200);
 
     try {
-      const response = await fetch('/api/v1/mcp/sse', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const data = await apiClient.post<{ result?: { content?: { text?: string }[] }; error?: { message?: string } }>(
+        '/mcp/sse',
+        {
           jsonrpc: '2.0',
           id: Date.now(),
           method: 'tools/call',
           params: {
             name: method,
-            arguments: args
-          }
-        })
-      });
-
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const data = await response.json();
+            arguments: args,
+          },
+        }
+      );
       
       if (data.error) {
         throw new Error(data.error.message);
@@ -52,11 +59,7 @@ export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
       addLog('success', `✅ Tool execution completed. Result:\n${textResult}`);
       
       // Parse result to get object if needed
-      try {
-        return JSON.parse(textResult);
-      } catch {
-        return textResult;
-      }
+      return parseToolResultText(textResult);
     } catch (e: any) {
       addLog('error', `❌ Tool error: ${e.message}`);
       throw e;
@@ -94,7 +97,15 @@ export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
         assigneeId: 'u-bob' // Bob
       });
 
-      const ticketKey = createResult?.ticket?.key || 'GRA-8';
+      const ticketKey =
+        typeof createResult === 'object' &&
+        createResult !== null &&
+        'ticket' in createResult &&
+        typeof createResult.ticket === 'object' &&
+        createResult.ticket !== null &&
+        typeof (createResult.ticket as McpToolResult).key === 'string'
+          ? ((createResult.ticket as McpToolResult).key as string)
+          : 'GRA-8';
 
       // 4. Call add_comment tool
       addLog('thought', `🤔 [Agent Thought]: Ticket created successfully as key ${ticketKey}. Now posting the requested comment on it...`);

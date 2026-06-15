@@ -92,6 +92,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
   comments,
   subtasks,
   availableTickets,
+  ticketsById,
   completedSubtasks,
   subtaskProgressPercent,
   users,
@@ -382,6 +383,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
         activeTicket={activeTicket}
         activeTicketDetail={activeTicketDetail}
         availableTickets={availableTickets}
+        ticketsById={ticketsById}
         parentTicket={parentTicket}
         users={users}
         onSelectTicket={onSelectTicket}

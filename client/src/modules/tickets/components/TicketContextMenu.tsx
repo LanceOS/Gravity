@@ -1,22 +1,14 @@
 import React, { useContext, useMemo } from 'react';
-import { TicketContext, type Ticket } from '../../../context/TicketContext';
+import { TicketContext, type Label, type Ticket } from '../../../context/TicketContext';
 import { ContextMenu, toast } from '@library';
-import {
-  Check,
-  User,
-  Folder,
-  Tag,
-  AlertCircle,
-  CheckSquare,
-  Trash2,
-  Calendar,
-  Link,
-} from 'lucide-react';
+import { Check, User, Folder, Tag, AlertCircle, CheckSquare, Trash2, Calendar, Link } from 'lucide-react';
 import { STATUS_OPTIONS, PRIORITY_OPTIONS } from '../utils/TicketDetail';
 import { getPriorityIcon } from '../utils/TicketBoard';
 import { TicketAssignmentSubMenu } from './TicketAssignmentSubMenu';
 
-const EMPTY_ARRAY: never[] = [];
+const EMPTY_TICKETS: Ticket[] = [];
+const EMPTY_USER_IDS: string[] = [];
+const EMPTY_LABELS: Label[] = [];
 
 interface TicketContextMenuProps {
   ticket: Ticket;
@@ -26,34 +18,20 @@ interface TicketContextMenuProps {
 
 export const TicketContextMenu: React.FC<TicketContextMenuProps> = ({ ticket, children, availableTickets }) => {
   const context = useContext(TicketContext);
-  const tickets = context?.tickets ?? EMPTY_ARRAY;
-  const users = context?.users ?? EMPTY_ARRAY;
-  const projects = context?.projects ?? EMPTY_ARRAY;
-  const labels = context?.labels ?? EMPTY_ARRAY;
-  const cycles = context?.cycles ?? EMPTY_ARRAY;
-
-  const ticketLabels = useMemo(
-    () => labels.filter((l) => l.projectId === ticket.projectId || !l.projectId),
-    [labels, ticket.projectId]
-  );
-
-  const assignableTickets = useMemo(
-    () => (availableTickets ?? tickets).filter((candidate) => candidate.id !== ticket.id && candidate.projectId === ticket.projectId),
-    [availableTickets, tickets, ticket.id, ticket.projectId]
-  );
-
-  const workspaceProjects = useMemo(() => {
-    const currentProject = projects.find((p) => p.id === ticket.projectId);
-    return currentProject?.workspaceId
-      ? projects.filter((p) => p.workspaceId === currentProject.workspaceId)
-      : projects;
-  }, [projects, ticket.projectId]);
-
   if (!context) {
     return <>{children}</>;
   }
 
   const {
+    tickets,
+    users,
+    cycles,
+    projectById,
+    labelsByProject,
+    globalLabels,
+    projectsByWorkspaceId,
+    projects,
+    ticketsByProject,
     updateTicket,
     moveTicket,
     deleteTicket,
@@ -62,10 +40,42 @@ export const TicketContextMenu: React.FC<TicketContextMenuProps> = ({ ticket, ch
     assignLabelToTicket,
     unassignLabelFromTicket,
   } = context;
+  const sourceTickets = availableTickets ?? tickets;
+
+  const ticketLabels = useMemo(() => {
+    const projectLabels = labelsByProject.get(ticket.projectId);
+    if (globalLabels.length === 0) {
+      return projectLabels || EMPTY_LABELS;
+    }
+    if (!projectLabels || projectLabels.length === 0) {
+      return globalLabels;
+    }
+    return [...globalLabels, ...projectLabels];
+  }, [globalLabels, labelsByProject, ticket.projectId]);
+
+  const assignableTickets = useMemo(() => {
+    const projectTickets = availableTickets
+      ? sourceTickets.filter((candidate) => candidate.projectId === ticket.projectId)
+      : ticketsByProject.get(ticket.projectId) || EMPTY_TICKETS;
+    if (!projectTickets.length) {
+      return EMPTY_TICKETS;
+    }
+    return projectTickets.filter((candidate) => candidate.id !== ticket.id);
+  }, [availableTickets, sourceTickets, ticket.id, ticket.projectId, ticketsByProject]);
+
+  const workspaceProjects = useMemo(() => {
+    const ticketProject = projectById.get(ticket.projectId);
+    if (!ticketProject?.workspaceId) {
+      return projects;
+    }
+
+    return projectsByWorkspaceId.get(ticketProject.workspaceId) || projects;
+  }, [projectById, projects, projectsByWorkspaceId, ticket.projectId]);
+
+  const assignedLabelIds = useMemo(() => new Set(ticket.labels?.map((assignedLabel) => assignedLabel.id) || EMPTY_USER_IDS), [ticket.labels]);
 
   const menuContent = (
     <>
-      {/* 1. Status Submenu */}
       <ContextMenu.Item icon={<CheckSquare size={13} style={{ color: 'var(--color-text-disabled)' }} />}>
         Change Status
         <ContextMenu.SubMenu>
@@ -89,7 +99,6 @@ export const TicketContextMenu: React.FC<TicketContextMenuProps> = ({ ticket, ch
         </ContextMenu.SubMenu>
       </ContextMenu.Item>
 
-      {/* 2. Priority Submenu */}
       <ContextMenu.Item icon={<AlertCircle size={13} style={{ color: 'var(--color-text-disabled)' }} />}>
         Change Priority
         <ContextMenu.SubMenu>
@@ -118,7 +127,6 @@ export const TicketContextMenu: React.FC<TicketContextMenuProps> = ({ ticket, ch
         </ContextMenu.SubMenu>
       </ContextMenu.Item>
 
-      {/* 3. Assignee Submenu */}
       <ContextMenu.Item icon={<User size={13} style={{ color: 'var(--color-text-disabled)' }} />}>
         Assign Member
         <ContextMenu.SubMenu>
@@ -164,7 +172,6 @@ export const TicketContextMenu: React.FC<TicketContextMenuProps> = ({ ticket, ch
         </ContextMenu.SubMenu>
       </ContextMenu.Item>
 
-      {/* 4. Project Submenu */}
       <ContextMenu.Item icon={<Folder size={13} style={{ color: 'var(--color-text-disabled)' }} />}>
         Move to Project
         <ContextMenu.SubMenu>
@@ -194,7 +201,6 @@ export const TicketContextMenu: React.FC<TicketContextMenuProps> = ({ ticket, ch
         </ContextMenu.SubMenu>
       </ContextMenu.Item>
 
-      {/* 5. Labels Submenu */}
       <ContextMenu.Item icon={<Tag size={13} style={{ color: 'var(--color-text-disabled)' }} />}>
         Labels
         <ContextMenu.SubMenu>
@@ -202,7 +208,7 @@ export const TicketContextMenu: React.FC<TicketContextMenuProps> = ({ ticket, ch
             <ContextMenu.Item disabled>No labels available</ContextMenu.Item>
           ) : (
             ticketLabels.map((l) => {
-              const isAssigned = ticket.labels?.some((assigned) => assigned.id === l.id) || false;
+              const isAssigned = assignedLabelIds.has(l.id);
               return (
                 <ContextMenu.Item
                   key={l.id}
@@ -238,7 +244,6 @@ export const TicketContextMenu: React.FC<TicketContextMenuProps> = ({ ticket, ch
         </ContextMenu.SubMenu>
       </ContextMenu.Item>
 
-      {/* 6. Cycle Submenu */}
       <ContextMenu.Item icon={<Calendar size={13} style={{ color: 'var(--color-text-disabled)' }} />}>
         Assign Cycle
         <ContextMenu.SubMenu>
@@ -273,7 +278,6 @@ export const TicketContextMenu: React.FC<TicketContextMenuProps> = ({ ticket, ch
         </ContextMenu.SubMenu>
       </ContextMenu.Item>
 
-      {/* 7. Assign As Submenu */}
       <ContextMenu.Item icon={<Link size={13} style={{ color: 'var(--color-text-disabled)' }} />}>
         Assign As
         <ContextMenu.SubMenu>
@@ -321,10 +325,8 @@ export const TicketContextMenu: React.FC<TicketContextMenuProps> = ({ ticket, ch
         </ContextMenu.SubMenu>
       </ContextMenu.Item>
 
-      {/* Divider */}
       <div className="lib-divider" style={{ margin: '4px 0' }} />
 
-      {/* 8. Delete Option */}
       <ContextMenu.Item
         danger
         icon={<Trash2 size={13} />}

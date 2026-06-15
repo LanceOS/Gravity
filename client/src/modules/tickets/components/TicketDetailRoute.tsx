@@ -13,6 +13,7 @@ interface TicketDetailRouteProps {
   projects: Project[];
   labels: Label[];
   cycles: Cycle[];
+  ticketsById?: Map<string, Ticket>;
   activeTicketDetail: Ticket | null;
   onSelectTicket: (ticket: Ticket | null) => void;
   onUpdateTicket: (id: string, updates: Partial<Ticket>) => Promise<void>;
@@ -43,6 +44,7 @@ export const TicketDetailRoute: React.FC<TicketDetailRouteProps> = ({
   onAddComment,
   onUpdateComment,
   onDeleteComment,
+  ticketsById,
   onOpenCreateSubtask,
   onAddDependency,
   onRemoveDependency,
@@ -53,13 +55,30 @@ export const TicketDetailRoute: React.FC<TicketDetailRouteProps> = ({
   const { workspaceId, projectId, ticketKey } = useParams();
 
   const detailSubtasks = useMemo(
-    () => (activeTicket ? tickets.filter((ticket) => ticket.parentId === activeTicket.id) : []),
-    [tickets, activeTicket]
+    () => {
+      if (!activeTicket) {
+        return [];
+      }
+
+      if (activeTicketDetail?.subtasks && activeTicketDetail.subtasks.length > 0) {
+        return activeTicketDetail.subtasks;
+      }
+
+      return tickets.filter((ticket) => ticket.parentId === activeTicket.id);
+    },
+    [activeTicket, tickets, activeTicketDetail?.subtasks]
   );
 
   const parentTicket = useMemo(
-    () => (activeTicket ? tickets.find((t) => t.id === activeTicket.parentId) || null : null),
-    [tickets, activeTicket]
+    () => {
+      if (!activeTicket?.parentId) {
+        return null;
+      }
+
+      const ticketsByIdResolved = ticketsById ?? new Map(tickets.map((ticket) => [ticket.id, ticket]));
+      return ticketsByIdResolved.get(activeTicket.parentId) || null;
+    },
+    [activeTicket?.parentId, tickets, ticketsById]
   );
 
   const completedDetailSubtasks = useMemo(
@@ -98,6 +117,7 @@ export const TicketDetailRoute: React.FC<TicketDetailRouteProps> = ({
         comments={comments}
         subtasks={detailSubtasks}
         availableTickets={tickets}
+        ticketsById={ticketsById}
         completedSubtasks={completedDetailSubtasks}
         subtaskProgressPercent={detailSubtaskProgressPercent}
         parentTicket={parentTicket}

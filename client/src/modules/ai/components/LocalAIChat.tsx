@@ -1,9 +1,11 @@
-import { useEffect, useEffectEvent, useRef, useState } from 'react';
+import React, { useEffect, useEffectEvent, useState } from 'react';
 import { useTickets } from '../../../context/TicketContext';
 import { FileText, ListPlus, Sparkles, Wifi, WifiOff } from 'lucide-react';
 import { DenseTextInput, AIChatWindow } from '@library';
 import type { LocalAIChatProps, Message, QuickActionType } from '../types/LocalAIChat';
 import { buildOllamaErrorMessage, buildQuickActionPrompt, getInitialMessages, getInitialModel, getInitialOllamaUrl } from '../utils/LocalAIChat';
+import { apiClient } from '../../../utils/apiClient';
+import { CACHE_CONFIGS, queryClient, queryKeys } from '../../../utils/queryClient';
 
 const CLOUD_MODELS: Record<string, string[]> = {
   openai: ['gpt-4o-mini', 'gpt-4o'],
@@ -11,6 +13,18 @@ const CLOUD_MODELS: Record<string, string[]> = {
   gemini: ['gemini-1.5-flash', 'gemini-1.5-pro'],
   deepseek: ['deepseek-chat'],
 };
+
+function parseToolArguments(argumentsPayload: Record<string, unknown> | string): Record<string, unknown> | string {
+  if (typeof argumentsPayload !== 'string') {
+    return argumentsPayload;
+  }
+
+  try {
+    return JSON.parse(argumentsPayload);
+  } catch {
+    return argumentsPayload;
+  }
+}
 
 export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllamaUrl, initialModel, settings, workspaceId, isClosing }) => {
   const { activeTicket, projects, users } = useTickets();
@@ -46,21 +60,32 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
 
   useEffect(() => {
     if (!workspaceId) {
+      setMcpTools([]);
       return;
     }
 
-    fetch('/api/v1/mcp/sse', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Workspace-Id': workspaceId
-      },
-      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' })
-    }).then(res => res.json()).then(data => {
-      if (data.result?.tools) {
-        setMcpTools(data.result.tools);
-      }
-    }).catch(console.error);
+    queryClient
+      .fetchQuery(
+        queryKeys.mcpTools(workspaceId),
+        () =>
+          apiClient.post<{ result?: { tools?: any[] } }>('/mcp/sse', {
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'tools/list',
+          }, {
+            headers: {
+              'X-Workspace-Id': workspaceId,
+            },
+          }),
+        {
+          staleTime: CACHE_CONFIGS.aiTools.staleTime,
+          gcTime: CACHE_CONFIGS.aiTools.gcTime,
+        },
+      )
+      .then((data) => {
+        setMcpTools(data.result?.tools ?? []);
+      })
+      .catch(console.error);
   }, [workspaceId]);
 
   // Chat state
@@ -79,27 +104,33 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
     }
 
     try {
-      const response = await fetch(`/api/v1/ai/ollama/models?ollamaUrl=${encodeURIComponent(urlToTest)}`);
-
-      if (response.ok) {
-        const data = await response.json() as { models?: string[]; connected?: boolean; error?: string };
-        const nextModels = Array.isArray(data.models)
-          ? data.models.filter((m): m is string => typeof m === 'string' && m.length > 0)
-          : [];
-
-        setDetectedModels(nextModels);
-        if (data.connected && nextModels.length > 0) {
-          if (!model || !nextModels.includes(model)) {
-            setModel(nextModels[0]);
-          }
-          setModelStatus('connected');
-        } else if (data.connected && nextModels.length === 0) {
-          // Connected but no models installed
-          setModelStatus('connected');
-        } else {
-          setModelStatus('disconnected');
-          setDetectedModels([]);
+      const data = await queryClient.fetchQuery(
+        queryKeys.ollamaModels(urlToTest),
+        () =>
+          apiClient.get<{ models?: string[]; connected?: boolean }>('/ai/ollama/models', {
+            params: {
+              ollamaUrl: urlToTest,
+            },
+          }),
+        {
+          staleTime: CACHE_CONFIGS.aiModels.staleTime,
+          gcTime: CACHE_CONFIGS.aiModels.gcTime,
         }
+      );
+
+      const nextModels = Array.isArray(data.models)
+        ? data.models.filter((m): m is string => typeof m === 'string' && m.length > 0)
+        : [];
+
+      setDetectedModels(nextModels);
+      if (data.connected && nextModels.length > 0) {
+        if (!model || !nextModels.includes(model)) {
+          setModel(nextModels[0]);
+        }
+        setModelStatus('connected');
+      } else if (data.connected && nextModels.length === 0) {
+        // Connected but no models installed
+        setModelStatus('connected');
       } else {
         setModelStatus('disconnected');
         setDetectedModels([]);
@@ -160,20 +191,13 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
         payload.ollamaUrl = ollamaUrl;
       }
 
-      const response = await fetch('/api/v1/ai/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+      const data = await apiClient.post<{ message?: { content?: string; tool_calls?: Array<{ id: string; name: string; arguments: Record<string, unknown> | string }> } }>('/ai/chat', payload, {
+        headers: {
+          'X-Mcp-Sanitize': 'true',
+        },
       });
 
       const providerLabel = isThirdParty ? getProviderName(settings.aiProvider) : 'Ollama';
-
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || `Server error proxying to ${providerLabel}.`);
-      }
-
-      const data = await response.json();
       const aiResponse = data.message?.content || '';
       const toolCalls = data.message?.tool_calls;
 
@@ -191,24 +215,24 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
         const toolMessages: Message[] = [];
         for (const tc of toolCalls) {
           try {
-            const toolResponse = await fetch('/api/v1/mcp/sse', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'X-Mcp-Sanitize': 'true',
-                ...(workspaceId ? { 'X-Workspace-Id': workspaceId } : {})
-              },
-              body: JSON.stringify({
+            const toolData = await apiClient.post<{ result?: { content?: { text?: string }[] }; error?: { message?: string } }>(
+              '/mcp/sse',
+              {
                 jsonrpc: '2.0',
                 id: Date.now(),
                 method: 'tools/call',
                 params: {
                   name: tc.name,
-                  arguments: typeof tc.arguments === 'string' ? JSON.parse(tc.arguments) : tc.arguments
-                }
-              })
-            });
-            const toolData = await toolResponse.json();
+                  arguments: parseToolArguments(tc.arguments),
+                },
+              },
+              {
+                headers: {
+                  'X-Mcp-Sanitize': 'true',
+                  ...(workspaceId ? { 'X-Workspace-Id': workspaceId } : {}),
+                },
+              }
+            );
             const toolResult = toolData.result?.content?.[0]?.text || JSON.stringify(toolData);
             toolMessages.push({
               role: 'tool',

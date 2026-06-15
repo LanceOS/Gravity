@@ -6,6 +6,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
+type NoteMetadata = NonNullable<Awaited<ReturnType<typeof MetadataRepository.getNoteMetadata>>>;
+
+export type NoteCleanupDependencies = {
+  getMetadata: (id: string) => Promise<NoteMetadata | null>;
+  getBody: (bucketPath: string) => Promise<string>;
+  listFiles: (bucketPath: string) => Promise<string[]>;
+  deleteFile: (bucketPath: string, filename: string) => Promise<void>;
+};
+
 function extractRichTextExcerpt(body: string): string | null {
   try {
     const parsed = JSON.parse(body);
@@ -184,50 +193,69 @@ export async function searchNotes(projectId: string, userId: string, query: stri
   return await MetadataRepository.searchNotesMetadata(projectId, userId, query, limit, offset, sortDirection);
 }
 
+export class NoteCleanupService {
+  private readonly dependencies: NoteCleanupDependencies;
+
+  constructor(dependencies?: Partial<NoteCleanupDependencies>) {
+    this.dependencies = {
+      getMetadata: MetadataRepository.getNoteMetadata,
+      getBody: NotesRepository.getBody,
+      listFiles: RustFS.listFiles,
+      deleteFile: NotesRepository.deleteFile,
+      ...dependencies,
+    };
+  }
+
+  async cleanupNoteMedia(noteId: string, projectId: string): Promise<{
+    cleanedFiles: string[];
+    deadLinks: string[];
+  }> {
+    const metadata = await this.dependencies.getMetadata(noteId);
+    if (!metadata || metadata.projectId !== projectId) {
+      throw new Error('NOT_FOUND');
+    }
+
+    let body = '';
+    try {
+      body = await this.dependencies.getBody(metadata.bucketPath);
+    } catch (e: any) {
+      if (e.code !== 'ENOENT') throw e;
+    }
+
+    const allFiles = await this.dependencies.listFiles(metadata.bucketPath);
+    const mediaFiles = allFiles.filter((f) => f !== 'body.md');
+    const mediaFileSet = new Set(mediaFiles);
+
+    // Find all file references in the body (e.g. /api/v1/notes/:noteId/media/:filename)
+    const referencePattern = new RegExp(`/api/v1/notes/${noteId}/media/([^\\s)"]+)`, 'g');
+    const referencedFiles = new Set<string>();
+    let match;
+    while ((match = referencePattern.exec(body)) !== null) {
+      try {
+        referencedFiles.add(decodeURIComponent(match[1]));
+      } catch {
+        referencedFiles.add(match[1]);
+      }
+    }
+
+    const orphanedFiles = mediaFiles.filter((file) => !referencedFiles.has(file));
+    const deadLinks = [...referencedFiles].filter((file) => !mediaFileSet.has(file));
+
+    await Promise.all(orphanedFiles.map((file) => this.dependencies.deleteFile(metadata.bucketPath, file)));
+
+    return {
+      cleanedFiles: orphanedFiles,
+      deadLinks,
+    };
+  }
+}
+
+const noteCleanupService = new NoteCleanupService();
+
+export function createNoteCleanupService(dependencies?: Partial<NoteCleanupDependencies>) {
+  return new NoteCleanupService(dependencies);
+}
+
 export async function cleanupNoteMedia(noteId: string, projectId: string) {
-  const metadata = await MetadataRepository.getNoteMetadata(noteId);
-  if (!metadata || metadata.projectId !== projectId) {
-    throw new Error('NOT_FOUND');
-  }
-
-  let body = '';
-  try {
-    body = await NotesRepository.getBody(metadata.bucketPath);
-  } catch (e: any) {
-    if (e.code !== 'ENOENT') throw e;
-  }
-
-  const allFiles = await RustFS.listFiles(metadata.bucketPath);
-  const mediaFiles = allFiles.filter(f => f !== 'body.md');
-  
-  // Find all file references in the body (e.g. /api/v1/notes/:noteId/media/:filename)
-  const referencePattern = new RegExp(`/api/v1/notes/${noteId}/media/([^\\s)"]+)`, 'g');
-  const referencedFiles = new Set<string>();
-  let match;
-  while ((match = referencePattern.exec(body)) !== null) {
-    referencedFiles.add(decodeURIComponent(match[1]));
-  }
-
-  const orphanedFiles: string[] = [];
-  const deadLinks: string[] = [];
-
-  // Identify and delete orphaned files
-  for (const file of mediaFiles) {
-    if (!referencedFiles.has(file)) {
-      orphanedFiles.push(file);
-      await NotesRepository.deleteFile(metadata.bucketPath, file);
-    }
-  }
-
-  // Identify dead links (referenced but file doesn't exist)
-  for (const ref of referencedFiles) {
-    if (!mediaFiles.includes(ref)) {
-      deadLinks.push(ref);
-    }
-  }
-
-  return {
-    cleanedFiles: orphanedFiles,
-    deadLinks: deadLinks
-  };
+  return noteCleanupService.cleanupNoteMedia(noteId, projectId);
 }

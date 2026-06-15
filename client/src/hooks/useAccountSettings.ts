@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { User } from '../context/TicketContext';
 import {
   DEFAULT_WORKSPACE_SETTINGS,
@@ -19,13 +19,6 @@ function normalizeApiKeyInput(value: string): string {
     return value.slice(API_KEY_MASK.length);
   }
   return value;
-}
-
-function getSavedCredentialForProvider(
-  credentials: SavedApiCredential[],
-  provider: WorkspaceSettings['aiProvider'],
-) {
-  return credentials.find((credential) => credential.provider === provider);
 }
 
 function normalizeSavedCredentials(rawCredentials: unknown): SavedApiCredential[] {
@@ -98,6 +91,16 @@ export function useAccountSettings({
   const [settingsHydrated, setSettingsHydrated] = useState(false);
   const [savedCredentials, setSavedCredentials] = useState<SavedApiCredential[]>([]);
   const [apiKeyState, setApiKeyState] = useState<'stored' | 'cleared' | 'pending'>('cleared');
+
+  const savedCredentialByProvider = useMemo(() => {
+    const map = new Map<WorkspaceSettings['aiProvider'], SavedApiCredential>();
+    for (const credential of savedCredentials) {
+      if (!map.has(credential.provider)) {
+        map.set(credential.provider, credential);
+      }
+    }
+    return map;
+  }, [savedCredentials]);
 
   useEffect(() => {
     if (!saveSuccess) {
@@ -242,10 +245,7 @@ export function useAccountSettings({
 
     const providerChanged = typeof nextUpdates.aiProvider === 'string';
     if (providerChanged) {
-      const selectedCredential = getSavedCredentialForProvider(
-        savedCredentials,
-        nextUpdates.aiProvider as WorkspaceSettings['aiProvider'],
-      );
+      const selectedCredential = savedCredentialByProvider.get(nextUpdates.aiProvider as WorkspaceSettings['aiProvider']);
 
       nextUpdates.apiKey = selectedCredential ? API_KEY_MASK : '';
     }
@@ -255,10 +255,7 @@ export function useAccountSettings({
     setSaveError(null);
 
     if (providerChanged) {
-      const selectedCredential = getSavedCredentialForProvider(
-        savedCredentials,
-        nextUpdates.aiProvider as WorkspaceSettings['aiProvider'],
-      );
+      const selectedCredential = savedCredentialByProvider.get(nextUpdates.aiProvider as WorkspaceSettings['aiProvider']);
 
       setApiKeyState(selectedCredential ? 'stored' : 'cleared');
       setTestResult(null);
@@ -273,7 +270,7 @@ export function useAccountSettings({
     if (nextUpdates.ollamaEndpoint !== undefined) {
       setOllamaModels([]);
     }
-  }, [savedCredentials]);
+  }, [savedCredentialByProvider]);
 
   const saveSettings = useCallback(async () => {
     if (!currentUser) {
@@ -373,7 +370,7 @@ export function useAccountSettings({
   }, [currentUser, settings.aiProvider]);
 
   const resetProviderDraft = useCallback(() => {
-    const selectedCredential = getSavedCredentialForProvider(savedCredentials, settings.aiProvider);
+    const selectedCredential = savedCredentialByProvider.get(settings.aiProvider);
 
     setSettings((current) => ({
       ...current,
@@ -383,7 +380,7 @@ export function useAccountSettings({
     setTestResult(null);
     setSaveSuccess(false);
     setSaveError(null);
-  }, [savedCredentials, settings.aiProvider]);
+  }, [savedCredentialByProvider, settings.aiProvider]);
 
   const testApiKey = useCallback(async () => {
     const provider = getProviderOption(settings.aiProvider);

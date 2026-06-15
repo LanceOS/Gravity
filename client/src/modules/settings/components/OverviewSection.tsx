@@ -1,22 +1,11 @@
 import React from 'react';
 import { Globe, Users, UserPlus } from 'lucide-react';
 import { Card, Stack, Grid, TextInput, Select, Divider } from '@library';
-import type { WorkspaceSummary } from '../../../hooks/useWorkspaceDirectory';
-import type { WorkspaceAdminSettings } from '../../../hooks/useWorkspaceSettings';
+import { useSettingsScreenContext } from '../../../context/settings/useSettingsScreenContext';
 
-interface OverviewSectionProps {
-  workspace: WorkspaceSummary;
-  settings: WorkspaceAdminSettings;
-  onChangeSettings: (updates: Partial<WorkspaceAdminSettings>) => void;
-  isMobile: boolean;
-}
+export function OverviewSection(): JSX.Element {
+  const { isMobile, workspace, settings, onChangeSettings } = useSettingsScreenContext();
 
-export function OverviewSection({
-  workspace,
-  settings,
-  onChangeSettings,
-  isMobile,
-}: OverviewSectionProps) {
   return (
     <Card style={{ padding: 'var(--space-lg)', borderRadius: 'var(--radius-lg)' }}>
       <Stack gap="var(--space-lg)">

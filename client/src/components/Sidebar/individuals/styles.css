@@ -3,22 +3,9 @@
   margin-top: 4px;
 }
 
-/* ── "Projects" collapse toggle button ───────────── */
-.individuals-sidebar__group-toggle {
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-  background: none;
-  border: none;
-  padding: 0;
-  font: inherit;
-  color: inherit;
-  width: 100%;
-  text-align: left;
-}
-
-.individuals-sidebar__group-toggle-label {
-  margin-left: 4px;
+/* ── "Projects" section label ────────────────────── */
+.individuals-sidebar__group-label {
+  font-weight: 600;
 }
 
 /* ── Project list ─────────────────────────────────── */
@@ -46,7 +33,8 @@
 /* gridTemplateRows is set via inline style (dynamic: '1fr' / '0fr') */
 .individuals-sidebar__accordion {
   display: grid;
-  transition: grid-template-rows var(--transition-normal);
+  transition: grid-template-rows var(--transition-normal), opacity var(--transition-normal);
+  opacity: 1;
 }
 
 .individuals-sidebar__accordion-inner {

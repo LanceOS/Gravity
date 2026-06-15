@@ -14,6 +14,7 @@ import {
   workspaceSettings,
 } from '../db/schema.js';
 import { env } from '../env.js';
+import { getWorkspaceMemberRole } from '../modules/workspaces/services/membership.js';
 
 export type ClientUser = {
   id: string;
@@ -260,6 +261,20 @@ export type WorkspaceSummary = {
   hierarchyMode?: 'flat' | 'teams';
 };
 
+export const WorkspaceCacheInvalidationReason = {
+  UNKNOWN: 'unknown',
+  TEAM_STRUCTURE_CHANGED: 'team-structure-changed',
+  PROJECT_STRUCTURE_CHANGED: 'project-structure-changed',
+  MEMBERSHIP_CHANGED: 'membership-changed',
+  WORKSPACE_SETTINGS_CHANGED: 'workspace-settings-changed',
+  WORKSPACE_JOIN_REQUESTS_UPDATED: 'workspace-join-requests-updated',
+} as const;
+
+export type WorkspaceCacheInvalidationReasonType =
+  (typeof WorkspaceCacheInvalidationReason)[keyof typeof WorkspaceCacheInvalidationReason];
+
+type WorkspaceSummaryBase = Omit<WorkspaceSummary, 'memberRole'>;
+
 export async function listWorkspaceSummaries(userId?: string): Promise<WorkspaceSummary[]> {
   const cacheKey = userId ? cache.CacheKeys.workspaces.byUser(userId) : cache.CacheKeys.workspaces.all();
   return cache.wrap(cacheKey, 300, async () => {
@@ -359,9 +374,16 @@ export async function listWorkspaceSummaries(userId?: string): Promise<Workspace
   });
 }
 
-export async function invalidateWorkspaceCache(workspaceId: string): Promise<void> {
+export async function invalidateWorkspaceCache(
+  workspaceId: string,
+  reason: WorkspaceCacheInvalidationReasonType = WorkspaceCacheInvalidationReason.UNKNOWN
+): Promise<void> {
   try {
-    const keysToInvalidate = [cache.CacheKeys.workspaces.all()];
+    const keysToInvalidate = [
+      cache.CacheKeys.workspaces.all(),
+      cache.CacheKeys.workspaces.byId(workspaceId),
+      cache.CacheKeys.workspaces.sidebar(workspaceId),
+    ];
     const members = await db
       .select({ userId: workspaceMembers.userId })
       .from(workspaceMembers)
@@ -372,7 +394,7 @@ export async function invalidateWorkspaceCache(workspaceId: string): Promise<voi
     }
     await cache.delMany(keysToInvalidate);
   } catch (error) {
-    console.error(`Failed to invalidate cache for workspace ${workspaceId}:`, error);
+    console.error(`Failed to invalidate workspace cache for ${workspaceId} due to ${reason}:`, error);
   }
 }
 
@@ -388,8 +410,74 @@ export async function invalidateUserWorkspacesCache(userId: string): Promise<voi
 }
 
 export async function getWorkspaceSummary(workspaceId: string, userId?: string) {
-  const summaries = await listWorkspaceSummaries(userId);
-  return summaries.find((workspace) => workspace.id === workspaceId) ?? null;
+  const cacheKey = cache.CacheKeys.workspaces.byId(workspaceId);
+  const summary = await cache.wrap(cacheKey, 300, async () => {
+    const workspaceRows: WorkspaceSummaryBase[] = await db
+      .select({
+        id: workspaces.id,
+        name: workspaces.name,
+        description: workspaces.description,
+        key: workspaces.key,
+        defaultProjectId: workspaces.defaultProjectId,
+        workspaceHostUrl: workspaces.hostUrl,
+        settingsHostUrl: workspaceSettings.hostUrl,
+        joinMode: workspaceSettings.joinMode,
+        hierarchyMode: workspaceSettings.hierarchyMode,
+      })
+      .from(workspaces)
+      .leftJoin(workspaceSettings, eq(workspaceSettings.workspaceId, workspaces.id))
+      .where(eq(workspaces.id, workspaceId))
+      .limit(1);
+
+    const workspace = workspaceRows[0];
+    if (!workspace) {
+      return null;
+    }
+
+    const [projectCountRow, memberCountRow, pendingJoinRequestCountRow] = await Promise.all([
+      db
+        .select({ count: sql<number>`count(*)` })
+        .from(projects)
+        .where(eq(projects.workspaceId, workspace.id)),
+      db
+        .select({ count: sql<number>`count(*)` })
+        .from(workspaceMembers)
+        .where(eq(workspaceMembers.workspaceId, workspace.id)),
+      db
+        .select({ count: sql<number>`count(*)` })
+        .from(workspaceJoinRequests)
+        .where(and(eq(workspaceJoinRequests.workspaceId, workspace.id), eq(workspaceJoinRequests.status, 'pending'))),
+    ]);
+
+    return {
+      id: workspace.id,
+      name: workspace.name,
+      description: workspace.description ?? '',
+      key: workspace.key,
+      defaultProjectId: workspace.defaultProjectId ?? null,
+      hostUrl: workspace.settingsHostUrl || workspace.workspaceHostUrl || '',
+      joinMode: workspace.joinMode === 'auto_join' ? 'auto_join' : 'approval_required',
+      projectCount: Number(projectCountRow[0]?.count ?? 0),
+      memberCount: Number(memberCountRow[0]?.count ?? 0),
+      pendingJoinRequestCount: Number(pendingJoinRequestCountRow[0]?.count ?? 0),
+      hierarchyMode: workspace.hierarchyMode ?? 'flat',
+    };
+  });
+
+  if (!summary) {
+    return null;
+  }
+
+  if (!userId) {
+    return summary;
+  }
+
+  const memberRole = await getWorkspaceMemberRole(workspaceId, userId);
+  if (!memberRole) {
+    return null;
+  }
+
+  return { ...summary, memberRole };
 }
 
 export async function nextTicketKey(projectId: string) {

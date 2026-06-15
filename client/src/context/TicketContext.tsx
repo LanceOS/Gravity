@@ -76,12 +76,46 @@ const initialFilters = {
 
 const CURRENT_USER_STORAGE_KEY = 'gravity_user';
 
+function writeStoredUser(value: User | null) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    if (value) {
+      window.localStorage.setItem(CURRENT_USER_STORAGE_KEY, JSON.stringify(value));
+    } else {
+      window.localStorage.removeItem(CURRENT_USER_STORAGE_KEY);
+    }
+  } catch {
+    // localStorage may be unavailable in restricted/private modes.
+  }
+}
+
+function clearStoredUser() {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    window.localStorage.removeItem(CURRENT_USER_STORAGE_KEY);
+  } catch {
+    // localStorage may be unavailable in restricted/private modes.
+  }
+}
+
 function readStoredUser(): User | null {
   if (typeof window === 'undefined') {
     return null;
   }
 
-  const rawUser = window.localStorage.getItem(CURRENT_USER_STORAGE_KEY);
+  let rawUser: string | null = null;
+  try {
+    rawUser = window.localStorage.getItem(CURRENT_USER_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+
   if (!rawUser) {
     return null;
   }
@@ -89,7 +123,7 @@ function readStoredUser(): User | null {
   try {
     const parsedUser = JSON.parse(rawUser) as Record<string, unknown>;
     if (typeof parsedUser.id !== 'string' || typeof parsedUser.name !== 'string' || typeof parsedUser.email !== 'string') {
-      window.localStorage.removeItem(CURRENT_USER_STORAGE_KEY);
+      clearStoredUser();
       return null;
     }
 
@@ -105,7 +139,7 @@ function readStoredUser(): User | null {
           : undefined,
     };
   } catch {
-    window.localStorage.removeItem(CURRENT_USER_STORAGE_KEY);
+    clearStoredUser();
     return null;
   }
 }
@@ -127,6 +161,25 @@ function canonicalizeStatus(status: string | undefined | null): Ticket['status']
   if (collapsed === 'todo' || collapsed === 'to_do') return 'todo';
 
   return 'todo';
+}
+
+function hasEquivalentTicketFields(left: Ticket, right: Ticket) {
+  return (
+    left.id === right.id &&
+    left.key === right.key &&
+    left.title === right.title &&
+    left.description === right.description &&
+    left.status === right.status &&
+    left.priority === right.priority &&
+    left.projectId === right.projectId &&
+    left.assigneeId === right.assigneeId &&
+    left.cycleId === right.cycleId &&
+    left.parentId === right.parentId &&
+    left.prStatus === right.prStatus &&
+    left.prUrl === right.prUrl &&
+    left.branchName === right.branchName &&
+    left.updatedAt === right.updatedAt
+  );
 }
 
 
@@ -185,6 +238,12 @@ interface TicketContextType extends State {
   setFilters: (filters: Partial<State['filters']>) => void;
   resetFilters: () => void;
   ticketMap: Map<string, Ticket>;
+  ticketById: Map<string, Ticket>;
+  projectById: Map<string, Project>;
+  labelsByProject: Map<string, Label[]>;
+  globalLabels: Label[];
+  projectsByWorkspaceId: Map<string, Project[]>;
+  ticketsByProject: Map<string, Ticket[]>;
 }
 
 export const TicketContext = createContext<TicketContextType | undefined>(undefined);
@@ -234,14 +293,45 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     queryKey: queryKeys.projects(currentUser?.id),
     queryFn: () => apiClient.get<Project[]>(`/projects`, { params: { userId: currentUser?.id } }),
     enabled: !!currentUser?.id,
+    ...CACHE_CONFIGS.metadata,
   });
   const projects = projectsQuery.data || [];
+  const projectLookup = useMemo(() => {
+    const lookup = new Map<string, { workspaceId: string; teamId: string | null }>();
+    projects.forEach((project) => {
+      lookup.set(project.id, {
+        workspaceId: project.workspaceId,
+        teamId: project.teamId || null,
+      });
+    });
+    return lookup;
+  }, [projects]);
+
+  const invalidateAggregateTicketQueries = useCallback((projectId?: string) => {
+    if (!projectId) return;
+
+    const metadata = projectLookup.get(projectId);
+    if (!metadata) {
+      queryClient.invalidateQueries({ queryKey: ['workspaceTickets'] });
+      queryClient.invalidateQueries({ queryKey: ['teamTickets'] });
+      return;
+    }
+
+    if (metadata.workspaceId) {
+      queryClient.invalidateQueries({ queryKey: ['workspaceTickets', metadata.workspaceId] });
+    }
+
+    if (metadata.teamId) {
+      queryClient.invalidateQueries({ queryKey: ['teamTickets', metadata.teamId] });
+    }
+  }, [projectLookup]);
 
   // Users List
   const usersQuery = useQuery({
     queryKey: queryKeys.users(),
     queryFn: () => apiClient.get<User[]>(`/users`),
     enabled: !!currentUser,
+    ...CACHE_CONFIGS.metadata,
   });
   const users = usersQuery.data || [];
 
@@ -282,6 +372,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     queryKey: queryKeys.comments(activeTicketId || ''),
     queryFn: () => apiClient.get<Comment[]>(`/tickets/${activeTicketId}/comments`, { projectId: activeTicketProjectId }),
     enabled: !!activeTicketId && !!activeTicketProjectId && !!currentUser,
+    ...CACHE_CONFIGS.ticketDetail,
   });
   const comments = commentsQuery.data || [];
 
@@ -309,21 +400,35 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     (!!activeProjectId && labelsQuery.isLoading) ||
     (!!activeProjectId && cyclesQuery.isLoading);
 
+  const ticketMap = useMemo(() => new Map(tickets.map((t) => [t.key.toUpperCase(), t])), [tickets]);
+  const ticketById = useMemo(() => new Map(tickets.map((t) => [t.id, t])), [tickets]);
+
   // Sync activeTicket if it was updated in the tickets query
   useEffect(() => {
-    if (activeTicket) {
-      const latest = tickets.find(t => t.id === activeTicket.id);
-      if (latest && JSON.stringify(latest) !== JSON.stringify(activeTicket)) {
-        setActiveTicket(latest);
-      }
+    if (!activeTicket) {
+      return;
     }
-  }, [tickets, activeTicket]);
+
+    const latest = ticketById.get(activeTicket.id);
+    if (latest && !hasEquivalentTicketFields(latest, activeTicket)) {
+      setActiveTicket(latest);
+    }
+  }, [activeTicket, ticketById]);
 
   // --- Actions ---
 
   const setActiveProjectId = useCallback((id: string) => {
+    if (activeProjectIdRef.current === id) {
+      return;
+    }
+
     setActiveProjectIdState(id);
-    setFiltersState(prev => ({ ...prev, projectId: id }));
+    setFiltersState((prev) => {
+      if (prev.projectId === id) {
+        return prev;
+      }
+      return { ...prev, projectId: id };
+    });
   }, []);
 
   const fetchInitialData = useCallback(async (userId?: string) => {
@@ -333,17 +438,40 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return;
     }
     await Promise.all([
-      queryClient.prefetchQuery({ queryKey: queryKeys.projects(userId), queryFn: () => apiClient.get<Project[]>(`/projects`, { params: { userId } }) }),
-      queryClient.prefetchQuery({ queryKey: queryKeys.users(), queryFn: () => apiClient.get<User[]>(`/users`) }),
+      queryClient.prefetchQuery({
+        queryKey: queryKeys.projects(userId),
+        queryFn: () => apiClient.get<Project[]>(`/projects`, { params: { userId } }),
+        ...CACHE_CONFIGS.metadata,
+      }),
+      queryClient.prefetchQuery({
+        queryKey: queryKeys.users(),
+        queryFn: () => apiClient.get<User[]>(`/users`),
+        ...CACHE_CONFIGS.metadata,
+      }),
     ]);
   }, []);
 
   const fetchProjectData = useCallback(async (projId: string) => {
     if (!projId) return;
     await Promise.all([
-      queryClient.prefetchQuery({ queryKey: queryKeys.tickets(projId), queryFn: () => apiClient.get<Ticket[]>(`/tickets`, { projectId: projId }) }),
-      queryClient.prefetchQuery({ queryKey: queryKeys.labels(projId), queryFn: () => apiClient.get<Label[]>(`/labels`, { projectId: projId }) }),
-      queryClient.prefetchQuery({ queryKey: queryKeys.cycles(projId), queryFn: () => apiClient.get<Cycle[]>(`/cycles`, { projectId: projId }) }),
+      queryClient.prefetchQuery({
+        queryKey: queryKeys.tickets(projId),
+        queryFn: async () => {
+          const data = await apiClient.get<Ticket[]>(`/tickets`, { projectId: projId });
+          return data.map((ticket) => ({ ...ticket, status: canonicalizeStatus(ticket.status) }));
+        },
+        ...CACHE_CONFIGS.ticketsList,
+      }),
+      queryClient.prefetchQuery({
+        queryKey: queryKeys.labels(projId),
+        queryFn: () => apiClient.get<Label[]>(`/labels`, { projectId: projId }),
+        ...CACHE_CONFIGS.metadata,
+      }),
+      queryClient.prefetchQuery({
+        queryKey: queryKeys.cycles(projId),
+        queryFn: () => apiClient.get<Cycle[]>(`/cycles`, { projectId: projId }),
+        ...CACHE_CONFIGS.metadata,
+      }),
     ]);
   }, []);
 
@@ -409,12 +537,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Sync stored user with local storage
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (currentUser) {
-      window.localStorage.setItem(CURRENT_USER_STORAGE_KEY, JSON.stringify(currentUser));
-    } else {
-      window.localStorage.removeItem(CURRENT_USER_STORAGE_KEY);
-    }
+    writeStoredUser(currentUser);
   }, [currentUser]);
 
   // --- Real-time SSE Synchronization ---
@@ -426,14 +549,22 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     eventSource.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data);
+        if (!message || typeof message !== 'object') {
+          return;
+        }
+
+        const messageData = message.data as Record<string, unknown>;
         if (message.type === 'tickets-updated') {
-          if (message.data.projectId === activeProjectIdRef.current) {
-            queryClient.invalidateQueries({ queryKey: queryKeys.tickets(message.data.projectId) });
+          const projectId = typeof messageData?.projectId === 'string' ? messageData.projectId : '';
+          if (projectId) {
+            queryClient.invalidateQueries({ queryKey: queryKeys.tickets(projectId) });
+            invalidateAggregateTicketQueries(projectId);
           }
         } else if (message.type === 'comments-updated') {
           const activeId = activeTicketRef.current?.id;
-          if (activeId && activeId === message.data.ticketId) {
-            queryClient.invalidateQueries({ queryKey: queryKeys.comments(message.data.ticketId) });
+          const ticketId = typeof messageData?.ticketId === 'string' ? messageData.ticketId : '';
+          if (activeId && activeId === ticketId) {
+            queryClient.invalidateQueries({ queryKey: queryKeys.comments(ticketId) });
           }
         } else if (message.type === 'users-updated') {
           queryClient.invalidateQueries({ queryKey: queryKeys.users() });
@@ -446,7 +577,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return () => {
       eventSource.close();
     };
-  }, []);
+  }, [invalidateAggregateTicketQueries]);
 
   // --- Mutations ---
 
@@ -465,14 +596,21 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return response.json() as Promise<Ticket>;
     },
     onSuccess: (createdTicket, ticketInput) => {
+      const normalizedTicket: Ticket = {
+        ...createdTicket,
+        status: canonicalizeStatus(createdTicket.status),
+      };
+
       if (ticketInput.projectId === activeProjectIdRef.current) {
         queryClient.setQueryData<Ticket[]>(queryKeys.tickets(activeProjectIdRef.current), (old) =>
-          old ? [...old, createdTicket] : [createdTicket]
+          old ? [...old, normalizedTicket] : [normalizedTicket]
         );
       }
+      invalidateAggregateTicketQueries(ticketInput.projectId);
     },
     onSettled: (data, error, ticketInput) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.tickets(ticketInput.projectId) });
+      invalidateAggregateTicketQueries(ticketInput.projectId);
     },
   });
 
@@ -492,6 +630,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setActiveProjectIdState,
     setFiltersState,
     setActiveTicket,
+    invalidateAggregateTicketQueries,
   });
 
   // Update Ticket (Debounced)
@@ -511,6 +650,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     onSettled: (data, error, { projectId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.tickets(projectId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.ticket(data?.key || '') });
+      invalidateAggregateTicketQueries(projectId);
     },
   });
 
@@ -652,6 +792,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     onSettled: () => {
       const projId = activeProjectIdRef.current;
       queryClient.invalidateQueries({ queryKey: queryKeys.tickets(projId) });
+      invalidateAggregateTicketQueries(projId);
     },
   });
 
@@ -927,6 +1068,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.labels(activeProjectIdRef.current) });
+      invalidateAggregateTicketQueries(activeProjectIdRef.current);
     },
   });
 
@@ -946,6 +1088,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.labels(activeProjectIdRef.current) });
+      invalidateAggregateTicketQueries(activeProjectIdRef.current);
     },
   });
 
@@ -966,6 +1109,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.tickets(activeProjectIdRef.current) });
+      invalidateAggregateTicketQueries(activeProjectIdRef.current);
     },
   });
 
@@ -986,6 +1130,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.tickets(activeProjectIdRef.current) });
+      invalidateAggregateTicketQueries(activeProjectIdRef.current);
     },
   });
 
@@ -1089,7 +1234,59 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setFiltersState({ ...initialFilters, projectId: activeProjectIdRef.current });
   }, []);
 
-  const ticketMap = useMemo(() => new Map(tickets.map(t => [t.key.toUpperCase(), t])), [tickets]);
+  const projectById = useMemo(() => {
+    const map = new Map<string, Project>();
+    for (const project of projects) {
+      map.set(project.id, project);
+    }
+    return map;
+  }, [projects]);
+
+  const projectsByWorkspaceId = useMemo(() => {
+    const map = new Map<string, Project[]>();
+    for (const project of projects) {
+      const workspaceId = project.workspaceId || '';
+      const current = map.get(workspaceId);
+      if (current) {
+        current.push(project);
+      } else {
+        map.set(workspaceId, [project]);
+      }
+    }
+    return map;
+  }, [projects]);
+
+  const labelsByProject = useMemo(() => {
+    const map = new Map<string, Label[]>();
+    for (const label of labels) {
+      if (!label.projectId) {
+        continue;
+      }
+
+      const current = map.get(label.projectId);
+      if (current) {
+        current.push(label);
+      } else {
+        map.set(label.projectId, [label]);
+      }
+    }
+    return map;
+  }, [labels]);
+
+  const globalLabels = useMemo(() => labels.filter((label) => !label.projectId), [labels]);
+
+  const ticketsByProject = useMemo(() => {
+    const map = new Map<string, Ticket[]>();
+    for (const ticket of tickets) {
+      const current = map.get(ticket.projectId);
+      if (current) {
+        current.push(ticket);
+      } else {
+        map.set(ticket.projectId, [ticket]);
+      }
+    }
+    return map;
+  }, [tickets]);
 
   const value = useMemo(
     () => ({
@@ -1140,6 +1337,12 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setFilters,
       resetFilters,
       ticketMap,
+      ticketById,
+      projectById,
+      labelsByProject,
+      globalLabels,
+      projectsByWorkspaceId,
+      ticketsByProject,
     }),
     [
       tickets,
@@ -1189,6 +1392,12 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       addTicketBlocker,
       removeTicketBlocker,
       ticketMap,
+      ticketById,
+      projectById,
+      labelsByProject,
+      globalLabels,
+      projectsByWorkspaceId,
+      ticketsByProject,
     ]
   );
 

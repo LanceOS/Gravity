@@ -7,7 +7,18 @@ export type CacheKey = string & { readonly __brand: unique symbol };
 export const CacheKeys = {
   workspaces: {
     all: () => 'all-workspaces' as CacheKey,
+    byId: (workspaceId: string) => `workspace-summary:${workspaceId}` as CacheKey,
+    sidebar: (workspaceId: string) => `workspace-sidebar:${workspaceId}` as CacheKey,
     byUser: (userId: string) => `user-workspaces:${userId}` as CacheKey,
+  },
+  memberships: {
+    workspaceRole: (workspaceId: string, userId: string) =>
+      `membership:workspace:${workspaceId}:user:${userId}:role` as CacheKey,
+    projectMember: (projectId: string, userId: string) =>
+      `membership:project:${projectId}:user:${userId}:role` as CacheKey,
+    projectWorkspace: (projectId: string) => `membership:project:${projectId}:workspace` as CacheKey,
+    projectTeam: (projectId: string) => `membership:project:${projectId}:team` as CacheKey,
+    teamWorkspace: (teamId: string) => `membership:team:${teamId}:workspace` as CacheKey,
   },
 };
 

@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { User } from '../context/TicketContext';
+import { ApiError } from '../utils/apiClient';
+import {
+  workspaceDirectoryService as defaultWorkspaceDirectoryService,
+  type WorkspaceDirectoryService,
+} from '../services/workspaceDirectoryService';
 
 export type WorkspaceJoinMode = 'approval_required' | 'auto_join';
 
@@ -31,9 +36,14 @@ export interface CreateWorkspaceInput {
 interface UseWorkspaceDirectoryOptions {
   currentUser: User | null;
   setCurrentUser: (user: User | null) => void;
+  workspaceDirectoryService?: WorkspaceDirectoryService;
 }
 
-export function useWorkspaceDirectory({ currentUser, setCurrentUser }: UseWorkspaceDirectoryOptions) {
+export function useWorkspaceDirectory({
+  currentUser,
+  setCurrentUser,
+  workspaceDirectoryService = defaultWorkspaceDirectoryService,
+}: UseWorkspaceDirectoryOptions) {
   const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [resolvedUserId, setResolvedUserId] = useState<string | null>(null);
@@ -60,25 +70,10 @@ export function useWorkspaceDirectory({ currentUser, setCurrentUser }: UseWorksp
     setError(null);
 
     try {
-      const response = await fetch('/api/v1/workspaces', {
-        headers: {
-          'X-User-Id': currentUser.id,
-        },
-      });
-      const data = await response.json();
+      const data = await workspaceDirectoryService.listWorkspaces(currentUser.id);
 
       if (requestId !== refreshRequestIdRef.current) {
         return [];
-      }
-
-      if (response.status === 401) {
-        setCurrentUser(null);
-        setWorkspaces([]);
-        return [];
-      }
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to load workspaces.');
       }
 
       setWorkspaces(Array.isArray(data) ? data : []);
@@ -86,6 +81,10 @@ export function useWorkspaceDirectory({ currentUser, setCurrentUser }: UseWorksp
     } catch (loadError) {
       if (requestId !== refreshRequestIdRef.current) {
         return [];
+      }
+
+      if (loadError instanceof ApiError && loadError.status === 401) {
+        setCurrentUser(null);
       }
 
       const message = loadError instanceof Error ? loadError.message : 'Failed to load workspaces.';
@@ -98,7 +97,7 @@ export function useWorkspaceDirectory({ currentUser, setCurrentUser }: UseWorksp
         setLoading(false);
       }
     }
-  }, [currentUser, setCurrentUser]);
+  }, [currentUser, setCurrentUser, workspaceDirectoryService]);
 
   useEffect(() => {
     void refreshWorkspaces();
@@ -123,26 +122,10 @@ export function useWorkspaceDirectory({ currentUser, setCurrentUser }: UseWorksp
     setSuccessMessage(null);
 
     try {
-      const response = await fetch('/api/v1/workspaces', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-User-Id': currentUser.id,
-        },
-        body: JSON.stringify({
-          ...input,
-          ownerId: currentUser.id,
-        }),
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to create workspace.');
-      }
-
+      const data = await workspaceDirectoryService.createWorkspace(currentUser.id, input);
       setSuccessMessage('Workspace created.');
       await refreshWorkspaces();
-      return data.workspace as WorkspaceSummary;
+      return data;
     } catch (createError) {
       const message = createError instanceof Error ? createError.message : 'Failed to create workspace.';
       setError(message);
@@ -150,7 +133,7 @@ export function useWorkspaceDirectory({ currentUser, setCurrentUser }: UseWorksp
     } finally {
       setPendingAction(null);
     }
-  }, [currentUser, refreshWorkspaces]);
+  }, [currentUser, refreshWorkspaces, workspaceDirectoryService]);
 
   const requestJoinByInvite = useCallback(async (inviteCode: string, message?: string) => {
     if (!currentUser) {
@@ -162,20 +145,7 @@ export function useWorkspaceDirectory({ currentUser, setCurrentUser }: UseWorksp
     setSuccessMessage(null);
 
     try {
-      const response = await fetch(`/api/v1/workspaces/invites/${encodeURIComponent(inviteCode)}/join-requests`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: currentUser.id,
-          message: message || '',
-        }),
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to send workspace join request.');
-      }
-
+      await workspaceDirectoryService.requestJoinByInvite(currentUser.id, inviteCode, message);
       setSuccessMessage('Join request sent. The workspace owner must approve it before you can connect.');
       return true;
     } catch (joinError) {
@@ -185,7 +155,7 @@ export function useWorkspaceDirectory({ currentUser, setCurrentUser }: UseWorksp
     } finally {
       setPendingAction(null);
     }
-  }, [currentUser]);
+  }, [currentUser, workspaceDirectoryService, refreshWorkspaces]);
 
 
 

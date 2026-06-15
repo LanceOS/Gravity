@@ -2,16 +2,18 @@ import { Router } from 'express';
 import { db } from '../../db/index.js';
 import { comments, cycles, labels, noteMetadata, projectMembers, projects, teams, ticketLabels, tickets, workspaces } from '../../db/schema.js';
 import { asc, eq, inArray } from 'drizzle-orm';
-import { createId, invalidateWorkspaceCache } from '../../lib/platform.js';
+import { createId, WorkspaceCacheInvalidationReason, invalidateWorkspaceCache } from '../../lib/platform.js';
 import { RustFS } from '../../lib/rustfs.js';
 import {
   authorizeWorkspaceAccess,
   authorizeWorkspaceOwnerAccess,
   authorizeTeamAccess,
   authorizeTeamOwnerAccess,
+  invalidateTeamWorkspaceCache,
+  invalidateProjectTeamCache,
 } from './services/membership.js';
 
-async function deleteLastTeamWithOwnedWork(teamId: string, workspaceId: string) {
+async function deleteLastTeamWithOwnedWork(teamId: string, workspaceId: string): Promise<string[]> {
   const projectRows = await db
     .select({ id: projects.id })
     .from(projects)
@@ -62,6 +64,7 @@ async function deleteLastTeamWithOwnedWork(teamId: string, workspaceId: string) 
     await tx.update(workspaces).set({ defaultProjectId: null }).where(eq(workspaces.id, workspaceId));
     await tx.delete(teams).where(eq(teams.id, teamId));
   });
+  await invalidateTeamWorkspaceCache(teamId);
 
   const cleanupResults = await Promise.allSettled(noteBucketPaths.map((bucketPath) => RustFS.deleteBucket(bucketPath)));
   for (const result of cleanupResults) {
@@ -72,7 +75,8 @@ async function deleteLastTeamWithOwnedWork(teamId: string, workspaceId: string) 
     }
   }
 
-  await invalidateWorkspaceCache(workspaceId);
+  await invalidateWorkspaceCache(workspaceId, WorkspaceCacheInvalidationReason.TEAM_STRUCTURE_CHANGED);
+  return projectIds;
 }
 
 async function mergeTeamLabels(tx: any, sourceTeamId: string, targetTeamId: string) {
@@ -149,6 +153,8 @@ export function createTeamsRouter() {
       });
 
       const newTeam = await db.select().from(teams).where(eq(teams.id, teamId)).limit(1);
+      await invalidateWorkspaceCache(workspaceId, WorkspaceCacheInvalidationReason.TEAM_STRUCTURE_CHANGED);
+      await invalidateTeamWorkspaceCache(teamId);
       res.status(201).json(newTeam[0]);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create team.' });
@@ -218,6 +224,7 @@ export function createTeamsRouter() {
       if (typeof color === 'string') updates.color = color;
 
       await db.update(teams).set(updates).where(eq(teams.id, teamId));
+      await invalidateWorkspaceCache(auth.workspaceId, WorkspaceCacheInvalidationReason.TEAM_STRUCTURE_CHANGED);
       const updated = await db.select().from(teams).where(eq(teams.id, teamId)).limit(1);
       res.json(updated[0]);
     } catch (error) {
@@ -250,6 +257,7 @@ export function createTeamsRouter() {
         db.select({ id: cycles.id }).from(cycles).where(eq(cycles.teamId, teamId)),
         db.select({ id: labels.id }).from(labels).where(eq(labels.teamId, teamId)),
       ]);
+      const existingProjectIds = existingProjects.map((project) => project.id);
       const isLastTeam = workspaceTeamRows.length <= 1;
 
       if (existingProjects.length > 0 || existingCycles.length > 0 || existingLabels.length > 0) {
@@ -275,16 +283,24 @@ export function createTeamsRouter() {
             await mergeTeamLabels(tx, teamId, reassignTeamId);
             await tx.delete(teams).where(eq(teams.id, teamId));
           });
-          await invalidateWorkspaceCache(workspaceId);
+          if (existingProjectIds.length > 0) {
+            await Promise.all(existingProjectIds.map((projectId) => invalidateProjectTeamCache(projectId)));
+          }
+          await invalidateWorkspaceCache(workspaceId, WorkspaceCacheInvalidationReason.TEAM_STRUCTURE_CHANGED);
+          await invalidateTeamWorkspaceCache(teamId);
         } else if (isLastTeam) {
-          await deleteLastTeamWithOwnedWork(teamId, workspaceId);
+          const deletedProjectIds = await deleteLastTeamWithOwnedWork(teamId, workspaceId);
+          if (deletedProjectIds.length > 0) {
+            await Promise.all(deletedProjectIds.map((projectId) => invalidateProjectTeamCache(projectId)));
+          }
         } else {
           res.status(400).json({ error: 'Cannot delete team: projects, cycles, or labels still reference it. Please reassign them first.' });
           return;
         }
       } else {
         await db.delete(teams).where(eq(teams.id, teamId));
-        await invalidateWorkspaceCache(workspaceId);
+        await invalidateWorkspaceCache(workspaceId, WorkspaceCacheInvalidationReason.TEAM_STRUCTURE_CHANGED);
+        await invalidateTeamWorkspaceCache(teamId);
       }
 
       res.json({ success: true });

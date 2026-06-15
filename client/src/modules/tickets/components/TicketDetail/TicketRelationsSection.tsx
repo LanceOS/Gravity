@@ -9,6 +9,7 @@ interface TicketRelationsSectionProps {
   activeTicket: Ticket;
   activeTicketDetail: Ticket | null;
   availableTickets: Ticket[];
+  ticketsById?: Map<string, Ticket>;
   parentTicket?: Ticket | null;
   users: User[];
   onSelectTicket: (ticket: Ticket | null) => void;
@@ -34,6 +35,7 @@ export const TicketRelationsSection: React.FC<TicketRelationsSectionProps> = ({
   activeTicket,
   activeTicketDetail,
   availableTickets,
+  ticketsById,
   parentTicket,
   users,
   onSelectTicket,
@@ -60,12 +62,16 @@ export const TicketRelationsSection: React.FC<TicketRelationsSectionProps> = ({
   }, [activeTicket.id, relatedTicketIds]);
 
   const availableTicketsById = useMemo(() => {
+    if (ticketsById) {
+      return ticketsById;
+    }
+
     const ticketMap = new Map(availableTickets.map((ticket) => [ticket.id, ticket]));
     if (parentTicket) {
       ticketMap.set(parentTicket.id, parentTicket);
     }
     return ticketMap;
-  }, [availableTickets, parentTicket]);
+  }, [availableTickets, parentTicket, ticketsById]);
   const usersById = useMemo(() => new Map(users.map((user) => [user.id, user])), [users]);
 
   const resolveAssignee = useCallback((ticket: Ticket | null) => {

@@ -1,20 +1,67 @@
 import React, { useState, useEffect } from 'react';
 import { Mail } from 'lucide-react';
 import { Card, Stack, TextInput, Button, Badge } from '@library';
-import type { CreateWorkspaceInviteInput, WorkspaceInvite } from '../../../hooks/useWorkspaceSettings';
-
-interface AccessSectionProps {
-  invites: WorkspaceInvite[];
-  invitesLoading: boolean;
-  inviteLoading: boolean;
-  revokeLoadingId: string | null;
-  onCreateInvite: (input: CreateWorkspaceInviteInput) => Promise<boolean>;
-  onRevokeInvite: (inviteId: string) => Promise<boolean>;
-  isMobile: boolean;
-}
+import type { WorkspaceInvite } from '../types';
+import { useSettingsScreenContext } from '../../../context/settings/useSettingsScreenContext';
 
 const COPY_FEEDBACK_STORAGE_KEY = 'gravity_peer_invite_copy_feedback';
 const COPY_FEEDBACK_DURATION_MS = 2200;
+
+type CopyFeedbackState = {
+  key: string;
+  expiresAt: number;
+};
+
+function clearCopyFeedbackState() {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    window.sessionStorage.removeItem(COPY_FEEDBACK_STORAGE_KEY);
+  } catch {
+    // sessionStorage may be unavailable in restricted/private modes.
+  }
+}
+
+function readCopyFeedbackState(): CopyFeedbackState | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    const rawValue = window.sessionStorage.getItem(COPY_FEEDBACK_STORAGE_KEY);
+    if (!rawValue) {
+      return null;
+    }
+
+    const parsed = JSON.parse(rawValue) as { key?: unknown; expiresAt?: unknown };
+    if (typeof parsed.key !== 'string' || typeof parsed.expiresAt !== 'number') {
+      clearCopyFeedbackState();
+      return null;
+    }
+
+    return {
+      key: parsed.key,
+      expiresAt: parsed.expiresAt,
+    };
+  } catch {
+    clearCopyFeedbackState();
+    return null;
+  }
+}
+
+function writeCopyFeedbackState(value: CopyFeedbackState) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    window.sessionStorage.setItem(COPY_FEEDBACK_STORAGE_KEY, JSON.stringify(value));
+  } catch {
+    // sessionStorage may be unavailable in restricted/private modes.
+  }
+}
 
 function getInviteStateLabel(invite: WorkspaceInvite) {
   if (invite.revokedAt) return 'Revoked';
@@ -26,37 +73,27 @@ function getInviteStateVariant(invite: WorkspaceInvite): 'accent' | 'success' | 
   return 'success';
 }
 
-export function AccessSection({
-  invites,
-  invitesLoading,
-  inviteLoading,
-  revokeLoadingId,
-  onCreateInvite,
-  onRevokeInvite,
-  isMobile,
-}: AccessSectionProps) {
+export function AccessSection(): JSX.Element {
+  const { isMobile, invites, invitesLoading, inviteLoading, revokeLoadingId, onCreateInvite, onRevokeInvite } =
+    useSettingsScreenContext();
+
   const latestInvite = invites[0] ?? null;
   const [label, setLabel] = useState('');
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   const scheduleCopyFeedbackReset = (key: string, expiresAt: number) => {
     window.setTimeout(() => {
-      const rawValue = window.sessionStorage.getItem(COPY_FEEDBACK_STORAGE_KEY);
-      if (!rawValue) {
+      const savedValue = readCopyFeedbackState();
+      if (!savedValue) {
         setCopiedField((current) => (current === key ? null : current));
         return;
       }
 
-      try {
-        const savedValue = JSON.parse(rawValue) as { key?: string; expiresAt?: number };
-        if (savedValue.key !== key || savedValue.expiresAt !== expiresAt) {
-          return;
-        }
-      } catch {
-        window.sessionStorage.removeItem(COPY_FEEDBACK_STORAGE_KEY);
+      if (savedValue.key !== key || savedValue.expiresAt !== expiresAt) {
+        return;
       }
 
-      window.sessionStorage.removeItem(COPY_FEEDBACK_STORAGE_KEY);
+      clearCopyFeedbackState();
       setCopiedField((current) => (current === key ? null : current));
     }, Math.max(expiresAt - Date.now(), 0));
   };
@@ -66,28 +103,18 @@ export function AccessSection({
       return undefined;
     }
 
-    const rawValue = window.sessionStorage.getItem(COPY_FEEDBACK_STORAGE_KEY);
-    if (!rawValue) {
+    const savedValue = readCopyFeedbackState();
+    if (!savedValue) {
       return undefined;
     }
 
-    try {
-      const savedValue = JSON.parse(rawValue) as { key?: string; expiresAt?: number };
-      if (typeof savedValue.key !== 'string' || typeof savedValue.expiresAt !== 'number') {
-        window.sessionStorage.removeItem(COPY_FEEDBACK_STORAGE_KEY);
-        return undefined;
-      }
-
-      if (savedValue.expiresAt <= Date.now()) {
-        window.sessionStorage.removeItem(COPY_FEEDBACK_STORAGE_KEY);
-        return undefined;
-      }
-
-      setCopiedField(savedValue.key);
-      scheduleCopyFeedbackReset(savedValue.key, savedValue.expiresAt);
-    } catch {
-      window.sessionStorage.removeItem(COPY_FEEDBACK_STORAGE_KEY);
+    if (savedValue.expiresAt <= Date.now()) {
+      clearCopyFeedbackState();
+      return undefined;
     }
+
+    setCopiedField(savedValue.key);
+    scheduleCopyFeedbackReset(savedValue.key, savedValue.expiresAt);
 
     return undefined;
   }, []);
@@ -97,7 +124,7 @@ export function AccessSection({
       await navigator.clipboard.writeText(value);
       setCopiedField(key);
       const expiresAt = Date.now() + COPY_FEEDBACK_DURATION_MS;
-      window.sessionStorage.setItem(COPY_FEEDBACK_STORAGE_KEY, JSON.stringify({ key, expiresAt }));
+      writeCopyFeedbackState({ key, expiresAt });
       scheduleCopyFeedbackReset(key, expiresAt);
     } catch {
       setCopiedField(null);

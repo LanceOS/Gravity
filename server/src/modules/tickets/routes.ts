@@ -1,11 +1,16 @@
 import { and, asc, eq } from 'drizzle-orm';
 import { type Request, type Response, Router } from 'express';
 import { db } from '../../db/index.js';
-import { cycles, labels, ticketLabels, projects, tickets } from '../../db/schema.js';
+import { cycles, labels, projects, teams, ticketLabels, tickets } from '../../db/schema.js';
 import { broadcastEvent } from '../../realtime.js';
-import { createId, getProjectIdFromRequest, normalizeIsoDate } from '../../lib/platform.js';
-import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
-import { isWorkspaceMember, getProjectWorkspaceId, authorizeProjectAccess, authorizeTeamAccess } from '../workspaces/services/membership.js';
+import {
+  createId,
+  getProjectIdFromRequest,
+  WorkspaceCacheInvalidationReason,
+  invalidateWorkspaceCache,
+  normalizeIsoDate,
+} from '../../lib/platform.js';
+import { authorizeProjectAccess, authorizeTeamAccess, getProjectTeamId } from '../workspaces/services/membership.js';
 import {
   addCommentRecord,
   createTicketRecord,
@@ -17,7 +22,6 @@ import {
   hasTicketDependencyRelation,
   getTicketDetails,
   listComments,
-  listTickets,
   listTicketBlockers,
   listTicketDependencies,
   updateTicketRecord,
@@ -52,16 +56,6 @@ function mapCycle(cycle: typeof cycles.$inferSelect) {
   };
 }
 
-async function getRequiredProjectTeamId(projectId: string) {
-  const projectRows = await db.select({ teamId: projects.teamId }).from(projects).where(eq(projects.id, projectId)).limit(1);
-  const teamId = projectRows[0]?.teamId;
-  if (!teamId) {
-    throw new Error(`Project ${projectId} is missing a team assignment.`);
-  }
-
-  return teamId;
-}
-
 function normalizeLabelName(name: string) {
   return name.trim();
 }
@@ -81,6 +75,20 @@ export function createTicketsRouter() {
 
   function normalizeRouteParam(value: string | string[]) {
     return Array.isArray(value) ? value[0] ?? '' : value;
+  }
+
+  function parseIntQueryParam(value: string | string[] | undefined) {
+    if (!value) {
+      return undefined;
+    }
+
+    const normalized = Array.isArray(value) ? value[0] : value;
+    const parsed = Number.parseInt(normalized, 10);
+    if (!Number.isFinite(parsed)) {
+      return undefined;
+    }
+
+    return parsed;
   }
 
   async function withProjectAccess(
@@ -127,6 +135,16 @@ export function createTicketsRouter() {
     await handler(ticket, auth.userId);
   }
 
+  async function invalidateSidebarCacheFromTeam(teamId: string) {
+    const teamRows = await db.select({ workspaceId: teams.workspaceId }).from(teams).where(eq(teams.id, teamId)).limit(1);
+    const workspaceId = teamRows[0]?.workspaceId;
+    if (!workspaceId) {
+      return;
+    }
+
+    await invalidateWorkspaceCache(workspaceId, WorkspaceCacheInvalidationReason.TEAM_STRUCTURE_CHANGED);
+  }
+
   router.get('/tickets', async (req, res) => {
     const projectId = typeof req.query.projectId === 'string' ? req.query.projectId : getProjectIdFromRequest(req);
     const teamId = typeof req.query.teamId === 'string' ? req.query.teamId : undefined;
@@ -151,6 +169,9 @@ export function createTicketsRouter() {
     }
 
     try {
+      const queryLimit = parseIntQueryParam(req.query.limit);
+      const queryOffset = parseIntQueryParam(req.query.offset);
+
       const ticketList = await strategy.execute({
         status: typeof req.query.status === 'string' ? req.query.status : undefined,
         priority: typeof req.query.priority === 'string' ? req.query.priority : undefined,
@@ -158,6 +179,8 @@ export function createTicketsRouter() {
         cycleId: typeof req.query.cycleId === 'string' ? req.query.cycleId : undefined,
         labels: typeof req.query.labels === 'string' ? req.query.labels.split(',').filter(Boolean) : undefined,
         labelMode: (req.query.labelMode === 'all' || req.query.labelMode === 'any') ? req.query.labelMode : undefined,
+        limit: queryLimit,
+        offset: queryOffset,
       });
       res.json(ticketList);
     } catch (error) {
@@ -189,7 +212,7 @@ export function createTicketsRouter() {
               : undefined,
         });
 
-        broadcastEvent('tickets-updated', { projectId, tickets: await listTickets(projectId) });
+        broadcastEvent('tickets-updated', { projectId });
         res.status(201).json(created);
       } catch (error) {
         res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create ticket.' });
@@ -226,13 +249,7 @@ export function createTicketsRouter() {
         return;
       }
 
-      res.json({
-        id: ticket.id,
-        key: ticket.key,
-        title: ticket.title,
-        status: ticket.status,
-        projectId: ticket.projectId,
-      });
+      res.json(ticket);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load ticket.' });
     }
@@ -263,7 +280,7 @@ export function createTicketsRouter() {
           broadcastEvent('tickets-updated', { projectId });
           broadcastEvent('tickets-updated', { projectId: updated.projectId });
         } else {
-          broadcastEvent('tickets-updated', { projectId, tickets: await listTickets(projectId) });
+          broadcastEvent('tickets-updated', { projectId });
         }
         res.json(updated);
       } catch (error) {
@@ -292,7 +309,7 @@ export function createTicketsRouter() {
           return;
         }
 
-        broadcastEvent('tickets-updated', { projectId, tickets: await listTickets(projectId) });
+        broadcastEvent('tickets-updated', { projectId });
         res.json({ success: true });
       } catch (error) {
         res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to delete ticket.' });
@@ -326,8 +343,7 @@ export function createTicketsRouter() {
         }
 
         const comment = await addCommentRecord(ticket.id, userId, body);
-        const allComments = await listComments(ticket.id);
-        broadcastEvent('comments-updated', { ticketId: ticket.id, comments: allComments });
+        broadcastEvent('comments-updated', { ticketId: ticket.id });
         res.status(201).json(comment);
       } catch (error) {
         res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to add comment.' });
@@ -352,8 +368,7 @@ export function createTicketsRouter() {
           return;
         }
 
-        const allComments = await listComments(ticket.id);
-        broadcastEvent('comments-updated', { ticketId: ticket.id, comments: allComments });
+        broadcastEvent('comments-updated', { ticketId: ticket.id });
         res.json(comment);
       } catch (error) {
         res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to update comment.' });
@@ -371,8 +386,7 @@ export function createTicketsRouter() {
           return;
         }
 
-        const allComments = await listComments(ticket.id);
-        broadcastEvent('comments-updated', { ticketId: ticket.id, comments: allComments });
+        broadcastEvent('comments-updated', { ticketId: ticket.id });
         res.json({ success: true });
       } catch (error) {
         res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to delete comment.' });
@@ -383,7 +397,11 @@ export function createTicketsRouter() {
   router.get('/labels', async (req, res) => {
     try {
       const projectId = typeof req.query.projectId === 'string' ? req.query.projectId : getProjectIdFromRequest(req);
-      const teamId = typeof req.query.teamId === 'string' ? req.query.teamId : (projectId ? await getRequiredProjectTeamId(projectId).catch(() => undefined) : undefined);
+      const teamId = typeof req.query.teamId === 'string'
+        ? req.query.teamId
+        : projectId
+          ? (await getProjectTeamId(projectId)) ?? undefined
+          : undefined;
 
       if (!teamId) {
         res.status(400).json({ error: 'Either teamId or projectId is required, or project not found.' });
@@ -423,7 +441,10 @@ export function createTicketsRouter() {
       const body = req.body ?? {};
       const projectId = typeof body.projectId === 'string' ? body.projectId : getProjectIdFromRequest(req);
       const bodyTeamId = typeof body.teamId === 'string' ? body.teamId : undefined;
-      const resolvedTeamId = bodyTeamId ?? (projectId ? await getRequiredProjectTeamId(projectId).catch(() => undefined) : undefined);
+      const resolvedTeamId = bodyTeamId
+        ?? (projectId
+          ? (await getProjectTeamId(projectId)) ?? undefined
+          : undefined);
 
       if (!resolvedTeamId) {
         res.status(400).json({ error: 'Either teamId or projectId is required, or project not found.' });
@@ -464,6 +485,8 @@ export function createTicketsRouter() {
           createdAt: new Date(),
         })
         .returning();
+
+      await invalidateSidebarCacheFromTeam(resolvedTeamId);
 
       res.status(201).json(mapLabel(rows[0]));
     } catch (error) {
@@ -525,6 +548,8 @@ export function createTicketsRouter() {
         .where(eq(labels.id, labelId))
         .returning();
 
+      await invalidateSidebarCacheFromTeam(labelRow.teamId);
+
       res.json(mapLabel(rows[0]));
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to update label.' });
@@ -556,6 +581,8 @@ export function createTicketsRouter() {
         await tx.delete(ticketLabels).where(eq(ticketLabels.labelId, labelId));
         await tx.delete(labels).where(eq(labels.id, labelId));
       });
+
+      await invalidateSidebarCacheFromTeam(labelRow.teamId);
 
       res.json({ success: true });
     } catch (error) {
@@ -601,7 +628,7 @@ export function createTicketsRouter() {
           return;
         }
 
-        const teamId = await getRequiredProjectTeamId(ticket.projectId);
+        const teamId = await getProjectTeamId(ticket.projectId);
         if (labelRows[0].teamId !== teamId) {
           res.status(400).json({ error: 'Label does not belong to the ticket team.' });
           return;
@@ -612,7 +639,7 @@ export function createTicketsRouter() {
           .values({ ticketId: ticket.id, labelId })
           .onConflictDoNothing();
 
-        broadcastEvent('tickets-updated', { projectId: ticket.projectId, tickets: await listTickets(ticket.projectId) });
+        broadcastEvent('tickets-updated', { projectId: ticket.projectId });
 
         res.status(201).json({ success: true });
       } catch (error) {
@@ -629,7 +656,7 @@ export function createTicketsRouter() {
           .delete(ticketLabels)
           .where(and(eq(ticketLabels.ticketId, ticket.id), eq(ticketLabels.labelId, labelId)));
 
-        broadcastEvent('tickets-updated', { projectId: ticket.projectId, tickets: await listTickets(ticket.projectId) });
+        broadcastEvent('tickets-updated', { projectId: ticket.projectId });
 
         res.json({ success: true });
       } catch (error) {
@@ -657,7 +684,7 @@ export function createTicketsRouter() {
           res.status(auth.status ?? 403).json({ error: auth.error });
           return;
         }
-        const teamIdOfProject = await getRequiredProjectTeamId(projectId).catch(() => undefined);
+        const teamIdOfProject = projectId ? (await getProjectTeamId(projectId)) ?? undefined : undefined;
         if (!teamIdOfProject) {
           res.status(400).json({ error: 'Project not found or missing team assignment.' });
           return;
@@ -684,7 +711,7 @@ export function createTicketsRouter() {
     const targetTeamId = typeof teamId === 'string'
       ? teamId
       : projectId
-        ? await getRequiredProjectTeamId(projectId)
+        ? (projectId ? (await getProjectTeamId(projectId)) ?? undefined : undefined)
         : undefined;
 
     if (!targetTeamId) {
@@ -714,6 +741,8 @@ export function createTicketsRouter() {
           createdAt: new Date(),
         })
         .returning();
+
+      await invalidateSidebarCacheFromTeam(targetTeamId);
       res.status(201).json(mapCycle(rows[0]));
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create cycle.' });

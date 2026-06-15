@@ -101,9 +101,7 @@ vi.mock('../../modules/auth', () => ({
 
 vi.mock('../../modules/tickets', () => ({
   CreateTicketModal: () => <div>CreateTicketModal</div>,
-}));
-
-vi.mock('../../modules/tickets/components/TicketDetailRoute', () => ({
+  LabelCreateOverlay: () => <div>LabelCreateOverlay</div>,
   TicketDetailRoute: ({ onDeleteTicket, activeTicket }: any) => (
     <div>
       <div>TicketDetailRoute Mock</div>
@@ -115,8 +113,6 @@ vi.mock('../../modules/tickets/components/TicketDetailRoute', () => ({
     </div>
   ),
 }));
-
-
 
 vi.mock('../../modules/onboarding', () => ({
   OnboardingModal: ({ onComplete }: { onComplete: () => void }) => (
@@ -203,10 +199,6 @@ vi.mock('../../pages/WorkspacePage/WorkspacePage', () => ({
       ) : null}
     </div>
   ),
-}));
-
-vi.mock('../../pages/WorkspaceProjectsPage/WorkspaceProjectsPage', () => ({
-  WorkspaceProjectsPage: () => <div>WorkspaceProjectsPage</div>,
 }));
 
 vi.mock('../../pages/WorkspaceProjectsListPage/WorkspaceProjectsListPage', () => ({

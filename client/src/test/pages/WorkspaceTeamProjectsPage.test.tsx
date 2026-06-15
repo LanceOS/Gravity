@@ -24,16 +24,16 @@ vi.mock('@library', () => ({
 }));
 
 vi.mock('../../modules/workspaces', () => ({
-  WorkspaceHeader: Object.assign(
-    ({ children }: any) => <header>{children}</header>,
-    {
-      Top: ({ children }: any) => <div>{children}</div>,
-      Title: ({ children }: any) => <h1>{children}</h1>,
-    },
-  ),
-}));
-
-vi.mock('../../modules/workspaces/components/ProjectCreateOverlay', () => ({
+  PROJECT_LIFECYCLE_OPTIONS: [
+    { value: 'planned', label: 'Planned' },
+    { value: 'active', label: 'Active' },
+    { value: 'completed', label: 'Archived' },
+  ],
+  PROJECT_STATUS_LABELS: {
+    planned: 'Planned',
+    active: 'Active',
+    completed: 'Archived',
+  },
   ProjectCreateOverlay: ({ onClose, onSubmitProject }: any) => (
     <div>
       <div>ProjectCreateOverlay</div>
@@ -54,6 +54,14 @@ vi.mock('../../modules/workspaces/components/ProjectCreateOverlay', () => ({
       </button>
     </div>
   ),
+  WorkspaceHeader: Object.assign(
+    ({ children }: any) => <header>{children}</header>,
+    {
+      Top: ({ children }: any) => <div>{children}</div>,
+      Title: ({ children }: any) => <h1>{children}</h1>,
+    },
+  ),
+  sanitizeProjectKey: (value: string) => value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8),
 }));
 
 const team = {

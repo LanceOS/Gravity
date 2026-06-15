@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useMutation, useQuery, type QueryClient } from '@tanstack/react-query';
 import { toast } from '@library';
 import { apiClient } from '../utils/apiClient';
@@ -31,8 +31,6 @@ interface UseTicketRelationActionsArgs {
   isAuthenticated: boolean;
 }
 
-const API_URL = '/api/v1';
-
 export function useTicketRelationActions({
   queryClient,
   tickets,
@@ -43,6 +41,19 @@ export function useTicketRelationActions({
 }: UseTicketRelationActionsArgs) {
   const activeTicketRef = useRef<Ticket | null>(activeTicket);
   const pendingTicketRelationAddsRef = useRef(new Set<string>());
+
+  const cachedTicketsById = useMemo(() => {
+    const byId = new Map<string, Ticket>();
+    for (const ticket of tickets) {
+      byId.set(ticket.id, ticket);
+    }
+
+    if (activeTicket) {
+      byId.set(activeTicket.id, activeTicket);
+    }
+
+    return byId;
+  }, [activeTicket, tickets]);
 
   useEffect(() => {
     activeTicketRef.current = activeTicket;
@@ -64,22 +75,27 @@ export function useTicketRelationActions({
   const activeTicketDetail = activeTicketDetailQuery.data || null;
 
   const getTicketProjectIdForMutation = useCallback((ticketId: string) => {
-    if (activeTicketRef.current?.id === ticketId) {
-      return activeTicketRef.current.projectId;
+    const cachedTicket = cachedTicketsById.get(ticketId);
+    if (cachedTicket) {
+      return cachedTicket.projectId;
     }
 
-    const matchingTicket = tickets.find((ticket) => ticket.id === ticketId);
-    return matchingTicket?.projectId;
-  }, [tickets]);
+    const detailTicket = queryClient.getQueryData<TicketWithRelations>(queryKeys.ticketDetail(ticketId));
+    return detailTicket?.projectId;
+  }, [cachedTicketsById, queryClient]);
 
   const findTicketInCache = useCallback((ticketId: string): Ticket | undefined => {
-    if (activeTicketRef.current?.id === ticketId) {
-      return activeTicketRef.current;
+    if (cachedTicketsById.has(ticketId)) {
+      return cachedTicketsById.get(ticketId);
     }
 
-    const matchingTicket = tickets.find((ticket) => ticket.id === ticketId);
-    if (matchingTicket) {
-      return matchingTicket;
+    const cachedDetailFromKey = queryClient.getQueryData<TicketWithRelations>(queryKeys.ticketDetail(ticketId));
+    if (cachedDetailFromKey) {
+      return cachedDetailFromKey;
+    }
+
+    if (activeTicketRef.current?.id === ticketId) {
+      return activeTicketRef.current;
     }
 
     const ticketDetails = queryClient.getQueriesData<TicketWithRelations>({ queryKey: queryKeys.ticketDetails() });
@@ -89,25 +105,8 @@ export function useTicketRelationActions({
       }
     }
 
-    const ticketLists = [
-      ...queryClient.getQueriesData<Ticket[]>({ queryKey: ['tickets'] }),
-      ...queryClient.getQueriesData<Ticket[]>({ queryKey: ['workspaceTickets'] }),
-      ...queryClient.getQueriesData<Ticket[]>({ queryKey: ['teamTickets'] }),
-    ];
-
-    for (const [, cachedTickets] of ticketLists) {
-      if (!Array.isArray(cachedTickets)) {
-        continue;
-      }
-
-      const cachedTicket = cachedTickets.find((ticket) => ticket.id === ticketId);
-      if (cachedTicket) {
-        return cachedTicket;
-      }
-    }
-
     return undefined;
-  }, [queryClient, tickets]);
+  }, [cachedTicketsById, queryClient]);
 
   const getCachedTicketRelation = useCallback((ticketId: string) => {
     const cachedTicket = findTicketInCache(ticketId);
@@ -144,13 +143,11 @@ export function useTicketRelationActions({
     queryClient.removeQueries({ queryKey, exact: true });
   }, [queryClient]);
 
-  const invalidateTicketRelationQueries = useCallback((projectId?: string) => {
-    if (projectId) {
+  const invalidateTicketRelationQueries = useCallback((projectIds: Array<string | undefined>) => {
+    const uniqueProjectIds = Array.from(new Set(projectIds.filter(Boolean) as string[]));
+    uniqueProjectIds.forEach((projectId) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.tickets(projectId) });
-    }
-
-    queryClient.invalidateQueries({ queryKey: ['workspaceTickets'] });
-    queryClient.invalidateQueries({ queryKey: ['teamTickets'] });
+    });
   }, [queryClient]);
 
   const handleTicketRelationMutationError = useCallback((context: TicketRelationMutationContext | undefined, message: string, shouldRollback = true) => {
@@ -236,7 +233,8 @@ export function useTicketRelationActions({
     },
     onSettled: (_data, _err, { ticketId, dependencyId, projectId }) => {
       clearPendingTicketRelationAdd(ticketId, 'dependencies', dependencyId);
-      invalidateTicketRelationQueries(projectId);
+      const relatedProjectId = getTicketProjectIdForMutation(dependencyId);
+      invalidateTicketRelationQueries([projectId, relatedProjectId]);
     },
   });
 
@@ -275,7 +273,8 @@ export function useTicketRelationActions({
     },
     onSettled: (_data, _err, { ticketId, dependencyId, projectId }) => {
       clearPendingTicketRelationAdd(ticketId, 'dependencies', dependencyId);
-      invalidateTicketRelationQueries(projectId);
+      const relatedProjectId = getTicketProjectIdForMutation(dependencyId);
+      invalidateTicketRelationQueries([projectId, relatedProjectId]);
     },
   });
 
@@ -314,7 +313,8 @@ export function useTicketRelationActions({
     },
     onSettled: (_data, _err, { ticketId, blockerId, projectId }) => {
       clearPendingTicketRelationAdd(ticketId, 'blockers', blockerId);
-      invalidateTicketRelationQueries(projectId);
+      const relatedProjectId = getTicketProjectIdForMutation(blockerId);
+      invalidateTicketRelationQueries([projectId, relatedProjectId]);
     },
   });
 
@@ -353,7 +353,8 @@ export function useTicketRelationActions({
     },
     onSettled: (_data, _err, { ticketId, blockerId, projectId }) => {
       clearPendingTicketRelationAdd(ticketId, 'blockers', blockerId);
-      invalidateTicketRelationQueries(projectId);
+      const relatedProjectId = getTicketProjectIdForMutation(blockerId);
+      invalidateTicketRelationQueries([projectId, relatedProjectId]);
     },
   });
 

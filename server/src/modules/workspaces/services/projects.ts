@@ -9,6 +9,7 @@ import {
   ensureProjectMembership,
   ensureWorkspaceMembership,
   invalidateWorkspaceCache,
+  WorkspaceCacheInvalidationReason,
   invalidateUserWorkspacesCache,
   normalizeEntityKey,
   normalizeIsoDate,
@@ -19,6 +20,12 @@ import {
   DEFAULT_TEAM_NAME,
   getDefaultTeamId,
 } from '../utils/default-team.js';
+import {
+  invalidateProjectWorkspaceCache,
+  invalidateProjectMembershipCache,
+  invalidateWorkspaceMembershipCache,
+  invalidateProjectTeamCache,
+} from './membership.js';
 
 function mapCycle(cycle: typeof cycles.$inferSelect) {
   const now = Date.now();
@@ -219,7 +226,9 @@ export async function createProjectRecord(params: {
   const rows = await db.select().from(projects).where(eq(projects.id, projectId)).limit(1);
   const project = rows[0];
   if (project) {
-    await invalidateWorkspaceCache(project.workspaceId);
+    await invalidateWorkspaceCache(project.workspaceId, WorkspaceCacheInvalidationReason.PROJECT_STRUCTURE_CHANGED);
+    await invalidateWorkspaceMembershipCache(project.workspaceId, params.ownerId);
+    await invalidateProjectMembershipCache(project.id, params.ownerId);
   }
   return project;
 }
@@ -237,6 +246,11 @@ export async function updateProjectRecord(projectId: string, params: { name?: st
     })
     .where(eq(projects.id, projectId))
     .returning();
+
+  if (rows[0]) {
+    await invalidateWorkspaceCache(rows[0].workspaceId, WorkspaceCacheInvalidationReason.PROJECT_STRUCTURE_CHANGED);
+    await invalidateProjectTeamCache(projectId);
+  }
 
   return rows[0] ?? null;
 }
@@ -257,8 +271,11 @@ export async function acceptProjectInvite(projectId: string, workspaceId: string
     await ensureProjectMembership(projectId, userId, 'developer', undefined, tx);
   });
 
-  await invalidateWorkspaceCache(workspaceId);
+  await invalidateWorkspaceCache(workspaceId, WorkspaceCacheInvalidationReason.MEMBERSHIP_CHANGED);
   await invalidateUserWorkspacesCache(userId);
+  await invalidateWorkspaceMembershipCache(workspaceId, userId);
+  await invalidateProjectWorkspaceCache(projectId);
+  await invalidateProjectMembershipCache(projectId, userId);
 }
 
 export async function addProjectMemberRecord(projectId: string, workspaceId: string, userId: string, role: string) {
@@ -267,11 +284,15 @@ export async function addProjectMemberRecord(projectId: string, workspaceId: str
     await ensureProjectMembership(projectId, userId, role, undefined, tx);
   });
 
-  await invalidateWorkspaceCache(workspaceId);
+  await invalidateWorkspaceCache(workspaceId, WorkspaceCacheInvalidationReason.MEMBERSHIP_CHANGED);
   await invalidateUserWorkspacesCache(userId);
+  await invalidateWorkspaceMembershipCache(workspaceId, userId);
+  await invalidateProjectWorkspaceCache(projectId);
+  await invalidateProjectMembershipCache(projectId, userId);
 }
 
 export async function deleteProjectRecord(projectId: string, workspaceId: string) {
+  const membershipRows = await db.select({ userId: projectMembers.userId }).from(projectMembers).where(eq(projectMembers.projectId, projectId));
   await db.transaction(async (tx) => {
     // 1. Delete comments belonging to tickets in this project
     await tx.delete(comments).where(sql`${comments.ticketId} in (
@@ -302,5 +323,8 @@ export async function deleteProjectRecord(projectId: string, workspaceId: string
     await tx.delete(projects).where(eq(projects.id, projectId));
   });
 
-  await invalidateWorkspaceCache(workspaceId);
+  await invalidateWorkspaceCache(workspaceId, WorkspaceCacheInvalidationReason.PROJECT_STRUCTURE_CHANGED);
+  await invalidateProjectWorkspaceCache(projectId);
+  await invalidateProjectMembershipCache(projectId, membershipRows.map((member) => member.userId));
+  await invalidateProjectTeamCache(projectId);
 }

@@ -1,35 +1,66 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Compass, PlusCircle } from 'lucide-react';
+import { Button } from '@library';
 import type { Ticket } from '../../../context/TicketContext';
-import { Compass } from 'lucide-react';
 import { TicketRow } from './TicketRow';
 import { TicketRowMobile } from './TicketRowMobile/TicketRowMobile';
 import { TicketContextMenu } from './TicketContextMenu';
 
-import type { TicketListProps } from '../types/TicketList';
+import type { TicketListPropsWithPerformance } from '../types/TicketList';
 import { getAssigneeAvatar, getPriorityIcon, getStatusLabel, getStatusColor } from '../utils/TicketList';
 import { LIST_STATUS_ORDER } from '../utils/ticketView';
 
-export const TicketList: React.FC<TicketListProps> = ({
+const INITIAL_TICKETS_PER_STATUS = 50;
+const LOAD_MORE_STEP = 50;
+
+export const TicketList = React.memo(({
   filteredCount,
   groupedTickets,
   availableTickets,
-  labelById,
   userAvatarById,
   projectById,
   onSelectTicket,
-}) => {
+  onLoadMore,
+  hasMoreRows,
+  isLoadingMoreRows,
+}: TicketListPropsWithPerformance) => {
+  const [visibleByStatus, setVisibleByStatus] = useState<Record<string, number>>(() =>
+    Object.fromEntries(LIST_STATUS_ORDER.map((status) => [status, INITIAL_TICKETS_PER_STATUS])) as Record<string, number>
+  );
+  const showMoreButton = hasMoreRows || false;
+  const loadingMoreRows = isLoadingMoreRows || false;
+
+  useEffect(() => {
+    setVisibleByStatus(Object.fromEntries(LIST_STATUS_ORDER.map((status) => [status, INITIAL_TICKETS_PER_STATUS])) as Record<string, number>);
+  }, [groupedTickets]);
+
+  const handleLoadMoreStatus = (status: string, totalTicketsForStatus: number) => {
+    setVisibleByStatus((previous) => {
+      const currentLimit = previous[status] ?? INITIAL_TICKETS_PER_STATUS;
+      const nextLimit = Math.min(totalTicketsForStatus, currentLimit + LOAD_MORE_STEP);
+      if (nextLimit === currentLimit) {
+        return previous;
+      }
+      return { ...previous, [status]: nextLimit };
+    });
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', flex: 1, overflow: 'hidden' }}>
-
-      <div style={{ flex: 1, overflowY: 'auto' }}>
+        <div style={{ flex: 1, overflowY: 'auto' }}>
         <>
           {LIST_STATUS_ORDER.map((status) => {
             const ticketsInGroup = groupedTickets[status];
-            if (!ticketsInGroup || ticketsInGroup.length === 0) return null;
+            if (!ticketsInGroup || ticketsInGroup.length === 0) {
+              return null;
+            }
+
+            const visibleCount = visibleByStatus[status] ?? INITIAL_TICKETS_PER_STATUS;
+            const visibleTickets = ticketsInGroup.slice(0, visibleCount);
+            const hasMoreInStatus = visibleTickets.length < ticketsInGroup.length;
+
             return (
               <div key={status} style={{ marginBottom: '24px' }}>
-
                 <div
                   style={{
                     display: 'flex',
@@ -61,7 +92,7 @@ export const TicketList: React.FC<TicketListProps> = ({
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {ticketsInGroup.map(ticket => {
+                  {visibleTickets.map((ticket) => {
                     const project = projectById?.[ticket.projectId];
                     const rowProps = {
                       ticket,
@@ -79,16 +110,44 @@ export const TicketList: React.FC<TicketListProps> = ({
                           </TicketContextMenu>
                         </div>
                         <div className="ticket-list__row-mobile">
-                          <TicketRowMobile {...rowProps} />
+                          <TicketRow {...rowProps} />
                         </div>
                       </React.Fragment>
                     );
                   })}
                 </div>
 
+                {hasMoreInStatus ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleLoadMoreStatus(status, ticketsInGroup.length)}
+                    disabled={loadingMoreRows}
+                    style={{
+                      marginTop: '8px',
+                      color: 'var(--color-text-disabled)',
+                      border: '1px dashed var(--color-border-default)',
+                    }}
+                  >
+                    <PlusCircle size={12} style={{ marginRight: '4px' }} />
+                    {loadingMoreRows ? 'Loading…' : `Load more ${Math.max(0, ticketsInGroup.length - visibleCount)} remaining`}
+                  </Button>
+                ) : null}
               </div>
             );
           })}
+
+          {showMoreButton ? (
+            <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'center' }}>
+              <Button
+                variant="primary"
+                onClick={onLoadMore}
+                disabled={!onLoadMore || loadingMoreRows}
+              >
+                {loadingMoreRows ? 'Loading more tickets…' : 'Load more tickets'}
+              </Button>
+            </div>
+          ) : null}
 
           {filteredCount === 0 && (
             <div style={{ padding: '48px', textAlign: 'center', color: 'var(--color-text-disabled)' }}>
@@ -98,7 +157,6 @@ export const TicketList: React.FC<TicketListProps> = ({
           )}
         </>
       </div>
-
     </div>
   );
-};
+});

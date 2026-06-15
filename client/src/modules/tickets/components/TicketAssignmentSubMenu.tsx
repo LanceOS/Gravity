@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ContextMenu } from '@library';
 import type { Ticket } from '../../../context/TicketContext';
+import { buildSearchableText, normalizeSearchTerm } from '../../../utils/search';
 
 export interface TicketAssignmentSubMenuProps {
   title: string;
@@ -9,14 +10,6 @@ export interface TicketAssignmentSubMenuProps {
   tickets: Ticket[];
   emptyStateLabel: string;
   onSelectTicket: (ticket: Ticket) => void | Promise<void>;
-}
-
-function normalizeSearchTerm(value: string) {
-  return value.trim().toLowerCase();
-}
-
-function buildSearchableText(ticket: Ticket) {
-  return [ticket.key, ticket.title].filter(Boolean).join(' ').toLowerCase();
 }
 
 export function TicketAssignmentSubMenu({
@@ -36,7 +29,7 @@ export function TicketAssignmentSubMenu({
       return tickets;
     }
 
-    return tickets.filter((ticket) => buildSearchableText(ticket).includes(normalizedSearch));
+    return tickets.filter((ticket) => buildSearchableText([ticket.key, ticket.title]).includes(normalizedSearch));
   }, [search, tickets]);
 
   useEffect(() => {

@@ -14,6 +14,7 @@ import {
   updateCommentRecord,
   updateTicketRecord,
 } from './services/tickets.js';
+import { getProjectTeamId } from '../workspaces/services/membership.js';
 import { ToolExecutionContext, ToolHandler } from '../mcp/tool-handlers/types.js';
 import { McpToolDefinition } from '../mcp/types.js';
 
@@ -24,16 +25,6 @@ function parseDateArg(value: unknown, fieldName: string): Date | undefined {
     throw new Error(`Invalid date format provided for ${fieldName}: ${value}`);
   }
   return d;
-}
-
-async function getProjectTeamId(projectId: string) {
-  const rows = await db
-    .select({ teamId: projects.teamId })
-    .from(projects)
-    .where(eq(projects.id, projectId))
-    .limit(1);
-
-  return rows[0]?.teamId ?? null;
 }
 
 /**
