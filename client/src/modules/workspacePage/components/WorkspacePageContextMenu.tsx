@@ -70,7 +70,7 @@ export const WorkspacePageContextMenu = memo(function WorkspacePageContextMenu({
     <>
       {activeIssueMenu ? (
         <>
-          <ContextMenu.Item icon={<Plus size={14} />} onClick={onOpenCreateTicket}>
+          <ContextMenu.Item icon={<Plus size={14} />} onClick={() => onOpenCreateTicket()}>
             New Ticket
           </ContextMenu.Item>
           <ContextMenu.Item icon={<Activity size={14} />}>
