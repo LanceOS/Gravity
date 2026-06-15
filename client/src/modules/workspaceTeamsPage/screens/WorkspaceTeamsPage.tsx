@@ -4,7 +4,7 @@ import { apiClient } from '../../../utils/apiClient';
 import { addSidebarTeam, removeSidebarTeam, updateSidebarTeam } from '../../../utils/sidebarTreeMutations';
 import { WorkspaceHeader } from '../../workspaces';
 import type { SidebarTeam, Team } from '../../../types/domain';
-import '../../../pages/WorkspacePage/WorkspacePage.css';
+import '../../workspacePage/styles/WorkspacePage.css';
 import '../styles/WorkspaceTeamsPage.css';
 
 import { WorkspaceTeamsCreateTeamModal } from '../components/WorkspaceTeamsCreateTeamModal';

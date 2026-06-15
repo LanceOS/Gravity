@@ -4,7 +4,7 @@ import { ProjectCreateOverlay } from '../../workspaceProjectsPanel/components/Pr
 import { sanitizeProjectKey } from '../../workspaceProjectsPanel/utils/WorkspaceProjectPanel';
 import { WorkspaceHeader } from '../../workspaces/components/WorkspaceHeader';
 import { removeProjectFromTeam, updateProjectInTeam } from '../../../utils/sidebarTreeMutations';
-import '../../../pages/WorkspacePage/WorkspacePage.css';
+import '../../workspacePage/styles/WorkspacePage.css';
 import '../styles/WorkspaceTeamProjectsPage.css';
 import { WorkspaceTeamProjectsDeleteModal } from '../components/WorkspaceTeamProjectsDeleteModal';
 import { WorkspaceTeamProjectsEditorSection } from '../components/WorkspaceTeamProjectsEditorSection';

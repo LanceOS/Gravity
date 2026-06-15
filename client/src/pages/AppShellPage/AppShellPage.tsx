@@ -8,8 +8,7 @@ import { useWorkspaceDirectory } from '../../hooks/useWorkspaceDirectory';
 import { LoadingPage } from '../LoadingPage/LoadingPage';
 import { WorkspaceDirectoryPage } from '../WorkspaceDirectoryPage/WorkspaceDirectoryPage';
 import { WorkspaceShellPage } from '../WorkspaceShellPage/WorkspaceShellPage';
-import { usePendingWorkspaceInvite } from './hooks/useWorkspaceLifecycle';
-import { useWorkspaceDirectoryState } from './hooks/useWorkspaceDirectoryState';
+import { usePendingWorkspaceInvite, useWorkspaceDirectoryState } from '../../modules/workspaceShellPage/hooks';
 import './AppShellPage.css';
 
 export function AppShellPage() {

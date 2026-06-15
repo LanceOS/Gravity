@@ -1,7 +1,7 @@
 import { useEffect, type Dispatch, type SetStateAction } from 'react';
 import type { User, Project } from '../../../types/domain';
 import type { WorkspaceSummary } from '../../../hooks/useWorkspaceDirectory';
-import type { AppSection } from '../AppShellPage.types';
+import type { AppSection } from '../types/AppShell';
 import { getActiveWorkspaceStorageKey } from '../../../modules/workspaces';
 
 interface UseActiveWorkspaceSelectionArgs {
