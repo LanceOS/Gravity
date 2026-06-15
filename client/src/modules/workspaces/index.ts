@@ -2,7 +2,7 @@ export { EmptyWorkspaceScreen } from './components/EmptyWorkspaceScreen';
 export { WorkspaceMcpModal } from './components/WorkspaceMcpModal';
 export { WorkspaceHeader } from './components/WorkspaceHeader';
 export { ProjectCreateOverlay } from '../workspaceProjects/components/ProjectCreateOverlay';
-export { WorkspaceProjectPanel } from '../workspaceProjects/components/WorkspaceProjectPanel';
+export { WorkspaceProjectPanelPage as WorkspaceProjectPanel } from '../workspaceProjects/screens/WorkspaceProjectPanelPage';
 export {
   useActiveWorkspaceStorage,
   useWorkspaceCreateLabelDialog,
@@ -13,7 +13,7 @@ export {
   useWorkspaceCreateTicketDialog,
   useWorkspaceSidebarCounts,
 } from './hooks';
-export { getActiveWorkspaceStorageKey } from './utils';
+export { getActiveWorkspaceStorageKey } from './utils/workspaceStorage';
 export {
   PROJECT_LIFECYCLE_OPTIONS,
   PROJECT_STATUS_LABELS,

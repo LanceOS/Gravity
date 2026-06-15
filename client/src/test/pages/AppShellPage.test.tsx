@@ -201,10 +201,6 @@ vi.mock('../../pages/WorkspacePage/WorkspacePage', () => ({
   ),
 }));
 
-vi.mock('../../pages/WorkspaceProjectsPage/WorkspaceProjectsPage', () => ({
-  WorkspaceProjectsPage: () => <div>WorkspaceProjectsPage</div>,
-}));
-
 vi.mock('../../pages/WorkspaceProjectsListPage/WorkspaceProjectsListPage', () => ({
   WorkspaceProjectsListPage: () => <div>WorkspaceProjectsListPage</div>,
 }));

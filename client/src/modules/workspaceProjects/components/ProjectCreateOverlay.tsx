@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { FolderPlus } from 'lucide-react';
 import { Button, TextInput, Textarea, Modal, Alert } from '@library';
 
@@ -16,13 +16,14 @@ export function ProjectCreateOverlay({
   const [projectDescription, setProjectDescription] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     if (!loading) {
       onClose();
     }
-  };
+  }, [loading, onClose]);
 
-  const handleSubmit = async (event?: React.SubmitEvent<HTMLFormElement>) => {
+  const handleSubmit = useCallback(
+    async (event?: React.SubmitEvent<HTMLFormElement>) => {
     event?.preventDefault();
     setFormError(null);
 
@@ -47,7 +48,9 @@ export function ProjectCreateOverlay({
       // errorMessage prop. Keep formError reserved for client-side validation
       // so a generic fallback does not mask a later, more specific error.
     }
-  };
+    },
+    [projectDescription, onSubmitProject, projectKey, projectName]
+  );
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -63,7 +66,7 @@ export function ProjectCreateOverlay({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleClose]);
+  }, [handleClose, handleSubmit]);
 
   const feedbackMessage = formError || errorMessage;
 

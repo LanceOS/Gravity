@@ -1,4 +1,4 @@
-export { WorkspaceProjectPanel } from './components/WorkspaceProjectPanel';
+export { WorkspaceProjectPanelPage as WorkspaceProjectPanel } from './screens/WorkspaceProjectPanelPage';
 export { WorkspaceProjectPanelPage } from './screens/WorkspaceProjectPanelPage';
 export { ProjectCreateOverlay } from './components/ProjectCreateOverlay';
 export { ProjectSelectionRail } from './components/ProjectSelectionRail';
@@ -18,4 +18,3 @@ export type {
   WorkspaceProjectPanelProps,
   WorkspaceProjectsPageProps,
 } from './types/WorkspaceProjectPanel';
-export { WorkspaceProjectsPage } from './screens';
