@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useMutation, useQuery, type QueryClient } from '@tanstack/react-query';
 import { toast } from '@library';
 import { apiClient } from '../utils/apiClient';
@@ -31,8 +31,6 @@ interface UseTicketRelationActionsArgs {
   isAuthenticated: boolean;
 }
 
-const API_URL = '/api/v1';
-
 export function useTicketRelationActions({
   queryClient,
   tickets,
@@ -43,6 +41,19 @@ export function useTicketRelationActions({
 }: UseTicketRelationActionsArgs) {
   const activeTicketRef = useRef<Ticket | null>(activeTicket);
   const pendingTicketRelationAddsRef = useRef(new Set<string>());
+
+  const cachedTicketsById = useMemo(() => {
+    const byId = new Map<string, Ticket>();
+    for (const ticket of tickets) {
+      byId.set(ticket.id, ticket);
+    }
+
+    if (activeTicket) {
+      byId.set(activeTicket.id, activeTicket);
+    }
+
+    return byId;
+  }, [activeTicket, tickets]);
 
   useEffect(() => {
     activeTicketRef.current = activeTicket;
@@ -64,22 +75,27 @@ export function useTicketRelationActions({
   const activeTicketDetail = activeTicketDetailQuery.data || null;
 
   const getTicketProjectIdForMutation = useCallback((ticketId: string) => {
-    if (activeTicketRef.current?.id === ticketId) {
-      return activeTicketRef.current.projectId;
+    const cachedTicket = cachedTicketsById.get(ticketId);
+    if (cachedTicket) {
+      return cachedTicket.projectId;
     }
 
-    const matchingTicket = tickets.find((ticket) => ticket.id === ticketId);
-    return matchingTicket?.projectId;
-  }, [tickets]);
+    const detailTicket = queryClient.getQueryData<TicketWithRelations>(queryKeys.ticketDetail(ticketId));
+    return detailTicket?.projectId;
+  }, [cachedTicketsById, queryClient]);
 
   const findTicketInCache = useCallback((ticketId: string): Ticket | undefined => {
-    if (activeTicketRef.current?.id === ticketId) {
-      return activeTicketRef.current;
+    if (cachedTicketsById.has(ticketId)) {
+      return cachedTicketsById.get(ticketId);
     }
 
-    const matchingTicket = tickets.find((ticket) => ticket.id === ticketId);
-    if (matchingTicket) {
-      return matchingTicket;
+    const cachedDetailFromKey = queryClient.getQueryData<TicketWithRelations>(queryKeys.ticketDetail(ticketId));
+    if (cachedDetailFromKey) {
+      return cachedDetailFromKey;
+    }
+
+    if (activeTicketRef.current?.id === ticketId) {
+      return activeTicketRef.current;
     }
 
     const ticketDetails = queryClient.getQueriesData<TicketWithRelations>({ queryKey: queryKeys.ticketDetails() });
@@ -107,7 +123,7 @@ export function useTicketRelationActions({
     }
 
     return undefined;
-  }, [queryClient, tickets]);
+  }, [cachedTicketsById, queryClient]);
 
   const getCachedTicketRelation = useCallback((ticketId: string) => {
     const cachedTicket = findTicketInCache(ticketId);

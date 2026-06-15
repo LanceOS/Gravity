@@ -22,6 +22,18 @@ export const CACHE_CONFIGS = {
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
   },
+  workspaceSettings: {
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  },
+  workspaceInvites: {
+    staleTime: 60 * 1000,
+    gcTime: 15 * 60 * 1000,
+  },
+  workspaceJoinRequests: {
+    staleTime: 60 * 1000,
+    gcTime: 15 * 60 * 1000,
+  },
   metadata: {
     staleTime: 10 * 60 * 1000,
     gcTime: 60 * 60 * 1000,

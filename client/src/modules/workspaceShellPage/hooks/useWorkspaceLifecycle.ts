@@ -3,6 +3,10 @@ import type { User, Project } from '../../../types/domain';
 import type { WorkspaceSummary } from '../../../hooks/useWorkspaceDirectory';
 import type { AppSection } from '../types/AppShell';
 import { useQueryCacheString } from '../../../hooks/useQueryCacheString';
+import {
+  workspaceDirectoryService as defaultWorkspaceDirectoryService,
+  type WorkspaceDirectoryService,
+} from '../../../services/workspaceDirectoryService';
 
 interface UseActiveWorkspaceSelectionArgs {
   currentUser: User | null;
@@ -142,35 +146,31 @@ interface UseWorkspaceMemberActivityArgs {
   activeWorkspaceId: string;
   currentUser: User | null;
   updateMemberActivity: (userId: string, lastActiveAt: string) => void;
+  workspaceDirectoryService?: WorkspaceDirectoryService;
 }
 
 export function useWorkspaceMemberActivity({
   activeWorkspaceId,
   currentUser,
   updateMemberActivity,
+  workspaceDirectoryService = defaultWorkspaceDirectoryService,
 }: UseWorkspaceMemberActivityArgs) {
   useEffect(() => {
     if (!activeWorkspaceId || !currentUser) {
       return;
     }
 
-    fetch(`/api/v1/workspaces/${activeWorkspaceId}/members/${currentUser.id}/activity`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-User-Id': currentUser.id,
-      },
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success && data.lastActiveAt) {
-          updateMemberActivity(currentUser.id, data.lastActiveAt);
+    void workspaceDirectoryService
+      .logWorkspaceMemberActivity(activeWorkspaceId, currentUser.id)
+      .then((lastActiveAt) => {
+        if (lastActiveAt) {
+          updateMemberActivity(currentUser.id, lastActiveAt);
         }
       })
       .catch((err) => {
         console.error('Failed to log workspace activity:', err);
       });
-  }, [activeWorkspaceId, currentUser, updateMemberActivity]);
+  }, [activeWorkspaceId, currentUser, updateMemberActivity, workspaceDirectoryService]);
 }
 
 interface UseWorkspaceProjectSelectionArgs {

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, queryKeys, CACHE_CONFIGS } from '../utils/queryClient';
+import { ApiError, apiClient } from '../utils/apiClient';
 import type { User } from '../context/TicketContext';
 import type { WorkspaceJoinMode } from './useWorkspaceDirectory';
 
@@ -93,6 +94,11 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const enabled = !!currentUser && !!activeWorkspaceId;
+  const userId = currentUser?.id;
+
+  const buildHeaders = useCallback(() => {
+    return userId ? { 'X-User-Id': userId } : {};
+  }, [userId]);
 
   // --- Queries ---
 
@@ -100,11 +106,17 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
   const settingsQuery = useQuery({
     queryKey: queryKeys.workspaceSettings(activeWorkspaceId),
     queryFn: async () => {
-      const res = await fetch(`/api/v1/workspaces/${activeWorkspaceId}/settings`, {
-        headers: { 'X-User-Id': currentUser!.id },
+      const data = await apiClient.get<{
+        workspaceId?: string;
+        key?: string;
+        hostUrl?: string;
+        joinMode?: WorkspaceJoinMode;
+        hierarchyMode?: 'flat' | 'teams';
+        workspaceKey?: string;
+        disabledMcpTools?: string[];
+      }>(`/workspaces/${activeWorkspaceId}/settings`, {
+        headers: buildHeaders(),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to load workspace settings.');
       return {
         workspaceId: data.workspaceId || activeWorkspaceId,
         key: data.key || '',
@@ -115,6 +127,8 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
         disabledMcpTools: Array.isArray(data.disabledMcpTools) ? data.disabledMcpTools : [],
       } as WorkspaceAdminSettings;
     },
+    staleTime: CACHE_CONFIGS.workspaceSettings.staleTime,
+    gcTime: CACHE_CONFIGS.workspaceSettings.gcTime,
     enabled,
   });
 
@@ -131,11 +145,9 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
   const membersQuery = useQuery({
     queryKey: queryKeys.workspaceMembers(activeWorkspaceId),
     queryFn: async () => {
-      const res = await fetch(`/api/v1/workspaces/${activeWorkspaceId}/members`, {
-        headers: { 'X-User-Id': currentUser!.id },
+      const data = await apiClient.get<unknown>(`/workspaces/${activeWorkspaceId}/members`, {
+        headers: buildHeaders(),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to load workspace members.');
       return (Array.isArray(data) ? data : []) as WorkspaceMember[];
     },
     enabled,
@@ -147,13 +159,13 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
   const invitesQuery = useQuery({
     queryKey: queryKeys.workspaceInvites(activeWorkspaceId),
     queryFn: async () => {
-      const res = await fetch(`/api/v1/workspaces/${activeWorkspaceId}/invites`, {
-        headers: { 'X-User-Id': currentUser!.id },
+      const data = await apiClient.get<unknown[]>(`/workspaces/${activeWorkspaceId}/invites`, {
+        headers: buildHeaders(),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to load workspace invites.');
       return (Array.isArray(data) ? data.map((invite) => normalizeWorkspaceInvite(invite as Record<string, unknown>)) : []) as WorkspaceInvite[];
     },
+    staleTime: CACHE_CONFIGS.workspaceInvites.staleTime,
+    gcTime: CACHE_CONFIGS.workspaceInvites.gcTime,
     enabled,
   });
 
@@ -161,14 +173,20 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
   const joinRequestsQuery = useQuery({
     queryKey: queryKeys.workspaceJoinRequests(activeWorkspaceId),
     queryFn: async () => {
-      const res = await fetch(`/api/v1/workspaces/${activeWorkspaceId}/join-requests`, {
-        headers: { 'X-User-Id': currentUser!.id },
-      });
-      const data = await res.json();
-      if (res.status === 403) return [] as WorkspaceJoinRequest[];
-      if (!res.ok) throw new Error(data.error || 'Failed to load workspace join requests.');
-      return (Array.isArray(data) ? data : []) as WorkspaceJoinRequest[];
+      try {
+        const data = await apiClient.get<unknown[]>(`/workspaces/${activeWorkspaceId}/join-requests`, {
+          headers: buildHeaders(),
+        });
+        return (Array.isArray(data) ? data : []) as WorkspaceJoinRequest[];
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 403) {
+          return [] as WorkspaceJoinRequest[];
+        }
+        throw error;
+      }
     },
+    staleTime: CACHE_CONFIGS.workspaceJoinRequests.staleTime,
+    gcTime: CACHE_CONFIGS.workspaceJoinRequests.gcTime,
     enabled,
   });
 
@@ -200,21 +218,22 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
   // Save Settings Mutation
   const saveSettingsMutation = useMutation({
     mutationFn: async (payload: Partial<WorkspaceAdminSettings>) => {
-      const response = await fetch(`/api/v1/workspaces/${activeWorkspaceId}/settings`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-User-Id': currentUser!.id,
-        },
-        body: JSON.stringify({
-          hostUrl: payload.hostUrl,
-          joinMode: payload.joinMode,
-          workspaceKey: payload.workspaceKey,
-          disabledMcpTools: payload.disabledMcpTools || [],
-        }),
+      const data = await apiClient.patch<{
+        workspaceId?: string;
+        key?: string;
+        hostUrl?: string;
+        joinMode?: WorkspaceJoinMode;
+        hierarchyMode?: 'flat' | 'teams';
+        workspaceKey?: string;
+        disabledMcpTools?: string[];
+      }>(`/workspaces/${activeWorkspaceId}/settings`, {
+        hostUrl: payload.hostUrl,
+        joinMode: payload.joinMode,
+        workspaceKey: payload.workspaceKey,
+        disabledMcpTools: payload.disabledMcpTools || [],
+      }, {
+        headers: buildHeaders(),
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed to save workspace settings.');
       return {
         workspaceId: data.workspaceId || activeWorkspaceId,
         key: data.key || payload.key,
@@ -238,19 +257,14 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
   // Create Invite Mutation
   const createInviteMutation = useMutation({
     mutationFn: async (input: CreateWorkspaceInviteInput) => {
-      const response = await fetch(`/api/v1/workspaces/${activeWorkspaceId}/invites`, {
-        method: 'POST',
+      const data = await apiClient.post<Record<string, unknown>>(`/workspaces/${activeWorkspaceId}/invites`, {
+        createdBy: currentUser?.id,
+        label: input.label,
+      }, {
         headers: {
-          'Content-Type': 'application/json',
-          'X-User-Id': currentUser!.id,
+          ...buildHeaders(),
         },
-        body: JSON.stringify({
-          createdBy: currentUser!.id,
-          label: input.label,
-        }),
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed to create invite.');
       return normalizeWorkspaceInvite(data as Record<string, unknown>);
     },
     onSuccess: async () => {
@@ -265,15 +279,11 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
   // Revoke Invite Mutation
   const revokeInviteMutation = useMutation({
     mutationFn: async (inviteId: string) => {
-      const response = await fetch(`/api/v1/workspaces/${activeWorkspaceId}/invites/${inviteId}/revoke`, {
-        method: 'POST',
+      await apiClient.post<{ success: boolean }>(`/workspaces/${activeWorkspaceId}/invites/${inviteId}/revoke`, {}, {
         headers: {
-          'Content-Type': 'application/json',
-          'X-User-Id': currentUser!.id,
+          ...buildHeaders(),
         },
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed to revoke invite.');
     },
     onSuccess: async () => {
       await refreshWorkspaceAdmin();
@@ -287,15 +297,11 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
   // Approve Join Request Mutation
   const approveJoinRequestMutation = useMutation({
     mutationFn: async (requestId: string) => {
-      const response = await fetch(`/api/v1/workspaces/${activeWorkspaceId}/join-requests/${requestId}/approve`, {
-        method: 'POST',
+      await apiClient.post<{ success: boolean }>(`/workspaces/${activeWorkspaceId}/join-requests/${requestId}/approve`, {}, {
         headers: {
-          'Content-Type': 'application/json',
-          'X-User-Id': currentUser!.id,
+          ...buildHeaders(),
         },
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed to approve join request.');
     },
     onSuccess: async () => {
       await refreshWorkspaceAdmin();
@@ -309,15 +315,11 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
   // Delete Workspace Mutation
   const deleteWorkspaceMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch(`/api/v1/workspaces/${activeWorkspaceId}`, {
-        method: 'DELETE',
+      await apiClient.delete<{ success: boolean }>(`/workspaces/${activeWorkspaceId}`, {
         headers: {
-          'Content-Type': 'application/json',
-          'X-User-Id': currentUser!.id,
+          ...buildHeaders(),
         },
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed to delete workspace.');
     },
     onError: (err: Error) => {
       setDeleteError(err.message || 'Failed to delete workspace.');

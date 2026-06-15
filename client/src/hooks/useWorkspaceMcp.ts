@@ -1,29 +1,26 @@
+import { apiClient } from '../utils/apiClient';
+
 export function useWorkspaceMcp(workspaceId?: string) {
   async function createConnection(options: { scopes?: string[]; ttlSeconds?: number; singleUse?: boolean } = {}) {
     if (!workspaceId) throw new Error('workspaceId is required');
-    const res = await fetch(`/api/v1/workspaces/${workspaceId}/mcp/connection`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(options),
+    const data = await apiClient.post<Record<string, unknown>>(`/workspaces/${workspaceId}/mcp/connection`, options, {
+      headers: { 'Content-Type': 'application/json' },
     });
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(text || 'Failed to create connection token');
+    if (!data) {
+      throw new Error('Failed to create connection token');
     }
-    return await res.json();
+    return data;
   }
 
   async function revokeConnection(tokenId: string) {
     if (!workspaceId) throw new Error('workspaceId is required');
-    const res = await fetch(`/api/v1/workspaces/${workspaceId}/mcp/connection/${tokenId}/revoke`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
+    const data = await apiClient.post<Record<string, unknown>>(`/workspaces/${workspaceId}/mcp/connection/${tokenId}/revoke`, {}, {
+      headers: { 'Content-Type': 'application/json' },
     });
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(text || 'Failed to revoke connection token');
+    if (!data) {
+      throw new Error('Failed to revoke connection token');
     }
-    return await res.json();
+    return data;
   }
 
   return { createConnection, revokeConnection };
