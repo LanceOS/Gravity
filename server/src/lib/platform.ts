@@ -364,7 +364,11 @@ export async function listWorkspaceSummaries(userId?: string): Promise<Workspace
 
 export async function invalidateWorkspaceCache(workspaceId: string): Promise<void> {
   try {
-    const keysToInvalidate = [cache.CacheKeys.workspaces.all(), cache.CacheKeys.workspaces.byId(workspaceId)];
+    const keysToInvalidate = [
+      cache.CacheKeys.workspaces.all(),
+      cache.CacheKeys.workspaces.byId(workspaceId),
+      cache.CacheKeys.workspaces.sidebar(workspaceId),
+    ];
     const members = await db
       .select({ userId: workspaceMembers.userId })
       .from(workspaceMembers)

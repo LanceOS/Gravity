@@ -8,6 +8,7 @@ export const CacheKeys = {
   workspaces: {
     all: () => 'all-workspaces' as CacheKey,
     byId: (workspaceId: string) => `workspace-summary:${workspaceId}` as CacheKey,
+    sidebar: (workspaceId: string) => `workspace-sidebar:${workspaceId}` as CacheKey,
     byUser: (userId: string) => `user-workspaces:${userId}` as CacheKey,
   },
   memberships: {

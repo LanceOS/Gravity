@@ -1,11 +1,15 @@
 import { and, asc, eq } from 'drizzle-orm';
 import { type Request, type Response, Router } from 'express';
 import { db } from '../../db/index.js';
-import { cycles, labels, ticketLabels, projects, tickets } from '../../db/schema.js';
+import { cycles, labels, projects, teams, ticketLabels, tickets } from '../../db/schema.js';
 import { broadcastEvent } from '../../realtime.js';
-import { createId, getProjectIdFromRequest, normalizeIsoDate } from '../../lib/platform.js';
-import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
-import { isWorkspaceMember, getProjectWorkspaceId, authorizeProjectAccess, authorizeTeamAccess } from '../workspaces/services/membership.js';
+import {
+  createId,
+  getProjectIdFromRequest,
+  invalidateWorkspaceCache,
+  normalizeIsoDate,
+} from '../../lib/platform.js';
+import { authorizeProjectAccess, authorizeTeamAccess } from '../workspaces/services/membership.js';
 import {
   addCommentRecord,
   createTicketRecord,
@@ -125,6 +129,16 @@ export function createTicketsRouter() {
     }
 
     await handler(ticket, auth.userId);
+  }
+
+  async function invalidateSidebarCacheFromTeam(teamId: string) {
+    const teamRows = await db.select({ workspaceId: teams.workspaceId }).from(teams).where(eq(teams.id, teamId)).limit(1);
+    const workspaceId = teamRows[0]?.workspaceId;
+    if (!workspaceId) {
+      return;
+    }
+
+    await invalidateWorkspaceCache(workspaceId);
   }
 
   router.get('/tickets', async (req, res) => {
@@ -465,6 +479,8 @@ export function createTicketsRouter() {
         })
         .returning();
 
+      await invalidateSidebarCacheFromTeam(resolvedTeamId);
+
       res.status(201).json(mapLabel(rows[0]));
     } catch (error) {
       if (error instanceof Error && /unique/i.test(error.message)) {
@@ -525,6 +541,8 @@ export function createTicketsRouter() {
         .where(eq(labels.id, labelId))
         .returning();
 
+      await invalidateSidebarCacheFromTeam(labelRow.teamId);
+
       res.json(mapLabel(rows[0]));
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to update label.' });
@@ -556,6 +574,8 @@ export function createTicketsRouter() {
         await tx.delete(ticketLabels).where(eq(ticketLabels.labelId, labelId));
         await tx.delete(labels).where(eq(labels.id, labelId));
       });
+
+      await invalidateSidebarCacheFromTeam(labelRow.teamId);
 
       res.json({ success: true });
     } catch (error) {
@@ -714,6 +734,8 @@ export function createTicketsRouter() {
           createdAt: new Date(),
         })
         .returning();
+
+      await invalidateSidebarCacheFromTeam(targetTeamId);
       res.status(201).json(mapCycle(rows[0]));
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create cycle.' });
