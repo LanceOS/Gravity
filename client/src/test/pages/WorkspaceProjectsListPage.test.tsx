@@ -34,9 +34,6 @@ function LocationDisplay() {
 }
 
 function renderWorkspaceProjectsListPage(overrides: Partial<Record<string, unknown>> = {}) {
-  const setActiveProjectId = vi.fn();
-  const setActiveTicket = vi.fn();
-
   mocks.useTickets.mockReturnValue({
     activeProjectId: 'project-1',
     projects: [
@@ -57,14 +54,12 @@ function renderWorkspaceProjectsListPage(overrides: Partial<Record<string, unkno
         workspaceId: 'workspace-2',
       },
     ],
-    setActiveProjectId,
-    setActiveTicket,
+    setActiveProjectId: vi.fn(),
+    setActiveTicket: vi.fn(),
     ...overrides,
   });
 
   return {
-    setActiveProjectId,
-    setActiveTicket,
     ...render(
       <MemoryRouter initialEntries={['/workspaces/workspace-1/projects/list']}>
         <LocationDisplay />
@@ -79,7 +74,7 @@ function renderWorkspaceProjectsListPage(overrides: Partial<Record<string, unkno
 describe('WorkspaceProjectsListPage', () => {
   it('filters projects to the active workspace and navigates when a row is clicked', async () => {
     const user = userEvent.setup();
-    const { setActiveProjectId, setActiveTicket } = renderWorkspaceProjectsListPage();
+    renderWorkspaceProjectsListPage();
 
     expect(screen.getByText('Workspace Projects')).toBeInTheDocument();
     expect(screen.getByText('Gravity Core')).toBeInTheDocument();
@@ -92,9 +87,6 @@ describe('WorkspaceProjectsListPage', () => {
         '/workspaces/workspace-1/projects/project-1/tickets'
       );
     });
-
-    expect(setActiveProjectId).toHaveBeenCalledWith('project-1');
-    expect(setActiveTicket).toHaveBeenCalledWith(null);
   });
 
   it('shows an empty state when the workspace has no projects', () => {

@@ -356,6 +356,39 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   });
   const labels = labelsQuery.data || [];
 
+  const findLabelQueryKey = useCallback(
+    (labelId: string) => {
+      const cachedLabelQueries = [
+        ...queryClient.getQueriesData<Label[]>({ queryKey: ['labels'] }),
+        ...queryClient.getQueriesData<Label[]>({ queryKey: ['teamLabels'] }),
+      ];
+
+      for (const [queryKey, cachedLabels] of cachedLabelQueries) {
+        if (Array.isArray(cachedLabels) && cachedLabels.some((label) => label.id === labelId)) {
+          return queryKey;
+        }
+      }
+
+      return null;
+    },
+    [queryClient]
+  );
+
+  const invalidateLabelQueries = useCallback(
+    (labelId: string, projectId?: string | null) => {
+      if (projectId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.labels(projectId), exact: true });
+        return;
+      }
+
+      const labelQueryKey = findLabelQueryKey(labelId);
+      if (labelQueryKey) {
+        queryClient.invalidateQueries({ queryKey: labelQueryKey, exact: true });
+      }
+    },
+    [findLabelQueryKey, queryClient]
+  );
+
   // Cycles
   const cyclesQuery = useQuery({
     queryKey: queryKeys.cycles(activeProjectId),
@@ -392,13 +425,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   });
 
   // Global loading state combining react-query status
-  const loading =
-    authLoading ||
-    projectsQuery.isLoading ||
-    usersQuery.isLoading ||
-    (!!activeProjectId && ticketsQuery.isLoading) ||
-    (!!activeProjectId && labelsQuery.isLoading) ||
-    (!!activeProjectId && cyclesQuery.isLoading);
+  const loading = authLoading || projectsQuery.isLoading || usersQuery.isLoading;
 
   const ticketMap = useMemo(() => new Map(tickets.map((t) => [t.key.toUpperCase(), t])), [tickets]);
   const ticketById = useMemo(() => new Map(tickets.map((t) => [t.id, t])), [tickets]);
@@ -1035,7 +1062,12 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const createLabelMutation = useMutation({
     mutationFn: async (labelInput: { name: string; color?: string; description?: string; projectId?: string; sortOrder?: number }) => {
       const projectId = labelInput.projectId || activeProjectIdRef.current;
-      const existingProjectLabels = labels.filter((label) => label.projectId === projectId || !label.projectId);
+      const cachedProjectLabels = queryClient.getQueryData<Label[]>(queryKeys.labels(projectId));
+      const existingProjectLabels = Array.isArray(cachedProjectLabels)
+        ? cachedProjectLabels
+        : projectId === activeProjectIdRef.current
+          ? labels
+          : [];
       const nextSortOrder =
         labelInput.sortOrder ??
         existingProjectLabels.reduce((maxSortOrder, label) => Math.max(maxSortOrder, Number(label.sortOrder ?? 0)), -1) + 1;
@@ -1048,7 +1080,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }, { projectId });
     },
     onSettled: (data) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.labels(data?.projectId || activeProjectIdRef.current) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.labels(data?.projectId || activeProjectIdRef.current), exact: true });
     },
   });
 
@@ -1066,8 +1098,8 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<Label> }) => {
       return apiClient.put<Label>(`/labels/${id}`, updates);
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.labels(activeProjectIdRef.current) });
+    onSettled: (data, _error, variables) => {
+      invalidateLabelQueries(variables.id, data?.projectId);
       invalidateAggregateTicketQueries(activeProjectIdRef.current);
     },
   });
@@ -1086,8 +1118,8 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     mutationFn: async (id: string) => {
       await apiClient.delete(`/labels/${id}`);
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.labels(activeProjectIdRef.current) });
+    onSettled: (_data, _error, labelId) => {
+      invalidateLabelQueries(labelId);
       invalidateAggregateTicketQueries(activeProjectIdRef.current);
     },
   });

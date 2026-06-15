@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useState } from 'react';
+import { useMemo, useCallback, useEffect, useState } from 'react';
 import { Button, Timeline, createEmptyRichTextValue, ContextMenu } from '@library';
 import type { Comment, Cycle, Label, Project, Ticket, User } from '../../../context/TicketContext';
 import {
@@ -58,6 +58,7 @@ interface WorkspacePageProps {
   onLoadMoreTickets?: () => void;
   hasMoreTickets?: boolean;
   isLoadingMoreTickets?: boolean;
+  isLoadingTickets?: boolean;
 }
 
 const STATUS_LABELS: Record<Ticket['status'], string> = {
@@ -104,8 +105,6 @@ function getTicketProjectName(ticket: Ticket, projectById: Record<string, Projec
 }
 
 export function WorkspacePage({
-  workspaceId,
-  workspaceName,
   pathname,
   activeContext = 'issues',
   activeNoteId,
@@ -133,6 +132,7 @@ export function WorkspacePage({
   onLoadMoreTickets,
   hasMoreTickets,
   isLoadingMoreTickets,
+  isLoadingTickets = false,
   onSetListSort,
   onSetView,
   onUpdateTicket,
@@ -276,7 +276,9 @@ export function WorkspacePage({
       : isTeamWorkspace
         ? (onOpenTeamManager ?? onOpenProjectManager)
         : onOpenProjectManager;
+  const shouldShowTicketsLoading = isLoadingTickets && !activeTicket && projects.length > 0;
 
+  // eslint-disable-next-line no-useless-assignment
   let displayTitle = '';
   if (activeContext === 'notes') {
     displayTitle = isNoteEditor ? (activeNoteTitle ? `Notes - ${activeNoteTitle}` : 'Notes') : 'Notes';
@@ -380,7 +382,22 @@ export function WorkspacePage({
                   <QueryErrorResetBoundary>
                     {({ reset }) => (
                       <ErrorBoundary onReset={reset}>
-                        {projects.length === 0 ? (
+                        <div className="workspace-page__tickets-stage">
+                          <div
+                            className={`workspace-page__tickets-loading-layer ${
+                              shouldShowTicketsLoading ? 'workspace-page__tickets-loading-layer--visible' : ''
+                            }`}
+                            aria-hidden={!shouldShowTicketsLoading}
+                          >
+                            <WorkspaceViewContainer>
+                              <div className="workspace-page__tickets-loading">
+                                <div className="workspace-page__tickets-loading-spinner" />
+                                <p className="workspace-page__tickets-loading-copy">Loading tickets…</p>
+                              </div>
+                            </WorkspaceViewContainer>
+                          </div>
+
+                          {projects.length === 0 ? (
                           <div className="workspace-page__empty-state">
                             <div className="workspace-page__empty-state-title">{emptyStateTitle}</div>
                             <p className="workspace-page__empty-state-copy">{emptyStateCopy}</p>
@@ -445,6 +462,7 @@ export function WorkspacePage({
                             />
                           </WorkspaceViewContainer>
                         )}
+                        </div>
                       </ErrorBoundary>
                     )}
                   </QueryErrorResetBoundary>

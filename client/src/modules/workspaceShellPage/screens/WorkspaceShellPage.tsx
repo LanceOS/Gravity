@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useIsFetching, useQuery } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
 import type { SidebarNavigationState, SidebarProps } from '../../../components/Sidebar';
 import { WorkspaceLayout } from '../../../layouts/WorkspaceLayout/WorkspaceLayout';
@@ -76,6 +76,7 @@ export function WorkspaceShellPage() {
     createTicket,
     currentUser,
     cycles,
+    fetchProjectData,
     deleteProject,
     deleteTicket,
     labels = [],
@@ -218,6 +219,8 @@ export function WorkspaceShellPage() {
     fetchNextPage: fetchWorkspaceAggregateNextPage,
     hasNextPage: workspaceAggregateHasNextPage,
     isFetchingNextPage: workspaceAggregateIsFetchingNextPage,
+    isLoading: workspaceAggregateTicketsLoading,
+    isFetching: workspaceAggregateTicketsFetching,
   } = useInfiniteQuery<Ticket[]>({
     queryKey: ['workspaceTickets', activeWorkspaceId, aggregateQueryParams, 'paged'],
     queryFn: ({ pageParam = 0 }) =>
@@ -244,6 +247,8 @@ export function WorkspaceShellPage() {
     fetchNextPage: fetchTeamAggregateNextPage,
     hasNextPage: teamAggregateHasNextPage,
     isFetchingNextPage: teamAggregateIsFetchingNextPage,
+    isLoading: teamAggregateTicketsLoading,
+    isFetching: teamAggregateTicketsFetching,
   } = useInfiniteQuery<Ticket[]>({
     queryKey: ['teamTickets', route.teamIdParam, aggregateQueryParams, 'paged'],
     queryFn: ({ pageParam = 0 }) =>
@@ -265,7 +270,7 @@ export function WorkspaceShellPage() {
     gcTime: CACHE_CONFIGS.ticketsList.gcTime,
   });
 
-  const { data: routeAggregateTicket } = useQuery<Ticket | null>({
+  const { data: routeAggregateTicket, isLoading: routeAggregateTicketLoading } = useQuery<Ticket | null>({
     queryKey: ['ticketByKey', route.ticketKey],
     queryFn: () => apiClient.get<Ticket | null>(`/tickets/key/${route.ticketKey}`),
     enabled: isAggregateDetailRoute && !!route.ticketKey && !!currentUser,
@@ -273,7 +278,7 @@ export function WorkspaceShellPage() {
     gcTime: CACHE_CONFIGS.ticketDetail.gcTime,
   });
 
-  const { data: routeAggregateProjectTickets = [] } = useQuery<Ticket[]>({
+  const { data: routeAggregateProjectTickets = [], isLoading: routeAggregateProjectTicketsLoading } = useQuery<Ticket[]>({
     queryKey: queryKeys.tickets(routeAggregateTicket?.projectId || ''),
     queryFn: () => apiClient.get<Ticket[]>('/tickets', {
       projectId: routeAggregateTicket?.projectId,
@@ -310,6 +315,74 @@ export function WorkspaceShellPage() {
     : isTeamAggregatePath && !isAggregateDetailRoute
       ? teamAggregateIsFetchingNextPage
       : false;
+
+  const scopedProjectTicketsFetching = useIsFetching({
+    queryKey: queryKeys.tickets(projectIdParam || activeProjectId || ''),
+    exact: true,
+  });
+  const labelsQueryFetching = useIsFetching({
+    queryKey: ['labels'],
+  });
+
+  const labelsByProject = useMemo(() => {
+    const cachedLabelsByProject = new Map<string, Label[]>();
+
+    for (const [queryKey, cachedLabels] of queryClient.getQueriesData<Label[]>({ queryKey: ['labels'] })) {
+      const queryProjectId = queryKey[1];
+      const projectId =
+        queryProjectId && typeof queryProjectId === 'object' && 'projectId' in queryProjectId
+          ? (queryProjectId as { projectId?: string }).projectId
+          : undefined;
+
+      if (!projectId || !Array.isArray(cachedLabels)) {
+        continue;
+      }
+
+      cachedLabelsByProject.set(projectId, cachedLabels);
+    }
+
+    return cachedLabelsByProject;
+  }, [activeProjectId, labels, labelsQueryFetching]);
+
+  const isScopedTicketsLoading = useMemo(
+    () => {
+      if (!currentUser) {
+        return false;
+      }
+
+      if (shouldUseAggregateTicketPagination) {
+        if (isAggregateDetailRoute) {
+          return routeAggregateTicketLoading || routeAggregateProjectTicketsLoading;
+        }
+
+        if (isWorkspaceAllTasksPath) {
+          return workspaceAggregateTicketsLoading || workspaceAggregateTicketsFetching;
+        }
+
+        if (isTeamAggregatePath) {
+          return teamAggregateTicketsLoading || teamAggregateTicketsFetching;
+        }
+
+        return false;
+      }
+
+      return scopedProjectTicketsFetching > 0;
+    },
+    [
+      currentUser,
+      isAggregateDetailRoute,
+      isTeamAggregatePath,
+      isWorkspaceAllTasksPath,
+      routeAggregateProjectTicketsLoading,
+      routeAggregateTicketLoading,
+      scopedProjectTicketsFetching,
+      shouldUseAggregateTicketPagination,
+      teamAggregateTicketsFetching,
+      teamAggregateTicketsLoading,
+      workspaceAggregateTicketsFetching,
+      workspaceAggregateTicketsLoading,
+    ]
+  );
 
   const aggregateLoadMoreRows = useCallback(() => {
     if (isWorkspaceAllTasksPath && !isAggregateDetailRoute && workspaceAggregateHasNextPage) {
@@ -369,6 +442,70 @@ export function WorkspaceShellPage() {
       routeAggregateDetailTickets,
     ]
   );
+  const ticketCountsByProject = useMemo(() => {
+    const countsByProject: Record<
+      string,
+      {
+        myIssues: number;
+        activeProjectIssues: number;
+        labels: Record<string, number>;
+        cycles: Record<string, number>;
+      }
+    > = Object.fromEntries(
+      activeWorkspaceProjects.map((project) => [
+        project.id,
+        {
+          myIssues: 0,
+          activeProjectIssues: 0,
+          labels: {},
+          cycles: {},
+        },
+      ])
+    );
+
+    const cachedProjectTickets = queryClient
+      .getQueriesData<Ticket[]>({ queryKey: ['tickets'] })
+      .map(([, cachedTickets]) => cachedTickets)
+      .filter((cachedTickets): cachedTickets is Ticket[] => Array.isArray(cachedTickets));
+
+    for (const projectTickets of cachedProjectTickets) {
+      for (const ticket of projectTickets) {
+        if (ticket.status === 'done' || ticket.status === 'canceled') {
+          continue;
+        }
+
+        const existing = countsByProject[ticket.projectId] ?? {
+          myIssues: 0,
+          activeProjectIssues: 0,
+          labels: {},
+          cycles: {},
+        };
+
+        const nextLabels = { ...existing.labels };
+        const nextCycles = { ...existing.cycles };
+
+        if (ticket.labelIds?.length) {
+          for (const labelId of ticket.labelIds) {
+            nextLabels[labelId] = (nextLabels[labelId] ?? 0) + 1;
+          }
+        }
+
+        if (ticket.cycleId) {
+          nextCycles[ticket.cycleId] = (nextCycles[ticket.cycleId] ?? 0) + 1;
+        }
+
+        countsByProject[ticket.projectId] = {
+          myIssues: existing.myIssues + (ticket.assigneeId === currentUser?.id ? 1 : 0),
+          activeProjectIssues: existing.activeProjectIssues + 1,
+          labels: nextLabels,
+          cycles: nextCycles,
+        };
+      }
+    }
+
+    return countsByProject;
+  }, [activeWorkspaceProjects, currentUser?.id, tickets]);
+
   const scopedTicketsByKey = useMemo(() => {
     const map = new Map<string, Ticket>();
     for (const ticket of routeScopedTickets) {
@@ -731,7 +868,10 @@ export function WorkspaceShellPage() {
       onSelectTeamLabel: (teamId, labelId) => navigate(`/workspaces/${activeWorkspaceId}/teams/${teamId}/labels/${labelId}`),
       onSelectAllTasks: (teamId) => navigate(`/workspaces/${activeWorkspaceId}/teams/${teamId}/tasks`),
       projects: activeWorkspaceProjects,
+      onPrefetchProject: fetchProjectData,
+      onHasCachedProjectData: (projectId) => queryClient.getQueryData<Ticket[]>(queryKeys.tickets(projectId)) !== undefined,
       labels,
+      labelsByProject,
       cycles,
       currentUser,
       activeProjectId,
@@ -741,6 +881,7 @@ export function WorkspaceShellPage() {
         activeProjectIssues: openTicketsCount,
         labels: labelCounts,
         cycles: cycleCounts,
+        byProject: ticketCountsByProject,
       },
       activeContext,
       onSelectProject: handleSelectProject,
@@ -895,6 +1036,7 @@ export function WorkspaceShellPage() {
             onAddBlocker={addTicketBlocker}
             onRemoveBlocker={removeTicketBlocker}
             ticketsById={scopedTicketsById}
+            isLoading={isScopedTicketsLoading}
           />
         ) : (
           <WorkspacePage
@@ -929,6 +1071,7 @@ export function WorkspaceShellPage() {
             onLoadMoreTickets={shouldUseAggregateTicketPagination ? aggregateLoadMoreRows : undefined}
             hasMoreTickets={shouldUseAggregateTicketPagination ? aggregateHasMoreRows : false}
             isLoadingMoreTickets={shouldUseAggregateTicketPagination ? aggregateIsLoadingMoreRows : false}
+            isLoadingTickets={isScopedTicketsLoading}
           />
         )}
       </WorkspaceLayout>

@@ -56,10 +56,18 @@ export function useWorkspaceProjectPanelLabelState({
   const [editingLabelLoading, setEditingLabelLoading] = useState(false);
 
   const sortedLabels = useMemo(
-    () =>
-      shouldShowLabels
-        ? [...labels].sort((first, second) => first.name.localeCompare(second.name))
-        : [],
+    () => {
+      if (!shouldShowLabels) {
+        return [];
+      }
+
+      const labelsById = new Map<string, Label>();
+      for (const label of labels) {
+        labelsById.set(label.id, label);
+      }
+
+      return [...labelsById.values()].sort((first, second) => first.name.localeCompare(second.name));
+    },
     [labels, shouldShowLabels]
   );
 

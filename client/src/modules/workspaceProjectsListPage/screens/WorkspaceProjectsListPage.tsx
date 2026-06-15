@@ -18,7 +18,7 @@ function getProjectTargetPath(workspaceId: string, project: Project) {
 export function WorkspaceProjectsListPage() {
   const navigate = useNavigate();
   const { workspaceId } = useParams();
-  const { activeProjectId, projects, setActiveProjectId, setActiveTicket } = useTickets();
+  const { activeProjectId, projects } = useTickets();
 
   const workspaceProjects = useMemo(() => {
     if (!workspaceId) {
@@ -37,8 +37,6 @@ export function WorkspaceProjectsListPage() {
       return;
     }
 
-    setActiveProjectId(project.id);
-    setActiveTicket(null);
     navigate(getProjectTargetPath(workspaceId, project));
   };
 
