@@ -19,6 +19,7 @@ import { WorkspaceViewContainer } from '../../../components/WorkspaceViewContain
 import { QueryErrorResetBoundary } from '@tanstack/react-query';
 import { ErrorBoundary } from '../../../components/ErrorBoundary';
 import { WorkspacePageContextMenu } from '../components/WorkspacePageContextMenu';
+import { apiClient } from '../../../utils/apiClient';
 import '../styles/WorkspacePage.css';
 
 export type WorkspaceIssueView = 'board' | 'list' | 'timeline';
@@ -203,19 +204,16 @@ export function WorkspacePage({
   const handleCreateNote = useCallback(async () => {
     if (!filters.projectId) return;
     try {
-      const response = await fetch('/api/v1/notes', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-project-id': filters.projectId,
-        },
-        body: JSON.stringify({
+      const note = await apiClient.post<{ id: string }>(
+        '/notes',
+        {
           title: 'Untitled Note',
           body: createEmptyRichTextValue(),
-        }),
-      });
-      if (response.ok) {
-        const note = await response.json();
+        },
+        { projectId: filters.projectId }
+      );
+
+      if (note?.id) {
         onSelectNote?.(note.id);
       }
     } catch (err) {

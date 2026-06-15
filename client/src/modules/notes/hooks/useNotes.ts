@@ -1,5 +1,6 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { CACHE_CONFIGS, queryKeys } from '../../../utils/queryClient';
+import { apiClient } from '../../../utils/apiClient';
 import type { NoteMetadata } from '../types';
 
 export function useNotes(projectId: string, sortDirection: 'desc' | 'asc' = 'desc') {
@@ -8,17 +9,14 @@ export function useNotes(projectId: string, sortDirection: 'desc' | 'asc' = 'des
   const query = useInfiniteQuery<NoteMetadata[]>({
     queryKey: [...queryKeys.notes(projectId), sortDirection],
     queryFn: async ({ pageParam = 0 }) => {
-      const response = await fetch(`/api/v1/notes?limit=${limit}&offset=${pageParam}&sort=${sortDirection}`, {
-        headers: {
-          'x-project-id': projectId,
+      return apiClient.get<NoteMetadata[]>('/notes', {
+        projectId,
+        params: {
+          limit: `${limit}`,
+          offset: `${pageParam}`,
+          sort: sortDirection,
         },
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to load notes');
-      }
-
-      return response.json();
     },
     initialPageParam: 0,
     staleTime: CACHE_CONFIGS.metadata.staleTime,

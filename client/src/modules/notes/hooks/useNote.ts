@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { queryClient, queryKeys } from '../../../utils/queryClient';
+import { CACHE_CONFIGS, queryClient, queryKeys } from '../../../utils/queryClient';
+import { apiClient, ApiError } from '../../../utils/apiClient';
 import type { NoteMetadata } from '../types';
 
 export interface Note extends NoteMetadata {
@@ -15,18 +16,9 @@ export function useNote(projectId: string, noteId: string | null) {
   const noteQuery = useQuery<Note>({
     queryKey: queryKeys.note(noteId || ''),
     queryFn: async () => {
-      const response = await fetch(`/api/v1/notes/${noteId}`, {
-        headers: {
-          'x-project-id': projectId,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to load note');
-      }
-
-      return response.json();
+      return apiClient.get<Note>(`/notes/${noteId}`, { projectId });
     },
+    staleTime: CACHE_CONFIGS.metadata.staleTime,
     enabled: !!noteId && !!projectId,
   });
 
@@ -35,26 +27,18 @@ export function useNote(projectId: string, noteId: string | null) {
       const currentNote = noteQuery.data;
       if (!noteId || !currentNote) throw new Error('No active note');
 
-      const response = await fetch(`/api/v1/notes/${noteId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-project-id': projectId,
-        },
-        body: JSON.stringify({
-          ...updates,
-          version: currentNote.version,
-        }),
-      });
-
-      if (!response.ok) {
-        if (response.status === 409) {
+      try {
+        return await apiClient.patch<Note>(
+          `/notes/${noteId}`,
+          { ...updates, version: currentNote.version },
+          { projectId },
+        );
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 409) {
           throw new Error('Version conflict. Please refresh the note.');
         }
-        throw new Error('Failed to save note');
+        throw err;
       }
-
-      return response.json() as Promise<Note>;
     },
     onSuccess: (updated) => {
       client.setQueryData(queryKeys.note(noteId || ''), updated);
