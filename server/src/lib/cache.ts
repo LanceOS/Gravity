@@ -14,8 +14,6 @@ export const CacheKeys = {
   memberships: {
     workspaceRole: (workspaceId: string, userId: string) =>
       `membership:workspace:${workspaceId}:user:${userId}:role` as CacheKey,
-    workspaceMember: (workspaceId: string, userId: string) =>
-      `membership:workspace:${workspaceId}:user:${userId}:member` as CacheKey,
     projectMember: (projectId: string, userId: string) =>
       `membership:project:${projectId}:user:${userId}:role` as CacheKey,
     projectWorkspace: (projectId: string) => `membership:project:${projectId}:workspace` as CacheKey,

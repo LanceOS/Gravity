@@ -30,12 +30,25 @@ export async function getSidebarTree(workspaceId: string) {
         .where(eq(workspaceSettings.workspaceId, workspaceId))
         .limit(1),
       db
-        .select()
+        .select({
+          id: teams.id,
+          name: teams.name,
+          description: teams.description,
+          color: teams.color,
+        })
         .from(teams)
         .where(eq(teams.workspaceId, workspaceId))
         .orderBy(asc(teams.createdAt)),
       db
-        .select()
+        .select({
+          id: projects.id,
+          name: projects.name,
+          key: projects.key,
+          description: projects.description,
+          status: projects.status,
+          teamId: projects.teamId,
+          githubRepoUrl: projects.githubRepoUrl,
+        })
         .from(projects)
         .where(eq(projects.workspaceId, workspaceId))
         .orderBy(asc(projects.createdAt)),
@@ -47,8 +60,30 @@ export async function getSidebarTree(workspaceId: string) {
     // 3/4. Fetch all cycles and labels in parallel for workspace teams.
     const [cycleRows, labelRows] = teamIds.length > 0
       ? await Promise.all([
-          db.select().from(cycles).where(inArray(cycles.teamId, teamIds)).orderBy(asc(cycles.startDate)),
-          db.select().from(labels).where(inArray(labels.teamId, teamIds)).orderBy(asc(labels.createdAt)),
+          db
+            .select({
+              id: cycles.id,
+              name: cycles.name,
+              startDate: cycles.startDate,
+              endDate: cycles.endDate,
+              completed: cycles.completed,
+              teamId: cycles.teamId,
+            })
+            .from(cycles)
+            .where(inArray(cycles.teamId, teamIds))
+            .orderBy(asc(cycles.startDate)),
+          db
+            .select({
+              id: labels.id,
+              teamId: labels.teamId,
+              name: labels.name,
+              color: labels.color,
+              description: labels.description,
+              sortOrder: labels.sortOrder,
+            })
+            .from(labels)
+            .where(inArray(labels.teamId, teamIds))
+            .orderBy(asc(labels.createdAt)),
         ])
       : [[], []];
 

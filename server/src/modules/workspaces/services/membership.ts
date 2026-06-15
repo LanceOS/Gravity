@@ -55,16 +55,8 @@ async function getTeamWorkspaceIdCached(teamId: string): Promise<string | null> 
  * Checks if a user is a member of a specific workspace.
  */
 export async function isWorkspaceMember(workspaceId: string, userId: string): Promise<boolean> {
-  const memberPromiseKey = cache.CacheKeys.memberships.workspaceMember(workspaceId, userId);
-  return cache.wrap(memberPromiseKey, WORKSPACE_MEMBERSHIP_TTL_SECONDS, async () => {
-    const membershipRows = await db
-      .select({ role: workspaceMembers.role })
-      .from(workspaceMembers)
-      .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, userId)))
-      .limit(1);
-
-    return membershipRows.length > 0;
-  });
+  const role = await getWorkspaceMemberRoleCached(workspaceId, userId);
+  return role !== null;
 }
 
 export async function getWorkspaceMemberRole(workspaceId: string, userId: string): Promise<string | null> {
@@ -117,7 +109,6 @@ export async function invalidateWorkspaceMembershipCaches(workspaceId: string, u
   await cache.delMany(
     uniqueUserIds.flatMap((userId) => [
       cache.CacheKeys.memberships.workspaceRole(workspaceId, userId),
-      cache.CacheKeys.memberships.workspaceMember(workspaceId, userId),
     ]),
   );
 }
