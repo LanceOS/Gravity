@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useTickets } from '../../../context/TicketContext';
-import { Terminal, X, Play, Loader2, Sparkles, AlertCircle, ArrowRight } from 'lucide-react';
+import { Terminal, X, Play, Loader2, Sparkles, AlertCircle } from 'lucide-react';
 import type { AgentLogEntry, AgentSimulatorProps } from '../types/AgentSimulator';
 import { delay, getInitialAgentLogs } from '../utils/AgentSimulator';
 import { Button, Textarea } from '@library';
+import { apiClient } from '../../../utils/apiClient';
 
 export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
   const { fetchInitialData } = useTickets();
@@ -27,22 +28,18 @@ export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
     await delay(1200);
 
     try {
-      const response = await fetch('/api/v1/mcp/sse', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const data = await apiClient.post<{ result?: { content?: { text?: string }[] }; error?: { message?: string } }>(
+        '/mcp/sse',
+        {
           jsonrpc: '2.0',
           id: Date.now(),
           method: 'tools/call',
           params: {
             name: method,
-            arguments: args
-          }
-        })
-      });
-
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const data = await response.json();
+            arguments: args,
+          },
+        }
+      );
       
       if (data.error) {
         throw new Error(data.error.message);

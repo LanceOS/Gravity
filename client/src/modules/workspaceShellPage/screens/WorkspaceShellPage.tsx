@@ -32,7 +32,7 @@ import { useOllamaPanel } from '../hooks/useOllamaPanel';
 import { useWorkspaceViewMode } from '../hooks/useWorkspaceViewMode';
 import type { AppSection } from '../types/AppShell';
 import { LoadingPage } from '../../loadingPage';
-import { queryClient, queryKeys } from '../../../utils/queryClient';
+import { CACHE_CONFIGS, queryClient, queryKeys } from '../../../utils/queryClient';
 import {
   useWorkspaceCreateLabelDialog,
   useWorkspaceCreateProjectDialog,
@@ -166,33 +166,43 @@ export function WorkspaceShellPage() {
   };
 
   const { data: sidebarTree } = useQuery<SidebarTree>({
-    queryKey: ['sidebarTree', activeWorkspaceId],
+    queryKey: queryKeys.workspaceSidebarTree(activeWorkspaceId),
     queryFn: () => apiClient.get<SidebarTree>(`/workspaces/${activeWorkspaceId}/sidebar`),
     enabled: !!activeWorkspaceId && !!currentUser,
+    staleTime: CACHE_CONFIGS.workspaceSidebar.staleTime,
+    gcTime: CACHE_CONFIGS.workspaceSidebar.gcTime,
   });
 
   const { data: workspaceTickets = [] } = useQuery<Ticket[]>({
     queryKey: ['workspaceTickets', activeWorkspaceId],
     queryFn: () => apiClient.get<Ticket[]>('/tickets', { params: { workspaceId: activeWorkspaceId } }),
     enabled: isWorkspaceAllTasksPath && !!activeWorkspaceId && !!currentUser,
+    staleTime: CACHE_CONFIGS.ticketsList.staleTime,
+    gcTime: CACHE_CONFIGS.ticketsList.gcTime,
   });
 
   const { data: teamTickets = [] } = useQuery<Ticket[]>({
     queryKey: ['teamTickets', route.teamIdParam],
     queryFn: () => apiClient.get<Ticket[]>('/tickets', { params: { teamId: route.teamIdParam } }),
     enabled: isTeamAggregatePath && !!currentUser,
+    staleTime: CACHE_CONFIGS.ticketsList.staleTime,
+    gcTime: CACHE_CONFIGS.ticketsList.gcTime,
   });
 
   const { data: teamCycles = [] } = useQuery<Cycle[]>({
     queryKey: ['teamCycles', route.teamIdParam],
     queryFn: () => apiClient.get<Cycle[]>('/cycles', { params: { teamId: route.teamIdParam } }),
     enabled: isTeamAggregatePath && !!currentUser,
+    staleTime: CACHE_CONFIGS.metadata.staleTime,
+    gcTime: CACHE_CONFIGS.metadata.gcTime,
   });
 
   const { data: teamLabels = [] } = useQuery<Label[]>({
     queryKey: ['teamLabels', route.teamIdParam],
     queryFn: () => apiClient.get<Label[]>('/labels', { params: { teamId: route.teamIdParam } }),
     enabled: isTeamAggregatePath && !!currentUser,
+    staleTime: CACHE_CONFIGS.metadata.staleTime,
+    gcTime: CACHE_CONFIGS.metadata.gcTime,
   });
 
   const routeScopedTickets = useMemo(
@@ -431,16 +441,16 @@ export function WorkspaceShellPage() {
   const isTeamsManager = activeSection === 'teams' || (isTeamWorkspace && activeSection === 'projects');
   const isWorkspaceOwner = activeWorkspace.memberRole === 'owner';
 
-  const handleOpenCurrentTeamProjectsManager = () => {
+  const handleOpenCurrentTeamProjectsManager = useCallback(() => {
     if (sidebarActiveTeamId) {
       handleOpenTeamProjectsManager(sidebarActiveTeamId);
       return;
     }
 
     handleOpenTeamManager();
-  };
+  }, [sidebarActiveTeamId, handleOpenTeamManager, handleOpenTeamProjectsManager]);
 
-  const sidebarNavigationState: SidebarNavigationState = {
+  const sidebarNavigationState: SidebarNavigationState = useMemo(() => ({
     activeTeam: sidebarActiveTeamId,
     activeScope:
       route.teamIdParam
@@ -458,7 +468,7 @@ export function WorkspaceShellPage() {
       activeSection === 'projects' || activeSection === 'team-projects' || activeSection === 'workspace'
         ? (projectIdParam || activeProjectId)
         : '',
-  };
+  }), [activeSection, activeProjectId, route.activeLabelIdParam, route.cycleIdParam, route.projectIdParam, route.teamIdParam, sidebarActiveTeamId, projectIdParam]);
 
   const sidebarActiveViewId =
     route.teamIdParam && sidebarNavigationState.activeScope === 'views'

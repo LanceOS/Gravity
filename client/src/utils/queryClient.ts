@@ -38,6 +38,18 @@ export const CACHE_CONFIGS = {
     staleTime: 10 * 60 * 1000,
     gcTime: 60 * 60 * 1000,
   },
+  workspaceSidebar: {
+    staleTime: 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  },
+  aiTools: {
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+  },
+  aiModels: {
+    staleTime: 2 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
+  },
 };
 
 export const queryKeys = {
@@ -57,4 +69,7 @@ export const queryKeys = {
   workspaceMembers: (workspaceId: string) => ['workspace', workspaceId, 'members'] as const,
   workspaceInvites: (workspaceId: string) => ['workspace', workspaceId, 'invites'] as const,
   workspaceJoinRequests: (workspaceId: string) => ['workspace', workspaceId, 'joinRequests'] as const,
+  workspaceSidebarTree: (workspaceId: string) => ['workspace', workspaceId, 'sidebar'] as const,
+  mcpTools: (workspaceId: string) => ['ai', 'mcp', 'tools', { workspaceId }] as const,
+  ollamaModels: (ollamaUrl: string) => ['ai', 'ollama', 'models', { ollamaUrl }] as const,
 };
