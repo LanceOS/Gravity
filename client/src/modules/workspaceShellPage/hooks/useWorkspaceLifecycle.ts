@@ -1,4 +1,4 @@
-import { useEffect, type Dispatch, type SetStateAction } from 'react';
+import { useEffect, useMemo, type Dispatch, type SetStateAction } from 'react';
 import type { User, Project } from '../../../types/domain';
 import type { WorkspaceSummary } from '../../../hooks/useWorkspaceDirectory';
 import type { AppSection } from '../types/AppShell';
@@ -143,6 +143,18 @@ export function useWorkspaceProjectSelection({
   activeProjectId,
   setActiveProjectId,
 }: UseWorkspaceProjectSelectionArgs) {
+  const activeWorkspaceProjectById = useMemo(() => {
+    const map = new Map<string, Project>();
+    for (const project of activeWorkspaceProjects) {
+      map.set(project.id, project);
+    }
+    return map;
+  }, [activeWorkspaceProjects]);
+  const activeWorkspaceProjectIdSet = useMemo(
+    () => new Set(activeWorkspaceProjects.map((project) => project.id)),
+    [activeWorkspaceProjects]
+  );
+
   useEffect(() => {
     if (!activeWorkspaceId) {
       return;
@@ -155,8 +167,8 @@ export function useWorkspaceProjectSelection({
       return;
     }
 
-    if (!activeWorkspaceProjects.some((project) => project.id === activeProjectId)) {
-      const preferredProject = activeWorkspaceProjects.find((project) => project.id === activeWorkspaceDefaultProjectId) || activeWorkspaceProjects[0];
+    if (!activeWorkspaceProjectIdSet.has(activeProjectId)) {
+      const preferredProject = activeWorkspaceDefaultProjectId ? activeWorkspaceProjectById.get(activeWorkspaceDefaultProjectId) : null;
       if (preferredProject) {
         setActiveProjectId(preferredProject.id);
       }
@@ -165,7 +177,8 @@ export function useWorkspaceProjectSelection({
     activeProjectId,
     activeWorkspaceDefaultProjectId,
     activeWorkspaceId,
-    activeWorkspaceProjects,
+    activeWorkspaceProjectById,
     setActiveProjectId,
+    activeWorkspaceProjectIdSet,
   ]);
 }

@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import type { NavigateFunction } from 'react-router-dom';
 
@@ -67,19 +67,26 @@ export function useWorkspaceShellNavigation({
     [activeWorkspaceId, projects, route.teamIdParam, sidebarTree]
   );
 
+  const projectWorkspaceById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const project of projects) {
+      map.set(project.id, project.workspaceId);
+    }
+    return map;
+  }, [projects]);
+
   const handleSelectProject = useCallback((projectId: string) => {
     navigate(buildProjectScopedPathCallback(projectId));
   }, [buildProjectScopedPathCallback, navigate]);
 
   const handleSelectProjectForManagement = useCallback(
     (projectId: string) => {
-      const project = projects.find((item) => item.id === projectId);
-      const wid = project?.workspaceId || activeWorkspaceId;
+      const wid = projectWorkspaceById.get(projectId) || activeWorkspaceId;
       setActiveProjectId(projectId);
       setSidebarActiveScope('projects');
       navigate(`/workspaces/${wid}/projects`);
     },
-    [activeWorkspaceId, navigate, projects, setActiveProjectId, setSidebarActiveScope]
+    [activeWorkspaceId, navigate, projectWorkspaceById, setActiveProjectId, setSidebarActiveScope]
   );
 
   const handleShowProjectIssues = useCallback(() => {

@@ -32,7 +32,6 @@ function areStringArraysEqual(a: string[], b: string[]) {
 interface UseAppShellRouteSyncArgs {
   route: AppShellRouteState;
   activeTicket: Ticket | null;
-  routeScopedTickets: Ticket[];
   routeScopedTicketByKey: Map<string, Ticket>;
   setActiveSection: Dispatch<SetStateAction<AppSection>>;
   setActiveWorkspaceId: Dispatch<SetStateAction<string>>;
@@ -47,7 +46,6 @@ interface UseAppShellRouteSyncArgs {
 export function useAppShellRouteSync({
   route,
   activeTicket,
-  routeScopedTickets,
   setActiveSection,
   setActiveWorkspaceId,
   setActiveContext,
@@ -249,9 +247,7 @@ export function useAppShellRouteSync({
     const normalizedRouteTicketKey = route.ticketKey.toUpperCase();
     if ((activeTicket?.key || '').toUpperCase() === normalizedRouteTicketKey) return;
 
-    const resolved = routeScopedTicketByKey.get(normalizedRouteTicketKey)
-      ?? routeScopedTickets.find((ticket) => ticket.key.toUpperCase() === normalizedRouteTicketKey)
-      ?? null;
+    const resolved = routeScopedTicketByKey.get(normalizedRouteTicketKey) ?? null;
     setActiveTicket(resolved);
-  }, [activeTicket?.key, route.ticketKey, routeScopedTicketByKey, routeScopedTickets, setActiveTicket]);
+  }, [activeTicket?.key, route.ticketKey, routeScopedTicketByKey, setActiveTicket]);
 }

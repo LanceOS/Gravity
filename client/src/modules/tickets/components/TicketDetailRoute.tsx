@@ -75,7 +75,8 @@ export const TicketDetailRoute: React.FC<TicketDetailRouteProps> = ({
         return null;
       }
 
-      return ticketsById?.get(activeTicket.parentId) || tickets.find((ticket) => ticket.id === activeTicket.parentId) || null;
+      const ticketsByIdResolved = ticketsById ?? new Map(tickets.map((ticket) => [ticket.id, ticket]));
+      return ticketsByIdResolved.get(activeTicket.parentId) || null;
     },
     [activeTicket?.parentId, tickets, ticketsById]
   );

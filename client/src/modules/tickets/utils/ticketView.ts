@@ -195,8 +195,9 @@ export function getWorkspaceHeaderTitle(
   if (filters.assigneeId === currentUser?.id) return 'My Issues';
 
   if (filters.labels && filters.labels.length > 0) {
+    const labelNameById = new Map(labels.map((label) => [label.id, label]));
     const labelNames = filters.labels
-      .map((lId) => labels.find((item) => item.id === lId)?.name)
+      .map((lId) => labelNameById.get(lId)?.name)
       .filter(Boolean);
     if (labelNames.length > 0) {
       return `${labelNames.join(', ')} Label${labelNames.length > 1 ? 's' : ''}`;
@@ -209,12 +210,14 @@ export function getWorkspaceHeaderTitle(
   }
 
   if (filters.cycleId) {
-    const cycle = cycles.find((item) => item.id === filters.cycleId);
+    const cycleById = new Map(cycles.map((cycle) => [cycle.id, cycle]));
+    const cycle = cycleById.get(filters.cycleId);
     return cycle ? cycle.name : 'Cycle Issues';
   }
 
   if (filters.projectId) {
-    const project = projects.find((item) => item.id === filters.projectId);
+    const projectById = new Map(projects.map((project) => [project.id, project]));
+    const project = projectById.get(filters.projectId);
     return project ? project.name : 'Project Issues';
   }
 

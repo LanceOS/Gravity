@@ -45,9 +45,11 @@ export function resolveTeamWorkspaceContext({
   teamId,
   sidebarTree,
 }: ResolveTeamWorkspaceArgs): ResolveTeamWorkspaceResult {
-  const activeProjectTeamId = projects.find((project) => project.id === activeProjectId)?.teamId ?? '';
+  const projectTeamById = new Map(projects.map((project) => [project.id, project.teamId]));
+  const sidebarTeamById = new Map((sidebarTree?.teams ?? []).map((sidebarTeam) => [sidebarTeam.id, sidebarTeam]));
+  const activeProjectTeamId = projectTeamById.get(activeProjectId) ?? '';
   const sidebarActiveTeamId = teamId || activeProjectTeamId;
-  const team = sidebarTree?.teams?.find((sidebarTeam) => sidebarTeam.id === sidebarActiveTeamId) ?? null;
+  const team = sidebarTeamById.get(sidebarActiveTeamId) ?? null;
 
   return {
     sidebarActiveTeamId,

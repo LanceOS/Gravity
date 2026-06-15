@@ -11,6 +11,7 @@ import { getAssigneeAvatar, getPriorityColor, getPriorityIcon } from '../utils/T
 
 const INITIAL_CARDS_PER_COLUMN = 40;
 const LOAD_MORE_CARDS = 40;
+const BOARD_COLUMN_BY_ID = Object.fromEntries(BOARD_COLUMNS.map((column) => [column.id, column])) as Record<string, (typeof BOARD_COLUMNS)[number]>;
 
 export const TicketBoard = React.memo(({
   ticketsByColumn,
@@ -51,7 +52,7 @@ export const TicketBoard = React.memo(({
   }, []);
 
   const renderColumnHeader = useCallback((columnId: string, title: string, count: number) => {
-    const col = BOARD_COLUMNS.find((c) => c.id === columnId);
+    const col = BOARD_COLUMN_BY_ID[columnId];
     const columnCount = visibleByColumn[columnId] ?? INITIAL_CARDS_PER_COLUMN;
     const fullColumnTickets = ticketsByColumn[columnId] || [];
     const hasMoreInColumn = fullColumnTickets.length > columnCount;
