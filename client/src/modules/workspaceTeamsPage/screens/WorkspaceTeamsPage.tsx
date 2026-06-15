@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { Button, Textarea, TextInput } from '@library';
 import { apiClient } from '../../../utils/apiClient';
 import { addSidebarTeam, removeSidebarTeam, updateSidebarTeam } from '../../../utils/sidebarTreeMutations';
 import type { SidebarTeam, Team } from '../../../types/domain';
@@ -11,13 +12,14 @@ import {
   WorkspaceManagementHeaderActions,
   WorkspaceManagementHero,
   WorkspaceManagementLoadingSkeleton,
+  WorkspaceManagementEditorSection,
+  WorkspaceManagementListSection,
 } from '../../../components/WorkspaceManagementPage';
 
 import { WorkspaceTeamsCreateTeamModal } from '../components/WorkspaceTeamsCreateTeamModal';
-import { WorkspaceTeamsTeamEditorSection } from '../components/WorkspaceTeamsTeamEditorSection';
-import { WorkspaceTeamsTeamListSection } from '../components/WorkspaceTeamsTeamListSection';
-import { Users } from 'lucide-react';
-import { getTeamReferenceCount, getInitialDraft, toSidebarTeam } from '../utils/WorkspaceTeamsPage';
+import { WorkspaceTeamsDangerZone } from '../components/WorkspaceTeamsDangerZone';
+import { CalendarDays, FolderKanban, Tags, Users } from 'lucide-react';
+import { COLOR_OPTIONS, DEFAULT_TEAM_COLOR, getTeamReferenceCount, getInitialDraft, toSidebarTeam } from '../utils/WorkspaceTeamsPage';
 import { useWorkspaceTeamsPageDraft } from '../hooks/useWorkspaceTeamsPageDraft';
 import { useWorkspaceTeamsPageSelection } from '../hooks/useWorkspaceTeamsPageSelection';
 import { type WorkspaceTeamsPageFeedback, type WorkspaceTeamsPageProps } from '../types/WorkspaceTeamsPage';
@@ -259,22 +261,187 @@ export function WorkspaceTeamsPage({
       }
     >
       <div className="workspace-teams-page__layout">
-        <WorkspaceTeamsTeamListSection teams={sortedTeams} selectedTeamId={selectedTeamId} onSelectTeam={handleSelectTeam} />
+        <WorkspaceManagementListSection
+          classNamePrefix="workspace-teams-page"
+          sectionClassName="workspace-teams-page__teams-card"
+          listClassName="workspace-teams-page__team-list"
+          ariaLabel="Teams roster"
+          sectionKicker="Team roster"
+          sectionTitle="Workspace teams"
+          sectionDescription="Pick a team to edit or view its projects, or create a new one."
+          items={sortedTeams}
+          selectedItemId={selectedTeamId}
+          onSelectItem={handleSelectTeam}
+          emptyStateTitle="No teams in this workspace yet"
+          emptyStateDescription="Create your first team to get started."
+          renderItem={({ item: team, isSelected, onSelect }) => (
+            <button
+              type="button"
+              className={
+                isSelected
+                  ? 'workspace-teams-page__team-card-item workspace-teams-page__team-card-item--active'
+                  : 'workspace-teams-page__team-card-item'
+              }
+              onClick={onSelect}
+            >
+              <div className="workspace-teams-page__team-card-item-top">
+                <span className="workspace-teams-page__team-color" style={{ background: team.color || DEFAULT_TEAM_COLOR }} />
+                <span className="workspace-teams-page__team-name">{team.name}</span>
+              </div>
 
-        <WorkspaceTeamsTeamEditorSection
-          selectedTeam={selectedTeam}
-          editDraft={editDraft}
-          savingAction={savingAction}
-          sortedTeams={sortedTeams}
-          reassignTeamById={reassignTeamById}
-          onSave={handleUpdateTeam}
-          onDraftChange={setEditDraft}
-          onReassignChange={(teamId, reassignTeamId) =>
-            setReassignTeamById((current) => ({ ...current, [teamId]: reassignTeamId }))
-          }
-          onDelete={handleDeleteTeam}
-          onManageProjects={onManageProjects}
+              <div className="workspace-teams-page__team-card-item-body">
+                <p>{team.description || 'No description added yet.'}</p>
+              </div>
+
+              <div className="workspace-teams-page__team-card-item-footer">
+                <div className="workspace-teams-page__team-metrics">
+                  <span>
+                    <FolderKanban size={11} />
+                    {team.projects?.length ?? 0}
+                  </span>
+                  <span>
+                    <CalendarDays size={11} />
+                    {team.cycles?.length ?? 0}
+                  </span>
+                  <span>
+                    <Tags size={11} />
+                    {(team.labels ?? []).length}
+                  </span>
+                </div>
+                <span className="workspace-teams-page__team-card-item-action-text">
+                  {isSelected ? 'Selected' : 'Click to edit'}
+                </span>
+              </div>
+            </button>
+          )}
         />
+
+        <WorkspaceManagementEditorSection
+          classNamePrefix="workspace-teams-page"
+          editorClassName="workspace-teams-page__editor-card"
+          ariaLabel="Team editor"
+          sectionKicker="Team editor"
+          sectionDescription="Update team name, description, color, or view its assigned projects."
+          selectedItem={selectedTeam}
+          emptyStateTitle="No team selected"
+          emptyStateDescription="Select a team from the roster to view or edit details."
+          getSelectedItemTitle={(team) => `${team.name} Details`}
+        >
+          {(selectedTeamForEditor) => (
+            <form
+              className="workspace-teams-page__form"
+              aria-label="Team editor"
+              onSubmit={(event) => {
+                event.preventDefault();
+                handleUpdateTeam(selectedTeamForEditor.id);
+              }}
+            >
+              <div className="workspace-teams-page__form-grid">
+                <div className="workspace-teams-page__form-main">
+                  <TextInput
+                    label="Team Name"
+                    aria-label="Team name"
+                    value={editDraft.name}
+                    onChange={(event) => setEditDraft((draft) => ({ ...draft, name: event.target.value }))}
+                    placeholder="Engineering"
+                    required
+                  />
+
+                  <Textarea
+                    label="Description"
+                    aria-label="Team description"
+                    value={editDraft.description}
+                    onChange={(event) => setEditDraft((draft) => ({ ...draft, description: event.target.value }))}
+                    placeholder="Describe this team&apos;s ownership"
+                    className="workspace-teams-page__description-field"
+                    autoGrow={false}
+                    inputStyle={{ resize: 'none' }}
+                  />
+                </div>
+
+                <div className="workspace-teams-page__form-sidebar">
+                  <div className="workspace-teams-page__color-section">
+                    <span className="workspace-teams-page__color-label">Team Color</span>
+                    <div className="workspace-teams-page__color-row" aria-label="Edit team color">
+                      {COLOR_OPTIONS.map((color) => (
+                        <button
+                          key={color}
+                          type="button"
+                          aria-label={`Use team color ${color}`}
+                          className={
+                            editDraft.color === color
+                              ? 'workspace-teams-page__color-swatch workspace-teams-page__color-swatch--active'
+                              : 'workspace-teams-page__color-swatch'
+                          }
+                          style={{ background: color }}
+                          onClick={() => setEditDraft((draft) => ({ ...draft, color }))}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="workspace-teams-page__projects-section">
+                    <span className="workspace-teams-page__projects-label">Projects</span>
+                    <div className="workspace-teams-page__project-list">
+                      {(selectedTeamForEditor.projects?.length ?? 0) > 0 ? (
+                        selectedTeamForEditor.projects?.map((project) => (
+                          <span key={project.id} className="workspace-teams-page__project-pill">
+                            {project.key} · {project.name}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="workspace-teams-page__muted">No projects assigned yet.</span>
+                      )}
+                    </div>
+                    {onManageProjects ? (
+                      <div className="workspace-teams-page__manage-projects-btn">
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => onManageProjects(selectedTeamForEditor.id)}
+                        >
+                          <FolderKanban size={13} />
+                          <span>Manage Projects</span>
+                        </Button>
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="workspace-teams-page__meta-section">
+                    <span className="workspace-teams-page__meta-label">Team Stats</span>
+                    <div className="workspace-teams-page__meta">
+                      <span className="workspace-teams-page__meta-pill">Cycles: {selectedTeamForEditor.cycles?.length ?? 0}</span>
+                      <span className="workspace-teams-page__meta-pill">
+                        Labels: {(selectedTeamForEditor.labels ?? []).length}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="workspace-teams-page__danger-zone-wrapper">
+                    <span className="workspace-teams-page__danger-zone-title">Danger Zone</span>
+                    <div className="workspace-teams-page__danger-zone-content">
+                      <WorkspaceTeamsDangerZone
+                        selectedTeam={selectedTeamForEditor}
+                        sortedTeams={sortedTeams}
+                        reassignTeamById={reassignTeamById}
+                        savingAction={savingAction}
+                        onReassignChange={onReassignChange}
+                        onDelete={onDelete}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="workspace-teams-page__actions-row">
+                <Button type="submit" variant="primary" size="sm" disabled={savingAction === `update:${selectedTeamForEditor.id}`}>
+                  <span>{savingAction === `update:${selectedTeamForEditor.id}` ? 'Saving...' : 'Save Team'}</span>
+                </Button>
+              </div>
+            </form>
+          )}
+        </WorkspaceManagementEditorSection>
       </div>
     </WorkspaceManagementLayout>
   );
