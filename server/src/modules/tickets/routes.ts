@@ -22,7 +22,6 @@ import {
   hasTicketDependencyRelation,
   getTicketDetails,
   listComments,
-  listTickets,
   listTicketBlockers,
   listTicketDependencies,
   updateTicketRecord,
@@ -76,6 +75,20 @@ export function createTicketsRouter() {
 
   function normalizeRouteParam(value: string | string[]) {
     return Array.isArray(value) ? value[0] ?? '' : value;
+  }
+
+  function parseIntQueryParam(value: string | string[] | undefined) {
+    if (!value) {
+      return undefined;
+    }
+
+    const normalized = Array.isArray(value) ? value[0] : value;
+    const parsed = Number.parseInt(normalized, 10);
+    if (!Number.isFinite(parsed)) {
+      return undefined;
+    }
+
+    return parsed;
   }
 
   async function withProjectAccess(
@@ -156,6 +169,9 @@ export function createTicketsRouter() {
     }
 
     try {
+      const queryLimit = parseIntQueryParam(req.query.limit);
+      const queryOffset = parseIntQueryParam(req.query.offset);
+
       const ticketList = await strategy.execute({
         status: typeof req.query.status === 'string' ? req.query.status : undefined,
         priority: typeof req.query.priority === 'string' ? req.query.priority : undefined,
@@ -163,6 +179,8 @@ export function createTicketsRouter() {
         cycleId: typeof req.query.cycleId === 'string' ? req.query.cycleId : undefined,
         labels: typeof req.query.labels === 'string' ? req.query.labels.split(',').filter(Boolean) : undefined,
         labelMode: (req.query.labelMode === 'all' || req.query.labelMode === 'any') ? req.query.labelMode : undefined,
+        limit: queryLimit,
+        offset: queryOffset,
       });
       res.json(ticketList);
     } catch (error) {
@@ -194,7 +212,7 @@ export function createTicketsRouter() {
               : undefined,
         });
 
-        broadcastEvent('tickets-updated', { projectId, tickets: await listTickets(projectId) });
+        broadcastEvent('tickets-updated', { projectId });
         res.status(201).json(created);
       } catch (error) {
         res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create ticket.' });
@@ -231,13 +249,7 @@ export function createTicketsRouter() {
         return;
       }
 
-      res.json({
-        id: ticket.id,
-        key: ticket.key,
-        title: ticket.title,
-        status: ticket.status,
-        projectId: ticket.projectId,
-      });
+      res.json(ticket);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load ticket.' });
     }
@@ -268,7 +280,7 @@ export function createTicketsRouter() {
           broadcastEvent('tickets-updated', { projectId });
           broadcastEvent('tickets-updated', { projectId: updated.projectId });
         } else {
-          broadcastEvent('tickets-updated', { projectId, tickets: await listTickets(projectId) });
+          broadcastEvent('tickets-updated', { projectId });
         }
         res.json(updated);
       } catch (error) {
@@ -297,7 +309,7 @@ export function createTicketsRouter() {
           return;
         }
 
-        broadcastEvent('tickets-updated', { projectId, tickets: await listTickets(projectId) });
+        broadcastEvent('tickets-updated', { projectId });
         res.json({ success: true });
       } catch (error) {
         res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to delete ticket.' });
@@ -331,8 +343,7 @@ export function createTicketsRouter() {
         }
 
         const comment = await addCommentRecord(ticket.id, userId, body);
-        const allComments = await listComments(ticket.id);
-        broadcastEvent('comments-updated', { ticketId: ticket.id, comments: allComments });
+        broadcastEvent('comments-updated', { ticketId: ticket.id });
         res.status(201).json(comment);
       } catch (error) {
         res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to add comment.' });
@@ -357,8 +368,7 @@ export function createTicketsRouter() {
           return;
         }
 
-        const allComments = await listComments(ticket.id);
-        broadcastEvent('comments-updated', { ticketId: ticket.id, comments: allComments });
+        broadcastEvent('comments-updated', { ticketId: ticket.id });
         res.json(comment);
       } catch (error) {
         res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to update comment.' });
@@ -376,8 +386,7 @@ export function createTicketsRouter() {
           return;
         }
 
-        const allComments = await listComments(ticket.id);
-        broadcastEvent('comments-updated', { ticketId: ticket.id, comments: allComments });
+        broadcastEvent('comments-updated', { ticketId: ticket.id });
         res.json({ success: true });
       } catch (error) {
         res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to delete comment.' });
@@ -630,7 +639,7 @@ export function createTicketsRouter() {
           .values({ ticketId: ticket.id, labelId })
           .onConflictDoNothing();
 
-        broadcastEvent('tickets-updated', { projectId: ticket.projectId, tickets: await listTickets(ticket.projectId) });
+        broadcastEvent('tickets-updated', { projectId: ticket.projectId });
 
         res.status(201).json({ success: true });
       } catch (error) {
@@ -647,7 +656,7 @@ export function createTicketsRouter() {
           .delete(ticketLabels)
           .where(and(eq(ticketLabels.ticketId, ticket.id), eq(ticketLabels.labelId, labelId)));
 
-        broadcastEvent('tickets-updated', { projectId: ticket.projectId, tickets: await listTickets(ticket.projectId) });
+        broadcastEvent('tickets-updated', { projectId: ticket.projectId });
 
         res.json({ success: true });
       } catch (error) {

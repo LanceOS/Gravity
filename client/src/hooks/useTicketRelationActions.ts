@@ -105,23 +105,6 @@ export function useTicketRelationActions({
       }
     }
 
-    const ticketLists = [
-      ...queryClient.getQueriesData<Ticket[]>({ queryKey: ['tickets'] }),
-      ...queryClient.getQueriesData<Ticket[]>({ queryKey: ['workspaceTickets'] }),
-      ...queryClient.getQueriesData<Ticket[]>({ queryKey: ['teamTickets'] }),
-    ];
-
-    for (const [, cachedTickets] of ticketLists) {
-      if (!Array.isArray(cachedTickets)) {
-        continue;
-      }
-
-      const cachedTicket = cachedTickets.find((ticket) => ticket.id === ticketId);
-      if (cachedTicket) {
-        return cachedTicket;
-      }
-    }
-
     return undefined;
   }, [cachedTicketsById, queryClient]);
 
@@ -160,13 +143,11 @@ export function useTicketRelationActions({
     queryClient.removeQueries({ queryKey, exact: true });
   }, [queryClient]);
 
-  const invalidateTicketRelationQueries = useCallback((projectId?: string) => {
-    if (projectId) {
+  const invalidateTicketRelationQueries = useCallback((projectIds: Array<string | undefined>) => {
+    const uniqueProjectIds = Array.from(new Set(projectIds.filter(Boolean) as string[]));
+    uniqueProjectIds.forEach((projectId) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.tickets(projectId) });
-    }
-
-    queryClient.invalidateQueries({ queryKey: ['workspaceTickets'] });
-    queryClient.invalidateQueries({ queryKey: ['teamTickets'] });
+    });
   }, [queryClient]);
 
   const handleTicketRelationMutationError = useCallback((context: TicketRelationMutationContext | undefined, message: string, shouldRollback = true) => {
@@ -252,7 +233,8 @@ export function useTicketRelationActions({
     },
     onSettled: (_data, _err, { ticketId, dependencyId, projectId }) => {
       clearPendingTicketRelationAdd(ticketId, 'dependencies', dependencyId);
-      invalidateTicketRelationQueries(projectId);
+      const relatedProjectId = getTicketProjectIdForMutation(dependencyId);
+      invalidateTicketRelationQueries([projectId, relatedProjectId]);
     },
   });
 
@@ -291,7 +273,8 @@ export function useTicketRelationActions({
     },
     onSettled: (_data, _err, { ticketId, dependencyId, projectId }) => {
       clearPendingTicketRelationAdd(ticketId, 'dependencies', dependencyId);
-      invalidateTicketRelationQueries(projectId);
+      const relatedProjectId = getTicketProjectIdForMutation(dependencyId);
+      invalidateTicketRelationQueries([projectId, relatedProjectId]);
     },
   });
 
@@ -330,7 +313,8 @@ export function useTicketRelationActions({
     },
     onSettled: (_data, _err, { ticketId, blockerId, projectId }) => {
       clearPendingTicketRelationAdd(ticketId, 'blockers', blockerId);
-      invalidateTicketRelationQueries(projectId);
+      const relatedProjectId = getTicketProjectIdForMutation(blockerId);
+      invalidateTicketRelationQueries([projectId, relatedProjectId]);
     },
   });
 
@@ -369,7 +353,8 @@ export function useTicketRelationActions({
     },
     onSettled: (_data, _err, { ticketId, blockerId, projectId }) => {
       clearPendingTicketRelationAdd(ticketId, 'blockers', blockerId);
-      invalidateTicketRelationQueries(projectId);
+      const relatedProjectId = getTicketProjectIdForMutation(blockerId);
+      invalidateTicketRelationQueries([projectId, relatedProjectId]);
     },
   });
 
