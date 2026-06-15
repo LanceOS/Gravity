@@ -3,4 +3,4 @@ export type {
   ProjectSelectionRailProps,
   WorkspaceProjectPanelProps,
   WorkspaceProjectsPageProps,
-} from '../workspaceProjects/types/WorkspaceProjectPanel';
+} from '../workspaceProjectsPanel/types/WorkspaceProjectPanel';

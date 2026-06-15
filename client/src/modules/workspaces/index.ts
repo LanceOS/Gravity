@@ -1,8 +1,8 @@
 export { EmptyWorkspaceScreen } from './components/EmptyWorkspaceScreen';
 export { WorkspaceMcpModal } from './components/WorkspaceMcpModal';
 export { WorkspaceHeader } from './components/WorkspaceHeader';
-export { ProjectCreateOverlay } from '../workspaceProjects/components/ProjectCreateOverlay';
-export { WorkspaceProjectPanelPage as WorkspaceProjectPanel } from '../workspaceProjects/screens/WorkspaceProjectPanelPage';
+export { ProjectCreateOverlay } from '../workspaceProjectsPanel/components/ProjectCreateOverlay';
+export { WorkspaceProjectPanelPage as WorkspaceProjectPanel } from '../workspaceProjectsPanel/screens/WorkspaceProjectPanelPage';
 export {
   useActiveWorkspaceStorage,
   useWorkspaceCreateLabelDialog,
@@ -22,4 +22,4 @@ export {
   getNextLabelSortOrder,
   sanitizeProjectKey,
   validateGithubRepoUrl,
-} from '../workspaceProjects/utils/WorkspaceProjectPanel';
+} from '../workspaceProjectsPanel/utils/WorkspaceProjectPanel';
