@@ -21,3 +21,15 @@ export interface WorkspaceTeamProjectsPanelProps {
   onUpdateProject: (id: string, updates: Partial<Project>) => Promise<Project | null>;
   onDeleteProject?: (id: string) => Promise<unknown>;
 }
+
+export interface WorkspaceTeamProjectsPanelDraft {
+  name: string;
+  description: string;
+  githubRepoUrl: string;
+  status: Project['status'];
+}
+
+export interface WorkspaceTeamProjectsPanelFeedback {
+  type: 'success' | 'error';
+  message: string;
+}
