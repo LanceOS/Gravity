@@ -1,10 +1,9 @@
 import type { WorkspaceProjectPanelProps } from '../types/WorkspaceProjectPanel';
-import { ProjectCreateOverlay } from '../components/ProjectCreateOverlay';
+import { ProjectCreateOverlay, ProjectSelectionRail } from '../../../components/WorkspaceProjectPanel';
 import { useWorkspaceProjectPanelActionsContext } from '../context/WorkspaceProjectPanelActionsContext';
 import { useWorkspaceProjectPanelLabelStateContext } from '../context/WorkspaceProjectPanelLabelStateContextCore';
 import { WorkspaceProjectPanelContextProviders } from '../context/WorkspaceProjectPanelContextProviders';
 import { useWorkspaceProjectPanelProjectStateContext } from '../context/WorkspaceProjectPanelProjectStateContext';
-import { ProjectSelectionRail } from '../components/ProjectSelectionRail';
 import { WorkspaceProjectCurrentProjectSection } from '../components/WorkspaceProjectCurrentProjectSection';
 import { WorkspaceProjectHeader } from '../components/WorkspaceProjectHeader';
 import { WorkspaceProjectLabelCreateForm } from '../components/WorkspaceProjectLabelCreateForm';
@@ -13,7 +12,6 @@ import { WorkspaceProjectLabelList } from '../components/WorkspaceProjectLabelLi
 import { WorkspaceProjectLabelNoSelectionMessage } from '../components/WorkspaceProjectLabelNoSelectionMessage';
 import { WorkspaceProjectLabelSectionErrors } from '../components/WorkspaceProjectLabelSectionErrors';
 import { WorkspaceProjectLabelSectionHeader } from '../components/WorkspaceProjectLabelSectionHeader';
-import { WorkspaceProjectSettingsSection } from '../components/WorkspaceProjectSettingsSection';
 
 export function WorkspaceProjectPanelPage({
   workspaceName,
@@ -81,9 +79,10 @@ function WorkspaceProjectPanelPageContent({
   const {
     managedProject,
     projectStrip,
+    currentProject,
   } = useWorkspaceProjectPanelProjectStateContext();
   const { sortedLabels, activeLabel, editingLabelLoading } = useWorkspaceProjectPanelLabelStateContext();
-  const { isCreateProjectModalOpen, closeCreateProjectModal, createProject } =
+  const { isCreateProjectModalOpen, closeCreateProjectModal, createProject, selectProject } =
     useWorkspaceProjectPanelActionsContext();
 
   const isLabelBusy = labelCreateLoading || editingLabelLoading;
@@ -126,7 +125,12 @@ function WorkspaceProjectPanelPageContent({
       ) : null}
 
       {hasProjects ? (
-        <ProjectSelectionRail defaultProjectId={defaultProjectId} />
+        <ProjectSelectionRail
+          projects={projectStrip}
+          selectedProjectId={managedProject?.id || currentProject?.id || null}
+          defaultProjectId={defaultProjectId}
+          onSelectProject={selectProject}
+        />
       ) : null}
 
       {isCreateProjectModalOpen ? (

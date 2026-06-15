@@ -1,14 +1,32 @@
-import type { ProjectSelectionRailProps } from '../types/WorkspaceProjectPanel';
-import { PROJECT_STATUS_LABELS } from '../utils/WorkspaceProjectPanel';
-import { useWorkspaceProjectPanelActionsContext } from '../context/WorkspaceProjectPanelActionsContext';
-import { useWorkspaceProjectPanelProjectStateContext } from '../context/WorkspaceProjectPanelProjectStateContext';
+type WorkspaceProjectPanelStatus = 'planned' | 'active' | 'completed';
 
-export function ProjectSelectionRail({ defaultProjectId }: Pick<ProjectSelectionRailProps, 'defaultProjectId'>) {
-  const { projectStrip, managedProject, currentProject } = useWorkspaceProjectPanelProjectStateContext();
-  const { selectProject } = useWorkspaceProjectPanelActionsContext();
+interface ProjectSelectionRailProject {
+  id: string;
+  name: string;
+  key: string;
+  description: string | null;
+  status: WorkspaceProjectPanelStatus;
+}
 
-  const selectedProjectId = managedProject?.id || currentProject?.id || null;
+export interface ProjectSelectionRailProps {
+  projects: ProjectSelectionRailProject[];
+  selectedProjectId: string | null;
+  defaultProjectId: string | null;
+  onSelectProject: (projectId: string) => void;
+}
 
+const PROJECT_STATUS_LABELS: Record<WorkspaceProjectPanelStatus, string> = {
+  planned: 'Planned',
+  active: 'Active',
+  completed: 'Archived',
+};
+
+export function ProjectSelectionRail({
+  projects,
+  selectedProjectId,
+  defaultProjectId,
+  onSelectProject,
+}: ProjectSelectionRailProps) {
   return (
     <section className="workspace-page__project-browser">
       <div className="workspace-page__project-browser-header">
@@ -22,7 +40,7 @@ export function ProjectSelectionRail({ defaultProjectId }: Pick<ProjectSelection
       </div>
 
       <div className="workspace-page__project-selection-list">
-        {projectStrip.map((project) => {
+        {projects.map((project) => {
           const isSelected = selectedProjectId === project.id;
           const roleLabel = project.id === defaultProjectId ? 'Default workspace project' : 'Workspace project';
           const selectionLabel = isSelected ? 'Currently managing' : 'Click to manage labels';
@@ -32,7 +50,7 @@ export function ProjectSelectionRail({ defaultProjectId }: Pick<ProjectSelection
               key={project.id}
               type="button"
               className={`workspace-page__project-strip-card ${isSelected ? 'workspace-page__project-strip-card--active' : ''}`}
-              onClick={() => selectProject(project.id)}
+              onClick={() => onSelectProject(project.id)}
             >
               <div className="workspace-page__project-strip-card-content">
                 <div className="workspace-page__project-card-head">

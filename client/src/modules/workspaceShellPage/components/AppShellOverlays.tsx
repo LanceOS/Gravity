@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
 import type { Cycle, Label, Project, Ticket, User } from '../../../types/domain';
 import { CreateTicketModal, LabelCreateOverlay } from '../../../modules/tickets';
-import { ProjectCreateOverlay, WorkspaceMcpModal } from '../../../modules/workspaces';
+import { ProjectCreateOverlay } from '../../../components/WorkspaceProjectPanel';
+import { WorkspaceMcpModal } from '../../../modules/workspaces';
 
 type CreateTicketOverlayProps = {
   isOpen: boolean;

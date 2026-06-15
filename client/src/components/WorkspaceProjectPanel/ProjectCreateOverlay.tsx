@@ -1,9 +1,51 @@
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { FolderPlus } from 'lucide-react';
 import { Button, TextInput, Textarea, Modal, Alert } from '@library';
 
-import type { ProjectCreateOverlayProps } from '../types/WorkspaceProjectPanel';
-import { createWorkspaceProjectPanelCreateProjectFormFactory } from '../utils/WorkspaceProjectPanel';
+export interface ProjectCreateOverlayProps {
+  loading: boolean;
+  errorMessage: string | null;
+  onClose: () => void;
+  onSubmitProject: (project: { name: string; description: string; key: string }) => Promise<void>;
+}
+
+interface ProjectCreatePayload {
+  name: string;
+  description: string;
+  key: string;
+}
+
+const sanitizeProjectKey = (value: string) => value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+
+function normalizeProjectInput(input: ProjectCreatePayload): ProjectCreatePayload {
+  return {
+    name: input.name.trim(),
+    description: input.description.trim(),
+    key: sanitizeProjectKey(input.key),
+  };
+}
+
+function validateProjectPayload(payload: ProjectCreatePayload): string | null {
+  if (!payload.name) {
+    return 'Please enter a project name.';
+  }
+
+  if (!payload.key) {
+    return 'Please enter a project key.';
+  }
+
+  return null;
+}
+
+type ProjectCreateValidationResult = {
+  value: ProjectCreatePayload;
+  error: string | null;
+};
+
+function buildValidatedPayload(input: ProjectCreatePayload): ProjectCreateValidationResult {
+  const value = normalizeProjectInput(input);
+  return { value, error: validateProjectPayload(value) };
+}
 
 export function ProjectCreateOverlay({
   loading,
@@ -15,7 +57,6 @@ export function ProjectCreateOverlay({
   const [projectKey, setProjectKey] = useState('');
   const [projectDescription, setProjectDescription] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
-  const formFactory = useMemo(() => createWorkspaceProjectPanelCreateProjectFormFactory(), []);
 
   const resetForm = useCallback(() => {
     setProjectName('');
@@ -36,7 +77,7 @@ export function ProjectCreateOverlay({
       event?.preventDefault();
       setFormError(null);
 
-      const { value, error } = formFactory.buildValidatedPayload({
+      const { value, error } = buildValidatedPayload({
         name: projectName,
         description: projectDescription,
         key: projectKey,
@@ -58,7 +99,7 @@ export function ProjectCreateOverlay({
         setFormError(error instanceof Error ? error.message : 'Failed to create project.');
       }
     },
-    [formFactory, onSubmitProject, projectDescription, projectKey, projectName, resetForm]
+    [onSubmitProject, projectDescription, projectKey, projectName, resetForm]
   );
 
   useEffect(() => {
@@ -78,7 +119,6 @@ export function ProjectCreateOverlay({
   }, [handleClose, handleSubmit]);
 
   const feedbackMessage = formError || errorMessage;
-
   const modalFooter = (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
       <span style={{ fontSize: '11px', color: 'var(--color-text-disabled)' }}>Ctrl/Cmd + Enter creates the project.</span>
@@ -120,7 +160,7 @@ export function ProjectCreateOverlay({
           <TextInput
             label="Project Key"
             value={projectKey}
-            onChange={(event) => setProjectKey(formFactory.sanitizeProjectKey(event.target.value))}
+            onChange={(event) => setProjectKey(sanitizeProjectKey(event.target.value))}
             placeholder="CORE"
             maxLength={8}
             required

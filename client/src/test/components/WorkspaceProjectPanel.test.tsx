@@ -47,7 +47,7 @@ vi.mock('@library', () => ({
   ),
 }));
 
-vi.mock('../../modules/workspaces/components/ProjectCreateOverlay', () => ({
+vi.mock('../../components/WorkspaceProjectPanel', () => ({
   ProjectCreateOverlay: ({ onClose, onSubmitProject }: ProjectCreateOverlayProps) => (
     <div>
       <div>ProjectCreateOverlay</div>
@@ -70,7 +70,7 @@ vi.mock('../../modules/workspaces/components/ProjectCreateOverlay', () => ({
   ),
 }));
 
-vi.mock('../../modules/workspaces/components/ProjectSelectionRail', () => ({
+vi.mock('../../components/WorkspaceProjectPanel', () => ({
   ProjectSelectionRail: ({ selectedProjectId, onSelectProject }: ProjectSelectionRailProps) => (
     <div>
       <div>{`ProjectSelectionRail ${selectedProjectId ?? 'none'}`}</div>
