@@ -471,12 +471,6 @@ export function WorkspaceShellPage() {
   const scopedLabels = isTeamAggregatePath ? teamLabels : labels;
   const scopedFilters = shouldUseAggregateTicketScope ? { ...filters, projectId: '' } : filters;
 
-  const activeProjectTeamId =
-    activeProject?.teamId ||
-    sidebarTree?.teams?.find((team) => team.projects?.some((project) => project.id === (projectIdParam || activeProjectId)))?.id ||
-    '';
-  const sidebarActiveTeamId = route.teamIdParam || activeProjectTeamId;
-
   const sidebarActiveViewId =
     route.teamIdParam && sidebarNavigationState.activeScope === 'views'
       ? (route.viewIdParam || 'all')
