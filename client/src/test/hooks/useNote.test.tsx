@@ -173,7 +173,7 @@ describe('useNote', () => {
     expect(fetchSpy).toHaveBeenLastCalledWith('/api/v1/notes/note-1/media?filename=test.png', {
       method: 'POST',
       headers: {
-        'x-project-id': 'proj-1',
+        'X-Project-Id': 'proj-1',
         'Content-Type': 'image/png',
       },
       body: file,

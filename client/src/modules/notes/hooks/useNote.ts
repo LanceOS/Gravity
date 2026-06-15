@@ -63,22 +63,15 @@ export function useNote(projectId: string, noteId: string | null) {
 
   const uploadMedia = useCallback(async (file: File): Promise<string> => {
     if (!noteId) throw new Error('No active note');
-    
-    const response = await fetch(`/api/v1/notes/${noteId}/media?filename=${encodeURIComponent(file.name)}`, {
-      method: 'POST',
+
+    const response = await apiClient.postBinary<{ url: string }>(`/notes/${noteId}/media?filename=${encodeURIComponent(file.name)}`, file, {
+      projectId,
       headers: {
-        'x-project-id': projectId,
         'Content-Type': file.type || 'application/octet-stream',
       },
-      body: file,
     });
 
-    if (!response.ok) {
-      throw new Error('Failed to upload media');
-    }
-
-    const data = await response.json();
-    return data.url;
+    return response.url;
   }, [projectId, noteId]);
 
   return {
