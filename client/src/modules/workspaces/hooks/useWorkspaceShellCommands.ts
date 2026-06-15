@@ -5,7 +5,7 @@ import type { Ticket } from '../../../context/TicketContext';
 interface UseWorkspaceShellCommandsArgs {
   activeWorkspaceId: string;
   currentUser: { id: string } | null;
-  tickets: Ticket[];
+  ticketsById?: Map<string, Ticket>;
   activeTicket: Ticket | null;
   activeProjectId: string;
   createTicket: (ticket: {
@@ -83,6 +83,7 @@ export function useWorkspaceShellCommands({
   activeWorkspaceId,
   currentUser,
   tickets,
+  ticketsById,
   activeTicket,
   activeProjectId,
   createTicket,
@@ -110,8 +111,7 @@ export function useWorkspaceShellCommands({
 
   const handleDeleteTicket = useCallback(
     async (ticketId: string) => {
-      const deletedTicket =
-        tickets.find((ticket) => ticket.id === ticketId) || (activeTicket?.id === ticketId ? activeTicket : null);
+      const deletedTicket = ticketsById?.get(ticketId) || (activeTicket?.id === ticketId ? activeTicket : null);
       await deleteTicket(ticketId);
 
       if (deletedTicket && activeTicket?.id === ticketId) {
@@ -121,7 +121,7 @@ export function useWorkspaceShellCommands({
 
       setActiveTicket(null);
     },
-    [activeTicket, buildProjectScopedPath, deleteTicket, navigate, setActiveTicket, tickets]
+    [activeTicket, buildProjectScopedPath, deleteTicket, navigate, setActiveTicket, ticketsById]
   );
 
   const handleCreateProject = useCallback(

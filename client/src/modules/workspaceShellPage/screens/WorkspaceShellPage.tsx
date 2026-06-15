@@ -145,20 +145,25 @@ export function WorkspaceShellPage() {
     requestJoinByInvite,
   } = useWorkspaceDirectory({ currentUser, setCurrentUser });
   const workspacesResolvedForCurrentUser = !currentUser || workspacesResolvedUserId === currentUser.id;
-
-  const activeWorkspace = useMemo(
-    () => workspaces.find((workspace) => workspace.id === activeWorkspaceId) || null,
-    [activeWorkspaceId, workspaces]
-  );
+  const workspacesById = useMemo(() => {
+    const map = new Map<string, (typeof workspaces)[number]>();
+    for (const workspace of workspaces) {
+      map.set(workspace.id, workspace);
+    }
+    return map;
+  }, [workspaces]);
+  const projectsById = useMemo(() => {
+    const map = new Map<string, (typeof projects)[number]>();
+    for (const project of projects) {
+      map.set(project.id, project);
+    }
+    return map;
+  }, [projects]);
+  const activeWorkspace = workspacesById.get(activeWorkspaceId) || null;
   const activeWorkspaceProjects = useMemo(
     () => projects.filter((project) => project.workspaceId === activeWorkspaceId),
     [projects, activeWorkspaceId]
   );
-  const parentTicket = useMemo(
-    () => (createParentId ? tickets.find((ticket) => ticket.id === createParentId) || null : null),
-    [createParentId, tickets]
-  );
-
   const projectCreateError =
     projectCreateErrorState.workspaceId === activeWorkspaceId ? projectCreateErrorState.message : null;
   const labelCreateError = labelCreateErrorState.projectId === activeProjectId ? labelCreateErrorState.message : null;
@@ -176,6 +181,15 @@ export function WorkspaceShellPage() {
     staleTime: CACHE_CONFIGS.workspaceSidebar.staleTime,
     gcTime: CACHE_CONFIGS.workspaceSidebar.gcTime,
   });
+  const sidebarTeamIdByProjectId = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const team of sidebarTree?.teams ?? []) {
+      for (const teamProject of team.projects ?? []) {
+        map.set(teamProject.id, team.id);
+      }
+    }
+    return map;
+  }, [sidebarTree]);
 
   const aggregateScopeLabels = useMemo(() => {
     if (filters.labels.length > 0) {
@@ -368,15 +382,18 @@ export function WorkspaceShellPage() {
     }
     return map;
   }, [routeScopedTickets]);
+  const parentTicket = useMemo(
+    () => (createParentId ? scopedTicketsById.get(createParentId) || null : null),
+    [createParentId, scopedTicketsById]
+  );
   const activeProject = useMemo(
-    () => projects.find((project) => project.id === (projectIdParam || activeProjectId)),
-    [activeProjectId, projectIdParam, projects]
+    () => projectsById.get(projectIdParam || activeProjectId) || null,
+    [activeProjectId, projectIdParam, projectsById]
   );
 
   useAppShellRouteSync({
     route,
     activeTicket,
-    routeScopedTickets,
     routeScopedTicketByKey: scopedTicketsByKey,
     setActiveSection,
     setActiveWorkspaceId,
@@ -454,6 +471,73 @@ export function WorkspaceShellPage() {
   });
 
   const {
+    isTeamProjectsManager,
+    isTeamWorkspace,
+    isTeamsManager,
+    isWorkspaceOwner,
+    sidebarActiveTeamId,
+    sidebarNavigationState,
+  } = useMemo(() => {
+    const activeProjectTeamId =
+      activeProject?.teamId ||
+      (projectIdParam || activeProjectId ? sidebarTeamIdByProjectId.get(projectIdParam || activeProjectId) || '' : '') ||
+      '';
+
+    const resolvedSidebarActiveTeamId = route.teamIdParam || activeProjectTeamId;
+    const resolvedIsTeamWorkspace = (sidebarTree?.hierarchyMode ?? activeWorkspace?.hierarchyMode ?? 'workspace') === 'teams';
+    const resolvedIsWorkspaceOwner = activeWorkspace?.memberRole === 'owner';
+
+    return {
+      isTeamProjectsManager: activeSection === 'team-projects',
+      isTeamWorkspace: resolvedIsTeamWorkspace,
+      isTeamsManager: activeSection === 'teams' || (resolvedIsTeamWorkspace && activeSection === 'projects'),
+      isWorkspaceOwner: resolvedIsWorkspaceOwner,
+      sidebarActiveTeamId: resolvedSidebarActiveTeamId,
+      sidebarNavigationState: {
+        activeTeam: resolvedSidebarActiveTeamId,
+        activeScope:
+          route.teamIdParam
+            ? route.projectIdParam
+              ? 'projects'
+              : route.cycleIdParam
+                ? 'cycles'
+                : route.activeLabelIdParam
+                  ? 'labels'
+                  : 'views'
+            : route.projectIdParam
+              ? 'projects'
+              : 'workspace',
+        activeProject:
+          activeSection === 'projects' || activeSection === 'team-projects' || activeSection === 'workspace'
+            ? (projectIdParam || activeProjectId)
+            : '',
+      } as SidebarNavigationState,
+    };
+  }, [
+    activeSection,
+    activeProject,
+    activeProjectId,
+    activeWorkspace?.hierarchyMode,
+    activeWorkspace?.memberRole,
+    projectIdParam,
+    route.activeLabelIdParam,
+    route.cycleIdParam,
+    route.projectIdParam,
+    route.teamIdParam,
+    sidebarTeamIdByProjectId,
+    sidebarTree?.teams,
+  ]);
+
+  const accountCredentialByProvider = useMemo(() => {
+    const map = new Map<string, { preferredModel: string }>();
+    for (const credential of accountSavedCredentials) {
+      map.set(credential.provider, credential);
+    }
+    return map;
+  }, [accountSavedCredentials]);
+
+  const preferredProviderModel = accountSettings.aiProvider ? accountCredentialByProvider.get(accountSettings.aiProvider)?.preferredModel || '' : '';
+  const {
     buildProjectScopedPath,
     handleOpenWorkspaceDirectory,
     handleSelectProject,
@@ -494,7 +578,7 @@ export function WorkspaceShellPage() {
   } = useWorkspaceShellCommands({
     activeWorkspaceId,
     currentUser,
-    tickets,
+    ticketsById: scopedTicketsById,
     activeTicket,
     activeProjectId,
     createTicket,
@@ -573,7 +657,7 @@ export function WorkspaceShellPage() {
   } = useMemo(() => {
     const activeProjectTeamId =
       activeProject?.teamId ||
-      sidebarTree?.teams?.find((team) => team.projects?.some((project) => project.id === (projectIdParam || activeProjectId)))?.id ||
+      (projectIdParam || activeProjectId ? sidebarTeamIdByProjectId.get(projectIdParam || activeProjectId) || '' : '') ||
       '';
 
     const resolvedSidebarActiveTeamId = route.teamIdParam || activeProjectTeamId;
@@ -754,7 +838,7 @@ export function WorkspaceShellPage() {
   const createDefaultProjectId =
     activeProjectId || scopedProjects[0]?.id || activeWorkspaceProjects[0]?.id || '';
 
-  return (
+    return (
     <>
       <WorkspaceLayout
         sidebarProps={sidebarProps}
@@ -766,7 +850,7 @@ export function WorkspaceShellPage() {
               initialOllamaUrl={accountSettings.ollamaEndpoint}
               initialModel={
                 accountSettings.agentIntegration === 'third_party'
-                  ? (accountSavedCredentials.find((c) => c.provider === accountSettings.aiProvider)?.preferredModel || '')
+                  ? preferredProviderModel
                   : (accountSettings.ollamaModel || ollamaModels[0] || '')
               }
               settings={accountSettings}

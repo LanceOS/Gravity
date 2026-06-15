@@ -204,6 +204,7 @@ interface TicketContextType extends State {
   setFilters: (filters: Partial<State['filters']>) => void;
   resetFilters: () => void;
   ticketMap: Map<string, Ticket>;
+  ticketById: Map<string, Ticket>;
   projectById: Map<string, Project>;
   labelsByProject: Map<string, Label[]>;
   globalLabels: Label[];
@@ -258,6 +259,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     queryKey: queryKeys.projects(currentUser?.id),
     queryFn: () => apiClient.get<Project[]>(`/projects`, { params: { userId: currentUser?.id } }),
     enabled: !!currentUser?.id,
+    ...CACHE_CONFIGS.metadata,
   });
   const projects = projectsQuery.data || [];
   const projectLookup = useMemo(() => {
@@ -295,6 +297,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     queryKey: queryKeys.users(),
     queryFn: () => apiClient.get<User[]>(`/users`),
     enabled: !!currentUser,
+    ...CACHE_CONFIGS.metadata,
   });
   const users = usersQuery.data || [];
 
@@ -335,6 +338,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     queryKey: queryKeys.comments(activeTicketId || ''),
     queryFn: () => apiClient.get<Comment[]>(`/tickets/${activeTicketId}/comments`, { projectId: activeTicketProjectId }),
     enabled: !!activeTicketId && !!activeTicketProjectId && !!currentUser,
+    ...CACHE_CONFIGS.ticketDetail,
   });
   const comments = commentsQuery.data || [];
 
@@ -364,19 +368,30 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Sync activeTicket if it was updated in the tickets query
   useEffect(() => {
-    if (activeTicket) {
-      const latest = tickets.find(t => t.id === activeTicket.id);
-      if (latest && !hasEquivalentTicketFields(latest, activeTicket)) {
-        setActiveTicket(latest);
-      }
+    if (!activeTicket) {
+      return;
     }
-  }, [tickets, activeTicket]);
+
+    const latest = ticketById.get(activeTicket.id);
+    if (latest && !hasEquivalentTicketFields(latest, activeTicket)) {
+      setActiveTicket(latest);
+    }
+  }, [activeTicket, ticketById]);
 
   // --- Actions ---
 
   const setActiveProjectId = useCallback((id: string) => {
+    if (activeProjectIdRef.current === id) {
+      return;
+    }
+
     setActiveProjectIdState(id);
-    setFiltersState(prev => ({ ...prev, projectId: id }));
+    setFiltersState((prev) => {
+      if (prev.projectId === id) {
+        return prev;
+      }
+      return { ...prev, projectId: id };
+    });
   }, []);
 
   const fetchInitialData = useCallback(async (userId?: string) => {
@@ -386,17 +401,40 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return;
     }
     await Promise.all([
-      queryClient.prefetchQuery({ queryKey: queryKeys.projects(userId), queryFn: () => apiClient.get<Project[]>(`/projects`, { params: { userId } }) }),
-      queryClient.prefetchQuery({ queryKey: queryKeys.users(), queryFn: () => apiClient.get<User[]>(`/users`) }),
+      queryClient.prefetchQuery({
+        queryKey: queryKeys.projects(userId),
+        queryFn: () => apiClient.get<Project[]>(`/projects`, { params: { userId } }),
+        ...CACHE_CONFIGS.metadata,
+      }),
+      queryClient.prefetchQuery({
+        queryKey: queryKeys.users(),
+        queryFn: () => apiClient.get<User[]>(`/users`),
+        ...CACHE_CONFIGS.metadata,
+      }),
     ]);
   }, []);
 
   const fetchProjectData = useCallback(async (projId: string) => {
     if (!projId) return;
     await Promise.all([
-      queryClient.prefetchQuery({ queryKey: queryKeys.tickets(projId), queryFn: () => apiClient.get<Ticket[]>(`/tickets`, { projectId: projId }) }),
-      queryClient.prefetchQuery({ queryKey: queryKeys.labels(projId), queryFn: () => apiClient.get<Label[]>(`/labels`, { projectId: projId }) }),
-      queryClient.prefetchQuery({ queryKey: queryKeys.cycles(projId), queryFn: () => apiClient.get<Cycle[]>(`/cycles`, { projectId: projId }) }),
+      queryClient.prefetchQuery({
+        queryKey: queryKeys.tickets(projId),
+        queryFn: async () => {
+          const data = await apiClient.get<Ticket[]>(`/tickets`, { projectId: projId });
+          return data.map((ticket) => ({ ...ticket, status: canonicalizeStatus(ticket.status) }));
+        },
+        ...CACHE_CONFIGS.ticketsList,
+      }),
+      queryClient.prefetchQuery({
+        queryKey: queryKeys.labels(projId),
+        queryFn: () => apiClient.get<Label[]>(`/labels`, { projectId: projId }),
+        ...CACHE_CONFIGS.metadata,
+      }),
+      queryClient.prefetchQuery({
+        queryKey: queryKeys.cycles(projId),
+        queryFn: () => apiClient.get<Cycle[]>(`/cycles`, { projectId: projId }),
+        ...CACHE_CONFIGS.metadata,
+      }),
     ]);
   }, []);
 
@@ -1152,7 +1190,8 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setFiltersState({ ...initialFilters, projectId: activeProjectIdRef.current });
   }, []);
 
-  const ticketMap = useMemo(() => new Map(tickets.map(t => [t.key.toUpperCase(), t])), [tickets]);
+  const ticketMap = useMemo(() => new Map(tickets.map((t) => [t.key.toUpperCase(), t])), [tickets]);
+  const ticketById = useMemo(() => new Map(tickets.map((t) => [t.id, t])), [tickets]);
 
   const projectById = useMemo(() => {
     const map = new Map<string, Project>();
@@ -1257,6 +1296,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setFilters,
       resetFilters,
       ticketMap,
+      ticketById,
       projectById,
       labelsByProject,
       globalLabels,
@@ -1311,6 +1351,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       addTicketBlocker,
       removeTicketBlocker,
       ticketMap,
+      ticketById,
       projectById,
       labelsByProject,
       globalLabels,
