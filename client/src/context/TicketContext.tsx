@@ -204,6 +204,11 @@ interface TicketContextType extends State {
   setFilters: (filters: Partial<State['filters']>) => void;
   resetFilters: () => void;
   ticketMap: Map<string, Ticket>;
+  projectById: Map<string, Project>;
+  labelsByProject: Map<string, Label[]>;
+  globalLabels: Label[];
+  projectsByWorkspaceId: Map<string, Project[]>;
+  ticketsByProject: Map<string, Ticket[]>;
 }
 
 export const TicketContext = createContext<TicketContextType | undefined>(undefined);
@@ -1149,6 +1154,60 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const ticketMap = useMemo(() => new Map(tickets.map(t => [t.key.toUpperCase(), t])), [tickets]);
 
+  const projectById = useMemo(() => {
+    const map = new Map<string, Project>();
+    for (const project of projects) {
+      map.set(project.id, project);
+    }
+    return map;
+  }, [projects]);
+
+  const projectsByWorkspaceId = useMemo(() => {
+    const map = new Map<string, Project[]>();
+    for (const project of projects) {
+      const workspaceId = project.workspaceId || '';
+      const current = map.get(workspaceId);
+      if (current) {
+        current.push(project);
+      } else {
+        map.set(workspaceId, [project]);
+      }
+    }
+    return map;
+  }, [projects]);
+
+  const labelsByProject = useMemo(() => {
+    const map = new Map<string, Label[]>();
+    for (const label of labels) {
+      if (!label.projectId) {
+        continue;
+      }
+
+      const current = map.get(label.projectId);
+      if (current) {
+        current.push(label);
+      } else {
+        map.set(label.projectId, [label]);
+      }
+    }
+    return map;
+  }, [labels]);
+
+  const globalLabels = useMemo(() => labels.filter((label) => !label.projectId), [labels]);
+
+  const ticketsByProject = useMemo(() => {
+    const map = new Map<string, Ticket[]>();
+    for (const ticket of tickets) {
+      const current = map.get(ticket.projectId);
+      if (current) {
+        current.push(ticket);
+      } else {
+        map.set(ticket.projectId, [ticket]);
+      }
+    }
+    return map;
+  }, [tickets]);
+
   const value = useMemo(
     () => ({
       tickets,
@@ -1198,6 +1257,11 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setFilters,
       resetFilters,
       ticketMap,
+      projectById,
+      labelsByProject,
+      globalLabels,
+      projectsByWorkspaceId,
+      ticketsByProject,
     }),
     [
       tickets,
@@ -1247,6 +1311,11 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       addTicketBlocker,
       removeTicketBlocker,
       ticketMap,
+      projectById,
+      labelsByProject,
+      globalLabels,
+      projectsByWorkspaceId,
+      ticketsByProject,
     ]
   );
 

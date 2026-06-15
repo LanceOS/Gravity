@@ -1,5 +1,5 @@
 import React, { useContext, useMemo } from 'react';
-import { TicketContext, type Label, type Project, type Ticket } from '../../../context/TicketContext';
+import { TicketContext, type Label, type Ticket } from '../../../context/TicketContext';
 import { ContextMenu, toast } from '@library';
 import { Check, User, Folder, Tag, AlertCircle, CheckSquare, Trash2, Calendar, Link } from 'lucide-react';
 import { STATUS_OPTIONS, PRIORITY_OPTIONS } from '../utils/TicketDetail';
@@ -25,9 +25,13 @@ export const TicketContextMenu: React.FC<TicketContextMenuProps> = ({ ticket, ch
   const {
     tickets,
     users,
-    projects,
-    labels,
     cycles,
+    projectById,
+    labelsByProject,
+    globalLabels,
+    projectsByWorkspaceId,
+    projects,
+    ticketsByProject,
     updateTicket,
     moveTicket,
     deleteTicket,
@@ -37,63 +41,6 @@ export const TicketContextMenu: React.FC<TicketContextMenuProps> = ({ ticket, ch
     unassignLabelFromTicket,
   } = context;
   const sourceTickets = availableTickets ?? tickets;
-
-  const globalLabels = useMemo(() => labels.filter((label) => !label.projectId), [labels]);
-  const labelsByProject = useMemo(() => {
-    const map = new Map<string, Label[]>();
-
-    for (const label of labels) {
-      if (!label.projectId) {
-        continue;
-      }
-
-      const current = map.get(label.projectId);
-      if (current) {
-        current.push(label);
-      } else {
-        map.set(label.projectId, [label]);
-      }
-    }
-
-    return map;
-  }, [labels]);
-
-  const projectsByWorkspaceId = useMemo(() => {
-    const map = new Map<string, Project[]>();
-
-    for (const project of projects) {
-      const workspaceId = project.workspaceId || '';
-      const current = map.get(workspaceId);
-      if (current) {
-        current.push(project);
-      } else {
-        map.set(workspaceId, [project]);
-      }
-    }
-
-    return map;
-  }, [projects]);
-
-  const projectById = useMemo(() => {
-    const map = new Map<string, Project>();
-    for (const project of projects) {
-      map.set(project.id, project);
-    }
-    return map;
-  }, [projects]);
-
-  const assignableTicketsByProject = useMemo(() => {
-    const map = new Map<string, Ticket[]>();
-    for (const candidate of sourceTickets) {
-      const current = map.get(candidate.projectId);
-      if (current) {
-        current.push(candidate);
-      } else {
-        map.set(candidate.projectId, [candidate]);
-      }
-    }
-    return map;
-  }, [sourceTickets]);
 
   const ticketLabels = useMemo(() => {
     const projectLabels = labelsByProject.get(ticket.projectId);
@@ -107,12 +54,14 @@ export const TicketContextMenu: React.FC<TicketContextMenuProps> = ({ ticket, ch
   }, [globalLabels, labelsByProject, ticket.projectId]);
 
   const assignableTickets = useMemo(() => {
-    const projectTickets = assignableTicketsByProject.get(ticket.projectId) || EMPTY_TICKETS;
+    const projectTickets = availableTickets
+      ? sourceTickets.filter((candidate) => candidate.projectId === ticket.projectId)
+      : ticketsByProject.get(ticket.projectId) || EMPTY_TICKETS;
     if (!projectTickets.length) {
       return EMPTY_TICKETS;
     }
     return projectTickets.filter((candidate) => candidate.id !== ticket.id);
-  }, [assignableTicketsByProject, ticket.id, ticket.projectId]);
+  }, [availableTickets, sourceTickets, ticket.id, ticket.projectId, ticketsByProject]);
 
   const workspaceProjects = useMemo(() => {
     const ticketProject = projectById.get(ticket.projectId);
