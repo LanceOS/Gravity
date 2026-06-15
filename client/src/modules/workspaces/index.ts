@@ -5,9 +5,12 @@ export { WorkspaceHeader } from './components/WorkspaceHeader';
 export { WorkspaceProjectPanel } from './components/WorkspaceProjectPanel';
 export {
   useActiveWorkspaceStorage,
+  useWorkspaceCreateLabelDialog,
   useWorkspaceShellCommands,
   useWorkspaceShellFilters,
   useWorkspaceShellNavigation,
+  useWorkspaceCreateProjectDialog,
+  useWorkspaceCreateTicketDialog,
   useWorkspaceSidebarCounts,
 } from './hooks';
 export { getActiveWorkspaceStorageKey } from './utils';

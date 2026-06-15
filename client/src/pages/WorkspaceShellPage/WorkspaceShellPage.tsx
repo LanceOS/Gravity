@@ -35,6 +35,9 @@ import { LoadingPage } from '../LoadingPage/LoadingPage';
 import { queryClient, queryKeys } from '../../utils/queryClient';
 import {
   useActiveWorkspaceStorage,
+  useWorkspaceCreateLabelDialog,
+  useWorkspaceCreateProjectDialog,
+  useWorkspaceCreateTicketDialog,
   useWorkspaceShellCommands,
   useWorkspaceShellFilters,
   useWorkspaceShellNavigation,
@@ -347,36 +350,27 @@ export function WorkspaceShellPage() {
     setSearchParams,
   });
 
+  const { handleOpenCreateTicket, handleOpenCreateSubtask } = useWorkspaceCreateTicketDialog({
+    hasActiveWorkspaceProjects: activeWorkspaceProjects.length > 0,
+    setCreateInitialStatus,
+    setCreateParentId,
+    setIsCreateModalOpen,
+  });
+
+  const { handleOpenCreateProject } = useWorkspaceCreateProjectDialog({
+    setIsCreateProjectModalOpen,
+  });
+
+  const { handleOpenCreateLabel } = useWorkspaceCreateLabelDialog({
+    setIsCreateLabelModalOpen,
+  });
+
   const { openTickets, myIssuesCount, labelCounts, cycleCounts } = useWorkspaceSidebarCounts({
     tickets,
     labels,
     cycles,
     currentUserId: currentUser?.id,
   });
-
-  const handleOpenCreateTicket = useCallback((initialStatus?: Ticket['status']) => {
-    if (activeWorkspaceProjects.length === 0) {
-      return;
-    }
-
-    setCreateInitialStatus(initialStatus);
-    setCreateParentId(undefined);
-    setIsCreateModalOpen(true);
-  }, [activeWorkspaceProjects.length]);
-
-  const handleOpenCreateProject = () => {
-    setIsCreateProjectModalOpen(true);
-  };
-
-  const handleOpenCreateLabel = () => {
-    setIsCreateLabelModalOpen(true);
-  };
-
-  const handleOpenCreateSubtask = (parentId: string) => {
-    setCreateParentId(parentId);
-    setCreateInitialStatus(undefined);
-    setIsCreateModalOpen(true);
-  };
 
   useEffect(() => {
     const handleGlobalKeyDown = (event: KeyboardEvent) => {
