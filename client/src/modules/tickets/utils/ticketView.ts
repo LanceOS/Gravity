@@ -1,4 +1,5 @@
 import type { Cycle, Label, Project, Ticket, User } from '../../../context/TicketContext';
+import { normalizeSearchTerm, normalizeSearchToken } from '../../../utils/search';
 
 export interface TicketFilters {
   status: string;
@@ -68,8 +69,8 @@ export function filterTickets(tickets: Ticket[], filters: TicketFilters): Ticket
     if (filters.assigneeId && ticket.assigneeId !== filters.assigneeId) return false;
 
     if (filters.search) {
-      const searchLower = filters.search.trim().toLowerCase();
-      const normalizedSearch = searchLower.replace(/[^a-z0-9]+/g, '');
+      const searchLower = normalizeSearchTerm(filters.search);
+      const normalizedSearch = normalizeSearchToken(searchLower);
       const hasNormalizedSearch = normalizedSearch.length > 0;
 
       const title = ticket.title?.toLowerCase() ?? '';

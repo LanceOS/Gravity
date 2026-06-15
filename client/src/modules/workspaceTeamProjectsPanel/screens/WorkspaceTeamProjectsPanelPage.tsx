@@ -1,8 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ProjectCreateOverlay } from '../../workspaceProjectsPanel/components/ProjectCreateOverlay';
-import { sanitizeProjectKey } from '../../workspaceProjectsPanel/utils/WorkspaceProjectPanel';
 import { removeProjectFromTeam, updateProjectInTeam } from '../../../utils/sidebarTreeMutations';
+import { sanitizeProjectKey, validateGithubRepoUrl } from '../../../utils/project';
 import '../../workspacePage/styles/WorkspacePage.css';
 import '../styles/WorkspaceTeamProjectsPage.css';
 import { WorkspaceManagementLayout } from '../../../layouts/WorkspaceManagementLayout/WorkspaceManagementLayout';
@@ -15,7 +15,6 @@ import { WorkspaceTeamProjectsLoadingSkeleton } from '../components/WorkspaceTea
 import { WorkspaceTeamProjectsProjectListSection } from '../components/WorkspaceTeamProjectsProjectListSection';
 import {
   createWorkspaceTeamProjectsPanelFeedback,
-  validateGithubRepoUrl,
 } from '../utils/WorkspaceTeamProjectsPanelUtils';
 import { useWorkspaceTeamProjectsPanelDraft } from '../hooks/useWorkspaceTeamProjectsPanelDraft';
 import { useWorkspaceTeamProjectsPanelSelection } from '../hooks/useWorkspaceTeamProjectsPanelSelection';

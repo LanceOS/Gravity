@@ -1,6 +1,8 @@
-import { ArrowDown, ArrowRight, ArrowUp, Minus, ShieldAlert } from 'lucide-react';
-import type { ReactNode } from 'react';
-import type { Ticket } from '../../../context/TicketContext';
+import {
+  getAssigneeAvatar,
+  getPriorityColor,
+  getPriorityIcon,
+} from '../../../utils/ticketPresentation';
 
 const PRIORITY_FILTER_VALUES: Array<[string, string]> = [
   ['', 'Any Priority'],
@@ -11,47 +13,9 @@ const PRIORITY_FILTER_VALUES: Array<[string, string]> = [
   ['no_priority', 'No Priority'],
 ];
 
+export { getPriorityIcon, getAssigneeAvatar, getPriorityColor };
+
 export const PRIORITY_FILTER_OPTIONS = PRIORITY_FILTER_VALUES.map(([value, label]) => ({
   value,
   label,
 }));
-
-
-export function getPriorityIcon(priority: Ticket['priority']): ReactNode {
-  switch (priority) {
-    case 'urgent':
-      return <ShieldAlert size={12} className="priority-urgent" />;
-    case 'high':
-      return <ArrowUp size={12} className="priority-high" />;
-    case 'medium':
-      return <ArrowRight size={12} className="priority-medium" />;
-    case 'low':
-      return <ArrowDown size={12} className="priority-low" />;
-    default:
-      return <Minus size={12} className="priority-no" />;
-  }
-}
-
-export function getPriorityColor(priority: Ticket['priority']) {
-  switch (priority) {
-    case 'urgent':
-      return '#ec4899';
-    case 'high':
-      return '#ef4444';
-    case 'medium':
-      return '#f59e0b';
-    case 'low':
-      return '#3b82f6';
-    default:
-      return 'transparent';
-  }
-}
-
-
-export function getAssigneeAvatar(userAvatarById: Record<string, string>, assigneeId: string | null) {
-  if (!assigneeId) {
-    return null;
-  }
-
-  return userAvatarById[assigneeId] || null;
-}

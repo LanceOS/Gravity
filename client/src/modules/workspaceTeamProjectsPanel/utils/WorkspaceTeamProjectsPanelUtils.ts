@@ -1,10 +1,8 @@
 import type { Project, SidebarTeam, SidebarTree } from '../../../types/domain';
 import type { WorkspaceTeamProjectsPanelDraft, WorkspaceTeamProjectsPanelFeedback } from '../types/WorkspaceTeamProjectsPanel';
+import { type GithubRepoValidationResult } from '../../../utils/project';
 
-export interface GithubRepoValidationResult {
-  url: string | null;
-  error: string | null;
-}
+export type { GithubRepoValidationResult };
 
 export interface ResolveTeamWorkspaceArgs {
   projects: Project[];
@@ -33,31 +31,6 @@ export function getProjectDraft(project?: Project | null): WorkspaceTeamProjects
   };
 }
 
-export function validateGithubRepoUrl(value: string): GithubRepoValidationResult {
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return { url: null, error: null };
-  }
-
-  try {
-    const parsed = new URL(trimmed);
-    const pathParts = parsed.pathname.split('/').filter(Boolean);
-
-    if (parsed.protocol !== 'https:' || parsed.hostname !== 'github.com' || pathParts.length < 2) {
-      return {
-        url: null,
-        error: 'URL must be a valid GitHub repository URL (e.g. https://github.com/owner/repo).',
-      };
-    }
-
-    return { url: trimmed, error: null };
-  } catch {
-    return {
-      url: null,
-      error: 'Please enter a valid URL (e.g. https://github.com/owner/repo).',
-    };
-  }
-}
 
 export function createWorkspaceTeamProjectsPanelFeedback(
   type: WorkspaceTeamProjectsPanelFeedback['type'],

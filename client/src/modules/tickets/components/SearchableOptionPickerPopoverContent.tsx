@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Button } from '@library';
+import { buildSearchableText, normalizeSearchTerm } from '../../../utils/search';
 
 export interface SearchableOptionPickerOption {
   id: string;
@@ -34,21 +35,6 @@ const CREATE_COLORS = [
   '#6b7280',
 ];
 
-function normalizeSearchTerm(value: string) {
-  return value.trim().toLowerCase();
-}
-
-function buildSearchableText(option: SearchableOptionPickerOption) {
-  return [
-    option.label,
-    option.description,
-    option.searchText,
-  ]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase();
-}
-
 export const SearchableOptionPickerPopoverContent: React.FC<SearchableOptionPickerPopoverContentProps> = ({
   title,
   searchPlaceholder,
@@ -72,7 +58,7 @@ export const SearchableOptionPickerPopoverContent: React.FC<SearchableOptionPick
       return options;
     }
 
-    return options.filter((option) => buildSearchableText(option).includes(normalizedSearch));
+    return options.filter((option) => buildSearchableText([option.label, option.description, option.searchText]).includes(normalizedSearch));
   }, [normalizedSearch, options]);
 
   const hasExactMatch = useMemo(() => {
