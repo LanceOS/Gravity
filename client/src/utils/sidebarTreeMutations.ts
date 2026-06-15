@@ -1,14 +1,13 @@
 import type { QueryClient } from '@tanstack/react-query';
 import type { SidebarTeam, SidebarTree } from '../types/domain';
-
-const SIDEBAR_TREE_QUERY_PREFIX = ['sidebarTree'] as const;
+import { queryKeys } from './queryClient';
 
 function withSidebarTreeData(
   queryClient: QueryClient,
   workspaceId: string,
   updater: (current: SidebarTree) => SidebarTree,
 ) {
-  queryClient.setQueryData<SidebarTree | undefined>([...SIDEBAR_TREE_QUERY_PREFIX, workspaceId], (current) => {
+  queryClient.setQueryData<SidebarTree | undefined>(queryKeys.workspaceSidebarTree(workspaceId), (current) => {
     if (!current) {
       return current;
     }

@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 
-import type { Ticket } from '../../../context/TicketContext';
+import type { Project, Ticket } from '../../../context/TicketContext';
 
 interface UseWorkspaceShellCommandsArgs {
   activeWorkspaceId: string;
@@ -60,7 +60,7 @@ interface UseWorkspaceShellCommandsResult {
     parentId: string | null;
   }) => Promise<boolean>;
   handleDeleteTicket: (ticketId: string) => Promise<void>;
-  handleCreateProject: (projectInput: { name: string; description: string; key: string }) => Promise<void>;
+  handleCreateProject: (projectInput: { name: string; description: string; key: string }) => Promise<Project | null | undefined>;
   handleCreateLabel: (labelInput: {
     name: string;
     color: string;
@@ -147,6 +147,7 @@ export function useWorkspaceShellCommands({
         await refreshWorkspaces();
         setActiveTicket(null);
         navigate(`/workspaces/${activeWorkspaceId}`);
+        return project;
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Failed to create project in this workspace.';
         setProjectCreateError(message);

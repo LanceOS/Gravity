@@ -19,7 +19,7 @@ export const WorkspaceTeamProjectsPage = ({
   activeProjectId: string;
   loading?: boolean;
   onBackToTeams: () => void;
-  onCreateProject: (project: { name: string; description: string; key: string }) => Promise<Project | null>;
+  onCreateProject: (project: { name: string; description: string; key: string }) => Promise<Project | null | undefined>;
   onUpdateProject: (id: string, updates: Partial<Project>) => Promise<Project | null>;
   onDeleteProject?: (id: string) => Promise<void>;
 }) => {
@@ -35,7 +35,7 @@ export const WorkspaceTeamProjectsPage = ({
       activeProjectId={activeProjectId}
       onBackToTeams={onBackToTeams}
       onCreateProject={async (project) => {
-        await onCreateProject(project);
+        return onCreateProject(project);
       }}
       onUpdateProject={onUpdateProject}
       onDeleteProject={onDeleteProject}

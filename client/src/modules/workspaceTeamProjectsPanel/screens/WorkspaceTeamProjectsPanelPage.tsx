@@ -3,8 +3,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { ProjectCreateOverlay } from '../../../components/WorkspaceProjectPanel';
 import { Button, TextInput, Textarea } from '@library';
 import { FolderKanban, Save, Trash } from 'lucide-react';
-import { removeProjectFromTeam, updateProjectInTeam } from '../../../utils/sidebarTreeMutations';
+import { addProjectToTeam, removeProjectFromTeam, updateProjectInTeam } from '../../../utils/sidebarTreeMutations';
 import { sanitizeProjectKey, validateGithubRepoUrl } from '../../../utils/project';
+import { queryKeys } from '../../../utils/queryClient';
 import '../../workspacePage/styles/WorkspacePage.css';
 import '../styles/WorkspaceTeamProjectsPage.css';
 import { WorkspaceManagementLayout } from '../../../layouts/WorkspaceManagementLayout/WorkspaceManagementLayout';
@@ -79,7 +80,7 @@ export function WorkspaceTeamProjectsPanelPage({
     setProjectCreateError(null);
 
     try {
-      await onCreateProject({
+      const createdProject = await onCreateProject({
         workspaceId,
         teamId: team.id,
         name: project.name.trim(),
@@ -87,7 +88,17 @@ export function WorkspaceTeamProjectsPanelPage({
         key: sanitizeProjectKey(project.key),
         status: 'active',
       });
-      void queryClient.invalidateQueries({ queryKey: ['sidebarTree', workspaceId] });
+
+      if (createdProject?.id) {
+        addProjectToTeam(queryClient, workspaceId, team.id, {
+          ...createdProject,
+          workspaceId: workspaceId || createdProject.workspaceId,
+          teamId: team.id,
+        });
+        setSelectedProjectId(createdProject.id);
+      }
+
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceSidebarTree(workspaceId) });
 
       setIsCreateModalOpen(false);
       setFeedback(createWorkspaceTeamProjectsPanelFeedback('success', 'Project created.'));
@@ -134,10 +145,10 @@ export function WorkspaceTeamProjectsPanelPage({
           setSelectedProjectId(updatedProject.id);
         }
         setFeedback(createWorkspaceTeamProjectsPanelFeedback('success', 'Project updated.'));
-        void queryClient.invalidateQueries({ queryKey: ['sidebarTree', workspaceId] });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceSidebarTree(workspaceId) });
       })
       .catch((error) => {
-        void queryClient.invalidateQueries({ queryKey: ['sidebarTree', workspaceId] });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceSidebarTree(workspaceId) });
         setFeedback(
           createWorkspaceTeamProjectsPanelFeedback(
             'error',
@@ -193,7 +204,7 @@ export function WorkspaceTeamProjectsPanelPage({
             error instanceof Error ? error.message : 'Failed to delete project.',
           ),
         );
-        void queryClient.invalidateQueries({ queryKey: ['sidebarTree', workspaceId] });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceSidebarTree(workspaceId) });
       })
       .finally(() => {
         setDeletingProjectId('');

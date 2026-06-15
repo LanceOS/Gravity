@@ -17,7 +17,7 @@ export interface WorkspaceTeamProjectsPanelProps {
       teamId?: string;
       status?: 'planned' | 'active' | 'completed';
     }
-  ) => Promise<void | unknown>;
+  ) => Promise<Project | null | undefined>;
   onUpdateProject: (id: string, updates: Partial<Project>) => Promise<Project | null>;
   onDeleteProject?: (id: string) => Promise<unknown>;
 }

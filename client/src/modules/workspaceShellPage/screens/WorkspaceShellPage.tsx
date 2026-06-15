@@ -831,9 +831,7 @@ export function WorkspaceShellPage() {
             sidebarTree={sidebarTree}
             activeProjectId={activeProjectId}
             onBackToTeams={() => navigate(`/workspaces/${activeWorkspaceId}/teams`)}
-            onCreateProject={async (project) => {
-              await handleCreateProject(project);
-            }}
+            onCreateProject={handleCreateProject}
             onUpdateProject={updateProject}
             onDeleteProject={deleteProject}
           />

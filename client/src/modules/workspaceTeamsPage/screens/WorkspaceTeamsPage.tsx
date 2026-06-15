@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button, Textarea, TextInput } from '@library';
 import { apiClient } from '../../../utils/apiClient';
+import { queryKeys } from '../../../utils/queryClient';
 import { addSidebarTeam, removeSidebarTeam, updateSidebarTeam } from '../../../utils/sidebarTreeMutations';
 import type { SidebarTeam, Team } from '../../../types/domain';
 import '../../workspacePage/styles/WorkspacePage.css';
@@ -79,7 +80,7 @@ export function WorkspaceTeamsPage({
   }, [selectedTeam]);
 
   const refreshTeams = async () => {
-    await queryClient.invalidateQueries({ queryKey: ['sidebarTree', workspaceId] });
+    await queryClient.invalidateQueries({ queryKey: queryKeys.workspaceSidebarTree(workspaceId) });
     await onTeamsChanged?.();
   };
 
@@ -151,10 +152,10 @@ export function WorkspaceTeamsPage({
     apiClient
       .patch<Team>(`/teams/${teamId}`, { name, description, color })
       .then(() => {
-        void queryClient.invalidateQueries({ queryKey: ['sidebarTree', workspaceId] });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceSidebarTree(workspaceId) });
       })
       .catch((error) => {
-        void queryClient.invalidateQueries({ queryKey: ['sidebarTree', workspaceId] });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceSidebarTree(workspaceId) });
         setFeedback({
           type: 'error',
           message: error instanceof Error ? error.message : 'Failed to update team.',
