@@ -1,14 +1,30 @@
 import { Alert, Card, Stack } from '@library';
 
 import { SavedKeyItem } from './SavedKeyItem';
+import type { AIProvider, SavedApiCredential } from '../../../../utils/settings';
 import {
   useAccountPreferencesCloudContext,
   useAccountPreferencesSettingsContext,
 } from '../../../../context/accountPreferencesPage/accountPreferencesPageContextHooks';
 
-export function SavedKeysCard() {
-  const { savedCredentials, onRemoveCredential } = useAccountPreferencesCloudContext();
+interface SavedKeysCardProps {
+  savedCredentials?: SavedApiCredential[];
+  activeProvider?: AIProvider;
+  onRemoveCredential?: (provider: AIProvider) => void;
+}
+
+export function SavedKeysCard({
+  savedCredentials: runtimeSavedCredentials,
+  activeProvider: runtimeActiveProvider,
+  onRemoveCredential: runtimeOnRemoveCredential,
+}: SavedKeysCardProps = {}) {
+  const { savedCredentials: contextSavedCredentials, onRemoveCredential: contextOnRemoveCredential } =
+    useAccountPreferencesCloudContext();
   const { settings } = useAccountPreferencesSettingsContext();
+
+  const savedCredentials = runtimeSavedCredentials ?? contextSavedCredentials;
+  const activeProvider = runtimeActiveProvider ?? settings.aiProvider;
+  const onRemoveCredential = runtimeOnRemoveCredential ?? contextOnRemoveCredential;
 
   return (
     <Card className="account-preferences-page__section-card">
@@ -31,7 +47,7 @@ export function SavedKeysCard() {
               <SavedKeyItem
                 key={credential.provider}
                 credential={credential}
-                isActive={credential.provider === settings.aiProvider}
+                isActive={credential.provider === activeProvider}
                 onRemove={() => onRemoveCredential(credential.provider)}
               />
             ))}

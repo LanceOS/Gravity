@@ -39,6 +39,8 @@ function AccountPreferencesPageContent() {
     testing,
     testResult,
     onTestApiKey,
+    onRemoveCredential,
+    savedCredentials,
   } = useAccountPreferencesCloudContext();
   const { ollamaModels, ollamaModelsLoading, onRefreshOllamaModels } = useAccountPreferencesOllamaContext();
 
@@ -130,7 +132,11 @@ function AccountPreferencesPageContent() {
                 onTestApiKey={onTestApiKey}
                 isMobile={isMobile}
               />
-              <SavedKeysCard />
+              <SavedKeysCard
+                savedCredentials={savedCredentials}
+                activeProvider={settings.aiProvider}
+                onRemoveCredential={onRemoveCredential}
+              />
             </Stack>
           )}
 
