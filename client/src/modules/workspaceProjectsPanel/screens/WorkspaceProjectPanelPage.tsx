@@ -12,6 +12,7 @@ import { WorkspaceProjectLabelList } from '../components/WorkspaceProjectLabelLi
 import { WorkspaceProjectLabelNoSelectionMessage } from '../components/WorkspaceProjectLabelNoSelectionMessage';
 import { WorkspaceProjectLabelSectionErrors } from '../components/WorkspaceProjectLabelSectionErrors';
 import { WorkspaceProjectLabelSectionHeader } from '../components/WorkspaceProjectLabelSectionHeader';
+import { WorkspaceProjectSettingsSection } from '../components/WorkspaceProjectSettingsSection';
 
 export function WorkspaceProjectPanelPage({
   workspaceName,
