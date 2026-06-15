@@ -169,11 +169,11 @@ export async function authorizeProjectAccess(req: Request, projectId: string) {
   if (!workspaceId) {
     return { allowed: false as const, error: 'Project not found.', status: 404 };
   }
-  const isMember = await isWorkspaceMember(workspaceId, userId);
-  if (!isMember) {
+  const workspaceRole = await getWorkspaceMemberRoleCached(workspaceId, userId);
+  if (workspaceRole === null) {
     return { allowed: false as const, error: 'Access denied: not a member of the workspace.', status: 403 };
   }
-  return { allowed: true as const, userId };
+  return { allowed: true as const, userId, workspaceRole };
 }
 
 export async function authorizeProjectMemberAccess(req: Request, projectId: string) {
@@ -201,8 +201,12 @@ export async function authorizeProjectOwnerOrWorkspaceAdminAccess(req: Request, 
     return auth;
   }
 
-  const workspaceRole = await getWorkspaceMemberRole(auth.workspaceId, auth.userId);
-  if (auth.projectRole === 'owner' || workspaceRole === 'admin' || workspaceRole === 'owner') {
+  if (auth.projectRole === 'owner') {
+    return auth;
+  }
+
+  const workspaceRole = await getWorkspaceMemberRoleCached(auth.workspaceId, auth.userId);
+  if (workspaceRole === 'admin' || workspaceRole === 'owner') {
     return auth;
   }
 
@@ -217,11 +221,11 @@ export async function authorizeWorkspaceAccess(req: Request, workspaceId: string
   if (!userId) {
     return { allowed: false as const, error: 'Authentication required.', status: 401 };
   }
-  const isMember = await isWorkspaceMember(workspaceId, userId);
-  if (!isMember) {
+  const workspaceRole = await getWorkspaceMemberRoleCached(workspaceId, userId);
+  if (workspaceRole === null) {
     return { allowed: false as const, error: 'Access denied: not a member of the workspace.', status: 403 };
   }
-  return { allowed: true as const, userId };
+  return { allowed: true as const, userId, workspaceRole };
 }
 
 export async function authorizeWorkspaceOwnerAccess(req: Request, workspaceId: string) {
@@ -230,8 +234,7 @@ export async function authorizeWorkspaceOwnerAccess(req: Request, workspaceId: s
     return auth;
   }
 
-  const role = await getWorkspaceMemberRole(workspaceId, auth.userId);
-  if (role !== 'owner') {
+  if (auth.workspaceRole !== 'owner') {
     return { allowed: false as const, error: 'Only workspace owners can manage teams.', status: 403 };
   }
 
@@ -244,8 +247,7 @@ export async function authorizeWorkspaceOwnerOrAdminAccess(req: Request, workspa
     return auth;
   }
 
-  const role = await getWorkspaceMemberRole(workspaceId, auth.userId);
-  if (role !== 'owner' && role !== 'admin') {
+  if (auth.workspaceRole !== 'owner' && auth.workspaceRole !== 'admin') {
     return { allowed: false as const, error: 'Only workspace owners or admins can perform this action.', status: 403 };
   }
 
@@ -264,29 +266,22 @@ export async function authorizeTeamAccess(req: Request, teamId: string) {
   if (!workspaceId) {
     return { allowed: false as const, error: 'Team not found.', status: 404 };
   }
-  const isMember = await isWorkspaceMember(workspaceId, userId);
-  if (!isMember) {
+  const workspaceRole = await getWorkspaceMemberRoleCached(workspaceId, userId);
+  if (workspaceRole === null) {
     return { allowed: false as const, error: 'Access denied: not a member of the workspace.', status: 403 };
   }
-  return { allowed: true as const, userId };
+  return { allowed: true as const, userId, workspaceId, workspaceRole };
 }
 
 export async function authorizeTeamOwnerAccess(req: Request, teamId: string) {
-  const userId = await resolveRequestActorUserId(req);
-  if (!userId) {
-    return { allowed: false as const, error: 'Authentication required.', status: 401 };
+  const auth = await authorizeTeamAccess(req, teamId);
+  if (!auth.allowed) {
+    return auth;
   }
-
-  const workspaceId = await getTeamWorkspaceIdCached(teamId);
-  if (!workspaceId) {
-    return { allowed: false as const, error: 'Team not found.', status: 404 };
-  }
-
-  const role = await getWorkspaceMemberRole(workspaceId, userId);
-  if (role !== 'owner') {
+  if (auth.workspaceRole !== 'owner') {
     return { allowed: false as const, error: 'Only workspace owners can manage teams.', status: 403 };
   }
 
   // Return workspaceId so callers can avoid a redundant round-trip to look it up again.
-  return { allowed: true as const, userId, workspaceId };
+  return auth;
 }
