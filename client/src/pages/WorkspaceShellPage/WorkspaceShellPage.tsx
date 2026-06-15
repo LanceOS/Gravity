@@ -4,7 +4,7 @@ import type { SidebarNavigationState, SidebarProps } from '../../components/Side
 import { WorkspaceLayout } from '../../layouts/WorkspaceLayout/WorkspaceLayout';
 import { LocalAIChat } from '../../modules/ai';
 import { AuthScreen } from '../../modules/auth';
-import type { TicketFilters, TicketListSort } from '../../modules/tickets';
+import type { TicketListSort } from '../../modules/tickets';
 import { TicketDetailRoute, type WorkspaceIssueView } from '../../modules/tickets';
 import { OnboardingModal } from '../../modules/onboarding';
 import { useTheme } from '../../modules/settings';
@@ -24,7 +24,6 @@ import { useAppShellRoute } from '../AppShellPage/hooks/useAppShellRoute';
 import { useAppShellRouteSync } from '../AppShellPage/hooks/useAppShellRouteSync';
 import { useWebMcpRegistration } from '../AppShellPage/hooks/useWebMcpRegistration';
 import {
-  getActiveWorkspaceStorageKey,
   usePendingWorkspaceInvite,
   useWorkspaceMemberActivity,
   useWorkspaceProjectSelection,
@@ -34,7 +33,21 @@ import { useWorkspaceViewMode } from '../AppShellPage/hooks/useWorkspaceViewMode
 import type { AppSection } from '../AppShellPage/AppShellPage.types';
 import { LoadingPage } from '../LoadingPage/LoadingPage';
 import { queryClient, queryKeys } from '../../utils/queryClient';
-import type { WorkspaceMember } from '../../hooks/useWorkspaceSettings';
+import { useActiveWorkspaceStorage } from './hooks/useActiveWorkspaceStorage';
+import { useWorkspaceShellCommands } from './hooks/useWorkspaceShellCommands';
+import { useWorkspaceShellFilters } from './hooks/useWorkspaceShellFilters';
+import { useWorkspaceShellNavigation } from './hooks/useWorkspaceShellNavigation';
+import { useWorkspaceSidebarCounts } from './hooks/useWorkspaceSidebarCounts';
+
+interface WorkspaceMember {
+  id: string;
+  name: string;
+  email: string;
+  avatar: string;
+  role: string;
+  createdAt: string;
+  lastActiveAt?: string | null;
+}
 
 export function WorkspaceShellPage() {
   const {
@@ -207,6 +220,7 @@ export function WorkspaceShellPage() {
 
   const {
     setDensity,
+    theme,
     setTheme: setDsTheme,
   } = useTheme();
   useEffect(() => {
@@ -257,19 +271,83 @@ export function WorkspaceShellPage() {
     removeTicketBlocker,
   });
 
-  useEffect(() => {
-    if (!currentUser || typeof window === 'undefined') {
-      return;
-    }
+  useActiveWorkspaceStorage({
+    currentUser,
+    activeWorkspaceId,
+  });
 
-    const storageKey = getActiveWorkspaceStorageKey(currentUser.id);
-    if (!activeWorkspaceId) {
-      window.localStorage.removeItem(storageKey);
-      return;
-    }
+  const {
+    buildProjectScopedPath,
+    handleOpenWorkspaceDirectory,
+    handleSelectProject,
+    handleSelectProjectForManagement,
+    handleShowProjectIssues,
+    handleShowMyIssues,
+    handleSelectCycleLegacy,
+    handleSelectLabel,
+    handleShowNotes,
+    handleSelectNote,
+    handleSelectTicket,
+    handleOpenSettings,
+    handleOpenAccountPreferences,
+    handleOpenProjectManager,
+    handleOpenTeamManager,
+    handleOpenTeamProjectsManager,
+    handleShowWorkspaceProjectList,
+  } = useWorkspaceShellNavigation({
+    route: { teamIdParam, projectIdParam },
+    activeWorkspaceId,
+    activeProjectId,
+    projects: activeWorkspaceProjects,
+    sidebarTree,
+    activeWorkspaceAvailable: !!activeWorkspace,
+    currentUser,
+    navigate,
+    setSidebarActiveScope,
+    setActiveProjectId,
+  });
 
-    window.localStorage.setItem(storageKey, activeWorkspaceId);
-  }, [activeWorkspaceId, currentUser]);
+  const {
+    handleCreateTicketSubmit,
+    handleDeleteTicket,
+    handleCreateProject,
+    handleCreateLabel,
+    handleUpdateLabel,
+    handleDeleteLabel,
+  } = useWorkspaceShellCommands({
+    activeWorkspaceId,
+    currentUser,
+    tickets,
+    activeTicket,
+    activeProjectId,
+    createTicket,
+    deleteTicket,
+    createProject,
+    refreshWorkspaces,
+    createLabel,
+    updateLabel,
+    deleteLabel,
+    setActiveTicket,
+    setProjectCreateLoading,
+    setProjectCreateError,
+    setLabelCreateLoading,
+    setLabelCreateError,
+    navigate,
+    buildProjectScopedPath,
+  });
+
+  const { handleSetFilters } = useWorkspaceShellFilters({
+    filters,
+    searchParams,
+    setSearchParams,
+  });
+
+  const { openTickets, myIssuesCount, labelCounts, cycleCounts } = useWorkspaceSidebarCounts({
+    tickets,
+    labels,
+    cycles,
+    currentUserId: currentUser?.id,
+  });
 
   const handleOpenCreateTicket = useCallback((initialStatus?: Ticket['status']) => {
     if (activeWorkspaceProjects.length === 0) {
@@ -293,251 +371,6 @@ export function WorkspaceShellPage() {
     setCreateParentId(parentId);
     setCreateInitialStatus(undefined);
     setIsCreateModalOpen(true);
-  };
-
-  const buildProjectScopedPath = useCallback(
-    (projectId: string, scope: 'tickets' | 'notes' = 'tickets', itemId?: string) => {
-      const project = projects.find((item) => item.id === projectId);
-      const projectWorkspaceId = project?.workspaceId || activeWorkspaceId;
-      const projectTeamId = project?.teamId || route.teamIdParam;
-      const basePath =
-        (sidebarTree?.hierarchyMode === 'teams' || !!route.teamIdParam) && projectTeamId
-          ? `/workspaces/${projectWorkspaceId}/teams/${projectTeamId}/projects/${projectId}/${scope}`
-          : `/workspaces/${projectWorkspaceId}/projects/${projectId}/${scope}`;
-
-      return itemId ? `${basePath}/${itemId}` : basePath;
-    },
-    [activeWorkspaceId, projects, route.teamIdParam, sidebarTree?.hierarchyMode]
-  );
-
-  const handleCreateTicketSubmit = async (ticket: {
-    title: string;
-    description: string;
-    status: Ticket['status'];
-    priority: Ticket['priority'];
-    projectId: string;
-    labelIds?: string[];
-    cycleId: string | null;
-    assigneeId: string | null;
-    parentId: string | null;
-  }) => {
-    const created = await createTicket(ticket);
-    return Boolean(created);
-  };
-
-  const handleDeleteTicket = async (ticketId: string) => {
-    const deletedTicket =
-      tickets.find((ticket) => ticket.id === ticketId) || (activeTicket?.id === ticketId ? activeTicket : null);
-    await deleteTicket(ticketId);
-
-    if (deletedTicket && activeTicket?.id === ticketId) {
-      navigate(buildProjectScopedPath(deletedTicket.projectId), { replace: true });
-      return;
-    }
-
-    setActiveTicket(null);
-  };
-
-  const handleSelectProject = (projectId: string) => {
-    navigate(buildProjectScopedPath(projectId));
-  };
-
-  const handleSelectProjectForManagement = (projectId: string) => {
-    const project = projects.find((p) => p.id === projectId);
-    const wid = project?.workspaceId || activeWorkspaceId;
-    setActiveProjectId(projectId);
-    setSidebarActiveScope('projects');
-    navigate(`/workspaces/${wid}/projects`);
-  };
-
-  const handleCreateProject = async (projectInput: { name: string; description: string; key: string }) => {
-    if (!activeWorkspaceId || !currentUser) {
-      return;
-    }
-
-    setProjectCreateLoading(true);
-    setProjectCreateError(null);
-
-    try {
-      const project = await createProject({
-        ...projectInput,
-        status: 'active',
-        workspaceId: activeWorkspaceId,
-      });
-
-      if (!project) {
-        throw new Error('Failed to create project in this workspace.');
-      }
-
-      await refreshWorkspaces();
-      setActiveTicket(null);
-      navigate(`/workspaces/${activeWorkspaceId}`);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to create project in this workspace.';
-      setProjectCreateError(message);
-      throw error;
-    } finally {
-      setProjectCreateLoading(false);
-    }
-  };
-
-  const handleCreateLabel = async (labelInput: { name: string; color: string; description?: string; sortOrder?: number }) => {
-    if (!activeProjectId) {
-      return;
-    }
-
-    setLabelCreateLoading(true);
-    setLabelCreateError(null);
-
-    try {
-      const label = await createLabel({
-        ...labelInput,
-        projectId: activeProjectId,
-      });
-
-      if (!label) {
-        throw new Error('Failed to create label for this project.');
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to create label for this project.';
-      setLabelCreateError(message);
-      throw error;
-    } finally {
-      setLabelCreateLoading(false);
-    }
-  };
-
-  const handleUpdateLabel = async (
-    labelId: string,
-    updates: { name?: string; color?: string; description?: string; sortOrder?: number }
-  ) => {
-    setLabelCreateError(null);
-    await updateLabel(labelId, updates);
-  };
-
-  const handleDeleteLabel = async (labelId: string) => {
-    setLabelCreateError(null);
-    const deleted = await deleteLabel(labelId);
-    if (!deleted) {
-      throw new Error('Failed to delete label.');
-    }
-  };
-
-  const handleShowProjectIssues = () => {
-    const pid = activeProjectId;
-    if (!pid) return;
-    navigate(buildProjectScopedPath(pid));
-  };
-
-  const handleShowMyIssues = () => {
-    const pid = activeProjectId;
-    if (!pid || !currentUser) return;
-    navigate(`${buildProjectScopedPath(pid)}?assigneeId=${currentUser.id}`);
-  };
-
-  const handleSelectCycleLegacy = (cycleId: string) => {
-    const pid = activeProjectId;
-    if (!pid) return;
-    navigate(`${buildProjectScopedPath(pid)}?cycleId=${cycleId}`);
-  };
-
-  const handleSelectLabel = (labelId: string) => {
-    const pid = activeProjectId;
-    if (!pid) return;
-    navigate(`${buildProjectScopedPath(pid)}?labels=${labelId}`);
-  };
-
-  const handleShowNotes = () => {
-    const pid = activeProjectId || projectIdParam;
-    if (!pid) return;
-    navigate(buildProjectScopedPath(pid, 'notes'));
-  };
-
-  const handleSelectNote = (nextNoteId: string) => {
-    const pid = activeProjectId || projectIdParam;
-    if (!pid) return;
-
-    if (!nextNoteId) {
-      navigate(buildProjectScopedPath(pid, 'notes'));
-      return;
-    }
-
-    navigate(buildProjectScopedPath(pid, 'notes', nextNoteId));
-  };
-
-  const handleSelectTicket = (ticket: Ticket | null) => {
-    if (ticket) {
-      navigate(buildProjectScopedPath(ticket.projectId, 'tickets', ticket.key));
-      return;
-    }
-
-    if (activeProjectId) {
-      navigate(buildProjectScopedPath(activeProjectId));
-      return;
-    }
-
-    navigate(`/workspaces/${activeWorkspaceId}`);
-  };
-
-  const handleOpenSettings = () => {
-    if (!activeWorkspace) {
-      navigate('/workspaces');
-      return;
-    }
-    navigate(`/workspaces/${activeWorkspaceId}/settings`);
-  };
-
-  const handleOpenAccountPreferences = () => {
-    navigate('/account');
-  };
-
-  const handleOpenProjectManager = () => {
-    if (!activeWorkspace) {
-      navigate('/workspaces');
-      return;
-    }
-    navigate(`/workspaces/${activeWorkspaceId}/projects`);
-  };
-
-  const handleOpenTeamManager = () => {
-    if (!activeWorkspace) {
-      navigate('/workspaces');
-      return;
-    }
-    navigate(`/workspaces/${activeWorkspaceId}/teams`);
-  };
-
-  const handleOpenTeamProjectsManager = (teamId: string) => {
-    if (!activeWorkspace) {
-      navigate('/workspaces');
-      return;
-    }
-    navigate(`/workspaces/${activeWorkspaceId}/teams/${teamId}/projects`);
-  };
-
-  const handleSetFilters = useCallback(
-    (updates: Partial<TicketFilters>) => {
-      const nextParams = new URLSearchParams(searchParams);
-      const merged = { ...filters, ...updates };
-
-      if (merged.labels && merged.labels.length > 0) nextParams.set('labels', merged.labels.join(',')); else nextParams.delete('labels');
-      if (merged.labelMode && merged.labelMode !== 'any') nextParams.set('labelMode', merged.labelMode); else nextParams.delete('labelMode');
-      if (merged.cycleId) nextParams.set('cycleId', merged.cycleId); else nextParams.delete('cycleId');
-      if (merged.labelId) nextParams.set('labelId', merged.labelId); else nextParams.delete('labelId');
-      nextParams.delete('domainId');
-      if (merged.assigneeId) nextParams.set('assigneeId', merged.assigneeId); else nextParams.delete('assigneeId');
-      if (merged.status) nextParams.set('status', merged.status); else nextParams.delete('status');
-      if (merged.priority) nextParams.set('priority', merged.priority); else nextParams.delete('priority');
-      if (merged.search) nextParams.set('q', merged.search); else nextParams.delete('q');
-
-      const isOnlySearchUpdate = Object.keys(updates).length === 1 && 'search' in updates;
-      setSearchParams(nextParams, { replace: isOnlySearchUpdate });
-    },
-    [filters, searchParams, setSearchParams]
-  );
-
-  const handleOpenWorkspaceDirectory = () => {
-    navigate('/workspaces');
   };
 
   useEffect(() => {
@@ -590,28 +423,6 @@ export function WorkspaceShellPage() {
   const scopedLabels = isTeamAggregatePath ? teamLabels : labels;
   const scopedFilters = shouldUseAggregateTicketScope ? { ...filters, projectId: '' } : filters;
 
-  const openTickets = useMemo(
-    () => tickets.filter((ticket) => ticket.status !== 'done' && ticket.status !== 'canceled'),
-    [tickets]
-  );
-  const myIssuesCount = useMemo(
-    () => openTickets.filter((ticket) => ticket.assigneeId === currentUser?.id).length,
-    [currentUser?.id, openTickets]
-  );
-  const labelCounts = useMemo(
-    () =>
-      Object.fromEntries(
-        labels.map((label) => [label.id, openTickets.filter((ticket) => ticket.labelIds?.includes(label.id)).length])
-      ),
-    [labels, openTickets]
-  );
-  const cycleCounts = useMemo(
-    () =>
-      Object.fromEntries(
-        cycles.map((cycle) => [cycle.id, openTickets.filter((ticket) => ticket.cycleId === cycle.id).length])
-      ),
-    [cycles, openTickets]
-  );
   const activeProject = useMemo(
     () => projects.find((project) => project.id === (projectIdParam || activeProjectId)),
     [activeProjectId, projectIdParam, projects]
@@ -686,7 +497,7 @@ export function WorkspaceShellPage() {
       activeCycleId: route.cycleIdParam,
       activeLabelId: route.activeLabelIdParam,
       onSelectWorkspaceAllTasks: () => navigate(`/workspaces/${activeWorkspaceId}/all`),
-      onSelectWorkspaceProjects: () => navigate(`/workspaces/${activeWorkspaceId}/projects/list`),
+      onSelectWorkspaceProjects: handleShowWorkspaceProjectList,
       onSelectTeam: (teamId) => navigate(`/workspaces/${activeWorkspaceId}/teams/${teamId}/tasks`),
       onSelectView: (teamId, viewId) => {
         if (viewId === 'all') {
@@ -872,15 +683,7 @@ export function WorkspaceShellPage() {
             onOpenCreateTicket={handleOpenCreateTicket}
             onOpenProjectManager={handleOpenProjectManager}
             onOpenTeamManager={handleOpenTeamManager}
-            onSelectTicket={(ticket) => {
-              if (ticket) {
-                navigate(buildProjectScopedPath(ticket.projectId, 'tickets', ticket.key));
-              } else if (activeProjectId) {
-                navigate(buildProjectScopedPath(activeProjectId));
-              } else {
-                navigate(`/workspaces/${activeWorkspaceId}`);
-              }
-            }}
+            onSelectTicket={handleSelectTicket}
             onSelectNote={handleSelectNote}
             activeNoteId={activeNoteId}
             onSetFilters={handleSetFilters}
@@ -912,26 +715,26 @@ export function WorkspaceShellPage() {
           workspaceId: activeWorkspaceId,
           onClose: () => setIsMcpOpen(false),
         }}
-        createProject={{
-          isOpen: isCreateProjectModalOpen,
-          loading: projectCreateLoading,
-          errorMessage: projectCreateError,
-          onClose: () => setIsCreateProjectModalOpen(false),
-          onSubmitProject: async (project) => {
-            await createProject(project);
-            setIsCreateProjectModalOpen(false);
-          },
-        }}
-        createLabel={{
-          isOpen: isCreateLabelModalOpen,
-          loading: labelCreateLoading,
-          errorMessage: labelCreateError,
-          onClose: () => setIsCreateLabelModalOpen(false),
-          onSubmitLabel: async (label) => {
-            await createLabel({ ...label, projectId: activeProjectId });
-            setIsCreateLabelModalOpen(false);
-          },
-        }}
+          createProject={{
+            isOpen: isCreateProjectModalOpen,
+            loading: projectCreateLoading,
+            errorMessage: projectCreateError,
+            onClose: () => setIsCreateProjectModalOpen(false),
+            onSubmitProject: async (project) => {
+              await handleCreateProject(project);
+              setIsCreateProjectModalOpen(false);
+            },
+          }}
+          createLabel={{
+            isOpen: isCreateLabelModalOpen,
+            loading: labelCreateLoading,
+            errorMessage: labelCreateError,
+            onClose: () => setIsCreateLabelModalOpen(false),
+            onSubmitLabel: async (label) => {
+              await handleCreateLabel(label);
+              setIsCreateLabelModalOpen(false);
+            },
+          }}
       />
     </>
   );
