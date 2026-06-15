@@ -39,8 +39,7 @@ import {
   useWorkspaceShellFilters,
   useWorkspaceShellNavigation,
   useWorkspaceSidebarCounts,
-} from '../../modules/workspaces/shell';
-
+} from '../../modules/workspaces';
 interface WorkspaceMember {
   id: string;
   name: string;

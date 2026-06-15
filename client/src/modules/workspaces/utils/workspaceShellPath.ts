@@ -1,4 +1,4 @@
-import type { Project, SidebarTree } from '../../../../types/domain';
+import type { Project, SidebarTree } from '../../../types/domain';
 
 interface BuildProjectScopedPathArgs {
   projectId: string;

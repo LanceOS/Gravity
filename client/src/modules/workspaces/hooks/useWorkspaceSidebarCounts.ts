@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { Cycle, Label, Ticket } from '../../../../types/domain';
+import type { Cycle, Label, Ticket } from '../../../types/domain';
 
 interface UseWorkspaceSidebarCountsArgs {
   tickets: Ticket[];

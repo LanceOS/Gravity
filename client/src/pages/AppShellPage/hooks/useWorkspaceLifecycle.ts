@@ -2,7 +2,7 @@ import { useEffect, type Dispatch, type SetStateAction } from 'react';
 import type { User, Project } from '../../../types/domain';
 import type { WorkspaceSummary } from '../../../hooks/useWorkspaceDirectory';
 import type { AppSection } from '../AppShellPage.types';
-import { getActiveWorkspaceStorageKey } from '../../../modules/workspaces/shell';
+import { getActiveWorkspaceStorageKey } from '../../../modules/workspaces';
 
 interface UseActiveWorkspaceSelectionArgs {
   currentUser: User | null;

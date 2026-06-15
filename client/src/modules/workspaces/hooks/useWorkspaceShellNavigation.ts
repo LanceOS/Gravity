@@ -3,10 +3,10 @@ import type { Dispatch, SetStateAction } from 'react';
 import type { NavigateFunction } from 'react-router-dom';
 
 import { buildProjectScopedPath } from '../utils/workspaceShellPath';
-import type { AppShellRouteState } from '../../../../pages/AppShellPage/hooks/useAppShellRoute';
-import type { Ticket } from '../../../../context/TicketContext';
-import { type SidebarNavigationState } from '../../../../components/Sidebar';
-import type { Project } from '../../../../types/domain';
+import type { AppShellRouteState } from '../../../pages/AppShellPage/hooks/useAppShellRoute';
+import type { Ticket } from '../../../context/TicketContext';
+import { type SidebarNavigationState } from '../../../components/Sidebar';
+import type { Project } from '../../../types/domain';
 
 interface UseWorkspaceShellNavigationArgs {
   route: Pick<AppShellRouteState, 'teamIdParam' | 'projectIdParam'>;

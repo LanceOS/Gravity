@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 
 import { getActiveWorkspaceStorageKey } from '../utils/workspaceStorage';
-import type { User } from '../../../../types/domain';
+import type { User } from '../../../types/domain';
 
 interface UseActiveWorkspaceStorageArgs {
   currentUser: User | null;

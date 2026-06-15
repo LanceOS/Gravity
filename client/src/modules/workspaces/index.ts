@@ -9,8 +9,8 @@ export {
   useWorkspaceShellFilters,
   useWorkspaceShellNavigation,
   useWorkspaceSidebarCounts,
-} from './shell';
-export { getActiveWorkspaceStorageKey } from './shell';
+} from './hooks';
+export { getActiveWorkspaceStorageKey } from './utils';
 export {
   PROJECT_LIFECYCLE_OPTIONS,
   PROJECT_STATUS_LABELS,

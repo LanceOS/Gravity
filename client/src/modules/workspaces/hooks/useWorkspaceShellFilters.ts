@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import type { SetURLSearchParams } from 'react-router-dom';
 
-import type { TicketFilters } from '../../../../modules/tickets';
+import type { TicketFilters } from '../../../tickets';
 
 interface UseWorkspaceShellFiltersArgs {
   filters: TicketFilters;
