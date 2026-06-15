@@ -1,6 +1,6 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
-import { PlaceholderLayout } from './PlaceholderLayout';
+import { PlaceholderLayout } from '../../../layouts/PlaceholderLayout/PlaceholderLayout';
 
 export default function TeamDomainViewView() {
   const params = useParams();
@@ -41,6 +41,6 @@ export default function TeamDomainViewView() {
           <div style={{ color: '#10b981' }}>Done</div>
         </div>
       </div>
-    </PlaceholderLayout>
+    ../../../layouts/PlaceholderLayout/PlaceholderLayout>
   );
 }

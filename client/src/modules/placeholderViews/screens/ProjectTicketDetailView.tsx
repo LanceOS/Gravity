@@ -1,6 +1,6 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
-import { PlaceholderLayout } from './PlaceholderLayout';
+import { PlaceholderLayout } from '../../../layouts/PlaceholderLayout/PlaceholderLayout';
 
 export default function ProjectTicketDetailView() {
   const params = useParams();
@@ -52,6 +52,6 @@ export default function ProjectTicketDetailView() {
           <div style={{ color: '#64748b', fontSize: '12px' }}>1h ago</div>
         </div>
       </div>
-    </PlaceholderLayout>
+    ../../../layouts/PlaceholderLayout/PlaceholderLayout>
   );
 }

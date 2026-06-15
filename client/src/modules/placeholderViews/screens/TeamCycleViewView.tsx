@@ -1,6 +1,6 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
-import { PlaceholderLayout } from './PlaceholderLayout';
+import { PlaceholderLayout } from '../../../layouts/PlaceholderLayout/PlaceholderLayout';
 
 export default function TeamCycleViewView() {
   const params = useParams();
@@ -79,6 +79,6 @@ export default function TeamCycleViewView() {
           </ul>
         </div>
       </div>
-    </PlaceholderLayout>
+    ../../../layouts/PlaceholderLayout/PlaceholderLayout>
   );
 }

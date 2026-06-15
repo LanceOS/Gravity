@@ -1,6 +1,6 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
-import { PlaceholderLayout } from './PlaceholderLayout';
+import { PlaceholderLayout } from '../../../layouts/PlaceholderLayout/PlaceholderLayout';
 
 export default function WorkspaceSettingsView() {
   const params = useParams();
@@ -33,6 +33,6 @@ export default function WorkspaceSettingsView() {
           </div>
         </div>
       </div>
-    </PlaceholderLayout>
+    ../../../layouts/PlaceholderLayout/PlaceholderLayout>
   );
 }

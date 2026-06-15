@@ -1,6 +1,6 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
-import { PlaceholderLayout } from './PlaceholderLayout';
+import { PlaceholderLayout } from '../../../layouts/PlaceholderLayout/PlaceholderLayout';
 
 export default function ProjectTicketListView() {
   const params = useParams();
@@ -42,6 +42,6 @@ export default function ProjectTicketListView() {
           <div style={{ color: '#ef4444' }}>Todo</div>
         </div>
       </div>
-    </PlaceholderLayout>
+    ../../../layouts/PlaceholderLayout/PlaceholderLayout>
   );
 }

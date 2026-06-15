@@ -1,5 +1,5 @@
 export { default as NotFoundView } from './screens/NotFoundView';
-export { default as PlaceholderLayout } from './screens/PlaceholderLayout';
+export { default as PlaceholderLayout } from '../../layouts/PlaceholderLayout/PlaceholderLayout';
 export { default as ProjectNoteDetailView } from './screens/ProjectNoteDetailView';
 export { default as ProjectNotesListView } from './screens/ProjectNotesListView';
 export { default as ProjectOverviewView } from './screens/ProjectOverviewView';

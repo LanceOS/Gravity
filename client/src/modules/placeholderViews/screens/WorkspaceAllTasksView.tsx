@@ -1,6 +1,6 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
-import { PlaceholderLayout } from './PlaceholderLayout';
+import { PlaceholderLayout } from '../../../layouts/PlaceholderLayout/PlaceholderLayout';
 
 export default function WorkspaceAllTasksView() {
   const params = useParams();
@@ -47,6 +47,6 @@ export default function WorkspaceAllTasksView() {
           <div style={{ color: '#3b82f6' }}>In Review</div>
         </div>
       </div>
-    </PlaceholderLayout>
+    ../../../layouts/PlaceholderLayout/PlaceholderLayout>
   );
 }

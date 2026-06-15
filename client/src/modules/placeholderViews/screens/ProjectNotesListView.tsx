@@ -1,6 +1,6 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
-import { PlaceholderLayout } from './PlaceholderLayout';
+import { PlaceholderLayout } from '../../../layouts/PlaceholderLayout/PlaceholderLayout';
 
 export default function ProjectNotesListView() {
   const params = useParams();
@@ -29,6 +29,6 @@ export default function ProjectNotesListView() {
           <span style={{ fontSize: '11px', color: '#64748b' }}>Last updated: 1d ago</span>
         </div>
       </div>
-    </PlaceholderLayout>
+    ../../../layouts/PlaceholderLayout/PlaceholderLayout>
   );
 }

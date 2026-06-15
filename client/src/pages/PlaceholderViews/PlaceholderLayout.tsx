@@ -1,1 +1,1 @@
-export { default } from '../../modules/placeholderViews/screens/PlaceholderLayout';
+export { default } from '../../layouts/PlaceholderLayout/PlaceholderLayout';

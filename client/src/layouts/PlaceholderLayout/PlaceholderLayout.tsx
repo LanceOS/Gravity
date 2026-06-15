@@ -14,7 +14,7 @@ import {
   Layers, 
   Tag
 } from 'lucide-react';
-import './PlaceholderViews.css';
+import './PlaceholderLayout.css';
 
 interface Breadcrumb {
   label: string;

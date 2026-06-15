@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { ArrowLeft, Globe, Link2, Settings2, ShieldCheck, UserPlus, Users } from 'lucide-react';
 import { Button, Divider, Flex, Avatar, Stack, Alert } from '@library';
-import { DashboardLayout } from '../../../components/DashboardLayout/DashboardLayout';
 import type { SettingsScreenProps, SettingsCategoryId } from '../types';
+import { SettingsPageLayout } from '../../../layouts/SettingsPageLayout/SettingsPageLayout';
 import { OverviewSection } from '../components/OverviewSection';
 import { DangerZoneSection } from '../components/DangerZoneSection';
 import { AccessSection } from '../components/AccessSection';
@@ -89,46 +89,47 @@ export function SettingsScreen({
   }, []);
 
   return (
-    <DashboardLayout>
-      <DashboardLayout.Header
-        leftContent={
-          isMobile ? (
+    <SettingsPageLayout
+      headerLeftContent={
+        isMobile ? (
+          <Button variant="ghost" size="sm" onClick={onBackToWorkspace} leftIcon={<ArrowLeft size={14} />}>
+            Workspace
+          </Button>
+        ) : (
+          <Flex align="center" gap="var(--space-md)">
             <Button variant="ghost" size="sm" onClick={onBackToWorkspace} leftIcon={<ArrowLeft size={14} />}>
               Workspace
             </Button>
-          ) : (
-            <Flex align="center" gap="var(--space-md)">
-              <Button variant="ghost" size="sm" onClick={onBackToWorkspace} leftIcon={<ArrowLeft size={14} />}>
-                Workspace
-              </Button>
 
-              <Button variant="ghost" size="sm" onClick={onOpenDirectory} leftIcon={<Globe size={14} />}>
-                Workspaces
-              </Button>
-
-              <Divider vertical style={{ height: '20px' }} />
-
-              <div>
-                <h1 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: 'var(--color-text-primary)' }}>Workspace Settings</h1>
-                <p style={{ margin: 0, fontSize: '11px', color: 'var(--color-text-disabled)' }}>Managing {workspace.name}</p>
-              </div>
-            </Flex>
-          )
-        }
-        rightContent={
-          isMobile ? (
             <Button variant="ghost" size="sm" onClick={onOpenDirectory} leftIcon={<Globe size={14} />}>
               Workspaces
             </Button>
-          ) : (
-            <Button variant="accent" size="sm" onClick={onSaveSettings} loading={saveLoading}>
-              {saveSuccess ? 'Changes Saved' : 'Save Changes'}
-            </Button>
-          )
-        }
-      />
 
-      <DashboardLayout.Sidebar>
+            <Divider vertical style={{ height: '20px' }} />
+
+            <div>
+              <h1 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                Workspace Settings
+              </h1>
+              <p style={{ margin: 0, fontSize: '11px', color: 'var(--color-text-disabled)' }}>
+                Managing {workspace.name}
+              </p>
+            </div>
+          </Flex>
+        )
+      }
+      headerRightContent={
+        isMobile ? (
+          <Button variant="ghost" size="sm" onClick={onOpenDirectory} leftIcon={<Globe size={14} />}>
+            Workspaces
+          </Button>
+        ) : (
+          <Button variant="accent" size="sm" onClick={onSaveSettings} loading={saveLoading}>
+            {saveSuccess ? 'Changes Saved' : 'Save Changes'}
+          </Button>
+        )
+      }
+      sidebar={
         <div style={{ padding: 'var(--space-lg)', display: 'flex', flexDirection: 'column', gap: 'var(--space-lg)', height: '100%', overflowY: 'auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)', padding: 'var(--space-md)', borderRadius: 'var(--radius-md)', background: 'var(--color-surface-card)', border: '1px solid var(--color-border-default)' }}>
             <Avatar src={currentUser.avatar} name={currentUser.name} size="md" />
@@ -174,110 +175,106 @@ export function SettingsScreen({
             })}
           </nav>
         </div>
-      </DashboardLayout.Sidebar>
+      }
+    >
+      <div style={{ padding: 'var(--space-lg) var(--space-lg) var(--space-xl) var(--space-lg)', maxWidth: '800px', margin: '0 auto' }}>
+        <Stack gap="var(--space-lg)">
+          {!isMobile && (
+            <div>
+              <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-text-disabled)' }}>
+                Settings Section
+              </span>
+              <h2 style={{ margin: '4px 0 0', fontSize: '24px', fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '-0.02em' }}>
+                {activeCategoryMeta.label}
+              </h2>
+              <p style={{ margin: '6px 0 0', fontSize: '13.5px', color: 'var(--color-text-disabled)', lineHeight: 1.5 }}>
+                {activeCategoryMeta.description}
+              </p>
+            </div>
+          )}
 
-      <DashboardLayout.Main>
-        <DashboardLayout.Content>
-          <div style={{ padding: 'var(--space-lg) var(--space-lg) var(--space-xl) var(--space-lg)', maxWidth: '800px', margin: '0 auto' }}>
-            <Stack gap="var(--space-lg)">
-              {!isMobile && (
-                <div>
-                  <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-text-disabled)' }}>
-                    Settings Section
-                  </span>
-                  <h2 style={{ margin: '4px 0 0', fontSize: '24px', fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '-0.02em' }}>
-                    {activeCategoryMeta.label}
-                  </h2>
-                  <p style={{ margin: '6px 0 0', fontSize: '13.5px', color: 'var(--color-text-disabled)', lineHeight: 1.5 }}>
-                    {activeCategoryMeta.description}
-                  </p>
-                </div>
-              )}
+          {settingsLoading && (
+            <Alert type="info">
+              Loading workspace administration data...
+            </Alert>
+          )}
 
-              {settingsLoading && (
-                <Alert type="info">
-                  Loading workspace administration data...
-                </Alert>
-              )}
+          {saveError && (
+            <Alert type="error">
+              {saveError}
+            </Alert>
+          )}
 
-              {saveError && (
-                <Alert type="error">
-                  {saveError}
-                </Alert>
-              )}
+          {inviteError && (
+            <Alert type="error">
+              {inviteError}
+            </Alert>
+          )}
 
-              {inviteError && (
-                <Alert type="error">
-                  {inviteError}
-                </Alert>
-              )}
+          {(isMobile || activeCategory === 'overview') && (
+            <>
+              <OverviewSection
+                workspace={workspace}
+                settings={settings}
+                onChangeSettings={onChangeSettings}
+                isMobile={isMobile}
+              />
+              <DangerZoneSection
+                workspace={workspace}
+                deleteLoading={deleteLoading}
+                deleteError={deleteError}
+                onDeleteWorkspace={onDeleteWorkspace}
+                onClearDeleteError={onClearDeleteError}
+                isMobile={isMobile}
+              />
+            </>
+          )}
 
-              {(isMobile || activeCategory === 'overview') && (
-                <>
-                  <OverviewSection
-                    workspace={workspace}
-                    settings={settings}
-                    onChangeSettings={onChangeSettings}
-                    isMobile={isMobile}
-                  />
-                  <DangerZoneSection
-                    workspace={workspace}
-                    deleteLoading={deleteLoading}
-                    deleteError={deleteError}
-                    onDeleteWorkspace={onDeleteWorkspace}
-                    onClearDeleteError={onClearDeleteError}
-                    isMobile={isMobile}
-                  />
-                </>
-              )}
+          {(isMobile || activeCategory === 'access') && (
+            <AccessSection
+              invites={invites}
+              invitesLoading={invitesLoading}
+              inviteLoading={inviteLoading}
+              revokeLoadingId={revokeLoadingId}
+              onCreateInvite={onCreateInvite}
+              onRevokeInvite={onRevokeInvite}
+              isMobile={isMobile}
+            />
+          )}
 
-              {(isMobile || activeCategory === 'access') && (
-                <AccessSection
-                  invites={invites}
-                  invitesLoading={invitesLoading}
-                  inviteLoading={inviteLoading}
-                  revokeLoadingId={revokeLoadingId}
-                  onCreateInvite={onCreateInvite}
-                  onRevokeInvite={onRevokeInvite}
-                  isMobile={isMobile}
-                />
-              )}
+          {(isMobile || activeCategory === 'members') && <MembersSection members={members} />}
 
-              {(isMobile || activeCategory === 'members') && <MembersSection members={members} />}
+          {(isMobile || activeCategory === 'requests') && (
+            <RequestsSection
+              joinRequests={joinRequests}
+              approveLoadingId={approveLoadingId}
+              onApproveJoinRequest={onApproveJoinRequest}
+            />
+          )}
 
-              {(isMobile || activeCategory === 'requests') && (
-                <RequestsSection
-                  joinRequests={joinRequests}
-                  approveLoadingId={approveLoadingId}
-                  onApproveJoinRequest={onApproveJoinRequest}
-                />
-              )}
+          {(isMobile || activeCategory === 'mcp_tools') && (
+            <McpToolsSection
+              workspace={workspace}
+              settings={settings}
+              onChangeSettings={onChangeSettings}
+            />
+          )}
 
-              {(isMobile || activeCategory === 'mcp_tools') && (
-                <McpToolsSection
-                  workspace={workspace}
-                  settings={settings}
-                  onChangeSettings={onChangeSettings}
-                />
-              )}
-
-              {isMobile && (
-                <div style={{ display: 'flex', marginTop: 'var(--space-md)' }}>
-                  <Button
-                    variant="accent"
-                    size="lg"
-                    onClick={onSaveSettings}
-                    loading={saveLoading}
-                    style={{ width: '100%', justifyContent: 'center' }}
-                  >
-                    {saveSuccess ? 'Changes Saved' : 'Save Changes'}
-                  </Button>
-                </div>
-              )}
-            </Stack>
-          </div>
-        </DashboardLayout.Content>
-      </DashboardLayout.Main>
-    </DashboardLayout>
+          {isMobile && (
+            <div style={{ display: 'flex', marginTop: 'var(--space-md)' }}>
+              <Button
+                variant="accent"
+                size="lg"
+                onClick={onSaveSettings}
+                loading={saveLoading}
+                style={{ width: '100%', justifyContent: 'center' }}
+              >
+                {saveSuccess ? 'Changes Saved' : 'Save Changes'}
+              </Button>
+            </div>
+          )}
+        </Stack>
+      </div>
+    </SettingsPageLayout>
   );
 }
