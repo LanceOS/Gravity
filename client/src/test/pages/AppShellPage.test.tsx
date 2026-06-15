@@ -99,7 +99,11 @@ vi.mock('../../modules/auth', () => ({
   AuthScreen: () => <div>AuthScreen</div>,
 }));
 
-vi.mock('../../modules/tickets', () => ({
+vi.mock('../../modules/tickets', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../modules/tickets')>();
+
+  return {
+    ...actual,
   CreateTicketModal: () => <div>CreateTicketModal</div>,
   LabelCreateOverlay: () => <div>LabelCreateOverlay</div>,
   TicketDetailRoute: ({ onDeleteTicket, activeTicket }: any) => (
@@ -112,7 +116,8 @@ vi.mock('../../modules/tickets', () => ({
       )}
     </div>
   ),
-}));
+  };
+});
 
 vi.mock('../../modules/onboarding', () => ({
   OnboardingModal: ({ onComplete }: { onComplete: () => void }) => (
@@ -159,15 +164,15 @@ vi.mock('../../layouts/WorkspaceLayout/WorkspaceLayout', () => ({
   ),
 }));
 
-vi.mock('../../pages/LoadingPage/LoadingPage', () => ({
+vi.mock('../../modules/loadingPage', () => ({
   LoadingPage: () => <div>LoadingPage</div>,
 }));
 
-vi.mock('../../pages/WorkspaceDirectoryPage/WorkspaceDirectoryPage', () => ({
+vi.mock('../../modules/workspaceDirectoryPage', () => ({
   WorkspaceDirectoryPage: () => <div>WorkspaceDirectoryPage</div>,
 }));
 
-vi.mock('../../pages/WorkspacePage/WorkspacePage', () => ({
+vi.mock('../../modules/workspacePage', () => ({
   WorkspacePage: ({
     activeView,
     filters,
@@ -201,15 +206,15 @@ vi.mock('../../pages/WorkspacePage/WorkspacePage', () => ({
   ),
 }));
 
-vi.mock('../../pages/WorkspaceProjectsListPage/WorkspaceProjectsListPage', () => ({
+vi.mock('../../modules/workspaceProjectsListPage', () => ({
   WorkspaceProjectsListPage: () => <div>WorkspaceProjectsListPage</div>,
 }));
 
-vi.mock('../../pages/WorkspaceTeamsPage/WorkspaceTeamsPage', () => ({
+vi.mock('../../modules/workspaceTeamsPage', () => ({
   WorkspaceTeamsPage: () => <div>WorkspaceTeamsPage</div>,
 }));
 
-vi.mock('../../pages/WorkspaceTeamProjectsPage/WorkspaceTeamProjectsPage', () => ({
+vi.mock('../../modules/workspaceTeamProjectsPage', () => ({
   WorkspaceTeamProjectsPage: ({ team, projects, onBackToTeams }: any) => (
     <div>
       <div>WorkspaceTeamProjectsPage</div>

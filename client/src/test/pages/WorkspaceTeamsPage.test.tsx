@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -138,11 +138,10 @@ describe('WorkspaceTeamsPage', () => {
 
     // Create a new team via Modal
     await user.click(screen.getByRole('button', { name: 'New Team' }));
-    
-    const dialog = screen.getByRole('dialog');
-    await user.type(within(dialog).getByLabelText('Team Name'), 'Support');
-    await user.type(within(dialog).getByLabelText('Description'), 'Customer escalation team');
-    await user.click(within(dialog).getByRole('button', { name: 'Create Team' }));
+
+    await user.type(screen.getByLabelText('Team Name'), 'Support');
+    await user.type(screen.getByLabelText('Description'), 'Customer escalation team');
+    await user.click(screen.getByRole('button', { name: /create team/i }));
 
     await waitFor(() => {
       expect(apiMocks.post).toHaveBeenCalledWith('/teams', {

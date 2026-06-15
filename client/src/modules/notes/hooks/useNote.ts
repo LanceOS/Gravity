@@ -12,6 +12,7 @@ interface UseNoteOptions {
 export function useNote(projectId: string, noteId: string | null, { notesService: clientNotesService = notesService }: UseNoteOptions = {}) {
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const client = useQueryClient();
 
   const noteQuery = useQuery<Note>({
@@ -19,6 +20,12 @@ export function useNote(projectId: string, noteId: string | null, { notesService
     queryFn: async () => {
       if (!noteId || !projectId) throw new Error('No active note/project');
       return clientNotesService.getNote(projectId, noteId);
+    },
+    onError: () => {
+      setLoadError('Failed to load note');
+    },
+    onSuccess: () => {
+      setLoadError(null);
     },
     staleTime: CACHE_CONFIGS.metadata.staleTime,
     enabled: !!noteId && !!projectId,
@@ -73,7 +80,7 @@ export function useNote(projectId: string, noteId: string | null, { notesService
   return {
     note: noteQuery.data || null,
     loading: noteQuery.isLoading,
-    error: noteQuery.error ? (noteQuery.error as Error).message : null,
+    error: loadError || (noteQuery.error ? 'Failed to load note' : null),
     saving: saveMutation.isPending,
     saveError,
     savedAt,

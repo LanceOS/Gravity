@@ -5,14 +5,21 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 
 describe('useNotes', () => {
+  const baseNoteMetadata = {
+    projectId: 'proj-1',
+    userId: 'user-1',
+    createdAt: '2026-05-01T00:00:00.000Z',
+    updatedAt: '2026-05-01T00:00:00.000Z',
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it('fetches notes on mount and sets state appropriately', async () => {
     const mockNotes = [
-      { id: '1', title: 'Note 1' },
-      { id: '2', title: 'Note 2' },
+      { id: '1', title: 'Note 1', version: 1, ...baseNoteMetadata },
+      { id: '2', title: 'Note 2', version: 1, ...baseNoteMetadata },
     ];
     
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
@@ -38,9 +45,13 @@ describe('useNotes', () => {
     // Assuming limit is 20 and we returned 2 items, hasMore should be false
     expect(result.current.hasMore).toBe(false);
 
-    expect(fetchSpy).toHaveBeenCalledWith('/api/v1/notes?limit=20&offset=0&sort=desc', {
-      headers: { 'x-project-id': 'proj-1' },
-    });
+    expect(fetchSpy).toHaveBeenCalledWith('/api/v1/notes?limit=20&offset=0&sort=desc', expect.objectContaining({
+      method: 'GET',
+      headers: {
+        'x-project-id': 'proj-1',
+        'Content-Type': 'application/json',
+      },
+    }));
   });
 
   it('handles fetch errors correctly', async () => {
@@ -63,8 +74,13 @@ describe('useNotes', () => {
   });
 
   it('handles loadMore when there are more notes', async () => {
-    const firstPage = Array.from({ length: 20 }, (_, i) => ({ id: `${i}`, title: `Note ${i}` }));
-    const secondPage = [{ id: '20', title: 'Note 20' }];
+    const firstPage = Array.from({ length: 20 }, (_, i) => ({
+      id: `${i}`,
+      title: `Note ${i}`,
+      version: 1,
+      ...baseNoteMetadata,
+    }));
+    const secondPage = [{ id: '20', title: 'Note 20', version: 1, ...baseNoteMetadata }];
 
     const fetchSpy = vi.spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce({
@@ -97,13 +113,17 @@ describe('useNotes', () => {
     });
 
     expect(result.current.hasMore).toBe(false);
-    expect(fetchSpy).toHaveBeenLastCalledWith('/api/v1/notes?limit=20&offset=20&sort=desc', {
-      headers: { 'x-project-id': 'proj-1' },
-    });
+    expect(fetchSpy).toHaveBeenLastCalledWith('/api/v1/notes?limit=20&offset=20&sort=desc', expect.objectContaining({
+      method: 'GET',
+      headers: {
+        'x-project-id': 'proj-1',
+        'Content-Type': 'application/json',
+      },
+    }));
   });
 
   it('does not loadMore if already loading or no more items', async () => {
-    const firstPage = [{ id: '1', title: 'Note 1' }];
+    const firstPage = [{ id: '1', title: 'Note 1', version: 1, ...baseNoteMetadata }];
 
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
       ok: true,
@@ -157,8 +177,12 @@ describe('useNotes', () => {
     });
     
     expect(fetchSpy).toHaveBeenCalledTimes(2);
-    expect(fetchSpy).toHaveBeenLastCalledWith(expect.stringContaining('/api/v1/notes'), {
-      headers: { 'x-project-id': 'proj-2' },
-    });
+    expect(fetchSpy).toHaveBeenLastCalledWith(expect.stringContaining('/api/v1/notes'), expect.objectContaining({
+      method: 'GET',
+      headers: {
+        'x-project-id': 'proj-2',
+        'Content-Type': 'application/json',
+      },
+    }));
   });
 });

@@ -303,7 +303,7 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
   // Approve Join Request Mutation
   const approveJoinRequestMutation = useMutation({
     mutationFn: async (requestId: string) => {
-      await apiClient.post<{ success: boolean }>(`/workspaces/${activeWorkspaceId}/join-requests/${requestId}/approve`, {}, {
+      await apiClient.post<{ success: boolean }>(`/workspaces/${activeWorkspaceId}/join-requests/${requestId}/approve`, undefined, {
         headers: {
           ...buildHeaders(),
         },

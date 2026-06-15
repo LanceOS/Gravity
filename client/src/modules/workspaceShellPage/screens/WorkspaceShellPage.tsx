@@ -6,7 +6,7 @@ import { WorkspaceLayout } from '../../../layouts/WorkspaceLayout/WorkspaceLayou
 import { LocalAIChat } from '../../ai';
 import { Button } from '@library';
 import { AuthScreen } from '../../auth';
-import type { TicketListSort } from '../../tickets';
+import type { TicketFilters, TicketListSort } from '../../tickets';
 import { TicketDetailRoute } from '../../tickets';
 import type { WorkspaceIssueView } from '../../workspacePage/screens/WorkspacePage';
 import { OnboardingModal } from '../../onboarding';
@@ -124,6 +124,18 @@ export function WorkspaceShellPage() {
     projectId: '',
     message: null,
   });
+  const safeFilters = useMemo<TicketFilters>(() => ({
+    status: filters?.status ?? '',
+    priority: filters?.priority ?? '',
+    projectId: filters?.projectId ?? '',
+    labelId: filters?.labelId,
+    domainId: filters?.domainId,
+    labels: filters?.labels ?? [],
+    labelMode: filters?.labelMode ?? 'any',
+    cycleId: filters?.cycleId ?? '',
+    assigneeId: filters?.assigneeId ?? '',
+    search: filters?.search ?? '',
+  }), [filters]);
 
   const route = useAppShellRoute(currentUser?.id);
   const {
@@ -194,24 +206,24 @@ export function WorkspaceShellPage() {
   }, [sidebarTree]);
 
   const aggregateScopeLabels = useMemo(() => {
-    if (filters.labels.length > 0) {
-      return [...filters.labels];
+    if (safeFilters.labels.length > 0) {
+      return [...safeFilters.labels];
     }
 
-    const labelId = filters.labelId || filters.domainId;
+    const labelId = safeFilters.labelId || safeFilters.domainId;
     return labelId ? [labelId] : [];
-  }, [filters.domainId, filters.labelId, filters.labels]);
+  }, [safeFilters.domainId, safeFilters.labelId, safeFilters.labels]);
 
   const aggregateQueryParams = useMemo(
     () => ({
-      status: filters.status || undefined,
-      priority: filters.priority || undefined,
-      assigneeId: filters.assigneeId || undefined,
-      cycleId: filters.cycleId || undefined,
+      status: safeFilters.status || undefined,
+      priority: safeFilters.priority || undefined,
+      assigneeId: safeFilters.assigneeId || undefined,
+      cycleId: safeFilters.cycleId || undefined,
       labels: aggregateScopeLabels.length > 0 ? aggregateScopeLabels.join(',') : undefined,
-      labelMode: aggregateScopeLabels.length > 0 ? filters.labelMode : undefined,
+      labelMode: aggregateScopeLabels.length > 0 ? safeFilters.labelMode : undefined,
     }),
-    [aggregateScopeLabels, filters.assigneeId, filters.cycleId, filters.labelMode, filters.priority, filters.status]
+    [aggregateScopeLabels, safeFilters.assigneeId, safeFilters.cycleId, safeFilters.labelMode, safeFilters.priority, safeFilters.status]
   );
 
   const {
@@ -509,7 +521,11 @@ export function WorkspaceShellPage() {
   const scopedTicketsByKey = useMemo(() => {
     const map = new Map<string, Ticket>();
     for (const ticket of routeScopedTickets) {
-      map.set(ticket.key.toUpperCase(), ticket);
+      const ticketKey = ticket.key?.toUpperCase();
+      if (!ticketKey) {
+        continue;
+      }
+      map.set(ticketKey, ticket);
     }
     return map;
   }, [routeScopedTickets]);
@@ -668,7 +684,8 @@ export function WorkspaceShellPage() {
 
   const accountCredentialByProvider = useMemo(() => {
     const map = new Map<string, { preferredModel: string }>();
-    for (const credential of accountSavedCredentials) {
+    const safeAccountCredentials = accountSavedCredentials ?? [];
+    for (const credential of safeAccountCredentials) {
       map.set(credential.provider, credential);
     }
     return map;
@@ -736,7 +753,7 @@ export function WorkspaceShellPage() {
   });
 
   const { handleSetFilters } = useWorkspaceShellFilters({
-    filters,
+    filters: safeFilters,
     searchParams,
     setSearchParams,
   });
@@ -765,10 +782,10 @@ export function WorkspaceShellPage() {
 
   const scopedFilters = useMemo(
     () => ({
-      ...filters,
-      projectId: shouldUseAggregateTicketScope ? '' : filters.projectId,
+      ...safeFilters,
+      projectId: shouldUseAggregateTicketScope ? '' : safeFilters.projectId,
     }),
-    [filters, shouldUseAggregateTicketScope]
+    [safeFilters, shouldUseAggregateTicketScope]
   );
 
   useEffect(() => {
@@ -875,7 +892,7 @@ export function WorkspaceShellPage() {
       cycles,
       currentUser,
       activeProjectId,
-      filters,
+      filters: safeFilters,
       counts: {
         myIssues: myIssuesCount,
         activeProjectIssues: openTicketsCount,

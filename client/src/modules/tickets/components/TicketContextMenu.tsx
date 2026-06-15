@@ -41,27 +41,30 @@ export const TicketContextMenu: React.FC<TicketContextMenuProps> = ({ ticket, ch
     unassignLabelFromTicket,
   } = context;
   const sourceTickets = availableTickets ?? tickets;
+  const safeLabelsByProject = labelsByProject ?? new Map<string, Label[]>();
+  const safeTicketsByProject = ticketsByProject ?? new Map<string, Ticket[]>();
+  const safeGlobalLabels = globalLabels ?? EMPTY_LABELS;
 
   const ticketLabels = useMemo(() => {
-    const projectLabels = labelsByProject.get(ticket.projectId);
-    if (globalLabels.length === 0) {
+    const projectLabels = safeLabelsByProject.get(ticket.projectId);
+    if (safeGlobalLabels.length === 0) {
       return projectLabels || EMPTY_LABELS;
     }
     if (!projectLabels || projectLabels.length === 0) {
-      return globalLabels;
+      return safeGlobalLabels;
     }
-    return [...globalLabels, ...projectLabels];
-  }, [globalLabels, labelsByProject, ticket.projectId]);
+    return [...safeGlobalLabels, ...projectLabels];
+  }, [safeGlobalLabels, safeLabelsByProject, ticket.projectId]);
 
   const assignableTickets = useMemo(() => {
     const projectTickets = availableTickets
       ? sourceTickets.filter((candidate) => candidate.projectId === ticket.projectId)
-      : ticketsByProject.get(ticket.projectId) || EMPTY_TICKETS;
+      : safeTicketsByProject.get(ticket.projectId) || EMPTY_TICKETS;
     if (!projectTickets.length) {
       return EMPTY_TICKETS;
     }
     return projectTickets.filter((candidate) => candidate.id !== ticket.id);
-  }, [availableTickets, sourceTickets, ticket.id, ticket.projectId, ticketsByProject]);
+  }, [availableTickets, safeTicketsByProject, sourceTickets, ticket.id, ticket.projectId]);
 
   const workspaceProjects = useMemo(() => {
     const ticketProject = projectById.get(ticket.projectId);
