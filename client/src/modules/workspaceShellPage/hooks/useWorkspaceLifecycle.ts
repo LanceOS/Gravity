@@ -3,6 +3,7 @@ import type { User, Project } from '../../../types/domain';
 import type { WorkspaceSummary } from '../../../hooks/useWorkspaceDirectory';
 import type { AppSection } from '../types/AppShell';
 import { getActiveWorkspaceStorageKey } from '../../../modules/workspaces';
+import { useLocalStorageString } from '../../../hooks/useLocalStorageString';
 
 interface UseActiveWorkspaceSelectionArgs {
   currentUser: User | null;
@@ -25,6 +26,10 @@ export function useActiveWorkspaceSelection({
   setWorkspaceReady,
   setActiveSection,
 }: UseActiveWorkspaceSelectionArgs) {
+  const { readValue, writeValue } = useLocalStorageString({
+    key: currentUser ? getActiveWorkspaceStorageKey(currentUser.id) : null,
+  });
+
   useEffect(() => {
     if (!currentUser) {
       setActiveSection('workspace');
@@ -46,7 +51,7 @@ export function useActiveWorkspaceSelection({
 
     if (!activeWorkspaceId || !workspaces.some((workspace) => workspace.id === activeWorkspaceId)) {
       const storedWorkspaceId =
-        typeof window === 'undefined' ? null : window.localStorage.getItem(getActiveWorkspaceStorageKey(currentUser.id));
+        readValue();
       const nextWorkspaceId =
         storedWorkspaceId && workspaces.some((workspace) => workspace.id === storedWorkspaceId)
           ? storedWorkspaceId
@@ -64,6 +69,7 @@ export function useActiveWorkspaceSelection({
     setActiveSection,
     setActiveWorkspaceId,
     setWorkspaceReady,
+    readValue,
     workspaces,
     workspacesLoading,
     workspacesResolvedForCurrentUser,
@@ -74,14 +80,8 @@ export function useActiveWorkspaceSelection({
       return;
     }
 
-    const storageKey = getActiveWorkspaceStorageKey(currentUser.id);
-    if (!activeWorkspaceId) {
-      window.localStorage.removeItem(storageKey);
-      return;
-    }
-
-    window.localStorage.setItem(storageKey, activeWorkspaceId);
-  }, [currentUser, activeWorkspaceId]);
+    writeValue(activeWorkspaceId || null);
+  }, [currentUser, activeWorkspaceId, writeValue]);
 }
 
 interface UsePendingWorkspaceInviteArgs {
@@ -95,6 +95,10 @@ export function usePendingWorkspaceInvite({
   requestJoinByInvite,
   refreshWorkspaces,
 }: UsePendingWorkspaceInviteArgs) {
+  const { readValue: readPendingInvite, writeValue: writePendingInvite } = useLocalStorageString({
+    key: 'gravity_pending_invite',
+  });
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -104,21 +108,21 @@ export function usePendingWorkspaceInvite({
       return;
     }
 
-    window.localStorage.setItem('gravity_pending_invite', invite);
+    writePendingInvite(invite);
     const newUrl = window.location.origin + window.location.pathname;
     window.history.replaceState({}, document.title, newUrl);
-  }, []);
+  }, [writePendingInvite]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (!currentUser) return;
 
-    const pendingInvite = window.localStorage.getItem('gravity_pending_invite');
+    const pendingInvite = readPendingInvite();
     if (!pendingInvite) {
       return;
     }
 
-    window.localStorage.removeItem('gravity_pending_invite');
+    writePendingInvite(null);
 
     const runAutoJoin = async () => {
       const success = await requestJoinByInvite(pendingInvite);
@@ -127,7 +131,7 @@ export function usePendingWorkspaceInvite({
       }
     };
     void runAutoJoin();
-  }, [currentUser, requestJoinByInvite, refreshWorkspaces]);
+  }, [currentUser, readPendingInvite, requestJoinByInvite, refreshWorkspaces, writePendingInvite]);
 }
 
 interface UseWorkspaceMemberActivityArgs {

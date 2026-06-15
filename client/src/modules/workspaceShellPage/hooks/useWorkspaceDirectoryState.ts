@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 
 import { getActiveWorkspaceStorageKey } from '../../../modules/workspaces';
 import type { WorkspaceSummary } from '../../../hooks/useWorkspaceDirectory';
+import { useLocalStorageString } from '../../../hooks/useLocalStorageString';
 
 interface UseWorkspaceDirectoryStateArgs {
   currentUser: { id: string } | null;
@@ -24,6 +25,9 @@ export function useWorkspaceDirectoryState({
 }: UseWorkspaceDirectoryStateArgs): UseWorkspaceDirectoryStateResult {
   const [activeWorkspaceId, setActiveWorkspaceId] = useState('');
   const [workspaceReady, setWorkspaceReady] = useState(false);
+  const { readValue, writeValue } = useLocalStorageString({
+    key: currentUser ? getActiveWorkspaceStorageKey(currentUser.id) : null,
+  });
 
   useEffect(() => {
     if (!currentUser) {
@@ -42,8 +46,7 @@ export function useWorkspaceDirectoryState({
       return;
     }
 
-    const storageKey = getActiveWorkspaceStorageKey(currentUser.id);
-    const storedWorkspaceId = window.localStorage.getItem(storageKey);
+    const storedWorkspaceId = readValue();
     const nextWorkspaceId =
       storedWorkspaceId && workspaces.some((workspace) => workspace.id === storedWorkspaceId)
         ? storedWorkspaceId
@@ -57,24 +60,19 @@ export function useWorkspaceDirectoryState({
   }, [
     activeWorkspaceId,
     currentUser,
+    readValue,
     workspaces,
     workspacesLoading,
     workspacesResolvedForCurrentUser,
   ]);
 
   useEffect(() => {
-    if (!currentUser || typeof window === 'undefined') {
+    if (!currentUser) {
       return;
     }
 
-    const storageKey = getActiveWorkspaceStorageKey(currentUser.id);
-    if (!activeWorkspaceId) {
-      window.localStorage.removeItem(storageKey);
-      return;
-    }
-
-    window.localStorage.setItem(storageKey, activeWorkspaceId);
-  }, [activeWorkspaceId, currentUser]);
+    writeValue(activeWorkspaceId || null);
+  }, [activeWorkspaceId, currentUser, writeValue]);
 
   return {
     activeWorkspaceId,
