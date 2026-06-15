@@ -76,12 +76,46 @@ const initialFilters = {
 
 const CURRENT_USER_STORAGE_KEY = 'gravity_user';
 
+function writeStoredUser(value: User | null) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    if (value) {
+      window.localStorage.setItem(CURRENT_USER_STORAGE_KEY, JSON.stringify(value));
+    } else {
+      window.localStorage.removeItem(CURRENT_USER_STORAGE_KEY);
+    }
+  } catch {
+    // localStorage may be unavailable in restricted/private modes.
+  }
+}
+
+function clearStoredUser() {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    window.localStorage.removeItem(CURRENT_USER_STORAGE_KEY);
+  } catch {
+    // localStorage may be unavailable in restricted/private modes.
+  }
+}
+
 function readStoredUser(): User | null {
   if (typeof window === 'undefined') {
     return null;
   }
 
-  const rawUser = window.localStorage.getItem(CURRENT_USER_STORAGE_KEY);
+  let rawUser: string | null = null;
+  try {
+    rawUser = window.localStorage.getItem(CURRENT_USER_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+
   if (!rawUser) {
     return null;
   }
@@ -89,7 +123,7 @@ function readStoredUser(): User | null {
   try {
     const parsedUser = JSON.parse(rawUser) as Record<string, unknown>;
     if (typeof parsedUser.id !== 'string' || typeof parsedUser.name !== 'string' || typeof parsedUser.email !== 'string') {
-      window.localStorage.removeItem(CURRENT_USER_STORAGE_KEY);
+      clearStoredUser();
       return null;
     }
 
@@ -105,7 +139,7 @@ function readStoredUser(): User | null {
           : undefined,
     };
   } catch {
-    window.localStorage.removeItem(CURRENT_USER_STORAGE_KEY);
+    clearStoredUser();
     return null;
   }
 }
@@ -366,6 +400,9 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     (!!activeProjectId && labelsQuery.isLoading) ||
     (!!activeProjectId && cyclesQuery.isLoading);
 
+  const ticketMap = useMemo(() => new Map(tickets.map((t) => [t.key.toUpperCase(), t])), [tickets]);
+  const ticketById = useMemo(() => new Map(tickets.map((t) => [t.id, t])), [tickets]);
+
   // Sync activeTicket if it was updated in the tickets query
   useEffect(() => {
     if (!activeTicket) {
@@ -500,12 +537,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Sync stored user with local storage
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (currentUser) {
-      window.localStorage.setItem(CURRENT_USER_STORAGE_KEY, JSON.stringify(currentUser));
-    } else {
-      window.localStorage.removeItem(CURRENT_USER_STORAGE_KEY);
-    }
+    writeStoredUser(currentUser);
   }, [currentUser]);
 
   // --- Real-time SSE Synchronization ---
@@ -517,15 +549,22 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     eventSource.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data);
-    if (message.type === 'tickets-updated') {
-          if (message.data.projectId) {
-            queryClient.invalidateQueries({ queryKey: queryKeys.tickets(message.data.projectId) });
-            invalidateAggregateTicketQueries(message.data.projectId);
+        if (!message || typeof message !== 'object') {
+          return;
+        }
+
+        const messageData = message.data as Record<string, unknown>;
+        if (message.type === 'tickets-updated') {
+          const projectId = typeof messageData?.projectId === 'string' ? messageData.projectId : '';
+          if (projectId) {
+            queryClient.invalidateQueries({ queryKey: queryKeys.tickets(projectId) });
+            invalidateAggregateTicketQueries(projectId);
           }
         } else if (message.type === 'comments-updated') {
           const activeId = activeTicketRef.current?.id;
-          if (activeId && activeId === message.data.ticketId) {
-            queryClient.invalidateQueries({ queryKey: queryKeys.comments(message.data.ticketId) });
+          const ticketId = typeof messageData?.ticketId === 'string' ? messageData.ticketId : '';
+          if (activeId && activeId === ticketId) {
+            queryClient.invalidateQueries({ queryKey: queryKeys.comments(ticketId) });
           }
         } else if (message.type === 'users-updated') {
           queryClient.invalidateQueries({ queryKey: queryKeys.users() });
@@ -1189,9 +1228,6 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const resetFilters = useCallback(() => {
     setFiltersState({ ...initialFilters, projectId: activeProjectIdRef.current });
   }, []);
-
-  const ticketMap = useMemo(() => new Map(tickets.map((t) => [t.key.toUpperCase(), t])), [tickets]);
-  const ticketById = useMemo(() => new Map(tickets.map((t) => [t.id, t])), [tickets]);
 
   const projectById = useMemo(() => {
     const map = new Map<string, Project>();

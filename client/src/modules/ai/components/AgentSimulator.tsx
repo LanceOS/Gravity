@@ -6,6 +6,14 @@ import { delay, getInitialAgentLogs } from '../utils/AgentSimulator';
 import { Button, Textarea } from '@library';
 import { apiClient } from '../../../utils/apiClient';
 
+function parseToolResultText(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
 export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
   const { fetchInitialData } = useTickets();
   const [prompt, setPrompt] = useState('Create a backend ticket for setup auth, assign to bob, and add comment "Lance is waiting"');
@@ -49,11 +57,7 @@ export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
       addLog('success', `✅ Tool execution completed. Result:\n${textResult}`);
       
       // Parse result to get object if needed
-      try {
-        return JSON.parse(textResult);
-      } catch {
-        return textResult;
-      }
+      return parseToolResultText(textResult);
     } catch (e: any) {
       addLog('error', `❌ Tool error: ${e.message}`);
       throw e;

@@ -14,20 +14,45 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
+function safeReadDensitySetting(): DensityScale {
+  if (typeof window === 'undefined') {
+    return 'compact';
+  }
+
+  try {
+    const saved = window.localStorage.getItem('ds-density') as DensityScale;
+    return saved === 'standard' ? 'standard' : 'compact';
+  } catch {
+    return 'compact';
+  }
+}
+
+function safeWriteStorageValue(key: string, value: string) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // localStorage may be unavailable in restricted/private modes.
+  }
+}
+
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [theme, setThemeState] = useState<ThemeMode>(() => {
     if (typeof window !== 'undefined') {
-      return resolveThemePreference(getStoredThemePreference());
+      try {
+        return resolveThemePreference(getStoredThemePreference());
+      } catch {
+        return 'marble-blue';
+      }
     }
     return 'marble-blue';
   });
 
   const [density, setDensityState] = useState<DensityScale>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('ds-density') as DensityScale;
-      return saved === 'standard' ? 'standard' : 'compact';
-    }
-    return 'compact';
+    return safeReadDensitySetting();
   });
 
   useLayoutEffect(() => {
@@ -49,14 +74,12 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const setTheme = React.useCallback((newTheme: ThemeMode) => {
     setThemeState(newTheme);
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem(THEME_STORAGE_KEY, newTheme);
-    }
+    safeWriteStorageValue(THEME_STORAGE_KEY, newTheme);
   }, []);
 
   const setDensity = React.useCallback((newDensity: DensityScale) => {
     setDensityState(newDensity);
-    localStorage.setItem('ds-density', newDensity);
+    safeWriteStorageValue('ds-density', newDensity);
   }, []);
 
   const toggleTheme = React.useCallback(() => {

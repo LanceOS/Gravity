@@ -14,6 +14,18 @@ const CLOUD_MODELS: Record<string, string[]> = {
   deepseek: ['deepseek-chat'],
 };
 
+function parseToolArguments(argumentsPayload: Record<string, unknown> | string): Record<string, unknown> | string {
+  if (typeof argumentsPayload !== 'string') {
+    return argumentsPayload;
+  }
+
+  try {
+    return JSON.parse(argumentsPayload);
+  } catch {
+    return argumentsPayload;
+  }
+}
+
 export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllamaUrl, initialModel, settings, workspaceId, isClosing }) => {
   const { activeTicket, projects, users } = useTickets();
 
@@ -207,7 +219,7 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
                 method: 'tools/call',
                 params: {
                   name: tc.name,
-                  arguments: typeof tc.arguments === 'string' ? JSON.parse(tc.arguments as string) : tc.arguments
+                  arguments: parseToolArguments(tc.arguments),
                 },
               },
               {

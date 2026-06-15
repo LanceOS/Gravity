@@ -625,6 +625,14 @@ export function WorkspaceShellPage() {
     currentUserId: currentUser?.id,
   });
 
+  const scopedFilters = useMemo(
+    () => ({
+      ...filters,
+      projectId: shouldUseAggregateTicketScope ? '' : filters.projectId,
+    }),
+    [filters, shouldUseAggregateTicketScope]
+  );
+
   useEffect(() => {
     const handleGlobalKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement;
@@ -646,63 +654,6 @@ export function WorkspaceShellPage() {
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, [activeWorkspaceProjects.length, handleOpenCreateTicket]);
-
-  const {
-    isTeamProjectsManager,
-    isTeamWorkspace,
-    isTeamsManager,
-    isWorkspaceOwner,
-    sidebarActiveTeamId,
-    sidebarNavigationState,
-  } = useMemo(() => {
-    const activeProjectTeamId =
-      activeProject?.teamId ||
-      (projectIdParam || activeProjectId ? sidebarTeamIdByProjectId.get(projectIdParam || activeProjectId) || '' : '') ||
-      '';
-
-    const resolvedSidebarActiveTeamId = route.teamIdParam || activeProjectTeamId;
-    const resolvedIsTeamWorkspace = (sidebarTree?.hierarchyMode ?? activeWorkspace?.hierarchyMode ?? 'workspace') === 'teams';
-    const resolvedIsWorkspaceOwner = activeWorkspace?.memberRole === 'owner';
-
-    return {
-      isTeamProjectsManager: activeSection === 'team-projects',
-      isTeamWorkspace: resolvedIsTeamWorkspace,
-      isTeamsManager: activeSection === 'teams' || (resolvedIsTeamWorkspace && activeSection === 'projects'),
-      isWorkspaceOwner: resolvedIsWorkspaceOwner,
-      sidebarActiveTeamId: resolvedSidebarActiveTeamId,
-      sidebarNavigationState: {
-        activeTeam: resolvedSidebarActiveTeamId,
-        activeScope:
-          route.teamIdParam
-            ? route.projectIdParam
-              ? 'projects'
-              : route.cycleIdParam
-                ? 'cycles'
-                : route.activeLabelIdParam
-                  ? 'labels'
-                  : 'views'
-            : route.projectIdParam
-              ? 'projects'
-              : 'workspace',
-        activeProject:
-          activeSection === 'projects' || activeSection === 'team-projects' || activeSection === 'workspace'
-            ? (projectIdParam || activeProjectId)
-            : '',
-      } as SidebarNavigationState,
-    };
-  }, [
-    activeSection,
-    activeProject,
-    activeProjectId,
-    activeWorkspace?.hierarchyMode,
-    activeWorkspace?.memberRole,
-    projectIdParam,
-    route.activeLabelIdParam,
-    route.cycleIdParam,
-    route.projectIdParam,
-    route.teamIdParam,
-    sidebarTree,
-  ]);
 
   const handleOpenCurrentTeamProjectsManager = useCallback(() => {
     if (sidebarActiveTeamId) {
@@ -734,15 +685,11 @@ export function WorkspaceShellPage() {
   ) : null;
 
   const scopedProjects = teamIdParam
-    ? activeWorkspaceProjects.filter((project) => project.teamId === teamIdParam || teamIdParam === project.teamId)
+    ? activeWorkspaceProjects.filter((project) => project.teamId === teamIdParam)
     : activeWorkspaceProjects;
   const scopedTickets = routeScopedTickets;
   const scopedCycles = isTeamAggregatePath ? teamCycles : cycles;
   const scopedLabels = isTeamAggregatePath ? teamLabels : labels;
-  const scopedFilters = useMemo(
-    () => (shouldUseAggregateTicketScope ? { ...filters, projectId: '' } : filters),
-    [filters, shouldUseAggregateTicketScope]
-  );
 
   const sidebarActiveViewId =
     route.teamIdParam && sidebarNavigationState.activeScope === 'views'
