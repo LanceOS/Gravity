@@ -46,7 +46,7 @@ import {
   WorkspaceHeader,
   WorkspaceProjectPanel,
 } from '../../modules/workspaces';
-import '../../modules/workspaceProjects/styles/WorkspaceProjectsPage.css';
+import '../../modules/workspaceProjectsPanel/styles/WorkspaceProjectsPage.css';
 import '../WorkspacePage/WorkspacePage.css';
 interface WorkspaceMember {
   id: string;
