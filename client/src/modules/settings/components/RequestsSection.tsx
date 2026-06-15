@@ -1,18 +1,10 @@
 import React, { useMemo } from 'react';
 import { Card, Stack, Button } from '@library';
-import type { WorkspaceJoinRequest } from '../../../hooks/useWorkspaceSettings';
+import { useSettingsScreenContext } from '../contexts/SettingsScreenContext';
 
-interface RequestsSectionProps {
-  joinRequests: WorkspaceJoinRequest[];
-  approveLoadingId: string | null;
-  onApproveJoinRequest: (requestId: string) => Promise<boolean>;
-}
+export function RequestsSection(): JSX.Element {
+  const { joinRequests, approveLoadingId, onApproveJoinRequest } = useSettingsScreenContext();
 
-export function RequestsSection({
-  joinRequests,
-  approveLoadingId,
-  onApproveJoinRequest,
-}: RequestsSectionProps) {
   const pendingRequests = useMemo(
     () => joinRequests.filter((request) => request.status === 'pending'),
     [joinRequests]

@@ -2,10 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../utils/apiClient';
 import { addSidebarTeam, removeSidebarTeam, updateSidebarTeam } from '../../../utils/sidebarTreeMutations';
-import { WorkspaceHeader } from '../../workspaces';
 import type { SidebarTeam, Team } from '../../../types/domain';
 import '../../workspacePage/styles/WorkspacePage.css';
 import '../styles/WorkspaceTeamsPage.css';
+import { WorkspaceManagementLayout } from '../../../layouts/WorkspaceManagementLayout/WorkspaceManagementLayout';
 
 import { WorkspaceTeamsCreateTeamModal } from '../components/WorkspaceTeamsCreateTeamModal';
 import { WorkspaceTeamsFeedback } from '../components/WorkspaceTeamsFeedback';
@@ -217,59 +217,39 @@ export function WorkspaceTeamsPage({
   }, [isCreateModalOpen]);
 
   return (
-    <div className="workspace-page workspace-teams-page">
-      <WorkspaceHeader>
-        <WorkspaceHeader.Top>
-          <WorkspaceHeader.Title>Manage Teams</WorkspaceHeader.Title>
-          <WorkspaceTeamsHeaderActions
-            onBackToWorkspace={onBackToWorkspace}
-            onOpenCreateTeam={() => setIsCreateModalOpen(true)}
-          />
-        </WorkspaceHeader.Top>
-      </WorkspaceHeader>
+    <WorkspaceManagementLayout
+      title="Manage Teams"
+      pageClassName="workspace-teams-page"
+      contentClassName="workspace-teams-page__content"
+      actions={
+        <WorkspaceTeamsHeaderActions
+          onBackToWorkspace={onBackToWorkspace}
+          onOpenCreateTeam={() => setIsCreateModalOpen(true)}
+        />
+      }
+      hero={<WorkspaceTeamsHero workspaceName={workspaceName} teamCount={sortedTeams.length} />}
+      feedback={<WorkspaceTeamsFeedback feedback={feedback} />}
+      loading={loading}
+      loadingNode={<WorkspaceTeamsLoadingSkeleton />}
+    >
+      <div className="workspace-teams-page__layout">
+        <WorkspaceTeamsTeamListSection teams={sortedTeams} selectedTeamId={selectedTeamId} onSelectTeam={handleSelectTeam} />
 
-      <div className="workspace-teams-page__content">
-        <WorkspaceTeamsHero workspaceName={workspaceName} teamCount={sortedTeams.length} />
-        <WorkspaceTeamsFeedback feedback={feedback} />
-
-        {loading ? (
-          <WorkspaceTeamsLoadingSkeleton />
-        ) : (
-          <div className="workspace-teams-page__layout">
-            <WorkspaceTeamsTeamListSection
-              teams={sortedTeams}
-              selectedTeamId={selectedTeamId}
-              onSelectTeam={handleSelectTeam}
-            />
-
-            <WorkspaceTeamsTeamEditorSection
-              selectedTeam={selectedTeam}
-              editDraft={editDraft}
-              savingAction={savingAction}
-              sortedTeams={sortedTeams}
-              reassignTeamById={reassignTeamById}
-              onSave={handleUpdateTeam}
-              onDraftChange={setEditDraft}
-              onReassignChange={(teamId, reassignTeamId) =>
-                setReassignTeamById((current) => ({ ...current, [teamId]: reassignTeamId }))
-              }
-              onDelete={handleDeleteTeam}
-              onManageProjects={onManageProjects}
-            />
-          </div>
-        )}
+        <WorkspaceTeamsTeamEditorSection
+          selectedTeam={selectedTeam}
+          editDraft={editDraft}
+          savingAction={savingAction}
+          sortedTeams={sortedTeams}
+          reassignTeamById={reassignTeamById}
+          onSave={handleUpdateTeam}
+          onDraftChange={setEditDraft}
+          onReassignChange={(teamId, reassignTeamId) =>
+            setReassignTeamById((current) => ({ ...current, [teamId]: reassignTeamId }))
+          }
+          onDelete={handleDeleteTeam}
+          onManageProjects={onManageProjects}
+        />
       </div>
-
-      <WorkspaceTeamsCreateTeamModal
-        isOpen={isCreateModalOpen}
-        savingAction={savingAction}
-        createDraft={createDraft}
-        onClose={() => setIsCreateModalOpen(false)}
-        onDraftChange={setCreateDraft}
-        onCreateTeam={() => {
-          void handleCreateTeam();
-        }}
-      />
-    </div>
+    </WorkspaceManagementLayout>
   );
 }

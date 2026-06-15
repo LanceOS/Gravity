@@ -1,17 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Mail } from 'lucide-react';
 import { Card, Stack, TextInput, Button, Badge } from '@library';
-import type { CreateWorkspaceInviteInput, WorkspaceInvite } from '../../../hooks/useWorkspaceSettings';
-
-interface AccessSectionProps {
-  invites: WorkspaceInvite[];
-  invitesLoading: boolean;
-  inviteLoading: boolean;
-  revokeLoadingId: string | null;
-  onCreateInvite: (input: CreateWorkspaceInviteInput) => Promise<boolean>;
-  onRevokeInvite: (inviteId: string) => Promise<boolean>;
-  isMobile: boolean;
-}
+import { useSettingsScreenContext } from '../contexts/SettingsScreenContext';
 
 const COPY_FEEDBACK_STORAGE_KEY = 'gravity_peer_invite_copy_feedback';
 const COPY_FEEDBACK_DURATION_MS = 2200;
@@ -26,15 +16,10 @@ function getInviteStateVariant(invite: WorkspaceInvite): 'accent' | 'success' | 
   return 'success';
 }
 
-export function AccessSection({
-  invites,
-  invitesLoading,
-  inviteLoading,
-  revokeLoadingId,
-  onCreateInvite,
-  onRevokeInvite,
-  isMobile,
-}: AccessSectionProps) {
+export function AccessSection(): JSX.Element {
+  const { isMobile, invites, invitesLoading, inviteLoading, revokeLoadingId, onCreateInvite, onRevokeInvite } =
+    useSettingsScreenContext();
+
   const latestInvite = invites[0] ?? null;
   const [label, setLabel] = useState('');
   const [copiedField, setCopiedField] = useState<string | null>(null);

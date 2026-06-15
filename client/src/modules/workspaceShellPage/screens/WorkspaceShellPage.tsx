@@ -43,12 +43,12 @@ import {
   useWorkspaceShellFilters,
   useWorkspaceShellNavigation,
   useWorkspaceSidebarCounts,
-  WorkspaceHeader,
   WorkspaceProjectPanel,
   WorkspaceTeamProjectsPanel,
 } from '../../workspaces';
 import '../../workspaceProjectsPanel/styles/WorkspaceProjectsPage.css';
 import '../../workspacePage/styles/WorkspacePage.css';
+import { WorkspaceManagementLayout } from '../../../layouts/WorkspaceManagementLayout/WorkspaceManagementLayout';
 interface WorkspaceMember {
   id: string;
   name: string;
@@ -613,40 +613,42 @@ export function WorkspaceShellPage() {
             onDeleteProject={deleteProject}
           />
         ) : activeSection === 'projects' ? (
-          <div className="workspace-page workspace-projects-page">
-            <WorkspaceHeader>
-              <WorkspaceHeader.Top>
-                <WorkspaceHeader.Title>Manage Projects</WorkspaceHeader.Title>
-
-                <div className="workspace-projects-page__actions">
-                  <Button type="button" variant="ghost" size="sm" onClick={() => navigate(`/workspaces/${activeWorkspaceId}`)}>
-                    <ArrowLeft size={14} />
-                    <span>Back to Workspace</span>
-                  </Button>
-                </div>
-              </WorkspaceHeader.Top>
-            </WorkspaceHeader>
-
-            <div className="workspace-projects-page__content">
-              <WorkspaceProjectPanel
-                workspaceName={activeWorkspace.name}
-                projects={activeWorkspaceProjects}
-                activeProjectId={activeProjectId}
-                defaultProjectId={activeWorkspace.defaultProjectId ?? null}
-                labels={scopedLabels}
-                projectCreateLoading={projectCreateLoading}
-                projectCreateError={projectCreateError}
-                labelCreateLoading={labelCreateLoading}
-                labelCreateError={labelCreateError}
-                onSelectProject={handleSelectProjectForManagement}
-                onCreateProject={handleCreateProject}
-                onUpdateProject={updateProject}
-                onCreateLabel={handleCreateLabel}
-                onUpdateLabel={handleUpdateLabel}
-                onDeleteLabel={handleDeleteLabel}
-              />
-            </div>
-          </div>
+          <WorkspaceManagementLayout
+            title="Manage Projects"
+            pageClassName="workspace-projects-page"
+            contentClassName="workspace-projects-page__content"
+            actions={
+              <div className="workspace-projects-page__actions">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => navigate(`/workspaces/${activeWorkspaceId}`)}
+                >
+                  <ArrowLeft size={14} />
+                  <span>Back to Workspace</span>
+                </Button>
+              </div>
+            }
+          >
+            <WorkspaceProjectPanel
+              workspaceName={activeWorkspace.name}
+              projects={activeWorkspaceProjects}
+              activeProjectId={activeProjectId}
+              defaultProjectId={activeWorkspace.defaultProjectId ?? null}
+              labels={scopedLabels}
+              projectCreateLoading={projectCreateLoading}
+              projectCreateError={projectCreateError}
+              labelCreateLoading={labelCreateLoading}
+              labelCreateError={labelCreateError}
+              onSelectProject={handleSelectProjectForManagement}
+              onCreateProject={handleCreateProject}
+              onUpdateProject={updateProject}
+              onCreateLabel={handleCreateLabel}
+              onUpdateLabel={handleUpdateLabel}
+              onDeleteLabel={handleDeleteLabel}
+            />
+          </WorkspaceManagementLayout>
         ) : route.ticketKey ? (
           <TicketDetailRoute
             activeWorkspaceId={activeWorkspaceId}

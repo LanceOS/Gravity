@@ -1,10 +1,6 @@
 import React from 'react';
 import { Card, Stack, Avatar, Badge } from '@library';
-import type { WorkspaceMember } from '../../../hooks/useWorkspaceSettings';
-
-interface MembersSectionProps {
-  members: WorkspaceMember[];
-}
+import { useSettingsScreenContext } from '../contexts/SettingsScreenContext';
 
 function formatLastActive(isoString?: string | null): string {
   if (!isoString) {
@@ -48,7 +44,9 @@ function formatLastActive(isoString?: string | null): string {
   }
 }
 
-export function MembersSection({ members }: MembersSectionProps) {
+export function MembersSection(): JSX.Element {
+  const { members } = useSettingsScreenContext();
+
   return (
     <Card style={{ padding: 'var(--space-lg)', borderRadius: 'var(--radius-lg)' }}>
       <Stack gap="var(--space-lg)">

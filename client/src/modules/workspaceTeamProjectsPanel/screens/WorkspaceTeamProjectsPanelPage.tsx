@@ -2,10 +2,10 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ProjectCreateOverlay } from '../../workspaceProjectsPanel/components/ProjectCreateOverlay';
 import { sanitizeProjectKey } from '../../workspaceProjectsPanel/utils/WorkspaceProjectPanel';
-import { WorkspaceHeader } from '../../workspaces/components/WorkspaceHeader';
 import { removeProjectFromTeam, updateProjectInTeam } from '../../../utils/sidebarTreeMutations';
 import '../../workspacePage/styles/WorkspacePage.css';
 import '../styles/WorkspaceTeamProjectsPage.css';
+import { WorkspaceManagementLayout } from '../../../layouts/WorkspaceManagementLayout/WorkspaceManagementLayout';
 import { WorkspaceTeamProjectsDeleteModal } from '../components/WorkspaceTeamProjectsDeleteModal';
 import { WorkspaceTeamProjectsEditorSection } from '../components/WorkspaceTeamProjectsEditorSection';
 import { WorkspaceTeamProjectsFeedback } from '../components/WorkspaceTeamProjectsFeedback';
@@ -201,55 +201,50 @@ export function WorkspaceTeamProjectsPanelPage({
   };
 
   return (
-    <div className="workspace-page workspace-team-projects-page">
-      <WorkspaceHeader>
-        <WorkspaceHeader.Top>
-          <WorkspaceHeader.Title>Manage Team Projects</WorkspaceHeader.Title>
-
-          <WorkspaceTeamProjectsHeaderActions
-            onBackToTeams={onBackToTeams}
-            onOpenCreateProject={() => setIsCreateModalOpen(true)}
-            canCreateProject={!!team}
-          />
-        </WorkspaceHeader.Top>
-      </WorkspaceHeader>
-
-      <div className="workspace-team-projects-page__content">
+    <WorkspaceManagementLayout
+      title="Manage Team Projects"
+      pageClassName="workspace-team-projects-page"
+      contentClassName="workspace-team-projects-page__content"
+      actions={
+        <WorkspaceTeamProjectsHeaderActions
+          onBackToTeams={onBackToTeams}
+          onOpenCreateProject={() => setIsCreateModalOpen(true)}
+          canCreateProject={!!team}
+        />
+      }
+      hero={
         <WorkspaceTeamProjectsHero
           teamName={team?.name}
           teamDescription={team?.description}
           workspaceName={workspaceName}
           projectCount={sortedProjects.length}
         />
+      }
+      feedback={<WorkspaceTeamProjectsFeedback feedback={feedback} />}
+      loading={loading}
+      loadingNode={<WorkspaceTeamProjectsLoadingSkeleton />}
+    >
+      <div className="workspace-team-projects-page__layout">
+        <WorkspaceTeamProjectsProjectListSection
+          projects={sortedProjects}
+          selectedProjectId={selectedProject?.id ?? ''}
+          teamName={team?.name}
+          onSelectProject={handleSelectProject}
+        />
 
-        <WorkspaceTeamProjectsFeedback feedback={feedback} />
-
-        {loading ? (
-          <WorkspaceTeamProjectsLoadingSkeleton />
-        ) : (
-          <div className="workspace-team-projects-page__layout">
-            <WorkspaceTeamProjectsProjectListSection
-              projects={sortedProjects}
-              selectedProjectId={selectedProject?.id ?? ''}
-              teamName={team?.name}
-              onSelectProject={handleSelectProject}
-            />
-
-            <WorkspaceTeamProjectsEditorSection
-              selectedProject={selectedProject}
-              projectDraft={projectDraft}
-              teamName={team?.name ?? 'Team'}
-              workspaceName={workspaceName}
-              savingProjectId={savingProjectId}
-              deletingProjectId={deletingProjectId}
-              isDeleteEnabled={!!onDeleteProject}
-              onDraftChange={setProjectDraft}
-              onResetDraft={handleResetDraft}
-              onSubmit={handleSaveProject}
-              onDeleteProject={onDeleteProject ? handleDeleteProject : undefined}
-            />
-          </div>
-        )}
+        <WorkspaceTeamProjectsEditorSection
+          selectedProject={selectedProject}
+          projectDraft={projectDraft}
+          teamName={team?.name ?? 'Team'}
+          workspaceName={workspaceName}
+          savingProjectId={savingProjectId}
+          deletingProjectId={deletingProjectId}
+          isDeleteEnabled={!!onDeleteProject}
+          onDraftChange={setProjectDraft}
+          onResetDraft={handleResetDraft}
+          onSubmit={handleSaveProject}
+          onDeleteProject={onDeleteProject ? handleDeleteProject : undefined}
+        />
       </div>
 
       {isCreateModalOpen && (
@@ -269,6 +264,6 @@ export function WorkspaceTeamProjectsPanelPage({
           onConfirmDelete={handleConfirmDelete}
         />
       )}
-    </div>
+    </WorkspaceManagementLayout>
   );
 }

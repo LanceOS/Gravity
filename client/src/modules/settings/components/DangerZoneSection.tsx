@@ -1,24 +1,10 @@
 import React, { useState } from 'react';
 import { Card, Stack, TextInput, Alert, Button } from '@library';
-import type { WorkspaceSummary } from '../../../hooks/useWorkspaceDirectory';
+import { useSettingsScreenContext } from '../contexts/SettingsScreenContext';
 
-interface DangerZoneSectionProps {
-  workspace: WorkspaceSummary;
-  deleteLoading?: boolean;
-  deleteError?: string | null;
-  onDeleteWorkspace?: () => Promise<void>;
-  onClearDeleteError?: () => void;
-  isMobile?: boolean;
-}
+export function DangerZoneSection(): JSX.Element {
+  const { isMobile, workspace, deleteLoading, deleteError, onDeleteWorkspace, onClearDeleteError } = useSettingsScreenContext();
 
-export function DangerZoneSection({
-  workspace,
-  deleteLoading,
-  deleteError,
-  onDeleteWorkspace,
-  onClearDeleteError,
-  isMobile,
-}: DangerZoneSectionProps) {
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
 
   return (
