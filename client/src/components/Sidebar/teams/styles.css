@@ -41,7 +41,7 @@
 .teams-sidebar__sub-items-container {
   display: grid;
   grid-template-rows: 1fr;
-  transition: grid-template-rows 0.25s ease-out, opacity 0.25s ease-out;
+  transition: grid-template-rows var(--transition-normal), opacity var(--transition-normal);
   opacity: 1;
 }
 

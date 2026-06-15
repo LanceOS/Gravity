@@ -120,14 +120,14 @@ export function ProjectCreateOverlay({
 
   const feedbackMessage = formError || errorMessage;
   const modalFooter = (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-      <span style={{ fontSize: '11px', color: 'var(--color-text-disabled)' }}>Ctrl/Cmd + Enter creates the project.</span>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+        <span style={{ fontSize: '11px', color: 'var(--color-text-disabled)' }}>Ctrl/Cmd + Enter creates the project.</span>
 
       <div style={{ display: 'flex', gap: '8px' }}>
         <Button type="button" onClick={handleClose} disabled={loading}>
           Cancel
         </Button>
-        <Button type="submit" variant="primary" disabled={loading}>
+        <Button type="button" variant="primary" disabled={loading} onClick={() => void handleSubmit()}>
           <FolderPlus size={14} style={{ marginRight: '6px' }} />
           <span>{loading ? 'Creating Project...' : 'Create Project'}</span>
         </Button>

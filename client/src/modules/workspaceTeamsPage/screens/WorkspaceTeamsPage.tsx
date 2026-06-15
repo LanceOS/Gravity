@@ -162,6 +162,13 @@ export function WorkspaceTeamsPage({
       });
   };
 
+  const handleReassignChange = (teamId: string, reassignTeamId: string) => {
+    setReassignTeamById((next) => ({
+      ...next,
+      [teamId]: reassignTeamId,
+    }));
+  };
+
   const handleDeleteTeam = async (team: SidebarTeam) => {
     const reassignOptions = sortedTeams.filter((candidate) => candidate.id !== team.id);
     const reassignTeamId = reassignTeamById[team.id] || undefined;
@@ -426,8 +433,8 @@ export function WorkspaceTeamsPage({
                         sortedTeams={sortedTeams}
                         reassignTeamById={reassignTeamById}
                         savingAction={savingAction}
-                        onReassignChange={onReassignChange}
-                        onDelete={onDelete}
+                        onReassignChange={handleReassignChange}
+                        onDelete={handleDeleteTeam}
                       />
                     </div>
                   </div>
