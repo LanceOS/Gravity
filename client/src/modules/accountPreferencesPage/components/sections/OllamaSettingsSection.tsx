@@ -4,15 +4,39 @@ import { RefreshCw } from 'lucide-react';
 import { useIsMobile } from '../../../../hooks/useIsMobile';
 import { StatusNotice } from '../StatusNotice';
 import { getOllamaModelOptions, getOllamaModelValue, getOllamaMissingModelsMessage } from '../../utils/accountPreferences';
+import type { WorkspaceSettings } from '../../../../utils/settings';
 import {
   useAccountPreferencesOllamaContext,
   useAccountPreferencesSettingsContext,
 } from '../../../../context/accountPreferencesPage/accountPreferencesPageContextHooks';
 
-export function OllamaSettingsSection() {
-  const { settings, onChangeSettings } = useAccountPreferencesSettingsContext();
-  const { ollamaModels, ollamaModelsLoading, onRefreshOllamaModels } = useAccountPreferencesOllamaContext();
-  const isMobile = useIsMobile();
+interface OllamaSettingsSectionProps {
+  settings?: WorkspaceSettings;
+  ollamaModels?: string[];
+  ollamaModelsLoading?: boolean;
+  onChangeSettings?: (updates: Partial<WorkspaceSettings>) => void;
+  onRefreshOllamaModels?: () => void;
+  isMobile?: boolean;
+}
+
+export function OllamaSettingsSection({
+  settings: runtimeSettings,
+  ollamaModels: runtimeOllamaModels,
+  ollamaModelsLoading: runtimeOllamaModelsLoading,
+  onChangeSettings: runtimeOnChangeSettings,
+  onRefreshOllamaModels: runtimeOnRefreshOllamaModels,
+  isMobile: runtimeIsMobile,
+}: OllamaSettingsSectionProps = {}): JSX.Element {
+  const contextSettings = useAccountPreferencesSettingsContext();
+  const contextOllama = useAccountPreferencesOllamaContext();
+  const isMobileFromContext = useIsMobile();
+
+  const settings = runtimeSettings ?? contextSettings.settings;
+  const onChangeSettings = runtimeOnChangeSettings ?? contextSettings.onChangeSettings;
+  const ollamaModels = runtimeOllamaModels ?? contextOllama.ollamaModels;
+  const ollamaModelsLoading = runtimeOllamaModelsLoading ?? contextOllama.ollamaModelsLoading;
+  const onRefreshOllamaModels = runtimeOnRefreshOllamaModels ?? contextOllama.onRefreshOllamaModels;
+  const isMobile = runtimeIsMobile ?? isMobileFromContext;
 
   const detectedModelValue = getOllamaModelValue(ollamaModels, settings.ollamaModel);
   const modelOptions = getOllamaModelOptions(ollamaModels, ollamaModelsLoading);
