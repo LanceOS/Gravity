@@ -44,15 +44,13 @@ export async function getSidebarTree(workspaceId: string) {
 
     const teamIds = workspaceTeams.map((t) => t.id);
 
-    // 3. Fetch all cycles in the workspace teams
-    const cycleRows = teamIds.length > 0
-      ? await db.select().from(cycles).where(inArray(cycles.teamId, teamIds)).orderBy(asc(cycles.startDate))
-      : [];
-
-    // 4. Fetch all labels in the workspace teams
-    const labelRows = teamIds.length > 0
-      ? await db.select().from(labels).where(inArray(labels.teamId, teamIds)).orderBy(asc(labels.createdAt))
-      : [];
+    // 3/4. Fetch all cycles and labels in parallel for workspace teams.
+    const [cycleRows, labelRows] = teamIds.length > 0
+      ? await Promise.all([
+          db.select().from(cycles).where(inArray(cycles.teamId, teamIds)).orderBy(asc(cycles.startDate)),
+          db.select().from(labels).where(inArray(labels.teamId, teamIds)).orderBy(asc(labels.createdAt)),
+        ])
+      : [[], []];
 
     // Group by teamId
     const projectsByTeam = new Map<string, Array<typeof projects.$inferSelect>>();
