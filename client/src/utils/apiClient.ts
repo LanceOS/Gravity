@@ -51,7 +51,7 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
   };
 
   if (projectId) {
-    (config.headers as Record<string, string>)['X-Project-Id'] = projectId;
+    (config.headers as Record<string, string>)['x-project-id'] = projectId;
   }
 
   const response = await fetch(url, config);

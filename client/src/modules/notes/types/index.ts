@@ -7,3 +7,7 @@ export interface NoteMetadata {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface Note extends NoteMetadata {
+  body: string;
+}

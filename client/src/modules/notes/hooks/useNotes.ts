@@ -1,21 +1,26 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { CACHE_CONFIGS, queryKeys } from '../../../utils/queryClient';
-import { apiClient } from '../../../utils/apiClient';
 import type { NoteMetadata } from '../types';
+import { notesService, type NotesService } from '../services/notesService';
 
-export function useNotes(projectId: string, sortDirection: 'desc' | 'asc' = 'desc') {
+interface UseNotesOptions {
+  notesService?: NotesService;
+}
+
+export function useNotes(projectId: string, sortDirection: 'desc' | 'asc' = 'desc', { notesService: clientNotesService = notesService }: UseNotesOptions = {}) {
   const limit = 20;
 
   const query = useInfiniteQuery<NoteMetadata[]>({
     queryKey: [...queryKeys.notes(projectId), sortDirection],
     queryFn: async ({ pageParam = 0 }) => {
-      return apiClient.get<NoteMetadata[]>('/notes', {
-        projectId,
-        params: {
-          limit: `${limit}`,
-          offset: `${pageParam}`,
-          sort: sortDirection,
-        },
+      if (!projectId) {
+        return [];
+      }
+
+      return clientNotesService.listNotes(projectId, {
+        limit,
+        offset: pageParam,
+        sort: sortDirection,
       });
     },
     initialPageParam: 0,
