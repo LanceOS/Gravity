@@ -25,6 +25,7 @@ export interface WorkspaceProjectPanelProps {
     updates: { name?: string; color?: string; description?: string; sortOrder?: number }
   ) => Promise<void>;
   onDeleteLabel: (labelId: string) => Promise<void>;
+  confirmDeleteLabel?: (message: string) => boolean | Promise<boolean>;
 }
 
 export interface WorkspaceProjectsPageProps {

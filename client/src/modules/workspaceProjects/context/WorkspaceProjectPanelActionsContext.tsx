@@ -1,7 +1,13 @@
-import { createContext, useCallback, useContext, type FormEvent, type PropsWithChildren } from 'react';
+import { createContext, useCallback, useContext, useMemo, type FormEvent, type PropsWithChildren } from 'react';
 
 import type { Label } from '../../../context/TicketContext';
-import { createProjectSettingsFeedback, DEFAULT_LABEL_COLOR, sanitizeProjectKey, validateGithubRepoUrl } from '../utils/WorkspaceProjectPanel';
+import {
+  createProjectSettingsFeedback,
+  createWorkspaceProjectPanelCreateProjectFormFactory,
+  createWorkspaceProjectPanelLabelFormFactory,
+  DEFAULT_LABEL_COLOR,
+  validateGithubRepoUrl,
+} from '../utils/WorkspaceProjectPanel';
 import type { WorkspaceProjectPanelProps } from '../types/WorkspaceProjectPanel';
 import { useWorkspaceProjectPanelLabelStateContext } from './WorkspaceProjectPanelLabelStateContextCore';
 import { useWorkspaceProjectPanelProjectStateContext } from './WorkspaceProjectPanelProjectStateContext';
@@ -10,6 +16,9 @@ type WorkspaceProjectPanelActionCallbacks = Pick<
   WorkspaceProjectPanelProps,
   'onSelectProject' | 'onCreateProject' | 'onUpdateProject' | 'onCreateLabel' | 'onUpdateLabel' | 'onDeleteLabel'
 >;
+type WorkspaceProjectPanelActionOptions = WorkspaceProjectPanelActionCallbacks & {
+  confirmDeleteLabel?: (message: string) => boolean | Promise<boolean>;
+};
 
 export interface WorkspaceProjectPanelActionsContextValue {
   isCreateProjectModalOpen: boolean;
@@ -34,7 +43,15 @@ export function WorkspaceProjectPanelActionsContextProvider({
   onCreateLabel,
   onUpdateLabel,
   onDeleteLabel,
-}: PropsWithChildren<WorkspaceProjectPanelActionCallbacks>): JSX.Element {
+  confirmDeleteLabel,
+}: PropsWithChildren<WorkspaceProjectPanelActionOptions>): JSX.Element {
+  const {
+    buildValidatedPayload,
+  } = useMemo(() => createWorkspaceProjectPanelCreateProjectFormFactory(), []);
+  const {
+    buildValidatedPayload: buildValidatedLabelPayload,
+  } = useMemo(() => createWorkspaceProjectPanelLabelFormFactory(), []);
+
   const {
     setManagedProjectId,
     managedProject,
@@ -52,7 +69,6 @@ export function WorkspaceProjectPanelActionsContextProvider({
     setLabelColor,
     labelDescription,
     setLabelDescription,
-    labelFormError,
     setLabelFormError,
     editingLabelId,
     setEditingLabelId,
@@ -71,6 +87,10 @@ export function WorkspaceProjectPanelActionsContextProvider({
     clearLabelEditor,
   } = useWorkspaceProjectPanelLabelStateContext();
 
+  const deleteLabelConfirmation =
+    confirmDeleteLabel ??
+    ((message: string) => (typeof window === 'undefined' ? true : window.confirm(message)));
+
   const openCreateProjectModal = useCallback(() => {
     setIsCreateModalOpen(true);
   }, [setIsCreateModalOpen]);
@@ -81,18 +101,23 @@ export function WorkspaceProjectPanelActionsContextProvider({
 
   const createProject = useCallback(
     async (project: { name: string; description: string; key: string }) => {
-      try {
-        await onCreateProject({
-          name: project.name.trim(),
-          key: sanitizeProjectKey(project.key),
-          description: project.description.trim(),
-        });
-        setIsCreateModalOpen(false);
-      } catch {
-        // The parent surfaces the error message.
+      const { value, error } = buildValidatedPayload({
+        name: project.name,
+        description: project.description,
+        key: project.key,
+      });
+      if (error) {
+        throw new Error(error);
       }
+
+      await onCreateProject({
+        name: value.name,
+        key: value.key,
+        description: value.description,
+      });
+      setIsCreateModalOpen(false);
     },
-    [onCreateProject, setIsCreateModalOpen]
+    [buildValidatedPayload, onCreateProject, setIsCreateModalOpen]
   );
 
   const createLabel = useCallback(
@@ -100,31 +125,38 @@ export function WorkspaceProjectPanelActionsContextProvider({
       event.preventDefault();
       setLabelFormError(null);
 
-      if (!managedProject || !labelName.trim()) {
-        setLabelFormError('Please enter a label name.');
+      const { value, error } = buildValidatedLabelPayload({
+        name: labelName,
+        color: labelColor,
+        description: labelDescription,
+      });
+
+      if (!managedProject || error) {
+        setLabelFormError(error || 'Please select a project before creating labels.');
         return;
       }
 
       try {
         await onCreateLabel({
           projectId: managedProject.id,
-          name: labelName.trim(),
-          color: labelColor,
-          description: labelDescription.trim(),
+          name: value.name,
+          color: value.color,
+          description: value.description,
           sortOrder: nextLabelSortOrder,
         });
 
         setLabelName('');
         setLabelColor(DEFAULT_LABEL_COLOR);
         setLabelDescription('');
-      } catch {
-        // The parent surfaces the error message.
+      } catch (error) {
+        setLabelFormError(error instanceof Error ? error.message : 'Failed to create label.');
       }
     },
     [
       labelColor,
       labelDescription,
       labelName,
+      buildValidatedLabelPayload,
       managedProject,
       nextLabelSortOrder,
       onCreateLabel,
@@ -150,8 +182,14 @@ export function WorkspaceProjectPanelActionsContextProvider({
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
 
-      if (!editingLabelId || !editingLabelName.trim()) {
-        setEditingLabelError('Please enter a label name.');
+      const { value, error } = buildValidatedLabelPayload({
+        name: editingLabelName,
+        color: editingLabelColor,
+        description: editingLabelDescription,
+      });
+
+      if (!editingLabelId || error) {
+        setEditingLabelError(error || 'Please select a label to edit.');
         return;
       }
 
@@ -160,9 +198,9 @@ export function WorkspaceProjectPanelActionsContextProvider({
 
       try {
         await onUpdateLabel(editingLabelId, {
-          name: editingLabelName.trim(),
-          color: editingLabelColor,
-          description: editingLabelDescription.trim(),
+          name: value.name,
+          color: value.color,
+          description: value.description,
         });
       } catch (error) {
         setEditingLabelError(error instanceof Error ? error.message : 'Failed to update label.');
@@ -175,6 +213,7 @@ export function WorkspaceProjectPanelActionsContextProvider({
       editingLabelDescription,
       editingLabelId,
       editingLabelName,
+      buildValidatedLabelPayload,
       onUpdateLabel,
       setEditingLabelError,
       setEditingLabelLoading,
@@ -186,8 +225,9 @@ export function WorkspaceProjectPanelActionsContextProvider({
       return;
     }
 
-    const confirmDelete =
-      typeof window === 'undefined' ? true : window.confirm(`Delete label "${activeLabel.name}"? It will be removed from all tickets.`);
+    const confirmDelete = await deleteLabelConfirmation(
+      `Delete label "${activeLabel.name}"? It will be removed from all tickets.`
+    );
     if (!confirmDelete) {
       return;
     }
@@ -203,7 +243,7 @@ export function WorkspaceProjectPanelActionsContextProvider({
     } finally {
       setEditingLabelLoading(false);
     }
-  }, [activeLabel, clearLabelEditor, onDeleteLabel, setEditingLabelError, setEditingLabelLoading]);
+  }, [activeLabel, clearLabelEditor, deleteLabelConfirmation, onDeleteLabel, setEditingLabelError, setEditingLabelLoading]);
 
   const selectProject = useCallback(
     (projectId: string) => {
@@ -246,21 +286,35 @@ export function WorkspaceProjectPanelActionsContextProvider({
     [githubRepoUrl, managedProject, onUpdateProject, setIsProjectSettingsSaving, setSettingsFeedback]
   );
 
+  const contextValue = useMemo(
+    () => ({
+      isCreateProjectModalOpen: isCreateModalOpen,
+      openCreateProjectModal,
+      closeCreateProjectModal,
+      createProject,
+      selectProject,
+      createLabel,
+      startEditingLabel,
+      updateLabel,
+      deleteLabel,
+      saveProjectSettings,
+    }),
+    [
+      closeCreateProjectModal,
+      createLabel,
+      createProject,
+      deleteLabel,
+      isCreateModalOpen,
+      openCreateProjectModal,
+      saveProjectSettings,
+      selectProject,
+      startEditingLabel,
+      updateLabel,
+    ]
+  );
+
   return (
-    <WorkspaceProjectPanelActionsContext.Provider
-      value={{
-        isCreateProjectModalOpen: isCreateModalOpen,
-        openCreateProjectModal,
-        closeCreateProjectModal,
-        createProject,
-        selectProject,
-        createLabel,
-        startEditingLabel,
-        updateLabel,
-        deleteLabel,
-        saveProjectSettings,
-      }}
-    >
+    <WorkspaceProjectPanelActionsContext.Provider value={contextValue}>
       {children}
     </WorkspaceProjectPanelActionsContext.Provider>
   );

@@ -23,6 +23,40 @@ export interface UseWorkspaceProjectPanelProjectStateResult {
   setGithubRepoUrl: Dispatch<SetStateAction<string>>;
 }
 
+function createProjectLookup(projects: Project[]): Map<string, Project> {
+  const lookup = new Map<string, Project>();
+
+  for (const project of projects) {
+    lookup.set(project.id, project);
+  }
+
+  return lookup;
+}
+
+function resolveManagedProjectId({
+  projects,
+  activeProjectId,
+  managedProjectId,
+}: {
+  projects: Project[];
+  activeProjectId: string;
+  managedProjectId: string;
+}): string {
+  if (!projects.length) {
+    return '';
+  }
+
+  if (activeProjectId && projects.some((project) => project.id === activeProjectId)) {
+    return activeProjectId;
+  }
+
+  if (managedProjectId && projects.some((project) => project.id === managedProjectId)) {
+    return managedProjectId;
+  }
+
+  return projects[0].id;
+}
+
 export function useWorkspaceProjectPanelProjectState({
   projects,
   activeProjectId,
@@ -32,14 +66,13 @@ export function useWorkspaceProjectPanelProjectState({
   const [settingsFeedback, setSettingsFeedback] = useState<ProjectSettingsFeedback>(null);
   const [githubRepoUrl, setGithubRepoUrl] = useState('');
 
-  const managedProject = useMemo(
-    () => projects.find((project) => project.id === managedProjectId) || null,
-    [projects, managedProjectId]
-  );
+  const projectLookup = useMemo(() => createProjectLookup(projects), [projects]);
+
+  const managedProject = useMemo(() => projectLookup.get(managedProjectId) || null, [managedProjectId, projectLookup]);
 
   const currentProject = useMemo(
-    () => projects.find((project) => project.id === activeProjectId) || managedProject || projects[0] || null,
-    [activeProjectId, managedProject, projects]
+    () => projectLookup.get(activeProjectId) || managedProject || projects[0] || null,
+    [activeProjectId, managedProject, projectLookup, projects]
   );
 
   const projectStrip = useMemo(() => {
@@ -59,20 +92,14 @@ export function useWorkspaceProjectPanelProjectState({
   }, [activeProjectId, managedProject]);
 
   useEffect(() => {
-    if (projects.length === 0) {
-      setManagedProjectId('');
-      return;
-    }
-
-    if (activeProjectId && projects.some((project) => project.id === activeProjectId)) {
-      setManagedProjectId(activeProjectId);
-      return;
-    }
-
-    if (!projects.some((project) => project.id === managedProjectId)) {
-      setManagedProjectId(projects[0].id);
-    }
-  }, [activeProjectId, managedProjectId, projects]);
+    setManagedProjectId((currentId) =>
+      resolveManagedProjectId({
+        projects,
+        activeProjectId,
+        managedProjectId: currentId,
+      })
+    );
+  }, [activeProjectId, projects]);
 
   useEffect(() => {
     if (!managedProject) {

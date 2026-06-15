@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { FolderPlus } from 'lucide-react';
 import { Button, TextInput, Textarea, Modal, Alert } from '@library';
 
 import type { ProjectCreateOverlayProps } from '../types/WorkspaceProjectPanel';
-import { sanitizeProjectKey } from '../utils/WorkspaceProjectPanel';
+import { createWorkspaceProjectPanelCreateProjectFormFactory } from '../utils/WorkspaceProjectPanel';
 
 export function ProjectCreateOverlay({
   loading,
@@ -15,41 +15,50 @@ export function ProjectCreateOverlay({
   const [projectKey, setProjectKey] = useState('');
   const [projectDescription, setProjectDescription] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
+  const formFactory = useMemo(() => createWorkspaceProjectPanelCreateProjectFormFactory(), []);
+
+  const resetForm = useCallback(() => {
+    setProjectName('');
+    setProjectKey('');
+    setProjectDescription('');
+    setFormError(null);
+  }, []);
 
   const handleClose = useCallback(() => {
     if (!loading) {
+      resetForm();
       onClose();
     }
-  }, [loading, onClose]);
+  }, [loading, onClose, resetForm]);
 
   const handleSubmit = useCallback(
-    async (event?: React.SubmitEvent<HTMLFormElement>) => {
-    event?.preventDefault();
-    setFormError(null);
+    async (event?: FormEvent<HTMLFormElement>) => {
+      event?.preventDefault();
+      setFormError(null);
 
-    if (!projectName.trim()) {
-      setFormError('Please enter a project name.');
-      return;
-    }
-
-    if (!projectKey.trim()) {
-      setFormError('Please enter a project key.');
-      return;
-    }
-
-    try {
-      await onSubmitProject({
-        name: projectName.trim(),
-        key: projectKey.trim(),
-        description: projectDescription.trim(),
+      const { value, error } = formFactory.buildValidatedPayload({
+        name: projectName,
+        description: projectDescription,
+        key: projectKey,
       });
-    } catch {
-      // Server-side submission errors are surfaced via the parent-provided
-      // errorMessage prop. Keep formError reserved for client-side validation
-      // so a generic fallback does not mask a later, more specific error.
-    }
+
+      if (error) {
+        setFormError(error);
+        return;
+      }
+
+      try {
+        await onSubmitProject({
+          name: value.name,
+          description: value.description,
+          key: value.key,
+        });
+        resetForm();
+      } catch (error) {
+        setFormError(error instanceof Error ? error.message : 'Failed to create project.');
+      }
     },
-    [projectDescription, onSubmitProject, projectKey, projectName]
+    [formFactory, onSubmitProject, projectDescription, projectKey, projectName, resetForm]
   );
 
   useEffect(() => {
@@ -111,7 +120,7 @@ export function ProjectCreateOverlay({
           <TextInput
             label="Project Key"
             value={projectKey}
-            onChange={(event) => setProjectKey(sanitizeProjectKey(event.target.value))}
+            onChange={(event) => setProjectKey(formFactory.sanitizeProjectKey(event.target.value))}
             placeholder="CORE"
             maxLength={8}
             required

@@ -31,6 +31,7 @@ export function WorkspaceProjectPanelPage({
   onCreateLabel,
   onUpdateLabel,
   onDeleteLabel,
+  confirmDeleteLabel,
 }: WorkspaceProjectPanelProps) {
   return (
     <WorkspaceProjectPanelContextProviders
@@ -43,6 +44,7 @@ export function WorkspaceProjectPanelPage({
       onCreateLabel={onCreateLabel}
       onUpdateLabel={onUpdateLabel}
       onDeleteLabel={onDeleteLabel}
+      confirmDeleteLabel={confirmDeleteLabel}
     >
       <WorkspaceProjectPanelPageContent
         workspaceName={workspaceName}

@@ -11,6 +11,7 @@ type WorkspaceProjectPanelContextProvidersProps = {
   projects: Project[];
   activeProjectId: string;
   labels: Label[];
+  confirmDeleteLabel?: (message: string) => boolean | Promise<boolean>;
 } & Pick<
   WorkspaceProjectPanelProps,
   'onSelectProject' | 'onCreateProject' | 'onUpdateProject' | 'onCreateLabel' | 'onUpdateLabel' | 'onDeleteLabel'
@@ -27,6 +28,7 @@ export function WorkspaceProjectPanelContextProviders({
   onCreateLabel,
   onUpdateLabel,
   onDeleteLabel,
+  confirmDeleteLabel,
 }: WorkspaceProjectPanelContextProvidersProps): JSX.Element {
   return (
     <WorkspaceProjectPanelProjectStateProvider projects={projects} activeProjectId={activeProjectId}>
@@ -38,6 +40,7 @@ export function WorkspaceProjectPanelContextProviders({
           onCreateLabel={onCreateLabel}
           onUpdateLabel={onUpdateLabel}
           onDeleteLabel={onDeleteLabel}
+          confirmDeleteLabel={confirmDeleteLabel}
         >
           {children}
         </WorkspaceProjectPanelActionsContextProvider>

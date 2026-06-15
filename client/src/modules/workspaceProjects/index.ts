@@ -9,6 +9,7 @@ export {
   PROJECT_LIFECYCLE_OPTIONS,
   getNextLabelSortOrder,
   sanitizeProjectKey,
+  createWorkspaceProjectPanelLabelFormFactory,
   validateGithubRepoUrl,
   createProjectSettingsFeedback,
 } from './utils/WorkspaceProjectPanel';
