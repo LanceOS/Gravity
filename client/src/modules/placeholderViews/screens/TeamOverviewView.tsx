@@ -62,6 +62,6 @@ export default function TeamOverviewView() {
           <div>Gravity Core, Analytics</div>
         </div>
       </div>
-    ../../../layouts/PlaceholderLayout/PlaceholderLayout>
+    </PlaceholderLayout>
   );
 }

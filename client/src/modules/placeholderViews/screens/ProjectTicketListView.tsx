@@ -42,6 +42,6 @@ export default function ProjectTicketListView() {
           <div style={{ color: '#ef4444' }}>Todo</div>
         </div>
       </div>
-    ../../../layouts/PlaceholderLayout/PlaceholderLayout>
+    </PlaceholderLayout>
   );
 }

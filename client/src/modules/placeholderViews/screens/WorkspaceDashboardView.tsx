@@ -61,6 +61,6 @@ export default function WorkspaceDashboardView() {
           <div>1 day ago</div>
         </div>
       </div>
-    ../../../layouts/PlaceholderLayout/PlaceholderLayout>
+    </PlaceholderLayout>
   );
 }

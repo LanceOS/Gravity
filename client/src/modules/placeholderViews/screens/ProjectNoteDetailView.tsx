@@ -36,6 +36,6 @@ export default function ProjectNoteDetailView() {
           </ul>
         </div>
       </div>
-    ../../../layouts/PlaceholderLayout/PlaceholderLayout>
+    </PlaceholderLayout>
   );
 }

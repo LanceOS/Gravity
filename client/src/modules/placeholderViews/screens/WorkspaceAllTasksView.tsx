@@ -47,6 +47,6 @@ export default function WorkspaceAllTasksView() {
           <div style={{ color: '#3b82f6' }}>In Review</div>
         </div>
       </div>
-    ../../../layouts/PlaceholderLayout/PlaceholderLayout>
+    </PlaceholderLayout>
   );
 }

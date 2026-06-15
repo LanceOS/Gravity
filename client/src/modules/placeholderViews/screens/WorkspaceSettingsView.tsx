@@ -33,6 +33,6 @@ export default function WorkspaceSettingsView() {
           </div>
         </div>
       </div>
-    ../../../layouts/PlaceholderLayout/PlaceholderLayout>
+    </PlaceholderLayout>
   );
 }

@@ -32,6 +32,6 @@ export default function ProjectOverviewView() {
           <div className="card-value">5</div>
         </div>
       </div>
-    ../../../layouts/PlaceholderLayout/PlaceholderLayout>
+    </PlaceholderLayout>
   );
 }

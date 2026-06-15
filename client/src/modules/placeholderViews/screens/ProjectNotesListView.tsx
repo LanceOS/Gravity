@@ -29,6 +29,6 @@ export default function ProjectNotesListView() {
           <span style={{ fontSize: '11px', color: '#64748b' }}>Last updated: 1d ago</span>
         </div>
       </div>
-    ../../../layouts/PlaceholderLayout/PlaceholderLayout>
+    </PlaceholderLayout>
   );
 }

@@ -79,6 +79,6 @@ export default function TeamCycleViewView() {
           </ul>
         </div>
       </div>
-    ../../../layouts/PlaceholderLayout/PlaceholderLayout>
+    </PlaceholderLayout>
   );
 }

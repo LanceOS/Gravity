@@ -47,6 +47,6 @@ export default function TeamAllTasksView() {
           <div style={{ color: '#10b981' }}>Done</div>
         </div>
       </div>
-    ../../../layouts/PlaceholderLayout/PlaceholderLayout>
+    </PlaceholderLayout>
   );
 }

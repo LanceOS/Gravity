@@ -31,6 +31,6 @@ export default function TeamSpecificViewView() {
           <div><code>Priority (Desc), Due Date (Asc)</code></div>
         </div>
       </div>
-    ../../../layouts/PlaceholderLayout/PlaceholderLayout>
+    </PlaceholderLayout>
   );
 }

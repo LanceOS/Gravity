@@ -194,3 +194,5 @@ export function PlaceholderLayout({
     </div>
   );
 }
+
+export default PlaceholderLayout;

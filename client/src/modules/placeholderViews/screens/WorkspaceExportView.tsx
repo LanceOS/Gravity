@@ -30,6 +30,6 @@ export default function WorkspaceExportView() {
           Start Export Action
         </button>
       </div>
-    ../../../layouts/PlaceholderLayout/PlaceholderLayout>
+    </PlaceholderLayout>
   );
 }

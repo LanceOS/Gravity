@@ -52,6 +52,6 @@ export default function ProjectTicketDetailView() {
           <div style={{ color: '#64748b', fontSize: '12px' }}>1h ago</div>
         </div>
       </div>
-    ../../../layouts/PlaceholderLayout/PlaceholderLayout>
+    </PlaceholderLayout>
   );
 }
