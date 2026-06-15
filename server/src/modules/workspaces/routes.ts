@@ -44,9 +44,10 @@ import { createRateLimiter } from '../../lib/rateLimit.js';
 import { createRedisRateLimiter } from '../../lib/rateLimitRedis.js';
 import { getRequestSourceIp } from '../../lib/request-ip.js';
 import {
-  isWorkspaceMember,
   authorizeWorkspaceOwnerAccess,
   authorizeWorkspaceOwnerOrAdminAccess,
+  authorizeWorkspaceAccess,
+  getWorkspaceMemberRole,
   invalidateWorkspaceMembershipCache,
   invalidateWorkspaceMembershipCaches,
 } from './services/membership.js';
@@ -269,14 +270,9 @@ export function createWorkspacesRouter() {
       res.status(400).json({ error: 'workspaceId is required.' });
       return;
     }
-    const actorUserId = await resolveRequestActorUserId(req);
-    if (!actorUserId) {
-      res.status(401).json({ error: 'Authentication required.' });
-      return;
-    }
-    const isMember = await isWorkspaceMember(workspaceId, actorUserId);
-    if (!isMember) {
-      res.status(403).json({ error: 'Access denied: not a member of the workspace.' });
+    const auth = await authorizeWorkspaceAccess(req, workspaceId);
+    if (!auth.allowed) {
+      res.status(auth.status).json({ error: auth.error });
       return;
     }
 
@@ -383,24 +379,14 @@ export function createWorkspacesRouter() {
         return;
       }
 
-      // Record activity only for authenticated workspace members
-      const actorUserId = await resolveRequestActorUserId(req);
-      if (actorUserId) {
-        const [membership] = await db
-          .select({ userId: workspaceMembers.userId })
-          .from(workspaceMembers)
-          .where(
-            and(
-              eq(workspaceMembers.workspaceId, workspaceId),
-              eq(workspaceMembers.userId, actorUserId),
-            ),
-          )
-          .limit(1);
-
-        if (membership) {
-          await recordWorkspaceActivity(workspaceId, actorUserId);
-        }
+    // Record activity only for authenticated workspace members
+    const actorUserId = await resolveRequestActorUserId(req);
+    if (actorUserId) {
+      const membershipRole = await getWorkspaceMemberRole(workspaceId, actorUserId);
+      if (membershipRole !== null) {
+        await recordWorkspaceActivity(workspaceId, actorUserId);
       }
+    }
 
       res.json(settings);
     } catch (error) {
@@ -788,13 +774,13 @@ export function createWorkspacesRouter() {
     }
 
     try {
-      const membershipRows = await db
-        .select()
-        .from(workspaceMembers)
-        .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, actorUserId)))
-        .limit(1);
-      const membership = membershipRows[0];
-      if (!membership || !['owner', 'admin'].includes(membership.role)) {
+      const auth = await authorizeWorkspaceAccess(req, workspaceId);
+      if (!auth.allowed) {
+        res.status(auth.status).json({ error: auth.error });
+        return;
+      }
+
+      if (auth.workspaceRole !== 'owner' && auth.workspaceRole !== 'admin') {
         res.status(403).json({ error: 'Owner or admin access is required.' });
         return;
       }
@@ -842,8 +828,13 @@ export function createWorkspacesRouter() {
     }
 
     try {
-      const member = await isWorkspaceMember(workspaceId, actorUserId);
-      if (!member) {
+      const auth = await authorizeWorkspaceAccess(req, workspaceId);
+      if (!auth.allowed) {
+        res.status(auth.status).json({ error: auth.error });
+        return;
+      }
+
+      if (auth.workspaceRole === null) {
         res.status(403).json({ error: 'Workspace membership required.' });
         return;
       }
@@ -890,18 +881,16 @@ export function createWorkspacesRouter() {
     }
 
     try {
-      const member = await isWorkspaceMember(workspaceId, actorUserId);
-      if (!member) {
-        res.status(403).json({ error: 'Workspace membership required.' });
+      const auth = await authorizeWorkspaceAccess(req, workspaceId);
+      if (!auth.allowed) {
+        res.status(auth.status).json({ error: auth.error });
         return;
       }
 
-      const membershipRows = await db
-        .select()
-        .from(workspaceMembers)
-        .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, actorUserId)))
-        .limit(1);
-      const membership = membershipRows[0];
+      if (auth.workspaceRole === null) {
+        res.status(403).json({ error: 'Workspace membership required.' });
+        return;
+      }
 
       const tokenRows = await db
         .select()
@@ -914,7 +903,7 @@ export function createWorkspacesRouter() {
         return;
       }
 
-      const isOwnerOrAdmin = membership && ['owner', 'admin'].includes(membership.role);
+      const isOwnerOrAdmin = auth.workspaceRole === 'owner' || auth.workspaceRole === 'admin';
       if (tokenRow.generatedBy !== actorUserId && !isOwnerOrAdmin) {
         res.status(403).json({ error: 'Insufficient privileges to refresh token.' });
         return;
@@ -960,12 +949,11 @@ export function createWorkspacesRouter() {
     }
 
     try {
-      const membershipRows = await db
-        .select()
-        .from(workspaceMembers)
-        .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, actorUserId)))
-        .limit(1);
-      const membership = membershipRows[0];
+      const auth = await authorizeWorkspaceAccess(req, workspaceId);
+      if (!auth.allowed) {
+        res.status(auth.status).json({ error: auth.error });
+        return;
+      }
 
       // Allow revoke if token owner or workspace owner/admin
       const tokenRows = await db
@@ -979,7 +967,7 @@ export function createWorkspacesRouter() {
         return;
       }
 
-      const isOwnerOrAdmin = membership && ['owner', 'admin'].includes(membership.role);
+      const isOwnerOrAdmin = auth.workspaceRole === 'owner' || auth.workspaceRole === 'admin';
       if (token.generatedBy !== actorUserId && !isOwnerOrAdmin) {
         res.status(403).json({ error: 'Insufficient privileges to revoke token.' });
         return;
@@ -1006,13 +994,13 @@ export function createWorkspacesRouter() {
     }
 
     try {
-      const membershipRows = await db
-        .select()
-        .from(workspaceMembers)
-        .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, actorUserId)))
-        .limit(1);
-      const membership = membershipRows[0];
-      if (!membership || !['owner', 'admin'].includes(membership.role)) {
+      const auth = await authorizeWorkspaceAccess(req, workspaceId);
+      if (!auth.allowed) {
+        res.status(auth.status).json({ error: auth.error });
+        return;
+      }
+
+      if (auth.workspaceRole !== 'owner' && auth.workspaceRole !== 'admin') {
         res.status(403).json({ error: 'Owner or admin access is required.' });
         return;
       }
@@ -1091,13 +1079,9 @@ export function createWorkspacesRouter() {
       const workspaceId = String(invite.workspaceId);
 
       // Check if user is already a member of the workspace
-      const existingMembership = await db
-        .select()
-        .from(workspaceMembers)
-        .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, userId)))
-        .limit(1);
+      const existingMembership = await getWorkspaceMemberRole(workspaceId, userId);
 
-      if (existingMembership[0]) {
+      if (existingMembership !== null) {
         res.status(200).json({
           id: '',
           workspaceId,

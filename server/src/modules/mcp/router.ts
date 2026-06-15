@@ -1,7 +1,7 @@
 import { type Request, type Response, Router } from 'express';
 import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
 import { handleMcpRequest } from './request-handler.js';
-import { isWorkspaceMember } from '../workspaces/services/membership.js';
+import { McpWorkspaceAccessService } from './access.js';
 import { createMcpErrorResponse } from './responses.js';
 import { createRateLimiter } from '../../lib/rateLimit.js';
 import { createRedisRateLimiter } from '../../lib/rateLimitRedis.js';
@@ -9,12 +9,22 @@ import { env } from '../../env.js';
 import { recordFailedAttempt, isBlocked, resetAttempts } from '../../lib/authThrottle.js';
 import { getRequestSourceIp } from '../../lib/request-ip.js';
 
+export interface McpRouterDependencies {
+  workspaceAccessService?: McpWorkspaceAccessService;
+}
+
 /**
  * @description Builds the HTTP MCP transport. Request authentication and
  * workspace guard failures stay HTTP-native here before control passes to the
  * JSON-RPC handler.
  */
 export class McpRouterFactory {
+    private readonly workspaceAccessService: McpWorkspaceAccessService;
+
+    constructor(dependencies: McpRouterDependencies = {}) {
+      this.workspaceAccessService = dependencies.workspaceAccessService ?? new McpWorkspaceAccessService();
+    }
+
     /**
      * @description Creates the Express router that serves the MCP HTTP endpoint.
      * @return The configured MCP router instance.
@@ -75,7 +85,7 @@ export class McpRouterFactory {
                         }
 
                         if (actorUserId) {
-                            const hasAccess = await isWorkspaceMember(workspaceId, actorUserId);
+                            const hasAccess = await this.workspaceAccessService.hasWorkspaceAccess(workspaceId, actorUserId);
                             if (!hasAccess) {
                                 res.status(403).json({ error: 'Unauthorized workspace access.' });
                                 return;
@@ -165,4 +175,3 @@ const defaultRouterFactory = new McpRouterFactory();
 export function createMcpRouter() {
     return defaultRouterFactory.create();
 }
-
