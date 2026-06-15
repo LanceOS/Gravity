@@ -596,9 +596,14 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return response.json() as Promise<Ticket>;
     },
     onSuccess: (createdTicket, ticketInput) => {
+      const normalizedTicket: Ticket = {
+        ...createdTicket,
+        status: canonicalizeStatus(createdTicket.status),
+      };
+
       if (ticketInput.projectId === activeProjectIdRef.current) {
         queryClient.setQueryData<Ticket[]>(queryKeys.tickets(activeProjectIdRef.current), (old) =>
-          old ? [...old, createdTicket] : [createdTicket]
+          old ? [...old, normalizedTicket] : [normalizedTicket]
         );
       }
       invalidateAggregateTicketQueries(ticketInput.projectId);

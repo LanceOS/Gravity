@@ -14,19 +14,34 @@ interface UseWorkspaceCreateTicketDialogResult {
   handleOpenCreateSubtask: (parentId: string) => void;
 }
 
+const VALID_TICKET_STATUSES = new Set<Ticket['status']>([
+  'backlog',
+  'todo',
+  'in_progress',
+  'in_review',
+  'done',
+  'canceled',
+]);
+
 export function useWorkspaceCreateTicketDialog({
   hasActiveWorkspaceProjects,
   setCreateInitialStatus,
   setCreateParentId,
   setIsCreateModalOpen,
 }: UseWorkspaceCreateTicketDialogArgs): UseWorkspaceCreateTicketDialogResult {
+  const normalizeInitialStatus = (initialStatus?: unknown): Ticket['status'] | undefined => {
+    return typeof initialStatus === 'string' && VALID_TICKET_STATUSES.has(initialStatus as Ticket['status'])
+      ? (initialStatus as Ticket['status'])
+      : undefined;
+  };
+
   const handleOpenCreateTicket = useCallback(
-    (initialStatus?: Ticket['status']) => {
+    (initialStatus?: unknown) => {
       if (!hasActiveWorkspaceProjects) {
         return;
       }
 
-      setCreateInitialStatus(initialStatus);
+      setCreateInitialStatus(normalizeInitialStatus(initialStatus));
       setCreateParentId(undefined);
       setIsCreateModalOpen(true);
     },

@@ -73,6 +73,7 @@ export function WorkspaceTeamProjectsPanelPage({
 
   const handleCreateProject = async (project: { name: string; description: string; key: string }) => {
     if (!team) {
+      setProjectCreateError('Unable to create this project yet. Please refresh and retry.');
       return;
     }
 

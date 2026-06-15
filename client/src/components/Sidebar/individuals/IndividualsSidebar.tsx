@@ -14,9 +14,7 @@ interface IndividualsSidebarProps {
 
 export function IndividualsSidebar({
   section,
-  projectsCollapsed,
   collapsedProjects,
-  onToggleProjectsCollapsed,
   onToggleProject,
 }: IndividualsSidebarProps) {
   const showProjectIssues = isProjectIssuesView(section);
@@ -37,13 +35,20 @@ export function IndividualsSidebar({
           {section.projects.map((project) => {
             const isActiveProject = project.id === section.activeProjectId;
             const isCollapsed = getProjectCollapsedState(collapsedProjects, project.id, section.activeProjectId);
+            const isProjectExpanded = isActiveProject || !isCollapsed;
 
             return (
               <div key={project.id} className="individuals-sidebar__project">
                 <SidebarItem
                   active={isActiveProject}
-                  onClick={() => onToggleProject(project.id)}
-                  leftIcon={isActiveProject && !isCollapsed ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                  onClick={() => {
+                    if (isActiveProject) {
+                      return;
+                    }
+
+                    onToggleProject(project.id);
+                  }}
+                  leftIcon={isProjectExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                 >
                   <div className="individuals-sidebar__project-label">
                     <Database size={14} />
@@ -54,7 +59,11 @@ export function IndividualsSidebar({
                 {/* Animated accordion — gridTemplateRows is dynamic so stays inline */}
                 <div
                   className="individuals-sidebar__accordion"
-                  style={{ gridTemplateRows: isActiveProject && !isCollapsed ? '1fr' : '0fr' }}
+                  style={{
+                    gridTemplateRows: isProjectExpanded ? '1fr' : '0fr',
+                    opacity: isProjectExpanded ? 1 : 0,
+                    pointerEvents: isProjectExpanded ? 'auto' : 'none',
+                  }}
                 >
                   <div className="individuals-sidebar__accordion-inner">
                     <div className="individuals-sidebar__sub-content">

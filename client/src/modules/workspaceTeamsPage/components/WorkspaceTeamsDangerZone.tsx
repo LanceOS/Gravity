@@ -7,7 +7,7 @@ interface WorkspaceTeamsDangerZoneProps {
   sortedTeams: SidebarTeam[];
   reassignTeamById: Record<string, string>;
   savingAction: string;
-  onReassignChange: (teamId: string, reassignId: string) => void;
+  onReassignChange?: (teamId: string, reassignId: string) => void;
   onDelete: (team: SidebarTeam) => void;
 }
 
@@ -20,6 +20,7 @@ export function WorkspaceTeamsDangerZone({
   onDelete,
 }: WorkspaceTeamsDangerZoneProps) {
   const referenceCount = getTeamReferenceCount(selectedTeam);
+  const handleReassignChange = onReassignChange ?? (() => undefined);
   const reassignOptions = sortedTeams.filter((candidate) => candidate.id !== selectedTeam.id);
   const selectedReassignTeamId = reassignTeamById[selectedTeam.id] ?? '';
   const showReassignField = referenceCount > 0 && reassignOptions.length > 0;
@@ -43,7 +44,7 @@ export function WorkspaceTeamsDangerZone({
               label: candidate.name,
               color: candidate.color,
             }))}
-            onValueChange={(nextTeamId) => onReassignChange(selectedTeam.id, nextTeamId)}
+            onValueChange={(nextTeamId) => handleReassignChange(selectedTeam.id, nextTeamId)}
           />
         </div>
       ) : null}

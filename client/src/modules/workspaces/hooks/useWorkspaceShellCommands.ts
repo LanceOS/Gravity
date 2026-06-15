@@ -127,7 +127,9 @@ export function useWorkspaceShellCommands({
   const handleCreateProject = useCallback(
     async (projectInput: { name: string; description: string; key: string }) => {
       if (!activeWorkspaceId || !currentUser) {
-        return;
+        const message = 'Unable to create project right now. Please refresh and try again.';
+        setProjectCreateError(message);
+        throw new Error(message);
       }
 
       setProjectCreateLoading(true);
