@@ -17,7 +17,7 @@ export function AccountPreferencesPageProviders({
   children,
   hasChanges,
   ...props
-}: PropsWithChildren<AccountPreferencesPageProps>): JSX.Element {
+}: PropsWithChildren<AccountPreferencesPageProps>) {
   const { activeCategory, setActiveCategory } = useAccountPreferencesPageState(props.onResetProviderDraft);
 
   return (

@@ -3,7 +3,7 @@ import { createContext, type Context } from 'react';
 import type { AIProvider, SavedApiCredential, WorkspaceSettings } from '../../utils/settings';
 import { type User } from '../TicketContext';
 
-import type { AccountPreferencesCategoryMeta, SettingsCategoryId, StatusMessage } from '../../types';
+import type { AccountPreferencesCategoryMeta, SettingsCategoryId, StatusMessage } from '../../modules/accountPreferencesPage/types';
 
 export interface AccountPreferencesRuntimeContextValue {
   currentUser: User;

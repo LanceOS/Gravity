@@ -26,7 +26,7 @@ export function OllamaSettingsSection({
   onChangeSettings: runtimeOnChangeSettings,
   onRefreshOllamaModels: runtimeOnRefreshOllamaModels,
   isMobile: runtimeIsMobile,
-}: OllamaSettingsSectionProps = {}): JSX.Element {
+}: OllamaSettingsSectionProps = {}) {
   const contextSettings = useAccountPreferencesSettingsContext();
   const contextOllama = useAccountPreferencesOllamaContext();
   const isMobileFromContext = useIsMobile();
