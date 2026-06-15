@@ -10,7 +10,7 @@ import {
   invalidateWorkspaceCache,
   normalizeIsoDate,
 } from '../../lib/platform.js';
-import { authorizeProjectAccess, authorizeTeamAccess } from '../workspaces/services/membership.js';
+import { authorizeProjectAccess, authorizeTeamAccess, getProjectTeamId } from '../workspaces/services/membership.js';
 import {
   addCommentRecord,
   createTicketRecord,
@@ -55,16 +55,6 @@ function mapCycle(cycle: typeof cycles.$inferSelect) {
     endDate: normalizeIsoDate(cycle.endDate),
     completed: cycle.completed ? 1 : 0,
   };
-}
-
-async function getRequiredProjectTeamId(projectId: string) {
-  const projectRows = await db.select({ teamId: projects.teamId }).from(projects).where(eq(projects.id, projectId)).limit(1);
-  const teamId = projectRows[0]?.teamId;
-  if (!teamId) {
-    throw new Error(`Project ${projectId} is missing a team assignment.`);
-  }
-
-  return teamId;
 }
 
 function normalizeLabelName(name: string) {
@@ -398,7 +388,11 @@ export function createTicketsRouter() {
   router.get('/labels', async (req, res) => {
     try {
       const projectId = typeof req.query.projectId === 'string' ? req.query.projectId : getProjectIdFromRequest(req);
-      const teamId = typeof req.query.teamId === 'string' ? req.query.teamId : (projectId ? await getRequiredProjectTeamId(projectId).catch(() => undefined) : undefined);
+      const teamId = typeof req.query.teamId === 'string'
+        ? req.query.teamId
+        : projectId
+          ? (await getProjectTeamId(projectId)) ?? undefined
+          : undefined;
 
       if (!teamId) {
         res.status(400).json({ error: 'Either teamId or projectId is required, or project not found.' });
@@ -438,7 +432,10 @@ export function createTicketsRouter() {
       const body = req.body ?? {};
       const projectId = typeof body.projectId === 'string' ? body.projectId : getProjectIdFromRequest(req);
       const bodyTeamId = typeof body.teamId === 'string' ? body.teamId : undefined;
-      const resolvedTeamId = bodyTeamId ?? (projectId ? await getRequiredProjectTeamId(projectId).catch(() => undefined) : undefined);
+      const resolvedTeamId = bodyTeamId
+        ?? (projectId
+          ? (await getProjectTeamId(projectId)) ?? undefined
+          : undefined);
 
       if (!resolvedTeamId) {
         res.status(400).json({ error: 'Either teamId or projectId is required, or project not found.' });
@@ -622,7 +619,7 @@ export function createTicketsRouter() {
           return;
         }
 
-        const teamId = await getRequiredProjectTeamId(ticket.projectId);
+        const teamId = await getProjectTeamId(ticket.projectId);
         if (labelRows[0].teamId !== teamId) {
           res.status(400).json({ error: 'Label does not belong to the ticket team.' });
           return;
@@ -678,7 +675,7 @@ export function createTicketsRouter() {
           res.status(auth.status ?? 403).json({ error: auth.error });
           return;
         }
-        const teamIdOfProject = await getRequiredProjectTeamId(projectId).catch(() => undefined);
+        const teamIdOfProject = projectId ? (await getProjectTeamId(projectId)) ?? undefined : undefined;
         if (!teamIdOfProject) {
           res.status(400).json({ error: 'Project not found or missing team assignment.' });
           return;
@@ -705,7 +702,7 @@ export function createTicketsRouter() {
     const targetTeamId = typeof teamId === 'string'
       ? teamId
       : projectId
-        ? await getRequiredProjectTeamId(projectId)
+        ? (projectId ? (await getProjectTeamId(projectId)) ?? undefined : undefined)
         : undefined;
 
     if (!targetTeamId) {

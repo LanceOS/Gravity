@@ -10,9 +10,10 @@ import {
   authorizeTeamAccess,
   authorizeTeamOwnerAccess,
   invalidateTeamWorkspaceCache,
+  invalidateProjectTeamCache,
 } from './services/membership.js';
 
-async function deleteLastTeamWithOwnedWork(teamId: string, workspaceId: string) {
+async function deleteLastTeamWithOwnedWork(teamId: string, workspaceId: string): Promise<string[]> {
   const projectRows = await db
     .select({ id: projects.id })
     .from(projects)
@@ -75,6 +76,7 @@ async function deleteLastTeamWithOwnedWork(teamId: string, workspaceId: string) 
   }
 
   await invalidateWorkspaceCache(workspaceId, WorkspaceCacheInvalidationReason.TEAM_STRUCTURE_CHANGED);
+  return projectIds;
 }
 
 async function mergeTeamLabels(tx: any, sourceTeamId: string, targetTeamId: string) {
@@ -255,6 +257,7 @@ export function createTeamsRouter() {
         db.select({ id: cycles.id }).from(cycles).where(eq(cycles.teamId, teamId)),
         db.select({ id: labels.id }).from(labels).where(eq(labels.teamId, teamId)),
       ]);
+      const existingProjectIds = existingProjects.map((project) => project.id);
       const isLastTeam = workspaceTeamRows.length <= 1;
 
       if (existingProjects.length > 0 || existingCycles.length > 0 || existingLabels.length > 0) {
@@ -280,10 +283,16 @@ export function createTeamsRouter() {
             await mergeTeamLabels(tx, teamId, reassignTeamId);
             await tx.delete(teams).where(eq(teams.id, teamId));
           });
+          if (existingProjectIds.length > 0) {
+            await Promise.all(existingProjectIds.map((projectId) => invalidateProjectTeamCache(projectId)));
+          }
           await invalidateWorkspaceCache(workspaceId, WorkspaceCacheInvalidationReason.TEAM_STRUCTURE_CHANGED);
           await invalidateTeamWorkspaceCache(teamId);
         } else if (isLastTeam) {
-          await deleteLastTeamWithOwnedWork(teamId, workspaceId);
+          const deletedProjectIds = await deleteLastTeamWithOwnedWork(teamId, workspaceId);
+          if (deletedProjectIds.length > 0) {
+            await Promise.all(deletedProjectIds.map((projectId) => invalidateProjectTeamCache(projectId)));
+          }
         } else {
           res.status(400).json({ error: 'Cannot delete team: projects, cycles, or labels still reference it. Please reassign them first.' });
           return;

@@ -24,6 +24,7 @@ import {
   invalidateProjectWorkspaceCache,
   invalidateProjectMembershipCache,
   invalidateWorkspaceMembershipCache,
+  invalidateProjectTeamCache,
 } from './membership.js';
 
 function mapCycle(cycle: typeof cycles.$inferSelect) {
@@ -248,6 +249,7 @@ export async function updateProjectRecord(projectId: string, params: { name?: st
 
   if (rows[0]) {
     await invalidateWorkspaceCache(rows[0].workspaceId, WorkspaceCacheInvalidationReason.PROJECT_STRUCTURE_CHANGED);
+    await invalidateProjectTeamCache(projectId);
   }
 
   return rows[0] ?? null;
@@ -324,4 +326,5 @@ export async function deleteProjectRecord(projectId: string, workspaceId: string
   await invalidateWorkspaceCache(workspaceId, WorkspaceCacheInvalidationReason.PROJECT_STRUCTURE_CHANGED);
   await invalidateProjectWorkspaceCache(projectId);
   await invalidateProjectMembershipCache(projectId, membershipRows.map((member) => member.userId));
+  await invalidateProjectTeamCache(projectId);
 }

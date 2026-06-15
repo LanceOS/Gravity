@@ -7,6 +7,7 @@ import { resolveRequestActorUserId } from '../../auth/utils/request-auth.js';
 
 const WORKSPACE_MEMBERSHIP_TTL_SECONDS = 45;
 const PROJECT_WORKSPACE_TTL_SECONDS = 120;
+const PROJECT_TEAM_TTL_SECONDS = 120;
 const PROJECT_MEMBERSHIP_TTL_SECONDS = 45;
 const TEAM_WORKSPACE_TTL_SECONDS = 120;
 
@@ -51,6 +52,18 @@ async function getTeamWorkspaceIdCached(teamId: string): Promise<string | null> 
   });
 }
 
+async function getProjectTeamIdCached(projectId: string): Promise<string | null> {
+  return cache.wrap(cache.CacheKeys.memberships.projectTeam(projectId), PROJECT_TEAM_TTL_SECONDS, async () => {
+    const projectRows = await db
+      .select({ teamId: projects.teamId })
+      .from(projects)
+      .where(eq(projects.id, projectId))
+      .limit(1);
+
+    return projectRows[0]?.teamId ?? null;
+  });
+}
+
 /**
  * Checks if a user is a member of a specific workspace.
  */
@@ -61,6 +74,10 @@ export async function isWorkspaceMember(workspaceId: string, userId: string): Pr
 
 export async function getWorkspaceMemberRole(workspaceId: string, userId: string): Promise<string | null> {
   return getWorkspaceMemberRoleCached(workspaceId, userId);
+}
+
+export async function getProjectTeamId(projectId: string): Promise<string | null> {
+  return getProjectTeamIdCached(projectId);
 }
 
 async function getProjectMemberRoleCached(projectId: string, userId: string): Promise<string | null> {
@@ -100,6 +117,10 @@ export async function getProjectWorkspaceId(projectId: string): Promise<string |
   return getProjectWorkspaceIdCached(projectId);
 }
 
+export async function getTeamWorkspaceId(teamId: string): Promise<string | null> {
+  return getTeamWorkspaceIdCached(teamId);
+}
+
 export async function invalidateWorkspaceMembershipCaches(workspaceId: string, userIds: string[]): Promise<void> {
   const uniqueUserIds = uniqueStringArray(userIds);
   if (uniqueUserIds.length === 0) {
@@ -136,6 +157,10 @@ export async function invalidateWorkspaceMembershipCache(workspaceId: string, us
 
 export async function invalidateProjectWorkspaceCache(projectId: string): Promise<void> {
   await cache.del(cache.CacheKeys.memberships.projectWorkspace(projectId));
+}
+
+export async function invalidateProjectTeamCache(projectId: string): Promise<void> {
+  await cache.del(cache.CacheKeys.memberships.projectTeam(projectId));
 }
 
 export async function invalidateProjectMembershipCache(projectId: string, userId?: string): Promise<void> {

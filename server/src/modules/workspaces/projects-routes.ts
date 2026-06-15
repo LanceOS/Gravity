@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import { Router } from 'express';
 import { db } from '../../db/index.js';
-import { cycles, projects, teams, workspaces, workspaceSettings } from '../../db/schema.js';
+import { cycles, projects, workspaces, workspaceSettings } from '../../db/schema.js';
 import {
   createId,
   normalizeEntityKey,
@@ -24,6 +24,7 @@ import {
   authorizeProjectMemberAccess,
   authorizeProjectOwnerOrWorkspaceAdminAccess,
   authorizeWorkspaceAccess,
+  getTeamWorkspaceId,
 } from './services/membership.js';
 
 function mapProject(project: typeof projects.$inferSelect) {
@@ -55,13 +56,8 @@ function mapCycle(cycle: typeof cycles.$inferSelect) {
 }
 
 async function teamBelongsToWorkspace(teamId: string, workspaceId: string) {
-  const teamRows = await db
-    .select({ id: teams.id })
-    .from(teams)
-    .where(and(eq(teams.id, teamId), eq(teams.workspaceId, workspaceId)))
-    .limit(1);
-
-  return teamRows.length > 0;
+  const teamWorkspaceId = await getTeamWorkspaceId(teamId);
+  return teamWorkspaceId === workspaceId;
 }
 
 export function createProjectsRouter() {

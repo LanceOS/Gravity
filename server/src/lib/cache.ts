@@ -17,6 +17,7 @@ export const CacheKeys = {
     projectMember: (projectId: string, userId: string) =>
       `membership:project:${projectId}:user:${userId}:role` as CacheKey,
     projectWorkspace: (projectId: string) => `membership:project:${projectId}:workspace` as CacheKey,
+    projectTeam: (projectId: string) => `membership:project:${projectId}:team` as CacheKey,
     teamWorkspace: (teamId: string) => `membership:team:${teamId}:workspace` as CacheKey,
   },
 };
