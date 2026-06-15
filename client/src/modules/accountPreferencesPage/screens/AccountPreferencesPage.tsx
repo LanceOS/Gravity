@@ -11,8 +11,11 @@ import { AccountPreferencesSidebar } from '../layout/AccountPreferencesSidebar';
 import { AccountPreferencesPageProps } from '../types';
 import {
   useAccountPreferencesCategoryContext,
+  useAccountPreferencesCloudContext,
   useAccountPreferencesNavigationContext,
+  useAccountPreferencesOllamaContext,
   useAccountPreferencesRuntimeContext,
+  useAccountPreferencesSettingsContext,
 } from '../../../context/accountPreferencesPage/accountPreferencesPageContextHooks';
 import { AccountPreferencesPageProviders } from './AccountPreferencesPageProviders';
 import { SettingsPageLayout } from '../../../layouts/SettingsPageLayout/SettingsPageLayout';
@@ -30,6 +33,14 @@ function AccountPreferencesPageContent() {
     saveLoading,
   } = useAccountPreferencesRuntimeContext();
   const { onBack, onOpenDirectory } = useAccountPreferencesNavigationContext();
+  const { settings, onChangeSettings } = useAccountPreferencesSettingsContext();
+  const {
+    hasProviderChanges,
+    testing,
+    testResult,
+    onTestApiKey,
+  } = useAccountPreferencesCloudContext();
+  const { ollamaModels, ollamaModelsLoading, onRefreshOllamaModels } = useAccountPreferencesOllamaContext();
 
   const activeCategoryMeta =
     categories.find((category) => category.id === activeCategory) || categories[0];
@@ -103,12 +114,31 @@ function AccountPreferencesPageContent() {
 
           {(isMobile || activeCategory === 'providers') && (
             <Stack gap="var(--space-md)">
-              <CloudProviderSection />
+              <CloudProviderSection
+                settings={settings}
+                onChangeSettings={onChangeSettings}
+                saveLoading={saveLoading}
+                hasProviderChanges={hasProviderChanges}
+                testing={testing}
+                testResult={testResult}
+                onSaveSettings={onSaveSettings}
+                onTestApiKey={onTestApiKey}
+                isMobile={isMobile}
+              />
               <SavedKeysCard />
             </Stack>
           )}
 
-          {(isMobile || activeCategory === 'ollama') && <OllamaSettingsSection />}
+          {(isMobile || activeCategory === 'ollama') && (
+            <OllamaSettingsSection
+              settings={settings}
+              ollamaModels={ollamaModels}
+              ollamaModelsLoading={ollamaModelsLoading}
+              onChangeSettings={onChangeSettings}
+              onRefreshOllamaModels={onRefreshOllamaModels}
+              isMobile={isMobile}
+            />
+          )}
 
           {(isMobile || activeCategory === 'onboarding') && <OnboardingSection />}
 
