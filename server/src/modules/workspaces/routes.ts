@@ -34,6 +34,7 @@ import {
   getWorkspaceSummary,
   invalidateUserWorkspacesCache,
   invalidateWorkspaceCache,
+  WorkspaceCacheInvalidationReason,
   listWorkspaceSummaries,
   normalizeEntityKey,
 } from '../../lib/platform.js';
@@ -488,7 +489,7 @@ export function createWorkspacesRouter() {
           .where(eq(workspaceSettings.workspaceId, workspaceId));
       });
 
-      await invalidateWorkspaceCache(workspaceId);
+      await invalidateWorkspaceCache(workspaceId, WorkspaceCacheInvalidationReason.WORKSPACE_SETTINGS_CHANGED);
       res.json(await loadWorkspaceSettingsPayload(workspaceId));
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to update workspace settings.' });
@@ -1142,7 +1143,12 @@ export function createWorkspacesRouter() {
         await invalidateWorkspaceMembershipCache(workspaceId, userId);
       }
 
-      await invalidateWorkspaceCache(workspaceId);
+      await invalidateWorkspaceCache(
+        workspaceId,
+        autoJoin
+          ? WorkspaceCacheInvalidationReason.MEMBERSHIP_CHANGED
+          : WorkspaceCacheInvalidationReason.WORKSPACE_JOIN_REQUESTS_UPDATED,
+      );
       if (autoJoin) {
         await invalidateUserWorkspacesCache(userId);
       }
@@ -1247,7 +1253,12 @@ export function createWorkspacesRouter() {
         await invalidateWorkspaceMembershipCache(workspaceId, request.requestingUserId);
       }
 
-      await invalidateWorkspaceCache(workspaceId);
+      await invalidateWorkspaceCache(
+        workspaceId,
+        request.requestingUserId
+          ? WorkspaceCacheInvalidationReason.MEMBERSHIP_CHANGED
+          : WorkspaceCacheInvalidationReason.WORKSPACE_JOIN_REQUESTS_UPDATED,
+      );
       if (request.requestingUserId) {
         await invalidateUserWorkspacesCache(request.requestingUserId);
       }

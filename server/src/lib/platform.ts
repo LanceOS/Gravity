@@ -261,6 +261,18 @@ export type WorkspaceSummary = {
   hierarchyMode?: 'flat' | 'teams';
 };
 
+export const WorkspaceCacheInvalidationReason = {
+  UNKNOWN: 'unknown',
+  TEAM_STRUCTURE_CHANGED: 'team-structure-changed',
+  PROJECT_STRUCTURE_CHANGED: 'project-structure-changed',
+  MEMBERSHIP_CHANGED: 'membership-changed',
+  WORKSPACE_SETTINGS_CHANGED: 'workspace-settings-changed',
+  WORKSPACE_JOIN_REQUESTS_UPDATED: 'workspace-join-requests-updated',
+} as const;
+
+export type WorkspaceCacheInvalidationReasonType =
+  (typeof WorkspaceCacheInvalidationReason)[keyof typeof WorkspaceCacheInvalidationReason];
+
 type WorkspaceSummaryBase = Omit<WorkspaceSummary, 'memberRole'>;
 
 export async function listWorkspaceSummaries(userId?: string): Promise<WorkspaceSummary[]> {
@@ -362,7 +374,10 @@ export async function listWorkspaceSummaries(userId?: string): Promise<Workspace
   });
 }
 
-export async function invalidateWorkspaceCache(workspaceId: string): Promise<void> {
+export async function invalidateWorkspaceCache(
+  workspaceId: string,
+  reason: WorkspaceCacheInvalidationReasonType = WorkspaceCacheInvalidationReason.UNKNOWN
+): Promise<void> {
   try {
     const keysToInvalidate = [
       cache.CacheKeys.workspaces.all(),
@@ -379,7 +394,7 @@ export async function invalidateWorkspaceCache(workspaceId: string): Promise<voi
     }
     await cache.delMany(keysToInvalidate);
   } catch (error) {
-    console.error(`Failed to invalidate cache for workspace ${workspaceId}:`, error);
+    console.error(`Failed to invalidate workspace cache for ${workspaceId} due to ${reason}:`, error);
   }
 }
 

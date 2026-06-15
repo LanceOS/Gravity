@@ -6,6 +6,7 @@ import { broadcastEvent } from '../../realtime.js';
 import {
   createId,
   getProjectIdFromRequest,
+  WorkspaceCacheInvalidationReason,
   invalidateWorkspaceCache,
   normalizeIsoDate,
 } from '../../lib/platform.js';
@@ -138,7 +139,7 @@ export function createTicketsRouter() {
       return;
     }
 
-    await invalidateWorkspaceCache(workspaceId);
+    await invalidateWorkspaceCache(workspaceId, WorkspaceCacheInvalidationReason.TEAM_STRUCTURE_CHANGED);
   }
 
   router.get('/tickets', async (req, res) => {

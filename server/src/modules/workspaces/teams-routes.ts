@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { db } from '../../db/index.js';
 import { comments, cycles, labels, noteMetadata, projectMembers, projects, teams, ticketLabels, tickets, workspaces } from '../../db/schema.js';
 import { asc, eq, inArray } from 'drizzle-orm';
-import { createId, invalidateWorkspaceCache } from '../../lib/platform.js';
+import { createId, WorkspaceCacheInvalidationReason, invalidateWorkspaceCache } from '../../lib/platform.js';
 import { RustFS } from '../../lib/rustfs.js';
 import {
   authorizeWorkspaceAccess,
@@ -74,7 +74,7 @@ async function deleteLastTeamWithOwnedWork(teamId: string, workspaceId: string) 
     }
   }
 
-  await invalidateWorkspaceCache(workspaceId);
+  await invalidateWorkspaceCache(workspaceId, WorkspaceCacheInvalidationReason.TEAM_STRUCTURE_CHANGED);
 }
 
 async function mergeTeamLabels(tx: any, sourceTeamId: string, targetTeamId: string) {
@@ -151,7 +151,7 @@ export function createTeamsRouter() {
       });
 
       const newTeam = await db.select().from(teams).where(eq(teams.id, teamId)).limit(1);
-      await invalidateWorkspaceCache(workspaceId);
+      await invalidateWorkspaceCache(workspaceId, WorkspaceCacheInvalidationReason.TEAM_STRUCTURE_CHANGED);
       await invalidateTeamWorkspaceCache(teamId);
       res.status(201).json(newTeam[0]);
     } catch (error) {
@@ -222,7 +222,7 @@ export function createTeamsRouter() {
       if (typeof color === 'string') updates.color = color;
 
       await db.update(teams).set(updates).where(eq(teams.id, teamId));
-      await invalidateWorkspaceCache(auth.workspaceId);
+      await invalidateWorkspaceCache(auth.workspaceId, WorkspaceCacheInvalidationReason.TEAM_STRUCTURE_CHANGED);
       const updated = await db.select().from(teams).where(eq(teams.id, teamId)).limit(1);
       res.json(updated[0]);
     } catch (error) {
@@ -280,7 +280,7 @@ export function createTeamsRouter() {
             await mergeTeamLabels(tx, teamId, reassignTeamId);
             await tx.delete(teams).where(eq(teams.id, teamId));
           });
-          await invalidateWorkspaceCache(workspaceId);
+          await invalidateWorkspaceCache(workspaceId, WorkspaceCacheInvalidationReason.TEAM_STRUCTURE_CHANGED);
           await invalidateTeamWorkspaceCache(teamId);
         } else if (isLastTeam) {
           await deleteLastTeamWithOwnedWork(teamId, workspaceId);
@@ -290,7 +290,7 @@ export function createTeamsRouter() {
         }
       } else {
         await db.delete(teams).where(eq(teams.id, teamId));
-        await invalidateWorkspaceCache(workspaceId);
+        await invalidateWorkspaceCache(workspaceId, WorkspaceCacheInvalidationReason.TEAM_STRUCTURE_CHANGED);
         await invalidateTeamWorkspaceCache(teamId);
       }
 
