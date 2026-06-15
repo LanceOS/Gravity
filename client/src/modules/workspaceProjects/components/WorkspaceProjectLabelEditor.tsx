@@ -3,7 +3,7 @@ import { PencilLine, Trash2 } from 'lucide-react';
 
 import type { Label } from '../../../context/TicketContext';
 
-interface WorkspaceProjectLabelEditorProps {
+export interface WorkspaceProjectLabelEditorProps {
   activeLabel: Label;
   editingLabelName: string;
   editingLabelColor: string;

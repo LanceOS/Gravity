@@ -256,32 +256,42 @@ export function WorkspaceProjectPanelPage({
       {managedProject ? (
         <WorkspaceProjectLabelsSection
           managedProjectName={managedProject.name}
-          labels={sortedLabels}
           labelFormError={labelFormError}
           labelCreateError={labelCreateError}
-          isLabelBusy={isLabelBusy}
-          labelCreateLoading={labelCreateLoading}
-          editingLabelLoading={editingLabelLoading}
-          activeLabel={activeLabel}
-          editingLabelError={editingLabelError}
-          labelName={labelName}
-          labelColor={labelColor}
-          labelDescription={labelDescription}
-          editingLabelId={editingLabelId}
-          editingLabelName={editingLabelName}
-          editingLabelColor={editingLabelColor}
-          editingLabelDescription={editingLabelDescription}
-          onLabelNameChange={setLabelName}
-          onLabelColorChange={setLabelColor}
-          onLabelDescriptionChange={setLabelDescription}
-          onCreateLabel={handleCreateLabel}
-          onStartEditingLabel={handleStartEditingLabel}
-          onEditingLabelNameChange={setEditingLabelName}
-          onEditingLabelColorChange={setEditingLabelColor}
-          onEditingLabelDescriptionChange={setEditingLabelDescription}
-          onUpdateLabel={handleUpdateLabel}
-          onDeleteLabel={handleDeleteLabel}
-          onClearLabelEditor={clearLabelEditor}
+          sections={{
+            list: {
+              labels: sortedLabels,
+              activeLabelId: editingLabelId,
+              onSelectLabel: handleStartEditingLabel,
+              managedProjectName: managedProject.name,
+            },
+            editor: {
+              activeLabel,
+              editingLabelName,
+              editingLabelColor,
+              editingLabelDescription,
+              isLabelBusy,
+              editingLabelLoading,
+              editingLabelError,
+              onEditingLabelNameChange: setEditingLabelName,
+              onEditingLabelColorChange: setEditingLabelColor,
+              onEditingLabelDescriptionChange: setEditingLabelDescription,
+              onSaveLabel: handleUpdateLabel,
+              onDeleteLabel: handleDeleteLabel,
+              onCancelEdit: clearLabelEditor,
+            },
+            create: {
+              labelName,
+              labelColor,
+              labelDescription,
+              isLabelBusy,
+              labelCreateLoading,
+              onLabelNameChange: setLabelName,
+              onLabelColorChange: setLabelColor,
+              onLabelDescriptionChange: setLabelDescription,
+              onSubmit: handleCreateLabel,
+            },
+          }}
         />
       ) : null}
 

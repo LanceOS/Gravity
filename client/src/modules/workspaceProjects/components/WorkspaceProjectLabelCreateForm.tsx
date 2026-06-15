@@ -1,6 +1,6 @@
 import { Button, TextInput, Textarea } from '@library';
 
-interface WorkspaceProjectLabelCreateFormProps {
+export interface WorkspaceProjectLabelCreateFormProps {
   labelName: string;
   labelColor: string;
   labelDescription: string;
@@ -70,4 +70,3 @@ export function WorkspaceProjectLabelCreateForm({
     </form>
   );
 }
-

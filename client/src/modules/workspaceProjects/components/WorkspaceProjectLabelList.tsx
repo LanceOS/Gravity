@@ -1,6 +1,6 @@
 import type { Label } from '../../../context/TicketContext';
 
-interface WorkspaceProjectLabelListProps {
+export interface WorkspaceProjectLabelListProps {
   labels: Label[];
   activeLabelId: string | null;
   onSelectLabel: (label: Label) => void;
