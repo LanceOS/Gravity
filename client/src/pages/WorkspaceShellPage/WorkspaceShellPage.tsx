@@ -191,6 +191,10 @@ export function WorkspaceShellPage() {
     () => (isWorkspaceAllTasksPath ? workspaceTickets : isTeamAggregatePath ? teamTickets : tickets),
     [isTeamAggregatePath, isWorkspaceAllTasksPath, teamTickets, tickets, workspaceTickets]
   );
+  const activeProject = useMemo(
+    () => projects.find((project) => project.id === (projectIdParam || activeProjectId)),
+    [activeProjectId, projectIdParam, projects]
+  );
 
   useAppShellRouteSync({
     route,
@@ -423,10 +427,6 @@ export function WorkspaceShellPage() {
   const scopedLabels = isTeamAggregatePath ? teamLabels : labels;
   const scopedFilters = shouldUseAggregateTicketScope ? { ...filters, projectId: '' } : filters;
 
-  const activeProject = useMemo(
-    () => projects.find((project) => project.id === (projectIdParam || activeProjectId)),
-    [activeProjectId, projectIdParam, projects]
-  );
   const activeProjectTeamId =
     activeProject?.teamId ||
     sidebarTree?.teams?.find((team) => team.projects?.some((project) => project.id === (projectIdParam || activeProjectId)))?.id ||
