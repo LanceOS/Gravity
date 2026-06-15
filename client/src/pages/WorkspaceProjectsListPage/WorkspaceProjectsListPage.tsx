@@ -1,10 +1,9 @@
 import { useMemo } from 'react';
 import { ChevronRight, Database } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { WorkspaceHeader } from '../../modules/workspaces';
+import { PROJECT_STATUS_LABELS, WorkspaceHeader } from '../../modules/workspaces';
 import type { Project } from '../../context/TicketContext';
 import { useTickets } from '../../context/TicketContext';
-import { PROJECT_STATUS_LABELS } from '../../modules/workspaces/utils/WorkspaceProjectPanel';
 import './WorkspaceProjectsListPage.css';
 
 function getProjectTargetPath(workspaceId: string, project: Project) {

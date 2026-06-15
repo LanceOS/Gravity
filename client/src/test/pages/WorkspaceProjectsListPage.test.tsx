@@ -14,6 +14,11 @@ vi.mock('../../context/TicketContext', () => ({
 }));
 
 vi.mock('../../modules/workspaces', () => ({
+  PROJECT_STATUS_LABELS: {
+    planned: 'Planned',
+    active: 'Active',
+    completed: 'Archived',
+  },
   WorkspaceHeader: Object.assign(
     ({ children }: { children?: ReactNode }) => <header>{children}</header>,
     {

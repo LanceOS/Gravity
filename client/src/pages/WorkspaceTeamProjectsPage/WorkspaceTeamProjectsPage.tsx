@@ -2,9 +2,13 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, FolderKanban, Save, Sparkles, Trash } from 'lucide-react';
 import { Button, TextInput, Textarea, Modal, Skeleton } from '@library';
-import { WorkspaceHeader } from '../../modules/workspaces';
-import { ProjectCreateOverlay } from '../../modules/workspaces/components/ProjectCreateOverlay';
-import { PROJECT_LIFECYCLE_OPTIONS, PROJECT_STATUS_LABELS, sanitizeProjectKey } from '../../modules/workspaces/utils/WorkspaceProjectPanel';
+import {
+  PROJECT_LIFECYCLE_OPTIONS,
+  PROJECT_STATUS_LABELS,
+  ProjectCreateOverlay,
+  WorkspaceHeader,
+  sanitizeProjectKey,
+} from '../../modules/workspaces';
 import type { CreateProjectInput, Project, SidebarTeam, SidebarTree } from '../../types/domain';
 import '../WorkspacePage/WorkspacePage.css';
 import './WorkspaceTeamProjectsPage.css';

@@ -2,10 +2,7 @@ import React, { memo } from 'react';
 import { ContextMenu } from '@library';
 import { Check, User as UserIcon, FolderKanban, Activity, Tag, Calendar, Plus, ArrowDown, ArrowUp } from 'lucide-react';
 import type { Cycle, Label, Project, Ticket, User } from '../../context/TicketContext';
-import type { TicketFilters } from '../../modules/tickets/utils/ticketView';
-import { getPriorityIcon } from '../../modules/tickets/utils/TicketBoard';
-import { getStatusColor } from '../../modules/tickets/utils/TicketList';
-import { PRIORITY_OPTIONS, STATUS_OPTIONS } from '../../modules/tickets/utils/TicketDetail';
+import { getPriorityIcon, getStatusColor, PRIORITY_OPTIONS, STATUS_OPTIONS, type TicketFilters } from '../../modules/tickets';
 
 interface WorkspacePageContextMenuProps {
   activeContext: 'issues' | 'notes';

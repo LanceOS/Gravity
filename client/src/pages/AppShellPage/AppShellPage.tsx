@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { MessageSquare, X } from 'lucide-react';
 import { useParams, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import type { SidebarTree, Cycle, Label } from '../../types/domain';
@@ -7,11 +6,10 @@ import { apiClient } from '../../utils/apiClient';
 import { useTicketRelationsSnapshot } from '../../hooks/useTicketRelationsSnapshot';
 
 import { AuthScreen } from '../../modules/auth';
-import { CreateTicketModal } from '../../modules/tickets';
+import { CreateTicketModal, LabelCreateOverlay, TicketDetailRoute, type TicketListSort } from '../../modules/tickets';
 import { LocalAIChat } from '../../modules/ai';
 import { OnboardingModal } from '../../modules/onboarding';
-import { ProjectCreateOverlay } from '../../modules/workspaces/components/ProjectCreateOverlay';
-import { LabelCreateOverlay } from '../../modules/tickets/components/LabelCreateOverlay';
+import { ProjectCreateOverlay, WorkspaceMcpModal } from '../../modules/workspaces';
 import type { SidebarNavigationState, SidebarProps } from '../../components/Sidebar';
 import { useTickets, type Ticket } from '../../context/TicketContext';
 import { useTheme, SettingsScreen as SettingsPage } from '../../modules/settings';
@@ -20,7 +18,6 @@ import { useWorkspaceDirectory } from '../../hooks/useWorkspaceDirectory';
 import { useWorkspaceSettings } from '../../hooks/useWorkspaceSettings';
 import { WorkspaceLayout } from '../../layouts/WorkspaceLayout/WorkspaceLayout';
 import { AccountPreferencesPage } from '../AccountPreferencesPage/AccountPreferencesPage';
-import type { TicketListSort } from '../../modules/tickets/utils/ticketView';
 import { registerWebMCPTools } from '../../utils/webmcp';
 import { LoadingPage } from '../LoadingPage/LoadingPage';
 import { WorkspaceDirectoryPage } from '../WorkspaceDirectoryPage/WorkspaceDirectoryPage';
@@ -29,8 +26,6 @@ import { WorkspaceProjectsPage } from '../WorkspaceProjectsPage/WorkspaceProject
 import { WorkspaceProjectsListPage } from '../WorkspaceProjectsListPage/WorkspaceProjectsListPage';
 import { WorkspaceTeamProjectsPage } from '../WorkspaceTeamProjectsPage/WorkspaceTeamProjectsPage';
 import { WorkspaceTeamsPage } from '../WorkspaceTeamsPage/WorkspaceTeamsPage';
-import { TicketDetailRoute } from '../../modules/tickets/components/TicketDetailRoute';
-import { WorkspaceMcpModal } from '../../modules/workspaces/components/WorkspaceMcpModal';
 import './AppShellPage.css';
 
 type AppSection = 'directory' | 'workspace' | 'settings' | 'account' | 'projects' | 'teams' | 'team-projects';

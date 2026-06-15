@@ -1,5 +1,5 @@
 import type { Cycle, Label, Project, User } from '../../../context/TicketContext';
-import type { TicketFilters } from '../../../modules/tickets/utils/ticketView';
+import type { TicketFilters } from '../../../modules/tickets';
 
 export interface SidebarWorkspaceOption {
   id: string;

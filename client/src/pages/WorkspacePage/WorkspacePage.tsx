@@ -1,16 +1,19 @@
 import { useMemo, useCallback, useState } from 'react';
 import { Button, Timeline, createEmptyRichTextValue, ContextMenu } from '@library';
 import type { Comment, Cycle, Label, Project, Ticket, User } from '../../context/TicketContext';
-import type { TicketFilters, TicketListSort } from '../../modules/tickets/utils/ticketView';
-import { TicketBoard, TicketList, TicketFilterBar } from '../../modules/tickets';
-import { NotesList, NoteEditor } from '../../modules/notes';
 import {
   filterTickets,
   getWorkspaceHeaderTitle,
   groupTicketsByStatus,
   hasActiveTicketFilters,
   sortTicketsForList,
-} from '../../modules/tickets/utils/ticketView';
+  TicketBoard,
+  TicketFilterBar,
+  TicketList,
+  type TicketFilters,
+  type TicketListSort,
+} from '../../modules/tickets';
+import { NotesList, NoteEditor } from '../../modules/notes';
 import { WorkspaceHeader } from '../../modules/workspaces';
 import { WorkspaceViewContainer } from '../../components/WorkspaceViewContainer';
 import { QueryErrorResetBoundary } from '@tanstack/react-query';
