@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useState, type Dispatch, type SetStateAction } from 'react';
 import { getProjectDraft } from '../utils/WorkspaceTeamProjectsPanelUtils';
 import type { Project } from '../../../types/domain';
 import type { WorkspaceTeamProjectsPanelDraft } from '../types/WorkspaceTeamProjectsPanel';
+import { useSyncedDraftState } from '../../../hooks/useSyncedDraft';
 
 interface UseWorkspaceTeamProjectsPanelDraftArgs {
   selectedProject: Project | null;
@@ -17,32 +18,16 @@ export interface UseWorkspaceTeamProjectsPanelDraftResult {
 export function useWorkspaceTeamProjectsPanelDraft({
   selectedProject,
 }: UseWorkspaceTeamProjectsPanelDraftArgs): UseWorkspaceTeamProjectsPanelDraftResult {
-  const [projectDraft, setProjectDraft] = useState<WorkspaceTeamProjectsPanelDraft>(getProjectDraft());
-  const lastSelectedProjectIdRef = useRef<string | null>(null);
-
-  const syncDraftFromProject = useCallback((project: Project | null) => {
-    setProjectDraft(getProjectDraft(project));
-    lastSelectedProjectIdRef.current = project?.id ?? null;
-  }, []);
-
-  useEffect(() => {
-    if (selectedProject?.id === lastSelectedProjectIdRef.current) {
-      return;
-    }
-
-    syncDraftFromProject(selectedProject);
-  }, [selectedProject, syncDraftFromProject]);
-
-  const resetProjectDraft = useCallback(() => {
-    syncDraftFromProject(selectedProject);
-  }, [selectedProject, syncDraftFromProject]);
-
-  const resetProjectDraftToProject = useCallback(
-    (project: Project | null) => {
-      syncDraftFromProject(project);
-    },
-    [syncDraftFromProject],
-  );
+  const {
+    draft: projectDraft,
+    setDraft: setProjectDraft,
+    resetDraft: resetProjectDraft,
+    resetDraftToItem: resetProjectDraftToProject,
+  } = useSyncedDraftState<Project, WorkspaceTeamProjectsPanelDraft>({
+    selectedItem: selectedProject,
+    getDefaultDraft: getProjectDraft,
+    getDraftFromItem: getProjectDraft,
+  });
 
   return {
     projectDraft,
