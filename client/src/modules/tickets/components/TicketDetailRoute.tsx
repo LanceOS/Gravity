@@ -13,6 +13,7 @@ interface TicketDetailRouteProps {
   projects: Project[];
   labels: Label[];
   cycles: Cycle[];
+  ticketsById?: Map<string, Ticket>;
   activeTicketDetail: Ticket | null;
   onSelectTicket: (ticket: Ticket | null) => void;
   onUpdateTicket: (id: string, updates: Partial<Ticket>) => Promise<void>;
@@ -43,6 +44,7 @@ export const TicketDetailRoute: React.FC<TicketDetailRouteProps> = ({
   onAddComment,
   onUpdateComment,
   onDeleteComment,
+  ticketsById,
   onOpenCreateSubtask,
   onAddDependency,
   onRemoveDependency,
@@ -51,11 +53,6 @@ export const TicketDetailRoute: React.FC<TicketDetailRouteProps> = ({
 }) => {
   const navigate = useNavigate();
   const { workspaceId, projectId, ticketKey } = useParams();
-
-  const ticketById = useMemo(
-    () => new Map(tickets.map((ticket) => [ticket.id, ticket])),
-    [tickets]
-  );
 
   const detailSubtasks = useMemo(
     () => {
@@ -73,8 +70,14 @@ export const TicketDetailRoute: React.FC<TicketDetailRouteProps> = ({
   );
 
   const parentTicket = useMemo(
-    () => (activeTicket?.parentId ? ticketById.get(activeTicket.parentId) || null : null),
-    [activeTicket?.parentId, ticketById]
+    () => {
+      if (!activeTicket?.parentId) {
+        return null;
+      }
+
+      return ticketsById?.get(activeTicket.parentId) || tickets.find((ticket) => ticket.id === activeTicket.parentId) || null;
+    },
+    [activeTicket?.parentId, tickets, ticketsById]
   );
 
   const completedDetailSubtasks = useMemo(
@@ -113,6 +116,7 @@ export const TicketDetailRoute: React.FC<TicketDetailRouteProps> = ({
         comments={comments}
         subtasks={detailSubtasks}
         availableTickets={tickets}
+        ticketsById={ticketsById}
         completedSubtasks={completedDetailSubtasks}
         subtaskProgressPercent={detailSubtaskProgressPercent}
         parentTicket={parentTicket}

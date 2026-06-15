@@ -354,6 +354,20 @@ export function WorkspaceShellPage() {
       routeAggregateDetailTickets,
     ]
   );
+  const scopedTicketsByKey = useMemo(() => {
+    const map = new Map<string, Ticket>();
+    for (const ticket of routeScopedTickets) {
+      map.set(ticket.key.toUpperCase(), ticket);
+    }
+    return map;
+  }, [routeScopedTickets]);
+  const scopedTicketsById = useMemo(() => {
+    const map = new Map<string, Ticket>();
+    for (const ticket of routeScopedTickets) {
+      map.set(ticket.id, ticket);
+    }
+    return map;
+  }, [routeScopedTickets]);
   const activeProject = useMemo(
     () => projects.find((project) => project.id === (projectIdParam || activeProjectId)),
     [activeProjectId, projectIdParam, projects]
@@ -363,6 +377,7 @@ export function WorkspaceShellPage() {
     route,
     activeTicket,
     routeScopedTickets,
+    routeScopedTicketByKey: scopedTicketsByKey,
     setActiveSection,
     setActiveWorkspaceId,
     setActiveContext,
@@ -637,15 +652,7 @@ export function WorkspaceShellPage() {
   const scopedProjects = teamIdParam
     ? activeWorkspaceProjects.filter((project) => project.teamId === teamIdParam || teamIdParam === project.teamId)
     : activeWorkspaceProjects;
-  const scopedTickets = isWorkspaceAllTasksPath
-    ? isAggregateDetailRoute
-      ? routeAggregateDetailTickets
-      : workspaceAggregateTickets
-      : isTeamAggregatePath
-        ? isAggregateDetailRoute
-          ? routeAggregateDetailTickets
-          : teamAggregateTickets
-        : tickets;
+  const scopedTickets = routeScopedTickets;
   const scopedCycles = isTeamAggregatePath ? teamCycles : cycles;
   const scopedLabels = isTeamAggregatePath ? teamLabels : labels;
   const scopedFilters = useMemo(
@@ -838,9 +845,7 @@ export function WorkspaceShellPage() {
         ) : route.ticketKey ? (
           <TicketDetailRoute
             activeWorkspaceId={activeWorkspaceId}
-            activeTicket={
-              route.ticketKey ? (scopedTickets.find((ticket) => ticket.key === route.ticketKey) || activeTicket) : activeTicket
-            }
+            activeTicket={scopedTicketsByKey.get(route.ticketKey?.toUpperCase() || '') || activeTicket}
             activeTicketDetail={activeTicketDetail}
             comments={comments}
             tickets={scopedTickets}
@@ -859,6 +864,7 @@ export function WorkspaceShellPage() {
             onRemoveDependency={removeTicketDependency}
             onAddBlocker={addTicketBlocker}
             onRemoveBlocker={removeTicketBlocker}
+            ticketsById={scopedTicketsById}
           />
         ) : (
           <WorkspacePage

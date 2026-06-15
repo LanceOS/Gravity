@@ -33,6 +33,7 @@ interface UseAppShellRouteSyncArgs {
   route: AppShellRouteState;
   activeTicket: Ticket | null;
   routeScopedTickets: Ticket[];
+  routeScopedTicketByKey: Map<string, Ticket>;
   setActiveSection: Dispatch<SetStateAction<AppSection>>;
   setActiveWorkspaceId: Dispatch<SetStateAction<string>>;
   setActiveContext: Dispatch<SetStateAction<'issues' | 'notes'>>;
@@ -55,6 +56,7 @@ export function useAppShellRouteSync({
   setActiveProjectId,
   setActiveTicket,
   setFilters,
+  routeScopedTicketByKey,
 }: UseAppShellRouteSyncArgs) {
   const lastSyncedFilterParams = useRef<SyncedFilterParams>({
     labels: [],
@@ -246,7 +248,10 @@ export function useAppShellRouteSync({
     if (!route.ticketKey) return;
     if (activeTicket?.key === route.ticketKey) return;
 
-    const resolved = routeScopedTickets.find((ticket) => ticket.key === route.ticketKey) ?? null;
+    const normalizedRouteTicketKey = route.ticketKey.toUpperCase();
+    const resolved = routeScopedTicketByKey.get(normalizedRouteTicketKey)
+      ?? routeScopedTickets.find((ticket) => ticket.key === route.ticketKey)
+      ?? null;
     setActiveTicket(resolved);
-  }, [activeTicket?.key, route.ticketKey, routeScopedTickets, setActiveTicket]);
+  }, [activeTicket?.key, route.ticketKey, routeScopedTicketByKey, routeScopedTickets, setActiveTicket]);
 }
