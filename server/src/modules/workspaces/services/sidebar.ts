@@ -19,27 +19,25 @@ function mapCycle(cycle: typeof cycles.$inferSelect) {
 }
 
 export async function getSidebarTree(workspaceId: string) {
-  // Fetch workspace settings to get hierarchyMode
-  const settingsRows = await db
-    .select({ hierarchyMode: workspaceSettings.hierarchyMode })
-    .from(workspaceSettings)
-    .where(eq(workspaceSettings.workspaceId, workspaceId))
-    .limit(1);
+  // Fetch settings, teams, and projects in parallel before composing the tree.
+  const [settingsRows, workspaceTeams, workspaceProjects] = await Promise.all([
+    db
+      .select({ hierarchyMode: workspaceSettings.hierarchyMode })
+      .from(workspaceSettings)
+      .where(eq(workspaceSettings.workspaceId, workspaceId))
+      .limit(1),
+    db
+      .select()
+      .from(teams)
+      .where(eq(teams.workspaceId, workspaceId))
+      .orderBy(asc(teams.createdAt)),
+    db
+      .select()
+      .from(projects)
+      .where(eq(projects.workspaceId, workspaceId))
+      .orderBy(asc(projects.createdAt)),
+  ]);
   const hierarchyMode = settingsRows[0]?.hierarchyMode ?? 'flat';
-
-  // 1. Fetch all teams in the workspace
-  const workspaceTeams = await db
-    .select()
-    .from(teams)
-    .where(eq(teams.workspaceId, workspaceId))
-    .orderBy(asc(teams.createdAt));
-
-  // 2. Fetch all projects in the workspace
-  const workspaceProjects = await db
-    .select()
-    .from(projects)
-    .where(eq(projects.workspaceId, workspaceId))
-    .orderBy(asc(projects.createdAt));
 
   const teamIds = workspaceTeams.map((t) => t.id);
 
