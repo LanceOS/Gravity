@@ -32,6 +32,29 @@ vi.mock('@library', () => ({
   ),
 }));
 
+vi.mock('../../components/WorkspaceProjectPanel', () => ({
+  ProjectCreateOverlay: ({ onClose, onSubmitProject }: any) => (
+    <div>
+      <div>ProjectCreateOverlay</div>
+      <button
+        type="button"
+        onClick={() =>
+          void onSubmitProject({
+            name: '  Orbit UI  ',
+            description: '  Delivery workspace  ',
+            key: ' orb-1234 ',
+          })
+        }
+      >
+        Submit overlay project
+      </button>
+      <button type="button" onClick={onClose}>
+        Close overlay
+      </button>
+    </div>
+  ),
+}));
+
 vi.mock('../../modules/workspaces', () => ({
   PROJECT_LIFECYCLE_OPTIONS: [
     { value: 'planned', label: 'Planned' },

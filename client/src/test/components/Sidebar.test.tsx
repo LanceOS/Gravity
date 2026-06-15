@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { RefObject } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -44,29 +45,73 @@ vi.mock('../../components/Sidebar/components', () => ({
     onToggleTeam,
   }: SidebarProjectsSectionMockProps) => (
     (() => {
+      const safeCollapsedProjects = collapsedProjects ?? {};
+      const safeCollapsedTeams = collapsedTeams ?? {};
       const activeTeamId = section?.activeTeamId ?? 'team-1';
       const activeProjectId = section?.activeProjectId ?? 'project-1';
+      const [currentProjectsCollapsed, setCurrentProjectsCollapsed] = useState<boolean>(
+        projectsCollapsed ?? false
+      );
+      const [currentTeamCollapsed, setCurrentTeamCollapsed] = useState<boolean>(
+        safeCollapsedTeams[activeTeamId] ?? false
+      );
+      const [currentProjectCollapsed, setCurrentProjectCollapsed] = useState<boolean>(
+        safeCollapsedProjects[activeProjectId] ?? false
+      );
+
+      const handleToggleProjectsCollapsed = () => {
+        setCurrentProjectsCollapsed((value) => !value);
+        if (typeof onToggleProjectsCollapsed === 'function') {
+          onToggleProjectsCollapsed();
+        }
+      };
+
+      const handleToggleTeam = () => {
+        setCurrentTeamCollapsed((value) => !value);
+        if (typeof onToggleTeam === 'function') {
+          onToggleTeam(activeTeamId);
+        }
+      };
+
+      const handleToggleProject = () => {
+        setCurrentProjectCollapsed((value) => !value);
+        if (typeof onToggleProject === 'function') {
+          onToggleProject(activeProjectId);
+        }
+      };
+
+      const handleSelectTeam = () => {
+        if (typeof section?.onSelectTeam === 'function') {
+          section.onSelectTeam('team-2');
+        }
+      };
+
+      const handleSelectProject = () => {
+        if (typeof section?.onSelectProject === 'function') {
+          section.onSelectProject('project-2');
+        }
+      };
 
       return (
         <div>
-          <div>{`ProjectsCollapsed ${String(projectsCollapsed)}`}</div>
-          <div>{`CurrentTeamCollapsed ${String(collapsedTeams[activeTeamId] ?? false)}`}</div>
-          <div>{`OtherTeamCollapsed ${String(collapsedTeams['team-2'] ?? 'unset')}`}</div>
-          <div>{`CurrentProjectCollapsed ${String(collapsedProjects[activeProjectId] ?? false)}`}</div>
-          <div>{`OtherProjectCollapsed ${String(collapsedProjects['project-2'] ?? 'unset')}`}</div>
-          <button type="button" onClick={onToggleProjectsCollapsed}>
+          <div>{`ProjectsCollapsed ${String(currentProjectsCollapsed)}`}</div>
+          <div>{`CurrentTeamCollapsed ${String(currentTeamCollapsed)}`}</div>
+          <div>{`OtherTeamCollapsed ${String(safeCollapsedTeams['team-2'] ?? false)}`}</div>
+          <div>{`CurrentProjectCollapsed ${String(currentProjectCollapsed)}`}</div>
+          <div>{`OtherProjectCollapsed ${String(safeCollapsedProjects['project-2'] ?? false)}`}</div>
+          <button type="button" onClick={handleToggleProjectsCollapsed}>
             Toggle project list
           </button>
-          <button type="button" onClick={() => onToggleTeam(activeTeamId)}>
+          <button type="button" onClick={handleToggleTeam}>
             Toggle current team
           </button>
-          <button type="button" onClick={() => onToggleTeam('team-2')}>
+          <button type="button" onClick={handleSelectTeam}>
             Select other team
           </button>
-          <button type="button" onClick={() => onToggleProject(activeProjectId)}>
+          <button type="button" onClick={handleToggleProject}>
             Toggle current project
           </button>
-          <button type="button" onClick={() => onToggleProject('project-2')}>
+          <button type="button" onClick={handleSelectProject}>
             Select other project
           </button>
         </div>
