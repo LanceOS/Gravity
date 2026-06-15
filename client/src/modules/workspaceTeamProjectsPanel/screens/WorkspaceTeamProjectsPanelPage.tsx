@@ -5,7 +5,7 @@ import { sanitizeProjectKey } from '../../workspaceProjectsPanel/utils/Workspace
 import { WorkspaceHeader } from '../../workspaces/components/WorkspaceHeader';
 import { removeProjectFromTeam, updateProjectInTeam } from '../../../utils/sidebarTreeMutations';
 import '../../../pages/WorkspacePage/WorkspacePage.css';
-import './WorkspaceTeamProjectsPage.css';
+import '../styles/WorkspaceTeamProjectsPage.css';
 import { WorkspaceTeamProjectsDeleteModal } from '../components/WorkspaceTeamProjectsDeleteModal';
 import { WorkspaceTeamProjectsEditorSection } from '../components/WorkspaceTeamProjectsEditorSection';
 import { WorkspaceTeamProjectsFeedback } from '../components/WorkspaceTeamProjectsFeedback';
