@@ -72,6 +72,7 @@ export function getNextLabelSortOrder(nextLabels: { sortOrder?: number | null }[
 
 export type { GithubRepoValidationResult };
 export { validateGithubRepoUrl };
+export { sanitizeProjectKey };
 
 export function createProjectSettingsFeedback(type: ProjectSettingsFeedback['type'], message: string): ProjectSettingsFeedback {
   if (!message) {
