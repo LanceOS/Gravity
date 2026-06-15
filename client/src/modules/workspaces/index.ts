@@ -2,6 +2,7 @@ export { EmptyWorkspaceScreen } from './components/EmptyWorkspaceScreen';
 export { WorkspaceMcpModal } from './components/WorkspaceMcpModal';
 export { WorkspaceHeader } from './components/WorkspaceHeader';
 export { ProjectCreateOverlay } from '../workspaceProjectsPanel/components/ProjectCreateOverlay';
+export { WorkspaceTeamsPage } from '../workspaceTeamsPage';
 export { WorkspaceProjectPanelPage as WorkspaceProjectPanel } from '../workspaceProjectsPanel/screens/WorkspaceProjectPanelPage';
 export { WorkspaceTeamProjectsPanel } from '../workspaceTeamProjectsPanel';
 export {
