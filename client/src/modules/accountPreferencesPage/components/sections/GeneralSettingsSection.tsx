@@ -2,7 +2,7 @@ import { Select, Stack, Grid, Card, Alert } from '@library';
 
 import { useIsMobile } from '../../../../hooks/useIsMobile';
 import { AGENT_INTEGRATION_OPTIONS, PROJECT_LAYOUT_OPTIONS, THEME_OPTIONS, VIEW_MODE_OPTIONS } from '../../utils/accountPreferences';
-import { useAccountPreferencesSettingsContext } from '../../contexts/accountPreferencesPageContexts';
+import { useAccountPreferencesSettingsContext } from '../../../../context/accountPreferencesPage/accountPreferencesPageContextHooks';
 import type { WorkspaceSettings } from '../../../../utils/settings';
 
 export function GeneralSettingsSection() {

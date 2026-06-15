@@ -1,6 +1,6 @@
 import React from 'react';
 import { Card, Stack, Avatar, Badge } from '@library';
-import { useSettingsScreenContext } from '../contexts/SettingsScreenContext';
+import { useSettingsScreenContext } from '../../../context/settings/useSettingsScreenContext';
 
 function formatLastActive(isoString?: string | null): string {
   if (!isoString) {

@@ -4,7 +4,7 @@ import { Globe, ArrowLeft } from 'lucide-react';
 import {
   useAccountPreferencesNavigationContext,
   useAccountPreferencesRuntimeContext,
-} from '../contexts/accountPreferencesPageContexts';
+} from '../../../context/accountPreferencesPage/accountPreferencesPageContextHooks';
 
 export function AccountPreferencesHeader({
   isMobile,

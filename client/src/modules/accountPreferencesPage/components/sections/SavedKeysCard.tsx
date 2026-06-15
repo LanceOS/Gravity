@@ -4,7 +4,7 @@ import { SavedKeyItem } from './SavedKeyItem';
 import {
   useAccountPreferencesCloudContext,
   useAccountPreferencesSettingsContext,
-} from '../../contexts/accountPreferencesPageContexts';
+} from '../../../../context/accountPreferencesPage/accountPreferencesPageContextHooks';
 
 export function SavedKeysCard() {
   const { savedCredentials, onRemoveCredential } = useAccountPreferencesCloudContext();

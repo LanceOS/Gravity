@@ -12,7 +12,7 @@ import {
   useAccountPreferencesCloudContext,
   useAccountPreferencesRuntimeContext,
   useAccountPreferencesSettingsContext,
-} from '../../contexts/accountPreferencesPageContexts';
+} from '../../../../context/accountPreferencesPage/accountPreferencesPageContextHooks';
 
 export function CloudProviderSection() {
   const { settings, onChangeSettings } = useAccountPreferencesSettingsContext();

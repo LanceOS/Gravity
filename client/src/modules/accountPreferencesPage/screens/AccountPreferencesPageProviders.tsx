@@ -11,7 +11,7 @@ import {
   AccountPreferencesOllamaContextProvider,
   AccountPreferencesRuntimeContextProvider,
   AccountPreferencesSettingsContextProvider,
-} from '../contexts/accountPreferencesPageContexts';
+} from '../../../context/accountPreferencesPage/accountPreferencesPageContexts';
 
 export function AccountPreferencesPageProviders({
   children,

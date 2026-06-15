@@ -1,7 +1,7 @@
 import React from 'react';
 import { Globe, Users, UserPlus } from 'lucide-react';
 import { Card, Stack, Grid, TextInput, Select, Divider } from '@library';
-import { useSettingsScreenContext } from '../contexts/SettingsScreenContext';
+import { useSettingsScreenContext } from '../../../context/settings/useSettingsScreenContext';
 
 export function OverviewSection(): JSX.Element {
   const { isMobile, workspace, settings, onChangeSettings } = useSettingsScreenContext();

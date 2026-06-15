@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Card, Stack, TextInput, Alert, Button } from '@library';
-import { useSettingsScreenContext } from '../contexts/SettingsScreenContext';
+import { useSettingsScreenContext } from '../../../context/settings/useSettingsScreenContext';
 
 export function DangerZoneSection(): JSX.Element {
   const { isMobile, workspace, deleteLoading, deleteError, onDeleteWorkspace, onClearDeleteError } = useSettingsScreenContext();

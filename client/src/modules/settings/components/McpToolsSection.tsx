@@ -1,6 +1,6 @@
 import React from 'react';
 import { Card, Stack, Switch, Alert } from '@library';
-import { useSettingsScreenContext } from '../contexts/SettingsScreenContext';
+import { useSettingsScreenContext } from '../../../context/settings/useSettingsScreenContext';
 
 interface McpToolMetadata {
   name: string;

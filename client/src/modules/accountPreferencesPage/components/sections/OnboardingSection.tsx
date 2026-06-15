@@ -1,7 +1,7 @@
 import { Button, Stack, Card } from '@library';
 
 import { StatusNotice } from '../StatusNotice';
-import { useAccountPreferencesOnboardingContext } from '../../contexts/accountPreferencesPageContexts';
+import { useAccountPreferencesOnboardingContext } from '../../../../context/accountPreferencesPage/accountPreferencesPageContextHooks';
 
 export function OnboardingSection() {
   const { tutorialResult, onResetTutorial } = useAccountPreferencesOnboardingContext();

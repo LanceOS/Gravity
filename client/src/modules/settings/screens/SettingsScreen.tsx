@@ -4,7 +4,7 @@ import { Button, Divider, Flex, Avatar, Stack, Alert } from '@library';
 import type { SettingsScreenProps, SettingsCategoryId } from '../types';
 import { useIsMobile } from '../../../hooks/useIsMobile';
 import { SettingsPageLayout } from '../../../layouts/SettingsPageLayout/SettingsPageLayout';
-import { SettingsScreenContextProvider } from '../contexts/SettingsScreenContext';
+import { SettingsScreenContextProvider } from '../../../context/settings/SettingsScreenContext';
 import { OverviewSection } from '../components/OverviewSection';
 import { DangerZoneSection } from '../components/DangerZoneSection';
 import { AccessSection } from '../components/AccessSection';

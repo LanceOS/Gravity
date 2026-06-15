@@ -12,7 +12,7 @@ import { AccountPreferencesPageProps } from '../types';
 import {
   useAccountPreferencesCategoryContext,
   useAccountPreferencesRuntimeContext,
-} from '../contexts/accountPreferencesPageContexts';
+} from '../../../context/accountPreferencesPage/accountPreferencesPageContextHooks';
 import { AccountPreferencesPageProviders } from './AccountPreferencesPageProviders';
 import { SettingsPageLayout } from '../../../layouts/SettingsPageLayout/SettingsPageLayout';
 import '../styles/accountPreferencesPage.css';

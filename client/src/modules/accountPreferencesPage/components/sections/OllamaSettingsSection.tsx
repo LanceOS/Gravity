@@ -7,7 +7,7 @@ import { getOllamaModelOptions, getOllamaModelValue, getOllamaMissingModelsMessa
 import {
   useAccountPreferencesOllamaContext,
   useAccountPreferencesSettingsContext,
-} from '../../contexts/accountPreferencesPageContexts';
+} from '../../../../context/accountPreferencesPage/accountPreferencesPageContextHooks';
 
 export function OllamaSettingsSection() {
   const { settings, onChangeSettings } = useAccountPreferencesSettingsContext();

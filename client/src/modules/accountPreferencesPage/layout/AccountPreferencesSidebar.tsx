@@ -2,7 +2,7 @@ import { Avatar } from '@library';
 import {
   useAccountPreferencesCategoryContext,
   useAccountPreferencesRuntimeContext,
-} from '../contexts/accountPreferencesPageContexts';
+} from '../../../context/accountPreferencesPage/accountPreferencesPageContextHooks';
 
 export function AccountPreferencesSidebar() {
   const { currentUser } = useAccountPreferencesRuntimeContext();
