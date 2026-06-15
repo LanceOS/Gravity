@@ -1,8 +1,9 @@
-interface WorkspaceProjectLabelSectionHeaderProps {
-  managedProjectName: string;
-}
+import { useWorkspaceProjectPanelProjectStateContext } from '../context/WorkspaceProjectPanelProjectStateContext';
 
-export function WorkspaceProjectLabelSectionHeader({ managedProjectName }: WorkspaceProjectLabelSectionHeaderProps) {
+export function WorkspaceProjectLabelSectionHeader() {
+  const { managedProject } = useWorkspaceProjectPanelProjectStateContext();
+  const managedProjectName = managedProject?.name || 'Selected';
+
   return (
     <div className="workspace-page__project-domain-header">
       <div>
@@ -15,4 +16,3 @@ export function WorkspaceProjectLabelSectionHeader({ managedProjectName }: Works
     </div>
   );
 }
-

@@ -1,31 +1,28 @@
 import type { Label } from '../../../context/TicketContext';
+import { useWorkspaceProjectPanelActionsContext } from '../context/WorkspaceProjectPanelActionsContext';
+import { useWorkspaceProjectPanelLabelStateContext } from '../context/WorkspaceProjectPanelLabelStateContextCore';
+import { useWorkspaceProjectPanelProjectStateContext } from '../context/WorkspaceProjectPanelProjectStateContext';
 
-export interface WorkspaceProjectLabelListProps {
-  labels: Label[];
-  activeLabelId: string | null;
-  onSelectLabel: (label: Label) => void;
-  managedProjectName: string;
-}
+export function WorkspaceProjectLabelList() {
+  const { sortedLabels, editingLabelId } = useWorkspaceProjectPanelLabelStateContext();
+  const { startEditingLabel } = useWorkspaceProjectPanelActionsContext();
+  const { managedProject } = useWorkspaceProjectPanelProjectStateContext();
 
-export function WorkspaceProjectLabelList({
-  labels,
-  activeLabelId,
-  onSelectLabel,
-  managedProjectName,
-}: WorkspaceProjectLabelListProps) {
+  const managedProjectName = managedProject?.name || 'this project';
+
   return (
     <div className="workspace-page__domain-list">
-      {labels.length > 0 ? (
-        labels.map((label) => (
+      {sortedLabels.length > 0 ? (
+        sortedLabels.map((label: Label) => (
           <button
             key={label.id}
             type="button"
             className={`workspace-page__domain-chip workspace-page__domain-chip--button ${
-              activeLabelId === label.id ? 'workspace-page__domain-chip--active' : ''
+              editingLabelId === label.id ? 'workspace-page__domain-chip--active' : ''
             }`}
-            onClick={() => onSelectLabel(label)}
+            onClick={() => startEditingLabel(label)}
             title={label.description || label.name}
-            aria-pressed={activeLabelId === label.id}
+            aria-pressed={editingLabelId === label.id}
           >
             <span className="workspace-page__domain-chip-swatch" style={{ background: label.color }} />
             <span>{label.name}</span>

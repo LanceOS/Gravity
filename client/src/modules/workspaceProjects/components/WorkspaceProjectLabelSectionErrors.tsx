@@ -1,12 +1,13 @@
+import { useWorkspaceProjectPanelLabelStateContext } from '../context/WorkspaceProjectPanelLabelStateContextCore';
+
 interface WorkspaceProjectLabelSectionErrorsProps {
-  labelFormError: string | null;
   labelCreateError: string | null;
 }
 
 export function WorkspaceProjectLabelSectionErrors({
-  labelFormError,
   labelCreateError,
 }: WorkspaceProjectLabelSectionErrorsProps) {
+  const { labelFormError } = useWorkspaceProjectPanelLabelStateContext();
   const feedback = labelFormError || labelCreateError;
 
   if (!feedback) {
@@ -15,4 +16,3 @@ export function WorkspaceProjectLabelSectionErrors({
 
   return <div className="workspace-page__project-feedback workspace-page__project-feedback--error">{feedback}</div>;
 }
-

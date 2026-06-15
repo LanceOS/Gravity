@@ -1,18 +1,18 @@
-import type { Project } from '../../../context/TicketContext';
+import { useWorkspaceProjectPanelProjectStateContext } from '../context/WorkspaceProjectPanelProjectStateContext';
 
 import { PROJECT_STATUS_LABELS } from '../utils/WorkspaceProjectPanel';
 
 interface WorkspaceProjectCurrentProjectSectionProps {
-  currentProject: Project | null;
   defaultProjectId: string | null;
   labelCount: number;
 }
 
 export function WorkspaceProjectCurrentProjectSection({
-  currentProject,
   defaultProjectId,
   labelCount,
 }: WorkspaceProjectCurrentProjectSectionProps) {
+  const { currentProject } = useWorkspaceProjectPanelProjectStateContext();
+
   return currentProject ? (
     <article className="workspace-page__current-project">
       <div className="workspace-page__current-project-main">
@@ -52,4 +52,3 @@ export function WorkspaceProjectCurrentProjectSection({
     </div>
   );
 }
-

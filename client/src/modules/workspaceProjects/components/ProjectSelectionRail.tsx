@@ -1,12 +1,14 @@
 import type { ProjectSelectionRailProps } from '../types/WorkspaceProjectPanel';
 import { PROJECT_STATUS_LABELS } from '../utils/WorkspaceProjectPanel';
+import { useWorkspaceProjectPanelActionsContext } from '../context/WorkspaceProjectPanelActionsContext';
+import { useWorkspaceProjectPanelProjectStateContext } from '../context/WorkspaceProjectPanelProjectStateContext';
 
-export function ProjectSelectionRail({
-  projects,
-  selectedProjectId,
-  defaultProjectId,
-  onSelectProject,
-}: ProjectSelectionRailProps) {
+export function ProjectSelectionRail({ defaultProjectId }: Pick<ProjectSelectionRailProps, 'defaultProjectId'>) {
+  const { projectStrip, managedProject, currentProject } = useWorkspaceProjectPanelProjectStateContext();
+  const { selectProject } = useWorkspaceProjectPanelActionsContext();
+
+  const selectedProjectId = managedProject?.id || currentProject?.id || null;
+
   return (
     <section className="workspace-page__project-browser">
       <div className="workspace-page__project-browser-header">
@@ -20,7 +22,7 @@ export function ProjectSelectionRail({
       </div>
 
       <div className="workspace-page__project-selection-list">
-        {projects.map((project) => {
+        {projectStrip.map((project) => {
           const isSelected = selectedProjectId === project.id;
           const roleLabel = project.id === defaultProjectId ? 'Default workspace project' : 'Workspace project';
           const selectionLabel = isSelected ? 'Currently managing' : 'Click to manage labels';
@@ -30,7 +32,7 @@ export function ProjectSelectionRail({
               key={project.id}
               type="button"
               className={`workspace-page__project-strip-card ${isSelected ? 'workspace-page__project-strip-card--active' : ''}`}
-              onClick={() => onSelectProject(project.id)}
+              onClick={() => selectProject(project.id)}
             >
               <div className="workspace-page__project-strip-card-content">
                 <div className="workspace-page__project-card-head">

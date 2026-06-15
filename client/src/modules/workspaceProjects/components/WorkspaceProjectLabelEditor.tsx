@@ -1,39 +1,35 @@
 import { Button, TextInput, Textarea } from '@library';
 import { PencilLine, Trash2 } from 'lucide-react';
 
-import type { Label } from '../../../context/TicketContext';
+import { useWorkspaceProjectPanelActionsContext } from '../context/WorkspaceProjectPanelActionsContext';
+import { useWorkspaceProjectPanelLabelStateContext } from '../context/WorkspaceProjectPanelLabelStateContextCore';
 
 export interface WorkspaceProjectLabelEditorProps {
-  activeLabel: Label;
-  editingLabelName: string;
-  editingLabelColor: string;
-  editingLabelDescription: string;
   isLabelBusy: boolean;
   editingLabelLoading: boolean;
-  editingLabelError: string | null;
-  onEditingLabelNameChange: (name: string) => void;
-  onEditingLabelColorChange: (color: string) => void;
-  onEditingLabelDescriptionChange: (description: string) => void;
-  onSaveLabel: (event: React.FormEvent<HTMLFormElement>) => void;
-  onDeleteLabel: () => void;
-  onCancelEdit: () => void;
 }
 
 export function WorkspaceProjectLabelEditor({
-  activeLabel,
-  editingLabelName,
-  editingLabelColor,
-  editingLabelDescription,
   isLabelBusy,
   editingLabelLoading,
-  editingLabelError,
-  onEditingLabelNameChange,
-  onEditingLabelColorChange,
-  onEditingLabelDescriptionChange,
-  onSaveLabel,
-  onDeleteLabel,
-  onCancelEdit,
 }: WorkspaceProjectLabelEditorProps) {
+  const {
+    activeLabel,
+    editingLabelName,
+    editingLabelColor,
+    editingLabelDescription,
+    editingLabelError,
+    setEditingLabelName,
+    setEditingLabelColor,
+    setEditingLabelDescription,
+    clearLabelEditor,
+  } = useWorkspaceProjectPanelLabelStateContext();
+  const { updateLabel, deleteLabel } = useWorkspaceProjectPanelActionsContext();
+
+  if (!activeLabel) {
+    return null;
+  }
+
   return (
     <section className="workspace-page__label-editor">
       <div className="workspace-page__project-domain-header">
@@ -50,12 +46,12 @@ export function WorkspaceProjectLabelEditor({
         <div className="workspace-page__project-feedback workspace-page__project-feedback--error">{editingLabelError}</div>
       ) : null}
 
-      <form className="workspace-page__label-editor-form" onSubmit={onSaveLabel}>
+      <form className="workspace-page__label-editor-form" onSubmit={updateLabel}>
         <div className="workspace-page__label-editor-grid">
           <TextInput
             label="Label Name"
             value={editingLabelName}
-            onChange={(event) => onEditingLabelNameChange(event.target.value)}
+            onChange={(event) => setEditingLabelName(event.target.value)}
             placeholder="Frontend Platform"
             disabled={isLabelBusy}
             required
@@ -67,7 +63,7 @@ export function WorkspaceProjectLabelEditor({
               type="color"
               className="workspace-page__project-color-input"
               value={editingLabelColor}
-              onChange={(event) => onEditingLabelColorChange(event.target.value)}
+              onChange={(event) => setEditingLabelColor(event.target.value)}
               disabled={isLabelBusy}
               style={{ height: '36px', padding: '2px', cursor: 'pointer' }}
             />
@@ -77,7 +73,7 @@ export function WorkspaceProjectLabelEditor({
         <Textarea
           label="Description"
           value={editingLabelDescription}
-          onChange={(event) => onEditingLabelDescriptionChange(event.target.value)}
+          onChange={(event) => setEditingLabelDescription(event.target.value)}
           placeholder="Explain when this label should be used."
           rows={3}
           disabled={isLabelBusy}
@@ -100,13 +96,13 @@ export function WorkspaceProjectLabelEditor({
             variant="danger"
             loading={editingLabelLoading}
             disabled={isLabelBusy}
-            onClick={onDeleteLabel}
+            onClick={deleteLabel}
           >
             <Trash2 size={14} />
             <span>Delete Label</span>
           </Button>
 
-          <Button type="button" variant="secondary" disabled={isLabelBusy} onClick={onCancelEdit}>
+          <Button type="button" variant="secondary" disabled={isLabelBusy} onClick={clearLabelEditor}>
             <span>Cancel</span>
           </Button>
         </div>

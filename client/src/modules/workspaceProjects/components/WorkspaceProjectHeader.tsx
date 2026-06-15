@@ -1,18 +1,19 @@
 import { Plus } from 'lucide-react';
+import { useWorkspaceProjectPanelActionsContext } from '../context/WorkspaceProjectPanelActionsContext';
 
 interface WorkspaceProjectHeaderProps {
   workspaceName: string;
   projectCount: number;
   projectCreateError: string | null;
-  onCreateProject: () => void;
 }
 
 export function WorkspaceProjectHeader({
   workspaceName,
   projectCount,
   projectCreateError,
-  onCreateProject,
 }: WorkspaceProjectHeaderProps) {
+  const { openCreateProjectModal } = useWorkspaceProjectPanelActionsContext();
+
   return (
     <>
       <div className="workspace-page__projects-header">
@@ -29,7 +30,7 @@ export function WorkspaceProjectHeader({
           <button
             type="button"
             className="workspace-page__projects-button workspace-page__projects-button--primary"
-            onClick={onCreateProject}
+            onClick={openCreateProjectModal}
           >
             <Plus size={14} />
             <span>New Project</span>
@@ -43,4 +44,3 @@ export function WorkspaceProjectHeader({
     </>
   );
 }
-

@@ -1,34 +1,26 @@
 import { Button, TextInput, Textarea } from '@library';
+import { useWorkspaceProjectPanelActionsContext } from '../context/WorkspaceProjectPanelActionsContext';
+import { useWorkspaceProjectPanelLabelStateContext } from '../context/WorkspaceProjectPanelLabelStateContextCore';
 
 export interface WorkspaceProjectLabelCreateFormProps {
-  labelName: string;
-  labelColor: string;
-  labelDescription: string;
   isLabelBusy: boolean;
   labelCreateLoading: boolean;
-  onLabelNameChange: (name: string) => void;
-  onLabelColorChange: (color: string) => void;
-  onLabelDescriptionChange: (description: string) => void;
-  onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
 }
 
 export function WorkspaceProjectLabelCreateForm({
-  labelName,
-  labelColor,
-  labelDescription,
   isLabelBusy,
   labelCreateLoading,
-  onLabelNameChange,
-  onLabelColorChange,
-  onLabelDescriptionChange,
-  onSubmit,
 }: WorkspaceProjectLabelCreateFormProps) {
+  const { labelName, labelColor, labelDescription, setLabelName, setLabelColor, setLabelDescription } =
+    useWorkspaceProjectPanelLabelStateContext();
+  const { createLabel } = useWorkspaceProjectPanelActionsContext();
+
   return (
-    <form className="workspace-page__domain-form" onSubmit={onSubmit}>
+    <form className="workspace-page__domain-form" onSubmit={createLabel}>
       <TextInput
         label="Label Name"
         value={labelName}
-        onChange={(event) => onLabelNameChange(event.target.value)}
+        onChange={(event) => setLabelName(event.target.value)}
         placeholder="Frontend Platform"
         disabled={isLabelBusy}
         required
@@ -40,7 +32,7 @@ export function WorkspaceProjectLabelCreateForm({
           type="color"
           className="workspace-page__project-color-input"
           value={labelColor}
-          onChange={(event) => onLabelColorChange(event.target.value)}
+          onChange={(event) => setLabelColor(event.target.value)}
           disabled={isLabelBusy}
           style={{ height: '36px', padding: '2px', cursor: 'pointer' }}
         />
@@ -49,7 +41,7 @@ export function WorkspaceProjectLabelCreateForm({
       <Textarea
         label="Description"
         value={labelDescription}
-        onChange={(event) => onLabelDescriptionChange(event.target.value)}
+        onChange={(event) => setLabelDescription(event.target.value)}
         placeholder="What does this label represent?"
         rows={3}
         disabled={isLabelBusy}
