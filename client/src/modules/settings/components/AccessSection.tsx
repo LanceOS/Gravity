@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Mail } from 'lucide-react';
 import { Card, Stack, TextInput, Button, Badge } from '@library';
+import type { WorkspaceInvite } from '../types';
 import { useSettingsScreenContext } from '../../../context/settings/useSettingsScreenContext';
 
 const COPY_FEEDBACK_STORAGE_KEY = 'gravity_peer_invite_copy_feedback';

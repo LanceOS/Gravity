@@ -6,9 +6,11 @@ import { delay, getInitialAgentLogs } from '../utils/AgentSimulator';
 import { Button, Textarea } from '@library';
 import { apiClient } from '../../../utils/apiClient';
 
-function parseToolResultText(text: string): unknown {
+type McpToolResult = Record<string, unknown>;
+
+function parseToolResultText(text: string): McpToolResult | string {
   try {
-    return JSON.parse(text);
+    return JSON.parse(text) as McpToolResult;
   } catch {
     return text;
   }
@@ -95,7 +97,15 @@ export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
         assigneeId: 'u-bob' // Bob
       });
 
-      const ticketKey = createResult?.ticket?.key || 'GRA-8';
+      const ticketKey =
+        typeof createResult === 'object' &&
+        createResult !== null &&
+        'ticket' in createResult &&
+        typeof createResult.ticket === 'object' &&
+        createResult.ticket !== null &&
+        typeof (createResult.ticket as McpToolResult).key === 'string'
+          ? ((createResult.ticket as McpToolResult).key as string)
+          : 'GRA-8';
 
       // 4. Call add_comment tool
       addLog('thought', `🤔 [Agent Thought]: Ticket created successfully as key ${ticketKey}. Now posting the requested comment on it...`);
