@@ -9,6 +9,15 @@ vi.mock('@library', () => ({
   Button: ({ children, loading, ...props }: any) => (
     <button {...props}>{loading ? 'Loading' : children}</button>
   ),
+  Modal: ({ children, title, footer, isOpen }: any) =>
+    isOpen ? (
+      <section>
+        {title ? <h2>{title}</h2> : null}
+        <div>{children}</div>
+        {footer ? <footer>{footer}</footer> : null}
+      </section>
+    ) : null,
+  Alert: ({ children, type }: any) => <div data-alert-type={type}>{children}</div>,
   TextInput: ({ label, value, onChange, ...props }: any) => (
     <label>
       <span>{label}</span>

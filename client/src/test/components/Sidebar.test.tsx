@@ -43,28 +43,35 @@ vi.mock('../../components/Sidebar/components', () => ({
     onToggleProject,
     onToggleTeam,
   }: SidebarProjectsSectionMockProps) => (
-    <div>
-      <div>{`ProjectsCollapsed ${String(projectsCollapsed)}`}</div>
-      <div>{`CurrentTeamCollapsed ${String(collapsedTeams[section.activeTeamId ?? 'team-1'] ?? false)}`}</div>
-      <div>{`OtherTeamCollapsed ${String(collapsedTeams['team-2'] ?? 'unset')}`}</div>
-      <div>{`CurrentProjectCollapsed ${String(collapsedProjects[section.activeProjectId] ?? false)}`}</div>
-      <div>{`OtherProjectCollapsed ${String(collapsedProjects['project-2'] ?? 'unset')}`}</div>
-      <button type="button" onClick={onToggleProjectsCollapsed}>
-        Toggle project list
-      </button>
-      <button type="button" onClick={() => onToggleTeam(section.activeTeamId ?? 'team-1')}>
-        Toggle current team
-      </button>
-      <button type="button" onClick={() => onToggleTeam('team-2')}>
-        Select other team
-      </button>
-      <button type="button" onClick={() => onToggleProject(section.activeProjectId)}>
-        Toggle current project
-      </button>
-      <button type="button" onClick={() => onToggleProject('project-2')}>
-        Select other project
-      </button>
-    </div>
+    (() => {
+      const activeTeamId = section?.activeTeamId ?? 'team-1';
+      const activeProjectId = section?.activeProjectId ?? 'project-1';
+
+      return (
+        <div>
+          <div>{`ProjectsCollapsed ${String(projectsCollapsed)}`}</div>
+          <div>{`CurrentTeamCollapsed ${String(collapsedTeams[activeTeamId] ?? false)}`}</div>
+          <div>{`OtherTeamCollapsed ${String(collapsedTeams['team-2'] ?? 'unset')}`}</div>
+          <div>{`CurrentProjectCollapsed ${String(collapsedProjects[activeProjectId] ?? false)}`}</div>
+          <div>{`OtherProjectCollapsed ${String(collapsedProjects['project-2'] ?? 'unset')}`}</div>
+          <button type="button" onClick={onToggleProjectsCollapsed}>
+            Toggle project list
+          </button>
+          <button type="button" onClick={() => onToggleTeam(activeTeamId)}>
+            Toggle current team
+          </button>
+          <button type="button" onClick={() => onToggleTeam('team-2')}>
+            Select other team
+          </button>
+          <button type="button" onClick={() => onToggleProject(activeProjectId)}>
+            Toggle current project
+          </button>
+          <button type="button" onClick={() => onToggleProject('project-2')}>
+            Select other project
+          </button>
+        </div>
+      );
+    })()
   ),
   SidebarAgentTools: ({ tools }: SidebarAgentToolsMockProps) => (
     <div>
