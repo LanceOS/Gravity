@@ -1,8 +1,17 @@
-import type { SidebarTree } from '../../types/domain';
+import type { SidebarTeam, Project, SidebarTree } from '../../types/domain';
 import { WorkspaceTeamProjectsPanelPage } from '../../modules/workspaceTeamProjectsPanel/screens/WorkspaceTeamProjectsPanelPage';
-import type { Project, SidebarTeam } from '../../types/domain';
 
-interface WorkspaceTeamProjectsPageProps {
+export const WorkspaceTeamProjectsPage = ({
+  workspaceId,
+  workspaceName,
+  team,
+  projects,
+  activeProjectId,
+  onBackToTeams,
+  onCreateProject,
+  onUpdateProject,
+  onDeleteProject,
+}: {
   workspaceId: string;
   workspaceName: string;
   team: SidebarTeam | null;
@@ -13,19 +22,7 @@ interface WorkspaceTeamProjectsPageProps {
   onCreateProject: (project: { name: string; description: string; key: string }) => Promise<Project | null>;
   onUpdateProject: (id: string, updates: Partial<Project>) => Promise<Project | null>;
   onDeleteProject?: (id: string) => Promise<void>;
-}
-
-export function WorkspaceTeamProjectsPage({
-  workspaceId,
-  workspaceName,
-  team,
-  projects,
-  activeProjectId,
-  onBackToTeams,
-  onCreateProject,
-  onUpdateProject,
-  onDeleteProject,
-}: WorkspaceTeamProjectsPageProps) {
+}) => {
   const sidebarTree: Pick<SidebarTree, 'teams'> | undefined = team ? { teams: [team] } : undefined;
 
   return (
@@ -44,4 +41,4 @@ export function WorkspaceTeamProjectsPage({
       onDeleteProject={onDeleteProject}
     />
   );
-}
+};
