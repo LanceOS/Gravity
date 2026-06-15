@@ -207,6 +207,12 @@ export function WorkspaceShellPage() {
   });
 
   const {
+    setDensity,
+    theme,
+    setTheme: setDsTheme,
+  } = useTheme();
+
+  const {
     settings: accountSettings,
     ollamaModels,
     savedCredentials: accountSavedCredentials,
@@ -217,12 +223,6 @@ export function WorkspaceShellPage() {
     setView,
     setTheme,
   });
-
-  const {
-    setDensity,
-    theme,
-    setTheme: setDsTheme,
-  } = useTheme();
   useEffect(() => {
     if (accountSettings) {
       setDensity(accountSettings.projectLayout === 'condensed' ? 'compact' : 'standard');
