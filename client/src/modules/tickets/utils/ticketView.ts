@@ -1,5 +1,6 @@
 import type { Cycle, Label, Project, Ticket, User } from '../../../context/TicketContext';
 import { normalizeSearchTerm, normalizeSearchToken } from '../../../utils/search';
+import { BOARD_COLUMNS, LIST_STATUS_ORDER } from '../../../utils/ticketOptions';
 
 export interface TicketFilters {
   status: string;
@@ -18,25 +19,7 @@ export type TicketListSort = 'created' | 'label' | 'newest' | 'oldest' | 'priori
 
 export type TicketsByStatus = Record<Ticket['status'], Ticket[]>;
 
-export const BOARD_COLUMNS: Array<{ id: Ticket['status']; title: string; color: string }> = [
-  { id: 'backlog', title: 'Backlog', color: '#71717a' },
-  { id: 'todo', title: 'Todo', color: '#3b82f6' },
-  { id: 'in_progress', title: 'In Progress', color: '#f59e0b' },
-  { id: 'in_review', title: 'In Review', color: '#aa3bff' },
-  { id: 'done', title: 'Done', color: '#10b981' },
-  { id: 'canceled', title: 'Canceled', color: '#ef4444' },
-];
-
-// Order used specifically for the list (non-board) ticket view. This presents a
-// linear workflow progression: In Review -> In Progress -> Todo -> Backlog -> Done
-export const LIST_STATUS_ORDER: Ticket['status'][] = [
-  'in_review',
-  'in_progress',
-  'todo',
-  'backlog',
-  'done',
-  'canceled',
-];
+export { BOARD_COLUMNS, LIST_STATUS_ORDER };
 
 export function filterTickets(tickets: Ticket[], filters: TicketFilters): Ticket[] {
   const selectedLabelId = filters.labelId ?? filters.domainId;
