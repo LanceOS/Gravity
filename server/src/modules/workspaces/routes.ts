@@ -44,6 +44,8 @@ import { createRedisRateLimiter } from '../../lib/rateLimitRedis.js';
 import { getRequestSourceIp } from '../../lib/request-ip.js';
 import {
   isWorkspaceMember,
+  authorizeWorkspaceOwnerAccess,
+  authorizeWorkspaceOwnerOrAdminAccess,
   invalidateWorkspaceMembershipCache,
   invalidateWorkspaceMembershipCaches,
 } from './services/membership.js';
@@ -427,19 +429,9 @@ export function createWorkspacesRouter() {
         return;
       }
 
-      const membershipRows = await db
-        .select({ role: workspaceMembers.role })
-        .from(workspaceMembers)
-        .where(
-          and(
-            eq(workspaceMembers.workspaceId, workspaceId),
-            eq(workspaceMembers.userId, actorUserId)
-          )
-        )
-        .limit(1);
-      const membership = membershipRows[0];
-      if (!membership || membership.role !== 'owner') {
-        res.status(403).json({ error: 'Only workspace owners can modify workspace settings.' });
+      const auth = await authorizeWorkspaceOwnerAccess(req, workspaceId);
+      if (!auth.allowed) {
+        res.status(auth.status).json({ error: auth.error });
         return;
       }
 
@@ -745,19 +737,9 @@ export function createWorkspacesRouter() {
         return;
       }
 
-      const membershipRows = await db
-        .select({ role: workspaceMembers.role })
-        .from(workspaceMembers)
-        .where(
-          and(
-            eq(workspaceMembers.workspaceId, workspaceId),
-            eq(workspaceMembers.userId, actorUserId)
-          )
-        )
-        .limit(1);
-      const membership = membershipRows[0];
-      if (!membership || !['owner', 'admin'].includes(membership.role)) {
-        res.status(403).json({ error: 'Owner or admin access is required.' });
+      const auth = await authorizeWorkspaceOwnerOrAdminAccess(req, workspaceId);
+      if (!auth.allowed) {
+        res.status(auth.status).json({ error: auth.error });
         return;
       }
 
@@ -1196,19 +1178,9 @@ export function createWorkspacesRouter() {
     }
 
     try {
-      const membershipRows = await db
-        .select({ role: workspaceMembers.role })
-        .from(workspaceMembers)
-        .where(
-          and(
-            eq(workspaceMembers.workspaceId, workspaceId),
-            eq(workspaceMembers.userId, actorUserId)
-          )
-        )
-        .limit(1);
-      const membership = membershipRows[0];
-      if (!membership || !['owner', 'admin'].includes(membership.role)) {
-        res.status(403).json({ error: 'Owner or admin access is required.' });
+      const auth = await authorizeWorkspaceOwnerOrAdminAccess(req, workspaceId);
+      if (!auth.allowed) {
+        res.status(auth.status).json({ error: auth.error });
         return;
       }
 
@@ -1251,19 +1223,9 @@ export function createWorkspacesRouter() {
     }
 
     try {
-      const membershipRows = await db
-        .select({ role: workspaceMembers.role })
-        .from(workspaceMembers)
-        .where(
-          and(
-            eq(workspaceMembers.workspaceId, workspaceId),
-            eq(workspaceMembers.userId, actorUserId)
-          )
-        )
-        .limit(1);
-      const membership = membershipRows[0];
-      if (!membership || !['owner', 'admin'].includes(membership.role)) {
-        res.status(403).json({ error: 'Owner or admin access is required.' });
+      const auth = await authorizeWorkspaceOwnerOrAdminAccess(req, workspaceId);
+      if (!auth.allowed) {
+        res.status(auth.status).json({ error: auth.error });
         return;
       }
 
@@ -1304,25 +1266,19 @@ export function createWorkspacesRouter() {
 
 
   router.delete('/workspaces/:workspaceId', async (req, res) => {
-    const actorUserId = await resolveRequestActorUserId(req);
-    if (!actorUserId) {
-      res.status(401).json({ error: 'Unauthorized.' });
-      return;
-    }
-
     const workspaceId = Array.isArray(req.params.workspaceId) ? req.params.workspaceId[0] : (req.params.workspaceId as string);
 
     try {
-      const membershipRows = await db
-        .select({ userId: workspaceMembers.userId, role: workspaceMembers.role })
-        .from(workspaceMembers)
-        .where(eq(workspaceMembers.workspaceId, workspaceId));
-      const membership = membershipRows.find((row) => row.userId === actorUserId);
-      
-      if (!membership || membership.role !== 'owner') {
-        res.status(403).json({ error: 'Only a workspace owner can delete the workspace.' });
+      const auth = await authorizeWorkspaceOwnerAccess(req, workspaceId);
+      if (!auth.allowed) {
+        res.status(auth.status).json({ error: auth.error });
         return;
       }
+
+      const membershipRows = await db
+        .select({ userId: workspaceMembers.userId })
+        .from(workspaceMembers)
+        .where(eq(workspaceMembers.workspaceId, workspaceId));
 
       await db.transaction(async (tx) => {
         await tx.delete(comments).where(sql`${comments.ticketId} in (

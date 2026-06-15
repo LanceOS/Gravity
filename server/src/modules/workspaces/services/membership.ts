@@ -247,6 +247,20 @@ export async function authorizeWorkspaceOwnerAccess(req: Request, workspaceId: s
   return auth;
 }
 
+export async function authorizeWorkspaceOwnerOrAdminAccess(req: Request, workspaceId: string) {
+  const auth = await authorizeWorkspaceAccess(req, workspaceId);
+  if (!auth.allowed) {
+    return auth;
+  }
+
+  const role = await getWorkspaceMemberRole(workspaceId, auth.userId);
+  if (role !== 'owner' && role !== 'admin') {
+    return { allowed: false as const, error: 'Only workspace owners or admins can perform this action.', status: 403 };
+  }
+
+  return auth;
+}
+
 /**
  * Ensures the requester is authenticated and a member of the workspace that owns the team.
  */
