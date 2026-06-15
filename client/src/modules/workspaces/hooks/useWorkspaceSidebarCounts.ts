@@ -9,7 +9,7 @@ interface UseWorkspaceSidebarCountsArgs {
 }
 
 interface UseWorkspaceSidebarCountsResult {
-  openTickets: Ticket[];
+  openTicketsCount: number;
   myIssuesCount: number;
   labelCounts: Record<string, number>;
   cycleCounts: Record<string, number>;
@@ -22,7 +22,7 @@ export function useWorkspaceSidebarCounts({
   currentUserId,
 }: UseWorkspaceSidebarCountsArgs): UseWorkspaceSidebarCountsResult {
   const counts = useMemo(() => {
-    const openTickets: Ticket[] = [];
+    let openTicketsCount = 0;
     const labelCounts: Record<string, number> = Object.fromEntries(labels.map((label) => [label.id, 0]));
     const cycleCounts: Record<string, number> = Object.fromEntries(cycles.map((cycle) => [cycle.id, 0]));
     let myIssuesCount = 0;
@@ -32,7 +32,7 @@ export function useWorkspaceSidebarCounts({
         continue;
       }
 
-      openTickets.push(ticket);
+      openTicketsCount += 1;
       if (ticket.assigneeId === currentUserId) {
         myIssuesCount += 1;
       }
@@ -50,7 +50,7 @@ export function useWorkspaceSidebarCounts({
       }
     }
 
-    return { openTickets, myIssuesCount, labelCounts, cycleCounts };
+    return { openTicketsCount, myIssuesCount, labelCounts, cycleCounts };
   }, [tickets, labels, cycles, currentUserId]);
 
   return counts;

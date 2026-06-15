@@ -519,7 +519,7 @@ export function WorkspaceShellPage() {
     setIsCreateLabelModalOpen,
   });
 
-  const { openTickets, myIssuesCount, labelCounts, cycleCounts } = useWorkspaceSidebarCounts({
+  const { openTicketsCount, myIssuesCount, labelCounts, cycleCounts } = useWorkspaceSidebarCounts({
     tickets,
     labels,
     cycles,
@@ -699,7 +699,7 @@ export function WorkspaceShellPage() {
       filters,
       counts: {
         myIssues: myIssuesCount,
-        activeProjectIssues: openTickets.length,
+        activeProjectIssues: openTicketsCount,
         labels: labelCounts,
         cycles: cycleCounts,
       },
