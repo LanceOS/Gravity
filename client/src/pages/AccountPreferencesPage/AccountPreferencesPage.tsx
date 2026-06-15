@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
   Bot,
@@ -22,7 +23,10 @@ import {
   Divider,
   Avatar,
 } from '@library';
+import { AuthScreen } from '../../modules/auth';
+import { OnboardingModal } from '../../modules/onboarding';
 import { DashboardLayout } from '../../components/DashboardLayout/DashboardLayout';
+import { useAccountSettings } from '../../hooks/useAccountSettings';
 import type { User } from '../../context/TicketContext';
 import {
   AI_PROVIDER_OPTIONS,
@@ -32,12 +36,103 @@ import {
   type SavedApiCredential,
   type WorkspaceSettings,
 } from '../../utils/settings';
+import { useTheme } from '../../modules/settings';
+import { useTickets } from '../../context/TicketContext';
+import { LoadingPage } from '../LoadingPage/LoadingPage';
 
 type SettingsCategoryId = 'general' | 'providers' | 'ollama' | 'onboarding';
 
 interface StatusMessage {
   success: boolean;
   message: string;
+}
+
+export function AccountPreferencesPageRoute() {
+  const navigate = useNavigate();
+  const { activeView, currentUser, loading, setCurrentUser, setTheme, setView, theme } = useTickets();
+  const {
+    settings,
+    settingsLoading,
+    saveLoading,
+    saveSuccess,
+    saveError,
+    testing,
+    testResult,
+    savedCredentials,
+    tutorialResult,
+    ollamaModels,
+    ollamaModelsLoading,
+    updateSettings,
+    saveSettings,
+    removeCredential,
+    resetProviderDraft,
+    testApiKey,
+    resetTutorial,
+    refreshOllamaModels,
+    hasProviderChanges,
+    hasChanges,
+  } = useAccountSettings({
+    currentUser,
+    activeView,
+    theme,
+    setView,
+    setTheme,
+  });
+  const { setDensity, setTheme: setDashboardTheme } = useTheme();
+
+  useEffect(() => {
+    if (settings) {
+      setDensity(settings.projectLayout === 'condensed' ? 'compact' : 'standard');
+      setDashboardTheme(settings.theme);
+    }
+  }, [settings, setDensity, setDashboardTheme]);
+
+  if (loading) {
+    return <LoadingPage />;
+  }
+
+  if (!currentUser) {
+    return <AuthScreen />;
+  }
+
+  const onboarding = currentUser.tutorial_completed === 0 || currentUser.tutorial_completed === false ? (
+    <OnboardingModal
+      onComplete={() => {
+        setCurrentUser({ ...currentUser, tutorial_completed: 1 });
+      }}
+    />
+  ) : null;
+
+  return (
+    <>
+      <AccountPreferencesPage
+        currentUser={currentUser}
+        settings={settings}
+        settingsLoading={settingsLoading}
+        saveLoading={saveLoading}
+        saveSuccess={saveSuccess}
+        hasChanges={hasChanges}
+        hasProviderChanges={hasProviderChanges}
+        saveError={saveError}
+        testing={testing}
+        testResult={testResult}
+        savedCredentials={savedCredentials}
+        tutorialResult={tutorialResult}
+        ollamaModels={ollamaModels}
+        ollamaModelsLoading={ollamaModelsLoading}
+        onBack={() => navigate('/workspaces')}
+        onOpenDirectory={() => navigate('/workspaces')}
+        onChangeSettings={updateSettings}
+        onResetProviderDraft={resetProviderDraft}
+        onRefreshOllamaModels={refreshOllamaModels}
+        onResetTutorial={resetTutorial}
+        onSaveSettings={saveSettings}
+        onTestApiKey={testApiKey}
+        onRemoveCredential={removeCredential}
+      />
+      {onboarding}
+    </>
+  );
 }
 
 interface AccountPreferencesPageProps {
