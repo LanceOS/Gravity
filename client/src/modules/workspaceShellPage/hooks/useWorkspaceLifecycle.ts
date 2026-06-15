@@ -1,9 +1,8 @@
-import { useEffect, type Dispatch, type SetStateAction } from 'react';
+import { useEffect, useMemo, type Dispatch, type SetStateAction } from 'react';
 import type { User, Project } from '../../../types/domain';
 import type { WorkspaceSummary } from '../../../hooks/useWorkspaceDirectory';
 import type { AppSection } from '../types/AppShell';
-import { getActiveWorkspaceStorageKey } from '../../../modules/workspaces';
-import { useLocalStorageString } from '../../../hooks/useLocalStorageString';
+import { useQueryCacheString } from '../../../hooks/useQueryCacheString';
 
 interface UseActiveWorkspaceSelectionArgs {
   currentUser: User | null;
@@ -26,8 +25,13 @@ export function useActiveWorkspaceSelection({
   setWorkspaceReady,
   setActiveSection,
 }: UseActiveWorkspaceSelectionArgs) {
-  const { readValue, writeValue } = useLocalStorageString({
-    key: currentUser ? getActiveWorkspaceStorageKey(currentUser.id) : null,
+  const cachedWorkspaceIdKey = useMemo(
+    () =>
+      currentUser ? (['workspaceShell', 'activeWorkspaceId', { userId: currentUser.id }] as const) : null,
+    [currentUser?.id]
+  );
+  const { readValue, writeValue } = useQueryCacheString({
+    key: cachedWorkspaceIdKey,
   });
 
   useEffect(() => {
@@ -95,8 +99,8 @@ export function usePendingWorkspaceInvite({
   requestJoinByInvite,
   refreshWorkspaces,
 }: UsePendingWorkspaceInviteArgs) {
-  const { readValue: readPendingInvite, writeValue: writePendingInvite } = useLocalStorageString({
-    key: 'gravity_pending_invite',
+  const { readValue: readPendingInvite, writeValue: writePendingInvite } = useQueryCacheString({
+    key: ['workspaceShell', 'pendingInvite'],
   });
 
   useEffect(() => {

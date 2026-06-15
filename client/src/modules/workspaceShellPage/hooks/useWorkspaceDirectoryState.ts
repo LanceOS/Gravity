@@ -1,8 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
-import { getActiveWorkspaceStorageKey } from '../../../modules/workspaces';
 import type { WorkspaceSummary } from '../../../hooks/useWorkspaceDirectory';
-import { useLocalStorageString } from '../../../hooks/useLocalStorageString';
+import { useQueryCacheString } from '../../../hooks/useQueryCacheString';
 
 interface UseWorkspaceDirectoryStateArgs {
   currentUser: { id: string } | null;
@@ -25,9 +24,11 @@ export function useWorkspaceDirectoryState({
 }: UseWorkspaceDirectoryStateArgs): UseWorkspaceDirectoryStateResult {
   const [activeWorkspaceId, setActiveWorkspaceId] = useState('');
   const [workspaceReady, setWorkspaceReady] = useState(false);
-  const { readValue, writeValue } = useLocalStorageString({
-    key: currentUser ? getActiveWorkspaceStorageKey(currentUser.id) : null,
-  });
+  const cachedWorkspaceIdKey = useMemo(
+    () => (currentUser ? (['workspaceShell', 'activeWorkspaceId', { userId: currentUser.id }] as const) : null),
+    [currentUser?.id]
+  );
+  const { readValue, writeValue } = useQueryCacheString({ key: cachedWorkspaceIdKey });
 
   useEffect(() => {
     if (!currentUser) {
