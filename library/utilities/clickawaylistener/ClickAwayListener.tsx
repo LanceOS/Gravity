@@ -38,11 +38,12 @@ export function ClickAwayListener({ children, onClickAway, active = true }: Clic
   return React.cloneElement(children as React.ReactElement<any>, {
     ref: (node: HTMLElement | null) => {
       childRef.current = node;
-      const { ref } = children as any;
-      if (typeof ref === 'function') {
-        ref(node);
-      } else if (ref) {
-        ref.current = node;
+      const childRefProp = (children.props as { ref?: React.Ref<HTMLElement> }).ref;
+
+      if (typeof childRefProp === 'function') {
+        childRefProp(node);
+      } else if (childRefProp && typeof childRefProp === 'object' && 'current' in childRefProp) {
+        childRefProp.current = node;
       }
     },
   });
