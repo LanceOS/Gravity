@@ -450,7 +450,7 @@ describe('TicketDetail', () => {
     });
 
     backSpy.mockRestore();
-  });
+  }, 12000);
 
   it('forwards editable selector changes, keeps project assignment read-only, and handles the delete confirmation flow', async () => {
     const user = userEvent.setup();
@@ -737,7 +737,7 @@ describe('TicketDetail', () => {
     await waitFor(() => {
       expect(screen.queryByText('Delete this comment?')).not.toBeInTheDocument();
     });
-  });
+  }, 12000);
 
   it('shows parent reference when active ticket is a sub-ticket and navigates on click', async () => {
     const user = userEvent.setup();

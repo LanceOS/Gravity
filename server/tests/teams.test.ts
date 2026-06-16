@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { db } from '../src/db/index.js';
 import { RustFS } from '../src/lib/rustfs.js';
-import { teams, projects, cycles, labels, noteMetadata, ticketLabels, tickets, workspaceMembers, workspaces } from '../src/db/schema.js';
+import { teams, projects, cycles, labels, noteMetadata, ticketLabels, tickets, workspaceMembers, workspaces, workspaceSettings } from '../src/db/schema.js';
 import { eq } from 'drizzle-orm';
 import { createAuthenticatedApi, seedWorkspaceFixture, seedTicket } from './helpers/test-helpers.js';
 
@@ -23,6 +23,7 @@ describe('teams integration tests', () => {
         avatarUrl: owner.avatar,
       },
     });
+    await db.update(workspaceSettings).set({ hierarchyMode: 'teams' }).where(eq(workspaceSettings.workspaceId, workspace.id));
 
     // 1. Create a Team
     const createResponse = await ownerApi
@@ -282,6 +283,7 @@ describe('teams integration tests', () => {
         avatarUrl: owner.avatar,
       },
     });
+    await db.update(workspaceSettings).set({ hierarchyMode: 'teams' }).where(eq(workspaceSettings.workspaceId, workspace.id));
 
     // Create team
     const teamRes = await ownerApi

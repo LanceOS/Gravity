@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { db } from '../../../db/index.js';
-import { comments, cycles, projectMembers, projects, teams, ticketLabels, tickets, workspaceMembers, workspaces, workspaceSettings } from '../../../db/schema.js';
+import { comments, cycles, labels, projectMembers, projects, teams, ticketLabels, tickets, workspaceMembers, workspaces, workspaceSettings } from '../../../db/schema.js';
 import {
   addWorkspaceMembersToProject,
   createId,
@@ -23,6 +23,7 @@ import {
 import {
   invalidateProjectWorkspaceCache,
   invalidateProjectMembershipCache,
+  invalidateProjectMembershipCaches,
   invalidateWorkspaceMembershipCache,
   invalidateProjectTeamCache,
 } from './membership.js';
@@ -234,18 +235,33 @@ export async function createProjectRecord(params: {
 }
 
 export async function updateProjectRecord(projectId: string, params: { name?: string; description?: string; status?: string; githubRepoUrl?: string | null; teamId?: string }) {
-  const rows = await db
-    .update(projects)
-    .set({
-      ...(typeof params.name === 'string' ? { name: params.name } : {}),
-      ...(typeof params.description === 'string' ? { description: params.description } : {}),
-      ...(typeof params.status === 'string' ? { status: params.status } : {}),
-      ...(typeof params.githubRepoUrl === 'string' || params.githubRepoUrl === null ? { githubRepoUrl: params.githubRepoUrl } : {}),
-      ...(typeof params.teamId === 'string' ? { teamId: params.teamId } : {}),
-      updatedAt: new Date(),
-    })
+  const currentRows = await db
+    .select({ teamId: projects.teamId, workspaceId: projects.workspaceId })
+    .from(projects)
     .where(eq(projects.id, projectId))
-    .returning();
+    .limit(1);
+  const currentProject = currentRows[0];
+
+  const rows = await db.transaction(async (tx) => {
+    const updatedRows = await tx
+      .update(projects)
+      .set({
+        ...(typeof params.name === 'string' ? { name: params.name } : {}),
+        ...(typeof params.description === 'string' ? { description: params.description } : {}),
+        ...(typeof params.status === 'string' ? { status: params.status } : {}),
+        ...(typeof params.githubRepoUrl === 'string' || params.githubRepoUrl === null ? { githubRepoUrl: params.githubRepoUrl } : {}),
+        ...(typeof params.teamId === 'string' ? { teamId: params.teamId } : {}),
+        updatedAt: new Date(),
+      })
+      .where(eq(projects.id, projectId))
+      .returning();
+
+    if (updatedRows[0] && typeof params.teamId === 'string' && currentProject?.teamId && currentProject.teamId !== updatedRows[0].teamId) {
+      await tx.update(labels).set({ teamId: updatedRows[0].teamId }).where(eq(labels.projectId, projectId));
+    }
+
+    return updatedRows;
+  });
 
   if (rows[0]) {
     await invalidateWorkspaceCache(rows[0].workspaceId, WorkspaceCacheInvalidationReason.PROJECT_STRUCTURE_CHANGED);
@@ -293,6 +309,8 @@ export async function addProjectMemberRecord(projectId: string, workspaceId: str
 
 export async function deleteProjectRecord(projectId: string, workspaceId: string) {
   const membershipRows = await db.select({ userId: projectMembers.userId }).from(projectMembers).where(eq(projectMembers.projectId, projectId));
+  const labelRows = await db.select({ id: labels.id }).from(labels).where(eq(labels.projectId, projectId));
+  const labelIds = labelRows.map((label) => label.id);
   await db.transaction(async (tx) => {
     // 1. Delete comments belonging to tickets in this project
     await tx.delete(comments).where(sql`${comments.ticketId} in (
@@ -308,23 +326,29 @@ export async function deleteProjectRecord(projectId: string, workspaceId: string
       where ${tickets.projectId} = ${projectId}
     )`);
 
-    // 3. Delete tickets in this project
+    // 3. Delete labels that belong to this project
+    if (labelIds.length > 0) {
+      await tx.delete(ticketLabels).where(inArray(ticketLabels.labelId, labelIds));
+      await tx.delete(labels).where(inArray(labels.id, labelIds));
+    }
+
+    // 4. Delete tickets in this project
     await tx.delete(tickets).where(eq(tickets.projectId, projectId));
 
-    // 4. Delete project members
+    // 5. Delete project members
     await tx.delete(projectMembers).where(eq(projectMembers.projectId, projectId));
 
-    // 5. Check if it's the default project for the workspace
+    // 6. Check if it's the default project for the workspace
     await tx.update(workspaces)
       .set({ defaultProjectId: null })
       .where(and(eq(workspaces.id, workspaceId), eq(workspaces.defaultProjectId, projectId)));
 
-    // 6. Delete project
+    // 7. Delete project
     await tx.delete(projects).where(eq(projects.id, projectId));
   });
 
   await invalidateWorkspaceCache(workspaceId, WorkspaceCacheInvalidationReason.PROJECT_STRUCTURE_CHANGED);
   await invalidateProjectWorkspaceCache(projectId);
-  await invalidateProjectMembershipCache(projectId, membershipRows.map((member) => member.userId));
+  await invalidateProjectMembershipCaches(projectId, membershipRows.map((member) => member.userId));
   await invalidateProjectTeamCache(projectId);
 }

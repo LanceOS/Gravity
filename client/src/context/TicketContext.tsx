@@ -293,9 +293,12 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     queryKey: queryKeys.projects(currentUser?.id),
     queryFn: () => apiClient.get<Project[]>(`/projects`, { params: { userId: currentUser?.id } }),
     enabled: !!currentUser?.id,
+    onError: (error) => {
+      console.error(error);
+    },
     ...CACHE_CONFIGS.metadata,
   });
-  const projects = projectsQuery.data || [];
+  const projects = Array.isArray(projectsQuery.data) ? projectsQuery.data : [];
   const projectLookup = useMemo(() => {
     const lookup = new Map<string, { workspaceId: string; teamId: string | null }>();
     projects.forEach((project) => {
@@ -326,6 +329,22 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [projectLookup]);
 
+  const invalidateWorkspaceSidebarQueries = useCallback((projectId?: string | null) => {
+    if (projectId) {
+      const workspaceId = projectLookup.get(projectId)?.workspaceId;
+      if (workspaceId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.workspaceSidebarTree(workspaceId), exact: true });
+        return;
+      }
+    }
+
+    for (const [queryKey] of queryClient.getQueriesData({ queryKey: ['workspace'] })) {
+      if (queryKey[0] === 'workspace' && queryKey[2] === 'sidebar') {
+        queryClient.invalidateQueries({ queryKey, exact: true });
+      }
+    }
+  }, [projectLookup, queryClient]);
+
   // Users List
   const usersQuery = useQuery({
     queryKey: queryKeys.users(),
@@ -350,11 +369,47 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Labels
   const labelsQuery = useQuery({
     queryKey: queryKeys.labels(activeProjectId),
-    queryFn: () => apiClient.get<Label[]>(`/labels`, { projectId: activeProjectId }),
+    queryFn: () => apiClient.get<Label[]>(`/labels`, {
+      params: { projectId: activeProjectId },
+      projectId: activeProjectId,
+    }),
     enabled: !!activeProjectId && !!currentUser,
     ...CACHE_CONFIGS.metadata,
   });
   const labels = labelsQuery.data || [];
+
+  const findLabelQueryKey = useCallback(
+    (labelId: string) => {
+      const cachedLabelQueries = [
+        ...queryClient.getQueriesData<Label[]>({ queryKey: ['labels'] }),
+        ...queryClient.getQueriesData<Label[]>({ queryKey: ['teamLabels'] }),
+      ];
+
+      for (const [queryKey, cachedLabels] of cachedLabelQueries) {
+        if (Array.isArray(cachedLabels) && cachedLabels.some((label) => label.id === labelId)) {
+          return queryKey;
+        }
+      }
+
+      return null;
+    },
+    [queryClient]
+  );
+
+  const invalidateLabelQueries = useCallback(
+    (labelId: string, projectId?: string | null) => {
+      if (projectId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.labels(projectId), exact: true });
+        return;
+      }
+
+      const labelQueryKey = findLabelQueryKey(labelId);
+      if (labelQueryKey) {
+        queryClient.invalidateQueries({ queryKey: labelQueryKey, exact: true });
+      }
+    },
+    [findLabelQueryKey, queryClient]
+  );
 
   // Cycles
   const cyclesQuery = useQuery({
@@ -392,13 +447,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   });
 
   // Global loading state combining react-query status
-  const loading =
-    authLoading ||
-    projectsQuery.isLoading ||
-    usersQuery.isLoading ||
-    (!!activeProjectId && ticketsQuery.isLoading) ||
-    (!!activeProjectId && labelsQuery.isLoading) ||
-    (!!activeProjectId && cyclesQuery.isLoading);
+  const loading = authLoading || projectsQuery.isLoading || usersQuery.isLoading;
 
   const ticketMap = useMemo(() => new Map(tickets.map((t) => [t.key.toUpperCase(), t])), [tickets]);
   const ticketById = useMemo(() => new Map(tickets.map((t) => [t.id, t])), [tickets]);
@@ -464,7 +513,10 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }),
       queryClient.prefetchQuery({
         queryKey: queryKeys.labels(projId),
-        queryFn: () => apiClient.get<Label[]>(`/labels`, { projectId: projId }),
+        queryFn: () => apiClient.get<Label[]>(`/labels`, {
+          params: { projectId: projId },
+          projectId: projId,
+        }),
         ...CACHE_CONFIGS.metadata,
       }),
       queryClient.prefetchQuery({
@@ -1035,20 +1087,28 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const createLabelMutation = useMutation({
     mutationFn: async (labelInput: { name: string; color?: string; description?: string; projectId?: string; sortOrder?: number }) => {
       const projectId = labelInput.projectId || activeProjectIdRef.current;
-      const existingProjectLabels = labels.filter((label) => label.projectId === projectId || !label.projectId);
+      const cachedProjectLabels = queryClient.getQueryData<Label[]>(queryKeys.labels(projectId));
+      const existingProjectLabels = Array.isArray(cachedProjectLabels)
+        ? cachedProjectLabels
+        : projectId === activeProjectIdRef.current
+          ? labels
+          : [];
       const nextSortOrder =
         labelInput.sortOrder ??
         existingProjectLabels.reduce((maxSortOrder, label) => Math.max(maxSortOrder, Number(label.sortOrder ?? 0)), -1) + 1;
 
       return apiClient.post<Label>(`/labels`, {
+        projectId,
         name: labelInput.name,
         color: labelInput.color || '#6B7280',
         description: labelInput.description || '',
         sortOrder: nextSortOrder,
       }, { projectId });
     },
-    onSettled: (data) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.labels(data?.projectId || activeProjectIdRef.current) });
+    onSettled: (data, _error, variables) => {
+      const projectId = data?.projectId || variables.projectId || activeProjectIdRef.current;
+      queryClient.invalidateQueries({ queryKey: queryKeys.labels(projectId), exact: true });
+      invalidateWorkspaceSidebarQueries(projectId);
     },
   });
 
@@ -1066,8 +1126,9 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<Label> }) => {
       return apiClient.put<Label>(`/labels/${id}`, updates);
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.labels(activeProjectIdRef.current) });
+    onSettled: (data, _error, variables) => {
+      invalidateLabelQueries(variables.id, data?.projectId);
+      invalidateWorkspaceSidebarQueries(data?.projectId);
       invalidateAggregateTicketQueries(activeProjectIdRef.current);
     },
   });
@@ -1086,8 +1147,9 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     mutationFn: async (id: string) => {
       await apiClient.delete(`/labels/${id}`);
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.labels(activeProjectIdRef.current) });
+    onSettled: (_data, _error, labelId) => {
+      invalidateLabelQueries(labelId);
+      invalidateWorkspaceSidebarQueries();
       invalidateAggregateTicketQueries(activeProjectIdRef.current);
     },
   });

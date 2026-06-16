@@ -74,7 +74,7 @@ export type { GithubRepoValidationResult };
 export { validateGithubRepoUrl };
 export { sanitizeProjectKey };
 
-export function createProjectSettingsFeedback(type: ProjectSettingsFeedback['type'], message: string): ProjectSettingsFeedback {
+export function createProjectSettingsFeedback(type: NonNullable<ProjectSettingsFeedback>['type'], message: string): ProjectSettingsFeedback {
   if (!message) {
     return null;
   }

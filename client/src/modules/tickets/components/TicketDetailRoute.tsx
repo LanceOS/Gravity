@@ -26,6 +26,7 @@ interface TicketDetailRouteProps {
   onRemoveDependency: (ticketId: string, dependencyId: string) => Promise<boolean>;
   onAddBlocker?: (ticketId: string, blockerId: string) => Promise<boolean>;
   onRemoveBlocker?: (ticketId: string, blockerId: string) => Promise<boolean>;
+  isLoading?: boolean;
 }
 
 export const TicketDetailRoute: React.FC<TicketDetailRouteProps> = ({
@@ -50,6 +51,7 @@ export const TicketDetailRoute: React.FC<TicketDetailRouteProps> = ({
   onRemoveDependency,
   onAddBlocker,
   onRemoveBlocker,
+  isLoading = false,
 }) => {
   const navigate = useNavigate();
   const { workspaceId, projectId, ticketKey } = useParams();
@@ -90,6 +92,22 @@ export const TicketDetailRoute: React.FC<TicketDetailRouteProps> = ({
     () => (detailSubtasks.length > 0 ? (completedDetailSubtasks / detailSubtasks.length) * 100 : 0),
     [detailSubtasks, completedDetailSubtasks]
   );
+
+  if (isLoading && !activeTicket) {
+    return (
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100%',
+          color: 'var(--color-text-secondary)',
+        }}
+      >
+        <div>Loading ticket details...</div>
+      </div>
+    );
+  }
 
   if (!activeTicket) {
     return (

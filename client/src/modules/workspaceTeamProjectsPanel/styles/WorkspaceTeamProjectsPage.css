@@ -4,15 +4,6 @@
   gap: 10px;
 }
 
-.workspace-team-projects-page__content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  padding: var(--space-lg) var(--space-lg);
-  gap: var(--space-md);
-}
-
 .workspace-team-projects-page__hero,
 .workspace-team-projects-page__layout,
 .workspace-team-projects-page__feedback,
@@ -142,7 +133,6 @@
 }
 
 .workspace-team-projects-page__feedback {
-  margin-top: 16px;
   padding: 12px 14px;
   border-radius: var(--radius-sm);
   font-size: 13px;
@@ -164,7 +154,6 @@
   display: flex;
   flex-direction: column-reverse;
   gap: var(--space-md);
-  margin-top: var(--space-md);
   flex: 1;
   min-height: 0;
 }
@@ -175,7 +164,6 @@
     grid-template-columns: 340px 1fr;
     align-items: stretch;
     gap: var(--space-lg);
-    margin-top: 0;
   }
 }
 
@@ -403,10 +391,6 @@
 
 
 @media (max-width: 960px) {
-  .workspace-team-projects-page__content {
-    padding: 16px;
-  }
-
   .workspace-team-projects-page__hero {
     grid-template-columns: 1fr;
     flex-direction: column;

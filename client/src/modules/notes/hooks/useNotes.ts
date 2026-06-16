@@ -3,6 +3,7 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import { CACHE_CONFIGS, queryKeys } from '../../../utils/queryClient';
 import type { NoteMetadata } from '../types';
 import { notesService, type NotesService } from '../services/notesService';
+import { useState } from 'react';
 
 interface UseNotesOptions {
   notesService?: NotesService;
@@ -10,6 +11,7 @@ interface UseNotesOptions {
 
 export function useNotes(projectId: string, sortDirection: 'desc' | 'asc' = 'desc', { notesService: clientNotesService = notesService }: UseNotesOptions = {}) {
   const limit = 20;
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const query = useInfiniteQuery<NoteMetadata[]>({
     queryKey: [...queryKeys.notes(projectId), sortDirection],
@@ -23,6 +25,12 @@ export function useNotes(projectId: string, sortDirection: 'desc' | 'asc' = 'des
         offset: pageParam,
         sort: sortDirection,
       });
+    },
+    onError: () => {
+      setLoadError('Failed to load notes');
+    },
+    onSuccess: () => {
+      setLoadError(null);
     },
     initialPageParam: 0,
     staleTime: CACHE_CONFIGS.metadata.staleTime,
@@ -47,7 +55,7 @@ export function useNotes(projectId: string, sortDirection: 'desc' | 'asc' = 'des
   return {
     notes,
     loading: query.isLoading || query.isFetchingNextPage || query.isFetching,
-    error: query.error ? (query.error as Error).message : null,
+    error: loadError || (query.error ? 'Failed to load notes' : null),
     hasMore: query.hasNextPage,
     loadMore,
   };

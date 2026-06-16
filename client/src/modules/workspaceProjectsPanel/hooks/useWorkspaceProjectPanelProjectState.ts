@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 
-import type { Project } from '../../../../context/TicketContext';
+import type { Project } from '../../../context/TicketContext';
 import type { ProjectSettingsFeedback } from '../types/WorkspaceProjectPanel';
 
 export interface UseWorkspaceProjectPanelProjectStateArgs {
@@ -83,13 +83,7 @@ export function useWorkspaceProjectPanelProjectState({
     return [currentProject, ...projects.filter((project) => project.id !== currentProject.id)];
   }, [currentProject, projects]);
 
-  const shouldShowLabels = useMemo(() => {
-    if (!activeProjectId) {
-      return true;
-    }
-
-    return managedProject?.id === activeProjectId;
-  }, [activeProjectId, managedProject]);
+  const shouldShowLabels = true;
 
   useEffect(() => {
     setManagedProjectId((currentId) =>

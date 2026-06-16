@@ -50,7 +50,7 @@ describe('SidebarProjectsSection', () => {
 
     await user.click(screen.getByRole('button', { name: /Label One/i }));
 
-    expect(props.section.onSelectLabel).toHaveBeenCalledWith('d-1');
+    expect(props.section.onSelectLabel).toHaveBeenCalledWith('project-1', 'd-1');
   });
 
   it('renders teams as primary navigation with scoped tabs and collapsible projects', async () => {
@@ -138,5 +138,50 @@ describe('SidebarProjectsSection', () => {
     );
 
     expect(screen.queryByText('Create your first team')).not.toBeInTheDocument();
+  });
+
+  it('does not leak fallback labels into non-active project lists in project-based workspace mode', () => {
+    render(
+      // @ts-expect-error narrow props for test
+      <SidebarProjectsSection
+        {...makeProps({
+          section: {
+            ...makeProps().section,
+            projects: [
+              { id: 'project-1', name: 'Proj 1', description: '', key: 'P1', status: 'active', workspaceId: 'w1' },
+              { id: 'project-2', name: 'Proj 2', description: '', key: 'P2', status: 'active', workspaceId: 'w1' },
+            ],
+            labels: [{ id: 'd-1', name: 'Shared Label', color: '#ff0000', projectId: 'project-1' }],
+            activeProjectId: 'project-1',
+          },
+        })}
+        collapsedProjects={{ 'project-1': false, 'project-2': false }}
+      />
+    );
+
+    expect(screen.getAllByRole('button', { name: /Shared Label/i })).toHaveLength(1);
+  });
+
+  it('does not render team-scoped labels as project labels in project-based workspace mode', () => {
+    render(
+      // @ts-expect-error narrow props for test
+      <SidebarProjectsSection
+        {...makeProps({
+          section: {
+            ...makeProps().section,
+            hierarchyMode: 'flat',
+            projects: [
+              { id: 'project-1', name: 'Proj 1', description: '', key: 'P1', status: 'active', workspaceId: 'w1' },
+              { id: 'project-2', name: 'Proj 2', description: '', key: 'P2', status: 'active', workspaceId: 'w1' },
+            ],
+            labels: [{ id: 'd-1', name: 'Team Scoped Label', color: '#ff0000' }],
+            activeProjectId: 'project-1',
+          },
+        })}
+        collapsedProjects={{ 'project-1': false, 'project-2': false }}
+      />
+    );
+
+    expect(screen.queryByRole('button', { name: /Team Scoped Label/i })).not.toBeInTheDocument();
   });
 });

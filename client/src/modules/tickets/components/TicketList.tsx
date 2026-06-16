@@ -2,8 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Compass, PlusCircle } from 'lucide-react';
 import { Button } from '@library';
 import type { Ticket } from '../../../context/TicketContext';
-import { TicketRow } from './TicketRow';
 import { TicketRowMobile } from './TicketRowMobile/TicketRowMobile';
+import { TicketRow } from './TicketRow';
 import { TicketContextMenu } from './TicketContextMenu';
 
 import type { TicketListPropsWithPerformance } from '../types/TicketList';
@@ -110,7 +110,7 @@ export const TicketList = React.memo(({
                           </TicketContextMenu>
                         </div>
                         <div className="ticket-list__row-mobile">
-                          <TicketRow {...rowProps} />
+                          <TicketRowMobile {...rowProps} />
                         </div>
                       </React.Fragment>
                     );

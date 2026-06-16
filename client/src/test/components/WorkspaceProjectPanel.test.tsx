@@ -5,7 +5,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkspaceProjectPanel } from '../../modules/workspaces';
 import type {
   ProjectCreateOverlayProps,
-  ProjectSelectionRailProps,
 } from '../../modules/workspaces/types/WorkspaceProjectPanel';
 
 type MockButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -65,17 +64,6 @@ vi.mock('../../components/WorkspaceProjectPanel', () => ({
       </button>
       <button type="button" onClick={onClose}>
         Close overlay
-      </button>
-    </div>
-  ),
-}));
-
-vi.mock('../../components/WorkspaceProjectPanel', () => ({
-  ProjectSelectionRail: ({ selectedProjectId, onSelectProject }: ProjectSelectionRailProps) => (
-    <div>
-      <div>{`ProjectSelectionRail ${selectedProjectId ?? 'none'}`}</div>
-      <button type="button" onClick={() => onSelectProject('project-2')}>
-        Manage Orbit
       </button>
     </div>
   ),
@@ -143,18 +131,16 @@ describe('WorkspaceProjectPanel', () => {
     vi.clearAllMocks();
   });
 
-  it('renders the current project summary and the selection rail', async () => {
+  it('renders the project management hero, roster, and editor', async () => {
     renderWorkspaceProjectPanel();
 
-    expect(screen.getByText('Workspace Projects')).toBeInTheDocument();
-    expect(screen.getByText('Gravity')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Gravity' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Workspace projects' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Gravity Core' })).toBeInTheDocument();
     expect(screen.getByText('GRA')).toBeInTheDocument();
     expect(screen.getByText('Primary project')).toBeInTheDocument();
+    expect(screen.getAllByText('Default project').length).toBeGreaterThan(0);
     expect(screen.getByText('Platform')).toBeInTheDocument();
-
-    await waitFor(() => {
-      expect(screen.getByText('ProjectSelectionRail project-1')).toBeInTheDocument();
-    });
   });
 
   it('opens the create overlay only after clicking New Project, sanitizes the payload, and closes after a successful project creation', async () => {
@@ -197,11 +183,7 @@ describe('WorkspaceProjectPanel', () => {
     ];
     const { props, rerender } = renderWorkspaceProjectPanel();
 
-    await waitFor(() => {
-      expect(screen.getByText('ProjectSelectionRail project-1')).toBeInTheDocument();
-    });
-
-    await user.click(screen.getByRole('button', { name: 'Manage Orbit' }));
+    await user.click(screen.getByRole('button', { name: /Orbit Delivery/ }));
     expect(props.onSelectProject).toHaveBeenCalledWith('project-2');
 
     rerender(
@@ -328,6 +310,82 @@ describe('WorkspaceProjectPanel', () => {
 
     await waitFor(() => {
       expect(screen.queryByRole('button', { name: 'Delete Label' })).not.toBeInTheDocument();
+    });
+  });
+
+  it('scopes labels to the managed project and clears label selection when project changes', async () => {
+    const user = userEvent.setup();
+    const { props, rerender } = renderWorkspaceProjectPanel({
+      activeProjectId: 'project-1',
+      labels: [
+        {
+          id: 'domain-1',
+          projectId: 'project-1',
+          name: 'Shared',
+          color: '#10b981',
+          description: '',
+          sortOrder: 0,
+        },
+        {
+          id: 'domain-2',
+          projectId: 'project-2',
+          name: 'Shared',
+          color: '#ef4444',
+          description: '',
+          sortOrder: 0,
+        },
+      ],
+    });
+
+    const [project1SharedLabel] = screen.getAllByRole('button', { name: 'Shared' });
+    await user.click(project1SharedLabel);
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Shared' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Save Label' })).toBeInTheDocument();
+    });
+
+    rerender(
+      <WorkspaceProjectPanel
+        workspaceName="Gravity"
+        projects={projects}
+        activeProjectId="project-2"
+        defaultProjectId="project-1"
+        labels={[
+          {
+            id: 'domain-1',
+            projectId: 'project-1',
+            name: 'Shared',
+            color: '#10b981',
+            description: '',
+            sortOrder: 0,
+          },
+          {
+            id: 'domain-2',
+            projectId: 'project-2',
+            name: 'Shared',
+            color: '#ef4444',
+            description: '',
+            sortOrder: 0,
+          },
+        ]}
+        projectCreateLoading={false}
+        projectCreateError={null}
+        labelCreateLoading={false}
+        labelCreateError={null}
+        onSelectProject={props.onSelectProject}
+        onCreateProject={props.onCreateProject}
+        onUpdateProject={props.onUpdateProject}
+        onCreateLabel={props.onCreateLabel}
+        onUpdateLabel={props.onUpdateLabel}
+        onDeleteLabel={props.onDeleteLabel}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Orbit Delivery labels' })).toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: 'Shared' })).not.toBeInTheDocument();
+      expect(screen.getAllByRole('button', { name: 'Shared' })).toHaveLength(1);
     });
   });
 });

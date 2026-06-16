@@ -78,6 +78,7 @@ function AppShellLandingPage() {
     description: string;
     key: string;
     workspaceKey?: string;
+    hierarchyMode?: 'teams' | 'flat';
   }) => {
     const workspace = await createWorkspace(workspaceInput);
     if (!workspace || !currentUser) {

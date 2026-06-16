@@ -60,6 +60,7 @@ function matchesFilters(queryKey: QueryKey, filters?: QueryFilters): boolean {
 export class QueryClient {
   private cache = new Map<string, QueryState>();
   private defaultOptions: any;
+  private globalSubscribers = new Set<() => void>();
 
   constructor(config: { defaultOptions?: any } = {}) {
     this.defaultOptions = config.defaultOptions || {};
@@ -108,6 +109,7 @@ export class QueryClient {
       };
       this.cache.set(serialized, nextState);
       this.notify(key);
+      this.notifyAll();
     }
   }
 
@@ -177,6 +179,7 @@ export class QueryClient {
         state.subscribers.forEach(cb => cb());
       }
     }
+    this.notifyAll();
   }
 
   public notify(key: QueryKey) {
@@ -185,6 +188,28 @@ export class QueryClient {
     if (state) {
       state.subscribers.forEach(cb => cb());
     }
+  }
+
+  public subscribeAll(callback: () => void) {
+    this.globalSubscribers.add(callback);
+    return () => {
+      this.globalSubscribers.delete(callback);
+    };
+  }
+
+  public getIsFetching(filters?: QueryFilters): number {
+    let count = 0;
+    for (const [serialized, state] of this.cache.entries()) {
+      const queryKey = JSON.parse(serialized) as QueryKey;
+      if (matchesFilters(queryKey, filters) && state.fetchStatus === 'fetching') {
+        count += 1;
+      }
+    }
+    return count;
+  }
+
+  private notifyAll() {
+    this.globalSubscribers.forEach(cb => cb());
   }
 
   public scheduleGc(key: QueryKey) {
@@ -274,6 +299,7 @@ export class QueryClient {
 
   public clear() {
     this.cache.clear();
+    this.notifyAll();
   }
 }
 
@@ -301,6 +327,11 @@ interface UseQueryOptions<T> {
   enabled?: boolean;
   staleTime?: number;
   gcTime?: number;
+}
+
+interface UseIsFetchingOptions {
+  queryKey?: QueryKey;
+  exact?: boolean;
 }
 
 export function useQuery<T>({ queryKey, queryFn, enabled = true, staleTime, gcTime }: UseQueryOptions<T>) {
@@ -445,6 +476,22 @@ export function useMutation<TData = any, TVariables = any, TContext = any>({
     mutateAsync,
     ...state,
   };
+}
+
+export function useIsFetching(filters?: UseIsFetchingOptions) {
+  const client = useQueryClient();
+  const stableFilters = useMemo(
+    () => filters,
+    [JSON.stringify(filters ?? {})]
+  );
+
+  const getSnapshot = useCallback(() => client.getIsFetching(stableFilters), [client, stableFilters]);
+
+  return useSyncExternalStore(
+    useCallback(cb => client.subscribeAll(cb), [client]),
+    getSnapshot,
+    getSnapshot
+  );
 }
 
 // --- useInfiniteQuery Hook ---

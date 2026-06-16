@@ -80,6 +80,8 @@ describe('WorkspaceDirectoryPage', () => {
     expect(screen.getByText('Workspace created.')).toBeInTheDocument();
     expect(screen.getByText('Gravity')).toBeInTheDocument();
     expect(screen.getByText('Orbit')).toBeInTheDocument();
+    expect(screen.getByText('Project-based (Projects live directly in the workspace)')).toBeInTheDocument();
+    expect(screen.queryByText((content) => content.toLowerCase().startsWith('flat'))).not.toBeInTheDocument();
 
     const gravityCard = screen.getByText('Gravity').closest('div');
     expect(gravityCard).not.toBeNull();

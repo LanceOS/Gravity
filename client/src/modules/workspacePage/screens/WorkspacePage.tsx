@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useState } from 'react';
+import { useMemo, useCallback, useEffect, useState } from 'react';
 import { Button, Timeline, createEmptyRichTextValue, ContextMenu } from '@library';
 import type { Comment, Cycle, Label, Project, Ticket, User } from '../../../context/TicketContext';
 import {
@@ -17,6 +17,7 @@ import {
 import { NotesList, NoteEditor } from '../../notes';
 import { WorkspaceHeader } from '../../workspaces';
 import { WorkspaceViewContainer } from '../../../components/WorkspaceViewContainer';
+import { WorkspacePageLayout } from '../../../layouts/WorkspacePageLayout/WorkspacePageLayout';
 import { QueryErrorResetBoundary } from '@tanstack/react-query';
 import { ErrorBoundary } from '../../../components/ErrorBoundary';
 import { WorkspacePageContextMenu } from '../components/WorkspacePageContextMenu';
@@ -58,6 +59,7 @@ interface WorkspacePageProps {
   onLoadMoreTickets?: () => void;
   hasMoreTickets?: boolean;
   isLoadingMoreTickets?: boolean;
+  isLoadingTickets?: boolean;
 }
 
 const STATUS_LABELS: Record<Ticket['status'], string> = {
@@ -104,8 +106,6 @@ function getTicketProjectName(ticket: Ticket, projectById: Record<string, Projec
 }
 
 export function WorkspacePage({
-  workspaceId,
-  workspaceName,
   pathname,
   activeContext = 'issues',
   activeNoteId,
@@ -133,6 +133,7 @@ export function WorkspacePage({
   onLoadMoreTickets,
   hasMoreTickets,
   isLoadingMoreTickets,
+  isLoadingTickets = false,
   onSetListSort,
   onSetView,
   onUpdateTicket,
@@ -276,7 +277,9 @@ export function WorkspacePage({
       : isTeamWorkspace
         ? (onOpenTeamManager ?? onOpenProjectManager)
         : onOpenProjectManager;
+  const shouldShowTicketsLoading = isLoadingTickets && !activeTicket && projects.length > 0;
 
+  // eslint-disable-next-line no-useless-assignment
   let displayTitle = '';
   if (activeContext === 'notes') {
     displayTitle = isNoteEditor ? (activeNoteTitle ? `Notes - ${activeNoteTitle}` : 'Notes') : 'Notes';
@@ -284,58 +287,54 @@ export function WorkspacePage({
     displayTitle = isTicketEditor ? `Tickets - ${activeTicket.key}` : headerTitle;
   }
 
-  return (
-    <div className="workspace-page">
-      {projects.length > 0 ? (
-        <WorkspaceHeader>
-          <WorkspaceHeader.Top>
-            <WorkspaceHeader.Title>{displayTitle}</WorkspaceHeader.Title>
-            {!activeTicket && activeContext === 'issues' && (
-              <div style={{ marginLeft: 'auto' }}>
-                {!viewModeLocked ? (
-                  <WorkspaceHeader.ViewToggle
-                    activeView={activeView}
-                    onSetView={onSetView}
-                  />
-                ) : null}
-              </div>
-            )}
-            {!activeTicket && activeContext === 'notes' && (
-              <div style={{ marginLeft: 'auto' }}>
-                {activeNoteId ? (
-                  <Button type="button" variant="secondary" onClick={() => window.history.back()}>
-                    Back to Notes
-                  </Button>
-                ) : (
-                  <Button type="button" variant="primary" onClick={handleCreateNote}>
-                    Create New Note
-                  </Button>
-                )}
-              </div>
-            )}
-          </WorkspaceHeader.Top>
-
-          {!activeTicket && activeContext === 'issues' && (
-            <WorkspaceHeader.Bottom>
-              <TicketFilterBar
-                filters={filters}
-                onFilterChange={onSetFilters}
-                hasActiveFilters={hasFiltersApplied}
-                onClearFilters={handleClearFilters}
-                filteredCount={filteredTickets.length}
-                totalCount={tickets.length}
-                listSort={activeView === 'list' ? listSort : undefined}
-                onListSortChange={activeView === 'list' ? onSetListSort : undefined}
-                labels={Object.values(labelById)}
-                cycles={cycles}
-                users={users}
-              />
-            </WorkspaceHeader.Bottom>
-          )}
-        </WorkspaceHeader>
+  const workspaceHeaderActions = !activeTicket && activeContext === 'issues' ? (
+    <div style={{ marginLeft: 'auto' }}>
+      {!viewModeLocked ? (
+        <WorkspaceHeader.ViewToggle
+          activeView={activeView}
+          onSetView={onSetView}
+        />
       ) : null}
+    </div>
+  ) : !activeTicket && activeContext === 'notes' ? (
+    <div style={{ marginLeft: 'auto' }}>
+      {activeNoteId ? (
+        <Button type="button" variant="secondary" onClick={() => window.history.back()}>
+          Back to Notes
+        </Button>
+      ) : (
+        <Button type="button" variant="primary" onClick={handleCreateNote}>
+          Create New Note
+        </Button>
+      )}
+    </div>
+  ) : null;
+  const workspaceHeaderBottom = !activeTicket && activeContext === 'issues' ? (
+    <TicketFilterBar
+      filters={filters}
+      onFilterChange={onSetFilters}
+      hasActiveFilters={hasFiltersApplied}
+      onClearFilters={handleClearFilters}
+      filteredCount={filteredTickets.length}
+      totalCount={tickets.length}
+      listSort={activeView === 'list' ? listSort : undefined}
+      onListSortChange={activeView === 'list' ? onSetListSort : undefined}
+      labels={Object.values(labelById)}
+      cycles={cycles}
+      users={users}
+    />
+  ) : null;
+  const shouldShowWorkspaceHeader = projects.length > 0;
 
-      <div className="workspace-page__content">
+  return (
+    <WorkspacePageLayout
+      pageClassName="workspace-page"
+      contentClassName="workspace-page__content"
+      title={shouldShowWorkspaceHeader ? displayTitle : undefined}
+      actions={shouldShowWorkspaceHeader ? workspaceHeaderActions : undefined}
+      headerBottom={shouldShowWorkspaceHeader ? workspaceHeaderBottom : undefined}
+      flushContent
+    >
         <div className="workspace-page__issues">
           <div className="workspace-page__issues-shell">
             <ContextMenu.Root
@@ -380,7 +379,22 @@ export function WorkspacePage({
                   <QueryErrorResetBoundary>
                     {({ reset }) => (
                       <ErrorBoundary onReset={reset}>
-                        {projects.length === 0 ? (
+                        <div className="workspace-page__tickets-stage">
+                          <div
+                            className={`workspace-page__tickets-loading-layer ${
+                              shouldShowTicketsLoading ? 'workspace-page__tickets-loading-layer--visible' : ''
+                            }`}
+                            aria-hidden={!shouldShowTicketsLoading}
+                          >
+                            <WorkspaceViewContainer>
+                              <div className="workspace-page__tickets-loading">
+                                <div className="workspace-page__tickets-loading-spinner" />
+                                <p className="workspace-page__tickets-loading-copy">Loading tickets…</p>
+                              </div>
+                            </WorkspaceViewContainer>
+                          </div>
+
+                          {projects.length === 0 ? (
                           <div className="workspace-page__empty-state">
                             <div className="workspace-page__empty-state-title">{emptyStateTitle}</div>
                             <p className="workspace-page__empty-state-copy">{emptyStateCopy}</p>
@@ -445,6 +459,7 @@ export function WorkspacePage({
                             />
                           </WorkspaceViewContainer>
                         )}
+                        </div>
                       </ErrorBoundary>
                     )}
                   </QueryErrorResetBoundary>
@@ -453,7 +468,6 @@ export function WorkspacePage({
             </ContextMenu.Root>
           </div>
         </div>
-      </div>
-    </div>
+    </WorkspacePageLayout>
   );
 }

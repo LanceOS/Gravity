@@ -38,9 +38,13 @@ vi.mock('../../modules/auth', () => ({
   AuthScreen: () => <div>AuthScreen</div>,
 }));
 
-vi.mock('../../modules/tickets', () => ({
+vi.mock('../../modules/tickets', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../modules/tickets')>();
+  return {
+    ...actual,
   CreateTicketModal: () => <div>CreateTicketModal</div>,
-}));
+  };
+});
 
 vi.mock('../../modules/ai', () => ({
   AgentSimulator: () => <div>AgentSimulator</div>,
@@ -61,19 +65,19 @@ vi.mock('../../layouts/WorkspaceLayout/WorkspaceLayout', () => ({
   ),
 }));
 
-vi.mock('../../pages/LoadingPage/LoadingPage', () => ({
+vi.mock('../../modules/loadingPage', () => ({
   LoadingPage: () => <div>LoadingPage</div>,
 }));
 
-vi.mock('../../pages/WorkspaceDirectoryPage/WorkspaceDirectoryPage', () => ({
+vi.mock('../../modules/workspaceDirectoryPage', () => ({
   WorkspaceDirectoryPage: () => <div>WorkspaceDirectoryPage</div>,
 }));
 
-vi.mock('../../pages/WorkspacePage/WorkspacePage', () => ({
+vi.mock('../../modules/workspacePage', () => ({
   WorkspacePage: () => <div>WorkspacePage</div>,
 }));
 
-vi.mock('../../pages/WorkspaceProjectsListPage/WorkspaceProjectsListPage', () => ({
+vi.mock('../../modules/workspaceProjectsListPage', () => ({
   WorkspaceProjectsListPage: () => <div>WorkspaceProjectsListPage</div>,
 }));
 
@@ -291,9 +295,15 @@ describe('AppShellPage theme integration', () => {
 
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue({
-        json: async () => ({ success: true, lastActiveAt: '2026-05-25T12:00:00.000Z' }),
-      })
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({ success: true, lastActiveAt: '2026-05-25T12:00:00.000Z' }),
+          {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }
+        )
+      )
     );
   });
 

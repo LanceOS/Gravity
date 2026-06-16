@@ -10,6 +10,7 @@ export interface SqlClient {
 type LabelRow = {
   id: string;
   team_id: string | null;
+  project_id: string | null;
   name: string;
   created_at: string | Date | null;
 };
@@ -31,22 +32,23 @@ function compareTimestamps(left: string | Date | null, right: string | Date | nu
 }
 
 /**
- * Consolidates labels that share the same team/name pair so the first label
- * becomes canonical and all ticket-label links point to it.
+ * Consolidates labels that share the same team/name pair so the first team
+ * label becomes canonical and all ticket-label links point to it.
  */
 export async function mergeDuplicateTeamLabels(client: SqlClient) {
   const labelRows = await client.query<LabelRow>(
     `
-      SELECT id, team_id, name, created_at
+      SELECT id, team_id, project_id, name, created_at
       FROM labels
       WHERE team_id IS NOT NULL
+        AND project_id IS NULL
       ORDER BY team_id, name, created_at, id
     `,
   );
 
   const labelGroups = new Map<string, LabelRow[]>();
   for (const row of labelRows.rows) {
-    if (!row.team_id) {
+    if (!row.team_id || row.project_id !== null) {
       continue;
     }
 

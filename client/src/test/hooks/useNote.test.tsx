@@ -5,6 +5,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 
 describe('useNote', () => {
+  const baseNote = {
+    projectId: 'proj-1',
+    userId: 'user-1',
+    createdAt: '2026-05-01T00:00:00.000Z',
+    updatedAt: '2026-05-01T00:00:00.000Z',
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -23,7 +30,7 @@ describe('useNote', () => {
   });
 
   it('fetches a note successfully on mount', async () => {
-    const mockNote = { id: 'note-1', title: 'Test', body: 'Body', version: 1 };
+    const mockNote = { id: 'note-1', ...baseNote, title: 'Test', body: 'Body', version: 1 };
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
       ok: true,
       json: async () => mockNote,
@@ -42,9 +49,13 @@ describe('useNote', () => {
     });
 
     expect(result.current.note).toEqual(mockNote);
-    expect(fetchSpy).toHaveBeenCalledWith('/api/v1/notes/note-1', {
-      headers: { 'x-project-id': 'proj-1' },
-    });
+    expect(fetchSpy).toHaveBeenCalledWith('/api/v1/notes/note-1', expect.objectContaining({
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-project-id': 'proj-1',
+      },
+    }));
   });
 
   it('handles fetch error gracefully', async () => {
@@ -67,7 +78,7 @@ describe('useNote', () => {
   });
 
   it('saves a note successfully', async () => {
-    const mockNote = { id: 'note-1', title: 'Test', body: 'Body', version: 1 };
+    const mockNote = { id: 'note-1', ...baseNote, title: 'Test', body: 'Body', version: 1 };
     const updatedNote = { ...mockNote, title: 'Updated', version: 2 };
     
     // First mock for the initial fetch
@@ -111,7 +122,7 @@ describe('useNote', () => {
   });
 
   it('handles save error and conflict', async () => {
-    const mockNote = { id: 'note-1', title: 'Test', body: 'Body', version: 1 };
+    const mockNote = { id: 'note-1', ...baseNote, title: 'Test', body: 'Body', version: 1 };
     
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
       ok: true,
@@ -144,7 +155,7 @@ describe('useNote', () => {
   });
 
   it('uploads media successfully', async () => {
-    const mockNote = { id: 'note-1', title: 'Test', body: 'Body', version: 1 };
+    const mockNote = { id: 'note-1', ...baseNote, title: 'Test', body: 'Body', version: 1 };
     
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
       ok: true,

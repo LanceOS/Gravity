@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import type { Label, Project } from '../../../../context/TicketContext';
+import type { Label } from '../../../context/TicketContext';
 import { DEFAULT_LABEL_COLOR, getNextLabelSortOrder } from '../utils/WorkspaceProjectPanel';
 
 export interface UseWorkspaceProjectPanelLabelStateArgs {
   labels: Label[];
-  managedProject: Project | null;
+  managedProjectId: string;
   shouldShowLabels: boolean;
 }
 
@@ -40,7 +40,7 @@ export interface UseWorkspaceProjectPanelLabelStateResult {
 
 export function useWorkspaceProjectPanelLabelState({
   labels,
-  managedProject,
+  managedProjectId,
   shouldShowLabels,
 }: UseWorkspaceProjectPanelLabelStateArgs): UseWorkspaceProjectPanelLabelStateResult {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -55,12 +55,28 @@ export function useWorkspaceProjectPanelLabelState({
   const [editingLabelError, setEditingLabelError] = useState<string | null>(null);
   const [editingLabelLoading, setEditingLabelLoading] = useState(false);
 
-  const sortedLabels = useMemo(
+  const labelsForManagedProject = useMemo(
     () =>
-      shouldShowLabels
-        ? [...labels].sort((first, second) => first.name.localeCompare(second.name))
-        : [],
-    [labels, shouldShowLabels]
+      managedProjectId
+        ? labels.filter((label) => label.projectId === managedProjectId)
+        : labels,
+    [labels, managedProjectId]
+  );
+
+  const sortedLabels = useMemo(
+    () => {
+      if (!shouldShowLabels) {
+        return [];
+      }
+
+      const labelsById = new Map<string, Label>();
+      for (const label of labelsForManagedProject) {
+        labelsById.set(label.id, label);
+      }
+
+      return [...labelsById.values()].sort((first, second) => first.name.localeCompare(second.name));
+    },
+    [labelsForManagedProject, shouldShowLabels]
   );
 
   const activeLabel = useMemo(
@@ -69,8 +85,8 @@ export function useWorkspaceProjectPanelLabelState({
   );
 
   const nextLabelSortOrder = useMemo(
-    () => (managedProject ? getNextLabelSortOrder(sortedLabels) : 0),
-    [managedProject, sortedLabels]
+    () => (labelsForManagedProject.length > 0 ? getNextLabelSortOrder(labelsForManagedProject) : 0),
+    [labelsForManagedProject]
   );
 
   const clearLabelEditor = useCallback(() => {
@@ -80,6 +96,10 @@ export function useWorkspaceProjectPanelLabelState({
     setEditingLabelDescription('');
     setEditingLabelError(null);
   }, []);
+
+  useEffect(() => {
+    clearLabelEditor();
+  }, [clearLabelEditor, managedProjectId]);
 
   useEffect(() => {
     if (!editingLabelId) {

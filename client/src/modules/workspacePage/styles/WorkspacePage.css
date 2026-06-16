@@ -846,6 +846,50 @@
   line-height: 1.6;
 }
 
+.workspace-page__tickets-stage {
+  position: relative;
+}
+
+.workspace-page__tickets-loading-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms ease;
+  will-change: opacity;
+}
+
+.workspace-page__tickets-loading-layer--visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.workspace-page__tickets-loading {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  gap: 14px;
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--color-text-disabled);
+}
+
+.workspace-page__tickets-loading-spinner {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 3px solid var(--color-border-focus);
+  border-top-color: var(--color-primary);
+  animation: workspace-page-spin 0.9s cubic-bezier(0.5, 0.1, 0.4, 0.9) infinite;
+}
+
+.workspace-page__tickets-loading-copy {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
 .workspace-page__empty-state-actions {
   display: flex;
   justify-content: center;

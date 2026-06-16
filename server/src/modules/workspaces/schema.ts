@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { boolean, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
 
 export const workspaces = pgTable('workspaces', {
@@ -125,6 +126,7 @@ export const projectMembers = pgTable(
 export const labels = pgTable('labels', {
   id: text('id').primaryKey(),
   teamId: text('team_id').notNull().references(() => teams.id, { onDelete: 'cascade' }),
+  projectId: text('project_id').references(() => projects.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
   color: text('color').notNull().default('#6B7280'),
   description: text('description').notNull().default(''),
@@ -132,7 +134,9 @@ export const labels = pgTable('labels', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   teamIdIdx: index('labels_team_id_idx').on(table.teamId),
-  teamIdNameUniqueIdx: uniqueIndex('labels_team_name_unique_idx').on(table.teamId, table.name),
+  projectIdIdx: index('labels_project_id_idx').on(table.projectId),
+  teamIdNameUniqueIdx: uniqueIndex('labels_team_name_unique_idx').on(table.teamId, table.name).where(sql`${table.projectId} IS NULL`),
+  projectIdNameUniqueIdx: uniqueIndex('labels_project_name_unique_idx').on(table.projectId, table.name).where(sql`${table.projectId} IS NOT NULL`),
 }));
 
 export const ticketLabels = pgTable('ticket_labels', {

@@ -1,7 +1,7 @@
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, isNull } from 'drizzle-orm';
 import { type Request, type Response, Router } from 'express';
 import { db } from '../../db/index.js';
-import { cycles, labels, projects, teams, ticketLabels, tickets } from '../../db/schema.js';
+import { cycles, labels, projects, teams, ticketLabels, tickets, workspaceSettings } from '../../db/schema.js';
 import { broadcastEvent } from '../../realtime.js';
 import {
   createId,
@@ -28,6 +28,7 @@ import {
   updateCommentRecord,
   deleteCommentRecord,
   removeTicketDependencyRelation,
+  getProjectScope,
 } from './services/tickets.js';
 import {
   ProjectScopeStrategy,
@@ -39,12 +40,23 @@ function mapLabel(label: typeof labels.$inferSelect) {
   return {
     id: label.id,
     teamId: label.teamId,
+    projectId: label.projectId ? String(label.projectId) : undefined,
     name: label.name,
     color: label.color,
     description: label.description,
     sortOrder: label.sortOrder,
   };
 }
+
+const labelSelectFields = {
+  id: labels.id,
+  teamId: labels.teamId,
+  projectId: labels.projectId,
+  name: labels.name,
+  color: labels.color,
+  description: labels.description,
+  sortOrder: labels.sortOrder,
+} as const;
 
 function mapCycle(cycle: typeof cycles.$inferSelect) {
   return {
@@ -60,11 +72,19 @@ function normalizeLabelName(name: string) {
   return name.trim();
 }
 
-async function ensureLabelNameAvailable(teamId: string, name: string, excludeLabelId?: string) {
+async function ensureLabelNameAvailable(
+  scope: { teamId: string; projectId?: string | null },
+  name: string,
+  excludeLabelId?: string,
+) {
   const rows = await db
     .select({ id: labels.id, name: labels.name })
     .from(labels)
-    .where(eq(labels.teamId, teamId));
+    .where(
+      scope.projectId
+        ? eq(labels.projectId, scope.projectId)
+        : and(eq(labels.teamId, scope.teamId), isNull(labels.projectId)),
+    );
 
   const normalizedName = normalizeLabelName(name);
   return rows.find((row) => row.id !== excludeLabelId && normalizeLabelName(row.name) === normalizedName) ?? null;
@@ -77,12 +97,16 @@ export function createTicketsRouter() {
     return Array.isArray(value) ? value[0] ?? '' : value;
   }
 
-  function parseIntQueryParam(value: string | string[] | undefined) {
+  function parseIntQueryParam(value: unknown) {
     if (!value) {
       return undefined;
     }
 
     const normalized = Array.isArray(value) ? value[0] : value;
+    if (typeof normalized !== 'string') {
+      return undefined;
+    }
+
     const parsed = Number.parseInt(normalized, 10);
     if (!Number.isFinite(parsed)) {
       return undefined;
@@ -143,6 +167,28 @@ export function createTicketsRouter() {
     }
 
     await invalidateWorkspaceCache(workspaceId, WorkspaceCacheInvalidationReason.TEAM_STRUCTURE_CHANGED);
+  }
+
+  async function getTeamWorkspaceScope(teamId: string) {
+    const rows = await db
+      .select({
+        workspaceId: teams.workspaceId,
+        hierarchyMode: workspaceSettings.hierarchyMode,
+      })
+      .from(teams)
+      .leftJoin(workspaceSettings, eq(workspaceSettings.workspaceId, teams.workspaceId))
+      .where(eq(teams.id, teamId))
+      .limit(1);
+
+    const row = rows[0];
+    if (!row) {
+      return null;
+    }
+
+    return {
+      workspaceId: row.workspaceId,
+      hierarchyMode: row.hierarchyMode === 'teams' ? 'teams' as const : 'flat' as const,
+    };
   }
 
   router.get('/tickets', async (req, res) => {
@@ -397,37 +443,50 @@ export function createTicketsRouter() {
   router.get('/labels', async (req, res) => {
     try {
       const projectId = typeof req.query.projectId === 'string' ? req.query.projectId : getProjectIdFromRequest(req);
-      const teamId = typeof req.query.teamId === 'string'
-        ? req.query.teamId
-        : projectId
-          ? (await getProjectTeamId(projectId)) ?? undefined
-          : undefined;
+      const teamId = typeof req.query.teamId === 'string' ? req.query.teamId : undefined;
 
-      if (!teamId) {
+      if (!teamId && !projectId) {
         res.status(400).json({ error: 'Either teamId or projectId is required, or project not found.' });
         return;
       }
 
-      const auth = typeof req.query.teamId === 'string'
-        ? await authorizeTeamAccess(req, teamId)
-        : await authorizeProjectAccess(req, projectId as string);
+      if (typeof req.query.teamId === 'string') {
+        const auth = await authorizeTeamAccess(req, teamId as string);
+        if (!auth.allowed) {
+          res.status(auth.status ?? 403).json({ error: auth.error });
+          return;
+        }
 
+        const rows = await db
+          .select(labelSelectFields)
+          .from(labels)
+          .where(and(eq(labels.teamId, teamId as string), isNull(labels.projectId)))
+          .orderBy(asc(labels.createdAt));
+
+        res.json(rows);
+        return;
+      }
+
+      const projectScope = await getProjectScope(projectId as string);
+      if (!projectScope) {
+        res.status(404).json({ error: 'Project not found.' });
+        return;
+      }
+
+      const auth = await authorizeProjectAccess(req, projectId as string);
       if (!auth.allowed) {
         res.status(auth.status ?? 403).json({ error: auth.error });
         return;
       }
 
       const rows = await db
-        .select({
-          id: labels.id,
-          teamId: labels.teamId,
-          name: labels.name,
-          color: labels.color,
-          description: labels.description,
-          sortOrder: labels.sortOrder,
-        })
+        .select(labelSelectFields)
         .from(labels)
-        .where(eq(labels.teamId, teamId))
+        .where(
+          projectScope.hierarchyMode === 'flat'
+            ? eq(labels.projectId, projectId as string)
+            : and(eq(labels.teamId, projectScope.teamId), isNull(labels.projectId)),
+        )
         .orderBy(asc(labels.createdAt));
 
       res.json(rows);
@@ -437,47 +496,79 @@ export function createTicketsRouter() {
   });
 
   router.post('/labels', async (req, res) => {
+    let resolvedProjectId: string | null = null;
     try {
       const body = req.body ?? {};
       const projectId = typeof body.projectId === 'string' ? body.projectId : getProjectIdFromRequest(req);
       const bodyTeamId = typeof body.teamId === 'string' ? body.teamId : undefined;
-      const resolvedTeamId = bodyTeamId
-        ?? (projectId
-          ? (await getProjectTeamId(projectId)) ?? undefined
-          : undefined);
-
-      if (!resolvedTeamId) {
-        res.status(400).json({ error: 'Either teamId or projectId is required, or project not found.' });
+      const labelName = typeof body.name === 'string' ? normalizeLabelName(body.name) : '';
+      if (!labelName) {
+        res.status(400).json({ error: 'Label name is required.' });
         return;
       }
 
-      const auth = bodyTeamId
-        ? await authorizeTeamAccess(req, resolvedTeamId)
-        : await authorizeProjectAccess(req, projectId as string);
+      let resolvedTeamId = '';
+      let auth:
+        | Awaited<ReturnType<typeof authorizeTeamAccess>>
+        | Awaited<ReturnType<typeof authorizeProjectAccess>>;
+
+      if (projectId) {
+        const projectScope = await getProjectScope(projectId);
+        if (!projectScope) {
+          res.status(404).json({ error: 'Project not found.' });
+          return;
+        }
+
+        if (bodyTeamId && bodyTeamId !== projectScope.teamId) {
+          res.status(400).json({ error: 'Team does not own this project.' });
+          return;
+        }
+
+        resolvedTeamId = projectScope.teamId;
+        resolvedProjectId = projectScope.hierarchyMode === 'flat' ? projectId : null;
+        auth = await authorizeProjectAccess(req, projectId);
+      } else if (bodyTeamId) {
+        resolvedTeamId = bodyTeamId;
+        auth = await authorizeTeamAccess(req, bodyTeamId);
+
+        if (auth.allowed) {
+          const teamScope = await getTeamWorkspaceScope(bodyTeamId);
+          if (!teamScope) {
+            res.status(404).json({ error: 'Team not found.' });
+            return;
+          }
+
+          if (teamScope.hierarchyMode !== 'teams') {
+            res.status(400).json({ error: 'Project ID is required to create labels in project-based workspaces.' });
+            return;
+          }
+        }
+      } else {
+        res.status(400).json({ error: 'Either teamId or projectId is required, or project not found.' });
+        return;
+      }
 
       if (!auth.allowed) {
         res.status(auth.status ?? 403).json({ error: auth.error });
         return;
       }
 
-    const labelName = typeof body.name === 'string' ? normalizeLabelName(body.name) : '';
-    if (!labelName) {
-      res.status(400).json({ error: 'Label name is required.' });
-      return;
-    }
+      const duplicate = await ensureLabelNameAvailable({ teamId: resolvedTeamId, projectId: resolvedProjectId }, labelName);
+      if (duplicate) {
+        res.status(409).json({
+          error: resolvedProjectId
+            ? 'Label name already exists in this project.'
+            : 'Label name already exists in this team.',
+        });
+        return;
+      }
 
-    const duplicate = await ensureLabelNameAvailable(resolvedTeamId, labelName);
-    if (duplicate) {
-      res.status(409).json({ error: 'Label name already exists in this team.' });
-      return;
-    }
-
-    try {
       const rows = await db
         .insert(labels)
         .values({
           id: createId('l'),
           teamId: resolvedTeamId,
+          projectId: resolvedProjectId ?? null,
           name: labelName,
           color: typeof body.color === 'string' ? body.color : '#6B7280',
           description: typeof body.description === 'string' ? body.description : '',
@@ -491,14 +582,15 @@ export function createTicketsRouter() {
       res.status(201).json(mapLabel(rows[0]));
     } catch (error) {
       if (error instanceof Error && /unique/i.test(error.message)) {
-        res.status(409).json({ error: 'Label name already exists in this team.' });
+        res.status(409).json({
+          error: resolvedProjectId
+            ? 'Label name already exists in this project.'
+            : 'Label name already exists in this team.',
+        });
         return;
       }
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create label.' });
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Internal Server Error' });
     }
-  } catch (error) {
-    res.status(500).json({ error: error instanceof Error ? error.message : 'Internal Server Error' });
-  }
   });
 
   router.put('/labels/:id', async (req, res) => {
@@ -516,7 +608,9 @@ export function createTicketsRouter() {
         return;
       }
 
-      const auth = await authorizeTeamAccess(req, labelRow.teamId);
+      const auth = labelRow.projectId
+        ? await authorizeProjectAccess(req, labelRow.projectId)
+        : await authorizeTeamAccess(req, labelRow.teamId);
       if (!auth.allowed) {
         res.status(auth.status ?? 403).json({ error: auth.error });
         return;
@@ -530,9 +624,17 @@ export function createTicketsRouter() {
           return;
         }
 
-        const duplicate = await ensureLabelNameAvailable(labelRow.teamId, normalizedName, labelId);
+        const duplicate = await ensureLabelNameAvailable(
+          { teamId: labelRow.teamId, projectId: labelRow.projectId },
+          normalizedName,
+          labelId,
+        );
         if (duplicate) {
-          res.status(409).json({ error: 'Label name already exists in this team.' });
+          res.status(409).json({
+            error: labelRow.projectId
+              ? 'Label name already exists in this project.'
+              : 'Label name already exists in this team.',
+          });
           return;
         }
 
@@ -571,7 +673,9 @@ export function createTicketsRouter() {
         return;
       }
 
-      const auth = await authorizeTeamAccess(req, labelRow.teamId);
+      const auth = labelRow.projectId
+        ? await authorizeProjectAccess(req, labelRow.projectId)
+        : await authorizeTeamAccess(req, labelRow.teamId);
       if (!auth.allowed) {
         res.status(auth.status ?? 403).json({ error: auth.error });
         return;
@@ -594,14 +698,7 @@ export function createTicketsRouter() {
     await withTicketAccess(req, res, normalizeRouteParam(req.params.id), async (ticket) => {
       try {
         const rows = await db
-          .select({
-            id: labels.id,
-            teamId: labels.teamId,
-            name: labels.name,
-            color: labels.color,
-            description: labels.description,
-            sortOrder: labels.sortOrder,
-          })
+          .select(labelSelectFields)
           .from(ticketLabels)
           .innerJoin(labels, eq(labels.id, ticketLabels.labelId))
           .where(eq(ticketLabels.ticketId, ticket.id));
@@ -628,9 +725,23 @@ export function createTicketsRouter() {
           return;
         }
 
-        const teamId = await getProjectTeamId(ticket.projectId);
-        if (labelRows[0].teamId !== teamId) {
-          res.status(400).json({ error: 'Label does not belong to the ticket team.' });
+        const projectScope = await getProjectScope(ticket.projectId);
+        if (!projectScope) {
+          res.status(404).json({ error: 'Project not found.' });
+          return;
+        }
+
+        const labelRow = labelRows[0];
+        const labelAllowed = projectScope.hierarchyMode === 'flat'
+          ? labelRow.projectId === ticket.projectId
+          : labelRow.projectId === null && labelRow.teamId === projectScope.teamId;
+
+        if (!labelAllowed) {
+          res.status(400).json({
+            error: projectScope.hierarchyMode === 'flat'
+              ? 'Label does not belong to the ticket project.'
+              : 'Label does not belong to the ticket team.',
+          });
           return;
         }
 

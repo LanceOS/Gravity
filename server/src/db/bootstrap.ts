@@ -69,6 +69,85 @@ async function ensureConstraint(tableName: string, constraintName: string, defin
   await pool.query(`ALTER TABLE "${tableName}" ADD CONSTRAINT "${constraintName}" ${definition}`);
 }
 
+async function migrateFlatWorkspaceTicketLabelAssignments() {
+  await pool.query(`
+    INSERT INTO labels (id, project_id, team_id, name, color, description, sort_order, created_at)
+    SELECT DISTINCT
+      labels.id || ':' || tickets.project_id,
+      tickets.project_id,
+      projects.team_id,
+      labels.name,
+      labels.color,
+      labels.description,
+      labels.sort_order,
+      labels.created_at
+    FROM ticket_labels
+    INNER JOIN labels ON labels.id = ticket_labels.label_id
+    INNER JOIN tickets ON tickets.id = ticket_labels.ticket_id
+    INNER JOIN projects ON projects.id = tickets.project_id
+    INNER JOIN workspace_settings ON workspace_settings.workspace_id = projects.workspace_id
+    WHERE labels.project_id IS NULL
+      AND workspace_settings.hierarchy_mode = 'flat'
+    ON CONFLICT DO NOTHING;
+  `);
+
+  await pool.query(`
+    INSERT INTO ticket_labels (ticket_id, label_id)
+    SELECT ticket_labels.ticket_id, ticket_labels.label_id || ':' || tickets.project_id
+    FROM ticket_labels
+    INNER JOIN tickets ON tickets.id = ticket_labels.ticket_id
+    INNER JOIN projects ON projects.id = tickets.project_id
+    INNER JOIN workspace_settings ON workspace_settings.workspace_id = projects.workspace_id
+    INNER JOIN labels ON labels.id = ticket_labels.label_id
+    WHERE labels.project_id IS NULL
+      AND workspace_settings.hierarchy_mode = 'flat'
+      AND EXISTS (
+        SELECT 1
+        FROM labels project_labels
+        WHERE project_labels.id = ticket_labels.label_id || ':' || tickets.project_id
+          AND project_labels.project_id = tickets.project_id
+      )
+    ON CONFLICT DO NOTHING;
+  `);
+
+  await pool.query(`
+    DELETE FROM ticket_labels
+    USING tickets, projects, workspace_settings, labels
+    WHERE ticket_labels.ticket_id = tickets.id
+      AND tickets.project_id = projects.id
+      AND workspace_settings.workspace_id = projects.workspace_id
+      AND ticket_labels.label_id = labels.id
+      AND labels.project_id IS NULL
+      AND workspace_settings.hierarchy_mode = 'flat'
+      AND EXISTS (
+        SELECT 1
+        FROM labels project_labels
+        WHERE project_labels.id = labels.id || ':' || tickets.project_id
+          AND project_labels.project_id = tickets.project_id
+      );
+  `);
+
+  await pool.query(`
+    DELETE FROM labels
+    USING teams, workspace_settings
+    WHERE labels.project_id IS NULL
+      AND labels.team_id = teams.id
+      AND workspace_settings.workspace_id = teams.workspace_id
+      AND workspace_settings.hierarchy_mode = 'flat'
+      AND NOT EXISTS (
+        SELECT 1
+        FROM ticket_labels
+        WHERE ticket_labels.label_id = labels.id
+      )
+      AND EXISTS (
+        SELECT 1
+        FROM labels project_labels
+        WHERE project_labels.project_id IS NOT NULL
+          AND substring(project_labels.id from 1 for length(labels.id) + 1) = labels.id || ':'
+      );
+  `);
+}
+
 export async function initializeDatabase() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS user_profiles (
@@ -221,6 +300,7 @@ export async function initializeDatabase() {
     CREATE TABLE IF NOT EXISTS labels (
       id TEXT PRIMARY KEY,
       team_id TEXT NOT NULL,
+      project_id TEXT,
       name TEXT NOT NULL,
       color TEXT NOT NULL DEFAULT '#6B7280',
       description TEXT NOT NULL DEFAULT '',
@@ -371,11 +451,19 @@ export async function initializeDatabase() {
     ALTER TABLE projects ADD COLUMN IF NOT EXISTS team_id TEXT;
     ALTER TABLE cycles ADD COLUMN IF NOT EXISTS team_id TEXT;
     ALTER TABLE labels ADD COLUMN IF NOT EXISTS team_id TEXT;
+    ALTER TABLE labels ADD COLUMN IF NOT EXISTS project_id TEXT;
+    ALTER TABLE labels ALTER COLUMN project_id DROP NOT NULL;
 
     CREATE INDEX IF NOT EXISTS teams_workspace_id_idx ON teams (workspace_id);
     CREATE INDEX IF NOT EXISTS projects_team_id_idx ON projects (team_id);
     CREATE INDEX IF NOT EXISTS cycles_team_id_idx ON cycles (team_id);
     CREATE INDEX IF NOT EXISTS labels_team_id_idx ON labels (team_id);
+    CREATE INDEX IF NOT EXISTS labels_project_id_idx ON labels (project_id);
+
+    DROP INDEX IF EXISTS labels_team_name_unique_idx;
+    DROP INDEX IF EXISTS labels_project_name_unique_idx;
+    CREATE UNIQUE INDEX IF NOT EXISTS labels_team_name_unique_idx ON labels (team_id, name) WHERE project_id IS NULL;
+    CREATE UNIQUE INDEX IF NOT EXISTS labels_project_name_unique_idx ON labels (project_id, name) WHERE project_id IS NOT NULL;
   `);
 
   await pool.query(`
@@ -453,6 +541,13 @@ export async function initializeDatabase() {
     });
   }
 
+  if (hasLabelsTable && hasProjectsTable && labelsHaveProjectId) {
+    await migrateFlatWorkspaceTicketLabelAssignments().catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error('Failed to migrate ticket label assignments for project-based workspaces:', err);
+    });
+  }
+
   if (hasDomainsTable && hasLabelsTable && hasProjectsTable) {
     if (labelsHaveProjectId) {
       await pool.query(`
@@ -507,6 +602,13 @@ export async function initializeDatabase() {
     }
   }
 
+  if (hasLabelsTable && hasProjectsTable && labelsHaveProjectId) {
+    await migrateFlatWorkspaceTicketLabelAssignments().catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error('Failed to migrate ticket label assignments for project-based workspaces:', err);
+    });
+  }
+
   if (hasLabelsTable) {
     await mergeDuplicateTeamLabels(pool).catch((err) => {
       // eslint-disable-next-line no-console
@@ -514,7 +616,8 @@ export async function initializeDatabase() {
     });
 
     await pool.query(`
-      CREATE UNIQUE INDEX IF NOT EXISTS labels_team_name_unique_idx ON labels (team_id, name);
+      CREATE UNIQUE INDEX IF NOT EXISTS labels_team_name_unique_idx ON labels (team_id, name) WHERE project_id IS NULL;
+      CREATE UNIQUE INDEX IF NOT EXISTS labels_project_name_unique_idx ON labels (project_id, name) WHERE project_id IS NOT NULL;
     `).catch((err) => {
       // eslint-disable-next-line no-console
       console.error('Failed to ensure unique team label names:', err);
@@ -568,12 +671,52 @@ export async function initializeDatabase() {
 
   await ensureConstraint(
     'labels',
+    'labels_project_id_projects_id_fk',
+    'FOREIGN KEY ("project_id") REFERENCES "projects"("id") ON DELETE CASCADE',
+  ).catch((err) => {
+    // eslint-disable-next-line no-console
+    console.error('Failed to ensure labels project foreign key:', err);
+  });
+
+  await ensureConstraint(
+    'labels',
     'labels_team_id_teams_id_fk',
     'FOREIGN KEY ("team_id") REFERENCES "teams"("id") ON DELETE CASCADE',
   ).catch((err) => {
     // eslint-disable-next-line no-console
     console.error('Failed to ensure labels team foreign key:', err);
   });
+
+  if (!env.databaseUrl.startsWith('pgmem://')) {
+    await pool.query(`
+      CREATE OR REPLACE FUNCTION "prevent_flat_workspace_team_scoped_labels"()
+      RETURNS trigger AS $$
+      BEGIN
+        IF NEW."project_id" IS NULL AND EXISTS (
+          SELECT 1
+          FROM "teams"
+          INNER JOIN "workspace_settings" ON "workspace_settings"."workspace_id" = "teams"."workspace_id"
+          WHERE "teams"."id" = NEW."team_id"
+            AND "workspace_settings"."hierarchy_mode" = 'flat'
+        ) THEN
+          RAISE EXCEPTION 'Project ID is required to create labels in project-based workspaces.';
+        END IF;
+
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+
+      DROP TRIGGER IF EXISTS "labels_require_project_scope_for_flat_workspaces" ON "labels";
+      CREATE TRIGGER "labels_require_project_scope_for_flat_workspaces"
+      BEFORE INSERT OR UPDATE OF "team_id", "project_id"
+      ON "labels"
+      FOR EACH ROW
+      EXECUTE FUNCTION "prevent_flat_workspace_team_scoped_labels"();
+    `).catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error('Failed to ensure flat workspace label scope guard:', err);
+    });
+  }
 
 
   // Ensure note_metadata has excerpt and full-text search vector columns/indexes

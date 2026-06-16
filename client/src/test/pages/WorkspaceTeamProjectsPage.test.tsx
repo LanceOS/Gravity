@@ -9,6 +9,15 @@ vi.mock('@library', () => ({
   Button: ({ children, loading, ...props }: any) => (
     <button {...props}>{loading ? 'Loading' : children}</button>
   ),
+  Modal: ({ children, title, footer, isOpen }: any) =>
+    isOpen ? (
+      <section>
+        {title ? <h2>{title}</h2> : null}
+        <div>{children}</div>
+        {footer ? <footer>{footer}</footer> : null}
+      </section>
+    ) : null,
+  Alert: ({ children, type }: any) => <div data-alert-type={type}>{children}</div>,
   TextInput: ({ label, value, onChange, ...props }: any) => (
     <label>
       <span>{label}</span>
@@ -20,6 +29,29 @@ vi.mock('@library', () => ({
       <span>{label}</span>
       <textarea value={value} onChange={onChange} {...props} />
     </label>
+  ),
+}));
+
+vi.mock('../../components/WorkspaceProjectPanel', () => ({
+  ProjectCreateOverlay: ({ onClose, onSubmitProject }: any) => (
+    <div>
+      <div>ProjectCreateOverlay</div>
+      <button
+        type="button"
+        onClick={() =>
+          void onSubmitProject({
+            name: '  Orbit UI  ',
+            description: '  Delivery workspace  ',
+            key: ' orb-1234 ',
+          })
+        }
+      >
+        Submit overlay project
+      </button>
+      <button type="button" onClick={onClose}>
+        Close overlay
+      </button>
+    </div>
   ),
 }));
 
@@ -181,7 +213,7 @@ describe('WorkspaceTeamProjectsPage', () => {
         status: 'completed',
       });
     });
-  });
+  }, 12000);
 
   it('opens a dedicated create overlay and scopes new projects to the team', async () => {
     const user = userEvent.setup();

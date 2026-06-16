@@ -8,7 +8,7 @@ import { sanitizeProjectKey, validateGithubRepoUrl } from '../../../utils/projec
 import { queryKeys } from '../../../utils/queryClient';
 import '../../workspacePage/styles/WorkspacePage.css';
 import '../styles/WorkspaceTeamProjectsPage.css';
-import { WorkspaceManagementLayout } from '../../../layouts/WorkspaceManagementLayout/WorkspaceManagementLayout';
+import { WorkspacePageLayout } from '../../../layouts/WorkspacePageLayout/WorkspacePageLayout';
 import { WorkspaceTeamProjectsDeleteModal } from '../components/WorkspaceTeamProjectsDeleteModal';
 import {
   WorkspaceManagementFeedback,
@@ -218,7 +218,7 @@ export function WorkspaceTeamProjectsPanelPage({
   };
 
   return (
-    <WorkspaceManagementLayout
+    <WorkspacePageLayout
       title="Manage Team Projects"
       pageClassName="workspace-team-projects-page"
       contentClassName="workspace-team-projects-page__content"
@@ -322,7 +322,7 @@ export function WorkspaceTeamProjectsPanelPage({
                   <TextInput
                     label="Project Name"
                     value={projectDraft.name}
-                    onChange={(event) => onDraftChange((draft) => ({ ...draft, name: event.target.value }))}
+                    onChange={(event) => setProjectDraft((draft) => ({ ...draft, name: event.target.value }))}
                     placeholder="Core Platform"
                     required
                   />
@@ -330,7 +330,7 @@ export function WorkspaceTeamProjectsPanelPage({
                   <TextInput
                     label="GitHub Repository URL"
                     value={projectDraft.githubRepoUrl}
-                    onChange={(event) => onDraftChange((draft) => ({ ...draft, githubRepoUrl: event.target.value }))}
+                    onChange={(event) => setProjectDraft((draft) => ({ ...draft, githubRepoUrl: event.target.value }))}
                     placeholder="https://github.com/owner/repo"
                   />
                 </div>
@@ -338,7 +338,7 @@ export function WorkspaceTeamProjectsPanelPage({
                 <Textarea
                   label="Description"
                   value={projectDraft.description}
-                  onChange={(event) => onDraftChange((draft) => ({ ...draft, description: event.target.value }))}
+                  onChange={(event) => setProjectDraft((draft) => ({ ...draft, description: event.target.value }))}
                   placeholder="Describe what this project owns."
                   className="workspace-team-projects-page__description-field"
                   autoGrow={false}
@@ -352,7 +352,7 @@ export function WorkspaceTeamProjectsPanelPage({
                       type="button"
                       size="sm"
                       variant={projectDraft.status === option.value ? 'primary' : 'secondary'}
-                      onClick={() => onDraftChange((draft) => ({ ...draft, status: option.value as Project['status'] }))}
+                      onClick={() => setProjectDraft((draft) => ({ ...draft, status: option.value as Project['status'] }))}
                     >
                       {option.label}
                     </Button>
@@ -434,6 +434,6 @@ export function WorkspaceTeamProjectsPanelPage({
           onConfirmDelete={handleConfirmDelete}
         />
       )}
-    </WorkspaceManagementLayout>
+    </WorkspacePageLayout>
   );
 }

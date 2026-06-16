@@ -1,5 +1,5 @@
 import React, { useContext, useMemo } from 'react';
-import { TicketContext, type Label, type Ticket } from '../../../context/TicketContext';
+import { TicketContext, type Label, type Project, type Ticket } from '../../../context/TicketContext';
 import { ContextMenu, toast } from '@library';
 import { Check, User, Folder, Tag, AlertCircle, CheckSquare, Trash2, Calendar, Link } from 'lucide-react';
 import { STATUS_OPTIONS, PRIORITY_OPTIONS } from '../utils/TicketDetail';
@@ -40,37 +40,65 @@ export const TicketContextMenu: React.FC<TicketContextMenuProps> = ({ ticket, ch
     assignLabelToTicket,
     unassignLabelFromTicket,
   } = context;
+  const safeProjects = useMemo(() => (Array.isArray(projects) ? projects : []), [projects]);
   const sourceTickets = availableTickets ?? tickets;
+  const safeLabelsByProject = labelsByProject ?? new Map<string, Label[]>();
+  const safeTicketsByProject = ticketsByProject ?? new Map<string, Ticket[]>();
+  const safeGlobalLabels = globalLabels ?? EMPTY_LABELS;
+  const safeProjectById = projectById ?? new Map<string, Project>();
+  const safeProjectsByWorkspaceId = projectsByWorkspaceId ?? new Map<string, Project[]>();
 
   const ticketLabels = useMemo(() => {
-    const projectLabels = labelsByProject.get(ticket.projectId);
-    if (globalLabels.length === 0) {
+    const projectLabels = safeLabelsByProject.get(ticket.projectId);
+    if (safeGlobalLabels.length === 0) {
       return projectLabels || EMPTY_LABELS;
     }
     if (!projectLabels || projectLabels.length === 0) {
-      return globalLabels;
+      return safeGlobalLabels;
     }
-    return [...globalLabels, ...projectLabels];
-  }, [globalLabels, labelsByProject, ticket.projectId]);
+    return [...safeGlobalLabels, ...projectLabels];
+  }, [safeGlobalLabels, safeLabelsByProject, ticket.projectId]);
 
   const assignableTickets = useMemo(() => {
     const projectTickets = availableTickets
       ? sourceTickets.filter((candidate) => candidate.projectId === ticket.projectId)
-      : ticketsByProject.get(ticket.projectId) || EMPTY_TICKETS;
+      : safeTicketsByProject.get(ticket.projectId) || EMPTY_TICKETS;
     if (!projectTickets.length) {
       return EMPTY_TICKETS;
     }
     return projectTickets.filter((candidate) => candidate.id !== ticket.id);
-  }, [availableTickets, sourceTickets, ticket.id, ticket.projectId, ticketsByProject]);
+  }, [availableTickets, safeTicketsByProject, sourceTickets, ticket.id, ticket.projectId]);
 
-  const workspaceProjects = useMemo(() => {
-    const ticketProject = projectById.get(ticket.projectId);
-    if (!ticketProject?.workspaceId) {
-      return projects;
+  const ticketWorkspaceId = useMemo(() => {
+    const ticketProject = safeProjectById.get(ticket.projectId);
+    if (ticketProject?.workspaceId) {
+      return ticketProject.workspaceId;
     }
 
-    return projectsByWorkspaceId.get(ticketProject.workspaceId) || projects;
-  }, [projectById, projects, projectsByWorkspaceId, ticket.projectId]);
+    return safeProjects.find((project) => project.id === ticket.projectId)?.workspaceId;
+  }, [projects, safeProjectById, ticket.projectId]);
+
+  const safeProjectsByWorkspaceIdFallback = useMemo(() => {
+    const map = new Map<string, Project[]>();
+    for (const project of safeProjects) {
+      const workspaceId = project.workspaceId || '';
+      const current = map.get(workspaceId);
+      if (current) {
+        current.push(project);
+      } else {
+        map.set(workspaceId, [project]);
+      }
+    }
+    return map;
+  }, [safeProjects]);
+
+  const workspaceProjects = useMemo(() => {
+    if (!ticketWorkspaceId) {
+      return safeProjects;
+    }
+
+    return safeProjectsByWorkspaceId.get(ticketWorkspaceId) || safeProjectsByWorkspaceIdFallback.get(ticketWorkspaceId) || safeProjects;
+  }, [safeProjectsByWorkspaceId, safeProjectsByWorkspaceIdFallback, safeProjects, ticketWorkspaceId]);
 
   const assignedLabelIds = useMemo(() => new Set(ticket.labels?.map((assignedLabel) => assignedLabel.id) || EMPTY_USER_IDS), [ticket.labels]);
 

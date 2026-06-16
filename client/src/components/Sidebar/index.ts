@@ -1,4 +1,5 @@
 export { Sidebar } from './Sidebar';
+export { SidebarNavigation } from './navigation';
 export type {
   SidebarActiveArea,
   SidebarNavigationState,

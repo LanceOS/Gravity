@@ -1,0 +1,134 @@
+.sidebar-navigation {
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sidebar-navigation__label {
+  font-weight: 600;
+}
+
+.sidebar-navigation__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+}
+
+.sidebar-navigation__branch {
+  display: grid;
+  gap: 4px;
+}
+
+.sidebar-navigation__item-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sidebar-navigation__item-label-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-navigation__item-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sidebar-navigation__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.sidebar-navigation__collapse {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows var(--transition-normal), opacity var(--transition-normal);
+  opacity: 1;
+}
+
+.sidebar-navigation__collapse--collapsed {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sidebar-navigation__collapse-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+
+.sidebar-navigation__sub-items {
+  margin-left: 12px;
+  padding: 4px 0 4px 8px;
+  border-left: 1px solid var(--color-border-default);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sidebar-navigation__empty {
+  padding: 4px 10px 6px 30px;
+  color: var(--color-text-disabled);
+  font-size: 12px;
+}
+
+.sidebar-navigation__completed {
+  text-decoration: line-through;
+}
+
+.sidebar-navigation__section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.sidebar-navigation__group-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.sidebar-navigation__group-toggle-label {
+  line-height: 1;
+}
+
+.sidebar-navigation__icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  padding: 0;
+  margin-right: 4px;
+}
+
+.sidebar-navigation__icon-button:hover {
+  background: var(--color-base100);
+  color: var(--color-text-primary);
+}

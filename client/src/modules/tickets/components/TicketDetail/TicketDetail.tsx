@@ -84,6 +84,7 @@ import { LabelBadge } from '../LabelBadge';
 import { SearchableOptionPickerPopoverContent } from '../SearchableOptionPickerPopoverContent';
 import { TicketContextMenu } from '../TicketContextMenu';
 import { TicketRelationsSection } from './TicketRelationsSection';
+import { WorkspacePageLayout } from '../../../../layouts/WorkspacePageLayout/WorkspacePageLayout';
 import './TicketDetail.css';
 
 export const TicketDetail: React.FC<TicketDetailProps> = ({
@@ -450,66 +451,67 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
   return (
     <>
       <TicketContextMenu ticket={activeTicket} availableTickets={availableTickets}>
-        <div className="ticket-detail">
-          <div className="ticket-detail__header">
-          <Button
-            onClick={() => onClose ? onClose() : window.history.back()}
-            variant="ghost"
-            size="sm"
-            className="ticket-detail__back-btn clickable"
-          >
-            <ChevronLeft size={16} />
-            <span className="ticket-detail__back-text">Back</span>
-          </Button>
+        <WorkspacePageLayout.Shell className="ticket-detail">
+          <WorkspacePageLayout.Header className="ticket-detail__header">
+            <Button
+              onClick={() => onClose ? onClose() : window.history.back()}
+              variant="ghost"
+              size="sm"
+              className="ticket-detail__back-btn clickable"
+            >
+              <ChevronLeft size={16} />
+              <span className="ticket-detail__back-text">Back</span>
+            </Button>
 
-          <span className="ticket-detail__sep">/</span>
+            <span className="ticket-detail__sep">/</span>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontFamily: 'var(--mono)', fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)', whiteSpace: 'nowrap' }}>
-              {activeTicket.key}
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)', whiteSpace: 'nowrap' }}>
+                {activeTicket.key}
+              </span>
 
-            {parentTicket ? (
-              <>
-                <span className="ticket-parent-ref">
-                  <span className="ticket-parent-label">Sub ticket of</span>
-                  <button
-                    type="button"
+              {parentTicket ? (
+                <>
+                  <span className="ticket-parent-ref">
+                    <span className="ticket-parent-label">Sub ticket of</span>
+                    <button
+                      type="button"
+                      onClick={() => onSelectTicket(parentTicket)}
+                      className="ticket-parent-btn clickable"
+                      aria-label={`${parentTicket.key} - ${parentTicket.title}`}
+                    >
+                      <span className="ticket-parent-key">{parentTicket.key}</span>
+                      <span className="ticket-parent-title">{` - ${parentTicket.title}`}</span>
+                    </button>
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="ticket-parent-mobile-btn"
                     onClick={() => onSelectTicket(parentTicket)}
-                    className="ticket-parent-btn clickable"
-                    aria-label={`${parentTicket.key} - ${parentTicket.title}`}
+                    aria-label={`Parent ticket: ${parentTicket.key}`}
+                    style={{ padding: '4px 10px', fontSize: '12.5px', height: '28px' }}
                   >
-                    <span className="ticket-parent-key">{parentTicket.key}</span>
-                    <span className="ticket-parent-title">{` - ${parentTicket.title}`}</span>
-                  </button>
-                </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="ticket-parent-mobile-btn"
-                  onClick={() => onSelectTicket(parentTicket)}
-                  aria-label={`Parent ticket: ${parentTicket.key}`}
-                  style={{ padding: '4px 10px', fontSize: '12.5px', height: '28px' }}
-                >
-                  <CornerLeftUp size={14} />
-                  <span>Parent</span>
-                </Button>
-              </>
-            ) : null}
-          </div>
+                    <CornerLeftUp size={14} />
+                    <span>Parent</span>
+                  </Button>
+                </>
+              ) : null}
+            </div>
 
-          <Button
-            onClick={handleDelete}
-            variant="danger"
-            size="sm"
-            className="ticket-detail__delete-btn"
-          >
-            <Trash2 size={14} />
-            <span>Delete Ticket</span>
-          </Button>
-        </div>
+            <Button
+              onClick={handleDelete}
+              variant="danger"
+              size="sm"
+              className="ticket-detail__delete-btn"
+            >
+              <Trash2 size={14} />
+              <span>Delete Ticket</span>
+            </Button>
+          </WorkspacePageLayout.Header>
 
-        <div className="ticket-detail__body">
+          <WorkspacePageLayout.Content className="ticket-detail__layout" flush>
+            <WorkspacePageLayout.Body className="ticket-detail__body">
 
           <div className="ticket-detail__content">
 
@@ -857,9 +859,10 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
 
 
 
-        </div>
+            </WorkspacePageLayout.Body>
+          </WorkspacePageLayout.Content>
 
-      </div>
+        </WorkspacePageLayout.Shell>
       </TicketContextMenu>
 
       {isDeleteConfirmOpen && (

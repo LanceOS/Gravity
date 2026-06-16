@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, useLocation, Route, Routes } from 'react-router-dom';
 import { AppShellPage } from '../../pages/AppShellPage/AppShellPage.tsx';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { queryClient as sharedQueryClient, queryKeys } from '../../utils/queryClient';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -99,7 +100,11 @@ vi.mock('../../modules/auth', () => ({
   AuthScreen: () => <div>AuthScreen</div>,
 }));
 
-vi.mock('../../modules/tickets', () => ({
+vi.mock('../../modules/tickets', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../modules/tickets')>();
+
+  return {
+    ...actual,
   CreateTicketModal: () => <div>CreateTicketModal</div>,
   LabelCreateOverlay: () => <div>LabelCreateOverlay</div>,
   TicketDetailRoute: ({ onDeleteTicket, activeTicket }: any) => (
@@ -112,7 +117,8 @@ vi.mock('../../modules/tickets', () => ({
       )}
     </div>
   ),
-}));
+  };
+});
 
 vi.mock('../../modules/onboarding', () => ({
   OnboardingModal: ({ onComplete }: { onComplete: () => void }) => (
@@ -147,7 +153,10 @@ vi.mock('../../layouts/WorkspaceLayout/WorkspaceLayout', () => ({
       >
         {sidebarProps.userMenu.workspaceManagementLabel || 'Manage Projects'}
       </div>
-      <button type="button" onClick={() => sidebarProps.projects?.onSelectLabel?.('d-1')}>
+      <button
+        type="button"
+        onClick={() => sidebarProps.projects?.onSelectLabel?.(sidebarProps.projects?.activeProjectId || 'project-1', 'd-1')}
+      >
         Select label
       </button>
       <button type="button" onClick={() => sidebarProps.projects?.onOpenCreateTeam?.()}>
@@ -159,15 +168,15 @@ vi.mock('../../layouts/WorkspaceLayout/WorkspaceLayout', () => ({
   ),
 }));
 
-vi.mock('../../pages/LoadingPage/LoadingPage', () => ({
+vi.mock('../../modules/loadingPage', () => ({
   LoadingPage: () => <div>LoadingPage</div>,
 }));
 
-vi.mock('../../pages/WorkspaceDirectoryPage/WorkspaceDirectoryPage', () => ({
+vi.mock('../../modules/workspaceDirectoryPage', () => ({
   WorkspaceDirectoryPage: () => <div>WorkspaceDirectoryPage</div>,
 }));
 
-vi.mock('../../pages/WorkspacePage/WorkspacePage', () => ({
+vi.mock('../../modules/workspacePage', () => ({
   WorkspacePage: ({
     activeView,
     filters,
@@ -201,15 +210,15 @@ vi.mock('../../pages/WorkspacePage/WorkspacePage', () => ({
   ),
 }));
 
-vi.mock('../../pages/WorkspaceProjectsListPage/WorkspaceProjectsListPage', () => ({
+vi.mock('../../modules/workspaceProjectsListPage', () => ({
   WorkspaceProjectsListPage: () => <div>WorkspaceProjectsListPage</div>,
 }));
 
-vi.mock('../../pages/WorkspaceTeamsPage/WorkspaceTeamsPage', () => ({
+vi.mock('../../modules/workspaceTeamsPage', () => ({
   WorkspaceTeamsPage: () => <div>WorkspaceTeamsPage</div>,
 }));
 
-vi.mock('../../pages/WorkspaceTeamProjectsPage/WorkspaceTeamProjectsPage', () => ({
+vi.mock('../../modules/workspaceTeamProjectsPage', () => ({
   WorkspaceTeamProjectsPage: ({ team, projects, onBackToTeams }: any) => (
     <div>
       <div>WorkspaceTeamProjectsPage</div>
@@ -415,6 +424,7 @@ function renderAppShell({
       <MemoryRouter initialEntries={initialEntries}>
         <LocationDisplay />
         <Routes>
+          <Route path="/workspaces/:workspaceId/projects" element={<AppShellPage />} />
           <Route path="/workspaces/:workspaceId/projects/:projectId/tickets/:ticketKey" element={<AppShellPage />} />
           <Route path="/workspaces/:workspaceId/projects/:projectId/tickets" element={<AppShellPage />} />
           <Route path="/workspaces/:workspaceId/projects/:projectId/notes" element={<AppShellPage />} />
@@ -554,21 +564,32 @@ const workspaceAggregateTickets = [
 
 function mockAggregateApiResponses() {
   mocks.fetch.mockImplementation((input: RequestInfo | URL) => {
-    const url = typeof input === 'string' ? input : input.toString();
+    const inputUrl = typeof input === 'string' ? input : input.toString();
+    const parsedUrl = inputUrl.startsWith('http')
+      ? new URL(inputUrl)
+      : new URL(inputUrl, 'http://localhost');
 
-    if (url === '/api/v1/workspaces/workspace-1/sidebar') {
+    if (parsedUrl.pathname === '/api/v1/workspaces/workspace-1/sidebar') {
       return Promise.resolve(jsonResponse(aggregateSidebarTree));
     }
 
-    if (url === '/api/v1/tickets?teamId=team-1') {
-      return Promise.resolve(jsonResponse(teamAggregateTickets));
+    if (parsedUrl.pathname === '/api/v1/tickets') {
+      const teamId = parsedUrl.searchParams.get('teamId');
+      const workspaceId = parsedUrl.searchParams.get('workspaceId');
+
+      if (teamId === 'team-1') {
+        return Promise.resolve(jsonResponse(teamAggregateTickets));
+      }
+
+      if (workspaceId === 'workspace-1') {
+        return Promise.resolve(jsonResponse(workspaceAggregateTickets));
+      }
     }
 
-    if (url === '/api/v1/tickets?workspaceId=workspace-1') {
-      return Promise.resolve(jsonResponse(workspaceAggregateTickets));
-    }
-
-    if (url === '/api/v1/cycles?teamId=team-1' || url === '/api/v1/labels?teamId=team-1') {
+    if (
+      (parsedUrl.pathname === '/api/v1/cycles' && parsedUrl.searchParams.get('teamId') === 'team-1')
+      || (parsedUrl.pathname === '/api/v1/labels' && parsedUrl.searchParams.get('teamId') === 'team-1')
+    ) {
       return Promise.resolve(jsonResponse([]));
     }
 
@@ -580,6 +601,7 @@ describe('AppShellPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.clear();
+    sharedQueryClient.clear();
     mocks.fetch.mockImplementation(() =>
       Promise.resolve(jsonResponse({ success: true, lastActiveAt: '2026-05-26T10:00:00.000Z' }))
     );
@@ -610,6 +632,7 @@ describe('AppShellPage', () => {
   it('routes signed-in users without workspaces to the directory page', async () => {
     renderAppShell({
       directory: buildWorkspaceDirectory({ workspaces: [] }),
+      initialEntries: ['/workspaces'],
     });
 
     await waitFor(() => {
@@ -788,8 +811,7 @@ describe('AppShellPage', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('WorkspaceTeamProjectsPage')).toBeInTheDocument();
-      expect(screen.getByTestId('team-projects-state')).toHaveTextContent('Engineering 2');
+      expect(screen.getByText('Manage Team Projects')).toBeInTheDocument();
       expect(screen.getByTestId('location-display').textContent).toBe('/workspaces/workspace-1/teams/team-1/projects');
     });
   });
@@ -843,17 +865,216 @@ describe('AppShellPage', () => {
     expect(screen.queryByText('CreateTicketModal')).not.toBeInTheDocument();
   });
 
+  it('shows cached workspace labels in Manage Projects even when the ticket context label list is empty', async () => {
+    sharedQueryClient.setQueryData(queryKeys.labels('project-1'), [
+      {
+        id: 'label-1',
+        projectId: 'project-1',
+        name: 'Frontend',
+        color: '#2563eb',
+        description: 'UI work',
+        sortOrder: 0,
+      },
+    ]);
+    sharedQueryClient.setQueryData(queryKeys.labels('project-2'), [
+      {
+        id: 'label-2',
+        projectId: 'project-2',
+        name: 'Payments',
+        color: '#10b981',
+        description: 'Billing work',
+        sortOrder: 0,
+      },
+    ]);
+
+    renderAppShell({
+      tickets: buildUseTickets({
+        activeProjectId: 'project-1',
+        labels: [],
+        projects: [
+          {
+            id: 'project-1',
+            name: 'Gravity Core',
+            key: 'GRA',
+            description: 'Primary project',
+            status: 'active',
+            workspaceId: 'workspace-1',
+          },
+          {
+            id: 'project-2',
+            name: 'Gravity API',
+            key: 'API',
+            description: 'API project',
+            status: 'planned',
+            workspaceId: 'workspace-1',
+          },
+        ],
+      }),
+      initialEntries: ['/workspaces/workspace-1/projects'],
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Frontend' })).toBeInTheDocument();
+    });
+
+    expect(screen.queryByRole('button', { name: 'Payments' })).not.toBeInTheDocument();
+  });
+
+  it('uses project-scoped sidebar labels in Manage Projects before per-project label prefetches resolve', async () => {
+    const user = userEvent.setup();
+
+    mocks.fetch.mockImplementation((input: RequestInfo | URL) => {
+      const inputUrl = typeof input === 'string' ? input : input.toString();
+      const parsedUrl = inputUrl.startsWith('http')
+        ? new URL(inputUrl)
+        : new URL(inputUrl, 'http://localhost');
+
+      if (parsedUrl.pathname === '/api/v1/workspaces/workspace-1/sidebar') {
+        return Promise.resolve(jsonResponse({
+          workspaceId: 'workspace-1',
+          hierarchyMode: 'flat',
+          teams: [
+            {
+              id: 'team-1',
+              name: 'Default',
+              description: '',
+              color: '#2563eb',
+              views: [],
+              cycles: [],
+              labels: [
+                {
+                  id: 'label-1',
+                  projectId: 'project-1',
+                  name: 'Frontend',
+                  color: '#2563eb',
+                  description: 'UI work',
+                  sortOrder: 0,
+                },
+                {
+                  id: 'label-2',
+                  projectId: 'project-2',
+                  name: 'Payments',
+                  color: '#10b981',
+                  description: 'Billing work',
+                  sortOrder: 0,
+                },
+              ],
+              projects: [
+                {
+                  id: 'project-1',
+                  name: 'Gravity Core',
+                  key: 'GRA',
+                  description: 'Primary project',
+                  status: 'active',
+                  githubRepoUrl: null,
+                },
+                {
+                  id: 'project-2',
+                  name: 'Gravity API',
+                  key: 'API',
+                  description: 'API project',
+                  status: 'planned',
+                  githubRepoUrl: null,
+                },
+              ],
+            },
+          ],
+        }));
+      }
+
+      if (parsedUrl.pathname === '/api/v1/labels') {
+        return new Promise<Response>(() => {});
+      }
+
+      return Promise.resolve(jsonResponse({ success: true, lastActiveAt: '2026-05-26T10:00:00.000Z' }));
+    });
+
+    renderAppShell({
+      tickets: buildUseTickets({
+        activeProjectId: 'project-1',
+        labels: [],
+        projects: [
+          {
+            id: 'project-1',
+            name: 'Gravity Core',
+            key: 'GRA',
+            description: 'Primary project',
+            status: 'active',
+            workspaceId: 'workspace-1',
+            teamId: 'team-1',
+          },
+          {
+            id: 'project-2',
+            name: 'Gravity API',
+            key: 'API',
+            description: 'API project',
+            status: 'planned',
+            workspaceId: 'workspace-1',
+            teamId: 'team-1',
+          },
+        ],
+      }),
+      directory: buildWorkspaceDirectory({
+        workspaces: [
+          {
+            id: 'workspace-1',
+            name: 'Gravity',
+            description: 'Main workspace',
+            key: 'GRA',
+            defaultProjectId: 'project-1',
+            hostUrl: 'http://localhost:8080',
+            joinMode: 'approval_required',
+            projectCount: 2,
+            memberCount: 1,
+            pendingJoinRequestCount: 0,
+            memberRole: 'owner',
+            hierarchyMode: 'flat',
+          },
+        ],
+      }),
+      initialEntries: ['/workspaces/workspace-1/projects'],
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Frontend' })).toBeInTheDocument();
+    });
+    await waitFor(() => {
+      const prefetchedProjectIds = new Set(
+        mocks.fetch.mock.calls
+          .map(([input]) => {
+            const inputUrl = typeof input === 'string' ? input : input.toString();
+            const parsedUrl = inputUrl.startsWith('http')
+              ? new URL(inputUrl)
+              : new URL(inputUrl, 'http://localhost');
+            return parsedUrl.pathname === '/api/v1/labels' ? parsedUrl.searchParams.get('projectId') : null;
+          })
+          .filter(Boolean)
+      );
+      expect(prefetchedProjectIds).toEqual(new Set(['project-1', 'project-2']));
+    });
+    expect(screen.queryByRole('button', { name: 'Payments' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Gravity API/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Payments' })).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('button', { name: 'Frontend' })).not.toBeInTheDocument();
+  });
+
   it('records member activity for the active workspace', async () => {
     renderAppShell();
 
     await waitFor(() => {
-      expect(mocks.fetch).toHaveBeenCalledWith('/api/v1/workspaces/workspace-1/members/user-1/activity', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-User-Id': 'user-1',
-        },
+      const hasActivityCall = mocks.fetch.mock.calls.some(([input, init]) => {
+        const inputUrl = typeof input === 'string' ? input : input.toString();
+        return (
+          inputUrl === '/api/v1/workspaces/workspace-1/members/user-1/activity'
+          && init?.method === 'POST'
+          && init?.headers?.['X-User-Id'] === 'user-1'
+        );
       });
+      expect(hasActivityCall).toBe(true);
     });
   });
 
@@ -1072,7 +1293,9 @@ describe('AppShellPage', () => {
     window.innerWidth = 500;
     window.dispatchEvent(new Event('resize'));
 
-    expect(setView).toHaveBeenCalledWith('list');
+    await waitFor(() => {
+      expect(setView).toHaveBeenCalledWith('list');
+    });
 
     // Restore window.innerWidth
     window.innerWidth = originalInnerWidth;

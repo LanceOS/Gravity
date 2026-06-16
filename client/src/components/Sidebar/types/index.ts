@@ -21,6 +21,15 @@ export interface SidebarProjectCounts {
   labels?: Record<string, number>;
   domains?: Record<string, number>;
   cycles: Record<string, number>;
+  byProject?: Record<
+    string,
+    {
+      myIssues?: number;
+      activeProjectIssues?: number;
+      labels?: Record<string, number>;
+      cycles?: Record<string, number>;
+    }
+  >;
 }
 
 import type { SidebarTeam } from '../../../types/domain';
@@ -50,7 +59,9 @@ export interface SidebarProjectSection {
   onSelectAllTasks?: (teamId: string) => void;
 
   projects: Project[];
+  onPrefetchProject?: (projectId: string) => void | Promise<void>;
   labels?: Label[];
+  labelsByProject?: Map<string, Label[]>;
   domains?: Label[];
   cycles: Cycle[];
   currentUser: User;
@@ -58,12 +69,13 @@ export interface SidebarProjectSection {
   filters: TicketFilters;
   counts: SidebarProjectCounts;
   onSelectProject: (projectId: string) => void;
+  onHasCachedProjectData?: (projectId: string) => boolean;
   activeContext?: 'issues' | 'notes';
-  onShowProjectIssues: () => void;
-  onShowMyIssues: () => void;
-  onShowNotes: () => void;
-  onSelectCycleLegacy?: (cycleId: string) => void;
-  onSelectLabel?: (labelId: string) => void;
+  onShowProjectIssues: (projectId?: string) => void;
+  onShowMyIssues: (projectId?: string) => void;
+  onShowNotes: (projectId?: string) => void;
+  onSelectCycleLegacy?: (projectId: string, cycleId: string) => void;
+  onSelectLabel?: (projectId: string, labelId: string) => void;
   isWorkspaceOwner?: boolean;
   onOpenTeamManager?: () => void;
   onOpenCreateTeam?: () => void;
