@@ -1,4 +1,5 @@
 import { Button, TextInput } from '@library';
+import { FormSection } from '../../../components/FormSection';
 import { useWorkspaceProjectPanelActionsContext } from '../context/WorkspaceProjectPanelActionsContext';
 import { useWorkspaceProjectPanelProjectStateContext } from '../context/WorkspaceProjectPanelProjectStateContext';
 
@@ -23,7 +24,12 @@ export function WorkspaceProjectSettingsSection() {
         </p>
       </div>
 
-      <form className="workspace-page__domain-form" onSubmit={saveProjectSettings} style={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'end', gap: '16px' }}>
+      <FormSection.Root
+        layout="none"
+        className="workspace-page__domain-form"
+        onSubmit={saveProjectSettings}
+        style={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'end', gap: '16px' }}
+      >
         <TextInput
           label="GitHub Repository URL"
           value={githubRepoUrl}
@@ -35,21 +41,22 @@ export function WorkspaceProjectSettingsSection() {
           title="Must be a full HTTPS GitHub repository URL (https://github.com/owner/repo)"
         />
 
-        <div className="workspace-page__project-form-actions workspace-page__project-form-actions--inline" style={{ minHeight: '36px' }}>
+        <FormSection.Actions className="workspace-page__project-form-actions workspace-page__project-form-actions--inline" style={{ minHeight: '36px' }}>
           <Button type="submit" variant="primary" loading={isProjectSettingsSaving} style={{ minHeight: '36px' }}>
             Save Settings
           </Button>
-        </div>
+        </FormSection.Actions>
 
         {stateSettingsFeedback ? (
-          <div
+          <FormSection.Feedback
+            type={stateSettingsFeedback.type}
             className={`workspace-page__project-feedback workspace-page__project-feedback--${stateSettingsFeedback.type}`}
             style={{ gridColumn: '1 / -1', marginTop: '8px' }}
           >
             {stateSettingsFeedback.message}
-          </div>
+          </FormSection.Feedback>
         ) : null}
-      </form>
+      </FormSection.Root>
     </section>
   );
 }

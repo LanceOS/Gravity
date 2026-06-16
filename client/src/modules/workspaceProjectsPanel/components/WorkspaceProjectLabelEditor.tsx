@@ -1,6 +1,7 @@
 import { Button, TextInput, Textarea } from '@library';
 import { PencilLine, Trash2 } from 'lucide-react';
 
+import { FormSection } from '../../../components/FormSection';
 import { useWorkspaceProjectPanelActionsContext } from '../context/WorkspaceProjectPanelActionsContext';
 import { useWorkspaceProjectPanelLabelStateContext } from '../context/WorkspaceProjectPanelLabelStateContextCore';
 
@@ -46,29 +47,26 @@ export function WorkspaceProjectLabelEditor({
         <div className="workspace-page__project-feedback workspace-page__project-feedback--error">{editingLabelError}</div>
       ) : null}
 
-      <form className="workspace-page__label-editor-form" onSubmit={updateLabel}>
-        <div className="workspace-page__label-editor-grid">
-          <TextInput
-            label="Label Name"
-            value={editingLabelName}
-            onChange={(event) => setEditingLabelName(event.target.value)}
-            placeholder="Frontend Platform"
-            disabled={isLabelBusy}
-            required
-          />
+      <FormSection.Root layout="none" className="workspace-page__label-editor-form" onSubmit={updateLabel}>
+        <TextInput
+          label="Label Name"
+          value={editingLabelName}
+          onChange={(event) => setEditingLabelName(event.target.value)}
+          placeholder="Frontend Platform"
+          disabled={isLabelBusy}
+          required
+        />
 
-          <div className="workspace-page__project-field workspace-page__project-field--compact">
-            <span className="workspace-page__project-label">Color</span>
-            <input
-              type="color"
-              className="workspace-page__project-color-input"
-              value={editingLabelColor}
-              onChange={(event) => setEditingLabelColor(event.target.value)}
-              disabled={isLabelBusy}
-              style={{ height: '36px', padding: '2px', cursor: 'pointer' }}
-            />
-          </div>
-        </div>
+        <FormSection.ColorField
+          className="workspace-page__project-field workspace-page__project-field--compact"
+          inputClassName="workspace-page__project-color-input"
+          labelClassName="workspace-page__project-label"
+          label="Color"
+          value={editingLabelColor}
+          onChange={(event) => setEditingLabelColor(event.target.value)}
+          disabled={isLabelBusy}
+          style={{ height: '36px', padding: '2px', cursor: 'pointer' }}
+        />
 
         <Textarea
           label="Description"
@@ -80,7 +78,7 @@ export function WorkspaceProjectLabelEditor({
           style={{ gridColumn: '1 / -1' }}
         />
 
-        <div className="workspace-page__label-editor-actions" style={{ gridColumn: '1 / -1' }}>
+        <FormSection.Actions className="workspace-page__label-editor-actions" style={{ gridColumn: '1 / -1' }}>
           <Button
             type="submit"
             variant="primary"
@@ -105,8 +103,8 @@ export function WorkspaceProjectLabelEditor({
           <Button type="button" variant="secondary" disabled={isLabelBusy} onClick={clearLabelEditor}>
             <span>Cancel</span>
           </Button>
-        </div>
-      </form>
+        </FormSection.Actions>
+      </FormSection.Root>
     </section>
   );
 }
