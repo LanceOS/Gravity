@@ -4,13 +4,6 @@
   gap: 10px;
 }
 
-.workspace-teams-page__content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
 .workspace-teams-page__hero,
 .workspace-teams-page__layout,
 .workspace-teams-page__feedback,

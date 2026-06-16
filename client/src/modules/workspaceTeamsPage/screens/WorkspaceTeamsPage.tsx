@@ -7,7 +7,7 @@ import { addSidebarTeam, removeSidebarTeam, updateSidebarTeam } from '../../../u
 import type { SidebarTeam, Team } from '../../../types/domain';
 import '../../workspacePage/styles/WorkspacePage.css';
 import '../styles/WorkspaceTeamsPage.css';
-import { WorkspaceManagementLayout } from '../../../layouts/WorkspaceManagementLayout/WorkspaceManagementLayout';
+import { WorkspacePageLayout } from '../../../layouts/WorkspacePageLayout/WorkspacePageLayout';
 import {
   WorkspaceManagementFeedback,
   WorkspaceManagementHeaderActions,
@@ -230,7 +230,7 @@ export function WorkspaceTeamsPage({
   }, [isCreateModalOpen]);
 
   return (
-    <WorkspaceManagementLayout
+    <WorkspacePageLayout
       title="Manage Teams"
       pageClassName="workspace-teams-page"
       contentClassName="workspace-teams-page__content"
@@ -460,6 +460,6 @@ export function WorkspaceTeamsPage({
           onCreateTeam={() => void handleCreateTeamRef.current()}
         />
       </div>
-    </WorkspaceManagementLayout>
+    </WorkspacePageLayout>
   );
 }

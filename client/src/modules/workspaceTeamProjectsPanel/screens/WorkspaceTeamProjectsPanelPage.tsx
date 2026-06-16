@@ -8,7 +8,7 @@ import { sanitizeProjectKey, validateGithubRepoUrl } from '../../../utils/projec
 import { queryKeys } from '../../../utils/queryClient';
 import '../../workspacePage/styles/WorkspacePage.css';
 import '../styles/WorkspaceTeamProjectsPage.css';
-import { WorkspaceManagementLayout } from '../../../layouts/WorkspaceManagementLayout/WorkspaceManagementLayout';
+import { WorkspacePageLayout } from '../../../layouts/WorkspacePageLayout/WorkspacePageLayout';
 import { WorkspaceTeamProjectsDeleteModal } from '../components/WorkspaceTeamProjectsDeleteModal';
 import {
   WorkspaceManagementFeedback,
@@ -218,7 +218,7 @@ export function WorkspaceTeamProjectsPanelPage({
   };
 
   return (
-    <WorkspaceManagementLayout
+    <WorkspacePageLayout
       title="Manage Team Projects"
       pageClassName="workspace-team-projects-page"
       contentClassName="workspace-team-projects-page__content"
@@ -434,6 +434,6 @@ export function WorkspaceTeamProjectsPanelPage({
           onConfirmDelete={handleConfirmDelete}
         />
       )}
-    </WorkspaceManagementLayout>
+    </WorkspacePageLayout>
   );
 }
