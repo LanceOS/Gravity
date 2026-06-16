@@ -177,12 +177,12 @@ export function WorkspaceDirectoryPage({
             />
 
             <Select
-              label="Organization Model"
+              label="Workspace Structure"
               value={hierarchyMode}
               onValueChange={(val) => setHierarchyMode(val as 'teams' | 'flat')}
               options={[
-                { value: 'flat', label: 'Flat (Projects directly under Workspace)' },
-                { value: 'teams', label: 'Team-based (Projects grouped by Teams)' },
+                { value: 'flat', label: 'Project-based (Projects live directly in the workspace)' },
+                { value: 'teams', label: 'Team-based (Projects are grouped by teams)' },
               ]}
             />
 
@@ -412,7 +412,7 @@ export function WorkspaceDirectoryPage({
                               <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
                                 {workspace.name}
                               </span>
-                              {workspace.hierarchyMode === 'teams' && <Badge variant="default">Team Workspace</Badge>}
+                              {workspace.hierarchyMode === 'teams' && <Badge variant="default">Team-based</Badge>}
                               {isActive && <Badge variant="accent">Active</Badge>}
                             </div>
                             {workspace.description && (
@@ -471,7 +471,7 @@ export function WorkspaceDirectoryPage({
                           <span style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
                             {workspace.name}
                           </span>
-                          {workspace.hierarchyMode === 'teams' && <Badge variant="default">Team Workspace</Badge>}
+                          {workspace.hierarchyMode === 'teams' && <Badge variant="default">Team-based</Badge>}
                           {isActive && <Badge variant="accent">Active</Badge>}
                         </div>
                         {workspace.description && (

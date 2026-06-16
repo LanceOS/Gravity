@@ -356,6 +356,33 @@ export function WorkspaceShellPage() {
     return cachedLabelsByProject;
   }, [activeProjectId, labels, labelsQueryFetching]);
 
+  const workspaceProjectLabels = useMemo(() => {
+    const dedupedWorkspaceLabels = new Map<string, Label>();
+
+    for (const project of activeWorkspaceProjects) {
+      const projectLabels = labelsByProject.get(project.id) ?? (project.id === activeProjectId ? labels : []);
+      for (const label of projectLabels) {
+        dedupedWorkspaceLabels.set(label.id, label);
+      }
+    }
+
+    return [...dedupedWorkspaceLabels.values()];
+  }, [activeProjectId, activeWorkspaceProjects, labels, labelsByProject]);
+
+  useEffect(() => {
+    if (activeSection !== 'projects' || !currentUser || activeWorkspaceProjects.length === 0) {
+      return;
+    }
+
+    for (const project of activeWorkspaceProjects) {
+      void queryClient.prefetchQuery({
+        queryKey: queryKeys.labels(project.id),
+        queryFn: () => apiClient.get<Label[]>('/labels', { projectId: project.id }),
+        ...CACHE_CONFIGS.metadata,
+      });
+    }
+  }, [activeSection, activeWorkspaceProjects, currentUser]);
+
   const isScopedTicketsLoading = useMemo(
     () => {
       if (!currentUser) {
@@ -1017,7 +1044,7 @@ export function WorkspaceShellPage() {
               projects={activeWorkspaceProjects}
               activeProjectId={activeProjectId}
               defaultProjectId={activeWorkspace.defaultProjectId ?? null}
-              labels={scopedLabels}
+              labels={workspaceProjectLabels}
               projectCreateLoading={projectCreateLoading}
               projectCreateError={projectCreateError}
               labelCreateLoading={labelCreateLoading}

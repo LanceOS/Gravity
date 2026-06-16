@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, useLocation, Route, Routes } from 'react-router-dom';
 import { AppShellPage } from '../../pages/AppShellPage/AppShellPage.tsx';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { queryClient as sharedQueryClient, queryKeys } from '../../utils/queryClient';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -423,6 +424,7 @@ function renderAppShell({
       <MemoryRouter initialEntries={initialEntries}>
         <LocationDisplay />
         <Routes>
+          <Route path="/workspaces/:workspaceId/projects" element={<AppShellPage />} />
           <Route path="/workspaces/:workspaceId/projects/:projectId/tickets/:ticketKey" element={<AppShellPage />} />
           <Route path="/workspaces/:workspaceId/projects/:projectId/tickets" element={<AppShellPage />} />
           <Route path="/workspaces/:workspaceId/projects/:projectId/notes" element={<AppShellPage />} />
@@ -599,6 +601,7 @@ describe('AppShellPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.clear();
+    sharedQueryClient.clear();
     mocks.fetch.mockImplementation(() =>
       Promise.resolve(jsonResponse({ success: true, lastActiveAt: '2026-05-26T10:00:00.000Z' }))
     );
@@ -860,6 +863,61 @@ describe('AppShellPage', () => {
     await user.keyboard('n');
 
     expect(screen.queryByText('CreateTicketModal')).not.toBeInTheDocument();
+  });
+
+  it('shows cached workspace labels in Manage Projects even when the ticket context label list is empty', async () => {
+    sharedQueryClient.setQueryData(queryKeys.labels('project-1'), [
+      {
+        id: 'label-1',
+        projectId: 'project-1',
+        name: 'Frontend',
+        color: '#2563eb',
+        description: 'UI work',
+        sortOrder: 0,
+      },
+    ]);
+    sharedQueryClient.setQueryData(queryKeys.labels('project-2'), [
+      {
+        id: 'label-2',
+        projectId: 'project-2',
+        name: 'Payments',
+        color: '#10b981',
+        description: 'Billing work',
+        sortOrder: 0,
+      },
+    ]);
+
+    renderAppShell({
+      tickets: buildUseTickets({
+        activeProjectId: 'project-1',
+        labels: [],
+        projects: [
+          {
+            id: 'project-1',
+            name: 'Gravity Core',
+            key: 'GRA',
+            description: 'Primary project',
+            status: 'active',
+            workspaceId: 'workspace-1',
+          },
+          {
+            id: 'project-2',
+            name: 'Gravity API',
+            key: 'API',
+            description: 'API project',
+            status: 'planned',
+            workspaceId: 'workspace-1',
+          },
+        ],
+      }),
+      initialEntries: ['/workspaces/workspace-1/projects'],
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Frontend' })).toBeInTheDocument();
+    });
+
+    expect(screen.queryByRole('button', { name: 'Payments' })).not.toBeInTheDocument();
   });
 
   it('records member activity for the active workspace', async () => {

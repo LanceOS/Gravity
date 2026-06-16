@@ -482,7 +482,7 @@ export async function initializeDatabase() {
       ON CONFLICT (id) DO NOTHING;
     `).catch((err) => {
       // eslint-disable-next-line no-console
-      console.error('Failed to clone flat workspace labels into projects:', err);
+      console.error('Failed to clone project-based workspace labels into projects:', err);
     });
 
     await pool.query(`
@@ -498,33 +498,39 @@ export async function initializeDatabase() {
       ON CONFLICT (ticket_id, label_id) DO NOTHING;
     `).catch((err) => {
       // eslint-disable-next-line no-console
-      console.error('Failed to clone ticket label links for flat workspaces:', err);
+      console.error('Failed to clone ticket label links for project-based workspaces:', err);
     });
 
     await pool.query(`
       DELETE FROM ticket_labels
-      USING tickets, projects, workspace_settings, labels
-      WHERE ticket_labels.ticket_id = tickets.id
-        AND tickets.project_id = projects.id
-        AND workspace_settings.workspace_id = projects.workspace_id
-        AND workspace_settings.hierarchy_mode = 'flat'
-        AND ticket_labels.label_id = labels.id
-        AND labels.project_id IS NULL;
+      WHERE ticket_id IN (
+        SELECT t.id
+        FROM tickets t
+        INNER JOIN projects p ON t.project_id = p.id
+        INNER JOIN workspace_settings ws ON ws.workspace_id = p.workspace_id
+        WHERE ws.hierarchy_mode = 'flat'
+      ) AND label_id IN (
+        SELECT l.id
+        FROM labels l
+        WHERE l.project_id IS NULL
+      );
     `).catch((err) => {
       // eslint-disable-next-line no-console
-      console.error('Failed to clear shared flat workspace ticket labels:', err);
+      console.error('Failed to clear shared project-based workspace ticket labels:', err);
     });
 
     await pool.query(`
       DELETE FROM labels
-      USING projects, workspace_settings
-      WHERE labels.project_id IS NULL
-        AND labels.team_id = projects.team_id
-        AND workspace_settings.workspace_id = projects.workspace_id
-        AND workspace_settings.hierarchy_mode = 'flat';
+      WHERE project_id IS NULL
+        AND team_id IN (
+          SELECT p.team_id
+          FROM projects p
+          INNER JOIN workspace_settings ws ON ws.workspace_id = p.workspace_id
+          WHERE ws.hierarchy_mode = 'flat'
+        );
     `).catch((err) => {
       // eslint-disable-next-line no-console
-      console.error('Failed to remove shared flat workspace labels:', err);
+      console.error('Failed to remove shared project-based workspace labels:', err);
     });
   }
 
@@ -602,7 +608,7 @@ export async function initializeDatabase() {
       ON CONFLICT (id) DO NOTHING;
     `).catch((err) => {
       // eslint-disable-next-line no-console
-      console.error('Failed to clone flat workspace labels into projects:', err);
+      console.error('Failed to clone project-based workspace labels into projects:', err);
     });
 
     await pool.query(`
@@ -618,33 +624,39 @@ export async function initializeDatabase() {
       ON CONFLICT (ticket_id, label_id) DO NOTHING;
     `).catch((err) => {
       // eslint-disable-next-line no-console
-      console.error('Failed to clone ticket label links for flat workspaces:', err);
+      console.error('Failed to clone ticket label links for project-based workspaces:', err);
     });
 
     await pool.query(`
       DELETE FROM ticket_labels
-      USING tickets, projects, workspace_settings, labels
-      WHERE ticket_labels.ticket_id = tickets.id
-        AND tickets.project_id = projects.id
-        AND workspace_settings.workspace_id = projects.workspace_id
-        AND workspace_settings.hierarchy_mode = 'flat'
-        AND ticket_labels.label_id = labels.id
-        AND labels.project_id IS NULL;
+      WHERE ticket_id IN (
+        SELECT t.id
+        FROM tickets t
+        INNER JOIN projects p ON t.project_id = p.id
+        INNER JOIN workspace_settings ws ON ws.workspace_id = p.workspace_id
+        WHERE ws.hierarchy_mode = 'flat'
+      ) AND label_id IN (
+        SELECT l.id
+        FROM labels l
+        WHERE l.project_id IS NULL
+      );
     `).catch((err) => {
       // eslint-disable-next-line no-console
-      console.error('Failed to clear shared flat workspace ticket labels:', err);
+      console.error('Failed to clear shared project-based workspace ticket labels:', err);
     });
 
     await pool.query(`
       DELETE FROM labels
-      USING projects, workspace_settings
-      WHERE labels.project_id IS NULL
-        AND labels.team_id = projects.team_id
-        AND workspace_settings.workspace_id = projects.workspace_id
-        AND workspace_settings.hierarchy_mode = 'flat';
+      WHERE project_id IS NULL
+        AND team_id IN (
+          SELECT p.team_id
+          FROM projects p
+          INNER JOIN workspace_settings ws ON ws.workspace_id = p.workspace_id
+          WHERE ws.hierarchy_mode = 'flat'
+        );
     `).catch((err) => {
       // eslint-disable-next-line no-console
-      console.error('Failed to remove shared flat workspace labels:', err);
+      console.error('Failed to remove shared project-based workspace labels:', err);
     });
   }
 

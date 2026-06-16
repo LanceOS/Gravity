@@ -83,13 +83,7 @@ export function useWorkspaceProjectPanelProjectState({
     return [currentProject, ...projects.filter((project) => project.id !== currentProject.id)];
   }, [currentProject, projects]);
 
-  const shouldShowLabels = useMemo(() => {
-    if (!activeProjectId) {
-      return true;
-    }
-
-    return managedProject?.id === activeProjectId;
-  }, [activeProjectId, managedProject]);
+  const shouldShowLabels = true;
 
   useEffect(() => {
     setManagedProjectId((currentId) =>

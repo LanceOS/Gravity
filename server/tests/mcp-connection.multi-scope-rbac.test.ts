@@ -87,7 +87,7 @@ describe('MCP token multi-use, scopes, and RBAC', () => {
     // Non-member cannot create token
     const createRes = await otherApi.post(`/api/v1/workspaces/${workspace.id}/mcp/connection`).send({});
     expect(createRes.status).toBe(403);
-    expect(createRes.body).toEqual({ error: 'Workspace membership required.' });
+    expect(createRes.body).toEqual({ error: 'Access denied: not a member of the workspace.' });
 
     // Owner creates a token
     const ownerCreate = await ownerApi.post(`/api/v1/workspaces/${workspace.id}/mcp/connection`).send({});
@@ -97,6 +97,6 @@ describe('MCP token multi-use, scopes, and RBAC', () => {
     // Non-member cannot revoke someone else's token
     const revokeRes = await otherApi.post(`/api/v1/workspaces/${workspace.id}/mcp/connection/${tokenId}/revoke`).send({});
     expect(revokeRes.status).toBe(403);
-    expect(revokeRes.body).toEqual({ error: 'Insufficient privileges to revoke token.' });
+    expect(revokeRes.body).toEqual({ error: 'Access denied: not a member of the workspace.' });
   });
 });

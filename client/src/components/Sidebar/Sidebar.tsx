@@ -15,7 +15,7 @@ export function Sidebar({ projects, tools, userMenu }: SidebarProps) {
     projects.onHasCachedProjectData,
   );
 
-  // Show the "New Ticket" header when there are projects — either in flat mode or via teams
+  // Show the "New Ticket" header when there are projects, either project-based or grouped by teams.
   const hasAnyProject =
     projects.projects.length > 0 ||
     (projects.teams ?? []).some((t) => t.projects && t.projects.length > 0);

@@ -282,7 +282,7 @@ describe('Sidebar', () => {
     expect(screen.getByText('UserDropdown closed')).toBeInTheDocument();
   });
 
-  it('renders flat workspace context menu and hides New Team', async () => {
+  it('renders project-based workspace context menu and hides New Team', async () => {
     const user = userEvent.setup();
     const { props, rerender, container } = renderSidebar();
     

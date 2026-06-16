@@ -6,6 +6,7 @@ import type { AppShellRouteState } from './useAppShellRoute';
 
 type SyncedFilterParams = {
   labels: string[];
+  projectId: string;
   labelMode: 'all' | 'any';
   cycleId: string;
   labelId: string;
@@ -58,6 +59,7 @@ export function useAppShellRouteSync({
 }: UseAppShellRouteSyncArgs) {
   const lastSyncedFilterParams = useRef<SyncedFilterParams>({
     labels: [],
+    projectId: '',
     labelMode: 'any',
     cycleId: '',
     labelId: '',
@@ -192,12 +194,15 @@ export function useAppShellRouteSync({
     const urlStatus = searchParams.get('status') ?? '';
     const urlPriority = searchParams.get('priority') ?? '';
     const urlSearch = searchParams.get('q') ?? '';
+    const urlProjectId = projectIdParam || '';
     const urlLabels = urlLabelId ? [urlLabelId] : searchLabels;
 
     const last = lastSyncedFilterParams.current;
+    const projectIdChanged = last.projectId !== urlProjectId;
     const labelsChanged = !areStringArraysEqual(last.labels, urlLabels);
     if (
       labelsChanged ||
+      projectIdChanged ||
       last.labelMode !== urlLabelMode ||
       last.cycleId !== urlCycleId ||
       last.labelId !== urlLabelId ||
@@ -208,6 +213,7 @@ export function useAppShellRouteSync({
     ) {
       lastSyncedFilterParams.current = {
         labels: urlLabels,
+        projectId: urlProjectId,
         labelMode: urlLabelMode,
         cycleId: urlCycleId,
         labelId: urlLabelId,
@@ -217,6 +223,7 @@ export function useAppShellRouteSync({
         search: urlSearch,
       };
       setFilters({
+        projectId: urlProjectId,
         labels: urlLabels,
         labelMode: urlLabelMode,
         cycleId: urlCycleId,

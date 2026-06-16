@@ -168,10 +168,16 @@ export function useWorkspaceProjectSelection({
     }
 
     if (!activeWorkspaceProjectIdSet.has(activeProjectId)) {
-      const preferredProject = activeWorkspaceDefaultProjectId ? activeWorkspaceProjectById.get(activeWorkspaceDefaultProjectId) : null;
-      if (preferredProject) {
-        setActiveProjectId(preferredProject.id);
+      const preferredProject = activeWorkspaceDefaultProjectId
+        ? activeWorkspaceProjectById.get(activeWorkspaceDefaultProjectId)
+        : null;
+      const nextProject = preferredProject ?? activeWorkspaceProjects[0] ?? null;
+
+      if (nextProject) {
+        setActiveProjectId(nextProject.id);
       }
+
+      return;
     }
   }, [
     activeProjectId,
