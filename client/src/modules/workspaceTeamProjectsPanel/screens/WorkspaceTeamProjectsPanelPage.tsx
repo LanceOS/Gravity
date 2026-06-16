@@ -10,6 +10,7 @@ import '../../workspacePage/styles/WorkspacePage.css';
 import '../styles/WorkspaceTeamProjectsPage.css';
 import { WorkspacePageLayout } from '../../../layouts/WorkspacePageLayout/WorkspacePageLayout';
 import { WorkspaceTeamProjectsDeleteModal } from '../components/WorkspaceTeamProjectsDeleteModal';
+import { FormSection } from '../../../components/FormSection';
 import {
   WorkspaceManagementFeedback,
   WorkspaceManagementEditorSection,
@@ -316,7 +317,12 @@ export function WorkspaceTeamProjectsPanelPage({
           getSelectedItemTitle={(project) => project.name}
         >
           {(selectedProjectForEditor) => (
-            <form className="workspace-team-projects-page__form" aria-label="Project editor" onSubmit={handleSaveProject}>
+            <FormSection.Root
+              layout="none"
+              className="workspace-team-projects-page__form"
+              aria-label="Project editor"
+              onSubmit={handleSaveProject}
+            >
               <div className="workspace-team-projects-page__form-fields">
                 <div className="workspace-team-projects-page__field-grid">
                   <TextInput
@@ -366,7 +372,7 @@ export function WorkspaceTeamProjectsPanelPage({
                 </div>
               </div>
 
-              <div className="workspace-team-projects-page__actions-row">
+              <FormSection.Actions className="workspace-team-projects-page__actions-row" align="between">
                 <div className="workspace-team-projects-page__actions-left">
                   <Button
                     type="submit"
@@ -404,15 +410,15 @@ export function WorkspaceTeamProjectsPanelPage({
                       disabled={
                         savingProjectId === selectedProjectForEditor.id || deletingProjectId === selectedProjectForEditor.id
                       }
-                      onClick={onDeleteProject ? handleDeleteProject : undefined}
+                      onClick={handleDeleteProject}
                     >
                       <Trash size={13} />
                       <span>Delete</span>
                     </Button>
                   </div>
                 ) : null}
-              </div>
-            </form>
+              </FormSection.Actions>
+            </FormSection.Root>
           )}
         </WorkspaceManagementEditorSection>
       </div>

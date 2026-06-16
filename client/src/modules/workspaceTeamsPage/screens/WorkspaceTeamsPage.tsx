@@ -8,6 +8,7 @@ import type { SidebarTeam, Team } from '../../../types/domain';
 import '../../workspacePage/styles/WorkspacePage.css';
 import '../styles/WorkspaceTeamsPage.css';
 import { WorkspacePageLayout } from '../../../layouts/WorkspacePageLayout/WorkspacePageLayout';
+import { FormSection } from '../../../components/FormSection';
 import {
   WorkspaceManagementFeedback,
   WorkspaceManagementHeaderActions,
@@ -336,7 +337,8 @@ export function WorkspaceTeamsPage({
           getSelectedItemTitle={(team) => `${team.name} Details`}
         >
           {(selectedTeamForEditor) => (
-            <form
+            <FormSection.Root
+              layout="none"
               className="workspace-teams-page__form"
               aria-label="Team editor"
               onSubmit={(event) => {
@@ -442,12 +444,12 @@ export function WorkspaceTeamsPage({
                 </div>
               </div>
 
-              <div className="workspace-teams-page__actions-row">
+              <FormSection.Actions className="workspace-teams-page__actions-row">
                 <Button type="submit" variant="primary" size="sm" disabled={savingAction === `update:${selectedTeamForEditor.id}`}>
                   <span>{savingAction === `update:${selectedTeamForEditor.id}` ? 'Saving...' : 'Save Team'}</span>
                 </Button>
-              </div>
-            </form>
+              </FormSection.Actions>
+            </FormSection.Root>
           )}
         </WorkspaceManagementEditorSection>
 
