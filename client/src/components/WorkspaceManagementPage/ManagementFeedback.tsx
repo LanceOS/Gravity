@@ -1,3 +1,5 @@
+import { ManagementSurface } from '../ManagementSurface';
+
 interface WorkspaceManagementFeedbackProps {
   classNamePrefix: string;
   feedback: {
@@ -7,13 +9,5 @@ interface WorkspaceManagementFeedbackProps {
 }
 
 export function WorkspaceManagementFeedback({ classNamePrefix, feedback }: WorkspaceManagementFeedbackProps) {
-  if (!feedback) {
-    return null;
-  }
-
-  return (
-    <div className={`${classNamePrefix}__feedback ${classNamePrefix}__feedback--${feedback.type}`}>
-      {feedback.message}
-    </div>
-  );
+  return <ManagementSurface.Feedback classNamePrefix={classNamePrefix} feedback={feedback} />;
 }

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { ManagementSurface } from '../ManagementSurface';
 
 interface WorkspaceManagementEditorSectionProps<T> {
   classNamePrefix: string;
@@ -25,29 +26,19 @@ export function WorkspaceManagementEditorSection<T>({
   getSelectedItemTitle,
   children,
 }: WorkspaceManagementEditorSectionProps<T>) {
-  if (!selectedItem) {
-    return (
-      <section className={editorClassName} aria-label={ariaLabel}>
-        <div className={`${classNamePrefix}__empty`}>
-          <div className={`${classNamePrefix}__empty-title`}>{emptyStateTitle}</div>
-          <p>{emptyStateDescription}</p>
-        </div>
-      </section>
-    );
-  }
-
   return (
-    <section className={editorClassName} aria-label={ariaLabel}>
-      <div className={`${classNamePrefix}__section-header`}>
-        <div>
-          <div className={`${classNamePrefix}__section-kicker`}>{sectionKicker}</div>
-          <h3>{getSelectedItemTitle(selectedItem)}</h3>
-        </div>
-        <p>{sectionDescription}</p>
-      </div>
-
-      {children(selectedItem)}
-    </section>
+    <ManagementSurface.EditorSection
+      classNamePrefix={classNamePrefix}
+      editorClassName={editorClassName}
+      ariaLabel={ariaLabel}
+      sectionKicker={sectionKicker}
+      sectionDescription={sectionDescription}
+      selectedItem={selectedItem}
+      emptyStateTitle={emptyStateTitle}
+      emptyStateDescription={emptyStateDescription}
+      getSelectedItemTitle={getSelectedItemTitle}
+    >
+      {children}
+    </ManagementSurface.EditorSection>
   );
 }
-

@@ -1,4 +1,5 @@
 import type { ComponentType } from 'react';
+import { ManagementSurface } from '../ManagementSurface';
 
 export interface WorkspaceManagementHeroProps {
   classNamePrefix: string;
@@ -24,27 +25,16 @@ export function WorkspaceManagementHero({
   statPluralLabel,
 }: WorkspaceManagementHeroProps) {
   return (
-    <section className={`${classNamePrefix}__hero`}>
-      <div>
-        <div className={`${classNamePrefix}__eyebrow`}>{eyebrow}</div>
-        <div className={`${classNamePrefix}__hero-header`}>
-          <h2>{title}</h2>
-          <div className={`${classNamePrefix}__hero-meta`}>
-            {metaItems.map((item, index) => (
-              <span key={`${classNamePrefix}__hero-pill-${index}`} className={`${classNamePrefix}__hero-pill`}>
-                {item}
-              </span>
-            ))}
-          </div>
-        </div>
-        <p className={`${classNamePrefix}__hero-description`}>{description}</p>
-      </div>
-
-      <div className={`${classNamePrefix}__hero-stat`}>
-        <StatIcon size={18} />
-        <span>{statValue}</span>
-        <small>{statValue === 1 ? statSingularLabel : statPluralLabel}</small>
-      </div>
-    </section>
+    <ManagementSurface.Hero
+      classNamePrefix={classNamePrefix}
+      eyebrow={eyebrow}
+      title={title}
+      metaItems={metaItems}
+      description={description}
+      StatIcon={StatIcon}
+      statValue={statValue}
+      statSingularLabel={statSingularLabel}
+      statPluralLabel={statPluralLabel}
+    />
   );
 }
