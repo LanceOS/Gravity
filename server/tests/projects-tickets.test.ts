@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { eq } from 'drizzle-orm';
 import {
   api,
   createAuthenticatedApi,
@@ -7,6 +8,9 @@ import {
   seedUser,
   seedWorkspaceFixture,
 } from './helpers/test-helpers.js';
+import { db } from '../src/db/index.js';
+import { labels } from '../src/db/schema.js';
+import { getDefaultTeamId } from '../src/modules/workspaces/utils/default-team.js';
 
 describe('projects and tickets routes', () => {
   it('lists, creates, updates, and shares projects', async () => {
@@ -152,6 +156,179 @@ describe('projects and tickets routes', () => {
     });
     expect(spoofedOwnerResponse.status).toBe(403);
     expect(spoofedOwnerResponse.body).toEqual({ error: 'Forbidden.' });
+  });
+
+  it('keeps project-based labels scoped to their projects in the workspace sidebar', async () => {
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Sidebar Label Owner',
+      email: 'sidebar-label-owner@example.com',
+      role: 'owner',
+    });
+    const { workspace, project } = await seedWorkspaceFixture({
+      owner: {
+        id: ownerApi.user.id,
+        name: ownerApi.user.name,
+        email: ownerApi.user.email,
+        role: 'owner',
+        avatarUrl: ownerApi.user.avatar,
+      },
+    });
+
+    const secondProjectResponse = await ownerApi.post('/api/v1/projects').send({
+      name: 'Gravity API',
+      description: 'API project',
+      key: 'API',
+      ownerId: ownerApi.user.id,
+      workspaceId: workspace.id,
+    });
+    expect(secondProjectResponse.status).toBe(201);
+    const secondProjectId = secondProjectResponse.body.id;
+
+    const firstLabelResponse = await ownerApi.post('/api/v1/labels').send({
+      projectId: project.id,
+      name: 'Frontend',
+      color: '#2563eb',
+    });
+    const secondLabelResponse = await ownerApi.post('/api/v1/labels').send({
+      projectId: secondProjectId,
+      name: 'Payments',
+      color: '#10b981',
+    });
+    expect(firstLabelResponse.status).toBe(201);
+    expect(secondLabelResponse.status).toBe(201);
+
+    const firstProjectLabels = await ownerApi.get('/api/v1/labels').query({ projectId: project.id });
+    expect(firstProjectLabels.status).toBe(200);
+    expect(firstProjectLabels.body).toEqual([
+      expect.objectContaining({
+        id: firstLabelResponse.body.id,
+        projectId: project.id,
+        name: 'Frontend',
+      }),
+    ]);
+
+    const secondProjectLabels = await ownerApi.get('/api/v1/labels').query({ projectId: secondProjectId });
+    expect(secondProjectLabels.status).toBe(200);
+    expect(secondProjectLabels.body).toEqual([
+      expect.objectContaining({
+        id: secondLabelResponse.body.id,
+        projectId: secondProjectId,
+        name: 'Payments',
+      }),
+    ]);
+
+    const sidebarResponse = await ownerApi.get(`/api/v1/workspaces/${workspace.id}/sidebar`);
+    expect(sidebarResponse.status).toBe(200);
+    expect(sidebarResponse.body.hierarchyMode).toBe('flat');
+
+    const sidebarLabels = sidebarResponse.body.teams.flatMap((team: { labels?: Array<{ id: string; projectId?: string; name: string }> }) => team.labels ?? []);
+    expect(sidebarLabels).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: firstLabelResponse.body.id,
+        projectId: project.id,
+        name: 'Frontend',
+      }),
+      expect.objectContaining({
+        id: secondLabelResponse.body.id,
+        projectId: secondProjectId,
+        name: 'Payments',
+      }),
+    ]));
+    expect(sidebarLabels.filter((label: { name: string }) => label.name === 'Frontend')).toHaveLength(1);
+    expect(sidebarLabels.filter((label: { name: string }) => label.name === 'Payments')).toHaveLength(1);
+  });
+
+  it('uses the project scope when project-based label creation also sends a team id', async () => {
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Mixed Scope Label Owner',
+      email: 'mixed-scope-label-owner@example.com',
+      role: 'owner',
+    });
+    const { workspace, project } = await seedWorkspaceFixture({
+      owner: {
+        id: ownerApi.user.id,
+        name: ownerApi.user.name,
+        email: ownerApi.user.email,
+        role: 'owner',
+        avatarUrl: ownerApi.user.avatar,
+      },
+    });
+    const teamId = getDefaultTeamId(workspace.id);
+
+    const createLabelResponse = await ownerApi.post('/api/v1/labels').send({
+      projectId: project.id,
+      teamId,
+      name: 'Mixed Scope',
+      color: '#7c3aed',
+    });
+    expect(createLabelResponse.status).toBe(201);
+    expect(createLabelResponse.body).toEqual(expect.objectContaining({
+      teamId,
+      projectId: project.id,
+      name: 'Mixed Scope',
+    }));
+
+    const projectLabelsResponse = await ownerApi.get('/api/v1/labels').query({ projectId: project.id });
+    expect(projectLabelsResponse.status).toBe(200);
+    expect(projectLabelsResponse.body).toEqual([
+      expect.objectContaining({
+        id: createLabelResponse.body.id,
+        projectId: project.id,
+        name: 'Mixed Scope',
+      }),
+    ]);
+
+    const teamLabelsResponse = await ownerApi.get('/api/v1/labels').query({ teamId });
+    expect(teamLabelsResponse.status).toBe(200);
+    expect(teamLabelsResponse.body).toHaveLength(0);
+
+    const teamOnlyResponse = await ownerApi.post('/api/v1/labels').send({
+      teamId,
+      name: 'Invalid Team Scope',
+    });
+    expect(teamOnlyResponse.status).toBe(400);
+    expect(teamOnlyResponse.body).toEqual({
+      error: 'Project ID is required to create labels in project-based workspaces.',
+    });
+  });
+
+  it('stores labels created from project request scope with a project id in project-based workspaces', async () => {
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Header Scope Label Owner',
+      email: 'header-scope-label-owner@example.com',
+      role: 'owner',
+    });
+    const { project } = await seedWorkspaceFixture({
+      owner: {
+        id: ownerApi.user.id,
+        name: ownerApi.user.name,
+        email: ownerApi.user.email,
+        role: 'owner',
+        avatarUrl: ownerApi.user.avatar,
+      },
+    });
+
+    const createLabelResponse = await ownerApi
+      .post('/api/v1/labels')
+      .set('X-Project-Id', project.id)
+      .send({
+        name: 'Header Scoped',
+        color: '#0ea5e9',
+      });
+
+    expect(createLabelResponse.status).toBe(201);
+    expect(createLabelResponse.body).toEqual(expect.objectContaining({
+      projectId: project.id,
+      name: 'Header Scoped',
+    }));
+
+    const storedLabels = await db
+      .select({ projectId: labels.projectId })
+      .from(labels)
+      .where(eq(labels.id, createLabelResponse.body.id))
+      .limit(1);
+
+    expect(storedLabels).toEqual([{ projectId: project.id }]);
   });
 
   it('manages tickets, comments, labels, and cycles', async () => {

@@ -69,6 +69,85 @@ async function ensureConstraint(tableName: string, constraintName: string, defin
   await pool.query(`ALTER TABLE "${tableName}" ADD CONSTRAINT "${constraintName}" ${definition}`);
 }
 
+async function migrateFlatWorkspaceTicketLabelAssignments() {
+  await pool.query(`
+    INSERT INTO labels (id, project_id, team_id, name, color, description, sort_order, created_at)
+    SELECT DISTINCT
+      labels.id || ':' || tickets.project_id,
+      tickets.project_id,
+      projects.team_id,
+      labels.name,
+      labels.color,
+      labels.description,
+      labels.sort_order,
+      labels.created_at
+    FROM ticket_labels
+    INNER JOIN labels ON labels.id = ticket_labels.label_id
+    INNER JOIN tickets ON tickets.id = ticket_labels.ticket_id
+    INNER JOIN projects ON projects.id = tickets.project_id
+    INNER JOIN workspace_settings ON workspace_settings.workspace_id = projects.workspace_id
+    WHERE labels.project_id IS NULL
+      AND workspace_settings.hierarchy_mode = 'flat'
+    ON CONFLICT DO NOTHING;
+  `);
+
+  await pool.query(`
+    INSERT INTO ticket_labels (ticket_id, label_id)
+    SELECT ticket_labels.ticket_id, ticket_labels.label_id || ':' || tickets.project_id
+    FROM ticket_labels
+    INNER JOIN tickets ON tickets.id = ticket_labels.ticket_id
+    INNER JOIN projects ON projects.id = tickets.project_id
+    INNER JOIN workspace_settings ON workspace_settings.workspace_id = projects.workspace_id
+    INNER JOIN labels ON labels.id = ticket_labels.label_id
+    WHERE labels.project_id IS NULL
+      AND workspace_settings.hierarchy_mode = 'flat'
+      AND EXISTS (
+        SELECT 1
+        FROM labels project_labels
+        WHERE project_labels.id = ticket_labels.label_id || ':' || tickets.project_id
+          AND project_labels.project_id = tickets.project_id
+      )
+    ON CONFLICT DO NOTHING;
+  `);
+
+  await pool.query(`
+    DELETE FROM ticket_labels
+    USING tickets, projects, workspace_settings, labels
+    WHERE ticket_labels.ticket_id = tickets.id
+      AND tickets.project_id = projects.id
+      AND workspace_settings.workspace_id = projects.workspace_id
+      AND ticket_labels.label_id = labels.id
+      AND labels.project_id IS NULL
+      AND workspace_settings.hierarchy_mode = 'flat'
+      AND EXISTS (
+        SELECT 1
+        FROM labels project_labels
+        WHERE project_labels.id = labels.id || ':' || tickets.project_id
+          AND project_labels.project_id = tickets.project_id
+      );
+  `);
+
+  await pool.query(`
+    DELETE FROM labels
+    USING teams, workspace_settings
+    WHERE labels.project_id IS NULL
+      AND labels.team_id = teams.id
+      AND workspace_settings.workspace_id = teams.workspace_id
+      AND workspace_settings.hierarchy_mode = 'flat'
+      AND NOT EXISTS (
+        SELECT 1
+        FROM ticket_labels
+        WHERE ticket_labels.label_id = labels.id
+      )
+      AND EXISTS (
+        SELECT 1
+        FROM labels project_labels
+        WHERE project_labels.project_id IS NOT NULL
+          AND substring(project_labels.id from 1 for length(labels.id) + 1) = labels.id || ':'
+      );
+  `);
+}
+
 export async function initializeDatabase() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS user_profiles (
@@ -463,74 +542,9 @@ export async function initializeDatabase() {
   }
 
   if (hasLabelsTable && hasProjectsTable && labelsHaveProjectId) {
-    await pool.query(`
-      INSERT INTO labels (id, project_id, team_id, name, color, description, sort_order, created_at)
-      SELECT
-        labels.id || ':' || projects.id,
-        projects.id,
-        projects.team_id,
-        labels.name,
-        labels.color,
-        labels.description,
-        labels.sort_order,
-        labels.created_at
-      FROM labels
-      INNER JOIN projects ON projects.team_id = labels.team_id
-      INNER JOIN workspace_settings ON workspace_settings.workspace_id = projects.workspace_id
-      WHERE labels.project_id IS NULL
-        AND workspace_settings.hierarchy_mode = 'flat'
-      ON CONFLICT (id) DO NOTHING;
-    `).catch((err) => {
+    await migrateFlatWorkspaceTicketLabelAssignments().catch((err) => {
       // eslint-disable-next-line no-console
-      console.error('Failed to clone project-based workspace labels into projects:', err);
-    });
-
-    await pool.query(`
-      INSERT INTO ticket_labels (ticket_id, label_id)
-      SELECT ticket_labels.ticket_id, ticket_labels.label_id || ':' || tickets.project_id
-      FROM ticket_labels
-      INNER JOIN tickets ON tickets.id = ticket_labels.ticket_id
-      INNER JOIN projects ON projects.id = tickets.project_id
-      INNER JOIN workspace_settings ON workspace_settings.workspace_id = projects.workspace_id
-      INNER JOIN labels ON labels.id = ticket_labels.label_id
-      WHERE labels.project_id IS NULL
-        AND workspace_settings.hierarchy_mode = 'flat'
-      ON CONFLICT (ticket_id, label_id) DO NOTHING;
-    `).catch((err) => {
-      // eslint-disable-next-line no-console
-      console.error('Failed to clone ticket label links for project-based workspaces:', err);
-    });
-
-    await pool.query(`
-      DELETE FROM ticket_labels
-      WHERE ticket_id IN (
-        SELECT t.id
-        FROM tickets t
-        INNER JOIN projects p ON t.project_id = p.id
-        INNER JOIN workspace_settings ws ON ws.workspace_id = p.workspace_id
-        WHERE ws.hierarchy_mode = 'flat'
-      ) AND label_id IN (
-        SELECT l.id
-        FROM labels l
-        WHERE l.project_id IS NULL
-      );
-    `).catch((err) => {
-      // eslint-disable-next-line no-console
-      console.error('Failed to clear shared project-based workspace ticket labels:', err);
-    });
-
-    await pool.query(`
-      DELETE FROM labels
-      WHERE project_id IS NULL
-        AND team_id IN (
-          SELECT p.team_id
-          FROM projects p
-          INNER JOIN workspace_settings ws ON ws.workspace_id = p.workspace_id
-          WHERE ws.hierarchy_mode = 'flat'
-        );
-    `).catch((err) => {
-      // eslint-disable-next-line no-console
-      console.error('Failed to remove shared project-based workspace labels:', err);
+      console.error('Failed to migrate ticket label assignments for project-based workspaces:', err);
     });
   }
 
@@ -589,74 +603,9 @@ export async function initializeDatabase() {
   }
 
   if (hasLabelsTable && hasProjectsTable && labelsHaveProjectId) {
-    await pool.query(`
-      INSERT INTO labels (id, project_id, team_id, name, color, description, sort_order, created_at)
-      SELECT
-        labels.id || ':' || projects.id,
-        projects.id,
-        projects.team_id,
-        labels.name,
-        labels.color,
-        labels.description,
-        labels.sort_order,
-        labels.created_at
-      FROM labels
-      INNER JOIN projects ON projects.team_id = labels.team_id
-      INNER JOIN workspace_settings ON workspace_settings.workspace_id = projects.workspace_id
-      WHERE labels.project_id IS NULL
-        AND workspace_settings.hierarchy_mode = 'flat'
-      ON CONFLICT (id) DO NOTHING;
-    `).catch((err) => {
+    await migrateFlatWorkspaceTicketLabelAssignments().catch((err) => {
       // eslint-disable-next-line no-console
-      console.error('Failed to clone project-based workspace labels into projects:', err);
-    });
-
-    await pool.query(`
-      INSERT INTO ticket_labels (ticket_id, label_id)
-      SELECT ticket_labels.ticket_id, ticket_labels.label_id || ':' || tickets.project_id
-      FROM ticket_labels
-      INNER JOIN tickets ON tickets.id = ticket_labels.ticket_id
-      INNER JOIN projects ON projects.id = tickets.project_id
-      INNER JOIN workspace_settings ON workspace_settings.workspace_id = projects.workspace_id
-      INNER JOIN labels ON labels.id = ticket_labels.label_id
-      WHERE labels.project_id IS NULL
-        AND workspace_settings.hierarchy_mode = 'flat'
-      ON CONFLICT (ticket_id, label_id) DO NOTHING;
-    `).catch((err) => {
-      // eslint-disable-next-line no-console
-      console.error('Failed to clone ticket label links for project-based workspaces:', err);
-    });
-
-    await pool.query(`
-      DELETE FROM ticket_labels
-      WHERE ticket_id IN (
-        SELECT t.id
-        FROM tickets t
-        INNER JOIN projects p ON t.project_id = p.id
-        INNER JOIN workspace_settings ws ON ws.workspace_id = p.workspace_id
-        WHERE ws.hierarchy_mode = 'flat'
-      ) AND label_id IN (
-        SELECT l.id
-        FROM labels l
-        WHERE l.project_id IS NULL
-      );
-    `).catch((err) => {
-      // eslint-disable-next-line no-console
-      console.error('Failed to clear shared project-based workspace ticket labels:', err);
-    });
-
-    await pool.query(`
-      DELETE FROM labels
-      WHERE project_id IS NULL
-        AND team_id IN (
-          SELECT p.team_id
-          FROM projects p
-          INNER JOIN workspace_settings ws ON ws.workspace_id = p.workspace_id
-          WHERE ws.hierarchy_mode = 'flat'
-        );
-    `).catch((err) => {
-      // eslint-disable-next-line no-console
-      console.error('Failed to remove shared project-based workspace labels:', err);
+      console.error('Failed to migrate ticket label assignments for project-based workspaces:', err);
     });
   }
 
@@ -737,6 +686,37 @@ export async function initializeDatabase() {
     // eslint-disable-next-line no-console
     console.error('Failed to ensure labels team foreign key:', err);
   });
+
+  if (!env.databaseUrl.startsWith('pgmem://')) {
+    await pool.query(`
+      CREATE OR REPLACE FUNCTION "prevent_flat_workspace_team_scoped_labels"()
+      RETURNS trigger AS $$
+      BEGIN
+        IF NEW."project_id" IS NULL AND EXISTS (
+          SELECT 1
+          FROM "teams"
+          INNER JOIN "workspace_settings" ON "workspace_settings"."workspace_id" = "teams"."workspace_id"
+          WHERE "teams"."id" = NEW."team_id"
+            AND "workspace_settings"."hierarchy_mode" = 'flat'
+        ) THEN
+          RAISE EXCEPTION 'Project ID is required to create labels in project-based workspaces.';
+        END IF;
+
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+
+      DROP TRIGGER IF EXISTS "labels_require_project_scope_for_flat_workspaces" ON "labels";
+      CREATE TRIGGER "labels_require_project_scope_for_flat_workspaces"
+      BEFORE INSERT OR UPDATE OF "team_id", "project_id"
+      ON "labels"
+      FOR EACH ROW
+      EXECUTE FUNCTION "prevent_flat_workspace_team_scoped_labels"();
+    `).catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error('Failed to ensure flat workspace label scope guard:', err);
+    });
+  }
 
 
   // Ensure note_metadata has excerpt and full-text search vector columns/indexes

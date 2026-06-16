@@ -265,7 +265,8 @@ export async function listTickets(projectId: string, filters: TicketFilters = {}
     .from(tickets)
     .innerJoin(projects, eq(projects.id, tickets.projectId))
     .where(and(...buildTicketFilterConditions([projectId], filters)))
-    .orderBy(asc(tickets.createdAt));
+    .orderBy(asc(tickets.createdAt))
+    .$dynamic();
 
   if (typeof filters.limit === 'number' && filters.limit > 0) {
     query = query.limit(filters.limit);
@@ -314,7 +315,8 @@ export async function listWorkspaceTickets(projectIds: string[], filters: Ticket
     .from(tickets)
     .innerJoin(projects, eq(projects.id, tickets.projectId))
     .where(and(...buildTicketFilterConditions(projectIds, filters)))
-    .orderBy(asc(tickets.createdAt));
+    .orderBy(asc(tickets.createdAt))
+    .$dynamic();
 
   if (typeof filters.limit === 'number' && filters.limit > 0) {
     query = query.limit(filters.limit);
@@ -757,7 +759,7 @@ export async function updateTicketRecord(
   const requestedProjectId = typeof updates.projectId === 'string' ? updates.projectId.trim() : '';
   const isProjectMove = requestedProjectId.length > 0 && requestedProjectId !== existingTicket.projectId;
   const targetProject = isProjectMove ? await getProjectScope(requestedProjectId) : sourceProject;
-  if (isProjectMove && !targetProject) {
+  if (!targetProject) {
     throw new Error('TARGET_PROJECT_NOT_FOUND');
   }
   if (isProjectMove && targetProject.workspaceId !== sourceProject.workspaceId) {

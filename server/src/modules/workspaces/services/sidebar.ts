@@ -1,10 +1,39 @@
-import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
 import { db } from '../../../db/index.js';
 import { teams, projects, cycles, labels, workspaceSettings } from '../schema.js';
 import * as cache from '../../../lib/cache.js';
 import { normalizeIsoDate } from '../../../lib/platform.js';
 
-function mapCycle(cycle: typeof cycles.$inferSelect) {
+type SidebarProjectRow = {
+  id: string;
+  name: string;
+  key: string;
+  description: string;
+  status: string;
+  teamId: string;
+  githubRepoUrl: string | null;
+};
+
+type SidebarCycleRow = {
+  id: string;
+  name: string;
+  startDate: Date;
+  endDate: Date;
+  completed: boolean;
+  teamId: string;
+};
+
+type SidebarLabelRow = {
+  id: string;
+  teamId: string;
+  projectId: string | null;
+  name: string;
+  color: string;
+  description: string;
+  sortOrder: number;
+};
+
+function mapCycle(cycle: SidebarCycleRow) {
   const now = Date.now();
   const startTime = cycle.startDate.getTime();
   const endTime = cycle.endDate.getTime();
@@ -58,6 +87,7 @@ export async function getSidebarTree(workspaceId: string) {
     const teamIds = workspaceTeams.map((t) => t.id);
 
     // 3/4. Fetch all cycles and labels in parallel for workspace teams.
+    // Team workspaces expose team-scoped labels; project-based workspaces expose project-scoped labels.
     const [cycleRows, labelRows] = teamIds.length > 0
       ? await Promise.all([
           db
@@ -83,13 +113,16 @@ export async function getSidebarTree(workspaceId: string) {
               sortOrder: labels.sortOrder,
             })
             .from(labels)
-            .where(and(inArray(labels.teamId, teamIds), isNull(labels.projectId)))
+            .where(and(
+              inArray(labels.teamId, teamIds),
+              hierarchyMode === 'teams' ? isNull(labels.projectId) : isNotNull(labels.projectId),
+            ))
             .orderBy(asc(labels.createdAt)),
         ])
       : [[], []];
 
     // Group by teamId
-    const projectsByTeam = new Map<string, Array<typeof projects.$inferSelect>>();
+    const projectsByTeam = new Map<string, SidebarProjectRow[]>();
     for (const project of workspaceProjects) {
       if (project.teamId) {
         const list = projectsByTeam.get(project.teamId) ?? [];
@@ -98,7 +131,7 @@ export async function getSidebarTree(workspaceId: string) {
       }
     }
 
-    const cyclesByTeam = new Map<string, Array<typeof cycles.$inferSelect>>();
+    const cyclesByTeam = new Map<string, SidebarCycleRow[]>();
     for (const cycle of cycleRows) {
       if (cycle.teamId) {
         const list = cyclesByTeam.get(cycle.teamId) ?? [];
@@ -107,7 +140,7 @@ export async function getSidebarTree(workspaceId: string) {
       }
     }
 
-    const labelsByTeam = new Map<string, Array<typeof labels.$inferSelect>>();
+    const labelsByTeam = new Map<string, SidebarLabelRow[]>();
     for (const label of labelRows) {
       if (label.teamId) {
         const list = labelsByTeam.get(label.teamId) ?? [];
@@ -136,6 +169,7 @@ export async function getSidebarTree(workspaceId: string) {
           id: l.id,
           name: l.name,
           color: l.color,
+          projectId: l.projectId ?? undefined,
           description: l.description,
           sortOrder: l.sortOrder,
         })),

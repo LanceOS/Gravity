@@ -178,6 +178,10 @@ export function WorkspaceShellPage() {
     () => projects.filter((project) => project.workspaceId === activeWorkspaceId),
     [projects, activeWorkspaceId]
   );
+  const activeWorkspaceProjectIds = useMemo(
+    () => new Set(activeWorkspaceProjects.map((project) => project.id)),
+    [activeWorkspaceProjects]
+  );
   const projectCreateError =
     projectCreateErrorState.workspaceId === activeWorkspaceId ? projectCreateErrorState.message : null;
   const labelCreateError = labelCreateErrorState.projectId === activeProjectId ? labelCreateErrorState.message : null;
@@ -339,6 +343,18 @@ export function WorkspaceShellPage() {
   const labelsByProject = useMemo(() => {
     const cachedLabelsByProject = new Map<string, Label[]>();
 
+    for (const team of sidebarTree?.teams ?? []) {
+      for (const label of team.labels ?? []) {
+        if (!label.projectId || !activeWorkspaceProjectIds.has(label.projectId)) {
+          continue;
+        }
+
+        const projectLabels = cachedLabelsByProject.get(label.projectId) ?? [];
+        projectLabels.push(label);
+        cachedLabelsByProject.set(label.projectId, projectLabels);
+      }
+    }
+
     for (const [queryKey, cachedLabels] of queryClient.getQueriesData<Label[]>({ queryKey: ['labels'] })) {
       const queryProjectId = queryKey[1];
       const projectId =
@@ -346,22 +362,30 @@ export function WorkspaceShellPage() {
           ? (queryProjectId as { projectId?: string }).projectId
           : undefined;
 
-      if (!projectId || !Array.isArray(cachedLabels)) {
+      if (!projectId || !activeWorkspaceProjectIds.has(projectId) || !Array.isArray(cachedLabels)) {
         continue;
       }
 
-      cachedLabelsByProject.set(projectId, cachedLabels);
+      cachedLabelsByProject.set(
+        projectId,
+        cachedLabels.filter((label) => label.projectId === projectId),
+      );
     }
 
     return cachedLabelsByProject;
-  }, [activeProjectId, labels, labelsQueryFetching]);
+  }, [activeWorkspaceProjectIds, labelsQueryFetching, sidebarTree]);
 
   const workspaceProjectLabels = useMemo(() => {
     const dedupedWorkspaceLabels = new Map<string, Label>();
 
     for (const project of activeWorkspaceProjects) {
-      const projectLabels = labelsByProject.get(project.id) ?? (project.id === activeProjectId ? labels : []);
+      const projectLabels = labelsByProject.get(project.id) ??
+        (project.id === activeProjectId ? labels.filter((label) => label.projectId === project.id) : []);
       for (const label of projectLabels) {
+        if (label.projectId !== project.id) {
+          continue;
+        }
+
         dedupedWorkspaceLabels.set(label.id, label);
       }
     }
@@ -377,7 +401,10 @@ export function WorkspaceShellPage() {
     for (const project of activeWorkspaceProjects) {
       void queryClient.prefetchQuery({
         queryKey: queryKeys.labels(project.id),
-        queryFn: () => apiClient.get<Label[]>('/labels', { projectId: project.id }),
+        queryFn: () => apiClient.get<Label[]>('/labels', {
+          params: { projectId: project.id },
+          projectId: project.id,
+        }),
         ...CACHE_CONFIGS.metadata,
       });
     }
@@ -871,7 +898,10 @@ export function WorkspaceShellPage() {
     : activeWorkspaceProjects;
   const scopedTickets = routeScopedTickets;
   const scopedCycles = isTeamAggregatePath ? teamCycles : cycles;
-  const scopedLabels = isTeamAggregatePath ? teamLabels : labels;
+  const scopedProjectId = projectIdParam || activeProjectId;
+  const scopedLabels = isTeamAggregatePath
+    ? teamLabels
+    : labels.filter((label) => label.projectId === scopedProjectId);
 
   const sidebarActiveViewId =
     route.teamIdParam && sidebarNavigationState.activeScope === 'views'

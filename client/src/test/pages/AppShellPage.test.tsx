@@ -920,6 +920,148 @@ describe('AppShellPage', () => {
     expect(screen.queryByRole('button', { name: 'Payments' })).not.toBeInTheDocument();
   });
 
+  it('uses project-scoped sidebar labels in Manage Projects before per-project label prefetches resolve', async () => {
+    const user = userEvent.setup();
+
+    mocks.fetch.mockImplementation((input: RequestInfo | URL) => {
+      const inputUrl = typeof input === 'string' ? input : input.toString();
+      const parsedUrl = inputUrl.startsWith('http')
+        ? new URL(inputUrl)
+        : new URL(inputUrl, 'http://localhost');
+
+      if (parsedUrl.pathname === '/api/v1/workspaces/workspace-1/sidebar') {
+        return Promise.resolve(jsonResponse({
+          workspaceId: 'workspace-1',
+          hierarchyMode: 'flat',
+          teams: [
+            {
+              id: 'team-1',
+              name: 'Default',
+              description: '',
+              color: '#2563eb',
+              views: [],
+              cycles: [],
+              labels: [
+                {
+                  id: 'label-1',
+                  projectId: 'project-1',
+                  name: 'Frontend',
+                  color: '#2563eb',
+                  description: 'UI work',
+                  sortOrder: 0,
+                },
+                {
+                  id: 'label-2',
+                  projectId: 'project-2',
+                  name: 'Payments',
+                  color: '#10b981',
+                  description: 'Billing work',
+                  sortOrder: 0,
+                },
+              ],
+              projects: [
+                {
+                  id: 'project-1',
+                  name: 'Gravity Core',
+                  key: 'GRA',
+                  description: 'Primary project',
+                  status: 'active',
+                  githubRepoUrl: null,
+                },
+                {
+                  id: 'project-2',
+                  name: 'Gravity API',
+                  key: 'API',
+                  description: 'API project',
+                  status: 'planned',
+                  githubRepoUrl: null,
+                },
+              ],
+            },
+          ],
+        }));
+      }
+
+      if (parsedUrl.pathname === '/api/v1/labels') {
+        return new Promise<Response>(() => {});
+      }
+
+      return Promise.resolve(jsonResponse({ success: true, lastActiveAt: '2026-05-26T10:00:00.000Z' }));
+    });
+
+    renderAppShell({
+      tickets: buildUseTickets({
+        activeProjectId: 'project-1',
+        labels: [],
+        projects: [
+          {
+            id: 'project-1',
+            name: 'Gravity Core',
+            key: 'GRA',
+            description: 'Primary project',
+            status: 'active',
+            workspaceId: 'workspace-1',
+            teamId: 'team-1',
+          },
+          {
+            id: 'project-2',
+            name: 'Gravity API',
+            key: 'API',
+            description: 'API project',
+            status: 'planned',
+            workspaceId: 'workspace-1',
+            teamId: 'team-1',
+          },
+        ],
+      }),
+      directory: buildWorkspaceDirectory({
+        workspaces: [
+          {
+            id: 'workspace-1',
+            name: 'Gravity',
+            description: 'Main workspace',
+            key: 'GRA',
+            defaultProjectId: 'project-1',
+            hostUrl: 'http://localhost:8080',
+            joinMode: 'approval_required',
+            projectCount: 2,
+            memberCount: 1,
+            pendingJoinRequestCount: 0,
+            memberRole: 'owner',
+            hierarchyMode: 'flat',
+          },
+        ],
+      }),
+      initialEntries: ['/workspaces/workspace-1/projects'],
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Frontend' })).toBeInTheDocument();
+    });
+    await waitFor(() => {
+      const prefetchedProjectIds = new Set(
+        mocks.fetch.mock.calls
+          .map(([input]) => {
+            const inputUrl = typeof input === 'string' ? input : input.toString();
+            const parsedUrl = inputUrl.startsWith('http')
+              ? new URL(inputUrl)
+              : new URL(inputUrl, 'http://localhost');
+            return parsedUrl.pathname === '/api/v1/labels' ? parsedUrl.searchParams.get('projectId') : null;
+          })
+          .filter(Boolean)
+      );
+      expect(prefetchedProjectIds).toEqual(new Set(['project-1', 'project-2']));
+    });
+    expect(screen.queryByRole('button', { name: 'Payments' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Gravity API/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Payments' })).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('button', { name: 'Frontend' })).not.toBeInTheDocument();
+  });
+
   it('records member activity for the active workspace', async () => {
     renderAppShell();
 

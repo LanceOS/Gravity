@@ -1,7 +1,7 @@
 import { and, asc, eq, isNull } from 'drizzle-orm';
 import { type Request, type Response, Router } from 'express';
 import { db } from '../../db/index.js';
-import { cycles, labels, projects, teams, ticketLabels, tickets } from '../../db/schema.js';
+import { cycles, labels, projects, teams, ticketLabels, tickets, workspaceSettings } from '../../db/schema.js';
 import { broadcastEvent } from '../../realtime.js';
 import {
   createId,
@@ -97,12 +97,16 @@ export function createTicketsRouter() {
     return Array.isArray(value) ? value[0] ?? '' : value;
   }
 
-  function parseIntQueryParam(value: string | string[] | undefined) {
+  function parseIntQueryParam(value: unknown) {
     if (!value) {
       return undefined;
     }
 
     const normalized = Array.isArray(value) ? value[0] : value;
+    if (typeof normalized !== 'string') {
+      return undefined;
+    }
+
     const parsed = Number.parseInt(normalized, 10);
     if (!Number.isFinite(parsed)) {
       return undefined;
@@ -163,6 +167,28 @@ export function createTicketsRouter() {
     }
 
     await invalidateWorkspaceCache(workspaceId, WorkspaceCacheInvalidationReason.TEAM_STRUCTURE_CHANGED);
+  }
+
+  async function getTeamWorkspaceScope(teamId: string) {
+    const rows = await db
+      .select({
+        workspaceId: teams.workspaceId,
+        hierarchyMode: workspaceSettings.hierarchyMode,
+      })
+      .from(teams)
+      .leftJoin(workspaceSettings, eq(workspaceSettings.workspaceId, teams.workspaceId))
+      .where(eq(teams.id, teamId))
+      .limit(1);
+
+    const row = rows[0];
+    if (!row) {
+      return null;
+    }
+
+    return {
+      workspaceId: row.workspaceId,
+      hierarchyMode: row.hierarchyMode === 'teams' ? 'teams' as const : 'flat' as const,
+    };
   }
 
   router.get('/tickets', async (req, res) => {
@@ -470,6 +496,7 @@ export function createTicketsRouter() {
   });
 
   router.post('/labels', async (req, res) => {
+    let resolvedProjectId: string | null = null;
     try {
       const body = req.body ?? {};
       const projectId = typeof body.projectId === 'string' ? body.projectId : getProjectIdFromRequest(req);
@@ -481,29 +508,44 @@ export function createTicketsRouter() {
       }
 
       let resolvedTeamId = '';
-      let resolvedProjectId: string | null = null;
       let auth:
         | Awaited<ReturnType<typeof authorizeTeamAccess>>
         | Awaited<ReturnType<typeof authorizeProjectAccess>>;
 
-      if (bodyTeamId) {
-        resolvedTeamId = bodyTeamId;
-        auth = await authorizeTeamAccess(req, bodyTeamId);
-      } else {
-        if (!projectId) {
-          res.status(400).json({ error: 'Either teamId or projectId is required, or project not found.' });
-          return;
-        }
-
+      if (projectId) {
         const projectScope = await getProjectScope(projectId);
         if (!projectScope) {
           res.status(404).json({ error: 'Project not found.' });
           return;
         }
 
+        if (bodyTeamId && bodyTeamId !== projectScope.teamId) {
+          res.status(400).json({ error: 'Team does not own this project.' });
+          return;
+        }
+
         resolvedTeamId = projectScope.teamId;
         resolvedProjectId = projectScope.hierarchyMode === 'flat' ? projectId : null;
         auth = await authorizeProjectAccess(req, projectId);
+      } else if (bodyTeamId) {
+        resolvedTeamId = bodyTeamId;
+        auth = await authorizeTeamAccess(req, bodyTeamId);
+
+        if (auth.allowed) {
+          const teamScope = await getTeamWorkspaceScope(bodyTeamId);
+          if (!teamScope) {
+            res.status(404).json({ error: 'Team not found.' });
+            return;
+          }
+
+          if (teamScope.hierarchyMode !== 'teams') {
+            res.status(400).json({ error: 'Project ID is required to create labels in project-based workspaces.' });
+            return;
+          }
+        }
+      } else {
+        res.status(400).json({ error: 'Either teamId or projectId is required, or project not found.' });
+        return;
       }
 
       if (!auth.allowed) {

@@ -412,7 +412,7 @@ export async function invalidateUserWorkspacesCache(userId: string): Promise<voi
 export async function getWorkspaceSummary(workspaceId: string, userId?: string) {
   const cacheKey = cache.CacheKeys.workspaces.byId(workspaceId);
   const summary = await cache.wrap(cacheKey, 300, async () => {
-    const workspaceRows: WorkspaceSummaryBase[] = await db
+    const workspaceRows: WorkspaceRow[] = await db
       .select({
         id: workspaces.id,
         name: workspaces.name,

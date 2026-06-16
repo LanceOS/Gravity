@@ -23,6 +23,7 @@ import {
 import {
   invalidateProjectWorkspaceCache,
   invalidateProjectMembershipCache,
+  invalidateProjectMembershipCaches,
   invalidateWorkspaceMembershipCache,
   invalidateProjectTeamCache,
 } from './membership.js';
@@ -348,6 +349,6 @@ export async function deleteProjectRecord(projectId: string, workspaceId: string
 
   await invalidateWorkspaceCache(workspaceId, WorkspaceCacheInvalidationReason.PROJECT_STRUCTURE_CHANGED);
   await invalidateProjectWorkspaceCache(projectId);
-  await invalidateProjectMembershipCache(projectId, membershipRows.map((member) => member.userId));
+  await invalidateProjectMembershipCaches(projectId, membershipRows.map((member) => member.userId));
   await invalidateProjectTeamCache(projectId);
 }
