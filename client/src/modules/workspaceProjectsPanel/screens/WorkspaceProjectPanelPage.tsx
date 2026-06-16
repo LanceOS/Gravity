@@ -3,7 +3,7 @@ import { FolderKanban, Sparkles } from 'lucide-react';
 import type { Project } from '../../../context/TicketContext';
 import type { WorkspaceProjectPanelProps } from '../types/WorkspaceProjectPanel';
 import { ProjectCreateOverlay } from '../../../components/WorkspaceProjectPanel';
-import { WorkspaceManagementLayout } from '../../../layouts/WorkspaceManagementLayout/WorkspaceManagementLayout';
+import { WorkspacePageLayout } from '../../../layouts/WorkspacePageLayout/WorkspacePageLayout';
 import {
   WorkspaceManagementEditorSection,
   WorkspaceManagementFeedback,
@@ -101,7 +101,7 @@ function WorkspaceProjectPanelPageContent({
 
   return (
     <>
-      <WorkspaceManagementLayout.ContentHeader>
+      <WorkspacePageLayout.ContentHeader>
         <section className="workspace-projects-page__hero">
           <div>
             <div className="workspace-projects-page__eyebrow">Workspace projects</div>
@@ -134,9 +134,9 @@ function WorkspaceProjectPanelPageContent({
         </section>
 
         <WorkspaceManagementFeedback classNamePrefix="workspace-projects-page" feedback={projectFeedback} />
-      </WorkspaceManagementLayout.ContentHeader>
+      </WorkspacePageLayout.ContentHeader>
 
-      <WorkspaceManagementLayout.ContentBody>
+      <WorkspacePageLayout.ContentBody>
         <div className="workspace-projects-page__layout">
           <section className="workspace-projects-page__projects-card" aria-label="Workspace projects">
             <div className="workspace-projects-page__section-header">
@@ -251,7 +251,7 @@ function WorkspaceProjectPanelPageContent({
             onSubmitProject={createProject}
           />
         ) : null}
-      </WorkspaceManagementLayout.ContentBody>
+      </WorkspacePageLayout.ContentBody>
     </>
   );
 }

@@ -47,7 +47,7 @@ import {
 } from '../../workspaces';
 import '../../workspaceProjectsPanel/styles/WorkspaceProjectsPage.css';
 import '../../workspacePage/styles/WorkspacePage.css';
-import { WorkspaceManagementLayout } from '../../../layouts/WorkspaceManagementLayout/WorkspaceManagementLayout';
+import { WorkspacePageLayout } from '../../../layouts/WorkspacePageLayout/WorkspacePageLayout';
 interface WorkspaceMember {
   id: string;
   name: string;
@@ -1051,10 +1051,11 @@ export function WorkspaceShellPage() {
             onDeleteProject={deleteProject}
           />
         ) : activeSection === 'projects' ? (
-          <WorkspaceManagementLayout
+          <WorkspacePageLayout
             title="Manage Projects"
             pageClassName="workspace-projects-page"
             contentClassName="workspace-projects-page__content"
+            wrapBody={false}
             actions={
               <div className="workspace-projects-page__actions">
                 <Button
@@ -1086,7 +1087,7 @@ export function WorkspaceShellPage() {
               onUpdateLabel={handleUpdateLabel}
               onDeleteLabel={handleDeleteLabel}
             />
-          </WorkspaceManagementLayout>
+          </WorkspacePageLayout>
         ) : route.ticketKey ? (
           <TicketDetailRoute
             activeWorkspaceId={activeWorkspaceId}

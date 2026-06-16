@@ -4,13 +4,6 @@
   gap: 10px;
 }
 
-.workspace-projects-page__content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
 .workspace-projects-page__hero,
 .workspace-projects-page__layout,
 .workspace-projects-page__feedback,
