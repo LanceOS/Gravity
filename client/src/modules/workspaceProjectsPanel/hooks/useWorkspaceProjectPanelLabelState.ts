@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import type { Label } from '../../../../context/TicketContext';
+import type { Label } from '../../../context/TicketContext';
 import { DEFAULT_LABEL_COLOR, getNextLabelSortOrder } from '../utils/WorkspaceProjectPanel';
 
 export interface UseWorkspaceProjectPanelLabelStateArgs {

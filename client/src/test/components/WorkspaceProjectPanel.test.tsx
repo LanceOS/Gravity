@@ -5,7 +5,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkspaceProjectPanel } from '../../modules/workspaces';
 import type {
   ProjectCreateOverlayProps,
-  ProjectSelectionRailProps,
 } from '../../modules/workspaces/types/WorkspaceProjectPanel';
 
 type MockButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -65,14 +64,6 @@ vi.mock('../../components/WorkspaceProjectPanel', () => ({
       </button>
       <button type="button" onClick={onClose}>
         Close overlay
-      </button>
-    </div>
-  ),
-  ProjectSelectionRail: ({ selectedProjectId, onSelectProject }: ProjectSelectionRailProps) => (
-    <div>
-      <div>{`ProjectSelectionRail ${selectedProjectId ?? 'none'}`}</div>
-      <button type="button" onClick={() => onSelectProject('project-2')}>
-        Manage Orbit
       </button>
     </div>
   ),
@@ -140,18 +131,16 @@ describe('WorkspaceProjectPanel', () => {
     vi.clearAllMocks();
   });
 
-  it('renders the current project summary and the selection rail', async () => {
+  it('renders the project management hero, roster, and editor', async () => {
     renderWorkspaceProjectPanel();
 
-    expect(screen.getByText('Workspace Projects')).toBeInTheDocument();
-    expect(screen.getByText('Gravity')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Gravity' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Workspace projects' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Gravity Core' })).toBeInTheDocument();
     expect(screen.getByText('GRA')).toBeInTheDocument();
     expect(screen.getByText('Primary project')).toBeInTheDocument();
+    expect(screen.getAllByText('Default project').length).toBeGreaterThan(0);
     expect(screen.getByText('Platform')).toBeInTheDocument();
-
-    await waitFor(() => {
-      expect(screen.getByText('ProjectSelectionRail project-1')).toBeInTheDocument();
-    });
   });
 
   it('opens the create overlay only after clicking New Project, sanitizes the payload, and closes after a successful project creation', async () => {
@@ -194,11 +183,7 @@ describe('WorkspaceProjectPanel', () => {
     ];
     const { props, rerender } = renderWorkspaceProjectPanel();
 
-    await waitFor(() => {
-      expect(screen.getByText('ProjectSelectionRail project-1')).toBeInTheDocument();
-    });
-
-    await user.click(screen.getByRole('button', { name: 'Manage Orbit' }));
+    await user.click(screen.getByRole('button', { name: /Orbit Delivery/ }));
     expect(props.onSelectProject).toHaveBeenCalledWith('project-2');
 
     rerender(

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 
-import type { Project } from '../../../../context/TicketContext';
+import type { Project } from '../../../context/TicketContext';
 import type { ProjectSettingsFeedback } from '../types/WorkspaceProjectPanel';
 
 export interface UseWorkspaceProjectPanelProjectStateArgs {

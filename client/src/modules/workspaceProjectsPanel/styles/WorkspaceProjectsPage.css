@@ -6,17 +6,439 @@
 
 .workspace-projects-page__content {
   flex: 1;
-  overflow-y: auto;
-  padding: 24px 28px 32px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-.workspace-projects-page__content .workspace-page__projects-panel {
-  max-width: 1320px;
-  margin: 0 auto;
+.workspace-projects-page__hero,
+.workspace-projects-page__layout,
+.workspace-projects-page__feedback,
+.workspace-projects-page__empty-shell {
+  width: 100%;
+  animation: workspace-projects-fade-in 0.4s ease-out backwards;
+}
+
+.workspace-projects-page__layout {
+  animation-delay: 0.1s;
+}
+
+@keyframes workspace-projects-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.workspace-projects-page__hero {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-md);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-card);
+  box-shadow: var(--shadow-sm);
+}
+
+.workspace-projects-page__eyebrow,
+.workspace-projects-page__section-kicker {
+  margin-bottom: 4px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+}
+
+.workspace-projects-page__hero-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.workspace-projects-page__hero-header h2,
+.workspace-projects-page__section-header h3 {
+  margin: 0;
+  color: var(--color-text-primary);
+  letter-spacing: -0.02em;
+}
+
+.workspace-projects-page__hero-header h2 {
+  font-size: 22px;
+  font-weight: 850;
+}
+
+.workspace-projects-page__hero-description {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.workspace-projects-page__section-header p,
+.workspace-projects-page__empty p,
+.workspace-projects-page__project-card-body p {
+  margin: 8px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.workspace-projects-page__hero-meta,
+.workspace-projects-page__hero-side {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.workspace-projects-page__hero-side {
+  justify-content: flex-end;
+}
+
+.workspace-projects-page__hero-pill,
+.workspace-projects-page__meta-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-full);
+  background: var(--color-state-hover-overlay);
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.workspace-projects-page__hero-stat {
+  min-width: 120px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 4px;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  background: var(--color-state-hover-overlay);
+  color: var(--color-primary);
+}
+
+.workspace-projects-page__hero-stat span {
+  font-size: 24px;
+  font-weight: 850;
+  color: var(--color-text-primary);
+}
+
+.workspace-projects-page__hero-stat small {
+  color: var(--color-text-disabled);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.workspace-projects-page__feedback {
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+
+.workspace-projects-page__feedback--success {
+  border: 1px solid var(--color-success);
+  background: var(--color-success-light);
+  color: var(--color-text-success);
+}
+
+.workspace-projects-page__feedback--error {
+  border: 1px solid var(--color-error);
+  background: var(--color-error-light);
+  color: var(--color-text-error);
+}
+
+.workspace-projects-page__layout {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: var(--space-md);
+  flex: 1;
+  min-height: 0;
+}
+
+@media (min-width: 960px) {
+  .workspace-projects-page__layout {
+    display: grid;
+    grid-template-columns: 340px minmax(0, 1fr);
+    align-items: stretch;
+    gap: var(--space-lg);
+  }
+}
+
+.workspace-projects-page__projects-card,
+.workspace-projects-page__editor-card,
+.workspace-projects-page__empty-shell,
+.workspace-projects-page__empty {
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-card);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.workspace-projects-page__projects-card {
+  padding: var(--space-lg) var(--space-md);
+}
+
+.workspace-projects-page__editor-card {
+  padding: var(--space-md);
+}
+
+.workspace-projects-page__section-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-sm);
+  flex-shrink: 0;
+}
+
+.workspace-projects-page__project-list {
+  display: grid;
+  align-content: start;
+  gap: var(--space-sm);
+  overflow-y: auto;
+  padding-right: var(--space-xs);
+  flex: 1;
+}
+
+.workspace-projects-page__project-card {
+  width: 100%;
+  display: grid;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  background: var(--color-state-hover-overlay);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.18s ease, transform 0.18s ease, background-color 0.18s ease;
+}
+
+.workspace-projects-page__project-card:hover {
+  border-color: var(--color-border-focus);
+}
+
+.workspace-projects-page__project-card--active {
+  border-color: var(--color-border-focus);
+  background: var(--color-state-selected-bg);
+}
+
+.workspace-projects-page__project-card-top,
+.workspace-projects-page__project-card-footer,
+.workspace-projects-page__actions-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.workspace-projects-page__project-card-top,
+.workspace-projects-page__project-card-footer {
+  justify-content: space-between;
+}
+
+.workspace-projects-page__project-key,
+.workspace-projects-page__project-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: var(--radius-full);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.workspace-projects-page__project-key {
+  border: 1px solid var(--color-border-default);
+  background: var(--color-state-hover-overlay);
+  color: var(--color-text-secondary);
+}
+
+.workspace-projects-page__project-status--planned {
+  background: var(--color-bg-warning);
+  color: var(--color-text-warning);
+}
+
+.workspace-projects-page__project-status--active {
+  background: var(--color-bg-success);
+  color: var(--color-text-success);
+}
+
+.workspace-projects-page__project-status--completed {
+  background: var(--color-bg-info);
+  color: var(--color-text-info);
+}
+
+.workspace-projects-page__project-name {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.workspace-projects-page__project-card-footer {
+  color: var(--color-text-disabled);
+  font-size: 11px;
+}
+
+.workspace-projects-page__editor-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.workspace-projects-page__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.workspace-projects-page__editor-stack > .workspace-page__project-domains {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+}
+
+.workspace-projects-page__editor-stack > .workspace-page__project-domains:not(:first-of-type) {
+  border-top: 1px solid var(--color-border-default);
+  padding-top: var(--space-md);
+}
+
+.workspace-projects-page__editor-card .workspace-page__project-domain-header {
+  align-items: flex-start;
+}
+
+.workspace-projects-page__editor-card .workspace-page__project-browser-copy {
+  max-width: 540px;
+  text-align: left;
+}
+
+.workspace-projects-page__editor-card .workspace-page__label-editor {
+  border: 0;
+  border-top: 1px solid var(--color-border-default);
+  border-radius: 0;
+  background: transparent;
+  padding: var(--space-md) 0 0;
+  box-shadow: none;
+}
+
+.workspace-projects-page__editor-card .workspace-page__domain-list {
+  gap: 8px;
+}
+
+.workspace-projects-page__editor-card .workspace-page__domain-chip {
+  min-height: 30px;
+  border-radius: var(--radius-full);
+  background: var(--color-state-hover-overlay);
+}
+
+.workspace-projects-page__editor-card .workspace-page__domain-form,
+.workspace-projects-page__editor-card .workspace-page__label-editor-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(100px, 140px);
+  gap: 12px;
+  align-items: end;
+}
+
+.workspace-projects-page input,
+.workspace-projects-page textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-app);
+  color: var(--color-text-primary);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.workspace-projects-page input {
+  min-height: 36px;
+  padding: 0 10px;
+}
+
+.workspace-projects-page input:focus,
+.workspace-projects-page textarea:focus {
+  border-color: var(--color-border-focus);
+  outline: 2px solid var(--color-state-focus-ring);
+}
+
+.workspace-projects-page__actions-row {
+  justify-content: space-between;
+}
+
+.workspace-projects-page__actions-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.workspace-projects-page__empty-shell,
+.workspace-projects-page__empty {
+  display: grid;
+  place-items: center;
+  min-height: 240px;
+  padding: 18px;
+  text-align: center;
+  color: var(--color-text-disabled);
+}
+
+.workspace-projects-page__empty-title {
+  color: var(--color-text-primary);
+  font-size: 15px;
+  font-weight: 800;
 }
 
 @media (max-width: 960px) {
-  .workspace-projects-page__content {
-    padding: 16px;
+  .workspace-projects-page__hero {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+
+  .workspace-projects-page__hero-side {
+    justify-content: space-between;
+  }
+
+  .workspace-projects-page__projects-card {
+    max-height: 80vh;
+  }
+
+  .workspace-projects-page .workspace-header__title-group {
+    display: none;
+  }
+
+  .workspace-projects-page__actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .workspace-projects-page__editor-card .workspace-page__domain-form,
+  .workspace-projects-page__editor-card .workspace-page__label-editor-form {
+    grid-template-columns: 1fr;
   }
 }

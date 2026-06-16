@@ -11,7 +11,7 @@ export interface WorkspaceProjectPanelProps {
   labelCreateLoading: boolean;
   labelCreateError: string | null;
   onSelectProject: (projectId: string) => void;
-  onCreateProject: (project: { name: string; description: string; key: string }) => Promise<void>;
+  onCreateProject: (project: { name: string; description: string; key: string }) => Promise<Project | null | undefined>;
   onUpdateProject: (id: string, updates: Partial<Project>) => Promise<Project | null>;
   onCreateLabel: (label: {
     projectId: string;
@@ -39,7 +39,7 @@ export interface WorkspaceProjectsPageProps {
   labelCreateLoading: boolean;
   labelCreateError: string | null;
   onBackToWorkspace: () => void;
-  onCreateProject: (project: { name: string; description: string; key: string }) => Promise<void>;
+  onCreateProject: (project: { name: string; description: string; key: string }) => Promise<Project | null | undefined>;
   onUpdateProject: (id: string, updates: Partial<Project>) => Promise<Project | null>;
   onCreateLabel: (label: {
     projectId: string;

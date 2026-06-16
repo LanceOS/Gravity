@@ -8,7 +8,7 @@ import { WorkspaceProjectPanelLabelStateContext } from './WorkspaceProjectPanelL
 export function WorkspaceProjectPanelLabelStateProvider({
   children,
   labels,
-}: PropsWithChildren<Pick<UseWorkspaceProjectPanelLabelStateArgs, 'labels' | 'managedProjectId'>>): JSX.Element {
+}: PropsWithChildren<Pick<UseWorkspaceProjectPanelLabelStateArgs, 'labels'>>): JSX.Element {
   const { managedProjectId, shouldShowLabels } = useWorkspaceProjectPanelProjectStateContext();
   const value = useWorkspaceProjectPanelLabelState({
     labels,
