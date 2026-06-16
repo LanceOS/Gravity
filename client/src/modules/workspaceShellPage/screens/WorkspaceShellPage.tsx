@@ -775,6 +775,7 @@ export function WorkspaceShellPage() {
     navigate,
     setSidebarActiveScope,
     setActiveProjectId,
+    setActiveTicket,
   });
 
   const {
