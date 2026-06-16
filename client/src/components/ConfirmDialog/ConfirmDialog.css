@@ -1,0 +1,17 @@
+.confirm-dialog__panel {
+  border-color: var(--color-border-error);
+}
+
+.confirm-dialog__footer {
+  min-height: 58px;
+}
+
+.confirm-dialog__hint {
+  color: var(--color-text-disabled);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.confirm-dialog__actions {
+  margin-left: auto;
+}
