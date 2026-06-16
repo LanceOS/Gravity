@@ -17,6 +17,7 @@ import {
 import { NotesList, NoteEditor } from '../../notes';
 import { WorkspaceHeader } from '../../workspaces';
 import { WorkspaceViewContainer } from '../../../components/WorkspaceViewContainer';
+import { WorkspacePageLayout } from '../../../layouts/WorkspacePageLayout/WorkspacePageLayout';
 import { QueryErrorResetBoundary } from '@tanstack/react-query';
 import { ErrorBoundary } from '../../../components/ErrorBoundary';
 import { WorkspacePageContextMenu } from '../components/WorkspacePageContextMenu';
@@ -286,58 +287,54 @@ export function WorkspacePage({
     displayTitle = isTicketEditor ? `Tickets - ${activeTicket.key}` : headerTitle;
   }
 
-  return (
-    <div className="workspace-page">
-      {projects.length > 0 ? (
-        <WorkspaceHeader>
-          <WorkspaceHeader.Top>
-            <WorkspaceHeader.Title>{displayTitle}</WorkspaceHeader.Title>
-            {!activeTicket && activeContext === 'issues' && (
-              <div style={{ marginLeft: 'auto' }}>
-                {!viewModeLocked ? (
-                  <WorkspaceHeader.ViewToggle
-                    activeView={activeView}
-                    onSetView={onSetView}
-                  />
-                ) : null}
-              </div>
-            )}
-            {!activeTicket && activeContext === 'notes' && (
-              <div style={{ marginLeft: 'auto' }}>
-                {activeNoteId ? (
-                  <Button type="button" variant="secondary" onClick={() => window.history.back()}>
-                    Back to Notes
-                  </Button>
-                ) : (
-                  <Button type="button" variant="primary" onClick={handleCreateNote}>
-                    Create New Note
-                  </Button>
-                )}
-              </div>
-            )}
-          </WorkspaceHeader.Top>
-
-          {!activeTicket && activeContext === 'issues' && (
-            <WorkspaceHeader.Bottom>
-              <TicketFilterBar
-                filters={filters}
-                onFilterChange={onSetFilters}
-                hasActiveFilters={hasFiltersApplied}
-                onClearFilters={handleClearFilters}
-                filteredCount={filteredTickets.length}
-                totalCount={tickets.length}
-                listSort={activeView === 'list' ? listSort : undefined}
-                onListSortChange={activeView === 'list' ? onSetListSort : undefined}
-                labels={Object.values(labelById)}
-                cycles={cycles}
-                users={users}
-              />
-            </WorkspaceHeader.Bottom>
-          )}
-        </WorkspaceHeader>
+  const workspaceHeaderActions = !activeTicket && activeContext === 'issues' ? (
+    <div style={{ marginLeft: 'auto' }}>
+      {!viewModeLocked ? (
+        <WorkspaceHeader.ViewToggle
+          activeView={activeView}
+          onSetView={onSetView}
+        />
       ) : null}
+    </div>
+  ) : !activeTicket && activeContext === 'notes' ? (
+    <div style={{ marginLeft: 'auto' }}>
+      {activeNoteId ? (
+        <Button type="button" variant="secondary" onClick={() => window.history.back()}>
+          Back to Notes
+        </Button>
+      ) : (
+        <Button type="button" variant="primary" onClick={handleCreateNote}>
+          Create New Note
+        </Button>
+      )}
+    </div>
+  ) : null;
+  const workspaceHeaderBottom = !activeTicket && activeContext === 'issues' ? (
+    <TicketFilterBar
+      filters={filters}
+      onFilterChange={onSetFilters}
+      hasActiveFilters={hasFiltersApplied}
+      onClearFilters={handleClearFilters}
+      filteredCount={filteredTickets.length}
+      totalCount={tickets.length}
+      listSort={activeView === 'list' ? listSort : undefined}
+      onListSortChange={activeView === 'list' ? onSetListSort : undefined}
+      labels={Object.values(labelById)}
+      cycles={cycles}
+      users={users}
+    />
+  ) : null;
+  const shouldShowWorkspaceHeader = projects.length > 0;
 
-      <div className="workspace-page__content">
+  return (
+    <WorkspacePageLayout
+      pageClassName="workspace-page"
+      contentClassName="workspace-page__content"
+      title={shouldShowWorkspaceHeader ? displayTitle : undefined}
+      actions={shouldShowWorkspaceHeader ? workspaceHeaderActions : undefined}
+      headerBottom={shouldShowWorkspaceHeader ? workspaceHeaderBottom : undefined}
+      flushContent
+    >
         <div className="workspace-page__issues">
           <div className="workspace-page__issues-shell">
             <ContextMenu.Root
@@ -471,7 +468,6 @@ export function WorkspacePage({
             </ContextMenu.Root>
           </div>
         </div>
-      </div>
-    </div>
+    </WorkspacePageLayout>
   );
 }
