@@ -35,8 +35,8 @@ COPY --chown=node:node server/package.json server/package-lock.json ./server/
 RUN cd server && npm ci
 
 # Install client dependencies (needed for building the client)
-COPY --chown=node:node client/package.json client/package-lock.json ./client/
-RUN cd client && npm ci
+COPY --chown=node:node client/package.json ./client/
+RUN cd client && if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
 # Copy server and client sources and any shared library
 COPY --chown=node:node server/tsconfig.json server/drizzle.config.ts ./server/
