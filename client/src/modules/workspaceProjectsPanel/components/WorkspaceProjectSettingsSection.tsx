@@ -1,12 +1,31 @@
 import { Button, TextInput } from '@library';
+import { useState } from 'react';
+import { Trash } from 'lucide-react';
 import { FormSection } from '../../../components/FormSection';
 import { useWorkspaceProjectPanelActionsContext } from '../context/WorkspaceProjectPanelActionsContext';
 import { useWorkspaceProjectPanelProjectStateContext } from '../context/WorkspaceProjectPanelProjectStateContext';
+import { WorkspaceProjectDeleteModal } from './WorkspaceProjectDeleteModal';
 
 export function WorkspaceProjectSettingsSection() {
   const { managedProject, isProjectSettingsSaving, settingsFeedback: stateSettingsFeedback, setGithubRepoUrl, githubRepoUrl } =
     useWorkspaceProjectPanelProjectStateContext();
-  const { saveProjectSettings } = useWorkspaceProjectPanelActionsContext();
+  const { saveProjectSettings, deleteProject, isDeletingProject, canDeleteProject } = useWorkspaceProjectPanelActionsContext();
+  const [isDeleteProjectModalOpen, setIsDeleteProjectModalOpen] = useState(false);
+
+  const handleOpenDeleteProjectModal = () => {
+    setIsDeleteProjectModalOpen(true);
+  };
+
+  const handleCloseDeleteProjectModal = () => {
+    if (!isDeletingProject) {
+      setIsDeleteProjectModalOpen(false);
+    }
+  };
+
+  const handleConfirmDeleteProject = async () => {
+    setIsDeleteProjectModalOpen(false);
+    await deleteProject();
+  };
 
   if (!managedProject) {
     return null;
@@ -28,7 +47,7 @@ export function WorkspaceProjectSettingsSection() {
         layout="none"
         className="workspace-page__domain-form"
         onSubmit={saveProjectSettings}
-        style={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'end', gap: '16px' }}
+        style={{ display: 'grid', gridTemplateColumns: '1fr', alignItems: 'end', gap: '16px' }}
       >
         <TextInput
           label="GitHub Repository URL"
@@ -41,10 +60,28 @@ export function WorkspaceProjectSettingsSection() {
           title="Must be a full HTTPS GitHub repository URL (https://github.com/owner/repo)"
         />
 
-        <FormSection.Actions className="workspace-page__project-form-actions workspace-page__project-form-actions--inline" style={{ minHeight: '36px' }}>
+        <FormSection.Actions
+          className="workspace-page__project-form-actions workspace-page__project-form-actions--inline"
+          align="between"
+          style={{ minHeight: '36px' }}
+        >
           <Button type="submit" variant="primary" loading={isProjectSettingsSaving} style={{ minHeight: '36px' }}>
             Save Settings
           </Button>
+
+          {canDeleteProject ? (
+              <Button
+                type="button"
+                variant="danger"
+                loading={isDeletingProject}
+                disabled={isProjectSettingsSaving}
+              onClick={handleOpenDeleteProjectModal}
+                style={{ minHeight: '36px' }}
+              >
+                <Trash size={13} />
+                <span>Delete Project</span>
+              </Button>
+          ) : null}
         </FormSection.Actions>
 
         {stateSettingsFeedback ? (
@@ -55,6 +92,15 @@ export function WorkspaceProjectSettingsSection() {
           >
             {stateSettingsFeedback.message}
           </FormSection.Feedback>
+        ) : null}
+
+        {canDeleteProject ? (
+          <WorkspaceProjectDeleteModal
+            isOpen={isDeleteProjectModalOpen}
+            projectName={managedProject.name}
+            onClose={handleCloseDeleteProjectModal}
+            onConfirmDelete={handleConfirmDeleteProject}
+          />
         ) : null}
       </FormSection.Root>
     </section>

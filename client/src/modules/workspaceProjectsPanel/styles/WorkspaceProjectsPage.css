@@ -375,10 +375,14 @@
   padding: 0 10px;
 }
 
+.workspace-projects-page input:hover:not(:focus),
+.workspace-projects-page textarea:hover:not(:focus) {
+  border-color: var(--color-border-focus);
+}
+
 .workspace-projects-page input:focus,
 .workspace-projects-page textarea:focus {
-  border-color: var(--color-border-focus);
-  outline: 2px solid var(--color-state-focus-ring);
+  border-color: var(--color-state-focus-ring);
 }
 
 .workspace-projects-page__actions-row {

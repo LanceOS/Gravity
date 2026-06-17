@@ -14,7 +14,13 @@ type WorkspaceProjectPanelContextProvidersProps = {
   confirmDeleteLabel?: (message: string) => boolean | Promise<boolean>;
 } & Pick<
   WorkspaceProjectPanelProps,
-  'onSelectProject' | 'onCreateProject' | 'onUpdateProject' | 'onCreateLabel' | 'onUpdateLabel' | 'onDeleteLabel'
+  | 'onSelectProject'
+    | 'onCreateProject'
+    | 'onUpdateProject'
+    | 'onCreateLabel'
+    | 'onUpdateLabel'
+    | 'onDeleteLabel'
+    | 'onDeleteProject'
 >;
 
 export function WorkspaceProjectPanelContextProviders({
@@ -28,6 +34,7 @@ export function WorkspaceProjectPanelContextProviders({
   onCreateLabel,
   onUpdateLabel,
   onDeleteLabel,
+  onDeleteProject,
   confirmDeleteLabel,
 }: WorkspaceProjectPanelContextProvidersProps): JSX.Element {
   return (
@@ -40,6 +47,7 @@ export function WorkspaceProjectPanelContextProviders({
           onCreateLabel={onCreateLabel}
           onUpdateLabel={onUpdateLabel}
           onDeleteLabel={onDeleteLabel}
+          onDeleteProject={onDeleteProject}
           confirmDeleteLabel={confirmDeleteLabel}
         >
           {children}

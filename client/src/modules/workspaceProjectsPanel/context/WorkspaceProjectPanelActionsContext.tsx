@@ -1,4 +1,4 @@
-import { createContext, type FormEvent, type JSX, useCallback, useContext, useMemo, type PropsWithChildren } from 'react';
+import { createContext, type FormEvent, type JSX, useCallback, useContext, useMemo, type PropsWithChildren, useState } from 'react';
 
 import type { Label } from '../../../context/TicketContext';
 import {
@@ -14,7 +14,13 @@ import { useWorkspaceProjectPanelProjectStateContext } from './WorkspaceProjectP
 
 type WorkspaceProjectPanelActionCallbacks = Pick<
   WorkspaceProjectPanelProps,
-  'onSelectProject' | 'onCreateProject' | 'onUpdateProject' | 'onCreateLabel' | 'onUpdateLabel' | 'onDeleteLabel'
+  'onSelectProject'
+    | 'onCreateProject'
+    | 'onUpdateProject'
+    | 'onCreateLabel'
+    | 'onUpdateLabel'
+    | 'onDeleteLabel'
+    | 'onDeleteProject'
 >;
 type WorkspaceProjectPanelActionOptions = WorkspaceProjectPanelActionCallbacks & {
   confirmDeleteLabel?: (message: string) => boolean | Promise<boolean>;
@@ -31,6 +37,9 @@ export interface WorkspaceProjectPanelActionsContextValue {
   updateLabel: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   deleteLabel: () => Promise<void>;
   saveProjectSettings: (event: FormEvent<HTMLFormElement>) => Promise<void>;
+  deleteProject: () => Promise<void>;
+  isDeletingProject: boolean;
+  canDeleteProject: boolean;
 }
 
 const WorkspaceProjectPanelActionsContext = createContext<WorkspaceProjectPanelActionsContextValue | null>(null);
@@ -43,6 +52,7 @@ export function WorkspaceProjectPanelActionsContextProvider({
   onCreateLabel,
   onUpdateLabel,
   onDeleteLabel,
+  onDeleteProject,
   confirmDeleteLabel,
 }: PropsWithChildren<WorkspaceProjectPanelActionOptions>): JSX.Element {
   const {
@@ -90,6 +100,8 @@ export function WorkspaceProjectPanelActionsContextProvider({
   const deleteLabelConfirmation =
     confirmDeleteLabel ??
     ((message: string) => (typeof window === 'undefined' ? true : window.confirm(message)));
+  const [isDeletingProject, setIsDeletingProject] = useState(false);
+  const canDeleteProject = !!onDeleteProject;
 
   const openCreateProjectModal = useCallback(() => {
     setIsCreateModalOpen(true);
@@ -286,6 +298,27 @@ export function WorkspaceProjectPanelActionsContextProvider({
     [githubRepoUrl, managedProject, onUpdateProject, setIsProjectSettingsSaving, setSettingsFeedback]
   );
 
+  const deleteProject = useCallback(async () => {
+    if (!managedProject || !onDeleteProject) {
+      return;
+    }
+
+    setIsDeletingProject(true);
+    setSettingsFeedback(null);
+
+    try {
+      await onDeleteProject(managedProject.id);
+      clearLabelEditor();
+      setSettingsFeedback(createProjectSettingsFeedback('success', 'Project deleted successfully.'));
+    } catch (error) {
+      setSettingsFeedback(
+        createProjectSettingsFeedback('error', error instanceof Error ? error.message : 'Failed to delete project.')
+      );
+    } finally {
+      setIsDeletingProject(false);
+    }
+  }, [clearLabelEditor, managedProject, onDeleteProject, setSettingsFeedback]);
+
   const contextValue = useMemo(
     () => ({
       isCreateProjectModalOpen: isCreateModalOpen,
@@ -298,13 +331,19 @@ export function WorkspaceProjectPanelActionsContextProvider({
       updateLabel,
       deleteLabel,
       saveProjectSettings,
+      deleteProject,
+      isDeletingProject,
+      canDeleteProject,
     }),
     [
       closeCreateProjectModal,
       createLabel,
       createProject,
+      canDeleteProject,
       deleteLabel,
+      deleteProject,
       isCreateModalOpen,
+      isDeletingProject,
       openCreateProjectModal,
       saveProjectSettings,
       selectProject,

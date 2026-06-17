@@ -221,21 +221,39 @@ export async function authorizeProjectMemberAccess(req: Request, projectId: stri
 }
 
 export async function authorizeProjectOwnerOrWorkspaceAdminAccess(req: Request, projectId: string) {
-  const auth = await authorizeProjectMemberAccess(req, projectId);
-  if (!auth.allowed) {
-    return auth;
+  const userId = await resolveRequestActorUserId(req);
+  if (!userId) {
+    return { allowed: false as const, error: 'Authentication required.', status: 401 };
   }
 
-  if (auth.projectRole === 'owner') {
-    return auth;
+  const workspaceId = await getProjectWorkspaceId(projectId);
+  if (!workspaceId) {
+    return { allowed: false as const, error: 'Project not found.', status: 404 };
   }
 
-  const workspaceRole = await getWorkspaceMemberRoleCached(auth.workspaceId, auth.userId);
-  if (workspaceRole === 'admin' || workspaceRole === 'owner') {
-    return auth;
+  const workspaceRole = await getWorkspaceMemberRoleCached(workspaceId, userId);
+  if (workspaceRole === null) {
+    return { allowed: false as const, error: 'Access denied: not a member of the workspace.', status: 403 };
   }
 
-  return { allowed: false as const, error: 'Only a project owner or workspace admin can manage this project.', status: 403 };
+  if (workspaceRole === 'owner' || workspaceRole === 'admin') {
+    return { allowed: true as const, userId, workspaceId, projectId, projectRole: null };
+  }
+
+  const projectRole = await getProjectMemberRole(projectId, userId);
+  if (!projectRole) {
+    return { allowed: false as const, error: 'Access denied: not a member of the project.', status: 403 };
+  }
+
+  if (projectRole === 'owner') {
+    return { allowed: true as const, userId, workspaceId, projectId, projectRole };
+  }
+
+  return {
+    allowed: false as const,
+    error: 'Only a project owner or workspace admin can manage this project.',
+    status: 403,
+  };
 }
 
 /**

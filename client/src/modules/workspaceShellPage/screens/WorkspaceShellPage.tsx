@@ -1087,6 +1087,7 @@ export function WorkspaceShellPage() {
               onCreateLabel={handleCreateLabel}
               onUpdateLabel={handleUpdateLabel}
               onDeleteLabel={handleDeleteLabel}
+              onDeleteProject={deleteProject}
             />
           </WorkspacePageLayout>
         ) : route.ticketKey ? (
