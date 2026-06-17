@@ -66,11 +66,7 @@ function AppShellLandingPage() {
       return;
     }
 
-    if (activeWorkspaceId) {
-      navigate(`/workspaces/${activeWorkspaceId}`, { replace: true });
-    } else if (workspaces.length === 0) {
-      navigate('/workspaces', { replace: true });
-    }
+    navigate('/workspaces', { replace: true });
   }, [navigate, pathname, activeWorkspaceId, workspaces, workspaceReady]);
 
   const handleCreateWorkspace = async (workspaceInput: {
