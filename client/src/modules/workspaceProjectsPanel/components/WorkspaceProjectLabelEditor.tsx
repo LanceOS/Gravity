@@ -1,4 +1,4 @@
-import { Button, TextInput, Textarea } from '@library';
+import { Button, CircularColorInput, TextInput, Textarea } from '@library';
 import { PencilLine, Trash2 } from 'lucide-react';
 
 import { FormSection } from '../../../components/FormSection';
@@ -57,16 +57,15 @@ export function WorkspaceProjectLabelEditor({
           required
         />
 
-        <FormSection.ColorField
+        <CircularColorInput
           className="workspace-page__project-field workspace-page__project-field--compact"
           inputClassName="workspace-page__project-color-input"
           labelClassName="workspace-page__project-label"
           label="Color"
           value={editingLabelColor}
-          onChange={(event) => setEditingLabelColor(event.target.value)}
-          disabled={isLabelBusy}
-          style={{ height: '36px', padding: '2px', cursor: 'pointer' }}
-        />
+        onChange={(event) => setEditingLabelColor(event.target.value)}
+        disabled={isLabelBusy}
+      />
 
         <Textarea
           label="Description"

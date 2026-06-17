@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Tag } from 'lucide-react';
-import { Button, TextInput, Textarea } from '@library';
+import { Button, CircularColorInput, TextInput, Textarea } from '@library';
 import { FormSection } from '../../../components/FormSection';
 import { ModalDialog } from '../../../components/ModalDialog';
 
@@ -97,7 +97,7 @@ export function LabelCreateOverlay({
             disabled={loading}
           />
 
-          <FormSection.ColorField
+          <CircularColorInput
             label="Color"
             value={labelColor}
             onChange={(event) => setLabelColor(event.target.value)}

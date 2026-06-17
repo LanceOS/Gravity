@@ -1,4 +1,4 @@
-import { Button, TextInput, Textarea } from '@library';
+import { Button, CircularColorInput, TextInput, Textarea } from '@library';
 import { FormSection } from '../../../components/FormSection';
 import { useWorkspaceProjectPanelActionsContext } from '../context/WorkspaceProjectPanelActionsContext';
 import { useWorkspaceProjectPanelLabelStateContext } from '../context/WorkspaceProjectPanelLabelStateContextCore';
@@ -27,7 +27,7 @@ export function WorkspaceProjectLabelCreateForm({
         required
       />
 
-      <FormSection.ColorField
+      <CircularColorInput
         className="workspace-page__project-field workspace-page__project-field--compact"
         inputClassName="workspace-page__project-color-input"
         labelClassName="workspace-page__project-label"
@@ -35,7 +35,6 @@ export function WorkspaceProjectLabelCreateForm({
         value={labelColor}
         onChange={(event) => setLabelColor(event.target.value)}
         disabled={isLabelBusy}
-        style={{ height: '36px', padding: '2px', cursor: 'pointer' }}
       />
 
       <Textarea
