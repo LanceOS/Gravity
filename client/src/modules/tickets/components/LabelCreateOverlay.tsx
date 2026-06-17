@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Tag } from 'lucide-react';
-import { Button, TextInput, Textarea, Modal, Alert } from '@library';
+import { Button, CircularColorInput, TextInput, Textarea } from '@library';
+import { FormSection } from '../../../components/FormSection';
+import { ModalDialog } from '../../../components/ModalDialog';
 
 const DEFAULT_LABEL_COLOR = '#3b82f6';
 
@@ -69,67 +71,62 @@ export function LabelCreateOverlay({
 
   const feedbackMessage = formError || errorMessage;
 
-  const modalFooter = (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-      <span style={{ fontSize: '11px', color: 'var(--color-text-disabled)' }}>Ctrl/Cmd + Enter creates the label.</span>
-
-      <div style={{ display: 'flex', gap: '8px' }}>
-        <Button type="button" onClick={handleClose} disabled={loading}>
-          Cancel
-        </Button>
-        <Button type="submit" variant="primary" disabled={loading}>
-          <Tag size={14} style={{ marginRight: '6px' }} />
-          <span>{loading ? 'Creating Label...' : 'Create Label'}</span>
-        </Button>
-      </div>
-    </div>
-  );
-
   return (
-    <Modal
+    <ModalDialog.Root
       isOpen={true}
       onClose={handleClose}
-      title="New Label"
-      footer={modalFooter}
+      size="sm"
       style={{ maxWidth: '400px' }}
     >
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
-        {feedbackMessage && (
-          <Alert type="error">
-            {feedbackMessage}
-          </Alert>
-        )}
+      <ModalDialog.Header
+        title="New Label"
+        description="Create a label for organizing tickets."
+      />
 
-        <TextInput
-          label="Label Name"
-          placeholder="Frontend Platform"
-          value={labelName}
-          onChange={(event) => setLabelName(event.target.value)}
-          autoFocus
-          required
-          disabled={loading}
-        />
+      <ModalDialog.Body>
+        <FormSection.Root id="label-create-form" noValidate onSubmit={handleSubmit}>
+          {feedbackMessage ? <ModalDialog.Feedback type="error">{feedbackMessage}</ModalDialog.Feedback> : null}
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--color-text-primary)' }}>Color</span>
-          <input
-            type="color"
+          <TextInput
+            label="Label Name"
+            placeholder="Frontend Platform"
+            value={labelName}
+            onChange={(event) => setLabelName(event.target.value)}
+            autoFocus
+            required
+            disabled={loading}
+          />
+
+          <CircularColorInput
+            label="Color"
             value={labelColor}
             onChange={(event) => setLabelColor(event.target.value)}
             disabled={loading}
-            style={{ height: '36px', padding: '2px', cursor: 'pointer', width: '100%', borderRadius: '4px', border: '1px solid var(--color-border-default)' }}
           />
-        </div>
 
-        <Textarea
-          label="Description"
-          placeholder="Explain when this label should be used."
-          value={labelDescription}
-          onChange={(event) => setLabelDescription(event.target.value)}
-          rows={3}
-          disabled={loading}
-        />
-      </form>
-    </Modal>
+          <Textarea
+            label="Description"
+            placeholder="Explain when this label should be used."
+            value={labelDescription}
+            onChange={(event) => setLabelDescription(event.target.value)}
+            rows={3}
+            disabled={loading}
+          />
+        </FormSection.Root>
+      </ModalDialog.Body>
+
+      <ModalDialog.Footer align="between">
+        <span className="modal-dialog__hint">Ctrl/Cmd + Enter creates the label.</span>
+        <ModalDialog.Actions>
+          <Button type="button" variant="secondary" onClick={handleClose} disabled={loading}>
+            Cancel
+          </Button>
+          <Button type="submit" form="label-create-form" variant="primary" loading={loading} disabled={loading}>
+            <Tag size={14} />
+            <span>{loading ? 'Creating Label...' : 'Create Label'}</span>
+          </Button>
+        </ModalDialog.Actions>
+      </ModalDialog.Footer>
+    </ModalDialog.Root>
   );
 }

@@ -1,6 +1,8 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { FolderPlus } from 'lucide-react';
-import { Button, TextInput, Textarea, Modal, Alert } from '@library';
+import { Button, TextInput, Textarea } from '@library';
+import { FormSection } from '../FormSection';
+import { ModalDialog } from '../ModalDialog';
 
 export interface ProjectCreateOverlayProps {
   loading: boolean;
@@ -119,34 +121,31 @@ export function ProjectCreateOverlay({
   }, [handleClose, handleSubmit]);
 
   const feedbackMessage = formError || errorMessage;
-  const modalFooter = (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-        <span style={{ fontSize: '11px', color: 'var(--color-text-disabled)' }}>Ctrl/Cmd + Enter creates the project.</span>
-
-      <div style={{ display: 'flex', gap: '8px' }}>
-        <Button type="button" onClick={handleClose} disabled={loading}>
-          Cancel
-        </Button>
-        <Button type="button" variant="primary" disabled={loading} onClick={() => void handleSubmit()}>
-          <FolderPlus size={14} style={{ marginRight: '6px' }} />
-          <span>{loading ? 'Creating Project...' : 'Create Project'}</span>
-        </Button>
-      </div>
-    </div>
-  );
 
   return (
-    <Modal
+    <ModalDialog.Root
       isOpen={true}
       onClose={handleClose}
-      title="New Project"
-      footer={modalFooter}
+      size="md"
       style={{ maxWidth: '500px' }}
     >
-      <form onSubmit={(e) => { e.preventDefault(); void handleSubmit(); }} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
-        {feedbackMessage && <Alert type="error">{feedbackMessage}</Alert>}
+      <ModalDialog.Header
+        title="New Project"
+        description="Create a project for this workspace."
+      />
 
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 'var(--space-md)' }}>
+      <ModalDialog.Body>
+        <FormSection.Root
+          id="project-create-form"
+          noValidate
+          onSubmit={(event) => {
+            event.preventDefault();
+            void handleSubmit();
+          }}
+        >
+          {feedbackMessage ? <ModalDialog.Feedback type="error">{feedbackMessage}</ModalDialog.Feedback> : null}
+
+          <FormSection.Grid>
           <TextInput
             label="Project Name"
             placeholder="Core Platform"
@@ -166,17 +165,31 @@ export function ProjectCreateOverlay({
             required
             disabled={loading}
           />
-        </div>
+          </FormSection.Grid>
 
-        <Textarea
-          label="Description"
-          placeholder="Describe the focus of this project within the workspace."
-          value={projectDescription}
-          onChange={(event) => setProjectDescription(event.target.value)}
-          rows={4}
-          disabled={loading}
-        />
-      </form>
-    </Modal>
+          <Textarea
+            label="Description"
+            placeholder="Describe the focus of this project within the workspace."
+            value={projectDescription}
+            onChange={(event) => setProjectDescription(event.target.value)}
+            rows={4}
+            disabled={loading}
+          />
+        </FormSection.Root>
+      </ModalDialog.Body>
+
+      <ModalDialog.Footer align="between">
+        <span className="modal-dialog__hint">Ctrl/Cmd + Enter creates the project.</span>
+        <ModalDialog.Actions>
+          <Button type="button" variant="secondary" onClick={handleClose} disabled={loading}>
+            Cancel
+          </Button>
+          <Button type="submit" form="project-create-form" variant="primary" loading={loading} disabled={loading}>
+            <FolderPlus size={14} />
+            <span>{loading ? 'Creating Project...' : 'Create Project'}</span>
+          </Button>
+        </ModalDialog.Actions>
+      </ModalDialog.Footer>
+    </ModalDialog.Root>
   );
 }

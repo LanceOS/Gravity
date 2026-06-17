@@ -15,7 +15,16 @@ export interface TicketFilters {
   search: string;
 }
 
-export type TicketListSort = 'created' | 'label' | 'newest' | 'oldest' | 'priority_desc' | 'priority_asc' | 'updated_desc' | 'updated_asc';
+export type TicketListSort =
+  | 'created'
+  | 'label'
+  | 'newest'
+  | 'newest_urgent'
+  | 'oldest'
+  | 'priority_desc'
+  | 'priority_asc'
+  | 'updated_desc'
+  | 'updated_asc';
 
 export type TicketsByStatus = Record<Ticket['status'], Ticket[]>;
 
@@ -143,9 +152,16 @@ export function sortTicketsForList(
       return first.createdAt.localeCompare(second.createdAt);
     }
 
-    if (sort === 'newest') {
-      return second.createdAt.localeCompare(first.createdAt);
+  if (sort === 'newest') {
+    return second.createdAt.localeCompare(first.createdAt);
+  }
+  if (sort === 'newest_urgent') {
+    const newestDiff = second.createdAt.localeCompare(first.createdAt);
+    if (newestDiff !== 0) {
+      return newestDiff;
     }
+    return priorityWeights[second.priority] - priorityWeights[first.priority];
+  }
     if (sort === 'oldest') {
       return first.createdAt.localeCompare(second.createdAt);
     }

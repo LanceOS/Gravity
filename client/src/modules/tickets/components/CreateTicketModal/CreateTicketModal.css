@@ -63,6 +63,20 @@
   gap: 6px;
 }
 
+.create-ticket-modal__footer-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.create-ticket-modal__footer-hint kbd {
+  padding: 1px 3px;
+  border: 1px solid var(--color-border-default);
+  border-radius: 3px;
+  background: var(--color-base50);
+  font-family: var(--mono);
+}
+
 .create-ticket-modal__labels-trigger {
   width: 100%;
   min-height: 36px;

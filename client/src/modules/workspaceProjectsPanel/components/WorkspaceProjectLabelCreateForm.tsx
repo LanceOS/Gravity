@@ -1,4 +1,5 @@
-import { Button, TextInput, Textarea } from '@library';
+import { Button, CircularColorInput, TextInput, Textarea } from '@library';
+import { FormSection } from '../../../components/FormSection';
 import { useWorkspaceProjectPanelActionsContext } from '../context/WorkspaceProjectPanelActionsContext';
 import { useWorkspaceProjectPanelLabelStateContext } from '../context/WorkspaceProjectPanelLabelStateContextCore';
 
@@ -16,7 +17,7 @@ export function WorkspaceProjectLabelCreateForm({
   const { createLabel } = useWorkspaceProjectPanelActionsContext();
 
   return (
-    <form className="workspace-page__domain-form" onSubmit={createLabel}>
+    <FormSection.Root layout="none" className="workspace-page__domain-form" onSubmit={createLabel}>
       <TextInput
         label="Label Name"
         value={labelName}
@@ -26,17 +27,15 @@ export function WorkspaceProjectLabelCreateForm({
         required
       />
 
-      <div className="workspace-page__project-field workspace-page__project-field--compact">
-        <span className="workspace-page__project-label">Color</span>
-        <input
-          type="color"
-          className="workspace-page__project-color-input"
-          value={labelColor}
-          onChange={(event) => setLabelColor(event.target.value)}
-          disabled={isLabelBusy}
-          style={{ height: '36px', padding: '2px', cursor: 'pointer' }}
-        />
-      </div>
+      <CircularColorInput
+        className="workspace-page__project-field workspace-page__project-field--compact"
+        inputClassName="workspace-page__project-color-input"
+        labelClassName="workspace-page__project-label"
+        label="Color"
+        value={labelColor}
+        onChange={(event) => setLabelColor(event.target.value)}
+        disabled={isLabelBusy}
+      />
 
       <Textarea
         label="Description"
@@ -48,7 +47,7 @@ export function WorkspaceProjectLabelCreateForm({
         style={{ gridColumn: '1 / -1' }}
       />
 
-      <div className="workspace-page__project-form-actions workspace-page__project-form-actions--inline" style={{ gridColumn: '1 / -1' }}>
+      <FormSection.Actions className="workspace-page__project-form-actions workspace-page__project-form-actions--inline" style={{ gridColumn: '1 / -1' }}>
         <Button
           type="submit"
           variant="primary"
@@ -58,7 +57,7 @@ export function WorkspaceProjectLabelCreateForm({
         >
           Create Label
         </Button>
-      </div>
-    </form>
+      </FormSection.Actions>
+    </FormSection.Root>
   );
 }

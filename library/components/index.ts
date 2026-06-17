@@ -16,6 +16,7 @@ export * from './carousel';
 export * from './cascader';
 export * from './checkbox';
 export * from './circularspinner';
+export * from './circularcolorinput';
 export * from './colorpicker';
 export * from './container';
 export * from './contextmenu';

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { ManagementSurface } from '../ManagementSurface';
 
 interface WorkspaceManagementListSectionItemProps<T> {
   item: T;
@@ -38,38 +39,20 @@ export function WorkspaceManagementListSection<T extends { id: string }>({
   renderItem,
 }: WorkspaceManagementListSectionProps<T>) {
   return (
-    <section className={sectionClassName} aria-label={ariaLabel}>
-      <div className={`${classNamePrefix}__section-header`}>
-        <div>
-          <div className={`${classNamePrefix}__section-kicker`}>{sectionKicker}</div>
-          <h3>{sectionTitle}</h3>
-        </div>
-        <p>{sectionDescription}</p>
-      </div>
-
-      {items.length === 0 ? (
-        <div className={`${classNamePrefix}__empty`}>
-          <div className={`${classNamePrefix}__empty-title`}>{emptyStateTitle}</div>
-          <p>{emptyStateDescription}</p>
-        </div>
-      ) : (
-        <div className={listClassName}>
-          {items.map((item) => {
-            const isSelected = selectedItemId === item.id;
-
-            return (
-              <div key={item.id}>
-                {renderItem({
-                  item,
-                  isSelected,
-                  onSelect: () => onSelectItem(item.id),
-                })}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </section>
+    <ManagementSurface.ListSection
+      classNamePrefix={classNamePrefix}
+      sectionClassName={sectionClassName}
+      listClassName={listClassName}
+      ariaLabel={ariaLabel}
+      sectionKicker={sectionKicker}
+      sectionTitle={sectionTitle}
+      sectionDescription={sectionDescription}
+      items={items}
+      selectedItemId={selectedItemId}
+      emptyStateTitle={emptyStateTitle}
+      emptyStateDescription={emptyStateDescription}
+      onSelectItem={onSelectItem}
+      renderItem={renderItem}
+    />
   );
 }
-

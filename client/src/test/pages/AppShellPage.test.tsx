@@ -41,6 +41,7 @@ type WorkspacePageMockProps = {
     projectId?: string;
   };
   onSelectNote?: (noteId: string) => void;
+  onSelectTicket?: (ticket: any) => void;
   onDeleteTicket?: (ticketId: string) => void;
   projects?: unknown[];
   tickets?: unknown[];
@@ -181,6 +182,7 @@ vi.mock('../../modules/workspacePage', () => ({
     activeView,
     filters,
     onSelectNote,
+    onSelectTicket,
     onDeleteTicket,
     projects = [],
     tickets = [],
@@ -199,6 +201,11 @@ vi.mock('../../modules/workspacePage', () => ({
       {onSelectNote ? (
         <button type="button" onClick={() => onSelectNote('note-1')}>
           Open note
+        </button>
+      ) : null}
+      {onSelectTicket && tickets[0] ? (
+        <button type="button" onClick={() => onSelectTicket(tickets[0])}>
+          Open first ticket
         </button>
       ) : null}
       {onDeleteTicket ? (
@@ -1118,6 +1125,48 @@ describe('AppShellPage', () => {
     await waitFor(() => {
       expect(screen.getByTestId('location-display').textContent).toBe(
         '/workspaces/workspace-1/projects/project-1/notes/note-1'
+      );
+    });
+  });
+
+  it('seeds the active ticket before navigating to a ticket detail URL', async () => {
+    const user = userEvent.setup();
+    const setActiveTicket = vi.fn();
+    const ticket = {
+      id: 'ticket-1',
+      key: 'GRA-101',
+      title: 'Investigate detail panel',
+      projectId: 'project-1',
+      status: 'todo',
+      priority: 'medium',
+      assigneeId: null,
+      labelIds: [],
+      cycleId: null,
+      parentId: null,
+      prStatus: 'none',
+      prUrl: null,
+      createdAt: '2026-06-04T10:00:00.000Z',
+      updatedAt: '2026-06-04T10:00:00.000Z',
+    };
+
+    renderAppShell({
+      tickets: buildUseTickets({
+        tickets: [ticket],
+        setActiveTicket,
+      }),
+      initialEntries: ['/workspaces/workspace-1/projects/project-1/tickets'],
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('WorkspacePage')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Open first ticket' }));
+
+    expect(setActiveTicket).toHaveBeenCalledWith(ticket);
+    await waitFor(() => {
+      expect(screen.getByTestId('location-display').textContent).toBe(
+        '/workspaces/workspace-1/projects/project-1/tickets/GRA-101'
       );
     });
   });

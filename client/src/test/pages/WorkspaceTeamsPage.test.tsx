@@ -202,6 +202,55 @@ describe('WorkspaceTeamsPage', () => {
     });
   }, 12000);
 
+  it('creates a team-scoped label without affecting project label scope', async () => {
+    const user = userEvent.setup();
+    const { queryClient } = renderWorkspaceTeamsPage();
+
+    apiMocks.post.mockResolvedValueOnce({
+      id: 'label-frontend',
+      name: 'Frontend',
+      color: '#10B981',
+      description: 'Frontend ownership',
+      sortOrder: 1,
+    });
+
+    await user.click(screen.getByRole('button', { name: /Engineering/ }));
+    await user.click(screen.getByRole('button', { name: /Create Label/i }));
+    await user.type(screen.getByLabelText('Label name'), 'Frontend');
+    await user.type(screen.getByLabelText('Label description'), 'Frontend ownership');
+    const labelCreateForm = screen.getByLabelText('Label name').closest('form');
+    expect(labelCreateForm).toBeTruthy();
+    await user.click(within(labelCreateForm as HTMLElement).getByRole('button', { name: /Create Label/i }));
+
+    await waitFor(() => {
+      expect(apiMocks.post).toHaveBeenCalledWith('/labels', {
+        teamId: 'team-engineering',
+        name: 'Frontend',
+        color: '#3B82F6',
+        description: 'Frontend ownership',
+        sortOrder: 1,
+      });
+    });
+
+    await waitFor(() => {
+      const sidebarTree = queryClient.getQueryData<SidebarTree>(['workspace', 'workspace-1', 'sidebar']);
+      const team = sidebarTree?.teams.find((row) => row.id === 'team-engineering');
+      expect(team?.labels ?? []).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: 'label-frontend',
+            name: 'Frontend',
+            color: '#10B981',
+            description: 'Frontend ownership',
+            sortOrder: 1,
+          }),
+        ]),
+      );
+      expect(apiMocks.post.mock.calls[0]?.[0]).toBe('/labels');
+      expect('projectId' in (apiMocks.post.mock.calls[0]?.[1] || {})).toBe(false);
+    });
+  });
+
   it('navigates to team project management from the team card', async () => {
     const user = userEvent.setup();
     const { props } = renderWorkspaceTeamsPage();

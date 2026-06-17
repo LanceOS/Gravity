@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Button, Textarea, TextInput } from '@library';
+import { Button, CircularColorInput, Popover, Textarea, TextInput } from '@library';
 import { apiClient } from '../../../utils/apiClient';
 import { queryKeys } from '../../../utils/queryClient';
-import { addSidebarTeam, removeSidebarTeam, updateSidebarTeam } from '../../../utils/sidebarTreeMutations';
+import { addLabelToTeam, addSidebarTeam, removeSidebarTeam, updateSidebarTeam } from '../../../utils/sidebarTreeMutations';
 import type { SidebarTeam, Team } from '../../../types/domain';
 import '../../workspacePage/styles/WorkspacePage.css';
 import '../styles/WorkspaceTeamsPage.css';
 import { WorkspacePageLayout } from '../../../layouts/WorkspacePageLayout/WorkspacePageLayout';
+import { FormSection } from '../../../components/FormSection';
 import {
   WorkspaceManagementFeedback,
   WorkspaceManagementHeaderActions,
@@ -19,11 +20,23 @@ import {
 
 import { WorkspaceTeamsCreateTeamModal } from '../components/WorkspaceTeamsCreateTeamModal';
 import { WorkspaceTeamsDangerZone } from '../components/WorkspaceTeamsDangerZone';
-import { CalendarDays, FolderKanban, Tags, Users } from 'lucide-react';
+import { CalendarDays, FolderKanban, Plus, Tags, Users } from 'lucide-react';
 import { COLOR_OPTIONS, DEFAULT_TEAM_COLOR, getTeamReferenceCount, getInitialDraft, toSidebarTeam } from '../utils/WorkspaceTeamsPage';
 import { useWorkspaceTeamsPageDraft } from '../hooks/useWorkspaceTeamsPageDraft';
 import { useWorkspaceTeamsPageSelection } from '../hooks/useWorkspaceTeamsPageSelection';
 import { type WorkspaceTeamsPageFeedback, type WorkspaceTeamsPageProps } from '../types/WorkspaceTeamsPage';
+
+const DEFAULT_TEAM_LABEL_COLOR = '#3B82F6';
+
+interface TeamLabelDraft {
+  name: string;
+  color: string;
+  description: string;
+}
+
+function getNextLabelSortOrder(labels: { sortOrder?: number | null }[]) {
+  return labels.reduce((max, label) => Math.max(max, Number(label.sortOrder ?? 0)), -1) + 1;
+}
 
 export function WorkspaceTeamsPage({
   workspaceId,
@@ -53,6 +66,12 @@ export function WorkspaceTeamsPage({
   const [reassignTeamById, setReassignTeamById] = useState<Record<string, string>>({});
   const [savingAction, setSavingAction] = useState('');
   const [feedback, setFeedback] = useState<WorkspaceTeamsPageFeedback | null>(null);
+  const [isCreateLabelOpen, setIsCreateLabelOpen] = useState(false);
+  const [labelDraft, setLabelDraft] = useState<TeamLabelDraft>({
+    name: '',
+    color: DEFAULT_TEAM_LABEL_COLOR,
+    description: '',
+  });
 
   const lastSelectedTeamIdRef = useRef<string | null>(null);
 
@@ -64,6 +83,11 @@ export function WorkspaceTeamsPage({
       window.history.replaceState({}, '', newUrl);
     }
   }, []);
+
+  useEffect(() => {
+    setLabelDraft({ name: '', color: DEFAULT_TEAM_LABEL_COLOR, description: '' });
+    setIsCreateLabelOpen(false);
+  }, [selectedTeamId]);
 
   useEffect(() => {
     if (!selectedTeam) {
@@ -168,6 +192,53 @@ export function WorkspaceTeamsPage({
       ...next,
       [teamId]: reassignTeamId,
     }));
+  };
+
+  const handleCreateTeamLabel = async (team: SidebarTeam) => {
+    const name = labelDraft.name.trim();
+    if (!name) {
+      setFeedback({ type: 'error', message: 'Label name is required.' });
+      return;
+    }
+
+    const sortOrder = getNextLabelSortOrder(team.labels ?? []);
+    setSavingAction(`create-label:${team.id}`);
+    setFeedback(null);
+
+    try {
+      const createdLabel = await apiClient.post<{
+        id: string;
+        name: string;
+        color: string;
+        description?: string;
+        sortOrder?: number;
+      }>('/labels', {
+        teamId: team.id,
+        name,
+        color: labelDraft.color,
+        description: labelDraft.description.trim(),
+        sortOrder,
+      });
+
+      addLabelToTeam(queryClient, workspaceId, team.id, {
+        id: createdLabel.id,
+        name: createdLabel.name,
+        color: createdLabel.color,
+        description: createdLabel.description ?? '',
+        sortOrder: createdLabel.sortOrder ?? sortOrder,
+      });
+
+      setLabelDraft({ name: '', color: DEFAULT_TEAM_LABEL_COLOR, description: '' });
+      setFeedback({ type: 'success', message: `Created label "${name}" for ${team.name}.` });
+      await refreshTeams();
+    } catch (error) {
+      setFeedback({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Failed to create label.',
+      });
+    } finally {
+      setSavingAction('');
+    }
   };
 
   const handleDeleteTeam = async (team: SidebarTeam) => {
@@ -336,7 +407,8 @@ export function WorkspaceTeamsPage({
           getSelectedItemTitle={(team) => `${team.name} Details`}
         >
           {(selectedTeamForEditor) => (
-            <form
+            <FormSection.Root
+              layout="none"
               className="workspace-teams-page__form"
               aria-label="Team editor"
               onSubmit={(event) => {
@@ -426,6 +498,88 @@ export function WorkspaceTeamsPage({
                     </div>
                   </div>
 
+                  <div className="workspace-teams-page__labels-section">
+                    <span className="workspace-teams-page__labels-title">Team Labels</span>
+                    <div className="workspace-teams-page__label-list">
+                      {(selectedTeamForEditor.labels ?? []).length > 0 ? (
+                        selectedTeamForEditor.labels?.map((label) => (
+                          <span key={label.id} className="workspace-teams-page__label-pill">
+                            <span className="workspace-teams-page__label-pill-dot" style={{ background: label.color }} />
+                            <span>{label.name}</span>
+                          </span>
+                        ))
+                      ) : (
+                        <span className="workspace-teams-page__muted">No labels yet.</span>
+                      )}
+                    </div>
+
+                    <Popover
+                      align="left"
+                      isOpen={isCreateLabelOpen}
+                      onOpenChange={setIsCreateLabelOpen}
+                      contentClassName="workspace-teams-page__label-create-body"
+                      trigger={
+                        <button type="button" className="workspace-teams-page__label-create-trigger">
+                          <Plus size={10} />
+                          <span>Create Label</span>
+                        </button>
+                      }
+                    >
+                      <FormSection.Root
+                        layout="none"
+                        className="workspace-teams-page__label-form"
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          void handleCreateTeamLabel(selectedTeamForEditor);
+                        }}
+                      >
+                        <TextInput
+                          label="New Label Name"
+                          aria-label="Label name"
+                          value={labelDraft.name}
+                          onChange={(event) => setLabelDraft((draft) => ({ ...draft, name: event.target.value }))}
+                          placeholder="Frontend"
+                          required
+                        />
+
+                        <CircularColorInput
+                          className="workspace-teams-page__label-color-field"
+                          inputClassName="workspace-teams-page__label-color-input"
+                          label="Label color"
+                          value={labelDraft.color}
+                          onChange={(event) => setLabelDraft((draft) => ({ ...draft, color: event.target.value }))}
+                        />
+
+                        <Textarea
+                          label="Label description"
+                          aria-label="Label description"
+                          value={labelDraft.description}
+                          onChange={(event) =>
+                            setLabelDraft((draft) => ({ ...draft, description: event.target.value }))
+                          }
+                          placeholder="What does this label represent?"
+                          rows={2}
+                          style={{ gridColumn: '1 / -1', minHeight: '60px' }}
+                        />
+
+                        <FormSection.Actions className="workspace-teams-page__label-actions">
+                          <Button
+                            type="submit"
+                            variant="primary"
+                            size="sm"
+                            disabled={
+                              savingAction === `create-label:${selectedTeamForEditor.id}` || !labelDraft.name.trim()
+                            }
+                          >
+                            {savingAction === `create-label:${selectedTeamForEditor.id}`
+                              ? 'Creating...'
+                              : 'Create Label'}
+                          </Button>
+                        </FormSection.Actions>
+                      </FormSection.Root>
+                    </Popover>
+                  </div>
+
                   <div className="workspace-teams-page__danger-zone-wrapper">
                     <span className="workspace-teams-page__danger-zone-title">Danger Zone</span>
                     <div className="workspace-teams-page__danger-zone-content">
@@ -442,12 +596,12 @@ export function WorkspaceTeamsPage({
                 </div>
               </div>
 
-              <div className="workspace-teams-page__actions-row">
+              <FormSection.Actions className="workspace-teams-page__actions-row">
                 <Button type="submit" variant="primary" size="sm" disabled={savingAction === `update:${selectedTeamForEditor.id}`}>
                   <span>{savingAction === `update:${selectedTeamForEditor.id}` ? 'Saving...' : 'Save Team'}</span>
                 </Button>
-              </div>
-            </form>
+              </FormSection.Actions>
+            </FormSection.Root>
           )}
         </WorkspaceManagementEditorSection>
 

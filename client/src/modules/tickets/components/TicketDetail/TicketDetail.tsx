@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import type { Ticket } from '../../../../context/TicketContext';
-import { Button, Select, MarkdownEditor, RichTextEditor, toast, ClickAwayListener, Portal, Accordion, Popover, createEmptyRichTextValue, isRichTextEmpty, serializeRichTextMarkdown } from '@library';
+import { Button, Select, MarkdownEditor, RichTextEditor, toast, ClickAwayListener, Accordion, Popover, createEmptyRichTextValue, isRichTextEmpty, serializeRichTextMarkdown } from '@library';
 import generateBranchName from '../../../../utils/branch';
 import TicketUtilities from '../TicketUtilities/TicketUtilities';
 
@@ -85,6 +85,7 @@ import { SearchableOptionPickerPopoverContent } from '../SearchableOptionPickerP
 import { TicketContextMenu } from '../TicketContextMenu';
 import { TicketRelationsSection } from './TicketRelationsSection';
 import { WorkspacePageLayout } from '../../../../layouts/WorkspacePageLayout/WorkspacePageLayout';
+import { ConfirmDialog } from '../../../../components/ConfirmDialog';
 import './TicketDetail.css';
 
 export const TicketDetail: React.FC<TicketDetailProps> = ({
@@ -866,104 +867,36 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
       </TicketContextMenu>
 
       {isDeleteConfirmOpen && (
-        <Portal>
-          <div
-            style={{
-              position: 'fixed',
-              inset: 0,
-              background: 'rgba(0, 0, 0, 0.55)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 950,
-            }}
-            className="lib-animate-fade-in"
-          >
-            <div
-              style={{
-                width: '360px',
-                background: 'var(--color-surface-card)',
-                border: '1px solid var(--color-border-error)',
-                borderRadius: 'var(--radius-md)',
-                boxShadow: 'var(--shadow-xl)',
-                overflow: 'hidden',
-                display: 'flex',
-                flexDirection: 'column',
-              }}
-            >
-              <div style={{ background: 'var(--color-bg-error)', borderBottom: '1px solid var(--color-border-error)', padding: '16px 20px 14px' }}>
-                <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-text-primary)', display: 'block', marginBottom: '4px' }}>
-                  Delete {activeTicket.key}?
-                </span>
-                <span style={{ fontSize: '12px', color: 'var(--color-text-disabled)', lineHeight: '1.5' }}>
-                  This removes the ticket and all its activity. This action cannot be undone.
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', padding: '14px 20px' }}>
-                <Button onClick={() => setIsDeleteConfirmOpen(false)} size="sm">
-                  Cancel
-                </Button>
-                <Button onClick={() => void confirmDelete()} variant="danger" size="sm">
-                  Delete Ticket
-                </Button>
-              </div>
-            </div>
-          </div>
-        </Portal>
+        <ConfirmDialog.Root isOpen={isDeleteConfirmOpen} onClose={() => setIsDeleteConfirmOpen(false)}>
+          <ConfirmDialog.Header
+            title={`Delete ${activeTicket.key}?`}
+            description="This removes the ticket and all its activity. This action cannot be undone."
+          />
+          <ConfirmDialog.Actions
+            cancelLabel="Cancel"
+            confirmLabel="Delete Ticket"
+            onCancel={() => setIsDeleteConfirmOpen(false)}
+            onConfirm={confirmDelete}
+          />
+        </ConfirmDialog.Root>
       )}
 
       {deletingCommentId && (
-        <Portal>
-          <div
-            style={{
-              position: 'fixed',
-              inset: 0,
-              background: 'rgba(0, 0, 0, 0.55)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 950,
+        <ConfirmDialog.Root isOpen={!!deletingCommentId} onClose={() => setDeletingCommentId(null)}>
+          <ConfirmDialog.Header
+            title="Delete this comment?"
+            description="This will permanently remove the comment from the activity thread."
+          />
+          <ConfirmDialog.Actions
+            cancelLabel="Cancel"
+            confirmLabel="Delete Comment"
+            onCancel={() => setDeletingCommentId(null)}
+            onConfirm={async () => {
+              await onDeleteComment(activeTicket.id, deletingCommentId);
+              setDeletingCommentId(null);
             }}
-            className="lib-animate-fade-in"
-          >
-            <div
-              style={{
-                width: '360px',
-                background: 'var(--color-surface-card)',
-                border: '1px solid var(--color-border-error)',
-                borderRadius: 'var(--radius-md)',
-                boxShadow: 'var(--shadow-xl)',
-                overflow: 'hidden',
-                display: 'flex',
-                flexDirection: 'column',
-              }}
-            >
-              <div style={{ background: 'var(--color-bg-error)', borderBottom: '1px solid var(--color-border-error)', padding: '16px 20px 14px' }}>
-                <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-text-primary)', display: 'block', marginBottom: '4px' }}>
-                  Delete this comment?
-                </span>
-                <span style={{ fontSize: '12px', color: 'var(--color-text-disabled)', lineHeight: '1.5' }}>
-                  This will permanently remove the comment from the activity thread.
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', padding: '14px 20px' }}>
-                <Button onClick={() => setDeletingCommentId(null)} size="sm">
-                  Cancel
-                </Button>
-                <Button
-                  onClick={async () => {
-                    await onDeleteComment(activeTicket.id, deletingCommentId);
-                    setDeletingCommentId(null);
-                  }}
-                  variant="danger"
-                  size="sm"
-                >
-                  Delete Comment
-                </Button>
-              </div>
-            </div>
-          </div>
-        </Portal>
+          />
+        </ConfirmDialog.Root>
       )}
 
 

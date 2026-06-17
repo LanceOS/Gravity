@@ -19,6 +19,7 @@ interface UseWorkspaceShellNavigationArgs {
   navigate: NavigateFunction;
   setSidebarActiveScope: Dispatch<SetStateAction<SidebarNavigationState['activeScope']>>;
   setActiveProjectId: (projectId: string) => void;
+  setActiveTicket: (ticket: Ticket | null) => void;
 }
 
 interface UseWorkspaceShellNavigationResult {
@@ -52,6 +53,7 @@ export function useWorkspaceShellNavigation({
   navigate,
   setSidebarActiveScope,
   setActiveProjectId,
+  setActiveTicket,
 }: UseWorkspaceShellNavigationArgs): UseWorkspaceShellNavigationResult {
   const buildProjectScopedPathCallback = useCallback(
     (projectId: string, scope: 'tickets' | 'notes' = 'tickets', itemId?: string) =>
@@ -146,6 +148,8 @@ export function useWorkspaceShellNavigation({
 
   const handleSelectTicket = useCallback(
     (ticket: Ticket | null) => {
+      setActiveTicket(ticket);
+
       if (ticket) {
         navigate(buildProjectScopedPathCallback(ticket.projectId, 'tickets', ticket.key));
         return;
@@ -158,7 +162,7 @@ export function useWorkspaceShellNavigation({
 
       navigate(`/workspaces/${activeWorkspaceId}`);
     },
-    [activeProjectId, activeWorkspaceId, buildProjectScopedPathCallback, navigate]
+    [activeProjectId, activeWorkspaceId, buildProjectScopedPathCallback, navigate, setActiveTicket]
   );
 
   const handleOpenSettings = useCallback(() => {

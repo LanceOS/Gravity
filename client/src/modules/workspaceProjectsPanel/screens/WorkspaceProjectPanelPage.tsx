@@ -37,6 +37,7 @@ export function WorkspaceProjectPanelPage({
   onCreateLabel,
   onUpdateLabel,
   onDeleteLabel,
+  onDeleteProject,
   confirmDeleteLabel,
 }: WorkspaceProjectPanelProps) {
   return (
@@ -50,6 +51,7 @@ export function WorkspaceProjectPanelPage({
       onCreateLabel={onCreateLabel}
       onUpdateLabel={onUpdateLabel}
       onDeleteLabel={onDeleteLabel}
+      onDeleteProject={onDeleteProject}
       confirmDeleteLabel={confirmDeleteLabel}
     >
       <WorkspaceProjectPanelPageContent

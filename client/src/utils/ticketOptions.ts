@@ -17,6 +17,7 @@ export type TicketSortOption = {
     | 'created'
     | 'label'
     | 'newest'
+    | 'newest_urgent'
     | 'oldest'
     | 'priority_desc'
     | 'priority_asc'
@@ -74,6 +75,7 @@ export const LIST_SORT_OPTIONS: Array<TicketSortOption> = [
   { value: 'created', label: 'Created Order' },
   { value: 'label', label: 'Labels' },
   { value: 'newest', label: 'Newest first' },
+  { value: 'newest_urgent', label: 'Newest, urgent first' },
   { value: 'oldest', label: 'Oldest first' },
   { value: 'priority_desc', label: 'Priority: high to low' },
   { value: 'priority_asc', label: 'Priority: low to high' },

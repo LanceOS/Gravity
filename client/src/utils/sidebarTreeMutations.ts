@@ -1,5 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query';
 import type { SidebarTeam, SidebarTree } from '../types/domain';
+import type { Label } from '../types/label';
 import { queryKeys } from './queryClient';
 
 function withSidebarTreeData(
@@ -51,6 +52,18 @@ export function addProjectToTeam(
   updateSidebarTeam(queryClient, workspaceId, teamId, (team) => ({
     ...team,
     projects: [...(team.projects || []), project],
+  }));
+}
+
+export function addLabelToTeam(
+  queryClient: QueryClient,
+  workspaceId: string,
+  teamId: string,
+  label: Label,
+) {
+  updateSidebarTeam(queryClient, workspaceId, teamId, (team) => ({
+    ...team,
+    labels: [...(team.labels ?? []), label],
   }));
 }
 

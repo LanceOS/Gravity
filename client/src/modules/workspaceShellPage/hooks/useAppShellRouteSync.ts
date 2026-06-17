@@ -255,7 +255,9 @@ export function useAppShellRouteSync({
     const normalizedRouteTicketKey = route.ticketKey.toUpperCase();
     if ((activeTicket?.key || '').toUpperCase() === normalizedRouteTicketKey) return;
 
-    const resolved = routeScopedTicketByKey.get(normalizedRouteTicketKey) ?? null;
-    setActiveTicket(resolved);
+    const resolved = routeScopedTicketByKey.get(normalizedRouteTicketKey);
+    if (resolved) {
+      setActiveTicket(resolved);
+    }
   }, [activeTicket?.key, route.ticketKey, routeScopedTicketByKey, setActiveTicket]);
 }
