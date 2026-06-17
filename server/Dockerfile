@@ -12,7 +12,7 @@ USER node
 
 # Install dependencies for local development (includes devDeps like tsx)
 COPY --chown=node:node server/package.json server/package-lock.json ./
-RUN npm ci
+RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
 # Copy server source and shared library for live-sync into container
 COPY --chown=node:node server ./
@@ -32,7 +32,7 @@ USER node
 
 # Install server dependencies
 COPY --chown=node:node server/package.json server/package-lock.json ./server/
-RUN cd server && npm ci
+RUN cd server && if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
 # Install client dependencies (needed for building the client)
 COPY --chown=node:node client/package.json ./client/
@@ -58,7 +58,7 @@ RUN mkdir -p /app && chown -R node:node /app
 
 # Install only production dependencies for server
 COPY --chown=node:node server/package.json server/package-lock.json ./
-RUN npm ci --omit=dev
+RUN if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi
 
 # Copy built server and client assets into final image
 COPY --from=builder --chown=node:node /workspace/server/dist ./dist
