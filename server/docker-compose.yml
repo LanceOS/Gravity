@@ -21,6 +21,30 @@ services:
     networks:
       - gravity_backend_db_redis
 
+  rustfs:
+    image: rustfs/rustfs:latest
+    container_name: ${GRAVITY_RUSTFS_CONTAINER:-gravity_rustfs}
+    restart: unless-stopped
+    command: /data/rustfs --console-enable
+    environment:
+      RUSTFS_ADDRESS: 0.0.0.0:9000
+      RUSTFS_CONSOLE_ADDRESS: 0.0.0.0:9001
+      RUSTFS_CONSOLE_ENABLE: true
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:-admin}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:-password}
+    volumes:
+      - gravity_rustfs_data:/data/rustfs
+    ports:
+      - "${RUSTFS_PORT:-9000}:9000"
+      - "${RUSTFS_CONSOLE_PORT:-9001}:9001"
+    healthcheck:
+      test: ["CMD", "sh", "-ec", "curl -f http://localhost:9000/health && curl -f http://localhost:9001/rustfs/console/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - gravity_backend_db_redis
+
   redis:
     image: docker.io/library/redis:7-alpine
     container_name: ${GRAVITY_REDIS_CONTAINER:-gravity_redis_dev}
@@ -39,6 +63,7 @@ services:
 
 volumes:
   gravity_postgres_data:
+  gravity_rustfs_data:
 
 networks:
   gravity_backend_db_redis:
