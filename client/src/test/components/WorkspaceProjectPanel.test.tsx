@@ -1,5 +1,5 @@
 import type { ButtonHTMLAttributes, ChangeEvent, ReactNode, TextareaHTMLAttributes } from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkspaceProjectPanel } from '../../modules/workspaces';
@@ -235,6 +235,53 @@ describe('WorkspaceProjectPanel', () => {
       expect(screen.getByLabelText('Label Name')).toHaveValue('');
       expect(screen.getByLabelText('Description')).toHaveValue('');
     });
+  });
+
+  it('opens a delete-confirmation modal and deletes a project after confirmation', async () => {
+    const user = userEvent.setup();
+    const onDeleteProject = vi.fn().mockResolvedValue(undefined);
+    renderWorkspaceProjectPanel({ onDeleteProject, activeProjectId: 'project-1' });
+
+    await user.click(screen.getByRole('button', { name: 'Delete Project' }));
+
+    const deleteDialog = screen.getByRole('alertdialog', { name: 'Delete Project' });
+    expect(deleteDialog).toBeInTheDocument();
+    expect(screen.getByText('Are you sure you want to delete the project Gravity Core?')).toBeInTheDocument();
+    expect(screen.getByText('This action is permanent and will delete all associated tickets and comments.')).toBeInTheDocument();
+
+    const confirmButton = within(deleteDialog).getByRole('button', { name: 'Delete Project' });
+    await user.click(confirmButton);
+
+    await waitFor(() => {
+      expect(onDeleteProject).toHaveBeenCalledWith('project-1');
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByRole('alertdialog', { name: 'Delete Project' })).not.toBeInTheDocument();
+    });
+  });
+
+  it('cancels project deletion without calling the API', async () => {
+    const user = userEvent.setup();
+    const onDeleteProject = vi.fn().mockResolvedValue(undefined);
+    renderWorkspaceProjectPanel({ onDeleteProject, activeProjectId: 'project-1' });
+
+    await user.click(screen.getByRole('button', { name: 'Delete Project' }));
+
+    const deleteDialog = screen.getByRole('alertdialog', { name: 'Delete Project' });
+    expect(deleteDialog).toBeInTheDocument();
+    await user.click(within(deleteDialog).getByRole('button', { name: 'Cancel' }));
+
+    await waitFor(() => {
+      expect(onDeleteProject).not.toHaveBeenCalled();
+    });
+    expect(screen.queryByRole('alertdialog', { name: 'Delete Project' })).not.toBeInTheDocument();
+  });
+
+  it('does not show project deletion controls when delete action is unavailable', () => {
+    renderWorkspaceProjectPanel();
+
+    expect(screen.queryByRole('button', { name: 'Delete Project' })).not.toBeInTheDocument();
   });
 
   it('opens a label editor, saves updates, and deletes the label', async () => {
