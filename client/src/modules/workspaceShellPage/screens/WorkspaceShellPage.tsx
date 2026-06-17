@@ -112,7 +112,7 @@ export function WorkspaceShellPage() {
   const { isOllamaOpen, isOllamaClosing, handleToggleOllama } = useOllamaPanel();
   const [createInitialStatus, setCreateInitialStatus] = useState<Ticket['status'] | undefined>(undefined);
   const [createParentId, setCreateParentId] = useState<string | undefined>(undefined);
-  const [listSort, setListSort] = useState<TicketListSort>('created');
+  const [listSort, setListSort] = useState<TicketListSort>('newest_urgent');
   const { isMobile } = useWorkspaceViewMode(activeView, setView);
   const [projectCreateLoading, setProjectCreateLoading] = useState(false);
   const [projectCreateErrorState, setProjectCreateErrorState] = useState<{ workspaceId: string; message: string | null }>({
