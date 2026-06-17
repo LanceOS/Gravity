@@ -1,9 +1,6 @@
-name: gravity
-
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: ${GRAVITY_POSTGRES_CONTAINER:-gravity_postgres}
     env_file:
       - ../.env
     environment:
@@ -25,7 +22,6 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: ${GRAVITY_REDIS_CONTAINER:-gravity_redis}
     env_file:
       - ../.env
     command: >
@@ -41,11 +37,11 @@ services:
 
   rustfs:
     image: rustfs/rustfs:latest
-    container_name: ${GRAVITY_RUSTFS_CONTAINER:-gravity_rustfs}
     env_file:
       - ../.env
     restart: unless-stopped
     command: /data/rustfs --console-enable
+    user: "0:0"
     environment:
       RUSTFS_ADDRESS: 0.0.0.0:9000
       RUSTFS_CONSOLE_ADDRESS: 0.0.0.0:9001
@@ -54,9 +50,7 @@ services:
       RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:-password}
     volumes:
       - gravity_rustfs_data:/data/rustfs
-    ports:
-      - "${RUSTFS_PORT:-9000}:9000"
-      - "${RUSTFS_CONSOLE_PORT:-9001}:9001"
+      - gravity_rustfs_logs:/logs
     healthcheck:
       test: ["CMD", "sh", "-ec", "curl -f http://localhost:9000/health && curl -f http://localhost:9001/rustfs/console/health"]
       interval: 5s
@@ -72,7 +66,6 @@ services:
     # Use the consolidated repository-level .env
     env_file:
       - ../.env
-    container_name: ${GRAVITY_BACKEND_CONTAINER:-gravity_app_server}
     environment:
       # Important: load sensitive values from ../.env via `env_file`.
       # Avoid interpolating DATABASE_URL and secrets in the compose file
@@ -107,7 +100,6 @@ services:
     build:
       context: ..
       dockerfile: client/Dockerfile
-    container_name: ${GRAVITY_FRONTEND_CONTAINER:-gravity_frontend}
     environment:
       BACKEND_UPSTREAM: http://backend:8080
     ports:
@@ -122,7 +114,9 @@ volumes:
   pgdata:
   gravity_rustfs_data:
   gravity_backend_data:
+  gravity_rustfs_logs:
 
 networks:
   gravity_internal:
+    internal: true
     driver: bridge
