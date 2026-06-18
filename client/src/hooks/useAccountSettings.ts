@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { User } from '../context/TicketContext';
 import {
-  DEFAULT_WORKSPACE_SETTINGS,
   API_KEY_MASK,
   getProviderOption,
   normalizeWorkspaceSettings,
@@ -41,6 +40,21 @@ const KEY_ACTION: Record<'stored' | 'cleared' | 'pending', 'keep' | 'clear' | 'u
   pending: 'update',
 };
 
+function coerceTheme(value: string | null | undefined): WorkspaceSettings['theme'] | undefined {
+  if (
+    value === 'dark' ||
+    value === 'coal-black' ||
+    value === 'coffee' ||
+    value === 'honey-glow' ||
+    value === 'marble-blue' ||
+    value === 'midnight-azure'
+  ) {
+    return value;
+  }
+
+  return undefined;
+}
+
 function shallowEqual<T extends Record<string, any>>(objA: T, objB: T): boolean {
   if (Object.is(objA, objB)) return true;
   if (typeof objA !== 'object' || objA === null || typeof objB !== 'object' || objB === null) return false;
@@ -63,9 +77,9 @@ function shallowEqual<T extends Record<string, any>>(objA: T, objB: T): boolean 
 interface UseAccountSettingsOptions {
   currentUser: User | null;
   activeView: 'board' | 'list';
-  theme: 'dark' | 'coal-black' | 'coffee' | 'honey-glow' | 'marble-blue';
+  theme: 'dark' | 'coal-black' | 'coffee' | 'honey-glow' | 'marble-blue' | 'midnight-azure';
   setView: (view: 'board' | 'list') => void;
-  setTheme: (theme: 'dark' | 'coal-black' | 'coffee' | 'honey-glow' | 'marble-blue') => void;
+  setTheme: (theme: 'dark' | 'coal-black' | 'coffee' | 'honey-glow' | 'marble-blue' | 'midnight-azure') => void;
 }
 
 export function useAccountSettings({
@@ -91,6 +105,8 @@ export function useAccountSettings({
   const [settingsHydrated, setSettingsHydrated] = useState(false);
   const [savedCredentials, setSavedCredentials] = useState<SavedApiCredential[]>([]);
   const [apiKeyState, setApiKeyState] = useState<'stored' | 'cleared' | 'pending'>('cleared');
+  const loadRequestId = useRef(0);
+  const saveRequestId = useRef(0);
 
   const savedCredentialByProvider = useMemo(() => {
     const map = new Map<WorkspaceSettings['aiProvider'], SavedApiCredential>();
@@ -142,6 +158,7 @@ export function useAccountSettings({
     }
 
     let cancelled = false;
+    const requestId = ++loadRequestId.current;
     setSettingsLoading(true);
     setSaveError(null);
     setSettingsHydrated(false);
@@ -155,27 +172,32 @@ export function useAccountSettings({
         return data;
       })
       .then((data) => {
-        if (!cancelled) {
-          const normalized = normalizeWorkspaceSettings(
-            data,
-            DEFAULT_WORKSPACE_SETTINGS.defaultView,
-            DEFAULT_WORKSPACE_SETTINGS.theme
-          );
-          setSettings(normalized);
-          setOriginalSettings(normalized);
-          setSavedCredentials(normalizeSavedCredentials(data.savedCredentials));
-          setTheme(normalized.theme);
-          setView(normalized.defaultView);
-          setApiKeyState(normalized.apiKey === API_KEY_MASK ? 'stored' : 'cleared');
+        if (cancelled || requestId <= saveRequestId.current) {
+          return;
         }
+
+        const normalizedTheme = coerceTheme(data.theme);
+        const nextTheme = normalizedTheme ?? theme;
+
+        const normalized = normalizeWorkspaceSettings(
+          data,
+          activeView,
+          nextTheme
+        );
+        setSettings(normalized);
+        setOriginalSettings(normalized);
+        setSavedCredentials(normalizeSavedCredentials(data.savedCredentials));
+        setTheme(nextTheme);
+        setView(normalized.defaultView);
+        setApiKeyState(normalized.apiKey === API_KEY_MASK ? 'stored' : 'cleared');
       })
       .catch((error: Error) => {
-        if (!cancelled) {
+        if (!cancelled && requestId > saveRequestId.current) {
           setSaveError(error.message);
         }
       })
       .finally(() => {
-        if (!cancelled) {
+        if (!cancelled && requestId > saveRequestId.current) {
           setSettingsLoading(false);
           setSettingsHydrated(true);
         }
@@ -277,6 +299,7 @@ export function useAccountSettings({
       return;
     }
 
+    const currentSaveRequestId = ++saveRequestId.current;
     setSaveLoading(true);
     setSaveSuccess(false);
     setSaveError(null);
@@ -284,8 +307,10 @@ export function useAccountSettings({
     try {
       const keyAction = KEY_ACTION[apiKeyState];
       const normalizedApiKey = normalizeApiKeyInput(settings.apiKey).trim();
+      const requestedTheme = coerceTheme(settings.theme) ?? theme;
       const payload = {
         ...settings,
+        theme: requestedTheme,
         keyAction,
         apiKey: keyAction === 'update' ? normalizedApiKey : undefined,
         ollamaModel: ollamaModels.length > 0 ? settings.ollamaModel : '',
@@ -302,10 +327,19 @@ export function useAccountSettings({
         throw new Error(data.error || 'Failed to save account settings.');
       }
 
+      if (currentSaveRequestId !== saveRequestId.current) {
+        return;
+      }
+
+      const normalizedTheme = coerceTheme(data?.theme) ?? requestedTheme;
+
       const normalized = normalizeWorkspaceSettings(
-        data,
-        DEFAULT_WORKSPACE_SETTINGS.defaultView,
-        DEFAULT_WORKSPACE_SETTINGS.theme
+        {
+          ...data,
+          theme: normalizedTheme,
+        },
+        activeView,
+        requestedTheme
       );
       setSettings(normalized);
       setOriginalSettings(normalized);
@@ -316,12 +350,16 @@ export function useAccountSettings({
       setTestResult(null);
       setSaveSuccess(true);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to save account settings.';
-      setSaveError(message);
+      if (currentSaveRequestId === saveRequestId.current) {
+        const message = error instanceof Error ? error.message : 'Failed to save account settings.';
+        setSaveError(message);
+      }
     } finally {
-      setSaveLoading(false);
+      if (currentSaveRequestId === saveRequestId.current) {
+        setSaveLoading(false);
+      }
     }
-  }, [currentUser, settings, apiKeyState, ollamaModels, setTheme, setView]);
+  }, [currentUser, activeView, settings, apiKeyState, ollamaModels, setTheme, setView]);
 
   const removeCredential = useCallback(async (provider: WorkspaceSettings['aiProvider']) => {
     if (!currentUser) {

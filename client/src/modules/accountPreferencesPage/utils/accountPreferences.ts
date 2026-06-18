@@ -41,6 +41,7 @@ export const THEME_OPTIONS = [
   { value: 'dark', label: 'Noir' },
   { value: 'coal-black', label: 'Coal Black' },
   { value: 'coffee', label: 'Coffee' },
+  { value: 'midnight-azure', label: 'Midnight Azure' },
   { value: 'honey-glow', label: 'Honey Glow' },
   { value: 'marble-blue', label: 'Marble Blue' },
 ] as const;

@@ -9,7 +9,7 @@ import { validateOllamaUrl } from '../ai/utils/utils.js';
 import { aiService } from '../ai/index.js';
 
 const DEFAULT_VIEWS = new Set(['board', 'list']);
-const THEMES = new Set(['dark', 'coal-black', 'coffee', 'honey-glow', 'marble-blue']);
+const THEMES = new Set(['dark', 'coal-black', 'coffee', 'honey-glow', 'marble-blue', 'midnight-azure']);
 const THEME_ALIASES = new Map<string, string>([
   ['light', 'marble-blue'],
   ['system', ''],
@@ -76,8 +76,12 @@ function getOptionalEnumValue(
   return { ok: true as const, value };
 }
 
-function normalizeTheme(rawValue: string): string | undefined {
+function normalizeTheme(rawValue: string): string | undefined | null {
   const normalized = rawValue.trim().toLowerCase().replace(/_/g, '-').replace(/\s+/g, '-');
+
+  if (!normalized.length) {
+    return undefined;
+  }
 
   if (normalized === 'system') {
     return undefined;
@@ -100,7 +104,7 @@ function normalizeTheme(rawValue: string): string | undefined {
     return withoutThemeSuffix;
   }
 
-  return undefined;
+  return null;
 }
 
 function getOptionalThemeValue(body: Record<string, unknown> | null | undefined, field: string) {
@@ -116,6 +120,9 @@ function getOptionalThemeValue(body: Record<string, unknown> | null | undefined,
   const normalized = normalizeTheme(value);
   if (normalized === undefined) {
     return { ok: true as const, value: undefined };
+  }
+  if (normalized === null) {
+    return { ok: false as const, error: `Invalid ${field}.` };
   }
   if (!THEMES.has(normalized)) {
     return { ok: false as const, error: `Invalid ${field}.` };

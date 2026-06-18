@@ -5,7 +5,7 @@ export const API_KEY_MASK = '••••••••••••';
 
 export interface WorkspaceSettings {
   defaultView: 'board' | 'list';
-  theme: 'dark' | 'coal-black' | 'coffee' | 'honey-glow' | 'marble-blue';
+  theme: 'dark' | 'coal-black' | 'coffee' | 'honey-glow' | 'marble-blue' | 'midnight-azure';
   ollamaModel: string;
   ollamaEndpoint: string;
   projectLayout: 'standard' | 'condensed';
@@ -78,10 +78,18 @@ export const getProviderOption = (provider: AIProvider): ProviderOption =>
 export const normalizeWorkspaceSettings = (
   raw: Partial<WorkspaceSettings> | null | undefined,
   activeView: 'board' | 'list',
-  theme: 'dark' | 'coal-black' | 'coffee' | 'honey-glow' | 'marble-blue'
+  theme: 'dark' | 'coal-black' | 'coffee' | 'honey-glow' | 'marble-blue' | 'midnight-azure',
 ): WorkspaceSettings => ({
   defaultView: raw?.defaultView === 'list' || raw?.defaultView === 'board' ? raw.defaultView : activeView,
-  theme: raw?.theme === 'dark' || raw?.theme === 'coal-black' || raw?.theme === 'coffee' || raw?.theme === 'honey-glow' || raw?.theme === 'marble-blue' ? raw.theme : theme,
+  theme:
+    raw?.theme === 'dark' ||
+    raw?.theme === 'coal-black' ||
+    raw?.theme === 'coffee' ||
+    raw?.theme === 'honey-glow' ||
+    raw?.theme === 'marble-blue' ||
+    raw?.theme === 'midnight-azure'
+      ? raw.theme
+      : theme,
   ollamaModel: typeof raw?.ollamaModel === 'string' ? raw.ollamaModel : DEFAULT_WORKSPACE_SETTINGS.ollamaModel,
   ollamaEndpoint:
     typeof raw?.ollamaEndpoint === 'string' && raw.ollamaEndpoint.trim().length > 0

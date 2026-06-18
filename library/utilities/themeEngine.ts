@@ -4,6 +4,7 @@ import coalBlackTheme from '../themes/coal-black.json';
 import coffeeTheme from '../themes/coffee.json';
 import marbleBlueTheme from '../themes/marble-blue.json';
 import honeyGlowTheme from '../themes/honey-glow.json';
+import midnightAzureTheme from '../themes/midnight-azure.json';
 
 export const KNOWN_THEME_COLOR_KEYS = [
   'primary',
@@ -88,8 +89,15 @@ export type ThemeValidationResult = {
   unknown: string[];
 };
 
-export type ThemePreference = 'dark' | 'coal-black' | 'coffee' | 'honey-glow' | 'marble-blue' | 'system';
-export type ResolvedThemeMode = 'dark' | 'coal-black' | 'coffee' | 'honey-glow' | 'marble-blue';
+export type ThemePreference =
+  | 'dark'
+  | 'coal-black'
+  | 'coffee'
+  | 'honey-glow'
+  | 'marble-blue'
+  | 'midnight-azure'
+  | 'system';
+export type ResolvedThemeMode = 'dark' | 'coal-black' | 'coffee' | 'honey-glow' | 'marble-blue' | 'midnight-azure';
 
 export const THEME_STORAGE_KEY = 'gravity_theme';
 
@@ -102,6 +110,7 @@ export const normalizeThemePreference = (value: string | null | undefined): Them
     value === 'coffee' ||
     value === 'honey-glow' ||
     value === 'marble-blue' ||
+    value === 'midnight-azure' ||
     value === 'system'
   ) {
     return value;
@@ -208,6 +217,7 @@ export const applyResolvedTheme = (resolvedTheme: ResolvedThemeMode) => {
     'coffee-theme',
     'honey-glow-theme',
     'marble-blue-theme',
+    'midnight-azure-theme',
   );
   root.removeAttribute('data-theme');
 
@@ -231,6 +241,10 @@ export const applyResolvedTheme = (resolvedTheme: ResolvedThemeMode) => {
     root.classList.add('marble-blue-theme', 'light-theme');
     root.setAttribute('data-theme', 'marble-blue');
     applyThemeConfig(marbleBlueTheme);
+  } else if (resolvedTheme === 'midnight-azure') {
+    root.classList.add('midnight-azure-theme', 'dark-theme');
+    root.setAttribute('data-theme', 'midnight-azure');
+    applyThemeConfig(midnightAzureTheme);
   }
 
   return resolvedTheme;
