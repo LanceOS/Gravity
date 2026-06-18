@@ -26,10 +26,59 @@ Gravity exposes two distinct MCP transports:
 7. **Execution**: The `executeTool` function (`server/src/mcp/tool-executor.ts`) dispatches the arguments to the registered handler (`server/src/mcp/tool-handlers/registry.ts`).
 8. **Response**: A JSON-RPC response containing the result or error is serialized and returned to the agent.
 
+## Realtime Mutation Events and SSE Fan-Out
+
+Tool handlers that mutate tickets, comments, labels, or dependencies also publish typed events to `mcpEventBus` (`server/src/lib/mcp-event-bus.ts`). The realtime service (`server/src/realtime.ts`) subscribes to that bus and broadcasts the events to workspace-scoped SSE clients. The client-side `TicketContext` then coalesces bursts of events and refetches only the data that changed.
+
+### Event Envelope
+
+Each SSE payload uses a consistent envelope:
+
+- `type`: the event name, such as `ticket.created` or `comment.added`
+- `workspaceId`: workspace scope for delivery
+- `projectId`: project scope when the mutation is project-bound
+- `teamId`: team scope when the mutation is team-bound
+- `ticketKey`: the affected ticket key when applicable
+- `actorUserId`: the user who triggered the mutation
+- `timestamp`: ISO-8601 event timestamp
+- `data`: event-specific payload
+
+### Event Types
+
+The current typed event set is:
+
+- `ticket.created`: fired after a ticket is created
+- `ticket.updated`: fired after ticket fields change
+- `ticket.deleted`: fired after a ticket is deleted
+- `comment.added`: fired after a comment is created
+- `comment.updated`: fired after a comment is edited
+- `comment.deleted`: fired after a comment is removed
+- `labels.added`: fired after labels are attached to a ticket
+- `labels.removed`: fired after labels are detached from a ticket
+- `labels.set`: fired when the full label set is replaced
+- `dependency.added`: fired after a ticket dependency is created
+- `dependency.removed`: fired after a ticket dependency is removed
+
+For backward compatibility, the SSE stream still accepts legacy broad-refresh events:
+
+- `tickets-updated`
+- `comments-updated`
+- `users-updated`
+- `init`
+
+### Client Refresh Behavior
+
+The current client does not fully replace local state with the SSE payload. Instead, it uses the event type to choose a targeted refresh:
+
+- Ticket, label, and dependency events refetch the active ticket detail with relations.
+- Comment events refetch the comment thread for the affected ticket.
+- A coalescer batches rapid mutations so a burst of updates can collapse into one network refresh.
+
 ## Data Stores and Resources
 - **`workspaceMembers`**: Read during transport validation to ensure the requesting user is a legitimate member of the workspace they are trying to act upon.
 - **`workspaces` (Settings)**: Read by `workspace-tools.ts` to retrieve `disabledMcpTools`, ensuring agents cannot bypass workspace owner controls.
 - **`tickets`, `projects`, `comments`**: Mutated or read by the specific tool handlers under `src/mcp/tool-handlers/`.
+- **`mcpEventBus`**: The in-process mutation event bus used to bridge domain writes into the realtime SSE layer.
 
 ## Interfaces and Contracts
 
@@ -47,6 +96,8 @@ The unified JSON-RPC dispatcher.
 - **`server/src/mcp/request-handler.ts`**: The protocol logic. Validates methods (`initialize`, `tools/list`, `tools/call`), processes tool filters, and calls the executor.
 - **`server/src/mcp/tool-executor.ts`**: Safely looks up and invokes the right function from the tool registry.
 - **`server/src/mcp/tool-handlers/registry.ts`**: Maps tool string names to actual implementation functions.
+- **`server/src/lib/mcp-event-bus.ts`**: Shared mutation event definitions and publish/subscribe helpers.
+- **`server/src/realtime.ts`**: Converts mutation events into client-facing SSE broadcasts.
 - **`server/src/lib/ai/ai-service.ts`**: Connects AI models to tool definitions and handles the bidirectional translation.
 - **`server/tests/auth-ai-mcp-webhooks.test.ts`**: Integration tests confirming that disabled tools fail and that unauthenticated/unauthorized users are denied.
 
@@ -66,4 +117,6 @@ The unified JSON-RPC dispatcher.
 
 ## Related Docs
 - [Link-Based MCP Connection](LINK_BASED_MCP_CONNECTION.md)
-- *(Add links to related auth, workspace membership, or ticket model documentation if applicable)*
+- [Adding MCP SSE Events](ADDING_MCP_SSE_EVENTS.md)
+- [Client State Management](../client/CLIENT_STATE_MANAGEMENT.md)
+- [Server Architecture Overview](../server/SERVER_ARCHITECTURE_OVERVIEW.md)

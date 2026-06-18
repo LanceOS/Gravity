@@ -27,7 +27,13 @@ podman compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml dow
 
 Docs
 -----
-Documentation is located in the `docs/` folder. See [docs/CSRF_IMPLEMENTATION.md](docs/CSRF_IMPLEMENTATION.md) for details on the server CSRF implementation.
+Documentation is located in the `docs/` folder. Good starting points:
+
+- [docs/CSRF_IMPLEMENTATION.md](docs/CSRF_IMPLEMENTATION.md) for server CSRF details
+- [docs/mcp/MCP_FLOW.md](docs/mcp/MCP_FLOW.md) for MCP request handling and realtime mutation events
+- [docs/mcp/ADDING_MCP_SSE_EVENTS.md](docs/mcp/ADDING_MCP_SSE_EVENTS.md) for adding new SSE-emitting MCP tools
+- [docs/client/CLIENT_STATE_MANAGEMENT.md](docs/client/CLIENT_STATE_MANAGEMENT.md) for client-side cache and SSE handling
+- [docs/server/SERVER_ARCHITECTURE_OVERVIEW.md](docs/server/SERVER_ARCHITECTURE_OVERVIEW.md) for the backend module layout
 
 ## Watch the nginx frontend on 5173
 

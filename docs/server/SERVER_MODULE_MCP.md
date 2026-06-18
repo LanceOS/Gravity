@@ -16,10 +16,12 @@ The `mcp` module (`server/src/modules/mcp/`) serves as the core framework implem
 2. **Request Reception**: The router intercepts JSON-RPC requests (`tools/list`, `tools/call`).
 3. **Context Resolution**: `resolveMcpContext` verifies the trusted context and actor ID using the transport-specific source; header parsing applies to the HTTP router path, while stdio uses the resolved stdio configuration.
 4. **Tool Dispatch**: `executeTool` matches the requested tool name against the `toolHandlers` registry and delegates the arguments to the target handler.
+5. **Realtime Publication**: Mutation handlers publish typed events to `mcpEventBus` after a successful write. The shared realtime service consumes those events and fans them out over SSE so the UI can update without a refresh.
 
 ## 5. Data Stores and Resources
 - Reads `workspace_settings` via `getDisabledTools` to dynamically remove deactivated tools from the `tools/list` output.
 - Operates primarily in-memory using `McpStateMap` to maintain session-specific contexts.
+- Shares the process-local `mcpEventBus` with the realtime layer for mutation broadcasts.
 
 ## 6. Interfaces and Contracts
 - **Stdio Transport**: Listens to `process.stdin` and writes to `process.stdout`.
@@ -32,11 +34,13 @@ The `mcp` module (`server/src/modules/mcp/`) serves as the core framework implem
 - `tool-executor.ts`: Evaluates tool executions safely.
 - `request-context.ts`: Authorizes cross-tenant MCP calls.
 - `tool-handlers/registry.ts` & `tools.ts`: The central dynamic registries holding loaded handlers and tool metadata. Handlers are injected at startup to prevent circular dependencies.
+- `lib/mcp-event-bus.ts`: Typed mutation event contract shared with the realtime layer.
 - `index.ts`: The barrel file for the `mcp` module API.
 
 ## 8. Permissions, Guards, or Tenant Boundaries
 - **Context Integrity**: The MCP router mandates that an explicit `workspaceId` is established. Domain handlers trust this context to isolate resources (tenant boundary).
 - **Tool Disablement**: Enforces `disabled_mcp_tools` defined by workspace owners.
+- **Event Emission Discipline**: Any new mutating tool should publish a typed realtime event rather than writing directly to the SSE layer.
 
 ## 9. Failure Modes, Observability, or Operational Notes
 - Custom JSON-RPC error responses (`createMcpErrorResponse`) gracefully handle invalid arguments or missing permissions without crashing the stdio process.
@@ -46,3 +50,4 @@ The `mcp` module (`server/src/modules/mcp/`) serves as the core framework implem
 
 ## 11. Related Docs
 - [SERVER_ARCHITECTURE_OVERVIEW.md](SERVER_ARCHITECTURE_OVERVIEW.md)
+- [MCP_FLOW.md](../mcp/MCP_FLOW.md)
