@@ -233,7 +233,7 @@ describe('TicketContext', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/auth/session', { credentials: 'same-origin' });
     expect(fetchMock).toHaveBeenNthCalledWith(2, `/api/v1/projects?userId=${encodeURIComponent(user.id)}`, expect.any(Object));
     expect(fetchMock).toHaveBeenNthCalledWith(3, '/api/v1/users', expect.any(Object));
-    expect(EventSourceMock).toHaveBeenCalledWith('/api/v1/events/subscribe?workspaceId=workspace-1');
+    expect(EventSourceMock).toHaveBeenCalledWith('/api/v1/events/subscribe?workspaceId=workspace-1', { withCredentials: true });
     expect(window.localStorage.getItem('gravity_user')).toContain(user.id);
   });
 

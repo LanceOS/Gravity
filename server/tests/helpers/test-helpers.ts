@@ -158,6 +158,18 @@ export async function seedUser(overrides: Partial<UserSeed> = {}) {
   return user;
 }
 
+function extractCookieHeader(cookieHeader: string | string[] | undefined): string {
+  if (!cookieHeader) {
+    return '';
+  }
+
+  const cookieValues = Array.isArray(cookieHeader) ? cookieHeader : [cookieHeader];
+  return cookieValues
+    .map((value) => value.split(';')[0])
+    .filter(Boolean)
+    .join('; ');
+}
+
 export async function createAuthenticatedApi(
   overrides: Partial<UserSeed> & { password?: string } = {},
 ) {
@@ -202,12 +214,15 @@ export async function createAuthenticatedApi(
     throw new Error(`Failed to load authenticated test user ${userId}.`);
   }
 
+  const sessionCookie = extractCookieHeader(signUpResponse.headers['set-cookie']);
+
   tdebug('getUserById found', { userId: user.id });
 
   return {
     agent,
     user,
     password,
+    sessionCookie,
     ...apiForAgent(agent),
   };
 }
@@ -446,7 +461,7 @@ export function jsonResponse(body: unknown, init: ResponseInit = {}) {
   });
 }
 
-export async function readSseChunk(path: string) {
+export async function readSseChunk(path: string, options: { headers?: http.OutgoingHttpHeaders } = {}) {
   const server = createApp().listen(0);
 
   try {
@@ -462,6 +477,7 @@ export async function readSseChunk(path: string) {
           method: 'GET',
           path,
           port: (address as AddressInfo).port,
+          headers: options.headers,
         },
         (res) => {
           res.setEncoding('utf8');

@@ -87,6 +87,13 @@ export async function revokeConnectionToken(tokenId: string, requestingUserId: s
   const rows = await db.select().from(mcpConnectionTokens).where(eq(mcpConnectionTokens.id, tokenId)).limit(1);
   const tokenRow = rows[0];
   await db.update(mcpConnectionTokens).set({ status: 'revoked', revokedAt: new Date() }).where(eq(mcpConnectionTokens.id, tokenId));
+  let disconnectedCount = 0;
+  try {
+    const realtime = await import('../../realtime.js');
+    disconnectedCount = await realtime.disconnectSseConnectionsByToken(tokenId);
+  } catch (err) {
+    // best-effort
+  }
   try {
     audit('mcp.token.revoked', {
       id: tokenId,
@@ -95,6 +102,7 @@ export async function revokeConnectionToken(tokenId: string, requestingUserId: s
       revokedBy: requestingUserId,
       connectionType: tokenRow?.connectionType ?? null,
       scopes: tokenRow?.scopes ?? null,
+      disconnectedSseConnections: disconnectedCount,
     });
   } catch (e) {
     // best-effort

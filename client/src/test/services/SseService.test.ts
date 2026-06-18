@@ -109,7 +109,10 @@ describe('SseService', () => {
 
     expect(instances).toHaveLength(1);
     expect(instances[0].url).toBe('/api/v1/events/subscribe?workspaceId=workspace-1');
-    expect(eventSourceFactory).toHaveBeenCalledWith('/api/v1/events/subscribe?workspaceId=workspace-1');
+    expect(eventSourceFactory).toHaveBeenCalledWith(
+      '/api/v1/events/subscribe?workspaceId=workspace-1',
+      { withCredentials: true },
+    );
 
     instances[0].emitMessage(JSON.stringify({ type: 'tickets-updated', data: { projectId: 'project-1' } }));
 
