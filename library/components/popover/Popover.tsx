@@ -67,6 +67,20 @@ export function Popover({ trigger, children, isOpen: controlledIsOpen, onOpenCha
     popoverRef.current.style.overflowY = 'auto';
   }, [align, shouldRender]);
 
+  const handleViewportChange = React.useCallback(
+    (event?: Event) => {
+      if (event instanceof Event) {
+        const target = event.target;
+        if (target instanceof Node && popoverRef.current?.contains(target)) {
+          return;
+        }
+      }
+
+      syncPosition();
+    },
+    [syncPosition]
+  );
+
   const setPopoverElement = React.useCallback((node: HTMLDivElement | null) => {
     popoverRef.current = node;
 
@@ -77,15 +91,15 @@ export function Popover({ trigger, children, isOpen: controlledIsOpen, onOpenCha
 
   React.useLayoutEffect(() => {
     if (shouldRender) {
-      syncPosition();
+      handleViewportChange();
       window.addEventListener('resize', syncPosition);
-      window.addEventListener('scroll', syncPosition, true);
+      window.addEventListener('scroll', handleViewportChange, true);
     }
     return () => {
       window.removeEventListener('resize', syncPosition);
-      window.removeEventListener('scroll', syncPosition, true);
+      window.removeEventListener('scroll', handleViewportChange, true);
     };
-  }, [shouldRender, syncPosition]);
+  }, [shouldRender, handleViewportChange, syncPosition]);
 
   React.useEffect(() => {
     if (shouldRender && popoverRef.current) {

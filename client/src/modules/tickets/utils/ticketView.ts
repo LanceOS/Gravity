@@ -30,6 +30,33 @@ export type TicketsByStatus = Record<Ticket['status'], Ticket[]>;
 
 export { BOARD_COLUMNS, LIST_STATUS_ORDER };
 
+function parseDateForSort(value: string): number | null {
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+function compareDateDescending(first: string, second: string): number {
+  const firstTime = parseDateForSort(first);
+  const secondTime = parseDateForSort(second);
+
+  if (firstTime !== null && secondTime !== null) {
+    return secondTime - firstTime;
+  }
+
+  return second.localeCompare(first);
+}
+
+function compareDateAscending(first: string, second: string): number {
+  const firstTime = parseDateForSort(first);
+  const secondTime = parseDateForSort(second);
+
+  if (firstTime !== null && secondTime !== null) {
+    return firstTime - secondTime;
+  }
+
+  return first.localeCompare(second);
+}
+
 export function filterTickets(tickets: Ticket[], filters: TicketFilters): Ticket[] {
   const selectedLabelId = filters.labelId ?? filters.domainId;
   const statusFilters = filters.status
@@ -149,39 +176,46 @@ export function sortTicketsForList(
         const labelComparison = firstLabel.name.localeCompare(secondLabel.name);
         if (labelComparison !== 0) return labelComparison;
       }
-      return first.createdAt.localeCompare(second.createdAt);
+      return compareDateAscending(first.createdAt, second.createdAt);
     }
 
-  if (sort === 'newest') {
-    return second.createdAt.localeCompare(first.createdAt);
-  }
-  if (sort === 'newest_urgent') {
-    const newestDiff = second.createdAt.localeCompare(first.createdAt);
-    if (newestDiff !== 0) {
-      return newestDiff;
+    if (sort === 'newest') {
+      return compareDateDescending(first.createdAt, second.createdAt);
     }
-    return priorityWeights[second.priority] - priorityWeights[first.priority];
-  }
+    if (sort === 'newest_urgent') {
+      const priorityDiff = priorityWeights[second.priority] - priorityWeights[first.priority];
+      if (priorityDiff !== 0) {
+        return priorityDiff;
+      }
+
+      return compareDateDescending(first.createdAt, second.createdAt);
+    }
     if (sort === 'oldest') {
-      return first.createdAt.localeCompare(second.createdAt);
+      return compareDateAscending(first.createdAt, second.createdAt);
     }
 
     if (sort === 'priority_desc') {
       const diff = priorityWeights[second.priority] - priorityWeights[first.priority];
       if (diff !== 0) return diff;
-      return second.createdAt.localeCompare(first.createdAt);
+      return compareDateDescending(first.createdAt, second.createdAt);
     }
     if (sort === 'priority_asc') {
       const diff = priorityWeights[first.priority] - priorityWeights[second.priority];
       if (diff !== 0) return diff;
-      return first.createdAt.localeCompare(second.createdAt);
+      return compareDateAscending(first.createdAt, second.createdAt);
     }
 
     if (sort === 'updated_desc') {
-      return (second.updatedAt || second.createdAt).localeCompare(first.updatedAt || first.createdAt);
+      return compareDateDescending(
+        first.updatedAt || first.createdAt,
+        second.updatedAt || second.createdAt
+      );
     }
     if (sort === 'updated_asc') {
-      return (first.updatedAt || first.createdAt).localeCompare(second.updatedAt || second.createdAt);
+      return compareDateAscending(
+        first.updatedAt || first.createdAt,
+        second.updatedAt || second.createdAt
+      );
     }
 
     return first.key.localeCompare(second.key);

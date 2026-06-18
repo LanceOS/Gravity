@@ -154,6 +154,7 @@ export const TicketFilterBar: React.FC<TicketFilterBarProps> = ({
                     }}
                   >
                     <input
+                      className="ticket-filter-bar__label-checkbox"
                       type="checkbox"
                       checked={isChecked}
                       onChange={() => {
@@ -162,7 +163,6 @@ export const TicketFilterBar: React.FC<TicketFilterBarProps> = ({
                           : [...selectedLabelIds, l.id];
                         onFilterChange({ labels: nextLabels });
                       }}
-                      style={{ cursor: 'pointer' }}
                     />
                     <div
                       style={{
@@ -249,12 +249,10 @@ export const TicketFilterBar: React.FC<TicketFilterBarProps> = ({
               variant="secondary"
               size="md"
               className="ticket-filter-bar__filter-btn"
-              style={{ paddingRight: '34px', minWidth: '112px' }}
+              aria-label="Open filters"
+              title="Open filters"
             >
-              <span className="ticket-filter-bar__filter-btn-content">
-                <Filter size={16} />
-                <span>Filter</span>
-              </span>
+              <Filter className="ticket-filter-bar__filter-icon" size={16} aria-hidden="true" focusable="false" />
               {activeCount > 0 && (
                 <Badge variant="accent" className="ticket-filter-bar__filter-badge">
                   {activeCount}
