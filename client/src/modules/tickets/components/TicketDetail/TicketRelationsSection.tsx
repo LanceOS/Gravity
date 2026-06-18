@@ -45,7 +45,7 @@ export const TicketRelationsSection: React.FC<TicketRelationsSectionProps> = ({
   onRemoveBlocker,
 }) => {
   const dependencyLinks = activeTicketDetail?.dependencies || [];
-  const blockerLinks = activeTicketDetail?.blockers || (activeTicketDetail?.blockedTicket ? [activeTicketDetail.blockedTicket] : []);
+  const blockerLinks = activeTicketDetail?.blockers || [];
   const canManageBlockers = typeof onAddBlocker === 'function' && typeof onRemoveBlocker === 'function';
 
   const dependencyTicketIds = useMemo(() => new Set(dependencyLinks.map((dependency) => dependency.id)), [dependencyLinks]);
@@ -54,9 +54,9 @@ export const TicketRelationsSection: React.FC<TicketRelationsSectionProps> = ({
     return new Set(collectRelatedTicketIds({
       dependencies: activeTicketDetail?.dependencies,
       blockers: activeTicketDetail?.blockers,
-      blockedTicket: activeTicketDetail?.blockedTicket ?? null,
+      
     }));
-  }, [activeTicketDetail?.blockedTicket, activeTicketDetail?.blockers, activeTicketDetail?.dependencies]);
+  }, [ activeTicketDetail?.blockers, activeTicketDetail?.dependencies]);
   const isCompatibleRelationCandidate = useCallback((ticketId: string) => {
     return ticketId !== activeTicket.id && !relatedTicketIds.has(ticketId);
   }, [activeTicket.id, relatedTicketIds]);
