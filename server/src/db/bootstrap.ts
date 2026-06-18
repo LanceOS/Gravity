@@ -61,6 +61,13 @@ async function hasColumn(tableName: string, columnName: string) {
   }
 }
 
+async function ensureColumn(tableName: string, columnName: string, definition: string) {
+  const hasColumnAlready = await hasColumn(tableName, columnName);
+  if (hasColumnAlready) return;
+
+  await pool.query(`ALTER TABLE "${tableName}" ADD COLUMN "${columnName}" ${definition}`);
+}
+
 async function ensureConstraint(tableName: string, constraintName: string, definition: string) {
   if (await hasConstraint(constraintName)) {
     return;
@@ -388,6 +395,15 @@ export async function initializeDatabase() {
     ALTER TABLE user_external_credentials ADD COLUMN IF NOT EXISTS preferred_model TEXT;
   `);
 
+  const hasTicketsTableForMigration = await hasTable('tickets');
+  const hasTicketDependenciesTableForMigration = await hasTable('ticket_dependencies');
+  if (hasTicketsTableForMigration) {
+    await ensureColumn('tickets', 'blocked_ticket_id', 'TEXT');
+  }
+  if (hasTicketDependenciesTableForMigration) {
+    await ensureColumn('ticket_dependencies', 'blocked_ticket_id', 'TEXT');
+  }
+
   // Backfill `provider` in a set-based update (avoids N+1 queries)
   if (!env.databaseUrl.startsWith('pgmem://')) {
     await pool.query(`
@@ -466,16 +482,20 @@ export async function initializeDatabase() {
     CREATE UNIQUE INDEX IF NOT EXISTS labels_project_name_unique_idx ON labels (project_id, name) WHERE project_id IS NOT NULL;
   `);
 
-  await pool.query(`
-    INSERT INTO ticket_dependencies (ticket_id, blocked_ticket_id)
-    SELECT blocked_ticket_id, id
-    FROM tickets
-    WHERE blocked_ticket_id IS NOT NULL
-    ON CONFLICT (ticket_id, blocked_ticket_id) DO NOTHING;
-  `).catch((err) => {
-    // eslint-disable-next-line no-console
-    console.error('Failed to backfill ticket dependency relations:', err);
-  });
+  const hasBlockedTicketColumn = await hasColumn('tickets', 'blocked_ticket_id');
+  const hasBlockedTicketDependenciesColumn = await hasColumn('ticket_dependencies', 'blocked_ticket_id');
+  if (hasBlockedTicketColumn && hasBlockedTicketDependenciesColumn) {
+    await pool.query(`
+      INSERT INTO ticket_dependencies (ticket_id, blocked_ticket_id)
+      SELECT blocked_ticket_id, id
+      FROM tickets
+      WHERE blocked_ticket_id IS NOT NULL
+      ON CONFLICT (ticket_id, blocked_ticket_id) DO NOTHING;
+    `).catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error('Failed to backfill ticket dependency relations:', err);
+    });
+  }
 
   // Migrate/Bootstrap default teams and preserve legacy domains as team labels.
   const hasProjectsTable = await hasTable('projects');
@@ -487,6 +507,8 @@ export async function initializeDatabase() {
   const cyclesHaveProjectId = hasCyclesTable && await hasColumn('cycles', 'project_id');
   const labelsHaveProjectId = hasLabelsTable && await hasColumn('labels', 'project_id');
   const ticketsHaveDomainId = hasTicketsTable && await hasColumn('tickets', 'domain_id');
+  const hasDomainsTeamId = hasDomainsTable && await hasColumn('domains', 'team_id');
+  const domainsTeamIdExpression = hasDomainsTeamId ? 'domains.team_id' : 'projects.team_id';
 
   await pool.query(`
     INSERT INTO teams (id, workspace_id, name, description, color, created_at, updated_at)
@@ -561,10 +583,10 @@ export async function initializeDatabase() {
     if (labelsHaveProjectId) {
       await pool.query(`
         INSERT INTO labels (id, project_id, team_id, name, color, description, sort_order, created_at)
-        SELECT domains.id, domains.project_id, COALESCE(domains.team_id, projects.team_id), domains.name, domains.color, '', 0, domains.created_at
+        SELECT domains.id, domains.project_id, COALESCE(${domainsTeamIdExpression}, projects.team_id), domains.name, domains.color, '', 0, domains.created_at
         FROM domains
         LEFT JOIN projects ON domains.project_id = projects.id
-        WHERE COALESCE(domains.team_id, projects.team_id) IS NOT NULL
+        WHERE COALESCE(${domainsTeamIdExpression}, projects.team_id) IS NOT NULL
         ON CONFLICT (id) DO NOTHING;
       `).catch((err) => {
         // eslint-disable-next-line no-console
@@ -573,10 +595,10 @@ export async function initializeDatabase() {
     } else {
       await pool.query(`
         INSERT INTO labels (id, team_id, name, color, description, sort_order, created_at)
-        SELECT domains.id, COALESCE(domains.team_id, projects.team_id), domains.name, domains.color, '', 0, domains.created_at
+        SELECT domains.id, COALESCE(${domainsTeamIdExpression}, projects.team_id), domains.name, domains.color, '', 0, domains.created_at
         FROM domains
         LEFT JOIN projects ON domains.project_id = projects.id
-        WHERE COALESCE(domains.team_id, projects.team_id) IS NOT NULL
+        WHERE COALESCE(${domainsTeamIdExpression}, projects.team_id) IS NOT NULL
         ON CONFLICT (id) DO NOTHING;
       `).catch((err) => {
         // eslint-disable-next-line no-console
@@ -593,7 +615,7 @@ export async function initializeDatabase() {
         LEFT JOIN projects ON domains.project_id = projects.id
         WHERE tickets.domain_id IS NOT NULL
           AND tickets.domain_id <> ''
-          AND COALESCE(domains.team_id, projects.team_id) IS NOT NULL
+          AND COALESCE(${domainsTeamIdExpression}, projects.team_id) IS NOT NULL
         ON CONFLICT (ticket_id, label_id) DO NOTHING;
       `).catch((err) => {
         // eslint-disable-next-line no-console

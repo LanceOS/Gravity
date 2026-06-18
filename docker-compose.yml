@@ -1,7 +1,6 @@
 services:
   postgres:
     image: docker.io/library/postgres:16-alpine
-    container_name: ${GRAVITY_POSTGRES_CONTAINER:-gravity_postgres_dev}
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${GRAVITY_POSTGRES_DB:-gravity_workspace}
@@ -19,7 +18,6 @@ services:
 
   redis:
     image: docker.io/library/redis:7-alpine
-    container_name: ${GRAVITY_REDIS_CONTAINER:-gravity_redis_dev}
     restart: unless-stopped
     command: >
       sh -c 'if [ -n "$$GRAVITY_REDIS_PASSWORD" ]; then redis-server --requirepass "$$GRAVITY_REDIS_PASSWORD"; else redis-server; fi'
@@ -32,23 +30,25 @@ services:
       - gravity_backend_db_redis
 
   rustfs:
-    image: docker.io/library/minio:RELEASE.2024-01-28T22-35-53Z
-    container_name: ${GRAVITY_RUSTFS_CONTAINER:-gravity_rustfs_dev}
+    image: rustfs/rustfs:latest
     restart: unless-stopped
-    command: server /data/rustfs --console-address ":9001"
+    command: /data/rustfs --console-enable
+    user: "0:0"
     environment:
-      MINIO_ROOT_USER: ${RUSTFS_ACCESS_KEY:-admin}
-      MINIO_ROOT_PASSWORD: ${RUSTFS_SECRET_KEY:-password}
+      RUSTFS_ADDRESS: 0.0.0.0:9000
+      RUSTFS_CONSOLE_ADDRESS: 0.0.0.0:9001
+      RUSTFS_CONSOLE_ENABLE: true
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:-admin}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:-password}
     volumes:
       - gravity_rustfs_data:/data/rustfs
-    ports:
-      - "${RUSTFS_PORT:-9000}:9000"
-      - "${RUSTFS_CONSOLE_PORT:-9001}:9001"
+      - gravity_rustfs_logs:/logs
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 5s
+      test: ["CMD", "sh", "-ec", "curl -s http://localhost:9000/ >/dev/null && curl -s http://localhost:9001/ >/dev/null"]
+      interval: 10s
+      start_period: 20s
       timeout: 5s
-      retries: 5
+      retries: 12
     networks:
       - gravity_backend_db_redis
 
@@ -57,7 +57,6 @@ services:
       context: .
       dockerfile: server/Dockerfile
       target: runner
-    container_name: ${GRAVITY_BACKEND_CONTAINER:-gravity_app_server}
     restart: unless-stopped
     environment:
       PORT: ${PORT:-8080}
@@ -93,7 +92,7 @@ services:
       redis:
         condition: service_healthy
       rustfs:
-        condition: service_healthy
+        condition: service_started
     networks:
       - gravity_backend_db_redis
       - gravity_frontend_backend
@@ -103,7 +102,6 @@ services:
       context: .
       dockerfile: client/Dockerfile
       target: runner
-    container_name: ${GRAVITY_FRONTEND_CONTAINER:-gravity_frontend}
     restart: unless-stopped
     environment:
       BACKEND_UPSTREAM: http://backend:8080
@@ -124,6 +122,7 @@ volumes:
 networks:
   gravity_frontend_backend:
     driver: bridge
+    internal: true
   gravity_backend_db_redis:
     driver: bridge
     internal: true
