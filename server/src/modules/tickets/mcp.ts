@@ -1,6 +1,6 @@
-import { eq, and, inArray, isNull } from 'drizzle-orm';
+import { asc, eq, and, inArray, isNull } from 'drizzle-orm';
 import { db } from '../../db/index.js';
-import { projects, labels } from '../../db/schema.js';
+import { projects, labels, teams, ticketLabels, workspaceSettings } from '../../db/schema.js';
 import { audit } from '../../lib/logger.js';
 import {
   addCommentRecord,
@@ -117,11 +117,11 @@ export class TicketTools {
   async createTicket(args: Record<string, unknown>, context: ToolExecutionContext) {
     const now = Date.now();
     const lastCreationTime = this.creationRateLimitMap.get(context.actorUserId) ?? 0;
-    
+
     if (process.env.NODE_ENV !== 'test' && now - lastCreationTime < 3000) {
       throw new Error('Rate limit exceeded: You can only create one ticket every 3 seconds from this server instance. Please wait a moment and try again.');
     }
-    
+
     this.creationRateLimitMap.set(context.actorUserId, now);
 
     const projectId = String(args.projectId ?? '');
@@ -270,7 +270,7 @@ export class TicketTools {
    * @description Reads all labels currently assigned to a specific ticket.
    * @param args Tool arguments containing the ticket key.
    * @param context Trusted tool execution context.
-   * @return A list of human-readable label names assigned to the ticket.
+   * @return An array of label objects (name, color, description) assigned to the ticket.
    * @throws When the ticket does not exist or belongs to another workspace.
    */
   async getTicketLabels(args: Record<string, unknown>, context: ToolExecutionContext) {
@@ -282,16 +282,177 @@ export class TicketTools {
 
     await this.assertProjectInWorkspace(ticket.projectId, context.workspaceId);
 
-    const labelNames = ticket.labels.map(l => l.name);
-    return { labels: labelNames };
+    // getTicketByKey does not join label rows — query directly.
+    const rows = await db
+      .select({
+        name: labels.name,
+        color: labels.color,
+        description: labels.description,
+      })
+      .from(ticketLabels)
+      .innerJoin(labels, eq(labels.id, ticketLabels.labelId))
+      .where(eq(ticketLabels.ticketId, ticket.id))
+      .orderBy(asc(labels.sortOrder), asc(labels.name));
+
+    return { labels: rows };
+  }
+
+  /**
+   * @description Adds one or more labels to a ticket without removing existing ones.
+   * Duplicate labels are silently skipped.
+   * @param args Tool arguments containing the ticket key and label names to add.
+   * @param context Trusted tool execution context.
+   * @return Confirmation with the updated full list of labels on the ticket.
+   * @throws When the ticket does not exist, belongs to another workspace, or any
+   *   specified label does not exist in the project/team scope.
+   */
+  async addTicketLabels(args: Record<string, unknown>, context: ToolExecutionContext) {
+    const ticketKey = String(args.ticketKey ?? '').toUpperCase();
+    const ticket = await getTicketByKey(ticketKey);
+    if (!ticket) {
+      throw new Error(`Ticket ${ticketKey} not found.`);
+    }
+
+    await this.assertProjectInWorkspace(ticket.projectId, context.workspaceId);
+
+    const labelsToAdd = typeof args.labels === 'string'
+      ? args.labels.split(',').map(s => s.trim()).filter(Boolean)
+      : Array.isArray(args.labels)
+        ? args.labels.map(String)
+        : [];
+
+    if (labelsToAdd.length === 0) {
+      // Nothing to add — return current labels.
+      const current = await db
+        .select({ name: labels.name, color: labels.color, description: labels.description })
+        .from(ticketLabels)
+        .innerJoin(labels, eq(labels.id, ticketLabels.labelId))
+        .where(eq(ticketLabels.ticketId, ticket.id))
+        .orderBy(asc(labels.sortOrder), asc(labels.name));
+      return { labels: current };
+    }
+
+    const projectScope = await getProjectScope(ticket.projectId);
+    if (!projectScope) {
+      throw new Error(`Project ${ticket.projectId} not found.`);
+    }
+    const scopeLabel = projectScope.hierarchyMode === 'flat' ? 'project' : 'team';
+
+    // Resolve requested label names to IDs within the correct scope.
+    const resolvedNew = await db
+      .select({ id: labels.id, name: labels.name })
+      .from(labels)
+      .where(
+        projectScope.hierarchyMode === 'flat'
+          ? and(eq(labels.projectId, ticket.projectId), inArray(labels.name, labelsToAdd))
+          : and(eq(labels.teamId, projectScope.teamId), isNull(labels.projectId), inArray(labels.name, labelsToAdd)),
+      );
+
+    if (resolvedNew.length !== labelsToAdd.length) {
+      const foundNames = new Set(resolvedNew.map(l => l.name));
+      const missing = labelsToAdd.filter(n => !foundNames.has(n));
+      throw new Error(
+        `The following labels do not exist in this ${scopeLabel}: ${missing.join(', ')}. ` +
+        `Use list_workspace_labels to see available labels.`,
+      );
+    }
+
+    // Fetch IDs already on the ticket so we avoid inserting duplicates.
+    const existingRows = await db
+      .select({ labelId: ticketLabels.labelId })
+      .from(ticketLabels)
+      .where(eq(ticketLabels.ticketId, ticket.id));
+    const existingLabelIds = new Set(existingRows.map(r => r.labelId));
+
+    const newEntries = resolvedNew
+      .filter(l => !existingLabelIds.has(l.id))
+      .map(l => ({ ticketId: ticket.id, labelId: l.id }));
+
+    if (newEntries.length > 0) {
+      await db.insert(ticketLabels).values(newEntries).onConflictDoNothing();
+    }
+
+    // Return the full updated label list.
+    const updated = await db
+      .select({ name: labels.name, color: labels.color, description: labels.description })
+      .from(ticketLabels)
+      .innerJoin(labels, eq(labels.id, ticketLabels.labelId))
+      .where(eq(ticketLabels.ticketId, ticket.id))
+      .orderBy(asc(labels.sortOrder), asc(labels.name));
+
+    audit('add_ticket_labels', {
+      workspaceId: context.workspaceId,
+      actorUserId: context.actorUserId,
+      ticketKey,
+      addedLabels: labelsToAdd,
+      finalLabels: updated.map(l => l.name),
+    });
+
+    return { labels: updated };
+  }
+
+  /**
+   * @description Lists all labels available in the authorized workspace.
+   * Scopes the query to the workspace resolved from the trusted context;
+   * an optional projectId narrows results further.
+   * @param args Tool arguments optionally containing a projectId.
+   * @param context Trusted tool execution context.
+   * @return An array of label objects available in the workspace/project.
+   */
+  async listWorkspaceLabels(args: Record<string, unknown>, context: ToolExecutionContext) {
+    const explicitProjectId = typeof args.projectId === 'string' && args.projectId.trim().length > 0
+      ? args.projectId.trim()
+      : undefined;
+
+    if (explicitProjectId) {
+      // Validate the project belongs to the authorized workspace.
+      await this.assertProjectInWorkspace(explicitProjectId, context.workspaceId);
+
+      const rows = await db
+        .select({
+          name: labels.name,
+          color: labels.color,
+          description: labels.description,
+          projectId: labels.projectId,
+        })
+        .from(labels)
+        .where(eq(labels.projectId, explicitProjectId))
+        .orderBy(asc(labels.sortOrder), asc(labels.name));
+
+      return { labels: rows.map(r => ({ name: r.name, color: r.color, description: r.description, projectId: r.projectId ?? undefined })) };
+    }
+
+    // No explicit project — return all labels scoped to the workspace via team membership.
+    const rows = await db
+      .select({
+        name: labels.name,
+        color: labels.color,
+        description: labels.description,
+        teamId: labels.teamId,
+        projectId: labels.projectId,
+      })
+      .from(labels)
+      .innerJoin(teams, eq(teams.id, labels.teamId))
+      .where(eq(teams.workspaceId, context.workspaceId))
+      .orderBy(asc(labels.sortOrder), asc(labels.name));
+
+    return {
+      labels: rows.map(r => ({
+        name: r.name,
+        color: r.color,
+        description: r.description,
+        ...(r.projectId ? { projectId: r.projectId } : { teamId: r.teamId }),
+      })),
+    };
   }
 
   /**
    * @description Removes one or more labels from a ticket by name.
+   * Specified labels not present on the ticket are silently skipped.
    * @param args Tool arguments containing the ticket key and label names to remove.
    * @param context Trusted tool execution context.
-   * @return The updated list of label names on the ticket.
-   * @throws When the ticket does not exist, belongs to another workspace, or label resolution fails.
+   * @return The updated list of label objects on the ticket.
+   * @throws When the ticket does not exist or belongs to another workspace.
    */
   async removeTicketLabels(args: Record<string, unknown>, context: ToolExecutionContext) {
     const ticketKey = String(args.ticketKey ?? '').toUpperCase();
@@ -307,13 +468,26 @@ export class TicketTools {
       : Array.isArray(args.labels)
         ? args.labels.map(String)
         : [];
+
+    // getTicketByKey does not join label rows — query the current label set directly.
+    const currentLabelRows = await db
+      .select({ id: labels.id, name: labels.name })
+      .from(ticketLabels)
+      .innerJoin(labels, eq(labels.id, ticketLabels.labelId))
+      .where(eq(ticketLabels.ticketId, ticket.id));
+
     if (labelsToRemove.length === 0) {
-      return { labels: ticket.labels.map(l => l.name) };
+      const full = await db
+        .select({ name: labels.name, color: labels.color, description: labels.description })
+        .from(ticketLabels)
+        .innerJoin(labels, eq(labels.id, ticketLabels.labelId))
+        .where(eq(ticketLabels.ticketId, ticket.id))
+        .orderBy(asc(labels.sortOrder), asc(labels.name));
+      return { labels: full };
     }
 
-    const currentLabels = ticket.labels;
     const namesToRemoveSet = new Set(labelsToRemove);
-    const newLabelNames = currentLabels.map(l => l.name).filter(name => !namesToRemoveSet.has(name));
+    const newLabelNames = currentLabelRows.map(l => l.name).filter(name => !namesToRemoveSet.has(name));
 
     const projectScope = await getProjectScope(ticket.projectId);
     if (!projectScope) {
@@ -322,15 +496,15 @@ export class TicketTools {
 
     const resolvedLabels = newLabelNames.length > 0
       ? await db.select({ id: labels.id, name: labels.name }).from(labels).where(
-          projectScope.hierarchyMode === 'flat'
-            ? and(eq(labels.projectId, ticket.projectId), inArray(labels.name, newLabelNames))
-            : and(eq(labels.teamId, projectScope.teamId), isNull(labels.projectId), inArray(labels.name, newLabelNames)),
-        )
+        projectScope.hierarchyMode === 'flat'
+          ? and(eq(labels.projectId, ticket.projectId), inArray(labels.name, newLabelNames))
+          : and(eq(labels.teamId, projectScope.teamId), isNull(labels.projectId), inArray(labels.name, newLabelNames)),
+      )
       : [];
 
     const labelIds = resolvedLabels.map(l => l.id);
-    const updated = await updateTicketRecord(ticket.id, { labelIds }, ticket.projectId);
-    
+    await updateTicketRecord(ticket.id, { labelIds }, ticket.projectId);
+
     audit('remove_ticket_labels', {
       workspaceId: context.workspaceId,
       actorUserId: context.actorUserId,
@@ -339,7 +513,15 @@ export class TicketTools {
       finalLabels: newLabelNames,
     });
 
-    return { labels: updated?.labels.map(l => l.name) ?? [] };
+    // Return the full updated label list as rich objects.
+    const updated = await db
+      .select({ name: labels.name, color: labels.color, description: labels.description })
+      .from(ticketLabels)
+      .innerJoin(labels, eq(labels.id, ticketLabels.labelId))
+      .where(eq(ticketLabels.ticketId, ticket.id))
+      .orderBy(asc(labels.sortOrder), asc(labels.name));
+
+    return { labels: updated };
   }
 
   /**
@@ -363,7 +545,7 @@ export class TicketTools {
       : Array.isArray(args.labels)
         ? args.labels.map(String)
         : [];
-    
+
     const projectScope = await getProjectScope(ticket.projectId);
     if (!projectScope) {
       throw new Error(`Project ${ticket.projectId} not found.`);
@@ -372,10 +554,10 @@ export class TicketTools {
 
     const resolvedLabels = labelNames.length > 0
       ? await db.select({ id: labels.id, name: labels.name }).from(labels).where(
-          projectScope.hierarchyMode === 'flat'
-            ? and(eq(labels.projectId, ticket.projectId), inArray(labels.name, labelNames))
-            : and(eq(labels.teamId, projectScope.teamId), isNull(labels.projectId), inArray(labels.name, labelNames)),
-        )
+        projectScope.hierarchyMode === 'flat'
+          ? and(eq(labels.projectId, ticket.projectId), inArray(labels.name, labelNames))
+          : and(eq(labels.teamId, projectScope.teamId), isNull(labels.projectId), inArray(labels.name, labelNames)),
+      )
       : [];
 
     if (resolvedLabels.length !== labelNames.length) {
@@ -452,8 +634,10 @@ export const ticketToolHandlers: Record<string, ToolHandler> = {
   delete_comment: (args, context) => ticketTools.deleteComment(args, context),
   update_comment: (args, context) => ticketTools.updateComment(args, context),
   get_ticket_labels: (args, context) => ticketTools.getTicketLabels(args, context),
+  add_ticket_labels: (args, context) => ticketTools.addTicketLabels(args, context),
   remove_ticket_labels: (args, context) => ticketTools.removeTicketLabels(args, context),
   set_ticket_labels: (args, context) => ticketTools.setTicketLabels(args, context),
+  list_workspace_labels: (args, context) => ticketTools.listWorkspaceLabels(args, context),
 };
 
 export const ticketToolDefinitions: McpToolDefinition[] = [
@@ -617,22 +801,37 @@ export const ticketToolDefinitions: McpToolDefinition[] = [
   },
   {
     name: 'get_ticket_labels',
-    description: 'Read all labels currently assigned to a specific ticket.',
+    description: 'Read all labels currently assigned to a specific ticket. Returns label objects with name, color, and description.',
     inputSchema: {
       type: 'object',
       properties: {
-        ticketKey: { type: 'string' },
+        ticketKey: { type: 'string', description: 'The ticket key, e.g. "GRAV-123".' },
       },
       required: ['ticketKey'],
     },
   },
   {
-    name: 'remove_ticket_labels',
-    description: 'Remove one or more labels from a ticket. Only removes specified labels, leaves others intact.',
+    name: 'add_ticket_labels',
+    description: 'Add one or more labels to a ticket without removing existing ones. Duplicate labels are silently skipped. Use list_workspace_labels to discover valid label names.',
     inputSchema: {
       type: 'object',
       properties: {
-        ticketKey: { type: 'string' },
+        ticketKey: { type: 'string', description: 'The ticket key, e.g. "GRAV-123".' },
+        labels: {
+          type: 'string',
+          description: 'Comma-separated list of label names to add, e.g. "bug,high-priority".',
+        },
+      },
+      required: ['ticketKey', 'labels'],
+    },
+  },
+  {
+    name: 'remove_ticket_labels',
+    description: 'Remove one or more labels from a ticket. Only removes the specified labels; all other labels remain intact. Labels not present on the ticket are silently skipped.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ticketKey: { type: 'string', description: 'The ticket key, e.g. "GRAV-123".' },
         labels: {
           type: 'string',
           description: 'Comma-separated list of label names to remove.',
@@ -643,17 +842,30 @@ export const ticketToolDefinitions: McpToolDefinition[] = [
   },
   {
     name: 'set_ticket_labels',
-    description: 'Replace all labels on a ticket with a new set of labels.',
+    description: 'Replace all labels on a ticket with a new set of labels. Use list_workspace_labels to discover valid label names.',
     inputSchema: {
       type: 'object',
       properties: {
-        ticketKey: { type: 'string' },
+        ticketKey: { type: 'string', description: 'The ticket key, e.g. "GRAV-123".' },
         labels: {
           type: 'string',
-          description: 'Comma-separated list of the exact label names to set on the ticket, replacing all existing labels.',
+          description: 'Comma-separated list of the exact label names to set on the ticket, replacing all existing labels. Pass an empty string to clear all labels.',
         },
       },
       required: ['ticketKey', 'labels'],
+    },
+  },
+  {
+    name: 'list_workspace_labels',
+    description: 'List all available labels in the workspace, or narrow to a specific project. Use this to discover valid label names before adding or setting labels on tickets.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectId: {
+          type: 'string',
+          description: 'Optional project ID to narrow results to labels available in that project only.',
+        },
+      },
     },
   },
 ];
