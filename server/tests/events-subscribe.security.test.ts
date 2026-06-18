@@ -27,6 +27,11 @@ type OpenOptions = {
   headers?: http.OutgoingHttpHeaders;
 };
 
+type ServerHandle = {
+  port: number;
+  close: () => Promise<void>;
+};
+
 function waitForServerListening(server: http.Server) {
   return new Promise<AddressInfo>((resolve, reject) => {
     const onListening = () => {
@@ -70,9 +75,7 @@ async function openPersistentSseConnection(path: string, options: OpenOptions = 
     request.end();
   });
 
-  let closedResolver: () => void = () => {};
   const closed = new Promise<void>((resolve) => {
-    closedResolver = resolve;
     response.once('close', resolve);
   });
 
@@ -102,8 +105,6 @@ async function openPersistentSseConnection(path: string, options: OpenOptions = 
     isClosing = true;
 
     response.destroy();
-    closedResolver();
-
     await new Promise<void>((resolve, reject) => {
       if (server.listening) {
         server.close((error) => {
@@ -127,12 +128,86 @@ async function openPersistentSseConnection(path: string, options: OpenOptions = 
   };
 }
 
+async function openSseTestServer(): Promise<ServerHandle> {
+  const app = createApp();
+  const server = app.listen(0);
+  const address = await waitForServerListening(server);
+
+  const close = async () => {
+    if (!server.listening) {
+      return;
+    }
+
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve();
+      });
+    });
+  };
+
+  return {
+    port: address.port,
+    close,
+  };
+}
+
 function parseSseErrorBody(chunk: string) {
   try {
     return JSON.parse(chunk) as { error?: string };
   } catch (_error) {
     return { error: chunk.trim() };
   }
+}
+
+async function readSseChunkFromPort(
+  port: number,
+  path: string,
+  options: { headers?: http.OutgoingHttpHeaders } = {},
+): Promise<{ statusCode: number; headers: http.IncomingHttpHeaders; chunk: string }> {
+  return await new Promise((resolve, reject) => {
+    const req = http.request({
+      host: '127.0.0.1',
+      method: 'GET',
+      path,
+      port,
+      headers: options.headers,
+    }, (res) => {
+      res.setEncoding('utf8');
+      const chunks: string[] = [];
+
+      const finalize = () => {
+        resolve({
+          statusCode: res.statusCode ?? 0,
+          headers: res.headers,
+          chunk: chunks.join(''),
+        });
+      };
+
+      if ((res.statusCode ?? 0) >= 400) {
+        res.on('data', (chunk) => {
+          chunks.push(typeof chunk === 'string' ? chunk : chunk.toString());
+        });
+        res.once('end', finalize);
+        res.once('error', reject);
+        return;
+      }
+
+      res.once('data', (chunk) => {
+        chunks.push(typeof chunk === 'string' ? chunk : chunk.toString());
+        finalize();
+        res.destroy();
+      });
+      res.once('end', finalize);
+      res.once('error', reject);
+    });
+
+    req.once('error', reject);
+    req.end();
+  });
 }
 
 function wait(timeoutMs: number) {
@@ -247,13 +322,18 @@ describe('SSE endpoint security', () => {
     const path = `/api/v1/events/subscribe?workspaceId=${workspace.id}`;
     const headers = { Cookie: ownerApi.sessionCookie };
     let blockedAt = -1;
+    const server = await openSseTestServer();
 
-    for (let i = 0; i < SSE_EVENTS_IP_RATE_LIMIT_MAX + 2; i += 1) {
-      const response = await readSseChunk(path, { headers });
-      if (response.statusCode === 429) {
-        blockedAt = i + 1;
-        break;
+    try {
+      for (let i = 0; i < SSE_EVENTS_IP_RATE_LIMIT_MAX + 2; i += 1) {
+        const response = await readSseChunkFromPort(server.port, path, { headers });
+        if (response.statusCode === 429) {
+          blockedAt = i + 1;
+          break;
+        }
       }
+    } finally {
+      await server.close();
     }
 
     expect(blockedAt).toBeGreaterThan(0);
@@ -401,10 +481,13 @@ describe('SSE endpoint security', () => {
       },
     });
 
-    const response = await readSseChunk(`/api/v1/events/subscribe?workspaceId=${workspace.id}`, {
+    const connection = await openPersistentSseConnection(`/api/v1/events/subscribe?workspaceId=${workspace.id}`, {
       headers: { Cookie: ownerApi.sessionCookie },
     });
-    expect(response.statusCode).toBe(200);
+    await connection.firstChunk;
+
+    await connection.close();
+    await connection.closed;
 
     expect(auditSpy).toHaveBeenCalledWith(
       'sse.connection.opened',
@@ -414,14 +497,25 @@ describe('SSE endpoint security', () => {
         authMethod: 'session',
       }),
     );
-    expect(auditSpy).toHaveBeenCalledWith(
-      'sse.connection.closed',
-      expect.objectContaining({
-        workspaceId: workspace.id,
-        userId: owner.id,
-        authMethod: 'session',
-        reason: 'request_closed',
-      }),
-    );
+
+    await expect.poll(() => {
+      return auditSpy.mock.calls.some((call) => {
+        if (call[0] !== 'sse.connection.closed') {
+          return false;
+        }
+
+        const payload = call[1];
+        return (
+          typeof payload === 'object'
+          && payload !== null
+          && 'workspaceId' in payload
+          && (payload as { workspaceId?: string }).workspaceId === workspace.id
+          && 'userId' in payload
+          && (payload as { userId?: string }).userId === owner.id
+          && 'reason' in payload
+          && (payload as { reason?: string }).reason === 'request_closed'
+        );
+      });
+    }).toBe(true);
   });
 });
