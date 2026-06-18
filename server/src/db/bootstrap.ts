@@ -77,10 +77,10 @@ async function ensureConstraint(tableName: string, constraintName: string, defin
 }
 
 async function migrateFlatWorkspaceTicketLabelAssignments() {
-  await pool.query(`
-    INSERT INTO labels (id, project_id, team_id, name, color, description, sort_order, created_at)
-    SELECT DISTINCT
-      labels.id || ':' || tickets.project_id,
+  const sourceRows = await pool.query(`
+    SELECT
+      ticket_labels.ticket_id,
+      ticket_labels.label_id,
       tickets.project_id,
       projects.team_id,
       labels.name,
@@ -95,64 +95,146 @@ async function migrateFlatWorkspaceTicketLabelAssignments() {
     INNER JOIN workspace_settings ON workspace_settings.workspace_id = projects.workspace_id
     WHERE labels.project_id IS NULL
       AND workspace_settings.hierarchy_mode = 'flat'
-    ON CONFLICT DO NOTHING;
   `);
 
-  await pool.query(`
-    INSERT INTO ticket_labels (ticket_id, label_id)
-    SELECT tl.ticket_id, tl.label_id || ':' || tickets.project_id
-    FROM ticket_labels tl
-    INNER JOIN tickets ON tickets.id = tl.ticket_id
-    INNER JOIN projects ON projects.id = tickets.project_id
-    INNER JOIN workspace_settings ON workspace_settings.workspace_id = projects.workspace_id
-    INNER JOIN labels ON labels.id = tl.label_id
-    WHERE labels.project_id IS NULL
-      AND workspace_settings.hierarchy_mode = 'flat'
-      AND EXISTS (
-        SELECT 1
-        FROM labels project_labels
-        WHERE project_labels.id = tl.label_id || ':' || tickets.project_id
-          AND project_labels.project_id = tickets.project_id
-      )
-    ON CONFLICT DO NOTHING;
-  `);
+  type MigrationRow = {
+    ticket_id: string;
+    label_id: string;
+    project_id: string;
+    team_id: string;
+    name: string;
+    color: string;
+    description: string | null;
+    sort_order: number;
+    created_at: string;
+  };
 
-  await pool.query(`
-    DELETE FROM ticket_labels
-    USING tickets, projects, workspace_settings, labels
-    WHERE ticket_labels.ticket_id = tickets.id
-      AND tickets.project_id = projects.id
-      AND workspace_settings.workspace_id = projects.workspace_id
-      AND ticket_labels.label_id = labels.id
-      AND labels.project_id IS NULL
-      AND workspace_settings.hierarchy_mode = 'flat'
-      AND EXISTS (
-        SELECT 1
-        FROM labels project_labels
-        WHERE project_labels.id = labels.id || ':' || tickets.project_id
-          AND project_labels.project_id = tickets.project_id
-      );
-  `);
+  const rows = sourceRows.rows as MigrationRow[];
+  if (!rows || rows.length === 0) {
+    return;
+  }
 
-  await pool.query(`
-    DELETE FROM labels
-    USING teams, workspace_settings
-    WHERE labels.project_id IS NULL
-      AND labels.team_id = teams.id
-      AND workspace_settings.workspace_id = teams.workspace_id
-      AND workspace_settings.hierarchy_mode = 'flat'
-      AND NOT EXISTS (
-        SELECT 1
-        FROM ticket_labels
-        WHERE ticket_labels.label_id = labels.id
-      )
-      AND EXISTS (
-        SELECT 1
-        FROM labels project_labels
-        WHERE project_labels.project_id IS NOT NULL
-          AND substring(project_labels.id from 1 for length(labels.id) + 1) = labels.id || ':'
-      );
-  `);
+  const projectScopedLabels = new Map<
+    string,
+    {
+      projectId: string;
+      teamId: string;
+      name: string;
+      color: string;
+      description: string | null;
+      sortOrder: number;
+      createdAt: string;
+    }
+  >();
+
+  for (const row of rows) {
+    const scopedLabelId = `${row.label_id}:${row.project_id}`;
+    if (!projectScopedLabels.has(scopedLabelId)) {
+      projectScopedLabels.set(scopedLabelId, {
+        projectId: row.project_id,
+        teamId: row.team_id,
+        name: row.name,
+        color: row.color,
+        description: row.description,
+        sortOrder: row.sort_order,
+        createdAt: row.created_at,
+      });
+    }
+  }
+
+  for (const [scopedLabelId, scopedLabel] of projectScopedLabels) {
+    await pool.query(`
+      INSERT INTO labels (id, project_id, team_id, name, color, description, sort_order, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      ON CONFLICT DO NOTHING;
+    `, [
+      scopedLabelId,
+      scopedLabel.projectId,
+      scopedLabel.teamId,
+      scopedLabel.name,
+      scopedLabel.color,
+      scopedLabel.description,
+      scopedLabel.sortOrder,
+      scopedLabel.createdAt,
+    ]);
+  }
+
+  const insertedTicketLinks: Array<{
+    ticketId: string;
+    sourceLabelId: string;
+    scopedLabelId: string;
+  }> = [];
+  const seenTicketLinks = new Set<string>();
+
+  for (const row of rows) {
+    const scopedLabelId = `${row.label_id}:${row.project_id}`;
+
+    const scopedLabelExists = await pool.query(`
+      SELECT 1
+      FROM labels
+      WHERE id = $1
+      LIMIT 1
+    `, [scopedLabelId]);
+
+    if ((scopedLabelExists.rowCount ?? 0) === 0) {
+      continue;
+    }
+
+    const linkKey = `${row.ticket_id}:${scopedLabelId}`;
+    if (seenTicketLinks.has(linkKey)) {
+      continue;
+    }
+    seenTicketLinks.add(linkKey);
+
+    await pool.query(`
+      INSERT INTO ticket_labels (ticket_id, label_id)
+      VALUES ($1, $2)
+      ON CONFLICT DO NOTHING
+    `, [row.ticket_id, scopedLabelId]);
+
+    insertedTicketLinks.push({
+      ticketId: row.ticket_id,
+      sourceLabelId: row.label_id,
+      scopedLabelId,
+    });
+  }
+
+  for (const link of insertedTicketLinks) {
+    await pool.query(`
+      DELETE FROM ticket_labels
+      WHERE ticket_id = $1
+        AND label_id = $2
+    `, [link.ticketId, link.sourceLabelId]);
+  }
+
+  const potentiallyObsoleteLabelIds = new Set(insertedTicketLinks.map((link) => link.sourceLabelId));
+  for (const labelId of potentiallyObsoleteLabelIds) {
+    const hasRemainingAssignments = await pool.query(`
+      SELECT 1
+      FROM ticket_labels
+      WHERE label_id = $1
+      LIMIT 1
+    `, [labelId]);
+    if ((hasRemainingAssignments.rowCount ?? 0) > 0) {
+      continue;
+    }
+
+    const hasProjectScopedCopy = await pool.query(`
+      SELECT 1
+      FROM labels project_labels
+      WHERE project_labels.project_id IS NOT NULL
+        AND substring(project_labels.id from 1 for length($1) + 1) = $1 || ':'
+      LIMIT 1
+    `, [labelId]);
+
+    if ((hasProjectScopedCopy.rowCount ?? 0) > 0) {
+      await pool.query(`
+        DELETE FROM labels
+        WHERE id = $1
+          AND project_id IS NULL
+      `, [labelId]);
+    }
+  }
 }
 
 export async function initializeDatabase() {

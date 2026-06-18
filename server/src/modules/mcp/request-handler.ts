@@ -22,6 +22,16 @@ type McpRequestHandlerOptions = {
  * established any trusted workspace and actor context.
  */
 export class McpRequestHandler {
+  private getDisablementAlias(toolName: string): string | null {
+    if (toolName === 'add_comment') return 'create_comment';
+    if (toolName === 'create_comment') return 'add_comment';
+    if (toolName === 'add_dependency') return 'add_ticket_dependency';
+    if (toolName === 'add_ticket_dependency') return 'add_dependency';
+    if (toolName === 'remove_dependency') return 'remove_ticket_dependency';
+    if (toolName === 'remove_ticket_dependency') return 'remove_dependency';
+    return null;
+  }
+
   /**
    * @description Handles the JSON-RPC portion of the MCP protocol after the
    * transport has supplied any trusted workspace or actor context.
@@ -72,10 +82,8 @@ export class McpRequestHandler {
           if (disabledTools.includes(tool.name)) {
             return false;
           }
-          if (tool.name === 'add_comment' && disabledTools.includes('create_comment')) {
-            return false;
-          }
-          if (tool.name === 'create_comment' && disabledTools.includes('add_comment')) {
+          const disablementAlias = this.getDisablementAlias(tool.name);
+          if (disablementAlias && disabledTools.includes(disablementAlias)) {
             return false;
           }
           return true;
@@ -104,8 +112,7 @@ export class McpRequestHandler {
         const toolName = payload.params?.name ?? '';
         const disabledTools = await getDisabledTools(context.workspaceId);
 
-        const disablementAlias =
-          toolName === 'create_comment' ? 'add_comment' : toolName === 'add_comment' ? 'create_comment' : null;
+        const disablementAlias = this.getDisablementAlias(toolName);
 
         if (disabledTools.includes(toolName) || (disablementAlias && disabledTools.includes(disablementAlias))) {
           throw new Error(`MCP tool "${toolName}" is disabled in this workspace.`);
