@@ -2,6 +2,7 @@ import { apiClient } from '../utils/apiClient';
 import React, { createContext, useContext, useEffect, useCallback, useMemo, useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys, CACHE_CONFIGS } from '../utils/queryClient';
+import { disposeSseService, getSseService } from '../services/sseService';
 import { useMoveTicket } from './useMoveTicket';
 import { useTicketRelationActions } from '../hooks/useTicketRelationActions';
 import type { TicketWithRelations } from '../modules/tickets/utils/ticketRelations';
@@ -608,9 +609,12 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (typeof EventSource === 'undefined') return;
     if (!sseWorkspaceId) return;
 
-    const eventSource = new EventSource(`${API_URL}/events/subscribe?workspaceId=${encodeURIComponent(sseWorkspaceId)}`);
+    const sseService = getSseService(sseWorkspaceId);
+    const handleSseMessage = (event: MessageEvent | Event) => {
+      if (!(event instanceof MessageEvent) || typeof event.data !== 'string') {
+        return;
+      }
 
-    eventSource.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data);
         if (!message || typeof message !== 'object') {
@@ -638,8 +642,13 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     };
 
+    sseService.on('message', handleSseMessage);
+    sseService.connect(sseWorkspaceId);
+
     return () => {
-      eventSource.close();
+      sseService.off('message', handleSseMessage);
+      sseService.disconnect();
+      disposeSseService(sseWorkspaceId);
     };
   }, [sseWorkspaceId, invalidateAggregateTicketQueries]);
 
