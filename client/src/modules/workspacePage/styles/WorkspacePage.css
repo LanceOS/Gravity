@@ -21,13 +21,17 @@
 }
 
 .workspace-page__issues {
+  display: flex;
+  flex-direction: column;
   flex: 1;
+  min-height: 0;
   overflow: hidden;
   background: var(--color-surface-app);
   animation: lib-fade-in var(--transition-spring);
 }
 
 .workspace-page__issues-shell {
+  flex: 1;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -35,8 +39,18 @@
 }
 
 .workspace-page__issues-content {
+  display: flex;
+  flex-direction: column;
   flex: 1;
   min-height: 0;
+  overflow: hidden;
+}
+
+.workspace-page__panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
 }
 
@@ -850,6 +864,11 @@
 
 .workspace-page__tickets-stage {
   position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .workspace-page__tickets-loading-layer {

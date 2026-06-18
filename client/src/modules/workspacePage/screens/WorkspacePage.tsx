@@ -1,6 +1,6 @@
-import { useMemo, useCallback, useEffect, useState } from 'react';
+import { useMemo, useCallback, useState } from 'react';
 import { Button, Timeline, createEmptyRichTextValue, ContextMenu } from '@library';
-import type { Comment, Cycle, Label, Project, Ticket, User } from '../../../context/TicketContext';
+import type { Cycle, Label, Project, Ticket, User } from '../../../context/TicketContext';
 import {
   filterTickets,
   getWorkspaceHeaderTitle,
@@ -358,7 +358,7 @@ export function WorkspacePage({
             >
               <div className="workspace-page__issues-content">
                 {/* Notes panel — always mounted, hidden when not in notes context */}
-                <div className={activeContext !== 'notes' ? 'workspace-page__issues--hidden' : ''}>
+                <div className={`workspace-page__panel ${activeContext !== 'notes' ? 'workspace-page__issues--hidden' : ''}`}>
                   <QueryErrorResetBoundary>
                     {({ reset }) => (
                       <ErrorBoundary onReset={reset}>
@@ -375,7 +375,7 @@ export function WorkspacePage({
                 </div>
 
                 {/* Tickets panel — always mounted, hidden when in notes context */}
-                <div className={activeContext === 'notes' ? 'workspace-page__issues--hidden' : ''}>
+                <div className={`workspace-page__panel ${activeContext === 'notes' ? 'workspace-page__issues--hidden' : ''}`}>
                   <QueryErrorResetBoundary>
                     {({ reset }) => (
                       <ErrorBoundary onReset={reset}>

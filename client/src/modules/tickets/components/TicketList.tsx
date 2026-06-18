@@ -46,8 +46,17 @@ export const TicketList = React.memo(({
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', flex: 1, overflow: 'hidden' }}>
-        <div style={{ flex: 1, overflowY: 'auto' }}>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        flex: 1,
+        minHeight: 0,
+        overflow: 'hidden'
+      }}
+    >
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}>
         <>
           {LIST_STATUS_ORDER.map((status) => {
             const ticketsInGroup = groupedTickets[status];
