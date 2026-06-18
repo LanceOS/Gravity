@@ -44,6 +44,11 @@ function mapCycle(cycle: typeof cycles.$inferSelect) {
 }
 
 export async function listProjectsWithDetails(userId: string, workspaceId?: string) {
+  const membershipFilter = or(
+    eq(projectMembers.userId, userId),
+    eq(workspaceMembers.userId, userId),
+  );
+  const workspaceFilter = workspaceId ? eq(projects.workspaceId, workspaceId) : undefined;
   const baseQuery = db
     .select({
       id: projects.id,
@@ -61,12 +66,7 @@ export async function listProjectsWithDetails(userId: string, workspaceId?: stri
       workspaceMembers,
       and(eq(workspaceMembers.workspaceId, projects.workspaceId), eq(workspaceMembers.userId, userId)),
     )
-    .where(
-      or(
-        eq(projectMembers.userId, userId),
-        eq(workspaceMembers.userId, userId),
-      ),
-    );
+    .where(workspaceFilter ? and(workspaceFilter, membershipFilter) : membershipFilter);
 
   const projectRows: Array<{
     id: string;
@@ -77,12 +77,7 @@ export async function listProjectsWithDetails(userId: string, workspaceId?: stri
     workspaceId: string;
     githubRepoUrl: string | null;
     teamId: string;
-  }> = workspaceId
-    ? await baseQuery.where(and(eq(projects.workspaceId, workspaceId), or(
-      eq(projectMembers.userId, userId),
-      eq(workspaceMembers.userId, userId),
-    )).orderBy(asc(projects.createdAt))
-    : await baseQuery.orderBy(asc(projects.createdAt));
+  }> = await baseQuery.orderBy(asc(projects.createdAt));
 
   const projectIds = projectRows.map((project) => project.id);
 
