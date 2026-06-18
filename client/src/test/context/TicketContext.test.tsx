@@ -197,7 +197,16 @@ describe('TicketContext', () => {
         return Promise.resolve(jsonResponse({ user, session: { userId: user.id } }));
       }
       if (url.includes('/projects')) {
-        return Promise.resolve(jsonResponse([]));
+        return Promise.resolve(jsonResponse([
+          {
+            id: 'project-1',
+            workspaceId: 'workspace-1',
+            name: 'Workspace Project',
+            description: '',
+            key: 'WS1',
+            status: 'active',
+          },
+        ]));
       }
       if (url.includes('/users')) {
         return Promise.resolve(jsonResponse([]));
@@ -224,7 +233,7 @@ describe('TicketContext', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/auth/session', { credentials: 'same-origin' });
     expect(fetchMock).toHaveBeenNthCalledWith(2, `/api/v1/projects?userId=${encodeURIComponent(user.id)}`, expect.any(Object));
     expect(fetchMock).toHaveBeenNthCalledWith(3, '/api/v1/users', expect.any(Object));
-    expect(EventSourceMock).toHaveBeenCalledWith('/api/v1/events/subscribe');
+    expect(EventSourceMock).toHaveBeenCalledWith('/api/v1/events/subscribe?workspaceId=workspace-1');
     expect(window.localStorage.getItem('gravity_user')).toContain(user.id);
   });
 

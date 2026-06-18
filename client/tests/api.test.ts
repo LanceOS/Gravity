@@ -111,6 +111,7 @@ let aliceUserId = '';
 let bobUserId = '';
 let testInviteCode = '';
 let gravityProjectId = '';
+let gravityWorkspaceId = '';
 let aiProjectId = '';
 let createdTicketId = '';
 let createdTicketKey = '';
@@ -344,6 +345,7 @@ const tests = [
 
       const gravityProject = await createProjectFixture(aliceUserId, 'Gravity Core', 'GRA');
       gravityProjectId = gravityProject.id;
+      gravityWorkspaceId = gravityProject.workspaceId;
       assert(gravityProject.inviteCode.startsWith('INV-GRA-'), 'Gravity fixture project should include an inviteCode');
 
       const aiProject = await createProjectFixture(aliceUserId, 'AI Lab', 'AI');
@@ -646,7 +648,7 @@ const tests = [
     name: 'SSE Live Stream Broadcaster & Real-time Client',
     fn: async () => {
       // 1. Programmatically connect to the SSE broadcast endpoint
-      const sseRes = await fetch(`${BASE_URL}/api/events/subscribe`);
+      const sseRes = await fetch(`${BASE_URL}/api/events/subscribe?workspaceId=${encodeURIComponent(gravityWorkspaceId)}`);
       assert(sseRes.ok, 'SSE subscription HTTP handshaking should succeed');
       
       const reader = sseRes.body?.getReader();
@@ -680,8 +682,15 @@ const tests = [
 
       // 5. Await read promise and assert it captured the broadcasted update event
       const broadcastText = await sseReadPromise;
-      assert(broadcastText.includes('comments-updated'), 'SSE payload should be type comments-updated');
-      assert(broadcastText.includes('Broadcasting live over SSE stream!'), 'SSE payload should contain comment body');
+      const broadcastLine = broadcastText
+        .split('\n')
+        .find((line) => line.startsWith('data: '))
+        ?.replace(/^data:\s*/, '');
+      assert(broadcastLine !== undefined, 'SSE stream should include a JSON data payload line');
+
+      const parsedBroadcast = broadcastLine ? JSON.parse(broadcastLine) : null;
+      assert(parsedBroadcast?.type === 'comments-updated', 'SSE payload should be type comments-updated');
+      assert(parsedBroadcast?.data?.ticketId === createdTicketId, 'SSE payload should include the updated ticket ID');
 
       // 6. Clean up the event stream reader connection
       await reader!.cancel();

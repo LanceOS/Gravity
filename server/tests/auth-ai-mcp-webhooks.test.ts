@@ -691,7 +691,7 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
   });
 
   it('streams the realtime subscription init event', async () => {
-    const response = await readSseChunk('/api/v1/events/subscribe');
+    const response = await readSseChunk('/api/v1/events/subscribe?workspaceId=workspace-1');
 
     expect(response.statusCode).toBe(200);
     expect(String(response.headers['content-type'])).toContain('text/event-stream');
