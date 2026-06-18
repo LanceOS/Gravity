@@ -9,7 +9,12 @@ import { validateOllamaUrl } from '../ai/utils/utils.js';
 import { aiService } from '../ai/index.js';
 
 const DEFAULT_VIEWS = new Set(['board', 'list']);
-const THEMES = new Set(['dark', 'coal-black', 'coffee', 'marble-blue']);
+const THEMES = new Set(['dark', 'coal-black', 'coffee', 'honey-glow', 'marble-blue', 'midnight-azure']);
+const THEME_ALIASES = new Map<string, string>([
+  ['light', 'marble-blue'],
+  ['system', ''],
+  ['noir', 'dark'],
+]);
 const AI_PROVIDERS = new Set(['openai', 'anthropic', 'gemini', 'deepseek']);
 const AGENT_INTEGRATIONS = new Set(['ollama', 'third_party']);
 const PROJECT_LAYOUTS = new Set(['standard', 'condensed']);
@@ -71,6 +76,61 @@ function getOptionalEnumValue(
   return { ok: true as const, value };
 }
 
+function normalizeTheme(rawValue: string): string | undefined | null {
+  const normalized = rawValue.trim().toLowerCase().replace(/_/g, '-').replace(/\s+/g, '-');
+
+  if (!normalized.length) {
+    return undefined;
+  }
+
+  if (normalized === 'system') {
+    return undefined;
+  }
+
+  const mapped = THEME_ALIASES.get(normalized);
+  if (mapped) {
+    if (mapped.length === 0) {
+      return undefined;
+    }
+    return mapped;
+  }
+
+  if (THEMES.has(normalized)) {
+    return normalized;
+  }
+
+  const withoutThemeSuffix = normalized.endsWith('-theme') ? normalized.slice(0, -6) : '';
+  if (withoutThemeSuffix && THEMES.has(withoutThemeSuffix)) {
+    return withoutThemeSuffix;
+  }
+
+  return null;
+}
+
+function getOptionalThemeValue(body: Record<string, unknown> | null | undefined, field: string) {
+  if (!body || !(field in body)) {
+    return { ok: true as const, value: undefined };
+  }
+
+  const value = body[field];
+  if (typeof value !== 'string') {
+    return { ok: false as const, error: `Invalid ${field}.` };
+  }
+
+  const normalized = normalizeTheme(value);
+  if (normalized === undefined) {
+    return { ok: true as const, value: undefined };
+  }
+  if (normalized === null) {
+    return { ok: false as const, error: `Invalid ${field}.` };
+  }
+  if (!THEMES.has(normalized)) {
+    return { ok: false as const, error: `Invalid ${field}.` };
+  }
+
+  return { ok: true as const, value: normalized };
+}
+
 export function createSettingsRouter() {
   const router = Router();
 
@@ -119,7 +179,7 @@ export function createSettingsRouter() {
         return;
       }
 
-      const theme = getOptionalEnumValue(req.body, 'theme', THEMES);
+      const theme = getOptionalThemeValue(req.body, 'theme');
       if (!theme.ok) {
         res.status(400).json({ error: theme.error });
         return;

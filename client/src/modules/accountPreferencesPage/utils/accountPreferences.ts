@@ -41,6 +41,8 @@ export const THEME_OPTIONS = [
   { value: 'dark', label: 'Noir' },
   { value: 'coal-black', label: 'Coal Black' },
   { value: 'coffee', label: 'Coffee' },
+  { value: 'midnight-azure', label: 'Midnight Azure' },
+  { value: 'honey-glow', label: 'Honey Glow' },
   { value: 'marble-blue', label: 'Marble Blue' },
 ] as const;
 
@@ -80,4 +82,3 @@ export const getOllamaModelOptions = (ollamaModels: string[], ollamaModelsLoadin
 
 export const getOllamaMissingModelsMessage = (ollamaEndpoint: string) =>
   `Gravity could not detect any models at ${ollamaEndpoint}. Start Ollama and install a model to populate this list.`;
-

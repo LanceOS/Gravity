@@ -70,6 +70,10 @@ export function startAutoRefresh(intervalMs?: number) {
   refreshInterval = setInterval(() => {
     void refreshFromSecretManager();
   }, ms);
+
+  if (refreshInterval && typeof (refreshInterval as { unref?: () => void }).unref === 'function') {
+    refreshInterval.unref();
+  }
 }
 
 export function stopAutoRefresh() {

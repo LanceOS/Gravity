@@ -421,6 +421,11 @@ describe('library forms and theme toggle', () => {
     expect(window.localStorage.getItem('gravity_theme')).toBe('coffee');
 
     await user.click(toggle);
+    expect(toggle).toHaveAttribute('title', 'Theme: midnight-azure');
+    expect(document.documentElement).toHaveAttribute('data-theme', 'midnight-azure');
+    expect(window.localStorage.getItem('gravity_theme')).toBe('midnight-azure');
+
+    await user.click(toggle);
     expect(toggle).toHaveAttribute('title', 'Theme: system');
     expect(window.localStorage.getItem('gravity_theme')).toBe('system');
   });

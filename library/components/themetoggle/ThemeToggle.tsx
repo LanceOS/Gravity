@@ -25,8 +25,8 @@ export function ThemeToggle() {
   }, [theme]);
 
   const toggleTheme = () => {
-    const modes: ThemeMode[] = ['marble-blue', 'dark', 'coal-black', 'coffee', 'system'];
-    const currentIndex = modes.indexOf(theme);
+    const modes: ThemeMode[] = ['marble-blue', 'dark', 'coal-black', 'coffee', 'midnight-azure', 'system'];
+    const currentIndex = Math.max(0, modes.indexOf(theme));
     const nextIndex = (currentIndex + 1) % modes.length;
     const nextTheme = modes[nextIndex];
     setTheme(nextTheme);
@@ -53,7 +53,7 @@ export function ThemeToggle() {
       }}
     >
       {theme === 'marble-blue' && <Sun size={15} style={{ color: 'var(--color-text-secondary)' }} />}
-      {(theme === 'dark' || theme === 'coal-black' || theme === 'coffee') && (
+      {(theme === 'dark' || theme === 'coal-black' || theme === 'coffee' || theme === 'midnight-azure') && (
         <Moon size={15} style={{ color: 'var(--color-primary)' }} />
       )}
       {theme === 'system' && <Laptop size={15} style={{ color: 'var(--color-text-disabled)' }} />}

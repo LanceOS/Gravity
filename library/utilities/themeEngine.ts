@@ -3,6 +3,8 @@ import noirTheme from '../themes/noir.json';
 import coalBlackTheme from '../themes/coal-black.json';
 import coffeeTheme from '../themes/coffee.json';
 import marbleBlueTheme from '../themes/marble-blue.json';
+import honeyGlowTheme from '../themes/honey-glow.json';
+import midnightAzureTheme from '../themes/midnight-azure.json';
 
 export const KNOWN_THEME_COLOR_KEYS = [
   'primary',
@@ -87,15 +89,30 @@ export type ThemeValidationResult = {
   unknown: string[];
 };
 
-export type ThemePreference = 'dark' | 'coal-black' | 'coffee' | 'marble-blue' | 'system';
-export type ResolvedThemeMode = 'dark' | 'coal-black' | 'coffee' | 'marble-blue';
+export type ThemePreference =
+  | 'dark'
+  | 'coal-black'
+  | 'coffee'
+  | 'honey-glow'
+  | 'marble-blue'
+  | 'midnight-azure'
+  | 'system';
+export type ResolvedThemeMode = 'dark' | 'coal-black' | 'coffee' | 'honey-glow' | 'marble-blue' | 'midnight-azure';
 
 export const THEME_STORAGE_KEY = 'gravity_theme';
 
 const knownThemeColorKeySet = new Set<string>(KNOWN_THEME_COLOR_KEYS);
 
 export const normalizeThemePreference = (value: string | null | undefined): ThemePreference => {
-  if (value === 'dark' || value === 'coal-black' || value === 'coffee' || value === 'marble-blue' || value === 'system') {
+  if (
+    value === 'dark' ||
+    value === 'coal-black' ||
+    value === 'coffee' ||
+    value === 'honey-glow' ||
+    value === 'marble-blue' ||
+    value === 'midnight-azure' ||
+    value === 'system'
+  ) {
     return value;
   }
 
@@ -192,7 +209,16 @@ export const applyResolvedTheme = (resolvedTheme: ResolvedThemeMode) => {
 
   const root = document.documentElement;
 
-  root.classList.remove('dark-theme', 'light-theme', 'noir-theme', 'coal-black-theme', 'coffee-theme', 'marble-blue-theme');
+  root.classList.remove(
+    'dark-theme',
+    'light-theme',
+    'noir-theme',
+    'coal-black-theme',
+    'coffee-theme',
+    'honey-glow-theme',
+    'marble-blue-theme',
+    'midnight-azure-theme',
+  );
   root.removeAttribute('data-theme');
 
   if (resolvedTheme === 'dark') {
@@ -207,10 +233,18 @@ export const applyResolvedTheme = (resolvedTheme: ResolvedThemeMode) => {
     root.classList.add('coffee-theme', 'dark-theme');
     root.setAttribute('data-theme', 'coffee');
     applyThemeConfig(coffeeTheme);
+  } else if (resolvedTheme === 'honey-glow') {
+    root.classList.add('honey-glow-theme', 'light-theme');
+    root.setAttribute('data-theme', 'honey-glow');
+    applyThemeConfig(honeyGlowTheme);
   } else if (resolvedTheme === 'marble-blue') {
     root.classList.add('marble-blue-theme', 'light-theme');
     root.setAttribute('data-theme', 'marble-blue');
     applyThemeConfig(marbleBlueTheme);
+  } else if (resolvedTheme === 'midnight-azure') {
+    root.classList.add('midnight-azure-theme', 'dark-theme');
+    root.setAttribute('data-theme', 'midnight-azure');
+    applyThemeConfig(midnightAzureTheme);
   }
 
   return resolvedTheme;
