@@ -1,4 +1,5 @@
 import { assertMcpWorkspaceAccess } from './access.js';
+import { McpToolError } from './errors.js';
 import { executeTool } from './tool-executor.js';
 import { resolveMcpContext } from './request-context.js';
 import { createMcpErrorResponse } from './responses.js';
@@ -6,6 +7,25 @@ import { mcpToolsList } from './tools.js';
 import type { McpRequestPayload } from './types.js';
 import { getDisabledTools } from './workspace-tools.js';
 import { desanitize, sanitize } from './state-map.js';
+
+const TOOL_ALIAS_GROUPS: string[][] = [
+  ['add_comment', 'create_comment'],
+  ['add_dependency', 'add_ticket_dependency', 'mark_ticket_blocked'],
+  ['remove_dependency', 'remove_ticket_dependency', 'unmark_ticket_blocked'],
+];
+
+function getToolAliasGroup(toolName: string) {
+  return TOOL_ALIAS_GROUPS.find((group) => group.includes(toolName)) ?? null;
+}
+
+function isToolDisabled(toolName: string, disabledTools: string[]) {
+  const group = getToolAliasGroup(toolName);
+  if (group) {
+    return group.some((name) => disabledTools.includes(name));
+  }
+
+  return disabledTools.includes(toolName);
+}
 
 /**
  * @description Lets transports skip the membership query when they already
@@ -22,16 +42,6 @@ type McpRequestHandlerOptions = {
  * established any trusted workspace and actor context.
  */
 export class McpRequestHandler {
-  private getDisablementAlias(toolName: string): string | null {
-    if (toolName === 'add_comment') return 'create_comment';
-    if (toolName === 'create_comment') return 'add_comment';
-    if (toolName === 'add_dependency') return 'add_ticket_dependency';
-    if (toolName === 'add_ticket_dependency') return 'add_dependency';
-    if (toolName === 'remove_dependency') return 'remove_ticket_dependency';
-    if (toolName === 'remove_ticket_dependency') return 'remove_dependency';
-    return null;
-  }
-
   /**
    * @description Handles the JSON-RPC portion of the MCP protocol after the
    * transport has supplied any trusted workspace or actor context.
@@ -79,14 +89,7 @@ export class McpRequestHandler {
         }
         const disabledTools = await getDisabledTools(context.workspaceId);
         const activeTools = mcpToolsList.filter((tool) => {
-          if (disabledTools.includes(tool.name)) {
-            return false;
-          }
-          const disablementAlias = this.getDisablementAlias(tool.name);
-          if (disablementAlias && disabledTools.includes(disablementAlias)) {
-            return false;
-          }
-          return true;
+          return !isToolDisabled(tool.name, disabledTools);
         });
         return {
           jsonrpc: '2.0',
@@ -112,9 +115,7 @@ export class McpRequestHandler {
         const toolName = payload.params?.name ?? '';
         const disabledTools = await getDisabledTools(context.workspaceId);
 
-        const disablementAlias = this.getDisablementAlias(toolName);
-
-        if (disabledTools.includes(toolName) || (disablementAlias && disabledTools.includes(disablementAlias))) {
+        if (isToolDisabled(toolName, disabledTools)) {
           throw new Error(`MCP tool "${toolName}" is disabled in this workspace.`);
         }
 
@@ -142,11 +143,15 @@ export class McpRequestHandler {
 
       return createMcpErrorResponse(payload.id, -32601, `Method not found: ${payload.method ?? 'unknown'}`);
     } catch (error) {
-        return createMcpErrorResponse(
-          payload.id,
-          -32603,
-          error instanceof Error ? error.message : 'Internal error executing tool',
-        );
+      if (error instanceof McpToolError) {
+        return createMcpErrorResponse(payload.id, error.code, error.message, error.data);
+      }
+
+      return createMcpErrorResponse(
+        payload.id,
+        -32603,
+        error instanceof Error ? error.message : 'Internal error executing tool',
+      );
     }
   }
 }

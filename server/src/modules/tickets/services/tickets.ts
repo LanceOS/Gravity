@@ -10,6 +10,8 @@ type RelatedTicketRecord = {
   key: string;
   title: string;
   projectId: string;
+  status: string;
+  priority: string;
 };
 
 const labelSelectFields = {
@@ -120,6 +122,8 @@ function mapRelatedTicket(record: RelatedTicketRecord) {
     key: String(record.key),
     title: String(record.title),
     projectId: String(record.projectId),
+    status: canonicalizeStatus(record.status),
+    priority: canonicalizePriority(record.priority),
   };
 }
 
@@ -407,6 +411,8 @@ export async function listTicketDependencies(ticketId: string) {
       key: tickets.key,
       title: tickets.title,
       projectId: tickets.projectId,
+      status: tickets.status,
+      priority: tickets.priority,
     })
     .from(ticketRelationships)
     .innerJoin(tickets, eq(tickets.id, ticketRelationships.blockedTicketId))
@@ -423,6 +429,8 @@ export async function listTicketBlockers(ticketId: string) {
       key: tickets.key,
       title: tickets.title,
       projectId: tickets.projectId,
+      status: tickets.status,
+      priority: tickets.priority,
     })
     .from(ticketRelationships)
     .innerJoin(tickets, eq(tickets.id, ticketRelationships.ticketId))
