@@ -74,6 +74,7 @@ export class SseEventCoalescer {
 
   private buildEventKey(event: SseCoalescedEvent): string {
     const key = event.ticketKey ?? '';
-    return `${event.type}::${key}`;
+    const projectId = event.projectId ?? '';
+    return `${event.type}::${projectId}::${key}`;
   }
 }

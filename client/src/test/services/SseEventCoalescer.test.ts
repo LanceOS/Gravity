@@ -65,6 +65,22 @@ describe('SseEventCoalescer', () => {
     expect(onFlush).toHaveBeenCalledWith([first, second]);
   });
 
+  it('separates same event type without ticket key when project IDs differ', () => {
+    vi.useFakeTimers();
+    const onFlush = vi.fn();
+    const coalescer = new SseEventCoalescer(onFlush, { coalesceWindowMs: 100 });
+
+    const first = { type: 'tickets-updated', projectId: 'project-1' };
+    const second = { type: 'tickets-updated', projectId: 'project-2' };
+
+    coalescer.enqueue(first);
+    coalescer.enqueue(second);
+
+    vi.advanceTimersByTime(100);
+    expect(onFlush).toHaveBeenCalledTimes(1);
+    expect(onFlush).toHaveBeenCalledWith([first, second]);
+  });
+
   it('supports overriding the coalescing window', () => {
     vi.useFakeTimers();
     const onFlush = vi.fn();
