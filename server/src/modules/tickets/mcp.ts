@@ -3,6 +3,7 @@ import { db } from '../../db/index.js';
 import { projects, labels, teams, ticketLabels, workspaceSettings } from '../../db/schema.js';
 import { audit } from '../../lib/logger.js';
 import { mcpEventBus } from '../../lib/mcp-event-bus.js';
+import { McpToolValidationError } from '../mcp/errors.js';
 import {
   addCommentRecord,
   createTicketRecord,
@@ -14,6 +15,8 @@ import {
   hasCircularDependency,
   hasTicketDependencyRelation,
   listComments,
+  listTicketBlockers,
+  listTicketDependencies,
   listTickets,
   listWorkspaceTickets,
   removeTicketDependencyRelation,
@@ -31,6 +34,61 @@ function parseDateArg(value: unknown, fieldName: string): Date | undefined {
     throw new Error(`Invalid date format provided for ${fieldName}: ${value}`);
   }
   return d;
+}
+
+type WorkspaceTicket = NonNullable<Awaited<ReturnType<typeof getTicketByKey>>>;
+type TicketRelationSummary = Awaited<ReturnType<typeof listTicketDependencies>>[number];
+type DependencyOperation = 'add' | 'remove';
+type DependencyStatus =
+  | 'ready'
+  | 'missing_input'
+  | 'not_found'
+  | 'unauthorized'
+  | 'self_reference'
+  | 'duplicate'
+  | 'reverse_duplicate'
+  | 'cycle'
+  | 'no_relation';
+type DependencyTicketSummary = {
+  ticketKey: string;
+  title: string;
+  status: string;
+  priority: string;
+};
+type DependencyRelationshipSummary = {
+  blockerTicketKey: string;
+  dependentTicketKey: string;
+};
+type DependencyPreviewResult = {
+  ok: boolean;
+  operation: string;
+  status: DependencyStatus;
+  message: string;
+  suggestedFix?: string;
+  relationship?: DependencyRelationshipSummary;
+  existingRelationship?: DependencyRelationshipSummary;
+  blockerTicket?: DependencyTicketSummary;
+  dependentTicket?: DependencyTicketSummary;
+};
+
+function readStringArg(args: Record<string, unknown>, names: string[]) {
+  for (const name of names) {
+    const value = args[name];
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+
+  return '';
+}
+
+function formatDependencyTicketForMcp(ticket: TicketRelationSummary) {
+  return {
+    ticketKey: ticket.key,
+    title: ticket.title,
+    status: ticket.status,
+    priority: ticket.priority,
+  };
 }
 
 /**
@@ -281,52 +339,7 @@ export class TicketTools {
    * @throws When either ticket is missing, cross-workspace, or creates an invalid relation.
    */
   async addDependency(args: Record<string, unknown>, context: ToolExecutionContext) {
-    const ticket = await this.getTicketInWorkspace(args, context.workspaceId);
-    const dependencyTicketKey = String((args.dependencyTicketKey ?? args.dependencyKey ?? '')).toUpperCase();
-    if (!dependencyTicketKey) {
-      throw new Error('dependencyTicketKey is required for add_dependency.');
-    }
-
-    if (dependencyTicketKey === ticket.key) {
-      throw new Error('A ticket cannot depend on itself.');
-    }
-
-    const dependency = await getTicketByKey(dependencyTicketKey);
-    if (!dependency) {
-      throw new Error(`Dependency ticket ${dependencyTicketKey} not found.`);
-    }
-
-    await this.assertProjectInWorkspace(dependency.projectId, context.workspaceId);
-
-    if (await hasTicketDependencyRelation(ticket.id, dependency.id)) {
-      throw new Error('This ticket already blocks the selected ticket.');
-    }
-    if (await hasTicketDependencyRelation(dependency.id, ticket.id)) {
-      throw new Error('This ticket is already blocked by the selected ticket.');
-    }
-    if (await hasCircularDependency(dependency.id, ticket.id)) {
-      throw new Error('Circular dependency detected.');
-    }
-
-    const scope = await getProjectScope(ticket.projectId);
-    if (!scope) {
-      throw new Error(`Project ${ticket.projectId} not found.`);
-    }
-
-    await createTicketDependencyRelation(ticket.id, dependency.id, ticket.projectId);
-
-    mcpEventBus.publish({
-      type: 'dependency.added',
-      workspaceId: scope.workspaceId,
-      projectId: ticket.projectId,
-      teamId: scope.teamId,
-      ticketKey: ticket.key,
-      actorUserId: context.actorUserId,
-      timestamp: new Date().toISOString(),
-      data: { dependencyTicketKey },
-    });
-
-    return { success: true };
+    return this.markTicketBlocked(args, context, 'add_dependency');
   }
 
   /**
@@ -337,42 +350,398 @@ export class TicketTools {
    * @throws When either ticket is missing, cross-workspace, or relation does not exist.
    */
   async removeDependency(args: Record<string, unknown>, context: ToolExecutionContext) {
-    const ticket = await this.getTicketInWorkspace(args, context.workspaceId);
-    const dependencyTicketKey = String((args.dependencyTicketKey ?? args.dependencyKey ?? '')).toUpperCase();
-    if (!dependencyTicketKey) {
-      throw new Error('dependencyTicketKey is required for remove_dependency.');
+    return this.unmarkTicketBlocked(args, context, 'remove_dependency');
+  }
+
+  /**
+   * @description Marks a ticket as blocked by another ticket using the
+   * blocker/dependency terminology that agents can reason about directly.
+   * @param args Tool arguments containing blocker and dependent ticket keys.
+   * @param context Trusted tool execution context.
+   * @param auditAction Audit event label for the caller-facing alias.
+   * @return Success wrapper with the created blocker relationship.
+   * @throws When the relationship cannot be created safely.
+   */
+  async markTicketBlocked(
+    args: Record<string, unknown>,
+    context: ToolExecutionContext,
+    auditAction = 'mark_ticket_blocked',
+  ) {
+    const preview = await this.analyzeDependencyMutation('add', args, context.workspaceId);
+
+    if (!preview.ok || !preview.relationship || !preview.blockerTicket || !preview.dependentTicket) {
+      throw new McpToolValidationError(preview.message, preview);
     }
 
-    const dependency = await getTicketByKey(dependencyTicketKey);
-    if (!dependency) {
-      throw new Error(`Dependency ticket ${dependencyTicketKey} not found.`);
-    }
-
-    await this.assertProjectInWorkspace(dependency.projectId, context.workspaceId);
-
-    if (!(await hasTicketDependencyRelation(ticket.id, dependency.id))) {
-      throw new Error('Ticket is not a dependency of this ticket.');
-    }
-
-    const scope = await getProjectScope(ticket.projectId);
+    const blockerTicket = await this.getTicketByKeyInWorkspace(
+      preview.relationship.blockerTicketKey,
+      context.workspaceId,
+      'Blocker ticket',
+    );
+    const dependentTicket = await this.getTicketByKeyInWorkspace(
+      preview.relationship.dependentTicketKey,
+      context.workspaceId,
+      'Dependent ticket',
+    );
+    const scope = await getProjectScope(blockerTicket.projectId);
     if (!scope) {
-      throw new Error(`Project ${ticket.projectId} not found.`);
+      throw new Error(`Project ${blockerTicket.projectId} not found.`);
     }
 
-    await removeTicketDependencyRelation(ticket.id, dependency.id);
+    await createTicketDependencyRelation(blockerTicket.id, dependentTicket.id, blockerTicket.projectId);
+
+    audit(auditAction, {
+      workspaceId: context.workspaceId,
+      actorUserId: context.actorUserId,
+      blockerTicketKey: blockerTicket.key,
+      dependentTicketKey: dependentTicket.key,
+    });
+
+    mcpEventBus.publish({
+      type: 'dependency.added',
+      workspaceId: scope.workspaceId,
+      projectId: blockerTicket.projectId,
+      teamId: scope.teamId,
+      ticketKey: blockerTicket.key,
+      actorUserId: context.actorUserId,
+      timestamp: new Date().toISOString(),
+      data: {
+        dependencyTicketKey: dependentTicket.key,
+        blockerTicketKey: blockerTicket.key,
+        dependentTicketKey: dependentTicket.key,
+      },
+    });
+
+    return {
+      success: true,
+      relationship: preview.relationship,
+      message: `${blockerTicket.key} now blocks ${dependentTicket.key}.`,
+    };
+  }
+
+  /**
+   * @description Removes a blocker/dependency relationship between two tickets.
+   * @param args Tool arguments containing blocker and dependent ticket keys.
+   * @param context Trusted tool execution context.
+   * @param auditAction Audit event label for the caller-facing alias.
+   * @return Success wrapper with the removed blocker relationship.
+   * @throws When the relationship cannot be removed safely.
+   */
+  async unmarkTicketBlocked(
+    args: Record<string, unknown>,
+    context: ToolExecutionContext,
+    auditAction = 'unmark_ticket_blocked',
+  ) {
+    const preview = await this.analyzeDependencyMutation('remove', args, context.workspaceId);
+
+    if (!preview.ok || !preview.relationship || !preview.blockerTicket || !preview.dependentTicket) {
+      throw new McpToolValidationError(preview.message, preview);
+    }
+
+    const blockerTicket = await this.getTicketByKeyInWorkspace(
+      preview.relationship.blockerTicketKey,
+      context.workspaceId,
+      'Blocker ticket',
+    );
+    const dependentTicket = await this.getTicketByKeyInWorkspace(
+      preview.relationship.dependentTicketKey,
+      context.workspaceId,
+      'Dependent ticket',
+    );
+    const scope = await getProjectScope(blockerTicket.projectId);
+    if (!scope) {
+      throw new Error(`Project ${blockerTicket.projectId} not found.`);
+    }
+
+    await removeTicketDependencyRelation(blockerTicket.id, dependentTicket.id);
+
+    audit(auditAction, {
+      workspaceId: context.workspaceId,
+      actorUserId: context.actorUserId,
+      blockerTicketKey: blockerTicket.key,
+      dependentTicketKey: dependentTicket.key,
+    });
 
     mcpEventBus.publish({
       type: 'dependency.removed',
       workspaceId: scope.workspaceId,
-      projectId: ticket.projectId,
+      projectId: blockerTicket.projectId,
       teamId: scope.teamId,
-      ticketKey: ticket.key,
+      ticketKey: blockerTicket.key,
       actorUserId: context.actorUserId,
       timestamp: new Date().toISOString(),
-      data: { dependencyTicketKey },
+      data: {
+        dependencyTicketKey: dependentTicket.key,
+        blockerTicketKey: blockerTicket.key,
+        dependentTicketKey: dependentTicket.key,
+      },
     });
 
-    return { success: true };
+    return {
+      success: true,
+      relationship: preview.relationship,
+      message: `${blockerTicket.key} no longer blocks ${dependentTicket.key}.`,
+    };
+  }
+
+  /**
+   * @description Returns a structured preflight analysis for adding or
+   * removing a blocker/dependency relationship without mutating any data.
+   * @param args Tool arguments containing the operation and ticket keys.
+   * @param context Trusted tool execution context.
+   * @return A structured preview with validation hints and suggested fixes.
+   */
+  async previewTicketDependency(args: Record<string, unknown>, context: ToolExecutionContext) {
+    return this.analyzeDependencyMutation(String(args.operation ?? '').toLowerCase().trim(), args, context.workspaceId);
+  }
+
+  private async lookupDependencyTicket(
+    ticketKey: string,
+    workspaceId: string,
+    operation: DependencyOperation,
+    role: 'blocker' | 'dependent',
+    relationship?: DependencyRelationshipSummary,
+  ): Promise<{ ticket?: WorkspaceTicket; failure?: DependencyPreviewResult }> {
+    const label = role === 'blocker' ? 'Blocker ticket' : 'Dependent ticket';
+
+    try {
+      const ticket = await this.getTicketByKeyInWorkspace(ticketKey, workspaceId, label);
+      return { ticket };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to resolve ticket.';
+      const normalized = message.toLowerCase();
+
+      if (normalized.includes('not found')) {
+        return {
+          failure: {
+            ok: false,
+            operation,
+            status: 'not_found',
+            message,
+            suggestedFix: `Check the ${role} ticket key and use a human-readable key like GRAV-123.`,
+            relationship,
+          },
+        };
+      }
+
+      if (normalized.includes('unauthorized') || normalized.includes('workspace mismatch')) {
+        return {
+          failure: {
+            ok: false,
+            operation,
+            status: 'unauthorized',
+            message: 'That ticket is not available in the active workspace.',
+            suggestedFix: 'Use tickets from the current workspace, or switch to the correct workspace first.',
+            relationship,
+          },
+        };
+      }
+
+      return {
+        failure: {
+          ok: false,
+          operation,
+          status: 'not_found',
+          message,
+          suggestedFix: 'Double-check the ticket key and try again.',
+          relationship,
+        },
+      };
+    }
+  }
+
+  private async analyzeDependencyMutation(
+    operation: DependencyOperation | string,
+    args: Record<string, unknown>,
+    workspaceId: string,
+  ): Promise<DependencyPreviewResult> {
+    const blockerTicketKey = readStringArg(args, [
+      'blocker_ticket_key',
+      'blockerTicketKey',
+      'ticketKey',
+      'ticket_key',
+    ]).toUpperCase();
+    const dependentTicketKey = readStringArg(args, [
+      'dependent_ticket_key',
+      'dependentTicketKey',
+      'dependency_ticket_key',
+      'dependencyTicketKey',
+      'dependencyKey',
+    ]).toUpperCase();
+    const relationship = blockerTicketKey && dependentTicketKey
+      ? { blockerTicketKey, dependentTicketKey }
+      : undefined;
+
+    const fail = (
+      status: DependencyStatus,
+      message: string,
+      suggestedFix: string,
+      extra: Partial<DependencyPreviewResult> = {},
+    ): DependencyPreviewResult => ({
+      ok: false,
+      operation,
+      status,
+      message,
+      suggestedFix,
+      relationship,
+      ...extra,
+    });
+
+    if (operation !== 'add' && operation !== 'remove') {
+      return fail('missing_input', 'Unsupported dependency preview operation.', 'Use operation="add" or operation="remove".');
+    }
+
+    if (!blockerTicketKey || !dependentTicketKey) {
+      return fail(
+        'missing_input',
+        'blocker_ticket_key and dependent_ticket_key are required.',
+        'Provide both human-readable ticket keys like GRAV-123 and GRAV-456.',
+      );
+    }
+
+    if (blockerTicketKey === dependentTicketKey) {
+      return fail(
+        'self_reference',
+        'A ticket cannot block or depend on itself.',
+        'Choose two different tickets for the blocker and dependent.',
+      );
+    }
+
+    const blockerLookup = await this.lookupDependencyTicket(blockerTicketKey, workspaceId, operation, 'blocker', relationship);
+    if (blockerLookup.failure) {
+      return blockerLookup.failure;
+    }
+
+    const dependentLookup = await this.lookupDependencyTicket(dependentTicketKey, workspaceId, operation, 'dependent', relationship);
+    if (dependentLookup.failure) {
+      return dependentLookup.failure;
+    }
+
+    const blockerTicket = blockerLookup.ticket!;
+    const dependentTicket = dependentLookup.ticket!;
+    const blockerSummary = formatDependencyTicketForMcp(blockerTicket);
+    const dependentSummary = formatDependencyTicketForMcp(dependentTicket);
+
+    if (operation === 'add') {
+      if (await hasTicketDependencyRelation(blockerTicket.id, dependentTicket.id)) {
+        return fail(
+          'duplicate',
+          `${blockerTicket.key} already blocks ${dependentTicket.key}.`,
+          'Use unmark_ticket_blocked to remove the existing blocker/dependency relationship before adding it again.',
+          {
+            blockerTicket: blockerSummary,
+            dependentTicket: dependentSummary,
+            existingRelationship: relationship ?? {
+              blockerTicketKey: blockerTicket.key,
+              dependentTicketKey: dependentTicket.key,
+            },
+          },
+        );
+      }
+
+      if (await hasTicketDependencyRelation(dependentTicket.id, blockerTicket.id)) {
+        return fail(
+          'reverse_duplicate',
+          `${dependentTicket.key} already blocks ${blockerTicket.key}.`,
+          `Remove ${dependentTicket.key} -> ${blockerTicket.key} first, or swap the keys if that was the intent.`,
+          {
+            blockerTicket: blockerSummary,
+            dependentTicket: dependentSummary,
+            existingRelationship: {
+              blockerTicketKey: dependentTicket.key,
+              dependentTicketKey: blockerTicket.key,
+            },
+          },
+        );
+      }
+
+      if (await hasCircularDependency(dependentTicket.id, blockerTicket.id)) {
+        return fail(
+          'cycle',
+          `Adding ${blockerTicket.key} -> ${dependentTicket.key} would create a circular dependency.`,
+          'Choose a different blocker or remove the downstream dependency chain before adding this relationship.',
+          {
+            blockerTicket: blockerSummary,
+            dependentTicket: dependentSummary,
+          },
+        );
+      }
+
+      return {
+        ok: true,
+        operation,
+        status: 'ready',
+        message: `${blockerTicket.key} can block ${dependentTicket.key}.`,
+        relationship,
+        blockerTicket: blockerSummary,
+        dependentTicket: dependentSummary,
+      };
+    }
+
+    if (await hasTicketDependencyRelation(blockerTicket.id, dependentTicket.id)) {
+      return {
+        ok: true,
+        operation,
+        status: 'ready',
+        message: `${blockerTicket.key} blocks ${dependentTicket.key} and can be removed.`,
+        relationship,
+        blockerTicket: blockerSummary,
+        dependentTicket: dependentSummary,
+      };
+    }
+
+    if (await hasTicketDependencyRelation(dependentTicket.id, blockerTicket.id)) {
+      return {
+        ok: true,
+        operation,
+        status: 'ready',
+        message: `${dependentTicket.key} blocks ${blockerTicket.key} and can be removed.`,
+        relationship: {
+          blockerTicketKey: dependentTicket.key,
+          dependentTicketKey: blockerTicket.key,
+        },
+        blockerTicket: dependentSummary,
+        dependentTicket: blockerSummary,
+      };
+    }
+
+    return fail(
+      'no_relation',
+      `No dependency relationship exists between ${blockerTicket.key} and ${dependentTicket.key}.`,
+      'Use preview_ticket_dependency with operation="add" if you want to create the relationship instead.',
+      {
+        blockerTicket: blockerSummary,
+        dependentTicket: dependentSummary,
+      },
+    );
+  }
+
+  /**
+   * @description Lists both blockers and dependents for a ticket using
+   * human-readable ticket keys so AI agents can reason about blocked-by and
+   * blocks relationships directly.
+   * @param args Tool arguments containing the ticket key.
+   * @param context Trusted tool execution context.
+   * @return Blocked-by and blocks summaries for the requested ticket.
+   * @throws When the ticket does not exist or belongs to another workspace.
+   */
+  async listTicketDependencyRelations(args: Record<string, unknown>, context: ToolExecutionContext) {
+    const ticketKey = readStringArg(args, ['ticket_key', 'ticketKey']).toUpperCase();
+    if (!ticketKey) {
+      throw new Error('ticket_key is required for list_ticket_dependencies.');
+    }
+
+    const ticket = await this.getTicketByKeyInWorkspace(ticketKey, context.workspaceId, 'Ticket');
+    const [blockedBy, blocks] = await Promise.all([
+      listTicketBlockers(ticket.id),
+      listTicketDependencies(ticket.id),
+    ]);
+
+    return {
+      ticketKey: ticket.key,
+      blockedBy: blockedBy.map(formatDependencyTicketForMcp),
+      blocks: blocks.map(formatDependencyTicketForMcp),
+    };
   }
 
   /**
@@ -867,15 +1236,95 @@ export class TicketTools {
    * @throws When the ticket does not exist or belongs to another workspace.
    */
   private async getTicketInWorkspace(args: Record<string, unknown>, workspaceId: string) {
-    const ticketKey = String(args.ticketKey ?? '').toUpperCase();
+    const ticketKey = readStringArg(args, ['ticketKey', 'ticket_key']).toUpperCase();
+    if (!ticketKey) {
+      throw new Error('ticketKey is required.');
+    }
+
+    return this.getTicketByKeyInWorkspace(ticketKey, workspaceId, 'Ticket');
+  }
+
+  private async getTicketByKeyInWorkspace(ticketKey: string, workspaceId: string, label: string): Promise<WorkspaceTicket> {
     const ticket = await getTicketByKey(ticketKey);
 
     if (!ticket) {
-      throw new Error(`Ticket ${ticketKey} not found.`);
+      throw new Error(`${label} ${ticketKey} not found.`);
     }
 
     await this.assertProjectInWorkspace(ticket.projectId, workspaceId);
     return ticket;
+  }
+
+  private async resolveDependencyAddition(args: Record<string, unknown>, workspaceId: string) {
+    const blockerTicketKey = (
+      readStringArg(args, ['blocker_ticket_key', 'blockerTicketKey'])
+      || readStringArg(args, ['ticketKey', 'ticket_key'])
+    ).toUpperCase();
+    const dependentTicketKey = (
+      readStringArg(args, ['dependent_ticket_key', 'dependentTicketKey'])
+      || readStringArg(args, ['dependencyTicketKey', 'dependency_ticket_key', 'dependencyKey'])
+    ).toUpperCase();
+
+    if (!blockerTicketKey || !dependentTicketKey) {
+      throw new Error('blocker_ticket_key and dependent_ticket_key are required. Legacy aliases ticketKey and dependencyTicketKey are also supported.');
+    }
+
+    if (blockerTicketKey === dependentTicketKey) {
+      throw new Error('A ticket cannot be both the blocker and the dependent in the same relationship.');
+    }
+
+    const blockerTicket = await this.getTicketByKeyInWorkspace(blockerTicketKey, workspaceId, 'Blocker ticket');
+    const dependentTicket = await this.getTicketByKeyInWorkspace(dependentTicketKey, workspaceId, 'Dependent ticket');
+
+    return { blockerTicket, dependentTicket };
+  }
+
+  private async resolveDependencyRemoval(args: Record<string, unknown>, workspaceId: string) {
+    const explicitBlockerTicketKey = readStringArg(args, ['blocker_ticket_key', 'blockerTicketKey']).toUpperCase();
+    const explicitDependentTicketKey = readStringArg(args, ['dependent_ticket_key', 'dependentTicketKey']).toUpperCase();
+
+    if (explicitBlockerTicketKey || explicitDependentTicketKey) {
+      if (!explicitBlockerTicketKey || !explicitDependentTicketKey) {
+        throw new Error('blocker_ticket_key and dependent_ticket_key are both required when removing a specific blocker/dependency relationship.');
+      }
+
+      if (explicitBlockerTicketKey === explicitDependentTicketKey) {
+        throw new Error('A ticket cannot remove a dependency relationship with itself.');
+      }
+
+      const blockerTicket = await this.getTicketByKeyInWorkspace(explicitBlockerTicketKey, workspaceId, 'Blocker ticket');
+      const dependentTicket = await this.getTicketByKeyInWorkspace(explicitDependentTicketKey, workspaceId, 'Dependent ticket');
+
+      if (!(await hasTicketDependencyRelation(blockerTicket.id, dependentTicket.id))) {
+        throw new Error(`No dependency relationship exists where ${blockerTicket.key} blocks ${dependentTicket.key}.`);
+      }
+
+      return { blockerTicket, dependentTicket };
+    }
+
+    const ticketKey = readStringArg(args, ['ticket_key', 'ticketKey']).toUpperCase();
+    const relatedTicketKey = readStringArg(args, ['dependency_ticket_key', 'dependencyTicketKey', 'dependencyKey']).toUpperCase();
+
+    if (!ticketKey || !relatedTicketKey) {
+      throw new Error('ticket_key and dependency_ticket_key are required for remove_ticket_dependency.');
+    }
+
+    if (ticketKey === relatedTicketKey) {
+      throw new Error('A ticket cannot remove a dependency relationship with itself.');
+    }
+
+    const ticket = await this.getTicketByKeyInWorkspace(ticketKey, workspaceId, 'Ticket');
+    const relatedTicket = await this.getTicketByKeyInWorkspace(relatedTicketKey, workspaceId, 'Dependency ticket');
+
+    if (await hasTicketDependencyRelation(ticket.id, relatedTicket.id)) {
+      return { blockerTicket: ticket, dependentTicket: relatedTicket };
+    }
+
+    if (await hasTicketDependencyRelation(relatedTicket.id, ticket.id)) {
+      return { blockerTicket: relatedTicket, dependentTicket: ticket };
+    }
+
+    throw new Error(`No dependency or blocker relationship exists between ${ticket.key} and ${relatedTicket.key}.`);
   }
 
   /**
@@ -913,10 +1362,14 @@ export const ticketToolHandlers: Record<string, ToolHandler> = {
   read_comments: (args, context) => ticketTools.readComments(args, context),
   delete_comment: (args, context) => ticketTools.deleteComment(args, context),
   update_comment: (args, context) => ticketTools.updateComment(args, context),
-  add_dependency: (args, context) => ticketTools.addDependency(args, context),
-  remove_dependency: (args, context) => ticketTools.removeDependency(args, context),
-  add_ticket_dependency: (args, context) => ticketTools.addDependency(args, context),
-  remove_ticket_dependency: (args, context) => ticketTools.removeDependency(args, context),
+  mark_ticket_blocked: (args, context) => ticketTools.markTicketBlocked(args, context, 'mark_ticket_blocked'),
+  unmark_ticket_blocked: (args, context) => ticketTools.unmarkTicketBlocked(args, context, 'unmark_ticket_blocked'),
+  preview_ticket_dependency: (args, context) => ticketTools.previewTicketDependency(args, context),
+  add_dependency: (args, context) => ticketTools.markTicketBlocked(args, context, 'add_dependency'),
+  remove_dependency: (args, context) => ticketTools.unmarkTicketBlocked(args, context, 'remove_dependency'),
+  add_ticket_dependency: (args, context) => ticketTools.markTicketBlocked(args, context, 'add_ticket_dependency'),
+  remove_ticket_dependency: (args, context) => ticketTools.unmarkTicketBlocked(args, context, 'remove_ticket_dependency'),
+  list_ticket_dependencies: (args, context) => ticketTools.listTicketDependencyRelations(args, context),
   get_ticket_labels: (args, context) => ticketTools.getTicketLabels(args, context),
   add_ticket_labels: (args, context) => ticketTools.addTicketLabels(args, context),
   remove_ticket_labels: (args, context) => ticketTools.removeTicketLabels(args, context),
@@ -1027,20 +1480,91 @@ export const ticketToolDefinitions: McpToolDefinition[] = [
     },
   },
   {
-    name: 'add_dependency',
-    description: 'Add a dependency so ticketKey blocks dependencyTicketKey.',
+    name: 'mark_ticket_blocked',
+    description: 'Mark a ticket as blocked by another ticket. blocker_ticket_key blocks dependent_ticket_key, and both blocker and dependency wording are treated interchangeably in the tool result.',
     inputSchema: {
       type: 'object',
       properties: {
-        ticketKey: { type: 'string', description: 'Ticket that should block the dependency ticket.' },
-        dependencyTicketKey: { type: 'string', description: 'The ticket key to add as a dependency.' },
+        blocker_ticket_key: { type: 'string', description: 'The blocker ticket key, such as GRAV-123.' },
+        dependent_ticket_key: { type: 'string', description: 'The dependent or blocked ticket key, such as GRAV-456.' },
+        blockerTicketKey: { type: 'string', description: 'CamelCase alias for blocker_ticket_key.' },
+        dependentTicketKey: { type: 'string', description: 'CamelCase alias for dependent_ticket_key.' },
       },
-      required: ['ticketKey', 'dependencyTicketKey'],
+      required: ['blocker_ticket_key', 'dependent_ticket_key'],
     },
   },
   {
     name: 'add_ticket_dependency',
-    description: 'Add a dependency so ticketKey blocks dependencyTicketKey.',
+    description: 'Legacy alias for mark_ticket_blocked. Adds a blocker/dependency relationship so blocker_ticket_key blocks dependent_ticket_key.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        blocker_ticket_key: { type: 'string', description: 'The blocker ticket key, such as GRAV-123.' },
+        dependent_ticket_key: { type: 'string', description: 'The dependent or blocked ticket key, such as GRAV-456.' },
+        blockerTicketKey: { type: 'string', description: 'CamelCase alias for blocker_ticket_key.' },
+        dependentTicketKey: { type: 'string', description: 'CamelCase alias for dependent_ticket_key.' },
+        ticketKey: { type: 'string', description: 'Legacy alias for blocker_ticket_key.' },
+        dependencyTicketKey: { type: 'string', description: 'Legacy alias for dependent_ticket_key.' },
+      },
+      required: ['blocker_ticket_key', 'dependent_ticket_key'],
+    },
+  },
+  {
+    name: 'unmark_ticket_blocked',
+    description: 'Remove a blocker/dependency relationship so blocker_ticket_key no longer blocks dependent_ticket_key.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        blocker_ticket_key: { type: 'string', description: 'The blocker ticket key, such as GRAV-123.' },
+        dependent_ticket_key: { type: 'string', description: 'The dependent or blocked ticket key, such as GRAV-456.' },
+        blockerTicketKey: { type: 'string', description: 'CamelCase alias for blocker_ticket_key.' },
+        dependentTicketKey: { type: 'string', description: 'CamelCase alias for dependent_ticket_key.' },
+      },
+      required: ['blocker_ticket_key', 'dependent_ticket_key'],
+    },
+  },
+  {
+    name: 'remove_ticket_dependency',
+    description: 'Legacy alias for unmark_ticket_blocked. Remove a blocker/dependency relationship for ticket_key and dependency_ticket_key.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ticket_key: { type: 'string', description: 'The ticket whose blockers/dependencies are being updated.' },
+        dependency_ticket_key: { type: 'string', description: 'The related ticket key to remove as either a blocker or a dependent.' },
+        blocker_ticket_key: { type: 'string', description: 'Optional explicit blocker ticket key when you want to target the exact direction.' },
+        dependent_ticket_key: { type: 'string', description: 'Optional explicit dependent ticket key when you want to target the exact direction.' },
+        ticketKey: { type: 'string', description: 'CamelCase alias for ticket_key.' },
+        dependencyTicketKey: { type: 'string', description: 'CamelCase alias for dependency_ticket_key.' },
+      },
+      required: ['ticket_key', 'dependency_ticket_key'],
+    },
+  },
+  {
+    name: 'preview_ticket_dependency',
+    description: 'Preview adding or removing a blocker/dependency relationship before mutating anything. Returns ok, status, and suggestedFix details so agents can avoid duplicate or circular dependency errors.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        operation: {
+          type: 'string',
+          enum: ['add', 'remove'],
+          description: 'Use add to preview creating a blocker/dependency relationship or remove to preview deleting one.',
+        },
+        blocker_ticket_key: { type: 'string', description: 'The blocker ticket key to analyze for an add or remove preview.' },
+        dependent_ticket_key: { type: 'string', description: 'The dependent or blocked ticket key to analyze for an add or remove preview.' },
+        ticket_key: { type: 'string', description: 'Legacy alias for the first ticket when previewing a removal.' },
+        dependency_ticket_key: { type: 'string', description: 'Legacy alias for the related ticket when previewing a removal.' },
+        blockerTicketKey: { type: 'string', description: 'CamelCase alias for blocker_ticket_key.' },
+        dependentTicketKey: { type: 'string', description: 'CamelCase alias for dependent_ticket_key.' },
+        ticketKey: { type: 'string', description: 'CamelCase alias for ticket_key.' },
+        dependencyTicketKey: { type: 'string', description: 'CamelCase alias for dependency_ticket_key.' },
+      },
+      required: ['operation'],
+    },
+  },
+  {
+    name: 'add_dependency',
+    description: 'Legacy alias for mark_ticket_blocked.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1052,7 +1576,7 @@ export const ticketToolDefinitions: McpToolDefinition[] = [
   },
   {
     name: 'remove_dependency',
-    description: 'Remove a dependency from ticketKey to dependencyTicketKey.',
+    description: 'Legacy alias for unmark_ticket_blocked.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1063,15 +1587,15 @@ export const ticketToolDefinitions: McpToolDefinition[] = [
     },
   },
   {
-    name: 'remove_ticket_dependency',
-    description: 'Remove a dependency from ticketKey to dependencyTicketKey.',
+    name: 'list_ticket_dependencies',
+    description: 'List both blocked-by blockers and blocks dependents for a ticket using human-readable ticket keys, titles, statuses, and priorities.',
     inputSchema: {
       type: 'object',
       properties: {
-        ticketKey: { type: 'string', description: 'Ticket that owns the dependency relation.' },
-        dependencyTicketKey: { type: 'string', description: 'The dependency ticket key to remove.' },
+        ticket_key: { type: 'string', description: 'The ticket key to inspect, such as GRAV-123.' },
+        ticketKey: { type: 'string', description: 'CamelCase alias for ticket_key.' },
       },
-      required: ['ticketKey', 'dependencyTicketKey'],
+      required: ['ticket_key'],
     },
   },
   {

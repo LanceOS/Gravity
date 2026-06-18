@@ -237,6 +237,28 @@ async function migrateFlatWorkspaceTicketLabelAssignments() {
   }
 }
 
+export async function migrateLegacyTicketDependenciesTable() {
+  await ensureColumn('ticket_relationships', 'project_id', "TEXT DEFAULT 'default' NOT NULL");
+  await ensureColumn('ticket_relationships', 'created_at', "TIMESTAMPTZ NOT NULL DEFAULT NOW()");
+
+  const oldTableExists = await hasTable('ticket_dependencies');
+  if (!oldTableExists) {
+    return;
+  }
+
+  await ensureColumn('ticket_dependencies', 'project_id', "TEXT DEFAULT 'default' NOT NULL");
+  await ensureColumn('ticket_dependencies', 'created_at', "TIMESTAMPTZ NOT NULL DEFAULT NOW()");
+
+  await pool.query(`
+    INSERT INTO ticket_relationships (ticket_id, blocked_ticket_id, project_id, created_at)
+    SELECT ticket_id, blocked_ticket_id, project_id, created_at
+    FROM ticket_dependencies
+    ON CONFLICT (ticket_id, blocked_ticket_id) DO NOTHING;
+  `);
+
+  await pool.query('DROP TABLE ticket_dependencies;');
+}
+
 export async function initializeDatabase() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS user_profiles (
@@ -566,14 +588,10 @@ export async function initializeDatabase() {
     CREATE UNIQUE INDEX IF NOT EXISTS labels_project_name_unique_idx ON labels (project_id, name) WHERE project_id IS NOT NULL;
   `);
 
-  
-  // Rename old table if it exists
-  const oldTableExists = await hasTable('ticket_dependencies');
-  if (oldTableExists) {
-    await pool.query('ALTER TABLE ticket_dependencies RENAME TO ticket_relationships;');
-    await pool.query('ALTER INDEX IF EXISTS ticket_dependencies_ticket_id_idx RENAME TO ticket_relationships_ticket_id_idx;').catch(() => {});
-    await pool.query('ALTER INDEX IF EXISTS ticket_dependencies_blocked_ticket_id_idx RENAME TO ticket_relationships_blocked_ticket_id_idx;').catch(() => {});
-  }
+  // Fold the legacy table into the canonical relationship table. Startup
+  // creates `ticket_relationships` above, so renaming into that name is not
+  // safe once both tables exist.
+  await migrateLegacyTicketDependenciesTable();
 
   // Drop old column
   const legacyColExists = await hasColumn('tickets', 'blocked_ticket_id');

@@ -4,6 +4,7 @@ import request from 'supertest';
 import { createApp } from '../src/app.js';
 import { db } from '../src/db/index.js';
 import { labels, projects, tickets, workspaceMembers } from '../src/db/schema.js';
+import * as logger from '../src/lib/logger.js';
 import { getDefaultTeamId } from '../src/modules/workspaces/utils/default-team.js';
 import { mcpEventBus, type McpMutationEvent } from '../src/lib/mcp-event-bus.js';
 import {
@@ -301,8 +302,30 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
     );
     expect(toolsResponse.body.result.tools).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ name: 'add_ticket_dependency' }),
-        expect.objectContaining({ name: 'remove_ticket_dependency' }),
+        expect.objectContaining({
+          name: 'mark_ticket_blocked',
+          inputSchema: expect.objectContaining({ required: ['blocker_ticket_key', 'dependent_ticket_key'] }),
+        }),
+        expect.objectContaining({
+          name: 'unmark_ticket_blocked',
+          inputSchema: expect.objectContaining({ required: ['blocker_ticket_key', 'dependent_ticket_key'] }),
+        }),
+        expect.objectContaining({
+          name: 'preview_ticket_dependency',
+          inputSchema: expect.objectContaining({ required: ['operation'] }),
+        }),
+        expect.objectContaining({
+          name: 'add_ticket_dependency',
+          inputSchema: expect.objectContaining({ required: ['blocker_ticket_key', 'dependent_ticket_key'] }),
+        }),
+        expect.objectContaining({
+          name: 'remove_ticket_dependency',
+          inputSchema: expect.objectContaining({ required: ['ticket_key', 'dependency_ticket_key'] }),
+        }),
+        expect.objectContaining({
+          name: 'list_ticket_dependencies',
+          inputSchema: expect.objectContaining({ required: ['ticket_key'] }),
+        }),
       ]),
     );
 
@@ -512,6 +535,306 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
       ]),
     );
     expect(membersList[0]).toHaveProperty('lastActiveAt');
+  });
+
+  it('manages blockers and dependencies through the canonical MCP tools', async () => {
+    const auditSpy = vi.spyOn(logger, 'audit').mockImplementation(() => {});
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Dependency Owner',
+      email: 'dependency-owner@example.com',
+      role: 'owner',
+      avatarUrl: 'https://example.com/dependency-owner.png',
+    });
+    const owner = ownerApi.user;
+    const { workspace, project } = await seedWorkspaceFixture({
+      owner: {
+        id: owner.id,
+        name: owner.name,
+        email: owner.email,
+        role: owner.role,
+        avatarUrl: owner.avatar,
+      },
+    });
+
+    const ownerMcpRequest = (payload: Record<string, unknown>) =>
+      ownerApi.post('/api/v1/mcp/sse').set('X-Workspace-Id', workspace.id).send(payload);
+
+    const blockerTicket = await seedTicket(project.id, {
+      id: 'ticket-blocker-primary',
+      key: `${project.key}-40`,
+      title: 'Primary blocker',
+      status: 'in_progress',
+      priority: 'high',
+    });
+    const dependentTicket = await seedTicket(project.id, {
+      id: 'ticket-dependent-primary',
+      key: `${project.key}-41`,
+      title: 'Primary dependent',
+      status: 'todo',
+      priority: 'medium',
+    });
+    const downstreamTicket = await seedTicket(project.id, {
+      id: 'ticket-dependent-downstream',
+      key: `${project.key}-42`,
+      title: 'Downstream dependent',
+      status: 'backlog',
+      priority: 'low',
+    });
+
+    try {
+      const previewResponse = await ownerMcpRequest({
+        jsonrpc: '2.0',
+        id: 80,
+        method: 'tools/call',
+        params: {
+          name: 'preview_ticket_dependency',
+          arguments: {
+            operation: 'add',
+            blocker_ticket_key: blockerTicket.key,
+            dependent_ticket_key: dependentTicket.key,
+          },
+        },
+      });
+
+      expect(previewResponse.status).toBe(200);
+      expect(parseMcpResult(previewResponse)).toMatchObject({
+        ok: true,
+        operation: 'add',
+        status: 'ready',
+        relationship: {
+          blockerTicketKey: blockerTicket.key,
+          dependentTicketKey: dependentTicket.key,
+        },
+        blockerTicket: {
+          ticketKey: blockerTicket.key,
+          title: blockerTicket.title,
+          status: blockerTicket.status,
+          priority: blockerTicket.priority,
+        },
+        dependentTicket: {
+          ticketKey: dependentTicket.key,
+          title: dependentTicket.title,
+          status: dependentTicket.status,
+          priority: dependentTicket.priority,
+        },
+      });
+
+      const addResponse = await ownerMcpRequest({
+        jsonrpc: '2.0',
+        id: 81,
+        method: 'tools/call',
+        params: {
+          name: 'mark_ticket_blocked',
+          arguments: {
+            blocker_ticket_key: blockerTicket.key,
+            dependent_ticket_key: dependentTicket.key,
+          },
+        },
+      });
+
+      expect(addResponse.status).toBe(200);
+      expect(parseMcpResult(addResponse)).toEqual({
+        success: true,
+        relationship: {
+          blockerTicketKey: blockerTicket.key,
+          dependentTicketKey: dependentTicket.key,
+        },
+        message: `${blockerTicket.key} now blocks ${dependentTicket.key}.`,
+      });
+      expect(auditSpy).toHaveBeenCalledWith(
+        'mark_ticket_blocked',
+        expect.objectContaining({
+          workspaceId: workspace.id,
+          actorUserId: owner.id,
+          blockerTicketKey: blockerTicket.key,
+          dependentTicketKey: dependentTicket.key,
+        }),
+      );
+
+      const duplicatePreviewResponse = await ownerMcpRequest({
+        jsonrpc: '2.0',
+        id: 82,
+        method: 'tools/call',
+        params: {
+          name: 'preview_ticket_dependency',
+          arguments: {
+            operation: 'add',
+            blocker_ticket_key: blockerTicket.key,
+            dependent_ticket_key: dependentTicket.key,
+          },
+        },
+      });
+      expect(duplicatePreviewResponse.status).toBe(200);
+      expect(parseMcpResult(duplicatePreviewResponse)).toMatchObject({
+        ok: false,
+        operation: 'add',
+        status: 'duplicate',
+      });
+      expect((parseMcpResult(duplicatePreviewResponse) as { suggestedFix?: string }).suggestedFix).toContain('unmark_ticket_blocked');
+
+      const duplicateResponse = await ownerMcpRequest({
+        jsonrpc: '2.0',
+        id: 83,
+        method: 'tools/call',
+        params: {
+          name: 'mark_ticket_blocked',
+          arguments: {
+            blocker_ticket_key: blockerTicket.key,
+            dependent_ticket_key: dependentTicket.key,
+          },
+        },
+      });
+      expect(duplicateResponse.status).toBe(200);
+      expect(duplicateResponse.body.error?.message).toContain(`${blockerTicket.key} already blocks ${dependentTicket.key}`);
+      expect(duplicateResponse.body.error?.code).toBe(-32602);
+      expect(duplicateResponse.body.error?.data).toMatchObject({
+        ok: false,
+        operation: 'add',
+        status: 'duplicate',
+      });
+      expect(duplicateResponse.body.error?.data?.suggestedFix).toContain('unmark_ticket_blocked');
+
+      const addDownstreamResponse = await ownerMcpRequest({
+        jsonrpc: '2.0',
+        id: 84,
+        method: 'tools/call',
+        params: {
+          name: 'mark_ticket_blocked',
+          arguments: {
+            blocker_ticket_key: dependentTicket.key,
+            dependent_ticket_key: downstreamTicket.key,
+          },
+        },
+      });
+      expect(addDownstreamResponse.status).toBe(200);
+
+      const listResponse = await ownerMcpRequest({
+        jsonrpc: '2.0',
+        id: 85,
+        method: 'tools/call',
+        params: {
+          name: 'list_ticket_dependencies',
+          arguments: {
+            ticket_key: dependentTicket.key,
+          },
+        },
+      });
+
+      expect(listResponse.status).toBe(200);
+      expect(parseMcpResult(listResponse)).toEqual({
+        ticketKey: dependentTicket.key,
+        blockedBy: [
+          {
+            ticketKey: blockerTicket.key,
+            title: blockerTicket.title,
+            status: blockerTicket.status,
+            priority: blockerTicket.priority,
+          },
+        ],
+        blocks: [
+          {
+            ticketKey: downstreamTicket.key,
+            title: downstreamTicket.title,
+            status: downstreamTicket.status,
+            priority: downstreamTicket.priority,
+          },
+        ],
+      });
+      expect((parseMcpResult(listResponse) as { blockedBy: Array<Record<string, unknown>> }).blockedBy[0]).not.toHaveProperty('id');
+
+      const missingTicketResponse = await ownerMcpRequest({
+        jsonrpc: '2.0',
+        id: 86,
+        method: 'tools/call',
+        params: {
+          name: 'list_ticket_dependencies',
+          arguments: {
+            ticket_key: 'BAD-999',
+          },
+        },
+      });
+      expect(missingTicketResponse.status).toBe(200);
+      expect(missingTicketResponse.body.error?.message).toContain('Ticket BAD-999 not found.');
+
+      const circularResponse = await ownerMcpRequest({
+        jsonrpc: '2.0',
+        id: 87,
+        method: 'tools/call',
+        params: {
+          name: 'mark_ticket_blocked',
+          arguments: {
+            blocker_ticket_key: downstreamTicket.key,
+            dependent_ticket_key: blockerTicket.key,
+          },
+        },
+      });
+      expect(circularResponse.status).toBe(200);
+      expect(circularResponse.body.error?.message).toContain('circular dependency');
+      expect(circularResponse.body.error?.data).toMatchObject({
+        ok: false,
+        operation: 'add',
+        status: 'cycle',
+      });
+
+      const removeResponse = await ownerMcpRequest({
+        jsonrpc: '2.0',
+        id: 88,
+        method: 'tools/call',
+        params: {
+          name: 'unmark_ticket_blocked',
+          arguments: {
+            blocker_ticket_key: blockerTicket.key,
+            dependent_ticket_key: dependentTicket.key,
+          },
+        },
+      });
+
+      expect(removeResponse.status).toBe(200);
+      expect(parseMcpResult(removeResponse)).toEqual({
+        success: true,
+        relationship: {
+          blockerTicketKey: blockerTicket.key,
+          dependentTicketKey: dependentTicket.key,
+        },
+        message: `${blockerTicket.key} no longer blocks ${dependentTicket.key}.`,
+      });
+      expect(auditSpy).toHaveBeenCalledWith(
+        'unmark_ticket_blocked',
+        expect.objectContaining({
+          workspaceId: workspace.id,
+          actorUserId: owner.id,
+          blockerTicketKey: blockerTicket.key,
+          dependentTicketKey: dependentTicket.key,
+        }),
+      );
+
+      const listAfterRemovalResponse = await ownerMcpRequest({
+        jsonrpc: '2.0',
+        id: 89,
+        method: 'tools/call',
+        params: {
+          name: 'list_ticket_dependencies',
+          arguments: {
+            ticket_key: dependentTicket.key,
+          },
+        },
+      });
+      expect(listAfterRemovalResponse.status).toBe(200);
+      expect(parseMcpResult(listAfterRemovalResponse)).toEqual({
+        ticketKey: dependentTicket.key,
+        blockedBy: [],
+        blocks: [
+          {
+            ticketKey: downstreamTicket.key,
+            title: downstreamTicket.title,
+            status: downstreamTicket.status,
+            priority: downstreamTicket.priority,
+          },
+        ],
+      });
+    } finally {
+      auditSpy.mockRestore();
+    }
   });
 
   it('emits MCP mutation events for all mutation handlers on success', async () => {
@@ -806,10 +1129,10 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
         id: 30,
         method: 'tools/call',
         params: {
-          name: 'add_dependency',
+          name: 'mark_ticket_blocked',
           arguments: {
-            ticketKey: createResult.ticket.key,
-            dependencyTicketKey: parentTicket2.key,
+            blocker_ticket_key: createResult.ticket.key,
+            dependent_ticket_key: parentTicket2.key,
           },
         },
       });
@@ -826,10 +1149,10 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
         id: 31,
         method: 'tools/call',
         params: {
-          name: 'remove_dependency',
+          name: 'unmark_ticket_blocked',
           arguments: {
-            ticketKey: createResult.ticket.key,
-            dependencyTicketKey: parentTicket2.key,
+            blocker_ticket_key: createResult.ticket.key,
+            dependent_ticket_key: parentTicket2.key,
           },
         },
       });
@@ -868,8 +1191,8 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
         params: {
           name: 'remove_ticket_dependency',
           arguments: {
-            ticketKey: createResult.ticket.key,
-            dependencyTicketKey: parentTicket3.key,
+            ticket_key: createResult.ticket.key,
+            dependency_ticket_key: parentTicket3.key,
           },
         },
       });
@@ -945,10 +1268,10 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
         id: 30,
         method: 'tools/call',
         params: {
-          name: 'add_dependency',
+          name: 'mark_ticket_blocked',
           arguments: {
-            ticketKey: blockerTicket.key,
-            dependencyTicketKey: blockedTicket.key,
+            blocker_ticket_key: blockerTicket.key,
+            dependent_ticket_key: blockedTicket.key,
           },
         },
       });
@@ -961,15 +1284,22 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
         id: 31,
         method: 'tools/call',
         params: {
-          name: 'add_ticket_dependency',
+          name: 'mark_ticket_blocked',
           arguments: {
-            ticketKey: blockerTicket.key,
-            dependencyTicketKey: blockedTicket.key,
+            blocker_ticket_key: blockerTicket.key,
+            dependent_ticket_key: blockedTicket.key,
           },
         },
       });
       expect(duplicateAdd.status).toBe(200);
-      expect(duplicateAdd.body.error?.message).toContain('already blocks the selected ticket');
+      expect(duplicateAdd.body.error?.message).toContain(`${blockerTicket.key} already blocks ${blockedTicket.key}`);
+      expect(duplicateAdd.body.error?.code).toBe(-32602);
+      expect(duplicateAdd.body.error?.data).toMatchObject({
+        ok: false,
+        operation: 'add',
+        status: 'duplicate',
+      });
+      expect(duplicateAdd.body.error?.data?.suggestedFix).toContain('unmark_ticket_blocked');
       expect(emittedEvents).toHaveLength(eventCountBeforeFailure);
     } finally {
       unsubscribe();
@@ -1289,17 +1619,17 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
     // 3. Owner PATCH settings succeeds
     const ownerPatch = await ownerApi
       .patch(`/api/v1/workspaces/${workspace.id}/settings`)
-      .send({ disabledMcpTools: ['list_tickets', 'create_ticket', 'add_ticket_dependency'] });
+      .send({ disabledMcpTools: ['list_tickets', 'create_ticket', 'mark_ticket_blocked'] });
     expect(ownerPatch.status).toBe(200);
     expect(ownerPatch.body.disabledMcpTools).toEqual(
-      expect.arrayContaining(['list_tickets', 'create_ticket', 'add_ticket_dependency']),
+      expect.arrayContaining(['list_tickets', 'create_ticket', 'mark_ticket_blocked']),
     );
 
     // 4. GET settings returns disabled list correctly
     const getSettings = await ownerApi.get(`/api/v1/workspaces/${workspace.id}/settings`);
     expect(getSettings.status).toBe(200);
     expect(getSettings.body.disabledMcpTools).toEqual(
-      expect.arrayContaining(['list_tickets', 'create_ticket', 'add_ticket_dependency']),
+      expect.arrayContaining(['list_tickets', 'create_ticket', 'mark_ticket_blocked']),
     );
 
     // 5. tools/list filters out disabled tools when X-Workspace-Id header is sent
@@ -1312,8 +1642,11 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
     const filteredTools = listFiltered.body.result.tools as Array<{ name: string }>;
     expect(filteredTools.some(t => t.name === 'list_tickets')).toBe(false);
     expect(filteredTools.some(t => t.name === 'create_ticket')).toBe(false);
+    expect(filteredTools.some(t => t.name === 'mark_ticket_blocked')).toBe(false);
     expect(filteredTools.some(t => t.name === 'add_dependency')).toBe(false);
     expect(filteredTools.some(t => t.name === 'add_ticket_dependency')).toBe(false);
+    expect(filteredTools.some(t => t.name === 'unmark_ticket_blocked')).toBe(true);
+    expect(filteredTools.some(t => t.name === 'remove_ticket_dependency')).toBe(true);
     expect(filteredTools.some(t => t.name === 'get_ticket_details')).toBe(true);
     expect(filteredTools.some(t => t.name === 'read_ticket_details')).toBe(true);
 
@@ -1333,16 +1666,16 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
     expect(callDisabled.status).toBe(200);
     expect(callDisabled.body.error.message).toContain('disabled in this workspace');
 
-    // 6b. add_ticket_dependency alias is blocked when add_dependency is equivalent.
+    // 6b. mark_ticket_blocked is blocked when the dependency family is disabled.
     const callDisabledAlias = await ownerMcpRequest({
       jsonrpc: '2.0',
       id: 12,
       method: 'tools/call',
       params: {
-        name: 'add_ticket_dependency',
+        name: 'mark_ticket_blocked',
         arguments: {
-          ticketKey: 'N/A',
-          dependencyTicketKey: 'N/A',
+          blocker_ticket_key: 'N/A',
+          dependent_ticket_key: 'N/A',
         },
       },
     });
