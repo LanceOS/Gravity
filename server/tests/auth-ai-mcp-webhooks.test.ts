@@ -1211,7 +1211,26 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
   });
 
   it('streams the realtime subscription init event', async () => {
-    const response = await readSseChunk('/api/v1/events/subscribe?workspaceId=workspace-1');
+    const ownerApi = await createAuthenticatedApi({
+      name: 'SSE Stream Owner',
+      email: 'sse-stream-owner@example.com',
+      role: 'owner',
+      avatarUrl: 'https://example.com/owner.png',
+    });
+    const owner = ownerApi.user;
+    const { workspace } = await seedWorkspaceFixture({
+      owner: {
+        id: owner.id,
+        name: owner.name,
+        email: owner.email,
+        role: owner.role,
+        avatarUrl: owner.avatar,
+      },
+    });
+
+    const response = await readSseChunk(`/api/v1/events/subscribe?workspaceId=${workspace.id}`, {
+      headers: { Cookie: ownerApi.sessionCookie },
+    });
 
     expect(response.statusCode).toBe(200);
     expect(String(response.headers['content-type'])).toContain('text/event-stream');

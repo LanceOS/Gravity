@@ -12,9 +12,22 @@ import { createWebhookRouter } from '../modules/webhooks/routes.js';
 import { createTeamsRouter } from '../modules/workspaces/teams-routes.js';
 import { csrfProtect } from '../lib/csrf.js';
 import { subscribeToEvents } from '../realtime.js';
+import { createRateLimiter } from '../lib/rateLimit.js';
+import { createRedisRateLimiter } from '../lib/rateLimitRedis.js';
+import { env } from '../env.js';
+import { getRequestSourceIp } from '../lib/request-ip.js';
+
+export const SSE_EVENTS_IP_RATE_LIMIT_MAX = 30;
+export const SSE_EVENTS_IP_RATE_LIMIT_WINDOW_MS = 60_000;
 
 export function createApiRouter() {
   const router = Router();
+  const createLimiter = env.redisEnabled ? createRedisRateLimiter : createRateLimiter;
+  const eventsIpLimiter = createLimiter({
+    windowMs: SSE_EVENTS_IP_RATE_LIMIT_WINDOW_MS,
+    max: SSE_EVENTS_IP_RATE_LIMIT_MAX,
+    keyFn: (req) => `ip:${getRequestSourceIp(req) ?? req.ip}`,
+  });
 
   // Apply CSRF protection to state-changing API endpoints. Authorization headers
   // and service tokens bypass the check.
@@ -31,7 +44,7 @@ export function createApiRouter() {
   router.use(createMcpRouter());
   router.use(createNotesRouter());
   router.use(createWebhookRouter());
-  router.get('/events/subscribe', subscribeToEvents);
+  router.get('/events/subscribe', eventsIpLimiter, subscribeToEvents);
 
   return router;
 }

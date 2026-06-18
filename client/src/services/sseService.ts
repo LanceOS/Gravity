@@ -1,5 +1,5 @@
 type SseListener = (event: MessageEvent | Event) => void;
-type EventSourceFactory = (url: string) => EventSource;
+type EventSourceFactory = (url: string, init?: EventSourceInit) => EventSource;
 
 interface SseServiceOptions {
   apiBasePath?: string;
@@ -193,7 +193,7 @@ export class SseService {
 
     let source: EventSource;
     try {
-      source = this.options.eventSourceFactory(apiUrl);
+      source = this.options.eventSourceFactory(apiUrl, { withCredentials: true });
     } catch {
       this.scheduleReconnect();
       return;
