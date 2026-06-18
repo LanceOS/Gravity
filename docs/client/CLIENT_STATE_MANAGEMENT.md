@@ -23,6 +23,10 @@ This document outlines how the React client manages application state, data fetc
    - When `activeProjectId` is set or changes, `fetchProjectData(activeProjectId)` loads the active project's tickets, domains, and cycles into global state.
 5. **Workspace Context**:
    - `useWorkspaceDirectory` fetches the list of workspaces the user is a member of. The active workspace filters the globally available tickets and projects.
+6. **Realtime Synchronization**:
+   - `TicketContext` subscribes to the workspace SSE stream exposed by the server's realtime service.
+   - Typed mutation events from `mcpEventBus` are coalesced and mapped to targeted refetches instead of a full-page refresh.
+   - Ticket, label, and dependency changes refresh the active ticket detail; comment changes refresh the active ticket's comment thread.
 
 ## 5. Data Stores and Resources
 - **React Context (`TicketContext`)**: Holds virtually all primary domain objects (Tickets, Users, Projects, Domains, Cycles) in memory.
@@ -46,7 +50,7 @@ This document outlines how the React client manages application state, data fetc
 - Client-side filtering applies `activeWorkspaceId` to ensure users only see projects and tickets belonging to the workspace they are currently viewing. However, the true tenant boundary is enforced by the server on every API call.
 
 ## 9. Failure Modes, Observability, or Operational Notes
-- **State Stagnation / Partial Real-Time Sync**: The app does not use WebSockets, but `TicketContext` does subscribe to Server-Sent Events (SSE) via `/api/v1/events/subscribe` and reacts to events such as `tickets-updated` and `comments-updated`. In practice, this means some ticket/comment changes can appear without a full page refresh. However, the live updates are still limited to what the active SSE handling refreshes (for example, the currently active project or ticket context), so users may still need to refresh or navigate to see changes outside that active scope.
+- **State Stagnation / Partial Real-Time Sync**: The app does not use WebSockets, but `TicketContext` does subscribe to Server-Sent Events (SSE) via `/api/v1/events/subscribe` and reacts to both legacy broad-refresh events and typed mutation events such as `ticket.updated`, `comment.added`, `labels.added`, and `dependency.removed`. The client deliberately refetches only the active ticket or comment thread that changed, and a 100 ms coalescing window keeps rapid mutation bursts from triggering redundant requests.
 - **Race Conditions**: Some hooks have loading states (`settingsLoading`, `saveLoading`). UI components must respect these states to prevent double-submissions.
 
 ## 10. Change Hazards, Invariants, or Migration Constraints

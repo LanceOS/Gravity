@@ -10,12 +10,14 @@ This document outlines the high-level architecture of the `server/src/` director
 ## 3. Entry Points
 - **HTTP Server**: `server/src/index.ts` and `server/src/app.ts` initialize the Express application and mount the global API router from `server/src/routes/index.ts`.
 - **MCP Server**: `server/src/modules/mcp/stdio.ts` provides the standard input/output transport for the Model Context Protocol.
+- **Realtime SSE Service**: `server/src/realtime.ts` bridges mutation events into the client-facing Server-Sent Events stream.
 
 ## 4. Flow Steps
 1. **Request Reception**: Requests hit `server/src/app.ts` (Express) or `server/src/modules/mcp/stdio.ts` (MCP).
 2. **Global Routing**: Express routes are forwarded to `server/src/routes/index.ts`, which mounts sub-routers from individual domain modules.
 3. **Module Handling**: Each module (e.g., `src/modules/workspaces/routes.ts`) defines its own REST endpoints and interacts with module-specific services.
 4. **Data Persistence**: Modules access PostgreSQL via Drizzle ORM (`server/src/db/index.js`). Schema definitions are isolated within each module (e.g., `src/modules/tickets/schema.ts`) and merged centrally in `server/src/db/schema.ts`.
+5. **Realtime Fan-Out**: Mutation handlers publish typed events to `mcpEventBus`; `server/src/realtime.ts` listens for those events and broadcasts workspace-scoped SSE messages so clients can refresh only the affected data.
 
 ## 5. Data Stores and Resources
 - **PostgreSQL**: Primary relational datastore configured via `src/db/index.ts`. Schema models are decoupled into domain-specific modules (`src/modules/<domain>/schema.ts`) and re-exported by `src/db/schema.ts` for database migrations.
@@ -24,6 +26,7 @@ This document outlines the high-level architecture of the `server/src/` director
 ## 6. Interfaces and Contracts
 - **REST API**: Exposes `api/v1/*` routes mounted per module.
 - **MCP API**: The MCP server uses dynamic tool registration. Modules export their specific definitions and handlers (e.g., `ticketTools` and `workspaceMemberTools`), which are registered globally in `src/app.ts` via the `registerMcpTools` and `registerToolHandlers` registry pattern.
+- **Realtime Event Bus**: `mcpEventBus` is the in-process contract for mutation events that need to reach the frontend without a full refresh.
 
 ## 7. Key Files and Modules
 The architecture is structured under `src/modules/`:
@@ -32,6 +35,8 @@ The architecture is structured under `src/modules/`:
 - **`tickets/`**: Manages ticket records, comments, and specific MCP tool handlers.
 - **`workspaces/`**: Manages workspaces, projects, members, activities, and specific MCP tool handlers.
 - **`mcp/`**: The core framework for the Model Context Protocol, including stdio configurations and tool execution dispatchers.
+- **`realtime.ts`**: Central SSE fan-out for workspace-scoped live updates.
+- **`lib/mcp-event-bus.ts`**: Typed mutation event definitions and publish/subscribe helpers.
 - **`users/`, `settings/`, `health/`, `webhooks/`**: Focused domain sub-routers and handlers.
 
 ## 8. Permissions, Guards, or Tenant Boundaries
@@ -50,3 +55,4 @@ The architecture is structured under `src/modules/`:
 ## 11. Related Docs
 - [SERVER_MODULE_WORKSPACES.md](SERVER_MODULE_WORKSPACES.md)
 - [SERVER_MODULE_MCP.md](SERVER_MODULE_MCP.md)
+- [MCP_FLOW.md](../mcp/MCP_FLOW.md)
