@@ -310,6 +310,17 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return lookup;
   }, [projects]);
 
+  const sseWorkspaceId = useMemo(() => {
+    if (activeProjectId) {
+      const activeWorkspaceId = projectLookup.get(activeProjectId)?.workspaceId;
+      if (activeWorkspaceId) {
+        return activeWorkspaceId;
+      }
+    }
+
+    return projects.length > 0 && projects[0]?.workspaceId ? projects[0].workspaceId : '';
+  }, [activeProjectId, projectLookup, projects]);
+
   const invalidateAggregateTicketQueries = useCallback((projectId?: string) => {
     if (!projectId) return;
 
@@ -595,8 +606,9 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // --- Real-time SSE Synchronization ---
   useEffect(() => {
     if (typeof EventSource === 'undefined') return;
+    if (!sseWorkspaceId) return;
 
-    const eventSource = new EventSource(`${API_URL}/events/subscribe`);
+    const eventSource = new EventSource(`${API_URL}/events/subscribe?workspaceId=${encodeURIComponent(sseWorkspaceId)}`);
 
     eventSource.onmessage = (event) => {
       try {
@@ -629,7 +641,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return () => {
       eventSource.close();
     };
-  }, [invalidateAggregateTicketQueries]);
+  }, [sseWorkspaceId, invalidateAggregateTicketQueries]);
 
   // --- Mutations ---
 

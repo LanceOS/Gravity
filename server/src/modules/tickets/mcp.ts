@@ -2,15 +2,21 @@ import { asc, eq, and, inArray, isNull } from 'drizzle-orm';
 import { db } from '../../db/index.js';
 import { projects, labels, teams, ticketLabels, workspaceSettings } from '../../db/schema.js';
 import { audit } from '../../lib/logger.js';
+import { mcpEventBus } from '../../lib/mcp-event-bus.js';
 import {
   addCommentRecord,
   createTicketRecord,
+  createTicketDependencyRelation,
   deleteCommentRecord,
+  deleteTicketRecord,
   getTicketByKey,
   getTicketDetailsByKey,
+  hasCircularDependency,
+  hasTicketDependencyRelation,
   listComments,
   listTickets,
   listWorkspaceTickets,
+  removeTicketDependencyRelation,
   updateCommentRecord,
   updateTicketRecord,
   getProjectScope,
@@ -141,7 +147,63 @@ export class TicketTools {
       updatedAt: parseDateArg(args.updatedAt, 'updatedAt'),
     });
 
+    // Emit SSE event so connected clients refresh immediately.
+    const scope = await getProjectScope(projectId);
+    if (scope) {
+      const eventType = ticket.parentId ? 'subtask.created' : 'ticket.created';
+      mcpEventBus.publish({
+        type: eventType,
+        workspaceId: scope.workspaceId,
+        projectId,
+        teamId: scope.teamId,
+        ticketKey: ticket.key,
+        actorUserId: context.actorUserId,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
     return { ticket };
+  }
+
+  /**
+   * @description Deletes a ticket after validating ownership for the authorized
+   * workspace.
+   * @param args Tool arguments containing the ticket key.
+   * @param context Trusted tool execution context.
+   * @return Deletion result wrapper.
+   * @throws When the ticket does not exist or belongs to another workspace.
+   */
+  async deleteTicket(args: Record<string, unknown>, context: ToolExecutionContext) {
+    const ticketKey = String(args.ticketKey ?? '').toUpperCase();
+    const ticket = await getTicketByKey(ticketKey);
+    if (!ticket) {
+      throw new Error(`Ticket ${ticketKey} not found.`);
+    }
+
+    await this.assertProjectInWorkspace(ticket.projectId, context.workspaceId);
+
+    const deleted = await deleteTicketRecord(ticket.id, ticket.projectId);
+    if (!deleted) {
+      throw new Error(`Ticket ${ticketKey} not found.`);
+    }
+
+    const scope = await getProjectScope(ticket.projectId);
+    if (!scope) {
+      throw new Error(`Project ${ticket.projectId} not found.`);
+    }
+
+    mcpEventBus.publish({
+      type: 'ticket.deleted',
+      workspaceId: scope.workspaceId,
+      projectId: ticket.projectId,
+      teamId: scope.teamId,
+      ticketKey,
+      actorUserId: context.actorUserId,
+      timestamp: new Date().toISOString(),
+      data: { ticketId: ticket.id },
+    });
+
+    return { success: true };
   }
 
   /**
@@ -183,7 +245,123 @@ export class TicketTools {
       ticket.projectId,
     );
 
+    const scope = await getProjectScope(ticket.projectId);
+    if (scope) {
+      mcpEventBus.publish({
+        type: 'ticket.updated',
+        workspaceId: scope.workspaceId,
+        projectId: ticket.projectId,
+        teamId: scope.teamId,
+        ticketKey,
+        actorUserId: context.actorUserId,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
     return { ticket: updated };
+  }
+
+  /**
+   * @description Adds a dependency link so the source ticket blocks the provided
+   * dependency ticket.
+   * @param args Tool arguments containing both ticket keys.
+   * @param context Trusted tool execution context.
+   * @return Success wrapper.
+   * @throws When either ticket is missing, cross-workspace, or creates an invalid relation.
+   */
+  async addDependency(args: Record<string, unknown>, context: ToolExecutionContext) {
+    const ticket = await this.getTicketInWorkspace(args, context.workspaceId);
+    const dependencyTicketKey = String((args.dependencyTicketKey ?? args.dependencyKey ?? '')).toUpperCase();
+    if (!dependencyTicketKey) {
+      throw new Error('dependencyTicketKey is required for add_dependency.');
+    }
+
+    if (dependencyTicketKey === ticket.key) {
+      throw new Error('A ticket cannot depend on itself.');
+    }
+
+    const dependency = await getTicketByKey(dependencyTicketKey);
+    if (!dependency) {
+      throw new Error(`Dependency ticket ${dependencyTicketKey} not found.`);
+    }
+
+    await this.assertProjectInWorkspace(dependency.projectId, context.workspaceId);
+
+    if (await hasTicketDependencyRelation(ticket.id, dependency.id)) {
+      throw new Error('This ticket already blocks the selected ticket.');
+    }
+    if (await hasTicketDependencyRelation(dependency.id, ticket.id)) {
+      throw new Error('This ticket is already blocked by the selected ticket.');
+    }
+    if (await hasCircularDependency(dependency.id, ticket.id)) {
+      throw new Error('Circular dependency detected.');
+    }
+
+    const scope = await getProjectScope(ticket.projectId);
+    if (!scope) {
+      throw new Error(`Project ${ticket.projectId} not found.`);
+    }
+
+    await createTicketDependencyRelation(ticket.id, dependency.id, ticket.projectId);
+
+    mcpEventBus.publish({
+      type: 'dependency.added',
+      workspaceId: scope.workspaceId,
+      projectId: ticket.projectId,
+      teamId: scope.teamId,
+      ticketKey: ticket.key,
+      actorUserId: context.actorUserId,
+      timestamp: new Date().toISOString(),
+      data: { dependencyTicketKey },
+    });
+
+    return { success: true };
+  }
+
+  /**
+   * @description Removes an existing dependency link from ticket to dependency ticket.
+   * @param args Tool arguments containing both ticket keys.
+   * @param context Trusted tool execution context.
+   * @return Success wrapper.
+   * @throws When either ticket is missing, cross-workspace, or relation does not exist.
+   */
+  async removeDependency(args: Record<string, unknown>, context: ToolExecutionContext) {
+    const ticket = await this.getTicketInWorkspace(args, context.workspaceId);
+    const dependencyTicketKey = String((args.dependencyTicketKey ?? args.dependencyKey ?? '')).toUpperCase();
+    if (!dependencyTicketKey) {
+      throw new Error('dependencyTicketKey is required for remove_dependency.');
+    }
+
+    const dependency = await getTicketByKey(dependencyTicketKey);
+    if (!dependency) {
+      throw new Error(`Dependency ticket ${dependencyTicketKey} not found.`);
+    }
+
+    await this.assertProjectInWorkspace(dependency.projectId, context.workspaceId);
+
+    if (!(await hasTicketDependencyRelation(ticket.id, dependency.id))) {
+      throw new Error('Ticket is not a dependency of this ticket.');
+    }
+
+    const scope = await getProjectScope(ticket.projectId);
+    if (!scope) {
+      throw new Error(`Project ${ticket.projectId} not found.`);
+    }
+
+    await removeTicketDependencyRelation(ticket.id, dependency.id);
+
+    mcpEventBus.publish({
+      type: 'dependency.removed',
+      workspaceId: scope.workspaceId,
+      projectId: ticket.projectId,
+      teamId: scope.teamId,
+      ticketKey: ticket.key,
+      actorUserId: context.actorUserId,
+      timestamp: new Date().toISOString(),
+      data: { dependencyTicketKey },
+    });
+
+    return { success: true };
   }
 
   /**
@@ -210,6 +388,21 @@ export class TicketTools {
 
     const createdAt = parseDateArg(args.createdAt, 'createdAt');
     const comment = await addCommentRecord(ticket.id, userId, body, createdAt);
+
+    const scope = await getProjectScope(ticket.projectId);
+    if (scope) {
+      mcpEventBus.publish({
+        type: 'comment.added',
+        workspaceId: scope.workspaceId,
+        projectId: ticket.projectId,
+        teamId: scope.teamId,
+        ticketKey: ticket.key,
+        actorUserId: context.actorUserId,
+        timestamp: new Date().toISOString(),
+        data: { commentId: comment.id },
+      });
+    }
+
     return { comment };
   }
 
@@ -243,6 +436,23 @@ export class TicketTools {
     }
 
     const success = await deleteCommentRecord(commentId, ticket.id);
+
+    if (success) {
+      const scope = await getProjectScope(ticket.projectId);
+      if (scope) {
+        mcpEventBus.publish({
+          type: 'comment.deleted',
+          workspaceId: scope.workspaceId,
+          projectId: ticket.projectId,
+          teamId: scope.teamId,
+          ticketKey: ticket.key,
+          actorUserId: context.actorUserId,
+          timestamp: new Date().toISOString(),
+          data: { commentId },
+        });
+      }
+    }
+
     return { success };
   }
 
@@ -263,6 +473,23 @@ export class TicketTools {
     }
 
     const comment = await updateCommentRecord(commentId, ticket.id, body);
+
+    if (comment) {
+      const scope = await getProjectScope(ticket.projectId);
+      if (scope) {
+        mcpEventBus.publish({
+          type: 'comment.updated',
+          workspaceId: scope.workspaceId,
+          projectId: ticket.projectId,
+          teamId: scope.teamId,
+          ticketKey: ticket.key,
+          actorUserId: context.actorUserId,
+          timestamp: new Date().toISOString(),
+          data: { commentId },
+        });
+      }
+    }
+
     return { comment };
   }
 
@@ -386,6 +613,17 @@ export class TicketTools {
       ticketKey,
       addedLabels: labelsToAdd,
       finalLabels: updated.map(l => l.name),
+    });
+
+    mcpEventBus.publish({
+      type: 'labels.added',
+      workspaceId: context.workspaceId,
+      projectId: ticket.projectId,
+      teamId: projectScope.teamId,
+      ticketKey,
+      actorUserId: context.actorUserId,
+      timestamp: new Date().toISOString(),
+      data: { addedLabels: labelsToAdd, finalLabels: updated.map(l => l.name) },
     });
 
     return { labels: updated };
@@ -513,6 +751,17 @@ export class TicketTools {
       finalLabels: newLabelNames,
     });
 
+    mcpEventBus.publish({
+      type: 'labels.removed',
+      workspaceId: projectScope.workspaceId,
+      projectId: ticket.projectId,
+      teamId: projectScope.teamId,
+      ticketKey,
+      actorUserId: context.actorUserId,
+      timestamp: new Date().toISOString(),
+      data: { removedLabels: labelsToRemove, finalLabels: newLabelNames },
+    });
+
     // Return the full updated label list as rich objects.
     const updated = await db
       .select({ name: labels.name, color: labels.color, description: labels.description })
@@ -567,7 +816,7 @@ export class TicketTools {
     }
 
     const labelIds = resolvedLabels.map(l => l.id);
-    const updated = await updateTicketRecord(ticket.id, { labelIds }, ticket.projectId);
+    await updateTicketRecord(ticket.id, { labelIds }, ticket.projectId);
 
     audit('set_ticket_labels', {
       workspaceId: context.workspaceId,
@@ -576,7 +825,26 @@ export class TicketTools {
       newLabels: labelNames,
     });
 
-    return { labels: updated?.labels.map(l => l.name) ?? [] };
+    mcpEventBus.publish({
+      type: 'labels.set',
+      workspaceId: projectScope.workspaceId,
+      projectId: ticket.projectId,
+      teamId: projectScope.teamId,
+      ticketKey,
+      actorUserId: context.actorUserId,
+      timestamp: new Date().toISOString(),
+      data: { labels: labelNames },
+    });
+
+    // Return the full updated label list as rich objects.
+    const updatedRows = await db
+      .select({ name: labels.name, color: labels.color, description: labels.description })
+      .from(ticketLabels)
+      .innerJoin(labels, eq(labels.id, ticketLabels.labelId))
+      .where(eq(ticketLabels.ticketId, ticket.id))
+      .orderBy(asc(labels.sortOrder), asc(labels.name));
+
+    return { labels: updatedRows };
   }
 
   /**
@@ -627,12 +895,15 @@ export const ticketToolHandlers: Record<string, ToolHandler> = {
   get_ticket_details: (args, context) => ticketTools.getTicketDetails(args, context),
   read_ticket_details: (args, context) => ticketTools.readTicketDetails(args, context),
   create_ticket: (args, context) => ticketTools.createTicket(args, context),
+  delete_ticket: (args, context) => ticketTools.deleteTicket(args, context),
   update_ticket: (args, context) => ticketTools.updateTicket(args, context),
   add_comment: (args, context) => ticketTools.createComment(args, context),
   create_comment: (args, context) => ticketTools.createComment(args, context),
   read_comments: (args, context) => ticketTools.readComments(args, context),
   delete_comment: (args, context) => ticketTools.deleteComment(args, context),
   update_comment: (args, context) => ticketTools.updateComment(args, context),
+  add_dependency: (args, context) => ticketTools.addDependency(args, context),
+  remove_dependency: (args, context) => ticketTools.removeDependency(args, context),
   get_ticket_labels: (args, context) => ticketTools.getTicketLabels(args, context),
   add_ticket_labels: (args, context) => ticketTools.addTicketLabels(args, context),
   remove_ticket_labels: (args, context) => ticketTools.removeTicketLabels(args, context),
@@ -703,6 +974,17 @@ export const ticketToolDefinitions: McpToolDefinition[] = [
     },
   },
   {
+    name: 'delete_ticket',
+    description: 'Delete an existing ticket by ticket key.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ticketKey: { type: 'string' },
+      },
+      required: ['ticketKey'],
+    },
+  },
+  {
     name: 'update_ticket',
     description: 'Modify properties of an existing ticket by its unique ticket key.',
     inputSchema: {
@@ -729,6 +1011,30 @@ export const ticketToolDefinitions: McpToolDefinition[] = [
         },
       },
       required: ['ticketKey'],
+    },
+  },
+  {
+    name: 'add_dependency',
+    description: 'Add a dependency so ticketKey blocks dependencyTicketKey.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ticketKey: { type: 'string', description: 'Ticket that should block the dependency ticket.' },
+        dependencyTicketKey: { type: 'string', description: 'The ticket key to add as a dependency.' },
+      },
+      required: ['ticketKey', 'dependencyTicketKey'],
+    },
+  },
+  {
+    name: 'remove_dependency',
+    description: 'Remove a dependency from ticketKey to dependencyTicketKey.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ticketKey: { type: 'string', description: 'Ticket that owns the dependency relation.' },
+        dependencyTicketKey: { type: 'string', description: 'The dependency ticket key to remove.' },
+      },
+      required: ['ticketKey', 'dependencyTicketKey'],
     },
   },
   {

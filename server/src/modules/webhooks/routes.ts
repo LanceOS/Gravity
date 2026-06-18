@@ -1,10 +1,10 @@
 import { eq, inArray } from 'drizzle-orm';
 import { Router } from 'express';
 import { db } from '../../db/index.js';
-import { projects, tickets } from '../../db/schema.js';
+import { projects, teams, tickets } from '../../db/schema.js';
 import { env } from '../../env.js';
 import { verifyGitHubWebhookSignature, isValidGitHubUrl, sanitizeGitHubLogin } from '../../lib/webhookSignature.js';
-import { broadcastEvent } from '../../realtime.js';
+import { broadcastToWorkspace } from '../../realtime.js';
 import { addCommentRecord, updateTicketRecord } from '../tickets/services/tickets.js';
 
 /** Maximum number of ticket keys to process from a single webhook delivery. */
@@ -112,6 +112,14 @@ export function createWebhookRouter() {
     // Build a map from projectId -> createdBy to avoid a per-ticket DB query later.
     const projectCreatedBy = new Map(linkedProjects.map((p) => [p.id, p.createdBy]));
 
+    // Build a map from projectId -> workspaceId for scoped SSE broadcasts.
+    const projectWorkspaceRows = await db
+      .select({ id: projects.id, workspaceId: teams.workspaceId })
+      .from(projects)
+      .innerJoin(teams, eq(teams.id, projects.teamId))
+      .where(inArray(projects.id, linkedProjectIds));
+    const projectWorkspaceMap = new Map(projectWorkspaceRows.map((r) => [r.id, r.workspaceId]));
+
     // ── Ticket key extraction ─────────────────────────────────────────────────
     const prTitle = String(pr.title || '');
     const prBranch = String(pr.head?.ref || '');
@@ -192,6 +200,8 @@ export function createWebhookRouter() {
 
       if (!updated) continue;
 
+      const workspaceId = projectWorkspaceMap.get(updated.projectId) ?? '';
+
       // Reuse the already-loaded createdBy from the linked project rather than
       // firing an additional DB query per ticket.
       const commentUserId = updated.assigneeId || projectCreatedBy.get(updated.projectId);
@@ -199,12 +209,12 @@ export function createWebhookRouter() {
         const commentBody = `GitHub PR update: #${prNumber} was ${eventDescription} by ${prAuthor}${prUrl ? ` (${prUrl})` : ''}.`;
 
         await addCommentRecord(updated.id, commentUserId, commentBody);
-        broadcastEvent('comments-updated', { ticketId: updated.id });
+        if (workspaceId) broadcastToWorkspace(workspaceId, 'comments-updated', { ticketId: updated.id });
       }
 
-      broadcastEvent('tickets-updated', {
-        projectId: updated.projectId,
-      });
+      if (workspaceId) {
+        broadcastToWorkspace(workspaceId, 'tickets-updated', { projectId: updated.projectId });
+      }
     }
 
     // ── Finding #8: Always return uniform success ─────────────────────────────
