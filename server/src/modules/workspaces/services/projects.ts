@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import { db } from '../../../db/index.js';
 import { comments, cycles, labels, projectMembers, projects, teams, ticketLabels, tickets, workspaceMembers, workspaces, workspaceSettings } from '../../../db/schema.js';
 import {
@@ -56,7 +56,17 @@ export async function listProjectsWithDetails(userId: string, workspaceId?: stri
       teamId: projects.teamId,
     })
     .from(projects)
-    .innerJoin(projectMembers, and(eq(projectMembers.projectId, projects.id), eq(projectMembers.userId, userId)));
+    .leftJoin(projectMembers, and(eq(projectMembers.projectId, projects.id), eq(projectMembers.userId, userId)))
+    .leftJoin(
+      workspaceMembers,
+      and(eq(workspaceMembers.workspaceId, projects.workspaceId), eq(workspaceMembers.userId, userId)),
+    )
+    .where(
+      or(
+        eq(projectMembers.userId, userId),
+        eq(workspaceMembers.userId, userId),
+      ),
+    );
 
   const projectRows: Array<{
     id: string;
@@ -68,7 +78,10 @@ export async function listProjectsWithDetails(userId: string, workspaceId?: stri
     githubRepoUrl: string | null;
     teamId: string;
   }> = workspaceId
-    ? await baseQuery.where(eq(projects.workspaceId, workspaceId)).orderBy(asc(projects.createdAt))
+    ? await baseQuery.where(and(eq(projects.workspaceId, workspaceId), or(
+      eq(projectMembers.userId, userId),
+      eq(workspaceMembers.userId, userId),
+    )).orderBy(asc(projects.createdAt))
     : await baseQuery.orderBy(asc(projects.createdAt));
 
   const projectIds = projectRows.map((project) => project.id);

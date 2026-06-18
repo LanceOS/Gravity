@@ -12,6 +12,7 @@ USER node
 # Install dev dependencies for running the Vite dev server inside the container
 COPY --chown=node:node client/package.json ./
 RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
+RUN mkdir -p /app && ln -sf /app/client/node_modules /app/node_modules
 
 # Copy source and shared library for live-sync into the container
 COPY --chown=node:node client ./
@@ -31,6 +32,7 @@ USER node
 
 COPY --chown=node:node client/package.json ./
 RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
+RUN mkdir -p /app && ln -sf /app/client/node_modules /app/node_modules
 
 COPY --chown=node:node client ./
 COPY --chown=node:node library ../library
