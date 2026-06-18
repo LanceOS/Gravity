@@ -93,6 +93,8 @@ async function main() {
   const cyclesHaveProjectId = hasCycles && await columnExists('cycles', 'project_id');
   const labelsHaveProjectId = hasLabels && await columnExists('labels', 'project_id');
   const ticketsHaveDomainId = hasTickets && await columnExists('tickets', 'domain_id');
+  const domainsHaveTeamId = hasDomains && await columnExists('domains', 'team_id');
+  const domainTeamIdExpression = domainsHaveTeamId ? 'COALESCE(domains.team_id, projects.team_id)' : 'projects.team_id';
 
   if (hasCycles && hasProjects && cyclesHaveProjectId) {
     await pool.query(`
@@ -138,19 +140,19 @@ async function main() {
     if (labelsHaveProjectId) {
       await pool.query(`
         INSERT INTO labels (id, project_id, team_id, name, color, description, sort_order, created_at)
-        SELECT domains.id, domains.project_id, COALESCE(domains.team_id, projects.team_id), domains.name, domains.color, '', 0, domains.created_at
+        SELECT domains.id, domains.project_id, ${domainTeamIdExpression}, domains.name, domains.color, '', 0, domains.created_at
         FROM domains
         LEFT JOIN projects ON domains.project_id = projects.id
-        WHERE COALESCE(domains.team_id, projects.team_id) IS NOT NULL
+        WHERE ${domainTeamIdExpression} IS NOT NULL
         ON CONFLICT (id) DO NOTHING;
       `);
     } else {
       await pool.query(`
         INSERT INTO labels (id, team_id, name, color, description, sort_order, created_at)
-        SELECT domains.id, COALESCE(domains.team_id, projects.team_id), domains.name, domains.color, '', 0, domains.created_at
+        SELECT domains.id, ${domainTeamIdExpression}, domains.name, domains.color, '', 0, domains.created_at
         FROM domains
         LEFT JOIN projects ON domains.project_id = projects.id
-        WHERE COALESCE(domains.team_id, projects.team_id) IS NOT NULL
+        WHERE ${domainTeamIdExpression} IS NOT NULL
         ON CONFLICT (id) DO NOTHING;
       `);
     }
@@ -164,7 +166,7 @@ async function main() {
         LEFT JOIN projects ON domains.project_id = projects.id
         WHERE tickets.domain_id IS NOT NULL
           AND tickets.domain_id <> ''
-          AND COALESCE(domains.team_id, projects.team_id) IS NOT NULL
+          AND ${domainTeamIdExpression} IS NOT NULL
         ON CONFLICT (ticket_id, label_id) DO NOTHING;
       `);
     }

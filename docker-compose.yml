@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: docker.io/library/postgres:16-alpine
@@ -120,12 +118,12 @@ services:
 volumes:
   gravity_postgres_data:
   gravity_rustfs_data:
+  gravity_rustfs_logs:
   gravity_backend_data:
 
 networks:
   gravity_frontend_backend:
-    name: gravity_frontend_backend
     driver: bridge
   gravity_backend_db_redis:
-    name: gravity_backend_db_redis
     driver: bridge
+    internal: true
