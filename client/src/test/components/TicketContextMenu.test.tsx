@@ -184,4 +184,60 @@ describe('TicketContextMenu', () => {
 
     expect(addTicketBlockerMock).toHaveBeenCalledWith('ticket-1', 'ticket-3');
   });
+
+  it('truncates long ticket titles inside the dependency and blocker popovers', async () => {
+    const user = userEvent.setup();
+    const longTitleTicket: Ticket = {
+      ...ticket,
+      id: 'ticket-10',
+      key: 'GRA-10',
+      title: 'Investigate intermittent synchronization backlog that should not expand the menu width',
+    };
+
+    render(
+      <TicketContext.Provider value={{
+        tickets: [ticket, longTitleTicket],
+        projects: [project1],
+        labels: [],
+        cycles: [],
+        users: [],
+        projectById,
+        updateTicket: vi.fn(),
+        moveTicket: vi.fn(),
+        deleteTicket: vi.fn(),
+        addTicketDependency: vi.fn().mockResolvedValue(true),
+        addTicketBlocker: vi.fn().mockResolvedValue(true),
+        assignLabelToTicket: vi.fn(),
+        unassignLabelFromTicket: vi.fn(),
+        removeTicketDependency: vi.fn(),
+        removeTicketBlocker: vi.fn(),
+      } as any}>
+        <TicketContextMenu
+          ticket={ticket}
+          availableTickets={[ticket, longTitleTicket]}
+        >
+          <div data-testid="ticket-trigger">Trigger Context Menu</div>
+        </TicketContextMenu>
+      </TicketContext.Provider>
+    );
+
+    fireEvent.contextMenu(screen.getByTestId('ticket-trigger'));
+
+    const assignAsItem = await screen.findByRole('menuitem', { name: 'Assign As' });
+    await user.hover(assignAsItem);
+
+    const dependencyItem = await screen.findByRole('menuitem', { name: 'Dependency' });
+    await user.hover(dependencyItem);
+
+    const dependencySearch = await screen.findByLabelText('Assign as Dependency');
+    await user.type(dependencySearch, 'Investigate');
+
+    const titleRow = await screen.findByText(longTitleTicket.title);
+    expect(titleRow).toHaveStyle({
+      display: 'block',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      whiteSpace: 'nowrap',
+    });
+  });
 });

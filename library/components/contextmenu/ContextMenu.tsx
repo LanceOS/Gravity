@@ -360,7 +360,7 @@ export function ContextMenuItemComponent({
         onKeyDown={handleKeyDown}
       >
         {icon && <span style={{ display: 'inline-flex', flexShrink: 0 }}>{icon}</span>}
-        <span style={{ flexGrow: 1 }}>{labelContent}</span>
+        <span style={{ flexGrow: 1, minWidth: 0, overflow: 'hidden' }}>{labelContent}</span>
         {hasSubmenu && (
           <ChevronRight size={13} style={{ marginLeft: 'auto', opacity: 0.7, flexShrink: 0 }} />
         )}

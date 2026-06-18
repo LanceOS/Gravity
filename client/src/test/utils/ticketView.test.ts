@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { getWorkspaceHeaderTitle, hasActiveTicketFilters, type TicketFilters } from '../../modules/tickets/utils/ticketView';
-import { filterTickets } from '../../modules/tickets/utils/ticketView';
+import {
+  filterTickets,
+  getWorkspaceHeaderTitle,
+  hasActiveTicketFilters,
+  sortTicketsForList,
+  type TicketFilters,
+} from '../../modules/tickets/utils/ticketView';
 
 const currentUser = {
   id: 'user-1',
@@ -127,5 +132,89 @@ describe('ticketView utils', () => {
     expect(filterTickets([branchTicket], { ...baseFilters, search: 'GRA100' })).toHaveLength(1);
     expect(filterTickets([branchTicket], { ...baseFilters, search: 'gra-100' })).toHaveLength(1);
     expect(filterTickets([branchTicket], { ...baseFilters, search: 'feature/gra-100' })).toHaveLength(1);
+  });
+
+  it('sorts newest_urgent by priority from urgent to low', () => {
+    const tickets = [
+      {
+        id: 'low',
+        key: 'GRA-4',
+        title: 'Low priority ticket',
+        description: '',
+        status: 'todo',
+        priority: 'low',
+        projectId: 'project-1',
+        labels: [],
+        labelIds: [],
+        cycleId: '',
+        assigneeId: '',
+        parentId: null,
+        prStatus: 'none',
+        prUrl: null,
+        createdAt: '2026-05-04T00:00:00.000Z',
+        updatedAt: '2026-05-04T00:00:00.000Z',
+      },
+      {
+        id: 'urgent',
+        key: 'GRA-1',
+        title: 'Urgent ticket',
+        description: '',
+        status: 'todo',
+        priority: 'urgent',
+        projectId: 'project-1',
+        labels: [],
+        labelIds: [],
+        cycleId: '',
+        assigneeId: '',
+        parentId: null,
+        prStatus: 'none',
+        prUrl: null,
+        createdAt: '2026-05-01T00:00:00.000Z',
+        updatedAt: '2026-05-01T00:00:00.000Z',
+      },
+      {
+        id: 'medium',
+        key: 'GRA-3',
+        title: 'Medium priority ticket',
+        description: '',
+        status: 'todo',
+        priority: 'medium',
+        projectId: 'project-1',
+        labels: [],
+        labelIds: [],
+        cycleId: '',
+        assigneeId: '',
+        parentId: null,
+        prStatus: 'none',
+        prUrl: null,
+        createdAt: '2026-05-03T00:00:00.000Z',
+        updatedAt: '2026-05-03T00:00:00.000Z',
+      },
+      {
+        id: 'high',
+        key: 'GRA-2',
+        title: 'High priority ticket',
+        description: '',
+        status: 'todo',
+        priority: 'high',
+        projectId: 'project-1',
+        labels: [],
+        labelIds: [],
+        cycleId: '',
+        assigneeId: '',
+        parentId: null,
+        prStatus: 'none',
+        prUrl: null,
+        createdAt: '2026-05-02T00:00:00.000Z',
+        updatedAt: '2026-05-02T00:00:00.000Z',
+      },
+    ] as any;
+
+    expect(sortTicketsForList(tickets, {}, 'newest_urgent').map((ticket) => ticket.id)).toEqual([
+      'urgent',
+      'high',
+      'medium',
+      'low',
+    ]);
   });
 });

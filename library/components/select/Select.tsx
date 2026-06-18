@@ -163,7 +163,16 @@ export function Select({
 
     syncMenuPosition();
 
-    const handleViewportChange = () => syncMenuPosition();
+    const handleViewportChange = (event?: Event) => {
+      if (event instanceof Event) {
+        const target = event.target;
+        if (target instanceof Node && menuRef.current?.contains(target)) {
+          return;
+        }
+      }
+
+      syncMenuPosition();
+    };
 
     window.addEventListener('resize', handleViewportChange);
     window.addEventListener('scroll', handleViewportChange, true);

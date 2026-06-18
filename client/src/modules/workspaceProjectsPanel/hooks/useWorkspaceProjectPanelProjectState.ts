@@ -75,13 +75,7 @@ export function useWorkspaceProjectPanelProjectState({
     [activeProjectId, managedProject, projectLookup, projects]
   );
 
-  const projectStrip = useMemo(() => {
-    if (!currentProject) {
-      return projects;
-    }
-
-    return [currentProject, ...projects.filter((project) => project.id !== currentProject.id)];
-  }, [currentProject, projects]);
+  const projectStrip = useMemo(() => projects, [projects]);
 
   const shouldShowLabels = true;
 
