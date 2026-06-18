@@ -70,10 +70,10 @@ services:
       REDIS_URL: redis://default:${GRAVITY_REDIS_PASSWORD:-admin}@redis:6379
       REDIS_ENABLED: ${REDIS_ENABLED:-true}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-test-secret}
-      BETTER_AUTH_BASE_URL: ${GRAVITY_BACKEND_PUBLIC_URL:-http://localhost:8080}
+      BETTER_AUTH_BASE_URL: ${GRAVITY_FRONTEND_PUBLIC_URL:-http://localhost:5173}
       NODE_IDENTITY_MASTER_KEY: ${NODE_IDENTITY_MASTER_KEY:-test-master-key}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,https://gravity.themanagerworkspace.com}
-      TRUSTED_ORIGINS: ${TRUSTED_ORIGINS:-http://localhost:5173,http://localhost:8080,https://gravity.themanagerworkspace.com}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,${GRAVITY_FRONTEND_PUBLIC_URL:-http://localhost:5173}}
+      TRUSTED_ORIGINS: ${TRUSTED_ORIGINS:-http://localhost:5173,http://localhost:8080,${GRAVITY_FRONTEND_PUBLIC_URL:-http://localhost:5173}}
       OLLAMA_DEFAULT_ENDPOINT: ${OLLAMA_DEFAULT_ENDPOINT:-http://host.docker.internal:11434}
       LOCAL_TESTING_KEK: ${LOCAL_TESTING_KEK:-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}
       FEDERATION_SYNC_INTERVAL_MS: ${FEDERATION_SYNC_INTERVAL_MS:-5000}
@@ -122,7 +122,6 @@ volumes:
 networks:
   gravity_frontend_backend:
     driver: bridge
-    internal: true
   gravity_backend_db_redis:
     driver: bridge
     internal: true
