@@ -150,16 +150,27 @@ export class TicketTools {
     // Emit SSE event so connected clients refresh immediately.
     const scope = await getProjectScope(projectId);
     if (scope) {
-      const eventType = ticket.parentId ? 'subtask.created' : 'ticket.created';
-      mcpEventBus.publish({
-        type: eventType,
+      const baseEvent = {
         workspaceId: scope.workspaceId,
         projectId,
         teamId: scope.teamId,
         ticketKey: ticket.key,
         actorUserId: context.actorUserId,
         timestamp: new Date().toISOString(),
+      };
+
+      mcpEventBus.publish({
+        ...baseEvent,
+        type: 'ticket.created',
       });
+
+      if (ticket.parentId) {
+        mcpEventBus.publish({
+          ...baseEvent,
+          type: 'subtask.created',
+          data: { parentId: ticket.parentId },
+        });
+      }
     }
 
     return { ticket };
@@ -904,6 +915,8 @@ export const ticketToolHandlers: Record<string, ToolHandler> = {
   update_comment: (args, context) => ticketTools.updateComment(args, context),
   add_dependency: (args, context) => ticketTools.addDependency(args, context),
   remove_dependency: (args, context) => ticketTools.removeDependency(args, context),
+  add_ticket_dependency: (args, context) => ticketTools.addDependency(args, context),
+  remove_ticket_dependency: (args, context) => ticketTools.removeDependency(args, context),
   get_ticket_labels: (args, context) => ticketTools.getTicketLabels(args, context),
   add_ticket_labels: (args, context) => ticketTools.addTicketLabels(args, context),
   remove_ticket_labels: (args, context) => ticketTools.removeTicketLabels(args, context),
@@ -1026,7 +1039,31 @@ export const ticketToolDefinitions: McpToolDefinition[] = [
     },
   },
   {
+    name: 'add_ticket_dependency',
+    description: 'Add a dependency so ticketKey blocks dependencyTicketKey.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ticketKey: { type: 'string', description: 'Ticket that should block the dependency ticket.' },
+        dependencyTicketKey: { type: 'string', description: 'The ticket key to add as a dependency.' },
+      },
+      required: ['ticketKey', 'dependencyTicketKey'],
+    },
+  },
+  {
     name: 'remove_dependency',
+    description: 'Remove a dependency from ticketKey to dependencyTicketKey.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ticketKey: { type: 'string', description: 'Ticket that owns the dependency relation.' },
+        dependencyTicketKey: { type: 'string', description: 'The dependency ticket key to remove.' },
+      },
+      required: ['ticketKey', 'dependencyTicketKey'],
+    },
+  },
+  {
+    name: 'remove_ticket_dependency',
     description: 'Remove a dependency from ticketKey to dependencyTicketKey.',
     inputSchema: {
       type: 'object',

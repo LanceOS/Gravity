@@ -3,8 +3,9 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../src/app.js';
 import { db } from '../src/db/index.js';
-import { projects, tickets, workspaceMembers } from '../src/db/schema.js';
+import { labels, projects, tickets, workspaceMembers } from '../src/db/schema.js';
 import { getDefaultTeamId } from '../src/modules/workspaces/utils/default-team.js';
+import { mcpEventBus, type McpMutationEvent } from '../src/lib/mcp-event-bus.js';
 import {
   api as baseApi,
   createAuthenticatedApi,
@@ -298,6 +299,12 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
         }),
       ]),
     );
+    expect(toolsResponse.body.result.tools).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'add_ticket_dependency' }),
+        expect.objectContaining({ name: 'remove_ticket_dependency' }),
+      ]),
+    );
 
     const createTicketResponse = await ownerMcpRequest({
         jsonrpc: '2.0',
@@ -505,6 +512,519 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
       ]),
     );
     expect(membersList[0]).toHaveProperty('lastActiveAt');
+  });
+
+  it('emits MCP mutation events for all mutation handlers on success', async () => {
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Grace Hopper',
+      email: 'grace-mcp-events@example.com',
+      role: 'owner',
+      avatarUrl: 'https://example.com/grace.png',
+    });
+    const owner = ownerApi.user;
+    const { workspace, project } = await seedWorkspaceFixture({
+      owner: {
+        id: owner.id,
+        name: owner.name,
+        email: owner.email,
+        role: owner.role,
+        avatarUrl: owner.avatar,
+      },
+    });
+    const teamId = getDefaultTeamId(workspace.id);
+
+    const ownerMcpRequest = (payload: Record<string, unknown>) =>
+      ownerApi.post('/api/v1/mcp/sse').set('X-Workspace-Id', workspace.id).send(payload);
+
+    const emittedEvents: McpMutationEvent[] = [];
+    const unsubscribe = mcpEventBus.subscribe(workspace.id, (event) => emittedEvents.push(event));
+
+    const parentTicket = await seedTicket(project.id, {
+      id: 'ticket-parent',
+      key: `${project.key}-10`,
+      title: 'Parent ticket',
+    });
+
+    await db.insert(labels).values([
+      {
+        id: 'label-primary',
+        teamId,
+        projectId: project.id,
+        name: 'Frontend',
+        color: '#7c3aed',
+        description: 'Frontend work',
+        sortOrder: 0,
+      },
+      {
+        id: 'label-secondary',
+        teamId,
+        projectId: project.id,
+        name: 'Backend',
+        color: '#2563eb',
+        description: 'Backend work',
+        sortOrder: 1,
+      },
+    ]);
+
+    const parentTicket2 = await seedTicket(project.id, {
+      id: 'ticket-dependency',
+      key: `${project.key}-11`,
+      title: 'Dependency ticket',
+    });
+    const parentTicket3 = await seedTicket(project.id, {
+      id: 'ticket-dependency-alt',
+      key: `${project.key}-12`,
+      title: 'Alternate dependency ticket',
+    });
+
+    const mutationBase = {
+      workspaceId: workspace.id,
+      projectId: project.id,
+      teamId,
+      actorUserId: owner.id,
+    };
+
+    try {
+      const createResponse = await ownerMcpRequest({
+        jsonrpc: '2.0',
+        id: 20,
+        method: 'tools/call',
+        params: {
+          name: 'create_ticket',
+          arguments: {
+            title: 'Create regular ticket',
+            projectId: project.id,
+          },
+        },
+      });
+      expect(createResponse.status).toBe(200);
+      const createResult = parseMcpResult(createResponse) as { ticket: { key: string } };
+      expect(createResult.ticket.key).toBeDefined();
+      const createTicketEvents = emittedEvents.slice(-1);
+
+      expect(createTicketEvents).toHaveLength(1);
+      expect(createTicketEvents[0]).toMatchObject({
+        ...mutationBase,
+        type: 'ticket.created',
+        ticketKey: createResult.ticket.key,
+      });
+
+      const createSubtaskResponse = await ownerMcpRequest({
+        jsonrpc: '2.0',
+        id: 21,
+        method: 'tools/call',
+        params: {
+          name: 'create_ticket',
+          arguments: {
+            title: 'Create sub-task ticket',
+            projectId: project.id,
+            parentId: parentTicket.id,
+          },
+        },
+      });
+      expect(createSubtaskResponse.status).toBe(200);
+      const createSubtaskResult = parseMcpResult(createSubtaskResponse) as { ticket: { key: string } };
+      const subtaskEvents = emittedEvents.slice(-2);
+
+      expect(subtaskEvents).toHaveLength(2);
+      expect(subtaskEvents[0]).toMatchObject({
+        ...mutationBase,
+        type: 'ticket.created',
+        ticketKey: createSubtaskResult.ticket.key,
+      });
+      expect(subtaskEvents[1]).toMatchObject({
+        ...mutationBase,
+        type: 'subtask.created',
+        ticketKey: createSubtaskResult.ticket.key,
+        data: { parentId: parentTicket.id },
+      });
+
+      const updateResponse = await ownerMcpRequest({
+        jsonrpc: '2.0',
+        id: 22,
+        method: 'tools/call',
+        params: {
+          name: 'update_ticket',
+          arguments: {
+            ticketKey: createResult.ticket.key,
+            status: 'in_review',
+          },
+        },
+      });
+      expect(updateResponse.status).toBe(200);
+      expect(emittedEvents.slice(-1)[0]).toMatchObject({
+        ...mutationBase,
+        type: 'ticket.updated',
+        ticketKey: createResult.ticket.key,
+      });
+
+      const addCommentResponse = await ownerMcpRequest({
+        jsonrpc: '2.0',
+        id: 23,
+        method: 'tools/call',
+        params: {
+          name: 'add_comment',
+          arguments: {
+            ticketKey: createResult.ticket.key,
+            body: 'Added via MCP',
+          },
+        },
+      });
+      expect(addCommentResponse.status).toBe(200);
+      const addCommentResult = parseMcpResult(addCommentResponse) as { comment: { id: string } };
+      expect(emittedEvents.slice(-1)[0]).toMatchObject({
+        ...mutationBase,
+        type: 'comment.added',
+        ticketKey: createResult.ticket.key,
+        data: { commentId: addCommentResult.comment.id },
+      });
+
+      const createCommentResponse = await ownerMcpRequest({
+        jsonrpc: '2.0',
+        id: 24,
+        method: 'tools/call',
+        params: {
+          name: 'create_comment',
+          arguments: {
+            ticketKey: createResult.ticket.key,
+            body: 'Created via MCP create_comment alias',
+          },
+        },
+      });
+      expect(createCommentResponse.status).toBe(200);
+      const createAliasCommentResult = parseMcpResult(createCommentResponse) as { comment: { id: string } };
+      expect(emittedEvents.slice(-1)[0]).toMatchObject({
+        ...mutationBase,
+        type: 'comment.added',
+        ticketKey: createResult.ticket.key,
+        data: { commentId: createAliasCommentResult.comment.id },
+      });
+
+      const updateCommentResponse = await ownerMcpRequest({
+        jsonrpc: '2.0',
+        id: 25,
+        method: 'tools/call',
+        params: {
+          name: 'update_comment',
+          arguments: {
+            ticketKey: createResult.ticket.key,
+            commentId: addCommentResult.comment.id,
+            body: 'Updated via MCP',
+          },
+        },
+      });
+      expect(updateCommentResponse.status).toBe(200);
+      expect(emittedEvents.slice(-1)[0]).toMatchObject({
+        ...mutationBase,
+        type: 'comment.updated',
+        ticketKey: createResult.ticket.key,
+        data: { commentId: addCommentResult.comment.id },
+      });
+
+      const deleteCommentResponse = await ownerMcpRequest({
+        jsonrpc: '2.0',
+        id: 26,
+        method: 'tools/call',
+        params: {
+          name: 'delete_comment',
+          arguments: {
+            ticketKey: createResult.ticket.key,
+            commentId: addCommentResult.comment.id,
+          },
+        },
+      });
+      expect(deleteCommentResponse.status).toBe(200);
+      expect(emittedEvents.slice(-1)[0]).toMatchObject({
+        ...mutationBase,
+        type: 'comment.deleted',
+        ticketKey: createResult.ticket.key,
+        data: { commentId: addCommentResult.comment.id },
+      });
+
+      const addLabelsResponse = await ownerMcpRequest({
+        jsonrpc: '2.0',
+        id: 27,
+        method: 'tools/call',
+        params: {
+          name: 'add_ticket_labels',
+          arguments: {
+            ticketKey: createResult.ticket.key,
+            labels: 'Frontend',
+          },
+        },
+      });
+      expect(addLabelsResponse.status).toBe(200);
+      expect(emittedEvents.slice(-1)[0]).toMatchObject({
+        ...mutationBase,
+        type: 'labels.added',
+        ticketKey: createResult.ticket.key,
+        data: { addedLabels: ['Frontend'], finalLabels: ['Frontend'] },
+      });
+
+      const setLabelsResponse = await ownerMcpRequest({
+        jsonrpc: '2.0',
+        id: 28,
+        method: 'tools/call',
+        params: {
+          name: 'set_ticket_labels',
+          arguments: {
+            ticketKey: createResult.ticket.key,
+            labels: 'Frontend,Backend',
+          },
+        },
+      });
+      expect(setLabelsResponse.status).toBe(200);
+      expect(emittedEvents.slice(-1)[0]).toMatchObject({
+        ...mutationBase,
+        type: 'labels.set',
+        ticketKey: createResult.ticket.key,
+        data: { labels: ['Frontend', 'Backend'] },
+      });
+
+      const removeLabelsResponse = await ownerMcpRequest({
+        jsonrpc: '2.0',
+        id: 29,
+        method: 'tools/call',
+        params: {
+          name: 'remove_ticket_labels',
+          arguments: {
+            ticketKey: createResult.ticket.key,
+            labels: 'Frontend',
+          },
+        },
+      });
+      expect(removeLabelsResponse.status).toBe(200);
+      expect(emittedEvents.slice(-1)[0]).toMatchObject({
+        ...mutationBase,
+        type: 'labels.removed',
+        ticketKey: createResult.ticket.key,
+        data: { removedLabels: ['Frontend'] },
+      });
+
+      const addDependencyResponse = await ownerMcpRequest({
+        jsonrpc: '2.0',
+        id: 30,
+        method: 'tools/call',
+        params: {
+          name: 'add_dependency',
+          arguments: {
+            ticketKey: createResult.ticket.key,
+            dependencyTicketKey: parentTicket2.key,
+          },
+        },
+      });
+      expect(addDependencyResponse.status).toBe(200);
+      expect(emittedEvents.slice(-1)[0]).toMatchObject({
+        ...mutationBase,
+        type: 'dependency.added',
+        ticketKey: createResult.ticket.key,
+        data: { dependencyTicketKey: parentTicket2.key },
+      });
+
+      const removeDependencyResponse = await ownerMcpRequest({
+        jsonrpc: '2.0',
+        id: 31,
+        method: 'tools/call',
+        params: {
+          name: 'remove_dependency',
+          arguments: {
+            ticketKey: createResult.ticket.key,
+            dependencyTicketKey: parentTicket2.key,
+          },
+        },
+      });
+      expect(removeDependencyResponse.status).toBe(200);
+      expect(emittedEvents.slice(-1)[0]).toMatchObject({
+        ...mutationBase,
+        type: 'dependency.removed',
+        ticketKey: createResult.ticket.key,
+        data: { dependencyTicketKey: parentTicket2.key },
+      });
+
+      const addDependencyAliasResponse = await ownerMcpRequest({
+        jsonrpc: '2.0',
+        id: 32,
+        method: 'tools/call',
+        params: {
+          name: 'add_ticket_dependency',
+          arguments: {
+            ticketKey: createResult.ticket.key,
+            dependencyTicketKey: parentTicket3.key,
+          },
+        },
+      });
+      expect(addDependencyAliasResponse.status).toBe(200);
+      expect(emittedEvents.slice(-1)[0]).toMatchObject({
+        ...mutationBase,
+        type: 'dependency.added',
+        ticketKey: createResult.ticket.key,
+        data: { dependencyTicketKey: parentTicket3.key },
+      });
+
+      const removeDependencyAliasResponse = await ownerMcpRequest({
+        jsonrpc: '2.0',
+        id: 33,
+        method: 'tools/call',
+        params: {
+          name: 'remove_ticket_dependency',
+          arguments: {
+            ticketKey: createResult.ticket.key,
+            dependencyTicketKey: parentTicket3.key,
+          },
+        },
+      });
+      expect(removeDependencyAliasResponse.status).toBe(200);
+      expect(emittedEvents.slice(-1)[0]).toMatchObject({
+        ...mutationBase,
+        type: 'dependency.removed',
+        ticketKey: createResult.ticket.key,
+        data: { dependencyTicketKey: parentTicket3.key },
+      });
+
+      const deleteTicketResponse = await ownerMcpRequest({
+        jsonrpc: '2.0',
+        id: 34,
+        method: 'tools/call',
+        params: {
+          name: 'delete_ticket',
+          arguments: {
+            ticketKey: createResult.ticket.key,
+          },
+        },
+      });
+      expect(deleteTicketResponse.status).toBe(200);
+      expect(emittedEvents.slice(-1)[0]).toMatchObject({
+        ...mutationBase,
+        type: 'ticket.deleted',
+        ticketKey: createResult.ticket.key,
+        data: { ticketId: expect.any(String) },
+      });
+    } finally {
+      unsubscribe();
+    }
+  });
+
+  it('does not emit MCP mutation events when a mutation fails', async () => {
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Grace Hopper',
+      email: 'grace-mcp-events-fail@example.com',
+      role: 'owner',
+      avatarUrl: 'https://example.com/grace.png',
+    });
+    const owner = ownerApi.user;
+    const { workspace, project } = await seedWorkspaceFixture({
+      owner: {
+        id: owner.id,
+        name: owner.name,
+        email: owner.email,
+        role: owner.role,
+        avatarUrl: owner.avatar,
+      },
+    });
+
+    const ownerMcpRequest = (payload: Record<string, unknown>) =>
+      ownerApi.post('/api/v1/mcp/sse').set('X-Workspace-Id', workspace.id).send(payload);
+
+    const blockerTicket = await seedTicket(project.id, {
+      id: 'ticket-failed-src',
+      key: `${project.key}-20`,
+      title: 'Dependency source',
+    });
+    const blockedTicket = await seedTicket(project.id, {
+      id: 'ticket-failed-target',
+      key: `${project.key}-21`,
+      title: 'Dependency target',
+    });
+
+    const emittedEvents: McpMutationEvent[] = [];
+    const unsubscribe = mcpEventBus.subscribe(workspace.id, (event) => emittedEvents.push(event));
+
+    try {
+      const firstAdd = await ownerMcpRequest({
+        jsonrpc: '2.0',
+        id: 30,
+        method: 'tools/call',
+        params: {
+          name: 'add_dependency',
+          arguments: {
+            ticketKey: blockerTicket.key,
+            dependencyTicketKey: blockedTicket.key,
+          },
+        },
+      });
+      expect(firstAdd.status).toBe(200);
+
+      const eventCountBeforeFailure = emittedEvents.length;
+
+      const duplicateAdd = await ownerMcpRequest({
+        jsonrpc: '2.0',
+        id: 31,
+        method: 'tools/call',
+        params: {
+          name: 'add_ticket_dependency',
+          arguments: {
+            ticketKey: blockerTicket.key,
+            dependencyTicketKey: blockedTicket.key,
+          },
+        },
+      });
+      expect(duplicateAdd.status).toBe(200);
+      expect(duplicateAdd.body.error?.message).toContain('already blocks the selected ticket');
+      expect(emittedEvents).toHaveLength(eventCountBeforeFailure);
+    } finally {
+      unsubscribe();
+    }
+  });
+
+  it('does not emit MCP mutation events when label mutation validation fails', async () => {
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Grace Hopper',
+      email: 'grace-mcp-events-fail-labels@example.com',
+      role: 'owner',
+      avatarUrl: 'https://example.com/grace.png',
+    });
+    const owner = ownerApi.user;
+    const { workspace, project } = await seedWorkspaceFixture({
+      owner: {
+        id: owner.id,
+        name: owner.name,
+        email: owner.email,
+        role: owner.role,
+        avatarUrl: owner.avatar,
+      },
+    });
+
+    const ownerMcpRequest = (payload: Record<string, unknown>) =>
+      ownerApi.post('/api/v1/mcp/sse').set('X-Workspace-Id', workspace.id).send(payload);
+
+    const targetTicket = await seedTicket(project.id, {
+      id: 'ticket-label-fail',
+      key: `${project.key}-30`,
+      title: 'Label failure target',
+    });
+
+    const emittedEvents: McpMutationEvent[] = [];
+    const unsubscribe = mcpEventBus.subscribe(workspace.id, (event) => emittedEvents.push(event));
+
+    try {
+      const setLabelsFailure = await ownerMcpRequest({
+        jsonrpc: '2.0',
+        id: 33,
+        method: 'tools/call',
+        params: {
+          name: 'set_ticket_labels',
+          arguments: {
+            ticketKey: targetTicket.key,
+            labels: 'DoesNotExist',
+          },
+        },
+      });
+      expect(setLabelsFailure.status).toBe(200);
+      expect(setLabelsFailure.body.error?.message).toContain('does not exist');
+      expect(emittedEvents).toHaveLength(0);
+    } finally {
+      unsubscribe();
+    }
   });
 
   it('lists workspace tickets in global createdAt order across projects', async () => {
@@ -750,14 +1270,18 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
     // 3. Owner PATCH settings succeeds
     const ownerPatch = await ownerApi
       .patch(`/api/v1/workspaces/${workspace.id}/settings`)
-      .send({ disabledMcpTools: ['list_tickets', 'create_ticket'] });
+      .send({ disabledMcpTools: ['list_tickets', 'create_ticket', 'add_ticket_dependency'] });
     expect(ownerPatch.status).toBe(200);
-    expect(ownerPatch.body.disabledMcpTools).toEqual(['list_tickets', 'create_ticket']);
+    expect(ownerPatch.body.disabledMcpTools).toEqual(
+      expect.arrayContaining(['list_tickets', 'create_ticket', 'add_ticket_dependency']),
+    );
 
     // 4. GET settings returns disabled list correctly
     const getSettings = await ownerApi.get(`/api/v1/workspaces/${workspace.id}/settings`);
     expect(getSettings.status).toBe(200);
-    expect(getSettings.body.disabledMcpTools).toEqual(['list_tickets', 'create_ticket']);
+    expect(getSettings.body.disabledMcpTools).toEqual(
+      expect.arrayContaining(['list_tickets', 'create_ticket', 'add_ticket_dependency']),
+    );
 
     // 5. tools/list filters out disabled tools when X-Workspace-Id header is sent
     const listFiltered = await ownerMcpRequest({
@@ -769,6 +1293,8 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
     const filteredTools = listFiltered.body.result.tools as Array<{ name: string }>;
     expect(filteredTools.some(t => t.name === 'list_tickets')).toBe(false);
     expect(filteredTools.some(t => t.name === 'create_ticket')).toBe(false);
+    expect(filteredTools.some(t => t.name === 'add_dependency')).toBe(false);
+    expect(filteredTools.some(t => t.name === 'add_ticket_dependency')).toBe(false);
     expect(filteredTools.some(t => t.name === 'get_ticket_details')).toBe(true);
     expect(filteredTools.some(t => t.name === 'read_ticket_details')).toBe(true);
 
@@ -784,14 +1310,30 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
             projectId: project.id,
           },
         },
-      });
+    });
     expect(callDisabled.status).toBe(200);
     expect(callDisabled.body.error.message).toContain('disabled in this workspace');
+
+    // 6b. add_ticket_dependency alias is blocked when add_dependency is equivalent.
+    const callDisabledAlias = await ownerMcpRequest({
+      jsonrpc: '2.0',
+      id: 12,
+      method: 'tools/call',
+      params: {
+        name: 'add_ticket_dependency',
+        arguments: {
+          ticketKey: 'N/A',
+          dependencyTicketKey: 'N/A',
+        },
+      },
+    });
+    expect(callDisabledAlias.status).toBe(200);
+    expect(callDisabledAlias.body.error.message).toContain('disabled in this workspace');
 
     // 7. tools/call allows calling enabled tools
     const callEnabled = await ownerMcpRequest({
         jsonrpc: '2.0',
-        id: 12,
+        id: 13,
         method: 'tools/call',
         params: {
           name: 'get_ticket_details',
