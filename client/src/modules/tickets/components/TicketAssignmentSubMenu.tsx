@@ -41,7 +41,7 @@ export function TicketAssignmentSubMenu({
   }, []);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '280px', maxWidth: '320px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '280px', maxWidth: '320px', overflowX: 'hidden' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', padding: '2px 2px 0' }}>
         <div
           style={{
@@ -84,7 +84,7 @@ export function TicketAssignmentSubMenu({
         }}
       />
 
-      <div style={{ maxHeight: '220px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '2px', paddingRight: '2px' }}>
+      <div style={{ maxHeight: '220px', overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column', gap: '2px', paddingRight: '2px' }}>
         {filteredTickets.length > 0 ? (
           filteredTickets.map((ticket) => (
             <ContextMenu.Item
@@ -93,11 +93,11 @@ export function TicketAssignmentSubMenu({
                 void onSelectTicket(ticket);
               }}
             >
-              <span style={{ display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0 }}>
-                <span style={{ fontSize: '12px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <span style={{ display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0, flex: 1, overflow: 'hidden' }}>
+                <span style={{ display: 'block', fontSize: '12px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
                   {ticket.key}
                 </span>
-                <span style={{ fontSize: '11px', color: 'var(--color-text-disabled)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <span style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-disabled)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
                   {ticket.title}
                 </span>
               </span>

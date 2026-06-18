@@ -402,6 +402,15 @@ function renderTicketDetail(overrides: Partial<Parameters<typeof TicketDetail>[0
 }
 
 describe('TicketDetail', () => {
+  it('keeps the desktop properties pane beside the ticket body with its own scrolling', () => {
+    const { container } = renderTicketDetail();
+
+    const detailBody = container.querySelector('.ticket-detail__body');
+    expect(detailBody).toBeInstanceOf(HTMLElement);
+    expect(getComputedStyle(detailBody as HTMLElement).flexDirection).toBe('row');
+    expect(getComputedStyle(screen.getByTestId('desktop-sidebar')).overflowY).toBe('auto');
+  });
+
   it('updates title and description, selects related subtasks, and posts comments', async () => {
     const user = userEvent.setup();
     const { props } = renderTicketDetail();

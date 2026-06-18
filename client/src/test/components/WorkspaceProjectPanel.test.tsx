@@ -32,6 +32,12 @@ type MockTextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
 
 vi.mock('@library', () => ({
   Button: ({ children, loading, ...props }: MockButtonProps) => <button {...props}>{loading ? 'Loading' : children}</button>,
+  CircularColorInput: ({ label, value, onChange, ...props }: { label: string; value: string; onChange: (event: ChangeEvent<HTMLInputElement>) => void }) => (
+    <label>
+      <span>{label}</span>
+      <input type="color" value={value} onChange={onChange} {...props} />
+    </label>
+  ),
   TextInput: ({ label, value, onChange, ...props }: MockTextInputProps) => (
     <label>
       <span>{label}</span>
@@ -237,6 +243,27 @@ describe('WorkspaceProjectPanel', () => {
     });
   });
 
+  it('keeps the project roster order stable after selecting a project', async () => {
+    const user = userEvent.setup();
+    renderWorkspaceProjectPanel();
+    const projectRoster = screen.getByRole('region', { name: 'Workspace projects' });
+
+    const getProjectNamesInOrder = () =>
+      within(projectRoster)
+        .getAllByRole('button')
+        .map((button) => button.textContent || '')
+        .filter((text) => text.includes('Gravity Core') || text.includes('Orbit Delivery'));
+
+    expect(getProjectNamesInOrder()[0]).toContain('Gravity Core');
+    expect(getProjectNamesInOrder()[1]).toContain('Orbit Delivery');
+
+    await user.click(screen.getByRole('button', { name: /Orbit Delivery/ }));
+
+    expect(getProjectNamesInOrder()[0]).toContain('Gravity Core');
+    expect(getProjectNamesInOrder()[1]).toContain('Orbit Delivery');
+    expect(screen.getByRole('heading', { name: 'Orbit Delivery labels' })).toBeInTheDocument();
+  });
+
   it('opens a delete-confirmation modal and deletes a project after confirmation', async () => {
     const user = userEvent.setup();
     const onDeleteProject = vi.fn().mockResolvedValue(undefined);
@@ -246,8 +273,8 @@ describe('WorkspaceProjectPanel', () => {
 
     const deleteDialog = screen.getByRole('alertdialog', { name: 'Delete Project' });
     expect(deleteDialog).toBeInTheDocument();
-    expect(screen.getByText('Are you sure you want to delete the project Gravity Core?')).toBeInTheDocument();
-    expect(screen.getByText('This action is permanent and will delete all associated tickets and comments.')).toBeInTheDocument();
+    expect(deleteDialog).toHaveTextContent('Are you sure you want to delete the project Gravity Core?');
+    expect(deleteDialog).toHaveTextContent('This action is permanent and will delete all associated tickets and comments.');
 
     const confirmButton = within(deleteDialog).getByRole('button', { name: 'Delete Project' });
     await user.click(confirmButton);
