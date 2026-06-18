@@ -150,16 +150,27 @@ export class TicketTools {
     // Emit SSE event so connected clients refresh immediately.
     const scope = await getProjectScope(projectId);
     if (scope) {
-      const eventType = ticket.parentId ? 'subtask.created' : 'ticket.created';
-      mcpEventBus.publish({
-        type: eventType,
+      const baseEvent = {
         workspaceId: scope.workspaceId,
         projectId,
         teamId: scope.teamId,
         ticketKey: ticket.key,
         actorUserId: context.actorUserId,
         timestamp: new Date().toISOString(),
+      };
+
+      mcpEventBus.publish({
+        ...baseEvent,
+        type: 'ticket.created',
       });
+
+      if (ticket.parentId) {
+        mcpEventBus.publish({
+          ...baseEvent,
+          type: 'subtask.created',
+          data: { parentId: ticket.parentId },
+        });
+      }
     }
 
     return { ticket };
