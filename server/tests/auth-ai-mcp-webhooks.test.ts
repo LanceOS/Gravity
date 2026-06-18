@@ -668,9 +668,30 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
         data: { commentId: addCommentResult.comment.id },
       });
 
-      const updateCommentResponse = await ownerMcpRequest({
+      const createCommentResponse = await ownerMcpRequest({
         jsonrpc: '2.0',
         id: 24,
+        method: 'tools/call',
+        params: {
+          name: 'create_comment',
+          arguments: {
+            ticketKey: createResult.ticket.key,
+            body: 'Created via MCP create_comment alias',
+          },
+        },
+      });
+      expect(createCommentResponse.status).toBe(200);
+      const createAliasCommentResult = parseMcpResult(createCommentResponse) as { comment: { id: string } };
+      expect(emittedEvents.slice(-1)[0]).toMatchObject({
+        ...mutationBase,
+        type: 'comment.added',
+        ticketKey: createResult.ticket.key,
+        data: { commentId: createAliasCommentResult.comment.id },
+      });
+
+      const updateCommentResponse = await ownerMcpRequest({
+        jsonrpc: '2.0',
+        id: 25,
         method: 'tools/call',
         params: {
           name: 'update_comment',
@@ -691,7 +712,7 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
 
       const deleteCommentResponse = await ownerMcpRequest({
         jsonrpc: '2.0',
-        id: 25,
+        id: 26,
         method: 'tools/call',
         params: {
           name: 'delete_comment',
@@ -709,9 +730,29 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
         data: { commentId: addCommentResult.comment.id },
       });
 
+      const addLabelsResponse = await ownerMcpRequest({
+        jsonrpc: '2.0',
+        id: 27,
+        method: 'tools/call',
+        params: {
+          name: 'add_ticket_labels',
+          arguments: {
+            ticketKey: createResult.ticket.key,
+            labels: 'Frontend',
+          },
+        },
+      });
+      expect(addLabelsResponse.status).toBe(200);
+      expect(emittedEvents.slice(-1)[0]).toMatchObject({
+        ...mutationBase,
+        type: 'labels.added',
+        ticketKey: createResult.ticket.key,
+        data: { addedLabels: ['Frontend'], finalLabels: ['Frontend'] },
+      });
+
       const setLabelsResponse = await ownerMcpRequest({
         jsonrpc: '2.0',
-        id: 26,
+        id: 28,
         method: 'tools/call',
         params: {
           name: 'set_ticket_labels',
@@ -731,7 +772,7 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
 
       const removeLabelsResponse = await ownerMcpRequest({
         jsonrpc: '2.0',
-        id: 27,
+        id: 29,
         method: 'tools/call',
         params: {
           name: 'remove_ticket_labels',
@@ -751,7 +792,7 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
 
       const addDependencyResponse = await ownerMcpRequest({
         jsonrpc: '2.0',
-        id: 28,
+        id: 30,
         method: 'tools/call',
         params: {
           name: 'add_dependency',
@@ -771,7 +812,7 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
 
       const removeDependencyResponse = await ownerMcpRequest({
         jsonrpc: '2.0',
-        id: 29,
+        id: 31,
         method: 'tools/call',
         params: {
           name: 'remove_dependency',
@@ -787,6 +828,25 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
         type: 'dependency.removed',
         ticketKey: createResult.ticket.key,
         data: { dependencyTicketKey: parentTicket2.key },
+      });
+
+      const deleteTicketResponse = await ownerMcpRequest({
+        jsonrpc: '2.0',
+        id: 32,
+        method: 'tools/call',
+        params: {
+          name: 'delete_ticket',
+          arguments: {
+            ticketKey: createResult.ticket.key,
+          },
+        },
+      });
+      expect(deleteTicketResponse.status).toBe(200);
+      expect(emittedEvents.slice(-1)[0]).toMatchObject({
+        ...mutationBase,
+        type: 'ticket.deleted',
+        ticketKey: createResult.ticket.key,
+        data: { ticketId: expect.any(String) },
       });
     } finally {
       unsubscribe();
@@ -860,6 +920,57 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
       expect(duplicateAdd.status).toBe(200);
       expect(duplicateAdd.body.error?.message).toContain('already blocks the selected ticket');
       expect(emittedEvents).toHaveLength(eventCountBeforeFailure);
+    } finally {
+      unsubscribe();
+    }
+  });
+
+  it('does not emit MCP mutation events when label mutation validation fails', async () => {
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Grace Hopper',
+      email: 'grace-mcp-events-fail-labels@example.com',
+      role: 'owner',
+      avatarUrl: 'https://example.com/grace.png',
+    });
+    const owner = ownerApi.user;
+    const { workspace, project } = await seedWorkspaceFixture({
+      owner: {
+        id: owner.id,
+        name: owner.name,
+        email: owner.email,
+        role: owner.role,
+        avatarUrl: owner.avatar,
+      },
+    });
+
+    const ownerMcpRequest = (payload: Record<string, unknown>) =>
+      ownerApi.post('/api/v1/mcp/sse').set('X-Workspace-Id', workspace.id).send(payload);
+
+    const targetTicket = await seedTicket(project.id, {
+      id: 'ticket-label-fail',
+      key: `${project.key}-30`,
+      title: 'Label failure target',
+    });
+
+    const emittedEvents: McpMutationEvent[] = [];
+    const unsubscribe = mcpEventBus.subscribe(workspace.id, (event) => emittedEvents.push(event));
+
+    try {
+      const setLabelsFailure = await ownerMcpRequest({
+        jsonrpc: '2.0',
+        id: 33,
+        method: 'tools/call',
+        params: {
+          name: 'set_ticket_labels',
+          arguments: {
+            ticketKey: targetTicket.key,
+            labels: 'DoesNotExist',
+          },
+        },
+      });
+      expect(setLabelsFailure.status).toBe(200);
+      expect(setLabelsFailure.body.error?.message).toContain('does not exist');
+      expect(emittedEvents).toHaveLength(0);
     } finally {
       unsubscribe();
     }
