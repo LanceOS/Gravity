@@ -20,6 +20,7 @@ import {
   getTicketRelationsByKey,
   deleteTicketRecord,
   hasTicketDependencyRelation,
+  hasCircularDependency,
   getTicketDetails,
   listComments,
   listTicketBlockers,
@@ -902,12 +903,17 @@ export function createTicketsRouter() {
       }
 
       if (await hasTicketDependencyRelation(dependencyId, ticket.id)) {
-        res.status(400).json({ error: 'Circular dependency detected: this ticket already depends on the selected ticket.' });
+        res.status(400).json({ error: 'This ticket is already blocked by the selected ticket.' });
+        return;
+      }
+
+      if (await hasCircularDependency(dependencyId, ticket.id)) {
+        res.status(400).json({ error: 'Circular dependency detected.' });
         return;
       }
 
       try {
-        await createTicketDependencyRelation(ticket.id, dependencyId);
+        await createTicketDependencyRelation(ticket.id, dependencyId, ticket.projectId);
 
         broadcastEvent('tickets-updated', { projectId: ticket.projectId });
         if (dependencyTicket.projectId !== ticket.projectId) {
@@ -999,12 +1005,17 @@ export function createTicketsRouter() {
       }
 
       if (await hasTicketDependencyRelation(ticket.id, blockerId)) {
-        res.status(400).json({ error: 'Circular dependency detected: this ticket already blocks the selected ticket.' });
+        res.status(400).json({ error: 'This ticket already blocks the selected ticket.' });
+        return;
+      }
+
+      if (await hasCircularDependency(ticket.id, blockerId)) {
+        res.status(400).json({ error: 'Circular dependency detected.' });
         return;
       }
 
       try {
-        await createTicketDependencyRelation(blockerId, ticket.id);
+        await createTicketDependencyRelation(blockerId, ticket.id, ticket.projectId);
 
         broadcastEvent('tickets-updated', { projectId: ticket.projectId });
         if (blockerTicket.projectId !== ticket.projectId) {

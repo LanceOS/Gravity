@@ -236,4 +236,38 @@ describe('ticket relationship routes', () => {
       .query({ projectId: project.id });
     expect(t4DetailsAfterDelete.body.dependencies).toEqual([]);
   });
+
+
+  it('prevents deep circular dependencies', async () => {
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Grace Hopper',
+      email: 'grace@example.com',
+      role: 'owner',
+    });
+    
+    const { project } = await seedWorkspaceFixture({
+      owner: {
+        id: ownerApi.user.id,
+        name: ownerApi.user.name,
+        email: ownerApi.user.email,
+        role: 'owner',
+        avatarUrl: ownerApi.user.avatar,
+      },
+    });
+
+    const ta = await seedTicket(project.id, { id: 'ta', key: 'GRAV-A', title: 'A', priority: 'medium' });
+    const tb = await seedTicket(project.id, { id: 'tb', key: 'GRAV-B', title: 'B', priority: 'medium' });
+    const tc = await seedTicket(project.id, { id: 'tc', key: 'GRAV-C', title: 'C', priority: 'medium' });
+
+    // A blocks B (B depends on A)
+    await ownerApi.post(`/api/v1/tickets/${ta.id}/dependencies`).send({ dependencyId: tb.id });
+    // B blocks C (C depends on B)
+    await ownerApi.post(`/api/v1/tickets/${tb.id}/dependencies`).send({ dependencyId: tc.id });
+
+    // C tries to block A (A depends on C) -> cycle A->B->C->A
+    const circularResponse = await ownerApi.post(`/api/v1/tickets/${tc.id}/dependencies`).send({ dependencyId: ta.id });
+    expect(circularResponse.status).toBe(400);
+    expect(circularResponse.body.error).toContain('Circular dependency detected');
+  });
+
 });

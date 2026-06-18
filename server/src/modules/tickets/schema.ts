@@ -1,4 +1,5 @@
-import { index, pgTable, primaryKey, text, timestamp } from 'drizzle-orm/pg-core';
+import { index, pgTable, primaryKey, text, timestamp, check } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 
 export const tickets = pgTable('tickets', {
   id: text('id').primaryKey(),
@@ -30,10 +31,13 @@ export const ticketRelationships = pgTable('ticket_relationships', {
   blockedTicketId: text('blocked_ticket_id')
     .notNull()
     .references(() => tickets.id, { onDelete: 'cascade' }),
+  projectId: text('project_id').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   pk: primaryKey({ columns: [table.ticketId, table.blockedTicketId] }),
   ticketIdIdx: index('ticket_relationships_ticket_id_idx').on(table.ticketId),
   blockedTicketIdIdx: index('ticket_relationships_blocked_ticket_id_idx').on(table.blockedTicketId),
+// noSelfRef: check('ticket_relationships_no_self_ref', sql`ticket_id != blocked_ticket_id`),
 }));
 
 export const comments = pgTable('comments', {

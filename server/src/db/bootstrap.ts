@@ -100,18 +100,18 @@ async function migrateFlatWorkspaceTicketLabelAssignments() {
 
   await pool.query(`
     INSERT INTO ticket_labels (ticket_id, label_id)
-    SELECT ticket_labels.ticket_id, ticket_labels.label_id || ':' || tickets.project_id
-    FROM ticket_labels
-    INNER JOIN tickets ON tickets.id = ticket_labels.ticket_id
+    SELECT tl.ticket_id, tl.label_id || ':' || tickets.project_id
+    FROM ticket_labels tl
+    INNER JOIN tickets ON tickets.id = tl.ticket_id
     INNER JOIN projects ON projects.id = tickets.project_id
     INNER JOIN workspace_settings ON workspace_settings.workspace_id = projects.workspace_id
-    INNER JOIN labels ON labels.id = ticket_labels.label_id
+    INNER JOIN labels ON labels.id = tl.label_id
     WHERE labels.project_id IS NULL
       AND workspace_settings.hierarchy_mode = 'flat'
       AND EXISTS (
         SELECT 1
         FROM labels project_labels
-        WHERE project_labels.id = ticket_labels.label_id || ':' || tickets.project_id
+        WHERE project_labels.id = tl.label_id || ':' || tickets.project_id
           AND project_labels.project_id = tickets.project_id
       )
     ON CONFLICT DO NOTHING;
@@ -353,6 +353,8 @@ export async function initializeDatabase() {
     CREATE TABLE IF NOT EXISTS ticket_relationships (
       ticket_id TEXT NOT NULL REFERENCES tickets (id) ON DELETE CASCADE,
       blocked_ticket_id TEXT NOT NULL REFERENCES tickets (id) ON DELETE CASCADE,
+      project_id TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       PRIMARY KEY (ticket_id, blocked_ticket_id)
     );
 
@@ -402,6 +404,8 @@ export async function initializeDatabase() {
   }
   if (hasTicketDependenciesTableForMigration) {
     await ensureColumn('ticket_relationships', 'blocked_ticket_id', 'TEXT');
+    await ensureColumn('ticket_relationships', 'project_id', "TEXT DEFAULT 'default' NOT NULL");
+    await ensureColumn('ticket_relationships', 'created_at', "TIMESTAMPTZ NOT NULL DEFAULT NOW()");
   }
 
   // Backfill `provider` in a set-based update (avoids N+1 queries)
