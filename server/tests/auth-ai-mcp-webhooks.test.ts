@@ -299,6 +299,12 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
         }),
       ]),
     );
+    expect(toolsResponse.body.result.tools).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'add_ticket_dependency' }),
+        expect.objectContaining({ name: 'remove_ticket_dependency' }),
+      ]),
+    );
 
     const createTicketResponse = await ownerMcpRequest({
         jsonrpc: '2.0',
@@ -565,6 +571,11 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
       key: `${project.key}-11`,
       title: 'Dependency ticket',
     });
+    const parentTicket3 = await seedTicket(project.id, {
+      id: 'ticket-dependency-alt',
+      key: `${project.key}-12`,
+      title: 'Alternate dependency ticket',
+    });
 
     const mutationBase = {
       workspaceId: workspace.id,
@@ -830,9 +841,49 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
         data: { dependencyTicketKey: parentTicket2.key },
       });
 
-      const deleteTicketResponse = await ownerMcpRequest({
+      const addDependencyAliasResponse = await ownerMcpRequest({
         jsonrpc: '2.0',
         id: 32,
+        method: 'tools/call',
+        params: {
+          name: 'add_ticket_dependency',
+          arguments: {
+            ticketKey: createResult.ticket.key,
+            dependencyTicketKey: parentTicket3.key,
+          },
+        },
+      });
+      expect(addDependencyAliasResponse.status).toBe(200);
+      expect(emittedEvents.slice(-1)[0]).toMatchObject({
+        ...mutationBase,
+        type: 'dependency.added',
+        ticketKey: createResult.ticket.key,
+        data: { dependencyTicketKey: parentTicket3.key },
+      });
+
+      const removeDependencyAliasResponse = await ownerMcpRequest({
+        jsonrpc: '2.0',
+        id: 33,
+        method: 'tools/call',
+        params: {
+          name: 'remove_ticket_dependency',
+          arguments: {
+            ticketKey: createResult.ticket.key,
+            dependencyTicketKey: parentTicket3.key,
+          },
+        },
+      });
+      expect(removeDependencyAliasResponse.status).toBe(200);
+      expect(emittedEvents.slice(-1)[0]).toMatchObject({
+        ...mutationBase,
+        type: 'dependency.removed',
+        ticketKey: createResult.ticket.key,
+        data: { dependencyTicketKey: parentTicket3.key },
+      });
+
+      const deleteTicketResponse = await ownerMcpRequest({
+        jsonrpc: '2.0',
+        id: 34,
         method: 'tools/call',
         params: {
           name: 'delete_ticket',
@@ -910,7 +961,7 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
         id: 31,
         method: 'tools/call',
         params: {
-          name: 'add_dependency',
+          name: 'add_ticket_dependency',
           arguments: {
             ticketKey: blockerTicket.key,
             dependencyTicketKey: blockedTicket.key,
@@ -1219,14 +1270,18 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
     // 3. Owner PATCH settings succeeds
     const ownerPatch = await ownerApi
       .patch(`/api/v1/workspaces/${workspace.id}/settings`)
-      .send({ disabledMcpTools: ['list_tickets', 'create_ticket'] });
+      .send({ disabledMcpTools: ['list_tickets', 'create_ticket', 'add_ticket_dependency'] });
     expect(ownerPatch.status).toBe(200);
-    expect(ownerPatch.body.disabledMcpTools).toEqual(['list_tickets', 'create_ticket']);
+    expect(ownerPatch.body.disabledMcpTools).toEqual(
+      expect.arrayContaining(['list_tickets', 'create_ticket', 'add_ticket_dependency']),
+    );
 
     // 4. GET settings returns disabled list correctly
     const getSettings = await ownerApi.get(`/api/v1/workspaces/${workspace.id}/settings`);
     expect(getSettings.status).toBe(200);
-    expect(getSettings.body.disabledMcpTools).toEqual(['list_tickets', 'create_ticket']);
+    expect(getSettings.body.disabledMcpTools).toEqual(
+      expect.arrayContaining(['list_tickets', 'create_ticket', 'add_ticket_dependency']),
+    );
 
     // 5. tools/list filters out disabled tools when X-Workspace-Id header is sent
     const listFiltered = await ownerMcpRequest({
@@ -1238,6 +1293,8 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
     const filteredTools = listFiltered.body.result.tools as Array<{ name: string }>;
     expect(filteredTools.some(t => t.name === 'list_tickets')).toBe(false);
     expect(filteredTools.some(t => t.name === 'create_ticket')).toBe(false);
+    expect(filteredTools.some(t => t.name === 'add_dependency')).toBe(false);
+    expect(filteredTools.some(t => t.name === 'add_ticket_dependency')).toBe(false);
     expect(filteredTools.some(t => t.name === 'get_ticket_details')).toBe(true);
     expect(filteredTools.some(t => t.name === 'read_ticket_details')).toBe(true);
 
@@ -1253,14 +1310,30 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
             projectId: project.id,
           },
         },
-      });
+    });
     expect(callDisabled.status).toBe(200);
     expect(callDisabled.body.error.message).toContain('disabled in this workspace');
+
+    // 6b. add_ticket_dependency alias is blocked when add_dependency is equivalent.
+    const callDisabledAlias = await ownerMcpRequest({
+      jsonrpc: '2.0',
+      id: 12,
+      method: 'tools/call',
+      params: {
+        name: 'add_ticket_dependency',
+        arguments: {
+          ticketKey: 'N/A',
+          dependencyTicketKey: 'N/A',
+        },
+      },
+    });
+    expect(callDisabledAlias.status).toBe(200);
+    expect(callDisabledAlias.body.error.message).toContain('disabled in this workspace');
 
     // 7. tools/call allows calling enabled tools
     const callEnabled = await ownerMcpRequest({
         jsonrpc: '2.0',
-        id: 12,
+        id: 13,
         method: 'tools/call',
         params: {
           name: 'get_ticket_details',
