@@ -916,9 +916,9 @@ export function createTicketsRouter() {
       try {
         await createTicketDependencyRelation(ticket.id, dependencyId, ticket.projectId);
 
-        broadcastToWorkspace(auth.workspaceId, 'tickets-updated', { projectId: ticket.projectId });
+        broadcastToWorkspace(depAuth.workspaceId, 'tickets-updated', { projectId: ticket.projectId });
         if (dependencyTicket.projectId !== ticket.projectId) {
-          broadcastToWorkspace(auth.workspaceId, 'tickets-updated', { projectId: dependencyTicket.projectId });
+          broadcastToWorkspace(depAuth.workspaceId, 'tickets-updated', { projectId: dependencyTicket.projectId });
         }
 
         res.status(201).json({ success: true });

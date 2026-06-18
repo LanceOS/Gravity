@@ -1020,7 +1020,7 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
         },
       });
       expect(setLabelsFailure.status).toBe(200);
-      expect(setLabelsFailure.body.error?.message).toContain('does not exist');
+      expect(setLabelsFailure.body.error?.message).toContain('do not exist');
       expect(emittedEvents).toHaveLength(0);
     } finally {
       unsubscribe();
