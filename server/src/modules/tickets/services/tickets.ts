@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { db } from '../../../db/index.js';
-import { authUsers, comments, tickets, ticketDependencies, userProfiles, projects, cycles, labels, ticketLabels, workspaceSettings } from '../../../db/schema.js';
+import { authUsers, comments, tickets, ticketRelationships, userProfiles, projects, cycles, labels, ticketLabels, workspaceSettings } from '../../../db/schema.js';
 import { createId, getProjectByKeyPrefix, nextTicketKey, normalizeIsoDate } from '../../../lib/platform.js';
 import generateBranchName from '../utils/branch.js';
 
@@ -72,7 +72,7 @@ function buildTicketFilterConditions(projectIds: string[], filters: TicketFilter
   return conditions;
 }
 
-function mapTicket(record: TicketRecord, labelRows: any[] = []) {
+function mapTicket(record: TicketRecord, labelRows: any[] = [], isBlocked: boolean = false) {
   const sortedLabels = [...labelRows].sort((first, second) => {
     const sortOrderDiff = Number(first.sortOrder ?? 0) - Number(second.sortOrder ?? 0);
     if (sortOrderDiff !== 0) {
@@ -84,6 +84,7 @@ function mapTicket(record: TicketRecord, labelRows: any[] = []) {
 
   return {
     id: record.id,
+    isBlocked,
     key: record.key,
     title: sanitizeTitle(record.title),
     description: record.description,
@@ -93,7 +94,7 @@ function mapTicket(record: TicketRecord, labelRows: any[] = []) {
     projectId: record.projectId,
     cycleId: record.cycleId,
     parentId: record.parentId,
-    blockedTicketId: record.blockedTicketId,
+    
     isSubtask: record.parentId !== null,
     prStatus: canonicalizePrStatus(record.prStatus),
     prUrl: record.prUrl,
@@ -125,11 +126,10 @@ function mapRelatedTicket(record: RelatedTicketRecord) {
 function collectRelatedTicketIds({
   dependencies,
   blockers,
-  blockedTicket,
+  
 }: {
   dependencies: Array<ReturnType<typeof mapRelatedTicket>>;
   blockers: Array<ReturnType<typeof mapRelatedTicket>>;
-  blockedTicket: ReturnType<typeof mapRelatedTicket> | null;
 }) {
   const relatedTicketIds = new Set<string>();
 
@@ -141,9 +141,6 @@ function collectRelatedTicketIds({
     relatedTicketIds.add(blocker.id);
   }
 
-  if (blockedTicket) {
-    relatedTicketIds.add(blockedTicket.id);
-  }
 
   return Array.from(relatedTicketIds);
 }
@@ -283,6 +280,12 @@ export async function listTickets(projectId: string, filters: TicketFilters = {}
   }
 
   const ticketIds = rows.map((r) => r.ticket.id);
+  const allBlockers = await db
+    .select({ blockedTicketId: ticketRelationships.blockedTicketId })
+    .from(ticketRelationships)
+    .where(inArray(ticketRelationships.blockedTicketId, ticketIds))
+    .groupBy(ticketRelationships.blockedTicketId);
+  const blockedIds = new Set(allBlockers.map(b => b.blockedTicketId));
   const allLabels = await db
     .select({
       ticketId: ticketLabels.ticketId,
@@ -300,7 +303,7 @@ export async function listTickets(projectId: string, filters: TicketFilters = {}
   }
 
   return rows.map((r) => ({
-    ...mapTicket(r.ticket, labelsByTicketId.get(r.ticket.id) || []),
+    ...mapTicket(r.ticket, labelsByTicketId.get(r.ticket.id) || [], blockedIds.has(r.ticket.id)),
     projectName: r.projectName,
   }));
 }
@@ -333,6 +336,12 @@ export async function listWorkspaceTickets(projectIds: string[], filters: Ticket
   }
 
   const ticketIds = rows.map((r) => r.ticket.id);
+  const allBlockers = await db
+    .select({ blockedTicketId: ticketRelationships.blockedTicketId })
+    .from(ticketRelationships)
+    .where(inArray(ticketRelationships.blockedTicketId, ticketIds))
+    .groupBy(ticketRelationships.blockedTicketId);
+  const blockedIds = new Set(allBlockers.map(b => b.blockedTicketId));
   const allLabels = await db
     .select({
       ticketId: ticketLabels.ticketId,
@@ -350,7 +359,7 @@ export async function listWorkspaceTickets(projectIds: string[], filters: Ticket
   }
 
   return rows.map((r) => ({
-    ...mapTicket(r.ticket, labelsByTicketId.get(r.ticket.id) || []),
+    ...mapTicket(r.ticket, labelsByTicketId.get(r.ticket.id) || [], blockedIds.has(r.ticket.id)),
     projectName: r.projectName,
   }));
 }
@@ -376,30 +385,17 @@ export async function getTicketRelationsByKey(ticketKey: string) {
     listTicketBlockers(ticket.id),
   ]);
 
-  let blockedTicket: ReturnType<typeof mapRelatedTicket> | null = blockersResult[0] ?? null;
-  if (!blockedTicket && ticket.blockedTicketId) {
-    const legacyBlockedRows = await db
-      .select({
-        id: tickets.id,
-        key: tickets.key,
-        title: tickets.title,
-        projectId: tickets.projectId,
-      })
-      .from(tickets)
-      .where(eq(tickets.id, ticket.blockedTicketId))
-      .limit(1);
-    blockedTicket = legacyBlockedRows[0] ? mapRelatedTicket(legacyBlockedRows[0]) : null;
-  }
+
 
   return {
     ...ticket,
-    blockedTicket,
+    
     dependencies: dependenciesResult,
     blockers: blockersResult,
     relatedTicketIds: collectRelatedTicketIds({
       dependencies: dependenciesResult,
       blockers: blockersResult,
-      blockedTicket,
+      
     }),
   };
 }
@@ -412,9 +408,9 @@ export async function listTicketDependencies(ticketId: string) {
       title: tickets.title,
       projectId: tickets.projectId,
     })
-    .from(ticketDependencies)
-    .innerJoin(tickets, eq(tickets.id, ticketDependencies.blockedTicketId))
-    .where(eq(ticketDependencies.ticketId, ticketId))
+    .from(ticketRelationships)
+    .innerJoin(tickets, eq(tickets.id, ticketRelationships.blockedTicketId))
+    .where(eq(ticketRelationships.ticketId, ticketId))
     .orderBy(asc(tickets.createdAt), asc(tickets.key));
 
   return rows.map(mapRelatedTicket);
@@ -428,9 +424,9 @@ export async function listTicketBlockers(ticketId: string) {
       title: tickets.title,
       projectId: tickets.projectId,
     })
-    .from(ticketDependencies)
-    .innerJoin(tickets, eq(tickets.id, ticketDependencies.ticketId))
-    .where(eq(ticketDependencies.blockedTicketId, ticketId))
+    .from(ticketRelationships)
+    .innerJoin(tickets, eq(tickets.id, ticketRelationships.ticketId))
+    .where(eq(ticketRelationships.blockedTicketId, ticketId))
     .orderBy(asc(tickets.createdAt), asc(tickets.key));
 
   return rows.map(mapRelatedTicket);
@@ -439,11 +435,11 @@ export async function listTicketBlockers(ticketId: string) {
 export async function hasTicketDependencyRelation(ticketId: string, blockedTicketId: string) {
   const rows = await db
     .select({
-      ticketId: ticketDependencies.ticketId,
-      blockedTicketId: ticketDependencies.blockedTicketId,
+      ticketId: ticketRelationships.ticketId,
+      blockedTicketId: ticketRelationships.blockedTicketId,
     })
-    .from(ticketDependencies)
-    .where(and(eq(ticketDependencies.ticketId, ticketId), eq(ticketDependencies.blockedTicketId, blockedTicketId)))
+    .from(ticketRelationships)
+    .where(and(eq(ticketRelationships.ticketId, ticketId), eq(ticketRelationships.blockedTicketId, blockedTicketId)))
     .limit(1);
 
   return rows.length > 0;
@@ -451,15 +447,15 @@ export async function hasTicketDependencyRelation(ticketId: string, blockedTicke
 
 export async function createTicketDependencyRelation(ticketId: string, blockedTicketId: string) {
   await db
-    .insert(ticketDependencies)
+    .insert(ticketRelationships)
     .values({ ticketId, blockedTicketId })
     .onConflictDoNothing();
 }
 
 export async function removeTicketDependencyRelation(ticketId: string, blockedTicketId: string) {
   await db
-    .delete(ticketDependencies)
-    .where(and(eq(ticketDependencies.ticketId, ticketId), eq(ticketDependencies.blockedTicketId, blockedTicketId)));
+    .delete(ticketRelationships)
+    .where(and(eq(ticketRelationships.ticketId, ticketId), eq(ticketRelationships.blockedTicketId, blockedTicketId)));
 }
 
 export async function listComments(ticketId: string) {
@@ -598,20 +594,7 @@ export async function getTicketDetails(ticketId: string, projectId?: string) {
 
   const dependencies = dependenciesResult;
   const blockers = blockersResult;
-  let blockedTicket: ReturnType<typeof mapRelatedTicket> | null = blockers[0] ?? null;
-  if (!blockedTicket && ticket.blockedTicketId) {
-    const legacyBlockedRows = await db
-      .select({
-        id: tickets.id,
-        key: tickets.key,
-        title: tickets.title,
-        projectId: tickets.projectId,
-      })
-      .from(tickets)
-      .where(eq(tickets.id, ticket.blockedTicketId))
-      .limit(1);
-    blockedTicket = legacyBlockedRows[0] ? mapRelatedTicket(legacyBlockedRows[0]) : null;
-  }
+
 
   return {
     ...ticket,
@@ -621,13 +604,13 @@ export async function getTicketDetails(ticketId: string, projectId?: string) {
     project,
     cycle,
     labels: labelResult,
-    blockedTicket,
+    
     dependencies,
     blockers,
     relatedTicketIds: collectRelatedTicketIds({
       dependencies,
       blockers,
-      blockedTicket,
+      
     }),
   };
 }

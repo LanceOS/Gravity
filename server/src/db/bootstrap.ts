@@ -350,7 +350,7 @@ export async function initializeDatabase() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
-    CREATE TABLE IF NOT EXISTS ticket_dependencies (
+    CREATE TABLE IF NOT EXISTS ticket_relationships (
       ticket_id TEXT NOT NULL REFERENCES tickets (id) ON DELETE CASCADE,
       blocked_ticket_id TEXT NOT NULL REFERENCES tickets (id) ON DELETE CASCADE,
       PRIMARY KEY (ticket_id, blocked_ticket_id)
@@ -396,12 +396,12 @@ export async function initializeDatabase() {
   `);
 
   const hasTicketsTableForMigration = await hasTable('tickets');
-  const hasTicketDependenciesTableForMigration = await hasTable('ticket_dependencies');
+  const hasTicketDependenciesTableForMigration = await hasTable('ticket_relationships');
   if (hasTicketsTableForMigration) {
     await ensureColumn('tickets', 'blocked_ticket_id', 'TEXT');
   }
   if (hasTicketDependenciesTableForMigration) {
-    await ensureColumn('ticket_dependencies', 'blocked_ticket_id', 'TEXT');
+    await ensureColumn('ticket_relationships', 'blocked_ticket_id', 'TEXT');
   }
 
   // Backfill `provider` in a set-based update (avoids N+1 queries)
@@ -451,9 +451,8 @@ export async function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS tickets_assignee_id_idx ON tickets (assignee_id);
     CREATE INDEX IF NOT EXISTS tickets_cycle_id_idx ON tickets (cycle_id);
     CREATE INDEX IF NOT EXISTS tickets_parent_id_idx ON tickets (parent_id);
-    CREATE INDEX IF NOT EXISTS tickets_blocked_ticket_id_idx ON tickets (blocked_ticket_id);
-    CREATE INDEX IF NOT EXISTS ticket_dependencies_ticket_id_idx ON ticket_dependencies (ticket_id);
-    CREATE INDEX IF NOT EXISTS ticket_dependencies_blocked_ticket_id_idx ON ticket_dependencies (blocked_ticket_id);
+        CREATE INDEX IF NOT EXISTS ticket_relationships_ticket_id_idx ON ticket_relationships (ticket_id);
+    CREATE INDEX IF NOT EXISTS ticket_relationships_blocked_ticket_id_idx ON ticket_relationships (blocked_ticket_id);
     CREATE INDEX IF NOT EXISTS comments_ticket_id_idx ON comments (ticket_id);
     CREATE INDEX IF NOT EXISTS comments_user_id_idx ON comments (user_id);
     CREATE INDEX IF NOT EXISTS note_metadata_project_id_user_id_idx ON note_metadata (project_id, user_id);
@@ -462,8 +461,7 @@ export async function initializeDatabase() {
 
   await pool.query(`
     ALTER TABLE tickets ADD COLUMN IF NOT EXISTS branch_name TEXT NOT NULL DEFAULT '';
-    ALTER TABLE tickets ADD COLUMN IF NOT EXISTS blocked_ticket_id TEXT;
-    ALTER TABLE projects ADD COLUMN IF NOT EXISTS github_repo_url TEXT;
+        ALTER TABLE projects ADD COLUMN IF NOT EXISTS github_repo_url TEXT;
     ALTER TABLE projects ADD COLUMN IF NOT EXISTS team_id TEXT;
     ALTER TABLE cycles ADD COLUMN IF NOT EXISTS team_id TEXT;
     ALTER TABLE labels ADD COLUMN IF NOT EXISTS team_id TEXT;
@@ -482,11 +480,26 @@ export async function initializeDatabase() {
     CREATE UNIQUE INDEX IF NOT EXISTS labels_project_name_unique_idx ON labels (project_id, name) WHERE project_id IS NOT NULL;
   `);
 
+  
+  // Rename old table if it exists
+  const oldTableExists = await hasTable('ticket_dependencies');
+  if (oldTableExists) {
+    await pool.query('ALTER TABLE ticket_dependencies RENAME TO ticket_relationships;');
+    await pool.query('ALTER INDEX IF EXISTS ticket_dependencies_ticket_id_idx RENAME TO ticket_relationships_ticket_id_idx;').catch(() => {});
+    await pool.query('ALTER INDEX IF EXISTS ticket_dependencies_blocked_ticket_id_idx RENAME TO ticket_relationships_blocked_ticket_id_idx;').catch(() => {});
+  }
+
+  // Drop old column
+  const legacyColExists = await hasColumn('tickets', 'blocked_ticket_id');
+  if (legacyColExists) {
+    await pool.query('ALTER TABLE tickets DROP COLUMN blocked_ticket_id;');
+  }
+
   const hasBlockedTicketColumn = await hasColumn('tickets', 'blocked_ticket_id');
-  const hasBlockedTicketDependenciesColumn = await hasColumn('ticket_dependencies', 'blocked_ticket_id');
+  const hasBlockedTicketDependenciesColumn = await hasColumn('ticket_relationships', 'blocked_ticket_id');
   if (hasBlockedTicketColumn && hasBlockedTicketDependenciesColumn) {
     await pool.query(`
-      INSERT INTO ticket_dependencies (ticket_id, blocked_ticket_id)
+      INSERT INTO ticket_relationships (ticket_id, blocked_ticket_id)
       SELECT blocked_ticket_id, id
       FROM tickets
       WHERE blocked_ticket_id IS NOT NULL
