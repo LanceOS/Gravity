@@ -63,9 +63,9 @@ function shallowEqual<T extends Record<string, any>>(objA: T, objB: T): boolean 
 interface UseAccountSettingsOptions {
   currentUser: User | null;
   activeView: 'board' | 'list';
-  theme: 'dark' | 'coal-black' | 'coffee' | 'marble-blue';
+  theme: 'dark' | 'coal-black' | 'coffee' | 'honey-glow' | 'marble-blue';
   setView: (view: 'board' | 'list') => void;
-  setTheme: (theme: 'dark' | 'coal-black' | 'coffee' | 'marble-blue') => void;
+  setTheme: (theme: 'dark' | 'coal-black' | 'coffee' | 'honey-glow' | 'marble-blue') => void;
 }
 
 export function useAccountSettings({

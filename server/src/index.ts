@@ -2,8 +2,9 @@ import { createServer } from 'node:http';
 import { createApp } from './app.js';
 import { initializeDatabase } from './db/bootstrap.js';
 import { env } from './env.js';
-import { start as startServiceTokens } from './lib/serviceTokens.js';
+import { start as startServiceTokens, stopAutoRefresh } from './lib/serviceTokens.js';
 import { McpStdioSession } from './modules/mcp/stdio-session.js';
+import type { ChildProcess } from 'node:child_process';
 
 async function main() {
   await initializeDatabase();
@@ -21,6 +22,80 @@ async function main() {
 
   // Graceful shutdown helpers
   let isShuttingDown = false;
+  let mcpAgentChild: ChildProcess | null = null;
+  let mcpAgentSession: McpStdioSession | null = null;
+
+  const stopMcpAgent = async () => {
+    if (!mcpAgentChild) return;
+
+    const child = mcpAgentChild;
+    const session = mcpAgentSession;
+    mcpAgentChild = null;
+    mcpAgentSession = null;
+
+    if (session) {
+      try {
+        session.stop();
+      } catch (error) {
+        console.error('Error stopping MCP session:', error);
+      }
+    }
+
+    await new Promise<void>((resolve) => {
+      let settled = false;
+
+      const finalize = () => {
+        if (settled) return;
+        settled = true;
+        resolve();
+      };
+
+      const timeout = setTimeout(() => {
+        if (!child.killed) {
+          try {
+            child.kill('SIGKILL');
+          } catch (error) {
+            console.error('Error force-killing MCP agent process:', error);
+          }
+        }
+        finalize();
+      }, 2_000);
+
+      child.once('exit', (code, signal) => {
+        clearTimeout(timeout);
+        console.log(`MCP agent process exited: code=${code}, signal=${signal}`);
+        finalize();
+      });
+
+      child.once('error', (error) => {
+        clearTimeout(timeout);
+        console.error('MCP agent process error during shutdown:', error);
+        finalize();
+      });
+
+      if (typeof timeout.unref === 'function') timeout.unref();
+
+      try {
+        child.stdin?.end();
+      } catch (error) {
+        console.error('Error ending MCP agent stdin:', error);
+      }
+
+      try {
+        child.stdout?.destroy();
+        child.stderr?.destroy();
+      } catch (error) {
+        console.error('Error destroying MCP agent streams:', error);
+      }
+
+      try {
+        child.kill('SIGTERM');
+      } catch (error) {
+        console.error('Error stopping MCP agent process:', error);
+        finalize();
+      }
+    });
+  };
 
   const gracefulShutdown = async (reason: string) => {
     if (isShuttingDown) return;
@@ -70,6 +145,9 @@ async function main() {
       console.error('Error shutting down Redis client:', err);
     }
 
+    await stopMcpAgent();
+    stopAutoRefresh();
+
     clearTimeout(forceTimer);
 
     // Exit with non-zero for error-style reasons
@@ -101,6 +179,7 @@ async function main() {
     try {
       const { spawn } = await import('node:child_process');
       const child = spawn(env.mcpAgentCommand, { shell: true, stdio: ['pipe', 'pipe', 'inherit'] });
+      mcpAgentChild = child;
       child.on('error', (error) => console.error('Agent process spawn error:', error));
       const session = new McpStdioSession(child.stdout, child.stdin, {
         workspaceId: env.mcpStdioWorkspaceId,
@@ -108,6 +187,7 @@ async function main() {
         allowHandshake: false,
       });
       session.start();
+      mcpAgentSession = session;
       child.on('exit', (code) => console.log(`Agent process exited: ${code}`));
       console.log('Spawned configured MCP agent via stdio.');
     } catch (err) {

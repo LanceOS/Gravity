@@ -42,7 +42,7 @@ interface State {
     search: string;
   };
   currentUser: User | null;
-  theme: 'dark' | 'coal-black' | 'coffee' | 'marble-blue';
+  theme: 'dark' | 'coal-black' | 'coffee' | 'honey-glow' | 'marble-blue';
   loading: boolean;
 }
 
@@ -227,7 +227,7 @@ interface TicketContextType extends State {
   signUp: (name: string, email: string, password?: string) => Promise<boolean>;
   signOut: () => void;
   setCurrentUser: (user: User | null) => void;
-  setTheme: (theme: 'dark' | 'coal-black' | 'coffee' | 'marble-blue') => void;
+  setTheme: (theme: 'dark' | 'coal-black' | 'coffee' | 'honey-glow' | 'marble-blue') => void;
   setActiveTicket: (ticket: Ticket | null) => void;
   activeTicketDetail: TicketWithRelations | null;
   addTicketDependency: (ticketId: string, dependencyId: string) => Promise<boolean>;
@@ -256,7 +256,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [activeView, setView] = useState<'list' | 'board'>('board');
   const [filters, setFiltersState] = useState<State['filters']>(initialFilters);
   const [currentUser, setCurrentUser] = useState<User | null>(readStoredUser());
-  const [theme, setThemeState] = useState<'dark' | 'coal-black' | 'coffee' | 'marble-blue'>('dark');
+  const [theme, setThemeState] = useState<'dark' | 'coal-black' | 'coffee' | 'honey-glow' | 'marble-blue'>('dark');
   const [authLoading, setAuthLoading] = useState(true);
   const [authResolved, setAuthResolved] = useState(false);
 
@@ -1284,7 +1284,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     queryClient.clear();
   }, []);
 
-  const setTheme = useCallback((nextTheme: 'dark' | 'coal-black' | 'coffee' | 'marble-blue') => {
+  const setTheme = useCallback((nextTheme: 'dark' | 'coal-black' | 'coffee' | 'honey-glow' | 'marble-blue') => {
     setThemeState(nextTheme);
   }, []);
 
