@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@library';
 import { TicketDetail } from './TicketDetail/TicketDetail';
 import type { Ticket, Comment, User, Project, Label, Cycle } from '../../../context/TicketContext';
+import type { TicketWithRelations } from '../utils/ticketRelations';
 
 interface TicketDetailRouteProps {
   activeWorkspaceId: string;
@@ -14,7 +15,7 @@ interface TicketDetailRouteProps {
   labels: Label[];
   cycles: Cycle[];
   ticketsById?: Map<string, Ticket>;
-  activeTicketDetail: Ticket | null;
+  activeTicketDetail: TicketWithRelations | null;
   onSelectTicket: (ticket: Ticket | null) => void;
   onUpdateTicket: (id: string, updates: Partial<Ticket>) => Promise<void>;
   onDeleteTicket: (ticketId: string) => Promise<void>;
@@ -62,13 +63,16 @@ export const TicketDetailRoute: React.FC<TicketDetailRouteProps> = ({
         return [];
       }
 
+      let rawSubtasks = tickets.filter((ticket) => ticket.parentId === activeTicket.id);
+
       if (activeTicketDetail?.subtasks && activeTicketDetail.subtasks.length > 0) {
-        return activeTicketDetail.subtasks;
+        rawSubtasks = activeTicketDetail.subtasks;
       }
 
-      return tickets.filter((ticket) => ticket.parentId === activeTicket.id);
+      const ticketsByIdResolved = ticketsById ?? new Map(tickets.map((ticket) => [ticket.id, ticket]));
+      return rawSubtasks.map((t) => ticketsByIdResolved.get(t.id) || t);
     },
-    [activeTicket, tickets, activeTicketDetail?.subtasks]
+    [activeTicket, tickets, activeTicketDetail?.subtasks, ticketsById]
   );
 
   const parentTicket = useMemo(

@@ -5,9 +5,11 @@ export type TicketRelationKey = 'dependencies' | 'blockers';
 
 export type TicketWithRelations = Ticket & {
   relatedTicketIds: string[];
+  subtasks?: Ticket[];
+  blockedTicket?: TicketRelation | null;
 };
 
-export type TicketRelationSource = Pick<Ticket, 'dependencies' | 'blockers' | 'blockedTicket'>;
+export type TicketRelationSource = Pick<TicketWithRelations, 'dependencies' | 'blockers' | 'blockedTicket'>;
 
 export function collectRelatedTicketIds({
   dependencies,
@@ -99,7 +101,7 @@ export function patchTicketRelation(
 
   const blockedTicket = relationKey === 'blockers'
     ? nextTicket.blockers?.[0] ?? null
-    : nextTicket.blockedTicket ?? null;
+    : (nextTicket as TicketWithRelations).blockedTicket ?? null;
 
   const isBlocked = Boolean(nextTicket.blockers && nextTicket.blockers.length > 0);
   const isDependency = Boolean(nextTicket.dependencies && nextTicket.dependencies.length > 0);
