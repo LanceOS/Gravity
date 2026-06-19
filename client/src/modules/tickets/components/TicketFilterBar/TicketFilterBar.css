@@ -129,8 +129,8 @@
 }
 
 .ticket-filter-bar__label-checkbox:checked {
-  background: var(--color-text-primary);
-  border-color: var(--color-text-primary);
+  background: var(--color-primary);
+  border-color: var(--color-primary);
 }
 
 @media (min-width: 500px) {
