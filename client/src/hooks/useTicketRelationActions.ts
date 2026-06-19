@@ -29,6 +29,7 @@ interface UseTicketRelationActionsArgs {
   activeTicketId?: string;
   activeTicketProjectId: string;
   isAuthenticated: boolean;
+  invalidateAggregateTicketQueries?: (projectId?: string) => void;
 }
 
 export function useTicketRelationActions({
@@ -38,6 +39,7 @@ export function useTicketRelationActions({
   activeTicketId,
   activeTicketProjectId,
   isAuthenticated,
+  invalidateAggregateTicketQueries,
 }: UseTicketRelationActionsArgs) {
   const activeTicketRef = useRef<Ticket | null>(activeTicket);
   const pendingTicketRelationAddsRef = useRef(new Set<string>());
@@ -147,8 +149,9 @@ export function useTicketRelationActions({
     const uniqueProjectIds = Array.from(new Set(projectIds.filter(Boolean) as string[]));
     uniqueProjectIds.forEach((projectId) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.tickets(projectId) });
+      invalidateAggregateTicketQueries?.(projectId);
     });
-  }, [queryClient]);
+  }, [invalidateAggregateTicketQueries, queryClient]);
 
   const handleTicketRelationMutationError = useCallback((context: TicketRelationMutationContext | undefined, message: string, shouldRollback = true) => {
     if (!shouldRollback) {

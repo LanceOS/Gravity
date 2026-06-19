@@ -100,7 +100,8 @@ export interface Ticket {
   cycleId: string | null;
   parentId: string | null;
   isBlocked?: boolean;
-    dependencies?: Array<{ id: string; key: string; title: string; projectId: string }>;
+  isDependency?: boolean;
+  dependencies?: Array<{ id: string; key: string; title: string; projectId: string }>;
   blockers?: Array<{ id: string; key: string; title: string; projectId: string }>;
   prStatus: 'open' | 'merged' | 'closed' | 'none';
   prUrl: string | null;

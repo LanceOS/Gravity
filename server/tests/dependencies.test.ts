@@ -90,6 +90,13 @@ describe('ticket relationship routes', () => {
       expect.objectContaining({ id: t1.id, key: t1.key, title: t1.title }),
     ]);
 
+    const listAfterDependencyAdd = await ownerApi.get('/api/v1/tickets').query({ projectId: project.id });
+    expect(listAfterDependencyAdd.status).toBe(200);
+    expect(listAfterDependencyAdd.body).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: t1.id, isDependency: true, isBlocked: false }),
+      expect.objectContaining({ id: t2.id, isBlocked: true, isDependency: false }),
+    ]));
+
     // 3. Add two blockers to T1 so we cover the many-to-many blocker side.
     const addBlockerResponse = await ownerApi
       .post(`/api/v1/tickets/${t1.id}/blockers`)

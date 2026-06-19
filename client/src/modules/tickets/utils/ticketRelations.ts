@@ -101,8 +101,13 @@ export function patchTicketRelation(
     ? nextTicket.blockers?.[0] ?? null
     : nextTicket.blockedTicket ?? null;
 
+  const isBlocked = Boolean(nextTicket.blockers && nextTicket.blockers.length > 0);
+  const isDependency = Boolean(nextTicket.dependencies && nextTicket.dependencies.length > 0);
+
   return {
     ...nextTicket,
+    isBlocked,
+    isDependency,
     blockedTicket,
     relatedTicketIds: collectRelatedTicketIds({
       dependencies: nextTicket.dependencies,

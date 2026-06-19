@@ -198,7 +198,7 @@ export async function authorizeProjectAccess(req: Request, projectId: string) {
   if (workspaceRole === null) {
     return { allowed: false as const, error: 'Access denied: not a member of the workspace.', status: 403 };
   }
-  return { allowed: true as const, userId, workspaceRole };
+  return { allowed: true as const, userId, workspaceId, workspaceRole };
 }
 
 export async function authorizeProjectMemberAccess(req: Request, projectId: string) {

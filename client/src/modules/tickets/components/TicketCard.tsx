@@ -2,6 +2,7 @@ import { memo, useState } from 'react';
 import { GitMerge, GitPullRequest, Paperclip } from 'lucide-react';
 import { Card, Avatar, Badge, Flex } from '@library';
 import type { TicketCardProps } from '../types/TicketBoard';
+import { TicketRelationIndicators } from './TicketRelationIndicators';
 
 function TicketCardImpl({
   ticket,
@@ -84,6 +85,7 @@ function TicketCardImpl({
       >
         <Flex align="center" gap="8px">
           <Flex align="center">{priorityIcon}</Flex>
+          <TicketRelationIndicators ticket={ticket} />
 
           {ticket.labels && ticket.labels.length > 0 ? (
             <Flex align="center" gap="4px" style={{ marginLeft: '4px' }}>

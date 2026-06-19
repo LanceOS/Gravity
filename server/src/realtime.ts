@@ -204,7 +204,7 @@ async function authenticateSseConnection(
   workspaceId: string,
 ): Promise<SseAuthResult> {
   const sourceIp = getRequestSourceIp(req) ?? req.ip ?? null;
-  const token = firstQueryValue(req.query.token);
+  const token = firstQueryValue(req.query.token as any);
   if (token) {
     const tokenRow = await verifyAndConsumeToken(token, workspaceId, { sourceIp });
     if (!tokenRow) {
