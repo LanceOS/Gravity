@@ -19,7 +19,11 @@ class MockEventSource {
   private readonly errorHandlers = new Set<ErrorHandler>();
   private readonly openHandlers = new Set<ErrorHandler>();
 
-  constructor(public readonly url: string) {}
+  public readonly url: string;
+
+  constructor(url: string) {
+    this.url = url;
+  }
 
   addEventListener(type: 'message' | 'error' | 'open', handler: MessageHandler | ErrorHandler): void {
     if (type === 'message') {

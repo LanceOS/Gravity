@@ -15,12 +15,14 @@ import {
   hasEquivalentTicketFields,
   initialFilters,
   patchTicketInListById,
+  patchTicketLabelAssignment,
+  normalizeTicketPayload,
+  normalizeCommentPayload,
   shouldAcceptSseTicketUpdate,
   shouldAcceptSseCommentUpdate,
   type TicketFiltersState,
-  useSessionQuery,
-  SESSION_QUERY_KEY,
 } from './shared';
+import { authClient } from './auth/authClient';
 import { toast } from '@library';
 import { TicketContext } from './TicketContextContext';
 
@@ -138,10 +140,6 @@ export interface TicketContextType extends State {
   updateProject: (id: string, updates: Partial<Project>) => Promise<Project | null>;
   deleteProject: (id: string) => Promise<void>;
   joinProject: (inviteCode: string) => Promise<Project | null>;
-  signIn: (email: string, password?: string) => Promise<boolean>;
-  signUp: (name: string, email: string, password?: string) => Promise<boolean>;
-  signOut: () => void;
-  setCurrentUser: () => void;
   setTheme: (theme: 'dark' | 'coal-black' | 'coffee' | 'honey-glow' | 'marble-blue' | 'midnight-azure') => void;
   setActiveTicket: (ticket: Ticket | null) => void;
   activeTicketDetail: TicketWithRelations | null;
@@ -168,9 +166,15 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [activeTicket, setActiveTicket] = useState<Ticket | null>(null);
   const [activeView, setView] = useState<'list' | 'board'>('board');
   const [filters, setFiltersState] = useState<State['filters']>(initialFilters);
-  const sessionQuery = useSessionQuery();
-  const currentUser = sessionQuery.data;
-  const authLoading = sessionQuery.isLoading;
+  const { data: session, isPending: authLoading } = authClient.useSession();
+  const currentUser: User | null = session?.user ? {
+    id: session.user.id,
+    name: session.user.name,
+    email: session.user.email,
+    avatar: session.user.image || '',
+    role: session.user.role || 'user',
+    tutorial_completed: (session.user as any).tutorial_completed,
+  } : null;
   const [theme, setThemeState] = useState<'dark' | 'coal-black' | 'coffee' | 'honey-glow' | 'marble-blue' | 'midnight-azure'>('dark');
 
   // --- Refs for batching and real-time handlers ---
@@ -618,7 +622,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     queryClient.setQueryData<TicketWithRelations>(queryKeys.ticketDetail(ticketId), (existing) => {
       if (!existing || existing.id !== ticketId) {
-        return existing;
+        return existing as any;
       }
       return patchTicket(existing);
     });
@@ -631,7 +635,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       queryClient.setQueryData<Ticket>([...queryKey], (existing) => {
         if (!existing || typeof existing !== 'object' || !(existing as { id?: string }).id) {
-          return existing;
+          return existing as any;
         }
         return patchTicket(existing as Ticket);
       });
@@ -645,7 +649,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       queryClient.setQueryData<Ticket>([...queryKey], (existing) => {
         if (!existing || typeof existing !== 'object' || !(existing as { id?: string }).id) {
-          return existing;
+          return existing as any;
         }
         return patchTicket(existing as Ticket);
       });
@@ -659,7 +663,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       queryClient.setQueryData<Ticket>([...queryKey], (existing) => {
         if (!existing || !('id' in existing)) {
-          return existing;
+          return existing as any;
         }
         return patchTicket(existing);
       });
@@ -1829,57 +1833,6 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [joinProjectMutation]);
 
   // --- Auth Actions ---
-  const signIn = useCallback(async (email: string, password?: string) => {
-    try {
-      const response = await fetch(`${AUTH_API_URL}/sign-in`, {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-
-      if (!response.ok) throw new Error('Sign in failed');
-      await queryClient.invalidateQueries({ queryKey: SESSION_QUERY_KEY });
-      return true;
-    } catch (e) {
-      console.error(e);
-      throw e;
-    }
-  }, [queryClient]);
-
-  const signUp = useCallback(async (name: string, email: string, password?: string) => {
-    try {
-      const response = await fetch(`${AUTH_API_URL}/sign-up`, {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password }),
-      });
-
-      if (!response.ok) throw new Error('Registration failed');
-      await queryClient.invalidateQueries({ queryKey: SESSION_QUERY_KEY });
-      return true;
-    } catch (e) {
-      console.error(e);
-      throw e;
-    }
-  }, [queryClient]);
-
-  const signOut = useCallback(() => {
-    void fetch(`${AUTH_API_URL}/sign-out`, {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
-    }).catch((error) => {
-      console.error('Failed to clear server session:', error);
-    });
-
-    queryClient.setQueryData(SESSION_QUERY_KEY, null);
-    setActiveProjectIdState('');
-    queryClient.clear();
-  }, [queryClient]);
-
   const setTheme = useCallback((nextTheme: 'dark' | 'coal-black' | 'coffee' | 'honey-glow' | 'marble-blue' | 'midnight-azure') => {
     setThemeState(nextTheme);
   }, []);
@@ -1887,13 +1840,6 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const setFilters = useCallback((nextFilters: Partial<State['filters']>) => {
     setFiltersState(prev => ({ ...prev, ...nextFilters }));
   }, []);
-
-  const setCurrentUser = useCallback(
-    (user: User | null) => {
-      queryClient.setQueryData(SESSION_QUERY_KEY, user);
-    },
-    [queryClient]
-  );
 
   const resetFilters = useCallback(() => {
     setFiltersState({ ...initialFilters, projectId: activeProjectIdRef.current });
@@ -1992,10 +1938,6 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       updateProject,
       deleteProject,
       joinProject,
-      signIn,
-      signUp,
-      signOut,
-      setCurrentUser,
       setTheme,
       setActiveTicket,
       setView,
@@ -2045,10 +1987,6 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       updateProject,
       deleteProject,
       joinProject,
-      signIn,
-      signUp,
-      signOut,
-      setCurrentUser,
       setTheme,
       setActiveTicket,
       setView,

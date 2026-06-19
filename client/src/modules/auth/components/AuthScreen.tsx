@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
-import { useTickets } from '../../../context/TicketContextContext';
+import { authClient } from '../../../context/auth/authClient';
 import { LogIn } from 'lucide-react';
 import { getAuthFailureMessage, isAuthSubmissionInvalid } from '../utils/AuthScreen';
 import { Button, TextInput, PasswordInput } from '@library';
 
 export const AuthScreen: React.FC = () => {
-  const { signIn, signUp } = useTickets();
   const [isSignUp, setIsSignUp] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -23,15 +22,18 @@ export const AuthScreen: React.FC = () => {
 
     setLoading(true);
     try {
-      let success = false;
       if (isSignUp) {
-        success = await signUp(name, email, password);
+        const { error } = await authClient.signUp.email({ name, email, password });
+        if (error) {
+          setErrorMsg(error.message || getAuthFailureMessage(isSignUp));
+          return;
+        }
       } else {
-        success = await signIn(email, password);
-      }
-
-      if (!success) {
-        setErrorMsg(getAuthFailureMessage(isSignUp));
+        const { error } = await authClient.signIn.email({ email, password });
+        if (error) {
+          setErrorMsg(error.message || getAuthFailureMessage(isSignUp));
+          return;
+        }
       }
     } catch (err: any) {
       setErrorMsg(err.message || 'An error occurred during authentication.');

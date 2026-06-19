@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Card, Stack, TextInput, Alert, Button } from '@library';
 import { useSettingsScreenContext } from '../../../context/settings/useSettingsScreenContext';
 
-export function DangerZoneSection(): JSX.Element {
+export function DangerZoneSection(): React.ReactNode {
   const { isMobile, workspace, deleteLoading, deleteError, onDeleteWorkspace, onClearDeleteError } = useSettingsScreenContext();
 
   const [deleteConfirmation, setDeleteConfirmation] = useState('');

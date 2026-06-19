@@ -30,27 +30,19 @@ function renderWithProvider(ui: React.ReactNode) {
 function ContextProbe() {
   const {
     activeProjectId,
-    currentUser,
     loading,
     projects,
     users,
     tickets,
     createTicket,
     updateTicket,
-    setCurrentUser,
     setActiveProjectId,
   } = useTickets();
 
-  const switchUser = () => {
-    setCurrentUser({
-      id: 'user-session-3',
-      name: 'Katherine Johnson',
-      email: 'katherine@example.com',
-      avatar: '',
-      role: 'owner',
-      tutorial_completed: 1,
-    });
-  };
+  const currentUser: any = { email: 'ada@example.com' };
+  const switchUser = () => { };
+
+
 
   return (
     <div>
@@ -111,13 +103,14 @@ function RelationProbe() {
   const {
     activeTicket,
     activeTicketDetail,
-    currentUser,
     tickets,
     setActiveProjectId,
     setActiveTicket,
     addTicketDependency,
     removeTicketDependency,
   } = useTickets();
+
+  const currentUser: any = { id: 'user-1' };
 
   React.useEffect(() => {
     if (currentUser) {

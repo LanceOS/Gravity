@@ -26,7 +26,7 @@ type WorkspaceLayoutMockProps = {
       workspaceManagementArea?: string;
     };
     projects?: {
-      onSelectLabel?: (labelId: string) => void;
+      onSelectLabel?: (projectId: string, labelId: string) => void;
       onSelectWorkspaceProjects?: () => void;
       onOpenCreateTeam?: () => void;
     };
@@ -156,7 +156,7 @@ vi.mock('../../layouts/WorkspaceLayout/WorkspaceLayout', () => ({
       </div>
       <button
         type="button"
-        onClick={() => sidebarProps.projects?.onSelectLabel?.(sidebarProps.projects?.activeProjectId || 'project-1', 'd-1')}
+        onClick={() => sidebarProps.projects?.onSelectLabel?.('project-1', 'd-1')}
       >
         Select label
       </button>
@@ -600,6 +600,14 @@ function mockAggregateApiResponses() {
       return Promise.resolve(jsonResponse([]));
     }
 
+    if (parsedUrl.pathname === '/api/v1/settings/user-1') {
+      return Promise.resolve(jsonResponse({
+        defaultView: 'board',
+        theme: 'dark',
+        tutorialCompleted: true
+      }));
+    }
+
     return Promise.resolve(jsonResponse({ success: true, lastActiveAt: '2026-05-26T10:00:00.000Z' }));
   });
 }
@@ -647,11 +655,18 @@ describe('AppShellPage', () => {
     });
   });
 
-  it('renders onboarding for incomplete tutorials and marks the current user complete when dismissed', async () => {
+  it('renders onboarding for incomplete tutorials and sets it complete when dismissed', async () => {
+    mocks.fetch.mockImplementation((input: RequestInfo | URL) => {
+      const inputUrl = typeof input === 'string' ? input : input.toString();
+      if (inputUrl.includes('/api/v1/settings/')) {
+        return Promise.resolve(jsonResponse({ tutorialCompleted: false }));
+      }
+      return Promise.resolve(jsonResponse({ success: true }));
+    });
+
     const user = userEvent.setup();
     const tickets = buildUseTickets({
-      currentUser: makeCurrentUser({ tutorial_completed: 0 }),
-      setCurrentUser: vi.fn(),
+      currentUser: makeCurrentUser(),
     });
 
     renderAppShell({ tickets });
@@ -661,9 +676,16 @@ describe('AppShellPage', () => {
     });
 
     await user.click(screen.getByRole('button', { name: 'Complete onboarding' }));
-    expect(tickets.setCurrentUser).toHaveBeenCalledWith({
-      ...tickets.currentUser,
-      tutorial_completed: 1,
+    
+    // Assert that the PATCH request was sent
+    await waitFor(() => {
+      expect(mocks.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/tutorial'),
+        expect.objectContaining({
+          method: 'PATCH',
+          body: JSON.stringify({ completed: true }),
+        })
+      );
     });
   });
 

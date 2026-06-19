@@ -6,4 +6,4 @@ export {
   getNextLabelSortOrder,
   sanitizeProjectKey,
   validateGithubRepoUrl,
-} from '../workspaceProjectsPanel/utils/WorkspaceProjectPanel';
+} from '../../workspaceProjectsPanel/utils/WorkspaceProjectPanel';

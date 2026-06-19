@@ -1,4 +1,4 @@
-import type { SidebarTeam, Project, SidebarTree } from '../../types/domain';
+import type { SidebarTeam, Project, SidebarTree } from '../../../types/domain';
 import { WorkspaceTeamProjectsPanelPage } from '../../workspaceTeamProjectsPanel/screens/WorkspaceTeamProjectsPanelPage';
 
 export const WorkspaceTeamProjectsPage = ({

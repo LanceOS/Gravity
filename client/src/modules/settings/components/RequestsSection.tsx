@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { Card, Stack, Button } from '@library';
 import { useSettingsScreenContext } from '../../../context/settings/useSettingsScreenContext';
 
-export function RequestsSection(): JSX.Element {
+export function RequestsSection(): React.ReactNode {
   const { joinRequests, approveLoadingId, onApproveJoinRequest } = useSettingsScreenContext();
 
   const pendingRequests = useMemo(

@@ -18,7 +18,7 @@ export function WorkspaceLayout({ sidebarProps, children, rightPanels, isMobile 
 
   const closeSidebar = () => setIsMobileSidebarOpen(false);
 
-  const wrapHandler = <T extends (...args: unknown[]) => unknown>(handler: T): T => {
+  const wrapHandler = <T extends (...args: any[]) => any>(handler: T): T => {
     return ((...args: Parameters<T>) => {
       closeSidebar();
       return handler(...args);

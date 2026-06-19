@@ -1,4 +1,4 @@
-import type { Ticket } from '../../types/domain';
+import type { Ticket, Comment, Label } from '../../types/domain';
 import { mergeTicketRelationSnapshot, type TicketWithRelations } from '../../modules/tickets/utils/ticketRelations';
 
 /**
@@ -6,7 +6,7 @@ import { mergeTicketRelationSnapshot, type TicketWithRelations } from '../../mod
  * Query keys for ticket lists follow the shape `[tag, { projectId }]`.
  * Returns `undefined` when the key does not match that shape.
  */
-export function getListQueryProjectId(queryKey: unknown[]): string | undefined {
+export function getListQueryProjectId(queryKey: readonly unknown[]): string | undefined {
   const maybeMeta = queryKey[1];
   if (!maybeMeta || typeof maybeMeta !== 'object' || Array.isArray(maybeMeta)) {
     return undefined;
@@ -138,3 +138,151 @@ export function patchTicketInListById(
   return next;
 }
 
+export function patchTicketLabelAssignment(ticket: Ticket, labelId: string, isAssigned: boolean, label?: Label): Ticket {
+  const currentLabelIds = Array.isArray(ticket.labelIds)
+    ? ticket.labelIds
+    : Array.isArray(ticket.labels)
+      ? ticket.labels.map((item) => item.id)
+      : [];
+  const nextLabelIds = new Set<string>(currentLabelIds.filter((id): id is string => typeof id === 'string'));
+
+  if (isAssigned) {
+    nextLabelIds.add(labelId);
+  } else {
+    nextLabelIds.delete(labelId);
+  }
+
+  const nextLabelIdsList = Array.from(nextLabelIds);
+  let nextLabels: Label[] = Array.isArray(ticket.labels) ? [...ticket.labels] : [];
+
+  if (Array.isArray(ticket.labels)) {
+    if (isAssigned) {
+      const hasLabel = ticket.labels.some((item) => item.id === labelId);
+      if (!hasLabel && label) {
+        nextLabels = [...nextLabels, label];
+      }
+    } else {
+      nextLabels = nextLabels.filter((item) => item.id !== labelId);
+    }
+  }
+
+  return {
+    ...ticket,
+    labels: nextLabels,
+    labelIds: nextLabelIdsList,
+  };
+}
+export function normalizeTicketPayload(value: unknown): Ticket | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+
+  const data = value as Record<string, unknown>;
+  const id = typeof data.id === 'string' ? data.id.trim() : '';
+  const key = typeof data.key === 'string' ? data.key.trim().toUpperCase() : '';
+  const projectId = typeof data.projectId === 'string' ? data.projectId.trim() : '';
+
+  if (!id || !key || !projectId) {
+    return null;
+  }
+
+  const statusValue = typeof data.status === 'string' ? data.status.toLowerCase() : 'todo';
+  const priorityValue = typeof data.priority === 'string' ? data.priority.toLowerCase() : 'no_priority';
+  const prStatusValue = typeof data.prStatus === 'string' ? data.prStatus.toLowerCase() : 'none';
+
+  const statusSet = new Set(['backlog', 'todo', 'in_progress', 'in_review', 'done', 'canceled']);
+  const prioritySet = new Set(['no_priority', 'low', 'medium', 'high', 'urgent']);
+  const prStatusSet = new Set(['open', 'merged', 'closed', 'none']);
+
+  return {
+    id,
+    key,
+    title: typeof data.title === 'string' ? data.title : '',
+    description: typeof data.description === 'string' ? data.description : '',
+    status: statusSet.has(statusValue) ? (statusValue as Ticket['status']) : 'todo',
+    priority: prioritySet.has(priorityValue) ? (priorityValue as Ticket['priority']) : 'no_priority',
+    assigneeId: typeof data.assigneeId === 'string' ? data.assigneeId : null,
+    projectId,
+    domainId: typeof data.domainId === 'string' ? data.domainId : null,
+    cycleId: typeof data.cycleId === 'string' ? data.cycleId : null,
+    parentId: typeof data.parentId === 'string' ? data.parentId : null,
+    isBlocked: typeof data.isBlocked === 'boolean' ? data.isBlocked : false,
+    isDependency: typeof data.isDependency === 'boolean' ? data.isDependency : false,
+    prStatus: prStatusSet.has(prStatusValue) ? (prStatusValue as Ticket['prStatus']) : 'none',
+    prUrl: typeof data.prUrl === 'string' ? data.prUrl : null,
+    branchName: typeof data.branchName === 'string' ? data.branchName : undefined,
+    createdAt: typeof data.createdAt === 'string' ? data.createdAt : new Date().toISOString(),
+    updatedAt: typeof data.updatedAt === 'string' ? data.updatedAt : new Date().toISOString(),
+    labels: Array.isArray((data as { labels?: unknown }).labels)
+      ? ((data as { labels: unknown[] }).labels.filter((label) => {
+          if (!label || typeof label !== 'object') {
+            return false;
+          }
+          const maybeLabel = label as { id?: unknown; name?: unknown; color?: unknown; sortOrder?: unknown; description?: unknown; teamId?: unknown; projectId?: unknown };
+          return typeof maybeLabel.id === 'string' && typeof maybeLabel.name === 'string';
+        }) as Label[])
+      : undefined,
+    labelIds: Array.isArray((data as { labelIds?: unknown }).labelIds)
+      ? ((data as { labelIds: unknown[] }).labelIds.filter((id): id is string => typeof id === 'string'))
+      : undefined,
+    dependencies: Array.isArray((data as { dependencies?: unknown }).dependencies)
+      ? ((data as { dependencies: unknown[] }).dependencies as Ticket['dependencies'])
+      : undefined,
+    blockers: Array.isArray((data as { blockers?: unknown }).blockers)
+      ? ((data as { blockers: unknown[] }).blockers as Ticket['blockers'])
+      : undefined,
+  };
+}
+export function normalizeCommentPayload(value: unknown): Comment | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+
+  const data = value as Record<string, unknown>;
+  const id = typeof data.id === 'string' ? data.id.trim() : '';
+  const ticketId = typeof data.ticketId === 'string' ? data.ticketId.trim() : '';
+  const userId = typeof data.userId === 'string' ? data.userId.trim() : '';
+
+  if (!id || !ticketId || !userId) {
+    return null;
+  }
+
+  const author =
+    data.author && typeof data.author === 'object'
+      ? (() => {
+        const authorData = data.author as Record<string, unknown>;
+        const authorId = typeof authorData.id === 'string' ? authorData.id : userId;
+        const authorUsername = typeof authorData.username === 'string' ? authorData.username : '';
+        const authorAvatar =
+          typeof authorData.avatar_url === 'string'
+            ? authorData.avatar_url
+            : typeof authorData.avatarUrl === 'string'
+              ? authorData.avatarUrl
+              : undefined;
+        const authorRole = typeof authorData.role === 'string' ? authorData.role : undefined;
+
+        return {
+          id: authorId,
+          username: authorUsername,
+          avatar_url: authorAvatar,
+          role: authorRole,
+        };
+      })()
+      : undefined;
+
+  return {
+    id,
+    ticketId,
+    userId,
+    body: typeof data.body === 'string' ? data.body : '',
+    createdAt: typeof data.createdAt === 'string' ? data.createdAt : new Date().toISOString(),
+    updatedAt: typeof data.updatedAt === 'string'
+      ? data.updatedAt
+      : typeof data.createdAt === 'string'
+        ? data.createdAt
+        : new Date().toISOString(),
+    userName: typeof data.userName === 'string' ? data.userName : undefined,
+    userAvatar: typeof data.userAvatar === 'string' ? data.userAvatar : undefined,
+    author,
+  };
+}

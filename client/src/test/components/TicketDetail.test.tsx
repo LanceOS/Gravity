@@ -351,9 +351,6 @@ function withRelatedTicketIds(ticket: Ticket): TicketWithRelations {
     }
   }
 
-  if (ticket.blockedTicket?.id) {
-    relatedTicketIds.add(ticket.blockedTicket.id);
-  }
 
   return {
     ...ticket,

@@ -81,7 +81,11 @@ function validateAttachment(data: unknown): NoteAttachment {
 }
 
 export class DefaultNotesService implements NotesService {
-  constructor(private readonly client = apiClient) {}
+  private readonly client: typeof apiClient;
+
+  constructor(client = apiClient) {
+    this.client = client;
+  }
 
   async getNote(projectId: string, noteId: string): Promise<Note> {
     const note = await this.client.get<unknown>(`/notes/${noteId}`, { projectId });

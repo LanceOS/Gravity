@@ -43,7 +43,10 @@ function isWorkspace(value: unknown): value is WorkspaceSummary {
 }
 
 export class DefaultWorkspaceDirectoryService implements WorkspaceDirectoryService {
-  constructor(private readonly client = apiClient) {}
+  private readonly client: typeof apiClient;
+  constructor(client = apiClient) {
+    this.client = client;
+  }
 
   async listWorkspaces(userId: string): Promise<WorkspaceSummary[]> {
     const data = await this.client.get<WorkspaceSummary[] | { error?: string }>('/workspaces', {

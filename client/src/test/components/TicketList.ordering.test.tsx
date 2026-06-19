@@ -39,7 +39,6 @@ describe('TicketList ordering', () => {
       <TicketList
         filteredCount={6}
         groupedTickets={groupedTickets}
-        domainById={{}}
         userAvatarById={{}}
         onSelectTicket={() => {}}
       />

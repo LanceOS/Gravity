@@ -35,13 +35,11 @@ export interface CreateWorkspaceInput {
 
 interface UseWorkspaceDirectoryOptions {
   currentUser: User | null;
-  setCurrentUser: (user: User | null) => void;
   workspaceDirectoryService?: WorkspaceDirectoryService;
 }
 
 export function useWorkspaceDirectory({
   currentUser,
-  setCurrentUser,
   workspaceDirectoryService = defaultWorkspaceDirectoryService,
 }: UseWorkspaceDirectoryOptions) {
   const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([]);
@@ -84,7 +82,7 @@ export function useWorkspaceDirectory({
       }
 
       if (loadError instanceof ApiError && loadError.status === 401) {
-        setCurrentUser(null);
+        // authClient handles logout
       }
 
       const message = loadError instanceof Error ? loadError.message : 'Failed to load workspaces.';
@@ -97,7 +95,7 @@ export function useWorkspaceDirectory({
         setLoading(false);
       }
     }
-  }, [currentUser, setCurrentUser, workspaceDirectoryService]);
+  }, [currentUser, workspaceDirectoryService]);
 
   useEffect(() => {
     void refreshWorkspaces();

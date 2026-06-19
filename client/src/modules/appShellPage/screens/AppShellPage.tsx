@@ -1,6 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
+import { authClient } from '../../../context/auth/authClient';
 import { AuthScreen } from '../../auth';
 import { OnboardingModal } from '../../onboarding';
 import { useTickets } from '../../../context/TicketContextContext';
@@ -31,8 +32,6 @@ function AppShellLandingPage() {
     currentUser,
     fetchInitialData,
     loading,
-    setCurrentUser,
-    signOut,
   } = useTickets();
 
   const {
@@ -45,7 +44,7 @@ function AppShellLandingPage() {
     refreshWorkspaces,
     createWorkspace,
     requestJoinByInvite,
-  } = useWorkspaceDirectory({ currentUser, setCurrentUser });
+  } = useWorkspaceDirectory({ currentUser });
   const workspacesResolvedForCurrentUser = !currentUser || workspacesResolvedUserId === currentUser.id;
 
   const { activeWorkspaceId, workspaceReady } = useWorkspaceDirectoryState({
@@ -68,6 +67,21 @@ function AppShellLandingPage() {
 
     navigate('/workspaces', { replace: true });
   }, [navigate, pathname, activeWorkspaceId, workspaces, workspaceReady]);
+
+  const [tutorialCompleted, setTutorialCompleted] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!currentUser) return;
+    let cancelled = false;
+    fetch(`/api/v1/settings/${currentUser.id}`)
+      .then(res => res.json())
+      .then(data => {
+        if (!cancelled) setTutorialCompleted(data.tutorialCompleted ?? true);
+      })
+      .catch(() => {
+        if (!cancelled) setTutorialCompleted(true);
+      });
+    return () => { cancelled = true; };
+  }, [currentUser]);
 
   const handleCreateWorkspace = async (workspaceInput: {
     name: string;
@@ -102,10 +116,19 @@ function AppShellLandingPage() {
     return <AuthScreen />;
   }
 
-  const onboarding = currentUser.tutorial_completed === 0 || currentUser.tutorial_completed === false ? (
+  const onboarding = tutorialCompleted === false ? (
     <OnboardingModal
-      onComplete={() => {
-        setCurrentUser({ ...currentUser, tutorial_completed: 1 });
+      onComplete={async () => {
+        setTutorialCompleted(true);
+        try {
+          await fetch(`/api/v1/users/${currentUser.id}/tutorial`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ completed: true }),
+          });
+        } catch (e) {
+          // Ignore
+        }
       }}
     />
     ) : null;
@@ -128,7 +151,7 @@ function AppShellLandingPage() {
             navigate(`/workspaces/${wsId}/settings`);
           }}
           onOpenAccountPreferences={() => navigate('/account')}
-          onSignOut={signOut}
+          onSignOut={() => authClient.signOut()}
         />
         {onboarding}
       </>

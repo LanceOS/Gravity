@@ -1,4 +1,4 @@
-import type { User } from '../../../context/TicketContextContext';
+import type { User } from '../../../types/domain';
 import type { WorkspaceSummary } from '../../../hooks/useWorkspaceDirectory';
 import type {
   CreateWorkspaceInviteInput,
@@ -7,6 +7,14 @@ import type {
   WorkspaceJoinRequest,
   WorkspaceMember,
 } from '../../../hooks/useWorkspaceSettings';
+
+export type {
+  CreateWorkspaceInviteInput,
+  WorkspaceAdminSettings,
+  WorkspaceInvite,
+  WorkspaceJoinRequest,
+  WorkspaceMember,
+};
 
 export type SettingsCategoryId = 'overview' | 'access' | 'members' | 'requests' | 'mcp_tools';
 

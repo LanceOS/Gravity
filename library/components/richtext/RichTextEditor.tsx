@@ -1,4 +1,4 @@
-import { forwardRef, useImperativeHandle } from 'react';
+import React, { forwardRef, useImperativeHandle } from 'react';
 import { Node as ProseMirrorNode } from 'prosemirror-model';
 import { cn } from '../../utilities/cn';
 import { useRichTextEditor } from './hooks/useRichTextEditor';
