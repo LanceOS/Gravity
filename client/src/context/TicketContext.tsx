@@ -6,7 +6,21 @@ import { disposeSseService, getSseService } from '../services/sseService';
 import { SseEventCoalescer, type SseCoalescedEvent } from '../services/SseEventCoalescer';
 import { useMoveTicket } from './useMoveTicket';
 import { useTicketRelationActions } from '../hooks/useTicketRelationActions';
-import { mergeTicketRelationSnapshot, type TicketWithRelations } from '../modules/tickets/utils/ticketRelations';
+import type { TicketWithRelations } from '../modules/tickets/utils/ticketRelations';
+import {
+  combineTicketDetails,
+  candidateMatchesKey,
+  findTicketInList,
+  getListQueryProjectId,
+  hasEquivalentTicketFields,
+  initialFilters,
+  patchTicketInListById,
+  shouldAcceptSseTicketUpdate,
+  shouldAcceptSseCommentUpdate,
+  type TicketFiltersState,
+  useSessionQuery,
+  SESSION_QUERY_KEY,
+} from './shared';
 import { toast } from '@library';
 import { TicketContext } from './TicketContextContext';
 
@@ -49,7 +63,8 @@ interface State {
   loading: boolean;
 }
 
-export type TicketFiltersState = State['filters'];
+// TicketFiltersState is imported from ./shared/filters and re-exported below.
+export type { TicketFiltersState };
 
 type CreateTicketInput = {
   title: string;
@@ -65,355 +80,18 @@ type CreateTicketInput = {
   domainId?: string | null;
 };
 
-const initialFilters = {
-  status: '',
-  priority: '',
-  projectId: '',
-  labelId: '',
-  labels: [] as string[],
-  labelMode: 'any' as 'all' | 'any',
-  cycleId: '',
-  assigneeId: '',
-  search: '',
-};
+// initialFilters is imported from ./shared/filters.
 
-const CURRENT_USER_STORAGE_KEY = 'gravity_user';
-function writeStoredUser(value: User | null) {
-  if (typeof window === 'undefined') {
-    return;
-  }
+// ---------------------------------------------------------------------------
+// All pure utility functions below have been extracted to context/shared/.
+// They are imported at the top of this file and used as-is.
+// See: src/context/shared/ticketNormalization.ts
+//      src/context/shared/ticketTimestamps.ts
+//      src/context/shared/ticketCache.ts
+//      src/context/shared/localStorage.ts
+//      src/context/shared/filters.ts
+// ---------------------------------------------------------------------------
 
-  try {
-    if (value) {
-      window.localStorage.setItem(CURRENT_USER_STORAGE_KEY, JSON.stringify(value));
-    } else {
-      window.localStorage.removeItem(CURRENT_USER_STORAGE_KEY);
-    }
-  } catch {
-    // localStorage may be unavailable in restricted/private modes.
-  }
-}
-
-function clearStoredUser() {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  try {
-    window.localStorage.removeItem(CURRENT_USER_STORAGE_KEY);
-  } catch {
-    // localStorage may be unavailable in restricted/private modes.
-  }
-}
-
-function readStoredUser(): User | null {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-
-  try {
-    const rawUser = window.localStorage.getItem(CURRENT_USER_STORAGE_KEY);
-    if (!rawUser) {
-      return null;
-    }
-    const parsedUser = JSON.parse(rawUser) as Record<string, unknown>;
-    if (typeof parsedUser.id !== 'string' || typeof parsedUser.name !== 'string' || typeof parsedUser.email !== 'string') {
-      clearStoredUser();
-      return null;
-    }
-
-    return {
-      id: parsedUser.id,
-      name: parsedUser.name,
-      email: parsedUser.email,
-      avatar: typeof parsedUser.avatar === 'string' ? parsedUser.avatar : '',
-      role: typeof parsedUser.role === 'string' ? parsedUser.role : 'guest_contributor',
-      tutorial_completed:
-        typeof parsedUser.tutorial_completed === 'number' || typeof parsedUser.tutorial_completed === 'boolean'
-          ? parsedUser.tutorial_completed
-          : undefined,
-    };
-  } catch {
-    clearStoredUser();
-    return null;
-  }
-}
-
-// Normalize incoming ticket status values to the canonical app values.
-function canonicalizeStatus(status: string | undefined | null): Ticket['status'] {
-  if (!status || typeof status !== 'string') return 'todo';
-  const lower = status.toLowerCase().trim();
-  const normalized = lower.replace(/[^a-z0-9]+/g, '_');
-  const allowed = new Set(['backlog', 'todo', 'in_progress', 'in_review', 'done', 'canceled']);
-  if (allowed.has(normalized)) return normalized as Ticket['status'];
-
-  const collapsed = normalized.replace(/_/g, '');
-  if (collapsed === 'inprogress' || collapsed === 'in_progress') return 'in_progress';
-  if (collapsed === 'inreview' || collapsed === 'in_review') return 'in_review';
-  if (collapsed === 'cancelled' || collapsed === 'canceled') return 'canceled';
-  if (collapsed === 'backlog') return 'backlog';
-  if (collapsed === 'done') return 'done';
-  if (collapsed === 'todo' || collapsed === 'to_do') return 'todo';
-
-  return 'todo';
-}
-
-function hasEquivalentTicketFields(left: Ticket, right: Ticket) {
-  return (
-    left.id === right.id &&
-    left.key === right.key &&
-    left.title === right.title &&
-    left.description === right.description &&
-    left.status === right.status &&
-    left.priority === right.priority &&
-    left.projectId === right.projectId &&
-    left.assigneeId === right.assigneeId &&
-    left.cycleId === right.cycleId &&
-    left.parentId === right.parentId &&
-    left.isBlocked === right.isBlocked &&
-    left.isDependency === right.isDependency &&
-    left.prStatus === right.prStatus &&
-    left.prUrl === right.prUrl &&
-    left.branchName === right.branchName &&
-    left.updatedAt === right.updatedAt
-  );
-}
-
-function patchTicketLabelAssignment(ticket: Ticket, labelId: string, isAssigned: boolean, label?: Label): Ticket {
-  const currentLabelIds = Array.isArray(ticket.labelIds)
-    ? ticket.labelIds
-    : Array.isArray(ticket.labels)
-      ? ticket.labels.map((item) => item.id)
-      : [];
-  const nextLabelIds = new Set<string>(currentLabelIds.filter((id): id is string => typeof id === 'string'));
-
-  if (isAssigned) {
-    nextLabelIds.add(labelId);
-  } else {
-    nextLabelIds.delete(labelId);
-  }
-
-  const nextLabelIdsList = Array.from(nextLabelIds);
-  let nextLabels: Label[] = Array.isArray(ticket.labels) ? [...ticket.labels] : [];
-
-  if (Array.isArray(ticket.labels)) {
-    if (isAssigned) {
-      const hasLabel = ticket.labels.some((item) => item.id === labelId);
-      if (!hasLabel && label) {
-        nextLabels = [...nextLabels, label];
-      }
-    } else {
-      nextLabels = nextLabels.filter((item) => item.id !== labelId);
-    }
-  }
-
-  return {
-    ...ticket,
-    labels: nextLabels,
-    labelIds: nextLabelIdsList,
-  };
-}
-
-function patchTicketInListById(
-  list: readonly Ticket[] | undefined,
-  ticketId: string,
-  updates: Partial<Ticket>,
-): Ticket[] | undefined {
-  if (!list) {
-    return undefined;
-  }
-
-  const index = list.findIndex((ticket) => ticket.id === ticketId);
-  if (index === -1) {
-    return [...list];
-  }
-
-  const existingTicket = list[index];
-  const nextTicket: Ticket = {
-    ...existingTicket,
-    ...updates,
-  };
-
-  if (hasEquivalentTicketFields(existingTicket, nextTicket)) {
-    return [...list];
-  }
-
-  const next = [...list];
-  next[index] = nextTicket;
-  return next;
-}
-
-function normalizeTicketPayload(value: unknown): Ticket | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return null;
-  }
-
-  const data = value as Record<string, unknown>;
-  const id = typeof data.id === 'string' ? data.id.trim() : '';
-  const key = typeof data.key === 'string' ? data.key.trim().toUpperCase() : '';
-  const projectId = typeof data.projectId === 'string' ? data.projectId.trim() : '';
-
-  if (!id || !key || !projectId) {
-    return null;
-  }
-
-  const statusValue = typeof data.status === 'string' ? data.status.toLowerCase() : 'todo';
-  const priorityValue = typeof data.priority === 'string' ? data.priority.toLowerCase() : 'no_priority';
-  const prStatusValue = typeof data.prStatus === 'string' ? data.prStatus.toLowerCase() : 'none';
-
-  const statusSet = new Set(['backlog', 'todo', 'in_progress', 'in_review', 'done', 'canceled']);
-  const prioritySet = new Set(['no_priority', 'low', 'medium', 'high', 'urgent']);
-  const prStatusSet = new Set(['open', 'merged', 'closed', 'none']);
-
-  return {
-    id,
-    key,
-    title: typeof data.title === 'string' ? data.title : '',
-    description: typeof data.description === 'string' ? data.description : '',
-    status: statusSet.has(statusValue) ? (statusValue as Ticket['status']) : 'todo',
-    priority: prioritySet.has(priorityValue) ? (priorityValue as Ticket['priority']) : 'no_priority',
-    assigneeId: typeof data.assigneeId === 'string' ? data.assigneeId : null,
-    projectId,
-    domainId: typeof data.domainId === 'string' ? data.domainId : null,
-    cycleId: typeof data.cycleId === 'string' ? data.cycleId : null,
-    parentId: typeof data.parentId === 'string' ? data.parentId : null,
-    isBlocked: typeof data.isBlocked === 'boolean' ? data.isBlocked : false,
-    isDependency: typeof data.isDependency === 'boolean' ? data.isDependency : false,
-    prStatus: prStatusSet.has(prStatusValue) ? (prStatusValue as Ticket['prStatus']) : 'none',
-    prUrl: typeof data.prUrl === 'string' ? data.prUrl : null,
-    branchName: typeof data.branchName === 'string' ? data.branchName : undefined,
-    createdAt: typeof data.createdAt === 'string' ? data.createdAt : new Date().toISOString(),
-    updatedAt: typeof data.updatedAt === 'string' ? data.updatedAt : new Date().toISOString(),
-    labels: Array.isArray((data as { labels?: unknown }).labels)
-      ? ((data as { labels: unknown[] }).labels.filter((label) => {
-          if (!label || typeof label !== 'object') {
-            return false;
-          }
-          const maybeLabel = label as { id?: unknown; name?: unknown; color?: unknown; sortOrder?: unknown; description?: unknown; teamId?: unknown; projectId?: unknown };
-          return typeof maybeLabel.id === 'string' && typeof maybeLabel.name === 'string';
-        }) as Label[])
-      : undefined,
-    labelIds: Array.isArray((data as { labelIds?: unknown }).labelIds)
-      ? ((data as { labelIds: unknown[] }).labelIds.filter((id): id is string => typeof id === 'string'))
-      : undefined,
-    dependencies: Array.isArray((data as { dependencies?: unknown }).dependencies)
-      ? ((data as { dependencies: unknown[] }).dependencies as Ticket['dependencies'])
-      : undefined,
-    blockers: Array.isArray((data as { blockers?: unknown }).blockers)
-      ? ((data as { blockers: unknown[] }).blockers as Ticket['blockers'])
-      : undefined,
-  };
-}
-
-function normalizeCommentPayload(value: unknown): Comment | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return null;
-  }
-
-  const data = value as Record<string, unknown>;
-  const id = typeof data.id === 'string' ? data.id.trim() : '';
-  const ticketId = typeof data.ticketId === 'string' ? data.ticketId.trim() : '';
-  const userId = typeof data.userId === 'string' ? data.userId.trim() : '';
-
-  if (!id || !ticketId || !userId) {
-    return null;
-  }
-
-  const author =
-    data.author && typeof data.author === 'object'
-      ? (() => {
-        const authorData = data.author as Record<string, unknown>;
-        const authorId = typeof authorData.id === 'string' ? authorData.id : userId;
-        const authorUsername = typeof authorData.username === 'string' ? authorData.username : '';
-        const authorAvatar =
-          typeof authorData.avatar_url === 'string'
-            ? authorData.avatar_url
-            : typeof authorData.avatarUrl === 'string'
-              ? authorData.avatarUrl
-              : undefined;
-        const authorRole = typeof authorData.role === 'string' ? authorData.role : undefined;
-
-        return {
-          id: authorId,
-          username: authorUsername,
-          avatar_url: authorAvatar,
-          role: authorRole,
-        };
-      })()
-      : undefined;
-
-  return {
-    id,
-    ticketId,
-    userId,
-    body: typeof data.body === 'string' ? data.body : '',
-    createdAt: typeof data.createdAt === 'string' ? data.createdAt : new Date().toISOString(),
-    updatedAt: typeof data.updatedAt === 'string'
-      ? data.updatedAt
-      : typeof data.createdAt === 'string'
-        ? data.createdAt
-        : new Date().toISOString(),
-    userName: typeof data.userName === 'string' ? data.userName : undefined,
-    userAvatar: typeof data.userAvatar === 'string' ? data.userAvatar : undefined,
-    author,
-  };
-}
-
-function getListQueryProjectId(queryKey: unknown[]): string | undefined {
-  const maybeMeta = queryKey[1];
-  if (!maybeMeta || typeof maybeMeta !== 'object' || Array.isArray(maybeMeta)) {
-    return undefined;
-  }
-
-  const meta = maybeMeta as { projectId?: unknown };
-  return typeof meta.projectId === 'string' ? meta.projectId : undefined;
-}
-
-function parseTimestamp(value: unknown): number | undefined {
-  if (typeof value !== 'string') {
-    return undefined;
-  }
-
-  const timestamp = Date.parse(value);
-  return Number.isNaN(timestamp) ? undefined : timestamp;
-}
-
-function shouldAcceptSseTicketUpdate(existing: Ticket | undefined, incoming: Ticket): boolean {
-  if (!existing) return true;
-
-  const existingUpdatedAt = parseTimestamp(existing.updatedAt);
-  const incomingUpdatedAt = parseTimestamp(incoming.updatedAt);
-
-  if (!incomingUpdatedAt || !existingUpdatedAt) {
-    return true;
-  }
-
-  return incomingUpdatedAt > existingUpdatedAt;
-}
-
-function shouldAcceptSseCommentUpdate(existing: Comment | undefined, incoming: Comment): boolean {
-  if (!existing) return true;
-
-  const existingUpdatedAt = parseTimestamp(existing.updatedAt ?? existing.createdAt);
-  const incomingUpdatedAt = parseTimestamp(incoming.updatedAt ?? incoming.createdAt);
-
-  if (!incomingUpdatedAt || !existingUpdatedAt) {
-    return true;
-  }
-
-  return incomingUpdatedAt > existingUpdatedAt;
-}
-
-function combineTicketDetails(existing: TicketWithRelations | undefined, incoming: Ticket): TicketWithRelations {
-  if (!existing) {
-    return incoming as TicketWithRelations;
-  }
-
-  return mergeTicketRelationSnapshot(existing, {
-    ...existing,
-    ...incoming,
-  } as TicketWithRelations);
-}
 
 
 const TICKET_UPDATE_DEBOUNCE_MS = 250;
@@ -463,7 +141,7 @@ export interface TicketContextType extends State {
   signIn: (email: string, password?: string) => Promise<boolean>;
   signUp: (name: string, email: string, password?: string) => Promise<boolean>;
   signOut: () => void;
-  setCurrentUser: (user: User | null) => void;
+  setCurrentUser: () => void;
   setTheme: (theme: 'dark' | 'coal-black' | 'coffee' | 'honey-glow' | 'marble-blue' | 'midnight-azure') => void;
   setActiveTicket: (ticket: Ticket | null) => void;
   activeTicketDetail: TicketWithRelations | null;
@@ -490,9 +168,10 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [activeTicket, setActiveTicket] = useState<Ticket | null>(null);
   const [activeView, setView] = useState<'list' | 'board'>('board');
   const [filters, setFiltersState] = useState<State['filters']>(initialFilters);
-  const [currentUser, setCurrentUser] = useState<User | null>(readStoredUser());
+  const sessionQuery = useSessionQuery();
+  const currentUser = sessionQuery.data;
+  const authLoading = sessionQuery.isLoading;
   const [theme, setThemeState] = useState<'dark' | 'coal-black' | 'coffee' | 'honey-glow' | 'marble-blue' | 'midnight-azure'>('dark');
-  const [authLoading, setAuthLoading] = useState(true);
 
   // --- Refs for batching and real-time handlers ---
   const activeProjectIdRef = useRef(activeProjectId);
@@ -659,22 +338,14 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (normalizedTicketKey) {
       const byKeyQueries = queryClient.getQueriesData<unknown>({ queryKey: ['tickets', 'detail', normalizedTicketKey] });
       for (const [, candidate] of byKeyQueries) {
-        if (
-          candidate && typeof candidate === 'object' && 'id' in candidate && 'key' in candidate
-          && typeof (candidate as { key?: string }).key === 'string'
-          && (candidate as { key?: string }).key === normalizedTicketKey
-        ) {
-          return candidate as Ticket | TicketWithRelations;
+        if (candidateMatchesKey(candidate, normalizedTicketKey)) {
+          return candidate;
         }
       }
 
       const byRelationQueries = queryClient.getQueriesData<unknown>({ queryKey: ['tickets', 'relations', normalizedTicketKey] });
       for (const [, candidate] of byRelationQueries) {
-        if (
-          candidate && typeof candidate === 'object' && 'id' in candidate && 'key' in candidate
-          && typeof (candidate as { key?: string }).key === 'string'
-          && (candidate as { key?: string }).key === normalizedTicketKey
-        ) {
+        if (candidateMatchesKey(candidate, normalizedTicketKey)) {
           return candidate as TicketWithRelations;
         }
       }
@@ -686,9 +357,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         continue;
       }
 
-      const match = candidateList.find((candidate) =>
-        (normalizedTicketKey ? candidate.key === normalizedTicketKey : false) || (normalizedTicketId ? candidate.id === normalizedTicketId : false),
-      );
+      const match = findTicketInList(candidateList, normalizedTicketKey, normalizedTicketId);
       if (match) {
         return match;
       }
@@ -898,7 +567,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     queryKey: queryKeys.tickets(activeProjectId),
     queryFn: async () => {
       const data = await apiClient.get<Ticket[]>(`/tickets`, { projectId: activeProjectId });
-      return data.map((t) => ({ ...t, status: canonicalizeStatus(t.status) }));
+      return data;
     },
     enabled: !!activeProjectId && !!currentUser,
     ...CACHE_CONFIGS.ticketsList,
@@ -1169,7 +838,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         queryKey: queryKeys.tickets(projId),
         queryFn: async () => {
           const data = await apiClient.get<Ticket[]>(`/tickets`, { projectId: projId });
-          return data.map((ticket) => ({ ...ticket, status: canonicalizeStatus(ticket.status) }));
+          return data;
         },
         ...CACHE_CONFIGS.ticketsList,
       }),
@@ -1189,54 +858,6 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     ]);
   }, []);
 
-  // --- Auth Session Check ---
-  useEffect(() => {
-    let cancelled = false;
-    const cachedUser = readStoredUser();
-
-    fetch(`${AUTH_API_URL}/session`, { credentials: 'same-origin' })
-      .then(async (response) => {
-        const data = await response.json().catch(() => null);
-        if (cancelled) return;
-
-        if (response.ok && data?.user) {
-          setCurrentUser(data.user as User);
-          return;
-        }
-
-        if (response.status === 401 || response.status === 403) {
-          setCurrentUser(null);
-          return;
-        }
-
-        if (cachedUser) {
-          setCurrentUser(cachedUser);
-          return;
-        }
-
-        setCurrentUser(null);
-      })
-      .catch((error) => {
-        console.error('Failed to restore session:', error);
-        if (!cancelled) {
-          if (cachedUser) {
-            setCurrentUser(cachedUser);
-            return;
-          }
-          setCurrentUser(null);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setAuthLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   const prevUserIdRef = useRef<string | undefined>(currentUser?.id);
   useEffect(() => {
     if (currentUser?.id !== prevUserIdRef.current) {
@@ -1246,12 +867,6 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       prevUserIdRef.current = currentUser?.id;
     }
   }, [currentUser?.id, queryClient]);
-
-
-  // Sync stored user with local storage
-  useEffect(() => {
-    writeStoredUser(currentUser);
-  }, [currentUser]);
 
   // --- Real-time SSE Synchronization ---
   useEffect(() => {
@@ -1264,7 +879,11 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
 
     const extractTicketFromEvent = (event: SseCoalescedEvent, messageData: Record<string, unknown>): Ticket | TicketWithRelations | undefined => {
-      const directTicket = normalizeTicketPayload(messageData.ticket);
+      const payloadTicket = messageData.ticket as Ticket | undefined;
+      const directTicket = payloadTicket && typeof payloadTicket === 'object' && payloadTicket.id && payloadTicket.key && payloadTicket.projectId
+        ? payloadTicket
+        : undefined;
+
       if (directTicket) {
         return directTicket;
       }
@@ -1291,9 +910,13 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           const messageData = event.data && typeof event.data === 'object' && !Array.isArray(event.data)
             ? (event.data as Record<string, unknown>)
             : {};
-          const payloadTicket = normalizeTicketPayload(messageData.ticket);
-          const payloadComment = normalizeCommentPayload(messageData.comment);
-          const payloadCommentId = extractString(messageData.commentId) || extractString((payloadComment as Comment | undefined)?.id);
+          const rawTicket = messageData.ticket as Ticket | undefined;
+          const payloadTicket = rawTicket && typeof rawTicket === 'object' && rawTicket.id && rawTicket.key && rawTicket.projectId ? rawTicket : null;
+
+          const rawComment = messageData.comment as Comment | undefined;
+          const payloadComment = rawComment && typeof rawComment === 'object' && rawComment.id && rawComment.ticketId && rawComment.userId ? rawComment : null;
+
+          const payloadCommentId = extractString(messageData.commentId) || extractString(payloadComment?.id);
           const payloadTicketId = extractString(messageData.ticketId) || extractString(event.ticketId);
           const eventTicketId = payloadTicketId || extractString((payloadComment as Comment | undefined)?.ticketId);
           const cachedTicket = extractTicketFromEvent(event, messageData);
@@ -1521,7 +1144,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     onSuccess: (createdTicket, ticketInput) => {
       const normalizedTicket: Ticket = {
         ...createdTicket,
-        status: canonicalizeStatus(createdTicket.status),
+        ...createdTicket,
       };
 
       if (ticketInput.projectId === activeProjectIdRef.current) {
@@ -1640,7 +1263,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (updates.status) {
       updates = {
         ...updates,
-        status: canonicalizeStatus(updates.status as string),
+        ...updates,
       };
     }
 
@@ -2216,14 +1839,13 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       });
 
       if (!response.ok) throw new Error('Sign in failed');
-      const data = await response.json();
-      setCurrentUser(data.user);
+      await queryClient.invalidateQueries({ queryKey: SESSION_QUERY_KEY });
       return true;
     } catch (e) {
       console.error(e);
       throw e;
     }
-  }, []);
+  }, [queryClient]);
 
   const signUp = useCallback(async (name: string, email: string, password?: string) => {
     try {
@@ -2235,14 +1857,13 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       });
 
       if (!response.ok) throw new Error('Registration failed');
-      const data = await response.json();
-      setCurrentUser(data.user);
+      await queryClient.invalidateQueries({ queryKey: SESSION_QUERY_KEY });
       return true;
     } catch (e) {
       console.error(e);
       throw e;
     }
-  }, []);
+  }, [queryClient]);
 
   const signOut = useCallback(() => {
     void fetch(`${AUTH_API_URL}/sign-out`, {
@@ -2254,10 +1875,10 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       console.error('Failed to clear server session:', error);
     });
 
-    setCurrentUser(null);
+    queryClient.setQueryData(SESSION_QUERY_KEY, null);
     setActiveProjectIdState('');
     queryClient.clear();
-  }, []);
+  }, [queryClient]);
 
   const setTheme = useCallback((nextTheme: 'dark' | 'coal-black' | 'coffee' | 'honey-glow' | 'marble-blue' | 'midnight-azure') => {
     setThemeState(nextTheme);
@@ -2266,6 +1887,13 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const setFilters = useCallback((nextFilters: Partial<State['filters']>) => {
     setFiltersState(prev => ({ ...prev, ...nextFilters }));
   }, []);
+
+  const setCurrentUser = useCallback(
+    (user: User | null) => {
+      queryClient.setQueryData(SESSION_QUERY_KEY, user);
+    },
+    [queryClient]
+  );
 
   const resetFilters = useCallback(() => {
     setFiltersState({ ...initialFilters, projectId: activeProjectIdRef.current });
