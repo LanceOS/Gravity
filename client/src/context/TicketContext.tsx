@@ -177,6 +177,8 @@ function hasEquivalentTicketFields(left: Ticket, right: Ticket) {
     left.assigneeId === right.assigneeId &&
     left.cycleId === right.cycleId &&
     left.parentId === right.parentId &&
+    left.isBlocked === right.isBlocked &&
+    left.isDependency === right.isDependency &&
     left.prStatus === right.prStatus &&
     left.prUrl === right.prUrl &&
     left.branchName === right.branchName &&
@@ -651,6 +653,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     activeTicketId,
     activeTicketProjectId,
     isAuthenticated: !!currentUser,
+    invalidateAggregateTicketQueries,
   });
 
   // Global loading state combining react-query status

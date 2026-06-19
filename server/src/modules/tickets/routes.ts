@@ -120,7 +120,7 @@ export function createTicketsRouter() {
     req: Request,
     res: Response,
     projectId: string | null | undefined,
-    handler: (projectId: string, userId: string) => Promise<void>
+    handler: (projectId: string, userId: string, workspaceId: string) => Promise<void>
   ) {
     if (!projectId) {
       res.status(400).json({ error: 'Project ID is required.' });

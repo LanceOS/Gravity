@@ -74,7 +74,12 @@ function buildTicketFilterConditions(projectIds: string[], filters: TicketFilter
   return conditions;
 }
 
-function mapTicket(record: TicketRecord, labelRows: any[] = [], isBlocked: boolean = false) {
+function mapTicket(
+  record: TicketRecord,
+  labelRows: any[] = [],
+  isBlocked: boolean = false,
+  isDependency: boolean = false,
+) {
   const sortedLabels = [...labelRows].sort((first, second) => {
     const sortOrderDiff = Number(first.sortOrder ?? 0) - Number(second.sortOrder ?? 0);
     if (sortOrderDiff !== 0) {
@@ -87,6 +92,7 @@ function mapTicket(record: TicketRecord, labelRows: any[] = [], isBlocked: boole
   return {
     id: record.id,
     isBlocked,
+    isDependency,
     key: record.key,
     title: sanitizeTitle(record.title),
     description: record.description,
@@ -147,6 +153,35 @@ function collectRelatedTicketIds({
 
 
   return Array.from(relatedTicketIds);
+}
+
+async function getTicketRelationshipFlags(ticketIds: string[]) {
+  if (ticketIds.length === 0) {
+    return {
+      blockedIds: new Set<string>(),
+      dependencyIds: new Set<string>(),
+    };
+  }
+
+  // blockedIds = tickets that are the target of at least one relation.
+  // dependencyIds = tickets that are the source of at least one relation.
+  const [blockedRows, dependencyRows] = await Promise.all([
+    db
+      .select({ blockedTicketId: ticketRelationships.blockedTicketId })
+      .from(ticketRelationships)
+      .where(inArray(ticketRelationships.blockedTicketId, ticketIds))
+      .groupBy(ticketRelationships.blockedTicketId),
+    db
+      .select({ ticketId: ticketRelationships.ticketId })
+      .from(ticketRelationships)
+      .where(inArray(ticketRelationships.ticketId, ticketIds))
+      .groupBy(ticketRelationships.ticketId),
+  ]);
+
+  return {
+    blockedIds: new Set(blockedRows.map((row) => row.blockedTicketId)),
+    dependencyIds: new Set(dependencyRows.map((row) => row.ticketId)),
+  };
 }
 
 export type ProjectScope = {
@@ -284,12 +319,7 @@ export async function listTickets(projectId: string, filters: TicketFilters = {}
   }
 
   const ticketIds = rows.map((r) => r.ticket.id);
-  const allBlockers = await db
-    .select({ blockedTicketId: ticketRelationships.blockedTicketId })
-    .from(ticketRelationships)
-    .where(inArray(ticketRelationships.blockedTicketId, ticketIds))
-    .groupBy(ticketRelationships.blockedTicketId);
-  const blockedIds = new Set(allBlockers.map(b => b.blockedTicketId));
+  const { blockedIds, dependencyIds } = await getTicketRelationshipFlags(ticketIds);
   const allLabels = await db
     .select({
       ticketId: ticketLabels.ticketId,
@@ -307,7 +337,12 @@ export async function listTickets(projectId: string, filters: TicketFilters = {}
   }
 
   return rows.map((r) => ({
-    ...mapTicket(r.ticket, labelsByTicketId.get(r.ticket.id) || [], blockedIds.has(r.ticket.id)),
+    ...mapTicket(
+      r.ticket,
+      labelsByTicketId.get(r.ticket.id) || [],
+      blockedIds.has(r.ticket.id),
+      dependencyIds.has(r.ticket.id),
+    ),
     projectName: r.projectName,
   }));
 }
@@ -340,12 +375,7 @@ export async function listWorkspaceTickets(projectIds: string[], filters: Ticket
   }
 
   const ticketIds = rows.map((r) => r.ticket.id);
-  const allBlockers = await db
-    .select({ blockedTicketId: ticketRelationships.blockedTicketId })
-    .from(ticketRelationships)
-    .where(inArray(ticketRelationships.blockedTicketId, ticketIds))
-    .groupBy(ticketRelationships.blockedTicketId);
-  const blockedIds = new Set(allBlockers.map(b => b.blockedTicketId));
+  const { blockedIds, dependencyIds } = await getTicketRelationshipFlags(ticketIds);
   const allLabels = await db
     .select({
       ticketId: ticketLabels.ticketId,
@@ -363,19 +393,36 @@ export async function listWorkspaceTickets(projectIds: string[], filters: Ticket
   }
 
   return rows.map((r) => ({
-    ...mapTicket(r.ticket, labelsByTicketId.get(r.ticket.id) || [], blockedIds.has(r.ticket.id)),
+    ...mapTicket(
+      r.ticket,
+      labelsByTicketId.get(r.ticket.id) || [],
+      blockedIds.has(r.ticket.id),
+      dependencyIds.has(r.ticket.id),
+    ),
     projectName: r.projectName,
   }));
 }
 
 export async function getTicketById(ticketId: string, projectId?: string) {
   const rows = await db.select().from(tickets).where(projectId ? and(eq(tickets.id, ticketId), eq(tickets.projectId, projectId)) : eq(tickets.id, ticketId)).limit(1);
-  return rows[0] ? mapTicket(rows[0]) : null;
+  const row = rows[0];
+  if (!row) {
+    return null;
+  }
+
+  const { blockedIds, dependencyIds } = await getTicketRelationshipFlags([row.id]);
+  return mapTicket(row, [], blockedIds.has(row.id), dependencyIds.has(row.id));
 }
 
 export async function getTicketByKey(ticketKey: string) {
   const rows = await db.select().from(tickets).where(eq(tickets.key, ticketKey.toUpperCase())).limit(1);
-  return rows[0] ? mapTicket(rows[0]) : null;
+  const row = rows[0];
+  if (!row) {
+    return null;
+  }
+
+  const { blockedIds, dependencyIds } = await getTicketRelationshipFlags([row.id]);
+  return mapTicket(row, [], blockedIds.has(row.id), dependencyIds.has(row.id));
 }
 
 export async function getTicketRelationsByKey(ticketKey: string) {
@@ -877,7 +924,8 @@ export async function updateTicketRecord(
     return null;
   }
 
-  return mapTicket(result.ticket, result.labels);
+  const { blockedIds, dependencyIds } = await getTicketRelationshipFlags([ticketId]);
+  return mapTicket(result.ticket, result.labels, blockedIds.has(ticketId), dependencyIds.has(ticketId));
 }
 
 export async function deleteTicketRecord(ticketId: string, projectId?: string) {

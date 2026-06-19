@@ -2,6 +2,7 @@ import { memo, useState, useCallback } from 'react';
 import { Paperclip } from 'lucide-react';
 import type { TicketRowProps } from '../../types/TicketList';
 import { LabelBadge } from '../LabelBadge';
+import { TicketRelationIndicators } from '../TicketRelationIndicators';
 import './TicketRowMobile.css';
 
 function TicketRowMobileImpl({ ticket, onClick, priorityIcon, assigneeAvatar, projectName }: TicketRowProps) {
@@ -43,6 +44,7 @@ function TicketRowMobileImpl({ ticket, onClick, priorityIcon, assigneeAvatar, pr
               {projectName}
             </span>
           )}
+          <TicketRelationIndicators ticket={ticket} />
           {ticket.labels?.map((label) => (
             <LabelBadge key={label.id} label={label} size="sm" />
           ))}

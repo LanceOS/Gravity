@@ -2,6 +2,7 @@ import { memo, useState, useCallback } from 'react';
 import { GitMerge, GitPullRequest, Paperclip } from 'lucide-react';
 import type { TicketRowProps } from '../types/TicketList';
 import { LabelBadge } from './LabelBadge';
+import { TicketRelationIndicators } from './TicketRelationIndicators';
 
 function TicketRowImpl({ ticket, onClick, priorityIcon, assigneeAvatar, projectName, projectColor }: TicketRowProps) {
   const [isHovered, setIsHovered] = useState(false);
@@ -86,6 +87,7 @@ function TicketRowImpl({ ticket, onClick, priorityIcon, assigneeAvatar, projectN
       </span>
 
       <div className="ticket-row-domain" style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
+        <TicketRelationIndicators ticket={ticket} />
         {ticket.labels?.map((label) => (
           <LabelBadge key={label.id} label={label} size="sm" />
         ))}
