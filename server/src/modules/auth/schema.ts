@@ -20,6 +20,10 @@ export const authSessions = pgTable('session', {
   ipAddress: text('ipAddress'),
   userAgent: text('userAgent'),
   userId: text('userId').notNull().references(() => authUsers.id),
+}, (table) => {
+  return {
+    userIdIdx: index('session_userId_idx').on(table.userId),
+  };
 });
 
 export const authAccounts = pgTable('account', {
@@ -36,6 +40,10 @@ export const authAccounts = pgTable('account', {
   password: text('password'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull(),
+}, (table) => {
+  return {
+    userIdIdx: index('account_userId_idx').on(table.userId),
+  };
 });
 
 export const authVerifications = pgTable('verification', {

@@ -15,6 +15,7 @@ export const ActiveProjectProvider: React.FC<{ children: ReactNode }> = ({ child
     if (activeProjectIdRef.current === id) {
       return;
     }
+    activeProjectIdRef.current = id;
     setActiveProjectIdState(id);
   }, []);
 
