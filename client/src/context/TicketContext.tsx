@@ -586,12 +586,122 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   });
   const labels = labelsQuery.data || [];
 
+  const patchTicketLabelsInCache = useCallback((ticketId: string, labelId: string, isAssigned: boolean) => {
+    const label = labels.find((entry) => entry.id === labelId);
+    const patchTicket = (ticket: Ticket) => patchTicketLabelAssignment(ticket, labelId, isAssigned, label);
+
+    const listQueries = queryClient.getQueriesData<Ticket[]>({ queryKey: ['tickets'] });
+    for (const [queryKey, list] of listQueries) {
+      if (!Array.isArray(list)) {
+        continue;
+      }
+      const hasMatch = list.some((ticket) => ticket.id === ticketId);
+      if (!hasMatch) {
+        continue;
+      }
+
+      queryClient.setQueryData<Ticket[]>([...queryKey], (existing) => {
+        if (!existing || !Array.isArray(existing)) {
+          return existing || list;
+        }
+
+        const next = [...existing];
+        const matchIndex = next.findIndex((ticket) => ticket.id === ticketId);
+        if (matchIndex === -1) {
+          return existing;
+        }
+
+        next[matchIndex] = patchTicket(next[matchIndex]);
+        return next;
+      });
+    }
+
+    queryClient.setQueryData<TicketWithRelations>(queryKeys.ticketDetail(ticketId), (existing) => {
+      if (!existing || existing.id !== ticketId) {
+        return existing;
+      }
+      return patchTicket(existing);
+    });
+
+    for (const [queryKey, data] of queryClient.getQueriesData<Ticket>({ queryKey: ['tickets', 'detail'] })) {
+      const existingTicket = data && typeof data === 'object' && 'id' in data ? (data as TicketWithRelations) : undefined;
+      if (!existingTicket || existingTicket.id !== ticketId) {
+        continue;
+      }
+
+      queryClient.setQueryData<Ticket>([...queryKey], (existing) => {
+        if (!existing || typeof existing !== 'object' || !(existing as { id?: string }).id) {
+          return existing;
+        }
+        return patchTicket(existing as Ticket);
+      });
+    }
+
+    for (const [queryKey, data] of queryClient.getQueriesData<Ticket>({ queryKey: ['tickets', 'relations'] })) {
+      const existingTicket = data && typeof data === 'object' && 'id' in data ? (data as TicketWithRelations) : undefined;
+      if (!existingTicket || existingTicket.id !== ticketId) {
+        continue;
+      }
+
+      queryClient.setQueryData<Ticket>([...queryKey], (existing) => {
+        if (!existing || typeof existing !== 'object' || !(existing as { id?: string }).id) {
+          return existing;
+        }
+        return patchTicket(existing as Ticket);
+      });
+    }
+
+    for (const [queryKey, data] of queryClient.getQueriesData<Ticket>({ queryKey: ['ticket-detail'] })) {
+      const existingTicket = data && typeof data === 'object' && 'id' in data ? (data as Ticket) : undefined;
+      if (!existingTicket || existingTicket.id !== ticketId) {
+        continue;
+      }
+
+      queryClient.setQueryData<Ticket>([...queryKey], (existing) => {
+        if (!existing || !('id' in existing)) {
+          return existing;
+        }
+        return patchTicket(existing);
+      });
+    }
+
+    setActiveTicket((current) => {
+      if (!current || current.id !== ticketId) {
+        return current;
+      }
+
+      return patchTicket(current);
+    });
+  }, [labels, queryClient, setActiveTicket]);
+
+  const invalidateTicketDetailCaches = useCallback((ticketId: string) => {
+    const cachedTicket = findCachedTicketByKeyOrId(undefined, ticketId);
+    if (!cachedTicket) {
+      return;
+    }
+
+    if (cachedTicket.projectId) {
+      queryClient.invalidateQueries({ queryKey: queryKeys.tickets(cachedTicket.projectId), exact: true });
+    }
+    queryClient.invalidateQueries({ queryKey: ['tickets', 'detail'] });
+    queryClient.invalidateQueries({ queryKey: ['tickets', 'relations'] });
+    queryClient.invalidateQueries({ queryKey: queryKeys.ticketDetail(ticketId) });
+    queryClient.invalidateQueries({ queryKey: ['ticket-detail'] });
+  }, [findCachedTicketByKeyOrId, queryClient]);
+
+  const showLabelMutationError = useCallback((error: unknown, action: 'assign' | 'unassign') => {
+    if (toast?.show) {
+      const errorMessage = error instanceof Error ? error.message : `Failed to ${action} label`;
+      const message = `Unable to ${action} label.`;
+      toast.show(errorMessage.includes('label') ? errorMessage : message, 'error');
+    }
+  }, []);
+
   const findLabelQueryKey = useCallback(
     (labelId: string) => {
-      const cachedLabelQueries = [
-        ...queryClient.getQueriesData<Label[]>({ queryKey: ['labels'] }),
-        ...queryClient.getQueriesData<Label[]>({ queryKey: ['teamLabels'] }),
-      ];
+      const labelQueries = queryClient.getQueriesData<Label[]>({ queryKey: ['labels'] }) || [];
+      const teamLabelQueries = queryClient.getQueriesData<Label[]>({ queryKey: ['teamLabels'] }) || [];
+      const cachedLabelQueries = [...labelQueries, ...teamLabelQueries];
 
       for (const [queryKey, cachedLabels] of cachedLabelQueries) {
         if (Array.isArray(cachedLabels) && cachedLabels.some((label) => label.id === labelId)) {
@@ -1542,7 +1652,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     mutationFn: async (labelInput: { name: string; color?: string; description?: string; projectId?: string; sortOrder?: number }) => {
       const projectId = labelInput.projectId || activeProjectIdRef.current;
       const cachedProjectLabels = queryClient.getQueryData<Label[]>(queryKeys.labels(projectId));
-      const existingProjectLabels = Array.isArray(cachedProjectLabels)
+      const existingProjectLabels: Label[] = Array.isArray(cachedProjectLabels)
         ? cachedProjectLabels
         : projectId === activeProjectIdRef.current
           ? labels
@@ -1640,6 +1750,18 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     mutationFn: async ({ ticketId, labelId }: { ticketId: string; labelId: string }) => {
       await apiClient.post(`/tickets/${ticketId}/labels`, { labelId });
     },
+    onMutate: ({ ticketId, labelId }) => {
+      patchTicketLabelsInCache(ticketId, labelId, true);
+      return { ticketId, labelId };
+    },
+    onError: (error, variables) => {
+      patchTicketLabelsInCache(variables.ticketId, variables.labelId, false);
+      showLabelMutationError(error, 'assign');
+      invalidateTicketDetailCaches(variables.ticketId);
+    },
+    onSuccess: (_result, variables) => {
+      invalidateTicketDetailCaches(variables.ticketId);
+    },
   });
 
   const assignLabelToTicket = useCallback(async (ticketId: string, labelId: string) => {
@@ -1656,6 +1778,18 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const unassignLabelMutation = useMutation({
     mutationFn: async ({ ticketId, labelId }: { ticketId: string; labelId: string }) => {
       await apiClient.delete(`/tickets/${ticketId}/labels/${labelId}`);
+    },
+    onMutate: ({ ticketId, labelId }) => {
+      patchTicketLabelsInCache(ticketId, labelId, false);
+      return { ticketId, labelId };
+    },
+    onError: (error, variables) => {
+      patchTicketLabelsInCache(variables.ticketId, variables.labelId, true);
+      showLabelMutationError(error, 'unassign');
+      invalidateTicketDetailCaches(variables.ticketId);
+    },
+    onSuccess: (_result, variables) => {
+      invalidateTicketDetailCaches(variables.ticketId);
     },
   });
 
