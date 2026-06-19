@@ -172,8 +172,8 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     name: session.user.name,
     email: session.user.email,
     avatar: session.user.image || '',
-    role: session.user.role || 'user',
-    tutorial_completed: (session.user as any).tutorial_completed,
+    role: 'user',
+    tutorial_completed: (session.user as typeof session.user & { tutorial_completed?: boolean }).tutorial_completed || false,
   } : null;
   const [theme, setThemeState] = useState<'dark' | 'coal-black' | 'coffee' | 'honey-glow' | 'marble-blue' | 'midnight-azure'>('dark');
 
