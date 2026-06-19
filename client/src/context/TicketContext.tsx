@@ -25,6 +25,7 @@ import {
 import { authClient } from './auth/authClient';
 import { toast } from '@library';
 import { TicketContext } from './TicketContextContext';
+import { useActiveProject } from './project/ActiveProjectContext';
 
 // Shared entity types live in src/types/domain.ts.
 export type {
@@ -161,8 +162,9 @@ export interface TicketContextType extends State {
 
 export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const queryClient = useQueryClient();
+  const { activeProjectId, setActiveProjectId, activeProjectIdRef } = useActiveProject();
+  const setActiveProjectIdState = setActiveProjectId;
   // --- Local UI States ---
-  const [activeProjectId, setActiveProjectIdState] = useState<string>('');
   const [activeTicket, setActiveTicket] = useState<Ticket | null>(null);
   const [activeView, setView] = useState<'list' | 'board'>('board');
   const [filters, setFiltersState] = useState<State['filters']>(initialFilters);
@@ -184,8 +186,14 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const sseCoalescerRef = useRef<SseEventCoalescer | null>(null);
   const pendingTicketUpdateBatchesRef = useRef(new Map<string, TicketUpdateBatch>());
   const inFlightTicketUpdateBatchesRef = useRef(new Map<string, InFlightTicketUpdateBatch>());
+
   useEffect(() => {
-    activeProjectIdRef.current = activeProjectId;
+    setFiltersState((prev) => {
+      if (prev.projectId === activeProjectId) {
+        return prev;
+      }
+      return { ...prev, projectId: activeProjectId };
+    });
   }, [activeProjectId]);
 
   useEffect(() => {
@@ -801,19 +809,6 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // --- Actions ---
 
-  const setActiveProjectId = useCallback((id: string) => {
-    if (activeProjectIdRef.current === id) {
-      return;
-    }
-
-    setActiveProjectIdState(id);
-    setFiltersState((prev) => {
-      if (prev.projectId === id) {
-        return prev;
-      }
-      return { ...prev, projectId: id };
-    });
-  }, []);
 
   const fetchInitialData = useCallback(async (userId?: string) => {
     if (!userId) {
