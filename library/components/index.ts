@@ -75,6 +75,7 @@ export * from './tabs';
 export * from './tag';
 export * from './textarea';
 export * from './textinput';
+export * from './toast';
 export * from './themetoggle';
 export * from './timeline';
 export * from './timepicker';

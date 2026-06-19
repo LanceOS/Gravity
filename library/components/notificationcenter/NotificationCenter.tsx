@@ -2,16 +2,24 @@ import React from 'react';
 import { X } from 'lucide-react';
 import { Portal } from '../../utilities';
 
+export type ToastType = 'error' | 'warning' | 'info' | 'success';
+
+export interface ToastPayload {
+  type: ToastType;
+  message: string;
+}
+
 export interface ToastItem {
   id: string;
   message: string;
-  type?: 'success' | 'error' | 'info' | 'warning';
+  type: ToastType;
 }
 
 type ToastListener = (toasts: ToastItem[]) => void;
 
 let toastListeners: ToastListener[] = [];
 let toastsGlobalStack: ToastItem[] = [];
+const DEFAULT_TOAST_DURATION = 4000;
 
 function emitToasts() {
   toastListeners.forEach((listener) => listener(toastsGlobalStack));
@@ -22,32 +30,47 @@ function dismissToast(id: string) {
   emitToasts();
 }
 
-export const toast = {
-  show(message: string, type: ToastItem['type'] = 'info', duration = 4000) {
-    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const nextToast: ToastItem = { id, message, type };
+function pushToast(type: ToastType, message: string, duration = DEFAULT_TOAST_DURATION) {
+  const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const nextToast: ToastItem = { id, message, type };
 
-    toastsGlobalStack = [...toastsGlobalStack, nextToast];
-    emitToasts();
+  toastsGlobalStack = [...toastsGlobalStack, nextToast];
+  emitToasts();
 
-    if (duration > 0) {
-      setTimeout(() => {
-        dismissToast(id);
-      }, duration);
-    }
+  if (duration > 0) {
+    setTimeout(() => {
+      dismissToast(id);
+    }, duration);
+  }
 
-    return id;
-  },
-  dismiss(id: string) {
-    dismissToast(id);
-  },
-  clear() {
-    toastsGlobalStack = [];
-    emitToasts();
-  },
+  return id;
+}
+
+interface ToastApi {
+  (input: ToastPayload): string;
+  show(message: string, type?: ToastType, duration?: number): string;
+  dismiss(id: string): void;
+  clear(): void;
+}
+
+export const toast: ToastApi = ((input: ToastPayload): string => {
+  return pushToast(input.type, input.message);
+}) as ToastApi;
+
+toast.show = (message: string, type: ToastType = 'info', duration = DEFAULT_TOAST_DURATION) => {
+  return pushToast(type, message, duration);
 };
 
-export function NotificationCenter() {
+toast.dismiss = (id: string) => {
+  dismissToast(id);
+};
+
+toast.clear = () => {
+  toastsGlobalStack = [];
+  emitToasts();
+};
+
+export function Toast() {
   const [toasts, setToasts] = React.useState<ToastItem[]>([]);
 
   React.useEffect(() => {
@@ -87,7 +110,7 @@ export function NotificationCenter() {
                 borderRadius: 'var(--radius-md)',
                 backgroundColor: 'var(--color-surface-card)',
                 border: '1px solid var(--color-border-default)',
-                borderLeft: `4px solid ${typeColors[t.type || 'info']}`,
+                borderLeft: `4px solid ${typeColors[t.type]}`,
                 boxShadow: 'var(--shadow-md)',
                 display: 'flex',
                 alignItems: 'center',
@@ -115,3 +138,5 @@ export function NotificationCenter() {
     </Portal>
   );
 }
+
+export const NotificationCenter = Toast;
