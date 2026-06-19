@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useTickets } from '../../../context/TicketContext';
+import { useTickets } from '../../../context/TicketContextContext';
 import { apiClient } from '../../../utils/apiClient';
 import { 
   Sparkles, Database, Layers, CheckCircle, Terminal, 

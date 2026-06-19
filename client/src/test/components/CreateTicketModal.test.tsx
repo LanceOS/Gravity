@@ -42,7 +42,7 @@ type MockModalProps = {
 
 const mockCreateLabel = vi.fn();
 
-vi.mock('../../context/TicketContext', () => ({
+vi.mock('../../context/TicketContextContext', () => ({
   useTickets: () => ({
     createLabel: mockCreateLabel,
   }),

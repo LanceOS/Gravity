@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { User } from '../context/TicketContext';
+import type { User } from '../context/TicketContextContext';
 import { ApiError } from '../utils/apiClient';
 import {
   workspaceDirectoryService as defaultWorkspaceDirectoryService,

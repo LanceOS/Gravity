@@ -29,7 +29,6 @@ interface UseTicketRelationActionsArgs {
   activeTicketId?: string;
   activeTicketProjectId: string;
   isAuthenticated: boolean;
-  invalidateAggregateTicketQueries?: (projectId?: string) => void;
 }
 
 export function useTicketRelationActions({
@@ -39,7 +38,6 @@ export function useTicketRelationActions({
   activeTicketId,
   activeTicketProjectId,
   isAuthenticated,
-  invalidateAggregateTicketQueries,
 }: UseTicketRelationActionsArgs) {
   const activeTicketRef = useRef<Ticket | null>(activeTicket);
   const pendingTicketRelationAddsRef = useRef(new Set<string>());
@@ -67,6 +65,8 @@ export function useTicketRelationActions({
     };
   }, []);
 
+  const previousActiveTicketDetailRef = useRef<TicketWithRelations | null>(null);
+
   // Active Ticket Detail (includes dependency and blocker relations)
   const activeTicketDetailQuery = useQuery<TicketWithRelations | null>({
     queryKey: queryKeys.ticketDetail(activeTicketId || ''),
@@ -74,7 +74,12 @@ export function useTicketRelationActions({
     enabled: !!activeTicketId && !!activeTicketProjectId && isAuthenticated,
     ...CACHE_CONFIGS.ticketDetail,
   });
-  const activeTicketDetail = activeTicketDetailQuery.data || null;
+  useEffect(() => {
+    if (activeTicketDetailQuery.data) {
+      previousActiveTicketDetailRef.current = activeTicketDetailQuery.data;
+    }
+  }, [activeTicketDetailQuery.data]);
+  const activeTicketDetail = activeTicketDetailQuery.data ?? previousActiveTicketDetailRef.current ?? null;
 
   const getTicketProjectIdForMutation = useCallback((ticketId: string) => {
     const cachedTicket = cachedTicketsById.get(ticketId);
@@ -145,14 +150,6 @@ export function useTicketRelationActions({
     queryClient.removeQueries({ queryKey, exact: true });
   }, [queryClient]);
 
-  const invalidateTicketRelationQueries = useCallback((projectIds: Array<string | undefined>) => {
-    const uniqueProjectIds = Array.from(new Set(projectIds.filter(Boolean) as string[]));
-    uniqueProjectIds.forEach((projectId) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.tickets(projectId) });
-      invalidateAggregateTicketQueries?.(projectId);
-    });
-  }, [invalidateAggregateTicketQueries, queryClient]);
-
   const handleTicketRelationMutationError = useCallback((context: TicketRelationMutationContext | undefined, message: string, shouldRollback = true) => {
     if (!shouldRollback) {
       return;
@@ -197,16 +194,24 @@ export function useTicketRelationActions({
     const ticketRelation = getCachedTicketRelation(ticketId);
 
     if (ticketDetail) {
+      const optimisticTicket = patchTicketRelation(ticketDetail, relationKey, relatedTicket, action);
       queryClient.setQueryData<TicketWithRelations>(
         ticketDetailKey,
-        patchTicketRelation(ticketDetail, relationKey, relatedTicket, action)
+        {
+          ...optimisticTicket,
+          updatedAt: new Date().toISOString(),
+        }
       );
     }
 
     if (relatedDetail) {
+      const optimisticRelatedTicket = patchTicketRelation(relatedDetail, reciprocalRelationKey, ticketRelation, action);
       queryClient.setQueryData<TicketWithRelations>(
         relatedDetailKey,
-        patchTicketRelation(relatedDetail, reciprocalRelationKey, ticketRelation, action)
+        {
+          ...optimisticRelatedTicket,
+          updatedAt: new Date().toISOString(),
+        }
       );
     }
 
@@ -234,10 +239,8 @@ export function useTicketRelationActions({
     onError: (error, _variables, context) => {
       handleTicketRelationMutationError(context, 'Failed to add dependency', !isDuplicateTicketRelationError(error));
     },
-    onSettled: (_data, _err, { ticketId, dependencyId, projectId }) => {
+    onSettled: (_data, _err, { ticketId, dependencyId }) => {
       clearPendingTicketRelationAdd(ticketId, 'dependencies', dependencyId);
-      const relatedProjectId = getTicketProjectIdForMutation(dependencyId);
-      invalidateTicketRelationQueries([projectId, relatedProjectId]);
     },
   });
 
@@ -274,10 +277,8 @@ export function useTicketRelationActions({
     onError: (_err, _variables, context) => {
       handleTicketRelationMutationError(context, 'Failed to remove dependency');
     },
-    onSettled: (_data, _err, { ticketId, dependencyId, projectId }) => {
+    onSettled: (_data, _err, { ticketId, dependencyId }) => {
       clearPendingTicketRelationAdd(ticketId, 'dependencies', dependencyId);
-      const relatedProjectId = getTicketProjectIdForMutation(dependencyId);
-      invalidateTicketRelationQueries([projectId, relatedProjectId]);
     },
   });
 
@@ -314,10 +315,8 @@ export function useTicketRelationActions({
     onError: (error, _variables, context) => {
       handleTicketRelationMutationError(context, 'Failed to add blocker', !isDuplicateTicketRelationError(error));
     },
-    onSettled: (_data, _err, { ticketId, blockerId, projectId }) => {
+    onSettled: (_data, _err, { ticketId, blockerId }) => {
       clearPendingTicketRelationAdd(ticketId, 'blockers', blockerId);
-      const relatedProjectId = getTicketProjectIdForMutation(blockerId);
-      invalidateTicketRelationQueries([projectId, relatedProjectId]);
     },
   });
 
@@ -354,10 +353,8 @@ export function useTicketRelationActions({
     onError: (_err, _variables, context) => {
       handleTicketRelationMutationError(context, 'Failed to remove blocker');
     },
-    onSettled: (_data, _err, { ticketId, blockerId, projectId }) => {
+    onSettled: (_data, _err, { ticketId, blockerId }) => {
       clearPendingTicketRelationAdd(ticketId, 'blockers', blockerId);
-      const relatedProjectId = getTicketProjectIdForMutation(blockerId);
-      invalidateTicketRelationQueries([projectId, relatedProjectId]);
     },
   });
 

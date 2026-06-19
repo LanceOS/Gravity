@@ -1,6 +1,7 @@
 export type SseCoalescedEvent = {
   type: string;
   ticketKey?: string;
+  ticketId?: string;
   projectId?: string;
   data?: Record<string, unknown>;
 };
@@ -73,7 +74,7 @@ export class SseEventCoalescer {
   }
 
   private buildEventKey(event: SseCoalescedEvent): string {
-    const key = event.ticketKey ?? '';
+    const key = event.ticketId ?? event.ticketKey ?? '';
     const projectId = event.projectId ?? '';
     return `${event.type}::${projectId}::${key}`;
   }

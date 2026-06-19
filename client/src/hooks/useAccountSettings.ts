@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { User } from '../context/TicketContext';
+import type { User } from '../context/TicketContextContext';
 import {
   API_KEY_MASK,
   getProviderOption,

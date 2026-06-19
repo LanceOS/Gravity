@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { TicketProvider, useTickets } from '../../context/TicketContext.tsx';
+import { TicketProvider } from '../../context/TicketContext.tsx';
+import { useTickets } from '../../context/TicketContextContext';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 

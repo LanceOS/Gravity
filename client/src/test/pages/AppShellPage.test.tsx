@@ -64,7 +64,7 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
-vi.mock('../../context/TicketContext', () => ({
+vi.mock('../../context/TicketContextContext', () => ({
   useTickets: mocks.useTickets,
 }));
 

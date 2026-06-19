@@ -1,6 +1,6 @@
 import { type JSX, type ReactNode } from 'react';
 
-import type { Label, Project } from '../../../context/TicketContext';
+import type { Label, Project } from '../../../context/TicketContextContext';
 import type { WorkspaceProjectPanelProps } from '../types/WorkspaceProjectPanel';
 import { WorkspaceProjectPanelActionsContextProvider } from './WorkspaceProjectPanelActionsContext';
 import { WorkspaceProjectPanelLabelStateProvider } from './WorkspaceProjectPanelLabelStateContext';

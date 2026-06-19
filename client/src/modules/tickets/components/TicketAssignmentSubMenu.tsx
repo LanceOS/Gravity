@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ContextMenu } from '@library';
-import type { Ticket } from '../../../context/TicketContext';
+import type { Ticket } from '../../../context/TicketContextContext';
 import { buildSearchableText, normalizeSearchTerm } from '../../../utils/search';
 
 export interface TicketAssignmentSubMenuProps {

@@ -1,7 +1,7 @@
 import React, { memo } from 'react';
 import { ContextMenu } from '@library';
 import { Check, User as UserIcon, FolderKanban, Activity, Tag, Calendar, Plus, ArrowDown, ArrowUp } from 'lucide-react';
-import type { Cycle, Label, Project, Ticket, User } from '../../../context/TicketContext';
+import type { Cycle, Label, Project, Ticket, User } from '../../../context/TicketContextContext';
 import { getPriorityIcon, getStatusColor, PRIORITY_OPTIONS, STATUS_OPTIONS, type TicketFilters } from '../../tickets';
 
 interface WorkspacePageContextMenuProps {

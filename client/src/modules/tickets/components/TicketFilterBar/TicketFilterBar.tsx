@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Filter } from 'lucide-react';
-import type { Ticket } from '../../../../context/TicketContext';
+import type { Ticket } from '../../../../context/TicketContextContext';
 import type { TicketFilters, TicketListSort } from '../../utils/ticketView';
 import { Button, Select, DenseTextInput, Popover, Badge } from '@library';
 import {

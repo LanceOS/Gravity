@@ -1,4 +1,4 @@
-import type { Cycle, Label, Project, User } from '../../../context/TicketContext';
+import type { Cycle, Label, Project, User } from '../../../context/TicketContextContext';
 import type { TicketFilters } from '../../../modules/tickets';
 
 export interface SidebarWorkspaceOption {

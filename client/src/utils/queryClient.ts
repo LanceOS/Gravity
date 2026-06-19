@@ -1,5 +1,9 @@
 import { QueryClient } from '@tanstack/react-query';
 
+type MutableQueryKey = unknown[];
+
+const toMutableQueryKey = <T extends MutableQueryKey>(queryKey: T): MutableQueryKey => [...queryKey];
+
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -15,7 +19,7 @@ export const CACHE_CONFIGS = {
     gcTime: 5 * 60 * 1000,
   },
   ticketDetail: {
-    staleTime: 60 * 1000,
+    staleTime: Number.POSITIVE_INFINITY,
     gcTime: 10 * 60 * 1000,
   },
   workspaceMembers: {
@@ -53,23 +57,23 @@ export const CACHE_CONFIGS = {
 };
 
 export const queryKeys = {
-  users: () => ['users'] as const,
-  projects: (userId?: string) => ['projects', { userId }] as const,
-  tickets: (projectId: string) => ['tickets', { projectId }] as const,
-  ticket: (ticketKey: string, userId?: string) => ['tickets', 'detail', ticketKey, { userId }] as const,
-  ticketRelations: (ticketKey: string, userId?: string) => ['tickets', 'relations', ticketKey, { userId }] as const,
-  ticketDetails: () => ['ticket-detail'] as const,
-  ticketDetail: (ticketId: string) => ['ticket-detail', ticketId] as const,
-  comments: (ticketId: string) => ['comments', { ticketId }] as const,
-  labels: (projectId: string) => ['labels', { projectId }] as const,
-  cycles: (projectId: string) => ['cycles', { projectId }] as const,
-  notes: (projectId: string) => ['notes', { projectId }] as const,
-  note: (noteId: string, projectId?: string) => ['notes', 'detail', noteId, { projectId }] as const,
-  workspaceSettings: (workspaceId: string) => ['workspace', workspaceId, 'settings'] as const,
-  workspaceMembers: (workspaceId: string) => ['workspace', workspaceId, 'members'] as const,
-  workspaceInvites: (workspaceId: string) => ['workspace', workspaceId, 'invites'] as const,
-  workspaceJoinRequests: (workspaceId: string) => ['workspace', workspaceId, 'joinRequests'] as const,
-  workspaceSidebarTree: (workspaceId: string) => ['workspace', workspaceId, 'sidebar'] as const,
-  mcpTools: (workspaceId: string) => ['ai', 'mcp', 'tools', { workspaceId }] as const,
-  ollamaModels: (ollamaUrl: string) => ['ai', 'ollama', 'models', { ollamaUrl }] as const,
+  users: () => toMutableQueryKey(['users']),
+  projects: (userId?: string) => toMutableQueryKey(['projects', { userId }]),
+  tickets: (projectId: string) => toMutableQueryKey(['tickets', { projectId }]),
+  ticket: (ticketKey: string, userId?: string) => toMutableQueryKey(['tickets', 'detail', ticketKey, { userId }]),
+  ticketRelations: (ticketKey: string, userId?: string) => toMutableQueryKey(['tickets', 'relations', ticketKey, { userId }]),
+  ticketDetails: () => toMutableQueryKey(['ticket-detail']),
+  ticketDetail: (ticketId: string) => toMutableQueryKey(['ticket-detail', ticketId]),
+  comments: (ticketId: string) => toMutableQueryKey(['comments', { ticketId }]),
+  labels: (projectId: string) => toMutableQueryKey(['labels', { projectId }]),
+  cycles: (projectId: string) => toMutableQueryKey(['cycles', { projectId }]),
+  notes: (projectId: string) => toMutableQueryKey(['notes', { projectId }]),
+  note: (noteId: string, projectId?: string) => toMutableQueryKey(['notes', 'detail', noteId, { projectId }]),
+  workspaceSettings: (workspaceId: string) => toMutableQueryKey(['workspace', workspaceId, 'settings']),
+  workspaceMembers: (workspaceId: string) => toMutableQueryKey(['workspace', workspaceId, 'members']),
+  workspaceInvites: (workspaceId: string) => toMutableQueryKey(['workspace', workspaceId, 'invites']),
+  workspaceJoinRequests: (workspaceId: string) => toMutableQueryKey(['workspace', workspaceId, 'joinRequests']),
+  workspaceSidebarTree: (workspaceId: string) => toMutableQueryKey(['workspace', workspaceId, 'sidebar']),
+  mcpTools: (workspaceId: string) => toMutableQueryKey(['ai', 'mcp', 'tools', { workspaceId }]),
+  ollamaModels: (ollamaUrl: string) => toMutableQueryKey(['ai', 'ollama', 'models', { ollamaUrl }]),
 };

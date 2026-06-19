@@ -1,4 +1,4 @@
-import type { Comment, Cycle, Label, Project, Ticket, User } from '../../../context/TicketContext';
+import type { Comment, Cycle, Label, Project, Ticket, User } from '../../../context/TicketContextContext';
 
 export interface TicketDetailProps {
   activeTicket: Ticket;
@@ -15,7 +15,7 @@ export interface TicketDetailProps {
   parentTicket?: Ticket | null;
   activeTicketDetail: Ticket | null;
   onSelectTicket: (ticket: Ticket | null) => void;
-  onUpdateTicket: (id: string, updates: Partial<Ticket>) => Promise<void>;
+  onUpdateTicket: (id: string, updates: Partial<Ticket>, options?: { immediate?: boolean }) => Promise<void>;
   onDeleteTicket: (ticketId: string) => Promise<void>;
   onAddComment: (ticketId: string, body: string) => Promise<void>;
   onUpdateComment: (ticketId: string, commentId: string, body: string) => Promise<void>;

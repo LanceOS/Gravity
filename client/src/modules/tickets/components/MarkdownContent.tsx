@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { CheckSquare, Square } from 'lucide-react';
 import type { MarkdownTextProps } from '../types/TicketDetail';
-import { useTickets } from '../../../context/TicketContext';
+import { useTickets } from '../../../context/TicketContextContext';
 import { useTicketByKey } from '../../../hooks/useTicketByKey';
 import { getStatusColor } from '../utils/TicketDetail';
 import { renderRichTextHtml } from '@library';

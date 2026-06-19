@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Compass, PlusCircle } from 'lucide-react';
 import { Button } from '@library';
-import type { Ticket } from '../../../context/TicketContext';
+import type { Ticket } from '../../../context/TicketContextContext';
 import { TicketRowMobile } from './TicketRowMobile/TicketRowMobile';
 import { TicketRow } from './TicketRow';
 import { TicketContextMenu } from './TicketContextMenu';

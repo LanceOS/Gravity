@@ -21,7 +21,7 @@ function createJsonResponse(body: unknown, ok = true) {
   };
 }
 
-vi.mock('../../context/TicketContext', () => ({
+vi.mock('../../context/TicketContextContext', () => ({
   useTickets: mocks.useTickets,
 }));
 

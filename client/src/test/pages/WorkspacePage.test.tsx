@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { WorkspacePage } from '../../pages/WorkspacePage/WorkspacePage.tsx';
-import type { Cycle, Domain, Project, Ticket } from '../../context/TicketContext.tsx';
+import type { Cycle, Domain, Project, Ticket } from '../../context/TicketContextContext';
 
 type TicketBoardMockProps = {
 };

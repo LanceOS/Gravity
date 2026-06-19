@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { MarkdownContent } from '../../modules/tickets/components/MarkdownContent';
 import { FormattedMarkdown } from '../../../../library/components/aichat/FormattedMarkdown';
 
-vi.mock('../../context/TicketContext', () => ({
+vi.mock('../../context/TicketContextContext', () => ({
   useTickets: () => ({
     projects: [],
     ticketMap: new Map(),

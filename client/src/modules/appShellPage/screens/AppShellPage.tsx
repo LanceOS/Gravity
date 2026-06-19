@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 
 import { AuthScreen } from '../../auth';
 import { OnboardingModal } from '../../onboarding';
-import { useTickets } from '../../../context/TicketContext';
+import { useTickets } from '../../../context/TicketContextContext';
 import { useWorkspaceDirectory } from '../../../hooks/useWorkspaceDirectory';
 import { LoadingPage } from '../../loadingPage';
 import { WorkspaceDirectoryPage } from '../../workspaceDirectoryPage';

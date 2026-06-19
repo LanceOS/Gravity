@@ -1,4 +1,4 @@
-import type { Project } from '../../../context/TicketContext';
+import type { Project } from '../../../context/TicketContextContext';
 import type { ProjectSettingsFeedback } from '../types/WorkspaceProjectPanel';
 import { sanitizeProjectKey, type GithubRepoValidationResult, validateGithubRepoUrl } from '../../../utils/project';
 

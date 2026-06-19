@@ -1,4 +1,4 @@
-import type { Ticket } from '../../../context/TicketContext';
+import type { Ticket } from '../../../context/TicketContextContext';
 import type { TicketListSort } from './ticketView';
 import {
   LIST_SORT_OPTIONS,

@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 
-import type { Ticket } from '../../../context/TicketContext';
+import type { Ticket } from '../../../context/TicketContextContext';
 
 interface UseWorkspaceCreateTicketDialogArgs {
   hasActiveWorkspaceProjects: boolean;

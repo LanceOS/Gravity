@@ -19,7 +19,7 @@ export function useQueryCacheString({ key }: UseQueryCacheStringArgs): UseQueryC
       return null;
     }
 
-    return queryClient.getQueryData<string>(key) ?? null;
+    return queryClient.getQueryData<string>([...key]) ?? null;
   }, [key, queryClient]);
 
   const writeValue = useCallback((value: string | null) => {
@@ -27,9 +27,8 @@ export function useQueryCacheString({ key }: UseQueryCacheStringArgs): UseQueryC
       return;
     }
 
-    queryClient.setQueryData<string | null>(key, value);
+    queryClient.setQueryData<string | null>([...key], value);
   }, [key, queryClient]);
 
   return { readValue, writeValue };
 }
-

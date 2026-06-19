@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import type { Project, Ticket } from '../../context/TicketContext';
+import type { Project, Ticket } from '../../context/TicketContextContext';
 import './Breadcrumbs.css';
 
 interface BreadcrumbsProps {

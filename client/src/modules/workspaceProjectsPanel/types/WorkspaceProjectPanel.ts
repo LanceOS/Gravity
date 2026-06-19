@@ -1,4 +1,4 @@
-import type { Label, Project } from '../../../context/TicketContext';
+import type { Label, Project } from '../../../context/TicketContextContext';
 
 export interface WorkspaceProjectPanelProps {
   workspaceName: string;

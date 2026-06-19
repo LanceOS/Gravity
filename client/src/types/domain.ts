@@ -5,8 +5,9 @@ export type { Label };
  * Shared entity types for the app's data model.
  *
  * These types reflect the backend API contract and are intentionally decoupled
- * from React context machinery. Import from here (or from `src/context/TicketContext`
- * which re-exports everything) — both paths resolve identically.
+ * from React context machinery. Import from here (or from
+ * `src/context/TicketContextContext` for context-related usage) — both paths
+ * resolve identically for type usage.
  */
 
 export interface User {
@@ -116,6 +117,7 @@ export interface Comment {
   userId: string;
   body: string;
   createdAt: string;
+  updatedAt?: string;
   userName?: string;
   userAvatar?: string;
   author?: {

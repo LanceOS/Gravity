@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useTickets } from '../context/TicketContext';
+import { useTickets } from '../context/TicketContextContext';
 import { queryKeys, CACHE_CONFIGS } from '../utils/queryClient';
 
 /**

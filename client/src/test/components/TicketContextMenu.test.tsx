@@ -2,7 +2,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { TicketContextMenu } from '../../modules/tickets/components/TicketContextMenu';
-import { TicketContext, type Ticket, type Project } from '../../context/TicketContext';
+import { TicketContext, type Ticket, type Project } from '../../context/TicketContextContext';
 
 const ticket: Ticket = {
   id: 'ticket-1',

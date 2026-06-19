@@ -1,7 +1,7 @@
 import { type ComponentType, type CSSProperties } from 'react';
 import type { LucideProps } from 'lucide-react';
 import { GitBranchPlus, GitMergeConflict } from 'lucide-react';
-import type { Ticket } from '../../../context/TicketContext';
+import type { Ticket } from '../../../context/TicketContextContext';
 
 interface TicketRelationIndicatorsProps {
   ticket: Pick<Ticket, 'isBlocked' | 'isDependency'>;

@@ -1,4 +1,4 @@
-import type { User } from '../../../context/TicketContext';
+import type { User } from '../../../context/TicketContextContext';
 
 export interface EmptyWorkspaceScreenProps {
   currentUser: User;

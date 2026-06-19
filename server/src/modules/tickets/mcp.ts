@@ -220,6 +220,7 @@ export class TicketTools {
       mcpEventBus.publish({
         ...baseEvent,
         type: 'ticket.created',
+        data: { ticket },
       });
 
       if (ticket.parentId) {
@@ -262,15 +263,15 @@ export class TicketTools {
     }
 
     mcpEventBus.publish({
-      type: 'ticket.deleted',
-      workspaceId: scope.workspaceId,
-      projectId: ticket.projectId,
-      teamId: scope.teamId,
-      ticketKey,
-      actorUserId: context.actorUserId,
-      timestamp: new Date().toISOString(),
-      data: { ticketId: ticket.id },
-    });
+        type: 'ticket.deleted',
+        workspaceId: scope.workspaceId,
+        projectId: ticket.projectId,
+        teamId: scope.teamId,
+        ticketKey,
+        actorUserId: context.actorUserId,
+        timestamp: new Date().toISOString(),
+        data: { ticketId: ticket.id, ticket },
+      });
 
     return { success: true };
   }
@@ -324,6 +325,7 @@ export class TicketTools {
         ticketKey,
         actorUserId: context.actorUserId,
         timestamp: new Date().toISOString(),
+        data: { ticket: updated },
       });
     }
 
@@ -779,7 +781,12 @@ export class TicketTools {
         ticketKey: ticket.key,
         actorUserId: context.actorUserId,
         timestamp: new Date().toISOString(),
-        data: { commentId: comment.id },
+        data: {
+          comment,
+          commentId: comment?.id,
+          ticketId: ticket.id,
+          ticketKey: ticket.key,
+        },
       });
     }
 
@@ -828,7 +835,11 @@ export class TicketTools {
           ticketKey: ticket.key,
           actorUserId: context.actorUserId,
           timestamp: new Date().toISOString(),
-          data: { commentId },
+          data: {
+            commentId,
+            ticketId: ticket.id,
+            ticketKey: ticket.key,
+          },
         });
       }
     }
@@ -865,7 +876,12 @@ export class TicketTools {
           ticketKey: ticket.key,
           actorUserId: context.actorUserId,
           timestamp: new Date().toISOString(),
-          data: { commentId },
+          data: {
+            comment,
+            commentId: comment.id,
+            ticketId: ticket.id,
+            ticketKey: ticket.key,
+          },
         });
       }
     }

@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
   registerWebMCPTools: vi.fn(() => null),
 }));
 
-vi.mock('../../context/TicketContext', () => ({
+vi.mock('../../context/TicketContextContext', () => ({
   useTickets: mocks.useTickets,
 }));
 

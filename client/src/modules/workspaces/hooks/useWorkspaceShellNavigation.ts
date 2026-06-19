@@ -4,7 +4,7 @@ import type { NavigateFunction } from 'react-router-dom';
 
 import { buildProjectScopedPath } from '../../../utils/workspace';
 import type { AppShellRouteState } from '../../../modules/workspaceShellPage/hooks/useAppShellRoute';
-import type { Ticket } from '../../../context/TicketContext';
+import type { Ticket } from '../../../context/TicketContextContext';
 import { type SidebarNavigationState } from '../../../components/Sidebar';
 import type { Project } from '../../../types/domain';
 
@@ -72,7 +72,7 @@ export function useWorkspaceShellNavigation({
   const projectWorkspaceById = useMemo(() => {
     const map = new Map<string, string>();
     for (const project of projects) {
-      map.set(project.id, project.workspaceId);
+      map.set(project.id, project.workspaceId || '');
     }
     return map;
   }, [projects]);

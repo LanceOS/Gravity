@@ -1,4 +1,4 @@
-import type { User } from '../../../context/TicketContext';
+import type { User } from '../../../context/TicketContextContext';
 import type { WorkspaceSummary } from '../../../hooks/useWorkspaceDirectory';
 import type {
   CreateWorkspaceInviteInput,

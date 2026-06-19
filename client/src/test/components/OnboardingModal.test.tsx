@@ -31,7 +31,7 @@ type MockLayoutProps = HTMLAttributes<HTMLDivElement> & {
   justify?: string;
 };
 
-vi.mock('../../context/TicketContext', () => ({
+vi.mock('../../context/TicketContextContext', () => ({
   useTickets: mocks.useTickets,
 }));
 

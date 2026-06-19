@@ -1,4 +1,4 @@
-import type { Cycle, Label, Project, Ticket, User } from '../../../context/TicketContext';
+import type { Cycle, Label, Project, Ticket, User } from '../../../context/TicketContextContext';
 import { normalizeSearchTerm, normalizeSearchToken } from '../../../utils/search';
 import { BOARD_COLUMNS, LIST_STATUS_ORDER } from '../../../utils/ticketOptions';
 

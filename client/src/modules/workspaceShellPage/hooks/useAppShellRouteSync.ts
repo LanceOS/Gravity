@@ -1,6 +1,6 @@
 import { useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
 import type { SidebarNavigationState } from '../../../components/Sidebar';
-import type { Ticket, TicketFiltersState } from '../../../context/TicketContext';
+import type { Ticket, TicketFiltersState } from '../../../context/TicketContextContext';
 import type { AppSection } from '../types/AppShell';
 import type { AppShellRouteState } from './useAppShellRoute';
 

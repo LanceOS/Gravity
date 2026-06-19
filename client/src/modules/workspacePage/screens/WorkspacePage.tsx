@@ -1,6 +1,6 @@
 import { useMemo, useCallback, useState } from 'react';
 import { Button, Timeline, createEmptyRichTextValue, ContextMenu } from '@library';
-import type { Cycle, Label, Project, Ticket, User } from '../../../context/TicketContext';
+import type { Cycle, Label, Project, Ticket, User } from '../../../context/TicketContextContext';
 import {
   filterTickets,
   getWorkspaceHeaderTitle,
@@ -55,7 +55,7 @@ interface WorkspacePageProps {
   onSetFilters: (filters: Partial<TicketFilters>) => void;
   onSetListSort: (sort: TicketListSort) => void;
   onSetView: (view: 'board' | 'list') => void;
-  onUpdateTicket: (id: string, updates: Partial<Ticket>) => Promise<void>;
+  onUpdateTicket: (id: string, updates: Partial<Ticket>, options?: { immediate?: boolean }) => Promise<void>;
   onLoadMoreTickets?: () => void;
   hasMoreTickets?: boolean;
   isLoadingMoreTickets?: boolean;
@@ -436,7 +436,7 @@ export function WorkspacePage({
                               ticketsByColumn={groupedTickets}
                               availableTickets={filteredTickets}
                               userAvatarById={userAvatarById}
-                              onMoveTicket={onUpdateTicket}
+                              onMoveTicket={(ticketId, updates) => onUpdateTicket(ticketId, updates, { immediate: true })}
                               onSelectTicket={onSelectTicket}
                               onOpenCreateTicket={onOpenCreateTicket}
                               onLoadMore={onLoadMoreTickets}
