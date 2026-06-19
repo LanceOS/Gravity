@@ -331,6 +331,7 @@ interface UseQueryOptions<T> {
   enabled?: boolean;
   staleTime?: number;
   gcTime?: number;
+  retry?: boolean | number | ((failureCount: number, error: any) => boolean);
 }
 
 interface UseIsFetchingOptions {
