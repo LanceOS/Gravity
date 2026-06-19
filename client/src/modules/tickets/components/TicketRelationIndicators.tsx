@@ -1,6 +1,6 @@
 import { type ComponentType, type CSSProperties } from 'react';
 import type { LucideProps } from 'lucide-react';
-import { OctagonAlert, Waypoints } from 'lucide-react';
+import { GitBranchPlus, GitMergeConflict } from 'lucide-react';
 import type { Ticket } from '../../../context/TicketContext';
 
 interface TicketRelationIndicatorsProps {
@@ -18,12 +18,12 @@ const CHIP_STYLES = {
   blocked: {
     color: 'var(--color-text-error)',
     title: 'Blocked',
-    icon: OctagonAlert,
+    icon: GitMergeConflict,
   },
   dependency: {
     color: 'var(--color-accent)',
     title: 'Blocking',
-    icon: Waypoints,
+    icon: GitBranchPlus,
   },
 } as const;
 
