@@ -1,5 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo, useSyncExternalStore } from 'react';
 
+export function keepPreviousData<T>(_data: T): T {
+  return _data;
+}
+
 // --- Types ---
 
 export type QueryKey = readonly unknown[];

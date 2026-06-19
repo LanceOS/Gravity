@@ -1,7 +1,7 @@
 import type { ComponentType } from 'react';
 
 import type { AIProvider, SavedApiCredential, WorkspaceSettings } from '../../../utils/settings';
-import type { User } from '../../../context/TicketContext';
+import type { User } from '../../../context/TicketContextContext';
 
 export type SettingsCategoryId = 'general' | 'providers' | 'ollama' | 'onboarding';
 

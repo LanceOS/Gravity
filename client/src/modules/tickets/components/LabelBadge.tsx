@@ -1,6 +1,6 @@
 import React from 'react';
 import { X } from 'lucide-react';
-import type { Label } from '../../../context/TicketContext';
+import type { Label } from '../../../context/TicketContextContext';
 
 interface LabelBadgeProps {
   label: Label;

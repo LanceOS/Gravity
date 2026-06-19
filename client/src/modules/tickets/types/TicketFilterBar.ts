@@ -1,4 +1,4 @@
-import type { Label, Cycle, User } from '../../../context/TicketContext';
+import type { Label, Cycle, User } from '../../../context/TicketContextContext';
 import type { TicketFilters, TicketListSort } from '../utils/ticketView';
 
 export interface TicketFilterBarProps {

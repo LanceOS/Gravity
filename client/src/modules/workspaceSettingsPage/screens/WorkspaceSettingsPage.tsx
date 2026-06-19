@@ -6,7 +6,7 @@ import { OnboardingModal } from '../../onboarding';
 import { useAccountSettings } from '../../../hooks/useAccountSettings';
 import { useWorkspaceDirectory } from '../../../hooks/useWorkspaceDirectory';
 import { useWorkspaceSettings } from '../../../hooks/useWorkspaceSettings';
-import { useTickets } from '../../../context/TicketContext';
+import { useTickets } from '../../../context/TicketContextContext';
 import { LoadingPage } from '../../../pages/LoadingPage/LoadingPage';
 
 export function WorkspaceSettingsPageRoute() {

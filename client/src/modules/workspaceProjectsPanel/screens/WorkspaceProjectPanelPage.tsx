@@ -1,6 +1,6 @@
 import { Button } from '@library';
 import { FolderKanban, Sparkles } from 'lucide-react';
-import type { Project } from '../../../context/TicketContext';
+import type { Project } from '../../../context/TicketContextContext';
 import type { WorkspaceProjectPanelProps } from '../types/WorkspaceProjectPanel';
 import { ProjectCreateOverlay } from '../../../components/WorkspaceProjectPanel';
 import { WorkspacePageLayout } from '../../../layouts/WorkspacePageLayout/WorkspacePageLayout';

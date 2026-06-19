@@ -1,4 +1,4 @@
-import type { Project, Ticket, User } from '../../../context/TicketContext';
+import type { Project, Ticket, User } from '../../../context/TicketContextContext';
 import type { WorkspaceSettings } from '../../../utils/settings';
 
 export interface LocalAIChatProps {

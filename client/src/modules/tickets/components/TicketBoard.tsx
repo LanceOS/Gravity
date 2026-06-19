@@ -1,5 +1,5 @@
 import React, { DragEvent, useCallback, useEffect, useMemo, useState } from 'react';
-import type { Ticket } from '../../../context/TicketContext';
+import type { Ticket } from '../../../context/TicketContextContext';
 import { BOARD_COLUMNS } from '../utils/ticketView';
 import { Button, KanbanBoard, Flex } from '@library';
 import { Plus } from 'lucide-react';

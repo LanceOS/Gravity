@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, queryKeys, CACHE_CONFIGS } from '../utils/queryClient';
 import { ApiError, apiClient } from '../utils/apiClient';
-import type { User } from '../context/TicketContext';
+import type { User } from '../context/TicketContextContext';
 import type { WorkspaceJoinMode } from './useWorkspaceDirectory';
 
 export interface WorkspaceAdminSettings {

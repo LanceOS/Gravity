@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import { useTickets } from '../context/TicketContext';
+import { useTickets } from '../context/TicketContextContext';
 import { AuthScreen } from '../modules/auth';
 import { LoadingPage } from '../pages/LoadingPage/LoadingPage';
 

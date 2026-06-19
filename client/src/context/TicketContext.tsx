@@ -1,13 +1,14 @@
 import { apiClient } from '../utils/apiClient';
-import React, { createContext, useContext, useEffect, useCallback, useMemo, useState, useRef } from 'react';
+import React, { useEffect, useCallback, useMemo, useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys, CACHE_CONFIGS } from '../utils/queryClient';
 import { disposeSseService, getSseService } from '../services/sseService';
 import { SseEventCoalescer, type SseCoalescedEvent } from '../services/SseEventCoalescer';
 import { useMoveTicket } from './useMoveTicket';
 import { useTicketRelationActions } from '../hooks/useTicketRelationActions';
-import type { TicketWithRelations } from '../modules/tickets/utils/ticketRelations';
+import { mergeTicketRelationSnapshot, type TicketWithRelations } from '../modules/tickets/utils/ticketRelations';
 import { toast } from '@library';
+import { TicketContext } from './TicketContextContext';
 
 // Shared entity types live in src/types/domain.ts.
 export type {
@@ -20,7 +21,7 @@ export type {
   Comment,
   CreateProjectInput,
 } from '../types/domain';
-import type { User, Project, Domain, Label, Cycle, Ticket, Comment, CreateProjectInput } from '../types/domain';
+import type { User, Project, Label, Cycle, Ticket, Comment, CreateProjectInput } from '../types/domain';
 
 interface State {
   tickets: Ticket[];
@@ -77,7 +78,6 @@ const initialFilters = {
 };
 
 const CURRENT_USER_STORAGE_KEY = 'gravity_user';
-
 function writeStoredUser(value: User | null) {
   if (typeof window === 'undefined') {
     return;
@@ -111,18 +111,11 @@ function readStoredUser(): User | null {
     return null;
   }
 
-  let rawUser: string | null = null;
   try {
-    rawUser = window.localStorage.getItem(CURRENT_USER_STORAGE_KEY);
-  } catch {
-    return null;
-  }
-
-  if (!rawUser) {
-    return null;
-  }
-
-  try {
+    const rawUser = window.localStorage.getItem(CURRENT_USER_STORAGE_KEY);
+    if (!rawUser) {
+      return null;
+    }
     const parsedUser = JSON.parse(rawUser) as Record<string, unknown>;
     if (typeof parsedUser.id !== 'string' || typeof parsedUser.name !== 'string' || typeof parsedUser.email !== 'string') {
       clearStoredUser();
@@ -186,6 +179,207 @@ function hasEquivalentTicketFields(left: Ticket, right: Ticket) {
   );
 }
 
+function patchTicketInListById(
+  list: readonly Ticket[] | undefined,
+  ticketId: string,
+  updates: Partial<Ticket>,
+): Ticket[] | undefined {
+  if (!list) {
+    return undefined;
+  }
+
+  const index = list.findIndex((ticket) => ticket.id === ticketId);
+  if (index === -1) {
+    return [...list];
+  }
+
+  const existingTicket = list[index];
+  const nextTicket: Ticket = {
+    ...existingTicket,
+    ...updates,
+  };
+
+  if (hasEquivalentTicketFields(existingTicket, nextTicket)) {
+    return [...list];
+  }
+
+  const next = [...list];
+  next[index] = nextTicket;
+  return next;
+}
+
+function normalizeTicketPayload(value: unknown): Ticket | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+
+  const data = value as Record<string, unknown>;
+  const id = typeof data.id === 'string' ? data.id.trim() : '';
+  const key = typeof data.key === 'string' ? data.key.trim().toUpperCase() : '';
+  const projectId = typeof data.projectId === 'string' ? data.projectId.trim() : '';
+
+  if (!id || !key || !projectId) {
+    return null;
+  }
+
+  const statusValue = typeof data.status === 'string' ? data.status.toLowerCase() : 'todo';
+  const priorityValue = typeof data.priority === 'string' ? data.priority.toLowerCase() : 'no_priority';
+  const prStatusValue = typeof data.prStatus === 'string' ? data.prStatus.toLowerCase() : 'none';
+
+  const statusSet = new Set(['backlog', 'todo', 'in_progress', 'in_review', 'done', 'canceled']);
+  const prioritySet = new Set(['no_priority', 'low', 'medium', 'high', 'urgent']);
+  const prStatusSet = new Set(['open', 'merged', 'closed', 'none']);
+
+  return {
+    id,
+    key,
+    title: typeof data.title === 'string' ? data.title : '',
+    description: typeof data.description === 'string' ? data.description : '',
+    status: statusSet.has(statusValue) ? (statusValue as Ticket['status']) : 'todo',
+    priority: prioritySet.has(priorityValue) ? (priorityValue as Ticket['priority']) : 'no_priority',
+    assigneeId: typeof data.assigneeId === 'string' ? data.assigneeId : null,
+    projectId,
+    domainId: typeof data.domainId === 'string' ? data.domainId : null,
+    cycleId: typeof data.cycleId === 'string' ? data.cycleId : null,
+    parentId: typeof data.parentId === 'string' ? data.parentId : null,
+    isBlocked: typeof data.isBlocked === 'boolean' ? data.isBlocked : false,
+    isDependency: typeof data.isDependency === 'boolean' ? data.isDependency : false,
+    prStatus: prStatusSet.has(prStatusValue) ? (prStatusValue as Ticket['prStatus']) : 'none',
+    prUrl: typeof data.prUrl === 'string' ? data.prUrl : null,
+    branchName: typeof data.branchName === 'string' ? data.branchName : undefined,
+    createdAt: typeof data.createdAt === 'string' ? data.createdAt : new Date().toISOString(),
+    updatedAt: typeof data.updatedAt === 'string' ? data.updatedAt : new Date().toISOString(),
+    labels: Array.isArray((data as { labels?: unknown }).labels)
+      ? ((data as { labels: unknown[] }).labels.filter((label) => {
+          if (!label || typeof label !== 'object') {
+            return false;
+          }
+          const maybeLabel = label as { id?: unknown; name?: unknown; color?: unknown; sortOrder?: unknown; description?: unknown; teamId?: unknown; projectId?: unknown };
+          return typeof maybeLabel.id === 'string' && typeof maybeLabel.name === 'string';
+        }) as Label[])
+      : undefined,
+    labelIds: Array.isArray((data as { labelIds?: unknown }).labelIds)
+      ? ((data as { labelIds: unknown[] }).labelIds.filter((id): id is string => typeof id === 'string'))
+      : undefined,
+    dependencies: Array.isArray((data as { dependencies?: unknown }).dependencies)
+      ? ((data as { dependencies: unknown[] }).dependencies as Ticket['dependencies'])
+      : undefined,
+    blockers: Array.isArray((data as { blockers?: unknown }).blockers)
+      ? ((data as { blockers: unknown[] }).blockers as Ticket['blockers'])
+      : undefined,
+  };
+}
+
+function normalizeCommentPayload(value: unknown): Comment | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+
+  const data = value as Record<string, unknown>;
+  const id = typeof data.id === 'string' ? data.id.trim() : '';
+  const ticketId = typeof data.ticketId === 'string' ? data.ticketId.trim() : '';
+  const userId = typeof data.userId === 'string' ? data.userId.trim() : '';
+
+  if (!id || !ticketId || !userId) {
+    return null;
+  }
+
+  const author =
+    data.author && typeof data.author === 'object'
+      ? (() => {
+        const authorData = data.author as Record<string, unknown>;
+        const authorId = typeof authorData.id === 'string' ? authorData.id : userId;
+        const authorUsername = typeof authorData.username === 'string' ? authorData.username : '';
+        const authorAvatar =
+          typeof authorData.avatar_url === 'string'
+            ? authorData.avatar_url
+            : typeof authorData.avatarUrl === 'string'
+              ? authorData.avatarUrl
+              : undefined;
+        const authorRole = typeof authorData.role === 'string' ? authorData.role : undefined;
+
+        return {
+          id: authorId,
+          username: authorUsername,
+          avatar_url: authorAvatar,
+          role: authorRole,
+        };
+      })()
+      : undefined;
+
+  return {
+    id,
+    ticketId,
+    userId,
+    body: typeof data.body === 'string' ? data.body : '',
+    createdAt: typeof data.createdAt === 'string' ? data.createdAt : new Date().toISOString(),
+    updatedAt: typeof data.updatedAt === 'string'
+      ? data.updatedAt
+      : typeof data.createdAt === 'string'
+        ? data.createdAt
+        : new Date().toISOString(),
+    userName: typeof data.userName === 'string' ? data.userName : undefined,
+    userAvatar: typeof data.userAvatar === 'string' ? data.userAvatar : undefined,
+    author,
+  };
+}
+
+function getListQueryProjectId(queryKey: unknown[]): string | undefined {
+  const maybeMeta = queryKey[1];
+  if (!maybeMeta || typeof maybeMeta !== 'object' || Array.isArray(maybeMeta)) {
+    return undefined;
+  }
+
+  const meta = maybeMeta as { projectId?: unknown };
+  return typeof meta.projectId === 'string' ? meta.projectId : undefined;
+}
+
+function parseTimestamp(value: unknown): number | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const timestamp = Date.parse(value);
+  return Number.isNaN(timestamp) ? undefined : timestamp;
+}
+
+function shouldAcceptSseTicketUpdate(existing: Ticket | undefined, incoming: Ticket): boolean {
+  if (!existing) return true;
+
+  const existingUpdatedAt = parseTimestamp(existing.updatedAt);
+  const incomingUpdatedAt = parseTimestamp(incoming.updatedAt);
+
+  if (!incomingUpdatedAt || !existingUpdatedAt) {
+    return true;
+  }
+
+  return incomingUpdatedAt > existingUpdatedAt;
+}
+
+function shouldAcceptSseCommentUpdate(existing: Comment | undefined, incoming: Comment): boolean {
+  if (!existing) return true;
+
+  const existingUpdatedAt = parseTimestamp(existing.updatedAt ?? existing.createdAt);
+  const incomingUpdatedAt = parseTimestamp(incoming.updatedAt ?? incoming.createdAt);
+
+  if (!incomingUpdatedAt || !existingUpdatedAt) {
+    return true;
+  }
+
+  return incomingUpdatedAt > existingUpdatedAt;
+}
+
+function combineTicketDetails(existing: TicketWithRelations | undefined, incoming: Ticket): TicketWithRelations {
+  if (!existing) {
+    return incoming as TicketWithRelations;
+  }
+
+  return mergeTicketRelationSnapshot(existing, {
+    ...existing,
+    ...incoming,
+  } as TicketWithRelations);
+}
+
 
 const TICKET_UPDATE_DEBOUNCE_MS = 250;
 
@@ -197,6 +391,10 @@ type TicketUpdateBatch = {
   flushRequested: boolean;
 };
 
+type TicketUpdateOptions = {
+  immediate?: boolean;
+};
+
 type InFlightTicketUpdateBatch = {
   originalTickets: Ticket[];
   projectId: string;
@@ -206,7 +404,7 @@ type InFlightTicketUpdateBatch = {
 const API_URL = '/api/v1';
 const AUTH_API_URL = '/api/auth';
 
-interface TicketContextType extends State {
+export interface TicketContextType extends State {
   activeProjectId: string;
   setActiveProjectId: (id: string) => void;
   fetchInitialData: (userId?: string) => Promise<void>;
@@ -217,7 +415,7 @@ interface TicketContextType extends State {
   assignLabelToTicket: (ticketId: string, labelId: string) => Promise<boolean>;
   unassignLabelFromTicket: (ticketId: string, labelId: string) => Promise<boolean>;
   createTicket: (ticket: CreateTicketInput) => Promise<Ticket | null>;
-  updateTicket: (id: string, updates: Partial<Ticket>) => Promise<void>;
+  updateTicket: (id: string, updates: Partial<Ticket>, options?: TicketUpdateOptions) => Promise<void>;
   deleteTicket: (id: string) => Promise<void>;
   moveTicket: (id: string, sourceProjectId: string, targetProjectId: string) => Promise<boolean>;
   addComment: (ticketId: string, body: string) => Promise<void>;
@@ -250,8 +448,6 @@ interface TicketContextType extends State {
   ticketsByProject: Map<string, Ticket[]>;
 }
 
-export const TicketContext = createContext<TicketContextType | undefined>(undefined);
-
 export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const queryClient = useQueryClient();
   // --- Local UI States ---
@@ -262,15 +458,14 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [currentUser, setCurrentUser] = useState<User | null>(readStoredUser());
   const [theme, setThemeState] = useState<'dark' | 'coal-black' | 'coffee' | 'honey-glow' | 'marble-blue' | 'midnight-azure'>('dark');
   const [authLoading, setAuthLoading] = useState(true);
-  const [authResolved, setAuthResolved] = useState(false);
 
   // --- Refs for batching and real-time handlers ---
   const activeProjectIdRef = useRef(activeProjectId);
   const activeTicketRef = useRef(activeTicket);
+  const currentUserIdRef = useRef<string | undefined>(currentUser?.id);
   const sseCoalescerRef = useRef<SseEventCoalescer | null>(null);
   const pendingTicketUpdateBatchesRef = useRef(new Map<string, TicketUpdateBatch>());
   const inFlightTicketUpdateBatchesRef = useRef(new Map<string, InFlightTicketUpdateBatch>());
-
   useEffect(() => {
     activeProjectIdRef.current = activeProjectId;
   }, [activeProjectId]);
@@ -278,6 +473,10 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => {
     activeTicketRef.current = activeTicket;
   }, [activeTicket]);
+
+  useEffect(() => {
+    currentUserIdRef.current = currentUser?.id;
+  }, [currentUser?.id]);
 
   useEffect(() => {
     return () => {
@@ -294,13 +493,22 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // --- Queries ---
 
   // Projects List
+  const fetchProjects = async () => {
+    try {
+      return await apiClient.get<Project[]>(`/projects`, { params: { userId: currentUser?.id } });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to load projects';
+      if (toast?.show) {
+        toast.show(message, 'error');
+      }
+      throw error;
+    }
+  };
+
   const projectsQuery = useQuery({
     queryKey: queryKeys.projects(currentUser?.id),
-    queryFn: () => apiClient.get<Project[]>(`/projects`, { params: { userId: currentUser?.id } }),
+    queryFn: fetchProjects,
     enabled: !!currentUser?.id,
-    onError: (error) => {
-      console.error(error);
-    },
     ...CACHE_CONFIGS.metadata,
   });
   const projects = Array.isArray(projectsQuery.data) ? projectsQuery.data : [];
@@ -308,7 +516,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const lookup = new Map<string, { workspaceId: string; teamId: string | null }>();
     projects.forEach((project) => {
       lookup.set(project.id, {
-        workspaceId: project.workspaceId,
+        workspaceId: project.workspaceId || '',
         teamId: project.teamId || null,
       });
     });
@@ -355,87 +563,12 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     for (const [queryKey] of queryClient.getQueriesData({ queryKey: ['workspace'] })) {
+      const normalizedQueryKey = [...queryKey];
       if (queryKey[0] === 'workspace' && queryKey[2] === 'sidebar') {
-        queryClient.invalidateQueries({ queryKey, exact: true });
+        queryClient.invalidateQueries({ queryKey: normalizedQueryKey, exact: true });
       }
     }
   }, [projectLookup, queryClient]);
-
-  const upsertSseTicketToProjectList = useCallback((ticket: Ticket | TicketWithRelations, options: { prepend: boolean }) => {
-    const canonicalizedTicket: Ticket = {
-      ...ticket,
-      status: canonicalizeStatus(ticket.status),
-    };
-    queryClient.setQueryData<Ticket[]>(queryKeys.tickets(canonicalizedTicket.projectId), (old) => {
-      const existing = old ? [...old] : [];
-      const foundIndex = existing.findIndex((item) => item.id === canonicalizedTicket.id || item.key === canonicalizedTicket.key);
-      if (foundIndex >= 0) {
-        existing[foundIndex] = {
-          ...existing[foundIndex],
-          ...canonicalizedTicket,
-        };
-        return existing;
-      }
-
-      return options.prepend
-        ? [canonicalizedTicket, ...existing]
-        : [...existing, canonicalizedTicket];
-    });
-  }, [queryClient]);
-
-  const setTicketCacheEntries = useCallback((ticket: Ticket | TicketWithRelations) => {
-    const canonicalizedTicket: TicketWithRelations = {
-      ...ticket,
-      status: canonicalizeStatus(ticket.status),
-      relatedTicketIds: ticket.relatedTicketIds ?? [],
-    };
-
-    queryClient.setQueryData<TicketWithRelations>(queryKeys.ticketDetail(canonicalizedTicket.id), (existing) => {
-      if (!existing) {
-        return canonicalizedTicket;
-      }
-
-      return {
-        ...existing,
-        ...canonicalizedTicket,
-        relatedTicketIds: canonicalizedTicket.relatedTicketIds ?? existing.relatedTicketIds ?? [],
-      };
-    });
-
-    for (const [queryKey] of queryClient.getQueriesData<TicketWithRelations>({
-      queryKey: ['tickets', 'detail', canonicalizedTicket.key],
-    })) {
-      queryClient.setQueryData<TicketWithRelations>(queryKey, (existing) => {
-        if (!existing) {
-          return canonicalizedTicket;
-        }
-        return {
-          ...existing,
-          ...canonicalizedTicket,
-          status: canonicalizeStatus(canonicalizedTicket.status),
-          relatedTicketIds: canonicalizedTicket.relatedTicketIds ?? existing.relatedTicketIds ?? [],
-        };
-      });
-    }
-
-    for (const [queryKey] of queryClient.getQueriesData<TicketWithRelations>({
-      queryKey: ['tickets', 'relations', canonicalizedTicket.key],
-    })) {
-      queryClient.setQueryData<TicketWithRelations>(queryKey, (existing) => {
-        if (!existing) {
-          return canonicalizedTicket;
-        }
-        return {
-          ...existing,
-          ...canonicalizedTicket,
-          dependencies: canonicalizedTicket.dependencies ?? existing.dependencies,
-          blockers: canonicalizedTicket.blockers ?? existing.blockers,
-          blockedTicket: canonicalizedTicket.blockedTicket ?? existing.blockedTicket ?? null,
-          relatedTicketIds: canonicalizedTicket.relatedTicketIds ?? existing.relatedTicketIds ?? [],
-        };
-      });
-    }
-  }, [queryClient]);
 
   const removeSseTicketEntries = useCallback((ticketKey?: string, ticketId?: string) => {
     const normalizedTicketKey = ticketKey?.toUpperCase();
@@ -453,7 +586,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       });
 
       if (nextList.length !== value.length) {
-        queryClient.setQueryData<Ticket[]>(queryKey, nextList);
+        queryClient.setQueryData<Ticket[]>([...queryKey], nextList);
       }
     }
 
@@ -466,39 +599,49 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       for (const [queryKey] of queryClient.getQueriesData({
         queryKey: ['tickets', 'detail', normalizedTicketKey],
       })) {
-        queryClient.removeQueries({ queryKey, exact: true });
+        queryClient.removeQueries({ queryKey: [...queryKey], exact: true });
       }
 
       for (const [queryKey] of queryClient.getQueriesData({
         queryKey: ['tickets', 'relations', normalizedTicketKey],
       })) {
-        queryClient.removeQueries({ queryKey, exact: true });
+        queryClient.removeQueries({ queryKey: [...queryKey], exact: true });
       }
     }
   }, [queryClient]);
 
-  const findCachedTicketByKey = useCallback((ticketKey: string): (Ticket | TicketWithRelations) | undefined => {
-    const normalized = ticketKey.toUpperCase();
+  const findCachedTicketByKeyOrId = useCallback((ticketKey?: string, ticketId?: string): (Ticket | TicketWithRelations) | undefined => {
+    const normalizedTicketKey = ticketKey?.toUpperCase();
+    const normalizedTicketId = ticketId?.trim();
 
-    const byKeyQueries = queryClient.getQueriesData<unknown>({ queryKey: ['tickets', 'detail', normalized] });
-    for (const [, candidate] of byKeyQueries) {
-      if (
-        candidate && typeof candidate === 'object' && 'id' in candidate && 'key' in candidate
-        && typeof (candidate as { key?: string }).key === 'string'
-        && (candidate as { key?: string }).key === normalized
-      ) {
-        return candidate as Ticket | TicketWithRelations;
+    if (normalizedTicketId) {
+      const byIdDetail = queryClient.getQueryData<TicketWithRelations>(queryKeys.ticketDetail(normalizedTicketId));
+      if (byIdDetail) {
+        return byIdDetail;
       }
     }
 
-    const byRelationQueries = queryClient.getQueriesData<unknown>({ queryKey: ['tickets', 'relations', normalized] });
-    for (const [, candidate] of byRelationQueries) {
-      if (
-        candidate && typeof candidate === 'object' && 'id' in candidate && 'key' in candidate
-        && typeof (candidate as { key?: string }).key === 'string'
-        && (candidate as { key?: string }).key === normalized
-      ) {
-        return candidate as TicketWithRelations;
+    if (normalizedTicketKey) {
+      const byKeyQueries = queryClient.getQueriesData<unknown>({ queryKey: ['tickets', 'detail', normalizedTicketKey] });
+      for (const [, candidate] of byKeyQueries) {
+        if (
+          candidate && typeof candidate === 'object' && 'id' in candidate && 'key' in candidate
+          && typeof (candidate as { key?: string }).key === 'string'
+          && (candidate as { key?: string }).key === normalizedTicketKey
+        ) {
+          return candidate as Ticket | TicketWithRelations;
+        }
+      }
+
+      const byRelationQueries = queryClient.getQueriesData<unknown>({ queryKey: ['tickets', 'relations', normalizedTicketKey] });
+      for (const [, candidate] of byRelationQueries) {
+        if (
+          candidate && typeof candidate === 'object' && 'id' in candidate && 'key' in candidate
+          && typeof (candidate as { key?: string }).key === 'string'
+          && (candidate as { key?: string }).key === normalizedTicketKey
+        ) {
+          return candidate as TicketWithRelations;
+        }
       }
     }
 
@@ -508,7 +651,9 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         continue;
       }
 
-      const match = candidateList.find((candidate) => candidate.key === normalized);
+      const match = candidateList.find((candidate) =>
+        (normalizedTicketKey ? candidate.key === normalizedTicketKey : false) || (normalizedTicketId ? candidate.id === normalizedTicketId : false),
+      );
       if (match) {
         return match;
       }
@@ -517,42 +662,189 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return undefined;
   }, [queryClient]);
 
-  const refreshSseTicket = useCallback(async (event: Pick<SseCoalescedEvent, 'ticketKey' | 'projectId'>, options: { prependOnCreate: boolean }): Promise<TicketWithRelations | null> => {
-    if (!event.ticketKey) {
-      return null;
+  const upsertTicketInListCachesFromSse = useCallback((normalizedTicket: Ticket, sourceProjectIdHint?: string) => {
+    const ticketId = normalizedTicket.id;
+    const ticketKey = normalizedTicket.key;
+    const targetProjectId = normalizedTicket.projectId;
+
+    const listQueries = queryClient.getQueriesData<Ticket[]>({ queryKey: ['tickets'] });
+    if (!listQueries.length) {
+      return;
     }
 
-    const normalizedTicketKey = event.ticketKey.toUpperCase();
-    try {
-      const refreshedTicket = await apiClient.get<TicketWithRelations>(`/tickets/key/${encodeURIComponent(normalizedTicketKey)}`, {
-        params: { include: 'relations' },
-        projectId: event.projectId,
-      });
-
-      if (!refreshedTicket?.id) {
-        return null;
+    const containingProjects = new Set<string>();
+    for (const [queryKey, list] of listQueries) {
+      if (!Array.isArray(list)) {
+        continue;
       }
 
-      setTicketCacheEntries(refreshedTicket);
-      upsertSseTicketToProjectList(refreshedTicket, { prepend: options.prependOnCreate });
-      return refreshedTicket;
-    } catch (error) {
-      console.error('Failed to refresh ticket for SSE update:', error);
-      return null;
-    }
-  }, [setTicketCacheEntries, upsertSseTicketToProjectList]);
+      const listProjectId = getListQueryProjectId(queryKey);
+      if (!listProjectId) {
+        continue;
+      }
 
-  const refreshSseComments = useCallback(async (ticketId: string, projectId?: string) => {
-    try {
-      const refreshedComments = await apiClient.get<Comment[]>(`/tickets/${ticketId}/comments`, {
-        projectId,
-      });
-      queryClient.setQueryData<Comment[]>(queryKeys.comments(ticketId), refreshedComments);
-    } catch (error) {
-      console.error('Failed to refresh comments for SSE update:', error);
-      queryClient.invalidateQueries({ queryKey: queryKeys.comments(ticketId) });
+      if (list.some((ticket) => ticket.id === ticketId || ticket.key === ticketKey)) {
+        containingProjects.add(listProjectId);
+      }
+    }
+
+    const affectedProjectIds = new Set<string>(containingProjects);
+    affectedProjectIds.add(targetProjectId);
+    if (sourceProjectIdHint) {
+      affectedProjectIds.add(sourceProjectIdHint);
+    }
+
+    for (const [queryKey, list] of listQueries) {
+      const mutableQueryKey = [...queryKey];
+      if (!Array.isArray(list)) {
+        continue;
+      }
+
+      const listProjectId = getListQueryProjectId(queryKey);
+      if (!listProjectId || !affectedProjectIds.has(listProjectId)) {
+        continue;
+      }
+
+      const shouldRemoveFromProject = listProjectId !== targetProjectId;
+      const existingIndex = list.findIndex((ticket) => ticket.id === ticketId || ticket.key === ticketKey);
+      if (existingIndex === -1) {
+        if (!shouldRemoveFromProject) {
+          queryClient.setQueryData<Ticket[]>(mutableQueryKey, [...list, normalizedTicket]);
+        }
+        continue;
+      }
+
+      const existingTicket = list[existingIndex];
+      if (!shouldAcceptSseTicketUpdate(existingTicket, normalizedTicket)) {
+        continue;
+      }
+
+      if (shouldRemoveFromProject) {
+        const next = list.filter((ticket) => ticket.id !== ticketId && ticket.key !== ticketKey);
+        if (next.length !== list.length) {
+          queryClient.setQueryData<Ticket[]>(mutableQueryKey, next);
+        }
+        continue;
+      }
+
+      const next = [...list];
+      next[existingIndex] = {
+        ...existingTicket,
+        ...normalizedTicket,
+      };
+      queryClient.setQueryData<Ticket[]>(mutableQueryKey, next);
     }
   }, [queryClient]);
+
+    const invalidateCommentCacheFromSse = useCallback((ticketId?: string) => {
+      if (!ticketId) {
+        return;
+      }
+
+    if (activeTicketRef.current?.id === ticketId) {
+      queryClient.invalidateQueries({ queryKey: queryKeys.comments(ticketId) });
+    }
+    }, [queryClient]);
+
+  const upsertTicketFromSse = useCallback((ticket: Ticket | null) => {
+    const normalizedTicket = normalizeTicketPayload(ticket);
+    if (!normalizedTicket) return;
+
+    const ticketKey = normalizedTicket.key;
+    const ticketId = normalizedTicket.id;
+    const cachedTicket = findCachedTicketByKeyOrId(ticketKey, ticketId);
+    const sourceProjectId = cachedTicket?.projectId;
+
+    queryClient.setQueryData<TicketWithRelations>(queryKeys.ticketDetail(ticketId), (existing) => {
+      if (existing && !shouldAcceptSseTicketUpdate(existing, normalizedTicket)) {
+        return existing;
+      }
+
+      return existing ? combineTicketDetails(existing, normalizedTicket) : (normalizedTicket as TicketWithRelations);
+    });
+
+    for (const [queryKey, existingData] of queryClient.getQueriesData<unknown>({
+      queryKey: ['tickets', 'detail', ticketKey],
+    })) {
+      queryClient.setQueryData<Ticket>([...queryKey], (existing) => {
+        const candidate = (existing ?? existingData) as Ticket | TicketWithRelations | undefined;
+        if (candidate && shouldAcceptSseTicketUpdate(candidate, normalizedTicket)) {
+          return combineTicketDetails(candidate as TicketWithRelations, normalizedTicket);
+        }
+
+        if (!candidate) {
+          return normalizedTicket as TicketWithRelations;
+        }
+
+        return candidate;
+      });
+    }
+
+    for (const [queryKey, existingData] of queryClient.getQueriesData<unknown>({
+      queryKey: ['tickets', 'relations', ticketKey],
+    })) {
+      queryClient.setQueryData<Ticket>([...queryKey], (existing) => {
+        const candidate = (existing ?? existingData) as Ticket | TicketWithRelations | undefined;
+        if (candidate && shouldAcceptSseTicketUpdate(candidate, normalizedTicket)) {
+          return combineTicketDetails(candidate as TicketWithRelations, normalizedTicket);
+        }
+
+        if (!candidate) {
+          return normalizedTicket as TicketWithRelations;
+        }
+
+        return candidate;
+      });
+    }
+
+    upsertTicketInListCachesFromSse(normalizedTicket, sourceProjectId);
+  }, [queryClient, findCachedTicketByKeyOrId, upsertTicketInListCachesFromSse]);
+
+  const upsertSseComment = useCallback((comment: Comment | null) => {
+    const normalizedComment = normalizeCommentPayload(comment);
+    if (!normalizedComment) return;
+
+    queryClient.setQueryData<Comment[]>(queryKeys.comments(normalizedComment.ticketId), (old) => {
+      const existing = old || [];
+      const index = existing.findIndex((cached) => cached.id === normalizedComment.id);
+      if (index !== -1) {
+        if (!shouldAcceptSseCommentUpdate(existing[index], normalizedComment)) {
+          return existing;
+        }
+
+        const next = [...existing];
+        next[index] = normalizedComment;
+        return next;
+      }
+
+      return [...existing, normalizedComment];
+    });
+  }, [queryClient]);
+
+  const removeSseComment = useCallback((ticketId?: string, commentId?: string) => {
+    if (!ticketId || !commentId) return;
+
+    queryClient.setQueryData<Comment[]>(queryKeys.comments(ticketId), (old) => old ? old.filter((comment) => comment.id !== commentId) : []);
+  }, [queryClient]);
+
+  const hydrateAndUpsertTicketFromSse = useCallback(async (ticketId?: string, projectId?: string) => {
+    if (!ticketId) {
+      return false;
+    }
+
+    try {
+      const ticket = await apiClient.get<Ticket>(`/tickets/${ticketId}`, projectId ? { projectId } : undefined);
+      const normalizedTicket = normalizeTicketPayload(ticket);
+      if (!normalizedTicket) {
+        return false;
+      }
+
+      upsertTicketFromSse(normalizedTicket);
+      return true;
+    } catch {
+      return false;
+    }
+  }, [upsertTicketFromSse]);
 
   // Users List
   const usersQuery = useQuery({
@@ -562,6 +854,9 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     ...CACHE_CONFIGS.metadata,
   });
   const users = usersQuery.data || [];
+
+  const previousTicketsRef = useRef<Ticket[] | undefined>(undefined);
+  const previousCommentsRef = useRef<Comment[] | undefined>(undefined);
 
   // Tickets List
   const ticketsQuery = useQuery({
@@ -573,7 +868,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     enabled: !!activeProjectId && !!currentUser,
     ...CACHE_CONFIGS.ticketsList,
   });
-  const tickets = ticketsQuery.data || [];
+  const tickets = ticketsQuery.data ?? previousTicketsRef.current ?? [];
 
   // Labels
   const labelsQuery = useQuery({
@@ -614,7 +909,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       const labelQueryKey = findLabelQueryKey(labelId);
       if (labelQueryKey) {
-        queryClient.invalidateQueries({ queryKey: labelQueryKey, exact: true });
+        queryClient.invalidateQueries({ queryKey: [...labelQueryKey], exact: true });
       }
     },
     [findLabelQueryKey, queryClient]
@@ -632,13 +927,26 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Comments
   const activeTicketId = activeTicket?.id;
   const activeTicketProjectId = activeTicket?.projectId || activeProjectId;
+  useEffect(() => {
+    if (Array.isArray(ticketsQuery.data)) {
+      previousTicketsRef.current = ticketsQuery.data;
+    }
+  }, [ticketsQuery.data]);
+
+  // Comments
   const commentsQuery = useQuery({
     queryKey: queryKeys.comments(activeTicketId || ''),
     queryFn: () => apiClient.get<Comment[]>(`/tickets/${activeTicketId}/comments`, { projectId: activeTicketProjectId }),
     enabled: !!activeTicketId && !!activeTicketProjectId && !!currentUser,
     ...CACHE_CONFIGS.ticketDetail,
   });
-  const comments = commentsQuery.data || [];
+  const comments = commentsQuery.data ?? previousCommentsRef.current ?? [];
+
+  useEffect(() => {
+    if (Array.isArray(commentsQuery.data)) {
+      previousCommentsRef.current = commentsQuery.data;
+    }
+  }, [commentsQuery.data]);
 
   const {
     activeTicketDetail,
@@ -653,7 +961,6 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     activeTicketId,
     activeTicketProjectId,
     isAuthenticated: !!currentUser,
-    invalidateAggregateTicketQueries,
   });
 
   // Global loading state combining react-query status
@@ -776,7 +1083,6 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       })
       .finally(() => {
         if (!cancelled) {
-          setAuthResolved(true);
           setAuthLoading(false);
         }
       });
@@ -812,73 +1118,85 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return typeof value === 'string' && value.trim() ? value.trim() : undefined;
     };
 
-    const extractTicketFromKey = (event: SseCoalescedEvent): Ticket | TicketWithRelations | undefined => {
-      if (event.ticketKey) {
-        return findCachedTicketByKey(event.ticketKey);
+    const extractTicketFromEvent = (event: SseCoalescedEvent, messageData: Record<string, unknown>): Ticket | TicketWithRelations | undefined => {
+      const directTicket = normalizeTicketPayload(messageData.ticket);
+      if (directTicket) {
+        return directTicket;
       }
-      return undefined;
+
+      const payloadTicketId = extractString(messageData.ticketId) || extractString(event.ticketId);
+      const cachedById = payloadTicketId ? findCachedTicketByKeyOrId(undefined, payloadTicketId) : undefined;
+      if (cachedById) {
+        return cachedById;
+      }
+
+      return event.ticketKey ? findCachedTicketByKeyOrId(event.ticketKey, payloadTicketId) : undefined;
     };
 
-    const fallbackInvalidateForProject = (projectId?: string) => {
-      if (!projectId) {
-        return;
+    const invalidateProjectMetadata = (projectId?: string) => {
+      if (projectId) {
+        invalidateAggregateTicketQueries(projectId);
       }
-
-      queryClient.invalidateQueries({ queryKey: queryKeys.tickets(projectId) });
-      invalidateAggregateTicketQueries(projectId);
     };
 
     const processSseBatch = (events: SseCoalescedEvent[]) => {
       void (async () => {
         for (const event of events) {
           const eventType = event.type;
-          const cachedTicket = extractTicketFromKey(event);
-          const projectId = event.projectId || (cachedTicket ? cachedTicket.projectId : undefined);
           const messageData = event.data && typeof event.data === 'object' && !Array.isArray(event.data)
             ? (event.data as Record<string, unknown>)
             : {};
+          const payloadTicket = normalizeTicketPayload(messageData.ticket);
+          const payloadComment = normalizeCommentPayload(messageData.comment);
+          const payloadCommentId = extractString(messageData.commentId) || extractString((payloadComment as Comment | undefined)?.id);
+          const payloadTicketId = extractString(messageData.ticketId) || extractString(event.ticketId);
+          const eventTicketId = payloadTicketId || extractString((payloadComment as Comment | undefined)?.ticketId);
+          const cachedTicket = extractTicketFromEvent(event, messageData);
+          const projectId = event.projectId || cachedTicket?.projectId;
 
           if (eventType === 'ticket.updated') {
-            if (!event.ticketKey) {
-              fallbackInvalidateForProject(projectId);
+            if (payloadTicket) {
+              upsertTicketFromSse(payloadTicket);
               continue;
             }
 
-            const refreshed = await refreshSseTicket(
-              {
-                ticketKey: event.ticketKey,
-                projectId,
-              },
-              { prependOnCreate: false },
-            );
-            if (!refreshed && projectId) {
-              fallbackInvalidateForProject(projectId);
+            if (cachedTicket) {
+              upsertTicketFromSse(cachedTicket as Ticket);
+              continue;
             }
+
+            await hydrateAndUpsertTicketFromSse(payloadTicketId || event.ticketId, event.projectId);
             continue;
           }
 
           if (eventType === 'ticket.created') {
-            if (!event.ticketKey) {
-              fallbackInvalidateForProject(projectId);
+            if (payloadTicket) {
+              upsertTicketFromSse(payloadTicket);
               continue;
             }
 
-            const refreshed = await refreshSseTicket(
-              {
-                ticketKey: event.ticketKey,
-                projectId,
-              },
-              { prependOnCreate: true },
-            );
-            if (!refreshed && projectId) {
-              fallbackInvalidateForProject(projectId);
+            if (cachedTicket) {
+              upsertTicketFromSse(cachedTicket as Ticket);
+              continue;
             }
+
+            await hydrateAndUpsertTicketFromSse(payloadTicketId || event.ticketId, event.projectId);
             continue;
           }
 
           if (eventType === 'ticket.deleted') {
+            if (payloadTicket) {
+              removeSseTicketEntries(payloadTicket.key, payloadTicket.id);
+              continue;
+            }
+
+            if (payloadTicketId) {
+              removeSseTicketEntries(undefined, payloadTicketId);
+              continue;
+            }
+
             if (!event.ticketKey && !cachedTicket?.id) {
-              fallbackInvalidateForProject(projectId);
+              invalidateProjectMetadata(projectId);
               continue;
             }
 
@@ -887,37 +1205,32 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           }
 
           if (eventType === 'comment.added' || eventType === 'comment.updated' || eventType === 'comment.deleted') {
-            const messageTicketId = extractString(messageData?.ticketId);
-            if (messageTicketId) {
-              await refreshSseComments(messageTicketId, projectId);
+            if (eventType === 'comment.deleted' && payloadCommentId && eventTicketId) {
+              removeSseComment(eventTicketId, payloadCommentId);
+              continue;
+            }
+
+            if (payloadComment && payloadComment.ticketId) {
+              upsertSseComment(payloadComment);
+              continue;
+            }
+
+            if (eventTicketId) {
+              invalidateCommentCacheFromSse(eventTicketId);
               continue;
             }
 
             if (cachedTicket?.id) {
-              await refreshSseComments(cachedTicket.id, projectId);
+              invalidateCommentCacheFromSse(cachedTicket.id);
               continue;
             }
 
-            if (!event.ticketKey) {
-              fallbackInvalidateForProject(projectId);
+            if (cachedTicket) {
+              upsertTicketFromSse(cachedTicket as Ticket);
               continue;
             }
 
-            const refreshedTicket = await refreshSseTicket(
-              {
-                ticketKey: event.ticketKey,
-                projectId,
-              },
-              { prependOnCreate: false },
-            );
-            if (refreshedTicket?.id) {
-              await refreshSseComments(refreshedTicket.id, projectId);
-              continue;
-            }
-
-            if (projectId) {
-              fallbackInvalidateForProject(projectId);
-            }
+            await hydrateAndUpsertTicketFromSse(event.ticketId || payloadTicketId, event.projectId);
             continue;
           }
 
@@ -928,31 +1241,25 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             eventType === 'dependency.added' ||
             eventType === 'dependency.removed'
           ) {
-            if (!event.ticketKey) {
-              fallbackInvalidateForProject(projectId);
-              continue;
-            }
-
-            const refreshed = await refreshSseTicket(
-              {
-                ticketKey: event.ticketKey,
-                projectId,
-              },
-              { prependOnCreate: false },
-            );
-            if (!refreshed && projectId) {
-              fallbackInvalidateForProject(projectId);
+            if (cachedTicket) {
+              upsertTicketFromSse(cachedTicket as Ticket);
+            } else {
+              await hydrateAndUpsertTicketFromSse(payloadTicketId, event.projectId);
             }
             continue;
           }
 
           if (eventType === 'tickets-updated') {
-            if (!projectId) {
+            if (payloadTicket) {
+              upsertTicketFromSse(payloadTicket);
               continue;
             }
 
-            queryClient.invalidateQueries({ queryKey: queryKeys.tickets(projectId) });
-            invalidateAggregateTicketQueries(projectId);
+            if (cachedTicket) {
+              upsertTicketFromSse(cachedTicket as Ticket);
+            } else {
+              await hydrateAndUpsertTicketFromSse(payloadTicketId || event.ticketId, event.projectId);
+            }
             continue;
           }
 
@@ -962,9 +1269,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               continue;
             }
 
-            if (activeTicketRef.current?.id === ticketId) {
-              queryClient.invalidateQueries({ queryKey: queryKeys.comments(ticketId) });
-            }
+            invalidateCommentCacheFromSse(ticketId);
             continue;
           }
 
@@ -978,11 +1283,10 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           }
 
           if (!projectId) {
-            queryClient.invalidateQueries({ queryKey: ['tickets'] });
             continue;
           }
 
-          fallbackInvalidateForProject(projectId);
+          invalidateProjectMetadata(projectId);
         }
       })();
     };
@@ -1010,12 +1314,18 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const messageData = message.data && typeof message.data === 'object' && !Array.isArray(message.data)
           ? message.data as Record<string, unknown>
           : {};
+        const actorUserId = extractString((message as Record<string, unknown>).actorUserId) || extractString(messageData.actorUserId);
+        if (actorUserId && actorUserId === currentUserIdRef.current) {
+          return;
+        }
         const ticketKey = extractString(message.ticketKey) || extractString(messageData.ticketKey);
         const projectId = extractString(message.projectId) || extractString(messageData.projectId);
+        const ticketId = extractString(message.ticketId) || extractString(messageData.ticketId);
 
         const coalescedEvent: SseCoalescedEvent = {
           type: eventType,
           ticketKey: ticketKey?.toUpperCase(),
+          ticketId,
           projectId,
           data: messageData,
         };
@@ -1030,12 +1340,22 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     return () => {
       sseService.off('message', handleSseMessage);
-      sseService.disconnect();
+    sseService.disconnect();
       disposeSseService(sseWorkspaceId);
       sseCoalescerRef.current?.destroy();
       sseCoalescerRef.current = null;
     };
-  }, [sseWorkspaceId, queryClient, refreshSseComments, refreshSseTicket, findCachedTicketByKey, removeSseTicketEntries, invalidateAggregateTicketQueries]);
+  }, [
+    sseWorkspaceId,
+    invalidateCommentCacheFromSse,
+    invalidateAggregateTicketQueries,
+    findCachedTicketByKeyOrId,
+    hydrateAndUpsertTicketFromSse,
+    upsertSseComment,
+    upsertTicketFromSse,
+    removeSseComment,
+    removeSseTicketEntries,
+  ]);
 
   // --- Mutations ---
 
@@ -1066,10 +1386,6 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
       invalidateAggregateTicketQueries(ticketInput.projectId);
     },
-    onSettled: (data, error, ticketInput) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.tickets(ticketInput.projectId) });
-      invalidateAggregateTicketQueries(ticketInput.projectId);
-    },
   });
 
   const createTicket = useCallback(async (ticketInput: CreateTicketInput) => {
@@ -1088,7 +1404,6 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setActiveProjectIdState,
     setFiltersState,
     setActiveTicket,
-    invalidateAggregateTicketQueries,
   });
 
   // Update Ticket (Debounced)
@@ -1105,14 +1420,9 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (!response.ok) throw new Error('Failed to update ticket');
       return response.json();
     },
-    onSettled: (data, error, { projectId }) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.tickets(projectId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.ticket(data?.key || '') });
-      invalidateAggregateTicketQueries(projectId);
-    },
   });
 
-  const flushPendingTicketUpdate = useCallback(async (ticketId: string) => {
+  const flushPendingTicketUpdate = useCallback(async function flushPendingTicketUpdateInner(ticketId: string) {
     const pendingBatch = pendingTicketUpdateBatchesRef.current.get(ticketId);
     if (!pendingBatch) return;
 
@@ -1144,37 +1454,105 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       inFlightTicketUpdateBatchesRef.current.delete(ticketId);
 
       const followUpBatch = pendingTicketUpdateBatchesRef.current.get(ticketId);
-      if (followUpBatch && followUpBatch.flushRequested) {
-        followUpBatch.flushRequested = false;
-        void flushPendingTicketUpdate(ticketId);
-      }
+        if (followUpBatch && followUpBatch.flushRequested) {
+          followUpBatch.flushRequested = false;
+          void flushPendingTicketUpdateInner(ticketId);
+        }
     } catch (e) {
       console.error('Error updating ticket on server, rolling back:', e);
       inFlightTicketUpdateBatchesRef.current.delete(ticketId);
       
       // Rollback cache
-      queryClient.setQueryData(queryKeys.tickets(pendingBatch.projectId), pendingBatch.originalTickets);
+      queryClient.setQueryData<Ticket[]>(queryKeys.tickets(pendingBatch.projectId), [...pendingBatch.originalTickets]);
 
       const followUpBatch = pendingTicketUpdateBatchesRef.current.get(ticketId);
       if (followUpBatch) {
         followUpBatch.originalTickets = pendingBatch.originalTickets;
         if (Object.keys(followUpBatch.updates).length > 0) {
-          queryClient.setQueryData<Ticket[]>(queryKeys.tickets(pendingBatch.projectId), (old) =>
-            old ? old.map((t) => (t.id === ticketId ? { ...t, ...followUpBatch.updates } : t)) : []
-          );
+          queryClient.setQueryData<Ticket[]>(queryKeys.tickets(pendingBatch.projectId), (old) => {
+            const currentTickets = old ?? [];
+            return patchTicketInListById(currentTickets, ticketId, followUpBatch.updates) ?? currentTickets;
+          });
         }
 
         if (followUpBatch.flushRequested) {
           followUpBatch.flushRequested = false;
-          void flushPendingTicketUpdate(ticketId);
+          void flushPendingTicketUpdateInner(ticketId);
         }
       }
     }
   }, [updateTicketMutation]);
 
-  const updateTicket = useCallback(async (id: string, updates: Partial<Ticket>) => {
-    const projectId = activeProjectIdRef.current;
+  const updateTicket = useCallback(async (
+    id: string,
+    updates: Partial<Ticket>,
+    options?: TicketUpdateOptions
+  ) => {
+    const cachedTicket = findCachedTicketByKeyOrId(undefined, id);
+    const projectId = cachedTicket?.projectId || activeProjectIdRef.current;
     if (!projectId) return;
+
+    if (updates.status) {
+      updates = {
+        ...updates,
+        status: canonicalizeStatus(updates.status as string),
+      };
+    }
+
+    const shouldUpdateImmediately = options?.immediate !== false;
+
+    if (shouldUpdateImmediately) {
+      const ticketsQueryKey = queryKeys.tickets(projectId);
+      const currentTickets = queryClient.getQueryData<Ticket[]>(ticketsQueryKey) || [];
+      const wasActiveTicket = activeTicketRef.current?.id === id;
+      const previousActiveTicket = wasActiveTicket ? activeTicketRef.current : null;
+      const previousTickets = [...currentTickets];
+      const optimisticUpdatedAt = new Date().toISOString();
+      const optimisticPatch = {
+        ...updates,
+        updatedAt: optimisticUpdatedAt,
+      };
+
+      const pendingBatch = pendingTicketUpdateBatchesRef.current.get(id);
+      if (pendingBatch && pendingBatch.timerId !== null) {
+        window.clearTimeout(pendingBatch.timerId);
+      }
+      pendingTicketUpdateBatchesRef.current.delete(id);
+
+      queryClient.setQueryData<Ticket[]>(ticketsQueryKey, (old) => {
+        const currentTickets = old ?? [];
+        return patchTicketInListById(currentTickets, id, optimisticPatch) ?? currentTickets;
+      });
+
+      if (wasActiveTicket) {
+        setActiveTicket((prev) => {
+          if (!prev) {
+            return null;
+          }
+          return hasEquivalentTicketFields(prev, { ...prev, ...optimisticPatch }) ? prev : { ...prev, ...optimisticPatch };
+        });
+      }
+
+      void updateTicketMutation.mutateAsync({
+        id,
+        updates,
+        projectId,
+      }).catch((error) => {
+        console.error('Error updating ticket on server, rolling back:', error);
+        queryClient.setQueryData<Ticket[]>(queryKeys.tickets(projectId), [...previousTickets]);
+
+        if (wasActiveTicket && activeTicketRef.current?.id === id) {
+          setActiveTicket(previousActiveTicket);
+        }
+
+        const message = error instanceof Error ? error.message : 'Failed to update ticket';
+        if (toast?.show) {
+          toast.show(message, 'error');
+        }
+      });
+
+      return;
+    }
 
     const pendingBatch = pendingTicketUpdateBatchesRef.current.get(id);
     const ticketsQueryKey = queryKeys.tickets(projectId);
@@ -1190,14 +1568,28 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       });
     }
 
+    const optimisticUpdatedAt = new Date().toISOString();
+    const optimisticPatch = {
+      ...updates,
+      updatedAt: optimisticUpdatedAt,
+    };
+
     // Optimistically update local query cache
-    queryClient.setQueryData<Ticket[]>(ticketsQueryKey, (old) =>
-      old ? old.map((t) => (t.id === id ? { ...t, ...updates } : t)) : []
-    );
+    queryClient.setQueryData<Ticket[]>(ticketsQueryKey, (old) => {
+      const currentTickets = old ?? [];
+      return patchTicketInListById(currentTickets, id, optimisticPatch) ?? currentTickets;
+    });
 
     // Also update active ticket if applicable
     if (activeTicketRef.current?.id === id) {
-      setActiveTicket((prev) => (prev ? { ...prev, ...updates } : null));
+      setActiveTicket((prev) => {
+        if (!prev) {
+          return null;
+        }
+
+        const next = { ...prev, ...optimisticPatch };
+        return hasEquivalentTicketFields(prev, next) ? prev : next;
+      });
     }
 
     const nextBatch = pendingTicketUpdateBatchesRef.current.get(id);
@@ -1214,7 +1606,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     nextBatch.timerId = window.setTimeout(() => {
       void flushPendingTicketUpdate(id);
     }, TICKET_UPDATE_DEBOUNCE_MS);
-  }, [flushPendingTicketUpdate]);
+  }, [findCachedTicketByKeyOrId, flushPendingTicketUpdate, queryClient, updateTicketMutation, setActiveTicket]);
 
   // Delete Ticket
   const deleteTicketMutation = useMutation({
@@ -1241,16 +1633,11 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       return { previousTickets };
     },
-    onError: (err, id, context: any) => {
+    onError: (_err: unknown, _id: string, context: { previousTickets?: Ticket[] } | undefined) => {
       const projId = activeProjectIdRef.current;
       if (context?.previousTickets) {
-        queryClient.setQueryData(queryKeys.tickets(projId), context.previousTickets);
+        queryClient.setQueryData(queryKeys.tickets(projId), [...context.previousTickets]);
       }
-    },
-    onSettled: () => {
-      const projId = activeProjectIdRef.current;
-      queryClient.invalidateQueries({ queryKey: queryKeys.tickets(projId) });
-      invalidateAggregateTicketQueries(projId);
     },
   });
 
@@ -1278,13 +1665,15 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const previousComments = queryClient.getQueryData<Comment[]>(queryKey);
 
       if (currentUser) {
+        const optimisticUpdatedAt = new Date().toISOString();
         const optimisticId = `co-opt-${Date.now()}`;
         const optimisticComment: Comment = {
           id: optimisticId,
           ticketId,
           userId: currentUser.id,
           body,
-          createdAt: new Date().toISOString(),
+          createdAt: optimisticUpdatedAt,
+          updatedAt: optimisticUpdatedAt,
           userName: currentUser.name,
           userAvatar: currentUser.avatar,
           author: {
@@ -1301,13 +1690,10 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       return { previousComments };
     },
-    onError: (err, { ticketId }, context: any) => {
+    onError: (_err: unknown, { ticketId }: { ticketId: string }, context: { previousComments?: Comment[] } | undefined) => {
       if (context?.previousComments) {
         queryClient.setQueryData(queryKeys.comments(ticketId), context.previousComments);
       }
-    },
-    onSettled: (data, err, { ticketId }) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.comments(ticketId) });
     },
   });
 
@@ -1323,22 +1709,20 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     onMutate: async ({ ticketId, commentId, body }) => {
       const queryKey = queryKeys.comments(ticketId);
       const previousComments = queryClient.getQueryData<Comment[]>(queryKey);
+      const optimisticUpdatedAt = new Date().toISOString();
 
       if (previousComments) {
         queryClient.setQueryData<Comment[]>(queryKey, (old) =>
-          old ? old.map((c) => (c.id === commentId ? { ...c, body } : c)) : []
+          old ? old.map((c) => (c.id === commentId ? { ...c, body, updatedAt: optimisticUpdatedAt } : c)) : []
         );
       }
 
       return { previousComments };
     },
-    onError: (err, { ticketId }, context: any) => {
+    onError: (_err: unknown, { ticketId }: { ticketId: string }, context: { previousComments?: Comment[] } | undefined) => {
       if (context?.previousComments) {
         queryClient.setQueryData(queryKeys.comments(ticketId), context.previousComments);
       }
-    },
-    onSettled: (data, err, { ticketId }) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.comments(ticketId) });
     },
   });
 
@@ -1363,13 +1747,10 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       return { previousComments };
     },
-    onError: (err, { ticketId }, context: any) => {
+    onError: (_err: unknown, { ticketId }: { ticketId: string }, context: { previousComments?: Comment[] } | undefined) => {
       if (context?.previousComments) {
         queryClient.setQueryData(queryKeys.comments(ticketId), context.previousComments);
       }
-    },
-    onSettled: (data, err, { ticketId }) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.comments(ticketId) });
     },
   });
 
@@ -1393,6 +1774,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           return old ? [...old, project] : [project];
         });
         queryClient.invalidateQueries({ queryKey: queryKeys.projects(currentUser.id) });
+        invalidateWorkspaceSidebarQueries(project.id);
         setActiveProjectId(project.id);
       }
     },
@@ -1425,9 +1807,14 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       return { previousProjects };
     },
-    onError: (err, variables, context: any) => {
+    onError: (_err: unknown, _variables: { id: string; updates: Partial<Project> }, context: { previousProjects?: Project[] } | undefined) => {
       if (currentUser && context?.previousProjects) {
         queryClient.setQueryData(queryKeys.projects(currentUser.id), context.previousProjects);
+      }
+    },
+    onSuccess: (project) => {
+      if (project) {
+        invalidateWorkspaceSidebarQueries(project.id);
       }
     },
     onSettled: () => {
@@ -1468,10 +1855,13 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       return { previousProjects };
     },
-    onError: (err, id, context: any) => {
+    onError: (_err: unknown, _id: string, context: { previousProjects?: Project[] } | undefined) => {
       if (currentUser && context?.previousProjects) {
         queryClient.setQueryData(queryKeys.projects(currentUser.id), context.previousProjects);
       }
+    },
+    onSuccess: (_, id) => {
+      invalidateWorkspaceSidebarQueries(id);
     },
     onSettled: () => {
       if (currentUser) {
@@ -1511,14 +1901,20 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         sortOrder: nextSortOrder,
       }, { projectId });
     },
-    onSettled: (data, _error, variables) => {
-      const projectId = data?.projectId || variables.projectId || activeProjectIdRef.current;
-      queryClient.invalidateQueries({ queryKey: queryKeys.labels(projectId), exact: true });
-      invalidateWorkspaceSidebarQueries(projectId);
+    onSuccess: (label) => {
+      if (label?.id) {
+        invalidateLabelQueries(label.id, label.projectId);
+      }
     },
   });
 
-  const createLabel = useCallback(async (labelInput: any) => {
+  const createLabel = useCallback(async (labelInput: {
+    name: string;
+    color?: string;
+    description?: string;
+    projectId?: string;
+    sortOrder?: number;
+  }) => {
     try {
       return await createLabelMutation.mutateAsync(labelInput);
     } catch (e) {
@@ -1532,10 +1928,18 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<Label> }) => {
       return apiClient.put<Label>(`/labels/${id}`, updates);
     },
-    onSettled: (data, _error, variables) => {
-      invalidateLabelQueries(variables.id, data?.projectId);
-      invalidateWorkspaceSidebarQueries(data?.projectId);
-      invalidateAggregateTicketQueries(activeProjectIdRef.current);
+    onMutate: async ({ id }) => {
+      const cachedLabel = labels.find((label) => label.id === id);
+      return { previousLabelProjectId: cachedLabel?.projectId };
+    },
+    onSuccess: (updatedLabel, { id }) => {
+      invalidateLabelQueries(id, updatedLabel?.projectId);
+      return updatedLabel;
+    },
+    onError: (_error, _variables, context: { previousLabelProjectId?: string | null } | undefined) => {
+      if (context?.previousLabelProjectId) {
+        invalidateLabelQueries(context.previousLabelProjectId);
+      }
     },
   });
 
@@ -1552,11 +1956,14 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const deleteLabelMutation = useMutation({
     mutationFn: async (id: string) => {
       await apiClient.delete(`/labels/${id}`);
+      return id;
     },
-    onSettled: (_data, _error, labelId) => {
-      invalidateLabelQueries(labelId);
-      invalidateWorkspaceSidebarQueries();
-      invalidateAggregateTicketQueries(activeProjectIdRef.current);
+    onMutate: async (id) => {
+      const cachedLabel = labels.find((label) => label.id === id);
+      return { projectId: cachedLabel?.projectId };
+    },
+    onSuccess: (_result, id, context: { projectId?: string | null } | undefined) => {
+      invalidateLabelQueries(id, context?.projectId);
     },
   });
 
@@ -1575,10 +1982,6 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     mutationFn: async ({ ticketId, labelId }: { ticketId: string; labelId: string }) => {
       await apiClient.post(`/tickets/${ticketId}/labels`, { labelId });
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.tickets(activeProjectIdRef.current) });
-      invalidateAggregateTicketQueries(activeProjectIdRef.current);
-    },
   });
 
   const assignLabelToTicket = useCallback(async (ticketId: string, labelId: string) => {
@@ -1595,10 +1998,6 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const unassignLabelMutation = useMutation({
     mutationFn: async ({ ticketId, labelId }: { ticketId: string; labelId: string }) => {
       await apiClient.delete(`/tickets/${ticketId}/labels/${labelId}`);
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.tickets(activeProjectIdRef.current) });
-      invalidateAggregateTicketQueries(activeProjectIdRef.current);
     },
   });
 
@@ -1622,6 +2021,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     onSuccess: (project) => {
       if (currentUser) {
         queryClient.invalidateQueries({ queryKey: queryKeys.projects(currentUser.id) });
+        invalidateWorkspaceSidebarQueries(project.id);
         setActiveProjectId(project.id);
       }
     },
@@ -1870,10 +2270,4 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   );
 
   return <TicketContext.Provider value={value}>{children}</TicketContext.Provider>;
-};
-
-export const useTickets = () => {
-  const context = useContext(TicketContext);
-  if (!context) throw new Error('useTickets must be used within a TicketProvider');
-  return context;
 };

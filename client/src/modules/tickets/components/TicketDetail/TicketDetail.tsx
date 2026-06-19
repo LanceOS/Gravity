@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import type { Ticket } from '../../../../context/TicketContext';
+import type { Ticket } from '../../../../context/TicketContextContext';
 import { Button, Select, MarkdownEditor, RichTextEditor, toast, ClickAwayListener, Accordion, Popover, createEmptyRichTextValue, isRichTextEmpty, serializeRichTextMarkdown } from '@library';
 import generateBranchName from '../../../../utils/branch';
 import TicketUtilities from '../TicketUtilities/TicketUtilities';
@@ -79,7 +79,7 @@ import { TicketRowMobile } from '../TicketRowMobile/TicketRowMobile';
 import { getPriorityIcon, getAssigneeAvatar } from '../../utils/TicketList';
 import type { TicketDetailProps } from '../../types/TicketDetail';
 import { PRIORITY_OPTIONS, STATUS_OPTIONS } from '../../utils/TicketDetail';
-import { useTickets } from '../../../../context/TicketContext';
+import { useTickets } from '../../../../context/TicketContextContext';
 import { LabelBadge } from '../LabelBadge';
 import { SearchableOptionPickerPopoverContent } from '../SearchableOptionPickerPopoverContent';
 import { TicketContextMenu } from '../TicketContextMenu';

@@ -1,4 +1,4 @@
-import type { Cycle, Label, Project, Ticket, User } from '../../../context/TicketContext';
+import type { Cycle, Label, Project, Ticket, User } from '../../../context/TicketContextContext';
 
 export interface CreateTicketInput {
   title: string;

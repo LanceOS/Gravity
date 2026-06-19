@@ -9,6 +9,7 @@ import { addCommentRecord, updateTicketRecord } from '../tickets/services/ticket
 
 /** Maximum number of ticket keys to process from a single webhook delivery. */
 const MAX_KEYS_PER_WEBHOOK = 10;
+const SSE_WEBHOOK_ACTOR_ID = 'system:webhook';
 
 /** Ticket key pattern: one or more letters, a hyphen, one or more digits. */
 const TICKET_KEY_REGEX = /([A-Za-z]+)-(\d+)/g;
@@ -209,11 +210,13 @@ export function createWebhookRouter() {
         const commentBody = `GitHub PR update: #${prNumber} was ${eventDescription} by ${prAuthor}${prUrl ? ` (${prUrl})` : ''}.`;
 
         await addCommentRecord(updated.id, commentUserId, commentBody);
-        if (workspaceId) broadcastToWorkspace(workspaceId, 'comments-updated', { ticketId: updated.id });
-      }
+        if (workspaceId) {
+          broadcastToWorkspace(workspaceId, 'comments-updated', { ticketId: updated.id, actorUserId: SSE_WEBHOOK_ACTOR_ID });
+        }
 
-      if (workspaceId) {
-        broadcastToWorkspace(workspaceId, 'tickets-updated', { projectId: updated.projectId });
+        if (workspaceId) {
+          broadcastToWorkspace(workspaceId, 'tickets-updated', { projectId: updated.projectId, actorUserId: SSE_WEBHOOK_ACTOR_ID });
+        }
       }
     }
 

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { useAccountSettings } from '../../../hooks/useAccountSettings';
 import { useTheme } from '../../settings';
-import { useTickets } from '../../../context/TicketContext';
+import { useTickets } from '../../../context/TicketContextContext';
 import { isOnboardingNeeded } from '../utils/accountPreferences';
 import type { AccountPreferencesRouteState } from '../types';
 

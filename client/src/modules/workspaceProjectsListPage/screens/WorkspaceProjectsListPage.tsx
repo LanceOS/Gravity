@@ -2,8 +2,8 @@ import { useMemo } from 'react';
 import { ChevronRight, Database } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { PROJECT_STATUS_LABELS } from '../../workspaces';
-import type { Project } from '../../../context/TicketContext';
-import { useTickets } from '../../../context/TicketContext';
+import type { Project } from '../../../context/TicketContextContext';
+import { useTickets } from '../../../context/TicketContextContext';
 import { WorkspacePageLayout } from '../../../layouts/WorkspacePageLayout/WorkspacePageLayout';
 import '../styles/WorkspaceProjectsListPage.css';
 

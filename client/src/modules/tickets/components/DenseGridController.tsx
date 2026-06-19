@@ -1,5 +1,5 @@
 import React, { useState, useDeferredValue, useTransition, useMemo } from 'react';
-import type { Ticket, Label } from '../../../context/TicketContext';
+import type { Ticket, Label } from '../../../context/TicketContextContext';
 import { DenseVirtualList, DenseTextInput } from '@library';
 import { getPriorityIcon } from '../utils/TicketList';
 

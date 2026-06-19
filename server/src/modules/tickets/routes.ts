@@ -160,6 +160,18 @@ export function createTicketsRouter() {
     await handler(ticket, auth.userId, auth.workspaceId);
   }
 
+  function emitWorkspaceEvent(
+    workspaceId: string,
+    type: string,
+    payload: Record<string, unknown>,
+    actorUserId?: string,
+  ) {
+    const data = actorUserId
+      ? { ...payload, actorUserId }
+      : payload;
+    broadcastToWorkspace(workspaceId, type, data);
+  }
+
   async function invalidateSidebarCacheFromTeam(teamId: string) {
     const teamRows = await db.select({ workspaceId: teams.workspaceId }).from(teams).where(eq(teams.id, teamId)).limit(1);
     const workspaceId = teamRows[0]?.workspaceId;
@@ -236,7 +248,7 @@ export function createTicketsRouter() {
   });
 
   router.post('/tickets', async (req, res) => {
-    await withProjectAccess(req, res, getProjectIdFromRequest(req), async (projectId, _userId, workspaceId) => {
+    await withProjectAccess(req, res, getProjectIdFromRequest(req), async (projectId, userId, workspaceId) => {
       if (!req.body?.title) {
         res.status(400).json({ error: 'Ticket title is required.' });
         return;
@@ -259,7 +271,7 @@ export function createTicketsRouter() {
               : undefined,
         });
 
-        broadcastToWorkspace(workspaceId, 'tickets-updated', { projectId });
+        emitWorkspaceEvent(workspaceId, 'tickets-updated', { projectId, ticket: created }, userId);
         res.status(201).json(created);
       } catch (error) {
         res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create ticket.' });
@@ -314,7 +326,7 @@ export function createTicketsRouter() {
   });
 
   router.patch('/tickets/:ticketId', async (req, res) => {
-    await withProjectAccess(req, res, getProjectIdFromRequest(req), async (projectId, _userId, workspaceId) => {
+    await withProjectAccess(req, res, getProjectIdFromRequest(req), async (projectId, userId, workspaceId) => {
       try {
         const ticketId = normalizeRouteParam(req.params.ticketId);
         const updated = await updateTicketRecord(ticketId, req.body ?? {}, projectId);
@@ -326,9 +338,9 @@ export function createTicketsRouter() {
         // Cross-project moves stay within the same workspace; one broadcast suffices
         // for the owning workspace but we still send two payloads so the client can
         // refresh both project views.
-        broadcastToWorkspace(workspaceId, 'tickets-updated', { projectId });
+        emitWorkspaceEvent(workspaceId, 'tickets-updated', { projectId, ticket: updated }, userId);
         if (updated.projectId !== projectId) {
-          broadcastToWorkspace(workspaceId, 'tickets-updated', { projectId: updated.projectId });
+          emitWorkspaceEvent(workspaceId, 'tickets-updated', { projectId: updated.projectId, ticket: updated }, userId);
         }
         res.json(updated);
       } catch (error) {
@@ -348,16 +360,20 @@ export function createTicketsRouter() {
   });
 
   router.delete('/tickets/:ticketId', async (req, res) => {
-    await withProjectAccess(req, res, getProjectIdFromRequest(req), async (projectId, _userId, workspaceId) => {
+    await withTicketAccess(req, res, normalizeRouteParam(req.params.ticketId), async (ticket, userId, workspaceId) => {
       try {
         const ticketId = normalizeRouteParam(req.params.ticketId);
-        const deleted = await deleteTicketRecord(ticketId, projectId);
+        const deleted = await deleteTicketRecord(ticketId, ticket.projectId);
         if (!deleted) {
           res.status(404).json({ error: 'Ticket not found.' });
           return;
         }
 
-        broadcastToWorkspace(workspaceId, 'tickets-updated', { projectId });
+        emitWorkspaceEvent(workspaceId, 'tickets-updated', {
+          projectId: ticket.projectId,
+          ticket: ticket,
+          ticketId: ticket.id,
+        }, userId);
         res.json({ success: true });
       } catch (error) {
         res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to delete ticket.' });
@@ -391,7 +407,12 @@ export function createTicketsRouter() {
         }
 
         const comment = await addCommentRecord(ticket.id, userId, body);
-        broadcastToWorkspace(workspaceId, 'comments-updated', { ticketId: ticket.id });
+        emitWorkspaceEvent(workspaceId, 'comments-updated', {
+          ticketId: ticket.id,
+          ticketKey: ticket.key,
+          comment,
+          commentId: comment?.id,
+        }, userId);
         res.status(201).json(comment);
       } catch (error) {
         res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to add comment.' });
@@ -400,7 +421,7 @@ export function createTicketsRouter() {
   });
 
   router.patch('/tickets/:ticketId/comments/:commentId', async (req, res) => {
-    await withTicketAccess(req, res, normalizeRouteParam(req.params.ticketId), async (ticket, _userId, workspaceId) => {
+    await withTicketAccess(req, res, normalizeRouteParam(req.params.ticketId), async (ticket, userId, workspaceId) => {
       try {
         const commentId = normalizeRouteParam(req.params.commentId);
         const body = typeof req.body?.body === 'string' ? req.body.body : '';
@@ -416,7 +437,12 @@ export function createTicketsRouter() {
           return;
         }
 
-        broadcastToWorkspace(workspaceId, 'comments-updated', { ticketId: ticket.id });
+        emitWorkspaceEvent(workspaceId, 'comments-updated', {
+          ticketId: ticket.id,
+          ticketKey: ticket.key,
+          comment,
+          commentId: comment.id,
+        }, userId);
         res.json(comment);
       } catch (error) {
         res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to update comment.' });
@@ -425,7 +451,7 @@ export function createTicketsRouter() {
   });
 
   router.delete('/tickets/:ticketId/comments/:commentId', async (req, res) => {
-    await withTicketAccess(req, res, normalizeRouteParam(req.params.ticketId), async (ticket, _userId, workspaceId) => {
+    await withTicketAccess(req, res, normalizeRouteParam(req.params.ticketId), async (ticket, userId, workspaceId) => {
       try {
         const commentId = normalizeRouteParam(req.params.commentId);
         const deleted = await deleteCommentRecord(commentId, ticket.id);
@@ -434,7 +460,11 @@ export function createTicketsRouter() {
           return;
         }
 
-        broadcastToWorkspace(workspaceId, 'comments-updated', { ticketId: ticket.id });
+        emitWorkspaceEvent(workspaceId, 'comments-updated', {
+          ticketId: ticket.id,
+          ticketKey: ticket.key,
+          commentId,
+        }, userId);
         res.json({ success: true });
       } catch (error) {
         res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to delete comment.' });
@@ -713,7 +743,7 @@ export function createTicketsRouter() {
   });
 
   router.post('/tickets/:id/labels', async (req, res) => {
-    await withTicketAccess(req, res, normalizeRouteParam(req.params.id), async (ticket, _userId, workspaceId) => {
+    await withTicketAccess(req, res, normalizeRouteParam(req.params.id), async (ticket, userId, workspaceId) => {
       try {
         const labelId = req.body?.labelId;
         if (!labelId) {
@@ -752,7 +782,12 @@ export function createTicketsRouter() {
           .values({ ticketId: ticket.id, labelId })
           .onConflictDoNothing();
 
-        broadcastToWorkspace(workspaceId, 'tickets-updated', { projectId: ticket.projectId });
+        const updatedTicket = await getTicketById(ticket.id, ticket.projectId);
+        emitWorkspaceEvent(workspaceId, 'tickets-updated', {
+          projectId: ticket.projectId,
+          ticketId: ticket.id,
+          ticket: updatedTicket ?? ticket,
+        }, userId);
 
         res.status(201).json({ success: true });
       } catch (error) {
@@ -762,14 +797,19 @@ export function createTicketsRouter() {
   });
 
   router.delete('/tickets/:id/labels/:labelId', async (req, res) => {
-    await withTicketAccess(req, res, normalizeRouteParam(req.params.id), async (ticket, _userId, workspaceId) => {
+    await withTicketAccess(req, res, normalizeRouteParam(req.params.id), async (ticket, userId, workspaceId) => {
       try {
         const labelId = normalizeRouteParam(req.params.labelId);
         await db
           .delete(ticketLabels)
           .where(and(eq(ticketLabels.ticketId, ticket.id), eq(ticketLabels.labelId, labelId)));
 
-        broadcastToWorkspace(workspaceId, 'tickets-updated', { projectId: ticket.projectId });
+        const updatedTicket = await getTicketById(ticket.id, ticket.projectId);
+        emitWorkspaceEvent(workspaceId, 'tickets-updated', {
+          projectId: ticket.projectId,
+          ticketId: ticket.id,
+          ticket: updatedTicket ?? ticket,
+        }, userId);
 
         res.json({ success: true });
       } catch (error) {
@@ -874,7 +914,7 @@ export function createTicketsRouter() {
   });
 
   router.post('/tickets/:ticketId/dependencies', async (req, res) => {
-    await withTicketAccess(req, res, normalizeRouteParam(req.params.ticketId), async (ticket) => {
+    await withTicketAccess(req, res, normalizeRouteParam(req.params.ticketId), async (ticket, userId) => {
       const dependencyId = req.body?.dependencyId;
       if (!dependencyId) {
         res.status(400).json({ error: 'Dependency ID is required.' });
@@ -916,9 +956,28 @@ export function createTicketsRouter() {
       try {
         await createTicketDependencyRelation(ticket.id, dependencyId, ticket.projectId);
 
-        broadcastToWorkspace(depAuth.workspaceId, 'tickets-updated', { projectId: ticket.projectId });
+        const updatedTicket = await getTicketById(ticket.id, ticket.projectId);
+        const updatedDependencyTicket = await getTicketById(dependencyId, dependencyTicket.projectId);
+
+        if (updatedTicket) {
+          emitWorkspaceEvent(depAuth.workspaceId, 'tickets-updated', {
+            projectId: ticket.projectId,
+            ticketId: updatedTicket.id,
+            ticket: updatedTicket,
+          }, userId);
+        } else {
+          emitWorkspaceEvent(depAuth.workspaceId, 'tickets-updated', { projectId: ticket.projectId }, userId);
+        }
         if (dependencyTicket.projectId !== ticket.projectId) {
-          broadcastToWorkspace(depAuth.workspaceId, 'tickets-updated', { projectId: dependencyTicket.projectId });
+          if (updatedDependencyTicket) {
+            emitWorkspaceEvent(depAuth.workspaceId, 'tickets-updated', {
+              projectId: dependencyTicket.projectId,
+              ticketId: updatedDependencyTicket.id,
+              ticket: updatedDependencyTicket,
+            }, userId);
+          } else {
+            emitWorkspaceEvent(depAuth.workspaceId, 'tickets-updated', { projectId: dependencyTicket.projectId }, userId);
+          }
         }
 
         res.status(201).json({ success: true });
@@ -929,7 +988,7 @@ export function createTicketsRouter() {
   });
 
   router.delete('/tickets/:ticketId/dependencies/:dependencyId', async (req, res) => {
-    await withTicketAccess(req, res, normalizeRouteParam(req.params.ticketId), async (ticket) => {
+    await withTicketAccess(req, res, normalizeRouteParam(req.params.ticketId), async (ticket, userId) => {
       const dependencyId = normalizeRouteParam(req.params.dependencyId);
 
       const dependencyTicket = await getTicketById(dependencyId);
@@ -952,9 +1011,28 @@ export function createTicketsRouter() {
       try {
         await removeTicketDependencyRelation(ticket.id, dependencyId);
 
-        broadcastToWorkspace(depAuth.workspaceId, 'tickets-updated', { projectId: ticket.projectId });
+        const updatedTicket = await getTicketById(ticket.id, ticket.projectId);
+        const updatedDependencyTicket = await getTicketById(dependencyId, dependencyTicket.projectId);
+
+        if (updatedTicket) {
+          emitWorkspaceEvent(depAuth.workspaceId, 'tickets-updated', {
+            projectId: ticket.projectId,
+            ticketId: updatedTicket.id,
+            ticket: updatedTicket,
+          }, userId);
+        } else {
+          emitWorkspaceEvent(depAuth.workspaceId, 'tickets-updated', { projectId: ticket.projectId }, userId);
+        }
         if (dependencyTicket.projectId !== ticket.projectId) {
-          broadcastToWorkspace(depAuth.workspaceId, 'tickets-updated', { projectId: dependencyTicket.projectId });
+          if (updatedDependencyTicket) {
+            emitWorkspaceEvent(depAuth.workspaceId, 'tickets-updated', {
+              projectId: dependencyTicket.projectId,
+              ticketId: updatedDependencyTicket.id,
+              ticket: updatedDependencyTicket,
+            }, userId);
+          } else {
+            emitWorkspaceEvent(depAuth.workspaceId, 'tickets-updated', { projectId: dependencyTicket.projectId }, userId);
+          }
         }
 
         res.json({ success: true });
@@ -976,7 +1054,7 @@ export function createTicketsRouter() {
   });
 
   router.post('/tickets/:ticketId/blockers', async (req, res) => {
-    await withTicketAccess(req, res, normalizeRouteParam(req.params.ticketId), async (ticket) => {
+    await withTicketAccess(req, res, normalizeRouteParam(req.params.ticketId), async (ticket, userId) => {
       const blockerId = req.body?.blockerId;
       if (!blockerId) {
         res.status(400).json({ error: 'Blocker ID is required.' });
@@ -1018,9 +1096,28 @@ export function createTicketsRouter() {
       try {
         await createTicketDependencyRelation(blockerId, ticket.id, ticket.projectId);
 
-        broadcastToWorkspace(blockerAuth.workspaceId, 'tickets-updated', { projectId: ticket.projectId });
+        const updatedTicket = await getTicketById(ticket.id, ticket.projectId);
+        const updatedBlockerTicket = await getTicketById(blockerId, blockerTicket.projectId);
+
+        if (updatedTicket) {
+          emitWorkspaceEvent(blockerAuth.workspaceId, 'tickets-updated', {
+            projectId: ticket.projectId,
+            ticketId: updatedTicket.id,
+            ticket: updatedTicket,
+          }, userId);
+        } else {
+          emitWorkspaceEvent(blockerAuth.workspaceId, 'tickets-updated', { projectId: ticket.projectId }, userId);
+        }
         if (blockerTicket.projectId !== ticket.projectId) {
-          broadcastToWorkspace(blockerAuth.workspaceId, 'tickets-updated', { projectId: blockerTicket.projectId });
+          if (updatedBlockerTicket) {
+            emitWorkspaceEvent(blockerAuth.workspaceId, 'tickets-updated', {
+              projectId: blockerTicket.projectId,
+              ticketId: updatedBlockerTicket.id,
+              ticket: updatedBlockerTicket,
+            }, userId);
+          } else {
+            emitWorkspaceEvent(blockerAuth.workspaceId, 'tickets-updated', { projectId: blockerTicket.projectId }, userId);
+          }
         }
 
         res.status(201).json({ success: true });
@@ -1031,7 +1128,7 @@ export function createTicketsRouter() {
   });
 
   router.delete('/tickets/:ticketId/blockers/:blockerId', async (req, res) => {
-    await withTicketAccess(req, res, normalizeRouteParam(req.params.ticketId), async (ticket) => {
+    await withTicketAccess(req, res, normalizeRouteParam(req.params.ticketId), async (ticket, userId) => {
       const blockerId = normalizeRouteParam(req.params.blockerId);
 
       const blockerTicket = await getTicketById(blockerId);
@@ -1054,9 +1151,28 @@ export function createTicketsRouter() {
       try {
         await removeTicketDependencyRelation(blockerId, ticket.id);
 
-        broadcastToWorkspace(blockerAuth.workspaceId, 'tickets-updated', { projectId: ticket.projectId });
+        const updatedTicket = await getTicketById(ticket.id, ticket.projectId);
+        const updatedBlockerTicket = await getTicketById(blockerId, blockerTicket.projectId);
+
+        if (updatedTicket) {
+          emitWorkspaceEvent(blockerAuth.workspaceId, 'tickets-updated', {
+            projectId: ticket.projectId,
+            ticketId: updatedTicket.id,
+            ticket: updatedTicket,
+          }, userId);
+        } else {
+          emitWorkspaceEvent(blockerAuth.workspaceId, 'tickets-updated', { projectId: ticket.projectId }, userId);
+        }
         if (blockerTicket.projectId !== ticket.projectId) {
-          broadcastToWorkspace(blockerAuth.workspaceId, 'tickets-updated', { projectId: blockerTicket.projectId });
+          if (updatedBlockerTicket) {
+            emitWorkspaceEvent(blockerAuth.workspaceId, 'tickets-updated', {
+              projectId: blockerTicket.projectId,
+              ticketId: updatedBlockerTicket.id,
+              ticket: updatedBlockerTicket,
+            }, userId);
+          } else {
+            emitWorkspaceEvent(blockerAuth.workspaceId, 'tickets-updated', { projectId: blockerTicket.projectId }, userId);
+          }
         }
 
         res.json({ success: true });

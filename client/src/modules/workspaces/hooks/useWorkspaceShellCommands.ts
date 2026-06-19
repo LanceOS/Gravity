@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 
-import type { Project, Ticket } from '../../../context/TicketContext';
+import type { Project, Ticket } from '../../../context/TicketContextContext';
 
 interface UseWorkspaceShellCommandsArgs {
   activeWorkspaceId: string;

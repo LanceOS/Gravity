@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@library';
 import { TicketDetail } from './TicketDetail/TicketDetail';
-import type { Ticket, Comment, User, Project, Label, Cycle } from '../../../context/TicketContext';
+import type { Ticket, Comment, User, Project, Label, Cycle } from '../../../context/TicketContextContext';
 import type { TicketWithRelations } from '../utils/ticketRelations';
 
 interface TicketDetailRouteProps {
@@ -17,7 +17,7 @@ interface TicketDetailRouteProps {
   ticketsById?: Map<string, Ticket>;
   activeTicketDetail: TicketWithRelations | null;
   onSelectTicket: (ticket: Ticket | null) => void;
-  onUpdateTicket: (id: string, updates: Partial<Ticket>) => Promise<void>;
+  onUpdateTicket: (id: string, updates: Partial<Ticket>, options?: { immediate?: boolean }) => Promise<void>;
   onDeleteTicket: (ticketId: string) => Promise<void>;
   onAddComment: (ticketId: string, body: string) => Promise<void>;
   onUpdateComment: (ticketId: string, commentId: string, body: string) => Promise<void>;

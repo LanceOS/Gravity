@@ -1,6 +1,6 @@
 import { ArrowDown, ArrowRight, ArrowUp, MinusCircle, TriangleAlert } from 'lucide-react';
 import type { ReactNode } from 'react';
-import type { Ticket } from '../context/TicketContext';
+import type { Ticket } from '../context/TicketContextContext';
 
 export const STATUS_COLOR_MAP: Record<string, string> = {
   backlog: '#9CA3AF',

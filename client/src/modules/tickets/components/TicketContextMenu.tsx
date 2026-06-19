@@ -1,5 +1,5 @@
 import React, { useContext, useMemo } from 'react';
-import { TicketContext, type Label, type Project, type Ticket } from '../../../context/TicketContext';
+import { TicketContext, type Label, type Project, type Ticket } from '../../../context/TicketContextContext';
 import { ContextMenu, toast } from '@library';
 import { Check, User, Folder, Tag, AlertCircle, CheckSquare, Trash2, Calendar, Link } from 'lucide-react';
 import { STATUS_OPTIONS, PRIORITY_OPTIONS } from '../utils/TicketDetail';

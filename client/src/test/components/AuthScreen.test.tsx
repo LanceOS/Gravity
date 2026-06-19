@@ -28,7 +28,7 @@ type MockInputProps = InputHTMLAttributes<HTMLInputElement> & {
   onChange: (event: ChangeEvent<HTMLInputElement>) => void;
 };
 
-vi.mock('../../context/TicketContext', () => ({
+vi.mock('../../context/TicketContextContext', () => ({
   useTickets: () => mockUseTickets,
 }));
 

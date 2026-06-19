@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   useTickets: vi.fn(),
 }));
 
-vi.mock('../../context/TicketContext', () => ({
+vi.mock('../../context/TicketContextContext', () => ({
   useTickets: mocks.useTickets,
 }));
 

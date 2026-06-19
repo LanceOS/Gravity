@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { Project, Ticket } from '../../../context/TicketContext';
+import type { Project, Ticket } from '../../../context/TicketContextContext';
 import type { TicketsByStatus } from '../utils/ticketView';
 
 export interface TicketListProps {

@@ -1,5 +1,5 @@
 import type { DragEvent, ReactNode } from 'react';
-import type { Ticket } from '../../../context/TicketContext';
+import type { Ticket } from '../../../context/TicketContextContext';
 import type { TicketsByStatus } from '../utils/ticketView';
 
 export interface TicketBoardProps {

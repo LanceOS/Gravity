@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useTickets } from '../../../context/TicketContext';
+import { useTickets } from '../../../context/TicketContextContext';
 import { Terminal, X, Play, Loader2, Sparkles, AlertCircle } from 'lucide-react';
 import type { AgentLogEntry, AgentSimulatorProps } from '../types/AgentSimulator';
 import { delay, getInitialAgentLogs } from '../utils/AgentSimulator';

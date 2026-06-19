@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import type { Ticket } from '../../../../context/TicketContext';
+import type { Ticket } from '../../../../context/TicketContextContext';
 import { Button, Select, Textarea, Popover, RichTextEditor, createEmptyRichTextValue } from '@library';
 import { AlertCircle } from 'lucide-react';
 import { ModalDialog } from '../../../../components/ModalDialog';
 import type { CreateTicketModalProps } from '../../types/CreateTicketModal';
 import { PRIORITY_OPTIONS, STATUS_OPTIONS } from '../../utils/CreateTicketModal';
-import { useTickets } from '../../../../context/TicketContext';
+import { useTickets } from '../../../../context/TicketContextContext';
 import { SearchableOptionPickerPopoverContent } from '../SearchableOptionPickerPopoverContent';
 import { LabelBadge } from '../LabelBadge';
 import { Plus } from 'lucide-react';
