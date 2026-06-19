@@ -54,7 +54,7 @@ export const TicketBoard = React.memo(({
   const renderColumnHeader = useCallback((columnId: string, title: string, count: number) => {
     const col = BOARD_COLUMN_BY_ID[columnId];
     const columnCount = visibleByColumn[columnId] ?? INITIAL_CARDS_PER_COLUMN;
-    const fullColumnTickets = ticketsByColumn[columnId] || [];
+    const fullColumnTickets = ticketsByColumn[columnId as keyof typeof ticketsByColumn] || [];
     const hasMoreInColumn = fullColumnTickets.length > columnCount;
     return (
       <Flex
@@ -122,7 +122,7 @@ export const TicketBoard = React.memo(({
 
   const formattedCards = useMemo(() => {
     return BOARD_COLUMNS.flatMap((col) => {
-      const fullTickets = ticketsByColumn[col.id] || [];
+      const fullTickets = ticketsByColumn[col.id as keyof typeof ticketsByColumn] || [];
       const visibleCount = visibleByColumn[col.id] ?? INITIAL_CARDS_PER_COLUMN;
       const colTickets = fullTickets.slice(0, visibleCount);
       return colTickets.map((ticket) => {

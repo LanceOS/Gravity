@@ -44,7 +44,7 @@ function formatLastActive(isoString?: string | null): string {
   }
 }
 
-export function MembersSection(): JSX.Element {
+export function MembersSection(): React.ReactNode {
   const { members } = useSettingsScreenContext();
 
   return (

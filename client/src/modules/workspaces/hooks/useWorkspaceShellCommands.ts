@@ -19,7 +19,7 @@ interface UseWorkspaceShellCommandsArgs {
     assigneeId: string | null;
     parentId: string | null;
   }) => Promise<Ticket | null>;
-  deleteTicket: (ticketId: string) => Promise<boolean | null>;
+  deleteTicket: (ticketId: string) => Promise<void>;
   createProject: (projectInput: {
     name: string;
     description: string;
@@ -27,7 +27,7 @@ interface UseWorkspaceShellCommandsArgs {
     status?: 'planned' | 'active' | 'completed';
     workspaceId?: string;
     teamId?: string;
-  }) => Promise<{ id: string } | null | undefined>;
+  }) => Promise<Project | null | undefined>;
   refreshWorkspaces: () => Promise<unknown>;
   createLabel: (labelInput: {
     name: string;
@@ -102,7 +102,7 @@ export function useWorkspaceShellCommands({
   buildProjectScopedPath,
 }: UseWorkspaceShellCommandsArgs): UseWorkspaceShellCommandsResult {
   const handleCreateTicketSubmit = useCallback(
-    async (ticket) => {
+    async (ticket: Parameters<UseWorkspaceShellCommandsArgs['createTicket']>[0]) => {
       const created = await createTicket(ticket);
       return Boolean(created);
     },

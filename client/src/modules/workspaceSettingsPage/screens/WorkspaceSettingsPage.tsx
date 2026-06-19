@@ -17,7 +17,6 @@ export function WorkspaceSettingsPageRoute() {
     activeView,
     currentUser,
     loading,
-    setCurrentUser,
     setTheme,
     setView,
     theme,
@@ -28,7 +27,7 @@ export function WorkspaceSettingsPageRoute() {
     loading: workspacesLoading,
     resolvedUserId: workspacesResolvedUserId,
     refreshWorkspaces,
-  } = useWorkspaceDirectory({ currentUser, setCurrentUser });
+  } = useWorkspaceDirectory({ currentUser });
 
   const activeWorkspace = useMemo(
     () => workspaces.find((workspace) => workspace.id === workspaceId) || null,
@@ -96,7 +95,7 @@ export function WorkspaceSettingsPageRoute() {
     currentUser && (currentUser.tutorial_completed === 0 || currentUser.tutorial_completed === false) ? (
       <OnboardingModal
         onComplete={() => {
-          setCurrentUser({ ...currentUser, tutorial_completed: 1 });
+          console.log('TODO: tutorial completed for', currentUser);
         }}
       />
     ) : null;

@@ -10,7 +10,7 @@ import {
   Alert,
   Select
 } from '@library';
-import type { User } from '../../context/TicketContextContext';
+import type { User } from '../../../types/domain';
 import type { CreateWorkspaceInput, WorkspaceSummary } from '../../../hooks/useWorkspaceDirectory';
 import { useIsMobile } from '../../../hooks/useIsMobile';
 

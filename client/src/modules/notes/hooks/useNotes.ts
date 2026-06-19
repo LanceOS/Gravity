@@ -11,7 +11,7 @@ interface UseNotesOptions {
 
 export function useNotes(projectId: string, sortDirection: 'desc' | 'asc' = 'desc', { notesService: clientNotesService = notesService }: UseNotesOptions = {}) {
   const limit = 20;
-  const [loadError, setLoadError] = useState<string | null>(null);
+
 
   const query = useInfiniteQuery<NoteMetadata[]>({
     queryKey: [...queryKeys.notes(projectId), sortDirection],
@@ -26,12 +26,7 @@ export function useNotes(projectId: string, sortDirection: 'desc' | 'asc' = 'des
         sort: sortDirection,
       });
     },
-    onError: () => {
-      setLoadError('Failed to load notes');
-    },
-    onSuccess: () => {
-      setLoadError(null);
-    },
+
     initialPageParam: 0,
     staleTime: CACHE_CONFIGS.metadata.staleTime,
     gcTime: CACHE_CONFIGS.metadata.gcTime,
@@ -55,7 +50,7 @@ export function useNotes(projectId: string, sortDirection: 'desc' | 'asc' = 'des
   return {
     notes,
     loading: query.isLoading || query.isFetchingNextPage || query.isFetching,
-    error: loadError || (query.error ? 'Failed to load notes' : null),
+    error: query.isError ? 'Failed to load notes' : null,
     hasMore: query.hasNextPage,
     loadMore,
   };

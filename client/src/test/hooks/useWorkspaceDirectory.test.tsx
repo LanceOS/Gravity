@@ -77,7 +77,7 @@ describe('useWorkspaceDirectory', () => {
     };
 
     const firstResponse = createDeferred<Response>();
-    const setCurrentUser = vi.fn();
+
     const fetchMock = vi.fn((input: string | URL | Request, init?: RequestInit) => {
       const userId = getHeader(init?.headers, 'X-User-Id');
 
@@ -95,7 +95,7 @@ describe('useWorkspaceDirectory', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const { result, rerender } = renderHook(
-      ({ currentUser }) => useWorkspaceDirectory({ currentUser, setCurrentUser }),
+      ({ currentUser }) => useWorkspaceDirectory({ currentUser }),
       { initialProps: { currentUser: firstUser } }
     );
 
@@ -112,7 +112,7 @@ describe('useWorkspaceDirectory', () => {
       await Promise.resolve();
     });
 
-    expect(setCurrentUser).not.toHaveBeenCalled();
+
     expect(result.current.resolvedUserId).toBe(secondUser.id);
     expect(result.current.workspaces).toEqual([secondWorkspace]);
     expect(fetchMock).toHaveBeenCalledTimes(2);

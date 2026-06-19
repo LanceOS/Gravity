@@ -7,6 +7,7 @@ export const authUsers = pgTable('user', {
   email: text('email').notNull().unique(),
   emailVerified: boolean('emailVerified').notNull(),
   image: text('image'),
+  tutorial_completed: boolean('tutorial_completed').default(false),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull(),
 });

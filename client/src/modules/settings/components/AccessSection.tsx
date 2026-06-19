@@ -73,7 +73,7 @@ function getInviteStateVariant(invite: WorkspaceInvite): 'accent' | 'success' | 
   return 'success';
 }
 
-export function AccessSection(): JSX.Element {
+export function AccessSection(): React.ReactNode {
   const { isMobile, invites, invitesLoading, inviteLoading, revokeLoadingId, onCreateInvite, onRevokeInvite } =
     useSettingsScreenContext();
 

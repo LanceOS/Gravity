@@ -2,8 +2,9 @@ import React from 'react';
 import { Globe, Users, UserPlus } from 'lucide-react';
 import { Card, Stack, Grid, TextInput, Select, Divider } from '@library';
 import { useSettingsScreenContext } from '../../../context/settings/useSettingsScreenContext';
+import type { WorkspaceAdminSettings } from '../types';
 
-export function OverviewSection(): JSX.Element {
+export function OverviewSection(): React.ReactNode {
   const { isMobile, workspace, settings, onChangeSettings } = useSettingsScreenContext();
 
   return (

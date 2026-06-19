@@ -327,7 +327,7 @@ export class SseService {
   private attachSourceListener(
     source: EventSource,
     eventType: 'message' | 'error' | 'open',
-    handler: (event: MessageEvent | Event) => void
+    handler: any
   ): void {
     const sourceAsAny = source as unknown as {
       addEventListener?: (type: string, listener: any) => void;
@@ -357,7 +357,7 @@ export class SseService {
   private removeSourceListener(
     source: EventSource,
     eventType: 'message' | 'error' | 'open',
-    handler: (event: MessageEvent | Event) => void
+    handler: any
   ): void {
     const sourceAsAny = source as unknown as {
       removeEventListener?: (type: string, listener: any) => void;

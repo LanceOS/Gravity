@@ -71,7 +71,7 @@ const MCP_TOOL_GROUPS: { title: string; tools: McpToolMetadata[] }[] = [
   },
 ];
 
-export function McpToolsSection(): JSX.Element {
+export function McpToolsSection(): React.ReactNode {
   const { workspace, settings, onChangeSettings } = useSettingsScreenContext();
 
   const isOwner = workspace.memberRole === 'owner';

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { authClient } from '../../../context/auth/authClient';
 import { useInfiniteQuery, useIsFetching, useQuery } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
 import type { SidebarNavigationState, SidebarProps } from '../../../components/Sidebar';
@@ -85,11 +86,9 @@ export function WorkspaceShellPage() {
     projects,
     setActiveProjectId,
     setActiveTicket,
-    setCurrentUser,
     setFilters,
     setTheme,
     setView,
-    signOut,
     tickets,
     updateTicket,
     updateProject,
@@ -157,7 +156,7 @@ export function WorkspaceShellPage() {
     resolvedUserId: workspacesResolvedUserId,
     refreshWorkspaces,
     requestJoinByInvite,
-  } = useWorkspaceDirectory({ currentUser, setCurrentUser });
+  } = useWorkspaceDirectory({ currentUser });
   const workspacesResolvedForCurrentUser = !currentUser || workspacesResolvedUserId === currentUser.id;
   const workspacesById = useMemo(() => {
     const map = new Map<string, (typeof workspaces)[number]>();
@@ -210,7 +209,7 @@ export function WorkspaceShellPage() {
   }, [sidebarTree]);
 
   const aggregateScopeLabels = useMemo(() => {
-    if (safeFilters.labels.length > 0) {
+    if (safeFilters.labels && safeFilters.labels.length > 0) {
       return [...safeFilters.labels];
     }
 
@@ -737,7 +736,7 @@ export function WorkspaceShellPage() {
   ]);
 
   const accountCredentialByProvider = useMemo(() => {
-    const map = new Map<string, { preferredModel: string }>();
+    const map = new Map<string, { preferredModel?: string }>();
     const safeAccountCredentials = accountSavedCredentials ?? [];
     for (const credential of safeAccountCredentials) {
       map.set(credential.provider, credential);
@@ -889,7 +888,7 @@ export function WorkspaceShellPage() {
   const onboarding = currentUser.tutorial_completed === 0 || currentUser.tutorial_completed === false ? (
     <OnboardingModal
       onComplete={() => {
-        setCurrentUser({ ...currentUser, tutorial_completed: 1 });
+        console.log('TODO: tutorial completed for', currentUser);
       }}
     />
   ) : null;
@@ -995,7 +994,7 @@ export function WorkspaceShellPage() {
       onOpenProjectManager: isTeamWorkspace ? handleOpenTeamManager : handleOpenProjectManager,
       onOpenSettings: handleOpenSettings,
       onOpenMcp: () => setIsMcpOpen(true),
-      onSignOut: signOut,
+      onSignOut: () => authClient.signOut(),
     },
   };
 

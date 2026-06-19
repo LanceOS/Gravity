@@ -1,4 +1,4 @@
-import { ReactNode, useLayoutEffect, useRef, useState } from 'react';
+import React, { ReactNode, useLayoutEffect, useRef, useState } from 'react';
 import { Bold, Code2, Heading1, Heading2, Italic, Link2, List, ListOrdered } from 'lucide-react';
 import { toggleMark } from 'prosemirror-commands';
 import { richTextSchema } from '../../../utilities/richtext';

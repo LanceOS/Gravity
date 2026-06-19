@@ -6,14 +6,14 @@ import { buildProjectScopedPath } from '../../../utils/workspace';
 import type { AppShellRouteState } from '../../../modules/workspaceShellPage/hooks/useAppShellRoute';
 import type { Ticket } from '../../../context/TicketContextContext';
 import { type SidebarNavigationState } from '../../../components/Sidebar';
-import type { Project } from '../../../types/domain';
+import type { Project, SidebarTree } from '../../../types/domain';
 
 interface UseWorkspaceShellNavigationArgs {
   route: Pick<AppShellRouteState, 'teamIdParam' | 'projectIdParam'>;
   activeWorkspaceId: string;
   activeProjectId: string;
   projects: Project[];
-  sidebarTree?: { hierarchyMode?: 'flat' | 'teams' };
+  sidebarTree?: SidebarTree;
   activeWorkspaceAvailable: boolean;
   currentUser: { id: string } | null;
   navigate: NavigateFunction;

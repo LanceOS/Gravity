@@ -10,7 +10,8 @@
     "types": [
       "vite/client",
       "react",
-      "react-dom"
+      "react-dom",
+      "@testing-library/jest-dom"
     ],
     "skipLibCheck": true,
     /* Bundler mode */

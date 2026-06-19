@@ -1,7 +1,7 @@
 import type { ComponentType } from 'react';
 
 import type { AIProvider, SavedApiCredential, WorkspaceSettings } from '../../../utils/settings';
-import type { User } from '../../../context/TicketContextContext';
+import type { User } from '../../../types/domain';
 
 export type SettingsCategoryId = 'general' | 'providers' | 'ollama' | 'onboarding';
 
@@ -14,7 +14,7 @@ export interface AccountPreferencesCategoryMeta {
   id: SettingsCategoryId;
   label: string;
   description: string;
-  icon: ComponentType<{ size?: number }>;
+  icon: ComponentType<{ size?: number; className?: string; 'aria-hidden'?: boolean | 'true' | 'false' }>;
 }
 
 export interface AccountPreferencesPageProps {

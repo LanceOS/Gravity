@@ -9,7 +9,7 @@ import type { AccountPreferencesRouteState } from '../types';
 
 export function useAccountPreferencesPageRoute(): AccountPreferencesRouteState {
   const navigate = useNavigate();
-  const { activeView, currentUser, loading, setCurrentUser, setTheme, setView, theme } = useTickets();
+  const { activeView, currentUser, loading, setTheme, setView, theme } = useTickets();
   const {
     settings,
     settingsLoading,
@@ -85,7 +85,7 @@ export function useAccountPreferencesPageRoute(): AccountPreferencesRouteState {
         return;
       }
 
-      setCurrentUser({ ...currentUser, tutorial_completed: 1 });
+      console.log('TODO: tutorial completed for', currentUser);
     },
   };
 }

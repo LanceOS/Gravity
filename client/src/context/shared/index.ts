@@ -23,6 +23,9 @@ export {
   getListQueryProjectId,
   hasEquivalentTicketFields,
   patchTicketInListById,
+  patchTicketLabelAssignment,
+  normalizeTicketPayload,
+  normalizeCommentPayload,
 } from './ticketCache';
 
 export {
@@ -31,7 +34,3 @@ export {
   type TicketFiltersState,
 } from './filters';
 
-export {
-  useSessionQuery,
-  SESSION_QUERY_KEY,
-} from './useSessionQuery';
