@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowRight, ArrowUp, MinusCircle, OctagonAlert } from 'lucide-react';
+import { ArrowDown, ArrowRight, ArrowUp, MinusCircle, TriangleAlert } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { Ticket } from '../context/TicketContext';
 
@@ -22,7 +22,7 @@ export const PRIORITY_COLOR_BY_PRIORITY: Record<Ticket['priority'], string> = {
 export const getPriorityIcon = (priority: Ticket['priority'], size = 12): ReactNode => {
   switch (priority) {
     case 'urgent':
-      return <OctagonAlert size={size} className="priority-urgent" />;
+      return <TriangleAlert size={size} className="priority-urgent" />;
     case 'high':
       return <ArrowUp size={size} className="priority-high" />;
     case 'medium':
