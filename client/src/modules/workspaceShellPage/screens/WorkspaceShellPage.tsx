@@ -14,6 +14,8 @@ import { OnboardingModal } from '../../onboarding';
 import { useTheme } from '../../settings';
 import type { Ticket } from '../../../context/TicketContextContext';
 import { useTickets } from '../../../context/TicketContextContext';
+import { useLabels } from '../../../context/label/LabelContext';
+import { useCycles } from '../../../context/cycle/CycleContext';
 import { useTicketFilters } from '../../../context/filters/TicketFiltersContext';
 import { useActiveView } from '../../../context/ui/ActiveViewContext';
 import { apiClient } from '../../../utils/apiClient';
@@ -71,17 +73,12 @@ export function WorkspaceShellPage() {
     updateComment,
     deleteComment,
     comments,
-    createLabel,
-    updateLabel,
-    deleteLabel,
     createProject,
     createTicket,
     currentUser,
-    cycles,
     fetchProjectData,
     deleteProject,
     deleteTicket,
-    labels = [],
     loading,
     projects,
     setActiveProjectId,
@@ -96,6 +93,8 @@ export function WorkspaceShellPage() {
     addTicketBlocker,
     removeTicketBlocker,
   } = useTickets();
+  const { labels, createLabel, updateLabel, deleteLabel } = useLabels();
+  const { cycles } = useCycles();
   const { filters, setFilters } = useTicketFilters();
   const { activeView, setView } = useActiveView();
   const [activeSection, setActiveSection] = useState<AppSection>('workspace');
@@ -198,6 +197,7 @@ export function WorkspaceShellPage() {
     staleTime: CACHE_CONFIGS.workspaceSidebar.staleTime,
     gcTime: CACHE_CONFIGS.workspaceSidebar.gcTime,
   });
+
   const sidebarTeamIdByProjectId = useMemo(() => {
     const map = new Map<string, string>();
     for (const team of sidebarTree?.teams ?? []) {

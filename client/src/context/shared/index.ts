@@ -26,6 +26,8 @@ export {
   patchTicketLabelAssignment,
   normalizeTicketPayload,
   normalizeCommentPayload,
+  patchTicketInAllCaches,
+  invalidateTicketCaches,
 } from './ticketCache';
 
 export {

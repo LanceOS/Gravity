@@ -1,5 +1,7 @@
 import type { Ticket, Comment, Label } from '../../types/domain';
 import { mergeTicketRelationSnapshot, type TicketWithRelations } from '../../modules/tickets/utils/ticketRelations';
+import type { QueryClient } from '@tanstack/react-query';
+import { queryKeys } from '../../utils/queryClient';
 
 /**
  * Extracts the `projectId` embedded in a React Query list query key.
@@ -285,4 +287,91 @@ export function normalizeCommentPayload(value: unknown): Comment | null {
     userAvatar: typeof data.userAvatar === 'string' ? data.userAvatar : undefined,
     author,
   };
+}
+
+/**
+ * Iterates across all known ticket-related query caches and applies a patch function
+ * to any cached representation of the target ticket.
+ */
+export function patchTicketInAllCaches(
+  queryClient: QueryClient,
+  ticketId: string,
+  patchFn: (ticket: Ticket) => Ticket
+) {
+  const listQueries = queryClient.getQueriesData<Ticket[]>({ queryKey: ['tickets'] });
+  for (const [queryKey, list] of listQueries) {
+    if (!Array.isArray(list)) {
+      continue;
+    }
+    const hasMatch = list.some((ticket) => ticket.id === ticketId);
+    if (!hasMatch) {
+      continue;
+    }
+
+    queryClient.setQueryData<Ticket[]>([...queryKey], (existing) => {
+      if (!existing || !Array.isArray(existing)) {
+        return existing || list;
+      }
+
+      const next = [...existing];
+      const matchIndex = next.findIndex((ticket) => ticket.id === ticketId);
+      if (matchIndex === -1) {
+        return existing;
+      }
+
+      next[matchIndex] = patchFn(next[matchIndex]);
+      return next;
+    });
+  }
+
+  queryClient.setQueryData<TicketWithRelations>(queryKeys.ticketDetail(ticketId), (existing) => {
+    if (!existing || existing.id !== ticketId) {
+      return existing as any;
+    }
+    return patchFn(existing);
+  });
+
+  const detailVariants = [['tickets', 'detail'], ['tickets', 'relations'], ['ticket-detail']];
+  
+  for (const baseKey of detailVariants) {
+    for (const [queryKey, data] of queryClient.getQueriesData<Ticket>({ queryKey: baseKey })) {
+      const existingTicket = data && typeof data === 'object' && 'id' in data ? (data as TicketWithRelations) : undefined;
+      if (!existingTicket || existingTicket.id !== ticketId) {
+        continue;
+      }
+
+      queryClient.setQueryData<Ticket>([...queryKey], (existing) => {
+        if (!existing || typeof existing !== 'object' || !(existing as { id?: string }).id) {
+          return existing as any;
+        }
+        return patchFn(existing as Ticket);
+      });
+    }
+  }
+}
+
+/**
+ * Invalidates all query caches related to a single ticket.
+ * If projectId is provided, also invalidates the project ticket list cache.
+ */
+export function invalidateTicketCaches(queryClient: QueryClient, ticketId: string, projectId?: string) {
+  if (projectId) {
+    queryClient.invalidateQueries({ queryKey: queryKeys.tickets(projectId), exact: true });
+  } else {
+    // Attempt to discover projectId from cache if not provided
+    for (const [, list] of queryClient.getQueriesData<Ticket[]>({ queryKey: ['tickets'] })) {
+      if (Array.isArray(list)) {
+        const t = list.find((ticket) => ticket.id === ticketId);
+        if (t?.projectId) {
+          queryClient.invalidateQueries({ queryKey: queryKeys.tickets(t.projectId), exact: true });
+          break;
+        }
+      }
+    }
+  }
+
+  queryClient.invalidateQueries({ queryKey: ['tickets', 'detail'] });
+  queryClient.invalidateQueries({ queryKey: ['tickets', 'relations'] });
+  queryClient.invalidateQueries({ queryKey: queryKeys.ticketDetail(ticketId) });
+  queryClient.invalidateQueries({ queryKey: ['ticket-detail'] });
 }

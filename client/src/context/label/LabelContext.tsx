@@ -4,11 +4,10 @@ import { apiClient } from '../../utils/apiClient';
 import { queryKeys, CACHE_CONFIGS } from '../../utils/queryClient';
 import { useActiveProject } from '../project/ActiveProjectContext';
 import { authClient } from '../auth/authClient';
-import { patchTicketLabelAssignment, findCachedTicketByKeyOrId } from '../shared';
+import { patchTicketLabelAssignment, patchTicketInAllCaches, invalidateTicketCaches } from '../shared';
 import { toast } from '@library';
 import type { LabelContextType } from './LabelContext.types';
 import type { Label, Ticket } from '../../types/domain';
-import type { TicketWithRelations } from '../../modules/tickets/utils/ticketRelations';
 
 export const LabelContext = createContext<LabelContextType | undefined>(undefined);
 
@@ -73,107 +72,12 @@ export const LabelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     [findLabelQueryKey, queryClient]
   );
 
-  const patchTicketLabelsInCache = useCallback((ticketId: string, labelId: string, isAssigned: boolean) => {
+  const handleTicketLabelUpdate = useCallback((ticketId: string, labelId: string, isAssigned: boolean) => {
     const label = labels.find((entry) => entry.id === labelId);
-    const patchTicket = (ticket: Ticket) => patchTicketLabelAssignment(ticket, labelId, isAssigned, label);
-
-    const listQueries = queryClient.getQueriesData<Ticket[]>({ queryKey: ['tickets'] });
-    for (const [queryKey, list] of listQueries) {
-      if (!Array.isArray(list)) {
-        continue;
-      }
-      const hasMatch = list.some((ticket) => ticket.id === ticketId);
-      if (!hasMatch) {
-        continue;
-      }
-
-      queryClient.setQueryData<Ticket[]>([...queryKey], (existing) => {
-        if (!existing || !Array.isArray(existing)) {
-          return existing || list;
-        }
-
-        const next = [...existing];
-        const matchIndex = next.findIndex((ticket) => ticket.id === ticketId);
-        if (matchIndex === -1) {
-          return existing;
-        }
-
-        next[matchIndex] = patchTicket(next[matchIndex]);
-        return next;
-      });
-    }
-
-    queryClient.setQueryData<TicketWithRelations>(queryKeys.ticketDetail(ticketId), (existing) => {
-      if (!existing || existing.id !== ticketId) {
-        return existing as any;
-      }
-      return patchTicket(existing);
-    });
-
-    for (const [queryKey, data] of queryClient.getQueriesData<Ticket>({ queryKey: ['tickets', 'detail'] })) {
-      const existingTicket = data && typeof data === 'object' && 'id' in data ? (data as TicketWithRelations) : undefined;
-      if (!existingTicket || existingTicket.id !== ticketId) {
-        continue;
-      }
-
-      queryClient.setQueryData<Ticket>([...queryKey], (existing) => {
-        if (!existing || typeof existing !== 'object' || !(existing as { id?: string }).id) {
-          return existing as any;
-        }
-        return patchTicket(existing as Ticket);
-      });
-    }
-
-    for (const [queryKey, data] of queryClient.getQueriesData<Ticket>({ queryKey: ['tickets', 'relations'] })) {
-      const existingTicket = data && typeof data === 'object' && 'id' in data ? (data as TicketWithRelations) : undefined;
-      if (!existingTicket || existingTicket.id !== ticketId) {
-        continue;
-      }
-
-      queryClient.setQueryData<Ticket>([...queryKey], (existing) => {
-        if (!existing || typeof existing !== 'object' || !(existing as { id?: string }).id) {
-          return existing as any;
-        }
-        return patchTicket(existing as Ticket);
-      });
-    }
-
-    for (const [queryKey, data] of queryClient.getQueriesData<Ticket>({ queryKey: ['ticket-detail'] })) {
-      const existingTicket = data && typeof data === 'object' && 'id' in data ? (data as Ticket) : undefined;
-      if (!existingTicket || existingTicket.id !== ticketId) {
-        continue;
-      }
-
-      queryClient.setQueryData<Ticket>([...queryKey], (existing) => {
-        if (!existing || !('id' in existing)) {
-          return existing as any;
-        }
-        return patchTicket(existing);
-      });
-    }
+    patchTicketInAllCaches(queryClient, ticketId, (ticket) => 
+      patchTicketLabelAssignment(ticket, labelId, isAssigned, label)
+    );
   }, [labels, queryClient]);
-
-  // Use the extracted findCachedTicketByKeyOrId from shared/ticketCache.ts or implement a local version
-  // Actually, we can just use the queryClient directly or import the shared one
-  const invalidateTicketDetailCaches = useCallback((ticketId: string) => {
-    // A simplified local find ticket if we don't import from shared correctly,
-    // assuming it exists in tickets list
-    let projectId: string | undefined;
-    for (const [, list] of queryClient.getQueriesData<Ticket[]>({ queryKey: ['tickets'] })) {
-      if (Array.isArray(list)) {
-        const t = list.find((t) => t.id === ticketId);
-        if (t) projectId = t.projectId;
-      }
-    }
-
-    if (projectId) {
-      queryClient.invalidateQueries({ queryKey: queryKeys.tickets(projectId), exact: true });
-    }
-    queryClient.invalidateQueries({ queryKey: ['tickets', 'detail'] });
-    queryClient.invalidateQueries({ queryKey: ['tickets', 'relations'] });
-    queryClient.invalidateQueries({ queryKey: queryKeys.ticketDetail(ticketId) });
-    queryClient.invalidateQueries({ queryKey: ['ticket-detail'] });
-  }, [queryClient]);
 
   const showLabelMutationError = useCallback((error: unknown, action: 'assign' | 'unassign') => {
     if (toast?.show) {
@@ -277,16 +181,16 @@ export const LabelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       await apiClient.post(`/tickets/${ticketId}/labels`, { labelId });
     },
     onMutate: ({ ticketId, labelId }) => {
-      patchTicketLabelsInCache(ticketId, labelId, true);
+      handleTicketLabelUpdate(ticketId, labelId, true);
       return { ticketId, labelId };
     },
     onError: (error, variables) => {
-      patchTicketLabelsInCache(variables.ticketId, variables.labelId, false);
+      handleTicketLabelUpdate(variables.ticketId, variables.labelId, false);
       showLabelMutationError(error, 'assign');
-      invalidateTicketDetailCaches(variables.ticketId);
+      invalidateTicketCaches(queryClient, variables.ticketId);
     },
     onSuccess: (_result, variables) => {
-      invalidateTicketDetailCaches(variables.ticketId);
+      invalidateTicketCaches(queryClient, variables.ticketId);
     },
   });
 
@@ -305,16 +209,16 @@ export const LabelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       await apiClient.delete(`/tickets/${ticketId}/labels/${labelId}`);
     },
     onMutate: ({ ticketId, labelId }) => {
-      patchTicketLabelsInCache(ticketId, labelId, false);
+      handleTicketLabelUpdate(ticketId, labelId, false);
       return { ticketId, labelId };
     },
     onError: (error, variables) => {
-      patchTicketLabelsInCache(variables.ticketId, variables.labelId, true);
+      handleTicketLabelUpdate(variables.ticketId, variables.labelId, true);
       showLabelMutationError(error, 'unassign');
-      invalidateTicketDetailCaches(variables.ticketId);
+      invalidateTicketCaches(queryClient, variables.ticketId);
     },
     onSuccess: (_result, variables) => {
-      invalidateTicketDetailCaches(variables.ticketId);
+      invalidateTicketCaches(queryClient, variables.ticketId);
     },
   });
 
