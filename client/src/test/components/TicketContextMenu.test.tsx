@@ -3,6 +3,8 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { TicketContextMenu } from '../../modules/tickets/components/TicketContextMenu';
 import { TicketContext, type Ticket, type Project } from '../../context/TicketContextContext';
+import { LabelContext } from '../../context/label/LabelContext';
+import { CycleContext } from '../../context/cycle/CycleContext';
 
 const ticket: Ticket = {
   id: 'ticket-1',
@@ -80,8 +82,6 @@ describe('TicketContextMenu', () => {
       <TicketContext.Provider value={{
         tickets: [ticket, dependencyTargetTicket, blockerTargetTicket],
         projects: [project1, project2, projectOtherWorkspace],
-        labels: [],
-        cycles: [],
         users: [],
         projectById,
         updateTicket: updateTicketMock,
@@ -89,14 +89,24 @@ describe('TicketContextMenu', () => {
         deleteTicket: vi.fn(),
         addTicketDependency: addTicketDependencyMock,
         addTicketBlocker: addTicketBlockerMock,
-        assignLabelToTicket: vi.fn(),
-        unassignLabelFromTicket: vi.fn(),
         removeTicketDependency: vi.fn(),
         removeTicketBlocker: vi.fn(),
       } as any}>
-        <TicketContextMenu ticket={ticket}>
-          <div data-testid="ticket-trigger">Trigger Context Menu</div>
-        </TicketContextMenu>
+        <LabelContext.Provider value={{
+          labels: [],
+          globalLabels: [],
+          labelsByProject: new Map(),
+          assignLabelToTicket: vi.fn(),
+          unassignLabelFromTicket: vi.fn(),
+        } as any}>
+          <CycleContext.Provider value={{
+            cycles: [],
+          } as any}>
+            <TicketContextMenu ticket={ticket}>
+              <div data-testid="ticket-trigger">Trigger Context Menu</div>
+            </TicketContextMenu>
+          </CycleContext.Provider>
+        </LabelContext.Provider>
       </TicketContext.Provider>
     );
 
@@ -132,8 +142,6 @@ describe('TicketContextMenu', () => {
       <TicketContext.Provider value={{
         tickets: [ticket, unrelatedProjectTicket],
         projects: [project1],
-        labels: [],
-        cycles: [],
         users: [],
         projectById,
         updateTicket: vi.fn(),
@@ -141,17 +149,27 @@ describe('TicketContextMenu', () => {
         deleteTicket: vi.fn(),
         addTicketDependency: addTicketDependencyMock,
         addTicketBlocker: addTicketBlockerMock,
-        assignLabelToTicket: vi.fn(),
-        unassignLabelFromTicket: vi.fn(),
         removeTicketDependency: vi.fn(),
         removeTicketBlocker: vi.fn(),
       } as any}>
-        <TicketContextMenu
-          ticket={ticket}
-          availableTickets={[ticket, dependencyTargetTicket, blockerTargetTicket]}
-        >
-          <div data-testid="ticket-trigger">Trigger Context Menu</div>
-        </TicketContextMenu>
+        <LabelContext.Provider value={{
+          labels: [],
+          globalLabels: [],
+          labelsByProject: new Map(),
+          assignLabelToTicket: vi.fn(),
+          unassignLabelFromTicket: vi.fn(),
+        } as any}>
+          <CycleContext.Provider value={{
+            cycles: [],
+          } as any}>
+            <TicketContextMenu
+              ticket={ticket}
+              availableTickets={[ticket, dependencyTargetTicket, blockerTargetTicket]}
+            >
+              <div data-testid="ticket-trigger">Trigger Context Menu</div>
+            </TicketContextMenu>
+          </CycleContext.Provider>
+        </LabelContext.Provider>
       </TicketContext.Provider>
     );
 
@@ -198,8 +216,6 @@ describe('TicketContextMenu', () => {
       <TicketContext.Provider value={{
         tickets: [ticket, longTitleTicket],
         projects: [project1],
-        labels: [],
-        cycles: [],
         users: [],
         projectById,
         updateTicket: vi.fn(),
@@ -207,17 +223,27 @@ describe('TicketContextMenu', () => {
         deleteTicket: vi.fn(),
         addTicketDependency: vi.fn().mockResolvedValue(true),
         addTicketBlocker: vi.fn().mockResolvedValue(true),
-        assignLabelToTicket: vi.fn(),
-        unassignLabelFromTicket: vi.fn(),
         removeTicketDependency: vi.fn(),
         removeTicketBlocker: vi.fn(),
       } as any}>
-        <TicketContextMenu
-          ticket={ticket}
-          availableTickets={[ticket, longTitleTicket]}
-        >
-          <div data-testid="ticket-trigger">Trigger Context Menu</div>
-        </TicketContextMenu>
+        <LabelContext.Provider value={{
+          labels: [],
+          globalLabels: [],
+          labelsByProject: new Map(),
+          assignLabelToTicket: vi.fn(),
+          unassignLabelFromTicket: vi.fn(),
+        } as any}>
+          <CycleContext.Provider value={{
+            cycles: [],
+          } as any}>
+            <TicketContextMenu
+              ticket={ticket}
+              availableTickets={[ticket, longTitleTicket]}
+            >
+              <div data-testid="ticket-trigger">Trigger Context Menu</div>
+            </TicketContextMenu>
+          </CycleContext.Provider>
+        </LabelContext.Provider>
       </TicketContext.Provider>
     );
 
