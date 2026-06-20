@@ -269,4 +269,68 @@ describe('TicketDetailContext', () => {
       expect(currentValue.comments.map((comment) => comment.id)).toEqual(['comment-2']);
     });
   });
+
+  it('clears stale detail and comments when the active ticket is deselected', async () => {
+    const queryClient = createQueryClient();
+    const setActiveTicket = vi.fn();
+    const activeTicket = makeTicket();
+    const activeTicketDetail = makeTicketWithRelations({
+      ...activeTicket,
+      dependencies: [],
+      blockers: [],
+    });
+    const activeTicketComments = [makeComment()];
+
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? 'GET';
+
+      if (url === '/api/v1/tickets/ticket-1' && method === 'GET') {
+        return Promise.resolve(jsonResponse(activeTicketDetail));
+      }
+
+      if (url === '/api/v1/tickets/ticket-1/comments' && method === 'GET') {
+        return Promise.resolve(jsonResponse(activeTicketComments));
+      }
+
+      return Promise.resolve(jsonResponse([]));
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { rerender } = render(
+      <QueryClientProvider client={queryClient}>
+        <Probe
+          activeTicket={activeTicket}
+          setActiveTicket={setActiveTicket}
+          activeProjectId="project-1"
+          tickets={[activeTicket]}
+          isAuthenticated
+        />
+      </QueryClientProvider>
+    );
+
+    await waitFor(() => {
+      expect(currentValue.activeTicketDetail?.id).toBe('ticket-1');
+      expect(currentValue.comments.map((comment) => comment.id)).toEqual(['comment-1']);
+    });
+
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <Probe
+          activeTicket={null}
+          setActiveTicket={setActiveTicket}
+          activeProjectId="project-1"
+          tickets={[activeTicket]}
+          isAuthenticated
+        />
+      </QueryClientProvider>
+    );
+
+    await waitFor(() => {
+      expect(currentValue.activeTicket).toBeNull();
+      expect(currentValue.activeTicketDetail).toBeNull();
+      expect(currentValue.comments).toEqual([]);
+    });
+  });
 });

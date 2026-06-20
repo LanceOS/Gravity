@@ -51,6 +51,13 @@ export function useTicketDetailContextValue({
     }
   }, [activeTicketDetailQuery.data]);
 
+  useEffect(() => {
+    if (!activeTicketId) {
+      previousActiveTicketDetailRef.current = null;
+      previousCommentsRef.current = undefined;
+    }
+  }, [activeTicketId]);
+
   const commentsQuery = useQuery<Comment[]>({
     queryKey: queryKeys.comments(activeTicketId || ''),
     queryFn: () => apiClient.get<Comment[]>(`/tickets/${activeTicketId}/comments`, { projectId: activeTicketProjectId }),
@@ -64,8 +71,12 @@ export function useTicketDetailContextValue({
     }
   }, [commentsQuery.data]);
 
-  const activeTicketDetail = activeTicketDetailQuery.data ?? previousActiveTicketDetailRef.current ?? null;
-  const comments = commentsQuery.data ?? previousCommentsRef.current ?? [];
+  const activeTicketDetail = activeTicketId
+    ? activeTicketDetailQuery.data ?? previousActiveTicketDetailRef.current ?? null
+    : null;
+  const comments = activeTicketId
+    ? commentsQuery.data ?? previousCommentsRef.current ?? []
+    : [];
 
   useEffect(() => {
     if (!activeTicket) {

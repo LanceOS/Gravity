@@ -55,8 +55,8 @@ export function useProjectContextValue({
   const projectsByWorkspaceId = useMemo(() => createProjectsByWorkspaceId(projects), [projects]);
   const projectsLoading = projectsQuery.isLoading;
 
-  const invalidateWorkspaceSidebarQueries = useCallback((projectId?: string | null) => {
-    invalidateWorkspaceSidebarQueriesHelper(queryClient, projectLookup, projectId);
+  const invalidateWorkspaceSidebarQueries = useCallback((projectId?: string | null, workspaceIds: Array<string | null | undefined> = []) => {
+    invalidateWorkspaceSidebarQueriesHelper(queryClient, projectLookup, projectId, workspaceIds);
   }, [projectLookup, queryClient]);
 
   const fetchInitialData = useCallback(async (userId?: string) => {
@@ -110,7 +110,7 @@ export function useProjectContextValue({
           return old ? [...old, project] : [project];
         });
         queryClient.invalidateQueries({ queryKey: queryKeys.projects(currentUser.id) });
-        invalidateWorkspaceSidebarQueries(project.id);
+        invalidateWorkspaceSidebarQueries(project.id, [project.workspaceId]);
         setActiveProjectId(project.id);
       }
     },
@@ -147,9 +147,10 @@ export function useProjectContextValue({
         queryClient.setQueryData(queryKeys.projects(currentUser.id), context.previousProjects);
       }
     },
-    onSuccess: (project) => {
+    onSuccess: (project, { id }, context) => {
       if (project) {
-        invalidateWorkspaceSidebarQueries(project.id);
+        const previousWorkspaceId = context?.previousProjects?.find((previousProject) => previousProject.id === id)?.workspaceId;
+        invalidateWorkspaceSidebarQueries(project.id, [previousWorkspaceId, project.workspaceId]);
       }
     },
     onSettled: () => {
@@ -194,8 +195,9 @@ export function useProjectContextValue({
         queryClient.setQueryData(queryKeys.projects(currentUser.id), context.previousProjects);
       }
     },
-    onSuccess: (_data, id) => {
-      invalidateWorkspaceSidebarQueries(id);
+    onSuccess: (_data, id, context) => {
+      const previousWorkspaceId = context?.previousProjects?.find((previousProject) => previousProject.id === id)?.workspaceId;
+      invalidateWorkspaceSidebarQueries(id, [previousWorkspaceId]);
     },
     onSettled: () => {
       if (currentUser) {
@@ -222,7 +224,7 @@ export function useProjectContextValue({
     onSuccess: (project) => {
       if (currentUser) {
         queryClient.invalidateQueries({ queryKey: queryKeys.projects(currentUser.id) });
-        invalidateWorkspaceSidebarQueries(project.id);
+        invalidateWorkspaceSidebarQueries(project.id, [project.workspaceId]);
         setActiveProjectId(project.id);
       }
     },

@@ -65,13 +65,28 @@ export function invalidateWorkspaceSidebarQueries(
   queryClient: QueryClient,
   projectLookup: Map<string, ProjectLookupEntry>,
   projectId?: string | null,
+  workspaceIds: Array<string | null | undefined> = [],
 ): void {
+  const targetWorkspaceIds = new Set<string>();
+
+  for (const workspaceId of workspaceIds) {
+    if (workspaceId) {
+      targetWorkspaceIds.add(workspaceId);
+    }
+  }
+
   if (projectId) {
     const workspaceId = projectLookup.get(projectId)?.workspaceId;
     if (workspaceId) {
-      queryClient.invalidateQueries({ queryKey: queryKeys.workspaceSidebarTree(workspaceId), exact: true });
-      return;
+      targetWorkspaceIds.add(workspaceId);
     }
+  }
+
+  if (targetWorkspaceIds.size > 0) {
+    for (const workspaceId of targetWorkspaceIds) {
+      queryClient.invalidateQueries({ queryKey: queryKeys.workspaceSidebarTree(workspaceId), exact: true });
+    }
+    return;
   }
 
   for (const [queryKey] of queryClient.getQueriesData({ queryKey: ['workspace'] })) {
