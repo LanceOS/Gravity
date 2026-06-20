@@ -75,7 +75,7 @@ interface UseMoveTicketArgs {
   activeProjectIdRef: React.MutableRefObject<string>;
   activeTicketRef: React.MutableRefObject<Ticket | null>;
   setActiveProjectIdState: (id: string) => void;
-  setFiltersState: React.Dispatch<React.SetStateAction<TicketFiltersState>>;
+  setFilters: (filters: Partial<TicketFiltersState>) => void;
   setActiveTicket: React.Dispatch<React.SetStateAction<Ticket | null>>;
 }
 
@@ -86,7 +86,7 @@ export function useMoveTicket({
   activeProjectIdRef,
   activeTicketRef,
   setActiveProjectIdState,
-  setFiltersState,
+  setFilters,
   setActiveTicket,
 }: UseMoveTicketArgs) {
   const moveTicketMutation = useMutation({
@@ -144,7 +144,7 @@ export function useMoveTicket({
 
       if (switchedProject) {
         setActiveProjectIdState(targetProjectId);
-        setFiltersState((prev) => ({ ...prev, projectId: targetProjectId }));
+        setFilters({ projectId: targetProjectId });
         setActiveTicket(optimisticTicket);
       }
 
@@ -171,7 +171,7 @@ export function useMoveTicket({
 
       if (context?.switchedProject) {
         setActiveProjectIdState(context.previousActiveProjectId);
-        setFiltersState((prev) => ({ ...prev, projectId: context.previousActiveProjectId }));
+        setFilters({ projectId: context.previousActiveProjectId });
         setActiveTicket(context.previousActiveTicket);
       }
     },
