@@ -19,13 +19,16 @@ export {
 export {
   candidateMatchesKey,
   combineTicketDetails,
+  findCachedTicketByKeyOrId,
   findTicketInList,
   getListQueryProjectId,
   hasEquivalentTicketFields,
+  invalidateAggregateTicketQueries,
   patchTicketInListById,
   patchTicketLabelAssignment,
   normalizeTicketPayload,
   normalizeCommentPayload,
+  type TicketAggregateProjectMetadata,
   patchTicketInAllCaches,
   invalidateTicketCaches,
 } from './ticketCache';
@@ -35,4 +38,3 @@ export {
   resetFilters,
   type TicketFiltersState,
 } from './filters';
-

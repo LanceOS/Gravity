@@ -42,20 +42,19 @@ type MockTextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
 const mockAssignLabel = vi.fn().mockResolvedValue(true);
 const mockUnassignLabel = vi.fn().mockResolvedValue(true);
 const mockCreateLabel = vi.fn().mockResolvedValue({ id: 'label-3', name: 'New Label', color: '#6B7280' });
-let mockTickets: Array<{ id: string; key: string; title: string; projectId: string }> = [];
 
-vi.mock('../../context/TicketContextContext', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../context/TicketContextContext')>();
-  return {
-    ...actual,
-    useTickets: () => ({
-      assignLabelToTicket: mockAssignLabel,
-      unassignLabelFromTicket: mockUnassignLabel,
-      createLabel: mockCreateLabel,
-      tickets: mockTickets,
-    }),
-  };
-});
+vi.mock('../../context/label/LabelContext', () => ({
+  useLabels: () => ({
+    labels: [],
+    globalLabels: [],
+    labelsByProject: new Map(),
+    assignLabelToTicket: mockAssignLabel,
+    unassignLabelFromTicket: mockUnassignLabel,
+    createLabel: mockCreateLabel,
+    updateLabel: vi.fn(),
+    deleteLabel: vi.fn(),
+  }),
+}));
 
 vi.mock('@library', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@library')>();
@@ -359,7 +358,6 @@ function withRelatedTicketIds(ticket: Ticket): TicketWithRelations {
 }
 
 function renderTicketDetail(overrides: Partial<Parameters<typeof TicketDetail>[0]> = {}, contextTickets = defaultContextTickets) {
-  mockTickets = contextTickets;
   const activeTicketDetail = overrides.activeTicketDetail ? withRelatedTicketIds(overrides.activeTicketDetail) : overrides.activeTicketDetail ?? null;
   const normalizedOverrides = {
     ...overrides,

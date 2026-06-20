@@ -1,4 +1,4 @@
-import type { Ticket, Comment, Label } from '../../types/domain';
+import type { Ticket, Comment, Label, Project } from '../../types/domain';
 import { mergeTicketRelationSnapshot, type TicketWithRelations } from '../../modules/tickets/utils/ticketRelations';
 import type { QueryClient } from '@tanstack/react-query';
 import { queryKeys } from '../../utils/queryClient';
@@ -41,8 +41,7 @@ export function combineTicketDetails(
 }
 
 // ---------------------------------------------------------------------------
-// Pure candidate-matching predicates used by findCachedTicketByKeyOrId
-// (the full function lives in TicketContext because it closes over queryClient)
+// Pure candidate-matching predicates used by findCachedTicketByKeyOrId.
 // ---------------------------------------------------------------------------
 
 /**
@@ -78,6 +77,98 @@ export function findTicketInList(
       (normalizedKey ? candidate.key === normalizedKey : false) ||
       (normalizedId ? candidate.id === normalizedId : false),
   );
+}
+
+export type TicketAggregateProjectMetadata = {
+  workspaceId: string;
+  teamId: string | null;
+};
+
+export function findCachedTicketByKeyOrId(
+  queryClient: QueryClient,
+  ticketKey?: string,
+  ticketId?: string,
+): Ticket | TicketWithRelations | undefined {
+  const normalizedTicketKey = ticketKey?.toUpperCase();
+  const normalizedTicketId = ticketId?.trim();
+
+  if (normalizedTicketId) {
+    const byIdDetail = queryClient.getQueryData<TicketWithRelations>(queryKeys.ticketDetail(normalizedTicketId));
+    if (byIdDetail) {
+      return byIdDetail;
+    }
+  }
+
+  if (normalizedTicketKey) {
+    const byKeyQueries = queryClient.getQueriesData<unknown>({ queryKey: ['tickets', 'detail', normalizedTicketKey] });
+    for (const [, candidate] of byKeyQueries) {
+      if (candidateMatchesKey(candidate, normalizedTicketKey)) {
+        return candidate;
+      }
+    }
+
+    const byRelationQueries = queryClient.getQueriesData<unknown>({ queryKey: ['tickets', 'relations', normalizedTicketKey] });
+    for (const [, candidate] of byRelationQueries) {
+      if (candidateMatchesKey(candidate, normalizedTicketKey)) {
+        return candidate as TicketWithRelations;
+      }
+    }
+  }
+
+  const listQueries = queryClient.getQueriesData<Ticket[]>({ queryKey: ['tickets'] });
+  for (const [, candidateList] of listQueries) {
+    if (!Array.isArray(candidateList)) {
+      continue;
+    }
+
+    const match = findTicketInList(candidateList, normalizedTicketKey, normalizedTicketId);
+    if (match) {
+      return match;
+    }
+  }
+
+  return undefined;
+}
+
+export function invalidateAggregateTicketQueries(
+  queryClient: QueryClient,
+  projectId?: string,
+): void {
+  if (!projectId) {
+    return;
+  }
+
+  const projectQueries = queryClient.getQueriesData<Project[]>({ queryKey: ['projects'] });
+  let metadata: TicketAggregateProjectMetadata | undefined;
+
+  for (const [, projects] of projectQueries) {
+    if (!Array.isArray(projects)) {
+      continue;
+    }
+
+    const match = projects.find((project) => project.id === projectId);
+    if (match) {
+      metadata = {
+        workspaceId: match.workspaceId || '',
+        teamId: match.teamId || null,
+      };
+      break;
+    }
+  }
+
+  if (!metadata) {
+    queryClient.invalidateQueries({ queryKey: ['workspaceTickets'] });
+    queryClient.invalidateQueries({ queryKey: ['teamTickets'] });
+    return;
+  }
+
+  if (metadata.workspaceId) {
+    queryClient.invalidateQueries({ queryKey: ['workspaceTickets', metadata.workspaceId] });
+  }
+
+  if (metadata.teamId) {
+    queryClient.invalidateQueries({ queryKey: ['teamTickets', metadata.teamId] });
+  }
 }
 
 /**
