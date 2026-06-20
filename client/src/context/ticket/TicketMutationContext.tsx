@@ -2,10 +2,15 @@ import React, { createContext, useContext, useCallback, useRef, useEffect, useMe
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { useActiveProject } from '../project/ActiveProjectContext';
 import { useTicketFilters } from '../filters/TicketFiltersContext';
-import { useTickets } from '../TicketContextContext';
+import { useActiveTicket } from './ActiveTicketContext';
 import { useMoveTicket } from '../utils/useMoveTicket';
 import { queryKeys } from '../../utils/queryClient';
-import { patchTicketInListById, hasEquivalentTicketFields } from '../shared';
+import {
+  findCachedTicketByKeyOrId,
+  hasEquivalentTicketFields,
+  invalidateAggregateTicketQueries,
+  patchTicketInListById,
+} from '../shared';
 import { toast } from '@library';
 import type { Ticket } from '../../types/domain';
 import type { 
@@ -19,8 +24,13 @@ import { API_URL, TICKET_UPDATE_DEBOUNCE_MS } from './ticketMutationUtils';
 
 export const TicketMutationContext = createContext<TicketMutationContextType | undefined>(undefined);
 
-export const useTicketMutations = () => {
+export const useOptionalTicketMutations = () => {
   const context = useContext(TicketMutationContext);
+  return context;
+};
+
+export const useTicketMutations = () => {
+  const context = useOptionalTicketMutations();
   if (!context) {
     throw new Error('useTicketMutations must be used within a TicketMutationProvider');
   }
@@ -31,12 +41,7 @@ export const TicketMutationProvider: React.FC<{ children: React.ReactNode }> = (
   const queryClient = useQueryClient();
   const { activeProjectIdRef, setActiveProjectId } = useActiveProject();
   const { setFilters } = useTicketFilters();
-  const { 
-    activeTicket, 
-    setActiveTicket, 
-    invalidateAggregateTicketQueries,
-    findCachedTicketByKeyOrId,
-  } = useTickets();
+  const { activeTicket, setActiveTicket } = useActiveTicket();
 
   const activeTicketRef = useRef(activeTicket);
   useEffect(() => {
@@ -81,8 +86,7 @@ export const TicketMutationProvider: React.FC<{ children: React.ReactNode }> = (
           old ? [...old, normalizedTicket] : [normalizedTicket]
         );
       }
-      // Access the invalidateAggregateTicketQueries function from TicketContext
-      invalidateAggregateTicketQueries(ticketInput.projectId);
+      invalidateAggregateTicketQueries(queryClient, ticketInput.projectId);
     },
   });
 
@@ -185,8 +189,7 @@ export const TicketMutationProvider: React.FC<{ children: React.ReactNode }> = (
     updates: Partial<Ticket>,
     options?: TicketUpdateOptions
   ) => {
-    // Note: findCachedTicketByKeyOrId needs to be exposed from TicketContext
-    const cachedTicket = findCachedTicketByKeyOrId(undefined, id);
+    const cachedTicket = findCachedTicketByKeyOrId(queryClient, undefined, id);
     const projectId = cachedTicket?.projectId || activeProjectIdRef.current;
     if (!projectId) return;
 
@@ -303,7 +306,7 @@ export const TicketMutationProvider: React.FC<{ children: React.ReactNode }> = (
     nextBatch.timerId = window.setTimeout(() => {
       void flushPendingTicketUpdate(id);
     }, TICKET_UPDATE_DEBOUNCE_MS);
-  }, [findCachedTicketByKeyOrId, flushPendingTicketUpdate, queryClient, updateTicketMutation, setActiveTicket, activeProjectIdRef]);
+  }, [activeProjectIdRef, flushPendingTicketUpdate, queryClient, setActiveTicket, updateTicketMutation]);
 
   const deleteTicketMutation = useMutation({
     mutationFn: async (id: string) => {

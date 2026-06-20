@@ -286,4 +286,25 @@ describe('TicketContextMenu', () => {
       whiteSpace: 'nowrap',
     });
   });
+
+  it('renders children unchanged when the mutation provider is absent', () => {
+    render(
+      <TicketContext.Provider value={{
+        tickets: [ticket],
+        projects: [project1],
+        users: [],
+        projectById,
+        addTicketDependency: vi.fn(),
+        addTicketBlocker: vi.fn(),
+        removeTicketDependency: vi.fn(),
+        removeTicketBlocker: vi.fn(),
+      } as any}>
+        <TicketContextMenu ticket={ticket}>
+          <div data-testid="ticket-trigger">Trigger Context Menu</div>
+        </TicketContextMenu>
+      </TicketContext.Provider>
+    );
+
+    expect(screen.getByTestId('ticket-trigger')).toBeInTheDocument();
+  });
 });

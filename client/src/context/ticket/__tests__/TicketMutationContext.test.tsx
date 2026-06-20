@@ -2,7 +2,7 @@ import React from 'react';
 import { act, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { Ticket } from '../../../types/domain';
+import type { Project, Ticket } from '../../../types/domain';
 import { queryKeys } from '../../../utils/queryClient';
 import { TicketMutationProvider, useTicketMutations } from '../TicketMutationContext';
 import type { TicketMutationContextType } from '../TicketMutationContext.types';
@@ -13,14 +13,14 @@ const mocks = vi.hoisted(() => {
 
   return {
     moveTicketMock,
-    useTickets: vi.fn(),
+    useActiveTicket: vi.fn(),
     useActiveProject: vi.fn(),
     useTicketFilters: vi.fn(),
   };
 });
 
-vi.mock('../../TicketContextContext', () => ({
-  useTickets: mocks.useTickets,
+vi.mock('../ActiveTicketContext', () => ({
+  useActiveTicket: mocks.useActiveTicket,
 }));
 
 vi.mock('../../project/ActiveProjectContext', () => ({
@@ -50,6 +50,16 @@ const baseTicket: Ticket = {
   prUrl: null,
   createdAt: '2026-06-01T00:00:00.000Z',
   updatedAt: '2026-06-01T00:00:00.000Z',
+};
+
+const aggregateProject: Project = {
+  id: 'project-1',
+  name: 'Gravity Core',
+  key: 'GRA',
+  description: '',
+  status: 'active',
+  workspaceId: 'workspace-1',
+  teamId: 'team-1',
 };
 
 function jsonResponse(body: unknown, status = 200) {
@@ -88,39 +98,19 @@ function renderWithProvider(queryClient: QueryClient) {
 
 function configureContext({
   activeTicket = null,
-  cachedTicket = baseTicket,
 }: {
   activeTicket?: Ticket | null;
-  cachedTicket?: Ticket | null;
 } = {}) {
   const setActiveTicket = vi.fn();
-  const invalidateAggregateTicketQueries = vi.fn();
-  const findCachedTicketByKeyOrId = vi.fn((ticketKey?: string, ticketId?: string) => {
-    if (!cachedTicket) {
-      return undefined;
-    }
 
-    if (ticketId && ticketId === cachedTicket.id) {
-      return cachedTicket;
-    }
-
-    if (ticketKey && ticketKey.toUpperCase() === cachedTicket.key.toUpperCase()) {
-      return cachedTicket;
-    }
-
-    return undefined;
-  });
-
-  mocks.useTickets.mockReturnValue({
+  mocks.useActiveTicket.mockReturnValue({
     activeTicket,
     setActiveTicket,
-    invalidateAggregateTicketQueries,
-    findCachedTicketByKeyOrId,
   });
 
   mocks.useActiveProject.mockReturnValue({
-    activeProjectId: cachedTicket?.projectId ?? '',
-    activeProjectIdRef: { current: cachedTicket?.projectId ?? '' },
+    activeProjectId: activeTicket?.projectId ?? baseTicket.projectId,
+    activeProjectIdRef: { current: activeTicket?.projectId ?? baseTicket.projectId },
     setActiveProjectId: vi.fn(),
   });
 
@@ -130,8 +120,6 @@ function configureContext({
 
   return {
     setActiveTicket,
-    invalidateAggregateTicketQueries,
-    findCachedTicketByKeyOrId,
   };
 }
 
@@ -149,8 +137,10 @@ describe('TicketMutationProvider', () => {
   it('creates tickets and invalidates aggregate queries', async () => {
     const queryClient = createQueryClient();
     queryClient.setQueryData(queryKeys.tickets('project-1'), [] as Ticket[]);
+    queryClient.setQueryData(queryKeys.projects('user-1'), [aggregateProject]);
+    const invalidateQueriesSpy = vi.spyOn(queryClient, 'invalidateQueries');
 
-    const { invalidateAggregateTicketQueries } = configureContext();
+    configureContext();
     const createdTicket: Ticket = {
       ...baseTicket,
       id: 'ticket-2',
@@ -186,7 +176,8 @@ describe('TicketMutationProvider', () => {
       })
     );
     expect(queryClient.getQueryData<Ticket[]>(queryKeys.tickets('project-1'))).toEqual([createdTicket]);
-    expect(invalidateAggregateTicketQueries).toHaveBeenCalledWith('project-1');
+    expect(invalidateQueriesSpy).toHaveBeenCalledWith({ queryKey: ['workspaceTickets', 'workspace-1'] });
+    expect(invalidateQueriesSpy).toHaveBeenCalledWith({ queryKey: ['teamTickets', 'team-1'] });
   });
 
   it('batches debounced ticket updates into a single request', async () => {
@@ -195,7 +186,7 @@ describe('TicketMutationProvider', () => {
     const queryClient = createQueryClient();
     queryClient.setQueryData(queryKeys.tickets('project-1'), [baseTicket]);
 
-    configureContext({ activeTicket: baseTicket, cachedTicket: baseTicket });
+    configureContext({ activeTicket: baseTicket });
     const updatedTicket: Ticket = {
       ...baseTicket,
       title: 'Renamed ticket',
@@ -242,7 +233,7 @@ describe('TicketMutationProvider', () => {
     const queryClient = createQueryClient();
     queryClient.setQueryData(queryKeys.tickets('project-1'), [baseTicket]);
 
-    const { setActiveTicket } = configureContext({ activeTicket: baseTicket, cachedTicket: baseTicket });
+    const { setActiveTicket } = configureContext({ activeTicket: baseTicket });
     const fetchMock = vi.fn().mockResolvedValue(new Response('boom', { status: 500 }));
     vi.stubGlobal('fetch', fetchMock);
     renderWithProvider(queryClient);
@@ -272,7 +263,7 @@ describe('TicketMutationProvider', () => {
 
   it('delegates moveTicket to the injected move hook', async () => {
     const queryClient = createQueryClient();
-    configureContext({ activeTicket: baseTicket, cachedTicket: baseTicket });
+    configureContext({ activeTicket: baseTicket });
     renderWithProvider(queryClient);
 
     await act(async () => {

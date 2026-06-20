@@ -9,8 +9,8 @@ import { useTicketRelationActions } from '../hooks/useTicketRelationActions';
 import type { TicketWithRelations } from '../modules/tickets/utils/ticketRelations';
 import {
   combineTicketDetails,
-  candidateMatchesKey,
-  findTicketInList,
+  findCachedTicketByKeyOrId,
+  invalidateAggregateTicketQueries,
   getListQueryProjectId,
   hasEquivalentTicketFields,
   initialFilters,
@@ -25,6 +25,7 @@ import {
 import { authClient } from './auth/authClient';
 import { toast } from '@library';
 import { TicketContext } from './TicketContextContext';
+import { ActiveTicketContext } from './ticket/ActiveTicketContext';
 import { useActiveProject } from './project/ActiveProjectContext';
 import { useActiveView } from './ui/ActiveViewContext';
 import { useTicketFilters } from './filters/TicketFiltersContext';
@@ -73,8 +74,6 @@ export interface TicketContextType extends State {
   setActiveProjectId: (id: string) => void;
   fetchInitialData: (userId?: string) => Promise<void>;
   fetchProjectData: (projId: string) => Promise<void>;
-  findCachedTicketByKeyOrId: (ticketKey?: string, ticketId?: string) => (Ticket | TicketWithRelations) | undefined;
-  invalidateAggregateTicketQueries: (projectId?: string) => void;
   addComment: (ticketId: string, body: string) => Promise<void>;
   updateComment: (ticketId: string, commentId: string, body: string) => Promise<void>;
   deleteComment: (ticketId: string, commentId: string) => Promise<void>;
@@ -178,25 +177,6 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return projects.length > 0 && projects[0]?.workspaceId ? projects[0].workspaceId : '';
   }, [activeProjectId, projectLookup, projects]);
 
-  const invalidateAggregateTicketQueries = useCallback((projectId?: string) => {
-    if (!projectId) return;
-
-    const metadata = projectLookup.get(projectId);
-    if (!metadata) {
-      queryClient.invalidateQueries({ queryKey: ['workspaceTickets'] });
-      queryClient.invalidateQueries({ queryKey: ['teamTickets'] });
-      return;
-    }
-
-    if (metadata.workspaceId) {
-      queryClient.invalidateQueries({ queryKey: ['workspaceTickets', metadata.workspaceId] });
-    }
-
-    if (metadata.teamId) {
-      queryClient.invalidateQueries({ queryKey: ['teamTickets', metadata.teamId] });
-    }
-  }, [projectLookup]);
-
   const invalidateWorkspaceSidebarQueries = useCallback((projectId?: string | null) => {
     if (projectId) {
       const workspaceId = projectLookup.get(projectId)?.workspaceId;
@@ -252,48 +232,6 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         queryClient.removeQueries({ queryKey: [...queryKey], exact: true });
       }
     }
-  }, [queryClient]);
-
-  const findCachedTicketByKeyOrId = useCallback((ticketKey?: string, ticketId?: string): (Ticket | TicketWithRelations) | undefined => {
-    const normalizedTicketKey = ticketKey?.toUpperCase();
-    const normalizedTicketId = ticketId?.trim();
-
-    if (normalizedTicketId) {
-      const byIdDetail = queryClient.getQueryData<TicketWithRelations>(queryKeys.ticketDetail(normalizedTicketId));
-      if (byIdDetail) {
-        return byIdDetail;
-      }
-    }
-
-    if (normalizedTicketKey) {
-      const byKeyQueries = queryClient.getQueriesData<unknown>({ queryKey: ['tickets', 'detail', normalizedTicketKey] });
-      for (const [, candidate] of byKeyQueries) {
-        if (candidateMatchesKey(candidate, normalizedTicketKey)) {
-          return candidate;
-        }
-      }
-
-      const byRelationQueries = queryClient.getQueriesData<unknown>({ queryKey: ['tickets', 'relations', normalizedTicketKey] });
-      for (const [, candidate] of byRelationQueries) {
-        if (candidateMatchesKey(candidate, normalizedTicketKey)) {
-          return candidate as TicketWithRelations;
-        }
-      }
-    }
-
-    const listQueries = queryClient.getQueriesData<Ticket[]>({ queryKey: ['tickets'] });
-    for (const [, candidateList] of listQueries) {
-      if (!Array.isArray(candidateList)) {
-        continue;
-      }
-
-      const match = findTicketInList(candidateList, normalizedTicketKey, normalizedTicketId);
-      if (match) {
-        return match;
-      }
-    }
-
-    return undefined;
   }, [queryClient]);
 
   const upsertTicketInListCachesFromSse = useCallback((normalizedTicket: Ticket, sourceProjectIdHint?: string) => {
@@ -386,7 +324,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const ticketKey = normalizedTicket.key;
     const ticketId = normalizedTicket.id;
-    const cachedTicket = findCachedTicketByKeyOrId(ticketKey, ticketId);
+    const cachedTicket = findCachedTicketByKeyOrId(queryClient, ticketKey, ticketId);
     const sourceProjectId = cachedTicket?.projectId;
 
     queryClient.setQueryData<TicketWithRelations>(queryKeys.ticketDetail(ticketId), (existing) => {
@@ -432,7 +370,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     upsertTicketInListCachesFromSse(normalizedTicket, sourceProjectId);
-  }, [queryClient, findCachedTicketByKeyOrId, upsertTicketInListCachesFromSse]);
+  }, [queryClient, upsertTicketInListCachesFromSse]);
 
   const upsertSseComment = useCallback((comment: Comment | null) => {
     const normalizedComment = normalizeCommentPayload(comment);
@@ -629,17 +567,17 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
 
       const payloadTicketId = extractString(messageData.ticketId) || extractString(event.ticketId);
-      const cachedById = payloadTicketId ? findCachedTicketByKeyOrId(undefined, payloadTicketId) : undefined;
+      const cachedById = payloadTicketId ? findCachedTicketByKeyOrId(queryClient, undefined, payloadTicketId) : undefined;
       if (cachedById) {
         return cachedById;
       }
 
-      return event.ticketKey ? findCachedTicketByKeyOrId(event.ticketKey, payloadTicketId) : undefined;
+      return event.ticketKey ? findCachedTicketByKeyOrId(queryClient, event.ticketKey, payloadTicketId) : undefined;
     };
 
     const invalidateProjectMetadata = (projectId?: string) => {
       if (projectId) {
-        invalidateAggregateTicketQueries(projectId);
+        invalidateAggregateTicketQueries(queryClient, projectId);
       }
     };
 
@@ -856,8 +794,6 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [
     sseWorkspaceId,
     invalidateCommentCacheFromSse,
-    invalidateAggregateTicketQueries,
-    findCachedTicketByKeyOrId,
     hydrateAndUpsertTicketFromSse,
     upsertSseComment,
     upsertTicketFromSse,
@@ -1175,8 +1111,6 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setActiveProjectId,
       fetchInitialData,
       fetchProjectData,
-      findCachedTicketByKeyOrId,
-      invalidateAggregateTicketQueries,
       addComment,
       updateComment,
       deleteComment,
@@ -1208,8 +1142,6 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setActiveProjectId,
       fetchInitialData,
       fetchProjectData,
-      findCachedTicketByKeyOrId,
-      invalidateAggregateTicketQueries,
       addComment,
       updateComment,
       deleteComment,
@@ -1230,5 +1162,17 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     ]
   );
 
-  return <TicketContext.Provider value={value}>{children}</TicketContext.Provider>;
+  const activeTicketContextValue = useMemo(
+    () => ({
+      activeTicket,
+      setActiveTicket,
+    }),
+    [activeTicket]
+  );
+
+  return (
+    <ActiveTicketContext.Provider value={activeTicketContextValue}>
+      <TicketContext.Provider value={value}>{children}</TicketContext.Provider>
+    </ActiveTicketContext.Provider>
+  );
 };
