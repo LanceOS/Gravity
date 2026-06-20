@@ -1,5 +1,8 @@
 import React, { useContext, useMemo } from 'react';
-import { TicketContext, type Label, type Project, type Ticket } from '../../../context/TicketContextContext';
+import { TicketContext, type Project, type Ticket } from '../../../context/TicketContextContext';
+import { useLabels } from '../../../context/label/LabelContext';
+import { useCycles } from '../../../context/cycle/CycleContext';
+import type { Label } from '../../../types/domain';
 import { ContextMenu, toast } from '@library';
 import { Check, User, Folder, Tag, AlertCircle, CheckSquare, Trash2, Calendar, Link } from 'lucide-react';
 import { STATUS_OPTIONS, PRIORITY_OPTIONS } from '../utils/TicketDetail';
@@ -25,10 +28,7 @@ export const TicketContextMenu: React.FC<TicketContextMenuProps> = ({ ticket, ch
   const {
     tickets,
     users,
-    cycles,
     projectById,
-    labelsByProject,
-    globalLabels,
     projectsByWorkspaceId,
     projects,
     ticketsByProject,
@@ -37,9 +37,9 @@ export const TicketContextMenu: React.FC<TicketContextMenuProps> = ({ ticket, ch
     deleteTicket,
     addTicketDependency,
     addTicketBlocker,
-    assignLabelToTicket,
-    unassignLabelFromTicket,
   } = context;
+  const { labelsByProject, globalLabels, assignLabelToTicket, unassignLabelFromTicket } = useLabels();
+  const { cycles } = useCycles();
   const safeProjects = useMemo(() => (Array.isArray(projects) ? projects : []), [projects]);
   const sourceTickets = availableTickets ?? tickets;
   const safeLabelsByProject = labelsByProject ?? new Map<string, Label[]>();

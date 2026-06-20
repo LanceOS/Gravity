@@ -11,6 +11,13 @@ vi.mock('../../context/TicketContextContext', () => ({
   useTickets: mocks.useTickets,
 }));
 
+vi.mock('../../context/label/LabelContext', () => ({
+  useLabels: () => ({ labels: [], globalLabels: [], labelsByProject: new Map(), assignLabelToTicket: vi.fn(), unassignLabelFromTicket: vi.fn(), createLabel: vi.fn(), updateLabel: vi.fn(), deleteLabel: vi.fn() }),
+}));
+vi.mock('../../context/cycle/CycleContext', () => ({
+  useCycles: () => ({ cycles: [] }),
+}));
+
 import { useTicketByKey } from '../../hooks/useTicketByKey.ts';
 
 function jsonResponse(body: unknown, status = 200) {
