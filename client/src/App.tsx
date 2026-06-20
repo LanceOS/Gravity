@@ -10,6 +10,8 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { ActiveProjectProvider } from './context/project/ActiveProjectContext';
 import { ActiveViewProvider } from './context/ui/ActiveViewContext';
 import { TicketFiltersProvider } from './context/filters/TicketFiltersContext';
+import { CycleProvider } from './context/cycle/CycleContext';
+import { LabelProvider } from './context/label/LabelContext';
 
 export default function App() {
   return (
@@ -17,13 +19,17 @@ export default function App() {
       <AppThemeProvider>
         <SettingsThemeProvider>
           <ActiveProjectProvider>
-            <TicketFiltersProvider>
-              <ActiveViewProvider>
-                <TicketProvider>
-                  <RouterProvider router={router} />
-                </TicketProvider>
-              </ActiveViewProvider>
-            </TicketFiltersProvider>
+            <CycleProvider>
+              <LabelProvider>
+                <TicketFiltersProvider>
+                  <ActiveViewProvider>
+                    <TicketProvider>
+                      <RouterProvider router={router} />
+                    </TicketProvider>
+                  </ActiveViewProvider>
+                </TicketFiltersProvider>
+              </LabelProvider>
+            </CycleProvider>
           </ActiveProjectProvider>
         </SettingsThemeProvider>
       </AppThemeProvider>
