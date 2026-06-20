@@ -17,18 +17,18 @@ QueryClientProvider          ← outermost data layer
 `TicketProvider` calls `useQueryClient()` internally. If `QueryClientProvider` were nested inside `TicketProvider`, the hook would throw. It must wrap everything that touches React Query.
 
 ### Rule 2 — Theme providers have separate responsibilities
-`ThemeContextProvider` owns persisted theme state and `SettingsThemeProvider` only reads that state to manage CSS custom properties and density. Neither provider calls `useTickets()` or `useQueryClient()`, so they can sit anywhere between `QueryClientProvider` and `TicketProvider` without causing dependency issues.
+`ThemeContextProvider` owns persisted theme state and `SettingsThemeProvider` only reads that state to manage CSS custom properties and density. Neither provider calls `useCurrentUser()`, `useTicketListContext()`, or `useQueryClient()`, so they can sit anywhere between `QueryClientProvider` and `TicketProvider` without causing dependency issues.
 
 ### Rule 3 — `TicketProvider` must wrap `RouterProvider`
-All routed page components that read ticket data (`useTickets()`, `useProjectContext()`, or `useTicketDetailContext()`) must have `TicketProvider` mounted above them.
+All routed page components that read ticket data (`useTicketListContext()`, `useProjectContext()`, `useTicketDetailContext()`, or `useCommentContext()`) must have `TicketProvider` mounted above them.
 
 ### Rule 4 — Future contexts that **depend on** ticket data
-Any new context/provider that calls `useTickets()` internally must be nested **inside** `TicketProvider`.
+Any new context/provider that calls `useTicketListContext()`, `useTicketDetailContext()`, or `useCommentContext()` internally must be nested **inside** `TicketProvider`.
 
 Example (correct):
 ```tsx
 <TicketProvider>
-  <NotificationProvider>   {/* reads tickets via useTickets() */}
+  <NotificationProvider>   {/* reads tickets via ticket-specific hooks */}
     <RouterProvider ... />
   </NotificationProvider>
 </TicketProvider>
@@ -54,14 +54,12 @@ When the monolithic `TicketProvider` is decomposed into smaller providers, the i
 QueryClientProvider
   ThemeContextProvider
     SettingsThemeProvider
-    AuthProvider            ← session / user identity (no ticket deps)
-      WorkspaceProvider     ← projects, members (depends on auth)
-        TicketListProvider  ← ticket list queries (depends on workspace)
-          TicketDetailProvider  ← single-ticket detail (depends on list)
-            RouterProvider
+      ActiveProjectProvider  ← active project selection
+        TicketProvider       ← composes current-user, project, ticket, and realtime state
+          RouterProvider
 ```
 
-Each provider in this chain should only import from `context/shared/` for pure utilities, never from sibling providers, to prevent circular dependencies.
+If a future ticket-specific provider is split out of `TicketProvider`, the decomposition should follow the earlier planned ordering and keep each provider dependent only on the layer above it.
 
 ## Circular Import Guard
 

@@ -15,6 +15,5 @@ export interface TicketDetailContextValueArgs {
   activeTicket: Ticket | null;
   setActiveTicket: Dispatch<SetStateAction<Ticket | null>>;
   activeProjectId: string;
-  tickets: Ticket[];
   isAuthenticated: boolean;
 }

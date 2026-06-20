@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { CheckSquare, Square } from 'lucide-react';
 import type { MarkdownTextProps } from '../types/TicketDetail';
-import { useTickets } from '../../../context/TicketContextContext';
+import { useTicketListContext } from '../../../context/ticket/TicketListContext';
 import { useActiveProject } from '../../../context/project/ActiveProjectContext';
 import { useProjectContext } from '../../../context/project/ProjectContext';
 import { useTicketByKey } from '../../../hooks/useTicketByKey';
@@ -17,7 +17,7 @@ import { renderRichTextHtml } from '@library';
  * @returns {JSX.Element} A React component rendering the inline ticket button.
  */
 export function TicketLink({ ticketKey }: { ticketKey: string }) {
-  const { ticketMap, setActiveTicket } = useTickets();
+  const { ticketMap, setActiveTicket } = useTicketListContext();
   const { setActiveProjectId } = useActiveProject();
   const normalizedKey = ticketKey.toUpperCase();
   const localTicket = ticketMap.get(normalizedKey);

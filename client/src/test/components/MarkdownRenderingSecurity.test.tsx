@@ -3,11 +3,14 @@ import { describe, expect, it, vi } from 'vitest';
 import { MarkdownContent } from '../../modules/tickets/components/MarkdownContent';
 import { FormattedMarkdown } from '../../../../library/components/aichat/FormattedMarkdown';
 
-vi.mock('../../context/TicketContextContext', () => ({
-  useTickets: () => ({
-    projects: [],
-    ticketMap: new Map(),
+vi.mock('../../context/ticket/TicketListContext', () => ({
+  useTicketListContext: () => ({
+    tickets: [],
+    activeTicket: null,
     setActiveTicket: vi.fn(),
+    ticketMap: new Map(),
+    ticketById: new Map(),
+    ticketsByProject: new Map(),
   }),
 }));
 
