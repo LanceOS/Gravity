@@ -9,9 +9,9 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { AuthScreen } from '../../modules/auth';
 
-const mockUseTickets = vi.hoisted(() => ({
-  signIn: vi.fn(),
-  signUp: vi.fn(),
+const mockAuthClient = vi.hoisted(() => ({
+  signIn: { email: vi.fn() },
+  signUp: { email: vi.fn() },
 }));
 
 type MockButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -28,8 +28,8 @@ type MockInputProps = InputHTMLAttributes<HTMLInputElement> & {
   onChange: (event: ChangeEvent<HTMLInputElement>) => void;
 };
 
-vi.mock('../../context/TicketContextContext', () => ({
-  useTickets: () => mockUseTickets,
+vi.mock('../../context/auth/authClient', () => ({
+  authClient: mockAuthClient,
 }));
 
 vi.mock('@library', () => ({
@@ -60,13 +60,13 @@ vi.mock('@library', () => ({
 
 describe('AuthScreen', () => {
   beforeEach(() => {
-    mockUseTickets.signIn.mockReset();
-    mockUseTickets.signUp.mockReset();
+    mockAuthClient.signIn.email.mockReset();
+    mockAuthClient.signUp.email.mockReset();
   });
 
   it('submits sign-in credentials and clears validation errors on success', async () => {
     const user = userEvent.setup();
-    mockUseTickets.signIn.mockResolvedValue(true);
+    mockAuthClient.signIn.email.mockResolvedValue({ data: {}, error: null });
 
     render(<AuthScreen />);
 
@@ -80,14 +80,14 @@ describe('AuthScreen', () => {
     await user.click(screen.getByRole('button', { name: 'Sign In' }));
 
     await waitFor(() => {
-      expect(mockUseTickets.signIn).toHaveBeenCalledWith('user@example.com', 'secret123');
+      expect(mockAuthClient.signIn.email).toHaveBeenCalledWith({ email: 'user@example.com', password: 'secret123' });
     });
     expect(screen.queryByText('Please fill in all required fields.')).not.toBeInTheDocument();
   });
 
   it('toggles to sign-up mode, validates the full name field, and uses signUp', async () => {
     const user = userEvent.setup();
-    mockUseTickets.signUp.mockResolvedValue(true);
+    mockAuthClient.signUp.email.mockResolvedValue({ data: {}, error: null });
 
     render(<AuthScreen />);
 
@@ -105,13 +105,13 @@ describe('AuthScreen', () => {
     await user.click(screen.getByRole('button', { name: 'Create Account' }));
 
     await waitFor(() => {
-      expect(mockUseTickets.signUp).toHaveBeenCalledWith('Jordan Lee', 'new@example.com', 'secret123');
+      expect(mockAuthClient.signUp.email).toHaveBeenCalledWith({ name: 'Jordan Lee', email: 'new@example.com', password: 'secret123' });
     });
   });
 
   it('shows auth failure messages and clears them when switching modes', async () => {
     const user = userEvent.setup();
-    mockUseTickets.signIn.mockResolvedValue(false);
+    mockAuthClient.signIn.email.mockResolvedValue({ data: null, error: { message: 'Invalid email or password.' } });
 
     render(<AuthScreen />);
 
@@ -127,7 +127,7 @@ describe('AuthScreen', () => {
 
   it('surfaces thrown authentication errors', async () => {
     const user = userEvent.setup();
-    mockUseTickets.signIn.mockRejectedValue(new Error('Auth service unavailable'));
+    mockAuthClient.signIn.email.mockRejectedValue(new Error('Auth service unavailable'));
 
     render(<AuthScreen />);
 
