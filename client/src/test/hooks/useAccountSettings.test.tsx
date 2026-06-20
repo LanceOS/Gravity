@@ -30,6 +30,7 @@ describe('useAccountSettings', () => {
       .mockResolvedValueOnce(
         jsonResponse({
           userId: currentUser.id,
+          tutorialCompleted: true,
           defaultView: 'list',
           theme: 'coffee',
           ollamaModel: 'llama3.2',
@@ -73,6 +74,7 @@ describe('useAccountSettings', () => {
     });
 
     expect(result.current.settings).toMatchObject({
+      tutorialCompleted: true,
       defaultView: 'list',
       theme: 'coffee',
       projectLayout: 'condensed',

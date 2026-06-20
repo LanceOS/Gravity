@@ -87,7 +87,6 @@ export function WorkspaceShellPage() {
     setActiveProjectId,
     setActiveTicket,
     setFilters,
-    setTheme,
     setView,
     tickets,
     updateTicket,
@@ -100,6 +99,7 @@ export function WorkspaceShellPage() {
     removeTicketBlocker,
   } = useTickets();
   const [activeSection, setActiveSection] = useState<AppSection>('workspace');
+  const [localTutorialCompleted, setLocalTutorialCompleted] = useState(false);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState('');
   const [activeContext, setActiveContext] = useState<'issues' | 'notes'>('issues');
   const [activeNoteId, setActiveNoteId] = useState<string>('');
@@ -627,7 +627,7 @@ export function WorkspaceShellPage() {
     activeView,
     theme,
     setView,
-    setTheme,
+    setTheme: setDsTheme,
   });
   useEffect(() => {
     if (accountSettings) {
@@ -885,10 +885,19 @@ export function WorkspaceShellPage() {
     return <LoadingPage />;
   }
 
-  const onboarding = currentUser.tutorial_completed === 0 || currentUser.tutorial_completed === false ? (
+  const onboarding = !localTutorialCompleted && accountSettings.tutorialCompleted === false ? (
     <OnboardingModal
-      onComplete={() => {
-        console.log('TODO: tutorial completed for', currentUser);
+      onComplete={async () => {
+        setLocalTutorialCompleted(true);
+        try {
+          await fetch(`/api/v1/users/${currentUser.id}/tutorial`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ completed: true }),
+          });
+        } catch (e) {
+          // Ignore
+        }
       }}
     />
   ) : null;

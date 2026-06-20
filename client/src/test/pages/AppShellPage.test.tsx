@@ -669,7 +669,7 @@ describe('AppShellPage', () => {
       currentUser: makeCurrentUser(),
     });
 
-    renderAppShell({ tickets });
+    renderAppShell({ tickets, initialEntries: ['/workspaces'] });
 
     await waitFor(() => {
       expect(screen.getByText('OnboardingModal')).toBeInTheDocument();
@@ -684,9 +684,35 @@ describe('AppShellPage', () => {
         expect.objectContaining({
           method: 'PATCH',
           body: JSON.stringify({ completed: true }),
-        })
+      })
       );
     });
+  });
+
+  it('keeps onboarding hidden in the workspace shell when the persisted tutorial is complete', async () => {
+    renderAppShell({
+      tickets: buildUseTickets({
+        currentUser: makeCurrentUser({ tutorial_completed: 0 }),
+      }),
+      account: buildAccountSettings({
+        settings: {
+          defaultView: 'board',
+          theme: 'dark',
+          projectLayout: 'standard',
+          aiProvider: 'openai',
+          apiKey: '',
+          ollamaEndpoint: 'http://localhost:11434',
+          ollamaModel: 'llama3',
+          tutorialCompleted: true,
+        },
+      }),
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('WorkspaceLayout')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText('OnboardingModal')).not.toBeInTheDocument();
   });
 
   it('ignores the create-ticket shortcut while typing in an input', async () => {

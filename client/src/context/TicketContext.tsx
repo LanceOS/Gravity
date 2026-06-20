@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys, CACHE_CONFIGS } from '../utils/queryClient';
 import { disposeSseService, getSseService } from '../services/sseService';
 import { SseEventCoalescer, type SseCoalescedEvent } from '../services/SseEventCoalescer';
-import { useMoveTicket } from './useMoveTicket';
+import { useMoveTicket } from './utils/useMoveTicket';
 import { useTicketRelationActions } from '../hooks/useTicketRelationActions';
 import type { TicketWithRelations } from '../modules/tickets/utils/ticketRelations';
 import {
@@ -62,7 +62,6 @@ interface State {
     search: string;
   };
   currentUser: User | null;
-  theme: 'dark' | 'coal-black' | 'coffee' | 'honey-glow' | 'marble-blue' | 'midnight-azure';
   loading: boolean;
 }
 
@@ -141,7 +140,6 @@ export interface TicketContextType extends State {
   updateProject: (id: string, updates: Partial<Project>) => Promise<Project | null>;
   deleteProject: (id: string) => Promise<void>;
   joinProject: (inviteCode: string) => Promise<Project | null>;
-  setTheme: (theme: 'dark' | 'coal-black' | 'coffee' | 'honey-glow' | 'marble-blue' | 'midnight-azure') => void;
   setActiveTicket: (ticket: Ticket | null) => void;
   activeTicketDetail: TicketWithRelations | null;
   addTicketDependency: (ticketId: string, dependencyId: string) => Promise<boolean>;
@@ -169,18 +167,20 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [activeView, setView] = useState<'list' | 'board'>('board');
   const [filters, setFiltersState] = useState<State['filters']>(initialFilters);
   const { data: session, isPending: authLoading } = authClient.useSession();
-  const currentUser: User | null = session?.user ? {
-    id: session.user.id,
-    name: session.user.name,
-    email: session.user.email,
-    avatar: session.user.image || '',
-    role: 'user',
-    tutorial_completed: (session.user as typeof session.user & { tutorial_completed?: boolean }).tutorial_completed || false,
-  } : null;
-  const [theme, setThemeState] = useState<'dark' | 'coal-black' | 'coffee' | 'honey-glow' | 'marble-blue' | 'midnight-azure'>('dark');
+  const currentUser: User | null = useMemo(() => {
+    return session?.user ? {
+      id: session.user.id,
+      name: session.user.name,
+      email: session.user.email,
+      avatar: session.user.image || '',
+      role: 'user',
+      tutorial_completed: (session.user as any).tutorialCompleted ?? (session.user as any).tutorial_completed ?? false,
+    } : null;
+  }, [session]);
+
 
   // --- Refs for batching and real-time handlers ---
-  const activeProjectIdRef = useRef(activeProjectId);
+
   const activeTicketRef = useRef(activeTicket);
   const currentUserIdRef = useRef<string | undefined>(currentUser?.id);
   const sseCoalescerRef = useRef<SseEventCoalescer | null>(null);
@@ -452,15 +452,15 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [queryClient]);
 
-    const invalidateCommentCacheFromSse = useCallback((ticketId?: string) => {
-      if (!ticketId) {
-        return;
-      }
+  const invalidateCommentCacheFromSse = useCallback((ticketId?: string) => {
+    if (!ticketId) {
+      return;
+    }
 
     if (activeTicketRef.current?.id === ticketId) {
       queryClient.invalidateQueries({ queryKey: queryKeys.comments(ticketId) });
     }
-    }, [queryClient]);
+  }, [queryClient]);
 
   const upsertTicketFromSse = useCallback((ticket: Ticket | null) => {
     const normalizedTicket = normalizeTicketPayload(ticket);
@@ -1107,7 +1107,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     return () => {
       sseService.off('message', handleSseMessage);
-    sseService.disconnect();
+      sseService.disconnect();
       disposeSseService(sseWorkspaceId);
       sseCoalescerRef.current?.destroy();
       sseCoalescerRef.current = null;
@@ -1221,14 +1221,14 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       inFlightTicketUpdateBatchesRef.current.delete(ticketId);
 
       const followUpBatch = pendingTicketUpdateBatchesRef.current.get(ticketId);
-        if (followUpBatch && followUpBatch.flushRequested) {
-          followUpBatch.flushRequested = false;
-          void flushPendingTicketUpdateInner(ticketId);
-        }
+      if (followUpBatch && followUpBatch.flushRequested) {
+        followUpBatch.flushRequested = false;
+        void flushPendingTicketUpdateInner(ticketId);
+      }
     } catch (e) {
       console.error('Error updating ticket on server, rolling back:', e);
       inFlightTicketUpdateBatchesRef.current.delete(ticketId);
-      
+
       // Rollback cache
       queryClient.setQueryData<Ticket[]>(queryKeys.tickets(pendingBatch.projectId), [...pendingBatch.originalTickets]);
 
@@ -1828,10 +1828,6 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [joinProjectMutation]);
 
   // --- Auth Actions ---
-  const setTheme = useCallback((nextTheme: 'dark' | 'coal-black' | 'coffee' | 'honey-glow' | 'marble-blue' | 'midnight-azure') => {
-    setThemeState(nextTheme);
-  }, []);
-
   const setFilters = useCallback((nextFilters: Partial<State['filters']>) => {
     setFiltersState(prev => ({ ...prev, ...nextFilters }));
   }, []);
@@ -1907,7 +1903,6 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       activeView,
       filters,
       currentUser,
-      theme,
       loading,
       activeProjectId,
       setActiveProjectId,
@@ -1933,7 +1928,6 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       updateProject,
       deleteProject,
       joinProject,
-      setTheme,
       setActiveTicket,
       setView,
       setFilters,
@@ -1958,7 +1952,6 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       activeView,
       filters,
       currentUser,
-      theme,
       loading,
       activeProjectId,
       setActiveProjectId,
@@ -1982,7 +1975,6 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       updateProject,
       deleteProject,
       joinProject,
-      setTheme,
       setActiveTicket,
       setView,
       setFilters,

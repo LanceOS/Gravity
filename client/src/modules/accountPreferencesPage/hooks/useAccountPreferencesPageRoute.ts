@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { useAccountSettings } from '../../../hooks/useAccountSettings';
@@ -9,7 +9,9 @@ import type { AccountPreferencesRouteState } from '../types';
 
 export function useAccountPreferencesPageRoute(): AccountPreferencesRouteState {
   const navigate = useNavigate();
-  const { activeView, currentUser, loading, setTheme, setView, theme } = useTickets();
+  const [localTutorialCompleted, setLocalTutorialCompleted] = useState(false);
+  const { activeView, currentUser, loading, setView } = useTickets();
+  const { theme, setTheme, setDensity } = useTheme();
   const {
     settings,
     settingsLoading,
@@ -39,16 +41,14 @@ export function useAccountPreferencesPageRoute(): AccountPreferencesRouteState {
     setTheme,
   });
 
-  const { setDensity, setTheme: setDashboardTheme } = useTheme();
-
   useEffect(() => {
     if (!settings) {
       return;
     }
 
     setDensity(settings.projectLayout === 'condensed' ? 'compact' : 'standard');
-    setDashboardTheme(settings.theme);
-  }, [settings, setDensity, setDashboardTheme]);
+    setTheme(settings.theme);
+  }, [settings, setDensity, setTheme]);
 
   const navigateToDirectory = () => {
     navigate('/workspaces');
@@ -79,14 +79,22 @@ export function useAccountPreferencesPageRoute(): AccountPreferencesRouteState {
     onTestApiKey: testApiKey,
     onRemoveCredential: removeCredential,
     savedCredentials,
-    onboardingVisible: isOnboardingNeeded(currentUser?.tutorial_completed),
-    completeOnboarding: () => {
+    onboardingVisible: !localTutorialCompleted && isOnboardingNeeded(settings.tutorialCompleted),
+    completeOnboarding: async () => {
       if (!currentUser) {
         return;
       }
 
-      console.log('TODO: tutorial completed for', currentUser);
+      setLocalTutorialCompleted(true);
+      try {
+        await fetch(`/api/v1/users/${currentUser.id}/tutorial`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ completed: true }),
+        });
+      } catch (e) {
+        // Ignore
+      }
     },
   };
 }
-

@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { Router } from 'express';
 import { db } from '../../db/index.js';
-import { userSettings } from '../../db/schema.js';
+import { userSettings, authUsers } from '../../db/schema.js';
 import { broadcastEvent } from '../../realtime.js';
 import { ensureUserDefaults, getUserById, listUsers } from '../../lib/platform.js';
 
@@ -28,6 +28,11 @@ export function createUsersRouter() {
         .update(userSettings)
         .set({ tutorialCompleted: completed, updatedAt: new Date() })
         .where(eq(userSettings.userId, userId));
+
+      await db
+        .update(authUsers)
+        .set({ tutorial_completed: completed, updatedAt: new Date() })
+        .where(eq(authUsers.id, userId));
 
       const user = await getUserById(userId);
       if (!user) {
