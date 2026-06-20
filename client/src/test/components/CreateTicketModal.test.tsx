@@ -42,14 +42,8 @@ type MockModalProps = {
 
 const mockCreateLabel = vi.fn();
 
-vi.mock('../../context/TicketContextContext', () => ({
-  useTickets: () => ({
-    createLabel: mockCreateLabel,
-  }),
-}));
-
 vi.mock('../../context/label/LabelContext', () => ({
-  useLabels: () => ({ labels: [], globalLabels: [], labelsByProject: new Map(), assignLabelToTicket: vi.fn(), unassignLabelFromTicket: vi.fn(), createLabel: vi.fn(), updateLabel: vi.fn(), deleteLabel: vi.fn() }),
+  useLabels: () => ({ labels: [], globalLabels: [], labelsByProject: new Map(), assignLabelToTicket: vi.fn(), unassignLabelFromTicket: vi.fn(), createLabel: mockCreateLabel, updateLabel: vi.fn(), deleteLabel: vi.fn() }),
 }));
 vi.mock('../../context/cycle/CycleContext', () => ({
   useCycles: () => ({ cycles: [] }),

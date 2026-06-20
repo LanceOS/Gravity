@@ -50,6 +50,7 @@ type WorkspacePageMockProps = {
 
 const mocks = vi.hoisted(() => ({
   useTickets: vi.fn(),
+  useTicketMutations: vi.fn(),
   useWorkspaceDirectory: vi.fn(),
   useAccountSettings: vi.fn(),
   useWorkspaceSettings: vi.fn(),
@@ -68,6 +69,10 @@ function jsonResponse(body: unknown, status = 200) {
 
 vi.mock('../../context/TicketContextContext', () => ({
   useTickets: mocks.useTickets,
+}));
+
+vi.mock('../../context/ticket/TicketMutationContext', () => ({
+  useTicketMutations: mocks.useTicketMutations,
 }));
 
 vi.mock('../../context/label/LabelContext', () => ({
@@ -323,6 +328,16 @@ function buildUseTickets(overrides: Partial<Record<string, unknown>> = {}) {
   };
 }
 
+function buildUseTicketMutations(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    createTicket: vi.fn(),
+    updateTicket: vi.fn(),
+    deleteTicket: vi.fn(),
+    moveTicket: vi.fn(),
+    ...overrides,
+  };
+}
+
 function buildWorkspaceDirectory(overrides: Partial<Record<string, unknown>> = {}) {
   return {
     workspaces: [
@@ -431,6 +446,7 @@ function renderAppShell({
   initialEntries?: string[];
 } = {}) {
   mocks.useTickets.mockReturnValue(tickets);
+  mocks.useTicketMutations.mockReturnValue(buildUseTicketMutations());
   mocks.useWorkspaceDirectory.mockReturnValue(directory);
   mocks.useAccountSettings.mockReturnValue(account);
   mocks.useWorkspaceSettings.mockReturnValue(workspaceSettings);

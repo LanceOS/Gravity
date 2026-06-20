@@ -34,8 +34,6 @@ function ContextProbe() {
     projects,
     users,
     tickets,
-    createTicket,
-    updateTicket,
     setActiveProjectId,
   } = useTickets();
 
@@ -57,44 +55,6 @@ function ContextProbe() {
       <button type="button" onClick={switchUser}>Switch user</button>
       <button type="button" onClick={() => setActiveProjectId('project-1')}>Select project 1</button>
       <button type="button" onClick={() => setActiveProjectId('project-2')}>Switch project</button>
-      <button
-        type="button"
-        onClick={() => {
-          void createTicket({
-            title: 'Created ticket',
-            description: '',
-            status: 'todo',
-            priority: 'medium',
-            projectId: activeProjectId || projects[0]?.id || 'project-1',
-            domainId: null,
-            cycleId: null,
-            assigneeId: null,
-            parentId: null,
-          });
-        }}
-      >
-        Create ticket
-      </button>
-      <button
-        type="button"
-        onClick={() => {
-          if (tickets[0]) {
-            void updateTicket(tickets[0].id, { status: 'done' });
-          }
-        }}
-      >
-        Mark first ticket done
-      </button>
-      <button
-        type="button"
-        onClick={() => {
-          if (tickets[0]) {
-            void updateTicket(tickets[0].id, { title: 'Updated ticket' });
-          }
-        }}
-      >
-        Update first ticket
-      </button>
     </div>
   );
 }

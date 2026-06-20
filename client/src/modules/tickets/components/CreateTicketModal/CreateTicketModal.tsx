@@ -5,7 +5,7 @@ import { AlertCircle } from 'lucide-react';
 import { ModalDialog } from '../../../../components/ModalDialog';
 import type { CreateTicketModalProps } from '../../types/CreateTicketModal';
 import { PRIORITY_OPTIONS, STATUS_OPTIONS } from '../../utils/CreateTicketModal';
-import { useTickets } from '../../../../context/TicketContextContext';
+import { useLabels } from '../../../../context/label/LabelContext';
 import { SearchableOptionPickerPopoverContent } from '../SearchableOptionPickerPopoverContent';
 import { LabelBadge } from '../LabelBadge';
 import { Plus } from 'lucide-react';
@@ -37,7 +37,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
     [labels, projectId],
   );
 
-  const { createLabel } = useTickets();
+  const { createLabel } = useLabels();
 
   // `projectId` is initialized from props via useState above. The modal
   // component is mounted/unmounted when opened, so remounting will reset

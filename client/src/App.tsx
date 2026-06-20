@@ -12,6 +12,7 @@ import { ActiveViewProvider } from './context/ui/ActiveViewContext';
 import { TicketFiltersProvider } from './context/filters/TicketFiltersContext';
 import { CycleProvider } from './context/cycle/CycleContext';
 import { LabelProvider } from './context/label/LabelContext';
+import { TicketMutationProvider } from './context/ticket/TicketMutationContext';
 
 export default function App() {
   return (
@@ -24,7 +25,9 @@ export default function App() {
                 <TicketFiltersProvider>
                   <ActiveViewProvider>
                     <TicketProvider>
-                      <RouterProvider router={router} />
+                      <TicketMutationProvider>
+                        <RouterProvider router={router} />
+                      </TicketMutationProvider>
                     </TicketProvider>
                   </ActiveViewProvider>
                 </TicketFiltersProvider>

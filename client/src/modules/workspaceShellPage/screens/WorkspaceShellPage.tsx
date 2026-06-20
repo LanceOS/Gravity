@@ -15,6 +15,7 @@ import { useTheme } from '../../settings';
 import type { Ticket } from '../../../context/TicketContextContext';
 import { useTickets } from '../../../context/TicketContextContext';
 import { useLabels } from '../../../context/label/LabelContext';
+import { useTicketMutations } from '../../../context/ticket/TicketMutationContext';
 import { useCycles } from '../../../context/cycle/CycleContext';
 import { useTicketFilters } from '../../../context/filters/TicketFiltersContext';
 import { useActiveView } from '../../../context/ui/ActiveViewContext';
@@ -74,17 +75,14 @@ export function WorkspaceShellPage() {
     deleteComment,
     comments,
     createProject,
-    createTicket,
     currentUser,
     fetchProjectData,
     deleteProject,
-    deleteTicket,
     loading,
     projects,
     setActiveProjectId,
     setActiveTicket,
     tickets,
-    updateTicket,
     updateProject,
     users,
     activeTicketDetail,
@@ -93,6 +91,7 @@ export function WorkspaceShellPage() {
     addTicketBlocker,
     removeTicketBlocker,
   } = useTickets();
+  const { createTicket, updateTicket, deleteTicket } = useTicketMutations();
   const { labels, createLabel, updateLabel, deleteLabel } = useLabels();
   const { cycles } = useCycles();
   const { filters, setFilters } = useTicketFilters();

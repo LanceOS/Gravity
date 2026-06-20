@@ -79,7 +79,7 @@ import { TicketRowMobile } from '../TicketRowMobile/TicketRowMobile';
 import { getPriorityIcon, getAssigneeAvatar } from '../../utils/TicketList';
 import type { TicketDetailProps } from '../../types/TicketDetail';
 import { PRIORITY_OPTIONS, STATUS_OPTIONS } from '../../utils/TicketDetail';
-import { useTickets } from '../../../../context/TicketContextContext';
+import { useLabels } from '../../../../context/label/LabelContext';
 import { LabelBadge } from '../LabelBadge';
 import { SearchableOptionPickerPopoverContent } from '../SearchableOptionPickerPopoverContent';
 import { TicketContextMenu } from '../TicketContextMenu';
@@ -119,7 +119,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
   const [commentInput, setCommentInput] = useState(createEmptyRichTextValue());
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
 
-  const { assignLabelToTicket, unassignLabelFromTicket, createLabel: createLabelInContext } = useTickets();
+  const { assignLabelToTicket, unassignLabelFromTicket, createLabel: createLabelInContext } = useLabels();
 
   const handleAssignLabel = useCallback(async (labelId: string) => {
     await assignLabelToTicket(activeTicket.id, labelId);

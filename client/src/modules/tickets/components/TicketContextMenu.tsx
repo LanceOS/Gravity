@@ -1,6 +1,7 @@
 import React, { useContext, useMemo } from 'react';
 import { TicketContext, type Project, type Ticket } from '../../../context/TicketContextContext';
 import { useLabels } from '../../../context/label/LabelContext';
+import { useTicketMutations } from '../../../context/ticket/TicketMutationContext';
 import { useCycles } from '../../../context/cycle/CycleContext';
 import type { Label } from '../../../types/domain';
 import { ContextMenu, toast } from '@library';
@@ -32,12 +33,10 @@ export const TicketContextMenu: React.FC<TicketContextMenuProps> = ({ ticket, ch
     projectsByWorkspaceId,
     projects,
     ticketsByProject,
-    updateTicket,
-    moveTicket,
-    deleteTicket,
     addTicketDependency,
     addTicketBlocker,
   } = context;
+  const { updateTicket, moveTicket, deleteTicket } = useTicketMutations();
   const { labelsByProject, globalLabels, assignLabelToTicket, unassignLabelFromTicket } = useLabels();
   const { cycles } = useCycles();
   const safeProjects = useMemo(() => (Array.isArray(projects) ? projects : []), [projects]);
