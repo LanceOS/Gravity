@@ -147,6 +147,16 @@ export function ContextMenuRoot({ children, trigger, content, items }: ContextMe
   const contextValue = React.useMemo(() => ({ closeMenu }), [closeMenu]);
   const timeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  React.useEffect(
+    () => () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    },
+    []
+  );
+
   const requestSubmenuOpen = React.useCallback((id: string) => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     timeoutRef.current = setTimeout(() => {
@@ -468,6 +478,16 @@ export function ContextMenuSubMenu({ children, parentItemRef, onClose }: Context
   };
 
   const timeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  React.useEffect(
+    () => () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    },
+    []
+  );
 
   const requestSubmenuOpen = React.useCallback((id: string) => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);

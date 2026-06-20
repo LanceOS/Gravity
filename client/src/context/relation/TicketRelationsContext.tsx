@@ -14,8 +14,8 @@ export function useTicketRelationsContext(): TicketRelationsContextType {
 }
 
 export function useTicketRelationsContextValue(args: TicketRelationsContextValueArgs): TicketRelationsContextType {
+  const { activeTicketDetail } = args;
   const {
-    activeTicketDetail,
     addTicketDependency,
     removeTicketDependency,
     addTicketBlocker,

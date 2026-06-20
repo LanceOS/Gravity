@@ -1,22 +1,21 @@
 import { apiClient } from '../utils/apiClient';
 import React, { useEffect, useCallback, useMemo, useState, useRef } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { queryKeys, CACHE_CONFIGS } from '../utils/queryClient';
 import { disposeSseService, getSseService } from '../services/sseService';
 import { SseEventCoalescer, type SseCoalescedEvent } from '../services/SseEventCoalescer';
 
 import { CommentContext, useCommentContextValue } from './comment/CommentContext';
 import { TicketRelationsContext, useTicketRelationsContextValue } from './relation/TicketRelationsContext';
+import { ProjectContext, useProjectContextValue } from './project/ProjectContext';
+import { resolveWorkspaceIdForSse } from './project/projectCacheUtils';
+import { TicketDetailContext, useTicketDetailContextValue } from './ticket/TicketDetailContext';
 import type { TicketWithRelations } from '../modules/tickets/utils/ticketRelations';
 import {
   combineTicketDetails,
   findCachedTicketByKeyOrId,
   invalidateAggregateTicketQueries,
   getListQueryProjectId,
-  hasEquivalentTicketFields,
-  initialFilters,
-  patchTicketInListById,
-  patchTicketLabelAssignment,
   normalizeTicketPayload,
   normalizeCommentPayload,
   shouldAcceptSseTicketUpdate,
@@ -24,12 +23,9 @@ import {
   type TicketFiltersState,
 } from './shared';
 import { authClient } from './auth/authClient';
-import { toast } from '@library';
 import { TicketContext } from './TicketContextContext';
 import { ActiveTicketContext } from './ticket/ActiveTicketContext';
 import { useActiveProject } from './project/ActiveProjectContext';
-import { useActiveView } from './ui/ActiveViewContext';
-import { useTicketFilters } from './filters/TicketFiltersContext';
 
 // Shared entity types live in src/types/domain.ts.
 export type {
@@ -42,13 +38,11 @@ export type {
   Comment,
   CreateProjectInput,
 } from '../types/domain';
-import type { User, Project, Label, Cycle, Ticket, Comment, CreateProjectInput } from '../types/domain';
+import type { User, Ticket, Comment } from '../types/domain';
 
 interface State {
   tickets: Ticket[];
-  projects: Project[];
   users: User[];
-  comments: Comment[];
   activeTicket: Ticket | null;
   currentUser: User | null;
   loading: boolean;
@@ -67,41 +61,23 @@ export type { TicketFiltersState };
 //      src/context/shared/filters.ts
 // ---------------------------------------------------------------------------
 
-const API_URL = '/api/v1';
-const AUTH_API_URL = '/api/auth';
-
 export interface TicketContextType extends State {
-  activeProjectId: string;
-  setActiveProjectId: (id: string) => void;
-  fetchInitialData: (userId?: string) => Promise<void>;
-  fetchProjectData: (projId: string) => Promise<void>;
   addComment: (ticketId: string, body: string) => Promise<void>;
   updateComment: (ticketId: string, commentId: string, body: string) => Promise<void>;
   deleteComment: (ticketId: string, commentId: string) => Promise<void>;
-  createProject: (project: CreateProjectInput) => Promise<Project | null>;
-  updateProject: (id: string, updates: Partial<Project>) => Promise<Project | null>;
-  deleteProject: (id: string) => Promise<void>;
-  joinProject: (inviteCode: string) => Promise<Project | null>;
   setActiveTicket: React.Dispatch<React.SetStateAction<Ticket | null>>;
-  activeTicketDetail: TicketWithRelations | null;
   addTicketDependency: (ticketId: string, dependencyId: string) => Promise<boolean>;
   removeTicketDependency: (ticketId: string, dependencyId: string) => Promise<boolean>;
   addTicketBlocker: (ticketId: string, blockerId: string) => Promise<boolean>;
   removeTicketBlocker: (ticketId: string, blockerId: string) => Promise<boolean>;
   ticketMap: Map<string, Ticket>;
-  ticketById: Map<string, Ticket>;
-  projectById: Map<string, Project>;
-  projectsByWorkspaceId: Map<string, Project[]>;
-  ticketsByProject: Map<string, Ticket[]>;
 }
 
 export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const queryClient = useQueryClient();
   const { activeProjectId, setActiveProjectId, activeProjectIdRef } = useActiveProject();
-  const setActiveProjectIdState = setActiveProjectId;
   // --- Local UI States ---
   const [activeTicket, setActiveTicket] = useState<Ticket | null>(null);
-  const { setFilters } = useTicketFilters();
   const { data: session, isPending: authLoading } = authClient.useSession();
   const currentUser: User | null = useMemo(() => {
     return session?.user ? {
@@ -129,71 +105,18 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     currentUserIdRef.current = currentUser?.id;
   }, [currentUser?.id]);
 
-  useEffect(() => {
-    return () => {
-    };
-  }, []);
-
   // --- Queries ---
 
-  // Projects List
-  const fetchProjects = async () => {
-    try {
-      return await apiClient.get<Project[]>(`/projects`, { params: { userId: currentUser?.id } });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to load projects';
-      if (toast?.show) {
-        toast.show(message, 'error');
-      }
-      throw error;
-    }
-  };
-
-  const projectsQuery = useQuery({
-    queryKey: queryKeys.projects(currentUser?.id),
-    queryFn: fetchProjects,
-    enabled: !!currentUser?.id,
-    ...CACHE_CONFIGS.metadata,
+  const projectContextValue = useProjectContextValue({
+    currentUser,
+    setActiveProjectId,
+    activeProjectIdRef,
   });
-  const projects = Array.isArray(projectsQuery.data) ? projectsQuery.data : [];
-  const projectLookup = useMemo(() => {
-    const lookup = new Map<string, { workspaceId: string; teamId: string | null }>();
-    projects.forEach((project) => {
-      lookup.set(project.id, {
-        workspaceId: project.workspaceId || '',
-        teamId: project.teamId || null,
-      });
-    });
-    return lookup;
-  }, [projects]);
-
-  const sseWorkspaceId = useMemo(() => {
-    if (activeProjectId) {
-      const activeWorkspaceId = projectLookup.get(activeProjectId)?.workspaceId;
-      if (activeWorkspaceId) {
-        return activeWorkspaceId;
-      }
-    }
-
-    return projects.length > 0 && projects[0]?.workspaceId ? projects[0].workspaceId : '';
-  }, [activeProjectId, projectLookup, projects]);
-
-  const invalidateWorkspaceSidebarQueries = useCallback((projectId?: string | null) => {
-    if (projectId) {
-      const workspaceId = projectLookup.get(projectId)?.workspaceId;
-      if (workspaceId) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.workspaceSidebarTree(workspaceId), exact: true });
-        return;
-      }
-    }
-
-    for (const [queryKey] of queryClient.getQueriesData({ queryKey: ['workspace'] })) {
-      const normalizedQueryKey = [...queryKey];
-      if (queryKey[0] === 'workspace' && queryKey[2] === 'sidebar') {
-        queryClient.invalidateQueries({ queryKey: normalizedQueryKey, exact: true });
-      }
-    }
-  }, [projectLookup, queryClient]);
+  const projects = projectContextValue.projects;
+  const sseWorkspaceId = useMemo(
+    () => resolveWorkspaceIdForSse(projects, projectContextValue.projectLookup, activeProjectId),
+    [activeProjectId, projectContextValue.projectLookup, projects]
+  );
 
   const removeSseTicketEntries = useCallback((ticketKey?: string, ticketId?: string) => {
     const normalizedTicketKey = ticketKey?.toUpperCase();
@@ -429,7 +352,6 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const users = usersQuery.data || [];
 
   const previousTicketsRef = useRef<Ticket[] | undefined>(undefined);
-  const previousCommentsRef = useRef<Comment[] | undefined>(undefined);
 
   // Tickets List
   const ticketsQuery = useQuery({
@@ -443,29 +365,19 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   });
   const tickets = ticketsQuery.data ?? previousTicketsRef.current ?? [];
 
-  // Comments
-  const activeTicketId = activeTicket?.id;
-  const activeTicketProjectId = activeTicket?.projectId || activeProjectId;
   useEffect(() => {
     if (Array.isArray(ticketsQuery.data)) {
       previousTicketsRef.current = ticketsQuery.data;
     }
   }, [ticketsQuery.data]);
 
-  // Comments
-  const commentsQuery = useQuery({
-    queryKey: queryKeys.comments(activeTicketId || ''),
-    queryFn: () => apiClient.get<Comment[]>(`/tickets/${activeTicketId}/comments`, { projectId: activeTicketProjectId }),
-    enabled: !!activeTicketId && !!activeTicketProjectId && !!currentUser,
-    ...CACHE_CONFIGS.ticketDetail,
+  const ticketDetailContextValue = useTicketDetailContextValue({
+    activeTicket,
+    setActiveTicket,
+    activeProjectId,
+    tickets,
+    isAuthenticated: !!currentUser,
   });
-  const comments = commentsQuery.data ?? previousCommentsRef.current ?? [];
-
-  useEffect(() => {
-    if (Array.isArray(commentsQuery.data)) {
-      previousCommentsRef.current = commentsQuery.data;
-    }
-  }, [commentsQuery.data]);
 
   const commentContextValue = useCommentContextValue({
     currentUser,
@@ -482,9 +394,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     queryClient,
     tickets,
     activeTicket,
-    activeTicketId,
-    activeTicketProjectId,
-    isAuthenticated: !!currentUser,
+    activeTicketDetail: ticketDetailContextValue.activeTicketDetail,
   });
 
   const ticketRelationsContextValue = useMemo(() => ({
@@ -502,59 +412,11 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   ]);
 
   // Global loading state combining react-query status
-  const loading = authLoading || projectsQuery.isLoading || usersQuery.isLoading;
+  const loading = authLoading || projectContextValue.projectsLoading || usersQuery.isLoading;
 
   const ticketMap = useMemo(() => new Map(tickets.map((t) => [t.key.toUpperCase(), t])), [tickets]);
-  const ticketById = useMemo(() => new Map(tickets.map((t) => [t.id, t])), [tickets]);
-
-  // Sync activeTicket if it was updated in the tickets query
-  useEffect(() => {
-    if (!activeTicket) {
-      return;
-    }
-
-    const latest = ticketById.get(activeTicket.id);
-    if (latest && !hasEquivalentTicketFields(latest, activeTicket)) {
-      setActiveTicket(latest);
-    }
-  }, [activeTicket, ticketById]);
 
   // --- Actions ---
-
-
-  const fetchInitialData = useCallback(async (userId?: string) => {
-    if (!userId) {
-      setActiveProjectIdState('');
-      queryClient.clear();
-      return;
-    }
-    await Promise.all([
-      queryClient.prefetchQuery({
-        queryKey: queryKeys.projects(userId),
-        queryFn: () => apiClient.get<Project[]>(`/projects`, { params: { userId } }),
-        ...CACHE_CONFIGS.metadata,
-      }),
-      queryClient.prefetchQuery({
-        queryKey: queryKeys.users(),
-        queryFn: () => apiClient.get<User[]>(`/users`),
-        ...CACHE_CONFIGS.metadata,
-      }),
-    ]);
-  }, []);
-
-  const fetchProjectData = useCallback(async (projId: string) => {
-    if (!projId) return;
-    await Promise.all([
-      queryClient.prefetchQuery({
-        queryKey: queryKeys.tickets(projId),
-        queryFn: async () => {
-          const data = await apiClient.get<Ticket[]>(`/tickets`, { projectId: projId });
-          return data;
-        },
-        ...CACHE_CONFIGS.ticketsList,
-      }),
-    ]);
-  }, []);
 
   const prevUserIdRef = useRef<string | undefined>(currentUser?.id);
   useEffect(() => {
@@ -828,201 +690,13 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     deleteComment,
   } = commentContextValue;
 
-  // Create Project
-  const createProjectMutation = useMutation({
-    mutationFn: async (projectInput: CreateProjectInput) => {
-      if (!currentUser) throw new Error('Not signed in');
-      return apiClient.post<Project>(`/projects`, {
-        ...projectInput,
-        ownerId: currentUser.id,
-        status: projectInput.status || 'active',
-      });
-    },
-    onSuccess: (project) => {
-      if (currentUser) {
-        queryClient.setQueryData<Project[]>(queryKeys.projects(currentUser.id), (old) => {
-          return old ? [...old, project] : [project];
-        });
-        queryClient.invalidateQueries({ queryKey: queryKeys.projects(currentUser.id) });
-        invalidateWorkspaceSidebarQueries(project.id);
-        setActiveProjectId(project.id);
-      }
-    },
-  });
-
-  const createProject = useCallback(async (projectInput: CreateProjectInput) => {
-    try {
-      return await createProjectMutation.mutateAsync(projectInput);
-    } catch (e) {
-      console.error(e);
-      throw e;
-    }
-  }, [createProjectMutation]);
-
-  // Update Project
-  const updateProjectMutation = useMutation({
-    mutationFn: async ({ id, updates }: { id: string; updates: Partial<Project> }) => {
-      return apiClient.patch<Project>(`/projects/${id}`, updates);
-    },
-    onMutate: async ({ id, updates }) => {
-      if (!currentUser) return;
-      const queryKey = queryKeys.projects(currentUser.id);
-      const previousProjects = queryClient.getQueryData<Project[]>(queryKey);
-
-      if (previousProjects) {
-        queryClient.setQueryData<Project[]>(queryKey, (old) =>
-          old ? old.map((p) => (p.id === id ? { ...p, ...updates } : p)) : []
-        );
-      }
-
-      return { previousProjects };
-    },
-    onError: (_err: unknown, _variables: { id: string; updates: Partial<Project> }, context: { previousProjects?: Project[] } | undefined) => {
-      if (currentUser && context?.previousProjects) {
-        queryClient.setQueryData(queryKeys.projects(currentUser.id), context.previousProjects);
-      }
-    },
-    onSuccess: (project) => {
-      if (project) {
-        invalidateWorkspaceSidebarQueries(project.id);
-      }
-    },
-    onSettled: () => {
-      if (currentUser) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.projects(currentUser.id) });
-      }
-    },
-  });
-
-  const updateProject = useCallback(async (id: string, updates: Partial<Project>) => {
-    try {
-      return await updateProjectMutation.mutateAsync({ id, updates });
-    } catch (e) {
-      console.error(e);
-      throw e;
-    }
-  }, [updateProjectMutation]);
-
-  // Delete Project
-  const deleteProjectMutation = useMutation({
-    mutationFn: async (id: string) => {
-      await apiClient.delete(`/projects/${id}`);
-    },
-    onMutate: async (id) => {
-      if (!currentUser) return;
-      const queryKey = queryKeys.projects(currentUser.id);
-      const previousProjects = queryClient.getQueryData<Project[]>(queryKey);
-
-      if (previousProjects) {
-        queryClient.setQueryData<Project[]>(queryKey, (old) =>
-          old ? old.filter((p) => p.id !== id) : []
-        );
-      }
-
-      if (activeProjectIdRef.current === id) {
-        setActiveProjectId('');
-      }
-
-      return { previousProjects };
-    },
-    onError: (_err: unknown, _id: string, context: { previousProjects?: Project[] } | undefined) => {
-      if (currentUser && context?.previousProjects) {
-        queryClient.setQueryData(queryKeys.projects(currentUser.id), context.previousProjects);
-      }
-    },
-    onSuccess: (_, id) => {
-      invalidateWorkspaceSidebarQueries(id);
-    },
-    onSettled: () => {
-      if (currentUser) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.projects(currentUser.id) });
-      }
-    },
-  });
-
-  const deleteProject = useCallback(async (id: string) => {
-    try {
-      await deleteProjectMutation.mutateAsync(id);
-    } catch (e) {
-      console.error(e);
-      throw e;
-    }
-  }, [deleteProjectMutation]);
-
-  // Join Project
-  const joinProjectMutation = useMutation({
-    mutationFn: async (inviteCode: string) => {
-      if (!currentUser) throw new Error('Not signed in');
-      const data = await apiClient.post<{ project: Project }>(`/projects/invite/accept`, { inviteCode, userId: currentUser.id });
-      return data.project;
-    },
-    onSuccess: (project) => {
-      if (currentUser) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.projects(currentUser.id) });
-        invalidateWorkspaceSidebarQueries(project.id);
-        setActiveProjectId(project.id);
-      }
-    },
-  });
-
-  const joinProject = useCallback(async (inviteCode: string) => {
-    try {
-      return await joinProjectMutation.mutateAsync(inviteCode);
-    } catch (error) {
-      console.error(error);
-      throw error;
-    }
-  }, [joinProjectMutation]);
-
-  const projectById = useMemo(() => {
-    const map = new Map<string, Project>();
-    for (const project of projects) {
-      map.set(project.id, project);
-    }
-    return map;
-  }, [projects]);
-
-  const projectsByWorkspaceId = useMemo(() => {
-    const map = new Map<string, Project[]>();
-    for (const project of projects) {
-      const workspaceId = project.workspaceId || '';
-      const current = map.get(workspaceId);
-      if (current) {
-        current.push(project);
-      } else {
-        map.set(workspaceId, [project]);
-      }
-    }
-    return map;
-  }, [projects]);
-
-  const ticketsByProject = useMemo(() => {
-    const map = new Map<string, Ticket[]>();
-    for (const ticket of tickets) {
-      const current = map.get(ticket.projectId);
-      if (current) {
-        current.push(ticket);
-      } else {
-        map.set(ticket.projectId, [ticket]);
-      }
-    }
-    return map;
-  }, [tickets]);
-
   const value = useMemo(
     () => ({
       tickets,
-      projects,
       users,
-      comments,
       activeTicket,
-      activeTicketDetail,
       currentUser,
       loading,
-      activeProjectId,
-      setActiveProjectId,
-      fetchInitialData,
-      fetchProjectData,
       addComment,
       updateComment,
       deleteComment,
@@ -1030,47 +704,24 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       removeTicketDependency,
       addTicketBlocker,
       removeTicketBlocker,
-      createProject,
-      updateProject,
-      deleteProject,
-      joinProject,
       setActiveTicket,
       ticketMap,
-      ticketById,
-      projectById,
-      projectsByWorkspaceId,
-      ticketsByProject,
     }),
     [
       tickets,
-      projects,
       users,
-      comments,
       activeTicket,
-      activeTicketDetail,
       currentUser,
       loading,
-      activeProjectId,
-      setActiveProjectId,
-      fetchInitialData,
-      fetchProjectData,
       addComment,
       updateComment,
       deleteComment,
       addTicketDependency,
       removeTicketDependency,
-      createProject,
-      updateProject,
-      deleteProject,
-      joinProject,
       setActiveTicket,
       addTicketBlocker,
       removeTicketBlocker,
       ticketMap,
-      ticketById,
-      projectById,
-      projectsByWorkspaceId,
-      ticketsByProject,
     ]
   );
 
@@ -1083,12 +734,16 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   );
 
   return (
-    <ActiveTicketContext.Provider value={activeTicketContextValue}>
-      <CommentContext.Provider value={commentContextValue}>
-        <TicketRelationsContext.Provider value={ticketRelationsContextValue}>
-          <TicketContext.Provider value={value}>{children}</TicketContext.Provider>
-        </TicketRelationsContext.Provider>
-      </CommentContext.Provider>
-    </ActiveTicketContext.Provider>
+    <ProjectContext.Provider value={projectContextValue}>
+      <ActiveTicketContext.Provider value={activeTicketContextValue}>
+        <TicketDetailContext.Provider value={ticketDetailContextValue}>
+          <CommentContext.Provider value={commentContextValue}>
+            <TicketRelationsContext.Provider value={ticketRelationsContextValue}>
+              <TicketContext.Provider value={value}>{children}</TicketContext.Provider>
+            </TicketRelationsContext.Provider>
+          </CommentContext.Provider>
+        </TicketDetailContext.Provider>
+      </ActiveTicketContext.Provider>
+    </ProjectContext.Provider>
   );
 };
