@@ -12,6 +12,16 @@ vi.mock('../../context/TicketContextContext', () => ({
   }),
 }));
 
+vi.mock('../../context/project/ProjectContext', () => ({
+  useProjectContext: () => ({
+    projects: [],
+    projectsLoading: false,
+    projectLookup: new Map(),
+    projectById: new Map(),
+    projectsByWorkspaceId: new Map(),
+  }),
+}));
+
 vi.mock('../../context/label/LabelContext', () => ({
   useLabels: () => ({ labels: [], globalLabels: [], labelsByProject: new Map(), assignLabelToTicket: vi.fn(), unassignLabelFromTicket: vi.fn(), createLabel: vi.fn(), updateLabel: vi.fn(), deleteLabel: vi.fn() }),
 }));

@@ -50,6 +50,8 @@ type WorkspacePageMockProps = {
 
 const mocks = vi.hoisted(() => ({
   useTickets: vi.fn(),
+  useProjectContext: vi.fn(),
+  useTicketDetailContext: vi.fn(),
   useTicketMutations: vi.fn(),
   useWorkspaceDirectory: vi.fn(),
   useAccountSettings: vi.fn(),
@@ -69,6 +71,14 @@ function jsonResponse(body: unknown, status = 200) {
 
 vi.mock('../../context/TicketContextContext', () => ({
   useTickets: mocks.useTickets,
+}));
+
+vi.mock('../../context/project/ProjectContext', () => ({
+  useProjectContext: mocks.useProjectContext,
+}));
+
+vi.mock('../../context/ticket/TicketDetailContext', () => ({
+  useTicketDetailContext: mocks.useTicketDetailContext,
 }));
 
 vi.mock('../../context/ticket/TicketMutationContext', () => ({
@@ -446,18 +456,48 @@ function renderAppShell({
   initialEntries?: string[];
 } = {}) {
   mocks.useTickets.mockReturnValue(tickets);
+  const ticketState = tickets as any;
+  const projects = Array.isArray(ticketState.projects) ? ticketState.projects : [];
+  const projectById = new Map(projects.map((project: any) => [project.id, project]));
+  const projectsByWorkspaceId = new Map<string, any[]>();
+  for (const project of projects as any[]) {
+    const workspaceProjects = projectsByWorkspaceId.get(project.workspaceId) || [];
+    workspaceProjects.push(project);
+    projectsByWorkspaceId.set(project.workspaceId, workspaceProjects);
+  }
+  mocks.useProjectContext.mockReturnValue({
+    projects,
+    projectsLoading: Boolean(ticketState.loading),
+    projectLookup: new Map(),
+    projectById,
+    projectsByWorkspaceId,
+    fetchInitialData: ticketState.fetchInitialData ?? vi.fn(),
+    fetchProjectData: ticketState.fetchProjectData ?? vi.fn(),
+    createProject: ticketState.createProject ?? vi.fn(),
+    updateProject: ticketState.updateProject ?? vi.fn(),
+    deleteProject: ticketState.deleteProject ?? vi.fn(),
+    joinProject: ticketState.joinProject ?? vi.fn(),
+  });
+  mocks.useTicketDetailContext.mockReturnValue({
+    activeTicket: ticketState.activeTicket ?? null,
+    setActiveTicket: ticketState.setActiveTicket ?? vi.fn(),
+    activeTicketId: ticketState.activeTicket?.id ?? '',
+    activeTicketProjectId: ticketState.activeTicket?.projectId || ticketState.activeProjectId || '',
+    comments: ticketState.comments ?? [],
+    activeTicketDetail: ticketState.activeTicketDetail ?? null,
+  });
   mocks.useTicketMutations.mockReturnValue(buildUseTicketMutations());
   mocks.useWorkspaceDirectory.mockReturnValue(directory);
   mocks.useAccountSettings.mockReturnValue(account);
   mocks.useWorkspaceSettings.mockReturnValue(workspaceSettings);
   mocks.useTicketFilters.mockReturnValue({
-    filters: tickets?.filters,
-    setFilters: tickets?.setFilters,
+    filters: ticketState.filters,
+    setFilters: ticketState.setFilters,
     resetFilters: vi.fn(),
   });
   mocks.useActiveView.mockReturnValue({
-    activeView: tickets?.activeView,
-    setView: tickets?.setView,
+    activeView: ticketState.activeView,
+    setView: ticketState.setView,
   });
 
   const queryClient = new QueryClient({

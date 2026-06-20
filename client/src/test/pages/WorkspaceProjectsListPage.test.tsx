@@ -3,14 +3,20 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import type { Project } from '../../context/TicketContextContext';
 import { WorkspaceProjectsListPage } from '../../pages/WorkspaceProjectsListPage/WorkspaceProjectsListPage.tsx';
 
 const mocks = vi.hoisted(() => ({
   useTickets: vi.fn(),
+  useProjectContext: vi.fn(),
 }));
 
 vi.mock('../../context/TicketContextContext', () => ({
   useTickets: mocks.useTickets,
+}));
+
+vi.mock('../../context/project/ProjectContext', () => ({
+  useProjectContext: mocks.useProjectContext,
 }));
 
 vi.mock('../../context/label/LabelContext', () => ({
@@ -41,29 +47,45 @@ function LocationDisplay() {
 }
 
 function renderWorkspaceProjectsListPage(overrides: Partial<Record<string, unknown>> = {}) {
+  const defaultProjects: Project[] = [
+    {
+      id: 'project-1',
+      name: 'Gravity Core',
+      key: 'GRA',
+      description: 'Primary project',
+      status: 'active',
+      workspaceId: 'workspace-1',
+    },
+    {
+      id: 'project-2',
+      name: 'Other Workspace Project',
+      key: 'OWP',
+      description: 'Should be filtered out',
+      status: 'planned',
+      workspaceId: 'workspace-2',
+    },
+  ];
+  const projects = Array.isArray(overrides.projects) ? (overrides.projects as Project[]) : defaultProjects;
+
   mocks.useTickets.mockReturnValue({
     activeProjectId: 'project-1',
-    projects: [
-      {
-        id: 'project-1',
-        name: 'Gravity Core',
-        key: 'GRA',
-        description: 'Primary project',
-        status: 'active',
-        workspaceId: 'workspace-1',
-      },
-      {
-        id: 'project-2',
-        name: 'Other Workspace Project',
-        key: 'OWP',
-        description: 'Should be filtered out',
-        status: 'planned',
-        workspaceId: 'workspace-2',
-      },
-    ],
     setActiveProjectId: vi.fn(),
     setActiveTicket: vi.fn(),
     ...overrides,
+  });
+
+  mocks.useProjectContext.mockReturnValue({
+    projects,
+    projectsLoading: false,
+    projectLookup: new Map(),
+    projectById: new Map(projects.map((project) => [project.id, project])),
+    projectsByWorkspaceId: projects.reduce((map, project) => {
+      const workspaceId = project.workspaceId || '';
+      const workspaceProjects = map.get(workspaceId) || [];
+      workspaceProjects.push(project);
+      map.set(workspaceId, workspaceProjects);
+      return map;
+    }, new Map<string, Project[]>()),
   });
 
   return {

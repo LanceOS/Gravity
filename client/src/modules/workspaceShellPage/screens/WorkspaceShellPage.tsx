@@ -14,8 +14,10 @@ import { OnboardingModal } from '../../onboarding';
 import { useTheme } from '../../settings';
 import type { Ticket } from '../../../context/TicketContextContext';
 import { useTickets } from '../../../context/TicketContextContext';
+import { useProjectContext } from '../../../context/project/ProjectContext';
 import { useLabels } from '../../../context/label/LabelContext';
 import { useTicketMutations } from '../../../context/ticket/TicketMutationContext';
+import { useTicketDetailContext } from '../../../context/ticket/TicketDetailContext';
 import { useCycles } from '../../../context/cycle/CycleContext';
 import { useTicketFilters } from '../../../context/filters/TicketFiltersContext';
 import { useActiveView } from '../../../context/ui/ActiveViewContext';
@@ -69,28 +71,34 @@ const AGGREGATE_TICKETS_PAGE_SIZE = 120;
 export function WorkspaceShellPage() {
   const {
     activeProjectId,
-    activeTicket,
     addComment,
     updateComment,
     deleteComment,
-    comments,
-    createProject,
     currentUser,
-    fetchProjectData,
-    deleteProject,
     loading,
-    projects,
     setActiveProjectId,
-    setActiveTicket,
     tickets,
-    updateProject,
     users,
-    activeTicketDetail,
     addTicketDependency,
     removeTicketDependency,
     addTicketBlocker,
     removeTicketBlocker,
   } = useTickets();
+  const {
+    projects,
+    projectById,
+    projectsByWorkspaceId,
+    createProject,
+    fetchProjectData,
+    deleteProject,
+    updateProject,
+  } = useProjectContext();
+  const {
+    activeTicket,
+    setActiveTicket,
+    comments,
+    activeTicketDetail,
+  } = useTicketDetailContext();
   const { createTicket, updateTicket, deleteTicket } = useTicketMutations();
   const { labels, createLabel, updateLabel, deleteLabel } = useLabels();
   const { cycles } = useCycles();
@@ -163,17 +171,10 @@ export function WorkspaceShellPage() {
     }
     return map;
   }, [workspaces]);
-  const projectsById = useMemo(() => {
-    const map = new Map<string, (typeof projects)[number]>();
-    for (const project of projects) {
-      map.set(project.id, project);
-    }
-    return map;
-  }, [projects]);
   const activeWorkspace = workspacesById.get(activeWorkspaceId) || null;
   const activeWorkspaceProjects = useMemo(
-    () => projects.filter((project) => project.workspaceId === activeWorkspaceId),
-    [projects, activeWorkspaceId]
+    () => projectsByWorkspaceId.get(activeWorkspaceId) || [],
+    [activeWorkspaceId, projectsByWorkspaceId]
   );
   const activeWorkspaceProjectIds = useMemo(
     () => new Set(activeWorkspaceProjects.map((project) => project.id)),
@@ -593,8 +594,8 @@ export function WorkspaceShellPage() {
     [createParentId, scopedTicketsById]
   );
   const activeProject = useMemo(
-    () => projectsById.get(projectIdParam || activeProjectId) || null,
-    [activeProjectId, projectIdParam, projectsById]
+    () => projectById.get(projectIdParam || activeProjectId) || null,
+    [activeProjectId, projectById, projectIdParam]
   );
 
   useAppShellRouteSync({

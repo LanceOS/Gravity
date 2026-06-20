@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { PROJECT_STATUS_LABELS } from '../../workspaces';
 import type { Project } from '../../../context/TicketContextContext';
 import { useTickets } from '../../../context/TicketContextContext';
+import { useProjectContext } from '../../../context/project/ProjectContext';
 import { WorkspacePageLayout } from '../../../layouts/WorkspacePageLayout/WorkspacePageLayout';
 import '../styles/WorkspaceProjectsListPage.css';
 
@@ -19,18 +20,18 @@ function getProjectTargetPath(workspaceId: string, project: Project) {
 export function WorkspaceProjectsListPage() {
   const navigate = useNavigate();
   const { workspaceId } = useParams();
-  const { activeProjectId, projects } = useTickets();
+  const { activeProjectId } = useTickets();
+  const { projectsByWorkspaceId } = useProjectContext();
 
   const workspaceProjects = useMemo(() => {
     if (!workspaceId) {
       return [];
     }
 
-    return projects
-      .filter((project) => project.workspaceId === workspaceId)
+    return (projectsByWorkspaceId.get(workspaceId) || [])
       .slice()
       .sort((first, second) => first.name.localeCompare(second.name) || first.key.localeCompare(second.key));
-  }, [projects, workspaceId]);
+  }, [projectsByWorkspaceId, workspaceId]);
   const projectCountLabel = `${workspaceProjects.length} project${workspaceProjects.length === 1 ? '' : 's'}`;
 
   const handleSelectProject = (project: Project) => {
