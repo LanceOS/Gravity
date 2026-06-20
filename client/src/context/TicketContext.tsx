@@ -38,13 +38,11 @@ export type {
   Comment,
   CreateProjectInput,
 } from '../types/domain';
-import type { User, Project, Label, Cycle, Ticket, Comment, CreateProjectInput } from '../types/domain';
+import type { User, Ticket, Comment } from '../types/domain';
 
 interface State {
   tickets: Ticket[];
-  projects: Project[];
   users: User[];
-  comments: Comment[];
   activeTicket: Ticket | null;
   currentUser: User | null;
   loading: boolean;
@@ -64,28 +62,15 @@ export type { TicketFiltersState };
 // ---------------------------------------------------------------------------
 
 export interface TicketContextType extends State {
-  activeProjectId: string;
-  setActiveProjectId: (id: string) => void;
-  fetchInitialData: (userId?: string) => Promise<void>;
-  fetchProjectData: (projId: string) => Promise<void>;
   addComment: (ticketId: string, body: string) => Promise<void>;
   updateComment: (ticketId: string, commentId: string, body: string) => Promise<void>;
   deleteComment: (ticketId: string, commentId: string) => Promise<void>;
-  createProject: (project: CreateProjectInput) => Promise<Project | null>;
-  updateProject: (id: string, updates: Partial<Project>) => Promise<Project | null>;
-  deleteProject: (id: string) => Promise<void>;
-  joinProject: (inviteCode: string) => Promise<Project | null>;
   setActiveTicket: React.Dispatch<React.SetStateAction<Ticket | null>>;
-  activeTicketDetail: TicketWithRelations | null;
   addTicketDependency: (ticketId: string, dependencyId: string) => Promise<boolean>;
   removeTicketDependency: (ticketId: string, dependencyId: string) => Promise<boolean>;
   addTicketBlocker: (ticketId: string, blockerId: string) => Promise<boolean>;
   removeTicketBlocker: (ticketId: string, blockerId: string) => Promise<boolean>;
   ticketMap: Map<string, Ticket>;
-  ticketById: Map<string, Ticket>;
-  projectById: Map<string, Project>;
-  projectsByWorkspaceId: Map<string, Project[]>;
-  ticketsByProject: Map<string, Ticket[]>;
 }
 
 export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -393,7 +378,6 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     tickets,
     isAuthenticated: !!currentUser,
   });
-  const comments = ticketDetailContextValue.comments;
 
   const commentContextValue = useCommentContextValue({
     currentUser,
@@ -431,7 +415,6 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const loading = authLoading || projectContextValue.projectsLoading || usersQuery.isLoading;
 
   const ticketMap = useMemo(() => new Map(tickets.map((t) => [t.key.toUpperCase(), t])), [tickets]);
-  const ticketById = useMemo(() => new Map(tickets.map((t) => [t.id, t])), [tickets]);
 
   // --- Actions ---
 
@@ -707,45 +690,13 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     deleteComment,
   } = commentContextValue;
 
-  const {
-    fetchInitialData,
-    fetchProjectData,
-    createProject,
-    updateProject,
-    deleteProject,
-    joinProject,
-  } = projectContextValue;
-
-  const projectById = projectContextValue.projectById;
-  const projectsByWorkspaceId = projectContextValue.projectsByWorkspaceId;
-
-  const ticketsByProject = useMemo(() => {
-    const map = new Map<string, Ticket[]>();
-    for (const ticket of tickets) {
-      const current = map.get(ticket.projectId);
-      if (current) {
-        current.push(ticket);
-      } else {
-        map.set(ticket.projectId, [ticket]);
-      }
-    }
-    return map;
-  }, [tickets]);
-
   const value = useMemo(
     () => ({
       tickets,
-      projects,
       users,
-      comments,
       activeTicket,
-      activeTicketDetail,
       currentUser,
       loading,
-      activeProjectId,
-      setActiveProjectId,
-      fetchInitialData,
-      fetchProjectData,
       addComment,
       updateComment,
       deleteComment,
@@ -753,47 +704,24 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       removeTicketDependency,
       addTicketBlocker,
       removeTicketBlocker,
-      createProject,
-      updateProject,
-      deleteProject,
-      joinProject,
       setActiveTicket,
       ticketMap,
-      ticketById,
-      projectById,
-      projectsByWorkspaceId,
-      ticketsByProject,
     }),
     [
       tickets,
-      projects,
       users,
-      comments,
       activeTicket,
-      activeTicketDetail,
       currentUser,
       loading,
-      activeProjectId,
-      setActiveProjectId,
-      fetchInitialData,
-      fetchProjectData,
       addComment,
       updateComment,
       deleteComment,
       addTicketDependency,
       removeTicketDependency,
-      createProject,
-      updateProject,
-      deleteProject,
-      joinProject,
       setActiveTicket,
       addTicketBlocker,
       removeTicketBlocker,
       ticketMap,
-      ticketById,
-      projectById,
-      projectsByWorkspaceId,
-      ticketsByProject,
     ]
   );
 

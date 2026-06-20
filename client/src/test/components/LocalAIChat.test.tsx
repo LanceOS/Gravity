@@ -6,6 +6,7 @@ import { LocalAIChat } from '../../modules/ai';
 
 const mocks = vi.hoisted(() => ({
   useTickets: vi.fn(),
+  useProjectContext: vi.fn(),
   fetch: vi.fn(),
 }));
 
@@ -23,6 +24,10 @@ function createJsonResponse(body: unknown, ok = true) {
 
 vi.mock('../../context/TicketContextContext', () => ({
   useTickets: mocks.useTickets,
+}));
+
+vi.mock('../../context/project/ProjectContext', () => ({
+  useProjectContext: mocks.useProjectContext,
 }));
 
 vi.mock('../../context/label/LabelContext', () => ({
@@ -109,9 +114,11 @@ function renderLocalAIChat(overrides: Partial<Parameters<typeof LocalAIChat>[0]>
 
   mocks.useTickets.mockReturnValue({
     activeTicket: null,
-    projects,
     users,
     ...ticketContextOverrides,
+  });
+  mocks.useProjectContext.mockReturnValue({
+    projects,
   });
 
   return {
@@ -123,6 +130,7 @@ function renderLocalAIChat(overrides: Partial<Parameters<typeof LocalAIChat>[0]>
 describe('LocalAIChat', () => {
   beforeEach(() => {
     mocks.useTickets.mockReset();
+    mocks.useProjectContext.mockReset();
     mocks.fetch.mockReset();
     vi.stubGlobal('fetch', mocks.fetch);
   });

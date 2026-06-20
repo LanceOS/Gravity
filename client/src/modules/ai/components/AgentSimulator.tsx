@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useTickets } from '../../../context/TicketContextContext';
+import { useProjectContext } from '../../../context/project/ProjectContext';
 import { Terminal, X, Play, Loader2, Sparkles, AlertCircle } from 'lucide-react';
 import type { AgentLogEntry, AgentSimulatorProps } from '../types/AgentSimulator';
 import { delay, getInitialAgentLogs } from '../utils/AgentSimulator';
@@ -17,7 +17,7 @@ function parseToolResultText(text: string): McpToolResult | string {
 }
 
 export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
-  const { fetchInitialData } = useTickets();
+  const { fetchInitialData } = useProjectContext();
   const [prompt, setPrompt] = useState('Create a backend ticket for setup auth, assign to bob, and add comment "Lance is waiting"');
   const [logs, setLogs] = useState<AgentLogEntry[]>(getInitialAgentLogs);
   const [isRunning, setIsRunning] = useState(false);

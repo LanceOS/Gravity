@@ -14,6 +14,7 @@ import { OnboardingModal } from '../../onboarding';
 import { useTheme } from '../../settings';
 import type { Ticket } from '../../../context/TicketContextContext';
 import { useTickets } from '../../../context/TicketContextContext';
+import { useActiveProject } from '../../../context/project/ActiveProjectContext';
 import { useProjectContext } from '../../../context/project/ProjectContext';
 import { useLabels } from '../../../context/label/LabelContext';
 import { useTicketMutations } from '../../../context/ticket/TicketMutationContext';
@@ -70,13 +71,11 @@ const AGGREGATE_TICKETS_PAGE_SIZE = 120;
 
 export function WorkspaceShellPage() {
   const {
-    activeProjectId,
     addComment,
     updateComment,
     deleteComment,
     currentUser,
     loading,
-    setActiveProjectId,
     tickets,
     users,
     addTicketDependency,
@@ -84,6 +83,7 @@ export function WorkspaceShellPage() {
     addTicketBlocker,
     removeTicketBlocker,
   } = useTickets();
+  const { activeProjectId, setActiveProjectId } = useActiveProject();
   const {
     projects,
     projectById,

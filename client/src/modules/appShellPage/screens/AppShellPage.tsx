@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 import { authClient } from '../../../context/auth/authClient';
+import { useProjectContext } from '../../../context/project/ProjectContext';
 import { AuthScreen } from '../../auth';
 import { OnboardingModal } from '../../onboarding';
 import { useTickets } from '../../../context/TicketContextContext';
@@ -30,9 +31,9 @@ function AppShellLandingPage() {
 
   const {
     currentUser,
-    fetchInitialData,
     loading,
   } = useTickets();
+  const { fetchInitialData } = useProjectContext();
 
   const {
     workspaces,

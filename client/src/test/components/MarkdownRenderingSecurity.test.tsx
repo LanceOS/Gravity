@@ -8,6 +8,13 @@ vi.mock('../../context/TicketContextContext', () => ({
     projects: [],
     ticketMap: new Map(),
     setActiveTicket: vi.fn(),
+  }),
+}));
+
+vi.mock('../../context/project/ActiveProjectContext', () => ({
+  useActiveProject: () => ({
+    activeProjectId: '',
+    activeProjectIdRef: { current: '' },
     setActiveProjectId: vi.fn(),
   }),
 }));

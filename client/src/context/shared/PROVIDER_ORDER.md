@@ -6,8 +6,9 @@
 QueryClientProvider          ← outermost data layer
   ThemeContextProvider       ← theme state + persistence
     SettingsThemeProvider    ← CSS variables + density
-      TicketProvider         ← all ticket / user / project state
-        RouterProvider       ← routing; consumes context via hooks
+      ActiveProjectProvider  ← active project selection
+        TicketProvider       ← ticket / user / comment orchestration
+          RouterProvider     ← routing; consumes context via hooks
 ```
 
 ## Ordering Rules
@@ -19,7 +20,7 @@ QueryClientProvider          ← outermost data layer
 `ThemeContextProvider` owns persisted theme state and `SettingsThemeProvider` only reads that state to manage CSS custom properties and density. Neither provider calls `useTickets()` or `useQueryClient()`, so they can sit anywhere between `QueryClientProvider` and `TicketProvider` without causing dependency issues.
 
 ### Rule 3 — `TicketProvider` must wrap `RouterProvider`
-All routed page components (workspace pages, ticket detail pages, settings, etc.) call `useTickets()`. `TicketProvider` must be an ancestor.
+All routed page components that read ticket data (`useTickets()`, `useProjectContext()`, or `useTicketDetailContext()`) must have `TicketProvider` mounted above them.
 
 ### Rule 4 — Future contexts that **depend on** ticket data
 Any new context/provider that calls `useTickets()` internally must be nested **inside** `TicketProvider`.

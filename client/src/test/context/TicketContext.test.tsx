@@ -2,6 +2,10 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TicketProvider } from '../../context/TicketContext.tsx';
 import { useTickets } from '../../context/TicketContextContext';
+import { useActiveProject } from '../../context/project/ActiveProjectContext';
+import { ActiveProjectProvider } from '../../context/project/ActiveProjectContext';
+import { useProjectContext } from '../../context/project/ProjectContext';
+import { useTicketDetailContext } from '../../context/ticket/TicketDetailContext';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 
@@ -22,20 +26,17 @@ function renderWithProvider(ui: React.ReactNode) {
   });
   return render(
     <QueryClientProvider client={queryClient}>
-      {ui}
+      <ActiveProjectProvider>
+        {ui}
+      </ActiveProjectProvider>
     </QueryClientProvider>
   );
 }
 
 function ContextProbe() {
-  const {
-    activeProjectId,
-    loading,
-    projects,
-    users,
-    tickets,
-    setActiveProjectId,
-  } = useTickets();
+  const { loading, users, tickets } = useTickets();
+  const { projects } = useProjectContext();
+  const { activeProjectId, setActiveProjectId } = useActiveProject();
 
   const currentUser: any = { email: 'ada@example.com' };
   const switchUser = () => { };
@@ -62,13 +63,13 @@ function ContextProbe() {
 function RelationProbe() {
   const {
     activeTicket,
-    activeTicketDetail,
     tickets,
-    setActiveProjectId,
     setActiveTicket,
     addTicketDependency,
     removeTicketDependency,
   } = useTickets();
+  const { activeTicketDetail } = useTicketDetailContext();
+  const { setActiveProjectId } = useActiveProject();
 
   const currentUser: any = { id: 'user-1' };
 

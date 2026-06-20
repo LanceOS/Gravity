@@ -50,6 +50,7 @@ type WorkspacePageMockProps = {
 
 const mocks = vi.hoisted(() => ({
   useTickets: vi.fn(),
+  useActiveProject: vi.fn(),
   useProjectContext: vi.fn(),
   useTicketDetailContext: vi.fn(),
   useTicketMutations: vi.fn(),
@@ -71,6 +72,10 @@ function jsonResponse(body: unknown, status = 200) {
 
 vi.mock('../../context/TicketContextContext', () => ({
   useTickets: mocks.useTickets,
+}));
+
+vi.mock('../../context/project/ActiveProjectContext', () => ({
+  useActiveProject: mocks.useActiveProject,
 }));
 
 vi.mock('../../context/project/ProjectContext', () => ({
@@ -457,6 +462,11 @@ function renderAppShell({
 } = {}) {
   mocks.useTickets.mockReturnValue(tickets);
   const ticketState = tickets as any;
+  mocks.useActiveProject.mockReturnValue({
+    activeProjectId: ticketState.activeProjectId || '',
+    setActiveProjectId: ticketState.setActiveProjectId ?? vi.fn(),
+    activeProjectIdRef: { current: ticketState.activeProjectId || '' },
+  });
   const projects = Array.isArray(ticketState.projects) ? ticketState.projects : [];
   const projectById = new Map(projects.map((project: any) => [project.id, project]));
   const projectsByWorkspaceId = new Map<string, any[]>();

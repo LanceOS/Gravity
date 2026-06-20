@@ -7,12 +7,12 @@ import type { Project } from '../../context/TicketContextContext';
 import { WorkspaceProjectsListPage } from '../../pages/WorkspaceProjectsListPage/WorkspaceProjectsListPage.tsx';
 
 const mocks = vi.hoisted(() => ({
-  useTickets: vi.fn(),
+  useActiveProject: vi.fn(),
   useProjectContext: vi.fn(),
 }));
 
-vi.mock('../../context/TicketContextContext', () => ({
-  useTickets: mocks.useTickets,
+vi.mock('../../context/project/ActiveProjectContext', () => ({
+  useActiveProject: mocks.useActiveProject,
 }));
 
 vi.mock('../../context/project/ProjectContext', () => ({
@@ -67,12 +67,12 @@ function renderWorkspaceProjectsListPage(overrides: Partial<Record<string, unkno
   ];
   const projects = Array.isArray(overrides.projects) ? (overrides.projects as Project[]) : defaultProjects;
 
-  mocks.useTickets.mockReturnValue({
+  mocks.useActiveProject.mockReturnValue({
     activeProjectId: 'project-1',
     setActiveProjectId: vi.fn(),
-    setActiveTicket: vi.fn(),
+    activeProjectIdRef: { current: 'project-1' },
     ...overrides,
-  });
+  } as any);
 
   mocks.useProjectContext.mockReturnValue({
     projects,

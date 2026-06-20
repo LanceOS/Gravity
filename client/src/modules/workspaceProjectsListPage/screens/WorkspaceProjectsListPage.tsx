@@ -3,7 +3,7 @@ import { ChevronRight, Database } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { PROJECT_STATUS_LABELS } from '../../workspaces';
 import type { Project } from '../../../context/TicketContextContext';
-import { useTickets } from '../../../context/TicketContextContext';
+import { useActiveProject } from '../../../context/project/ActiveProjectContext';
 import { useProjectContext } from '../../../context/project/ProjectContext';
 import { WorkspacePageLayout } from '../../../layouts/WorkspacePageLayout/WorkspacePageLayout';
 import '../styles/WorkspaceProjectsListPage.css';
@@ -20,7 +20,7 @@ function getProjectTargetPath(workspaceId: string, project: Project) {
 export function WorkspaceProjectsListPage() {
   const navigate = useNavigate();
   const { workspaceId } = useParams();
-  const { activeProjectId } = useTickets();
+  const { activeProjectId } = useActiveProject();
   const { projectsByWorkspaceId } = useProjectContext();
 
   const workspaceProjects = useMemo(() => {

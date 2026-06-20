@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { TicketContextMenu } from '../../modules/tickets/components/TicketContextMenu';
 import { TicketContext, type Ticket, type Project } from '../../context/TicketContextContext';
+import { ProjectContext } from '../../context/project/ProjectContext';
 import { TicketMutationContext } from '../../context/ticket/TicketMutationContext';
 import { LabelContext } from '../../context/label/LabelContext';
 import { CycleContext } from '../../context/cycle/CycleContext';
@@ -51,12 +52,6 @@ const projectOtherWorkspace: Project = {
   workspaceId: 'workspace-2',
 };
 
-const projectById = new Map([
-  ['project-1', project1],
-  ['project-2', project2],
-  ['project-3', projectOtherWorkspace],
-]);
-
 const dependencyTargetTicket: Ticket = {
   ...ticket,
   id: 'ticket-2',
@@ -71,6 +66,30 @@ const blockerTargetTicket: Ticket = {
   title: 'Blocker target ticket',
 };
 
+function makeProjectContext(projects: Project[]) {
+  const projectsByWorkspaceId = new Map<string, Project[]>();
+  for (const project of projects) {
+    const workspaceId = project.workspaceId || '';
+    const workspaceProjects = projectsByWorkspaceId.get(workspaceId) || [];
+    workspaceProjects.push(project);
+    projectsByWorkspaceId.set(workspaceId, workspaceProjects);
+  }
+
+  return {
+    projects,
+    projectsLoading: false,
+    projectLookup: new Map(),
+    projectById: new Map(projects.map((project) => [project.id, project])),
+    projectsByWorkspaceId,
+    fetchInitialData: vi.fn(),
+    fetchProjectData: vi.fn(),
+    createProject: vi.fn(),
+    updateProject: vi.fn(),
+    deleteProject: vi.fn(),
+    joinProject: vi.fn(),
+  };
+}
+
 describe('TicketContextMenu', () => {
   it('filters projects by workspace for Move to Project', async () => {
     const user = userEvent.setup();
@@ -79,6 +98,7 @@ describe('TicketContextMenu', () => {
     const deleteTicketMock = vi.fn();
     const addTicketDependencyMock = vi.fn().mockResolvedValue(true);
     const addTicketBlockerMock = vi.fn().mockResolvedValue(true);
+    const projectContextValue = makeProjectContext([project1, project2, projectOtherWorkspace]);
 
     render(
       <TicketMutationContext.Provider value={{
@@ -87,32 +107,40 @@ describe('TicketContextMenu', () => {
         moveTicket: moveTicketMock,
         deleteTicket: deleteTicketMock,
       }}>
-        <TicketContext.Provider value={{
-          tickets: [ticket, dependencyTargetTicket, blockerTargetTicket],
-          projects: [project1, project2, projectOtherWorkspace],
-          users: [],
-          projectById,
-          addTicketDependency: addTicketDependencyMock,
-          addTicketBlocker: addTicketBlockerMock,
-          removeTicketDependency: vi.fn(),
-          removeTicketBlocker: vi.fn(),
-        } as any}>
-          <LabelContext.Provider value={{
-            labels: [],
-            globalLabels: [],
-            labelsByProject: new Map(),
-            assignLabelToTicket: vi.fn(),
-            unassignLabelFromTicket: vi.fn(),
+        <ProjectContext.Provider value={projectContextValue as any}>
+          <TicketContext.Provider value={{
+            tickets: [ticket, dependencyTargetTicket, blockerTargetTicket],
+            users: [],
+            activeTicket: null,
+            currentUser: null,
+            loading: false,
+            addTicketDependency: addTicketDependencyMock,
+            addTicketBlocker: addTicketBlockerMock,
+            addComment: vi.fn(),
+            updateComment: vi.fn(),
+            deleteComment: vi.fn(),
+            setActiveTicket: vi.fn(),
+            removeTicketDependency: vi.fn(),
+            removeTicketBlocker: vi.fn(),
+            ticketMap: new Map(),
           } as any}>
-            <CycleContext.Provider value={{
-              cycles: [],
+            <LabelContext.Provider value={{
+              labels: [],
+              globalLabels: [],
+              labelsByProject: new Map(),
+              assignLabelToTicket: vi.fn(),
+              unassignLabelFromTicket: vi.fn(),
             } as any}>
-              <TicketContextMenu ticket={ticket}>
-                <div data-testid="ticket-trigger">Trigger Context Menu</div>
-              </TicketContextMenu>
-            </CycleContext.Provider>
-          </LabelContext.Provider>
-        </TicketContext.Provider>
+              <CycleContext.Provider value={{
+                cycles: [],
+              } as any}>
+                <TicketContextMenu ticket={ticket}>
+                  <div data-testid="ticket-trigger">Trigger Context Menu</div>
+                </TicketContextMenu>
+              </CycleContext.Provider>
+            </LabelContext.Provider>
+          </TicketContext.Provider>
+        </ProjectContext.Provider>
       </TicketMutationContext.Provider>
     );
 
@@ -139,6 +167,7 @@ describe('TicketContextMenu', () => {
     const deleteTicketMock = vi.fn();
     const updateTicketMock = vi.fn();
     const moveTicketMock = vi.fn();
+    const projectContextValue = makeProjectContext([project1]);
     const unrelatedProjectTicket: Ticket = {
       ...ticket,
       id: 'ticket-9',
@@ -154,35 +183,43 @@ describe('TicketContextMenu', () => {
         moveTicket: moveTicketMock,
         deleteTicket: deleteTicketMock,
       }}>
-        <TicketContext.Provider value={{
-          tickets: [ticket, unrelatedProjectTicket],
-          projects: [project1],
-          users: [],
-          projectById,
-          addTicketDependency: addTicketDependencyMock,
-          addTicketBlocker: addTicketBlockerMock,
-          removeTicketDependency: vi.fn(),
-          removeTicketBlocker: vi.fn(),
-        } as any}>
-          <LabelContext.Provider value={{
-            labels: [],
-            globalLabels: [],
-            labelsByProject: new Map(),
-            assignLabelToTicket: vi.fn(),
-            unassignLabelFromTicket: vi.fn(),
+        <ProjectContext.Provider value={projectContextValue as any}>
+          <TicketContext.Provider value={{
+            tickets: [ticket, unrelatedProjectTicket],
+            users: [],
+            activeTicket: null,
+            currentUser: null,
+            loading: false,
+            addTicketDependency: addTicketDependencyMock,
+            addTicketBlocker: addTicketBlockerMock,
+            addComment: vi.fn(),
+            updateComment: vi.fn(),
+            deleteComment: vi.fn(),
+            setActiveTicket: vi.fn(),
+            removeTicketDependency: vi.fn(),
+            removeTicketBlocker: vi.fn(),
+            ticketMap: new Map(),
           } as any}>
-            <CycleContext.Provider value={{
-              cycles: [],
+            <LabelContext.Provider value={{
+              labels: [],
+              globalLabels: [],
+              labelsByProject: new Map(),
+              assignLabelToTicket: vi.fn(),
+              unassignLabelFromTicket: vi.fn(),
             } as any}>
-              <TicketContextMenu
-                ticket={ticket}
-                availableTickets={[ticket, dependencyTargetTicket, blockerTargetTicket]}
-              >
-                <div data-testid="ticket-trigger">Trigger Context Menu</div>
-              </TicketContextMenu>
-            </CycleContext.Provider>
-          </LabelContext.Provider>
-        </TicketContext.Provider>
+              <CycleContext.Provider value={{
+                cycles: [],
+              } as any}>
+                <TicketContextMenu
+                  ticket={ticket}
+                  availableTickets={[ticket, dependencyTargetTicket, blockerTargetTicket]}
+                >
+                  <div data-testid="ticket-trigger">Trigger Context Menu</div>
+                </TicketContextMenu>
+              </CycleContext.Provider>
+            </LabelContext.Provider>
+          </TicketContext.Provider>
+        </ProjectContext.Provider>
       </TicketMutationContext.Provider>
     );
 
@@ -227,6 +264,7 @@ describe('TicketContextMenu', () => {
     const deleteTicketMock = vi.fn();
     const updateTicketMock = vi.fn();
     const moveTicketMock = vi.fn();
+    const projectContextValue = makeProjectContext([project1]);
 
     render(
       <TicketMutationContext.Provider value={{
@@ -235,35 +273,43 @@ describe('TicketContextMenu', () => {
         moveTicket: moveTicketMock,
         deleteTicket: deleteTicketMock,
       }}>
-        <TicketContext.Provider value={{
-          tickets: [ticket, longTitleTicket],
-          projects: [project1],
-          users: [],
-          projectById,
-          addTicketDependency: vi.fn().mockResolvedValue(true),
-          addTicketBlocker: vi.fn().mockResolvedValue(true),
-          removeTicketDependency: vi.fn(),
-          removeTicketBlocker: vi.fn(),
-        } as any}>
-          <LabelContext.Provider value={{
-            labels: [],
-            globalLabels: [],
-            labelsByProject: new Map(),
-            assignLabelToTicket: vi.fn(),
-            unassignLabelFromTicket: vi.fn(),
+        <ProjectContext.Provider value={projectContextValue as any}>
+          <TicketContext.Provider value={{
+            tickets: [ticket, longTitleTicket],
+            users: [],
+            activeTicket: null,
+            currentUser: null,
+            loading: false,
+            addTicketDependency: vi.fn().mockResolvedValue(true),
+            addTicketBlocker: vi.fn().mockResolvedValue(true),
+            addComment: vi.fn(),
+            updateComment: vi.fn(),
+            deleteComment: vi.fn(),
+            setActiveTicket: vi.fn(),
+            removeTicketDependency: vi.fn(),
+            removeTicketBlocker: vi.fn(),
+            ticketMap: new Map(),
           } as any}>
-            <CycleContext.Provider value={{
-              cycles: [],
+            <LabelContext.Provider value={{
+              labels: [],
+              globalLabels: [],
+              labelsByProject: new Map(),
+              assignLabelToTicket: vi.fn(),
+              unassignLabelFromTicket: vi.fn(),
             } as any}>
-              <TicketContextMenu
-                ticket={ticket}
-                availableTickets={[ticket, longTitleTicket]}
-              >
-                <div data-testid="ticket-trigger">Trigger Context Menu</div>
-              </TicketContextMenu>
-            </CycleContext.Provider>
-          </LabelContext.Provider>
-        </TicketContext.Provider>
+              <CycleContext.Provider value={{
+                cycles: [],
+              } as any}>
+                <TicketContextMenu
+                  ticket={ticket}
+                  availableTickets={[ticket, longTitleTicket]}
+                >
+                  <div data-testid="ticket-trigger">Trigger Context Menu</div>
+                </TicketContextMenu>
+              </CycleContext.Provider>
+            </LabelContext.Provider>
+          </TicketContext.Provider>
+        </ProjectContext.Provider>
       </TicketMutationContext.Provider>
     );
 
@@ -289,20 +335,28 @@ describe('TicketContextMenu', () => {
 
   it('renders children unchanged when the mutation provider is absent', () => {
     render(
-      <TicketContext.Provider value={{
-        tickets: [ticket],
-        projects: [project1],
-        users: [],
-        projectById,
-        addTicketDependency: vi.fn(),
-        addTicketBlocker: vi.fn(),
-        removeTicketDependency: vi.fn(),
-        removeTicketBlocker: vi.fn(),
-      } as any}>
-        <TicketContextMenu ticket={ticket}>
-          <div data-testid="ticket-trigger">Trigger Context Menu</div>
-        </TicketContextMenu>
-      </TicketContext.Provider>
+      <ProjectContext.Provider value={makeProjectContext([project1]) as any}>
+        <TicketContext.Provider value={{
+          tickets: [ticket],
+          users: [],
+          activeTicket: null,
+          currentUser: null,
+          loading: false,
+          addTicketDependency: vi.fn(),
+          addTicketBlocker: vi.fn(),
+          addComment: vi.fn(),
+          updateComment: vi.fn(),
+          deleteComment: vi.fn(),
+          setActiveTicket: vi.fn(),
+          removeTicketDependency: vi.fn(),
+          removeTicketBlocker: vi.fn(),
+          ticketMap: new Map(),
+        } as any}>
+          <TicketContextMenu ticket={ticket}>
+            <div data-testid="ticket-trigger">Trigger Context Menu</div>
+          </TicketContextMenu>
+        </TicketContext.Provider>
+      </ProjectContext.Provider>
     );
 
     expect(screen.getByTestId('ticket-trigger')).toBeInTheDocument();
