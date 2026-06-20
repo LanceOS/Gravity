@@ -85,3 +85,8 @@
     display: none !important;
   }
 }
+
+.workspace-header--with-bottom {
+  min-height: 96px;
+}
+

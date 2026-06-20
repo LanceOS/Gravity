@@ -35,9 +35,20 @@ type WorkspaceHeaderComponent = (({
   Bottom: ({ children }: WorkspaceHeaderBottomProps) => React.JSX.Element;
 };
 
+function WorkspaceHeaderBottom({ children }: WorkspaceHeaderBottomProps) {
+  return <div className="workspace-header__bottom">{children}</div>;
+}
+
 export const WorkspaceHeader: WorkspaceHeaderComponent = Object.assign(
   function WorkspaceHeader({ children }: WorkspaceHeaderProps) {
-    return <header className="workspace-header">{children}</header>;
+    const hasBottom = React.Children.toArray(children).some(
+      (child) => React.isValidElement(child) && child.type === WorkspaceHeaderBottom
+    );
+    return (
+      <header className={`workspace-header ${hasBottom ? 'workspace-header--with-bottom' : ''}`}>
+        {children}
+      </header>
+    );
   },
   {
     Top: function WorkspaceHeaderTop({ children }: WorkspaceHeaderTopProps) {
@@ -82,8 +93,6 @@ export const WorkspaceHeader: WorkspaceHeaderComponent = Object.assign(
       );
     },
 
-    Bottom: function WorkspaceHeaderBottom({ children }: WorkspaceHeaderBottomProps) {
-      return <div className="workspace-header__bottom">{children}</div>;
-    },
+    Bottom: WorkspaceHeaderBottom,
   }
 );

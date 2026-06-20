@@ -1,49 +1,58 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import React, { createContext, useContext, useReducer, ReactNode, useCallback } from 'react';
 import type { TicketFiltersContextType } from './TicketFiltersContext.types';
 import { initialFilters, type TicketFiltersState } from '../shared/filters';
-import { useActiveProject } from '../project/ActiveProjectContext';
+
+type FilterAction = 
+  | { type: 'UPDATE'; payload: Partial<TicketFiltersState> }
+  | { type: 'RESET' };
+
+function filtersReducer(state: TicketFiltersState, action: FilterAction): TicketFiltersState {
+  switch (action.type) {
+    case 'UPDATE': {
+      let hasChanges = false;
+      const nextState = { ...state };
+
+      const checkAndSet = <K extends keyof TicketFiltersState>(key: K) => {
+        const newValue = action.payload[key];
+        if (newValue !== undefined) {
+          const prevValue = state[key];
+
+          if (Array.isArray(newValue) && Array.isArray(prevValue)) {
+            if (newValue.length !== prevValue.length || newValue.some((v, i) => v !== prevValue[i])) {
+              nextState[key] = newValue as NonNullable<TicketFiltersState[K]>;
+              hasChanges = true;
+            }
+          } else if (newValue !== prevValue) {
+            nextState[key] = newValue as NonNullable<TicketFiltersState[K]>;
+            hasChanges = true;
+          }
+        }
+      };
+
+      const keys = Object.keys(action.payload) as Array<keyof TicketFiltersState>;
+      keys.forEach(checkAndSet);
+
+      return hasChanges ? nextState : state;
+    }
+    case 'RESET':
+      return { ...initialFilters, projectId: state.projectId };
+    default:
+      return state;
+  }
+}
 
 const TicketFiltersContext = createContext<TicketFiltersContextType | undefined>(undefined);
 
 export const TicketFiltersProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { activeProjectId, activeProjectIdRef } = useActiveProject();
-  const [filters, setFiltersState] = useState<TicketFiltersState>(initialFilters);
-
-  useEffect(() => {
-    setFiltersState((prev) => {
-      if (prev.projectId === activeProjectId) {
-        return prev;
-      }
-      return { ...prev, projectId: activeProjectId };
-    });
-  }, [activeProjectId]);
+  const [filters, dispatch] = useReducer(filtersReducer, initialFilters);
 
   const setFilters = useCallback((nextFilters: Partial<TicketFiltersState>) => {
-    setFiltersState((prev) => {
-      let hasChanges = false;
-      const merged = { ...prev };
-      
-      for (const [key, value] of Object.entries(nextFilters)) {
-        const prevValue = prev[key as keyof TicketFiltersState];
-        
-        if (Array.isArray(value) && Array.isArray(prevValue)) {
-          if (value.length !== prevValue.length || !value.every((v, i) => v === prevValue[i])) {
-            (merged as any)[key] = value;
-            hasChanges = true;
-          }
-        } else if (prevValue !== value) {
-          (merged as any)[key] = value;
-          hasChanges = true;
-        }
-      }
-
-      return hasChanges ? merged : prev;
-    });
+    dispatch({ type: 'UPDATE', payload: nextFilters });
   }, []);
 
   const resetFilters = useCallback(() => {
-    setFiltersState({ ...initialFilters, projectId: activeProjectIdRef.current });
-  }, [activeProjectIdRef]);
+    dispatch({ type: 'RESET' });
+  }, []);
 
   return (
     <TicketFiltersContext.Provider value={{ filters, setFilters, resetFilters }}>

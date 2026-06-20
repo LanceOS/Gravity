@@ -44,6 +44,7 @@ interface WorkspacePageProps {
   filters: TicketFilters;
   listSort: TicketListSort;
   projects: Project[];
+  projectsLoading?: boolean;
   tickets: Ticket[];
   users: User[];
   onOpenCreateTicket: (initialStatus?: Ticket['status']) => void;
@@ -121,6 +122,7 @@ export function WorkspacePage({
   filters,
   listSort,
   projects,
+  projectsLoading = false,
   tickets,
   users,
   onOpenCreateTicket,
@@ -277,7 +279,7 @@ export function WorkspacePage({
       : isTeamWorkspace
         ? (onOpenTeamManager ?? onOpenProjectManager)
         : onOpenProjectManager;
-  const shouldShowTicketsLoading = isLoadingTickets && !activeTicket && projects.length > 0;
+  const shouldShowTicketsLoading = (isLoadingTickets || projectsLoading) && !activeTicket && (projects.length > 0 || projectsLoading);
 
   // eslint-disable-next-line no-useless-assignment
   let displayTitle = '';
@@ -324,7 +326,7 @@ export function WorkspacePage({
       users={users}
     />
   ) : null;
-  const shouldShowWorkspaceHeader = projects.length > 0;
+  const shouldShowWorkspaceHeader = projectsLoading || projects.length > 0;
 
   return (
     <WorkspacePageLayout
@@ -394,7 +396,7 @@ export function WorkspacePage({
                             </WorkspaceViewContainer>
                           </div>
 
-                          {projects.length === 0 ? (
+                          {projects.length === 0 && !projectsLoading ? (
                           <div className="workspace-page__empty-state">
                             <div className="workspace-page__empty-state-title">{emptyStateTitle}</div>
                             <p className="workspace-page__empty-state-copy">{emptyStateCopy}</p>

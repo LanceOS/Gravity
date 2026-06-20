@@ -26,6 +26,8 @@ import { authClient } from './auth/authClient';
 import { toast } from '@library';
 import { TicketContext } from './TicketContextContext';
 import { useActiveProject } from './project/ActiveProjectContext';
+import { useActiveView } from './ui/ActiveViewContext';
+import { useTicketFilters } from './filters/TicketFiltersContext';
 
 // Shared entity types live in src/types/domain.ts.
 export type {
@@ -164,8 +166,8 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const setActiveProjectIdState = setActiveProjectId;
   // --- Local UI States ---
   const [activeTicket, setActiveTicket] = useState<Ticket | null>(null);
-  const [activeView, setView] = useState<'list' | 'board'>('board');
-  const [filters, setFiltersState] = useState<State['filters']>(initialFilters);
+  const { activeView, setView } = useActiveView();
+  const { filters, setFilters, resetFilters } = useTicketFilters();
   const { data: session, isPending: authLoading } = authClient.useSession();
   const currentUser: User | null = useMemo(() => {
     return session?.user ? {
@@ -188,13 +190,10 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const inFlightTicketUpdateBatchesRef = useRef(new Map<string, InFlightTicketUpdateBatch>());
 
   useEffect(() => {
-    setFiltersState((prev) => {
-      if (prev.projectId === activeProjectId) {
-        return prev;
-      }
-      return { ...prev, projectId: activeProjectId };
-    });
-  }, [activeProjectId]);
+    if (filters.projectId !== activeProjectId) {
+      setFilters({ projectId: activeProjectId });
+    }
+  }, [activeProjectId, filters.projectId, setFilters]);
 
   useEffect(() => {
     activeTicketRef.current = activeTicket;
@@ -1169,7 +1168,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     activeProjectIdRef,
     activeTicketRef,
     setActiveProjectIdState,
-    setFiltersState,
+    setFilters,
     setActiveTicket,
   });
 
@@ -1826,15 +1825,6 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       throw error;
     }
   }, [joinProjectMutation]);
-
-  // --- Auth Actions ---
-  const setFilters = useCallback((nextFilters: Partial<State['filters']>) => {
-    setFiltersState(prev => ({ ...prev, ...nextFilters }));
-  }, []);
-
-  const resetFilters = useCallback(() => {
-    setFiltersState({ ...initialFilters, projectId: activeProjectIdRef.current });
-  }, []);
 
   const projectById = useMemo(() => {
     const map = new Map<string, Project>();

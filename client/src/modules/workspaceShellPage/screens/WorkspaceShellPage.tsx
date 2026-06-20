@@ -1140,6 +1140,7 @@ export function WorkspaceShellPage() {
             filters={scopedFilters}
             listSort={listSort}
             projects={scopedProjects}
+            projectsLoading={loading}
             tickets={scopedTickets}
             users={users}
             onOpenCreateTicket={handleOpenCreateTicket}
