@@ -5,7 +5,8 @@ import { queryKeys, CACHE_CONFIGS } from '../utils/queryClient';
 import { disposeSseService, getSseService } from '../services/sseService';
 import { SseEventCoalescer, type SseCoalescedEvent } from '../services/SseEventCoalescer';
 
-import { useTicketRelationActions } from '../hooks/useTicketRelationActions';
+import { CommentContext, useCommentContextValue } from './comment/CommentContext';
+import { TicketRelationsContext, useTicketRelationsContextValue } from './relation/TicketRelationsContext';
 import type { TicketWithRelations } from '../modules/tickets/utils/ticketRelations';
 import {
   combineTicketDetails,
@@ -466,13 +467,18 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [commentsQuery.data]);
 
+  const commentContextValue = useCommentContextValue({
+    currentUser,
+    activeProjectIdRef,
+  });
+
   const {
     activeTicketDetail,
     addTicketDependency,
     removeTicketDependency,
     addTicketBlocker,
     removeTicketBlocker,
-  } = useTicketRelationActions({
+  } = useTicketRelationsContextValue({
     queryClient,
     tickets,
     activeTicket,
@@ -480,6 +486,20 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     activeTicketProjectId,
     isAuthenticated: !!currentUser,
   });
+
+  const ticketRelationsContextValue = useMemo(() => ({
+    activeTicketDetail,
+    addTicketDependency,
+    removeTicketDependency,
+    addTicketBlocker,
+    removeTicketBlocker,
+  }), [
+    activeTicketDetail,
+    addTicketDependency,
+    removeTicketDependency,
+    addTicketBlocker,
+    removeTicketBlocker,
+  ]);
 
   // Global loading state combining react-query status
   const loading = authLoading || projectsQuery.isLoading || usersQuery.isLoading;
@@ -802,119 +822,11 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   ]);
 
   // --- Mutations ---
-
-  // Add Comment
-  const addCommentMutation = useMutation({
-    mutationFn: async ({ ticketId, body }: { ticketId: string; body: string }) => {
-      if (!currentUser || !activeProjectIdRef.current) throw new Error('Not authenticated');
-      const response = await fetch(`${API_URL}/tickets/${ticketId}/comments`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Project-Id': activeProjectIdRef.current,
-        },
-        body: JSON.stringify({ userId: currentUser.id, body }),
-      });
-      if (!response.ok) throw new Error('Failed to add comment');
-      return response.json() as Promise<Comment>;
-    },
-    onMutate: async ({ ticketId, body }) => {
-      const queryKey = queryKeys.comments(ticketId);
-      const previousComments = queryClient.getQueryData<Comment[]>(queryKey);
-
-      if (currentUser) {
-        const optimisticUpdatedAt = new Date().toISOString();
-        const optimisticId = `co-opt-${Date.now()}`;
-        const optimisticComment: Comment = {
-          id: optimisticId,
-          ticketId,
-          userId: currentUser.id,
-          body,
-          createdAt: optimisticUpdatedAt,
-          updatedAt: optimisticUpdatedAt,
-          userName: currentUser.name,
-          userAvatar: currentUser.avatar,
-          author: {
-            id: currentUser.id,
-            username: currentUser.name,
-            avatar_url: currentUser.avatar,
-            role: currentUser.role,
-          },
-        };
-        queryClient.setQueryData<Comment[]>(queryKey, (old) =>
-          old ? [...old, optimisticComment] : [optimisticComment]
-        );
-      }
-
-      return { previousComments };
-    },
-    onError: (_err: unknown, { ticketId }: { ticketId: string }, context: { previousComments?: Comment[] } | undefined) => {
-      if (context?.previousComments) {
-        queryClient.setQueryData(queryKeys.comments(ticketId), context.previousComments);
-      }
-    },
-  });
-
-  const addComment = useCallback(async (ticketId: string, body: string) => {
-    await addCommentMutation.mutateAsync({ ticketId, body });
-  }, [addCommentMutation]);
-
-  // Update Comment
-  const updateCommentMutation = useMutation({
-    mutationFn: async ({ ticketId, commentId, body }: { ticketId: string; commentId: string; body: string }) => {
-      await apiClient.patch(`/tickets/${ticketId}/comments/${commentId}`, { body }, { projectId: activeProjectIdRef.current });
-    },
-    onMutate: async ({ ticketId, commentId, body }) => {
-      const queryKey = queryKeys.comments(ticketId);
-      const previousComments = queryClient.getQueryData<Comment[]>(queryKey);
-      const optimisticUpdatedAt = new Date().toISOString();
-
-      if (previousComments) {
-        queryClient.setQueryData<Comment[]>(queryKey, (old) =>
-          old ? old.map((c) => (c.id === commentId ? { ...c, body, updatedAt: optimisticUpdatedAt } : c)) : []
-        );
-      }
-
-      return { previousComments };
-    },
-    onError: (_err: unknown, { ticketId }: { ticketId: string }, context: { previousComments?: Comment[] } | undefined) => {
-      if (context?.previousComments) {
-        queryClient.setQueryData(queryKeys.comments(ticketId), context.previousComments);
-      }
-    },
-  });
-
-  const updateComment = useCallback(async (ticketId: string, commentId: string, body: string) => {
-    await updateCommentMutation.mutateAsync({ ticketId, commentId, body });
-  }, [updateCommentMutation]);
-
-  // Delete Comment
-  const deleteCommentMutation = useMutation({
-    mutationFn: async ({ ticketId, commentId }: { ticketId: string; commentId: string }) => {
-      await apiClient.delete(`/tickets/${ticketId}/comments/${commentId}`, { projectId: activeProjectIdRef.current });
-    },
-    onMutate: async ({ ticketId, commentId }) => {
-      const queryKey = queryKeys.comments(ticketId);
-      const previousComments = queryClient.getQueryData<Comment[]>(queryKey);
-
-      if (previousComments) {
-        queryClient.setQueryData<Comment[]>(queryKey, (old) =>
-          old ? old.filter((c) => c.id !== commentId) : []
-        );
-      }
-
-      return { previousComments };
-    },
-    onError: (_err: unknown, { ticketId }: { ticketId: string }, context: { previousComments?: Comment[] } | undefined) => {
-      if (context?.previousComments) {
-        queryClient.setQueryData(queryKeys.comments(ticketId), context.previousComments);
-      }
-    },
-  });
-
-  const deleteComment = useCallback(async (ticketId: string, commentId: string) => {
-    await deleteCommentMutation.mutateAsync({ ticketId, commentId });
-  }, [deleteCommentMutation]);
+  const {
+    addComment,
+    updateComment,
+    deleteComment,
+  } = commentContextValue;
 
   // Create Project
   const createProjectMutation = useMutation({
@@ -1172,7 +1084,11 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   return (
     <ActiveTicketContext.Provider value={activeTicketContextValue}>
-      <TicketContext.Provider value={value}>{children}</TicketContext.Provider>
+      <CommentContext.Provider value={commentContextValue}>
+        <TicketRelationsContext.Provider value={ticketRelationsContextValue}>
+          <TicketContext.Provider value={value}>{children}</TicketContext.Provider>
+        </TicketRelationsContext.Provider>
+      </CommentContext.Provider>
     </ActiveTicketContext.Provider>
   );
 };
