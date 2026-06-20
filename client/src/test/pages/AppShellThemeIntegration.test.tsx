@@ -2,7 +2,8 @@ import type { ReactNode } from 'react';
 import { render, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
-import { ThemeProvider } from '../../modules/settings';
+import { ThemeProvider as AppThemeProvider } from '../../context/theme/ThemeContext';
+import { ThemeProvider as SettingsThemeProvider } from '../../modules/settings';
 import { AppShellPage } from '../../pages/AppShellPage/AppShellPage.tsx';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
@@ -274,11 +275,13 @@ function renderAppShell() {
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={['/workspaces/workspace-1']}>
-        <ThemeProvider>
-          <AppShellPage />
-        </ThemeProvider>
-      </MemoryRouter>
+      <AppThemeProvider>
+        <SettingsThemeProvider>
+          <MemoryRouter initialEntries={['/workspaces/workspace-1']}>
+            <AppShellPage />
+          </MemoryRouter>
+        </SettingsThemeProvider>
+      </AppThemeProvider>
     </QueryClientProvider>
   );
 }

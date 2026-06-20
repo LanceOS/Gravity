@@ -4,9 +4,10 @@
 
 ```
 QueryClientProvider          ← outermost data layer
-  ThemeProvider              ← CSS variable management
-    TicketProvider           ← all ticket / user / project state
-      RouterProvider         ← routing; consumes context via hooks
+  ThemeContextProvider       ← theme state + persistence
+    SettingsThemeProvider    ← CSS variables + density
+      TicketProvider         ← all ticket / user / project state
+        RouterProvider       ← routing; consumes context via hooks
 ```
 
 ## Ordering Rules
@@ -14,8 +15,8 @@ QueryClientProvider          ← outermost data layer
 ### Rule 1 — `QueryClientProvider` must be outermost
 `TicketProvider` calls `useQueryClient()` internally. If `QueryClientProvider` were nested inside `TicketProvider`, the hook would throw. It must wrap everything that touches React Query.
 
-### Rule 2 — `ThemeProvider` has no data dependencies
-`ThemeProvider` only reads/writes CSS custom properties on `<html>`. It does not call `useTickets()` or `useQueryClient()`. It can therefore sit anywhere between `QueryClientProvider` and `TicketProvider` without causing dependency issues.
+### Rule 2 — Theme providers have separate responsibilities
+`ThemeContextProvider` owns persisted theme state and `SettingsThemeProvider` only reads that state to manage CSS custom properties and density. Neither provider calls `useTickets()` or `useQueryClient()`, so they can sit anywhere between `QueryClientProvider` and `TicketProvider` without causing dependency issues.
 
 ### Rule 3 — `TicketProvider` must wrap `RouterProvider`
 All routed page components (workspace pages, ticket detail pages, settings, etc.) call `useTickets()`. `TicketProvider` must be an ancestor.
@@ -50,7 +51,8 @@ When the monolithic `TicketProvider` is decomposed into smaller providers, the i
 
 ```
 QueryClientProvider
-  ThemeProvider
+  ThemeContextProvider
+    SettingsThemeProvider
     AuthProvider            ← session / user identity (no ticket deps)
       WorkspaceProvider     ← projects, members (depends on auth)
         TicketListProvider  ← ticket list queries (depends on workspace)

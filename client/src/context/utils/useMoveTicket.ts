@@ -1,8 +1,8 @@
 import React, { useCallback } from 'react';
 import { useMutation, type QueryClient } from '@tanstack/react-query';
-import type { Ticket } from '../types/domain';
-import { queryKeys } from '../utils/queryClient';
-import type { TicketFiltersState } from './TicketContextContext';
+import type { Ticket } from '../../types/domain';
+import { queryKeys } from '../../utils/queryClient';
+import type { TicketFiltersState } from '../TicketContextContext';
 
 type MoveTicketVariables = {
   id: string;
@@ -74,7 +74,7 @@ interface UseMoveTicketArgs {
   queryClient: QueryClient;
   activeProjectIdRef: React.MutableRefObject<string>;
   activeTicketRef: React.MutableRefObject<Ticket | null>;
-  setActiveProjectIdState: React.Dispatch<React.SetStateAction<string>>;
+  setActiveProjectIdState: (id: string) => void;
   setFiltersState: React.Dispatch<React.SetStateAction<TicketFiltersState>>;
   setActiveTicket: React.Dispatch<React.SetStateAction<Ticket | null>>;
 }

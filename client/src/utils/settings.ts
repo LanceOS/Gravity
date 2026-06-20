@@ -1,3 +1,5 @@
+import { isThemeMode, type ThemeMode } from '../context/theme/ThemeContext.types';
+
 export type AIProvider = 'openai' | 'anthropic' | 'gemini' | 'deepseek';
 export type AgentIntegration = 'ollama' | 'third_party';
 
@@ -5,13 +7,14 @@ export const API_KEY_MASK = '••••••••••••';
 
 export interface WorkspaceSettings {
   defaultView: 'board' | 'list';
-  theme: 'dark' | 'coal-black' | 'coffee' | 'honey-glow' | 'marble-blue' | 'midnight-azure';
+  theme: ThemeMode;
   ollamaModel: string;
   ollamaEndpoint: string;
   projectLayout: 'standard' | 'condensed';
   apiKey: string;
   aiProvider: AIProvider;
   agentIntegration: AgentIntegration;
+  tutorialCompleted?: boolean;
 }
 
 export interface SavedApiCredential {
@@ -78,18 +81,10 @@ export const getProviderOption = (provider: AIProvider): ProviderOption =>
 export const normalizeWorkspaceSettings = (
   raw: Partial<WorkspaceSettings> | null | undefined,
   activeView: 'board' | 'list',
-  theme: 'dark' | 'coal-black' | 'coffee' | 'honey-glow' | 'marble-blue' | 'midnight-azure',
+  theme: ThemeMode,
 ): WorkspaceSettings => ({
   defaultView: raw?.defaultView === 'list' || raw?.defaultView === 'board' ? raw.defaultView : activeView,
-  theme:
-    raw?.theme === 'dark' ||
-    raw?.theme === 'coal-black' ||
-    raw?.theme === 'coffee' ||
-    raw?.theme === 'honey-glow' ||
-    raw?.theme === 'marble-blue' ||
-    raw?.theme === 'midnight-azure'
-      ? raw.theme
-      : theme,
+  theme: isThemeMode(raw?.theme) ? raw.theme : theme,
   ollamaModel: typeof raw?.ollamaModel === 'string' ? raw.ollamaModel : DEFAULT_WORKSPACE_SETTINGS.ollamaModel,
   ollamaEndpoint:
     typeof raw?.ollamaEndpoint === 'string' && raw.ollamaEndpoint.trim().length > 0
@@ -99,4 +94,5 @@ export const normalizeWorkspaceSettings = (
   apiKey: typeof raw?.apiKey === 'string' ? raw.apiKey : DEFAULT_WORKSPACE_SETTINGS.apiKey,
   aiProvider: isAIProvider(raw?.aiProvider) ? raw.aiProvider : DEFAULT_WORKSPACE_SETTINGS.aiProvider,
   agentIntegration: raw?.agentIntegration === 'third_party' ? 'third_party' : 'ollama',
+  tutorialCompleted: typeof raw?.tutorialCompleted === 'boolean' ? raw.tutorialCompleted : undefined,
 });

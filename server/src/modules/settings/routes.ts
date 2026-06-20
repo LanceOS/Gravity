@@ -47,6 +47,7 @@ function toSettingsResponse(
 ) {
   return {
     userId: settings.userId,
+    tutorialCompleted: settings.tutorialCompleted,
     defaultView: settings.defaultView,
     ollamaModel: settings.preferredOllamaModel ?? '',
     ollamaEndpoint: settings.ollamaEndpoint,

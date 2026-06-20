@@ -1,13 +1,13 @@
-import React, { createContext, useContext, useState, useLayoutEffect } from 'react';
-import { applyResolvedTheme, getStoredThemePreference, resolveThemePreference, THEME_STORAGE_KEY } from '@library/utilities/themeEngine';
+import React, { createContext, useContext, useLayoutEffect, useMemo, useState } from 'react';
+import { useTheme as useAppTheme } from '../../../context/theme/ThemeContext';
+import type { ThemeMode as AppThemeMode } from '../../../context/theme/ThemeContext.types';
 
-export type ThemeMode = 'dark' | 'coal-black' | 'coffee' | 'honey-glow' | 'marble-blue' | 'midnight-azure';
 export type DensityScale = 'compact' | 'standard';
 
 interface ThemeContextType {
-  theme: ThemeMode;
+  theme: AppThemeMode;
   density: DensityScale;
-  setTheme: (theme: ThemeMode) => void;
+  setTheme: (theme: AppThemeMode) => void;
   setDensity: (density: DensityScale) => void;
   toggleTheme: () => void;
 }
@@ -40,26 +40,13 @@ function safeWriteStorageValue(key: string, value: string) {
 }
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [theme, setThemeState] = useState<ThemeMode>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        return resolveThemePreference(getStoredThemePreference());
-      } catch {
-        return 'marble-blue';
-      }
-    }
-    return 'marble-blue';
-  });
-
-  const [density, setDensityState] = useState<DensityScale>(() => {
-    return safeReadDensitySetting();
-  });
+  const { theme, setTheme } = useAppTheme();
+  const [density, setDensityState] = useState<DensityScale>(() => safeReadDensitySetting());
 
   useLayoutEffect(() => {
     const root = document.documentElement;
-    applyResolvedTheme(theme);
     root.setAttribute('data-density', density);
-    
+
     // Inject dynamic CSS spacing variables based on density scaling
     if (density === 'compact') {
       root.style.setProperty('--space-base-multiplier', '0.75');
@@ -70,12 +57,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       root.style.setProperty('--table-row-height', '36px');
       root.style.setProperty('--input-padding-y', '6px');
     }
-  }, [theme, density]);
-
-  const setTheme = React.useCallback((newTheme: ThemeMode) => {
-    setThemeState(newTheme);
-    safeWriteStorageValue(THEME_STORAGE_KEY, newTheme);
-  }, []);
+  }, [density]);
 
   const setDensity = React.useCallback((newDensity: DensityScale) => {
     setDensityState(newDensity);
@@ -86,8 +68,19 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setTheme(theme === 'dark' ? 'coal-black' : 'dark');
   }, [theme, setTheme]);
 
+  const value = useMemo(
+    () => ({
+      theme,
+      density,
+      setTheme,
+      setDensity,
+      toggleTheme,
+    }),
+    [theme, density, setTheme, setDensity, toggleTheme]
+  );
+
   return (
-    <ThemeContext.Provider value={{ theme, density, setTheme, setDensity, toggleTheme }}>
+    <ThemeContext.Provider value={value}>
       {children}
     </ThemeContext.Provider>
   );
@@ -100,3 +93,5 @@ export const useTheme = () => {
   }
   return context;
 };
+
+export type { ThemeMode } from '../../../context/theme/ThemeContext.types';

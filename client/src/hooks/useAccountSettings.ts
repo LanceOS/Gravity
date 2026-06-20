@@ -7,6 +7,7 @@ import {
   type SavedApiCredential,
   type WorkspaceSettings,
 } from '../utils/settings';
+import { isThemeMode, type ThemeMode } from '../context/theme/ThemeContext.types';
 
 interface StatusMessage {
   success: boolean;
@@ -40,19 +41,8 @@ const KEY_ACTION: Record<'stored' | 'cleared' | 'pending', 'keep' | 'clear' | 'u
   pending: 'update',
 };
 
-function coerceTheme(value: string | null | undefined): WorkspaceSettings['theme'] | undefined {
-  if (
-    value === 'dark' ||
-    value === 'coal-black' ||
-    value === 'coffee' ||
-    value === 'honey-glow' ||
-    value === 'marble-blue' ||
-    value === 'midnight-azure'
-  ) {
-    return value;
-  }
-
-  return undefined;
+function coerceTheme(value: string | null | undefined): ThemeMode | undefined {
+  return isThemeMode(value) ? value : undefined;
 }
 
 function shallowEqual<T extends Record<string, any>>(objA: T, objB: T): boolean {
@@ -77,9 +67,9 @@ function shallowEqual<T extends Record<string, any>>(objA: T, objB: T): boolean 
 interface UseAccountSettingsOptions {
   currentUser: User | null;
   activeView: 'board' | 'list';
-  theme: 'dark' | 'coal-black' | 'coffee' | 'honey-glow' | 'marble-blue' | 'midnight-azure';
+  theme: ThemeMode;
   setView: (view: 'board' | 'list') => void;
-  setTheme: (theme: 'dark' | 'coal-black' | 'coffee' | 'honey-glow' | 'marble-blue' | 'midnight-azure') => void;
+  setTheme: (theme: ThemeMode) => void;
 }
 
 export function useAccountSettings({
@@ -152,8 +142,10 @@ export function useAccountSettings({
     setSettingsHydrated(false);
   }, [currentUser, activeView, theme]);
 
+  const currentUserId = currentUser?.id;
+
   useEffect(() => {
-    if (!currentUser) {
+    if (!currentUserId) {
       return;
     }
 
@@ -163,7 +155,7 @@ export function useAccountSettings({
     setSaveError(null);
     setSettingsHydrated(false);
 
-    fetch(`/api/v1/settings/${currentUser.id}`)
+    fetch(`/api/v1/settings/${currentUserId}`)
       .then(async (response) => {
         const data = await response.json();
         if (!response.ok) {
@@ -206,7 +198,7 @@ export function useAccountSettings({
     return () => {
       cancelled = true;
     };
-  }, [currentUser, setTheme, setView]);
+  }, [currentUserId, setTheme, setView]);
 
   const refreshOllamaModels = useCallback(async (endpoint?: string) => {
     const ollamaUrl = (endpoint ?? settings.ollamaEndpoint).trim();

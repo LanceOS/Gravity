@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { SettingsScreen as SettingsPage, useTheme } from '../../settings';
 import { AuthScreen } from '../../auth';
@@ -12,15 +12,15 @@ import { LoadingPage } from '../../../pages/LoadingPage/LoadingPage';
 export function WorkspaceSettingsPageRoute() {
   const { workspaceId = '' } = useParams<{ workspaceId: string }>();
   const navigate = useNavigate();
+  const [localTutorialCompleted, setLocalTutorialCompleted] = useState(false);
 
   const {
     activeView,
     currentUser,
     loading,
-    setTheme,
     setView,
-    theme,
   } = useTickets();
+  const { theme, setTheme, setDensity } = useTheme();
 
   const {
     workspaces,
@@ -72,14 +72,13 @@ export function WorkspaceSettingsPageRoute() {
     setView,
     setTheme,
   });
-  const { setDensity, setTheme: setDashboardTheme } = useTheme();
 
   useEffect(() => {
     if (accountSettings) {
       setDensity(accountSettings.projectLayout === 'condensed' ? 'compact' : 'standard');
-      setDashboardTheme(accountSettings.theme);
+      setTheme(accountSettings.theme);
     }
-  }, [accountSettings, setDensity, setDashboardTheme]);
+  }, [accountSettings, setDensity, setTheme]);
 
   useEffect(() => {
     if (loading || workspacesLoading || !workspacesResolvedForCurrentUser) {
@@ -90,15 +89,6 @@ export function WorkspaceSettingsPageRoute() {
       navigate('/workspaces', { replace: true });
     }
   }, [activeWorkspace, loading, navigate, workspacesLoading, workspacesResolvedForCurrentUser, workspaceId]);
-
-  const onboarding =
-    currentUser && (currentUser.tutorial_completed === 0 || currentUser.tutorial_completed === false) ? (
-      <OnboardingModal
-        onComplete={() => {
-          console.log('TODO: tutorial completed for', currentUser);
-        }}
-      />
-    ) : null;
 
   if (loading || workspacesLoading || !workspacesResolvedForCurrentUser) {
     return <LoadingPage />;
@@ -111,6 +101,24 @@ export function WorkspaceSettingsPageRoute() {
   if (!activeWorkspace) {
     return <LoadingPage />;
   }
+
+  const onboarding =
+    !localTutorialCompleted && accountSettings.tutorialCompleted === false ? (
+      <OnboardingModal
+        onComplete={async () => {
+          setLocalTutorialCompleted(true);
+          try {
+            await fetch(`/api/v1/users/${currentUser.id}/tutorial`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ completed: true }),
+            });
+          } catch (e) {
+            // Ignore
+          }
+        }}
+      />
+    ) : null;
 
   const handleDeleteWorkspace = async () => {
     const success = await deleteWorkspace();
