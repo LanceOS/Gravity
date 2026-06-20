@@ -4,13 +4,15 @@ import { useNavigate } from 'react-router-dom';
 import { useAccountSettings } from '../../../hooks/useAccountSettings';
 import { useTheme } from '../../settings';
 import { useTickets } from '../../../context/TicketContextContext';
+import { useActiveView } from '../../../context/ui/ActiveViewContext';
 import { isOnboardingNeeded } from '../utils/accountPreferences';
 import type { AccountPreferencesRouteState } from '../types';
 
 export function useAccountPreferencesPageRoute(): AccountPreferencesRouteState {
   const navigate = useNavigate();
   const [localTutorialCompleted, setLocalTutorialCompleted] = useState(false);
-  const { activeView, currentUser, loading, setView } = useTickets();
+  const { currentUser, loading } = useTickets();
+  const { activeView, setView } = useActiveView();
   const { theme, setTheme, setDensity } = useTheme();
   const {
     settings,

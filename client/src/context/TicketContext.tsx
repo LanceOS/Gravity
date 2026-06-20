@@ -50,19 +50,6 @@ interface State {
   users: User[];
   comments: Comment[];
   activeTicket: Ticket | null;
-  activeView: 'list' | 'board';
-  filters: {
-    status: string;
-    priority: string;
-    projectId: string;
-    labelId?: string;
-    domainId?: string;
-    labels: string[];
-    labelMode: 'all' | 'any';
-    cycleId: string;
-    assigneeId: string;
-    search: string;
-  };
   currentUser: User | null;
   loading: boolean;
 }
@@ -148,9 +135,6 @@ export interface TicketContextType extends State {
   removeTicketDependency: (ticketId: string, dependencyId: string) => Promise<boolean>;
   addTicketBlocker: (ticketId: string, blockerId: string) => Promise<boolean>;
   removeTicketBlocker: (ticketId: string, blockerId: string) => Promise<boolean>;
-  setView: (view: 'list' | 'board') => void;
-  setFilters: (filters: Partial<State['filters']>) => void;
-  resetFilters: () => void;
   ticketMap: Map<string, Ticket>;
   ticketById: Map<string, Ticket>;
   projectById: Map<string, Project>;
@@ -166,8 +150,7 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const setActiveProjectIdState = setActiveProjectId;
   // --- Local UI States ---
   const [activeTicket, setActiveTicket] = useState<Ticket | null>(null);
-  const { activeView, setView } = useActiveView();
-  const { filters, setFilters, resetFilters } = useTicketFilters();
+  const { setFilters } = useTicketFilters();
   const { data: session, isPending: authLoading } = authClient.useSession();
   const currentUser: User | null = useMemo(() => {
     return session?.user ? {
@@ -188,12 +171,6 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const sseCoalescerRef = useRef<SseEventCoalescer | null>(null);
   const pendingTicketUpdateBatchesRef = useRef(new Map<string, TicketUpdateBatch>());
   const inFlightTicketUpdateBatchesRef = useRef(new Map<string, InFlightTicketUpdateBatch>());
-
-  useEffect(() => {
-    if (filters.projectId !== activeProjectId) {
-      setFilters({ projectId: activeProjectId });
-    }
-  }, [activeProjectId, filters.projectId, setFilters]);
 
   useEffect(() => {
     activeTicketRef.current = activeTicket;
@@ -1890,8 +1867,6 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       comments,
       activeTicket,
       activeTicketDetail,
-      activeView,
-      filters,
       currentUser,
       loading,
       activeProjectId,
@@ -1919,9 +1894,6 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       deleteProject,
       joinProject,
       setActiveTicket,
-      setView,
-      setFilters,
-      resetFilters,
       ticketMap,
       ticketById,
       projectById,
@@ -1939,8 +1911,6 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       comments,
       activeTicket,
       activeTicketDetail,
-      activeView,
-      filters,
       currentUser,
       loading,
       activeProjectId,
@@ -1966,9 +1936,6 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       deleteProject,
       joinProject,
       setActiveTicket,
-      setView,
-      setFilters,
-      resetFilters,
       addTicketBlocker,
       removeTicketBlocker,
       ticketMap,

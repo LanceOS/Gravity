@@ -69,6 +69,13 @@ describe('TicketFiltersContext', () => {
     expect(result.current.filters.status).toBe('done');
 
     activeProjectIdRef.current = 'project-456';
+    (useActiveProject as any).mockReturnValue({
+      activeProjectId: 'project-456',
+      activeProjectIdRef,
+    });
+
+    // Re-render to propagate the mock change before we reset
+    result.current.setFilters({ search: 'bug' }); // force re-render
 
     act(() => {
       result.current.resetFilters();

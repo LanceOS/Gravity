@@ -12,6 +12,8 @@ const mocks = vi.hoisted(() => ({
   useWorkspaceDirectory: vi.fn(),
   useAccountSettings: vi.fn(),
   useWorkspaceSettings: vi.fn(),
+  useTicketFilters: vi.fn(),
+  useActiveView: vi.fn(),
   registerWebMCPTools: vi.fn(() => null),
 }));
 
@@ -29,6 +31,14 @@ vi.mock('../../hooks/useAccountSettings', () => ({
 
 vi.mock('../../hooks/useWorkspaceSettings', () => ({
   useWorkspaceSettings: mocks.useWorkspaceSettings,
+}));
+
+vi.mock('../../context/filters/TicketFiltersContext', () => ({
+  useTicketFilters: mocks.useTicketFilters,
+}));
+
+vi.mock('../../context/ui/ActiveViewContext', () => ({
+  useActiveView: mocks.useActiveView,
 }));
 
 vi.mock('../../utils/webmcp', () => ({
@@ -260,10 +270,21 @@ function buildWorkspaceSettings(overrides: Partial<Record<string, unknown>> = {}
 }
 
 function renderAppShell() {
-  mocks.useTickets.mockReturnValue(buildUseTickets());
   mocks.useWorkspaceDirectory.mockReturnValue(buildWorkspaceDirectory());
   mocks.useAccountSettings.mockReturnValue(buildAccountSettings());
   mocks.useWorkspaceSettings.mockReturnValue(buildWorkspaceSettings());
+  
+  const tickets = buildUseTickets();
+  mocks.useTickets.mockReturnValue(tickets);
+  mocks.useTicketFilters.mockReturnValue({
+    filters: tickets.filters,
+    setFilters: tickets.setFilters,
+    resetFilters: vi.fn(),
+  });
+  mocks.useActiveView.mockReturnValue({
+    activeView: tickets.activeView,
+    setView: tickets.setView,
+  });
 
   const queryClient = new QueryClient({
     defaultOptions: {

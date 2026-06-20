@@ -14,6 +14,8 @@ import { OnboardingModal } from '../../onboarding';
 import { useTheme } from '../../settings';
 import type { Ticket } from '../../../context/TicketContextContext';
 import { useTickets } from '../../../context/TicketContextContext';
+import { useTicketFilters } from '../../../context/filters/TicketFiltersContext';
+import { useActiveView } from '../../../context/ui/ActiveViewContext';
 import { apiClient } from '../../../utils/apiClient';
 import type { Cycle, Label, SidebarTree } from '../../../types/domain';
 import { WorkspacePage } from '../../workspacePage';
@@ -65,7 +67,6 @@ export function WorkspaceShellPage() {
   const {
     activeProjectId,
     activeTicket,
-    activeView,
     addComment,
     updateComment,
     deleteComment,
@@ -81,13 +82,10 @@ export function WorkspaceShellPage() {
     deleteProject,
     deleteTicket,
     labels = [],
-    filters,
     loading,
     projects,
     setActiveProjectId,
     setActiveTicket,
-    setFilters,
-    setView,
     tickets,
     updateTicket,
     updateProject,
@@ -98,6 +96,8 @@ export function WorkspaceShellPage() {
     addTicketBlocker,
     removeTicketBlocker,
   } = useTickets();
+  const { filters, setFilters } = useTicketFilters();
+  const { activeView, setView } = useActiveView();
   const [activeSection, setActiveSection] = useState<AppSection>('workspace');
   const [localTutorialCompleted, setLocalTutorialCompleted] = useState(false);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState('');

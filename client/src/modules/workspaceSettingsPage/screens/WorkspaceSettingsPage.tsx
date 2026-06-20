@@ -7,6 +7,7 @@ import { useAccountSettings } from '../../../hooks/useAccountSettings';
 import { useWorkspaceDirectory } from '../../../hooks/useWorkspaceDirectory';
 import { useWorkspaceSettings } from '../../../hooks/useWorkspaceSettings';
 import { useTickets } from '../../../context/TicketContextContext';
+import { useActiveView } from '../../../context/ui/ActiveViewContext';
 import { LoadingPage } from '../../../pages/LoadingPage/LoadingPage';
 
 export function WorkspaceSettingsPageRoute() {
@@ -15,11 +16,10 @@ export function WorkspaceSettingsPageRoute() {
   const [localTutorialCompleted, setLocalTutorialCompleted] = useState(false);
 
   const {
-    activeView,
     currentUser,
     loading,
-    setView,
   } = useTickets();
+  const { activeView, setView } = useActiveView();
   const { theme, setTheme, setDensity } = useTheme();
 
   const {
