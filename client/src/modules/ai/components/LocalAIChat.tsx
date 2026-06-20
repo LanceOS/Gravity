@@ -1,6 +1,8 @@
 import React, { useEffect, useEffectEvent, useState } from 'react';
+import { useCurrentUser } from '../../../context/auth/useCurrentUser';
 import { useProjectContext } from '../../../context/project/ProjectContext';
-import { useTickets } from '../../../context/TicketContextContext';
+import { useActiveTicket } from '../../../context/ticket/ActiveTicketContext';
+import { useUsersQuery } from '../../../hooks/useUsers';
 import { FileText, ListPlus, Sparkles, Wifi, WifiOff } from 'lucide-react';
 import { DenseTextInput, AIChatWindow } from '@library';
 import type { LocalAIChatProps, Message, QuickActionType } from '../types/LocalAIChat';
@@ -28,7 +30,9 @@ function parseToolArguments(argumentsPayload: Record<string, unknown> | string):
 }
 
 export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllamaUrl, initialModel, settings, workspaceId, isClosing }) => {
-  const { activeTicket, users } = useTickets();
+  const { activeTicket } = useActiveTicket();
+  const { currentUser } = useCurrentUser();
+  const { users } = useUsersQuery(!!currentUser);
   const { projects } = useProjectContext();
 
   const isThirdParty = settings.agentIntegration === 'third_party';

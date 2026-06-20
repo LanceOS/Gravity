@@ -13,12 +13,16 @@ import type { WorkspaceIssueView } from '../../workspacePage/screens/WorkspacePa
 import { OnboardingModal } from '../../onboarding';
 import { useTheme } from '../../settings';
 import type { Ticket } from '../../../context/TicketContextContext';
-import { useTickets } from '../../../context/TicketContextContext';
+import { useCommentContext } from '../../../context/comment/CommentContext';
+import { useCurrentUser } from '../../../context/auth/useCurrentUser';
 import { useActiveProject } from '../../../context/project/ActiveProjectContext';
 import { useProjectContext } from '../../../context/project/ProjectContext';
 import { useLabels } from '../../../context/label/LabelContext';
 import { useTicketMutations } from '../../../context/ticket/TicketMutationContext';
 import { useTicketDetailContext } from '../../../context/ticket/TicketDetailContext';
+import { useTicketListContext } from '../../../context/ticket/TicketListContext';
+import { useTicketRelationsContext } from '../../../context/relation/TicketRelationsContext';
+import { useUsersQuery } from '../../../hooks/useUsers';
 import { useCycles } from '../../../context/cycle/CycleContext';
 import { useTicketFilters } from '../../../context/filters/TicketFiltersContext';
 import { useActiveView } from '../../../context/ui/ActiveViewContext';
@@ -70,40 +74,38 @@ interface WorkspaceMember {
 const AGGREGATE_TICKETS_PAGE_SIZE = 120;
 
 export function WorkspaceShellPage() {
+  const { currentUser, loading: authLoading } = useCurrentUser();
+  const { users, loading: usersLoading } = useUsersQuery(!!currentUser);
   const {
-    addComment,
-    updateComment,
-    deleteComment,
-    currentUser,
-    loading,
     tickets,
-    users,
+    activeTicket,
+    setActiveTicket,
+  } = useTicketListContext();
+  const { addComment, updateComment, deleteComment } = useCommentContext();
+  const { activeTicketDetail, comments } = useTicketDetailContext();
+  const {
     addTicketDependency,
     removeTicketDependency,
     addTicketBlocker,
     removeTicketBlocker,
-  } = useTickets();
+  } = useTicketRelationsContext();
   const { activeProjectId, setActiveProjectId } = useActiveProject();
   const {
     projects,
     projectById,
     projectsByWorkspaceId,
+    projectsLoading,
     createProject,
     fetchProjectData,
     deleteProject,
     updateProject,
   } = useProjectContext();
-  const {
-    activeTicket,
-    setActiveTicket,
-    comments,
-    activeTicketDetail,
-  } = useTicketDetailContext();
   const { createTicket, updateTicket, deleteTicket } = useTicketMutations();
   const { labels, createLabel, updateLabel, deleteLabel } = useLabels();
   const { cycles } = useCycles();
   const { filters, setFilters } = useTicketFilters();
   const { activeView, setView } = useActiveView();
+  const loading = authLoading || projectsLoading || usersLoading;
   const [activeSection, setActiveSection] = useState<AppSection>('workspace');
   const [localTutorialCompleted, setLocalTutorialCompleted] = useState(false);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState('');

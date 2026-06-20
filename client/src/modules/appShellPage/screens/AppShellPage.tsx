@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 import { authClient } from '../../../context/auth/authClient';
+import { useCurrentUser } from '../../../context/auth/useCurrentUser';
 import { useProjectContext } from '../../../context/project/ProjectContext';
 import { AuthScreen } from '../../auth';
 import { OnboardingModal } from '../../onboarding';
-import { useTickets } from '../../../context/TicketContextContext';
 import { useWorkspaceDirectory } from '../../../hooks/useWorkspaceDirectory';
 import { LoadingPage } from '../../loadingPage';
 import { WorkspaceDirectoryPage } from '../../workspaceDirectoryPage';
@@ -29,11 +29,9 @@ function AppShellLandingPage() {
   const { pathname } = useLocation();
   const isWorkspaceDirectory = pathname === '/workspaces' || pathname === '/workspaces/';
 
-  const {
-    currentUser,
-    loading,
-  } = useTickets();
-  const { fetchInitialData } = useProjectContext();
+  const { currentUser, loading: authLoading } = useCurrentUser();
+  const { fetchInitialData, projectsLoading } = useProjectContext();
+  const loading = authLoading || projectsLoading;
 
   const {
     workspaces,

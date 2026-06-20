@@ -1,15 +1,14 @@
 import React, { useEffect, useMemo, useRef } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiClient } from '../utils/apiClient';
-import { CACHE_CONFIGS, queryKeys } from '../utils/queryClient';
-import { authClient } from './auth/authClient';
+import { useQueryClient } from '@tanstack/react-query';
 import { CommentContext, useCommentContextValue } from './comment/CommentContext';
+import { useCurrentUser } from './auth/useCurrentUser';
 import { TicketRelationsContext, useTicketRelationsContextValue } from './relation/TicketRelationsContext';
 import { ProjectContext, useProjectContextValue } from './project/ProjectContext';
 import { useActiveProject } from './project/ActiveProjectContext';
 import { TicketDetailContext, useTicketDetailContextValue } from './ticket/TicketDetailContext';
 import { RealtimeProvider } from './realtime/RealtimeContext';
 import { TicketListProvider, useTicketListContext } from './ticket/TicketListContext';
+import { useUsersQuery } from '../hooks/useUsers';
 import { TicketContext } from './TicketContextContext';
 
 // Shared entity types live in src/types/domain.ts.
@@ -156,17 +155,7 @@ function TicketProviderContent({
 export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const queryClient = useQueryClient();
   const { setActiveProjectId, activeProjectIdRef } = useActiveProject();
-  const { data: session, isPending: authLoading } = authClient.useSession();
-  const currentUser: User | null = useMemo(() => {
-    return session?.user ? {
-      id: session.user.id,
-      name: session.user.name,
-      email: session.user.email,
-      avatar: session.user.image || '',
-      role: 'user',
-      tutorial_completed: (session.user as any).tutorialCompleted ?? (session.user as any).tutorial_completed ?? false,
-    } : null;
-  }, [session]);
+  const { currentUser, loading: authLoading } = useCurrentUser();
 
   const projectContextValue = useProjectContextValue({
     currentUser,
@@ -174,15 +163,9 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     activeProjectIdRef,
   });
 
-  const usersQuery = useQuery({
-    queryKey: queryKeys.users(),
-    queryFn: () => apiClient.get<User[]>(`/users`),
-    enabled: !!currentUser,
-    ...CACHE_CONFIGS.metadata,
-  });
-  const users = usersQuery.data || [];
+  const { users, loading: usersLoading } = useUsersQuery(!!currentUser);
 
-  const loading = authLoading || projectContextValue.projectsLoading || usersQuery.isLoading;
+  const loading = authLoading || projectContextValue.projectsLoading || usersLoading;
 
   const prevUserIdRef = useRef<string | undefined>(currentUser?.id);
   useEffect(() => {
