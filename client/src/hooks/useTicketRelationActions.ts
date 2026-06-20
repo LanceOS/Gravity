@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { useMutation, useQuery, type QueryClient } from '@tanstack/react-query';
+import { useMutation, type QueryClient } from '@tanstack/react-query';
 import { toast } from '@library';
 import { apiClient } from '../utils/apiClient';
-import { CACHE_CONFIGS, queryKeys } from '../utils/queryClient';
+import { queryKeys } from '../utils/queryClient';
 import type { Ticket } from '../types/domain';
 import {
   fallbackTicketRelation,
@@ -26,18 +26,12 @@ interface UseTicketRelationActionsArgs {
   queryClient: QueryClient;
   tickets: Ticket[];
   activeTicket: Ticket | null;
-  activeTicketId?: string;
-  activeTicketProjectId: string;
-  isAuthenticated: boolean;
 }
 
 export function useTicketRelationActions({
   queryClient,
   tickets,
   activeTicket,
-  activeTicketId,
-  activeTicketProjectId,
-  isAuthenticated,
 }: UseTicketRelationActionsArgs) {
   const activeTicketRef = useRef<Ticket | null>(activeTicket);
   const pendingTicketRelationAddsRef = useRef(new Set<string>());
@@ -64,22 +58,6 @@ export function useTicketRelationActions({
       pendingTicketRelationAddsRef.current.clear();
     };
   }, []);
-
-  const previousActiveTicketDetailRef = useRef<TicketWithRelations | null>(null);
-
-  // Active Ticket Detail (includes dependency and blocker relations)
-  const activeTicketDetailQuery = useQuery<TicketWithRelations | null>({
-    queryKey: queryKeys.ticketDetail(activeTicketId || ''),
-    queryFn: () => apiClient.get<TicketWithRelations>(`/tickets/${activeTicketId}`, { projectId: activeTicketProjectId }),
-    enabled: !!activeTicketId && !!activeTicketProjectId && isAuthenticated,
-    ...CACHE_CONFIGS.ticketDetail,
-  });
-  useEffect(() => {
-    if (activeTicketDetailQuery.data) {
-      previousActiveTicketDetailRef.current = activeTicketDetailQuery.data;
-    }
-  }, [activeTicketDetailQuery.data]);
-  const activeTicketDetail = activeTicketDetailQuery.data ?? previousActiveTicketDetailRef.current ?? null;
 
   const getTicketProjectIdForMutation = useCallback((ticketId: string) => {
     const cachedTicket = cachedTicketsById.get(ticketId);
@@ -378,7 +356,6 @@ export function useTicketRelationActions({
   }, [getTicketProjectIdForMutation, hasCachedTicketRelation, isPendingTicketRelationAdd, removeTicketBlockerMutation]);
 
   return {
-    activeTicketDetail,
     addTicketDependency,
     removeTicketDependency,
     addTicketBlocker,

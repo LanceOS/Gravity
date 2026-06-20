@@ -14,7 +14,5 @@ export interface TicketRelationsContextValueArgs {
   queryClient: QueryClient;
   tickets: Ticket[];
   activeTicket: Ticket | null;
-  activeTicketId?: string;
-  activeTicketProjectId: string;
-  isAuthenticated: boolean;
+  activeTicketDetail: TicketWithRelations | null;
 }

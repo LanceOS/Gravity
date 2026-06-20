@@ -63,24 +63,18 @@ function Probe({
   queryClient,
   tickets,
   activeTicket,
-  activeTicketId,
-  activeTicketProjectId,
-  isAuthenticated,
+  activeTicketDetail,
 }: {
   queryClient: QueryClient;
   tickets: Ticket[];
   activeTicket: Ticket | null;
-  activeTicketId?: string;
-  activeTicketProjectId: string;
-  isAuthenticated: boolean;
+  activeTicketDetail: TicketWithRelations | null;
 }) {
   const actions = useTicketRelationsContextValue({
     queryClient,
     tickets,
     activeTicket,
-    activeTicketId,
-    activeTicketProjectId,
-    isAuthenticated,
+    activeTicketDetail,
   });
 
   React.useEffect(() => {
@@ -147,9 +141,7 @@ describe('TicketRelationsContext', () => {
           queryClient={queryClient}
           tickets={[sourceTicket, dependencyTicket]}
           activeTicket={sourceTicket}
-          activeTicketId="ticket-1"
-          activeTicketProjectId="project-1"
-          isAuthenticated
+          activeTicketDetail={sourceDetail}
         />
       </QueryClientProvider>
     );
@@ -261,9 +253,7 @@ describe('TicketRelationsContext', () => {
           queryClient={queryClient}
           tickets={[sourceTicket, blockerTicket]}
           activeTicket={sourceTicket}
-          activeTicketId="ticket-1"
-          activeTicketProjectId="project-1"
-          isAuthenticated
+          activeTicketDetail={sourceDetail}
         />
       </QueryClientProvider>
     );
