@@ -168,13 +168,20 @@ export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const loading = authLoading || projectContextValue.projectsLoading || usersLoading;
 
   const prevUserIdRef = useRef<string | undefined>(currentUser?.id);
+  const didMountRef = useRef(false);
   useEffect(() => {
-    if (currentUser?.id !== prevUserIdRef.current) {
-      if (prevUserIdRef.current !== undefined && currentUser?.id !== undefined) {
-        queryClient.clear();
-      }
+    if (!didMountRef.current) {
+      didMountRef.current = true;
       prevUserIdRef.current = currentUser?.id;
+      return;
     }
+
+    if (currentUser?.id === prevUserIdRef.current) {
+      return;
+    }
+
+    queryClient.clear();
+    prevUserIdRef.current = currentUser?.id;
   }, [currentUser?.id, queryClient]);
 
   return (

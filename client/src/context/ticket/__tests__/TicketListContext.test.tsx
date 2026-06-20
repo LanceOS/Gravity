@@ -42,6 +42,13 @@ const currentUser = {
   role: 'owner',
 };
 
+const switchedUser = {
+  ...currentUser,
+  id: 'user-2',
+  name: 'Grace Hopper',
+  email: 'grace@example.com',
+};
+
 const projectOneTickets: Ticket[] = [
   {
     id: 'ticket-1',
@@ -117,15 +124,27 @@ function Probe() {
   return null;
 }
 
-function renderWithProviders(queryClient: QueryClient) {
-  return render(
+function Harness({
+  queryClient,
+  currentUser: harnessCurrentUser,
+}: {
+  queryClient: QueryClient;
+  currentUser: typeof currentUser | null;
+}) {
+  return (
     <QueryClientProvider client={queryClient}>
       <ActiveProjectProvider>
-        <TicketListProvider currentUser={currentUser}>
+        <TicketListProvider currentUser={harnessCurrentUser}>
           <Probe />
         </TicketListProvider>
       </ActiveProjectProvider>
     </QueryClientProvider>
+  );
+}
+
+function renderWithProviders(queryClient: QueryClient, harnessCurrentUser: typeof currentUser | null = currentUser) {
+  return render(
+    <Harness queryClient={queryClient} currentUser={harnessCurrentUser} />
   );
 }
 
@@ -247,6 +266,72 @@ describe('TicketListContext', () => {
       expect(currentValue.tickets.map((ticket) => ticket.id)).toEqual(['ticket-9']);
       expect(currentValue.ticketById.get('ticket-9')?.title).toBe('Project two ticket');
       expect(currentValue.ticketsByProject.get('project-2')?.map((ticket) => ticket.id)).toEqual(['ticket-9']);
+    });
+  });
+
+  it('clears preserved tickets and the active ticket when the authenticated user changes', async () => {
+    const queryClient = createQueryClient();
+    let resolveNextFetch!: (response: Response) => void;
+    const fetchMock = vi.fn()
+      .mockImplementationOnce((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        const projectId = getProjectIdFromInit(init);
+        if (url === '/api/v1/tickets' && projectId === 'project-1') {
+          return Promise.resolve(jsonResponse(projectOneTickets));
+        }
+        return Promise.resolve(jsonResponse([]));
+      })
+      .mockImplementationOnce(() => new Promise<Response>((resolve) => {
+        resolveNextFetch = resolve;
+      }));
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { rerender } = renderWithProviders(queryClient, currentUser);
+
+    await waitFor(() => {
+      expect(currentProject).toBeDefined();
+    });
+
+    await act(async () => {
+      currentProject!.setActiveProjectId('project-1');
+    });
+
+    await waitFor(() => {
+      expect(currentValue.tickets).toHaveLength(2);
+    });
+
+    await act(async () => {
+      currentValue.setActiveTicket(projectOneTickets[0]);
+    });
+
+    await waitFor(() => {
+      expect(currentValue.activeTicket?.id).toBe('ticket-1');
+    });
+
+    await act(async () => {
+      queryClient.clear();
+      rerender(<Harness queryClient={queryClient} currentUser={switchedUser} />);
+    });
+
+    await waitFor(() => {
+      expect(currentValue.tickets).toEqual([]);
+      expect(currentValue.ticketMap.size).toBe(0);
+      expect(currentValue.activeTicket).toBeNull();
+      expect(currentActiveTicket?.activeTicket).toBeNull();
+    });
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    await act(async () => {
+      resolveNextFetch(jsonResponse([]));
+    });
+
+    await waitFor(() => {
+      expect(currentValue.tickets).toEqual([]);
+      expect(currentValue.activeTicket).toBeNull();
     });
   });
 });

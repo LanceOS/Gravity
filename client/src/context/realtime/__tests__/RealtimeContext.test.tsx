@@ -9,7 +9,7 @@ import { createProjectLookup } from '../../project/projectCacheUtils';
 import { ActiveTicketContext, useActiveTicket } from '../../ticket/ActiveTicketContext';
 import { RealtimeProvider, useRealtimeContext } from '../RealtimeContext';
 import type { RealtimeContextType } from '../RealtimeContext.types';
-import type { Project, Ticket } from '../../../types/domain';
+import type { Comment, Project, Ticket } from '../../../types/domain';
 import { queryKeys } from '../../../utils/queryClient';
 
 type MockSseHandler = (event: MessageEvent | Event) => void;
@@ -324,9 +324,54 @@ describe('RealtimeContext', () => {
     });
   });
 
+  it('removes deleted comments when the SSE payload only includes the normalized comment', async () => {
+    const queryClient = createQueryClient();
+    vi.stubGlobal('EventSource', class {});
+
+    renderWithProviders(queryClient);
+
+    await waitFor(() => {
+      expect(currentProject).toBeDefined();
+    });
+
+    await act(async () => {
+      currentProject!.setActiveProjectId('project-1');
+    });
+
+    await waitFor(() => {
+      expect(currentRealtime.workspaceId).toBe('workspace-1');
+    });
+
+    const service = serviceRegistry.get('workspace-1');
+    expect(service).toBeDefined();
+
+    const comment: Comment = {
+      id: 'comment-1',
+      ticketId: 'ticket-1',
+      userId: 'user-1',
+      body: 'Looks good',
+      createdAt: '2026-06-18T12:00:00.000Z',
+      updatedAt: '2026-06-18T12:00:00.000Z',
+    };
+    queryClient.setQueryData(queryKeys.comments('ticket-1'), [comment]);
+
+    service!.emitMessage({
+      type: 'comment.deleted',
+      actorUserId: 'user-2',
+      ticketId: 'ticket-1',
+      projectId: 'project-1',
+      data: { comment },
+    });
+
+    await waitFor(() => {
+      expect(queryClient.getQueryData<Comment[]>(queryKeys.comments('ticket-1'))).toEqual([]);
+    });
+  });
+
   it('invalidates the active ticket comment cache and cleans up listeners on workspace change', async () => {
     const queryClient = createQueryClient();
     queryClient.setQueryData(queryKeys.tickets('project-1'), [] as Ticket[]);
+    queryClient.setQueryData(queryKeys.users(), [] as any[]);
     const invalidateQueriesSpy = vi.spyOn(queryClient, 'invalidateQueries');
     vi.stubGlobal('EventSource', class {});
 
@@ -365,6 +410,17 @@ describe('RealtimeContext', () => {
 
     await waitFor(() => {
       expect(invalidateQueriesSpy).toHaveBeenCalledWith({ queryKey: queryKeys.comments(baseTicket.id) });
+    });
+
+    service!.emitMessage({
+      type: 'users-updated',
+      actorUserId: 'user-2',
+      projectId: baseTicket.projectId,
+      data: {},
+    });
+
+    await waitFor(() => {
+      expect(invalidateQueriesSpy).toHaveBeenCalledWith({ queryKey: queryKeys.users() });
     });
 
     await act(async () => {

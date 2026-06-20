@@ -7,6 +7,7 @@ import { useActiveProject } from '../project/ActiveProjectContext';
 import { useProjectContext } from '../project/ProjectContext';
 import { resolveWorkspaceIdForSse } from '../project/projectCacheUtils';
 import { useActiveTicket } from '../ticket/ActiveTicketContext';
+import { queryKeys } from '../../utils/queryClient';
 import {
   extractSseMessageFields,
   findCachedTicketByKeyOrId,
@@ -123,9 +124,19 @@ export function useRealtimeContextValue({
 
             case 'comment.added':
             case 'comment.updated':
-            case 'comment.deleted':
-              if (event.type === 'comment.deleted' && messageData.commentId && eventTicketId) {
-                removeSseComment(queryClient, eventTicketId, String(messageData.commentId));
+            case 'comment.deleted': {
+              const commentId = typeof messageData.commentId === 'string' && messageData.commentId.trim()
+                ? messageData.commentId.trim()
+                : payloadComment?.id;
+
+              if (event.type === 'comment.deleted') {
+                const ticketIdForComment = eventTicketId || cachedTicket?.id;
+
+                if (commentId && ticketIdForComment) {
+                  removeSseComment(queryClient, ticketIdForComment, commentId);
+                } else if (ticketIdForComment) {
+                  invalidateCommentCacheFromSse(queryClient, ticketIdForComment, activeTicketRef.current?.id ?? null);
+                }
                 break;
               }
 
@@ -146,6 +157,7 @@ export function useRealtimeContextValue({
 
               await hydrateAndUpsertTicketFromSse(queryClient, payloadTicketId || event.ticketId, projectId);
               break;
+            }
 
             case 'labels.added':
             case 'labels.removed':
@@ -191,6 +203,8 @@ export function useRealtimeContextValue({
             }
 
             case 'users-updated':
+              queryClient.invalidateQueries({ queryKey: queryKeys.users() });
+              break;
             case 'init':
               break;
 

@@ -30,6 +30,9 @@ export function useTicketListContextValue({
   const { activeProjectId } = useActiveProject();
   const [activeTicket, setActiveTicket] = useState<Ticket | null>(null);
   const previousTicketsRef = useRef<Ticket[] | undefined>(undefined);
+  const currentUserId = currentUser?.id ?? null;
+  const previousUserIdRef = useRef<string | null>(currentUserId);
+  const hasUserChanged = previousUserIdRef.current !== currentUserId;
 
   const ticketsQuery = useQuery({
     queryKey: queryKeys.tickets(activeProjectId),
@@ -41,13 +44,23 @@ export function useTicketListContextValue({
     ...CACHE_CONFIGS.ticketsList,
   });
 
-  const tickets = ticketsQuery.data ?? previousTicketsRef.current ?? [];
+  const tickets = hasUserChanged ? [] : ticketsQuery.data ?? previousTicketsRef.current ?? [];
 
   useEffect(() => {
-    if (Array.isArray(ticketsQuery.data)) {
+    if (!hasUserChanged && Array.isArray(ticketsQuery.data)) {
       previousTicketsRef.current = ticketsQuery.data;
     }
-  }, [ticketsQuery.data]);
+  }, [hasUserChanged, ticketsQuery.data]);
+
+  useEffect(() => {
+    if (previousUserIdRef.current === currentUserId) {
+      return;
+    }
+
+    previousTicketsRef.current = undefined;
+    setActiveTicket(null);
+    previousUserIdRef.current = currentUserId;
+  }, [currentUserId]);
 
   const ticketMap = useMemo(() => createTicketMap(tickets), [tickets]);
   const ticketById = useMemo(() => createTicketByIdMap(tickets), [tickets]);
@@ -62,7 +75,7 @@ export function useTicketListContextValue({
 
   return useMemo(() => ({
     tickets,
-    activeTicket,
+    activeTicket: hasUserChanged ? null : activeTicket,
     setActiveTicket,
     ticketMap,
     ticketById,
@@ -74,6 +87,7 @@ export function useTicketListContextValue({
     ticketById,
     ticketsByProject,
     tickets,
+    hasUserChanged,
   ]);
 }
 
