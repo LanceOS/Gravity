@@ -79,14 +79,12 @@ function Probe({
   setActiveTicket,
   currentUserId = 'user-1',
   activeProjectId,
-  tickets,
   isAuthenticated,
 }: {
   activeTicket: Ticket | null;
   setActiveTicket: React.Dispatch<React.SetStateAction<Ticket | null>>;
   currentUserId?: string;
   activeProjectId: string;
-  tickets: Ticket[];
   isAuthenticated: boolean;
 }) {
   const value = useTicketDetailContextValue({
@@ -94,7 +92,6 @@ function Probe({
     setActiveTicket,
     currentUserId,
     activeProjectId,
-    tickets,
     isAuthenticated,
   });
 
@@ -124,7 +121,6 @@ describe('TicketDetailContext', () => {
           activeTicket={null}
           setActiveTicket={setActiveTicket}
           activeProjectId="project-1"
-          tickets={[]}
           isAuthenticated
         />
       </QueryClientProvider>
@@ -142,15 +138,10 @@ describe('TicketDetailContext', () => {
     expect(currentValue.comments).toEqual([]);
   });
 
-  it('keeps the previous detail and comments visible while swapping tickets and syncs live ticket updates', async () => {
+  it('keeps the previous detail and comments visible while swapping tickets', async () => {
     const queryClient = createQueryClient();
     const setActiveTicket = vi.fn();
     const activeTicket = makeTicket();
-    const updatedActiveTicket = {
-      ...activeTicket,
-      title: 'Seed ticket updated',
-      updatedAt: '2026-06-19T00:00:00.000Z',
-    };
     const nextTicket = makeTicket({
       id: 'ticket-2',
       key: 'GRA-2',
@@ -212,7 +203,6 @@ describe('TicketDetailContext', () => {
           activeTicket={activeTicket}
           setActiveTicket={setActiveTicket}
           activeProjectId="project-1"
-          tickets={[activeTicket, nextTicket]}
           isAuthenticated
         />
       </QueryClientProvider>
@@ -226,26 +216,9 @@ describe('TicketDetailContext', () => {
     rerender(
       <QueryClientProvider client={queryClient}>
         <Probe
-          activeTicket={activeTicket}
-          setActiveTicket={setActiveTicket}
-          activeProjectId="project-1"
-          tickets={[updatedActiveTicket, nextTicket]}
-          isAuthenticated
-        />
-      </QueryClientProvider>
-    );
-
-    await waitFor(() => {
-      expect(setActiveTicket).toHaveBeenCalledWith(updatedActiveTicket);
-    });
-
-    rerender(
-      <QueryClientProvider client={queryClient}>
-        <Probe
           activeTicket={nextTicket}
           setActiveTicket={setActiveTicket}
           activeProjectId="project-1"
-          tickets={[updatedActiveTicket, nextTicket]}
           isAuthenticated
         />
       </QueryClientProvider>
@@ -307,7 +280,6 @@ describe('TicketDetailContext', () => {
           activeTicket={activeTicket}
           setActiveTicket={setActiveTicket}
           activeProjectId="project-1"
-          tickets={[activeTicket]}
           isAuthenticated
         />
       </QueryClientProvider>
@@ -324,7 +296,6 @@ describe('TicketDetailContext', () => {
           activeTicket={null}
           setActiveTicket={setActiveTicket}
           activeProjectId="project-1"
-          tickets={[activeTicket]}
           isAuthenticated
         />
       </QueryClientProvider>

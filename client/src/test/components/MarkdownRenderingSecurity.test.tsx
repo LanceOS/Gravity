@@ -3,26 +3,22 @@ import { describe, expect, it, vi } from 'vitest';
 import { MarkdownContent } from '../../modules/tickets/components/MarkdownContent';
 import { FormattedMarkdown } from '../../../../library/components/aichat/FormattedMarkdown';
 
+vi.mock('../../context/ticket/TicketListContext', () => ({
+  useTicketListContext: () => ({
+    tickets: [],
+    activeTicket: null,
+    setActiveTicket: vi.fn(),
+    ticketMap: new Map(),
+    ticketById: new Map(),
+    ticketsByProject: new Map(),
+  }),
+}));
+
 vi.mock('../../context/project/ActiveProjectContext', () => ({
   useActiveProject: () => ({
     activeProjectId: '',
     activeProjectIdRef: { current: '' },
     setActiveProjectId: vi.fn(),
-  }),
-}));
-
-vi.mock('../../context/ticket/ActiveTicketContext', () => ({
-  useActiveTicket: () => ({
-    activeTicket: null,
-    setActiveTicket: vi.fn(),
-  }),
-}));
-
-vi.mock('../../context/ticket/TicketListContext', () => ({
-  useTicketList: () => ({
-    tickets: [],
-    ticketMap: new Map(),
-    isLoading: false,
   }),
 }));
 

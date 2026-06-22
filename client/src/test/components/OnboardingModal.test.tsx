@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OnboardingModal } from '../../modules/onboarding';
 
 const mocks = vi.hoisted(() => ({
-  useAuth: vi.fn(),
+  useCurrentUser: vi.fn(),
   fetch: vi.fn(),
 }));
 
@@ -31,8 +31,8 @@ type MockLayoutProps = HTMLAttributes<HTMLDivElement> & {
   justify?: string;
 };
 
-vi.mock('../../context/auth/AuthContext', () => ({
-  useAuth: mocks.useAuth,
+vi.mock('../../context/auth/useCurrentUser', () => ({
+  useCurrentUser: mocks.useCurrentUser,
 }));
 
 vi.mock('../../context/label/LabelContext', () => ({
@@ -71,13 +71,14 @@ vi.mock('@library', () => ({
 
 describe('OnboardingModal', () => {
   beforeEach(() => {
-    mocks.useAuth.mockReset();
+    mocks.useCurrentUser.mockReset();
     mocks.fetch.mockReset();
-    mocks.useAuth.mockReturnValue({
+    mocks.useCurrentUser.mockReturnValue({
       currentUser: {
         id: 'user-1',
         name: 'Casey Carter',
       },
+      loading: false,
     });
     vi.stubGlobal('fetch', mocks.fetch);
   });

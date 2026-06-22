@@ -1,25 +1,40 @@
-import { createContext, useContext, useEffect, useMemo, useRef, type FC, type ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../../utils/apiClient';
 import { CACHE_CONFIGS, queryKeys } from '../../utils/queryClient';
 import { useActiveProject } from '../project/ActiveProjectContext';
-import { useAuth } from '../auth/AuthContext';
+import { ActiveTicketContext } from './ActiveTicketContext';
+import {
+  createTicketByIdMap,
+  createTicketMap,
+  createTicketsByProjectMap,
+  resolveSyncedActiveTicket,
+} from './ticketListUtils';
+import type { TicketListContextType, TicketListProviderProps, TicketListContextValueArgs } from './TicketListContext.types';
 import type { Ticket } from '../../types/domain';
 
-export interface TicketListContextType {
-  tickets: Ticket[];
-  ticketMap: Map<string, Ticket>;
-  isLoading: boolean;
+export const TicketListContext = createContext<TicketListContextType | undefined>(undefined);
+
+export function useTicketListContext(): TicketListContextType {
+  const context = useContext(TicketListContext);
+  if (!context) {
+    throw new Error('useTicketListContext must be used within a TicketListProvider');
+  }
+
+  return context;
 }
 
-const TicketListContext = createContext<TicketListContextType | undefined>(undefined);
+export const useTicketList = useTicketListContext;
 
-export const TicketListProvider: FC<{ children: ReactNode }> = ({ children }) => {
-  const { currentUser } = useAuth();
+export function useTicketListContextValue({
+  currentUser,
+}: TicketListContextValueArgs): TicketListContextType {
   const { activeProjectId } = useActiveProject();
+  const [activeTicket, setActiveTicket] = useState<Ticket | null>(null);
   const previousTicketsRef = useRef<Ticket[] | undefined>(undefined);
-  const previousContextKeyRef = useRef<string | undefined>(undefined);
-  const currentContextKey = `${currentUser?.id ?? 'anonymous'}:${activeProjectId ?? ''}`;
+  const currentUserId = currentUser?.id ?? null;
+  const previousUserIdRef = useRef<string | null>(currentUserId);
+  const hasUserChanged = previousUserIdRef.current !== currentUserId;
 
   const ticketsQuery = useQuery({
     queryKey: queryKeys.tickets(activeProjectId),
@@ -31,51 +46,68 @@ export const TicketListProvider: FC<{ children: ReactNode }> = ({ children }) =>
     ...CACHE_CONFIGS.ticketsList,
   });
 
-  const tickets = ticketsQuery.data ?? previousTicketsRef.current ?? [];
+  const tickets = hasUserChanged ? [] : ticketsQuery.data ?? previousTicketsRef.current ?? [];
 
   useEffect(() => {
-    if (Array.isArray(ticketsQuery.data)) {
+    if (!hasUserChanged && Array.isArray(ticketsQuery.data)) {
       previousTicketsRef.current = ticketsQuery.data;
-      previousContextKeyRef.current = currentContextKey;
+    }
+  }, [hasUserChanged, ticketsQuery.data]);
+
+  useEffect(() => {
+    if (previousUserIdRef.current === currentUserId) {
       return;
     }
 
-    if (!currentUser || !activeProjectId) {
-      previousTicketsRef.current = undefined;
-      previousContextKeyRef.current = currentContextKey;
-      return;
+    previousTicketsRef.current = undefined;
+    setActiveTicket(null);
+    previousUserIdRef.current = currentUserId;
+  }, [currentUserId]);
+
+  const ticketMap = useMemo(() => createTicketMap(tickets), [tickets]);
+  const ticketById = useMemo(() => createTicketByIdMap(tickets), [tickets]);
+  const ticketsByProject = useMemo(() => createTicketsByProjectMap(tickets), [tickets]);
+
+  useEffect(() => {
+    const syncedActiveTicket = resolveSyncedActiveTicket(activeTicket, ticketById);
+    if (syncedActiveTicket) {
+      setActiveTicket(syncedActiveTicket);
     }
+  }, [activeTicket, setActiveTicket, ticketById]);
 
-    if (ticketsQuery.isError && previousContextKeyRef.current !== currentContextKey) {
-      previousTicketsRef.current = undefined;
-      previousContextKeyRef.current = currentContextKey;
-    }
-  }, [activeProjectId, currentContextKey, currentUser, ticketsQuery.data, ticketsQuery.isError]);
-
-  const ticketMap = useMemo(
-    () => new Map(tickets.map((ticket) => [ticket.key.toUpperCase(), ticket])),
-    [tickets]
-  );
-
-  const value = useMemo<TicketListContextType>(
-    () => ({
-      tickets,
-      ticketMap,
-      isLoading: ticketsQuery.isLoading,
-    }),
-    [ticketMap, tickets, ticketsQuery.isLoading]
-  );
-
-  return <TicketListContext.Provider value={value}>{children}</TicketListContext.Provider>;
-};
-
-export function useTicketList(): TicketListContextType {
-  const context = useContext(TicketListContext);
-  if (!context) {
-    throw new Error('useTicketList must be used within a TicketListProvider');
-  }
-
-  return context;
+  return useMemo(() => ({
+    tickets,
+    activeTicket: hasUserChanged ? null : activeTicket,
+    setActiveTicket,
+    ticketMap,
+    ticketById,
+    ticketsByProject,
+  }), [
+    activeTicket,
+    setActiveTicket,
+    ticketMap,
+    ticketById,
+    ticketsByProject,
+    tickets,
+    hasUserChanged,
+  ]);
 }
 
-export { TicketListContext };
+export function TicketListProvider({
+  currentUser,
+  children,
+}: TicketListProviderProps) {
+  const value = useTicketListContextValue({ currentUser });
+  const activeTicketContextValue = useMemo(() => ({
+    activeTicket: value.activeTicket,
+    setActiveTicket: value.setActiveTicket,
+  }), [value.activeTicket, value.setActiveTicket]);
+
+  return (
+    <TicketListContext.Provider value={value}>
+      <ActiveTicketContext.Provider value={activeTicketContextValue}>
+        {children}
+      </ActiveTicketContext.Provider>
+    </TicketListContext.Provider>
+  );
+}

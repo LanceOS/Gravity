@@ -5,8 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LocalAIChat } from '../../modules/ai';
 
 const mocks = vi.hoisted(() => ({
+  useCurrentUser: vi.fn(),
+  useUsersQuery: vi.fn(),
   useActiveTicket: vi.fn(),
-  useUserDirectory: vi.fn(),
   useProjectContext: vi.fn(),
   fetch: vi.fn(),
 }));
@@ -23,12 +24,16 @@ function createJsonResponse(body: unknown, ok = true) {
   };
 }
 
-vi.mock('../../context/ticket/ActiveTicketContext', () => ({
-  useActiveTicket: mocks.useActiveTicket,
+vi.mock('../../context/auth/useCurrentUser', () => ({
+  useCurrentUser: mocks.useCurrentUser,
 }));
 
-vi.mock('../../context/user/UserDirectoryContext', () => ({
-  useUserDirectory: mocks.useUserDirectory,
+vi.mock('../../hooks/useUsers', () => ({
+  useUsersQuery: mocks.useUsersQuery,
+}));
+
+vi.mock('../../context/ticket/ActiveTicketContext', () => ({
+  useActiveTicket: mocks.useActiveTicket,
 }));
 
 vi.mock('../../context/project/ProjectContext', () => ({
@@ -117,14 +122,24 @@ function renderLocalAIChat(overrides: Partial<Parameters<typeof LocalAIChat>[0]>
     ...overrides,
   };
 
+  mocks.useCurrentUser.mockReturnValue({
+    currentUser: {
+      id: 'user-1',
+      name: 'Casey Carter',
+      email: 'casey@example.com',
+      avatar: '',
+      role: 'owner',
+    },
+    loading: false,
+  });
+  mocks.useUsersQuery.mockReturnValue({
+    users,
+    loading: false,
+  });
   mocks.useActiveTicket.mockReturnValue({
     activeTicket: null,
     setActiveTicket: vi.fn(),
     ...ticketContextOverrides,
-  });
-  mocks.useUserDirectory.mockReturnValue({
-    users,
-    isLoading: false,
   });
   mocks.useProjectContext.mockReturnValue({
     projects,
@@ -138,8 +153,9 @@ function renderLocalAIChat(overrides: Partial<Parameters<typeof LocalAIChat>[0]>
 
 describe('LocalAIChat', () => {
   beforeEach(() => {
+    mocks.useCurrentUser.mockReset();
+    mocks.useUsersQuery.mockReset();
     mocks.useActiveTicket.mockReset();
-    mocks.useUserDirectory.mockReset();
     mocks.useProjectContext.mockReset();
     mocks.fetch.mockReset();
     vi.stubGlobal('fetch', mocks.fetch);

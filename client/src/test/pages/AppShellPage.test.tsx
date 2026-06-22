@@ -49,15 +49,15 @@ type WorkspacePageMockProps = {
 };
 
 const mocks = vi.hoisted(() => ({
-  useAuth: vi.fn(),
+  useCurrentUser: vi.fn(),
+  useUsersQuery: vi.fn(),
   useActiveProject: vi.fn(),
   useProjectContext: vi.fn(),
-  useTicketDetailContext: vi.fn(),
-  useTicketMutations: vi.fn(),
-  useTicketList: vi.fn(),
-  useUserDirectory: vi.fn(),
+  useTicketListContext: vi.fn(),
   useCommentContext: vi.fn(),
+  useTicketDetailContext: vi.fn(),
   useTicketRelationsContext: vi.fn(),
+  useTicketMutations: vi.fn(),
   useWorkspaceDirectory: vi.fn(),
   useAccountSettings: vi.fn(),
   useWorkspaceSettings: vi.fn(),
@@ -74,8 +74,12 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
-vi.mock('../../context/auth/AuthContext', () => ({
-  useAuth: mocks.useAuth,
+vi.mock('../../context/auth/useCurrentUser', () => ({
+  useCurrentUser: mocks.useCurrentUser,
+}));
+
+vi.mock('../../hooks/useUsers', () => ({
+  useUsersQuery: mocks.useUsersQuery,
 }));
 
 vi.mock('../../context/project/ActiveProjectContext', () => ({
@@ -86,28 +90,24 @@ vi.mock('../../context/project/ProjectContext', () => ({
   useProjectContext: mocks.useProjectContext,
 }));
 
-vi.mock('../../context/ticket/TicketDetailContext', () => ({
-  useTicketDetailContext: mocks.useTicketDetailContext,
-}));
-
-vi.mock('../../context/ticket/TicketMutationContext', () => ({
-  useTicketMutations: mocks.useTicketMutations,
-}));
-
 vi.mock('../../context/ticket/TicketListContext', () => ({
-  useTicketList: mocks.useTicketList,
-}));
-
-vi.mock('../../context/user/UserDirectoryContext', () => ({
-  useUserDirectory: mocks.useUserDirectory,
+  useTicketListContext: mocks.useTicketListContext,
 }));
 
 vi.mock('../../context/comment/CommentContext', () => ({
   useCommentContext: mocks.useCommentContext,
 }));
 
+vi.mock('../../context/ticket/TicketDetailContext', () => ({
+  useTicketDetailContext: mocks.useTicketDetailContext,
+}));
+
 vi.mock('../../context/relation/TicketRelationsContext', () => ({
   useTicketRelationsContext: mocks.useTicketRelationsContext,
+}));
+
+vi.mock('../../context/ticket/TicketMutationContext', () => ({
+  useTicketMutations: mocks.useTicketMutations,
 }));
 
 vi.mock('../../context/label/LabelContext', () => ({
@@ -311,13 +311,44 @@ function makeCurrentUser(overrides: Partial<Record<string, unknown>> = {}) {
 }
 
 function buildUseTickets(overrides: Partial<Record<string, unknown>> = {}) {
-  const currentUser = (overrides.currentUser as ReturnType<typeof makeCurrentUser> | null | undefined) ?? makeCurrentUser();
+  const currentUser = 'currentUser' in overrides
+    ? (overrides.currentUser as ReturnType<typeof makeCurrentUser> | null)
+    : makeCurrentUser();
+  const defaultTickets = [
+    {
+      id: 'ticket-1',
+      key: 'GRA-1',
+      title: 'Seed ticket',
+      description: '',
+      status: 'todo',
+      priority: 'medium',
+      projectId: 'project-1',
+      domainId: null,
+      cycleId: null,
+      assigneeId: null,
+      parentId: null,
+      prStatus: 'none',
+      prUrl: null,
+      createdAt: '2026-05-01T00:00:00.000Z',
+      updatedAt: '2026-05-01T00:00:00.000Z',
+    },
+  ];
+  const tickets = (Array.isArray(overrides.tickets) ? overrides.tickets : defaultTickets) as any[];
+  const users = (Array.isArray(overrides.users) ? overrides.users : [currentUser].filter(Boolean)) as any[];
+  const ticketsByProject = new Map<string, unknown[]>();
+  for (const ticket of tickets as any[]) {
+    const projectTickets = ticketsByProject.get(ticket.projectId) || [];
+    projectTickets.push(ticket);
+    ticketsByProject.set(ticket.projectId, projectTickets);
+  }
 
   return {
     activeProjectId: 'project-1',
     activeTicket: null,
     activeView: 'board',
     addComment: vi.fn(),
+    addTicketDependency: vi.fn(),
+    addTicketBlocker: vi.fn(),
     comments: [],
     createLabel: vi.fn(),
     createProject: vi.fn(),
@@ -354,11 +385,16 @@ function buildUseTickets(overrides: Partial<Record<string, unknown>> = {}) {
     setFilters: vi.fn(),
     setTheme: vi.fn(),
     setView: vi.fn(),
+    removeTicketDependency: vi.fn(),
+    removeTicketBlocker: vi.fn(),
     signOut: vi.fn(),
     theme: 'dark',
-    tickets: [],
+    ticketMap: new Map(tickets.map((ticket) => [ticket.key.toUpperCase(), ticket])),
+    ticketById: new Map(tickets.map((ticket) => [ticket.id, ticket])),
+    ticketsByProject,
+    tickets,
     updateTicket: vi.fn(),
-    users: [currentUser].filter(Boolean),
+    users,
     ...overrides,
   };
 }
@@ -480,34 +516,19 @@ function renderAppShell({
   workspaceSettings?: Record<string, unknown>;
   initialEntries?: string[];
 } = {}) {
-  mocks.useAuth.mockReturnValue(tickets);
   const ticketState = tickets as any;
+  mocks.useCurrentUser.mockReturnValue({
+    currentUser: ticketState.currentUser ?? null,
+    loading: Boolean(ticketState.loading),
+  });
+  mocks.useUsersQuery.mockReturnValue({
+    users: Array.isArray(ticketState.users) ? ticketState.users : [],
+    loading: Boolean(ticketState.loading),
+  });
   mocks.useActiveProject.mockReturnValue({
     activeProjectId: ticketState.activeProjectId || '',
     setActiveProjectId: ticketState.setActiveProjectId ?? vi.fn(),
     activeProjectIdRef: { current: ticketState.activeProjectId || '' },
-  });
-  const ticketList = Array.isArray(ticketState.tickets) ? ticketState.tickets : [];
-  mocks.useTicketList.mockReturnValue({
-    tickets: ticketList,
-    ticketMap: new Map(ticketList.map((ticket: any) => [String(ticket.key ?? '').toUpperCase(), ticket])),
-    isLoading: Boolean(ticketState.ticketListLoading ?? ticketState.loading),
-  });
-  mocks.useUserDirectory.mockReturnValue({
-    users: Array.isArray(ticketState.users) ? ticketState.users : [],
-    isLoading: Boolean(ticketState.usersLoading),
-  });
-  mocks.useCommentContext.mockReturnValue({
-    addComment: ticketState.addComment ?? vi.fn(),
-    updateComment: ticketState.updateComment ?? vi.fn(),
-    deleteComment: ticketState.deleteComment ?? vi.fn(),
-  });
-  mocks.useTicketRelationsContext.mockReturnValue({
-    addTicketDependency: ticketState.addTicketDependency ?? vi.fn(),
-    removeTicketDependency: ticketState.removeTicketDependency ?? vi.fn(),
-    addTicketBlocker: ticketState.addTicketBlocker ?? vi.fn(),
-    removeTicketBlocker: ticketState.removeTicketBlocker ?? vi.fn(),
-    activeTicketDetail: ticketState.activeTicketDetail ?? null,
   });
   const projects = Array.isArray(ticketState.projects) ? ticketState.projects : [];
   const projectById = new Map(projects.map((project: any) => [project.id, project]));
@@ -530,6 +551,19 @@ function renderAppShell({
     deleteProject: ticketState.deleteProject ?? vi.fn(),
     joinProject: ticketState.joinProject ?? vi.fn(),
   });
+  mocks.useTicketListContext.mockReturnValue({
+    tickets: Array.isArray(ticketState.tickets) ? ticketState.tickets : [],
+    activeTicket: ticketState.activeTicket ?? null,
+    setActiveTicket: ticketState.setActiveTicket ?? vi.fn(),
+    ticketMap: ticketState.ticketMap ?? new Map(),
+    ticketById: ticketState.ticketById ?? new Map(),
+    ticketsByProject: ticketState.ticketsByProject ?? new Map(),
+  });
+  mocks.useCommentContext.mockReturnValue({
+    addComment: ticketState.addComment ?? vi.fn(),
+    updateComment: ticketState.updateComment ?? vi.fn(),
+    deleteComment: ticketState.deleteComment ?? vi.fn(),
+  });
   mocks.useTicketDetailContext.mockReturnValue({
     activeTicket: ticketState.activeTicket ?? null,
     setActiveTicket: ticketState.setActiveTicket ?? vi.fn(),
@@ -537,6 +571,13 @@ function renderAppShell({
     activeTicketProjectId: ticketState.activeTicket?.projectId || ticketState.activeProjectId || '',
     comments: ticketState.comments ?? [],
     activeTicketDetail: ticketState.activeTicketDetail ?? null,
+  });
+  mocks.useTicketRelationsContext.mockReturnValue({
+    activeTicketDetail: ticketState.activeTicketDetail ?? null,
+    addTicketDependency: ticketState.addTicketDependency ?? vi.fn(),
+    removeTicketDependency: ticketState.removeTicketDependency ?? vi.fn(),
+    addTicketBlocker: ticketState.addTicketBlocker ?? vi.fn(),
+    removeTicketBlocker: ticketState.removeTicketBlocker ?? vi.fn(),
   });
   mocks.useTicketMutations.mockReturnValue(buildUseTicketMutations());
   mocks.useWorkspaceDirectory.mockReturnValue(directory);
