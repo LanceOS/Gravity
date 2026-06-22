@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../../utils/apiClient';
 import { queryKeys, CACHE_CONFIGS } from '../../utils/queryClient';
 import { useActiveProject } from '../project/ActiveProjectContext';
-import { authClient } from '../auth/authClient';
+import { useAuth } from '../auth/AuthContext';
 import type { CycleContextType } from './CycleContext.types';
 import type { Cycle } from '../../types/domain';
 
@@ -19,11 +19,7 @@ export const useCycles = () => {
 
 export const CycleProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { activeProjectId } = useActiveProject();
-  const { data: session } = authClient.useSession();
-  
-  const currentUser = useMemo(() => {
-    return session?.user ? session.user : null;
-  }, [session]);
+  const { currentUser } = useAuth();
 
   const cyclesQuery = useQuery({
     queryKey: queryKeys.cycles(activeProjectId),

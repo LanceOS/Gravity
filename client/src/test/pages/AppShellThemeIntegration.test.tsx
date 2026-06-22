@@ -8,11 +8,15 @@ import { AppShellPage } from '../../pages/AppShellPage/AppShellPage.tsx';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const mocks = vi.hoisted(() => ({
-  useTickets: vi.fn(),
+  useAuth: vi.fn(),
   useActiveProject: vi.fn(),
   useProjectContext: vi.fn(),
   useTicketDetailContext: vi.fn(),
   useTicketMutations: vi.fn(),
+  useTicketList: vi.fn(),
+  useUserDirectory: vi.fn(),
+  useCommentContext: vi.fn(),
+  useTicketRelationsContext: vi.fn(),
   useWorkspaceDirectory: vi.fn(),
   useAccountSettings: vi.fn(),
   useWorkspaceSettings: vi.fn(),
@@ -21,8 +25,8 @@ const mocks = vi.hoisted(() => ({
   registerWebMCPTools: vi.fn(() => null),
 }));
 
-vi.mock('../../context/TicketContextContext', () => ({
-  useTickets: mocks.useTickets,
+vi.mock('../../context/auth/AuthContext', () => ({
+  useAuth: mocks.useAuth,
 }));
 
 vi.mock('../../context/project/ActiveProjectContext', () => ({
@@ -39,6 +43,22 @@ vi.mock('../../context/ticket/TicketDetailContext', () => ({
 
 vi.mock('../../context/ticket/TicketMutationContext', () => ({
   useTicketMutations: mocks.useTicketMutations,
+}));
+
+vi.mock('../../context/ticket/TicketListContext', () => ({
+  useTicketList: mocks.useTicketList,
+}));
+
+vi.mock('../../context/user/UserDirectoryContext', () => ({
+  useUserDirectory: mocks.useUserDirectory,
+}));
+
+vi.mock('../../context/comment/CommentContext', () => ({
+  useCommentContext: mocks.useCommentContext,
+}));
+
+vi.mock('../../context/relation/TicketRelationsContext', () => ({
+  useTicketRelationsContext: mocks.useTicketRelationsContext,
 }));
 
 vi.mock('../../context/label/LabelContext', () => ({
@@ -311,13 +331,35 @@ function renderAppShell() {
   mocks.useAccountSettings.mockReturnValue(buildAccountSettings());
   mocks.useWorkspaceSettings.mockReturnValue(buildWorkspaceSettings());
   
-  const tickets = buildUseTickets();
-  mocks.useTickets.mockReturnValue(tickets);
-  const ticketState = tickets as any;
+  const authState = buildUseTickets();
+  mocks.useAuth.mockReturnValue(authState);
+  const ticketState = authState as any;
   mocks.useActiveProject.mockReturnValue({
     activeProjectId: ticketState.activeProjectId || '',
     setActiveProjectId: ticketState.setActiveProjectId ?? vi.fn(),
     activeProjectIdRef: { current: ticketState.activeProjectId || '' },
+  });
+  const ticketList = Array.isArray(ticketState.tickets) ? ticketState.tickets : [];
+  mocks.useTicketList.mockReturnValue({
+    tickets: ticketList,
+    ticketMap: new Map(ticketList.map((ticket: any) => [String(ticket.key ?? '').toUpperCase(), ticket])),
+    isLoading: Boolean(ticketState.ticketListLoading ?? ticketState.loading),
+  });
+  mocks.useUserDirectory.mockReturnValue({
+    users: Array.isArray(ticketState.users) ? ticketState.users : [],
+    isLoading: Boolean(ticketState.usersLoading),
+  });
+  mocks.useCommentContext.mockReturnValue({
+    addComment: ticketState.addComment ?? vi.fn(),
+    updateComment: ticketState.updateComment ?? vi.fn(),
+    deleteComment: ticketState.deleteComment ?? vi.fn(),
+  });
+  mocks.useTicketRelationsContext.mockReturnValue({
+    addTicketDependency: ticketState.addTicketDependency ?? vi.fn(),
+    removeTicketDependency: ticketState.removeTicketDependency ?? vi.fn(),
+    addTicketBlocker: ticketState.addTicketBlocker ?? vi.fn(),
+    removeTicketBlocker: ticketState.removeTicketBlocker ?? vi.fn(),
+    activeTicketDetail: ticketState.activeTicketDetail ?? null,
   });
   const projects = Array.isArray(ticketState.projects) ? ticketState.projects : [];
   const projectById = new Map(projects.map((project: any) => [project.id, project]));

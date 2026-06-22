@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useTickets } from '../../../context/TicketContextContext';
+import { useAuth } from '../../../context/auth/AuthContext';
 import { apiClient } from '../../../utils/apiClient';
 import { 
   Sparkles, Database, Layers, CheckCircle, Terminal, 
@@ -10,7 +10,7 @@ import { getNextOnboardingStep, getPreviousOnboardingStep, LAST_ONBOARDING_STEP 
 import { Button, Modal, Stack, Flex } from '@library';
 
 export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) => {
-  const { currentUser } = useTickets();
+  const { currentUser } = useAuth();
   const [step, setStep] = useState(0); // 0: Question, 1-4: Tour steps
 
   const handleSkip = async () => {

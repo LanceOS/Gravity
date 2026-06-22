@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../utils/apiClient';
 import { queryKeys, CACHE_CONFIGS } from '../../utils/queryClient';
 import { useActiveProject } from '../project/ActiveProjectContext';
-import { authClient } from '../auth/authClient';
+import { useAuth } from '../auth/AuthContext';
 import { patchTicketLabelAssignment, patchTicketInAllCaches, invalidateTicketCaches } from '../shared';
 import { toast } from '@library';
 import type { LabelContextType } from './LabelContext.types';
@@ -22,11 +22,7 @@ export const useLabels = () => {
 export const LabelProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const queryClient = useQueryClient();
   const { activeProjectId, activeProjectIdRef } = useActiveProject();
-  const { data: session } = authClient.useSession();
-  
-  const currentUser = useMemo(() => {
-    return session?.user ? session.user : null;
-  }, [session]);
+  const { currentUser } = useAuth();
 
   const labelsQuery = useQuery({
     queryKey: queryKeys.labels(activeProjectId),

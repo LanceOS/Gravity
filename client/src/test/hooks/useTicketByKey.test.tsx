@@ -4,11 +4,16 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 
 const mocks = vi.hoisted(() => ({
-  useTickets: vi.fn(),
+  useAuth: vi.fn(),
+  useTicketList: vi.fn(),
 }));
 
-vi.mock('../../context/TicketContextContext', () => ({
-  useTickets: mocks.useTickets,
+vi.mock('../../context/auth/AuthContext', () => ({
+  useAuth: mocks.useAuth,
+}));
+
+vi.mock('../../context/ticket/TicketListContext', () => ({
+  useTicketList: mocks.useTicketList,
 }));
 
 vi.mock('../../context/label/LabelContext', () => ({
@@ -55,13 +60,18 @@ describe('useTicketByKey', () => {
       title: 'Restricted ticket',
     };
 
-    let ticketsState = {
+    let ticketState = {
       tickets: [],
       ticketMap: new Map<string, never>(),
+      isLoading: false,
+    };
+
+    let authState = {
       currentUser: owner,
     };
 
-    mocks.useTickets.mockImplementation(() => ticketsState);
+    mocks.useTicketList.mockImplementation(() => ticketState);
+    mocks.useAuth.mockImplementation(() => authState);
 
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(jsonResponse(ticket))
@@ -84,9 +94,12 @@ describe('useTicketByKey', () => {
       expect(result.current.error).toBeNull();
     });
 
-    ticketsState = {
+    ticketState = {
       tickets: [],
       ticketMap: new Map<string, never>(),
+      isLoading: false,
+    };
+    authState = {
       currentUser: member,
     };
 

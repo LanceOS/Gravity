@@ -77,12 +77,14 @@ let currentValue: TicketDetailContextType;
 function Probe({
   activeTicket,
   setActiveTicket,
+  currentUserId = 'user-1',
   activeProjectId,
   tickets,
   isAuthenticated,
 }: {
   activeTicket: Ticket | null;
   setActiveTicket: React.Dispatch<React.SetStateAction<Ticket | null>>;
+  currentUserId?: string;
   activeProjectId: string;
   tickets: Ticket[];
   isAuthenticated: boolean;
@@ -90,6 +92,7 @@ function Probe({
   const value = useTicketDetailContextValue({
     activeTicket,
     setActiveTicket,
+    currentUserId,
     activeProjectId,
     tickets,
     isAuthenticated,

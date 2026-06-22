@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { useTickets } from '../context/TicketContextContext';
+import { useAuth } from '../context/auth/AuthContext';
+import { useTicketList } from '../context/ticket/TicketListContext';
 import { queryKeys, CACHE_CONFIGS } from '../utils/queryClient';
 
 /**
@@ -10,7 +11,8 @@ import { queryKeys, CACHE_CONFIGS } from '../utils/queryClient';
  * @returns {Object} An object containing the ticketInfo, loading state, and error (if any).
  */
 export function useTicketByKey(ticketKey: string) {
-  const { ticketMap, currentUser } = useTickets();
+  const { ticketMap } = useTicketList();
+  const { currentUser } = useAuth();
   const normalizedKey = ticketKey.trim().toUpperCase();
   const localTicket = ticketMap.get(normalizedKey);
 

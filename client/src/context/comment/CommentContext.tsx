@@ -1,8 +1,10 @@
-import { createContext, useCallback, useContext, useMemo } from 'react';
+import { createContext, useCallback, useContext, useMemo, type FC, type ReactNode } from 'react';
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../utils/apiClient';
 import { queryKeys } from '../../utils/queryClient';
 import { normalizeCommentPayload } from '../shared';
+import { useAuth } from '../auth/AuthContext';
+import { useActiveProject } from '../project/ActiveProjectContext';
 import type { Comment } from '../../types/domain';
 import type { CommentContextType, CommentContextValueArgs } from './CommentContext.types';
 
@@ -23,6 +25,17 @@ export function useCommentContext(): CommentContextType {
 
   return context;
 }
+
+export const CommentProvider: FC<{ children: ReactNode }> = ({ children }) => {
+  const { currentUser } = useAuth();
+  const { activeProjectIdRef } = useActiveProject();
+  const value = useCommentContextValue({
+    currentUser,
+    activeProjectIdRef,
+  });
+
+  return <CommentContext.Provider value={value}>{children}</CommentContext.Provider>;
+};
 
 function createOptimisticComment(
   ticketId: string,

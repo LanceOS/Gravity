@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OnboardingModal } from '../../modules/onboarding';
 
 const mocks = vi.hoisted(() => ({
-  useTickets: vi.fn(),
+  useAuth: vi.fn(),
   fetch: vi.fn(),
 }));
 
@@ -31,8 +31,8 @@ type MockLayoutProps = HTMLAttributes<HTMLDivElement> & {
   justify?: string;
 };
 
-vi.mock('../../context/TicketContextContext', () => ({
-  useTickets: mocks.useTickets,
+vi.mock('../../context/auth/AuthContext', () => ({
+  useAuth: mocks.useAuth,
 }));
 
 vi.mock('../../context/label/LabelContext', () => ({
@@ -71,9 +71,9 @@ vi.mock('@library', () => ({
 
 describe('OnboardingModal', () => {
   beforeEach(() => {
-    mocks.useTickets.mockReset();
+    mocks.useAuth.mockReset();
     mocks.fetch.mockReset();
-    mocks.useTickets.mockReturnValue({
+    mocks.useAuth.mockReturnValue({
       currentUser: {
         id: 'user-1',
         name: 'Casey Carter',

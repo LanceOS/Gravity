@@ -1,5 +1,9 @@
-import { createContext, useContext, useMemo } from 'react';
+import { createContext, useContext, useMemo, type FC, type ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useTicketRelationActions } from '../../hooks/useTicketRelationActions';
+import { useActiveTicket } from '../ticket/ActiveTicketContext';
+import { useTicketList } from '../ticket/TicketListContext';
+import { useTicketDetailContext } from '../ticket/TicketDetailContext';
 import type { TicketRelationsContextType, TicketRelationsContextValueArgs } from './TicketRelationsContext.types';
 
 export const TicketRelationsContext = createContext<TicketRelationsContextType | undefined>(undefined);
@@ -36,3 +40,19 @@ export function useTicketRelationsContextValue(args: TicketRelationsContextValue
     removeTicketBlocker,
   ]);
 }
+
+export const TicketRelationsProvider: FC<{ children: ReactNode }> = ({ children }) => {
+  const queryClient = useQueryClient();
+  const { tickets } = useTicketList();
+  const { activeTicket } = useActiveTicket();
+  const { activeTicketDetail } = useTicketDetailContext();
+
+  const value = useTicketRelationsContextValue({
+    queryClient,
+    tickets,
+    activeTicket,
+    activeTicketDetail,
+  });
+
+  return <TicketRelationsContext.Provider value={value}>{children}</TicketRelationsContext.Provider>;
+};

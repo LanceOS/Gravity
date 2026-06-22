@@ -3,10 +3,10 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { SettingsScreen as SettingsPage, useTheme } from '../../settings';
 import { AuthScreen } from '../../auth';
 import { OnboardingModal } from '../../onboarding';
+import { useAuth } from '../../../context/auth/AuthContext';
 import { useAccountSettings } from '../../../hooks/useAccountSettings';
 import { useWorkspaceDirectory } from '../../../hooks/useWorkspaceDirectory';
 import { useWorkspaceSettings } from '../../../hooks/useWorkspaceSettings';
-import { useTickets } from '../../../context/TicketContextContext';
 import { useActiveView } from '../../../context/ui/ActiveViewContext';
 import { LoadingPage } from '../../../pages/LoadingPage/LoadingPage';
 
@@ -15,10 +15,7 @@ export function WorkspaceSettingsPageRoute() {
   const navigate = useNavigate();
   const [localTutorialCompleted, setLocalTutorialCompleted] = useState(false);
 
-  const {
-    currentUser,
-    loading,
-  } = useTickets();
+  const { currentUser, loading } = useAuth();
   const { activeView, setView } = useActiveView();
   const { theme, setTheme, setDensity } = useTheme();
 

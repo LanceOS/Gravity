@@ -1,8 +1,12 @@
-import { createContext, useContext, useEffect, useMemo, useRef } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type FC, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../../utils/apiClient';
 import { CACHE_CONFIGS, queryKeys } from '../../utils/queryClient';
 import { hasEquivalentTicketFields } from '../shared';
+import { useAuth } from '../auth/AuthContext';
+import { useActiveProject } from '../project/ActiveProjectContext';
+import { useTicketList } from './TicketListContext';
+import { ActiveTicketContext } from './ActiveTicketContext';
 import type { Comment, Ticket } from '../../types/domain';
 import type { TicketWithRelations } from '../../modules/tickets/utils/ticketRelations';
 import type { TicketDetailContextType, TicketDetailContextValueArgs } from './TicketDetailContext.types';
@@ -21,6 +25,7 @@ export function useTicketDetailContext(): TicketDetailContextType {
 export function useTicketDetailContextValue({
   activeTicket,
   setActiveTicket,
+  currentUserId,
   activeProjectId,
   tickets,
   isAuthenticated,
@@ -29,6 +34,8 @@ export function useTicketDetailContextValue({
   const activeTicketProjectId = activeTicket?.projectId || activeProjectId;
   const previousActiveTicketDetailRef = useRef<TicketWithRelations | null>(null);
   const previousCommentsRef = useRef<Comment[] | undefined>(undefined);
+  const previousContextKeyRef = useRef<string | undefined>(undefined);
+  const currentContextKey = `${currentUserId ?? 'anonymous'}:${activeProjectId ?? ''}`;
 
   const ticketById = useMemo(() => {
     const map = new Map<string, Ticket>();
@@ -48,15 +55,17 @@ export function useTicketDetailContextValue({
   useEffect(() => {
     if (activeTicketDetailQuery.data) {
       previousActiveTicketDetailRef.current = activeTicketDetailQuery.data;
+      previousContextKeyRef.current = currentContextKey;
     }
-  }, [activeTicketDetailQuery.data]);
+  }, [activeTicketDetailQuery.data, currentContextKey]);
 
   useEffect(() => {
     if (!activeTicketId) {
       previousActiveTicketDetailRef.current = null;
       previousCommentsRef.current = undefined;
+      previousContextKeyRef.current = currentContextKey;
     }
-  }, [activeTicketId]);
+  }, [activeTicketId, currentContextKey]);
 
   const commentsQuery = useQuery<Comment[]>({
     queryKey: queryKeys.comments(activeTicketId || ''),
@@ -68,8 +77,31 @@ export function useTicketDetailContextValue({
   useEffect(() => {
     if (Array.isArray(commentsQuery.data)) {
       previousCommentsRef.current = commentsQuery.data;
+      previousContextKeyRef.current = currentContextKey;
     }
-  }, [commentsQuery.data]);
+  }, [commentsQuery.data, currentContextKey]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !currentUserId || !activeProjectId || !activeTicketId) {
+      previousActiveTicketDetailRef.current = null;
+      previousCommentsRef.current = undefined;
+      previousContextKeyRef.current = currentContextKey;
+      return;
+    }
+
+    if ((activeTicketDetailQuery.isError || commentsQuery.isError) && previousContextKeyRef.current !== currentContextKey) {
+      previousActiveTicketDetailRef.current = null;
+      previousCommentsRef.current = undefined;
+      previousContextKeyRef.current = currentContextKey;
+    }
+  }, [
+    activeProjectId,
+    activeTicketDetailQuery.isError,
+    activeTicketId,
+    commentsQuery.isError,
+    currentContextKey,
+    isAuthenticated,
+  ]);
 
   const activeTicketDetail = activeTicketId
     ? activeTicketDetailQuery.data ?? previousActiveTicketDetailRef.current ?? null
@@ -105,3 +137,33 @@ export function useTicketDetailContextValue({
     setActiveTicket,
   ]);
 }
+
+export const TicketDetailProvider: FC<{ children: ReactNode }> = ({ children }) => {
+  const { currentUser } = useAuth();
+  const { activeProjectId } = useActiveProject();
+  const { tickets } = useTicketList();
+  const [activeTicket, setActiveTicket] = useState<Ticket | null>(null);
+
+  const value = useTicketDetailContextValue({
+    activeTicket,
+    setActiveTicket,
+    currentUserId: currentUser?.id,
+    activeProjectId,
+    tickets,
+    isAuthenticated: !!currentUser,
+  });
+
+  const activeTicketContextValue = useMemo(
+    () => ({
+      activeTicket,
+      setActiveTicket,
+    }),
+    [activeTicket, setActiveTicket]
+  );
+
+  return (
+    <ActiveTicketContext.Provider value={activeTicketContextValue}>
+      <TicketDetailContext.Provider value={value}>{children}</TicketDetailContext.Provider>
+    </ActiveTicketContext.Provider>
+  );
+};

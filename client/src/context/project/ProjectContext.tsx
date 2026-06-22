@@ -1,9 +1,11 @@
-import { createContext, useCallback, useContext, useMemo } from 'react';
+import { createContext, useCallback, useContext, useMemo, type FC, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from '@library';
 import { apiClient } from '../../utils/apiClient';
 import { CACHE_CONFIGS, queryKeys } from '../../utils/queryClient';
 import type { CreateProjectInput, Project, Ticket, User } from '../../types/domain';
+import { useAuth } from '../auth/AuthContext';
+import { useActiveProject } from './ActiveProjectContext';
 import {
   createProjectById,
   createProjectLookup,
@@ -22,6 +24,18 @@ export function useProjectContext(): ProjectContextType {
 
   return context;
 }
+
+export const ProjectProvider: FC<{ children: ReactNode }> = ({ children }) => {
+  const { currentUser } = useAuth();
+  const { setActiveProjectId, activeProjectIdRef } = useActiveProject();
+  const value = useProjectContextValue({
+    currentUser,
+    setActiveProjectId,
+    activeProjectIdRef,
+  });
+
+  return <ProjectContext.Provider value={value}>{children}</ProjectContext.Provider>;
+};
 
 export function useProjectContextValue({
   currentUser,

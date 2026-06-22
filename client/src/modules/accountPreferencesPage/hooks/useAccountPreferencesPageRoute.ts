@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import { useAuth } from '../../../context/auth/AuthContext';
 import { useAccountSettings } from '../../../hooks/useAccountSettings';
 import { useTheme } from '../../settings';
-import { useTickets } from '../../../context/TicketContextContext';
 import { useActiveView } from '../../../context/ui/ActiveViewContext';
 import { isOnboardingNeeded } from '../utils/accountPreferences';
 import type { AccountPreferencesRouteState } from '../types';
@@ -11,7 +11,7 @@ import type { AccountPreferencesRouteState } from '../types';
 export function useAccountPreferencesPageRoute(): AccountPreferencesRouteState {
   const navigate = useNavigate();
   const [localTutorialCompleted, setLocalTutorialCompleted] = useState(false);
-  const { currentUser, loading } = useTickets();
+  const { currentUser, loading } = useAuth();
   const { activeView, setView } = useActiveView();
   const { theme, setTheme, setDensity } = useTheme();
   const {

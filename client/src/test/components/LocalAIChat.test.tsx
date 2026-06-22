@@ -5,7 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LocalAIChat } from '../../modules/ai';
 
 const mocks = vi.hoisted(() => ({
-  useTickets: vi.fn(),
+  useActiveTicket: vi.fn(),
+  useUserDirectory: vi.fn(),
   useProjectContext: vi.fn(),
   fetch: vi.fn(),
 }));
@@ -22,8 +23,12 @@ function createJsonResponse(body: unknown, ok = true) {
   };
 }
 
-vi.mock('../../context/TicketContextContext', () => ({
-  useTickets: mocks.useTickets,
+vi.mock('../../context/ticket/ActiveTicketContext', () => ({
+  useActiveTicket: mocks.useActiveTicket,
+}));
+
+vi.mock('../../context/user/UserDirectoryContext', () => ({
+  useUserDirectory: mocks.useUserDirectory,
 }));
 
 vi.mock('../../context/project/ProjectContext', () => ({
@@ -112,10 +117,14 @@ function renderLocalAIChat(overrides: Partial<Parameters<typeof LocalAIChat>[0]>
     ...overrides,
   };
 
-  mocks.useTickets.mockReturnValue({
+  mocks.useActiveTicket.mockReturnValue({
     activeTicket: null,
-    users,
+    setActiveTicket: vi.fn(),
     ...ticketContextOverrides,
+  });
+  mocks.useUserDirectory.mockReturnValue({
+    users,
+    isLoading: false,
   });
   mocks.useProjectContext.mockReturnValue({
     projects,
@@ -129,7 +138,8 @@ function renderLocalAIChat(overrides: Partial<Parameters<typeof LocalAIChat>[0]>
 
 describe('LocalAIChat', () => {
   beforeEach(() => {
-    mocks.useTickets.mockReset();
+    mocks.useActiveTicket.mockReset();
+    mocks.useUserDirectory.mockReset();
     mocks.useProjectContext.mockReset();
     mocks.fetch.mockReset();
     vi.stubGlobal('fetch', mocks.fetch);
