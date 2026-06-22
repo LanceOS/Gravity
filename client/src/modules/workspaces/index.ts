@@ -7,7 +7,7 @@ export { WorkspaceProjectPanelPage as WorkspaceProjectPanel } from '../workspace
 export { WorkspaceTeamProjectsPanel } from '../workspaceTeamProjectsPanel';
 export {
   useWorkspaceCreateLabelDialog,
-  useWorkspaceShellCommands,
+  useWorkspaceManagementCommands,
   useWorkspaceShellFilters,
   useWorkspaceShellNavigation,
   useWorkspaceCreateProjectDialog,

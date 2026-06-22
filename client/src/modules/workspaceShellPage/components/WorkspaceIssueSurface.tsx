@@ -9,7 +9,6 @@ import type { Cycle, Label, Project, User } from '../../../types/domain';
 import { CreateTicketModal, TicketDetailRoute, type TicketFilters, type TicketListSort } from '../../tickets';
 import { WorkspacePage } from '../../workspacePage';
 import type { WorkspaceIssueView } from '../../workspacePage/screens/WorkspacePage';
-import { useWebMcpRegistration } from '../hooks/useWebMcpRegistration';
 
 type Navigate = (to: string, options?: { replace?: boolean }) => void;
 
@@ -67,11 +66,6 @@ interface WorkspaceIssueSurfaceProps {
     buildProjectScopedPath: (projectId: string, scope?: 'tickets' | 'notes', itemId?: string) => string;
     setActiveTicket: (ticket: Ticket | null) => void;
   };
-  webMcp: {
-    tickets: Ticket[];
-    users: User[];
-    projects: Project[];
-  };
 }
 
 export function WorkspaceIssueSurface({
@@ -113,7 +107,6 @@ export function WorkspaceIssueSurface({
   isLoadingMoreTickets,
   createTicket: createTicketModal,
   navigation,
-  webMcp,
 }: WorkspaceIssueSurfaceProps) {
   const { createTicket, updateTicket, deleteTicket } = useTicketMutations();
   const { addComment, updateComment, deleteComment } = useCommentContext();
@@ -124,17 +117,6 @@ export function WorkspaceIssueSurface({
     addTicketBlocker,
     removeTicketBlocker,
   } = useTicketRelationsContext();
-
-  useWebMcpRegistration({
-    tickets: webMcp.tickets,
-    users: webMcp.users,
-    projects: webMcp.projects,
-    createTicket,
-    updateTicket,
-    addComment,
-    addTicketBlocker,
-    removeTicketBlocker,
-  });
 
   const handleCreateTicketSubmit = useCallback(
     async (ticket: Parameters<typeof createTicket>[0]) => {
