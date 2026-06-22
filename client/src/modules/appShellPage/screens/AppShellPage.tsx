@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
-import { authClient } from '../../../context/auth/authClient';
-import { useCurrentUser } from '../../../context/auth/useCurrentUser';
+import { useAuth } from '../../../context/auth/AuthContext';
 import { useProjectContext } from '../../../context/project/ProjectContext';
 import { AuthScreen } from '../../auth';
 import { OnboardingModal } from '../../onboarding';
@@ -29,7 +28,7 @@ function AppShellLandingPage() {
   const { pathname } = useLocation();
   const isWorkspaceDirectory = pathname === '/workspaces' || pathname === '/workspaces/';
 
-  const { currentUser, loading: authLoading } = useCurrentUser();
+  const { currentUser, loading: authLoading, signOut } = useAuth();
   const { fetchInitialData, projectsLoading } = useProjectContext();
   const loading = authLoading || projectsLoading;
 
@@ -150,7 +149,9 @@ function AppShellLandingPage() {
             navigate(`/workspaces/${wsId}/settings`);
           }}
           onOpenAccountPreferences={() => navigate('/account')}
-          onSignOut={() => authClient.signOut()}
+          onSignOut={() => {
+            void signOut();
+          }}
         />
         {onboarding}
       </>

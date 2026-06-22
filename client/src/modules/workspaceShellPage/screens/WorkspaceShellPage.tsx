@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { authClient } from '../../../context/auth/authClient';
 import { useInfiniteQuery, useIsFetching, useQuery } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
 import type { SidebarNavigationState, SidebarProps } from '../../../components/Sidebar';
@@ -14,7 +13,7 @@ import { OnboardingModal } from '../../onboarding';
 import { useTheme } from '../../settings';
 import type { Ticket } from '../../../context/TicketContextContext';
 import { useCommentContext } from '../../../context/comment/CommentContext';
-import { useCurrentUser } from '../../../context/auth/useCurrentUser';
+import { useAuth } from '../../../context/auth/AuthContext';
 import { useActiveProject } from '../../../context/project/ActiveProjectContext';
 import { useProjectContext } from '../../../context/project/ProjectContext';
 import { useLabels } from '../../../context/label/LabelContext';
@@ -22,7 +21,7 @@ import { useTicketMutations } from '../../../context/ticket/TicketMutationContex
 import { useTicketDetailContext } from '../../../context/ticket/TicketDetailContext';
 import { useTicketListContext } from '../../../context/ticket/TicketListContext';
 import { useTicketRelationsContext } from '../../../context/relation/TicketRelationsContext';
-import { useUsersQuery } from '../../../hooks/useUsers';
+import { useUserDirectory } from '../../../context/user/UserDirectoryContext';
 import { useCycles } from '../../../context/cycle/CycleContext';
 import { useTicketFilters } from '../../../context/filters/TicketFiltersContext';
 import { useActiveView } from '../../../context/ui/ActiveViewContext';
@@ -74,8 +73,8 @@ interface WorkspaceMember {
 const AGGREGATE_TICKETS_PAGE_SIZE = 120;
 
 export function WorkspaceShellPage() {
-  const { currentUser, loading: authLoading } = useCurrentUser();
-  const { users, loading: usersLoading } = useUsersQuery(!!currentUser);
+  const { currentUser, loading: authLoading, signOut } = useAuth();
+  const { users, isLoading: usersLoading } = useUserDirectory();
   const {
     tickets,
     activeTicket,
@@ -1005,7 +1004,9 @@ export function WorkspaceShellPage() {
       onOpenProjectManager: isTeamWorkspace ? handleOpenTeamManager : handleOpenProjectManager,
       onOpenSettings: handleOpenSettings,
       onOpenMcp: () => setIsMcpOpen(true),
-      onSignOut: () => authClient.signOut(),
+      onSignOut: () => {
+        void signOut();
+      },
     },
   };
 

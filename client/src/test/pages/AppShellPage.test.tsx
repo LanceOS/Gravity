@@ -49,8 +49,8 @@ type WorkspacePageMockProps = {
 };
 
 const mocks = vi.hoisted(() => ({
-  useCurrentUser: vi.fn(),
-  useUsersQuery: vi.fn(),
+  useAuth: vi.fn(),
+  useUserDirectory: vi.fn(),
   useActiveProject: vi.fn(),
   useProjectContext: vi.fn(),
   useTicketListContext: vi.fn(),
@@ -74,13 +74,21 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
-vi.mock('../../context/auth/useCurrentUser', () => ({
-  useCurrentUser: mocks.useCurrentUser,
-}));
+vi.mock('../../context/auth/AuthContext', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../context/auth/AuthContext')>();
+  return {
+    ...actual,
+    useAuth: mocks.useAuth,
+  };
+});
 
-vi.mock('../../hooks/useUsers', () => ({
-  useUsersQuery: mocks.useUsersQuery,
-}));
+vi.mock('../../context/user/UserDirectoryContext', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../context/user/UserDirectoryContext')>();
+  return {
+    ...actual,
+    useUserDirectory: mocks.useUserDirectory,
+  };
+});
 
 vi.mock('../../context/project/ActiveProjectContext', () => ({
   useActiveProject: mocks.useActiveProject,
@@ -517,13 +525,15 @@ function renderAppShell({
   initialEntries?: string[];
 } = {}) {
   const ticketState = tickets as any;
-  mocks.useCurrentUser.mockReturnValue({
+  mocks.useAuth.mockReturnValue({
     currentUser: ticketState.currentUser ?? null,
     loading: Boolean(ticketState.loading),
+    isAuthenticated: Boolean(ticketState.currentUser),
+    signOut: vi.fn(),
   });
-  mocks.useUsersQuery.mockReturnValue({
+  mocks.useUserDirectory.mockReturnValue({
     users: Array.isArray(ticketState.users) ? ticketState.users : [],
-    loading: Boolean(ticketState.loading),
+    isLoading: Boolean(ticketState.loading),
   });
   mocks.useActiveProject.mockReturnValue({
     activeProjectId: ticketState.activeProjectId || '',

@@ -1,70 +1,39 @@
-# Provider Ordering Plan
+# Ticket Provider Order
 
-## Current Provider Hierarchy (App.tsx)
+`TicketProvider` now acts as a compatibility shell that composes the decomposed ticket-domain providers in a fixed order.
 
-```
-QueryClientProvider          ← outermost data layer
-  ThemeContextProvider       ← theme state + persistence
-    SettingsThemeProvider    ← CSS variables + density
-      ActiveProjectProvider  ← active project selection
-        TicketProvider       ← ticket / user / comment orchestration
-          RouterProvider     ← routing; consumes context via hooks
-```
+## Runtime Order
 
-## Ordering Rules
-
-### Rule 1 — `QueryClientProvider` must be outermost
-`TicketProvider` calls `useQueryClient()` internally. If `QueryClientProvider` were nested inside `TicketProvider`, the hook would throw. It must wrap everything that touches React Query.
-
-### Rule 2 — Theme providers have separate responsibilities
-`ThemeContextProvider` owns persisted theme state and `SettingsThemeProvider` only reads that state to manage CSS custom properties and density. Neither provider calls `useCurrentUser()`, `useTicketListContext()`, or `useQueryClient()`, so they can sit anywhere between `QueryClientProvider` and `TicketProvider` without causing dependency issues.
-
-### Rule 3 — `TicketProvider` must wrap `RouterProvider`
-All routed page components that read ticket data (`useTicketListContext()`, `useProjectContext()`, `useTicketDetailContext()`, or `useCommentContext()`) must have `TicketProvider` mounted above them.
-
-### Rule 4 — Future contexts that **depend on** ticket data
-Any new context/provider that calls `useTicketListContext()`, `useTicketDetailContext()`, or `useCommentContext()` internally must be nested **inside** `TicketProvider`.
-
-Example (correct):
 ```tsx
-<TicketProvider>
-  <NotificationProvider>   {/* reads tickets via ticket-specific hooks */}
-    <RouterProvider ... />
-  </NotificationProvider>
-</TicketProvider>
-```
-
-### Rule 5 — Future contexts that ticket logic **depends on**
-Any new context/provider that `TicketProvider` itself consumes via a hook must be nested **outside** `TicketProvider`.
-
-Example (correct):
-```tsx
-<AuthProvider>             {/* TicketProvider reads auth state */}
-  <TicketProvider>
-    <RouterProvider ... />
-  </TicketProvider>
-</AuthProvider>
-```
-
-## Planned Future Contexts (Phase 1+)
-
-When the monolithic `TicketProvider` is decomposed into smaller providers, the intended nesting order is:
-
-```
 QueryClientProvider
-  ThemeContextProvider
-    SettingsThemeProvider
-      ActiveProjectProvider  ← active project selection
-        TicketProvider       ← composes current-user, project, ticket, and realtime state
-          RouterProvider
+  AuthProvider
+    ThemeProvider
+      ActiveProjectProvider
+        ProjectProvider
+          ActiveViewProvider
+            TicketFiltersProvider
+              UserDirectoryProvider
+                CycleProvider
+                  LabelProvider
+                    TicketListProvider
+                      TicketDetailProvider
+                        TicketMutationProvider
+                          CommentProvider
+                            TicketRelationsProvider
+                              RealtimeProvider
+                                CompatibilityTicketProvider
+                                  RouterProvider
 ```
 
-If a future ticket-specific provider is split out of `TicketProvider`, the decomposition should follow the earlier planned ordering and keep each provider dependent only on the layer above it.
+## Notes
 
-## Circular Import Guard
+- `ThemeProvider` in the shell is a composition layer: it mounts the persisted app-theme provider first and the settings-theme provider second so both `useTheme()` hooks remain available.
+- `ProjectProvider` stays above `RealtimeProvider` because realtime workspace resolution depends on project metadata.
+- `TicketDetailProvider` stays above `TicketRelationsProvider` because relation actions need the active ticket detail snapshot.
+- `CompatibilityTicketProvider` must remain last so the legacy `TicketContextType` is rebuilt from the narrower contexts instead of owning state directly.
 
-All shared utilities live in `context/shared/` and import exclusively from:
-- `src/types/domain.ts`
-- `src/modules/tickets/utils/ticketRelations.ts`
+## Guardrails
 
-No shared module imports from any context provider file. This is enforced by the directory structure: shared modules are leaves in the dependency graph.
+- Providers may depend only on providers listed above them.
+- New high-traffic consumers should prefer narrow hooks such as `useAuth()`, `useTheme()`, `useTicketList()`, and `useTicketFilters()`.
+- Shared helpers in `context/shared/` must remain leaf modules and must not import provider files.
