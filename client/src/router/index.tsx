@@ -1,7 +1,14 @@
 import { createBrowserRouter, Navigate, useParams } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
+import type { ReactNode } from 'react';
+import {
+  ProjectContextProviders,
+  WorkspaceTicketActionProviders,
+  WorkspaceTicketProviders,
+} from '../context/TicketContext';
 import { AccountPreferencesPageRoute } from '../pages/AccountPreferencesPage/AccountPreferencesPage';
 import { AppShellPage } from '../pages/AppShellPage/AppShellPage';
+import { WorkspaceShellPage } from '../pages/WorkspaceShellPage/WorkspaceShellPage';
 import { WorkspaceSettingsPageRoute } from '../pages/WorkspaceSettingsPage/WorkspaceSettingsPage';
 import { ProtectedRoute } from './ProtectedRoute';
 import { LoadingPage } from '../pages/LoadingPage/LoadingPage';
@@ -21,72 +28,68 @@ function TeamLabelRedirect() {
   return <Navigate to={`/workspaces/${workspaceId}/teams/${teamId}/labels/${domainId}`} replace />;
 }
 
+function protectedElement(children: ReactNode) {
+  return <ProtectedRoute>{children}</ProtectedRoute>;
+}
+
+function projectElement(children: ReactNode) {
+  return protectedElement(
+    <ProjectContextProviders>
+      {children}
+    </ProjectContextProviders>
+  );
+}
+
+function appShellElement() {
+  return projectElement(<AppShellPage />);
+}
+
+function workspaceShellElement({ withTicketActions = true }: { withTicketActions?: boolean } = {}) {
+  const shellPage = <WorkspaceShellPage />;
+
+  return projectElement(
+    <WorkspaceTicketProviders>
+      {withTicketActions ? (
+        <WorkspaceTicketActionProviders>{shellPage}</WorkspaceTicketActionProviders>
+      ) : shellPage}
+    </WorkspaceTicketProviders>
+  );
+}
+
 export const router = createBrowserRouter([
   {
     path: '/',
-    element: (
-      <ProtectedRoute>
-        <AppShellPage />
-      </ProtectedRoute>
-    ),
+    element: appShellElement(),
   },
   
   // Workspace Directory / Workspace Overview Page
   {
     path: '/workspaces',
-    element: (
-      <ProtectedRoute>
-        <AppShellPage />
-      </ProtectedRoute>
-    ),
+    element: appShellElement(),
   },
   {
     path: '/workspaces/:workspaceId',
-    element: (
-      <ProtectedRoute>
-        <AppShellPage />
-      </ProtectedRoute>
-    ),
+    element: workspaceShellElement(),
   },
   {
     path: '/workspaces/:workspaceId/settings',
-    element: (
-      <ProtectedRoute>
-        <WorkspaceSettingsPageRoute />
-      </ProtectedRoute>
-    ),
+    element: protectedElement(<WorkspaceSettingsPageRoute />),
   },
   {
     path: '/workspaces/:workspaceId/projects',
-    element: (
-      <ProtectedRoute>
-        <AppShellPage />
-      </ProtectedRoute>
-    ),
+    element: workspaceShellElement({ withTicketActions: false }),
   },
   {
     path: '/workspaces/:workspaceId/projects/list',
-    element: (
-      <ProtectedRoute>
-        <AppShellPage />
-      </ProtectedRoute>
-    ),
+    element: workspaceShellElement({ withTicketActions: false }),
   },
   {
     path: '/workspaces/:workspaceId/teams',
-    element: (
-      <ProtectedRoute>
-        <AppShellPage />
-      </ProtectedRoute>
-    ),
+    element: workspaceShellElement({ withTicketActions: false }),
   },
   {
     path: '/account',
-    element: (
-      <ProtectedRoute>
-        <AccountPreferencesPageRoute />
-      </ProtectedRoute>
-    ),
+    element: protectedElement(<AccountPreferencesPageRoute />),
   },
 
   // ----------------------------------------------------
@@ -96,186 +99,108 @@ export const router = createBrowserRouter([
   // All tasks (workspace-level)
   {
     path: '/workspaces/:workspaceId/all',
-    element: (
-      <ProtectedRoute>
-        <AppShellPage />
-      </ProtectedRoute>
-    ),
+    element: workspaceShellElement(),
   },
   // Team overview
   {
     path: '/workspaces/:workspaceId/teams/:teamId',
-    element: (
-      <ProtectedRoute>
-        <AppShellPage />
-      </ProtectedRoute>
-    ),
+    element: workspaceShellElement(),
   },
   // Team-level all tasks
   {
     path: '/workspaces/:workspaceId/teams/:teamId/tasks',
-    element: (
-      <ProtectedRoute>
-        <AppShellPage />
-      </ProtectedRoute>
-    ),
+    element: workspaceShellElement(),
   },
   // Team-level specific view
   {
     path: '/workspaces/:workspaceId/teams/:teamId/views/:viewId',
-    element: (
-      <ProtectedRoute>
-        <AppShellPage />
-      </ProtectedRoute>
-    ),
+    element: workspaceShellElement(),
   },
   // Team cycle view
   {
     path: '/workspaces/:workspaceId/teams/:teamId/cycles/:cycleId',
-    element: (
-      <ProtectedRoute>
-        <AppShellPage />
-      </ProtectedRoute>
-    ),
+    element: workspaceShellElement(),
   },
   // Legacy compatibility route for label-filtered views
   {
     path: '/workspaces/:workspaceId/teams/:teamId/domains/:domainId',
-    element: (
-      <ProtectedRoute>
-        <TeamLabelRedirect />
-      </ProtectedRoute>
-    ),
+    element: protectedElement(<TeamLabelRedirect />),
   },
   // Label-filtered view
   {
     path: '/workspaces/:workspaceId/teams/:teamId/labels/:labelId',
-    element: (
-      <ProtectedRoute>
-        <AppShellPage />
-      </ProtectedRoute>
-    ),
+    element: workspaceShellElement(),
   },
   // Team projects list page
   {
     path: '/workspaces/:workspaceId/teams/:teamId/projects',
-    element: (
-      <ProtectedRoute>
-        <AppShellPage />
-      </ProtectedRoute>
-    ),
+    element: workspaceShellElement({ withTicketActions: false }),
   },
   // Team project overview
   {
     path: '/workspaces/:workspaceId/teams/:teamId/projects/:projectId',
-    element: (
-      <ProtectedRoute>
-        <AppShellPage />
-      </ProtectedRoute>
-    ),
+    element: workspaceShellElement(),
   },
   // Team-level project ticket list
   {
     path: '/workspaces/:workspaceId/teams/:teamId/projects/:projectId/tickets',
-    element: (
-      <ProtectedRoute>
-        <AppShellPage />
-      </ProtectedRoute>
-    ),
+    element: workspaceShellElement(),
   },
   // Team-level project ticket detail
   {
     path: '/workspaces/:workspaceId/teams/:teamId/projects/:projectId/tickets/:ticketKey',
-    element: (
-      <ProtectedRoute>
-        <AppShellPage />
-      </ProtectedRoute>
-    ),
+    element: workspaceShellElement(),
   },
   // Team-level project notes list
   {
     path: '/workspaces/:workspaceId/teams/:teamId/projects/:projectId/notes',
-    element: (
-      <ProtectedRoute>
-        <AppShellPage />
-      </ProtectedRoute>
-    ),
+    element: workspaceShellElement(),
   },
   // Team-level project note detail
   {
     path: '/workspaces/:workspaceId/teams/:teamId/projects/:projectId/notes/:noteId',
-    element: (
-      <ProtectedRoute>
-        <AppShellPage />
-      </ProtectedRoute>
-    ),
+    element: workspaceShellElement(),
   },
 
   // Individual (no teams) routing:
   {
     path: '/workspaces/:workspaceId/projects/:projectId',
-    element: (
-      <ProtectedRoute>
-        <ProjectHomeGuard />
-      </ProtectedRoute>
-    ),
+    element: protectedElement(<ProjectHomeGuard />),
   },
   {
     path: '/workspaces/:workspaceId/projects/:projectId/tickets',
-    // Renders AppShellPage so the workspace shell + ticket list context is fully preserved
-    element: (
-      <ProtectedRoute>
-        <AppShellPage />
-      </ProtectedRoute>
-    ),
+    element: workspaceShellElement(),
   },
   {
     path: '/workspaces/:workspaceId/projects/:projectId/tickets/:ticketKey',
-    // Renders AppShellPage; it reads ticketKey from URL params to open the detail panel
-    element: (
-      <ProtectedRoute>
-        <AppShellPage />
-      </ProtectedRoute>
-    ),
+    element: workspaceShellElement(),
   },
   {
     path: '/workspaces/:workspaceId/projects/:projectId/notes',
-    element: (
-      <ProtectedRoute>
-        <AppShellPage />
-      </ProtectedRoute>
-    ),
+    element: workspaceShellElement(),
   },
   {
     path: '/workspaces/:workspaceId/projects/:projectId/notes/:noteId',
-    element: (
-      <ProtectedRoute>
-        <AppShellPage />
-      </ProtectedRoute>
-    ),
+    element: workspaceShellElement(),
   },
   
   // Export tasks/notes
   {
     path: '/workspaces/:workspaceId/settings/export',
-    element: (
-      <ProtectedRoute>
-        <Suspense fallback={<LoadingPage />}>
-          <WorkspaceExportView />
-        </Suspense>
-      </ProtectedRoute>
+    element: protectedElement(
+      <Suspense fallback={<LoadingPage />}>
+        <WorkspaceExportView />
+      </Suspense>
     ),
   },
 
   // Backward compatibility with legacy placeholder page
   {
     path: '/placeholder/:id',
-    element: (
-      <ProtectedRoute>
-        <Suspense fallback={<LoadingPage />}>
-          <PlaceholderPage />
-        </Suspense>
-      </ProtectedRoute>
+    element: protectedElement(
+      <Suspense fallback={<LoadingPage />}>
+        <PlaceholderPage />
+      </Suspense>
     ),
   },
 

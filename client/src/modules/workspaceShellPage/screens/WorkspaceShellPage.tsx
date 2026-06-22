@@ -12,15 +12,16 @@ import type { WorkspaceIssueView } from '../../workspacePage/screens/WorkspacePa
 import { OnboardingModal } from '../../onboarding';
 import { useTheme } from '../../settings';
 import type { Ticket } from '../../../context/TicketContextContext';
-import { useCommentContext } from '../../../context/comment/CommentContext';
+import { useOptionalCommentContext } from '../../../context/comment/CommentContext';
 import { useAuth } from '../../../context/auth/AuthContext';
 import { useActiveProject } from '../../../context/project/ActiveProjectContext';
 import { useProjectContext } from '../../../context/project/ProjectContext';
 import { useLabels } from '../../../context/label/LabelContext';
-import { useTicketMutations } from '../../../context/ticket/TicketMutationContext';
-import { useTicketDetailContext } from '../../../context/ticket/TicketDetailContext';
+import { useOptionalTicketMutations } from '../../../context/ticket/TicketMutationContext';
+import type { CreateTicketInput } from '../../../context/ticket/TicketMutationContext.types';
+import { useOptionalTicketDetailContext } from '../../../context/ticket/TicketDetailContext';
 import { useTicketListContext } from '../../../context/ticket/TicketListContext';
-import { useTicketRelationsContext } from '../../../context/relation/TicketRelationsContext';
+import { useOptionalTicketRelationsContext } from '../../../context/relation/TicketRelationsContext';
 import { useUserDirectory } from '../../../context/user/UserDirectoryContext';
 import { useCycles } from '../../../context/cycle/CycleContext';
 import { useTicketFilters } from '../../../context/filters/TicketFiltersContext';
@@ -72,6 +73,14 @@ interface WorkspaceMember {
 
 const AGGREGATE_TICKETS_PAGE_SIZE = 120;
 
+const noopAddComment = async (_ticketId: string, _body: string) => {};
+const noopUpdateComment = async (_ticketId: string, _commentId: string, _body: string) => {};
+const noopDeleteComment = async (_ticketId: string, _commentId: string) => {};
+const noopCreateTicket = async (_ticket: CreateTicketInput) => null;
+const noopUpdateTicket = async (_id: string, _updates: Partial<Ticket>) => {};
+const noopDeleteTicket = async (_id: string) => {};
+const noopTicketRelation = async (_ticketId: string, _relatedTicketId: string) => false;
+
 export function WorkspaceShellPage() {
   const { currentUser, loading: authLoading, signOut } = useAuth();
   const { users, isLoading: usersLoading } = useUserDirectory();
@@ -80,14 +89,9 @@ export function WorkspaceShellPage() {
     activeTicket,
     setActiveTicket,
   } = useTicketListContext();
-  const { addComment, updateComment, deleteComment } = useCommentContext();
-  const { activeTicketDetail, comments } = useTicketDetailContext();
-  const {
-    addTicketDependency,
-    removeTicketDependency,
-    addTicketBlocker,
-    removeTicketBlocker,
-  } = useTicketRelationsContext();
+  const commentContext = useOptionalCommentContext();
+  const ticketDetailContext = useOptionalTicketDetailContext();
+  const ticketRelationsContext = useOptionalTicketRelationsContext();
   const { activeProjectId, setActiveProjectId } = useActiveProject();
   const {
     projects,
@@ -99,7 +103,20 @@ export function WorkspaceShellPage() {
     deleteProject,
     updateProject,
   } = useProjectContext();
-  const { createTicket, updateTicket, deleteTicket } = useTicketMutations();
+  const ticketMutations = useOptionalTicketMutations();
+  const addComment = commentContext?.addComment ?? noopAddComment;
+  const updateComment = commentContext?.updateComment ?? noopUpdateComment;
+  const deleteComment = commentContext?.deleteComment ?? noopDeleteComment;
+  const activeTicketDetail = ticketDetailContext?.activeTicketDetail ?? null;
+  const comments = ticketDetailContext?.comments ?? [];
+  const addTicketDependency = ticketRelationsContext?.addTicketDependency ?? noopTicketRelation;
+  const removeTicketDependency = ticketRelationsContext?.removeTicketDependency ?? noopTicketRelation;
+  const addTicketBlocker = ticketRelationsContext?.addTicketBlocker ?? noopTicketRelation;
+  const removeTicketBlocker = ticketRelationsContext?.removeTicketBlocker ?? noopTicketRelation;
+  const createTicket = ticketMutations?.createTicket ?? noopCreateTicket;
+  const updateTicket = ticketMutations?.updateTicket ?? noopUpdateTicket;
+  const deleteTicket = ticketMutations?.deleteTicket ?? noopDeleteTicket;
+  const hasTicketActions = Boolean(commentContext && ticketDetailContext && ticketRelationsContext && ticketMutations);
   const { labels, createLabel, updateLabel, deleteLabel } = useLabels();
   const { cycles } = useCycles();
   const { filters, setFilters } = useTicketFilters();
@@ -668,6 +685,7 @@ export function WorkspaceShellPage() {
   });
 
   useWebMcpRegistration({
+    enabled: hasTicketActions,
     tickets,
     users,
     projects,
@@ -857,13 +875,17 @@ export function WorkspaceShellPage() {
 
       if (event.key === 'n' || event.key === 'N') {
         event.preventDefault();
-        handleOpenCreateTicket();
+        if (hasTicketActions) {
+          handleOpenCreateTicket();
+        } else {
+          navigate(`/workspaces/${activeWorkspaceId}`);
+        }
       }
     };
 
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [activeWorkspaceProjects.length, handleOpenCreateTicket]);
+  }, [activeWorkspaceId, hasTicketActions, handleOpenCreateTicket, navigate]);
 
   const handleOpenCurrentTeamProjectsManager = useCallback(() => {
     if (sidebarActiveTeamId) {
@@ -982,7 +1004,7 @@ export function WorkspaceShellPage() {
       onOpenOllama: handleToggleOllama,
       isOllamaOpen,
       onOpenSimulator: () => {},
-      onOpenCreateTicket: handleOpenCreateTicket,
+      onOpenCreateTicket: hasTicketActions ? handleOpenCreateTicket : () => navigate(`/workspaces/${activeWorkspaceId}`),
       onOpenCreateProject: handleOpenCreateProject,
       onOpenCreateLabel: handleOpenCreateLabel,
       agentIntegration: accountSettings.agentIntegration,
@@ -1168,7 +1190,7 @@ export function WorkspaceShellPage() {
       <AppShellOverlays
         onboarding={onboarding}
         createTicket={{
-          isOpen: isCreateModalOpen,
+          isOpen: hasTicketActions && isCreateModalOpen,
           onClose: () => setIsCreateModalOpen(false),
           projects: activeWorkspaceProjects,
           labels: scopedLabels,

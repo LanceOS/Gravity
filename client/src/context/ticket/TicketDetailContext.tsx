@@ -11,8 +11,12 @@ import type { TicketDetailContextType, TicketDetailContextValueArgs } from './Ti
 
 export const TicketDetailContext = createContext<TicketDetailContextType | undefined>(undefined);
 
+export function useOptionalTicketDetailContext(): TicketDetailContextType | undefined {
+  return useContext(TicketDetailContext);
+}
+
 export function useTicketDetailContext(): TicketDetailContextType {
-  const context = useContext(TicketDetailContext);
+  const context = useOptionalTicketDetailContext();
   if (!context) {
     throw new Error('useTicketDetailContext must be used within a TicketDetailContext provider');
   }

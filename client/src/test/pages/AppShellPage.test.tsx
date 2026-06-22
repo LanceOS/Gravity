@@ -104,18 +104,22 @@ vi.mock('../../context/ticket/TicketListContext', () => ({
 
 vi.mock('../../context/comment/CommentContext', () => ({
   useCommentContext: mocks.useCommentContext,
+  useOptionalCommentContext: mocks.useCommentContext,
 }));
 
 vi.mock('../../context/ticket/TicketDetailContext', () => ({
   useTicketDetailContext: mocks.useTicketDetailContext,
+  useOptionalTicketDetailContext: mocks.useTicketDetailContext,
 }));
 
 vi.mock('../../context/relation/TicketRelationsContext', () => ({
   useTicketRelationsContext: mocks.useTicketRelationsContext,
+  useOptionalTicketRelationsContext: mocks.useTicketRelationsContext,
 }));
 
 vi.mock('../../context/ticket/TicketMutationContext', () => ({
   useTicketMutations: mocks.useTicketMutations,
+  useOptionalTicketMutations: mocks.useTicketMutations,
 }));
 
 vi.mock('../../context/label/LabelContext', () => ({

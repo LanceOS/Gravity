@@ -81,46 +81,84 @@ const CompatibilityTicketProvider: FC<{ children: ReactNode }> = ({ children }) 
   return <TicketContext.Provider value={value}>{children}</TicketContext.Provider>;
 };
 
-const OrderedTicketProviders: FC<{ children: ReactNode }> = ({ children }) => {
+export const AppContextProviders: FC<{ children: ReactNode }> = ({ children }) => {
+  return (
+    <AuthProvider>
+      <ThemeProvider>
+        <ActiveViewProvider>{children}</ActiveViewProvider>
+      </ThemeProvider>
+    </AuthProvider>
+  );
+};
+
+export const ProjectContextProviders: FC<{ children: ReactNode }> = ({ children }) => {
+  return (
+    <ActiveProjectProvider>
+      <ProjectProvider>{children}</ProjectProvider>
+    </ActiveProjectProvider>
+  );
+};
+
+export const WorkspaceTicketStateProviders: FC<{ children: ReactNode }> = ({ children }) => {
   const { currentUser } = useAuth();
 
   return (
-    <ActiveProjectProvider>
-      <ProjectProvider>
-        <ActiveViewProvider>
-          <TicketFiltersProvider>
-            <UserDirectoryProvider>
-              <CycleProvider>
-                <LabelProvider>
-                  <TicketListProvider currentUser={currentUser}>
-                    <TicketDetailProvider>
-                      <TicketMutationProvider>
-                        <CommentProvider>
-                          <TicketRelationsProvider>
-                            <RealtimeProvider currentUserId={currentUser?.id ?? null}>
-                              <CompatibilityTicketProvider>{children}</CompatibilityTicketProvider>
-                            </RealtimeProvider>
-                          </TicketRelationsProvider>
-                        </CommentProvider>
-                      </TicketMutationProvider>
-                    </TicketDetailProvider>
-                  </TicketListProvider>
-                </LabelProvider>
-              </CycleProvider>
-            </UserDirectoryProvider>
-          </TicketFiltersProvider>
-        </ActiveViewProvider>
-      </ProjectProvider>
-    </ActiveProjectProvider>
+    <TicketFiltersProvider>
+      <UserDirectoryProvider>
+        <TicketListProvider currentUser={currentUser}>{children}</TicketListProvider>
+      </UserDirectoryProvider>
+    </TicketFiltersProvider>
+  );
+};
+
+export const WorkspaceTicketMetadataProviders: FC<{ children: ReactNode }> = ({ children }) => {
+  return (
+    <CycleProvider>
+      <LabelProvider>{children}</LabelProvider>
+    </CycleProvider>
+  );
+};
+
+export const WorkspaceTicketActionProviders: FC<{ children: ReactNode }> = ({ children }) => {
+  return (
+    <TicketDetailProvider>
+      <TicketMutationProvider>
+        <CommentProvider>
+          <TicketRelationsProvider>{children}</TicketRelationsProvider>
+        </CommentProvider>
+      </TicketMutationProvider>
+    </TicketDetailProvider>
+  );
+};
+
+export const WorkspaceTicketRealtimeProviders: FC<{ children: ReactNode }> = ({ children }) => {
+  const { currentUser } = useAuth();
+
+  return (
+    <RealtimeProvider currentUserId={currentUser?.id ?? null}>{children}</RealtimeProvider>
+  );
+};
+
+export const WorkspaceTicketProviders: FC<{ children: ReactNode }> = ({ children }) => {
+  return (
+    <WorkspaceTicketStateProviders>
+      <WorkspaceTicketMetadataProviders>
+        <WorkspaceTicketRealtimeProviders>{children}</WorkspaceTicketRealtimeProviders>
+      </WorkspaceTicketMetadataProviders>
+    </WorkspaceTicketStateProviders>
   );
 };
 
 export const TicketProvider: FC<{ children: ReactNode }> = ({ children }) => {
   return (
-    <AuthProvider>
-      <ThemeProvider>
-        <OrderedTicketProviders>{children}</OrderedTicketProviders>
-      </ThemeProvider>
-    </AuthProvider>
+    <AppContextProviders>
+      <ProjectContextProviders>
+        <WorkspaceTicketProviders>
+          <WorkspaceTicketActionProviders>
+            <CompatibilityTicketProvider>{children}</CompatibilityTicketProvider>
+          </WorkspaceTicketActionProviders>
+        </WorkspaceTicketProviders>
+      </ProjectContextProviders>
+    </AppContextProviders>
   );
 };

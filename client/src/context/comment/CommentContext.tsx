@@ -17,8 +17,12 @@ type CommentMutationSnapshot = {
 
 export const CommentContext = createContext<CommentContextType | undefined>(undefined);
 
+export function useOptionalCommentContext(): CommentContextType | undefined {
+  return useContext(CommentContext);
+}
+
 export function useCommentContext(): CommentContextType {
-  const context = useContext(CommentContext);
+  const context = useOptionalCommentContext();
   if (!context) {
     throw new Error('useCommentContext must be used within a CommentContext provider');
   }

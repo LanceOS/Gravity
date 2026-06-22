@@ -8,7 +8,7 @@ import type { TicketContextType } from './TicketContext.types';
 export function useTicketContext(): TicketContextType {
   const context = useContext(TicketContext);
   if (!context) {
-    throw new Error('useTicketContext must be used within a TicketProvider');
+    throw new Error('useTicketContext must be used within WorkspaceTicketProviders or TicketProvider');
   }
 
   return context;

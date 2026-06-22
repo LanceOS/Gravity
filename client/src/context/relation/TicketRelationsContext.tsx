@@ -8,8 +8,12 @@ import type { TicketRelationsContextType, TicketRelationsContextValueArgs } from
 
 export const TicketRelationsContext = createContext<TicketRelationsContextType | undefined>(undefined);
 
+export function useOptionalTicketRelationsContext(): TicketRelationsContextType | undefined {
+  return useContext(TicketRelationsContext);
+}
+
 export function useTicketRelationsContext(): TicketRelationsContextType {
-  const context = useContext(TicketRelationsContext);
+  const context = useOptionalTicketRelationsContext();
   if (!context) {
     throw new Error('useTicketRelationsContext must be used within a TicketRelationsContext provider');
   }
