@@ -49,6 +49,10 @@ vi.mock('../../context/project/ProjectContext', () => ({
   useProjectContext: mocks.useProjectContext,
 }));
 
+vi.mock('../../context/TicketContext', () => ({
+  WorkspaceTicketActionProviders: ({ children }: { children: ReactNode }) => <>{children}</>,
+}));
+
 vi.mock('../../context/ticket/TicketListContext', () => ({
   useTicketListContext: mocks.useTicketListContext,
 }));

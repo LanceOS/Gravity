@@ -3,7 +3,6 @@ import { lazy, Suspense } from 'react';
 import type { ReactNode } from 'react';
 import {
   ProjectContextProviders,
-  WorkspaceTicketActionProviders,
   WorkspaceTicketProviders,
 } from '../context/TicketContext';
 import { AccountPreferencesPageRoute } from '../pages/AccountPreferencesPage/AccountPreferencesPage';
@@ -44,14 +43,10 @@ function appShellElement() {
   return projectElement(<AppShellPage />);
 }
 
-function workspaceShellElement({ withTicketActions = true }: { withTicketActions?: boolean } = {}) {
-  const shellPage = <WorkspaceShellPage />;
-
+function workspaceShellElement() {
   return projectElement(
     <WorkspaceTicketProviders>
-      {withTicketActions ? (
-        <WorkspaceTicketActionProviders>{shellPage}</WorkspaceTicketActionProviders>
-      ) : shellPage}
+      <WorkspaceShellPage />
     </WorkspaceTicketProviders>
   );
 }
@@ -77,15 +72,15 @@ export const router = createBrowserRouter([
   },
   {
     path: '/workspaces/:workspaceId/projects',
-    element: workspaceShellElement({ withTicketActions: false }),
+    element: workspaceShellElement(),
   },
   {
     path: '/workspaces/:workspaceId/projects/list',
-    element: workspaceShellElement({ withTicketActions: false }),
+    element: workspaceShellElement(),
   },
   {
     path: '/workspaces/:workspaceId/teams',
-    element: workspaceShellElement({ withTicketActions: false }),
+    element: workspaceShellElement(),
   },
   {
     path: '/account',
@@ -134,7 +129,7 @@ export const router = createBrowserRouter([
   // Team projects list page
   {
     path: '/workspaces/:workspaceId/teams/:teamId/projects',
-    element: workspaceShellElement({ withTicketActions: false }),
+    element: workspaceShellElement(),
   },
   // Team project overview
   {
