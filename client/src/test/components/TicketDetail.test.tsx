@@ -412,6 +412,9 @@ describe('TicketDetail', () => {
     const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => { });
 
     expect(screen.queryByText('Relations')).not.toBeInTheDocument();
+    expect(screen.getAllByLabelText('Status: DONE')[0]).toBeInTheDocument();
+    expect(screen.getAllByLabelText('Status: IN REVIEW')[0]).toBeInTheDocument();
+    expect(screen.getAllByText('Ship retry fix')[0]).toHaveStyle('text-decoration: line-through');
 
     await user.click(screen.getByRole('button', { name: 'Back' }));
     expect(props.onClose).toHaveBeenCalledTimes(1);

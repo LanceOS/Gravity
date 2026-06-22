@@ -3,9 +3,11 @@ import { GitMerge, GitPullRequest, Paperclip } from 'lucide-react';
 import type { TicketRowProps } from '../types/TicketList';
 import { LabelBadge } from './LabelBadge';
 import { TicketRelationIndicators } from './TicketRelationIndicators';
+import { TicketStatusBadge } from './TicketStatusBadge';
 
 function TicketRowImpl({ ticket, onClick, priorityIcon, assigneeAvatar, projectName, projectColor }: TicketRowProps) {
   const [isHovered, setIsHovered] = useState(false);
+  const isCompleted = ticket.status === 'done' || ticket.status === 'canceled';
 
   const handleClick = useCallback(() => {
     onClick(ticket);
@@ -32,59 +34,87 @@ function TicketRowImpl({ ticket, onClick, priorityIcon, assigneeAvatar, projectN
     >
       <div className="ticket-row-priority" style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>{priorityIcon}</div>
 
-      <span className="ticket-row-key" style={{ fontFamily: 'var(--mono)', fontSize: '12px', color: 'var(--color-text-disabled)', width: '60px', flexShrink: 0 }}>
-        {ticket.key}
-      </span>
-
-      {projectName && (
+      <div
+        className="ticket-row-title-wrap"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          flex: 1,
+          minWidth: 0,
+        }}
+      >
         <span
-          className="ticket-row-project"
+          className="ticket-row-key"
           style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '5px',
-            fontSize: '11px',
-            fontWeight: 500,
-            color: 'var(--color-text-secondary)',
-            background: 'var(--color-surface-overlay)',
-            border: '1px solid var(--color-border-default)',
-            borderRadius: '4px',
-            padding: '2px 7px',
-            flexShrink: 0,
-            maxWidth: '120px',
+            width: '72px',
+            fontFamily: 'var(--mono)',
+            fontSize: '12px',
+            color: 'var(--color-text-disabled)',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
+            flexShrink: 0,
             whiteSpace: 'nowrap',
           }}
         >
-          <span
-            aria-hidden="true"
-            style={{
-              width: '6px',
-              height: '6px',
-              borderRadius: '50%',
-              background: projectColor || 'var(--color-primary)',
-              flexShrink: 0,
-            }}
-          />
-          {projectName}
+          {ticket.key}
         </span>
-      )}
 
-      <span
-        className="ticket-row-title"
-        style={{
-          fontSize: '13px',
-          fontWeight: 500,
-          color: 'var(--color-text-primary)',
-          flex: 1,
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-        }}
-      >
-        {ticket.title}
-      </span>
+        {projectName && (
+          <span
+            className="ticket-row-project"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              fontSize: '11px',
+              fontWeight: 500,
+              color: 'var(--color-text-secondary)',
+              background: 'var(--color-surface-overlay)',
+              border: '1px solid var(--color-border-default)',
+              borderRadius: '4px',
+              padding: '2px 7px',
+              flexShrink: 0,
+              maxWidth: '120px',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <span
+              aria-hidden="true"
+              style={{
+                width: '6px',
+                height: '6px',
+                borderRadius: '50%',
+                background: projectColor || 'var(--color-primary)',
+                flexShrink: 0,
+              }}
+            />
+            {projectName}
+          </span>
+        )}
+
+        <TicketStatusBadge status={ticket.status} />
+
+        <span
+          className="ticket-row-title"
+          style={{
+            fontSize: '13px',
+            fontWeight: 500,
+            color: isCompleted ? 'var(--color-text-secondary)' : 'var(--color-text-primary)',
+            textDecoration: isCompleted ? 'line-through' : 'none',
+            opacity: isCompleted ? 0.85 : 1,
+            flex: 1,
+            minWidth: 0,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {ticket.title}
+        </span>
+      </div>
 
       <div className="ticket-row-domain" style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
         <TicketRelationIndicators ticket={ticket} />

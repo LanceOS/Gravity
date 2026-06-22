@@ -3,10 +3,12 @@ import { Paperclip } from 'lucide-react';
 import type { TicketRowProps } from '../../types/TicketList';
 import { LabelBadge } from '../LabelBadge';
 import { TicketRelationIndicators } from '../TicketRelationIndicators';
+import { TicketStatusBadge } from '../TicketStatusBadge';
 import './TicketRowMobile.css';
 
 function TicketRowMobileImpl({ ticket, onClick, priorityIcon, assigneeAvatar, projectName }: TicketRowProps) {
   const [isHovered, setIsHovered] = useState(false);
+  const isCompleted = ticket.status === 'done' || ticket.status === 'canceled';
 
   const handleClick = useCallback(() => {
     onClick(ticket);
@@ -25,7 +27,31 @@ function TicketRowMobileImpl({ ticket, onClick, priorityIcon, assigneeAvatar, pr
       <div className="ticket-row-mobile__main">
         <div className="ticket-row-mobile__priority">{priorityIcon}</div>
 
-        <span className="ticket-row-mobile__title">{ticket.title}</span>
+        <div
+          className="ticket-row-mobile__title-wrap"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            flex: 1,
+            minWidth: 0,
+          }}
+        >
+          <TicketStatusBadge status={ticket.status} />
+
+          <span
+            className="ticket-row-mobile__title"
+            style={{
+              color: isCompleted ? 'var(--color-text-secondary)' : 'var(--color-text-primary)',
+              textDecoration: isCompleted ? 'line-through' : 'none',
+              opacity: isCompleted ? 0.85 : 1,
+              minWidth: 0,
+              flex: 1,
+            }}
+          >
+            {ticket.title}
+          </span>
+        </div>
 
         <div className="ticket-row-mobile__avatar">
           {assigneeAvatar ? (

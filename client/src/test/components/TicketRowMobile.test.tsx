@@ -38,9 +38,14 @@ describe('TicketRowMobile', () => {
       />
     );
 
+    const statusDot = screen.getByLabelText('Status: TODO');
+    const title = screen.getByText('Test mobile ticket row');
+
     // Main row
-    expect(screen.getByText('Test mobile ticket row')).toBeInTheDocument();
     expect(screen.getByTestId('priority-icon')).toBeInTheDocument();
+    expect(statusDot).toBeInTheDocument();
+    expect(title).toBeInTheDocument();
+    expect(statusDot.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
 
     // Avatar
     const avatar = screen.getByRole('presentation', { hidden: true });
@@ -51,7 +56,7 @@ describe('TicketRowMobile', () => {
     expect(screen.getByText('Sub-ticket')).toBeInTheDocument();
 
     // Click
-    await user.click(screen.getByText('Test mobile ticket row'));
+    await user.click(title);
     expect(onClick).toHaveBeenCalledWith(mockTicket);
   });
 
@@ -70,5 +75,23 @@ describe('TicketRowMobile', () => {
     expect(screen.getByText('--')).toBeInTheDocument(); // Missing avatar placeholder
     expect(screen.queryByText('Platform')).not.toBeInTheDocument();
     expect(screen.queryByText('Sub-ticket')).not.toBeInTheDocument();
+  });
+
+  it('strikes through completed ticket titles', () => {
+    render(
+      <TicketRowMobile
+        ticket={{ ...mockTicket, status: 'done' }}
+        onClick={vi.fn()}
+        priorityIcon={null as any}
+        assigneeAvatar={null as any}
+      />
+    );
+
+    const statusDot = screen.getByLabelText('Status: DONE');
+    const title = screen.getByText('Test mobile ticket row');
+
+    expect(statusDot).toBeInTheDocument();
+    expect(title).toHaveStyle('text-decoration: line-through');
+    expect(statusDot.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
   });
 });
