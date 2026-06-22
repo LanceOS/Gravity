@@ -5,8 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LocalAIChat } from '../../modules/ai';
 
 const mocks = vi.hoisted(() => ({
-  useCurrentUser: vi.fn(),
-  useUsersQuery: vi.fn(),
+  useAuth: vi.fn(),
+  useUserDirectory: vi.fn(),
   useActiveTicket: vi.fn(),
   useProjectContext: vi.fn(),
   fetch: vi.fn(),
@@ -24,13 +24,21 @@ function createJsonResponse(body: unknown, ok = true) {
   };
 }
 
-vi.mock('../../context/auth/useCurrentUser', () => ({
-  useCurrentUser: mocks.useCurrentUser,
-}));
+vi.mock('../../context/auth/AuthContext', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../context/auth/AuthContext')>();
+  return {
+    ...actual,
+    useAuth: mocks.useAuth,
+  };
+});
 
-vi.mock('../../hooks/useUsers', () => ({
-  useUsersQuery: mocks.useUsersQuery,
-}));
+vi.mock('../../context/user/UserDirectoryContext', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../context/user/UserDirectoryContext')>();
+  return {
+    ...actual,
+    useUserDirectory: mocks.useUserDirectory,
+  };
+});
 
 vi.mock('../../context/ticket/ActiveTicketContext', () => ({
   useActiveTicket: mocks.useActiveTicket,
@@ -122,7 +130,7 @@ function renderLocalAIChat(overrides: Partial<Parameters<typeof LocalAIChat>[0]>
     ...overrides,
   };
 
-  mocks.useCurrentUser.mockReturnValue({
+  mocks.useAuth.mockReturnValue({
     currentUser: {
       id: 'user-1',
       name: 'Casey Carter',
@@ -131,10 +139,12 @@ function renderLocalAIChat(overrides: Partial<Parameters<typeof LocalAIChat>[0]>
       role: 'owner',
     },
     loading: false,
+    isAuthenticated: true,
+    signOut: vi.fn(),
   });
-  mocks.useUsersQuery.mockReturnValue({
+  mocks.useUserDirectory.mockReturnValue({
     users,
-    loading: false,
+    isLoading: false,
   });
   mocks.useActiveTicket.mockReturnValue({
     activeTicket: null,
@@ -153,8 +163,8 @@ function renderLocalAIChat(overrides: Partial<Parameters<typeof LocalAIChat>[0]>
 
 describe('LocalAIChat', () => {
   beforeEach(() => {
-    mocks.useCurrentUser.mockReset();
-    mocks.useUsersQuery.mockReset();
+    mocks.useAuth.mockReset();
+    mocks.useUserDirectory.mockReset();
     mocks.useActiveTicket.mockReset();
     mocks.useProjectContext.mockReset();
     mocks.fetch.mockReset();

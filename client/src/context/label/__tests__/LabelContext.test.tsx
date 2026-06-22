@@ -1,6 +1,6 @@
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { authClient } from '../../auth/authClient';
+import { useAuth } from '../../auth/AuthContext';
 import { LabelProvider, useLabels } from '../LabelContext';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
@@ -12,10 +12,8 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
-vi.mock('../../auth/authClient', () => ({
-  authClient: {
-    useSession: vi.fn(),
-  },
+vi.mock('../../auth/AuthContext', () => ({
+  useAuth: vi.fn(),
 }));
 
 let mockActiveProjectId = '';
@@ -77,7 +75,12 @@ describe('LabelContext', () => {
 
   it('fetches labels and builds derived maps correctly', async () => {
     const user = { id: 'user-session-1' };
-    vi.mocked(authClient.useSession).mockReturnValue({ data: { user } } as any);
+    vi.mocked(useAuth).mockReturnValue({
+      currentUser: user as any,
+      loading: false,
+      isAuthenticated: true,
+      signOut: vi.fn(),
+    } as any);
 
     const fetchMock = vi.fn((url) => {
       if (url.includes('/labels')) {
@@ -103,7 +106,12 @@ describe('LabelContext', () => {
 
   it('provides label crud functions', async () => {
     const user = { id: 'user-session-1' };
-    vi.mocked(authClient.useSession).mockReturnValue({ data: { user } } as any);
+    vi.mocked(useAuth).mockReturnValue({
+      currentUser: user as any,
+      loading: false,
+      isAuthenticated: true,
+      signOut: vi.fn(),
+    } as any);
 
     const fetchMock = vi.fn((url, init) => {
       if (url.includes('/labels') && init?.method === 'POST') {

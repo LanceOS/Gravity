@@ -6,7 +6,7 @@ import { OnboardingModal } from '../../onboarding';
 import { useAccountSettings } from '../../../hooks/useAccountSettings';
 import { useWorkspaceDirectory } from '../../../hooks/useWorkspaceDirectory';
 import { useWorkspaceSettings } from '../../../hooks/useWorkspaceSettings';
-import { useCurrentUser } from '../../../context/auth/useCurrentUser';
+import { useAuth } from '../../../context/auth/AuthContext';
 import { useActiveView } from '../../../context/ui/ActiveViewContext';
 import { LoadingPage } from '../../../pages/LoadingPage/LoadingPage';
 
@@ -15,7 +15,7 @@ export function WorkspaceSettingsPageRoute() {
   const navigate = useNavigate();
   const [localTutorialCompleted, setLocalTutorialCompleted] = useState(false);
 
-  const { currentUser, loading } = useCurrentUser();
+  const { currentUser, loading } = useAuth();
   const { activeView, setView } = useActiveView();
   const { theme, setTheme, setDensity } = useTheme();
 

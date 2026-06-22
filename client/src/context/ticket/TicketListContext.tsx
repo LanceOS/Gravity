@@ -24,6 +24,8 @@ export function useTicketListContext(): TicketListContextType {
   return context;
 }
 
+export const useTicketList = useTicketListContext;
+
 export function useTicketListContextValue({
   currentUser,
 }: TicketListContextValueArgs): TicketListContextType {

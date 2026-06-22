@@ -3,6 +3,7 @@ import type { Project, Ticket, User } from '../../../types/domain';
 import { registerWebMCPTools } from '../../../utils/webmcp';
 
 interface UseWebMcpRegistrationArgs {
+  enabled?: boolean;
   tickets: Ticket[];
   users: User[];
   projects: Project[];
@@ -14,6 +15,7 @@ interface UseWebMcpRegistrationArgs {
 }
 
 export function useWebMcpRegistration({
+  enabled = true,
   tickets,
   users,
   projects,
@@ -24,6 +26,10 @@ export function useWebMcpRegistration({
   removeTicketBlocker,
 }: UseWebMcpRegistrationArgs) {
   useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
     const controller = registerWebMCPTools({
       createTicket,
       updateTicket,
@@ -40,5 +46,5 @@ export function useWebMcpRegistration({
         controller.abort();
       }
     };
-  }, [tickets, users, projects, createTicket, updateTicket, addComment, addTicketBlocker, removeTicketBlocker]);
+  }, [enabled, tickets, users, projects, createTicket, updateTicket, addComment, addTicketBlocker, removeTicketBlocker]);
 }

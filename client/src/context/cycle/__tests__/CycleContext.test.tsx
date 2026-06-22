@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { authClient } from '../../auth/authClient';
+import { useAuth } from '../../auth/AuthContext';
 import { CycleProvider, useCycles } from '../CycleContext';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
@@ -12,10 +12,8 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
-vi.mock('../../auth/authClient', () => ({
-  authClient: {
-    useSession: vi.fn(),
-  },
+vi.mock('../../auth/AuthContext', () => ({
+  useAuth: vi.fn(),
 }));
 
 let mockActiveProjectId = '';
@@ -68,7 +66,12 @@ describe('CycleContext', () => {
     const user = {
       id: 'user-session-1',
     };
-    vi.mocked(authClient.useSession).mockReturnValue({ data: { user } } as any);
+    vi.mocked(useAuth).mockReturnValue({
+      currentUser: user as any,
+      loading: false,
+      isAuthenticated: true,
+      signOut: vi.fn(),
+    } as any);
 
     const fetchMock = vi.fn((url) => {
       if (url.includes('/cycles')) {
@@ -99,7 +102,12 @@ describe('CycleContext', () => {
     const user = {
       id: 'user-session-1',
     };
-    vi.mocked(authClient.useSession).mockReturnValue({ data: { user } } as any);
+    vi.mocked(useAuth).mockReturnValue({
+      currentUser: user as any,
+      loading: false,
+      isAuthenticated: true,
+      signOut: vi.fn(),
+    } as any);
 
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);

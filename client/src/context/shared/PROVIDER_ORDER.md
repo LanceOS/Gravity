@@ -1,70 +1,78 @@
-# Provider Ordering Plan
+# Ticket Provider Order
 
-## Current Provider Hierarchy (App.tsx)
+The ticket-domain providers are split by route scope. `AppContextProviders` is the app-wide shell, `ProjectContextProviders` is mounted around app-shell routes that need project metadata, and `WorkspaceTicketProviders` is mounted only around workspace shell routes that need ticket state/metadata/realtime. Ticket action/detail/comment providers are a separate opt-in layer. `TicketProvider` remains as a compatibility shell for callers that still need the full historical stack.
 
-```
-QueryClientProvider          ← outermost data layer
-  ThemeContextProvider       ← theme state + persistence
-    SettingsThemeProvider    ← CSS variables + density
-      ActiveProjectProvider  ← active project selection
-        TicketProvider       ← ticket / user / comment orchestration
-          RouterProvider     ← routing; consumes context via hooks
-```
+## Runtime Order
 
-## Ordering Rules
-
-### Rule 1 — `QueryClientProvider` must be outermost
-`TicketProvider` calls `useQueryClient()` internally. If `QueryClientProvider` were nested inside `TicketProvider`, the hook would throw. It must wrap everything that touches React Query.
-
-### Rule 2 — Theme providers have separate responsibilities
-`ThemeContextProvider` owns persisted theme state and `SettingsThemeProvider` only reads that state to manage CSS custom properties and density. Neither provider calls `useCurrentUser()`, `useTicketListContext()`, or `useQueryClient()`, so they can sit anywhere between `QueryClientProvider` and `TicketProvider` without causing dependency issues.
-
-### Rule 3 — `TicketProvider` must wrap `RouterProvider`
-All routed page components that read ticket data (`useTicketListContext()`, `useProjectContext()`, `useTicketDetailContext()`, or `useCommentContext()`) must have `TicketProvider` mounted above them.
-
-### Rule 4 — Future contexts that **depend on** ticket data
-Any new context/provider that calls `useTicketListContext()`, `useTicketDetailContext()`, or `useCommentContext()` internally must be nested **inside** `TicketProvider`.
-
-Example (correct):
 ```tsx
-<TicketProvider>
-  <NotificationProvider>   {/* reads tickets via ticket-specific hooks */}
-    <RouterProvider ... />
-  </NotificationProvider>
-</TicketProvider>
-```
-
-### Rule 5 — Future contexts that ticket logic **depends on**
-Any new context/provider that `TicketProvider` itself consumes via a hook must be nested **outside** `TicketProvider`.
-
-Example (correct):
-```tsx
-<AuthProvider>             {/* TicketProvider reads auth state */}
-  <TicketProvider>
-    <RouterProvider ... />
-  </TicketProvider>
-</AuthProvider>
-```
-
-## Planned Future Contexts (Phase 1+)
-
-When the monolithic `TicketProvider` is decomposed into smaller providers, the intended nesting order is:
-
-```
 QueryClientProvider
-  ThemeContextProvider
-    SettingsThemeProvider
-      ActiveProjectProvider  ← active project selection
-        TicketProvider       ← composes current-user, project, ticket, and realtime state
+  AppContextProviders
+    AuthProvider
+      ThemeProvider
+        ActiveViewProvider
           RouterProvider
+
+App shell routes
+  ProtectedRoute
+    ProjectContextProviders
+      ActiveProjectProvider
+        ProjectProvider
+          AppShellPage
+
+Workspace shell routes with ticket actions
+  ProtectedRoute
+    ProjectContextProviders
+      ActiveProjectProvider
+        ProjectProvider
+          WorkspaceTicketProviders
+            WorkspaceTicketStateProviders
+              TicketFiltersProvider
+                UserDirectoryProvider
+                  TicketListProvider
+            WorkspaceTicketMetadataProviders
+              CycleProvider
+                LabelProvider
+            WorkspaceTicketRealtimeProviders
+              RealtimeProvider
+            WorkspaceShellPage
+              WorkspaceTicketActionProviders
+                TicketDetailProvider
+                  TicketMutationProvider
+                    CommentProvider
+                      TicketRelationsProvider
+                        WorkspaceIssueSurface
+
+Workspace management routes
+  ProtectedRoute
+    ProjectContextProviders
+      ActiveProjectProvider
+        ProjectProvider
+          WorkspaceTicketProviders
+            WorkspaceShellPage
+
+Legacy compatibility wrapper
+  TicketProvider
+    AppContextProviders
+      ProjectContextProviders
+        WorkspaceTicketProviders
+          WorkspaceTicketActionProviders
+            CompatibilityTicketProvider
 ```
 
-If a future ticket-specific provider is split out of `TicketProvider`, the decomposition should follow the earlier planned ordering and keep each provider dependent only on the layer above it.
+## Notes
 
-## Circular Import Guard
+- `ThemeProvider` in the shell is a composition layer: it mounts the persisted app-theme provider first and the settings-theme provider second so both `useTheme()` hooks remain available.
+- `ProtectedRoute` depends only on `AuthProvider`; project loading belongs to routes/pages that mount `ProjectContextProviders`.
+- `ProjectProvider` stays above `RealtimeProvider` because realtime workspace resolution depends on project metadata.
+- `TicketDetailProvider` stays above `TicketRelationsProvider` because relation actions need the active ticket detail snapshot.
+- `CompatibilityTicketProvider` is no longer mounted by production workspace routes. It must remain inside the legacy `TicketProvider` so the legacy `TicketContextType` is rebuilt from the narrower contexts instead of owning state directly.
+- `WorkspaceTicketProviders` intentionally excludes `WorkspaceTicketActionProviders`; routes or components that need mutations/detail/comments/relations opt into the action layer explicitly.
+- Pure management surfaces such as workspace project management, workspace project list, teams management, and team project management skip `WorkspaceTicketActionProviders`.
+- `WorkspaceShellPage` owns the frame, routing, sidebar, workspace/project management, and non-ticket overlays. `WorkspaceIssueSurface` owns ticket mutations, detail, comments, relations, WebMCP registration, and the create-ticket modal.
 
-All shared utilities live in `context/shared/` and import exclusively from:
-- `src/types/domain.ts`
-- `src/modules/tickets/utils/ticketRelations.ts`
+## Guardrails
 
-No shared module imports from any context provider file. This is enforced by the directory structure: shared modules are leaves in the dependency graph.
+- Providers may depend only on providers listed above them.
+- New routes should mount the narrowest provider bundle that satisfies their hooks.
+- New high-traffic consumers should prefer narrow hooks such as `useAuth()`, `useTheme()`, `useTicketList()`, and `useTicketFilters()`.
+- Shared helpers in `context/shared/` must remain leaf modules and must not import provider files.

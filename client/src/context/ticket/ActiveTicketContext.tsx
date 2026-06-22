@@ -11,7 +11,7 @@ export const ActiveTicketContext = createContext<ActiveTicketContextValue | unde
 export function useActiveTicket(): ActiveTicketContextValue {
   const context = useContext(ActiveTicketContext);
   if (!context) {
-    throw new Error('useActiveTicket must be used within a TicketProvider');
+    throw new Error('useActiveTicket must be used within WorkspaceTicketProviders or TicketProvider');
   }
 
   return context;

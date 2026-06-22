@@ -1,112 +1,49 @@
-import React, { useEffect, useMemo, useRef } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { CommentContext, useCommentContextValue } from './comment/CommentContext';
-import { useCurrentUser } from './auth/useCurrentUser';
-import { TicketRelationsContext, useTicketRelationsContextValue } from './relation/TicketRelationsContext';
-import { ProjectContext, useProjectContextValue } from './project/ProjectContext';
-import { useActiveProject } from './project/ActiveProjectContext';
-import { TicketDetailContext, useTicketDetailContextValue } from './ticket/TicketDetailContext';
+import { useMemo, type FC, type ReactNode } from 'react';
+import { AuthProvider, useAuth } from './auth/AuthContext';
+import { CommentProvider, useCommentContext } from './comment/CommentContext';
+import { CycleProvider } from './cycle/CycleContext';
+import { TicketFiltersProvider } from './filters/TicketFiltersContext';
+import { LabelProvider } from './label/LabelContext';
+import { ProjectProvider, useProjectContext } from './project/ProjectContext';
+import { ActiveProjectProvider } from './project/ActiveProjectContext';
+import { TicketRelationsProvider, useTicketRelationsContext } from './relation/TicketRelationsContext';
 import { RealtimeProvider } from './realtime/RealtimeContext';
-import { TicketListProvider, useTicketListContext } from './ticket/TicketListContext';
-import { useUsersQuery } from '../hooks/useUsers';
+import { ThemeProvider as AppThemeProvider } from './theme/ThemeContext';
 import { TicketContext } from './TicketContextContext';
+import { TicketDetailProvider } from './ticket/TicketDetailContext';
+import { TicketListProvider, useTicketListContext } from './ticket/TicketListContext';
+import { TicketMutationProvider } from './ticket/TicketMutationContext';
+import { ActiveViewProvider } from './ui/ActiveViewContext';
+import { UserDirectoryProvider, useUserDirectory } from './user/UserDirectoryContext';
+import type { TicketContextType } from './TicketContext.types';
+import { ThemeProvider as SettingsThemeProvider } from '../modules/settings/components/ThemeProvider';
 
-// Shared entity types live in src/types/domain.ts.
-export type {
-  User,
-  Project,
-  Domain,
-  Label,
-  Cycle,
-  Ticket,
-  Comment,
-  CreateProjectInput,
-} from '../types/domain';
-import type { User, Ticket, Comment } from '../types/domain';
+export type * from './TicketContext.types';
 
-interface State {
-  tickets: Ticket[];
-  users: User[];
-  activeTicket: Ticket | null;
-  currentUser: User | null;
-  loading: boolean;
-}
-
-// TicketFiltersState is imported from ./shared/filters and re-exported below.
-export type { TicketFiltersState } from './shared';
-
-export interface TicketContextType extends State {
-  addComment: (ticketId: string, body: string) => Promise<void>;
-  updateComment: (ticketId: string, commentId: string, body: string) => Promise<void>;
-  deleteComment: (ticketId: string, commentId: string) => Promise<void>;
-  setActiveTicket: React.Dispatch<React.SetStateAction<Ticket | null>>;
-  addTicketDependency: (ticketId: string, dependencyId: string) => Promise<boolean>;
-  removeTicketDependency: (ticketId: string, dependencyId: string) => Promise<boolean>;
-  addTicketBlocker: (ticketId: string, blockerId: string) => Promise<boolean>;
-  removeTicketBlocker: (ticketId: string, blockerId: string) => Promise<boolean>;
-  ticketMap: Map<string, Ticket>;
-}
-
-type TicketProviderContentProps = {
-  currentUser: User | null;
-  users: User[];
-  loading: boolean;
-  activeProjectIdRef: React.MutableRefObject<string>;
-  children: React.ReactNode;
+const ThemeProvider: FC<{ children: ReactNode }> = ({ children }) => {
+  return (
+    <AppThemeProvider>
+      <SettingsThemeProvider>{children}</SettingsThemeProvider>
+    </AppThemeProvider>
+  );
 };
 
-function TicketProviderContent({
-  currentUser,
-  users,
-  loading,
-  activeProjectIdRef,
-  children,
-}: TicketProviderContentProps) {
-  const queryClient = useQueryClient();
-  const { activeProjectId } = useActiveProject();
+const CompatibilityTicketProvider: FC<{ children: ReactNode }> = ({ children }) => {
+  const { currentUser, loading: authLoading } = useAuth();
+  const { projectsLoading } = useProjectContext();
+  const { users, isLoading: usersLoading } = useUserDirectory();
   const { tickets, activeTicket, setActiveTicket, ticketMap } = useTicketListContext();
-
-  const ticketDetailContextValue = useTicketDetailContextValue({
-    activeTicket,
-    setActiveTicket,
-    activeProjectId,
-    isAuthenticated: !!currentUser,
-  });
-
-  const commentContextValue = useCommentContextValue({
-    currentUser,
-    activeProjectIdRef,
-  });
-
+  const { addComment, updateComment, deleteComment } = useCommentContext();
   const {
-    activeTicketDetail,
     addTicketDependency,
     removeTicketDependency,
     addTicketBlocker,
     removeTicketBlocker,
-  } = useTicketRelationsContextValue({
-    queryClient,
-    tickets,
-    activeTicket,
-    activeTicketDetail: ticketDetailContextValue.activeTicketDetail,
-  });
+  } = useTicketRelationsContext();
 
-  const ticketRelationsContextValue = useMemo(() => ({
-    activeTicketDetail,
-    addTicketDependency,
-    removeTicketDependency,
-    addTicketBlocker,
-    removeTicketBlocker,
-  }), [
-    activeTicketDetail,
-    addTicketDependency,
-    removeTicketDependency,
-    addTicketBlocker,
-    removeTicketBlocker,
-  ]);
+  const loading = authLoading || projectsLoading || usersLoading;
 
-  const { addComment, updateComment, deleteComment } = commentContextValue;
-  const value = useMemo(
+  const value = useMemo<TicketContextType>(
     () => ({
       tickets,
       users,
@@ -138,66 +75,90 @@ function TicketProviderContent({
       removeTicketBlocker,
       setActiveTicket,
       ticketMap,
-    ]
+    ],
   );
 
+  return <TicketContext.Provider value={value}>{children}</TicketContext.Provider>;
+};
+
+export const AppContextProviders: FC<{ children: ReactNode }> = ({ children }) => {
   return (
-    <TicketDetailContext.Provider value={ticketDetailContextValue}>
-      <CommentContext.Provider value={commentContextValue}>
-        <TicketRelationsContext.Provider value={ticketRelationsContextValue}>
-          <TicketContext.Provider value={value}>{children}</TicketContext.Provider>
-        </TicketRelationsContext.Provider>
-      </CommentContext.Provider>
-    </TicketDetailContext.Provider>
+    <AuthProvider>
+      <ThemeProvider>
+        <ActiveViewProvider>{children}</ActiveViewProvider>
+      </ThemeProvider>
+    </AuthProvider>
   );
-}
+};
 
-export const TicketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const queryClient = useQueryClient();
-  const { setActiveProjectId, activeProjectIdRef } = useActiveProject();
-  const { currentUser, loading: authLoading } = useCurrentUser();
+export const ProjectContextProviders: FC<{ children: ReactNode }> = ({ children }) => {
+  return (
+    <ActiveProjectProvider>
+      <ProjectProvider>{children}</ProjectProvider>
+    </ActiveProjectProvider>
+  );
+};
 
-  const projectContextValue = useProjectContextValue({
-    currentUser,
-    setActiveProjectId,
-    activeProjectIdRef,
-  });
-
-  const { users, loading: usersLoading } = useUsersQuery(!!currentUser);
-
-  const loading = authLoading || projectContextValue.projectsLoading || usersLoading;
-
-  const prevUserIdRef = useRef<string | undefined>(currentUser?.id);
-  const didMountRef = useRef(false);
-  useEffect(() => {
-    if (!didMountRef.current) {
-      didMountRef.current = true;
-      prevUserIdRef.current = currentUser?.id;
-      return;
-    }
-
-    if (currentUser?.id === prevUserIdRef.current) {
-      return;
-    }
-
-    queryClient.clear();
-    prevUserIdRef.current = currentUser?.id;
-  }, [currentUser?.id, queryClient]);
+export const WorkspaceTicketStateProviders: FC<{ children: ReactNode }> = ({ children }) => {
+  const { currentUser } = useAuth();
 
   return (
-    <ProjectContext.Provider value={projectContextValue}>
-      <TicketListProvider currentUser={currentUser}>
-        <RealtimeProvider currentUserId={currentUser?.id ?? null}>
-          <TicketProviderContent
-            currentUser={currentUser}
-            users={users}
-            loading={loading}
-            activeProjectIdRef={activeProjectIdRef}
-          >
-            {children}
-          </TicketProviderContent>
-        </RealtimeProvider>
-      </TicketListProvider>
-    </ProjectContext.Provider>
+    <TicketFiltersProvider>
+      <UserDirectoryProvider>
+        <TicketListProvider currentUser={currentUser}>{children}</TicketListProvider>
+      </UserDirectoryProvider>
+    </TicketFiltersProvider>
+  );
+};
+
+export const WorkspaceTicketMetadataProviders: FC<{ children: ReactNode }> = ({ children }) => {
+  return (
+    <CycleProvider>
+      <LabelProvider>{children}</LabelProvider>
+    </CycleProvider>
+  );
+};
+
+export const WorkspaceTicketActionProviders: FC<{ children: ReactNode }> = ({ children }) => {
+  return (
+    <TicketDetailProvider>
+      <TicketMutationProvider>
+        <CommentProvider>
+          <TicketRelationsProvider>{children}</TicketRelationsProvider>
+        </CommentProvider>
+      </TicketMutationProvider>
+    </TicketDetailProvider>
+  );
+};
+
+export const WorkspaceTicketRealtimeProviders: FC<{ children: ReactNode }> = ({ children }) => {
+  const { currentUser } = useAuth();
+
+  return (
+    <RealtimeProvider currentUserId={currentUser?.id ?? null}>{children}</RealtimeProvider>
+  );
+};
+
+export const WorkspaceTicketProviders: FC<{ children: ReactNode }> = ({ children }) => {
+  return (
+    <WorkspaceTicketStateProviders>
+      <WorkspaceTicketMetadataProviders>
+        <WorkspaceTicketRealtimeProviders>{children}</WorkspaceTicketRealtimeProviders>
+      </WorkspaceTicketMetadataProviders>
+    </WorkspaceTicketStateProviders>
+  );
+};
+
+export const TicketProvider: FC<{ children: ReactNode }> = ({ children }) => {
+  return (
+    <AppContextProviders>
+      <ProjectContextProviders>
+        <WorkspaceTicketProviders>
+          <WorkspaceTicketActionProviders>
+            <CompatibilityTicketProvider>{children}</CompatibilityTicketProvider>
+          </WorkspaceTicketActionProviders>
+        </WorkspaceTicketProviders>
+      </ProjectContextProviders>
+    </AppContextProviders>
   );
 };

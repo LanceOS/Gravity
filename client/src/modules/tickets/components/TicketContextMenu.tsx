@@ -1,10 +1,13 @@
 import React, { useContext, useMemo } from 'react';
-import { TicketContext, type Ticket } from '../../../context/TicketContextContext';
+import type { Ticket } from '../../../types/domain';
 import { ProjectContext } from '../../../context/project/ProjectContext';
 import { useLabels } from '../../../context/label/LabelContext';
 import { useOptionalTicketMutations } from '../../../context/ticket/TicketMutationContext';
 import { useCycles } from '../../../context/cycle/CycleContext';
 import type { Label } from '../../../types/domain';
+import { useTicketList } from '../../../context/ticket/TicketListContext';
+import { useUserDirectory } from '../../../context/user/UserDirectoryContext';
+import { useTicketRelationsContext } from '../../../context/relation/TicketRelationsContext';
 import { ContextMenu, toast } from '@library';
 import { Check, User, Folder, Tag, AlertCircle, CheckSquare, Trash2, Calendar, Link } from 'lucide-react';
 import { STATUS_OPTIONS, PRIORITY_OPTIONS } from '../utils/TicketDetail';
@@ -21,9 +24,8 @@ interface TicketContextMenuProps {
 }
 
 export const TicketContextMenu: React.FC<TicketContextMenuProps> = ({ ticket, children, availableTickets }) => {
-  const context = useContext(TicketContext);
   const projectContext = useContext(ProjectContext);
-  if (!context || !projectContext) {
+  if (!projectContext) {
     return <>{children}</>;
   }
 
@@ -34,10 +36,14 @@ export const TicketContextMenu: React.FC<TicketContextMenuProps> = ({ ticket, ch
 
   const {
     tickets,
+  } = useTicketList();
+  const {
     users,
+  } = useUserDirectory();
+  const {
     addTicketDependency,
     addTicketBlocker,
-  } = context;
+  } = useTicketRelationsContext();
   const {
     projects,
     projectById,

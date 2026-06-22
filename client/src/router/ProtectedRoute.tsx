@@ -1,6 +1,5 @@
 import { ReactNode } from 'react';
-import { useProjectContext } from '../context/project/ProjectContext';
-import { useCurrentUser } from '../context/auth/useCurrentUser';
+import { useAuth } from '../context/auth/AuthContext';
 import { AuthScreen } from '../modules/auth';
 import { LoadingPage } from '../pages/LoadingPage/LoadingPage';
 
@@ -9,9 +8,7 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { currentUser, loading: authLoading } = useCurrentUser();
-  const { projectsLoading } = useProjectContext();
-  const loading = authLoading || projectsLoading;
+  const { currentUser, loading } = useAuth();
 
   if (loading) {
     return <LoadingPage />;

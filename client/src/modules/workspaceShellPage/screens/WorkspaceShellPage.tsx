@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { authClient } from '../../../context/auth/authClient';
 import { useInfiniteQuery, useIsFetching, useQuery } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
 import type { SidebarNavigationState, SidebarProps } from '../../../components/Sidebar';
@@ -8,35 +7,30 @@ import { LocalAIChat } from '../../ai';
 import { Button } from '@library';
 import { AuthScreen } from '../../auth';
 import type { TicketFilters, TicketListSort } from '../../tickets';
-import { TicketDetailRoute } from '../../tickets';
 import type { WorkspaceIssueView } from '../../workspacePage/screens/WorkspacePage';
 import { OnboardingModal } from '../../onboarding';
 import { useTheme } from '../../settings';
 import type { Ticket } from '../../../context/TicketContextContext';
-import { useCommentContext } from '../../../context/comment/CommentContext';
-import { useCurrentUser } from '../../../context/auth/useCurrentUser';
+import { useAuth } from '../../../context/auth/AuthContext';
 import { useActiveProject } from '../../../context/project/ActiveProjectContext';
 import { useProjectContext } from '../../../context/project/ProjectContext';
 import { useLabels } from '../../../context/label/LabelContext';
-import { useTicketMutations } from '../../../context/ticket/TicketMutationContext';
-import { useTicketDetailContext } from '../../../context/ticket/TicketDetailContext';
+import { WorkspaceTicketActionProviders } from '../../../context/TicketContext';
 import { useTicketListContext } from '../../../context/ticket/TicketListContext';
-import { useTicketRelationsContext } from '../../../context/relation/TicketRelationsContext';
-import { useUsersQuery } from '../../../hooks/useUsers';
+import { useUserDirectory } from '../../../context/user/UserDirectoryContext';
 import { useCycles } from '../../../context/cycle/CycleContext';
 import { useTicketFilters } from '../../../context/filters/TicketFiltersContext';
 import { useActiveView } from '../../../context/ui/ActiveViewContext';
 import { apiClient } from '../../../utils/apiClient';
 import type { Cycle, Label, SidebarTree } from '../../../types/domain';
-import { WorkspacePage } from '../../workspacePage';
 import { WorkspaceProjectsListPage } from '../../workspaceProjectsListPage';
 import { WorkspaceTeamsPage } from '../../workspaceTeamsPage';
 import { useAccountSettings } from '../../../hooks/useAccountSettings';
 import { useWorkspaceDirectory } from '../../../hooks/useWorkspaceDirectory';
 import { AppShellOverlays } from '../components/AppShellOverlays';
+import { WorkspaceIssueSurface } from '../components/WorkspaceIssueSurface';
 import { useAppShellRoute } from '../hooks/useAppShellRoute';
 import { useAppShellRouteSync } from '../hooks/useAppShellRouteSync';
-import { useWebMcpRegistration } from '../hooks/useWebMcpRegistration';
 import {
   usePendingWorkspaceInvite,
   useWorkspaceMemberActivity,
@@ -51,7 +45,6 @@ import {
   useWorkspaceCreateLabelDialog,
   useWorkspaceCreateProjectDialog,
   useWorkspaceCreateTicketDialog,
-  useWorkspaceShellCommands,
   useWorkspaceShellFilters,
   useWorkspaceShellNavigation,
   useWorkspaceSidebarCounts,
@@ -74,21 +67,13 @@ interface WorkspaceMember {
 const AGGREGATE_TICKETS_PAGE_SIZE = 120;
 
 export function WorkspaceShellPage() {
-  const { currentUser, loading: authLoading } = useCurrentUser();
-  const { users, loading: usersLoading } = useUsersQuery(!!currentUser);
+  const { currentUser, loading: authLoading, signOut } = useAuth();
+  const { users, isLoading: usersLoading } = useUserDirectory();
   const {
     tickets,
     activeTicket,
     setActiveTicket,
   } = useTicketListContext();
-  const { addComment, updateComment, deleteComment } = useCommentContext();
-  const { activeTicketDetail, comments } = useTicketDetailContext();
-  const {
-    addTicketDependency,
-    removeTicketDependency,
-    addTicketBlocker,
-    removeTicketBlocker,
-  } = useTicketRelationsContext();
   const { activeProjectId, setActiveProjectId } = useActiveProject();
   const {
     projects,
@@ -100,7 +85,6 @@ export function WorkspaceShellPage() {
     deleteProject,
     updateProject,
   } = useProjectContext();
-  const { createTicket, updateTicket, deleteTicket } = useTicketMutations();
   const { labels, createLabel, updateLabel, deleteLabel } = useLabels();
   const { cycles } = useCycles();
   const { filters, setFilters } = useTicketFilters();
@@ -668,17 +652,6 @@ export function WorkspaceShellPage() {
     setActiveProjectId,
   });
 
-  useWebMcpRegistration({
-    tickets,
-    users,
-    projects,
-    createTicket,
-    updateTicket,
-    addComment,
-    addTicketBlocker,
-    removeTicketBlocker,
-  });
-
   const {
     isTeamProjectsManager,
     isTeamWorkspace,
@@ -779,34 +752,100 @@ export function WorkspaceShellPage() {
     setActiveTicket,
   });
 
-  const {
-    handleCreateTicketSubmit,
-    handleDeleteTicket,
-    handleCreateProject,
-    handleCreateLabel,
-    handleUpdateLabel,
-    handleDeleteLabel,
-  } = useWorkspaceShellCommands({
-    activeWorkspaceId,
-    currentUser,
-    ticketsById: scopedTicketsById,
-    activeTicket,
-    activeProjectId,
-    createTicket,
-    deleteTicket,
-    createProject,
-    refreshWorkspaces,
-    createLabel,
-    updateLabel,
-    deleteLabel,
-    setActiveTicket,
-    setProjectCreateLoading,
-    setProjectCreateError,
-    setLabelCreateLoading,
-    setLabelCreateError,
-    navigate,
-    buildProjectScopedPath,
-  });
+  const handleCreateProject = useCallback(
+    async (projectInput: { name: string; description: string; key: string }) => {
+      if (!activeWorkspaceId || !currentUser) {
+        const message = 'Unable to create project right now. Please refresh and try again.';
+        setProjectCreateError(message);
+        throw new Error(message);
+      }
+
+      setProjectCreateLoading(true);
+      setProjectCreateError(null);
+
+      try {
+        const project = await createProject({
+          ...projectInput,
+          status: 'active',
+          workspaceId: activeWorkspaceId,
+        });
+
+        if (!project) {
+          throw new Error('Failed to create project in this workspace.');
+        }
+
+        await refreshWorkspaces();
+        setActiveTicket(null);
+        navigate(`/workspaces/${activeWorkspaceId}`);
+        return project;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to create project in this workspace.';
+        setProjectCreateError(message);
+        throw error;
+      } finally {
+        setProjectCreateLoading(false);
+      }
+    },
+    [
+      activeWorkspaceId,
+      createProject,
+      currentUser,
+      navigate,
+      refreshWorkspaces,
+      setActiveTicket,
+      setProjectCreateError,
+      setProjectCreateLoading,
+    ]
+  );
+
+  const handleCreateLabel = useCallback(
+    async (labelInput: { name: string; color: string; description?: string; sortOrder?: number; projectId?: string }) => {
+      const projectId = labelInput.projectId || activeProjectId;
+      if (!projectId) {
+        return;
+      }
+
+      setLabelCreateLoading(true);
+      setLabelCreateError(null, projectId);
+
+      try {
+        const label = await createLabel({
+          ...labelInput,
+          projectId,
+        });
+
+        if (!label) {
+          throw new Error('Failed to create label for this project.');
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to create label for this project.';
+        setLabelCreateError(message, projectId);
+        throw error;
+      } finally {
+        setLabelCreateLoading(false);
+      }
+    },
+    [activeProjectId, createLabel, setLabelCreateError, setLabelCreateLoading]
+  );
+
+  const handleUpdateLabel = useCallback(
+    async (labelId: string, updates: { name?: string; color?: string; description?: string; sortOrder?: number }) => {
+      setLabelCreateError(null);
+      await updateLabel(labelId, updates);
+    },
+    [setLabelCreateError, updateLabel]
+  );
+
+  const handleDeleteLabel = useCallback(
+    async (labelId: string) => {
+      setLabelCreateError(null);
+      const deleted = await deleteLabel(labelId);
+      if (!deleted) {
+        throw new Error('Failed to delete label.');
+      }
+    },
+    [deleteLabel, setLabelCreateError]
+  );
 
   const { handleSetFilters } = useWorkspaceShellFilters({
     filters: safeFilters,
@@ -858,13 +897,17 @@ export function WorkspaceShellPage() {
 
       if (event.key === 'n' || event.key === 'N') {
         event.preventDefault();
-        handleOpenCreateTicket();
+        if (activeSection === 'workspace') {
+          handleOpenCreateTicket();
+        } else {
+          navigate(`/workspaces/${activeWorkspaceId}`);
+        }
       }
     };
 
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [activeWorkspaceProjects.length, handleOpenCreateTicket]);
+  }, [activeSection, activeWorkspaceId, handleOpenCreateTicket, navigate]);
 
   const handleOpenCurrentTeamProjectsManager = useCallback(() => {
     if (sidebarActiveTeamId) {
@@ -983,7 +1026,7 @@ export function WorkspaceShellPage() {
       onOpenOllama: handleToggleOllama,
       isOllamaOpen,
       onOpenSimulator: () => {},
-      onOpenCreateTicket: handleOpenCreateTicket,
+      onOpenCreateTicket: activeSection === 'workspace' ? handleOpenCreateTicket : () => navigate(`/workspaces/${activeWorkspaceId}`),
       onOpenCreateProject: handleOpenCreateProject,
       onOpenCreateLabel: handleOpenCreateLabel,
       agentIntegration: accountSettings.agentIntegration,
@@ -1005,7 +1048,9 @@ export function WorkspaceShellPage() {
       onOpenProjectManager: isTeamWorkspace ? handleOpenTeamManager : handleOpenProjectManager,
       onOpenSettings: handleOpenSettings,
       onOpenMcp: () => setIsMcpOpen(true),
-      onSignOut: () => authClient.signOut(),
+      onSignOut: () => {
+        void signOut();
+      },
     },
   };
 
@@ -1100,85 +1145,74 @@ export function WorkspaceShellPage() {
               onDeleteProject={deleteProject}
             />
           </WorkspacePageLayout>
-        ) : route.ticketKey ? (
-          <TicketDetailRoute
-            activeWorkspaceId={activeWorkspaceId}
-            activeTicket={scopedTicketsByKey.get(route.ticketKey?.toUpperCase() || '') || activeTicket}
-            activeTicketDetail={activeTicketDetail}
-            comments={comments}
-            tickets={scopedTickets}
-            users={users}
-            projects={activeWorkspaceProjects}
-            labels={scopedLabels}
-            cycles={scopedCycles}
-            onSelectTicket={handleSelectTicket}
-            onUpdateTicket={updateTicket}
-            onDeleteTicket={handleDeleteTicket}
-            onAddComment={addComment}
-            onUpdateComment={updateComment}
-            onDeleteComment={deleteComment}
-            onOpenCreateSubtask={handleOpenCreateSubtask}
-            onAddDependency={addTicketDependency}
-            onRemoveDependency={removeTicketDependency}
-            onAddBlocker={addTicketBlocker}
-            onRemoveBlocker={removeTicketBlocker}
-            ticketsById={scopedTicketsById}
-            isLoading={isScopedTicketsLoading}
-          />
         ) : (
-          <WorkspacePage
-            workspaceId={activeWorkspaceId}
-            workspaceName={activeWorkspace.name}
-            pathname={pathname}
-            activeContext={activeContext}
-            activeTicket={activeTicket}
-            activeView={effectiveActiveView}
-            viewModeLocked={lockWorkspaceIssueView}
-            isTeamWorkspace={isTeamWorkspace}
-            hasTeams={!!(sidebarTree?.teams?.length)}
-            currentUser={currentUser}
-            cycles={scopedCycles}
-            labels={scopedLabels}
-            filters={scopedFilters}
-            listSort={listSort}
-            projects={scopedProjects}
-            projectsLoading={loading}
-            tickets={scopedTickets}
-            users={users}
-            onOpenCreateTicket={handleOpenCreateTicket}
-            onOpenProjectManager={handleOpenProjectManager}
-            onOpenTeamManager={handleOpenTeamManager}
-            onSelectTicket={handleSelectTicket}
-            onSelectNote={handleSelectNote}
-            activeNoteId={activeNoteId}
-            onSetFilters={handleSetFilters}
-            onSetListSort={setListSort}
-            onSetView={setView}
-            onUpdateTicket={updateTicket}
-            onOpenTeamProjectManager={handleOpenCurrentTeamProjectsManager}
-            onLoadMoreTickets={shouldUseAggregateTicketPagination ? aggregateLoadMoreRows : undefined}
-            hasMoreTickets={shouldUseAggregateTicketPagination ? aggregateHasMoreRows : false}
-            isLoadingMoreTickets={shouldUseAggregateTicketPagination ? aggregateIsLoadingMoreRows : false}
-            isLoadingTickets={isScopedTicketsLoading}
-          />
+          <WorkspaceTicketActionProviders>
+            <WorkspaceIssueSurface
+              activeWorkspaceId={activeWorkspaceId}
+              workspaceName={activeWorkspace.name}
+              pathname={pathname}
+              activeContext={activeContext}
+              activeNoteId={activeNoteId}
+              activeTicket={activeTicket}
+              activeView={effectiveActiveView}
+              viewModeLocked={lockWorkspaceIssueView}
+              isTeamWorkspace={isTeamWorkspace}
+              hasTeams={!!(sidebarTree?.teams?.length)}
+              currentUser={currentUser}
+              cycles={scopedCycles}
+              labels={scopedLabels}
+              filters={scopedFilters}
+              listSort={listSort}
+              projects={scopedProjects}
+              projectsLoading={loading}
+              tickets={scopedTickets}
+              users={users}
+              routeTicketKey={route.ticketKey}
+              ticketsByKey={scopedTicketsByKey}
+              ticketsById={scopedTicketsById}
+              isLoadingTickets={isScopedTicketsLoading}
+              onOpenCreateTicket={handleOpenCreateTicket}
+              onOpenCreateSubtask={handleOpenCreateSubtask}
+              onOpenProjectManager={handleOpenProjectManager}
+              onOpenTeamManager={handleOpenTeamManager}
+              onOpenTeamProjectManager={handleOpenCurrentTeamProjectsManager}
+              onSelectTicket={handleSelectTicket}
+              onSelectNote={handleSelectNote}
+              onSetFilters={handleSetFilters}
+              onSetListSort={setListSort}
+              onSetView={setView}
+              onLoadMoreTickets={shouldUseAggregateTicketPagination ? aggregateLoadMoreRows : undefined}
+              hasMoreTickets={shouldUseAggregateTicketPagination ? aggregateHasMoreRows : false}
+              isLoadingMoreTickets={shouldUseAggregateTicketPagination ? aggregateIsLoadingMoreRows : false}
+              createTicket={{
+                isOpen: isCreateModalOpen,
+                onClose: () => setIsCreateModalOpen(false),
+                projects: activeWorkspaceProjects,
+                labels: scopedLabels,
+                cycles: scopedCycles,
+                users,
+                parentTicket,
+                defaultProjectId: createDefaultProjectId,
+                initialStatus: createInitialStatus,
+                parentId: createParentId,
+              }}
+              navigation={{
+                navigate,
+                buildProjectScopedPath,
+                setActiveTicket,
+              }}
+              webMcp={{
+                tickets,
+                users,
+                projects,
+              }}
+            />
+          </WorkspaceTicketActionProviders>
         )}
       </WorkspaceLayout>
 
       <AppShellOverlays
         onboarding={onboarding}
-        createTicket={{
-          isOpen: isCreateModalOpen,
-          onClose: () => setIsCreateModalOpen(false),
-          projects: activeWorkspaceProjects,
-          labels: scopedLabels,
-          cycles: scopedCycles,
-          users,
-          parentTicket,
-          defaultProjectId: createDefaultProjectId,
-          onSubmitTicket: handleCreateTicketSubmit,
-          initialStatus: createInitialStatus,
-          parentId: createParentId,
-        }}
         mcp={{
           isOpen: isMcpOpen,
           workspaceId: activeWorkspaceId,

@@ -52,7 +52,7 @@ type CreateLabelOverlayProps = {
 
 interface AppShellOverlaysProps {
   onboarding: ReactNode;
-  createTicket: CreateTicketOverlayProps;
+  createTicket?: CreateTicketOverlayProps;
   mcp: WorkspaceMcpOverlayProps;
   createProject: CreateProjectOverlayProps;
   createLabel: CreateLabelOverlayProps;
@@ -67,7 +67,7 @@ export function AppShellOverlays({
 }: AppShellOverlaysProps) {
   return (
     <>
-      {createTicket.isOpen ? (
+      {createTicket?.isOpen ? (
         <CreateTicketModal
           onClose={createTicket.onClose}
           projects={createTicket.projects}
