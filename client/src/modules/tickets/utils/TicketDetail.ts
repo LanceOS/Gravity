@@ -1,5 +1,6 @@
 export {
   getStatusColor,
+  getStatusLabel,
   STATUS_COLOR_MAP,
 } from '../../../utils/ticketPresentation';
 

@@ -3,6 +3,7 @@ import { GitMerge, GitPullRequest, Paperclip } from 'lucide-react';
 import { Card, Avatar, Badge, Flex } from '@library';
 import type { TicketCardProps } from '../types/TicketBoard';
 import { TicketRelationIndicators } from './TicketRelationIndicators';
+import { TicketStatusBadge } from './TicketStatusBadge';
 
 function TicketCardImpl({
   ticket,
@@ -13,6 +14,7 @@ function TicketCardImpl({
   assigneeAvatar,
 }: TicketCardProps) {
   const [isHovered, setIsHovered] = useState(false);
+  const isCompleted = ticket.status === 'done' || ticket.status === 'canceled';
 
   return (
     <Card
@@ -60,18 +62,33 @@ function TicketCardImpl({
 
       <div
         style={{
-          fontSize: '13px',
-          fontWeight: 500,
-          color: 'var(--color-text-primary)',
-          lineHeight: '1.4',
-          wordBreak: 'break-word',
-          display: '-webkit-box',
-          WebkitLineClamp: 2,
-          WebkitBoxOrient: 'vertical',
-          overflow: 'hidden',
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: '6px',
+          minWidth: 0,
         }}
       >
-        {ticket.title}
+        <TicketStatusBadge status={ticket.status} />
+
+        <div
+          style={{
+            fontSize: '13px',
+            fontWeight: 500,
+            color: isCompleted ? 'var(--color-text-secondary)' : 'var(--color-text-primary)',
+            lineHeight: '1.4',
+            wordBreak: 'break-word',
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+            textDecoration: isCompleted ? 'line-through' : 'none',
+            opacity: isCompleted ? 0.85 : 1,
+            minWidth: 0,
+            flex: 1,
+          }}
+        >
+          {ticket.title}
+        </div>
       </div>
 
       <Flex
