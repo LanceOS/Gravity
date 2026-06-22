@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, useLocation, Route, Routes } from 'react-router-dom';
 import { AppShellPage } from '../../pages/AppShellPage/AppShellPage.tsx';
+import { WorkspaceShellPage } from '../../pages/WorkspaceShellPage/WorkspaceShellPage.tsx';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { queryClient as sharedQueryClient, queryKeys } from '../../utils/queryClient';
 
@@ -99,7 +100,9 @@ vi.mock('../../context/project/ProjectContext', () => ({
 }));
 
 vi.mock('../../context/TicketContext', () => ({
-  WorkspaceTicketActionProviders: ({ children }: { children: ReactNode }) => <>{children}</>,
+  WorkspaceTicketActionProviders: ({ children }: { children: ReactNode }) => (
+    <div data-testid="workspace-ticket-action-provider">{children}</div>
+  ),
 }));
 
 vi.mock('../../context/ticket/TicketListContext', () => ({
@@ -624,22 +627,24 @@ function renderAppShell({
       <MemoryRouter initialEntries={initialEntries}>
         <LocationDisplay />
         <Routes>
-          <Route path="/workspaces/:workspaceId/projects" element={<AppShellPage />} />
-          <Route path="/workspaces/:workspaceId/projects/:projectId/tickets/:ticketKey" element={<AppShellPage />} />
-          <Route path="/workspaces/:workspaceId/projects/:projectId/tickets" element={<AppShellPage />} />
-          <Route path="/workspaces/:workspaceId/projects/:projectId/notes" element={<AppShellPage />} />
-          <Route path="/workspaces/:workspaceId/projects/:projectId/notes/:noteId" element={<AppShellPage />} />
-          <Route path="/workspaces/:workspaceId/projects/list" element={<AppShellPage />} />
-          <Route path="/workspaces/:workspaceId/all" element={<AppShellPage />} />
-          <Route path="/workspaces/:workspaceId/teams" element={<AppShellPage />} />
-          <Route path="/workspaces/:workspaceId/teams/:teamId/tasks" element={<AppShellPage />} />
-          <Route path="/workspaces/:workspaceId/teams/:teamId/views/:viewId" element={<AppShellPage />} />
-          <Route path="/workspaces/:workspaceId/teams/:teamId/cycles/:cycleId" element={<AppShellPage />} />
-          <Route path="/workspaces/:workspaceId/teams/:teamId/labels/:labelId" element={<AppShellPage />} />
-          <Route path="/workspaces/:workspaceId/teams/:teamId/projects" element={<AppShellPage />} />
-          <Route path="/workspaces/:workspaceId/teams/:teamId/projects/:projectId/tickets" element={<AppShellPage />} />
-          <Route path="/workspaces/:workspaceId/teams/:teamId/projects/:projectId/tickets/:ticketKey" element={<AppShellPage />} />
-          <Route path="/workspaces/:workspaceId" element={<AppShellPage />} />
+          <Route path="/" element={<AppShellPage />} />
+          <Route path="/workspaces" element={<AppShellPage />} />
+          <Route path="/workspaces/:workspaceId/projects" element={<WorkspaceShellPage />} />
+          <Route path="/workspaces/:workspaceId/projects/:projectId/tickets/:ticketKey" element={<WorkspaceShellPage />} />
+          <Route path="/workspaces/:workspaceId/projects/:projectId/tickets" element={<WorkspaceShellPage />} />
+          <Route path="/workspaces/:workspaceId/projects/:projectId/notes" element={<WorkspaceShellPage />} />
+          <Route path="/workspaces/:workspaceId/projects/:projectId/notes/:noteId" element={<WorkspaceShellPage />} />
+          <Route path="/workspaces/:workspaceId/projects/list" element={<WorkspaceShellPage />} />
+          <Route path="/workspaces/:workspaceId/all" element={<WorkspaceShellPage />} />
+          <Route path="/workspaces/:workspaceId/teams" element={<WorkspaceShellPage />} />
+          <Route path="/workspaces/:workspaceId/teams/:teamId/tasks" element={<WorkspaceShellPage />} />
+          <Route path="/workspaces/:workspaceId/teams/:teamId/views/:viewId" element={<WorkspaceShellPage />} />
+          <Route path="/workspaces/:workspaceId/teams/:teamId/cycles/:cycleId" element={<WorkspaceShellPage />} />
+          <Route path="/workspaces/:workspaceId/teams/:teamId/labels/:labelId" element={<WorkspaceShellPage />} />
+          <Route path="/workspaces/:workspaceId/teams/:teamId/projects" element={<WorkspaceShellPage />} />
+          <Route path="/workspaces/:workspaceId/teams/:teamId/projects/:projectId/tickets" element={<WorkspaceShellPage />} />
+          <Route path="/workspaces/:workspaceId/teams/:teamId/projects/:projectId/tickets/:ticketKey" element={<WorkspaceShellPage />} />
+          <Route path="/workspaces/:workspaceId" element={<WorkspaceShellPage />} />
           <Route path="*" element={<AppShellPage />} />
         </Routes>
       </MemoryRouter>
@@ -808,6 +813,7 @@ function mockAggregateApiResponses() {
 describe('AppShellPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    delete (navigator as any).modelContext;
     window.localStorage.clear();
     sharedQueryClient.clear();
     mocks.fetch.mockImplementation(() =>
@@ -989,6 +995,46 @@ describe('AppShellPage', () => {
     });
 
     expect(screen.getByTestId('location-display').textContent).toBe('/workspaces/workspace-1/projects/list');
+  });
+
+  it('mounts ticket actions for issue routes but not management routes without WebMCP support', async () => {
+    const user = userEvent.setup();
+
+    renderAppShell();
+
+    await waitFor(() => {
+      expect(screen.getByText('WorkspacePage')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('workspace-ticket-action-provider')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Open workspace projects' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('WorkspaceProjectsListPage')).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('workspace-ticket-action-provider')).not.toBeInTheDocument();
+  });
+
+  it('keeps the WebMCP action bridge available on management routes when native WebMCP is supported', async () => {
+    Object.defineProperty(navigator, 'modelContext', {
+      configurable: true,
+      value: {
+        registerTool: vi.fn(),
+      },
+    });
+
+    renderAppShell({
+      initialEntries: ['/workspaces/workspace-1/projects/list'],
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('WorkspaceProjectsListPage')).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId('workspace-ticket-action-provider')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(mocks.registerWebMCPTools).toHaveBeenCalled();
+    });
   });
 
   it('routes Manage Teams to the dedicated team manager for team workspace owners', async () => {

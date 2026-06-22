@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { ThemeProvider as AppThemeProvider } from '../../context/theme/ThemeContext';
 import { ThemeProvider as SettingsThemeProvider } from '../../modules/settings';
-import { AppShellPage } from '../../pages/AppShellPage/AppShellPage.tsx';
+import { WorkspaceShellPage } from '../../pages/WorkspaceShellPage/WorkspaceShellPage.tsx';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const mocks = vi.hoisted(() => ({
@@ -50,7 +50,9 @@ vi.mock('../../context/project/ProjectContext', () => ({
 }));
 
 vi.mock('../../context/TicketContext', () => ({
-  WorkspaceTicketActionProviders: ({ children }: { children: ReactNode }) => <>{children}</>,
+  WorkspaceTicketActionProviders: ({ children }: { children: ReactNode }) => (
+    <div data-testid="workspace-ticket-action-provider">{children}</div>
+  ),
 }));
 
 vi.mock('../../context/ticket/TicketListContext', () => ({
@@ -473,7 +475,7 @@ function renderAppShell() {
       <AppThemeProvider>
         <SettingsThemeProvider>
           <MemoryRouter initialEntries={['/workspaces/workspace-1']}>
-            <AppShellPage />
+            <WorkspaceShellPage />
           </MemoryRouter>
         </SettingsThemeProvider>
       </AppThemeProvider>
@@ -484,6 +486,7 @@ function renderAppShell() {
 describe('AppShellPage theme integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    delete (navigator as any).modelContext;
     window.localStorage.clear();
     window.localStorage.setItem('gravity_theme', 'dark');
     document.documentElement.className = '';

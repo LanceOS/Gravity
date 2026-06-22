@@ -8,18 +8,10 @@ import { OnboardingModal } from '../../onboarding';
 import { useWorkspaceDirectory } from '../../../hooks/useWorkspaceDirectory';
 import { LoadingPage } from '../../loadingPage';
 import { WorkspaceDirectoryPage } from '../../workspaceDirectoryPage';
-import { WorkspaceShellPage } from '../../workspaceShellPage';
 import { usePendingWorkspaceInvite, useWorkspaceDirectoryState } from '../../workspaceShellPage/hooks';
 import './AppShellPage.css';
 
 export function AppShellPage() {
-  const { pathname } = useLocation();
-
-  const isWorkspaceRoute = /^\/workspaces\/[^/]+/.test(pathname);
-  if (isWorkspaceRoute) {
-    return <WorkspaceShellPage />;
-  }
-
   return <AppShellLandingPage />;
 }
 

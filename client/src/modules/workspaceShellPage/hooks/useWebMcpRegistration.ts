@@ -14,6 +14,15 @@ interface UseWebMcpRegistrationArgs {
   removeTicketBlocker: Parameters<typeof registerWebMCPTools>[0]['removeBlocker'];
 }
 
+export function supportsWebMcpRegistration() {
+  if (typeof navigator === 'undefined') {
+    return false;
+  }
+
+  const modelContext = (navigator as any).modelContext;
+  return !!modelContext && typeof modelContext.registerTool === 'function';
+}
+
 export function useWebMcpRegistration({
   enabled = true,
   tickets,

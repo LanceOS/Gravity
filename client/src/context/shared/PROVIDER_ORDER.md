@@ -49,6 +49,8 @@ Workspace management routes
         ProjectProvider
           WorkspaceTicketProviders
             WorkspaceShellPage
+              WorkspaceTicketActionProviders
+                WorkspaceWebMcpRegistration (only when browser-native WebMCP is supported)
 
 Legacy compatibility wrapper
   TicketProvider
@@ -67,8 +69,8 @@ Legacy compatibility wrapper
 - `TicketDetailProvider` stays above `TicketRelationsProvider` because relation actions need the active ticket detail snapshot.
 - `CompatibilityTicketProvider` is no longer mounted by production workspace routes. It must remain inside the legacy `TicketProvider` so the legacy `TicketContextType` is rebuilt from the narrower contexts instead of owning state directly.
 - `WorkspaceTicketProviders` intentionally excludes `WorkspaceTicketActionProviders`; routes or components that need mutations/detail/comments/relations opt into the action layer explicitly.
-- Pure management surfaces such as workspace project management, workspace project list, teams management, and team project management skip `WorkspaceTicketActionProviders`.
-- `WorkspaceShellPage` owns the frame, routing, sidebar, workspace/project management, and non-ticket overlays. `WorkspaceIssueSurface` owns ticket mutations, detail, comments, relations, WebMCP registration, and the create-ticket modal.
+- Pure management surfaces such as workspace project management, workspace project list, teams management, and team project management skip `WorkspaceTicketActionProviders` unless browser-native WebMCP registration is available and needs ticket actions.
+- `WorkspaceShellPage` owns the frame, routing, sidebar, workspace/project management, WebMCP action bridge placement, and non-ticket overlays. `WorkspaceIssueSurface` owns ticket mutations, detail, comments, relations, and the create-ticket modal.
 
 ## Guardrails
 

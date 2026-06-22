@@ -29,8 +29,10 @@ import { useAccountSettings } from '../../../hooks/useAccountSettings';
 import { useWorkspaceDirectory } from '../../../hooks/useWorkspaceDirectory';
 import { AppShellOverlays } from '../components/AppShellOverlays';
 import { WorkspaceIssueSurface } from '../components/WorkspaceIssueSurface';
+import { WorkspaceWebMcpRegistration } from '../components/WorkspaceWebMcpRegistration';
 import { useAppShellRoute } from '../hooks/useAppShellRoute';
 import { useAppShellRouteSync } from '../hooks/useAppShellRouteSync';
+import { supportsWebMcpRegistration } from '../hooks/useWebMcpRegistration';
 import {
   usePendingWorkspaceInvite,
   useWorkspaceMemberActivity,
@@ -45,6 +47,7 @@ import {
   useWorkspaceCreateLabelDialog,
   useWorkspaceCreateProjectDialog,
   useWorkspaceCreateTicketDialog,
+  useWorkspaceManagementCommands,
   useWorkspaceShellFilters,
   useWorkspaceShellNavigation,
   useWorkspaceSidebarCounts,
@@ -105,6 +108,7 @@ export function WorkspaceShellPage() {
   const [createParentId, setCreateParentId] = useState<string | undefined>(undefined);
   const [listSort, setListSort] = useState<TicketListSort>('newest_urgent');
   const { isMobile } = useWorkspaceViewMode(activeView, setView);
+  const isWebMcpSupported = useMemo(() => supportsWebMcpRegistration(), []);
   const [projectCreateLoading, setProjectCreateLoading] = useState(false);
   const [projectCreateErrorState, setProjectCreateErrorState] = useState<{ workspaceId: string; message: string | null }>({
     workspaceId: '',
@@ -752,100 +756,27 @@ export function WorkspaceShellPage() {
     setActiveTicket,
   });
 
-  const handleCreateProject = useCallback(
-    async (projectInput: { name: string; description: string; key: string }) => {
-      if (!activeWorkspaceId || !currentUser) {
-        const message = 'Unable to create project right now. Please refresh and try again.';
-        setProjectCreateError(message);
-        throw new Error(message);
-      }
-
-      setProjectCreateLoading(true);
-      setProjectCreateError(null);
-
-      try {
-        const project = await createProject({
-          ...projectInput,
-          status: 'active',
-          workspaceId: activeWorkspaceId,
-        });
-
-        if (!project) {
-          throw new Error('Failed to create project in this workspace.');
-        }
-
-        await refreshWorkspaces();
-        setActiveTicket(null);
-        navigate(`/workspaces/${activeWorkspaceId}`);
-        return project;
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Failed to create project in this workspace.';
-        setProjectCreateError(message);
-        throw error;
-      } finally {
-        setProjectCreateLoading(false);
-      }
-    },
-    [
-      activeWorkspaceId,
-      createProject,
-      currentUser,
-      navigate,
-      refreshWorkspaces,
-      setActiveTicket,
-      setProjectCreateError,
-      setProjectCreateLoading,
-    ]
-  );
-
-  const handleCreateLabel = useCallback(
-    async (labelInput: { name: string; color: string; description?: string; sortOrder?: number; projectId?: string }) => {
-      const projectId = labelInput.projectId || activeProjectId;
-      if (!projectId) {
-        return;
-      }
-
-      setLabelCreateLoading(true);
-      setLabelCreateError(null, projectId);
-
-      try {
-        const label = await createLabel({
-          ...labelInput,
-          projectId,
-        });
-
-        if (!label) {
-          throw new Error('Failed to create label for this project.');
-        }
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Failed to create label for this project.';
-        setLabelCreateError(message, projectId);
-        throw error;
-      } finally {
-        setLabelCreateLoading(false);
-      }
-    },
-    [activeProjectId, createLabel, setLabelCreateError, setLabelCreateLoading]
-  );
-
-  const handleUpdateLabel = useCallback(
-    async (labelId: string, updates: { name?: string; color?: string; description?: string; sortOrder?: number }) => {
-      setLabelCreateError(null);
-      await updateLabel(labelId, updates);
-    },
-    [setLabelCreateError, updateLabel]
-  );
-
-  const handleDeleteLabel = useCallback(
-    async (labelId: string) => {
-      setLabelCreateError(null);
-      const deleted = await deleteLabel(labelId);
-      if (!deleted) {
-        throw new Error('Failed to delete label.');
-      }
-    },
-    [deleteLabel, setLabelCreateError]
-  );
+  const {
+    handleCreateProject,
+    handleCreateLabel,
+    handleUpdateLabel,
+    handleDeleteLabel,
+  } = useWorkspaceManagementCommands({
+    activeWorkspaceId,
+    currentUser,
+    activeProjectId,
+    createProject,
+    refreshWorkspaces,
+    createLabel,
+    updateLabel,
+    deleteLabel,
+    setActiveTicket,
+    setProjectCreateLoading,
+    setProjectCreateError,
+    setLabelCreateLoading,
+    setLabelCreateError,
+    navigate,
+  });
 
   const { handleSetFilters } = useWorkspaceShellFilters({
     filters: safeFilters,
@@ -1056,8 +987,18 @@ export function WorkspaceShellPage() {
 
   const createDefaultProjectId =
     activeProjectId || scopedProjects[0]?.id || activeWorkspaceProjects[0]?.id || '';
+  const isWorkspaceProjectsListActive = sidebarActiveScope === 'workspace-projects';
+  const isIssueSurfaceActive =
+    !isWorkspaceProjectsListActive && !isTeamsManager && !isTeamProjectsManager && activeSection !== 'projects';
+  const workspaceWebMcpRegistration = isWebMcpSupported ? (
+    <WorkspaceWebMcpRegistration
+      tickets={tickets}
+      users={users}
+      projects={projects}
+    />
+  ) : null;
 
-    return (
+  return (
     <>
       <WorkspaceLayout
         sidebarProps={sidebarProps}
@@ -1079,7 +1020,13 @@ export function WorkspaceShellPage() {
           ) : null
         }
       >
-        {sidebarActiveScope === 'workspace-projects' ? (
+        {!isIssueSurfaceActive && workspaceWebMcpRegistration ? (
+          <WorkspaceTicketActionProviders>
+            {workspaceWebMcpRegistration}
+          </WorkspaceTicketActionProviders>
+        ) : null}
+
+        {isWorkspaceProjectsListActive ? (
           <WorkspaceProjectsListPage />
         ) : isTeamsManager ? (
           <WorkspaceTeamsPage
@@ -1147,6 +1094,7 @@ export function WorkspaceShellPage() {
           </WorkspacePageLayout>
         ) : (
           <WorkspaceTicketActionProviders>
+            {workspaceWebMcpRegistration}
             <WorkspaceIssueSurface
               activeWorkspaceId={activeWorkspaceId}
               workspaceName={activeWorkspace.name}
@@ -1200,11 +1148,6 @@ export function WorkspaceShellPage() {
                 navigate,
                 buildProjectScopedPath,
                 setActiveTicket,
-              }}
-              webMcp={{
-                tickets,
-                users,
-                projects,
               }}
             />
           </WorkspaceTicketActionProviders>

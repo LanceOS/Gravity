@@ -1,25 +1,11 @@
 import { useCallback } from 'react';
 
-import type { Project, Ticket } from '../../../context/TicketContextContext';
+import type { Project, Ticket } from '../../../types/domain';
 
-interface UseWorkspaceShellCommandsArgs {
+interface UseWorkspaceManagementCommandsArgs {
   activeWorkspaceId: string;
   currentUser: { id: string } | null;
-  ticketsById?: Map<string, Ticket>;
-  activeTicket: Ticket | null;
   activeProjectId: string;
-  createTicket: (ticket: {
-    title: string;
-    description: string;
-    status: Ticket['status'];
-    priority: Ticket['priority'];
-    projectId: string;
-    labelIds?: string[];
-    cycleId: string | null;
-    assigneeId: string | null;
-    parentId: string | null;
-  }) => Promise<Ticket | null>;
-  deleteTicket: (ticketId: string) => Promise<void>;
   createProject: (projectInput: {
     name: string;
     description: string;
@@ -44,22 +30,9 @@ interface UseWorkspaceShellCommandsArgs {
   setLabelCreateLoading: (loading: boolean) => void;
   setLabelCreateError: (message: string | null, projectId?: string) => void;
   navigate: (to: string, options?: { replace?: boolean }) => void;
-  buildProjectScopedPath: (projectId: string, scope?: 'tickets' | 'notes', itemId?: string) => string;
 }
 
-interface UseWorkspaceShellCommandsResult {
-  handleCreateTicketSubmit: (ticket: {
-    title: string;
-    description: string;
-    status: Ticket['status'];
-    priority: Ticket['priority'];
-    projectId: string;
-    labelIds?: string[];
-    cycleId: string | null;
-    assigneeId: string | null;
-    parentId: string | null;
-  }) => Promise<boolean>;
-  handleDeleteTicket: (ticketId: string) => Promise<void>;
+interface UseWorkspaceManagementCommandsResult {
   handleCreateProject: (projectInput: { name: string; description: string; key: string }) => Promise<Project | null | undefined>;
   handleCreateLabel: (labelInput: {
     name: string;
@@ -80,14 +53,10 @@ interface UseWorkspaceShellCommandsResult {
   handleDeleteLabel: (labelId: string) => Promise<void>;
 }
 
-export function useWorkspaceShellCommands({
+export function useWorkspaceManagementCommands({
   activeWorkspaceId,
   currentUser,
-  ticketsById,
-  activeTicket,
   activeProjectId,
-  createTicket,
-  deleteTicket,
   createProject,
   refreshWorkspaces,
   createLabel,
@@ -99,31 +68,7 @@ export function useWorkspaceShellCommands({
   setLabelCreateLoading,
   setLabelCreateError,
   navigate,
-  buildProjectScopedPath,
-}: UseWorkspaceShellCommandsArgs): UseWorkspaceShellCommandsResult {
-  const handleCreateTicketSubmit = useCallback(
-    async (ticket: Parameters<UseWorkspaceShellCommandsArgs['createTicket']>[0]) => {
-      const created = await createTicket(ticket);
-      return Boolean(created);
-    },
-    [createTicket]
-  );
-
-  const handleDeleteTicket = useCallback(
-    async (ticketId: string) => {
-      const deletedTicket = ticketsById?.get(ticketId) || (activeTicket?.id === ticketId ? activeTicket : null);
-      await deleteTicket(ticketId);
-
-      if (deletedTicket && activeTicket?.id === ticketId) {
-        navigate(buildProjectScopedPath(deletedTicket.projectId), { replace: true });
-        return;
-      }
-
-      setActiveTicket(null);
-    },
-    [activeTicket, buildProjectScopedPath, deleteTicket, navigate, setActiveTicket, ticketsById]
-  );
-
+}: UseWorkspaceManagementCommandsArgs): UseWorkspaceManagementCommandsResult {
   const handleCreateProject = useCallback(
     async (projectInput: { name: string; description: string; key: string }) => {
       if (!activeWorkspaceId || !currentUser) {
@@ -160,13 +105,13 @@ export function useWorkspaceShellCommands({
     },
     [
       activeWorkspaceId,
-      currentUser,
       createProject,
+      currentUser,
+      navigate,
       refreshWorkspaces,
       setActiveTicket,
       setProjectCreateError,
       setProjectCreateLoading,
-      navigate,
     ]
   );
 
@@ -220,8 +165,6 @@ export function useWorkspaceShellCommands({
   );
 
   return {
-    handleCreateTicketSubmit,
-    handleDeleteTicket,
     handleCreateProject,
     handleCreateLabel,
     handleUpdateLabel,
