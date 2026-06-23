@@ -121,6 +121,27 @@ describe('combineTicketDetails', () => {
     const result = combineTicketDetails(existing, incoming);
     expect(result.dependencies).toEqual([newDep]);
   });
+
+  it('clears stale relation arrays when incoming flags explicitly say the ticket is no longer blocked or blocking', () => {
+    const existing = makeTicketWithRelations({
+      dependencies: [{ id: 'dep-1', key: 'GRA-2', title: 'Dependency', projectId: 'project-1' }],
+      blockers: [{ id: 'blk-1', key: 'GRA-3', title: 'Blocker', projectId: 'project-1' }],
+      blockedTicket: { id: 'blk-1', key: 'GRA-3', title: 'Blocker', projectId: 'project-1' },
+      isBlocked: true,
+      isDependency: true,
+      relatedTicketIds: ['dep-1', 'blk-1'],
+    });
+    const incoming = makeTicket({
+      isBlocked: false,
+      isDependency: false,
+    });
+    const result = combineTicketDetails(existing, incoming);
+
+    expect(result.dependencies).toEqual([]);
+    expect(result.blockers).toEqual([]);
+    expect(result.blockedTicket).toBeNull();
+    expect(result.relatedTicketIds).toEqual([]);
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -5,7 +5,13 @@ import { projects, teams, tickets } from '../../db/schema.js';
 import { env } from '../../env.js';
 import { verifyGitHubWebhookSignature, isValidGitHubUrl, sanitizeGitHubLogin } from '../../lib/webhookSignature.js';
 import { broadcastToWorkspace } from '../../realtime.js';
-import { addCommentRecord, updateTicketRecord } from '../tickets/services/tickets.js';
+import {
+  addCommentRecord,
+  getProjectScope,
+  getTicketById,
+  type TicketRelationshipCleanupEffect,
+  updateTicketRecordWithEffects,
+} from '../tickets/services/tickets.js';
 
 /** Maximum number of ticket keys to process from a single webhook delivery. */
 const MAX_KEYS_PER_WEBHOOK = 10;
@@ -31,6 +37,45 @@ function isRateLimited(ip: string): boolean {
   timestamps.push(now);
   rateLimitMap.set(ip, timestamps);
   return false;
+}
+
+async function broadcastRelationshipCleanupEvents(relationshipCleanup: TicketRelationshipCleanupEffect) {
+  if (relationshipCleanup.affectedTickets.length === 0) {
+    return;
+  }
+
+  const affectedTicketSnapshots = await Promise.all(
+    relationshipCleanup.affectedTickets.map(async ({ id, projectId }) => {
+      const [ticket, scope] = await Promise.all([
+        getTicketById(id, projectId),
+        getProjectScope(projectId),
+      ]);
+
+      if (!scope) {
+        return null;
+      }
+
+      return {
+        projectId,
+        ticket,
+        ticketId: id,
+        workspaceId: scope.workspaceId,
+      };
+    }),
+  );
+
+  for (const snapshot of affectedTicketSnapshots) {
+    if (!snapshot) {
+      continue;
+    }
+
+    broadcastToWorkspace(snapshot.workspaceId, 'tickets-updated', {
+      projectId: snapshot.projectId,
+      ticketId: snapshot.ticketId,
+      ...(snapshot.ticket ? { ticket: snapshot.ticket } : {}),
+      actorUserId: SSE_WEBHOOK_ACTOR_ID,
+    });
+  }
 }
 
 export function createWebhookRouter() {
@@ -189,7 +234,7 @@ export function createWebhookRouter() {
 
     // ── Process each matched ticket ───────────────────────────────────────────
     for (const ticket of relevantTickets) {
-      const updated = await updateTicketRecord(
+      const updateResult = await updateTicketRecordWithEffects(
         ticket.id,
         {
           prStatus: nextPrStatus,
@@ -199,7 +244,8 @@ export function createWebhookRouter() {
         ticket.projectId,
       );
 
-      if (!updated) continue;
+      if (!updateResult) continue;
+      const { ticket: updated, relationshipCleanup } = updateResult;
 
       const workspaceId = projectWorkspaceMap.get(updated.projectId) ?? '';
 
@@ -218,6 +264,8 @@ export function createWebhookRouter() {
           broadcastToWorkspace(workspaceId, 'tickets-updated', { projectId: updated.projectId, actorUserId: SSE_WEBHOOK_ACTOR_ID });
         }
       }
+
+      await broadcastRelationshipCleanupEvents(relationshipCleanup);
     }
 
     // ── Finding #8: Always return uniform success ─────────────────────────────

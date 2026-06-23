@@ -90,15 +90,24 @@ export function useRealtimeContextValue({
             case 'ticket.updated':
               if (payloadTicket) {
                 upsertTicketFromSse(queryClient, payloadTicket);
+                if (projectId) {
+                  invalidateAggregateTicketQueries(queryClient, projectId);
+                }
                 break;
               }
 
               if (cachedTicket) {
                 upsertTicketFromSse(queryClient, cachedTicket as Ticket);
+                if (projectId) {
+                  invalidateAggregateTicketQueries(queryClient, projectId);
+                }
                 break;
               }
 
               await hydrateAndUpsertTicketFromSse(queryClient, payloadTicketId || event.ticketId, projectId);
+              if (projectId) {
+                invalidateAggregateTicketQueries(queryClient, projectId);
+              }
               break;
 
             case 'ticket.deleted':
@@ -166,29 +175,47 @@ export function useRealtimeContextValue({
             case 'dependency.removed':
               if (payloadTicket) {
                 upsertTicketFromSse(queryClient, payloadTicket);
+                if (projectId) {
+                  invalidateAggregateTicketQueries(queryClient, projectId);
+                }
                 break;
               }
 
               if (cachedTicket) {
                 upsertTicketFromSse(queryClient, cachedTicket as Ticket);
+                if (projectId) {
+                  invalidateAggregateTicketQueries(queryClient, projectId);
+                }
                 break;
               }
 
               await hydrateAndUpsertTicketFromSse(queryClient, payloadTicketId || event.ticketId, projectId);
+              if (projectId) {
+                invalidateAggregateTicketQueries(queryClient, projectId);
+              }
               break;
 
             case 'tickets-updated':
               if (payloadTicket) {
                 upsertTicketFromSse(queryClient, payloadTicket);
+                if (projectId) {
+                  invalidateAggregateTicketQueries(queryClient, projectId);
+                }
                 break;
               }
 
               if (cachedTicket) {
                 upsertTicketFromSse(queryClient, cachedTicket as Ticket);
+                if (projectId) {
+                  invalidateAggregateTicketQueries(queryClient, projectId);
+                }
                 break;
               }
 
               await hydrateAndUpsertTicketFromSse(queryClient, payloadTicketId || event.ticketId, projectId);
+              if (projectId) {
+                invalidateAggregateTicketQueries(queryClient, projectId);
+              }
               break;
 
             case 'comments-updated': {

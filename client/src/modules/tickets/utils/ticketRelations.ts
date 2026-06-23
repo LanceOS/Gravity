@@ -69,12 +69,19 @@ export function mergeTicketRelationSnapshot(existing: TicketWithRelations | unde
     return snapshot;
   }
 
+  const nextDependencies = snapshot.dependencies
+    ?? (snapshot.isDependency === false ? [] : existing.dependencies);
+  const nextBlockers = snapshot.blockers
+    ?? (snapshot.isBlocked === false ? [] : existing.blockers);
+  const nextBlockedTicket = snapshot.blockedTicket
+    ?? (snapshot.isBlocked === false ? null : existing.blockedTicket ?? null);
+
   const merged = {
     ...existing,
     ...snapshot,
-    blockedTicket: snapshot.blockedTicket ?? existing.blockedTicket ?? null,
-    dependencies: snapshot.dependencies ?? existing.dependencies,
-    blockers: snapshot.blockers ?? existing.blockers,
+    blockedTicket: nextBlockedTicket,
+    dependencies: nextDependencies,
+    blockers: nextBlockers,
   };
 
   return {

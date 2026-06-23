@@ -25,11 +25,12 @@ import {
   listComments,
   listTicketBlockers,
   listTicketDependencies,
-  updateTicketRecord,
+  updateTicketRecordWithEffects,
   updateCommentRecord,
   deleteCommentRecord,
   removeTicketDependencyRelation,
   getProjectScope,
+  type TicketRelationshipCleanupEffect,
 } from './services/tickets.js';
 import {
   ProjectScopeStrategy,
@@ -170,6 +171,56 @@ export function createTicketsRouter() {
       ? { ...payload, actorUserId }
       : payload;
     broadcastToWorkspace(workspaceId, type, data);
+  }
+
+  async function emitRelationshipCleanupEvents(
+    relationshipCleanup: TicketRelationshipCleanupEffect,
+  ) {
+    if (relationshipCleanup.affectedTickets.length === 0) {
+      return;
+    }
+
+    const affectedTicketSnapshots = await Promise.all(
+      relationshipCleanup.affectedTickets.map(async ({ id, projectId }) => {
+        const [ticket, scope] = await Promise.all([
+          getTicketById(id, projectId),
+          getProjectScope(projectId),
+        ]);
+
+        if (!scope) {
+          return null;
+        }
+
+        return {
+          projectId,
+          ticket,
+          ticketId: id,
+          workspaceId: scope.workspaceId,
+        };
+      }),
+    );
+
+    for (const snapshot of affectedTicketSnapshots) {
+      if (!snapshot) {
+        continue;
+      }
+
+      if (snapshot.ticket) {
+        // Deliberately omit actorUserId so the originating client processes
+        // follow-up ticket refreshes for other tickets affected by cleanup.
+        emitWorkspaceEvent(snapshot.workspaceId, 'tickets-updated', {
+          projectId: snapshot.projectId,
+          ticketId: snapshot.ticketId,
+          ticket: snapshot.ticket,
+        });
+        continue;
+      }
+
+      emitWorkspaceEvent(snapshot.workspaceId, 'tickets-updated', {
+        projectId: snapshot.projectId,
+        ticketId: snapshot.ticketId,
+      });
+    }
   }
 
   async function invalidateSidebarCacheFromTeam(teamId: string) {
@@ -329,11 +380,12 @@ export function createTicketsRouter() {
     await withProjectAccess(req, res, getProjectIdFromRequest(req), async (projectId, userId, workspaceId) => {
       try {
         const ticketId = normalizeRouteParam(req.params.ticketId);
-        const updated = await updateTicketRecord(ticketId, req.body ?? {}, projectId);
-        if (!updated) {
+        const updateResult = await updateTicketRecordWithEffects(ticketId, req.body ?? {}, projectId);
+        if (!updateResult) {
           res.status(404).json({ error: 'Ticket not found.' });
           return;
         }
+        const { ticket: updated, relationshipCleanup } = updateResult;
 
         // Cross-project moves stay within the same workspace; one broadcast suffices
         // for the owning workspace but we still send two payloads so the client can
@@ -342,6 +394,7 @@ export function createTicketsRouter() {
         if (updated.projectId !== projectId) {
           emitWorkspaceEvent(workspaceId, 'tickets-updated', { projectId: updated.projectId, ticket: updated }, userId);
         }
+        await emitRelationshipCleanupEvents(relationshipCleanup);
         res.json(updated);
       } catch (error) {
         if (error instanceof Error) {

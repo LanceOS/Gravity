@@ -35,6 +35,19 @@ export type TicketFilters = {
   offset?: number;
 };
 
+export type TicketRelationshipCleanupEffect = {
+  removedRelationCount: number;
+  affectedTickets: Array<{
+    id: string;
+    projectId: string;
+  }>;
+};
+
+export type TicketUpdateEffects = {
+  ticket: ReturnType<typeof mapTicket>;
+  relationshipCleanup: TicketRelationshipCleanupEffect;
+};
+
 function buildTicketFilterConditions(projectIds: string[], filters: TicketFilters = {}) {
   const conditions = [inArray(tickets.projectId, projectIds)];
 
@@ -163,24 +176,61 @@ async function getTicketRelationshipFlags(ticketIds: string[]) {
     };
   }
 
-  // blockedIds = tickets that are the target of at least one relation.
-  // dependencyIds = tickets that are the source of at least one relation.
+  const ticketStatusMap = await getTicketStatusMap(ticketIds);
+  const activeTicketIds = ticketIds.filter((ticketId) => !isTerminalTicketStatus(ticketStatusMap.get(ticketId)));
+  if (activeTicketIds.length === 0) {
+    return {
+      blockedIds: new Set<string>(),
+      dependencyIds: new Set<string>(),
+    };
+  }
+
+  // blockedIds = tickets that are the target of at least one non-terminal blocker.
+  // dependencyIds = tickets that are the source of at least one edge to a non-terminal blocked ticket.
   const [blockedRows, dependencyRows] = await Promise.all([
     db
-      .select({ blockedTicketId: ticketRelationships.blockedTicketId })
+      .select({
+        blockedTicketId: ticketRelationships.blockedTicketId,
+        ticketId: ticketRelationships.ticketId,
+      })
       .from(ticketRelationships)
-      .where(inArray(ticketRelationships.blockedTicketId, ticketIds))
-      .groupBy(ticketRelationships.blockedTicketId),
+      .where(inArray(ticketRelationships.blockedTicketId, activeTicketIds)),
     db
-      .select({ ticketId: ticketRelationships.ticketId })
+      .select({
+        ticketId: ticketRelationships.ticketId,
+        blockedTicketId: ticketRelationships.blockedTicketId,
+      })
       .from(ticketRelationships)
-      .where(inArray(ticketRelationships.ticketId, ticketIds))
-      .groupBy(ticketRelationships.ticketId),
+      .where(inArray(ticketRelationships.ticketId, activeTicketIds)),
   ]);
 
+  const relatedTicketIds = new Set<string>();
+  for (const row of blockedRows) {
+    relatedTicketIds.add(row.ticketId);
+  }
+  for (const row of dependencyRows) {
+    relatedTicketIds.add(row.blockedTicketId);
+  }
+
+  const relatedTicketStatusMap = await getTicketStatusMap(Array.from(relatedTicketIds));
+  const filteredBlockedIds = new Set<string>();
+  const filteredDependencyIds = new Set<string>();
+
+  for (const row of blockedRows) {
+    if (!isTerminalTicketStatus(relatedTicketStatusMap.get(row.ticketId))) {
+      filteredBlockedIds.add(row.blockedTicketId);
+    }
+  }
+
+  for (const row of dependencyRows) {
+    if (!isTerminalTicketStatus(relatedTicketStatusMap.get(row.blockedTicketId))) {
+      filteredDependencyIds.add(row.ticketId);
+    }
+  }
+
   return {
-    blockedIds: new Set(blockedRows.map((row) => row.blockedTicketId)),
-    dependencyIds: new Set(dependencyRows.map((row) => row.ticketId)),
+    blockedIds: filteredBlockedIds,
+    dependencyIds: filteredDependencyIds,
   };
 }
 
@@ -234,6 +284,27 @@ export function canonicalizeStatus(status?: string | null): string {
   if (collapsed === 'todo' || collapsed === 'todo') return 'todo';
 
   return 'todo';
+}
+
+export function isTerminalTicketStatus(status?: string | null): boolean {
+  const canonicalStatus = canonicalizeStatus(status);
+  return canonicalStatus === 'done' || canonicalStatus === 'canceled';
+}
+
+async function getTicketStatusMap(ticketIds: string[]) {
+  if (ticketIds.length === 0) {
+    return new Map<string, string>();
+  }
+
+  const rows = await db
+    .select({
+      id: tickets.id,
+      status: tickets.status,
+    })
+    .from(tickets)
+    .where(inArray(tickets.id, ticketIds));
+
+  return new Map(rows.map((row) => [row.id, canonicalizeStatus(row.status)]));
 }
 
 // Normalize priority strings to canonical DB/application values.
@@ -452,6 +523,11 @@ export async function getTicketRelationsByKey(ticketKey: string) {
 }
 
 export async function listTicketDependencies(ticketId: string) {
+  const ticketStatusMap = await getTicketStatusMap([ticketId]);
+  if (isTerminalTicketStatus(ticketStatusMap.get(ticketId))) {
+    return [];
+  }
+
   const rows = await db
     .select({
       id: tickets.id,
@@ -466,10 +542,17 @@ export async function listTicketDependencies(ticketId: string) {
     .where(eq(ticketRelationships.ticketId, ticketId))
     .orderBy(asc(tickets.createdAt), asc(tickets.key));
 
-  return rows.map(mapRelatedTicket);
+  return rows
+    .filter((row) => !isTerminalTicketStatus(row.status))
+    .map(mapRelatedTicket);
 }
 
 export async function listTicketBlockers(ticketId: string) {
+  const ticketStatusMap = await getTicketStatusMap([ticketId]);
+  if (isTerminalTicketStatus(ticketStatusMap.get(ticketId))) {
+    return [];
+  }
+
   const rows = await db
     .select({
       id: tickets.id,
@@ -484,7 +567,9 @@ export async function listTicketBlockers(ticketId: string) {
     .where(eq(ticketRelationships.blockedTicketId, ticketId))
     .orderBy(asc(tickets.createdAt), asc(tickets.key));
 
-  return rows.map(mapRelatedTicket);
+  return rows
+    .filter((row) => !isTerminalTicketStatus(row.status))
+    .map(mapRelatedTicket);
 }
 
 
@@ -793,7 +878,51 @@ export async function createTicketRecord(input: {
   return mapTicket(result.ticketRow, result.createdLabels);
 }
 
-export async function updateTicketRecord(
+async function getTicketRelationshipCleanupEffect(ticketId: string): Promise<TicketRelationshipCleanupEffect> {
+  const affectedTickets = new Map<string, { id: string; projectId: string }>();
+
+  const rows = await db
+    .select({
+      ticketId: ticketRelationships.ticketId,
+      blockedTicketId: ticketRelationships.blockedTicketId,
+    })
+    .from(ticketRelationships)
+    .where(sql`${ticketRelationships.ticketId} = ${ticketId} OR ${ticketRelationships.blockedTicketId} = ${ticketId}`);
+
+  const relatedTicketIds = new Set<string>();
+  for (const row of rows) {
+    if (row.ticketId !== ticketId) {
+      relatedTicketIds.add(row.ticketId);
+    }
+    if (row.blockedTicketId !== ticketId) {
+      relatedTicketIds.add(row.blockedTicketId);
+    }
+  }
+
+  const relatedTickets = relatedTicketIds.size > 0
+    ? await db
+        .select({
+          id: tickets.id,
+          projectId: tickets.projectId,
+        })
+        .from(tickets)
+        .where(inArray(tickets.id, Array.from(relatedTicketIds)))
+    : [];
+
+  for (const relatedTicket of relatedTickets) {
+    affectedTickets.set(relatedTicket.id, {
+      id: relatedTicket.id,
+      projectId: relatedTicket.projectId,
+    });
+  }
+
+  return {
+    removedRelationCount: affectedTickets.size,
+    affectedTickets: Array.from(affectedTickets.values()),
+  };
+}
+
+export async function updateTicketRecordWithEffects(
   ticketId: string,
   updates: Partial<{
     title: string;
@@ -811,7 +940,7 @@ export async function updateTicketRecord(
     projectId: string;
   }>,
   projectId?: string,
-) {
+): Promise<TicketUpdateEffects | null> {
   const existingRows = await db
     .select()
     .from(tickets)
@@ -845,11 +974,19 @@ export async function updateTicketRecord(
     : projectLabelScopeChanged || teamChanged
       ? []
       : undefined;
+  const nextStatus = updates.status !== undefined
+    ? canonicalizeStatus(updates.status as string)
+    : existingTicket.status;
+  const shouldClearRelationships = updates.status !== undefined
+    && isTerminalTicketStatus(nextStatus);
+  const relationshipCleanup = shouldClearRelationships
+    ? await getTicketRelationshipCleanupEffect(ticketId)
+    : { removedRelationCount: 0, affectedTickets: [] };
 
   const payload = {
     ...(updates.title !== undefined ? { title: sanitizeTitle(updates.title as string) } : {}),
     ...(updates.description !== undefined ? { description: updates.description } : {}),
-    ...(updates.status !== undefined ? { status: canonicalizeStatus(updates.status as string) } : {}),
+    ...(updates.status !== undefined ? { status: nextStatus } : {}),
     ...(updates.priority !== undefined ? { priority: canonicalizePriority(updates.priority as string) } : {}),
     ...(updates.assigneeId !== undefined ? { assigneeId: updates.assigneeId } : {}),
     ...((updates.cycleId !== undefined || teamChanged) ? { cycleId: nextCycleId } : {}),
@@ -878,6 +1015,11 @@ export async function updateTicketRecord(
 
     if (rows.length === 0) {
       return null;
+    }
+
+    if (shouldClearRelationships) {
+      await tx.delete(ticketRelationships).where(eq(ticketRelationships.ticketId, ticketId));
+      await tx.delete(ticketRelationships).where(eq(ticketRelationships.blockedTicketId, ticketId));
     }
 
     if (updates.labelIds !== undefined || projectLabelScopeChanged || teamChanged) {
@@ -925,7 +1067,33 @@ export async function updateTicketRecord(
   }
 
   const { blockedIds, dependencyIds } = await getTicketRelationshipFlags([ticketId]);
-  return mapTicket(result.ticket, result.labels, blockedIds.has(ticketId), dependencyIds.has(ticketId));
+  return {
+    ticket: mapTicket(result.ticket, result.labels, blockedIds.has(ticketId), dependencyIds.has(ticketId)),
+    relationshipCleanup,
+  };
+}
+
+export async function updateTicketRecord(
+  ticketId: string,
+  updates: Partial<{
+    title: string;
+    description: string;
+    status: string;
+    priority: string;
+    assigneeId: string | null;
+    cycleId: string | null;
+    parentId: string | null;
+    labelIds: string[];
+    prStatus: string;
+    prUrl: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+    projectId: string;
+  }>,
+  projectId?: string,
+) {
+  const result = await updateTicketRecordWithEffects(ticketId, updates, projectId);
+  return result?.ticket ?? null;
 }
 
 export async function deleteTicketRecord(ticketId: string, projectId?: string) {

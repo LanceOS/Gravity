@@ -10,6 +10,7 @@ import {
   createTicketDependencyRelation,
   deleteCommentRecord,
   deleteTicketRecord,
+  getTicketById,
   getTicketByKey,
   getTicketDetailsByKey,
   hasCircularDependency,
@@ -22,6 +23,7 @@ import {
   removeTicketDependencyRelation,
   updateCommentRecord,
   updateTicketRecord,
+  updateTicketRecordWithEffects,
   getProjectScope,
 } from './services/tickets.js';
 import { ToolExecutionContext, ToolHandler } from '../mcp/tool-handlers/types.js';
@@ -296,7 +298,7 @@ export class TicketTools {
     const createdAt = parseDateArg(args.createdAt, 'createdAt');
     const updatedAt = parseDateArg(args.updatedAt, 'updatedAt');
 
-    const updated = await updateTicketRecord(
+    const updateResult = await updateTicketRecordWithEffects(
       ticket.id,
       {
         ...(typeof args.title === 'string' ? { title: args.title } : {}),
@@ -314,6 +316,7 @@ export class TicketTools {
       },
       ticket.projectId,
     );
+    const updated = updateResult?.ticket ?? null;
 
     const scope = await getProjectScope(ticket.projectId);
     if (scope) {
@@ -327,6 +330,43 @@ export class TicketTools {
         timestamp: new Date().toISOString(),
         data: { ticket: updated },
       });
+    }
+
+    if (updateResult?.relationshipCleanup.affectedTickets.length) {
+      const relatedTicketEvents = await Promise.all(
+        updateResult.relationshipCleanup.affectedTickets.map(async ({ id, projectId }) => {
+          const [relatedTicket, relatedScope] = await Promise.all([
+            getTicketById(id, projectId),
+            getProjectScope(projectId),
+          ]);
+
+          if (!relatedTicket || !relatedScope || relatedScope.workspaceId !== context.workspaceId) {
+            return null;
+          }
+
+          return {
+            scope: relatedScope,
+            ticket: relatedTicket,
+          };
+        }),
+      );
+
+      for (const event of relatedTicketEvents) {
+        if (!event) {
+          continue;
+        }
+
+        mcpEventBus.publish({
+          type: 'ticket.updated',
+          workspaceId: event.scope.workspaceId,
+          projectId: event.ticket.projectId,
+          teamId: event.scope.teamId,
+          ticketKey: event.ticket.key,
+          actorUserId: context.actorUserId,
+          timestamp: new Date().toISOString(),
+          data: { ticket: event.ticket },
+        });
+      }
     }
 
     return { ticket: updated };
