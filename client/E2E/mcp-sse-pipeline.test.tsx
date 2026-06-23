@@ -3,6 +3,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import App from '../src/App';
+import { router } from '../src/router';
 import {
   addWorkspaceMember,
   dbState,
@@ -236,6 +237,9 @@ async function callMcpTool(
 
 async function renderRealtimeApp(workspaceId: string, userId: string) {
   const user = userEvent.setup();
+  const ws = dbState.workspaces.find((w) => w.id === workspaceId);
+  const projectId = ws?.defaultProjectId || 'prj-realtime';
+  await router.navigate(`/workspaces/${workspaceId}/projects/${projectId}/tickets`);
   render(<App />);
 
   await waitFor(() => {
@@ -266,7 +270,15 @@ describe('MCP SSE pipeline', () => {
       status: 'todo',
       priority: 'medium',
     });
+    
+    // Go back to the board to verify the new ticket is rendered
+    const backBtn = await screen.findByRole('button', { name: 'Back' });
+    await user.click(backBtn);
     expect(await screen.findByText('MCP-created ticket')).toBeInTheDocument();
+
+    // Re-open main ticket details to continue with detail-view tests
+    const mainTicketCardRefetched = await screen.findByText(mainTicket.title);
+    await user.click(mainTicketCardRefetched);
 
     await callMcpTool(workspace.id, memberUser.id, 'update_ticket', {
       ticketKey: mainTicket.key,
@@ -318,10 +330,14 @@ describe('MCP SSE pipeline', () => {
 
   it('does not deliver SSE events to a non-member source', async () => {
     const { memberUser, nonMemberUser, workspace, mainTicket } = seedRealtimeWorkspace();
-    await renderRealtimeApp(workspace.id, memberUser.id);
+    const user = await renderRealtimeApp(workspace.id, memberUser.id);
 
     const memberSource = getActiveMockSseSource(workspace.id, memberUser.id);
     expect(memberSource).toBeTruthy();
+
+    // Open detail view of the ticket to verify input value
+    const mainTicketCard = await screen.findByText(mainTicket.title);
+    await user.click(mainTicketCard);
 
     dbState.currentUser = nonMemberUser;
     const deniedSource = new EventSource(`/api/v1/events/subscribe?workspaceId=${workspace.id}`) as any;
@@ -345,7 +361,11 @@ describe('MCP SSE pipeline', () => {
 
   it('reconnects after disconnecting and keeps updating the UI', async () => {
     const { memberUser, workspace, mainTicket } = seedRealtimeWorkspace();
-    await renderRealtimeApp(workspace.id, memberUser.id);
+    const user = await renderRealtimeApp(workspace.id, memberUser.id);
+
+    // Open detail view of the ticket to verify input value
+    const mainTicketCard = await screen.findByText(mainTicket.title);
+    await user.click(mainTicketCard);
 
     const initialSource = getActiveMockSseSource(workspace.id, memberUser.id);
     expect(initialSource).toBeTruthy();
@@ -370,11 +390,11 @@ describe('MCP SSE pipeline', () => {
 
   it('coalesces rapid mutations into a single targeted refresh', async () => {
     const { memberUser, workspace, mainTicket } = seedRealtimeWorkspace();
-    await renderRealtimeApp(workspace.id, memberUser.id);
+    const user = await renderRealtimeApp(workspace.id, memberUser.id);
 
     const mainTicketCard = await screen.findByText(mainTicket.title);
     expect(mainTicketCard).toBeInTheDocument();
-    await userEvent.click(mainTicketCard);
+    await user.click(mainTicketCard);
 
     const fetchMock = vi.mocked(globalThis.fetch);
     fetchMock.mockClear();
