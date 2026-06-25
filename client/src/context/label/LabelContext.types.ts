@@ -9,6 +9,6 @@ export interface LabelContextType {
   deleteLabel: (id: string) => Promise<boolean>;
   assignLabelToTicket: (ticketId: string, labelId: string) => Promise<boolean>;
   unassignLabelFromTicket: (ticketId: string, labelId: string) => Promise<boolean>;
-  findLabelQueryKey: (labelId: string) => readonly unknown[] | null;
+  findLabelQueryKey: (labelId: string, projectId?: string | null) => readonly unknown[] | null;
   invalidateLabelQueries: (labelId: string, projectId?: string | null) => void;
 }

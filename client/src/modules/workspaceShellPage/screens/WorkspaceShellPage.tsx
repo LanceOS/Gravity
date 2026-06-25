@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { useInfiniteQuery, useIsFetching, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
 import type { SidebarNavigationState, SidebarProps } from '../../../components/Sidebar';
@@ -327,15 +327,49 @@ export function WorkspaceShellPage() {
     exact: true,
   });
 
-  const labelsQueryVersionMap = useMemo(() => activeWorkspaceProjects.map((project) => {
-    const cachedLabels = queryClient.getQueryData<Label[]>(queryKeys.labels(project.id));
-    if (!Array.isArray(cachedLabels) || cachedLabels.length === 0) {
-      return `${project.id}:0`;
+  const buildWorkspaceProjectCacheFingerprint = useCallback(() => {
+    const signatureParts = [];
+    for (const project of activeWorkspaceProjects) {
+      const cachedTickets = queryClient.getQueryData<Ticket[]>(queryKeys.tickets(project.id)) ?? [];
+      const cachedLabels = queryClient.getQueryData<Label[]>(queryKeys.labels(project.id)) ?? [];
+
+      const ticketSignature = cachedTickets
+        .map((ticket) => `${ticket.id}:${ticket.updatedAt || ''}:${ticket.status || ''}:${ticket.assigneeId || ''}:${ticket.cycleId || ''}:${(ticket.labelIds ?? []).join(',')}`)
+        .join('|');
+      const labelSignature = cachedLabels
+        .map((label) => `${label.id}:${label.projectId || ''}:${label.name || ''}`)
+        .join('|');
+
+      signatureParts.push(`${project.id}:tickets=${cachedTickets.length}:${ticketSignature}:labels=${cachedLabels.length}:${labelSignature}`);
     }
 
-    const signature = cachedLabels.map((label) => label.id ?? label.name ?? '').join(',');
-    return `${project.id}:${cachedLabels.length}:${signature}`;
-  }).join('|'), [activeWorkspaceProjects]);
+    return signatureParts.join('|');
+  }, [activeWorkspaceProjects, queryClient]);
+
+  const cacheFingerprint = useSyncExternalStore(
+    useCallback(
+      (onStoreChange) => {
+        const queryClientProxy = queryClient as unknown as {
+          subscribeAll?: (listener: () => void) => () => void;
+          getQueryCache?: () => { subscribe?: (listener: () => void) => () => void };
+        };
+
+        if (typeof queryClientProxy.subscribeAll === 'function') {
+          return queryClientProxy.subscribeAll(onStoreChange);
+        }
+
+        const queryCache = queryClientProxy.getQueryCache?.();
+        if (queryCache && typeof queryCache.subscribe === 'function') {
+          return queryCache.subscribe(onStoreChange);
+        }
+
+        return () => undefined;
+      },
+      [queryClient]
+    ),
+    buildWorkspaceProjectCacheFingerprint,
+    buildWorkspaceProjectCacheFingerprint,
+  );
 
   const labelsByProject = useMemo(() => {
     const cachedLabelsByProject = new Map<string, Label[]>();
@@ -377,7 +411,7 @@ export function WorkspaceShellPage() {
     }
 
     return cachedLabelsByProject;
-  }, [activeWorkspaceProjectIds, activeWorkspaceProjects, labelsQueryVersionMap, sidebarTree]);
+  }, [activeWorkspaceProjectIds, activeWorkspaceProjects, cacheFingerprint, sidebarTree]);
 
   const workspaceProjectLabels = useMemo(() => {
     const dedupedWorkspaceLabels = new Map<string, Label>();
@@ -512,18 +546,6 @@ export function WorkspaceShellPage() {
       routeAggregateDetailTickets,
     ]
   );
-  const ticketQueryVersionMap = useMemo(() => activeWorkspaceProjects.map((project) => {
-    const cachedTickets = queryClient.getQueryData<Ticket[]>(queryKeys.tickets(project.id)) ?? [];
-    if (!Array.isArray(cachedTickets) || cachedTickets.length === 0) {
-      return `${project.id}:0`;
-    }
-
-    const signature = cachedTickets
-      .map((ticket) => `${ticket.id}:${ticket.updatedAt ?? ''}:${ticket.status}`)
-      .join(',');
-    return `${project.id}:${cachedTickets.length}:${signature}`;
-  }).join('|'), [activeWorkspaceProjects]);
-
   const ticketCountsByProject = useMemo(() => {
     const countsByProject: Record<
       string,
@@ -583,7 +605,7 @@ export function WorkspaceShellPage() {
     }
 
     return countsByProject;
-  }, [activeWorkspaceProjects, currentUser?.id, ticketQueryVersionMap]);
+  }, [activeWorkspaceProjects, cacheFingerprint, currentUser?.id, queryClient]);
 
   const scopedTicketMaps = useMemo(() => {
     const mapByKey = new Map<string, Ticket>();

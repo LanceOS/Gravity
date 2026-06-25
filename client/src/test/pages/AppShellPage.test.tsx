@@ -1397,6 +1397,122 @@ describe('AppShellPage', () => {
     ).toBe(true);
   });
 
+  it('recomputes project sidebar counts when per-project ticket cache entries change', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+        },
+      },
+    });
+
+    const activeProjectTicket = {
+      id: 'ticket-1',
+      key: 'GRA-1',
+      title: 'Active project ticket',
+      status: 'todo',
+      priority: 'medium',
+      projectId: 'project-1',
+      assigneeId: 'user-1',
+      cycleId: 'cycle-1',
+      parentId: null,
+      prStatus: 'none',
+      prUrl: null,
+      createdAt: '2026-05-01T00:00:00.000Z',
+      updatedAt: '2026-05-01T00:00:00.000Z',
+    };
+
+    queryClient.setQueryData(queryKeys.tickets('project-1'), [activeProjectTicket]);
+    queryClient.setQueryData(queryKeys.tickets('project-2'), [
+      {
+        id: 'ticket-2',
+        key: 'API-1',
+        title: 'Team backlog',
+        status: 'in_progress',
+        priority: 'low',
+        projectId: 'project-2',
+        assigneeId: null,
+        cycleId: null,
+        parentId: null,
+        prStatus: 'none',
+        prUrl: null,
+        createdAt: '2026-05-02T00:00:00.000Z',
+        updatedAt: '2026-05-02T00:00:00.000Z',
+      },
+    ]);
+
+    renderAppShell({
+      tickets: buildUseTickets({
+        activeProjectId: 'project-1',
+        projects: [
+          {
+            id: 'project-1',
+            name: 'Gravity Core',
+            key: 'GRA',
+            description: 'Primary project',
+            status: 'active',
+            workspaceId: 'workspace-1',
+          },
+          {
+            id: 'project-2',
+            name: 'Gravity API',
+            key: 'API',
+            description: 'API project',
+            status: 'planned',
+            workspaceId: 'workspace-1',
+          },
+        ],
+        activeView: 'list',
+      }),
+      initialEntries: ['/workspaces/workspace-1'],
+      queryClient,
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('sidebar-counts-by-project')).toBeInTheDocument();
+    });
+
+    const parseCounts = () =>
+      JSON.parse(screen.getByTestId('sidebar-counts-by-project').textContent || '{}') as Record<
+        string,
+        { myIssues: number; activeProjectIssues: number; labels: Record<string, number>; cycles: Record<string, number> }
+      >;
+
+    expect(parseCounts()).toMatchObject({
+      'project-1': {
+        myIssues: 1,
+        activeProjectIssues: 1,
+      },
+      'project-2': {
+        myIssues: 0,
+        activeProjectIssues: 1,
+      },
+    });
+
+    queryClient.setQueryData(queryKeys.tickets('project-1'), [
+      activeProjectTicket,
+      {
+        id: 'ticket-3',
+        key: 'GRA-2',
+        title: 'Second ticket',
+        status: 'in_progress',
+        priority: 'low',
+        projectId: 'project-1',
+        assigneeId: null,
+        cycleId: null,
+        parentId: null,
+        prStatus: 'none',
+        prUrl: null,
+        createdAt: '2026-05-03T00:00:00.000Z',
+        updatedAt: '2026-05-03T00:00:00.000Z',
+      },
+    ]);
+
+    await waitFor(() => {
+      expect(parseCounts()['project-1'].activeProjectIssues).toBe(2);
+    });
+  });
+
   it('uses project-scoped sidebar labels in Manage Projects before per-project label prefetches resolve', async () => {
     const user = userEvent.setup();
 
