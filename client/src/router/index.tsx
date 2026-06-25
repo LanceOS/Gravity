@@ -51,133 +51,87 @@ function workspaceShellElement() {
   );
 }
 
-export const router = createBrowserRouter([
-  {
-    path: '/',
-    element: appShellElement(),
-  },
-  
-  // Workspace Directory / Workspace Overview Page
-  {
-    path: '/workspaces',
-    element: appShellElement(),
-  },
-  {
-    path: '/workspaces/:workspaceId',
+const appShellPaths = [
+  '/',
+  '/workspaces',
+];
+
+const workspaceShellPaths = [
+  '/workspaces/:workspaceId',
+  '/workspaces/:workspaceId/projects',
+  '/workspaces/:workspaceId/projects/list',
+  '/workspaces/:workspaceId/teams',
+  '/workspaces/:workspaceId/all',
+];
+
+const workspaceTeamShellSuffixes = [
+  '/teams/:teamId',
+  '/teams/:teamId/tasks',
+  '/teams/:teamId/views/:viewId',
+  '/teams/:teamId/cycles/:cycleId',
+  '/teams/:teamId/labels/:labelId',
+  '/teams/:teamId/projects',
+];
+
+const workspaceTeamProjectShellSuffixes = [
+  '/teams/:teamId/projects/:projectId',
+  '/teams/:teamId/projects/:projectId/tickets',
+  '/teams/:teamId/projects/:projectId/tickets/:ticketKey',
+  '/teams/:teamId/projects/:projectId/notes',
+  '/teams/:teamId/projects/:projectId/notes/:noteId',
+];
+
+const workspaceProjectShellSuffixes = [
+  '/projects/:projectId/tickets',
+  '/projects/:projectId/tickets/:ticketKey',
+  '/projects/:projectId/notes',
+  '/projects/:projectId/notes/:noteId',
+];
+
+const workspaceRoutes = [
+  ...appShellPaths.map((path) => ({ path, element: appShellElement() })),
+  ...workspaceShellPaths.map((path) => ({ path, element: workspaceShellElement() })),
+  ...workspaceTeamShellSuffixes.map((suffix) => ({
+    path: `/workspaces/:workspaceId${suffix}`,
     element: workspaceShellElement(),
-  },
+  })),
+  ...workspaceTeamProjectShellSuffixes.map((suffix) => ({
+    path: `/workspaces/:workspaceId${suffix}`,
+    element: workspaceShellElement(),
+  })),
+  ...workspaceProjectShellSuffixes.map((suffix) => ({
+    path: `/workspaces/:workspaceId${suffix}`,
+    element: workspaceShellElement(),
+  })),
+];
+
+const staticProtectedRoutes = [
   {
     path: '/workspaces/:workspaceId/settings',
-    element: protectedElement(<WorkspaceSettingsPageRoute />),
-  },
-  {
-    path: '/workspaces/:workspaceId/projects',
-    element: workspaceShellElement(),
-  },
-  {
-    path: '/workspaces/:workspaceId/projects/list',
-    element: workspaceShellElement(),
-  },
-  {
-    path: '/workspaces/:workspaceId/teams',
-    element: workspaceShellElement(),
+    element: <WorkspaceSettingsPageRoute />,
   },
   {
     path: '/account',
-    element: protectedElement(<AccountPreferencesPageRoute />),
+    element: <AccountPreferencesPageRoute />,
   },
+];
 
-  // ----------------------------------------------------
-  // New Workspace / Team / Project URL Structure Routes
-  // ----------------------------------------------------
+export const router = createBrowserRouter([
+  ...workspaceRoutes,
 
-  // All tasks (workspace-level)
-  {
-    path: '/workspaces/:workspaceId/all',
-    element: workspaceShellElement(),
-  },
-  // Team overview
-  {
-    path: '/workspaces/:workspaceId/teams/:teamId',
-    element: workspaceShellElement(),
-  },
-  // Team-level all tasks
-  {
-    path: '/workspaces/:workspaceId/teams/:teamId/tasks',
-    element: workspaceShellElement(),
-  },
-  // Team-level specific view
-  {
-    path: '/workspaces/:workspaceId/teams/:teamId/views/:viewId',
-    element: workspaceShellElement(),
-  },
-  // Team cycle view
-  {
-    path: '/workspaces/:workspaceId/teams/:teamId/cycles/:cycleId',
-    element: workspaceShellElement(),
-  },
   // Legacy compatibility route for label-filtered views
   {
     path: '/workspaces/:workspaceId/teams/:teamId/domains/:domainId',
     element: protectedElement(<TeamLabelRedirect />),
   },
-  // Label-filtered view
-  {
-    path: '/workspaces/:workspaceId/teams/:teamId/labels/:labelId',
-    element: workspaceShellElement(),
-  },
-  // Team projects list page
-  {
-    path: '/workspaces/:workspaceId/teams/:teamId/projects',
-    element: workspaceShellElement(),
-  },
-  // Team project overview
-  {
-    path: '/workspaces/:workspaceId/teams/:teamId/projects/:projectId',
-    element: workspaceShellElement(),
-  },
-  // Team-level project ticket list
-  {
-    path: '/workspaces/:workspaceId/teams/:teamId/projects/:projectId/tickets',
-    element: workspaceShellElement(),
-  },
-  // Team-level project ticket detail
-  {
-    path: '/workspaces/:workspaceId/teams/:teamId/projects/:projectId/tickets/:ticketKey',
-    element: workspaceShellElement(),
-  },
-  // Team-level project notes list
-  {
-    path: '/workspaces/:workspaceId/teams/:teamId/projects/:projectId/notes',
-    element: workspaceShellElement(),
-  },
-  // Team-level project note detail
-  {
-    path: '/workspaces/:workspaceId/teams/:teamId/projects/:projectId/notes/:noteId',
-    element: workspaceShellElement(),
-  },
-
-  // Individual (no teams) routing:
   {
     path: '/workspaces/:workspaceId/projects/:projectId',
     element: protectedElement(<ProjectHomeGuard />),
   },
-  {
-    path: '/workspaces/:workspaceId/projects/:projectId/tickets',
-    element: workspaceShellElement(),
-  },
-  {
-    path: '/workspaces/:workspaceId/projects/:projectId/tickets/:ticketKey',
-    element: workspaceShellElement(),
-  },
-  {
-    path: '/workspaces/:workspaceId/projects/:projectId/notes',
-    element: workspaceShellElement(),
-  },
-  {
-    path: '/workspaces/:workspaceId/projects/:projectId/notes/:noteId',
-    element: workspaceShellElement(),
-  },
+  ...staticProtectedRoutes.map((route) => ({
+    path: route.path,
+    element: protectedElement(route.element),
+  })),
   
   // Export tasks/notes
   {

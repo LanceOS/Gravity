@@ -1,7 +1,7 @@
 import React from 'react';
 import { renderHook, act } from '@testing-library/react';
 import { ActiveViewProvider, useActiveView } from '../ActiveViewContext';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 beforeEach(() => {
   window.localStorage.clear();
