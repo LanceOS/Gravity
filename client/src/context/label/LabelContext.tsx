@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../utils/apiClient';
 import { queryKeys, CACHE_CONFIGS } from '../../utils/queryClient';
 import { useActiveProject } from '../project/ActiveProjectContext';
+import { useProjectContext } from '../project/ProjectContext';
 import { useAuth } from '../auth/AuthContext';
 import { patchTicketLabelAssignment, patchTicketInAllCaches, invalidateTicketCaches } from '../shared';
 import { toast } from '@library';
@@ -23,6 +24,7 @@ export const LabelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const queryClient = useQueryClient();
   const { activeProjectId, activeProjectIdRef } = useActiveProject();
   const { currentUser } = useAuth();
+  const { projects } = useProjectContext();
 
   const labelsQuery = useQuery({
     queryKey: queryKeys.labels(activeProjectId),
@@ -37,12 +39,25 @@ export const LabelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const labels = labelsQuery.data || [];
 
   const findLabelQueryKey = useCallback(
-    (labelId: string) => {
-      const labelQueries = queryClient.getQueriesData<Label[]>({ queryKey: ['labels'] }) || [];
-      const teamLabelQueries = queryClient.getQueriesData<Label[]>({ queryKey: ['teamLabels'] }) || [];
-      const cachedLabelQueries = [...labelQueries, ...teamLabelQueries];
+    (labelId: string, projectId?: string | null) => {
+      const projectIdsToProbe: string[] = [];
 
-      for (const [queryKey, cachedLabels] of cachedLabelQueries) {
+      if (projectId) {
+        projectIdsToProbe.push(projectId);
+      } else if (activeProjectId) {
+        projectIdsToProbe.push(activeProjectId);
+      }
+
+      for (const project of projects) {
+        if (!projectIdsToProbe.includes(project.id)) {
+          projectIdsToProbe.push(project.id);
+        }
+      }
+
+      for (const probeProjectId of projectIdsToProbe) {
+        const queryKey = queryKeys.labels(probeProjectId);
+        const cachedLabels = queryClient.getQueryData<Label[]>(queryKey);
+
         if (Array.isArray(cachedLabels) && cachedLabels.some((label) => label.id === labelId)) {
           return queryKey;
         }
@@ -50,7 +65,7 @@ export const LabelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       return null;
     },
-    [queryClient]
+    [activeProjectId, projects, queryClient]
   );
 
   const invalidateLabelQueries = useCallback(
@@ -192,10 +207,14 @@ export const LabelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     onError: (error, variables) => {
       handleTicketLabelUpdate(variables.ticketId, variables.labelId, false);
       showLabelMutationError(error, 'assign');
-      invalidateTicketCaches(queryClient, variables.ticketId, resolveTicketProjectId(variables.ticketId) || undefined);
+      const resolvedProjectId = resolveTicketProjectId(variables.ticketId) || undefined;
+      const resolvedTicketKey = queryClient.getQueryData<Ticket>(queryKeys.ticketDetail(variables.ticketId))?.key?.toUpperCase();
+      invalidateTicketCaches(queryClient, variables.ticketId, resolvedProjectId, resolvedTicketKey);
     },
     onSuccess: (_result, variables) => {
-      invalidateTicketCaches(queryClient, variables.ticketId, resolveTicketProjectId(variables.ticketId) || undefined);
+      const resolvedProjectId = resolveTicketProjectId(variables.ticketId) || undefined;
+      const resolvedTicketKey = queryClient.getQueryData<Ticket>(queryKeys.ticketDetail(variables.ticketId))?.key?.toUpperCase();
+      invalidateTicketCaches(queryClient, variables.ticketId, resolvedProjectId, resolvedTicketKey);
     },
   });
 
@@ -220,10 +239,14 @@ export const LabelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     onError: (error, variables) => {
       handleTicketLabelUpdate(variables.ticketId, variables.labelId, true);
       showLabelMutationError(error, 'unassign');
-      invalidateTicketCaches(queryClient, variables.ticketId, resolveTicketProjectId(variables.ticketId) || undefined);
+      const resolvedProjectId = resolveTicketProjectId(variables.ticketId) || undefined;
+      const resolvedTicketKey = queryClient.getQueryData<Ticket>(queryKeys.ticketDetail(variables.ticketId))?.key?.toUpperCase();
+      invalidateTicketCaches(queryClient, variables.ticketId, resolvedProjectId, resolvedTicketKey);
     },
     onSuccess: (_result, variables) => {
-      invalidateTicketCaches(queryClient, variables.ticketId, resolveTicketProjectId(variables.ticketId) || undefined);
+      const resolvedProjectId = resolveTicketProjectId(variables.ticketId) || undefined;
+      const resolvedTicketKey = queryClient.getQueryData<Ticket>(queryKeys.ticketDetail(variables.ticketId))?.key?.toUpperCase();
+      invalidateTicketCaches(queryClient, variables.ticketId, resolvedProjectId, resolvedTicketKey);
     },
   });
 

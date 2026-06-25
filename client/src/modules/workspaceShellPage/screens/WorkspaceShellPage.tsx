@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useInfiniteQuery, useIsFetching, useQuery } from '@tanstack/react-query';
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { useInfiniteQuery, useIsFetching, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
 import type { SidebarNavigationState, SidebarProps } from '../../../components/Sidebar';
 import { WorkspaceLayout } from '../../../layouts/WorkspaceLayout/WorkspaceLayout';
@@ -42,7 +42,7 @@ import { useOllamaPanel } from '../hooks/useOllamaPanel';
 import { useWorkspaceViewMode } from '../hooks/useWorkspaceViewMode';
 import type { AppSection } from '../types/AppShell';
 import { LoadingPage } from '../../loadingPage';
-import { CACHE_CONFIGS, queryClient, queryKeys } from '../../../utils/queryClient';
+import { CACHE_CONFIGS, queryKeys } from '../../../utils/queryClient';
 import {
   useWorkspaceCreateLabelDialog,
   useWorkspaceCreateProjectDialog,
@@ -71,6 +71,7 @@ const AGGREGATE_TICKETS_PAGE_SIZE = 120;
 
 export function WorkspaceShellPage() {
   const { currentUser, loading: authLoading, signOut } = useAuth();
+  const queryClient = useQueryClient();
   const { users, isLoading: usersLoading } = useUserDirectory();
   const {
     tickets,
@@ -325,44 +326,92 @@ export function WorkspaceShellPage() {
     queryKey: queryKeys.tickets(projectIdParam || activeProjectId || ''),
     exact: true,
   });
-  const labelsQueryFetching = useIsFetching({
-    queryKey: ['labels'],
-  });
+
+  const buildWorkspaceProjectCacheFingerprint = useCallback(() => {
+    const signatureParts = [];
+    for (const project of activeWorkspaceProjects) {
+      const cachedTickets = queryClient.getQueryData<Ticket[]>(queryKeys.tickets(project.id)) ?? [];
+      const cachedLabels = queryClient.getQueryData<Label[]>(queryKeys.labels(project.id)) ?? [];
+
+      const ticketSignature = cachedTickets
+        .map((ticket) => `${ticket.id}:${ticket.updatedAt || ''}:${ticket.status || ''}:${ticket.assigneeId || ''}:${ticket.cycleId || ''}:${(ticket.labelIds ?? []).join(',')}`)
+        .join('|');
+      const labelSignature = cachedLabels
+        .map((label) => `${label.id}:${label.projectId || ''}:${label.name || ''}`)
+        .join('|');
+
+      signatureParts.push(`${project.id}:tickets=${cachedTickets.length}:${ticketSignature}:labels=${cachedLabels.length}:${labelSignature}`);
+    }
+
+    return signatureParts.join('|');
+  }, [activeWorkspaceProjects, queryClient]);
+
+  const cacheFingerprint = useSyncExternalStore(
+    useCallback(
+      (onStoreChange) => {
+        const queryClientProxy = queryClient as unknown as {
+          subscribeAll?: (listener: () => void) => () => void;
+          getQueryCache?: () => { subscribe?: (listener: () => void) => () => void };
+        };
+
+        if (typeof queryClientProxy.subscribeAll === 'function') {
+          return queryClientProxy.subscribeAll(onStoreChange);
+        }
+
+        const queryCache = queryClientProxy.getQueryCache?.();
+        if (queryCache && typeof queryCache.subscribe === 'function') {
+          return queryCache.subscribe(onStoreChange);
+        }
+
+        return () => undefined;
+      },
+      [queryClient]
+    ),
+    buildWorkspaceProjectCacheFingerprint,
+    buildWorkspaceProjectCacheFingerprint,
+  );
 
   const labelsByProject = useMemo(() => {
     const cachedLabelsByProject = new Map<string, Label[]>();
+    const appendProjectLabels = (projectId: string, projectLabels: Label[]) => {
+      if (!projectLabels.length) {
+        if (!cachedLabelsByProject.has(projectId)) {
+          cachedLabelsByProject.set(projectId, []);
+        }
+        return;
+      }
+
+      const mergedLabels = new Map<string, Label>(projectLabels.map((label) => [label.id, label]));
+      const currentLabels = cachedLabelsByProject.get(projectId);
+      for (const label of currentLabels ?? []) {
+        mergedLabels.set(label.id, label);
+      }
+
+      cachedLabelsByProject.set(projectId, Array.from(mergedLabels.values()));
+    };
+
+    for (const project of activeWorkspaceProjects) {
+      cachedLabelsByProject.set(project.id, []);
+    }
 
     for (const team of sidebarTree?.teams ?? []) {
-      for (const label of team.labels ?? []) {
-        if (!label.projectId || !activeWorkspaceProjectIds.has(label.projectId)) {
+      for (const project of team.projects ?? []) {
+        if (!activeWorkspaceProjectIds.has(project.id)) {
           continue;
         }
 
-        const projectLabels = cachedLabelsByProject.get(label.projectId) ?? [];
-        projectLabels.push(label);
-        cachedLabelsByProject.set(label.projectId, projectLabels);
+        const projectLabels = team.labels ?? [];
+        appendProjectLabels(project.id, projectLabels.filter((label) => label.projectId === project.id));
       }
     }
 
-    for (const [queryKey, cachedLabels] of queryClient.getQueriesData<Label[]>({ queryKey: ['labels'] })) {
-      const queryProjectId = queryKey[1];
-      const projectId =
-        queryProjectId && typeof queryProjectId === 'object' && 'projectId' in queryProjectId
-          ? (queryProjectId as { projectId?: string }).projectId
-          : undefined;
-
-      if (!projectId || !activeWorkspaceProjectIds.has(projectId) || !Array.isArray(cachedLabels)) {
-        continue;
-      }
-
-      cachedLabelsByProject.set(
-        projectId,
-        cachedLabels.filter((label) => label.projectId === projectId),
-      );
+    for (const project of activeWorkspaceProjects) {
+      const cachedProjectLabels = queryClient.getQueryData<Label[]>(queryKeys.labels(project.id));
+      appendProjectLabels(project.id, Array.isArray(cachedProjectLabels) ? cachedProjectLabels : []);
     }
 
     return cachedLabelsByProject;
-  }, [activeWorkspaceProjectIds, labelsQueryFetching, sidebarTree]);
+  }, [activeWorkspaceProjectIds, activeWorkspaceProjects, cacheFingerprint, sidebarTree]);
 
   const workspaceProjectLabels = useMemo(() => {
     const dedupedWorkspaceLabels = new Map<string, Label>();
@@ -518,24 +567,21 @@ export function WorkspaceShellPage() {
       ])
     );
 
-    const cachedProjectTickets = queryClient
-      .getQueriesData<Ticket[]>({ queryKey: ['tickets'] })
-      .map(([, cachedTickets]) => cachedTickets)
-      .filter((cachedTickets): cachedTickets is Ticket[] => Array.isArray(cachedTickets));
+    for (const project of activeWorkspaceProjects) {
+      const projectTickets = queryClient.getQueryData<Ticket[]>(queryKeys.tickets(project.id)) ?? [];
+      if (!Array.isArray(projectTickets)) {
+        continue;
+      }
 
-    for (const projectTickets of cachedProjectTickets) {
       for (const ticket of projectTickets) {
+        if (ticket.projectId && ticket.projectId !== project.id) {
+          continue;
+        }
         if (ticket.status === 'done' || ticket.status === 'canceled') {
           continue;
         }
 
-        const existing = countsByProject[ticket.projectId] ?? {
-          myIssues: 0,
-          activeProjectIssues: 0,
-          labels: {},
-          cycles: {},
-        };
-
+        const existing = countsByProject[project.id];
         const nextLabels = { ...existing.labels };
         const nextCycles = { ...existing.cycles };
 
@@ -549,7 +595,7 @@ export function WorkspaceShellPage() {
           nextCycles[ticket.cycleId] = (nextCycles[ticket.cycleId] ?? 0) + 1;
         }
 
-        countsByProject[ticket.projectId] = {
+        countsByProject[project.id] = {
           myIssues: existing.myIssues + (ticket.assigneeId === currentUser?.id ? 1 : 0),
           activeProjectIssues: existing.activeProjectIssues + 1,
           labels: nextLabels,
@@ -559,26 +605,24 @@ export function WorkspaceShellPage() {
     }
 
     return countsByProject;
-  }, [activeWorkspaceProjects, currentUser?.id, tickets]);
+  }, [activeWorkspaceProjects, cacheFingerprint, currentUser?.id, queryClient]);
 
-  const scopedTicketsByKey = useMemo(() => {
-    const map = new Map<string, Ticket>();
+  const scopedTicketMaps = useMemo(() => {
+    const mapByKey = new Map<string, Ticket>();
+    const mapById = new Map<string, Ticket>();
+
     for (const ticket of routeScopedTickets) {
       const ticketKey = ticket.key?.toUpperCase();
-      if (!ticketKey) {
-        continue;
+      if (ticketKey) {
+        mapByKey.set(ticketKey, ticket);
       }
-      map.set(ticketKey, ticket);
+      mapById.set(ticket.id, ticket);
     }
-    return map;
+
+    return { mapByKey, mapById };
   }, [routeScopedTickets]);
-  const scopedTicketsById = useMemo(() => {
-    const map = new Map<string, Ticket>();
-    for (const ticket of routeScopedTickets) {
-      map.set(ticket.id, ticket);
-    }
-    return map;
-  }, [routeScopedTickets]);
+  const scopedTicketsByKey = scopedTicketMaps.mapByKey;
+  const scopedTicketsById = scopedTicketMaps.mapById;
   const parentTicket = useMemo(
     () => (createParentId ? scopedTicketsById.get(createParentId) || null : null),
     [createParentId, scopedTicketsById]

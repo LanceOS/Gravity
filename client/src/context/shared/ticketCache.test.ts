@@ -186,7 +186,7 @@ describe('ticket cache helpers', () => {
     });
   });
 
-  it('falls back to scanning key-based families when ticket key is not stored on ticket detail cache', () => {
+  it('invalidates key-scoped ticket caches when the key is provided directly', () => {
     const queryClient = createQueryClient();
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
     const targetTicket = makeTicket({ id: 'ticket-1', key: 'ABC-15', projectId: 'project-1', title: 'Fallback scan' });
@@ -196,7 +196,7 @@ describe('ticket cache helpers', () => {
     queryClient.setQueryData<Ticket>(detailQueryKey, targetTicket);
     queryClient.setQueryData<Ticket>(relationsQueryKey, targetTicket);
 
-    invalidateTicketCaches(queryClient, 'ticket-1');
+    invalidateTicketCaches(queryClient, 'ticket-1', undefined, 'ABC-15');
 
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: queryKeys.ticketDetail('ticket-1'),

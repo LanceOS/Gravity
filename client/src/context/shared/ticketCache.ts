@@ -560,10 +560,28 @@ export function patchTicketInAllCaches(
  * Invalidates all query caches related to a single ticket.
  * If projectId is provided, also invalidates the project ticket list cache.
  */
-export function invalidateTicketCaches(queryClient: QueryClient, ticketId: string, projectId?: string) {
+export function invalidateTicketCaches(
+  queryClient: QueryClient,
+  ticketId: string,
+  projectId?: string,
+  ticketKey?: string,
+) {
   const cachedById = queryClient.getQueryData<Ticket>(queryKeys.ticketDetail(ticketId));
   const resolvedProjectId = projectId || cachedById?.projectId;
-  const ticketKey = cachedById?.key?.toUpperCase();
+  const resolvedTicketKey = ticketKey?.toUpperCase() || cachedById?.key?.toUpperCase();
+
+  const readTicketFromQueryPayload = (cached: unknown): Ticket | undefined => {
+    if (!cached || typeof cached !== 'object' || !('id' in cached)) {
+      return undefined;
+    }
+
+    const candidate = cached as { id?: unknown; projectId?: unknown; key?: unknown };
+    if (typeof candidate.id !== 'string') {
+      return undefined;
+    }
+
+    return candidate as Ticket;
+  };
 
   if (resolvedProjectId) {
     queryClient.invalidateQueries({ queryKey: queryKeys.tickets(resolvedProjectId), exact: true });
@@ -571,10 +589,14 @@ export function invalidateTicketCaches(queryClient: QueryClient, ticketId: strin
 
   queryClient.invalidateQueries({ queryKey: queryKeys.ticketDetail(ticketId), exact: true });
 
+  if (!resolvedTicketKey) {
+    return;
+  }
+
   const invalidateUserScopedQueriesById = (queryPrefix: string[]) => {
     for (const [queryKey, cached] of queryClient.getQueriesData<unknown>({ queryKey: queryPrefix })) {
-      const ticket = cached && typeof cached === 'object' && 'id' in cached ? cached as Ticket : undefined;
-      if (ticket?.id !== ticketId) {
+      const ticket = readTicketFromQueryPayload(cached);
+      if (!ticket || ticket.id !== ticketId) {
         continue;
       }
 
@@ -582,8 +604,8 @@ export function invalidateTicketCaches(queryClient: QueryClient, ticketId: strin
     }
   };
 
-  const detailPrefix = ticketKey ? ['tickets', 'detail', ticketKey] : ['tickets', 'detail'];
-  const relationsPrefix = ticketKey ? ['tickets', 'relations', ticketKey] : ['tickets', 'relations'];
+  const detailPrefix = ['tickets', 'detail', resolvedTicketKey];
+  const relationsPrefix = ['tickets', 'relations', resolvedTicketKey];
 
   invalidateUserScopedQueriesById(detailPrefix);
   invalidateUserScopedQueriesById(relationsPrefix);

@@ -24,9 +24,29 @@ vi.mock('../../project/ActiveProjectContext', () => ({
     activeProjectIdRef: { current: mockActiveProjectId },
   }),
 }));
+let mockProjects: Array<{ id: string; workspaceId?: string }> = [];
+vi.mock('../../project/ProjectContext', () => ({
+  useProjectContext: () => {
+    const projectById = new Map(mockProjects.map((project) => [project.id, project]));
+    return {
+      projects: mockProjects,
+      projectsLoading: false,
+      projectLookup: new Map(),
+      projectById,
+      projectsByWorkspaceId: new Map(),
+      fetchInitialData: vi.fn(),
+      fetchProjectData: vi.fn(),
+      createProject: vi.fn(),
+      updateProject: vi.fn(),
+      deleteProject: vi.fn(),
+      joinProject: vi.fn(),
+    };
+  },
+}));
 
 function renderWithProvider(ui: React.ReactNode, activeProjectId: string) {
   mockActiveProjectId = activeProjectId;
+  mockProjects = [{ id: activeProjectId }];
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
