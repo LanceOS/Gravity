@@ -5,6 +5,82 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>gravity</title>
+    <script>
+      (function () {
+        const THEME_STORAGE_KEY = 'gravity_theme';
+        const VIEW_STORAGE_KEY = 'gravity_active_view';
+        const root = document.documentElement;
+
+        const readThemePreference = () => {
+          try {
+            const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
+
+            if (
+              storedTheme === 'dark' ||
+              storedTheme === 'coal-black' ||
+              storedTheme === 'coffee' ||
+              storedTheme === 'honey-glow' ||
+              storedTheme === 'marble-blue' ||
+              storedTheme === 'midnight-azure'
+            ) {
+              return storedTheme;
+            }
+          } catch {
+            // localStorage may be unavailable in restricted/private modes.
+          }
+
+          return 'system';
+        };
+
+        const readViewPreference = () => {
+          try {
+            const storedView = window.localStorage.getItem(VIEW_STORAGE_KEY);
+            return storedView === 'list' || storedView === 'board' ? storedView : 'board';
+          } catch {
+            return 'board';
+          }
+        };
+
+        const isDarkTheme = (preference) => {
+          if (preference === 'system') {
+            return !!window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+          }
+
+          return ['dark', 'coal-black', 'coffee', 'midnight-azure'].includes(preference);
+        };
+
+        const applyThemePreference = (preference) => {
+          root.classList.remove(
+            'dark-theme',
+            'light-theme',
+            'noir-theme',
+            'coal-black-theme',
+            'coffee-theme',
+            'honey-glow-theme',
+            'marble-blue-theme',
+            'midnight-azure-theme',
+          );
+          root.removeAttribute('data-theme');
+
+          if (isDarkTheme(preference)) {
+            root.classList.add('dark-theme');
+            root.setAttribute('data-theme', preference === 'dark' ? 'dark' : preference);
+          } else {
+            root.classList.add('light-theme');
+            root.setAttribute('data-theme', preference);
+          }
+        };
+
+        const initialThemePreference = readThemePreference();
+        const resolvedTheme = initialThemePreference === 'system'
+          ? (isDarkTheme('system') ? 'dark' : 'marble-blue')
+          : initialThemePreference;
+        const initialViewPreference = readViewPreference();
+
+        applyThemePreference(resolvedTheme);
+        root.dataset.initialView = initialViewPreference;
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

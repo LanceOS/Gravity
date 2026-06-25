@@ -7,6 +7,7 @@ import {
   type SavedApiCredential,
   type WorkspaceSettings,
 } from '../utils/settings';
+import { setStoredWorkspaceDefaultView } from '../utils/workspacePreferences';
 import { isThemeMode, type ThemeMode } from '../context/theme/ThemeContext.types';
 
 interface StatusMessage {
@@ -71,6 +72,8 @@ interface UseAccountSettingsOptions {
   setView: (view: 'board' | 'list') => void;
   setTheme: (theme: ThemeMode) => void;
 }
+
+const ACCOUNT_SETTINGS_HYDRATION_TIMEOUT_MS = 5000;
 
 export function useAccountSettings({
   currentUser,
@@ -154,6 +157,12 @@ export function useAccountSettings({
     setSettingsLoading(true);
     setSaveError(null);
     setSettingsHydrated(false);
+    const hydrationTimeout = window.setTimeout(() => {
+      if (!cancelled && requestId > saveRequestId.current) {
+        setSettingsLoading(false);
+        setSettingsHydrated(true);
+      }
+    }, ACCOUNT_SETTINGS_HYDRATION_TIMEOUT_MS);
 
     fetch(`/api/v1/settings/${currentUserId}`)
       .then(async (response) => {
@@ -181,6 +190,7 @@ export function useAccountSettings({
         setSavedCredentials(normalizeSavedCredentials(data.savedCredentials));
         setTheme(nextTheme);
         setView(normalized.defaultView);
+        setStoredWorkspaceDefaultView(normalized.defaultView);
         setApiKeyState(normalized.apiKey === API_KEY_MASK ? 'stored' : 'cleared');
       })
       .catch((error: Error) => {
@@ -189,6 +199,7 @@ export function useAccountSettings({
         }
       })
       .finally(() => {
+        window.clearTimeout(hydrationTimeout);
         if (!cancelled && requestId > saveRequestId.current) {
           setSettingsLoading(false);
           setSettingsHydrated(true);
@@ -197,6 +208,7 @@ export function useAccountSettings({
 
     return () => {
       cancelled = true;
+      window.clearTimeout(hydrationTimeout);
     };
   }, [currentUserId, setTheme, setView]);
 
@@ -338,6 +350,7 @@ export function useAccountSettings({
       setSavedCredentials(normalizeSavedCredentials(data.savedCredentials));
       setTheme(normalized.theme);
       setView(normalized.defaultView);
+      setStoredWorkspaceDefaultView(normalized.defaultView);
       setApiKeyState(normalized.apiKey === API_KEY_MASK ? 'stored' : 'cleared');
       setTestResult(null);
       setSaveSuccess(true);
@@ -522,5 +535,6 @@ export function useAccountSettings({
     refreshOllamaModels,
     hasProviderChanges,
     hasChanges,
+    settingsHydrated,
   };
 }

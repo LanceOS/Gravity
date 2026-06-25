@@ -6,6 +6,9 @@ import { ThemeProvider as AppThemeProvider } from '../../context/theme/ThemeCont
 import { ThemeProvider as SettingsThemeProvider } from '../../modules/settings';
 import { WorkspaceShellPage } from '../../pages/WorkspaceShellPage/WorkspaceShellPage.tsx';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const mocks = vi.hoisted(() => ({
   useAuth: vi.fn(),
@@ -380,6 +383,22 @@ function buildWorkspaceSettings(overrides: Partial<Record<string, unknown>> = {}
   };
 }
 
+const themeBootstrapScript = (() => {
+  const html = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../../../index.html'), 'utf8');
+  const scriptCandidates = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((match) => match[1]);
+  const scriptMatch = scriptCandidates.find(
+    (scriptContent) => scriptContent.includes('readThemePreference') || scriptContent.includes('gravity_active_view')
+  );
+  if (!scriptMatch) {
+    throw new Error('Unable to locate inline bootstrap script in client/index.html.');
+  }
+  return scriptMatch;
+})();
+
+function runThemeBootstrapScript() {
+  return new Function(themeBootstrapScript)();
+}
+
 function renderAppShell() {
   mocks.useWorkspaceDirectory.mockReturnValue(buildWorkspaceDirectory());
   mocks.useAccountSettings.mockReturnValue(buildAccountSettings());
@@ -492,6 +511,7 @@ describe('AppShellPage theme integration', () => {
     document.documentElement.className = '';
     document.documentElement.removeAttribute('data-theme');
     document.documentElement.removeAttribute('data-density');
+    document.documentElement.removeAttribute('data-initial-view');
     document.documentElement.style.cssText = '';
 
     vi.stubGlobal(
@@ -523,5 +543,16 @@ describe('AppShellPage theme integration', () => {
       expect(document.documentElement.style.getPropertyValue('--space-base-multiplier')).toBe('0.75');
       expect(window.localStorage.getItem('gravity_theme')).toBe('marble-blue');
     });
+  });
+
+  it('applies bootstrap theme/view preferences before React render', () => {
+    window.localStorage.setItem('gravity_theme', 'dark');
+    window.localStorage.setItem('gravity_active_view', 'list');
+
+    runThemeBootstrapScript();
+
+    expect(document.documentElement).toHaveClass('dark-theme');
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark');
+    expect(document.documentElement).toHaveAttribute('data-initial-view', 'list');
   });
 });
