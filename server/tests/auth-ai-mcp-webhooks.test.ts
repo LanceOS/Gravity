@@ -537,6 +537,99 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
     expect(membersList[0]).toHaveProperty('lastActiveAt');
   });
 
+  it('enforces single-workspace scope for MCP tool calls', async () => {
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Scope Owner',
+      email: 'scope-owner@example.com',
+      role: 'owner',
+      avatarUrl: 'https://example.com/scope-owner.png',
+    });
+    const owner = ownerApi.user;
+    const { workspace: sourceWorkspace } = await seedWorkspaceFixture({
+      owner: {
+        id: owner.id,
+        name: owner.name,
+        email: owner.email,
+        role: 'owner',
+        avatarUrl: owner.avatar,
+      },
+      workspace: {
+        id: 'workspace-scope-source',
+        name: 'Source Scope',
+      },
+      project: {
+        id: 'project-scope-source',
+        key: 'SS',
+        inviteCode: 'INV-SS-0011ABCD',
+      },
+    });
+
+    const { workspace: otherWorkspace, project: otherProject } = await seedWorkspaceFixture({
+      owner: {
+        id: owner.id,
+        name: owner.name,
+        email: owner.email,
+        role: 'owner',
+        avatarUrl: owner.avatar,
+      },
+      workspace: {
+        id: 'workspace-scope-other',
+        name: 'Other Scope',
+      },
+      project: {
+        id: 'project-scope-other',
+        key: 'OS',
+        inviteCode: 'INV-OS-0022ABCD',
+      },
+    });
+
+    const crossScopeTicket = await seedTicket(otherProject.id, {
+      id: 'ticket-scope-other-1',
+      key: `${otherProject.key}-1`,
+      title: 'Cross-workspace ticket',
+    });
+
+    const ownerMcpRequest = (payload: Record<string, unknown>) =>
+      ownerApi.post('/api/v1/mcp/sse').set('X-Workspace-Id', sourceWorkspace.id).send(payload);
+
+    const deniedTicketResponse = await ownerMcpRequest({
+      jsonrpc: '2.0',
+      id: 2001,
+      method: 'tools/call',
+      params: {
+        name: 'get_ticket_details',
+        arguments: {
+          ticketKey: crossScopeTicket.key,
+        },
+      },
+    });
+
+    expect(deniedTicketResponse.status).toBe(200);
+    expect(deniedTicketResponse.body.error?.message).toBe(
+      `This action is scoped to workspace ${sourceWorkspace.name} and cannot be performed on resources in other workspaces.`,
+    );
+    expect(deniedTicketResponse.body.error?.code).toBe(-32602);
+    expect(deniedTicketResponse.body.error?.message).not.toContain(crossScopeTicket.key);
+
+    const deniedMembersResponse = await ownerMcpRequest({
+      jsonrpc: '2.0',
+      id: 2002,
+      method: 'tools/call',
+      params: {
+        name: 'list_workspace_members',
+        arguments: {
+          workspaceId: otherWorkspace.id,
+        },
+      },
+    });
+
+    expect(deniedMembersResponse.status).toBe(200);
+    expect(deniedMembersResponse.body.error?.message).toBe(
+      `This action is scoped to workspace ${sourceWorkspace.name} and cannot be performed on resources in other workspaces.`,
+    );
+    expect(deniedMembersResponse.body.error?.code).toBe(-32602);
+  });
+
   it('manages blockers and dependencies through the canonical MCP tools', async () => {
     const auditSpy = vi.spyOn(logger, 'audit').mockImplementation(() => {});
     const ownerApi = await createAuthenticatedApi({

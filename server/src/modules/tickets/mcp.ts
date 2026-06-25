@@ -4,6 +4,7 @@ import { projects, labels, teams, ticketLabels, workspaceSettings } from '../../
 import { audit } from '../../lib/logger.js';
 import { mcpEventBus } from '../../lib/mcp-event-bus.js';
 import { McpToolValidationError } from '../mcp/errors.js';
+import { createWorkspaceScopeViolationError, isWorkspaceScopeViolationError } from '../mcp/scope.js';
 import {
   addCommentRecord,
   createTicketRecord,
@@ -566,13 +567,20 @@ export class TicketTools {
         };
       }
 
-      if (normalized.includes('unauthorized') || normalized.includes('workspace mismatch')) {
+      if (isWorkspaceScopeViolationError(error) || normalized.includes('unauthorized') || normalized.includes('workspace mismatch')) {
+        const scopeError = await createWorkspaceScopeViolationError(workspaceId, {
+          action: 'preview_ticket_dependency',
+          operation,
+          role,
+          ticketKey,
+        });
+
         return {
           failure: {
             ok: false,
             operation,
             status: 'unauthorized',
-            message: 'That ticket is not available in the active workspace.',
+            message: scopeError.message,
             suggestedFix: 'Use tickets from the current workspace, or switch to the correct workspace first.',
             relationship,
           },
@@ -1398,8 +1406,15 @@ export class TicketTools {
       .where(eq(projects.id, projectId))
       .limit(1);
 
-    if (!project || project.workspaceId !== workspaceId) {
-      throw new Error('Unauthorized or workspace mismatch');
+    if (!project) {
+      throw new Error(`Project ${projectId} not found.`);
+    }
+
+    if (project.workspaceId !== workspaceId) {
+      throw await createWorkspaceScopeViolationError(workspaceId, {
+        action: 'ticket_workspace_scope',
+        projectId,
+      });
     }
   }
 }

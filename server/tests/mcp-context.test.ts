@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { resolveMcpContext } from '../src/modules/mcp/request-context.js';
 
 describe('resolveMcpContext', () => {
-  it('uses request workspace but ignores request actor without trusted context', () => {
+  it('uses trusted context and ignores request values when no trusted context is provided', () => {
     expect(
       resolveMcpContext(
         {
@@ -14,26 +14,28 @@ describe('resolveMcpContext', () => {
         } as never,
       ),
     ).toEqual({
-      workspaceId: 'workspace-1',
+      workspaceId: '',
       actorUserId: '',
     });
   });
 
-  it('uses trusted actor context with request-provided workspace', () => {
+  it('uses trusted context even when request provides workspace and actor', () => {
     expect(
       resolveMcpContext(
         {
           method: 'tools/call',
           params: {
             workspaceId: 'workspace-from-request',
+            actorUserId: 'user-from-request',
           },
         },
         {
           actorUserId: 'user-from-auth',
+          workspaceId: 'workspace-from-auth',
         },
       ),
     ).toEqual({
-      workspaceId: 'workspace-from-request',
+      workspaceId: 'workspace-from-auth',
       actorUserId: 'user-from-auth',
     });
   });

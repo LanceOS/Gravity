@@ -4,9 +4,14 @@ import { executeTool } from './tool-executor.js';
 import { resolveMcpContext } from './request-context.js';
 import { createMcpErrorResponse } from './responses.js';
 import { mcpToolsList } from './tools.js';
+import { createWorkspaceScopeViolationError } from './scope.js';
 import type { McpRequestPayload } from './types.js';
 import { getDisabledTools } from './workspace-tools.js';
 import { desanitize, sanitize } from './state-map.js';
+
+function normalizeContextValue(value: unknown) {
+  return typeof value === 'string' ? value.trim() : '';
+}
 
 const TOOL_ALIAS_GROUPS: string[][] = [
   ['add_comment', 'create_comment'],
@@ -99,20 +104,31 @@ export class McpRequestHandler {
       }
 
       if (payload.method === 'tools/call') {
+        const toolName = payload.params?.name ?? '';
         // Enforce token scopes for external clients when provided.
         if (tokenScopes) {
-          const toolName = payload.params?.name ?? '';
           const hasGlobalCall = tokenScopes.includes('tools/call') || tokenScopes.includes('tools/call:*');
           const hasExactCall = typeof toolName === 'string' && toolName.length > 0 && tokenScopes.includes(`tools/call:${toolName}`);
           if (!hasGlobalCall && !hasExactCall) {
             return createMcpErrorResponse(payload.id ?? null, -32001, 'Insufficient token scopes.');
           }
         }
+        const requestedWorkspaceId = normalizeContextValue(payload.params?.workspaceId);
+        if (requestedWorkspaceId && requestedWorkspaceId !== context.workspaceId) {
+          const toolScopeError = await createWorkspaceScopeViolationError(context.workspaceId, {
+            action: 'tools/call',
+            toolName: toolName,
+            requestedWorkspaceId,
+            actorUserId: context.actorUserId || undefined,
+            requestId: payload.id,
+          });
+          return createMcpErrorResponse(payload.id ?? null, toolScopeError.code, toolScopeError.message, toolScopeError.data);
+        }
+
         // Tool execution always uses the trusted context resolved above.
         if (!accessChecked) {
           await assertMcpWorkspaceAccess(context);
         }
-        const toolName = payload.params?.name ?? '';
         const disabledTools = await getDisabledTools(context.workspaceId);
 
         if (isToolDisabled(toolName, disabledTools)) {

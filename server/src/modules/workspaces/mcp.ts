@@ -6,6 +6,7 @@ import {
   workspaceMemberActivity,
   workspaceMembers,
 } from '../../db/schema.js';
+import { createWorkspaceScopeViolationError } from '../mcp/scope.js';
 import { ToolExecutionContext, ToolHandler } from '../mcp/tool-handlers/types.js';
 import { McpToolDefinition } from '../mcp/types.js';
 
@@ -23,13 +24,19 @@ export class WorkspaceMemberTools {
    * @throws When the workspace id is missing or does not match the authorized context.
    */
   async listWorkspaceMembers(args: Record<string, unknown>, context: ToolExecutionContext) {
-    const workspaceId = String(args.workspaceId ?? '');
+    const requestedWorkspaceId = typeof args.workspaceId === 'string' ? args.workspaceId.trim() : '';
+    const workspaceId = requestedWorkspaceId || context.workspaceId;
+
     if (!workspaceId) {
       throw new Error('workspaceId is required.');
     }
 
     if (workspaceId !== context.workspaceId) {
-      throw new Error('Unauthorized or workspace mismatch');
+      throw await createWorkspaceScopeViolationError(context.workspaceId, {
+        action: 'list_workspace_members',
+        requestedWorkspaceId,
+        actorUserId: context.actorUserId,
+      });
     }
 
     const members = await db
@@ -81,7 +88,6 @@ export const workspaceToolDefinitions: McpToolDefinition[] = [
       properties: {
         workspaceId: { type: 'string' },
       },
-      required: ['workspaceId'],
     },
   },
 ];
