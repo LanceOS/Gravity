@@ -610,6 +610,7 @@ export function WorkspaceShellPage() {
 
   const {
     settings: accountSettings,
+    settingsHydrated = true,
     ollamaModels,
     savedCredentials: accountSavedCredentials,
   } = useAccountSettings({
@@ -849,7 +850,7 @@ export function WorkspaceShellPage() {
     handleOpenTeamManager();
   }, [sidebarActiveTeamId, handleOpenTeamManager, handleOpenTeamProjectsManager]);
 
-  if (loading || workspacesLoading || !workspacesResolvedForCurrentUser) {
+  if (loading || workspacesLoading || !workspacesResolvedForCurrentUser || (currentUser && !settingsHydrated)) {
     return <LoadingPage />;
   }
 

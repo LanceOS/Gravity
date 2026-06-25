@@ -843,6 +843,17 @@ describe('AppShellPage', () => {
     expect(screen.getByText('LoadingPage')).toBeInTheDocument();
   });
 
+  it('renders the loading page while account settings are still hydrating', () => {
+    renderAppShell({
+      account: buildAccountSettings({
+        settingsHydrated: false,
+      }),
+    });
+
+    expect(screen.getByText('LoadingPage')).toBeInTheDocument();
+    expect(screen.queryByText('WorkspaceLayout')).not.toBeInTheDocument();
+  });
+
   it('routes signed-in users without workspaces to the directory page', async () => {
     renderAppShell({
       directory: buildWorkspaceDirectory({ workspaces: [] }),

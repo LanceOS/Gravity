@@ -1,10 +1,11 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
+import { getStoredWorkspaceDefaultView } from '../../utils/workspacePreferences';
 import type { ActiveView, ActiveViewContextType } from './ActiveViewContext.types';
 
 const ActiveViewContext = createContext<ActiveViewContextType | undefined>(undefined);
 
 export const ActiveViewProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [activeView, setView] = useState<ActiveView>('board');
+  const [activeView, setView] = useState<ActiveView>(getStoredWorkspaceDefaultView);
 
   return (
     <ActiveViewContext.Provider value={{ activeView, setView }}>

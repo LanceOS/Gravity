@@ -7,6 +7,7 @@ import {
   type SavedApiCredential,
   type WorkspaceSettings,
 } from '../utils/settings';
+import { setStoredWorkspaceDefaultView } from '../utils/workspacePreferences';
 import { isThemeMode, type ThemeMode } from '../context/theme/ThemeContext.types';
 
 interface StatusMessage {
@@ -181,6 +182,7 @@ export function useAccountSettings({
         setSavedCredentials(normalizeSavedCredentials(data.savedCredentials));
         setTheme(nextTheme);
         setView(normalized.defaultView);
+        setStoredWorkspaceDefaultView(normalized.defaultView);
         setApiKeyState(normalized.apiKey === API_KEY_MASK ? 'stored' : 'cleared');
       })
       .catch((error: Error) => {
@@ -338,6 +340,7 @@ export function useAccountSettings({
       setSavedCredentials(normalizeSavedCredentials(data.savedCredentials));
       setTheme(normalized.theme);
       setView(normalized.defaultView);
+      setStoredWorkspaceDefaultView(normalized.defaultView);
       setApiKeyState(normalized.apiKey === API_KEY_MASK ? 'stored' : 'cleared');
       setTestResult(null);
       setSaveSuccess(true);
@@ -522,5 +525,6 @@ export function useAccountSettings({
     refreshOllamaModels,
     hasProviderChanges,
     hasChanges,
+    settingsHydrated,
   };
 }
