@@ -65,9 +65,14 @@ async function assertAssigneeInProjectScope(project: ProjectScope, assigneeId: s
     return;
   }
 
+  const isWorkspaceMemberId = await isWorkspaceMember(project.workspaceId, assigneeId);
+  if (!isWorkspaceMemberId) {
+    throw new Error(TICKET_ASSIGNEE_SCOPE_VIOLATION);
+  }
+
   const isAllowed = project.hierarchyMode === 'teams'
     ? await isProjectMember(project.id, assigneeId)
-    : await isWorkspaceMember(project.workspaceId, assigneeId);
+    : true;
 
   if (!isAllowed) {
     throw new Error(TICKET_ASSIGNEE_SCOPE_VIOLATION);

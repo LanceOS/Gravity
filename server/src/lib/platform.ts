@@ -234,19 +234,52 @@ export async function listUsers(scope: { projectId?: string; workspaceId?: strin
     `);
   } else if (workspaceId) {
     result = await db.execute(sql`
+      WITH workspace_owner AS (
+        SELECT created_by
+        FROM workspaces
+        WHERE id = ${workspaceId}
+        LIMIT 1
+      )
       SELECT
-        u.id,
-        u.name,
-        u.email,
-        COALESCE(up.avatar_url, u.image, '') AS avatar,
-        COALESCE(up.role, 'guest_contributor') AS role,
-        COALESCE(us.tutorial_completed, FALSE) AS tutorial_completed
-      FROM workspace_members wm
-      INNER JOIN "user" u ON u.id = wm.user_id
-      LEFT JOIN user_profiles up ON up.user_id = u.id
-      LEFT JOIN user_settings us ON us.user_id = u.id
-      WHERE wm.workspace_id = ${workspaceId}
-      ORDER BY u.name ASC
+        combined.id,
+        combined.name,
+        combined.email,
+        combined.avatar,
+        combined.role,
+        combined.tutorial_completed
+      FROM (
+        SELECT
+          u.id,
+          u.name,
+          u.email,
+          COALESCE(up.avatar_url, u.image, '') AS avatar,
+          COALESCE(wm.role, 'guest_contributor') AS role,
+          COALESCE(us.tutorial_completed, FALSE) AS tutorial_completed
+        FROM workspace_members wm
+        INNER JOIN "user" u ON u.id = wm.user_id
+        LEFT JOIN user_profiles up ON up.user_id = u.id
+        LEFT JOIN user_settings us ON us.user_id = u.id
+        WHERE wm.workspace_id = ${workspaceId}
+
+        UNION ALL
+
+        SELECT
+          u.id,
+          u.name,
+          u.email,
+          COALESCE(up.avatar_url, u.image, '') AS avatar,
+          'owner' AS role,
+          COALESCE(us.tutorial_completed, FALSE) AS tutorial_completed
+        FROM workspace_owner wo
+        INNER JOIN "user" u ON u.id = wo.created_by
+        LEFT JOIN user_profiles up ON up.user_id = u.id
+        LEFT JOIN user_settings us ON us.user_id = u.id
+        LEFT JOIN workspace_members wm_owner
+          ON wm_owner.workspace_id = ${workspaceId}
+          AND wm_owner.user_id = u.id
+        WHERE wm_owner.user_id IS NULL
+      ) AS combined
+      ORDER BY combined.name ASC
     `);
   } else {
     return [];

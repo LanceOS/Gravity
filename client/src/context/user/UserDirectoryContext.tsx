@@ -1,6 +1,6 @@
 import { createContext, useContext, useMemo, type FC, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useLocation } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { apiClient } from '../../utils/apiClient';
 import { CACHE_CONFIGS, queryKeys } from '../../utils/queryClient';
 import { useAuth } from '../auth/AuthContext';
@@ -17,30 +17,43 @@ const UserDirectoryContext = createContext<UserDirectoryContextType | undefined>
 
 export const UserDirectoryProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const { currentUser } = useAuth();
-  const { pathname } = useLocation();
   const { activeProjectId } = useActiveProject();
   const { projectById } = useProjectContext();
+  const {
+    workspaceId: workspaceIdFromRoute,
+    projectId: projectIdFromRoute,
+    teamId: teamIdFromRoute,
+  } = useParams();
+  const activeWorkspaceId = useMemo(
+    () => (activeProjectId ? projectById.get(activeProjectId)?.workspaceId : ''),
+    [activeProjectId, projectById],
+  );
 
-  const pathSegments = pathname.split('/').filter(Boolean);
-  const workspaceIdFromRoute = pathSegments[0] === 'workspaces' ? pathSegments[1] : '';
-  const isTeamRoute = pathSegments[0] === 'workspaces' && pathSegments[2] === 'teams';
-  const teamIdFromRoute = isTeamRoute ? pathSegments[3] : '';
-  const projectIdFromRoute = pathSegments.indexOf('projects') > -1 ? pathSegments[pathSegments.indexOf('projects') + 1] : '';
   const routedProject = projectIdFromRoute ? projectById.get(projectIdFromRoute) : undefined;
   const activeProject = activeProjectId ? projectById.get(activeProjectId) : undefined;
-  const userScope = activeProject?.id
-    ? isTeamRoute && teamIdFromRoute
-      ? { teamId: teamIdFromRoute }
-      : routedProject?.teamId
-        ? { teamId: routedProject.teamId }
-        : workspaceIdFromRoute
-          ? { workspaceId: workspaceIdFromRoute }
-          : null
-    : isTeamRoute && teamIdFromRoute
-      ? { teamId: teamIdFromRoute }
-      : workspaceIdFromRoute
-        ? { workspaceId: workspaceIdFromRoute }
-        : null;
+  const userScope = useMemo(() => {
+    if (teamIdFromRoute) {
+      return { teamId: teamIdFromRoute };
+    }
+
+    if (routedProject?.teamId) {
+      return { teamId: routedProject.teamId };
+    }
+
+    if (workspaceIdFromRoute) {
+      return { workspaceId: workspaceIdFromRoute };
+    }
+
+    if (activeProject?.id) {
+      return { workspaceId: activeProject.workspaceId };
+    }
+
+    if (activeWorkspaceId) {
+      return { workspaceId: activeWorkspaceId };
+    }
+
+    return null;
+  }, [activeProject, activeWorkspaceId, routedProject, teamIdFromRoute, workspaceIdFromRoute]);
   const queryParams = userScope
     ? Object.fromEntries(Object.entries(userScope).filter(([, value]) => Boolean(value))) as { projectId?: string; workspaceId?: string; teamId?: string }
     : undefined;
