@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { db } from '../../../db/index.js';
 import { projects } from '../../../db/schema.js';
 
@@ -11,15 +11,23 @@ type DbErrorCandidate = {
 };
 
 export function buildProjectKeyConflictMessage(projectKey: string) {
-  return `Project key ${projectKey} is already in use. Choose a different global project key.`;
+  return `Project key ${projectKey} is already in use in this workspace. Choose a different key.`;
 }
 
 export function buildProjectInviteConflictMessage() {
   return 'Could not reserve a unique project invite code. Please try again.';
 }
 
-export async function projectKeyExists(projectKey: string) {
-  const rows = await db.select({ id: projects.id }).from(projects).where(eq(projects.key, projectKey)).limit(1);
+export async function projectKeyExists(projectKey: string, workspaceId?: string) {
+  if (!workspaceId) {
+    return false;
+  }
+
+  const rows = await db
+    .select({ id: projects.id })
+    .from(projects)
+    .where(and(eq(projects.workspaceId, workspaceId), eq(projects.key, projectKey)))
+    .limit(1);
   return Boolean(rows[0]);
 }
 
@@ -47,7 +55,14 @@ export function mapProjectCreationError(error: unknown, projectKey: string) {
         return { status: 503, message: buildProjectInviteConflictMessage() };
       }
 
-      if (constraint === 'projects_key_key' || /Key \(key\)=/.test(detail) || /projects_key_key/i.test(message)) {
+      if (
+        constraint === 'projects_key_key'
+        || constraint === 'projects_workspace_id_key_key'
+        || /projects_workspace_id_key/i.test(constraint)
+        || /Key \(workspace_id, key\)=/.test(detail)
+        || /projects_key_key/i.test(message)
+        || /projects_workspace_id_key/i.test(message)
+      ) {
         return { status: 409, message: buildProjectKeyConflictMessage(projectKey) };
       }
 
