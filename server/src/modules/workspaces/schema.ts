@@ -96,7 +96,7 @@ export const projects = pgTable('projects', {
   teamId: text('team_id').notNull().references(() => teams.id),
   name: text('name').notNull(),
   description: text('description').notNull().default(''),
-  key: text('key').notNull().unique(),
+  key: text('key').notNull(),
   status: text('status').notNull().default('planned'),
   inviteCode: text('invite_code').notNull().unique(),
   createdBy: text('created_by').notNull(),
@@ -106,6 +106,7 @@ export const projects = pgTable('projects', {
 }, (table) => ({
   workspaceIdIdx: index('projects_workspace_id_idx').on(table.workspaceId),
   teamIdIdx: index('projects_team_id_idx').on(table.teamId),
+  workspaceIdKeyUniqueIdx: uniqueIndex('projects_workspace_id_key_idx').on(table.workspaceId, table.key),
 }));
 
 export const projectMembers = pgTable(

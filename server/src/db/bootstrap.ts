@@ -388,7 +388,7 @@ export async function initializeDatabase() {
       team_id TEXT,
       name TEXT NOT NULL,
       description TEXT NOT NULL DEFAULT '',
-      key TEXT NOT NULL UNIQUE,
+      key TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'planned',
       invite_code TEXT NOT NULL UNIQUE,
       created_by TEXT NOT NULL,
@@ -555,6 +555,9 @@ export async function initializeDatabase() {
 
     CREATE INDEX IF NOT EXISTS projects_workspace_id_idx ON projects (workspace_id);
     CREATE INDEX IF NOT EXISTS project_members_user_id_idx ON project_members (user_id);
+    ALTER TABLE projects DROP CONSTRAINT IF EXISTS projects_key_key;
+    DROP INDEX IF EXISTS projects_workspace_id_key_idx;
+    CREATE UNIQUE INDEX IF NOT EXISTS projects_workspace_id_key_idx ON projects (workspace_id, key);
     CREATE INDEX IF NOT EXISTS tickets_project_id_idx ON tickets (project_id);
     CREATE INDEX IF NOT EXISTS tickets_assignee_id_idx ON tickets (assignee_id);
     CREATE INDEX IF NOT EXISTS tickets_cycle_id_idx ON tickets (cycle_id);

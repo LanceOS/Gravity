@@ -110,6 +110,59 @@ describe('projects and tickets routes', () => {
     });
   });
 
+  it('allows the same project key to be used in different workspaces', async () => {
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Workspace Scoped Key Owner',
+      email: 'scoped-key-owner@example.com',
+      role: 'owner',
+    });
+    const owner = ownerApi.user;
+    const { workspace: workspaceA } = await seedWorkspaceFixture({
+      owner: {
+        id: owner.id,
+        name: owner.name,
+        email: owner.email,
+        role: 'owner',
+        avatarUrl: owner.avatar,
+      },
+      project: {
+        key: 'TEST',
+      },
+    });
+
+    const createWorkspaceResponse = await ownerApi
+      .post('/api/v1/workspaces')
+      .send({
+        name: 'Second Workspace',
+        description: 'Second workspace for key-scoping checks',
+        key: 'SBX',
+        ownerId: owner.id,
+      });
+
+    expect(createWorkspaceResponse.status).toBe(201);
+    const workspaceBId = createWorkspaceResponse.body.workspace.id;
+
+    const createProjectResponse = await ownerApi
+      .post('/api/v1/projects')
+      .send({
+        workspaceId: workspaceBId,
+        name: 'Second Workspace Project',
+        key: 'TEST',
+        description: 'Project key duplicate across workspaces',
+      });
+
+    expect(createProjectResponse.status).toBe(201);
+    expect(createProjectResponse.body).toMatchObject({
+      name: 'Second Workspace Project',
+      key: 'TEST',
+      workspaceId: workspaceBId,
+      status: 'active',
+    });
+
+    expect(createProjectResponse.body.workspaceId).toBe(workspaceBId);
+    expect(workspaceA.id).not.toEqual(workspaceBId);
+  });
+
   it('requires authentication and workspace membership to create projects', async () => {
     const ownerApi = await createAuthenticatedApi({
       name: 'Project Owner',

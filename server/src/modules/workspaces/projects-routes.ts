@@ -108,10 +108,6 @@ export function createProjectsRouter() {
 
       const projectId = createId('p');
       const normalizedKey = normalizeEntityKey(key);
-      if (await projectKeyExists(normalizedKey)) {
-        res.status(409).json({ error: buildProjectKeyConflictMessage(normalizedKey) });
-        return;
-      }
 
       let targetWorkspaceId = workspaceId as string | undefined;
       if (targetWorkspaceId) {
@@ -132,6 +128,11 @@ export function createProjectsRouter() {
           res.status(400).json({ error: 'teamId must belong to the target workspace.' });
           return;
         }
+      }
+
+      if (targetWorkspaceId && await projectKeyExists(normalizedKey, targetWorkspaceId)) {
+        res.status(409).json({ error: buildProjectKeyConflictMessage(normalizedKey) });
+        return;
       }
 
       const project = await createProjectRecord({
