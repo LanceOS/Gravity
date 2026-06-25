@@ -94,6 +94,7 @@ export function findCachedTicketByKeyOrId(
   queryClient: QueryClient,
   ticketKey?: string,
   ticketId?: string,
+  projectId?: string,
 ): Ticket | TicketWithRelations | undefined {
   const normalizedTicketKey = ticketKey?.toUpperCase();
   const normalizedTicketId = ticketId?.trim();
@@ -106,6 +107,16 @@ export function findCachedTicketByKeyOrId(
   }
 
   if (normalizedTicketKey) {
+    const directByKey = queryClient.getQueryData<TicketWithRelations>(queryKeys.ticket(normalizedTicketKey));
+    if (candidateMatchesKey(directByKey, normalizedTicketKey)) {
+      return directByKey;
+    }
+
+    const directByRelations = queryClient.getQueryData<TicketWithRelations>(queryKeys.ticketRelations(normalizedTicketKey));
+    if (candidateMatchesKey(directByRelations, normalizedTicketKey)) {
+      return directByRelations;
+    }
+
     const byKeyQueries = queryClient.getQueriesData<unknown>({ queryKey: ['tickets', 'detail', normalizedTicketKey] });
     for (const [, candidate] of byKeyQueries) {
       if (candidateMatchesKey(candidate, normalizedTicketKey)) {
@@ -117,6 +128,16 @@ export function findCachedTicketByKeyOrId(
     for (const [, candidate] of byRelationQueries) {
       if (candidateMatchesKey(candidate, normalizedTicketKey)) {
         return candidate as TicketWithRelations;
+      }
+    }
+  }
+
+  if (projectId) {
+    const projectList = queryClient.getQueryData<Ticket[]>(queryKeys.tickets(projectId));
+    if (Array.isArray(projectList)) {
+      const match = findTicketInList(projectList, normalizedTicketKey, normalizedTicketId);
+      if (match) {
+        return match;
       }
     }
   }
@@ -393,9 +414,16 @@ export function normalizeCommentPayload(value: unknown): Comment | null {
 export function patchTicketInAllCaches(
   queryClient: QueryClient,
   ticketId: string,
-  patchFn: (ticket: Ticket) => Ticket
+  patchFn: (ticket: Ticket) => Ticket,
+  options?: {
+    projectId?: string;
+    ticketKey?: string;
+  }
 ) {
-  const listQueries = queryClient.getQueriesData<Ticket[]>({ queryKey: ['tickets'] });
+  const listQueries = options?.projectId
+    ? [[queryKeys.tickets(options.projectId), queryClient.getQueryData<Ticket[]>(queryKeys.tickets(options.projectId))] as const]
+    : queryClient.getQueriesData<Ticket[]>({ queryKey: ['tickets'] });
+
   for (const [queryKey, list] of listQueries) {
     if (!Array.isArray(list)) {
       continue;
@@ -428,9 +456,16 @@ export function patchTicketInAllCaches(
     return patchFn(existing);
   });
 
-  const detailVariants = [['tickets', 'detail'], ['tickets', 'relations'], ['ticket-detail']];
-  
-  for (const baseKey of detailVariants) {
+  const detailByKey = options?.ticketKey
+    ? normalizedTicketKeyCandidates(options.ticketKey)
+    : [['ticket-detail']];
+
+  if (!options?.ticketKey) {
+    detailByKey.push(['tickets', 'detail']);
+    detailByKey.push(['tickets', 'relations']);
+  }
+
+  for (const baseKey of detailByKey) {
     for (const [queryKey, data] of queryClient.getQueriesData<Ticket>({ queryKey: baseKey })) {
       const existingTicket = data && typeof data === 'object' && 'id' in data ? (data as TicketWithRelations) : undefined;
       if (!existingTicket || existingTicket.id !== ticketId) {
@@ -447,11 +482,19 @@ export function patchTicketInAllCaches(
   }
 }
 
+function normalizedTicketKeyCandidates(ticketKey: string): (readonly unknown[])[] {
+  const upperKey = ticketKey.toUpperCase();
+  return [['tickets', 'detail', upperKey], ['tickets', 'relations', upperKey]];
+}
+
 /**
  * Invalidates all query caches related to a single ticket.
  * If projectId is provided, also invalidates the project ticket list cache.
  */
 export function invalidateTicketCaches(queryClient: QueryClient, ticketId: string, projectId?: string) {
+  const cachedById = queryClient.getQueryData<Ticket>(queryKeys.ticketDetail(ticketId));
+  const ticketKey = cachedById?.key?.toUpperCase();
+
   if (projectId) {
     queryClient.invalidateQueries({ queryKey: queryKeys.tickets(projectId), exact: true });
   } else {
@@ -467,8 +510,13 @@ export function invalidateTicketCaches(queryClient: QueryClient, ticketId: strin
     }
   }
 
-  queryClient.invalidateQueries({ queryKey: ['tickets', 'detail'] });
-  queryClient.invalidateQueries({ queryKey: ['tickets', 'relations'] });
   queryClient.invalidateQueries({ queryKey: queryKeys.ticketDetail(ticketId) });
+  if (ticketKey) {
+    queryClient.invalidateQueries({ queryKey: ['tickets', 'detail', ticketKey] });
+    queryClient.invalidateQueries({ queryKey: ['tickets', 'relations', ticketKey] });
+  } else {
+    queryClient.invalidateQueries({ queryKey: ['tickets', 'detail'] });
+    queryClient.invalidateQueries({ queryKey: ['tickets', 'relations'] });
+  }
   queryClient.invalidateQueries({ queryKey: ['ticket-detail'] });
 }

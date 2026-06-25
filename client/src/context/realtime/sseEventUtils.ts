@@ -27,11 +27,16 @@ export function removeSseTicketEntries(
   queryClient: QueryClient,
   ticketKey?: string,
   ticketId?: string,
+  projectId?: string,
 ): void {
   const normalizedTicketKey = ticketKey?.toUpperCase();
   const targetTicketId = ticketId?.trim() || undefined;
 
-  for (const [queryKey, value] of queryClient.getQueriesData<Ticket[]>({ queryKey: ['tickets'] })) {
+  const listQueries = projectId
+    ? [[queryKeys.tickets(projectId), queryClient.getQueryData<Ticket[]>(queryKeys.tickets(projectId))] as const]
+    : queryClient.getQueriesData<Ticket[]>({ queryKey: ['tickets'] });
+
+  for (const [queryKey, value] of listQueries) {
     if (!Array.isArray(value)) {
       continue;
     }
@@ -53,13 +58,8 @@ export function removeSseTicketEntries(
   }
 
   if (normalizedTicketKey) {
-    for (const [queryKey] of queryClient.getQueriesData({ queryKey: ['tickets', 'detail', normalizedTicketKey] })) {
-      queryClient.removeQueries({ queryKey: [...queryKey], exact: true });
-    }
-
-    for (const [queryKey] of queryClient.getQueriesData({ queryKey: ['tickets', 'relations', normalizedTicketKey] })) {
-      queryClient.removeQueries({ queryKey: [...queryKey], exact: true });
-    }
+    queryClient.removeQueries({ queryKey: ['tickets', 'detail', normalizedTicketKey] });
+    queryClient.removeQueries({ queryKey: ['tickets', 'relations', normalizedTicketKey] });
   }
 }
 
@@ -150,7 +150,7 @@ export function upsertTicketFromSse(
 
   const ticketKey = normalizedTicket.key;
   const ticketId = normalizedTicket.id;
-  const cachedTicket = findCachedTicketByKeyOrId(queryClient, ticketKey, ticketId);
+  const cachedTicket = findCachedTicketByKeyOrId(queryClient, ticketKey, ticketId, normalizedTicket.projectId);
   const sourceProjectId = cachedTicket?.projectId;
 
   queryClient.setQueryData<TicketWithRelations>(queryKeys.ticketDetail(ticketId), (existing) => {
