@@ -7,6 +7,8 @@ import { ThemeProvider as SettingsThemeProvider } from '../../modules/settings';
 import { WorkspaceShellPage } from '../../pages/WorkspaceShellPage/WorkspaceShellPage.tsx';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const mocks = vi.hoisted(() => ({
   useAuth: vi.fn(),
@@ -382,12 +384,15 @@ function buildWorkspaceSettings(overrides: Partial<Record<string, unknown>> = {}
 }
 
 const themeBootstrapScript = (() => {
-  const html = readFileSync(new URL('../../../index.html', import.meta.url), 'utf8');
-  const scriptMatch = html.match(/<head>[\s\S]*?<script>([\s\S]*?)<\/script>/);
+  const html = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../../../index.html'), 'utf8');
+  const scriptCandidates = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((match) => match[1]);
+  const scriptMatch = scriptCandidates.find(
+    (scriptContent) => scriptContent.includes('readThemePreference') || scriptContent.includes('gravity_active_view')
+  );
   if (!scriptMatch) {
     throw new Error('Unable to locate inline bootstrap script in client/index.html.');
   }
-  return scriptMatch[1];
+  return scriptMatch;
 })();
 
 function runThemeBootstrapScript() {

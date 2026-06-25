@@ -211,4 +211,44 @@ describe('useAccountSettings', () => {
     expect(result.current.hasChanges).toBe(false);
     expect(result.current.hasProviderChanges).toBe(true);
   });
+
+  it('falls back to hydrated state if settings request stalls', async () => {
+    const currentUser = {
+      id: 'user-settings-3',
+      name: 'Alan Turing',
+      email: 'alan@example.com',
+      avatar: '',
+      role: 'developer',
+      tutorial_completed: 1,
+    };
+    const setTheme = vi.fn();
+    const setView = vi.fn();
+    const fetchMock = vi.fn(() => new Promise<never>(() => undefined));
+    vi.stubGlobal('fetch', fetchMock);
+    vi.useFakeTimers();
+
+    try {
+      const { result } = renderHook(() =>
+        useAccountSettings({
+          currentUser,
+          activeView: 'board',
+          theme: 'dark',
+          setTheme,
+          setView,
+        })
+      );
+
+      expect(result.current.settingsLoading).toBe(true);
+      expect(result.current.settingsHydrated).toBe(false);
+
+      act(() => {
+        vi.advanceTimersByTime(5000);
+      });
+
+      expect(result.current.settingsHydrated).toBe(true);
+      expect(result.current.settingsLoading).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

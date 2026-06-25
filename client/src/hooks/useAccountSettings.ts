@@ -73,6 +73,8 @@ interface UseAccountSettingsOptions {
   setTheme: (theme: ThemeMode) => void;
 }
 
+const ACCOUNT_SETTINGS_HYDRATION_TIMEOUT_MS = 5000;
+
 export function useAccountSettings({
   currentUser,
   activeView,
@@ -155,6 +157,12 @@ export function useAccountSettings({
     setSettingsLoading(true);
     setSaveError(null);
     setSettingsHydrated(false);
+    const hydrationTimeout = window.setTimeout(() => {
+      if (!cancelled && requestId > saveRequestId.current) {
+        setSettingsLoading(false);
+        setSettingsHydrated(true);
+      }
+    }, ACCOUNT_SETTINGS_HYDRATION_TIMEOUT_MS);
 
     fetch(`/api/v1/settings/${currentUserId}`)
       .then(async (response) => {
@@ -191,6 +199,7 @@ export function useAccountSettings({
         }
       })
       .finally(() => {
+        window.clearTimeout(hydrationTimeout);
         if (!cancelled && requestId > saveRequestId.current) {
           setSettingsLoading(false);
           setSettingsHydrated(true);
@@ -199,6 +208,7 @@ export function useAccountSettings({
 
     return () => {
       cancelled = true;
+      window.clearTimeout(hydrationTimeout);
     };
   }, [currentUserId, setTheme, setView]);
 
