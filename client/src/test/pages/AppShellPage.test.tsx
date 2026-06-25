@@ -533,12 +533,14 @@ function renderAppShell({
   account = buildAccountSettings(),
   workspaceSettings = buildWorkspaceSettings(),
   initialEntries = ['/workspaces/workspace-1'],
+  queryClient,
 }: {
   tickets?: Record<string, unknown>;
   directory?: Record<string, unknown>;
   account?: Record<string, unknown>;
   workspaceSettings?: Record<string, unknown>;
   initialEntries?: string[];
+  queryClient?: QueryClient;
 } = {}) {
   const ticketState = tickets as any;
   mocks.useAuth.mockReturnValue({
@@ -619,16 +621,10 @@ function renderAppShell({
     setView: ticketState.setView,
   });
 
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
-      },
-    },
-  });
+  const appShellQueryClient = queryClient ?? sharedQueryClient;
 
   return render(
-    <QueryClientProvider client={queryClient}>
+    <QueryClientProvider client={appShellQueryClient}>
       <MemoryRouter initialEntries={initialEntries}>
         <LocationDisplay />
         <Routes>
@@ -1231,8 +1227,15 @@ describe('AppShellPage', () => {
   });
 
   it('builds project sidebar counts from exact per-project ticket cache entries', async () => {
-    const getQueriesData = vi.spyOn(sharedQueryClient, 'getQueriesData');
-    const getQueryData = vi.spyOn(sharedQueryClient, 'getQueryData');
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+        },
+      },
+    });
+    const getQueriesData = vi.spyOn(queryClient, 'getQueriesData');
+    const getQueryData = vi.spyOn(queryClient, 'getQueryData');
     const hasTicketQueryProjectId = (queryKey: unknown, projectId: string) => {
       if (!Array.isArray(queryKey) || queryKey[0] !== 'tickets' || typeof queryKey[1] !== 'object' || !queryKey[1]) {
         return false;
@@ -1240,7 +1243,7 @@ describe('AppShellPage', () => {
       return (queryKey[1] as { projectId?: string }).projectId === projectId;
     };
 
-    sharedQueryClient.setQueryData(queryKeys.tickets('project-1'), [
+    queryClient.setQueryData(queryKeys.tickets('project-1'), [
       {
         id: 'ticket-1',
         key: 'GRA-1',
@@ -1287,7 +1290,7 @@ describe('AppShellPage', () => {
         updatedAt: '2026-05-01T00:00:00.000Z',
       },
     ]);
-    sharedQueryClient.setQueryData(queryKeys.tickets('project-2'), [
+    queryClient.setQueryData(queryKeys.tickets('project-2'), [
       {
         id: 'ticket-4',
         title: 'Api backlog ticket',
@@ -1304,7 +1307,7 @@ describe('AppShellPage', () => {
         updatedAt: '2026-05-02T00:00:00.000Z',
       },
     ]);
-    sharedQueryClient.setQueryData(queryKeys.tickets('other-project'), [
+    queryClient.setQueryData(queryKeys.tickets('other-project'), [
       {
         id: 'ticket-other',
         title: 'Other workspace ticket',
@@ -1346,6 +1349,7 @@ describe('AppShellPage', () => {
         activeView: 'list',
       }),
       initialEntries: ['/workspaces/workspace-1'],
+      queryClient,
     });
 
     await waitFor(() => {

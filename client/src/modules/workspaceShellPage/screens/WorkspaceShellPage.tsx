@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useInfiniteQuery, useIsFetching, useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useIsFetching, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
 import type { SidebarNavigationState, SidebarProps } from '../../../components/Sidebar';
 import { WorkspaceLayout } from '../../../layouts/WorkspaceLayout/WorkspaceLayout';
@@ -42,7 +42,7 @@ import { useOllamaPanel } from '../hooks/useOllamaPanel';
 import { useWorkspaceViewMode } from '../hooks/useWorkspaceViewMode';
 import type { AppSection } from '../types/AppShell';
 import { LoadingPage } from '../../loadingPage';
-import { CACHE_CONFIGS, queryClient, queryKeys } from '../../../utils/queryClient';
+import { CACHE_CONFIGS, queryKeys } from '../../../utils/queryClient';
 import {
   useWorkspaceCreateLabelDialog,
   useWorkspaceCreateProjectDialog,
@@ -71,6 +71,7 @@ const AGGREGATE_TICKETS_PAGE_SIZE = 120;
 
 export function WorkspaceShellPage() {
   const { currentUser, loading: authLoading, signOut } = useAuth();
+  const queryClient = useQueryClient();
   const { users, isLoading: usersLoading } = useUserDirectory();
   const {
     tickets,
@@ -327,8 +328,13 @@ export function WorkspaceShellPage() {
   });
 
   const labelsQueryVersionMap = useMemo(() => activeWorkspaceProjects.map((project) => {
-    const queryState = queryClient.getQueryState(queryKeys.labels(project.id));
-    return `${project.id}:${queryState?.dataUpdatedAt ?? 0}`;
+    const cachedLabels = queryClient.getQueryData<Label[]>(queryKeys.labels(project.id));
+    if (!Array.isArray(cachedLabels) || cachedLabels.length === 0) {
+      return `${project.id}:0`;
+    }
+
+    const signature = cachedLabels.map((label) => label.id ?? label.name ?? '').join(',');
+    return `${project.id}:${cachedLabels.length}:${signature}`;
   }).join('|'), [activeWorkspaceProjects]);
 
   const labelsByProject = useMemo(() => {
@@ -507,8 +513,15 @@ export function WorkspaceShellPage() {
     ]
   );
   const ticketQueryVersionMap = useMemo(() => activeWorkspaceProjects.map((project) => {
-    const queryState = queryClient.getQueryState(queryKeys.tickets(project.id));
-    return `${project.id}:${queryState?.dataUpdatedAt ?? 0}`;
+    const cachedTickets = queryClient.getQueryData<Ticket[]>(queryKeys.tickets(project.id)) ?? [];
+    if (!Array.isArray(cachedTickets) || cachedTickets.length === 0) {
+      return `${project.id}:0`;
+    }
+
+    const signature = cachedTickets
+      .map((ticket) => `${ticket.id}:${ticket.updatedAt ?? ''}:${ticket.status}`)
+      .join(',');
+    return `${project.id}:${cachedTickets.length}:${signature}`;
   }).join('|'), [activeWorkspaceProjects]);
 
   const ticketCountsByProject = useMemo(() => {
