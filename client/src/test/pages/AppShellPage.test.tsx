@@ -212,6 +212,11 @@ vi.mock('../../layouts/WorkspaceLayout/WorkspaceLayout', () => ({
   WorkspaceLayout: ({ sidebarProps, children, rightPanels }: WorkspaceLayoutMockProps) => (
     <div>
       <div>WorkspaceLayout</div>
+      {sidebarProps.projects?.counts?.byProject ? (
+        <pre data-testid="sidebar-counts-by-project">
+          {JSON.stringify(sidebarProps.projects.counts.byProject)}
+        </pre>
+      ) : null}
       <button type="button" onClick={sidebarProps.userMenu.onOpenSettings}>
         Open settings
       </button>
@@ -1223,6 +1228,169 @@ describe('AppShellPage', () => {
     });
 
     expect(screen.queryByRole('button', { name: 'Payments' })).not.toBeInTheDocument();
+  });
+
+  it('builds project sidebar counts from exact per-project ticket cache entries', async () => {
+    const getQueriesData = vi.spyOn(sharedQueryClient, 'getQueriesData');
+    const getQueryData = vi.spyOn(sharedQueryClient, 'getQueryData');
+    const hasTicketQueryProjectId = (queryKey: unknown, projectId: string) => {
+      if (!Array.isArray(queryKey) || queryKey[0] !== 'tickets' || typeof queryKey[1] !== 'object' || !queryKey[1]) {
+        return false;
+      }
+      return (queryKey[1] as { projectId?: string }).projectId === projectId;
+    };
+
+    sharedQueryClient.setQueryData(queryKeys.tickets('project-1'), [
+      {
+        id: 'ticket-1',
+        key: 'GRA-1',
+        title: 'Frontend ticket',
+        status: 'todo',
+        priority: 'medium',
+        projectId: 'project-1',
+        assigneeId: 'user-1',
+        cycleId: 'cycle-1',
+        parentId: null,
+        prStatus: 'none',
+        prUrl: null,
+        createdAt: '2026-05-01T00:00:00.000Z',
+        updatedAt: '2026-05-01T00:00:00.000Z',
+      },
+      {
+        id: 'ticket-2',
+        title: 'Archived ticket',
+        key: 'GRA-2',
+        status: 'done',
+        priority: 'low',
+        projectId: 'project-1',
+        assigneeId: 'user-1',
+        cycleId: 'cycle-2',
+        parentId: null,
+        prStatus: 'none',
+        prUrl: null,
+        createdAt: '2026-05-01T00:00:00.000Z',
+        updatedAt: '2026-05-01T00:00:00.000Z',
+      },
+      {
+        id: 'ticket-3',
+        title: 'In progress ticket',
+        key: 'GRA-3',
+        status: 'in_progress',
+        priority: 'high',
+        projectId: 'project-1',
+        assigneeId: null,
+        cycleId: null,
+        parentId: null,
+        prStatus: 'none',
+        prUrl: null,
+        createdAt: '2026-05-01T00:00:00.000Z',
+        updatedAt: '2026-05-01T00:00:00.000Z',
+      },
+    ]);
+    sharedQueryClient.setQueryData(queryKeys.tickets('project-2'), [
+      {
+        id: 'ticket-4',
+        title: 'Api backlog ticket',
+        key: 'API-1',
+        status: 'backlog',
+        priority: 'low',
+        projectId: 'project-2',
+        assigneeId: null,
+        cycleId: 'cycle-1',
+        parentId: null,
+        prStatus: 'none',
+        prUrl: null,
+        createdAt: '2026-05-02T00:00:00.000Z',
+        updatedAt: '2026-05-02T00:00:00.000Z',
+      },
+    ]);
+    sharedQueryClient.setQueryData(queryKeys.tickets('other-project'), [
+      {
+        id: 'ticket-other',
+        title: 'Other workspace ticket',
+        key: 'OTH-1',
+        status: 'todo',
+        priority: 'medium',
+        projectId: 'other-project',
+        assigneeId: 'user-1',
+        cycleId: null,
+        parentId: null,
+        prStatus: 'none',
+        prUrl: null,
+        createdAt: '2026-05-03T00:00:00.000Z',
+        updatedAt: '2026-05-03T00:00:00.000Z',
+      },
+    ]);
+
+    renderAppShell({
+      tickets: buildUseTickets({
+        activeProjectId: 'project-1',
+        projects: [
+          {
+            id: 'project-1',
+            name: 'Gravity Core',
+            key: 'GRA',
+            description: 'Primary project',
+            status: 'active',
+            workspaceId: 'workspace-1',
+          },
+          {
+            id: 'project-2',
+            name: 'Gravity API',
+            key: 'API',
+            description: 'API project',
+            status: 'planned',
+            workspaceId: 'workspace-1',
+          },
+        ],
+        activeView: 'list',
+      }),
+      initialEntries: ['/workspaces/workspace-1'],
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('sidebar-counts-by-project')).toBeInTheDocument();
+    });
+
+    const projectCounts = JSON.parse(
+      screen.getByTestId('sidebar-counts-by-project').textContent || '{}'
+    ) as Record<
+      string,
+      { myIssues: number; activeProjectIssues: number; labels: Record<string, number>; cycles: Record<string, number> }
+    >;
+
+    expect(projectCounts).toEqual({
+      'project-1': {
+        myIssues: 1,
+        activeProjectIssues: 2,
+        labels: {},
+        cycles: { 'cycle-1': 1 },
+      },
+      'project-2': {
+        myIssues: 0,
+        activeProjectIssues: 1,
+        labels: {},
+        cycles: { 'cycle-1': 1 },
+      },
+    });
+    expect(
+      getQueriesData.mock.calls.some(([queryFilter]: unknown[]) => {
+        if (!queryFilter || typeof queryFilter !== 'object' || !('queryKey' in queryFilter)) {
+          return false;
+        }
+        const queryKey = (queryFilter as { queryKey?: unknown[] }).queryKey;
+        return Array.isArray(queryKey) && (queryKey[0] === 'tickets' || queryKey[0] === 'labels');
+      })
+    ).toBe(false);
+    expect(
+      getQueryData.mock.calls.some(([queryKey]) => hasTicketQueryProjectId(queryKey, 'other-project'))
+    ).toBe(false);
+    expect(
+      getQueryData.mock.calls.some(([queryKey]) => hasTicketQueryProjectId(queryKey, 'project-1'))
+    ).toBe(true);
+    expect(
+      getQueryData.mock.calls.some(([queryKey]) => hasTicketQueryProjectId(queryKey, 'project-2'))
+    ).toBe(true);
   });
 
   it('uses project-scoped sidebar labels in Manage Projects before per-project label prefetches resolve', async () => {

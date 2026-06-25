@@ -325,44 +325,53 @@ export function WorkspaceShellPage() {
     queryKey: queryKeys.tickets(projectIdParam || activeProjectId || ''),
     exact: true,
   });
-  const labelsQueryFetching = useIsFetching({
-    queryKey: ['labels'],
-  });
+
+  const labelsQueryVersionMap = useMemo(() => activeWorkspaceProjects.map((project) => {
+    const queryState = queryClient.getQueryState(queryKeys.labels(project.id));
+    return `${project.id}:${queryState?.dataUpdatedAt ?? 0}`;
+  }).join('|'), [activeWorkspaceProjects]);
 
   const labelsByProject = useMemo(() => {
     const cachedLabelsByProject = new Map<string, Label[]>();
+    const appendProjectLabels = (projectId: string, projectLabels: Label[]) => {
+      if (!projectLabels.length) {
+        if (!cachedLabelsByProject.has(projectId)) {
+          cachedLabelsByProject.set(projectId, []);
+        }
+        return;
+      }
+
+      const mergedLabels = new Map<string, Label>(projectLabels.map((label) => [label.id, label]));
+      const currentLabels = cachedLabelsByProject.get(projectId);
+      for (const label of currentLabels ?? []) {
+        mergedLabels.set(label.id, label);
+      }
+
+      cachedLabelsByProject.set(projectId, Array.from(mergedLabels.values()));
+    };
+
+    for (const project of activeWorkspaceProjects) {
+      cachedLabelsByProject.set(project.id, []);
+    }
 
     for (const team of sidebarTree?.teams ?? []) {
-      for (const label of team.labels ?? []) {
-        if (!label.projectId || !activeWorkspaceProjectIds.has(label.projectId)) {
+      for (const project of team.projects ?? []) {
+        if (!activeWorkspaceProjectIds.has(project.id)) {
           continue;
         }
 
-        const projectLabels = cachedLabelsByProject.get(label.projectId) ?? [];
-        projectLabels.push(label);
-        cachedLabelsByProject.set(label.projectId, projectLabels);
+        const projectLabels = team.labels ?? [];
+        appendProjectLabels(project.id, projectLabels.filter((label) => label.projectId === project.id));
       }
     }
 
-    for (const [queryKey, cachedLabels] of queryClient.getQueriesData<Label[]>({ queryKey: ['labels'] })) {
-      const queryProjectId = queryKey[1];
-      const projectId =
-        queryProjectId && typeof queryProjectId === 'object' && 'projectId' in queryProjectId
-          ? (queryProjectId as { projectId?: string }).projectId
-          : undefined;
-
-      if (!projectId || !activeWorkspaceProjectIds.has(projectId) || !Array.isArray(cachedLabels)) {
-        continue;
-      }
-
-      cachedLabelsByProject.set(
-        projectId,
-        cachedLabels.filter((label) => label.projectId === projectId),
-      );
+    for (const project of activeWorkspaceProjects) {
+      const cachedProjectLabels = queryClient.getQueryData<Label[]>(queryKeys.labels(project.id));
+      appendProjectLabels(project.id, Array.isArray(cachedProjectLabels) ? cachedProjectLabels : []);
     }
 
     return cachedLabelsByProject;
-  }, [activeWorkspaceProjectIds, labelsQueryFetching, sidebarTree]);
+  }, [activeWorkspaceProjectIds, activeWorkspaceProjects, labelsQueryVersionMap, sidebarTree]);
 
   const workspaceProjectLabels = useMemo(() => {
     const dedupedWorkspaceLabels = new Map<string, Label>();
@@ -497,6 +506,11 @@ export function WorkspaceShellPage() {
       routeAggregateDetailTickets,
     ]
   );
+  const ticketQueryVersionMap = useMemo(() => activeWorkspaceProjects.map((project) => {
+    const queryState = queryClient.getQueryState(queryKeys.tickets(project.id));
+    return `${project.id}:${queryState?.dataUpdatedAt ?? 0}`;
+  }).join('|'), [activeWorkspaceProjects]);
+
   const ticketCountsByProject = useMemo(() => {
     const countsByProject: Record<
       string,
@@ -518,24 +532,21 @@ export function WorkspaceShellPage() {
       ])
     );
 
-    const cachedProjectTickets = queryClient
-      .getQueriesData<Ticket[]>({ queryKey: ['tickets'] })
-      .map(([, cachedTickets]) => cachedTickets)
-      .filter((cachedTickets): cachedTickets is Ticket[] => Array.isArray(cachedTickets));
+    for (const project of activeWorkspaceProjects) {
+      const projectTickets = queryClient.getQueryData<Ticket[]>(queryKeys.tickets(project.id)) ?? [];
+      if (!Array.isArray(projectTickets)) {
+        continue;
+      }
 
-    for (const projectTickets of cachedProjectTickets) {
       for (const ticket of projectTickets) {
+        if (ticket.projectId && ticket.projectId !== project.id) {
+          continue;
+        }
         if (ticket.status === 'done' || ticket.status === 'canceled') {
           continue;
         }
 
-        const existing = countsByProject[ticket.projectId] ?? {
-          myIssues: 0,
-          activeProjectIssues: 0,
-          labels: {},
-          cycles: {},
-        };
-
+        const existing = countsByProject[project.id];
         const nextLabels = { ...existing.labels };
         const nextCycles = { ...existing.cycles };
 
@@ -549,7 +560,7 @@ export function WorkspaceShellPage() {
           nextCycles[ticket.cycleId] = (nextCycles[ticket.cycleId] ?? 0) + 1;
         }
 
-        countsByProject[ticket.projectId] = {
+        countsByProject[project.id] = {
           myIssues: existing.myIssues + (ticket.assigneeId === currentUser?.id ? 1 : 0),
           activeProjectIssues: existing.activeProjectIssues + 1,
           labels: nextLabels,
@@ -559,26 +570,24 @@ export function WorkspaceShellPage() {
     }
 
     return countsByProject;
-  }, [activeWorkspaceProjects, currentUser?.id, tickets]);
+  }, [activeWorkspaceProjects, currentUser?.id, ticketQueryVersionMap]);
 
-  const scopedTicketsByKey = useMemo(() => {
-    const map = new Map<string, Ticket>();
+  const scopedTicketMaps = useMemo(() => {
+    const mapByKey = new Map<string, Ticket>();
+    const mapById = new Map<string, Ticket>();
+
     for (const ticket of routeScopedTickets) {
       const ticketKey = ticket.key?.toUpperCase();
-      if (!ticketKey) {
-        continue;
+      if (ticketKey) {
+        mapByKey.set(ticketKey, ticket);
       }
-      map.set(ticketKey, ticket);
+      mapById.set(ticket.id, ticket);
     }
-    return map;
+
+    return { mapByKey, mapById };
   }, [routeScopedTickets]);
-  const scopedTicketsById = useMemo(() => {
-    const map = new Map<string, Ticket>();
-    for (const ticket of routeScopedTickets) {
-      map.set(ticket.id, ticket);
-    }
-    return map;
-  }, [routeScopedTickets]);
+  const scopedTicketsByKey = scopedTicketMaps.mapByKey;
+  const scopedTicketsById = scopedTicketMaps.mapById;
   const parentTicket = useMemo(
     () => (createParentId ? scopedTicketsById.get(createParentId) || null : null),
     [createParentId, scopedTicketsById]
