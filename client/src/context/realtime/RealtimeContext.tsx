@@ -82,7 +82,7 @@ export function useRealtimeContextValue({
               ? event.ticketId.trim()
               : undefined;
           const eventTicketId = payloadTicketId || payloadComment?.ticketId || undefined;
-          const cachedTicket = findCachedTicketByKeyOrId(queryClient, event.ticketKey, payloadTicketId);
+          const cachedTicket = findCachedTicketByKeyOrId(queryClient, event.ticketKey, payloadTicketId, event.projectId || payloadTicket?.projectId);
           const projectId = event.projectId || cachedTicket?.projectId || payloadTicket?.projectId;
 
           switch (event.type) {
@@ -112,17 +112,17 @@ export function useRealtimeContextValue({
 
             case 'ticket.deleted':
               if (payloadTicket) {
-                removeSseTicketEntries(queryClient, payloadTicket.key, payloadTicket.id);
+                removeSseTicketEntries(queryClient, payloadTicket.key, payloadTicket.id, event.projectId || payloadTicket?.projectId);
                 break;
               }
 
               if (payloadTicketId) {
-                removeSseTicketEntries(queryClient, undefined, payloadTicketId);
+                removeSseTicketEntries(queryClient, undefined, payloadTicketId, event.projectId || payloadTicket?.projectId);
                 break;
               }
 
               if (event.ticketKey || cachedTicket?.id) {
-                removeSseTicketEntries(queryClient, event.ticketKey, cachedTicket?.id);
+                removeSseTicketEntries(queryClient, event.ticketKey, cachedTicket?.id, event.projectId || payloadTicket?.projectId);
                 break;
               }
 

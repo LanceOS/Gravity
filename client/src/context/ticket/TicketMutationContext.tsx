@@ -62,7 +62,10 @@ export const TicketMutationProvider: React.FC<{ children: React.ReactNode }> = (
     patchTicketInAllCaches(queryClient, updatedTicket.id, (existing) => combineTicketDetails(
       existing as TicketWithRelations,
       updatedTicket,
-    ));
+    ), {
+      projectId: updatedTicket.projectId,
+      ticketKey: updatedTicket.key,
+    });
 
     invalidateAggregateTicketQueries(queryClient, updatedTicket.projectId);
 
@@ -217,7 +220,7 @@ export const TicketMutationProvider: React.FC<{ children: React.ReactNode }> = (
     updates: Partial<Ticket>,
     options?: TicketUpdateOptions
   ) => {
-    const cachedTicket = findCachedTicketByKeyOrId(queryClient, undefined, id);
+    const cachedTicket = findCachedTicketByKeyOrId(queryClient, undefined, id, activeProjectIdRef.current);
     const projectId = cachedTicket?.projectId || activeProjectIdRef.current;
     if (!projectId) return;
 
