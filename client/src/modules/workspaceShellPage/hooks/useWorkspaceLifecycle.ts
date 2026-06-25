@@ -2,12 +2,50 @@ import { useEffect, useMemo, type Dispatch, type SetStateAction } from 'react';
 import type { User, Project } from '../../../types/domain';
 import type { WorkspaceSummary } from '../../../hooks/useWorkspaceDirectory';
 import type { AppSection } from '../types/AppShell';
-import { useQueryCacheString } from '../../../hooks/useQueryCacheString';
 import {
   workspaceDirectoryService as defaultWorkspaceDirectoryService,
   type WorkspaceDirectoryService,
 } from '../../../services/workspaceDirectoryService';
 import { useWorkspaceSelectionState } from './useWorkspaceSelectionState';
+import { normalizeInviteCode } from '../../../utils/workspace';
+
+const WORKSPACE_INVITE_TTL_MS = 5 * 60 * 1000;
+
+type PendingWorkspaceInviteState = {
+  code: string;
+  expiresAt: number;
+};
+
+let pendingWorkspaceInviteState: PendingWorkspaceInviteState | null = null;
+
+function storePendingWorkspaceInvite(rawInviteCode: string) {
+  const code = normalizeInviteCode(rawInviteCode);
+  if (!code) {
+    return;
+  }
+
+  pendingWorkspaceInviteState = {
+    code,
+    expiresAt: Date.now() + WORKSPACE_INVITE_TTL_MS,
+  };
+}
+
+function consumePendingWorkspaceInvite(): string | null {
+  if (!pendingWorkspaceInviteState) {
+    return null;
+  }
+
+  if (pendingWorkspaceInviteState.expiresAt <= Date.now()) {
+    pendingWorkspaceInviteState = null;
+    return null;
+  }
+
+  return pendingWorkspaceInviteState.code;
+}
+
+function clearPendingWorkspaceInvite() {
+  pendingWorkspaceInviteState = null;
+}
 
 interface UseActiveWorkspaceSelectionArgs {
   currentUser: User | null;
@@ -58,10 +96,6 @@ export function usePendingWorkspaceInvite({
   requestJoinByInvite,
   refreshWorkspaces,
 }: UsePendingWorkspaceInviteArgs) {
-  const { readValue: readPendingInvite, writeValue: writePendingInvite } = useQueryCacheString({
-    key: ['workspaceShell', 'pendingInvite'],
-  });
-
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -71,30 +105,33 @@ export function usePendingWorkspaceInvite({
       return;
     }
 
-    writePendingInvite(invite);
+    storePendingWorkspaceInvite(invite);
     const newUrl = window.location.origin + window.location.pathname;
     window.history.replaceState({}, document.title, newUrl);
-  }, [writePendingInvite]);
+  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (!currentUser) return;
 
-    const pendingInvite = readPendingInvite();
+    const pendingInvite = consumePendingWorkspaceInvite();
     if (!pendingInvite) {
+      clearPendingWorkspaceInvite();
       return;
     }
 
-    writePendingInvite(null);
-
     const runAutoJoin = async () => {
+    try {
       const success = await requestJoinByInvite(pendingInvite);
       if (success) {
         await refreshWorkspaces();
       }
+    } finally {
+      clearPendingWorkspaceInvite();
+    }
     };
     void runAutoJoin();
-  }, [currentUser, readPendingInvite, requestJoinByInvite, refreshWorkspaces, writePendingInvite]);
+  }, [currentUser, requestJoinByInvite, refreshWorkspaces]);
 }
 
 interface UseWorkspaceMemberActivityArgs {
