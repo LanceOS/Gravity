@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { McpRequestHandler } from '../src/modules/mcp/request-handler.js';
 import * as accessModule from '../src/modules/mcp/access.js';
 import * as workspaceToolsModule from '../src/modules/mcp/workspace-tools.js';
+import * as logger from '../src/lib/logger.js';
 
 describe('McpRequestHandler', () => {
   afterEach(() => {
@@ -65,5 +66,46 @@ describe('McpRequestHandler', () => {
         tools: expect.any(Array),
       },
     });
+  });
+
+  it('rejects tool calls where payload workspaceId does not match scoped workspace', async () => {
+    const auditSpy = vi.spyOn(logger, 'audit').mockImplementation(() => {});
+
+    const handler = new McpRequestHandler();
+    const response = await handler.handle(
+      {
+        jsonrpc: '2.0',
+        id: 3,
+        method: 'tools/call',
+        params: {
+          name: 'get_ticket_details',
+          workspaceId: 'workspace-2',
+          arguments: {
+            ticketKey: 'SCP-1',
+          },
+        },
+      } as never,
+      'workspace-1',
+      'user-1',
+    );
+
+    expect(response).toMatchObject({
+      jsonrpc: '2.0',
+      id: 3,
+      error: {
+        code: -32602,
+        message: 'This action is scoped to workspace workspace-1 and cannot be performed on resources in other workspaces.',
+      },
+    });
+
+    expect(auditSpy).toHaveBeenCalledWith(
+      'mcp.scope.violation',
+      expect.objectContaining({
+        action: 'mcp_scope_violation',
+        workspaceId: 'workspace-1',
+        toolName: 'get_ticket_details',
+        requestedWorkspaceId: 'workspace-2',
+      }),
+    );
   });
 });
