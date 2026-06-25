@@ -2,6 +2,7 @@ import { and, asc, eq } from 'drizzle-orm';
 import { db } from '../../db/index.js';
 import {
   authUsers,
+  workspaces,
   userProfiles,
   workspaceMemberActivity,
   workspaceMembers,
@@ -59,10 +60,18 @@ export class WorkspaceMemberTools {
           eq(workspaceMemberActivity.workspaceId, workspaceMembers.workspaceId),
         ),
       )
-      .where(eq(workspaceMembers.workspaceId, workspaceId))
-      .orderBy(asc(workspaceMembers.createdAt));
+        .where(eq(workspaceMembers.workspaceId, workspaceId))
+        .orderBy(asc(workspaceMembers.createdAt));
 
-    return members.map((member) => ({
+    const workspaceOwnerRows = await db
+      .select({ ownerId: workspaces.createdBy })
+      .from(workspaces)
+      .where(eq(workspaces.id, workspaceId))
+      .limit(1);
+
+    const ownerId = workspaceOwnerRows[0]?.ownerId;
+
+    let normalizedMembers = members.map((member) => ({
       id: member.id,
       name: member.name,
       avatar: member.avatarUrl || member.image || '',
@@ -70,6 +79,56 @@ export class WorkspaceMemberTools {
       createdAt: member.createdAt.toISOString(),
       lastActiveAt: member.lastActiveAt?.toISOString() || null,
     }));
+
+    if (ownerId) {
+      const ownerMember = normalizedMembers.find((member) => member.id === ownerId);
+      if (ownerMember) {
+        if (ownerMember.role !== 'owner') {
+          normalizedMembers = normalizedMembers.map((member) =>
+            member.id === ownerId ? { ...member, role: 'owner' } : member,
+          );
+        }
+      } else {
+        const ownerRecords = await db
+          .select({
+            id: authUsers.id,
+            name: authUsers.name,
+            image: authUsers.image,
+            avatarUrl: userProfiles.avatarUrl,
+            createdAt: workspaceMembers.createdAt,
+            lastActiveAt: workspaceMemberActivity.lastActiveAt,
+          })
+          .from(authUsers)
+          .leftJoin(
+            workspaceMembers,
+            and(eq(workspaceMembers.userId, authUsers.id), eq(workspaceMembers.workspaceId, workspaceId)),
+          )
+          .leftJoin(userProfiles, eq(userProfiles.userId, authUsers.id))
+          .leftJoin(
+            workspaceMemberActivity,
+            and(eq(workspaceMemberActivity.workspaceId, workspaceId), eq(workspaceMemberActivity.userId, authUsers.id)),
+          )
+          .where(eq(authUsers.id, ownerId))
+          .limit(1);
+
+        const ownerRecord = ownerRecords[0];
+        if (ownerRecord) {
+          normalizedMembers = [
+            {
+              id: ownerRecord.id,
+              name: ownerRecord.name,
+              avatar: ownerRecord.avatarUrl || ownerRecord.image || '',
+              role: 'owner',
+              createdAt: ownerRecord.createdAt ? ownerRecord.createdAt.toISOString() : new Date().toISOString(),
+              lastActiveAt: ownerRecord.lastActiveAt ? ownerRecord.lastActiveAt.toISOString() : null,
+            },
+            ...normalizedMembers,
+          ];
+        }
+      }
+    }
+
+    return normalizedMembers;
   }
 }
 
