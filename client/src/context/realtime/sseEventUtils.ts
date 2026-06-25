@@ -23,6 +23,48 @@ function extractString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
 
+function getTicketProjectIdFromCachedTicket(
+  queryClient: QueryClient,
+  ticketKey: string,
+): string | undefined {
+  const normalizedTicketKey = ticketKey.toUpperCase();
+  const directQueries: Array<readonly unknown[]> = [
+    queryKeys.ticket(normalizedTicketKey),
+    queryKeys.ticketRelations(normalizedTicketKey),
+  ];
+  const directByKeyQueries = queryClient.getQueriesData<{ projectId?: string }>({ queryKey: ['tickets', 'detail', normalizedTicketKey] });
+  const directByRelationsQueries = queryClient.getQueriesData<{ projectId?: string }>({ queryKey: ['tickets', 'relations', normalizedTicketKey] });
+
+  const scopedQueries = [
+    ...directQueries,
+    ...directByKeyQueries.map(([queryKey]) => queryKey as unknown[]),
+    ...directByRelationsQueries.map(([queryKey]) => queryKey as unknown[]),
+  ];
+
+  for (const candidateKey of scopedQueries) {
+    const cachedTicket = queryClient.getQueryData<{ projectId?: string }>(candidateKey);
+    const projectId = cachedTicket?.projectId;
+    if (typeof projectId === 'string' && projectId.trim()) {
+      return projectId;
+    }
+  }
+
+  return undefined;
+}
+
+function getTicketProjectIdFromCachedTicketById(
+  queryClient: QueryClient,
+  ticketId: string,
+): string | undefined {
+  const cachedById = queryClient.getQueryData<{ projectId?: string }>(queryKeys.ticketDetail(ticketId));
+  const projectIdFromId = cachedById?.projectId;
+  if (typeof projectIdFromId === 'string' && projectIdFromId.trim()) {
+    return projectIdFromId;
+  }
+
+  return undefined;
+}
+
 export function removeSseTicketEntries(
   queryClient: QueryClient,
   ticketKey?: string,
@@ -31,10 +73,13 @@ export function removeSseTicketEntries(
 ): void {
   const normalizedTicketKey = ticketKey?.toUpperCase();
   const targetTicketId = ticketId?.trim() || undefined;
+  const resolvedProjectId = projectId
+    || (targetTicketId ? getTicketProjectIdFromCachedTicketById(queryClient, targetTicketId) : undefined)
+    || (normalizedTicketKey ? getTicketProjectIdFromCachedTicket(queryClient, normalizedTicketKey) : undefined);
 
-  const listQueries = projectId
-    ? [[queryKeys.tickets(projectId), queryClient.getQueryData<Ticket[]>(queryKeys.tickets(projectId))] as const]
-    : queryClient.getQueriesData<Ticket[]>({ queryKey: ['tickets'] });
+  const listQueries = resolvedProjectId
+    ? [[queryKeys.tickets(resolvedProjectId), queryClient.getQueryData<Ticket[]>(queryKeys.tickets(resolvedProjectId))] as const]
+    : [];
 
   for (const [queryKey, value] of listQueries) {
     if (!Array.isArray(value)) {
@@ -58,8 +103,32 @@ export function removeSseTicketEntries(
   }
 
   if (normalizedTicketKey) {
-    queryClient.removeQueries({ queryKey: ['tickets', 'detail', normalizedTicketKey] });
-    queryClient.removeQueries({ queryKey: ['tickets', 'relations', normalizedTicketKey] });
+    const detailQueries = queryClient.getQueriesData<unknown>({ queryKey: ['tickets', 'detail', normalizedTicketKey] });
+    const relationQueries = queryClient.getQueriesData<unknown>({ queryKey: ['tickets', 'relations', normalizedTicketKey] });
+
+    for (const [entryQueryKey, detailData] of detailQueries) {
+      const detailTicket = detailData && typeof detailData === 'object' && 'key' in detailData ? detailData : undefined;
+      if (!detailTicket || !('id' in detailTicket)) {
+        continue;
+      }
+
+      const detailId = typeof (detailTicket as { id?: unknown }).id === 'string' ? (detailTicket as { id?: string }).id : undefined;
+      if (detailId && (!targetTicketId || detailId === targetTicketId)) {
+        queryClient.removeQueries({ queryKey: [...entryQueryKey], exact: true });
+      }
+    }
+
+    for (const [entryQueryKey, relationData] of relationQueries) {
+      const relationTicket = relationData && typeof relationData === 'object' && 'key' in relationData ? relationData : undefined;
+      if (!relationTicket || !('id' in relationTicket)) {
+        continue;
+      }
+
+      const relationId = typeof (relationTicket as { id?: unknown }).id === 'string' ? (relationTicket as { id?: string }).id : undefined;
+      if (relationId && (!targetTicketId || relationId === targetTicketId)) {
+        queryClient.removeQueries({ queryKey: [...entryQueryKey], exact: true });
+      }
+    }
   }
 }
 
@@ -71,36 +140,19 @@ export function upsertTicketInListCachesFromSse(
   const ticketId = normalizedTicket.id;
   const ticketKey = normalizedTicket.key;
   const targetProjectId = normalizedTicket.projectId;
+  const affectedProjectIds = new Set<string>([
+    targetProjectId,
+    ...(sourceProjectIdHint ? [sourceProjectIdHint] : []),
+  ]);
 
-  const listQueries = queryClient.getQueriesData<Ticket[]>({ queryKey: ['tickets'] });
+  const listQueries = Array.from(affectedProjectIds).map((projectId) => (
+    [queryKeys.tickets(projectId), queryClient.getQueryData<Ticket[]>(queryKeys.tickets(projectId))] as const
+  ));
   if (!listQueries.length) {
     return;
   }
 
-  const containingProjects = new Set<string>();
   for (const [queryKey, list] of listQueries) {
-    if (!Array.isArray(list)) {
-      continue;
-    }
-
-    const listProjectId = getListQueryProjectId(queryKey);
-    if (!listProjectId) {
-      continue;
-    }
-
-    if (list.some((ticket) => ticket.id === ticketId || ticket.key === ticketKey)) {
-      containingProjects.add(listProjectId);
-    }
-  }
-
-  const affectedProjectIds = new Set<string>(containingProjects);
-  affectedProjectIds.add(targetProjectId);
-  if (sourceProjectIdHint) {
-    affectedProjectIds.add(sourceProjectIdHint);
-  }
-
-  for (const [queryKey, list] of listQueries) {
-    const mutableQueryKey = [...queryKey];
     if (!Array.isArray(list)) {
       continue;
     }
@@ -110,6 +162,7 @@ export function upsertTicketInListCachesFromSse(
       continue;
     }
 
+    const mutableQueryKey = [...queryKey];
     const shouldRemoveFromProject = listProjectId !== targetProjectId;
     const existingIndex = list.findIndex((ticket) => ticket.id === ticketId || ticket.key === ticketKey);
     if (existingIndex === -1) {

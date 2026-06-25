@@ -68,12 +68,21 @@ export const LabelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     [findLabelQueryKey, queryClient]
   );
 
+  const resolveTicketProjectId = useCallback(
+    (ticketId: string) => {
+      return queryClient.getQueryData<Ticket>(queryKeys.ticketDetail(ticketId))?.projectId || activeProjectIdRef.current;
+    },
+    [activeProjectIdRef, queryClient]
+  );
+
   const handleTicketLabelUpdate = useCallback((ticketId: string, labelId: string, isAssigned: boolean) => {
     const label = labels.find((entry) => entry.id === labelId);
+    const projectId = resolveTicketProjectId(ticketId);
     patchTicketInAllCaches(queryClient, ticketId, (ticket) => 
-      patchTicketLabelAssignment(ticket, labelId, isAssigned, label)
+      patchTicketLabelAssignment(ticket, labelId, isAssigned, label),
+      projectId ? { projectId } : undefined
     );
-  }, [labels, queryClient]);
+  }, [labels, queryClient, resolveTicketProjectId]);
 
   const showLabelMutationError = useCallback((error: unknown, action: 'assign' | 'unassign') => {
     if (toast?.show) {
@@ -178,15 +187,15 @@ export const LabelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     },
     onMutate: ({ ticketId, labelId }) => {
       handleTicketLabelUpdate(ticketId, labelId, true);
-      return { ticketId, labelId };
+      return { ticketId, labelId, projectId: resolveTicketProjectId(ticketId) };
     },
     onError: (error, variables) => {
       handleTicketLabelUpdate(variables.ticketId, variables.labelId, false);
       showLabelMutationError(error, 'assign');
-      invalidateTicketCaches(queryClient, variables.ticketId);
+      invalidateTicketCaches(queryClient, variables.ticketId, resolveTicketProjectId(variables.ticketId) || undefined);
     },
     onSuccess: (_result, variables) => {
-      invalidateTicketCaches(queryClient, variables.ticketId);
+      invalidateTicketCaches(queryClient, variables.ticketId, resolveTicketProjectId(variables.ticketId) || undefined);
     },
   });
 
@@ -206,15 +215,15 @@ export const LabelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     },
     onMutate: ({ ticketId, labelId }) => {
       handleTicketLabelUpdate(ticketId, labelId, false);
-      return { ticketId, labelId };
+      return { ticketId, labelId, projectId: resolveTicketProjectId(ticketId) };
     },
     onError: (error, variables) => {
       handleTicketLabelUpdate(variables.ticketId, variables.labelId, true);
       showLabelMutationError(error, 'unassign');
-      invalidateTicketCaches(queryClient, variables.ticketId);
+      invalidateTicketCaches(queryClient, variables.ticketId, resolveTicketProjectId(variables.ticketId) || undefined);
     },
     onSuccess: (_result, variables) => {
-      invalidateTicketCaches(queryClient, variables.ticketId);
+      invalidateTicketCaches(queryClient, variables.ticketId, resolveTicketProjectId(variables.ticketId) || undefined);
     },
   });
 

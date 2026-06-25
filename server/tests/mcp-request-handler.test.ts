@@ -101,7 +101,7 @@ describe('McpRequestHandler', () => {
     expect(auditSpy).toHaveBeenCalledWith(
       'mcp.scope.violation',
       expect.objectContaining({
-        action: 'mcp_scope_violation',
+        action: 'tools/call',
         workspaceId: 'workspace-1',
         toolName: 'get_ticket_details',
         requestedWorkspaceId: 'workspace-2',
