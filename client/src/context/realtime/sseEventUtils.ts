@@ -25,11 +25,44 @@ function extractString(value: unknown): string | undefined {
 
 function getTicketProjectIdFromCachedTicket(
   queryClient: QueryClient,
-  queryKey: ReturnType<typeof queryKeys.ticketDetail> | ReturnType<typeof queryKeys.ticket> | ReturnType<typeof queryKeys.ticketRelations>,
+  ticketKey: string,
 ): string | undefined {
-  const cachedTicket = queryClient.getQueryData<{ projectId?: string }>(queryKey as never);
-  const projectId = cachedTicket?.projectId;
-  return typeof projectId === 'string' && projectId.trim() ? projectId : undefined;
+  const normalizedTicketKey = ticketKey.toUpperCase();
+  const directQueries: Array<readonly unknown[]> = [
+    queryKeys.ticket(normalizedTicketKey),
+    queryKeys.ticketRelations(normalizedTicketKey),
+  ];
+  const directByKeyQueries = queryClient.getQueriesData<{ projectId?: string }>({ queryKey: ['tickets', 'detail', normalizedTicketKey] });
+  const directByRelationsQueries = queryClient.getQueriesData<{ projectId?: string }>({ queryKey: ['tickets', 'relations', normalizedTicketKey] });
+
+  const scopedQueries = [
+    ...directQueries,
+    ...directByKeyQueries.map(([queryKey]) => queryKey as unknown[]),
+    ...directByRelationsQueries.map(([queryKey]) => queryKey as unknown[]),
+  ];
+
+  for (const candidateKey of scopedQueries) {
+    const cachedTicket = queryClient.getQueryData<{ projectId?: string }>(candidateKey);
+    const projectId = cachedTicket?.projectId;
+    if (typeof projectId === 'string' && projectId.trim()) {
+      return projectId;
+    }
+  }
+
+  return undefined;
+}
+
+function getTicketProjectIdFromCachedTicketById(
+  queryClient: QueryClient,
+  ticketId: string,
+): string | undefined {
+  const cachedById = queryClient.getQueryData<{ projectId?: string }>(queryKeys.ticketDetail(ticketId));
+  const projectIdFromId = cachedById?.projectId;
+  if (typeof projectIdFromId === 'string' && projectIdFromId.trim()) {
+    return projectIdFromId;
+  }
+
+  return undefined;
 }
 
 export function removeSseTicketEntries(
@@ -41,13 +74,12 @@ export function removeSseTicketEntries(
   const normalizedTicketKey = ticketKey?.toUpperCase();
   const targetTicketId = ticketId?.trim() || undefined;
   const resolvedProjectId = projectId
-    || (targetTicketId ? getTicketProjectIdFromCachedTicket(queryClient, queryKeys.ticketDetail(targetTicketId)) : undefined)
-    || (normalizedTicketKey ? getTicketProjectIdFromCachedTicket(queryClient, queryKeys.ticket(normalizedTicketKey)) : undefined)
-    || (normalizedTicketKey ? getTicketProjectIdFromCachedTicket(queryClient, queryKeys.ticketRelations(normalizedTicketKey)) : undefined);
+    || (targetTicketId ? getTicketProjectIdFromCachedTicketById(queryClient, targetTicketId) : undefined)
+    || (normalizedTicketKey ? getTicketProjectIdFromCachedTicket(queryClient, normalizedTicketKey) : undefined);
 
   const listQueries = resolvedProjectId
     ? [[queryKeys.tickets(resolvedProjectId), queryClient.getQueryData<Ticket[]>(queryKeys.tickets(resolvedProjectId))] as const]
-    : queryClient.getQueriesData<Ticket[]>({ queryKey: ['tickets'] });
+    : [];
 
   for (const [queryKey, value] of listQueries) {
     if (!Array.isArray(value)) {
@@ -71,8 +103,32 @@ export function removeSseTicketEntries(
   }
 
   if (normalizedTicketKey) {
-    queryClient.removeQueries({ queryKey: ['tickets', 'detail', normalizedTicketKey] });
-    queryClient.removeQueries({ queryKey: ['tickets', 'relations', normalizedTicketKey] });
+    const detailQueries = queryClient.getQueriesData<unknown>({ queryKey: ['tickets', 'detail', normalizedTicketKey] });
+    const relationQueries = queryClient.getQueriesData<unknown>({ queryKey: ['tickets', 'relations', normalizedTicketKey] });
+
+    for (const [entryQueryKey, detailData] of detailQueries) {
+      const detailTicket = detailData && typeof detailData === 'object' && 'key' in detailData ? detailData : undefined;
+      if (!detailTicket || !('id' in detailTicket)) {
+        continue;
+      }
+
+      const detailId = typeof (detailTicket as { id?: unknown }).id === 'string' ? (detailTicket as { id?: string }).id : undefined;
+      if (detailId && (!targetTicketId || detailId === targetTicketId)) {
+        queryClient.removeQueries({ queryKey: [...entryQueryKey], exact: true });
+      }
+    }
+
+    for (const [entryQueryKey, relationData] of relationQueries) {
+      const relationTicket = relationData && typeof relationData === 'object' && 'key' in relationData ? relationData : undefined;
+      if (!relationTicket || !('id' in relationTicket)) {
+        continue;
+      }
+
+      const relationId = typeof (relationTicket as { id?: unknown }).id === 'string' ? (relationTicket as { id?: string }).id : undefined;
+      if (relationId && (!targetTicketId || relationId === targetTicketId)) {
+        queryClient.removeQueries({ queryKey: [...entryQueryKey], exact: true });
+      }
+    }
   }
 }
 
