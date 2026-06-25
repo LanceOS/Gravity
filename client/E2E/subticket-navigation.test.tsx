@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import App from '../src/App';
 import { dbState } from './setup';
+import { router } from '../src/router';
 
 describe('Sub-ticket navigation E2E', () => {
   it('navigates from parent ticket to sub-ticket and back via parent reference', async () => {
@@ -53,6 +54,7 @@ describe('Sub-ticket navigation E2E', () => {
     dbState.tickets.push(parentTicket, childTicket);
 
     // Render the full App
+    await router.navigate('/workspaces/wsp-1/projects/prj-1/tickets');
     render(<App />);
 
     // Parent ticket should appear on the board/list
@@ -63,9 +65,11 @@ describe('Sub-ticket navigation E2E', () => {
     await user.click(parentCard);
 
     // Subtask (child) should be visible in the parent detail and clickable
-    const detailContainer = document.querySelector('.workspace-page__detail');
-    expect(detailContainer).toBeTruthy();
-    const matches = within(detailContainer as Element).getAllByText(childTicket.title);
+    await waitFor(() => {
+      expect(document.querySelector('.ticket-detail')).toBeTruthy();
+    });
+    const detailContainer = document.querySelector('.ticket-detail')!;
+    const matches = within(detailContainer).getAllByText(childTicket.title);
     const clickableMatch = matches.find((el) => el.closest('.clickable')) || matches[0];
     expect(clickableMatch).toBeTruthy();
     await user.click(clickableMatch as Element);
@@ -78,7 +82,7 @@ describe('Sub-ticket navigation E2E', () => {
     await user.click(parentBtn);
 
     // Parent detail should be visible again — check the ticket key inside the detail container
-    const detailContainerAfter = document.querySelector('.workspace-page__detail');
+    const detailContainerAfter = document.querySelector('.ticket-detail');
     expect(detailContainerAfter).toBeTruthy();
     await waitFor(() => {
       expect(within(detailContainerAfter as Element).getByDisplayValue(parentTicket.title)).toBeInTheDocument();

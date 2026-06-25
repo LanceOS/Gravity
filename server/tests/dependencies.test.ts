@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { db } from '../src/db/index.js';
+import { ticketRelationships } from '../src/db/schema.js';
 import {
   createAuthenticatedApi,
   seedTicket,
@@ -242,6 +244,186 @@ describe('ticket relationship routes', () => {
       .get(`/api/v1/tickets/${t4.id}`)
       .query({ projectId: project.id });
     expect(t4DetailsAfterDelete.body.dependencies).toEqual([]);
+  });
+
+
+  it('removes blocker and dependency relationships when a ticket transitions to done', async () => {
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Katherine Johnson',
+      email: 'katherine@example.com',
+      role: 'owner',
+    });
+
+    const { workspace, project } = await seedWorkspaceFixture({
+      owner: {
+        id: ownerApi.user.id,
+        name: ownerApi.user.name,
+        email: ownerApi.user.email,
+        role: 'owner',
+        avatarUrl: ownerApi.user.avatar,
+      },
+    });
+
+    const secondProjectResponse = await ownerApi.post('/api/v1/projects').send({
+      name: 'Gravity API',
+      key: 'API',
+      ownerId: ownerApi.user.id,
+      workspaceId: workspace.id,
+    });
+    expect(secondProjectResponse.status).toBe(201);
+    const secondProjectId = String(secondProjectResponse.body.id);
+
+    const completedTicket = await seedTicket(project.id, {
+      id: 'ticket-done-cleanup-1',
+      key: 'GRV-71',
+      title: 'Completed ticket',
+      priority: 'high',
+    });
+
+    const previouslyBlockedTicket = await seedTicket(project.id, {
+      id: 'ticket-done-cleanup-2',
+      key: 'GRV-72',
+      title: 'Previously blocked ticket',
+      priority: 'medium',
+    });
+
+    const crossProjectBlocker = await seedTicket(secondProjectId, {
+      id: 'ticket-done-cleanup-3',
+      key: 'API-1',
+      title: 'Cross-project blocker',
+      priority: 'medium',
+    });
+
+    const addDependencyResponse = await ownerApi
+      .post(`/api/v1/tickets/${completedTicket.id}/dependencies`)
+      .set('x-project-id', project.id)
+      .send({ dependencyId: previouslyBlockedTicket.id });
+    expect(addDependencyResponse.status).toBe(201);
+
+    const addBlockerResponse = await ownerApi
+      .post(`/api/v1/tickets/${completedTicket.id}/blockers`)
+      .set('x-project-id', project.id)
+      .send({ blockerId: crossProjectBlocker.id });
+    expect(addBlockerResponse.status).toBe(201);
+
+    const markDoneResponse = await ownerApi
+      .patch(`/api/v1/tickets/${completedTicket.id}`)
+      .set('x-project-id', project.id)
+      .send({ status: 'done' });
+    expect(markDoneResponse.status).toBe(200);
+    expect(markDoneResponse.body).toMatchObject({
+      id: completedTicket.id,
+      status: 'done',
+      isBlocked: false,
+      isDependency: false,
+    });
+
+    const completedDetails = await ownerApi
+      .get(`/api/v1/tickets/${completedTicket.id}`)
+      .query({ projectId: project.id });
+    expect(completedDetails.status).toBe(200);
+    expect(completedDetails.body.dependencies).toEqual([]);
+    expect(completedDetails.body.blockers).toEqual([]);
+    expect(completedDetails.body.isBlocked).toBe(false);
+    expect(completedDetails.body.isDependency).toBe(false);
+
+    const previouslyBlockedDetails = await ownerApi
+      .get(`/api/v1/tickets/${previouslyBlockedTicket.id}`)
+      .query({ projectId: project.id });
+    expect(previouslyBlockedDetails.status).toBe(200);
+    expect(previouslyBlockedDetails.body.blockers).toEqual([]);
+    expect(previouslyBlockedDetails.body.isBlocked).toBe(false);
+
+    const crossProjectBlockerDetails = await ownerApi
+      .get(`/api/v1/tickets/${crossProjectBlocker.id}`)
+      .query({ projectId: secondProjectId });
+    expect(crossProjectBlockerDetails.status).toBe(200);
+    expect(crossProjectBlockerDetails.body.dependencies).toEqual([]);
+    expect(crossProjectBlockerDetails.body.isDependency).toBe(false);
+
+    const firstProjectTickets = await ownerApi.get('/api/v1/tickets').query({ projectId: project.id });
+    expect(firstProjectTickets.status).toBe(200);
+    expect(firstProjectTickets.body).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: completedTicket.id, isBlocked: false, isDependency: false }),
+      expect.objectContaining({ id: previouslyBlockedTicket.id, isBlocked: false, isDependency: false }),
+    ]));
+
+    const secondProjectTickets = await ownerApi.get('/api/v1/tickets').query({ projectId: secondProjectId });
+    expect(secondProjectTickets.status).toBe(200);
+    expect(secondProjectTickets.body).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: crossProjectBlocker.id, isBlocked: false, isDependency: false }),
+    ]));
+
+    const remainingRelationships = await db.select().from(ticketRelationships);
+    expect(remainingRelationships).toEqual([]);
+  });
+
+  it('clears stale relationships when a done ticket is saved as done again', async () => {
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Dorothy Vaughan',
+      email: 'dorothy@example.com',
+      role: 'owner',
+    });
+
+    const { project } = await seedWorkspaceFixture({
+      owner: {
+        id: ownerApi.user.id,
+        name: ownerApi.user.name,
+        email: ownerApi.user.email,
+        role: 'owner',
+        avatarUrl: ownerApi.user.avatar,
+      },
+    });
+
+    const doneTicket = await seedTicket(project.id, {
+      id: 'ticket-stale-done-1',
+      key: 'GRV-80',
+      title: 'Already done ticket',
+      status: 'done',
+      priority: 'medium',
+    });
+
+    const blockedTicket = await seedTicket(project.id, {
+      id: 'ticket-stale-done-2',
+      key: 'GRV-81',
+      title: 'Blocked by stale done ticket',
+      priority: 'medium',
+    });
+
+    const createRelationshipResponse = await ownerApi
+      .post(`/api/v1/tickets/${doneTicket.id}/dependencies`)
+      .set('x-project-id', project.id)
+      .send({ dependencyId: blockedTicket.id });
+    expect(createRelationshipResponse.status).toBe(201);
+
+    const blockedDetailsBeforeRefresh = await ownerApi
+      .get(`/api/v1/tickets/${blockedTicket.id}`)
+      .query({ projectId: project.id });
+    expect(blockedDetailsBeforeRefresh.status).toBe(200);
+    expect(blockedDetailsBeforeRefresh.body.blockers).toEqual([]);
+
+    const saveDoneAgainResponse = await ownerApi
+      .patch(`/api/v1/tickets/${doneTicket.id}`)
+      .set('x-project-id', project.id)
+      .send({ status: 'done' });
+    expect(saveDoneAgainResponse.status).toBe(200);
+
+    const doneDetails = await ownerApi
+      .get(`/api/v1/tickets/${doneTicket.id}`)
+      .query({ projectId: project.id });
+    expect(doneDetails.status).toBe(200);
+    expect(doneDetails.body.dependencies).toEqual([]);
+    expect(doneDetails.body.blockers).toEqual([]);
+
+    const blockedDetailsAfterRefresh = await ownerApi
+      .get(`/api/v1/tickets/${blockedTicket.id}`)
+      .query({ projectId: project.id });
+    expect(blockedDetailsAfterRefresh.status).toBe(200);
+    expect(blockedDetailsAfterRefresh.body.blockers).toEqual([]);
+    expect(blockedDetailsAfterRefresh.body.isBlocked).toBe(false);
+
+    const remainingRelationships = await db.select().from(ticketRelationships);
+    expect(remainingRelationships).toEqual([]);
   });
 
 

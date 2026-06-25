@@ -1,6 +1,8 @@
 import '@testing-library/jest-dom/vitest';
 import { afterEach, beforeEach, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
+import { queryClient } from '../src/utils/queryClient';
+import { router } from '../src/router';
 
 // Mock standard JSDOM/browser API gaps
 if (!window.matchMedia) {
@@ -251,6 +253,11 @@ function canonicalizeStatus(status: unknown): MockTicket['status'] {
     default:
       return 'todo';
   }
+}
+
+function isTerminalTicketStatus(status?: string | null): boolean {
+  const canonical = canonicalizeStatus(status);
+  return canonical === 'done' || canonical === 'canceled';
 }
 
 function canonicalizePriority(priority: unknown): MockTicket['priority'] {
@@ -768,9 +775,12 @@ if (typeof window !== 'undefined') {
 }
 
 function jsonResponse(status: number, data: any) {
+  const headers = new Headers();
+  headers.set('content-type', 'application/json');
   return {
     ok: status >= 200 && status < 300,
     status,
+    headers,
     json: async () => (data !== undefined ? JSON.parse(JSON.stringify(data)) : data),
     text: async () => JSON.stringify(data),
   } as unknown as Response;
@@ -922,7 +932,14 @@ async function executeMockMcpTool(workspaceId: string, actorUserId: string, tool
         ticket.description = args.description;
       }
       if (typeof args.status === 'string') {
-        ticket.status = canonicalizeStatus(args.status);
+        const nextStatus = canonicalizeStatus(args.status);
+        ticket.status = nextStatus;
+        if (isTerminalTicketStatus(nextStatus)) {
+          removeTicketFromRelations(ticket.id);
+          ticket.dependencies = [];
+          ticket.blockers = [];
+          ticket.relatedTicketIds = [];
+        }
       }
       if (typeof args.priority === 'string') {
         ticket.priority = canonicalizePriority(args.priority);
@@ -1305,21 +1322,22 @@ globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
   const body = parseJsonBody(init);
   const path = url.pathname.replace(/\/+$/, '') || '/';
   const projectIdHeader = normalizeText(getHeader(init, 'x-project-id'));
+  console.log(`[mock-fetch] ${method} ${path}`, { hasUser: !!dbState.currentUser });
 
-  if (path === '/api/auth/session') {
+  if (path === '/api/auth/session' || path === '/api/auth/get-session') {
     if (dbState.currentUser) {
       return jsonResponse(200, {
         session: { user: dbState.currentUser },
         user: dbState.currentUser,
       });
     }
-    return jsonResponse(401, { error: 'Unauthorized' });
+    return jsonResponse(200, null);
   }
 
-  if (path === '/api/auth/sign-up' && method === 'POST') {
+  if ((path === '/api/auth/sign-up' || path === '/api/auth/sign-up/email') && method === 'POST') {
     const name = normalizeText(body?.name) || 'New Member';
     const email = normalizeText(body?.email) || `${name.toLowerCase().replace(/\s+/g, '.')}@gravity.test`;
-    dbState.currentUser = {
+    const newUser: MockUser = {
       id: `usr-${Date.now()}`,
       name,
       email,
@@ -1327,8 +1345,9 @@ globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
       role: 'owner',
       tutorial_completed: 0,
     };
+    dbState.currentUser = newUser;
     dbState.accountSettings = {
-      userId: dbState.currentUser.id,
+      userId: newUser.id,
       theme: 'dark',
       projectLayout: 'spacious',
       notificationsEnabled: true,
@@ -1336,10 +1355,10 @@ globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
     return jsonResponse(200, { user: dbState.currentUser });
   }
 
-  if (path === '/api/auth/sign-in' && method === 'POST') {
+  if ((path === '/api/auth/sign-in' || path === '/api/auth/sign-in/email') && method === 'POST') {
     const email = normalizeText(body?.email) || 'member@gravity.test';
     const name = normalizeText(body?.name) || email.split('@')[0] || 'Member';
-    dbState.currentUser = {
+    const newUser: MockUser = {
       id: `usr-${Date.now()}`,
       name,
       email,
@@ -1347,8 +1366,9 @@ globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
       role: 'owner',
       tutorial_completed: 0,
     };
+    dbState.currentUser = newUser;
     dbState.accountSettings = {
-      userId: dbState.currentUser.id,
+      userId: newUser.id,
       theme: 'dark',
       projectLayout: 'spacious',
       notificationsEnabled: true,
@@ -1692,7 +1712,14 @@ globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
       ticket.description = body.description;
     }
     if (typeof body?.status === 'string') {
-      ticket.status = canonicalizeStatus(body.status);
+      const nextStatus = canonicalizeStatus(body.status);
+      ticket.status = nextStatus;
+      if (isTerminalTicketStatus(nextStatus)) {
+        removeTicketFromRelations(ticket.id);
+        ticket.dependencies = [];
+        ticket.blockers = [];
+        ticket.relatedTicketIds = [];
+      }
     }
     if (typeof body?.priority === 'string') {
       ticket.priority = canonicalizePriority(body.priority);
@@ -1768,6 +1795,7 @@ globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
 
 beforeEach(() => {
   resetMockDb();
+  queryClient.clear();
   const fetchMock = globalThis.fetch as unknown as { mockClear?: () => void };
   fetchMock.mockClear?.();
 });
@@ -1778,17 +1806,15 @@ afterEach(() => {
 });
 
 export function resetMockDb() {
-  dbState = {
-    currentUser: null,
-    tutorialCompleted: false,
-    workspaces: [],
-    workspaceMembers: [],
-    projects: [],
-    tickets: [],
-    labels: [],
-    cycles: [],
-    comments: [],
-    accountSettings: null,
-  };
+  dbState.currentUser = null;
+  dbState.tutorialCompleted = false;
+  dbState.workspaces.length = 0;
+  dbState.workspaceMembers.length = 0;
+  dbState.projects.length = 0;
+  dbState.tickets.length = 0;
+  dbState.labels.length = 0;
+  dbState.cycles.length = 0;
+  dbState.comments.length = 0;
+  dbState.accountSettings = null;
   resetMockSseRegistry();
 }

@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { canonicalizeStatus, canonicalizePriority, canonicalizePrStatus, sanitizeTitle, canonicalizeBranchName } from '../../src/modules/tickets/services/tickets';
+import {
+  canonicalizeStatus,
+  canonicalizePriority,
+  canonicalizePrStatus,
+  sanitizeTitle,
+  canonicalizeBranchName,
+  isTerminalTicketStatus,
+} from '../../src/modules/tickets/services/tickets';
 
 describe('canonicalization helpers', () => {
   it('canonicalizeStatus normalizes various inputs to canonical values', () => {
@@ -40,5 +47,13 @@ describe('canonicalization helpers', () => {
   it('canonicalizeBranchName normalizes branch names', () => {
     expect(canonicalizeBranchName('Feature/ABC-1 My Feature')).toBe('feature/abc-1-my-feature');
     expect(canonicalizeBranchName('  BUGFIX\t/FOO__bar ')).toBe('bugfix/foo__bar');
+  });
+
+  it('isTerminalTicketStatus recognizes completed states that should clear relationships', () => {
+    expect(isTerminalTicketStatus('done')).toBe(true);
+    expect(isTerminalTicketStatus('Done')).toBe(true);
+    expect(isTerminalTicketStatus('canceled')).toBe(true);
+    expect(isTerminalTicketStatus('in_progress')).toBe(false);
+    expect(isTerminalTicketStatus(undefined)).toBe(false);
   });
 });

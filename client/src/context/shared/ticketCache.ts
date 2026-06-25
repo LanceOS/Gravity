@@ -34,10 +34,16 @@ export function combineTicketDetails(
     return incoming as TicketWithRelations;
   }
 
-  return mergeTicketRelationSnapshot(existing, {
+  const relationAwareIncoming = {
     ...existing,
     ...incoming,
-  } as TicketWithRelations);
+    dependencies: incoming.dependencies,
+    blockers: incoming.blockers,
+    blockedTicket: (incoming as TicketWithRelations).blockedTicket,
+    relatedTicketIds: (incoming as TicketWithRelations).relatedTicketIds,
+  } as TicketWithRelations;
+
+  return mergeTicketRelationSnapshot(existing, relationAwareIncoming);
 }
 
 // ---------------------------------------------------------------------------

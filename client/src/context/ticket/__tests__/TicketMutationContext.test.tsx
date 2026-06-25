@@ -229,6 +229,65 @@ describe('TicketMutationProvider', () => {
     );
   });
 
+  it('applies the confirmed server ticket payload so cleared relation flags replace optimistic stale state', async () => {
+    const queryClient = createQueryClient();
+    queryClient.setQueryData(queryKeys.projects('user-1'), [aggregateProject]);
+    const staleTicket: Ticket = {
+      ...baseTicket,
+      isBlocked: true,
+      isDependency: true,
+    };
+    queryClient.setQueryData(queryKeys.tickets('project-1'), [staleTicket]);
+    queryClient.setQueryData(queryKeys.ticketDetail(baseTicket.id), {
+      ...staleTicket,
+      dependencies: [{ id: 'ticket-2', key: 'GRA-2', title: 'Dependency', projectId: 'project-1' }],
+      blockers: [{ id: 'ticket-3', key: 'GRA-3', title: 'Blocker', projectId: 'project-1' }],
+      relatedTicketIds: ['ticket-2', 'ticket-3'],
+      blockedTicket: { id: 'ticket-3', key: 'GRA-3', title: 'Blocker', projectId: 'project-1' },
+    });
+    const invalidateQueriesSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+    configureContext({ activeTicket: staleTicket });
+    const updatedTicket: Ticket = {
+      ...baseTicket,
+      status: 'done',
+      isBlocked: false,
+      isDependency: false,
+      updatedAt: '2026-06-02T00:00:00.000Z',
+    };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(updatedTicket));
+    vi.stubGlobal('fetch', fetchMock);
+    renderWithProvider(queryClient);
+
+    await act(async () => {
+      void currentActions.updateTicket(baseTicket.id, { status: 'done' });
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(queryClient.getQueryData<Ticket[]>(queryKeys.tickets('project-1'))?.[0]).toMatchObject({
+      id: baseTicket.id,
+      status: 'done',
+      isBlocked: false,
+      isDependency: false,
+    });
+    expect(queryClient.getQueryData<any>(queryKeys.ticketDetail(baseTicket.id))).toMatchObject({
+      id: baseTicket.id,
+      status: 'done',
+      isBlocked: false,
+      isDependency: false,
+      dependencies: [],
+      blockers: [],
+      relatedTicketIds: [],
+      blockedTicket: null,
+    });
+    expect(invalidateQueriesSpy).toHaveBeenCalledWith({ queryKey: ['workspaceTickets', 'workspace-1'] });
+    expect(invalidateQueriesSpy).toHaveBeenCalledWith({ queryKey: ['teamTickets', 'team-1'] });
+  });
+
   it('rolls back failed updates and clears the active ticket on delete', async () => {
     const queryClient = createQueryClient();
     queryClient.setQueryData(queryKeys.tickets('project-1'), [baseTicket]);

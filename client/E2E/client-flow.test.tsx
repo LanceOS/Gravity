@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import App from '../src/App';
 import { dbState } from './setup';
+import { router } from '../src/router';
 
 describe('Gravity Client End-to-End User Journey', () => {
   it('should successfully execute the complete user flow from registration to ticket updates and theme changes', async () => {
@@ -13,6 +14,7 @@ describe('Gravity Client End-to-End User Journey', () => {
     window.localStorage.setItem('gravity_theme', 'dark');
 
     // Start with a fresh render of the full Application
+    await router.navigate('/');
     render(<App />);
 
     // ==========================================

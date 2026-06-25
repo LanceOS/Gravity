@@ -6,13 +6,16 @@ import { useActiveTicket } from './ActiveTicketContext';
 import { useMoveTicket } from '../utils/useMoveTicket';
 import { queryKeys } from '../../utils/queryClient';
 import {
+  combineTicketDetails,
   findCachedTicketByKeyOrId,
   hasEquivalentTicketFields,
   invalidateAggregateTicketQueries,
+  patchTicketInAllCaches,
   patchTicketInListById,
 } from '../shared';
 import { toast } from '@library';
 import type { Ticket } from '../../types/domain';
+import type { TicketWithRelations } from '../../modules/tickets/utils/ticketRelations';
 import type { 
   TicketMutationContextType, 
   CreateTicketInput, 
@@ -50,6 +53,30 @@ export const TicketMutationProvider: React.FC<{ children: React.ReactNode }> = (
 
   const pendingTicketUpdateBatchesRef = useRef(new Map<string, TicketUpdateBatch>());
   const inFlightTicketUpdateBatchesRef = useRef(new Map<string, InFlightTicketUpdateBatch>());
+
+  const applyConfirmedTicketUpdate = useCallback((updatedTicket: Ticket) => {
+    queryClient.setQueryData<TicketWithRelations>(queryKeys.ticketDetail(updatedTicket.id), (existing) => (
+      existing ? combineTicketDetails(existing, updatedTicket) : (updatedTicket as TicketWithRelations)
+    ));
+
+    patchTicketInAllCaches(queryClient, updatedTicket.id, (existing) => combineTicketDetails(
+      existing as TicketWithRelations,
+      updatedTicket,
+    ));
+
+    invalidateAggregateTicketQueries(queryClient, updatedTicket.projectId);
+
+    if (activeTicketRef.current?.id === updatedTicket.id) {
+      setActiveTicket((prev) => {
+        if (!prev) {
+          return null;
+        }
+
+        const next = combineTicketDetails(prev as TicketWithRelations, updatedTicket);
+        return hasEquivalentTicketFields(prev, next) ? prev : next;
+      });
+    }
+  }, [queryClient, setActiveTicket]);
 
   useEffect(() => {
     return () => {
@@ -119,7 +146,7 @@ export const TicketMutationProvider: React.FC<{ children: React.ReactNode }> = (
         body: JSON.stringify(updates),
       });
       if (!response.ok) throw new Error('Failed to update ticket');
-      return response.json();
+      return response.json() as Promise<Ticket>;
     },
   });
 
@@ -146,11 +173,12 @@ export const TicketMutationProvider: React.FC<{ children: React.ReactNode }> = (
     inFlightTicketUpdateBatchesRef.current.set(ticketId, pendingBatch);
 
     try {
-      await updateTicketMutation.mutateAsync({
+      const updatedTicket = await updateTicketMutation.mutateAsync({
         id: ticketId,
         updates: pendingBatch.updates,
         projectId: pendingBatch.projectId,
       });
+      applyConfirmedTicketUpdate(updatedTicket);
 
       inFlightTicketUpdateBatchesRef.current.delete(ticketId);
 
@@ -182,7 +210,7 @@ export const TicketMutationProvider: React.FC<{ children: React.ReactNode }> = (
         }
       }
     }
-  }, [updateTicketMutation, queryClient]);
+  }, [applyConfirmedTicketUpdate, queryClient, updateTicketMutation]);
 
   const updateTicket = useCallback(async (
     id: string,
@@ -237,6 +265,8 @@ export const TicketMutationProvider: React.FC<{ children: React.ReactNode }> = (
         id,
         updates,
         projectId,
+      }).then((updatedTicket) => {
+        applyConfirmedTicketUpdate(updatedTicket);
       }).catch((error) => {
         console.error('Error updating ticket on server, rolling back:', error);
         queryClient.setQueryData<Ticket[]>(queryKeys.tickets(projectId), [...previousTickets]);
@@ -306,7 +336,7 @@ export const TicketMutationProvider: React.FC<{ children: React.ReactNode }> = (
     nextBatch.timerId = window.setTimeout(() => {
       void flushPendingTicketUpdate(id);
     }, TICKET_UPDATE_DEBOUNCE_MS);
-  }, [activeProjectIdRef, flushPendingTicketUpdate, queryClient, setActiveTicket, updateTicketMutation]);
+  }, [activeProjectIdRef, applyConfirmedTicketUpdate, flushPendingTicketUpdate, queryClient, setActiveTicket, updateTicketMutation]);
 
   const deleteTicketMutation = useMutation({
     mutationFn: async (id: string) => {
