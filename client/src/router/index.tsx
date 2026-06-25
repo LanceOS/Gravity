@@ -51,61 +51,45 @@ function workspaceShellElement() {
   );
 }
 
-const appShellPaths = [
-  '/',
-  '/workspaces',
+const appShellPaths = ['/', '/workspaces'];
+
+const workspaceShellRouteGroups = [
+  {
+    basePath: '/workspaces/:workspaceId',
+    suffixes: ['', '/projects', '/projects/list', '/teams', '/all'],
+  },
+  {
+    basePath: '/workspaces/:workspaceId/teams/:teamId',
+    suffixes: ['', '/tasks', '/views/:viewId', '/cycles/:cycleId', '/labels/:labelId', '/projects'],
+  },
+  {
+    basePath: '/workspaces/:workspaceId/teams/:teamId/projects/:projectId',
+    suffixes: ['/tickets', '/tickets/:ticketKey', '/notes', '/notes/:noteId'],
+  },
+  {
+    basePath: '/workspaces/:workspaceId/projects/:projectId',
+    suffixes: ['/tickets', '/tickets/:ticketKey', '/notes', '/notes/:noteId'],
+  },
 ];
 
-const workspaceShellPaths = [
-  '/workspaces/:workspaceId',
-  '/workspaces/:workspaceId/projects',
-  '/workspaces/:workspaceId/projects/list',
-  '/workspaces/:workspaceId/teams',
-  '/workspaces/:workspaceId/all',
-];
+export const workspaceShellRoutePaths = workspaceShellRouteGroups.flatMap(({ basePath, suffixes }) => (
+  suffixes.map((suffix) => `${basePath}${suffix}`)
+));
 
-const workspaceTeamShellSuffixes = [
-  '/teams/:teamId',
-  '/teams/:teamId/tasks',
-  '/teams/:teamId/views/:viewId',
-  '/teams/:teamId/cycles/:cycleId',
-  '/teams/:teamId/labels/:labelId',
-  '/teams/:teamId/projects',
-];
-
-const workspaceTeamProjectShellSuffixes = [
-  '/teams/:teamId/projects/:projectId',
-  '/teams/:teamId/projects/:projectId/tickets',
-  '/teams/:teamId/projects/:projectId/tickets/:ticketKey',
-  '/teams/:teamId/projects/:projectId/notes',
-  '/teams/:teamId/projects/:projectId/notes/:noteId',
-];
-
-const workspaceProjectShellSuffixes = [
-  '/projects/:projectId/tickets',
-  '/projects/:projectId/tickets/:ticketKey',
-  '/projects/:projectId/notes',
-  '/projects/:projectId/notes/:noteId',
-];
-
-const workspaceRoutes = [
-  ...appShellPaths.map((path) => ({ path, element: appShellElement() })),
-  ...workspaceShellPaths.map((path) => ({ path, element: workspaceShellElement() })),
-  ...workspaceTeamShellSuffixes.map((suffix) => ({
-    path: `/workspaces/:workspaceId${suffix}`,
-    element: workspaceShellElement(),
-  })),
-  ...workspaceTeamProjectShellSuffixes.map((suffix) => ({
-    path: `/workspaces/:workspaceId${suffix}`,
-    element: workspaceShellElement(),
-  })),
-  ...workspaceProjectShellSuffixes.map((suffix) => ({
-    path: `/workspaces/:workspaceId${suffix}`,
-    element: workspaceShellElement(),
-  })),
-];
+const workspaceShellRoutes = workspaceShellRoutePaths.map((path) => ({
+  path,
+  element: workspaceShellElement(),
+}));
 
 const staticProtectedRoutes = [
+  {
+    path: '/workspaces/:workspaceId/teams/:teamId/domains/:domainId',
+    element: <TeamLabelRedirect />,
+  },
+  {
+    path: '/workspaces/:workspaceId/projects/:projectId',
+    element: <ProjectHomeGuard />,
+  },
   {
     path: '/workspaces/:workspaceId/settings',
     element: <WorkspaceSettingsPageRoute />,
@@ -116,18 +100,11 @@ const staticProtectedRoutes = [
   },
 ];
 
-export const router = createBrowserRouter([
-  ...workspaceRoutes,
+export const staticProtectedRoutePaths = staticProtectedRoutes.map((route) => route.path);
 
-  // Legacy compatibility route for label-filtered views
-  {
-    path: '/workspaces/:workspaceId/teams/:teamId/domains/:domainId',
-    element: protectedElement(<TeamLabelRedirect />),
-  },
-  {
-    path: '/workspaces/:workspaceId/projects/:projectId',
-    element: protectedElement(<ProjectHomeGuard />),
-  },
+export const router = createBrowserRouter([
+  ...appShellPaths.map((path) => ({ path, element: appShellElement() })),
+  ...workspaceShellRoutes,
   ...staticProtectedRoutes.map((route) => ({
     path: route.path,
     element: protectedElement(route.element),

@@ -18,6 +18,62 @@ export function getListQueryProjectId(queryKey: readonly unknown[]): string | un
   return typeof meta.projectId === 'string' ? meta.projectId : undefined;
 }
 
+function getTicketProjectIdFromCachedTicketData(ticket: unknown): string | undefined {
+  if (!ticket || typeof ticket !== 'object' || !('projectId' in ticket)) {
+    return undefined;
+  }
+
+  const withProject = ticket as { projectId?: unknown };
+  return typeof withProject.projectId === 'string' && withProject.projectId.trim()
+    ? withProject.projectId
+    : undefined;
+}
+
+function resolveProjectIdFromTicketCache(
+  queryClient: QueryClient,
+  ticketId?: string,
+  ticketKey?: string,
+): string | undefined {
+  if (ticketId) {
+    const cachedById = queryClient.getQueryData<TicketWithRelations>(queryKeys.ticketDetail(ticketId));
+    const projectIdFromId = getTicketProjectIdFromCachedTicketData(cachedById);
+    if (projectIdFromId) {
+      return projectIdFromId;
+    }
+  }
+
+  if (ticketKey) {
+    const normalizedTicketKey = ticketKey.toUpperCase();
+    const cachedByKey = queryClient.getQueryData<TicketWithRelations>(queryKeys.ticket(normalizedTicketKey));
+    const projectIdFromKey = getTicketProjectIdFromCachedTicketData(cachedByKey);
+    if (projectIdFromKey) {
+      return projectIdFromKey;
+    }
+
+    const cachedRelations = queryClient.getQueryData<TicketWithRelations>(queryKeys.ticketRelations(normalizedTicketKey));
+    return getTicketProjectIdFromCachedTicketData(cachedRelations);
+  }
+
+  return undefined;
+}
+
+function resolveTicketKeyFromCache(
+  queryClient: QueryClient,
+  ticketId: string,
+  ticketKey?: string,
+): string | undefined {
+  if (ticketKey) {
+    return ticketKey.toUpperCase();
+  }
+
+  const cachedById = queryClient.getQueryData<TicketWithRelations>(queryKeys.ticketDetail(ticketId));
+  if (cachedById?.key) {
+    return cachedById.key.toUpperCase();
+  }
+
+  return undefined;
+}
+
 /**
  * Merges an incoming flat `Ticket` from SSE into the existing cached
  * `TicketWithRelations`, preserving relation data (dependencies, blockers,
@@ -142,7 +198,10 @@ export function findCachedTicketByKeyOrId(
     }
   }
 
-  const listQueries = queryClient.getQueriesData<Ticket[]>({ queryKey: ['tickets'] });
+  const resolvedProjectId = resolveProjectIdFromTicketCache(queryClient, normalizedTicketId, normalizedTicketKey);
+  const listQueries = resolvedProjectId
+    ? [[queryKeys.tickets(resolvedProjectId), queryClient.getQueryData<Ticket[]>(queryKeys.tickets(resolvedProjectId))] as const]
+    : queryClient.getQueriesData<Ticket[]>({ queryKey: ['tickets'] });
   for (const [, candidateList] of listQueries) {
     if (!Array.isArray(candidateList)) {
       continue;
@@ -420,9 +479,10 @@ export function patchTicketInAllCaches(
     ticketKey?: string;
   }
 ) {
-  const listQueries = options?.projectId
-    ? [[queryKeys.tickets(options.projectId), queryClient.getQueryData<Ticket[]>(queryKeys.tickets(options.projectId))] as const]
-    : queryClient.getQueriesData<Ticket[]>({ queryKey: ['tickets'] });
+  const resolvedProjectId = options?.projectId || resolveProjectIdFromTicketCache(queryClient, ticketId, options?.ticketKey);
+  const listQueries = resolvedProjectId
+    ? [[queryKeys.tickets(resolvedProjectId), queryClient.getQueryData<Ticket[]>(queryKeys.tickets(resolvedProjectId))] as const]
+    : [];
 
   for (const [queryKey, list] of listQueries) {
     if (!Array.isArray(list)) {
@@ -456,18 +516,14 @@ export function patchTicketInAllCaches(
     return patchFn(existing);
   });
 
-  const detailByKey = options?.ticketKey
-    ? normalizedTicketKeyCandidates(options.ticketKey)
-    : [['ticket-detail']];
-
-  if (!options?.ticketKey) {
-    detailByKey.push(['tickets', 'detail']);
-    detailByKey.push(['tickets', 'relations']);
-  }
+  const resolvedTicketKey = resolveTicketKeyFromCache(queryClient, ticketId, options?.ticketKey);
+  const detailByKey = resolvedTicketKey
+    ? [['tickets', 'detail', resolvedTicketKey], ['tickets', 'relations', resolvedTicketKey]]
+    : [queryKeys.ticketDetail(ticketId) as unknown[]];
 
   for (const baseKey of detailByKey) {
-    for (const [queryKey, data] of queryClient.getQueriesData<Ticket>({ queryKey: baseKey })) {
-      const existingTicket = data && typeof data === 'object' && 'id' in data ? (data as TicketWithRelations) : undefined;
+    for (const [queryKey, existingData] of queryClient.getQueriesData<Ticket>({ queryKey: baseKey })) {
+      const existingTicket = existingData && typeof existingData === 'object' && 'id' in existingData ? existingData : undefined;
       if (!existingTicket || existingTicket.id !== ticketId) {
         continue;
       }
@@ -482,41 +538,22 @@ export function patchTicketInAllCaches(
   }
 }
 
-function normalizedTicketKeyCandidates(ticketKey: string): (readonly unknown[])[] {
-  const upperKey = ticketKey.toUpperCase();
-  return [['tickets', 'detail', upperKey], ['tickets', 'relations', upperKey]];
-}
-
 /**
  * Invalidates all query caches related to a single ticket.
  * If projectId is provided, also invalidates the project ticket list cache.
  */
 export function invalidateTicketCaches(queryClient: QueryClient, ticketId: string, projectId?: string) {
   const cachedById = queryClient.getQueryData<Ticket>(queryKeys.ticketDetail(ticketId));
+  const resolvedProjectId = projectId || cachedById?.projectId;
   const ticketKey = cachedById?.key?.toUpperCase();
 
-  if (projectId) {
-    queryClient.invalidateQueries({ queryKey: queryKeys.tickets(projectId), exact: true });
-  } else {
-    // Attempt to discover projectId from cache if not provided
-    for (const [, list] of queryClient.getQueriesData<Ticket[]>({ queryKey: ['tickets'] })) {
-      if (Array.isArray(list)) {
-        const t = list.find((ticket) => ticket.id === ticketId);
-        if (t?.projectId) {
-          queryClient.invalidateQueries({ queryKey: queryKeys.tickets(t.projectId), exact: true });
-          break;
-        }
-      }
-    }
+  if (resolvedProjectId) {
+    queryClient.invalidateQueries({ queryKey: queryKeys.tickets(resolvedProjectId), exact: true });
   }
 
   queryClient.invalidateQueries({ queryKey: queryKeys.ticketDetail(ticketId) });
   if (ticketKey) {
     queryClient.invalidateQueries({ queryKey: ['tickets', 'detail', ticketKey] });
     queryClient.invalidateQueries({ queryKey: ['tickets', 'relations', ticketKey] });
-  } else {
-    queryClient.invalidateQueries({ queryKey: ['tickets', 'detail'] });
-    queryClient.invalidateQueries({ queryKey: ['tickets', 'relations'] });
   }
-  queryClient.invalidateQueries({ queryKey: ['ticket-detail'] });
 }

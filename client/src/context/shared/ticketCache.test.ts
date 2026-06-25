@@ -99,6 +99,25 @@ describe('ticket cache helpers', () => {
     expect(queryClient.getQueryData<Ticket>(queryKeys.ticketRelations('ABC-3'))).toMatchObject({ title: 'Updated title' });
   });
 
+  it('patches list cache using resolved ticket detail project when projectId is omitted', () => {
+    const queryClient = createQueryClient();
+    const scopedTicket = makeTicket({ id: 'ticket-1', key: 'ABC-5', title: 'Before', projectId: 'project-1' });
+    const staleTicket = makeTicket({ id: 'ticket-1', key: 'ABC-5', title: 'Should stay', projectId: 'project-stale' });
+
+    queryClient.setQueryData<Ticket[]>(queryKeys.tickets('project-1'), [staleTicket]);
+    queryClient.setQueryData<Ticket>(queryKeys.ticketDetail('ticket-1'), scopedTicket);
+
+    patchTicketInAllCaches(
+      queryClient,
+      'ticket-1',
+      (ticket) => ({ ...ticket, title: 'Updated title' }),
+      { ticketKey: 'ABC-5' }
+    );
+
+    const projectOneTickets = queryClient.getQueryData<Ticket[]>(queryKeys.tickets('project-1'));
+    expect(projectOneTickets?.[0]).toMatchObject({ title: 'Updated title' });
+  });
+
   it('invalidates ticket-key-specific detail caches when ticket key is known in cache', () => {
     const queryClient = createQueryClient();
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
@@ -125,6 +144,25 @@ describe('ticket cache helpers', () => {
     });
     expect(invalidateSpy).not.toHaveBeenCalledWith({
       queryKey: ['tickets', 'relations'],
+    });
+  });
+
+  it('infers project-specific list invalidation from cached ticket detail', () => {
+    const queryClient = createQueryClient();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    const scopedTicket = makeTicket({ id: 'ticket-1', key: 'ABC-6', projectId: 'project-1', title: 'Cached title' });
+
+    queryClient.setQueryData<Ticket>(queryKeys.ticketDetail('ticket-1'), scopedTicket);
+    queryClient.setQueryData<Ticket[]>(queryKeys.tickets('project-1'), [scopedTicket]);
+
+    invalidateTicketCaches(queryClient, 'ticket-1');
+
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: queryKeys.tickets('project-1'),
+      exact: true,
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: queryKeys.ticketDetail('ticket-1'),
     });
   });
 });

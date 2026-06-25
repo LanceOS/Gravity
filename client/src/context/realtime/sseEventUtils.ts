@@ -23,6 +23,15 @@ function extractString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
 
+function getTicketProjectIdFromCachedTicket(
+  queryClient: QueryClient,
+  queryKey: ReturnType<typeof queryKeys.ticketDetail> | ReturnType<typeof queryKeys.ticket> | ReturnType<typeof queryKeys.ticketRelations>,
+): string | undefined {
+  const cachedTicket = queryClient.getQueryData<{ projectId?: string }>(queryKey as never);
+  const projectId = cachedTicket?.projectId;
+  return typeof projectId === 'string' && projectId.trim() ? projectId : undefined;
+}
+
 export function removeSseTicketEntries(
   queryClient: QueryClient,
   ticketKey?: string,
@@ -31,9 +40,13 @@ export function removeSseTicketEntries(
 ): void {
   const normalizedTicketKey = ticketKey?.toUpperCase();
   const targetTicketId = ticketId?.trim() || undefined;
+  const resolvedProjectId = projectId
+    || (targetTicketId ? getTicketProjectIdFromCachedTicket(queryClient, queryKeys.ticketDetail(targetTicketId)) : undefined)
+    || (normalizedTicketKey ? getTicketProjectIdFromCachedTicket(queryClient, queryKeys.ticket(normalizedTicketKey)) : undefined)
+    || (normalizedTicketKey ? getTicketProjectIdFromCachedTicket(queryClient, queryKeys.ticketRelations(normalizedTicketKey)) : undefined);
 
-  const listQueries = projectId
-    ? [[queryKeys.tickets(projectId), queryClient.getQueryData<Ticket[]>(queryKeys.tickets(projectId))] as const]
+  const listQueries = resolvedProjectId
+    ? [[queryKeys.tickets(resolvedProjectId), queryClient.getQueryData<Ticket[]>(queryKeys.tickets(resolvedProjectId))] as const]
     : queryClient.getQueriesData<Ticket[]>({ queryKey: ['tickets'] });
 
   for (const [queryKey, value] of listQueries) {
@@ -71,36 +84,19 @@ export function upsertTicketInListCachesFromSse(
   const ticketId = normalizedTicket.id;
   const ticketKey = normalizedTicket.key;
   const targetProjectId = normalizedTicket.projectId;
+  const affectedProjectIds = new Set<string>([
+    targetProjectId,
+    ...(sourceProjectIdHint ? [sourceProjectIdHint] : []),
+  ]);
 
-  const listQueries = queryClient.getQueriesData<Ticket[]>({ queryKey: ['tickets'] });
+  const listQueries = Array.from(affectedProjectIds).map((projectId) => (
+    [queryKeys.tickets(projectId), queryClient.getQueryData<Ticket[]>(queryKeys.tickets(projectId))] as const
+  ));
   if (!listQueries.length) {
     return;
   }
 
-  const containingProjects = new Set<string>();
   for (const [queryKey, list] of listQueries) {
-    if (!Array.isArray(list)) {
-      continue;
-    }
-
-    const listProjectId = getListQueryProjectId(queryKey);
-    if (!listProjectId) {
-      continue;
-    }
-
-    if (list.some((ticket) => ticket.id === ticketId || ticket.key === ticketKey)) {
-      containingProjects.add(listProjectId);
-    }
-  }
-
-  const affectedProjectIds = new Set<string>(containingProjects);
-  affectedProjectIds.add(targetProjectId);
-  if (sourceProjectIdHint) {
-    affectedProjectIds.add(sourceProjectIdHint);
-  }
-
-  for (const [queryKey, list] of listQueries) {
-    const mutableQueryKey = [...queryKey];
     if (!Array.isArray(list)) {
       continue;
     }
@@ -110,6 +106,7 @@ export function upsertTicketInListCachesFromSse(
       continue;
     }
 
+    const mutableQueryKey = [...queryKey];
     const shouldRemoveFromProject = listProjectId !== targetProjectId;
     const existingIndex = list.findIndex((ticket) => ticket.id === ticketId || ticket.key === ticketKey);
     if (existingIndex === -1) {
