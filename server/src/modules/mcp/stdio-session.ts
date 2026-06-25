@@ -95,8 +95,12 @@ export class McpStdioSession {
       }
     });
 
-    this.input.on('end', () => this.stop());
-    this.input.on('error', () => this.stop());
+    this.input.on('end', () => {
+      void this.stop();
+    });
+    this.input.on('error', () => {
+      void this.stop();
+    });
   }
 
   private processBuffer() {
@@ -387,7 +391,7 @@ export class McpStdioSession {
     }
   }
 
-  stop() {
+  async stop() {
     if (!this.running) return;
     this.running = false;
     try {
@@ -409,6 +413,8 @@ export class McpStdioSession {
       } catch (e) {
         // ignore
       }
+      await this.processingPromise.catch(() => {});
+      this.sendQueue.length = 0;
     } catch (e) {
       // ignore
     }
