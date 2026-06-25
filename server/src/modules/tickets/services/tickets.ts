@@ -2,6 +2,7 @@ import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { db } from '../../../db/index.js';
 import { authUsers, comments, tickets, ticketRelationships, userProfiles, projects, cycles, labels, ticketLabels, workspaceSettings } from '../../../db/schema.js';
 import { createId, getProjectByKeyPrefix, nextTicketKey, normalizeIsoDate } from '../../../lib/platform.js';
+import { isProjectMember, isWorkspaceMember } from '../../workspaces/services/membership.js';
 import generateBranchName from '../utils/branch.js';
 
 type TicketRecord = typeof tickets.$inferSelect;
@@ -47,6 +48,36 @@ export type TicketUpdateEffects = {
   ticket: ReturnType<typeof mapTicket>;
   relationshipCleanup: TicketRelationshipCleanupEffect;
 };
+
+export const TICKET_ASSIGNEE_SCOPE_VIOLATION = 'TICKET_ASSIGNEE_SCOPE_VIOLATION';
+
+function normalizeAssigneeId(value: string | null | undefined): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+async function assertAssigneeInProjectScope(project: ProjectScope, assigneeId: string | null): Promise<void> {
+  if (!assigneeId) {
+    return;
+  }
+
+  const isWorkspaceMemberId = await isWorkspaceMember(project.workspaceId, assigneeId);
+  if (!isWorkspaceMemberId) {
+    throw new Error(TICKET_ASSIGNEE_SCOPE_VIOLATION);
+  }
+
+  const isAllowed = project.hierarchyMode === 'teams'
+    ? await isProjectMember(project.id, assigneeId)
+    : true;
+
+  if (!isAllowed) {
+    throw new Error(TICKET_ASSIGNEE_SCOPE_VIOLATION);
+  }
+}
 
 function buildTicketFilterConditions(projectIds: string[], filters: TicketFilters = {}) {
   const conditions = [inArray(tickets.projectId, projectIds)];
@@ -808,6 +839,7 @@ export async function createTicketRecord(input: {
 }) {
   const key = await nextTicketKey(input.projectId);
   const sanitizedTitle = sanitizeTitle(input.title);
+  const nextAssigneeId = normalizeAssigneeId(input.assigneeId);
   const result = await db.transaction(async (tx) => {
     const rows = await tx
       .insert(tickets)
@@ -820,7 +852,7 @@ export async function createTicketRecord(input: {
         priority: canonicalizePriority(input.priority ?? 'no_priority'),
         projectId: input.projectId,
         cycleId: input.cycleId ?? null,
-        assigneeId: input.assigneeId ?? null,
+        assigneeId: nextAssigneeId,
         parentId: input.parentId ?? null,
         branchName: generateBranchName(key, sanitizedTitle),
         prStatus: 'none',
@@ -833,6 +865,7 @@ export async function createTicketRecord(input: {
     const ticketRow = rows[0];
     const projectRows = await tx
       .select({
+        workspaceId: projects.workspaceId,
         teamId: projects.teamId,
         hierarchyMode: workspaceSettings.hierarchyMode,
       })
@@ -845,6 +878,15 @@ export async function createTicketRecord(input: {
       throw new Error(`Project ${input.projectId} is missing.`);
     }
     const hierarchyMode = projectScope.hierarchyMode === 'teams' ? 'teams' : 'flat';
+    await assertAssigneeInProjectScope(
+      {
+        id: input.projectId,
+        workspaceId: projectScope.workspaceId,
+        teamId: projectScope.teamId,
+        hierarchyMode,
+      },
+      nextAssigneeId,
+    );
 
     const uniqueLabelIds = [...new Set((input.labelIds ?? []).filter(Boolean))];
     const createdLabels = uniqueLabelIds.length > 0
@@ -965,6 +1007,10 @@ export async function updateTicketRecordWithEffects(
   if (isProjectMove && targetProject.workspaceId !== sourceProject.workspaceId) {
     throw new Error('TICKET_MOVE_CROSS_WORKSPACE');
   }
+  const nextAssigneeId = updates.assigneeId !== undefined ? normalizeAssigneeId(updates.assigneeId) : undefined;
+  if (nextAssigneeId !== undefined) {
+    await assertAssigneeInProjectScope(targetProject, nextAssigneeId);
+  }
 
   const teamChanged = isProjectMove && targetProject.teamId !== sourceProject.teamId;
   const projectLabelScopeChanged = isProjectMove && sourceProject.hierarchyMode === 'flat';
@@ -988,7 +1034,7 @@ export async function updateTicketRecordWithEffects(
     ...(updates.description !== undefined ? { description: updates.description } : {}),
     ...(updates.status !== undefined ? { status: nextStatus } : {}),
     ...(updates.priority !== undefined ? { priority: canonicalizePriority(updates.priority as string) } : {}),
-    ...(updates.assigneeId !== undefined ? { assigneeId: updates.assigneeId } : {}),
+    ...(nextAssigneeId !== undefined ? { assigneeId: nextAssigneeId } : {}),
     ...((updates.cycleId !== undefined || teamChanged) ? { cycleId: nextCycleId } : {}),
     ...(updates.parentId !== undefined ? { parentId: updates.parentId } : {}),
     ...(updates.prStatus !== undefined ? { prStatus: canonicalizePrStatus(updates.prStatus as string) } : {}),

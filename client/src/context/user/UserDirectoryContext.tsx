@@ -1,8 +1,11 @@
 import { createContext, useContext, useMemo, type FC, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useParams } from 'react-router-dom';
 import { apiClient } from '../../utils/apiClient';
 import { CACHE_CONFIGS, queryKeys } from '../../utils/queryClient';
 import { useAuth } from '../auth/AuthContext';
+import { useActiveProject } from '../project/ActiveProjectContext';
+import { useProjectContext } from '../project/ProjectContext';
 import type { User } from '../../types/domain';
 
 export interface UserDirectoryContextType {
@@ -14,11 +17,51 @@ const UserDirectoryContext = createContext<UserDirectoryContextType | undefined>
 
 export const UserDirectoryProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const { currentUser } = useAuth();
+  const { activeProjectId } = useActiveProject();
+  const { projectById } = useProjectContext();
+  const {
+    workspaceId: workspaceIdFromRoute,
+    projectId: projectIdFromRoute,
+    teamId: teamIdFromRoute,
+  } = useParams();
+  const activeWorkspaceId = useMemo(
+    () => (activeProjectId ? projectById.get(activeProjectId)?.workspaceId : ''),
+    [activeProjectId, projectById],
+  );
+
+  const routedProject = projectIdFromRoute ? projectById.get(projectIdFromRoute) : undefined;
+  const activeProject = activeProjectId ? projectById.get(activeProjectId) : undefined;
+  const userScope = useMemo(() => {
+    if (teamIdFromRoute) {
+      return { teamId: teamIdFromRoute };
+    }
+
+    if (routedProject?.teamId) {
+      return { teamId: routedProject.teamId };
+    }
+
+    if (workspaceIdFromRoute) {
+      return { workspaceId: workspaceIdFromRoute };
+    }
+
+    if (activeProject?.id) {
+      return { workspaceId: activeProject.workspaceId };
+    }
+
+    if (activeWorkspaceId) {
+      return { workspaceId: activeWorkspaceId };
+    }
+
+    return null;
+  }, [activeProject, activeWorkspaceId, routedProject, teamIdFromRoute, workspaceIdFromRoute]);
+  const queryParams = userScope
+    ? Object.fromEntries(Object.entries(userScope).filter(([, value]) => Boolean(value))) as { projectId?: string; workspaceId?: string; teamId?: string }
+    : undefined;
 
   const usersQuery = useQuery({
-    queryKey: queryKeys.users(),
-    queryFn: () => apiClient.get<User[]>(`/users`),
-    enabled: !!currentUser,
+    queryKey: userScope ? queryKeys.users(userScope) : queryKeys.users(),
+    queryFn: () => apiClient.get<User[]>(`/users`, { params: queryParams }),
+    enabled: !!currentUser && !!userScope,
     ...CACHE_CONFIGS.metadata,
   });
 

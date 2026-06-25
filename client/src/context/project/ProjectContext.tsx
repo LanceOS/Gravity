@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from '@library';
 import { apiClient } from '../../utils/apiClient';
 import { CACHE_CONFIGS, queryKeys } from '../../utils/queryClient';
-import type { CreateProjectInput, Project, Ticket, User } from '../../types/domain';
+import type { CreateProjectInput, Project, Ticket } from '../../types/domain';
 import { useAuth } from '../auth/AuthContext';
 import { useActiveProject } from './ActiveProjectContext';
 import {
@@ -84,11 +84,6 @@ export function useProjectContextValue({
       queryClient.prefetchQuery({
         queryKey: queryKeys.projects(userId),
         queryFn: () => apiClient.get<Project[]>(`/projects`, { params: { userId } }),
-        ...CACHE_CONFIGS.metadata,
-      }),
-      queryClient.prefetchQuery({
-        queryKey: queryKeys.users(),
-        queryFn: () => apiClient.get<User[]>(`/users`),
         ...CACHE_CONFIGS.metadata,
       }),
     ]);

@@ -149,9 +149,40 @@ export async function getUserById(userId: string) {
   return row ? toClientUser(row) : null;
 }
 
-export async function listUsers(projectId?: string) {
-  const result = projectId
-    ? await db.execute(sql`
+export async function listUsers(scope: { projectId?: string; workspaceId?: string; teamId?: string } = {}) {
+  const { projectId, workspaceId, teamId } = scope;
+
+  let result: { rows: unknown[] };
+
+  if (projectId) {
+    const projectScopeRows = await db.execute(sql`
+      SELECT
+        p.workspace_id AS workspace_id,
+        p.team_id AS team_id,
+        ws.hierarchy_mode AS hierarchy_mode
+      FROM projects p
+      LEFT JOIN workspace_settings ws ON ws.workspace_id = p.workspace_id
+      WHERE p.id = ${projectId}
+      LIMIT 1
+    `);
+    const projectScope = projectScopeRows.rows[0] as
+      | {
+          workspace_id: string | null;
+          team_id: string | null;
+          hierarchy_mode: 'flat' | 'teams' | null;
+        }
+      | undefined;
+
+    if (!projectScope?.workspace_id) {
+      return [];
+    }
+
+    if (projectScope.hierarchy_mode === 'teams') {
+      if (!projectScope.team_id) {
+        return [];
+      }
+
+      result = await db.execute(sql`
         SELECT DISTINCT
           u.id,
           u.name,
@@ -159,14 +190,16 @@ export async function listUsers(projectId?: string) {
           COALESCE(up.avatar_url, u.image, '') AS avatar,
           COALESCE(up.role, 'guest_contributor') AS role,
           COALESCE(us.tutorial_completed, FALSE) AS tutorial_completed
-        FROM project_members pm
-        JOIN "user" u ON u.id = pm.user_id
+        FROM workspace_members wm
+        INNER JOIN project_members pm ON pm.user_id = wm.user_id
+        INNER JOIN projects p ON p.id = pm.project_id AND p.team_id = ${projectScope.team_id}
+        INNER JOIN "user" u ON u.id = wm.user_id
         LEFT JOIN user_profiles up ON up.user_id = u.id
         LEFT JOIN user_settings us ON us.user_id = u.id
-        WHERE pm.project_id = ${projectId}
         ORDER BY u.name ASC
-      `)
-    : await db.execute(sql`
+      `);
+    } else {
+      result = await db.execute(sql`
         SELECT
           u.id,
           u.name,
@@ -174,11 +207,83 @@ export async function listUsers(projectId?: string) {
           COALESCE(up.avatar_url, u.image, '') AS avatar,
           COALESCE(up.role, 'guest_contributor') AS role,
           COALESCE(us.tutorial_completed, FALSE) AS tutorial_completed
-        FROM "user" u
+        FROM workspace_members wm
+        INNER JOIN "user" u ON u.id = wm.user_id
         LEFT JOIN user_profiles up ON up.user_id = u.id
         LEFT JOIN user_settings us ON us.user_id = u.id
+        WHERE wm.workspace_id = ${projectScope.workspace_id}
         ORDER BY u.name ASC
       `);
+    }
+  } else if (teamId) {
+    result = await db.execute(sql`
+      SELECT DISTINCT
+        u.id,
+        u.name,
+        u.email,
+        COALESCE(up.avatar_url, u.image, '') AS avatar,
+        COALESCE(up.role, 'guest_contributor') AS role,
+        COALESCE(us.tutorial_completed, FALSE) AS tutorial_completed
+      FROM workspace_members wm
+      INNER JOIN project_members pm ON pm.user_id = wm.user_id
+      INNER JOIN projects p ON p.id = pm.project_id AND p.team_id = ${teamId}
+      INNER JOIN "user" u ON u.id = wm.user_id
+      LEFT JOIN user_profiles up ON up.user_id = u.id
+      LEFT JOIN user_settings us ON us.user_id = u.id
+      ORDER BY u.name ASC
+    `);
+  } else if (workspaceId) {
+    result = await db.execute(sql`
+      WITH workspace_owner AS (
+        SELECT created_by
+        FROM workspaces
+        WHERE id = ${workspaceId}
+        LIMIT 1
+      )
+      SELECT
+        combined.id,
+        combined.name,
+        combined.email,
+        combined.avatar,
+        combined.role,
+        combined.tutorial_completed
+      FROM (
+        SELECT
+          u.id,
+          u.name,
+          u.email,
+          COALESCE(up.avatar_url, u.image, '') AS avatar,
+          COALESCE(wm.role, 'guest_contributor') AS role,
+          COALESCE(us.tutorial_completed, FALSE) AS tutorial_completed
+        FROM workspace_members wm
+        INNER JOIN "user" u ON u.id = wm.user_id
+        LEFT JOIN user_profiles up ON up.user_id = u.id
+        LEFT JOIN user_settings us ON us.user_id = u.id
+        WHERE wm.workspace_id = ${workspaceId}
+
+        UNION ALL
+
+        SELECT
+          u.id,
+          u.name,
+          u.email,
+          COALESCE(up.avatar_url, u.image, '') AS avatar,
+          'owner' AS role,
+          COALESCE(us.tutorial_completed, FALSE) AS tutorial_completed
+        FROM workspace_owner wo
+        INNER JOIN "user" u ON u.id = wo.created_by
+        LEFT JOIN user_profiles up ON up.user_id = u.id
+        LEFT JOIN user_settings us ON us.user_id = u.id
+        LEFT JOIN workspace_members wm_owner
+          ON wm_owner.workspace_id = ${workspaceId}
+          AND wm_owner.user_id = u.id
+        WHERE wm_owner.user_id IS NULL
+      ) AS combined
+      ORDER BY combined.name ASC
+    `);
+  } else {
+    return [];
+  }
 
   return (result.rows as RawUserRow[]).map(toClientUser);
 }

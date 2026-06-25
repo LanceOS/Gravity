@@ -57,7 +57,9 @@ export const CACHE_CONFIGS = {
 };
 
 export const queryKeys = {
-  users: () => toMutableQueryKey(['users']),
+  users: (scope?: { projectId?: string; workspaceId?: string; teamId?: string }) => (
+    scope ? toMutableQueryKey(['users', scope]) : toMutableQueryKey(['users'])
+  ),
   projects: (userId?: string) => toMutableQueryKey(['projects', { userId }]),
   tickets: (projectId: string) => toMutableQueryKey(['tickets', { projectId }]),
   ticket: (ticketKey: string, userId?: string) => toMutableQueryKey(['tickets', 'detail', ticketKey, { userId }]),

@@ -1,6 +1,6 @@
 import { and, eq } from 'drizzle-orm';
 import { db } from '../../../db/index.js';
-import { workspaceMembers, projects, projectMembers, teams } from '../schema.js';
+import { workspaceMembers, projects, projectMembers, teams, workspaces } from '../schema.js';
 import type { Request } from 'express';
 import * as cache from '../../../lib/cache.js';
 import { resolveRequestActorUserId } from '../../auth/utils/request-auth.js';
@@ -23,8 +23,17 @@ async function getWorkspaceMemberRoleCached(workspaceId: string, userId: string)
       .from(workspaceMembers)
       .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, userId)))
       .limit(1);
+    if (membershipRows[0]?.role) {
+      return membershipRows[0].role;
+    }
 
-    return membershipRows[0]?.role ?? null;
+    const ownerRows = await db
+      .select({ ownerId: workspaces.createdBy })
+      .from(workspaces)
+      .where(eq(workspaces.id, workspaceId))
+      .limit(1);
+
+    return ownerRows[0]?.ownerId === userId ? 'owner' : null;
   });
 }
 

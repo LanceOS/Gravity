@@ -10,6 +10,7 @@ import {
   invalidateWorkspaceCache,
   normalizeIsoDate,
 } from '../../lib/platform.js';
+import { audit } from '../../lib/logger.js';
 import { authorizeProjectAccess, authorizeTeamAccess, getProjectTeamId } from '../workspaces/services/membership.js';
 import {
   addCommentRecord,
@@ -30,6 +31,7 @@ import {
   deleteCommentRecord,
   removeTicketDependencyRelation,
   getProjectScope,
+  TICKET_ASSIGNEE_SCOPE_VIOLATION,
   type TicketRelationshipCleanupEffect,
 } from './services/tickets.js';
 import {
@@ -115,6 +117,19 @@ export function createTicketsRouter() {
     }
 
     return parsed;
+  }
+
+  function normalizeAssigneeId(value: unknown): string | null | undefined {
+    if (value === undefined) {
+      return undefined;
+    }
+
+    if (typeof value !== 'string') {
+      return null;
+    }
+
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
   }
 
   async function withProjectAccess(
@@ -306,6 +321,7 @@ export function createTicketsRouter() {
       }
 
       try {
+        const assigneeId = normalizeAssigneeId(req.body.assigneeId);
         const created = await createTicketRecord({
           title: req.body.title,
           description: req.body.description,
@@ -313,7 +329,7 @@ export function createTicketsRouter() {
           priority: req.body.priority,
           projectId,
           cycleId: req.body.cycleId,
-          assigneeId: req.body.assigneeId,
+          assigneeId,
           parentId: req.body.parentId,
           labelIds: Array.isArray(req.body.labelIds)
             ? req.body.labelIds.map(String)
@@ -325,6 +341,17 @@ export function createTicketsRouter() {
         emitWorkspaceEvent(workspaceId, 'tickets-updated', { projectId, ticket: created }, userId);
         res.status(201).json(created);
       } catch (error) {
+        if (error instanceof Error && error.message === TICKET_ASSIGNEE_SCOPE_VIOLATION) {
+          audit('tickets.assignee_scope_violation', {
+            action: 'create_ticket',
+            actorUserId: userId,
+            projectId,
+            workspaceId,
+            assigneeId: req.body?.assigneeId,
+          });
+          res.status(400).json({ error: 'The selected assignee is not part of this workspace.' });
+          return;
+        }
         res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create ticket.' });
       }
     });
@@ -379,8 +406,12 @@ export function createTicketsRouter() {
   router.patch('/tickets/:ticketId', async (req, res) => {
     await withProjectAccess(req, res, getProjectIdFromRequest(req), async (projectId, userId, workspaceId) => {
       try {
+        const assigneeId = normalizeAssigneeId(req.body?.assigneeId);
         const ticketId = normalizeRouteParam(req.params.ticketId);
-        const updateResult = await updateTicketRecordWithEffects(ticketId, req.body ?? {}, projectId);
+        const updateResult = await updateTicketRecordWithEffects(ticketId, {
+          ...(req.body ?? {}),
+          ...(assigneeId !== undefined ? { assigneeId } : {}),
+        }, projectId);
         if (!updateResult) {
           res.status(404).json({ error: 'Ticket not found.' });
           return;
@@ -398,6 +429,18 @@ export function createTicketsRouter() {
         res.json(updated);
       } catch (error) {
         if (error instanceof Error) {
+          if (error.message === TICKET_ASSIGNEE_SCOPE_VIOLATION) {
+            audit('tickets.assignee_scope_violation', {
+              action: 'update_ticket',
+              actorUserId: userId,
+              ticketId: normalizeRouteParam(req.params.ticketId),
+              projectId,
+              workspaceId,
+              assigneeId: req.body?.assigneeId,
+            });
+            res.status(400).json({ error: 'The selected assignee is not part of this workspace.' });
+            return;
+          }
           if (error.message === 'TARGET_PROJECT_NOT_FOUND') {
             res.status(404).json({ error: 'Target project not found.' });
             return;
