@@ -26,6 +26,7 @@ import {
   updateTicketRecord,
   updateTicketRecordWithEffects,
   getProjectScope,
+  TICKET_ASSIGNEE_SCOPE_VIOLATION,
 } from './services/tickets.js';
 import { ToolExecutionContext, ToolHandler } from '../mcp/tool-handlers/types.js';
 import { McpToolDefinition } from '../mcp/types.js';
@@ -194,19 +195,35 @@ export class TicketTools {
     const projectId = String(args.projectId ?? '');
     await this.assertProjectInWorkspace(projectId, context.workspaceId);
 
-    const ticket = await createTicketRecord({
-      title: String(args.title ?? ''),
-      description: typeof args.description === 'string' ? args.description : '',
-      status: typeof args.status === 'string' ? args.status : 'todo',
-      priority: typeof args.priority === 'string' ? args.priority : 'no_priority',
-      projectId,
-      cycleId: typeof args.cycleId === 'string' ? args.cycleId : null,
-      assigneeId: typeof args.assigneeId === 'string' ? args.assigneeId : null,
-      parentId: typeof args.parentId === 'string' ? args.parentId : null,
-      labelIds: typeof args.labels === 'string' ? args.labels.split(',').filter(Boolean) : Array.isArray(args.labels) ? args.labels.map(String) : Array.isArray(args.labelIds) ? args.labelIds.map(String) : undefined,
-      createdAt: parseDateArg(args.createdAt, 'createdAt'),
-      updatedAt: parseDateArg(args.updatedAt, 'updatedAt'),
-    });
+    let ticket;
+    try {
+      ticket = await createTicketRecord({
+        title: String(args.title ?? ''),
+        description: typeof args.description === 'string' ? args.description : '',
+        status: typeof args.status === 'string' ? args.status : 'todo',
+        priority: typeof args.priority === 'string' ? args.priority : 'no_priority',
+        projectId,
+        cycleId: typeof args.cycleId === 'string' ? args.cycleId : null,
+        assigneeId: typeof args.assigneeId === 'string' ? args.assigneeId : null,
+        parentId: typeof args.parentId === 'string' ? args.parentId : null,
+        labelIds: typeof args.labels === 'string' ? args.labels.split(',').filter(Boolean) : Array.isArray(args.labels) ? args.labels.map(String) : Array.isArray(args.labelIds) ? args.labelIds.map(String) : undefined,
+        createdAt: parseDateArg(args.createdAt, 'createdAt'),
+        updatedAt: parseDateArg(args.updatedAt, 'updatedAt'),
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message === TICKET_ASSIGNEE_SCOPE_VIOLATION) {
+        audit('mcp.tickets.assignee_scope_violation', {
+          action: 'create_ticket',
+          actorUserId: context.actorUserId,
+          workspaceId: context.workspaceId,
+          projectId,
+          assigneeId: args.assigneeId,
+        });
+        throw new McpToolValidationError('The selected assignee is not part of this workspace.');
+      }
+
+      throw error;
+    }
 
     // Emit SSE event so connected clients refresh immediately.
     const scope = await getProjectScope(projectId);
@@ -299,24 +316,41 @@ export class TicketTools {
     const createdAt = parseDateArg(args.createdAt, 'createdAt');
     const updatedAt = parseDateArg(args.updatedAt, 'updatedAt');
 
-    const updateResult = await updateTicketRecordWithEffects(
-      ticket.id,
-      {
-        ...(typeof args.title === 'string' ? { title: args.title } : {}),
-        ...(typeof args.description === 'string' ? { description: args.description } : {}),
-        ...(typeof args.status === 'string' ? { status: args.status } : {}),
-        ...(typeof args.priority === 'string' ? { priority: args.priority } : {}),
-        ...(typeof args.assigneeId === 'string' ? { assigneeId: args.assigneeId } : {}),
-        ...(typeof args.cycleId === 'string' ? { cycleId: args.cycleId } : {}),
-        ...(typeof args.parentId === 'string' ? { parentId: args.parentId } : {}),
-        ...(typeof args.prStatus === 'string' ? { prStatus: args.prStatus } : {}),
-        ...(typeof args.prUrl === 'string' ? { prUrl: args.prUrl } : {}),
-        ...(typeof args.labels === 'string' ? { labelIds: args.labels.split(',').filter(Boolean) } : Array.isArray(args.labels) ? { labelIds: args.labels.map(String) } : Array.isArray(args.labelIds) ? { labelIds: args.labelIds.map(String) } : {}),
-        ...(createdAt ? { createdAt } : {}),
-        ...(updatedAt ? { updatedAt } : {}),
-      },
-      ticket.projectId,
-    );
+    let updateResult;
+    try {
+      updateResult = await updateTicketRecordWithEffects(
+        ticket.id,
+        {
+          ...(typeof args.title === 'string' ? { title: args.title } : {}),
+          ...(typeof args.description === 'string' ? { description: args.description } : {}),
+          ...(typeof args.status === 'string' ? { status: args.status } : {}),
+          ...(typeof args.priority === 'string' ? { priority: args.priority } : {}),
+          ...(typeof args.assigneeId === 'string' ? { assigneeId: args.assigneeId } : {}),
+          ...(typeof args.cycleId === 'string' ? { cycleId: args.cycleId } : {}),
+          ...(typeof args.parentId === 'string' ? { parentId: args.parentId } : {}),
+          ...(typeof args.prStatus === 'string' ? { prStatus: args.prStatus } : {}),
+          ...(typeof args.prUrl === 'string' ? { prUrl: args.prUrl } : {}),
+          ...(typeof args.labels === 'string' ? { labelIds: args.labels.split(',').filter(Boolean) } : Array.isArray(args.labels) ? { labelIds: args.labels.map(String) } : Array.isArray(args.labelIds) ? { labelIds: args.labelIds.map(String) } : {}),
+          ...(createdAt ? { createdAt } : {}),
+          ...(updatedAt ? { updatedAt } : {}),
+        },
+        ticket.projectId,
+      );
+    } catch (error) {
+      if (error instanceof Error && error.message === TICKET_ASSIGNEE_SCOPE_VIOLATION) {
+        audit('mcp.tickets.assignee_scope_violation', {
+          action: 'update_ticket',
+          actorUserId: context.actorUserId,
+          workspaceId: context.workspaceId,
+          ticketId: ticket.id,
+          ticketKey,
+          assigneeId: args.assigneeId,
+        });
+        throw new McpToolValidationError('The selected assignee is not part of this workspace.');
+      }
+
+      throw error;
+    }
     const updated = updateResult?.ticket ?? null;
 
     const scope = await getProjectScope(ticket.projectId);
