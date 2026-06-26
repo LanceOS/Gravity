@@ -69,6 +69,7 @@ const MCP_SCOPE_CALL = 'tools/call';
 const MCP_SCOPE_CALL_WILDCARD = 'tools/call:*';
 const MCP_SCOPE_CALL_PREFIX = 'tools/call:';
 const MCP_DEFAULT_CONNECTION_SCOPES = [MCP_SCOPE_LIST];
+const MCP_MAX_CONNECTION_TTL_SECONDS = 24 * 60 * 60;
 
 function normalizeMcpScope(rawScope: unknown) {
   return typeof rawScope === 'string' ? rawScope.trim() : '';
@@ -132,6 +133,27 @@ function resolveAuthorizedMcpScopes(rawScopes: unknown, isPrivilegedRequestor: b
   }
 
   return [...allowedScopes];
+}
+
+function resolveConnectionTokenTtl(rawTtlSeconds: unknown) {
+  if (rawTtlSeconds === undefined) {
+    return undefined;
+  }
+
+  if (typeof rawTtlSeconds !== 'number' || !Number.isFinite(rawTtlSeconds)) {
+    return null;
+  }
+
+  if (rawTtlSeconds <= 0) {
+    return null;
+  }
+
+  const normalized = Math.floor(rawTtlSeconds);
+  if (normalized > MCP_MAX_CONNECTION_TTL_SECONDS) {
+    return null;
+  }
+
+  return normalized;
 }
 
 function getDefaultWorkspaceInviteExpiresAt() {
@@ -992,6 +1014,13 @@ export function createWorkspacesRouter() {
       }
 
       const { scopes, ttlSeconds, singleUse, connectionType } = req.body ?? {};
+      const resolvedTtlSeconds = resolveConnectionTokenTtl(ttlSeconds);
+      if (resolvedTtlSeconds === null) {
+        res
+          .status(400)
+          .json({ error: `Invalid ttlSeconds. Must be a positive number of seconds up to ${MCP_MAX_CONNECTION_TTL_SECONDS}.` });
+        return;
+      }
       const sourceIp = getRequestSourceIp(req);
       const isPrivilegedRequestor = auth.workspaceRole === 'owner' || auth.workspaceRole === 'admin';
       let resolvedScopes: string[];
@@ -1007,7 +1036,7 @@ export function createWorkspacesRouter() {
         workspaceId,
         generatedBy: actorUserId,
         scopes: resolvedScopes,
-        ttlSeconds: typeof ttlSeconds === 'number' ? ttlSeconds : undefined,
+        ttlSeconds: resolvedTtlSeconds,
         singleUse: singleUse === false ? false : true,
         connectionType: typeof connectionType === 'string' ? connectionType : 'http-post',
         sourceIp,
@@ -1075,9 +1104,15 @@ export function createWorkspacesRouter() {
         return;
       }
 
-      const ttlSeconds = typeof req.body?.ttlSeconds === 'number' ? req.body.ttlSeconds : undefined;
+      const resolvedTtlSeconds = resolveConnectionTokenTtl(req.body?.ttlSeconds);
+      if (resolvedTtlSeconds === null) {
+        res
+          .status(400)
+          .json({ error: `Invalid ttlSeconds. Must be a positive number of seconds up to ${MCP_MAX_CONNECTION_TTL_SECONDS}.` });
+        return;
+      }
       const sourceIp = getRequestSourceIp(req);
-      const token = await refreshConnectionToken(tokenId, actorUserId, { ttlSeconds, sourceIp });
+      const token = await refreshConnectionToken(tokenId, actorUserId, { ttlSeconds: resolvedTtlSeconds, sourceIp });
 
       if (!token) {
         res.status(400).json({ error: 'Token could not be refreshed.' });
