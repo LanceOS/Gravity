@@ -68,6 +68,9 @@ export class McpStdioSession {
       // best-effort
     }
   };
+  private onOutputError = () => {
+    void this.stop();
+  };
   // Serializes request handling to avoid races (handshake mutates session state).
   private processingPromise: Promise<void> = Promise.resolve();
 
@@ -101,6 +104,7 @@ export class McpStdioSession {
     this.input.on('error', () => {
       void this.stop();
     });
+    this.output.on('error', this.onOutputError);
   }
 
   private processBuffer() {
@@ -360,7 +364,15 @@ export class McpStdioSession {
   }
 
   send(msg: unknown) {
+    if (!this.running) {
+      return;
+    }
+
     try {
+      if ((this.output as any).destroyed) {
+        return;
+      }
+
       const s = JSON.stringify(msg);
       // Prepare payload
       const payload = this.options.legacyOutput ? s + '\n' : `Content-Length: ${Buffer.byteLength(s, 'utf8')}\r\n\r\n` + s;
@@ -400,7 +412,8 @@ export class McpStdioSession {
       this.input.removeAllListeners('error');
       // Clean up any pending drain listener and queued messages.
       try {
-        this.output.removeListener('drain', this.onDrain);
+      this.output.removeListener('drain', this.onDrain);
+        this.output.removeListener('error', this.onOutputError);
       } catch (e) {
         // ignore
       }
