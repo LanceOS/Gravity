@@ -6,6 +6,8 @@ import { createId } from '../../lib/platform.js';
 import { env } from '../../env.js';
 import { audit } from '../../lib/logger.js';
 
+const DEFAULT_MCP_SCOPES = ['tools/list'];
+
 type CreateOptions = {
   workspaceId: string;
   generatedBy: string;
@@ -37,13 +39,14 @@ export async function createConnectionToken(opts: CreateOptions): Promise<Connec
   const tokenHash = createHmac('sha256', secretForKey).update(raw).digest('hex');
 
   const expiresAt = opts.ttlSeconds ? new Date(Date.now() + opts.ttlSeconds * 1000) : new Date(Date.now() + 5 * 60 * 1000);
+  const normalizedScopes = opts.scopes ?? DEFAULT_MCP_SCOPES;
 
   await db.insert(mcpConnectionTokens).values({
     id,
     workspaceId: opts.workspaceId,
     tokenHash,
     hmacKeyId,
-    scopes: opts.scopes || ['tools/list', 'tools/call'],
+    scopes: normalizedScopes,
     expiresAt,
     singleUse: opts.singleUse !== undefined ? opts.singleUse : true,
     status: 'active',
@@ -60,7 +63,7 @@ export async function createConnectionToken(opts: CreateOptions): Promise<Connec
       id,
       workspaceId: opts.workspaceId,
       generatedBy: opts.generatedBy,
-      scopes: opts.scopes || ['tools/list', 'tools/call'],
+      scopes: normalizedScopes,
       singleUse: opts.singleUse !== undefined ? opts.singleUse : true,
       connectionType: opts.connectionType ?? 'http-post',
       sourceIp: opts.sourceIp ?? null,
@@ -76,7 +79,7 @@ export async function createConnectionToken(opts: CreateOptions): Promise<Connec
     id,
     rawToken: raw,
     expiresAt: expiresAt.toISOString(),
-    scopes: opts.scopes || ['tools/list', 'tools/call'],
+    scopes: normalizedScopes,
     singleUse: opts.singleUse !== undefined ? opts.singleUse : true,
     connectionType: opts.connectionType ?? 'http-post',
   };
