@@ -177,6 +177,7 @@ export function WorkspaceIssueSurface({
           workspaceId={activeWorkspaceId}
           workspaceName={workspaceName}
           pathname={pathname}
+          isTicketDetailRoute={Boolean(routeTicketKey)}
           activeContext={activeContext}
           activeTicket={activeTicket}
           activeView={activeView}
