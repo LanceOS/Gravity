@@ -1227,6 +1227,11 @@ export function createWorkspacesRouter() {
             reviewedAt: autoJoin ? requestCreatedAt : null,
             createdAt: requestCreatedAt,
           });
+
+          if (autoJoin) {
+            await ensureWorkspaceMembership(workspaceId, userId, 'member', undefined, tx);
+            await addUserToWorkspaceProjects(workspaceId, userId, 'developer', undefined, tx);
+          }
         });
       } catch (consumeError) {
         if (consumeError instanceof Error && consumeError.message === 'INVITE_USAGE_LIMIT') {
@@ -1236,18 +1241,15 @@ export function createWorkspacesRouter() {
         throw consumeError;
       }
 
-      if (autoJoin) {
-        await ensureWorkspaceMembership(workspaceId, userId, 'member');
-        await addUserToWorkspaceProjects(workspaceId, userId);
-        await invalidateWorkspaceMembershipCache(workspaceId, userId);
-      }
-
       await invalidateWorkspaceCache(
         workspaceId,
         autoJoin
           ? WorkspaceCacheInvalidationReason.MEMBERSHIP_CHANGED
           : WorkspaceCacheInvalidationReason.WORKSPACE_JOIN_REQUESTS_UPDATED,
       );
+      if (autoJoin) {
+        await invalidateWorkspaceMembershipCache(workspaceId, userId);
+      }
       if (autoJoin) {
         await invalidateUserWorkspacesCache(userId);
       }
