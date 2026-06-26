@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { Router } from 'express';
 import { db } from '../../db/index.js';
 import {
@@ -53,6 +53,7 @@ import {
 } from './services/membership.js';
 import { getSidebarTree } from './services/sidebar.js';
 import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
+import { toolHandlers } from '../mcp/tool-handlers/registry.js';
 import { env } from '../../env.js';
 
 function getParamString(param?: string | string[] | undefined): string {
@@ -63,6 +64,97 @@ function getParamString(param?: string | string[] | undefined): string {
 
 const DEFAULT_WORKSPACE_INVITE_TTL_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_WORKSPACE_INVITE_MAX_USES = 1;
+const MCP_SCOPE_LIST = 'tools/list';
+const MCP_SCOPE_CALL = 'tools/call';
+const MCP_SCOPE_CALL_WILDCARD = 'tools/call:*';
+const MCP_SCOPE_CALL_PREFIX = 'tools/call:';
+const MCP_DEFAULT_CONNECTION_SCOPES = [MCP_SCOPE_LIST];
+const MCP_MAX_CONNECTION_TTL_SECONDS = 24 * 60 * 60;
+
+function normalizeMcpScope(rawScope: unknown) {
+  return typeof rawScope === 'string' ? rawScope.trim() : '';
+}
+
+function normalizeRequestedMcpScopes(rawScopes: unknown) {
+  if (!Array.isArray(rawScopes)) {
+    return [];
+  }
+
+  return Array.from(new Set(rawScopes.map(normalizeMcpScope).filter(Boolean)));
+}
+
+function resolveAllowedToolCallScopes() {
+  return new Set(Object.keys(toolHandlers));
+}
+
+function resolveAuthorizedMcpScopes(rawScopes: unknown, isPrivilegedRequestor: boolean) {
+  const requestedScopes = normalizeRequestedMcpScopes(rawScopes);
+  const allowedScopes = new Set<string>(MCP_DEFAULT_CONNECTION_SCOPES);
+  const invalidScopes: string[] = [];
+  const allowedToolNames = resolveAllowedToolCallScopes();
+
+  for (const scope of requestedScopes) {
+    if (scope === MCP_SCOPE_LIST) {
+      allowedScopes.add(scope);
+      continue;
+    }
+
+    if (scope === MCP_SCOPE_CALL || scope === MCP_SCOPE_CALL_WILDCARD) {
+      if (!isPrivilegedRequestor) {
+        invalidScopes.push(scope);
+        continue;
+      }
+
+      allowedScopes.add(scope);
+      continue;
+    }
+
+    if (scope.startsWith(MCP_SCOPE_CALL_PREFIX)) {
+      if (!isPrivilegedRequestor) {
+        invalidScopes.push(scope);
+        continue;
+      }
+
+      const toolName = scope.slice(MCP_SCOPE_CALL_PREFIX.length);
+      if (!toolName || !allowedToolNames.has(toolName)) {
+        invalidScopes.push(scope);
+        continue;
+      }
+
+      allowedScopes.add(scope);
+      continue;
+    }
+
+    invalidScopes.push(scope);
+  }
+
+  if (invalidScopes.length > 0) {
+    throw new Error(`Unsupported MCP scopes requested: ${invalidScopes.join(', ')}`);
+  }
+
+  return [...allowedScopes];
+}
+
+function resolveConnectionTokenTtl(rawTtlSeconds: unknown) {
+  if (rawTtlSeconds === undefined) {
+    return undefined;
+  }
+
+  if (typeof rawTtlSeconds !== 'number' || !Number.isFinite(rawTtlSeconds)) {
+    return null;
+  }
+
+  if (rawTtlSeconds <= 0) {
+    return null;
+  }
+
+  const normalized = Math.floor(rawTtlSeconds);
+  if (normalized > MCP_MAX_CONNECTION_TTL_SECONDS) {
+    return null;
+  }
+
+  return normalized;
+}
 
 function getDefaultWorkspaceInviteExpiresAt() {
   return new Date(Date.now() + DEFAULT_WORKSPACE_INVITE_TTL_MS);
@@ -922,13 +1014,29 @@ export function createWorkspacesRouter() {
       }
 
       const { scopes, ttlSeconds, singleUse, connectionType } = req.body ?? {};
+      const resolvedTtlSeconds = resolveConnectionTokenTtl(ttlSeconds);
+      if (resolvedTtlSeconds === null) {
+        res
+          .status(400)
+          .json({ error: `Invalid ttlSeconds. Must be a positive number of seconds up to ${MCP_MAX_CONNECTION_TTL_SECONDS}.` });
+        return;
+      }
       const sourceIp = getRequestSourceIp(req);
+      const isPrivilegedRequestor = auth.workspaceRole === 'owner' || auth.workspaceRole === 'admin';
+      let resolvedScopes: string[];
+
+      try {
+        resolvedScopes = resolveAuthorizedMcpScopes(scopes, isPrivilegedRequestor);
+      } catch (scopeError) {
+        res.status(400).json({ error: scopeError instanceof Error ? scopeError.message : 'Invalid token scopes.' });
+        return;
+      }
 
       const token = await createConnectionToken({
         workspaceId,
         generatedBy: actorUserId,
-        scopes: Array.isArray(scopes) ? scopes : undefined,
-        ttlSeconds: typeof ttlSeconds === 'number' ? ttlSeconds : undefined,
+        scopes: resolvedScopes,
+        ttlSeconds: resolvedTtlSeconds,
         singleUse: singleUse === false ? false : true,
         connectionType: typeof connectionType === 'string' ? connectionType : 'http-post',
         sourceIp,
@@ -996,9 +1104,15 @@ export function createWorkspacesRouter() {
         return;
       }
 
-      const ttlSeconds = typeof req.body?.ttlSeconds === 'number' ? req.body.ttlSeconds : undefined;
+      const resolvedTtlSeconds = resolveConnectionTokenTtl(req.body?.ttlSeconds);
+      if (resolvedTtlSeconds === null) {
+        res
+          .status(400)
+          .json({ error: `Invalid ttlSeconds. Must be a positive number of seconds up to ${MCP_MAX_CONNECTION_TTL_SECONDS}.` });
+        return;
+      }
       const sourceIp = getRequestSourceIp(req);
-      const token = await refreshConnectionToken(tokenId, actorUserId, { ttlSeconds, sourceIp });
+      const token = await refreshConnectionToken(tokenId, actorUserId, { ttlSeconds: resolvedTtlSeconds, sourceIp });
 
       if (!token) {
         res.status(400).json({ error: 'Token could not be refreshed.' });
@@ -1202,7 +1316,7 @@ export function createWorkspacesRouter() {
             .where(
               and(
                 eq(workspaceInvites.id, String(invite.id)),
-                eq(workspaceInvites.revokedAt, null),
+                isNull(workspaceInvites.revokedAt),
                 invite.expiresAt ? sql`${workspaceInvites.expiresAt} > NOW()` : sql`true`,
                 sql`${workspaceInvites.useCount} < ${normalizedMaxUses}`,
               ),

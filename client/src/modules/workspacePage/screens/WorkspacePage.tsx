@@ -30,6 +30,7 @@ interface WorkspacePageProps {
   workspaceId?: string;
   workspaceName?: string;
   pathname?: string;
+  isTicketDetailRoute?: boolean;
   activeContext?: 'issues' | 'notes';
   activeNoteId?: string;
   activeTicket: Ticket | null;
@@ -108,6 +109,7 @@ function getTicketProjectName(ticket: Ticket, projectById: Record<string, Projec
 
 export function WorkspacePage({
   pathname,
+  isTicketDetailRoute = false,
   activeContext = 'issues',
   activeNoteId,
   activeTicket,
@@ -248,7 +250,8 @@ export function WorkspacePage({
   }, [filters.projectId, onSelectNote]);
 
   const isNoteEditor = activeContext === 'notes' && activeNoteId;
-  const isTicketEditor = activeContext === 'issues' && activeTicket;
+  const isTicketDetailContext = activeContext === 'issues' && isTicketDetailRoute;
+  const isTicketEditor = isTicketDetailContext && activeTicket;
   const showTeamScopedProjectEmptyState = isTeamWorkspace && isTeamScopedRoute;
   const showTeamWorkspaceTaskEmptyState = isTeamWorkspace && !showTeamScopedProjectEmptyState && hasTeams;
   const emptyStateTitle = showTeamScopedProjectEmptyState
@@ -279,7 +282,8 @@ export function WorkspacePage({
       : isTeamWorkspace
         ? (onOpenTeamManager ?? onOpenProjectManager)
         : onOpenProjectManager;
-  const shouldShowTicketsLoading = (isLoadingTickets || projectsLoading) && !activeTicket && (projects.length > 0 || projectsLoading);
+  const shouldShowTicketsLoading =
+    (isLoadingTickets || projectsLoading) && !isTicketDetailContext && (projects.length > 0 || projectsLoading);
 
   // eslint-disable-next-line no-useless-assignment
   let displayTitle = '';
@@ -289,7 +293,7 @@ export function WorkspacePage({
     displayTitle = isTicketEditor ? `Tickets - ${activeTicket.key}` : headerTitle;
   }
 
-  const workspaceHeaderActions = !activeTicket && activeContext === 'issues' ? (
+  const workspaceHeaderActions = !isTicketDetailContext && activeContext === 'issues' ? (
     <div style={{ marginLeft: 'auto' }}>
       {!viewModeLocked ? (
         <WorkspaceHeader.ViewToggle
@@ -298,7 +302,7 @@ export function WorkspacePage({
         />
       ) : null}
     </div>
-  ) : !activeTicket && activeContext === 'notes' ? (
+  ) : activeContext === 'notes' ? (
     <div style={{ marginLeft: 'auto' }}>
       {activeNoteId ? (
         <Button type="button" variant="secondary" onClick={() => window.history.back()}>
@@ -311,7 +315,7 @@ export function WorkspacePage({
       )}
     </div>
   ) : null;
-  const workspaceHeaderBottom = !activeTicket && activeContext === 'issues' ? (
+  const workspaceHeaderBottom = !isTicketDetailContext && activeContext === 'issues' ? (
     <TicketFilterBar
       filters={filters}
       onFilterChange={onSetFilters}

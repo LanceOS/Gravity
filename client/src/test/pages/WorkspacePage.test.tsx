@@ -311,6 +311,100 @@ describe('WorkspacePage', () => {
     });
   });
 
+  it('keeps header list context when returning from ticket detail', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+        },
+      },
+    });
+    const renderRoute = (isTicketDetailRoute: boolean) => render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/workspaces/workspace-1/projects/project-1/tickets']}>
+          <WorkspacePage
+            activeTicket={ticket}
+            activeView='board'
+            currentUser={currentUser}
+            cycles={[cycle]}
+            labels={[domain]}
+            filters={{
+              search: 'billing',
+              priority: '',
+              status: '',
+              projectId: 'project-1',
+              labels: [],
+              cycleId: '',
+              assigneeId: '',
+            }}
+            listSort='created'
+            pathname='/workspaces/workspace-1/projects/project-1/tickets'
+            projects={[project]}
+            isTicketDetailRoute={isTicketDetailRoute}
+            tickets={[ticket, doneTicket, subtaskOpen, subtaskDone]}
+            users={[currentUser]}
+            onOpenCreateTicket={vi.fn()}
+            onOpenProjectManager={vi.fn()}
+            onOpenTeamManager={vi.fn()}
+            onOpenTeamProjectManager={vi.fn()}
+            onSelectTicket={vi.fn()}
+            onSetFilters={vi.fn()}
+            onSetListSort={vi.fn()}
+            onSetView={vi.fn()}
+            onUpdateTicket={vi.fn().mockResolvedValue(undefined)}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    const { rerender } = renderRoute(true);
+
+    expect(screen.getByText(`Tickets - ${ticket.key}`)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Clear board filters' })).not.toBeInTheDocument();
+
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/workspaces/workspace-1/projects/project-1/tickets']}>
+          <WorkspacePage
+            activeTicket={ticket}
+            activeView='board'
+            currentUser={currentUser}
+            cycles={[cycle]}
+            labels={[domain]}
+            filters={{
+              search: 'billing',
+              priority: '',
+              status: '',
+              projectId: 'project-1',
+              labels: [],
+              cycleId: '',
+              assigneeId: '',
+            }}
+            listSort='created'
+            pathname='/workspaces/workspace-1/projects/project-1/tickets'
+            projects={[project]}
+            isTicketDetailRoute={false}
+            tickets={[ticket, doneTicket, subtaskOpen, subtaskDone]}
+            users={[currentUser]}
+            onOpenCreateTicket={vi.fn()}
+            onOpenProjectManager={vi.fn()}
+            onOpenTeamManager={vi.fn()}
+            onOpenTeamProjectManager={vi.fn()}
+            onSelectTicket={vi.fn()}
+            onSetFilters={vi.fn()}
+            onSetListSort={vi.fn()}
+            onSetView={vi.fn()}
+            onUpdateTicket={vi.fn().mockResolvedValue(undefined)}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    expect(screen.queryByText(`Tickets - ${ticket.key}`)).not.toBeInTheDocument();
+    expect(screen.getByText('Gravity Core')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Clear board filters' })).toBeInTheDocument();
+  });
+
   it('shows cycle-scoped headers and clears cycle and assignee filters together', async () => {
     const user = userEvent.setup();
     const { props } = renderWorkspacePage({

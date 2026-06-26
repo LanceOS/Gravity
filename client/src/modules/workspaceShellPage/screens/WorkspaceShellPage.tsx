@@ -330,8 +330,10 @@ export function WorkspaceShellPage() {
   const buildWorkspaceProjectCacheFingerprint = useCallback(() => {
     const signatureParts = [];
     for (const project of activeWorkspaceProjects) {
-      const cachedTickets = queryClient.getQueryData<Ticket[]>(queryKeys.tickets(project.id)) ?? [];
-      const cachedLabels = queryClient.getQueryData<Label[]>(queryKeys.labels(project.id)) ?? [];
+      const rawCachedTickets = queryClient.getQueryData<unknown>(queryKeys.tickets(project.id));
+      const rawCachedLabels = queryClient.getQueryData<unknown>(queryKeys.labels(project.id));
+      const cachedTickets = Array.isArray(rawCachedTickets) ? rawCachedTickets as Ticket[] : [];
+      const cachedLabels = Array.isArray(rawCachedLabels) ? rawCachedLabels as Label[] : [];
 
       const ticketSignature = cachedTickets
         .map((ticket) => `${ticket.id}:${ticket.updatedAt || ''}:${ticket.status || ''}:${ticket.assigneeId || ''}:${ticket.cycleId || ''}:${(ticket.labelIds ?? []).join(',')}`)

@@ -1,11 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import { api, createAuthenticatedApi, seedUser } from './helpers/test-helpers.js';
+import { createAuthenticatedApi, seedWorkspaceFixture } from './helpers/test-helpers.js';
 
 describe('users and settings routes', () => {
   it('lists users and updates tutorial completion', async () => {
-    const user = await seedUser();
+    const userApi = await createAuthenticatedApi({
+      name: 'Tutorial User',
+      email: 'tutorial@example.com',
+      role: 'owner',
+    });
+    const user = userApi.user;
+    const { workspace } = await seedWorkspaceFixture({
+      owner: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: 'owner',
+        avatarUrl: user.avatar,
+      },
+    });
 
-    const listResponse = await api().get('/api/v1/users');
+    const listResponse = await userApi.get('/api/v1/users').query({ workspaceId: workspace.id });
     expect(listResponse.status).toBe(200);
     expect(listResponse.body).toEqual([
       expect.objectContaining({
@@ -16,7 +30,7 @@ describe('users and settings routes', () => {
       }),
     ]);
 
-    const updateResponse = await api().patch(`/api/v1/users/${user.id}/tutorial`).send({ completed: true });
+    const updateResponse = await userApi.patch(`/api/v1/users/${user.id}/tutorial`).send({ completed: true });
     expect(updateResponse.status).toBe(200);
     expect(updateResponse.body.user).toMatchObject({
       id: user.id,
