@@ -556,6 +556,7 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
       workspace: {
         id: 'workspace-scope-source',
         name: 'Source Scope',
+        key: 'WKSRC',
       },
       project: {
         id: 'project-scope-source',
@@ -575,6 +576,7 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
       workspace: {
         id: 'workspace-scope-other',
         name: 'Other Scope',
+        key: 'WKLIT',
       },
       project: {
         id: 'project-scope-other',

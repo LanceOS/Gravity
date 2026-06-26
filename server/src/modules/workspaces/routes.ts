@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { Router } from 'express';
 import { db } from '../../db/index.js';
 import {
@@ -1316,7 +1316,7 @@ export function createWorkspacesRouter() {
             .where(
               and(
                 eq(workspaceInvites.id, String(invite.id)),
-                eq(workspaceInvites.revokedAt, null),
+                isNull(workspaceInvites.revokedAt),
                 invite.expiresAt ? sql`${workspaceInvites.expiresAt} > NOW()` : sql`true`,
                 sql`${workspaceInvites.useCount} < ${normalizedMaxUses}`,
               ),
