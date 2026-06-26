@@ -14,7 +14,6 @@ export {
   useWorkspaceCreateTicketDialog,
   useWorkspaceSidebarCounts,
 } from './hooks';
-export { getActiveWorkspaceStorageKey } from './utils/workspaceStorage';
 export {
   PROJECT_LIFECYCLE_OPTIONS,
   PROJECT_STATUS_LABELS,
