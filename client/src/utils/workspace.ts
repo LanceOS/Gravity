@@ -10,10 +10,6 @@ export interface BuildProjectScopedPathArgs {
   sidebarTree?: SidebarTree;
 }
 
-export function getActiveWorkspaceStorageKey(userId: string) {
-  return `gravity_active_workspace:${userId}`;
-}
-
 export function normalizeInviteCode(value: string) {
   return value.toUpperCase();
 }

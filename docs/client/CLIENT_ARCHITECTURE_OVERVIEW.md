@@ -18,7 +18,7 @@ This document outlines the high-level architecture of the React-based client app
 4. **Layout Composition**: Pages are wrapped in `WorkspaceLayout`, rendering the sidebar and central content areas.
 
 ## 5. Data Stores and Resources
-- **Local Storage**: Caches user theme preferences, active workspace (`gravity_active_workspace:{userId}`), and pending invites.
+- **Local Storage**: Caches only non-sensitive UI preferences (theme and view), not auth tokens or workspace membership state.
 - **REST APIs**: The client communicates with the server primarily through REST APIs (e.g., fetching workspaces, members, tickets).
 
 ## 6. Interfaces and Contracts
