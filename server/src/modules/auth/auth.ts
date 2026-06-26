@@ -8,6 +8,14 @@ export const auth = betterAuth({
   secret: env.betterAuthSecret,
   baseURL: env.betterAuthBaseUrl,
   trustedOrigins: env.trustedOrigins,
+  advanced: {
+    defaultCookieAttributes: {
+      httpOnly: true,
+      secure: env.nodeEnv === 'production',
+      sameSite: 'lax',
+      path: '/',
+    },
+  },
   plugins: [],
   session: {
     expiresIn: 60 * 60 * 24 * 30,

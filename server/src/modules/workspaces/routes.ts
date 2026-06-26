@@ -61,6 +61,26 @@ function getParamString(param?: string | string[] | undefined): string {
   return '';
 }
 
+const DEFAULT_WORKSPACE_INVITE_TTL_MS = 24 * 60 * 60 * 1000;
+const DEFAULT_WORKSPACE_INVITE_MAX_USES = 1;
+
+function getDefaultWorkspaceInviteExpiresAt() {
+  return new Date(Date.now() + DEFAULT_WORKSPACE_INVITE_TTL_MS);
+}
+
+function normalizeWorkspaceInviteMaxUses(rawMaxUses: number | null | undefined): number {
+  if (rawMaxUses == null) {
+    return DEFAULT_WORKSPACE_INVITE_MAX_USES;
+  }
+
+  const parsed = Number(rawMaxUses);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return DEFAULT_WORKSPACE_INVITE_MAX_USES;
+  }
+
+  return Math.min(Math.floor(parsed), DEFAULT_WORKSPACE_INVITE_MAX_USES);
+}
+
 async function recordWorkspaceActivity(workspaceId: string, userId: string) {
   try {
     await db
@@ -789,28 +809,31 @@ export function createWorkspacesRouter() {
         return;
       }
 
+      const expiresAt = getDefaultWorkspaceInviteExpiresAt();
       const invite = {
         id: createId('wsi'),
         workspaceId,
         code: createWorkspaceInviteCode(workspace.key),
         createdBy: actorUserId,
         label: label ?? '',
+        expiresAt,
+        maxUses: DEFAULT_WORKSPACE_INVITE_MAX_USES,
       };
 
       await db.insert(workspaceInvites).values({
         ...invite,
-        expiresAt: null,
+        expiresAt,
         revokedAt: null,
-        maxUses: null,
+        maxUses: DEFAULT_WORKSPACE_INVITE_MAX_USES,
         useCount: 0,
         createdAt: new Date(),
       });
 
       res.status(201).json({
         ...invite,
-        expiresAt: null,
+        expiresAt: invite.expiresAt.toISOString(),
         revokedAt: null,
-        maxUses: null,
+        maxUses: DEFAULT_WORKSPACE_INVITE_MAX_USES,
         useCount: 0,
         createdAt: new Date().toISOString(),
       });
@@ -1120,11 +1143,17 @@ export function createWorkspacesRouter() {
         res.status(400).json({ error: 'This invite has been revoked.' });
         return;
       }
-      if (invite.expiresAt && new Date(String(invite.expiresAt)).getTime() < Date.now()) {
+      const normalizedMaxUses = normalizeWorkspaceInviteMaxUses(invite.maxUses);
+      const inviteExpiresAt = invite.expiresAt
+        ? new Date(String(invite.expiresAt))
+        : getDefaultWorkspaceInviteExpiresAt();
+
+      if (inviteExpiresAt.getTime() < Date.now()) {
         res.status(400).json({ error: 'This invite has expired.' });
         return;
       }
-      if (invite.maxUses && Number(invite.useCount) >= Number(invite.maxUses)) {
+
+      if (normalizedMaxUses && Number(invite.useCount) >= normalizedMaxUses) {
         res.status(400).json({ error: 'This invite has reached its usage limit.' });
         return;
       }
@@ -1159,31 +1188,57 @@ export function createWorkspacesRouter() {
 
       const requestId = createId('wsr');
       const autoJoin = invite.joinMode === 'auto_join';
+      const requestCreatedAt = new Date();
 
-      await db.insert(workspaceJoinRequests).values({
-        id: requestId,
-        workspaceId,
-        inviteId: String(invite.id),
-        requestingUserId: userId,
-        requesterName: user.name,
-        requesterEmail: user.email,
-        requesterAvatar: user.avatar || null,
-        message: message ?? '',
-        status: autoJoin ? 'approved' : 'pending',
-        reviewedBy: autoJoin ? userId : null,
-        reviewedAt: autoJoin ? new Date() : null,
-        createdAt: new Date(),
-      });
+      try {
+        await db.transaction(async (tx) => {
+          const consumeRows = await tx
+            .update(workspaceInvites)
+            .set({
+              expiresAt: inviteExpiresAt,
+              maxUses: normalizedMaxUses,
+              useCount: sql`${workspaceInvites.useCount} + 1`,
+            })
+            .where(
+              and(
+                eq(workspaceInvites.id, String(invite.id)),
+                eq(workspaceInvites.revokedAt, null),
+                invite.expiresAt ? sql`${workspaceInvites.expiresAt} > NOW()` : sql`true`,
+                sql`${workspaceInvites.useCount} < ${normalizedMaxUses}`,
+              ),
+            )
+            .returning({ id: workspaceInvites.id });
 
-      await db
-        .update(workspaceInvites)
-        .set({ useCount: Number(invite.useCount) + 1 })
-        .where(eq(workspaceInvites.id, String(invite.id)));
+          if (consumeRows.length === 0) {
+            throw new Error('INVITE_USAGE_LIMIT');
+          }
 
-      if (autoJoin) {
-        await ensureWorkspaceMembership(workspaceId, userId, 'member');
-        await addUserToWorkspaceProjects(workspaceId, userId);
-        await invalidateWorkspaceMembershipCache(workspaceId, userId);
+          await tx.insert(workspaceJoinRequests).values({
+            id: requestId,
+            workspaceId,
+            inviteId: String(invite.id),
+            requestingUserId: userId,
+            requesterName: user.name,
+            requesterEmail: user.email,
+            requesterAvatar: user.avatar || null,
+            message: message ?? '',
+            status: autoJoin ? 'approved' : 'pending',
+            reviewedBy: autoJoin ? userId : null,
+            reviewedAt: autoJoin ? requestCreatedAt : null,
+            createdAt: requestCreatedAt,
+          });
+
+          if (autoJoin) {
+            await ensureWorkspaceMembership(workspaceId, userId, 'member', undefined, tx);
+            await addUserToWorkspaceProjects(workspaceId, userId, 'developer', undefined, tx);
+          }
+        });
+      } catch (consumeError) {
+        if (consumeError instanceof Error && consumeError.message === 'INVITE_USAGE_LIMIT') {
+          res.status(400).json({ error: 'This invite has reached its usage limit.' });
+          return;
+        }
+        throw consumeError;
       }
 
       await invalidateWorkspaceCache(
@@ -1192,6 +1247,9 @@ export function createWorkspacesRouter() {
           ? WorkspaceCacheInvalidationReason.MEMBERSHIP_CHANGED
           : WorkspaceCacheInvalidationReason.WORKSPACE_JOIN_REQUESTS_UPDATED,
       );
+      if (autoJoin) {
+        await invalidateWorkspaceMembershipCache(workspaceId, userId);
+      }
       if (autoJoin) {
         await invalidateUserWorkspacesCache(userId);
       }
@@ -1206,8 +1264,8 @@ export function createWorkspacesRouter() {
         message: message ?? '',
         status: autoJoin ? 'approved' : 'pending',
         reviewedBy: autoJoin ? userId : null,
-        reviewedAt: autoJoin ? new Date().toISOString() : null,
-        createdAt: new Date().toISOString(),
+        reviewedAt: autoJoin ? requestCreatedAt.toISOString() : null,
+        createdAt: requestCreatedAt.toISOString(),
       });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create join request.' });
