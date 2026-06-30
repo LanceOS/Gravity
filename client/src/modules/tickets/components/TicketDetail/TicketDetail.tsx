@@ -90,6 +90,108 @@ import { WorkspacePageLayout } from '../../../../layouts/WorkspacePageLayout/Wor
 import { ConfirmDialog } from '../../../../components/ConfirmDialog';
 import './TicketDetail.css';
 
+function TicketDescriptionEditor({ 
+  initialDescription, 
+  ticketId, 
+  onUpdateTicket 
+}: { 
+  initialDescription: string | null; 
+  ticketId: string; 
+  onUpdateTicket: (id: string, updates: any) => void; 
+}) {
+  const [editingDescriptionBody, setEditingDescriptionBody] = useState(() => initialDescription || createEmptyRichTextValue());
+  const lastSavedDescriptionRef = useRef(initialDescription);
+  const prevDescriptionRef = useRef(initialDescription);
+  const descriptionTicketIdRef = useRef(ticketId);
+
+  useEffect(() => {
+    const isNewTicket = descriptionTicketIdRef.current !== ticketId;
+    const nextDescription = initialDescription || createEmptyRichTextValue();
+
+    if (isNewTicket) {
+      descriptionTicketIdRef.current = ticketId;
+      setEditingDescriptionBody(nextDescription);
+      lastSavedDescriptionRef.current = initialDescription;
+      prevDescriptionRef.current = initialDescription;
+    } else {
+      const wasSavedByUs = initialDescription === lastSavedDescriptionRef.current;
+      if (!wasSavedByUs && initialDescription !== prevDescriptionRef.current) {
+        setEditingDescriptionBody(nextDescription);
+        lastSavedDescriptionRef.current = initialDescription;
+        prevDescriptionRef.current = initialDescription;
+      } else {
+        prevDescriptionRef.current = initialDescription;
+      }
+    }
+  }, [ticketId, initialDescription]);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (editingDescriptionBody !== lastSavedDescriptionRef.current) {
+        lastSavedDescriptionRef.current = editingDescriptionBody;
+        void onUpdateTicket(ticketId, { description: editingDescriptionBody });
+      }
+    }, 1500);
+    return () => clearTimeout(timeoutId);
+  }, [editingDescriptionBody, ticketId, onUpdateTicket]);
+
+  const handleDescriptionBlur = useCallback(() => {
+    if (editingDescriptionBody !== lastSavedDescriptionRef.current) {
+      lastSavedDescriptionRef.current = editingDescriptionBody;
+      void onUpdateTicket(ticketId, { description: editingDescriptionBody });
+    }
+  }, [editingDescriptionBody, ticketId, onUpdateTicket]);
+
+  return (
+    <RichTextEditor
+      key={`desc-${ticketId}`}
+      value={editingDescriptionBody}
+      onChange={setEditingDescriptionBody}
+      onBlur={handleDescriptionBlur}
+      placeholder="Describe your issue..."
+      className="ticket-detail__description-editor"
+      surface="bare"
+      toolbarMode="bubble"
+    />
+  );
+}
+
+function TicketCommentForm({
+  ticketId,
+  onAddComment,
+}: {
+  ticketId: string;
+  onAddComment: (ticketId: string, commentInput: string) => void;
+}) {
+  const [commentInput, setCommentInput] = useState(createEmptyRichTextValue());
+
+  const handlePostComment = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!isRichTextEmpty(commentInput)) {
+      onAddComment(ticketId, commentInput);
+      setCommentInput(createEmptyRichTextValue());
+    }
+  };
+
+  return (
+    <form onSubmit={handlePostComment} className="ticket-detail__comment-form">
+      <CommentEditor
+        placeholder="Post updates, links, or mention PRs..."
+        value={commentInput}
+        onChange={setCommentInput}
+        className="ticket-detail__comment-editor"
+      />
+      <Button
+        type="submit"
+        variant="primary"
+      >
+        <Send size={12} />
+        <span>Comment</span>
+      </Button>
+    </form>
+  );
+}
+
 export const TicketDetail: React.FC<TicketDetailProps> = ({
   activeTicket,
   activeTicketDetail,
@@ -118,7 +220,6 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
   parentTicket,
   ticketLink: customTicketLink,
 }) => {
-  const [commentInput, setCommentInput] = useState(createEmptyRichTextValue());
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -217,51 +318,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
   const [editingCommentBody, setEditingCommentBody] = useState<string>('');
   const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
 
-  const [editingDescriptionBody, setEditingDescriptionBody] = useState(() => activeTicket.description || createEmptyRichTextValue());
-  const lastSavedDescriptionRef = useRef(activeTicket.description);
-  const prevDescriptionRef = useRef(activeTicket.description);
-  const descriptionTicketIdRef = useRef(activeTicket.id);
-
   const closeCommentMenu = useCallback(() => setOpenMenuCommentId(null), []);
-
-  useEffect(() => {
-    const isNewTicket = descriptionTicketIdRef.current !== activeTicket.id;
-    const nextDescription = activeTicket.description || createEmptyRichTextValue();
-
-    if (isNewTicket) {
-      descriptionTicketIdRef.current = activeTicket.id;
-      setEditingDescriptionBody(nextDescription);
-      lastSavedDescriptionRef.current = activeTicket.description;
-      prevDescriptionRef.current = activeTicket.description;
-    } else {
-      const wasSavedByUs = activeTicket.description === lastSavedDescriptionRef.current;
-      if (!wasSavedByUs && activeTicket.description !== prevDescriptionRef.current) {
-        setEditingDescriptionBody(nextDescription);
-        lastSavedDescriptionRef.current = activeTicket.description;
-        prevDescriptionRef.current = activeTicket.description;
-      } else {
-        prevDescriptionRef.current = activeTicket.description;
-      }
-    }
-  }, [activeTicket.id, activeTicket.description]);
-
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (editingDescriptionBody !== lastSavedDescriptionRef.current) {
-        lastSavedDescriptionRef.current = editingDescriptionBody;
-        void onUpdateTicket(activeTicket.id, { description: editingDescriptionBody });
-      }
-    }, 1500);
-
-    return () => clearTimeout(timeoutId);
-  }, [editingDescriptionBody, activeTicket.id, onUpdateTicket]);
-
-  const handleDescriptionBlur = useCallback(() => {
-    if (editingDescriptionBody !== lastSavedDescriptionRef.current) {
-      lastSavedDescriptionRef.current = editingDescriptionBody;
-      void onUpdateTicket(activeTicket.id, { description: editingDescriptionBody });
-    }
-  }, [editingDescriptionBody, activeTicket.id, onUpdateTicket]);
 
   const ticketLink = useMemo(() => customTicketLink || `${TICKET_URL_BASE}/${activeTicket.key}`, [customTicketLink, activeTicket.key]);
 
@@ -291,14 +348,6 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
       if (toast?.show) toast.show('Failed to copy', 'error');
     }
   }, []);
-
-  const handlePostComment = (e: React.SubmitEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!isRichTextEmpty(commentInput)) {
-      onAddComment(activeTicket.id, commentInput);
-      setCommentInput(createEmptyRichTextValue());
-    }
-  };
 
   const handleDelete = () => {
     setIsDeleteConfirmOpen(true);
@@ -584,15 +633,10 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
-                <RichTextEditor
-                  key={`desc-${activeTicket.id}`}
-                  value={editingDescriptionBody}
-                  onChange={setEditingDescriptionBody}
-                  onBlur={handleDescriptionBlur}
-                  placeholder="Describe your issue..."
-                  className="ticket-detail__description-editor"
-                  surface="bare"
-                  toolbarMode="bubble"
+                <TicketDescriptionEditor
+                  initialDescription={activeTicket.description || null}
+                  ticketId={activeTicket.id}
+                  onUpdateTicket={onUpdateTicket}
                 />
               </div>
             </div>
@@ -871,21 +915,10 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                 ))}
               </div>
 
-              <form onSubmit={handlePostComment} className="ticket-detail__comment-form">
-                <CommentEditor
-                  placeholder="Post updates, links, or mention PRs..."
-                  value={commentInput}
-                  onChange={setCommentInput}
-                  className="ticket-detail__comment-editor"
-                />
-                <Button
-                  type="submit"
-                  variant="primary"
-                >
-                  <Send size={12} />
-                  <span>Comment</span>
-                </Button>
-              </form>
+              <TicketCommentForm
+                ticketId={activeTicket.id}
+                onAddComment={onAddComment}
+              />
 
             </div>
 
