@@ -132,7 +132,7 @@ export function ContextMenuRoot({ children, trigger, content, items }: ContextMe
       targets: menuElement,
       opacity: [0, 1],
       scale: [0.95, 1],
-      duration: 120,
+      duration: 100,
       easing: 'easeOutQuart'
     });
   }, [isRendered, coords, menuElement]);
@@ -488,7 +488,7 @@ export function ContextMenuSubMenu({ children, parentItemRef, onClose }: Context
       targets: submenuElement,
       opacity: [0, 1],
       scale: [0.95, 1],
-      duration: 120,
+      duration: 100,
       easing: 'easeOutQuart'
     });
   }, [parentItemRef, submenuElement]);
