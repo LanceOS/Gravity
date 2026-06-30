@@ -1,6 +1,7 @@
 import React from 'react';
 import { X } from 'lucide-react';
 import { Portal } from '../../utilities';
+import anime from 'animejs';
 
 export type ToastType = 'error' | 'warning' | 'info' | 'success';
 
@@ -70,8 +71,100 @@ toast.clear = () => {
   emitToasts();
 };
 
+interface ToastItemComponentProps {
+  item: ToastItem & { isExiting?: boolean };
+  onExited: (id: string) => void;
+}
+
+function ToastItemComponent({ item, onExited }: ToastItemComponentProps) {
+  const elementRef = React.useRef<HTMLDivElement>(null);
+
+  React.useLayoutEffect(() => {
+    if (!item.isExiting && elementRef.current) {
+      if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
+        return;
+      }
+      elementRef.current.style.opacity = '0';
+      elementRef.current.style.transform = 'translateY(20px)';
+      anime({
+        targets: elementRef.current,
+        opacity: [0, 1],
+        translateY: [20, 0],
+        duration: 250,
+        easing: 'easeOutBack',
+      });
+    }
+  }, [item.isExiting]);
+
+  React.useEffect(() => {
+    if (item.isExiting && elementRef.current) {
+      if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
+        onExited(item.id);
+        return;
+      }
+      anime({
+        targets: elementRef.current,
+        opacity: [1, 0],
+        translateX: [0, 40],
+        duration: 200,
+        easing: 'easeInQuad',
+        complete: () => {
+          onExited(item.id);
+        },
+      });
+    }
+  }, [item.isExiting, item.id, onExited]);
+
+  React.useEffect(() => {
+    return () => {
+      if (elementRef.current) {
+        anime.remove(elementRef.current);
+      }
+    };
+  }, []);
+
+  const typeColors = {
+    success: 'var(--color-base400)',
+    error: 'var(--color-text-primary)',
+    warning: 'var(--color-text-secondary)',
+    info: 'var(--color-text-primary)',
+  };
+
+  return (
+    <div
+      ref={elementRef}
+      style={{
+        padding: '12px 16px',
+        borderRadius: 'var(--radius-md)',
+        backgroundColor: 'var(--color-surface-card)',
+        border: '1px solid var(--color-border-default)',
+        borderLeft: `4px solid ${typeColors[item.type]}`,
+        boxShadow: 'var(--shadow-md)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '12px',
+        fontSize: '13px',
+        color: 'var(--color-text-primary)',
+      }}
+    >
+      <span>{item.message}</span>
+      <button
+        type="button"
+        onClick={() => {
+          dismissToast(item.id);
+        }}
+        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--color-text-disabled)' }}
+      >
+        <X size={14} />
+      </button>
+    </div>
+  );
+}
+
 export function Toast() {
   const [toasts, setToasts] = React.useState<ToastItem[]>([]);
+  const [localToasts, setLocalToasts] = React.useState<(ToastItem & { isExiting?: boolean })[]>([]);
 
   React.useEffect(() => {
     const listener = (newToasts: ToastItem[]) => setToasts(newToasts);
@@ -79,6 +172,31 @@ export function Toast() {
     return () => {
       toastListeners = toastListeners.filter((l) => l !== listener);
     };
+  }, []);
+
+  React.useEffect(() => {
+    setLocalToasts((prevLocal) => {
+      const nextLocal = [...prevLocal];
+      
+      // Add new ones
+      toasts.forEach((t) => {
+        if (!nextLocal.some((local) => local.id === t.id)) {
+          nextLocal.push(t);
+        }
+      });
+
+      // Mark removed ones as exiting
+      return nextLocal.map((local) => {
+        if (!toasts.some((t) => t.id === local.id)) {
+          return { ...local, isExiting: true };
+        }
+        return local;
+      });
+    });
+  }, [toasts]);
+
+  const handleExited = React.useCallback((id: string) => {
+    setLocalToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
   return (
@@ -95,45 +213,9 @@ export function Toast() {
           maxWidth: '320px',
         }}
       >
-        {toasts.map((t) => {
-          const typeColors = {
-            success: 'var(--color-base400)',
-            error: 'var(--color-text-primary)',
-            warning: 'var(--color-text-secondary)',
-            info: 'var(--color-text-primary)',
-          };
-          return (
-            <div
-              key={t.id}
-              style={{
-                padding: '12px 16px',
-                borderRadius: 'var(--radius-md)',
-                backgroundColor: 'var(--color-surface-card)',
-                border: '1px solid var(--color-border-default)',
-                borderLeft: `4px solid ${typeColors[t.type]}`,
-                boxShadow: 'var(--shadow-md)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '12px',
-                fontSize: '13px',
-                color: 'var(--color-text-primary)',
-              }}
-              className="lib-animate-fade-in"
-            >
-              <span>{t.message}</span>
-              <button
-                type="button"
-                onClick={() => {
-                  dismissToast(t.id);
-                }}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--color-text-disabled)' }}
-              >
-                <X size={14} />
-              </button>
-            </div>
-          );
-        })}
+        {localToasts.map((t) => (
+          <ToastItemComponent key={t.id} item={t} onExited={handleExited} />
+        ))}
       </div>
     </Portal>
   );
