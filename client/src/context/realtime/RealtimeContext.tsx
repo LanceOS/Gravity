@@ -4,7 +4,7 @@ import { disposeSseService, getSseService } from '../../services/sseService';
 import { SseEventCoalescer, type SseCoalescedEvent } from '../../services/SseEventCoalescer';
 import { normalizeCommentPayload, normalizeTicketPayload, invalidateAggregateTicketQueries } from '../shared';
 import { useActiveProject } from '../project/ActiveProjectContext';
-import { useProjectContext } from '../project/ProjectContext';
+import { useProjectContext, ProjectContext } from '../project/ProjectContext';
 import { resolveWorkspaceIdForSse } from '../project/projectCacheUtils';
 import { useActiveTicket } from '../ticket/ActiveTicketContext';
 import { queryKeys } from '../../utils/queryClient';
