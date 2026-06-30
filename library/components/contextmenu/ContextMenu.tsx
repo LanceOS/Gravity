@@ -409,7 +409,7 @@ export function ContextMenuItemComponent({
     <div
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      style={{ display: 'block', position: 'relative', paddingBottom: '3px' }}
+      style={{ display: 'block', position: 'relative' }}
     >
       <button
         ref={itemRef}
