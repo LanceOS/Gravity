@@ -1,17 +1,17 @@
 .context-menu-container {
   position: fixed;
   z-index: 2000;
-  padding: 8px;
+  padding: 6px;
   background-color: var(--color-surface-card);
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-lg);
-  min-width: 220px;
+  min-width: 190px;
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
   outline: none;
   font-family: 'Space Grotesk', var(--sans);
 }
@@ -19,10 +19,10 @@
 .context-menu-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 14px;
+  gap: 10px;
+  padding: 8px 12px;
   border-radius: var(--radius-sm);
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 500;
   letter-spacing: 0.02em;
   cursor: pointer;
