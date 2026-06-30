@@ -1,4 +1,4 @@
-import React, { DragEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import React, { DragEvent, useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import type { Ticket } from '../../../context/TicketContextContext';
 import { BOARD_COLUMNS } from '../utils/ticketView';
 import { Button, KanbanBoard, Flex } from '@library';
@@ -8,6 +8,8 @@ import { TicketContextMenu } from './TicketContextMenu';
 
 import type { TicketBoardProps } from '../types/TicketBoard';
 import { getAssigneeAvatar, getPriorityColor, getPriorityIcon } from '../utils/TicketBoard';
+import { safeAnime } from '../../../utils/animationUtils';
+import anime from 'animejs';
 
 const INITIAL_CARDS_PER_COLUMN = 40;
 const LOAD_MORE_CARDS = 40;
@@ -31,6 +33,26 @@ export const TicketBoard = React.memo(({
   const [visibleByColumn, setVisibleByColumn] = useState<Record<string, number>>(() =>
     Object.fromEntries(BOARD_COLUMNS.map((column) => [column.id, INITIAL_CARDS_PER_COLUMN])) as Record<string, number>
   );
+
+  const boardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!boardRef.current) return;
+    const cards = boardRef.current.querySelectorAll('.ticket-card');
+    if (cards.length === 0) return;
+
+    // Set initial state before animating
+    anime.set(cards, { opacity: 0, scale: 0.96 });
+
+    safeAnime({
+      targets: cards,
+      scale: [0.96, 1],
+      opacity: [0, 1],
+      delay: anime.stagger(20),
+      duration: 300,
+      easing: 'easeOutBack',
+    });
+  }, [ticketsByColumn, visibleByColumn]);
 
   const visibleByColumnSnapshot = useMemo(() => ticketsByColumn, [ticketsByColumn]);
   const hasMoreRowsValue = hasMoreRows || false;
@@ -154,7 +176,7 @@ export const TicketBoard = React.memo(({
     <Flex direction="column" style={{ height: '100%', flex: 1, overflow: 'hidden' }}>
 
       {/* Kanban Board Container */}
-      <div style={{ flex: 1, overflowY: 'hidden', background: 'var(--color-surface-app)' }}>
+      <div ref={boardRef} style={{ flex: 1, overflowY: 'hidden', background: 'var(--color-surface-app)' }}>
         <KanbanBoard
           columns={BOARD_COLUMNS}
           cards={formattedCards}

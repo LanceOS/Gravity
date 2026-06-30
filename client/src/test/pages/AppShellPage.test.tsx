@@ -30,6 +30,7 @@ type WorkspaceLayoutMockProps = {
       onSelectLabel?: (projectId: string, labelId: string) => void;
       onSelectWorkspaceProjects?: () => void;
       onOpenCreateTeam?: () => void;
+      counts?: any;
     };
   };
   children?: ReactNode;

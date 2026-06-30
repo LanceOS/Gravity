@@ -117,12 +117,12 @@ export function useRealtimeContextValue({
               }
 
               if (payloadTicketId) {
-                removeSseTicketEntries(queryClient, undefined, payloadTicketId, event.projectId || payloadTicket?.projectId);
+                removeSseTicketEntries(queryClient, undefined, payloadTicketId, event.projectId);
                 break;
               }
 
               if (event.ticketKey || cachedTicket?.id) {
-                removeSseTicketEntries(queryClient, event.ticketKey, cachedTicket?.id, event.projectId || payloadTicket?.projectId);
+                removeSseTicketEntries(queryClient, event.ticketKey, cachedTicket?.id, event.projectId);
                 break;
               }
 

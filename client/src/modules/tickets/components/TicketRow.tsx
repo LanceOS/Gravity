@@ -29,6 +29,7 @@ function TicketRowImpl({ ticket, onClick, priorityIcon, assigneeAvatar, projectN
         borderColor: isHovered ? 'var(--color-border-focus)' : 'var(--color-border-default)',
         borderRadius: '6px',
         transition: 'all 0.15s ease',
+        transform: isHovered ? 'translateX(3px)' : 'translateX(0)',
         cursor: 'pointer',
       }}
     >

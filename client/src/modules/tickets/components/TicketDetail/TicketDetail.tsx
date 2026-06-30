@@ -3,6 +3,8 @@ import type { Ticket } from '../../../../context/TicketContextContext';
 import { Button, Select, MarkdownEditor, RichTextEditor, toast, ClickAwayListener, Accordion, Popover, createEmptyRichTextValue, isRichTextEmpty, serializeRichTextMarkdown } from '@library';
 import generateBranchName from '../../../../utils/branch';
 import TicketUtilities from '../TicketUtilities/TicketUtilities';
+import { safeAnime } from '../../../../utils/animationUtils';
+import anime from 'animejs';
 
 const DEFAULT_TICKET_URL_BASE = 'https://tickets.placeholder.local';
 
@@ -118,6 +120,44 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
 }) => {
   const [commentInput, setCommentInput] = useState(createEmptyRichTextValue());
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    // Reset initial state before animating
+    anime.set(containerRef.current, { transform: 'translateX(30px)', opacity: 0 });
+
+    safeAnime({
+      targets: containerRef.current,
+      translateX: [30, 0],
+      opacity: [0, 1],
+      duration: 350,
+      easing: 'easeOutCubic',
+    });
+  }, [activeTicket.id]);
+
+  const handleClose = useCallback(() => {
+    const isTransitionDisabled = prefersReducedMotion() || (typeof process !== 'undefined' && process.env.NODE_ENV === 'test');
+
+    if (isTransitionDisabled || !containerRef.current) {
+      if (onClose) onClose();
+      else window.history.back();
+      return;
+    }
+
+    safeAnime({
+      targets: containerRef.current,
+      translateX: [0, 30],
+      opacity: [1, 0],
+      duration: 250,
+      easing: 'easeInCubic',
+      complete: () => {
+        if (onClose) onClose();
+        else window.history.back();
+      }
+    });
+  }, [onClose]);
 
   const { assignLabelToTicket, unassignLabelFromTicket, createLabel: createLabelInContext } = useLabels();
 
@@ -450,12 +490,12 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
     </div>
   );
   return (
-    <>
+    <div ref={containerRef} style={{ height: '100%', width: '100%', display: 'flex', flexDirection: 'column', flex: '1 1 auto', overflow: 'hidden' }}>
       <TicketContextMenu ticket={activeTicket} availableTickets={availableTickets}>
         <WorkspacePageLayout.Shell className="ticket-detail">
           <WorkspacePageLayout.Header className="ticket-detail__header">
             <Button
-              onClick={() => onClose ? onClose() : window.history.back()}
+              onClick={handleClose}
               variant="ghost"
               size="sm"
               className="ticket-detail__back-btn clickable"
@@ -900,6 +940,6 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
       )}
 
 
-    </>
+    </div>
   );
 };
