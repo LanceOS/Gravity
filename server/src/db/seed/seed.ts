@@ -1,6 +1,7 @@
 import { db } from '../index.js';
 import {
   authUsers,
+  authAccounts,
   userProfiles,
   workspaces,
   workspaceSettings,
@@ -9,6 +10,7 @@ import {
   projects,
   projectMembers,
   labels,
+  cycles,
   tickets,
   ticketLabels,
   ticketRelationships,
@@ -29,6 +31,10 @@ function randomBoolean(chance = 0.5) {
 }
 
 const SEED_PREFIX = 'seed-';
+const TEST_USER_ID = `${SEED_PREFIX}test-user`;
+
+// Hash for 'password123' using better-auth/crypto
+const TEST_USER_PASSWORD_HASH = '36f9442c31bb59aaddda66b21dea011b:42db6d551c9d2980725170922e9c24ff9bc4889ffbb7a6bd19489e59637348fff8eec8f2ed8f62dc4112a0a19ace67238988f8aea80d756ffb8fbf6e87703b32';
 
 async function main() {
   console.log('🌱 Starting database seed...');
@@ -36,8 +42,6 @@ async function main() {
   // 1. Cleanup old seed data
   console.log('🧹 Cleaning up old seed data...');
   
-  // Since we have multiple entities with 'seed-', we can delete based on LIKE prefix.
-  // We should do it in reverse order of dependencies.
   const allSeedUsersQuery = await db.select({ id: authUsers.id }).from(authUsers).where(like(authUsers.id, `${SEED_PREFIX}%`));
   const seedUserIds = allSeedUsersQuery.map(u => u.id);
   
@@ -77,29 +81,79 @@ async function main() {
   }
 
   if (seedUserIds.length > 0) {
+    await db.delete(authAccounts).where(inArray(authAccounts.userId, seedUserIds));
     await db.delete(userProfiles).where(inArray(userProfiles.userId, seedUserIds));
     await db.delete(authUsers).where(inArray(authUsers.id, seedUserIds));
   }
 
+  // 2. Create Default Test User
+  console.log('👤 Creating default test user (test@example.com / password123)...');
+  await db.insert(authUsers).values({
+    id: TEST_USER_ID,
+    name: 'Test User',
+    email: 'test@example.com',
+    emailVerified: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+
+  await db.insert(authAccounts).values({
+    id: `${SEED_PREFIX}test-account`,
+    accountId: 'test@example.com',
+    providerId: 'credential',
+    userId: TEST_USER_ID,
+    password: TEST_USER_PASSWORD_HASH,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+
+  await db.insert(userProfiles).values({
+    userId: TEST_USER_ID,
+    role: 'admin',
+    createdAt: new Date(),
+  });
+
   // Define data configurations
   const wsConfigs = [
     {
-      id: `${SEED_PREFIX}ws-team`,
-      name: 'Team Workspace (Seeded)',
-      key: 'TEAM',
+      id: `${SEED_PREFIX}ws-team-1`,
+      name: 'Team Workspace 1 (Owner)',
+      key: 'TEAM1',
       hierarchyMode: 'teams' as const,
-      numUsers: 5,
+      numUsers: 4, // Will add test user automatically
       numProjects: 3,
       numTicketsPerProject: 25,
+      testUserRole: 'owner' as const,
     },
     {
-      id: `${SEED_PREFIX}ws-proj`,
-      name: 'Project Workspace (Seeded)',
-      key: 'PROJ',
+      id: `${SEED_PREFIX}ws-proj-1`,
+      name: 'Project Workspace 1 (Owner)',
+      key: 'PROJ1',
       hierarchyMode: 'flat' as const,
-      numUsers: 5,
+      numUsers: 4,
       numProjects: 3,
       numTicketsPerProject: 25,
+      testUserRole: 'owner' as const,
+    },
+    {
+      id: `${SEED_PREFIX}ws-team-2`,
+      name: 'Team Workspace 2 (Participant)',
+      key: 'TEAM2',
+      hierarchyMode: 'teams' as const,
+      numUsers: 4,
+      numProjects: 3,
+      numTicketsPerProject: 25,
+      testUserRole: 'member' as const,
+    },
+    {
+      id: `${SEED_PREFIX}ws-proj-2`,
+      name: 'Project Workspace 2 (Participant)',
+      key: 'PROJ2',
+      hierarchyMode: 'flat' as const,
+      numUsers: 4,
+      numProjects: 3,
+      numTicketsPerProject: 25,
+      testUserRole: 'member' as const,
     }
   ];
 
@@ -136,8 +190,8 @@ async function main() {
   for (const config of wsConfigs) {
     console.log(`\n🏢 Seeding ${config.name}...`);
 
-    // Create users for this workspace
-    const userIds: string[] = [];
+    // Create other users for this workspace
+    const userIds: string[] = [TEST_USER_ID];
     for (let u = 1; u <= config.numUsers; u++) {
       const userId = `${config.id}-user-${u}`;
       userIds.push(userId);
@@ -152,12 +206,12 @@ async function main() {
 
       await db.insert(userProfiles).values({
         userId,
-        role: u === 1 ? 'admin' : 'guest_contributor',
+        role: u === 1 && config.testUserRole !== 'owner' ? 'admin' : 'guest_contributor',
         createdAt: new Date(),
       });
     }
 
-    const adminUserId = userIds[0];
+    const adminUserId = config.testUserRole === 'owner' ? TEST_USER_ID : userIds[1];
 
     // Create workspace
     await db.insert(workspaces).values({
@@ -180,7 +234,7 @@ async function main() {
       await db.insert(workspaceMembers).values({
         workspaceId: config.id,
         userId,
-        role: userId === adminUserId ? 'owner' : 'member',
+        role: userId === TEST_USER_ID ? config.testUserRole : (userId === adminUserId ? 'owner' : 'member'),
         createdAt: new Date(),
       });
     }
@@ -203,19 +257,21 @@ async function main() {
       
       // Cycles are not implemented yet, skipping cycle generation.
 
-      // Create Labels for the team
-      const labelIds: string[] = [];
-      for (const label of labelData) {
-        const labelId = `${teamId}-label-${label.name.toLowerCase()}`;
-        labelIds.push(labelId);
-        await db.insert(labels).values({
-          id: labelId,
-          teamId,
-          name: label.name,
-          color: label.color,
-          description: `Issues related to ${label.name}`,
-          createdAt: new Date(),
-        });
+      // Create Labels for the team if in 'teams' mode
+      const teamLabelIds: string[] = [];
+      if (config.hierarchyMode === 'teams') {
+        for (const label of labelData) {
+          const labelId = `${teamId}-label-${label.name.toLowerCase()}`;
+          teamLabelIds.push(labelId);
+          await db.insert(labels).values({
+            id: labelId,
+            teamId,
+            name: label.name,
+            color: label.color,
+            description: `Issues related to ${label.name}`,
+            createdAt: new Date(),
+          });
+        }
       }
 
       // Create Projects
@@ -241,9 +297,27 @@ async function main() {
           await db.insert(projectMembers).values({
             projectId,
             userId,
-            role: userId === adminUserId ? 'admin' : 'developer',
+            role: userId === TEST_USER_ID ? (config.testUserRole === 'owner' ? 'admin' : 'developer') : (userId === adminUserId ? 'admin' : 'developer'),
             createdAt: new Date(),
           });
+        }
+
+        // Create Labels for the project if in 'flat' mode
+        const projectLabelIds: string[] = [];
+        if (config.hierarchyMode === 'flat') {
+          for (const label of labelData) {
+            const labelId = `${projectId}-label-${label.name.toLowerCase()}`;
+            projectLabelIds.push(labelId);
+            await db.insert(labels).values({
+              id: labelId,
+              teamId,
+              projectId,
+              name: label.name,
+              color: label.color,
+              description: `Issues related to ${label.name}`,
+              createdAt: new Date(),
+            });
+          }
         }
 
         // Create Tickets for this project
@@ -277,7 +351,7 @@ async function main() {
           // Assign labels
           const numLabels = randomInt(1, 3);
           const selectedLabels = [];
-          const availableLabels = [...labelIds];
+          const availableLabels = config.hierarchyMode === 'teams' ? [...teamLabelIds] : [...projectLabelIds];
           for (let l = 0; l < numLabels; l++) {
             if (availableLabels.length > 0) {
               const labelIdx = randomInt(0, availableLabels.length - 1);
