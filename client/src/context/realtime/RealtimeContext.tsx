@@ -19,7 +19,7 @@ import {
   upsertTicketFromSse,
 } from './sseEventUtils';
 import type { RealtimeContextType, RealtimeProviderProps, RealtimeContextValueArgs } from './RealtimeContext.types';
-import type { Comment, Ticket } from '../../types/domain';
+import type { Ticket } from '../../types/domain';
 
 export const RealtimeContext = createContext<RealtimeContextType | undefined>(undefined);
 
