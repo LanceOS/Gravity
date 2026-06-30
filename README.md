@@ -25,6 +25,17 @@ To stop the dev stack:
 podman compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml down
 ```
 
+## Database Seeding
+
+To populate the database with realistic sample data (user, workspace, projects, tickets, comments, etc.), run the following command from the `server` directory:
+
+```bash
+cd server
+npm run db:seed
+```
+
+This script is idempotent. It deletes specifically named seed objects (e.g., `seed@example.com` and related projects/tickets) before inserting fresh data, so it can be safely run multiple times without causing duplicates or destroying other user data.
+
 Docs
 -----
 Documentation is located in the `docs/` folder. Good starting points:
