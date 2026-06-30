@@ -1,6 +1,7 @@
 import React from 'react';
 import { X, AlertCircle, Info, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { ClickAwayListener, FocusTrap, Portal, getDropdownPosition } from '../../utilities';
+import anime from 'animejs';
 import './Popover.css';
 
 export interface PopoverProps {
@@ -115,15 +116,57 @@ export function Popover({ trigger, children, isOpen: controlledIsOpen, onOpenCha
     }
   }, [shouldRender, syncPosition]);
 
-  const handleAnimationEnd = () => {
-    if (!isCurrentlyOpen) {
-      setRenderState((prev) => ({
-        ...prev,
-        shouldRender: false,
-        isAnimatingOut: false,
-      }));
+  React.useLayoutEffect(() => {
+    if (shouldRender && !isAnimatingOut && popoverRef.current) {
+      if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
+        return;
+      }
+      popoverRef.current.style.opacity = '0';
+      popoverRef.current.style.transform = 'translateY(-8px)';
+      anime({
+        targets: popoverRef.current,
+        opacity: [0, 1],
+        translateY: [-8, 0],
+        duration: 150,
+        easing: 'easeOutQuad',
+      });
     }
-  };
+  }, [shouldRender, isAnimatingOut]);
+
+  React.useEffect(() => {
+    if (isAnimatingOut && popoverRef.current) {
+      if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
+        setRenderState((prev) => ({
+          ...prev,
+          shouldRender: false,
+          isAnimatingOut: false,
+        }));
+        return;
+      }
+      anime({
+        targets: popoverRef.current,
+        opacity: [1, 0],
+        translateY: [0, -8],
+        duration: 120,
+        easing: 'easeInQuad',
+        complete: () => {
+          setRenderState((prev) => ({
+            ...prev,
+            shouldRender: false,
+            isAnimatingOut: false,
+          }));
+        },
+      });
+    }
+  }, [isAnimatingOut]);
+
+  React.useEffect(() => {
+    return () => {
+      if (popoverRef.current) {
+        anime.remove(popoverRef.current);
+      }
+    };
+  }, []);
 
   return (
     <ClickAwayListener onClickAway={() => setOpen(false)}>
@@ -138,9 +181,8 @@ export function Popover({ trigger, children, isOpen: controlledIsOpen, onOpenCha
             <div
               ref={setPopoverElement}
               role="dialog"
-              onAnimationEnd={handleAnimationEnd}
               onClick={(e) => e.stopPropagation()}
-              className={`popover-content popover-content--align-${align} ${isAnimatingOut ? 'lib-animate-fade-out-up' : 'lib-animate-fade-in-down'} ${contentClassName}`}
+              className={`popover-content popover-content--align-${align} ${contentClassName}`}
               style={{ zIndex: 1700 }}
             >
               {children}

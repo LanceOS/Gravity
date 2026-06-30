@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { Compass, PlusCircle } from 'lucide-react';
 import { Button } from '@library';
 import type { Ticket } from '../../../context/TicketContextContext';
@@ -9,6 +9,8 @@ import { TicketContextMenu } from './TicketContextMenu';
 import type { TicketListPropsWithPerformance } from '../types/TicketList';
 import { getAssigneeAvatar, getPriorityIcon, getStatusLabel, getStatusColor } from '../utils/TicketList';
 import { LIST_STATUS_ORDER } from '../utils/ticketView';
+import { safeAnime } from '../../../utils/animationUtils';
+import anime from 'animejs';
 
 const INITIAL_TICKETS_PER_STATUS = 50;
 const LOAD_MORE_STEP = 50;
@@ -29,10 +31,29 @@ export const TicketList = React.memo(({
   );
   const showMoreButton = hasMoreRows || false;
   const loadingMoreRows = isLoadingMoreRows || false;
+  const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setVisibleByStatus(Object.fromEntries(LIST_STATUS_ORDER.map((status) => [status, INITIAL_TICKETS_PER_STATUS])) as Record<string, number>);
   }, [groupedTickets]);
+
+  useEffect(() => {
+    if (!listRef.current) return;
+    const rows = listRef.current.querySelectorAll('.ticket-row, .ticket-row-mobile');
+    if (rows.length === 0) return;
+
+    // Set initial state before animating
+    anime.set(rows, { opacity: 0, translateY: 12 });
+
+    safeAnime({
+      targets: rows,
+      translateY: [12, 0],
+      opacity: [0, 1],
+      delay: anime.stagger(25),
+      duration: 350,
+      easing: 'easeOutQuad',
+    });
+  }, [groupedTickets, visibleByStatus]);
 
   const handleLoadMoreStatus = (status: string, totalTicketsForStatus: number) => {
     setVisibleByStatus((previous) => {
@@ -56,7 +77,7 @@ export const TicketList = React.memo(({
         overflow: 'hidden'
       }}
     >
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}>
+      <div ref={listRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}>
         <>
           {LIST_STATUS_ORDER.map((status) => {
             const ticketsInGroup = groupedTickets[status];

@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import { Portal } from '../../utilities';
 import { FocusTrap } from '../../utilities';
 import { ClickAwayListener } from '../../utilities';
+import anime from 'animejs';
 
 export interface DrawerProps {
   isOpen: boolean;
@@ -13,23 +14,93 @@ export interface DrawerProps {
 }
 
 export function Drawer({ isOpen, onClose, title, children, style }: DrawerProps) {
+  const [isRendered, setIsRendered] = React.useState(isOpen);
+  const backdropRef = React.useRef<HTMLDivElement>(null);
+  const contentRef = React.useRef<HTMLDivElement>(null);
+
   React.useEffect(() => {
     if (isOpen) {
+      setIsRendered(true);
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
+      if (isRendered) {
+        if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
+          setIsRendered(false);
+        } else {
+          if (backdropRef.current) {
+            anime.remove(backdropRef.current);
+            anime({
+              targets: backdropRef.current,
+              opacity: [1, 0],
+              duration: 75,
+              easing: 'linear',
+            });
+          }
+          if (contentRef.current) {
+            anime.remove(contentRef.current);
+            anime({
+              targets: contentRef.current,
+              translateX: ['0%', '100%'],
+              duration: 75,
+              easing: 'easeInCubic',
+            });
+          }
+          setTimeout(() => {
+            setIsRendered(false);
+          }, 75);
+        }
+      }
     }
     return () => {
       document.body.style.overflow = '';
     };
-  }, [isOpen]);
+  }, [isOpen, isRendered]);
 
-  if (!isOpen) return null;
+  React.useLayoutEffect(() => {
+    if (isOpen && isRendered) {
+      if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
+        return;
+      }
+      if (backdropRef.current) {
+        backdropRef.current.style.opacity = '0';
+        anime({
+          targets: backdropRef.current,
+          opacity: [0, 1],
+          duration: 75,
+          easing: 'linear',
+        });
+      }
+      if (contentRef.current) {
+        contentRef.current.style.transform = 'translateX(100%)';
+        anime({
+          targets: contentRef.current,
+          translateX: ['100%', '0%'],
+          duration: 75,
+          easing: 'easeOutCubic',
+        });
+      }
+    }
+  }, [isOpen, isRendered]);
+
+  React.useEffect(() => {
+    return () => {
+      if (backdropRef.current) {
+        anime.remove(backdropRef.current);
+      }
+      if (contentRef.current) {
+        anime.remove(contentRef.current);
+      }
+    };
+  }, []);
+
+  if (!isRendered) return null;
 
   return (
     <Portal>
       <FocusTrap>
         <div
+          ref={backdropRef}
           style={{
             position: 'fixed',
             top: 0,
@@ -41,10 +112,10 @@ export function Drawer({ isOpen, onClose, title, children, style }: DrawerProps)
             display: 'flex',
             justifyContent: 'flex-end',
           }}
-          className="lib-animate-fade-in"
         >
           <ClickAwayListener onClickAway={onClose}>
             <div
+              ref={contentRef}
               role="dialog"
               aria-modal="true"
               style={{
@@ -58,7 +129,6 @@ export function Drawer({ isOpen, onClose, title, children, style }: DrawerProps)
                 flexDirection: 'column',
                 ...style,
               }}
-              className="lib-animate-slide-in-right"
             >
               <div
                 style={{

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useMemo } from 'react';
 import { getStoredWorkspaceDefaultView } from '../../utils/workspacePreferences';
 import type { ActiveView, ActiveViewContextType } from './ActiveViewContext.types';
 
@@ -7,8 +7,10 @@ const ActiveViewContext = createContext<ActiveViewContextType | undefined>(undef
 export const ActiveViewProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [activeView, setView] = useState<ActiveView>(getStoredWorkspaceDefaultView);
 
+  const value = useMemo(() => ({ activeView, setView }), [activeView, setView]);
+
   return (
-    <ActiveViewContext.Provider value={{ activeView, setView }}>
+    <ActiveViewContext.Provider value={value}>
       {children}
     </ActiveViewContext.Provider>
   );

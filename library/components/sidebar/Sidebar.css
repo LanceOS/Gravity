@@ -1,31 +1,31 @@
 .sidebar-item {
-  font-size: 13px;
+  font-size: 14px;
   padding: 6px 10px;
 }
 
 .sidebar-item-nested {
-  font-size: 12px;
+  font-size: 13px;
   padding: 5px 8px;
 }
 
 .sidebar-group-label {
-  font-size: 10px;
+  font-size: 11px;
   padding: 4px 8px 0 8px;
 }
 
 @media (max-width: 768px) {
   .sidebar-item {
-    font-size: 15px;
+    font-size: 16px;
     padding: 8px 12px;
   }
 
   .sidebar-item-nested {
-    font-size: 14px;
+    font-size: 15px;
     padding: 8px 10px;
   }
 
   .sidebar-group-label {
-    font-size: 12px;
+    font-size: 13px;
     padding: 8px 12px 0 12px;
   }
 }

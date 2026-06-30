@@ -47,10 +47,10 @@ export function SidebarUserMenu({
           style={{ width: '28px', height: '28px', borderRadius: '50%', border: '1px solid var(--color-border-default)' }}
         />
         <div style={{ overflow: 'hidden' }}>
-          <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-primary)', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+          <div style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-text-primary)', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
             {userMenu.currentUser.name}
           </div>
-          <div style={{ fontSize: '11px', color: 'var(--color-text-disabled)', textTransform: 'capitalize' }}>
+          <div style={{ fontSize: '12px', color: 'var(--color-text-disabled)', textTransform: 'capitalize' }}>
             {userMenu.currentUser.role || 'User'}
           </div>
         </div>
@@ -79,7 +79,7 @@ export function SidebarUserMenu({
           pointerEvents: showUserDropdown ? 'auto' : 'none',
         }}
       >
-        <div style={{ padding: '6px 10px', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase', borderBottom: '1px solid var(--color-border-default)', marginBottom: '4px' }}>
+        <div style={{ padding: '6px 10px', fontSize: '12px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase', borderBottom: '1px solid var(--color-border-default)', marginBottom: '4px' }}>
           Account & Settings
         </div>
 
@@ -158,7 +158,7 @@ export function SidebarUserMenu({
             padding: '8px 10px',
             borderRadius: '4px',
             cursor: 'pointer',
-            fontSize: '12px',
+            fontSize: '13px',
             borderTop: '1px solid var(--color-border-default)',
             marginTop: '4px',
             color: 'var(--color-primary)',

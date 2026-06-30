@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import { Portal } from '../../utilities';
 import { FocusTrap } from '../../utilities';
 import { ClickAwayListener } from '../../utilities';
+import anime from 'animejs';
 
 export interface ModalProps {
   isOpen: boolean;
@@ -14,23 +15,96 @@ export interface ModalProps {
 }
 
 export function Modal({ isOpen, onClose, title, children, footer, style }: ModalProps) {
+  const [isRendered, setIsRendered] = React.useState(isOpen);
+  const backdropRef = React.useRef<HTMLDivElement>(null);
+  const dialogRef = React.useRef<HTMLDivElement>(null);
+
   React.useEffect(() => {
     if (isOpen) {
+      setIsRendered(true);
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
+      if (isRendered) {
+        if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
+          setIsRendered(false);
+        } else {
+          if (backdropRef.current) {
+            anime.remove(backdropRef.current);
+            anime({
+              targets: backdropRef.current,
+              opacity: [1, 0],
+              duration: 75,
+              easing: 'linear',
+            });
+          }
+          if (dialogRef.current) {
+            anime.remove(dialogRef.current);
+            anime({
+              targets: dialogRef.current,
+              opacity: [1, 0],
+              translateY: ['0px', '16px'],
+              duration: 75,
+              easing: 'easeInQuad',
+            });
+          }
+          setTimeout(() => {
+            setIsRendered(false);
+          }, 75);
+        }
+      }
     }
     return () => {
       document.body.style.overflow = '';
     };
-  }, [isOpen]);
+  }, [isOpen, isRendered]);
 
-  if (!isOpen) return null;
+  React.useLayoutEffect(() => {
+    if (isOpen && isRendered) {
+      if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
+        return;
+      }
+      if (backdropRef.current) {
+        backdropRef.current.style.opacity = '0';
+        anime({
+          targets: backdropRef.current,
+          opacity: [0, 1],
+          duration: 75,
+          easing: 'linear',
+        });
+      }
+      if (dialogRef.current) {
+        dialogRef.current.style.opacity = '0';
+        dialogRef.current.style.transform = 'translateY(16px)';
+        anime({
+          targets: dialogRef.current,
+          opacity: [0, 1],
+          translateY: ['16px', '0px'],
+          duration: 75,
+          easing: 'easeOutQuad',
+        });
+      }
+    }
+  }, [isOpen, isRendered]);
+
+  React.useEffect(() => {
+    return () => {
+      if (backdropRef.current) {
+        anime.remove(backdropRef.current);
+      }
+      if (dialogRef.current) {
+        anime.remove(dialogRef.current);
+      }
+    };
+  }, []);
+
+  if (!isRendered) return null;
 
   return (
     <Portal>
       <FocusTrap>
         <div
+          ref={backdropRef}
           style={{
             position: 'fixed',
             top: 0,
@@ -45,10 +119,10 @@ export function Modal({ isOpen, onClose, title, children, footer, style }: Modal
             justifyContent: 'center',
             padding: '16px',
           }}
-          className="lib-animate-fade-in"
         >
           <ClickAwayListener onClickAway={onClose}>
             <div
+              ref={dialogRef}
               role="dialog"
               aria-modal="true"
               aria-labelledby={title ? 'modal-title' : undefined}

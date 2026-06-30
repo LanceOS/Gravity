@@ -49,16 +49,7 @@
 }
 
 .sidebar-navigation__collapse {
-  display: grid;
-  grid-template-rows: 1fr;
-  transition: grid-template-rows var(--transition-normal), opacity var(--transition-normal);
   opacity: 1;
-}
-
-.sidebar-navigation__collapse--collapsed {
-  grid-template-rows: 0fr;
-  opacity: 0;
-  pointer-events: none;
 }
 
 .sidebar-navigation__collapse-inner {
@@ -78,7 +69,7 @@
 .sidebar-navigation__empty {
   padding: 4px 10px 6px 30px;
   color: var(--color-text-disabled);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .sidebar-navigation__completed {

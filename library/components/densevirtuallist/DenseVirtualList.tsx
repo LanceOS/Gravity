@@ -17,23 +17,43 @@ export function DenseVirtualList<T>({
   renderRow
 }: DenseVirtualListProps<T>) {
   const containerRef = React.useRef<HTMLDivElement>(null);
-  const [scrollTop, setScrollTop] = React.useState(0);
+  
+  const [scrollRange, setScrollRange] = React.useState({
+    startIndex: 0,
+    endIndex: Math.min(Math.max(0, items.length - 1), Math.ceil(height / rowHeight) + buffer)
+  });
+
+  React.useEffect(() => {
+    const visibleCount = Math.ceil(height / rowHeight);
+    if (containerRef.current) {
+      const scrollTop = containerRef.current.scrollTop;
+      const start = Math.floor(scrollTop / rowHeight);
+      const boundedStart = Math.max(0, start - buffer);
+      const boundedEnd = Math.min(Math.max(0, items.length - 1), start + visibleCount + buffer);
+      setScrollRange({ startIndex: boundedStart, endIndex: boundedEnd });
+    } else {
+      setScrollRange({ startIndex: 0, endIndex: Math.min(Math.max(0, items.length - 1), visibleCount + buffer) });
+    }
+  }, [items.length, height, rowHeight, buffer]);
 
   const onScroll = React.useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    setScrollTop(e.currentTarget.scrollTop);
-  }, []);
-
-  const totalHeight = items.length * rowHeight;
-  
-  const { startIndex, endIndex } = React.useMemo(() => {
-    const visibleCount = Math.ceil(height / rowHeight);
+    const scrollTop = e.currentTarget.scrollTop;
     const start = Math.floor(scrollTop / rowHeight);
+    const visibleCount = Math.ceil(height / rowHeight);
     
     const boundedStart = Math.max(0, start - buffer);
-    const boundedEnd = Math.min(items.length - 1, start + visibleCount + buffer);
+    const boundedEnd = Math.min(Math.max(0, items.length - 1), start + visibleCount + buffer);
     
-    return { startIndex: boundedStart, endIndex: boundedEnd };
-  }, [scrollTop, items.length, height, rowHeight, buffer]);
+    setScrollRange(prev => {
+      if (prev.startIndex !== boundedStart || prev.endIndex !== boundedEnd) {
+        return { startIndex: boundedStart, endIndex: boundedEnd };
+      }
+      return prev;
+    });
+  }, [height, rowHeight, buffer, items.length]);
+
+  const totalHeight = items.length * rowHeight;
+  const { startIndex, endIndex } = scrollRange;
 
   const visibleItems = React.useMemo(() => {
     const renderedRange: React.ReactNode[] = [];

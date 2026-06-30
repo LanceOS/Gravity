@@ -21,7 +21,4 @@ export const getWindowStyle = (isMobile: boolean, isClosing: boolean): React.CSS
   overflow: 'hidden',
   backdropFilter: 'blur(20px)',
   WebkitBackdropFilter: 'blur(20px)',
-  animation: isClosing 
-    ? 'aiChatFadeUpClose 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards'
-    : 'aiChatFadeDownOpen 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
 });

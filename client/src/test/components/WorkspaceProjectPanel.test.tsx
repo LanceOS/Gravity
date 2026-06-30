@@ -53,7 +53,7 @@ vi.mock('@library', () => ({
 }));
 
 vi.mock('../../components/WorkspaceProjectPanel', () => ({
-  ProjectCreateOverlay: ({ onClose, onSubmitProject }: ProjectCreateOverlayProps) => (
+  ProjectCreateOverlay: ({ isOpen, onClose, onSubmitProject }: ProjectCreateOverlayProps) => isOpen ? (
     <div>
       <div>ProjectCreateOverlay</div>
       <button
@@ -72,7 +72,7 @@ vi.mock('../../components/WorkspaceProjectPanel', () => ({
         Close overlay
       </button>
     </div>
-  ),
+  ) : null,
 }));
 
 const projects = [
