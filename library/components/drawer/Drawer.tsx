@@ -28,30 +28,27 @@ export function Drawer({ isOpen, onClose, title, children, style }: DrawerProps)
         if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
           setIsRendered(false);
         } else {
-          const animations = [];
           if (backdropRef.current) {
-            animations.push(
-              anime({
-                targets: backdropRef.current,
-                opacity: [1, 0],
-                duration: 200,
-                easing: 'linear',
-              }).finished
-            );
+            anime.remove(backdropRef.current);
+            anime({
+              targets: backdropRef.current,
+              opacity: [1, 0],
+              duration: 75,
+              easing: 'linear',
+            });
           }
           if (contentRef.current) {
-            animations.push(
-              anime({
-                targets: contentRef.current,
-                translateX: ['0%', '100%'],
-                duration: 250,
-                easing: 'easeInCubic',
-              }).finished
-            );
+            anime.remove(contentRef.current);
+            anime({
+              targets: contentRef.current,
+              translateX: ['0%', '100%'],
+              duration: 75,
+              easing: 'easeInCubic',
+            });
           }
-          Promise.all(animations).then(() => {
+          setTimeout(() => {
             setIsRendered(false);
-          });
+          }, 75);
         }
       }
     }
@@ -70,7 +67,7 @@ export function Drawer({ isOpen, onClose, title, children, style }: DrawerProps)
         anime({
           targets: backdropRef.current,
           opacity: [0, 1],
-          duration: 200,
+          duration: 75,
           easing: 'linear',
         });
       }
@@ -79,7 +76,7 @@ export function Drawer({ isOpen, onClose, title, children, style }: DrawerProps)
         anime({
           targets: contentRef.current,
           translateX: ['100%', '0%'],
-          duration: 300,
+          duration: 75,
           easing: 'easeOutCubic',
         });
       }

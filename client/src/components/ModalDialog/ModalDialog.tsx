@@ -82,31 +82,28 @@ function ModalDialogRoot({
       if (isTest) {
         setIsRendered(false);
       } else {
-        const animations = [];
         if (backdropRef.current) {
-          animations.push(
-            anime({
-              targets: backdropRef.current,
-              opacity: [1, 0],
-              duration: 150,
-              easing: 'linear',
-            }).finished
-          );
+          anime.remove(backdropRef.current);
+          anime({
+            targets: backdropRef.current,
+            opacity: [1, 0],
+            duration: 75,
+            easing: 'linear',
+          });
         }
         if (panelRef.current) {
-          animations.push(
-            anime({
-              targets: panelRef.current,
-              opacity: [1, 0],
-              scale: [1, 0.95],
-              duration: 150,
-              easing: 'easeInQuad',
-            }).finished
-          );
+          anime.remove(panelRef.current);
+          anime({
+            targets: panelRef.current,
+            opacity: [1, 0],
+            translateY: ['0px', '16px'],
+            duration: 75,
+            easing: 'easeInQuad',
+          });
         }
-        Promise.all(animations).then(() => {
+        setTimeout(() => {
           setIsRendered(false);
-        });
+        }, 75);
       }
     }
   }, [isOpen, isRendered]);
@@ -118,23 +115,25 @@ function ModalDialogRoot({
         return;
       }
       if (backdropRef.current) {
+        anime.remove(backdropRef.current);
         backdropRef.current.style.opacity = '0';
         anime({
           targets: backdropRef.current,
           opacity: [0, 1],
-          duration: 200,
+          duration: 75,
           easing: 'linear',
         });
       }
       if (panelRef.current) {
+        anime.remove(panelRef.current);
         panelRef.current.style.opacity = '0';
-        panelRef.current.style.transform = 'scale(0.95)';
+        panelRef.current.style.transform = 'translateY(16px)';
         anime({
           targets: panelRef.current,
           opacity: [0, 1],
-          scale: [0.95, 1],
-          duration: 250,
-          easing: 'easeOutBack',
+          translateY: ['16px', '0px'],
+          duration: 75,
+          easing: 'easeOutQuad',
         });
       }
     }

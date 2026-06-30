@@ -29,31 +29,28 @@ export function Modal({ isOpen, onClose, title, children, footer, style }: Modal
         if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
           setIsRendered(false);
         } else {
-          const animations = [];
           if (backdropRef.current) {
-            animations.push(
-              anime({
-                targets: backdropRef.current,
-                opacity: [1, 0],
-                duration: 150,
-                easing: 'linear',
-              }).finished
-            );
+            anime.remove(backdropRef.current);
+            anime({
+              targets: backdropRef.current,
+              opacity: [1, 0],
+              duration: 75,
+              easing: 'linear',
+            });
           }
           if (dialogRef.current) {
-            animations.push(
-              anime({
-                targets: dialogRef.current,
-                opacity: [1, 0],
-                scale: [1, 0.95],
-                duration: 150,
-                easing: 'easeInQuad',
-              }).finished
-            );
+            anime.remove(dialogRef.current);
+            anime({
+              targets: dialogRef.current,
+              opacity: [1, 0],
+              translateY: ['0px', '16px'],
+              duration: 75,
+              easing: 'easeInQuad',
+            });
           }
-          Promise.all(animations).then(() => {
+          setTimeout(() => {
             setIsRendered(false);
-          });
+          }, 75);
         }
       }
     }
@@ -72,19 +69,19 @@ export function Modal({ isOpen, onClose, title, children, footer, style }: Modal
         anime({
           targets: backdropRef.current,
           opacity: [0, 1],
-          duration: 200,
+          duration: 75,
           easing: 'linear',
         });
       }
       if (dialogRef.current) {
         dialogRef.current.style.opacity = '0';
-        dialogRef.current.style.transform = 'scale(0.95)';
+        dialogRef.current.style.transform = 'translateY(16px)';
         anime({
           targets: dialogRef.current,
           opacity: [0, 1],
-          scale: [0.95, 1],
-          duration: 250,
-          easing: 'easeOutBack',
+          translateY: ['16px', '0px'],
+          duration: 75,
+          easing: 'easeOutQuad',
         });
       }
     }

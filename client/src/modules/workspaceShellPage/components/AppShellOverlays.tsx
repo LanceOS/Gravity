@@ -83,9 +83,7 @@ export function AppShellOverlays({
 
       {onboarding}
 
-      {mcp.isOpen ? (
-        <WorkspaceMcpModal workspaceId={mcp.workspaceId} isOpen={mcp.isOpen} onClose={mcp.onClose} />
-      ) : null}
+      <WorkspaceMcpModal workspaceId={mcp.workspaceId} isOpen={mcp.isOpen} onClose={mcp.onClose} />
 
       <ProjectCreateOverlay
         isOpen={createProject.isOpen}
