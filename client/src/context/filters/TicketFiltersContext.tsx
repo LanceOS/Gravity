@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, ReactNode, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useReducer, ReactNode, useCallback, useEffect, useMemo } from 'react';
 import type { TicketFiltersContextType } from './TicketFiltersContext.types';
 import { initialFilters, type TicketFiltersState } from '../shared/filters';
 import { useActiveProject } from '../project/ActiveProjectContext';
@@ -67,8 +67,10 @@ export const TicketFiltersProvider: React.FC<{ children: ReactNode }> = ({ child
     }
   }, [activeProjectId, filters.projectId, setFilters]);
 
+  const value = useMemo(() => ({ filters, setFilters, resetFilters }), [filters, setFilters, resetFilters]);
+
   return (
-    <TicketFiltersContext.Provider value={{ filters, setFilters, resetFilters }}>
+    <TicketFiltersContext.Provider value={value}>
       {children}
     </TicketFiltersContext.Provider>
   );

@@ -37,7 +37,9 @@ export function useRealtimeContextValue({
 }: RealtimeContextValueArgs): RealtimeContextType {
   const { activeProjectId } = useActiveProject();
   const { activeTicket } = useActiveTicket();
-  const { projects, projectLookup } = useProjectContext();
+  const projectContext = React.useContext(ProjectContext);
+  const projects = projectContext?.projects || [];
+  const projectLookup = projectContext?.projectLookup || new Map();
   const queryClient = useQueryClient();
   const currentUserIdRef = useRef<string | undefined>(currentUserId ?? undefined);
   const activeTicketRef = useRef<Ticket | null>(activeTicket);
