@@ -3,7 +3,7 @@ import type { Ticket } from '../../../../context/TicketContextContext';
 import { Button, Select, MarkdownEditor, RichTextEditor, toast, ClickAwayListener, Accordion, Popover, createEmptyRichTextValue, isRichTextEmpty, serializeRichTextMarkdown } from '@library';
 import generateBranchName from '../../../../utils/branch';
 import TicketUtilities from '../TicketUtilities/TicketUtilities';
-import { safeAnime } from '../../../../utils/animationUtils';
+import { safeAnime, prefersReducedMotion } from '../../../../utils/animationUtils';
 import anime from 'animejs';
 
 const DEFAULT_TICKET_URL_BASE = 'https://tickets.placeholder.local';

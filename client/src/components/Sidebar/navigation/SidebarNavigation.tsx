@@ -1,7 +1,7 @@
 import { type ButtonHTMLAttributes, type JSX, type ReactNode, useRef, useEffect } from 'react';
 import { SidebarGroup, SidebarItem, type SidebarGroupProps, type SidebarItemProps } from '@library';
 import './SidebarNavigation.css';
-import { safeAnime } from '../../../utils/animationUtils';
+import { safeAnime, prefersReducedMotion } from '../../../utils/animationUtils';
 import anime from 'animejs';
 
 interface SidebarNavigationRootProps {
