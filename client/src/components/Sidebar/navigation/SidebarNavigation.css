@@ -69,7 +69,7 @@
 .sidebar-navigation__empty {
   padding: 4px 10px 6px 30px;
   color: var(--color-text-disabled);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .sidebar-navigation__completed {
