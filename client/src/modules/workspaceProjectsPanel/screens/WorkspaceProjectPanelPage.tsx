@@ -245,14 +245,13 @@ function WorkspaceProjectPanelPageContent({
           </WorkspaceManagementEditorSection>
         </div>
 
-        {isCreateProjectModalOpen ? (
-          <ProjectCreateOverlay
-            loading={projectCreateLoading}
-            errorMessage={projectCreateError}
-            onClose={closeCreateProjectModal}
-            onSubmitProject={createProject}
-          />
-        ) : null}
+        <ProjectCreateOverlay
+          isOpen={isCreateProjectModalOpen}
+          loading={projectCreateLoading}
+          errorMessage={projectCreateError}
+          onClose={closeCreateProjectModal}
+          onSubmitProject={createProject}
+        />
       </WorkspacePageLayout.ContentBody>
     </>
   );

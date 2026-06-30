@@ -4,6 +4,7 @@ import { DenseTextarea } from '../densetextarea';
 import { AIChatMessageBubble } from './AIChatMessage';
 import type { AIChatMessage } from './types';
 import { getWindowStyle } from './styles';
+import anime from 'animejs';
 
 export interface AIChatWindowProps {
   title?: React.ReactNode;
@@ -31,6 +32,7 @@ export function AIChatWindow({
   const [chatInput, setChatInput] = useState('');
   const chatEndRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const windowRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -43,6 +45,41 @@ export function AIChatWindow({
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isGenerating]);
 
+  useEffect(() => {
+    if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
+      return;
+    }
+    if (windowRef.current) {
+      if (isClosing) {
+        anime({
+          targets: windowRef.current,
+          opacity: [1, 0],
+          translateY: [0, 20],
+          duration: 280,
+          easing: 'easeInCubic',
+        });
+      } else {
+        windowRef.current.style.opacity = '0';
+        windowRef.current.style.transform = 'translateY(20px)';
+        anime({
+          targets: windowRef.current,
+          opacity: [0, 1],
+          translateY: [20, 0],
+          duration: 300,
+          easing: 'easeOutCubic',
+        });
+      }
+    }
+  }, [isClosing]);
+
+  useEffect(() => {
+    return () => {
+      if (windowRef.current) {
+        anime.remove(windowRef.current);
+      }
+    };
+  }, []);
+
   const handleSubmit = (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!chatInput.trim() || isGenerating) return;
@@ -52,6 +89,7 @@ export function AIChatWindow({
 
   return (
     <div
+      ref={windowRef}
       style={getWindowStyle(isMobile, isClosing)}
     >
       <div

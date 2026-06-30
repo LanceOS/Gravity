@@ -18,29 +18,54 @@ export interface DataGridProps<T> {
 }
 
 export function DataGrid<T>({ columns, data, rowHeight = 36, height = 360, style }: DataGridProps<T>) {
-  const [scrollTop, setScrollTop] = React.useState(0);
   const containerRef = React.useRef<HTMLDivElement | null>(null);
+  const buffer = 5;
+
+  const [scrollRange, setScrollRange] = React.useState({
+    start: 0,
+    end: Math.min(Math.max(0, data.length - 1), Math.ceil(height / rowHeight) + buffer)
+  });
+
+  React.useEffect(() => {
+    const visibleCount = Math.ceil(height / rowHeight);
+    if (containerRef.current) {
+      const scrollTop = containerRef.current.scrollTop;
+      const start = Math.floor(scrollTop / rowHeight);
+      const boundedStart = Math.max(0, start - buffer);
+      const boundedEnd = Math.min(Math.max(0, data.length - 1), start + visibleCount + buffer);
+      setScrollRange({ start: boundedStart, end: boundedEnd });
+    } else {
+      setScrollRange({ start: 0, end: Math.min(Math.max(0, data.length - 1), visibleCount + buffer) });
+    }
+  }, [data.length, height, rowHeight, buffer]);
 
   const totalHeight = data.length * rowHeight;
-  const startIndex = Math.floor(scrollTop / rowHeight);
-  const visibleCount = Math.ceil(height / rowHeight);
-  const buffer = 5;
-  const bufferedStartIndex = Math.max(0, startIndex - buffer);
-  const bufferedEndIndex = Math.min(data.length - 1, startIndex + visibleCount + buffer);
+
+  const handleScroll = React.useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const scrollTop = e.currentTarget.scrollTop;
+    const start = Math.floor(scrollTop / rowHeight);
+    const visibleCount = Math.ceil(height / rowHeight);
+    
+    const boundedStart = Math.max(0, start - buffer);
+    const boundedEnd = Math.min(Math.max(0, data.length - 1), start + visibleCount + buffer);
+    
+    setScrollRange(prev => {
+      if (prev.start !== boundedStart || prev.end !== boundedEnd) {
+        return { start: boundedStart, end: boundedEnd };
+      }
+      return prev;
+    });
+  }, [height, rowHeight, buffer, data.length]);
 
   const visibleRows = React.useMemo(() => {
     const rows = [];
-    for (let i = bufferedStartIndex; i <= bufferedEndIndex; i++) {
+    for (let i = scrollRange.start; i <= scrollRange.end; i++) {
       if (data[i]) {
         rows.push({ index: i, item: data[i] });
       }
     }
     return rows;
-  }, [data, bufferedStartIndex, bufferedEndIndex]);
-
-  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    setScrollTop(e.currentTarget.scrollTop);
-  };
+  }, [data, scrollRange]);
 
   return (
     <div

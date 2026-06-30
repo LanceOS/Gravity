@@ -30,6 +30,7 @@ type WorkspaceLayoutMockProps = {
       onSelectLabel?: (projectId: string, labelId: string) => void;
       onSelectWorkspaceProjects?: () => void;
       onOpenCreateTeam?: () => void;
+      counts?: any;
     };
   };
   children?: ReactNode;
@@ -182,8 +183,8 @@ vi.mock('../../modules/tickets', async (importOriginal) => {
 
   return {
     ...actual,
-  CreateTicketModal: () => <div>CreateTicketModal</div>,
-  LabelCreateOverlay: () => <div>LabelCreateOverlay</div>,
+  CreateTicketModal: ({ isOpen }: any) => isOpen ? <div>CreateTicketModal</div> : null,
+  LabelCreateOverlay: ({ isOpen }: any) => isOpen ? <div>LabelCreateOverlay</div> : null,
   TicketDetailRoute: ({ onDeleteTicket, activeTicket }: any) => (
     <div>
       <div>TicketDetailRoute Mock</div>

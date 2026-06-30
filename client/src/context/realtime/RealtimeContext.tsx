@@ -4,7 +4,7 @@ import { disposeSseService, getSseService } from '../../services/sseService';
 import { SseEventCoalescer, type SseCoalescedEvent } from '../../services/SseEventCoalescer';
 import { normalizeCommentPayload, normalizeTicketPayload, invalidateAggregateTicketQueries } from '../shared';
 import { useActiveProject } from '../project/ActiveProjectContext';
-import { useProjectContext } from '../project/ProjectContext';
+import { useProjectContext, ProjectContext } from '../project/ProjectContext';
 import { resolveWorkspaceIdForSse } from '../project/projectCacheUtils';
 import { useActiveTicket } from '../ticket/ActiveTicketContext';
 import { queryKeys } from '../../utils/queryClient';
@@ -19,7 +19,7 @@ import {
   upsertTicketFromSse,
 } from './sseEventUtils';
 import type { RealtimeContextType, RealtimeProviderProps, RealtimeContextValueArgs } from './RealtimeContext.types';
-import type { Comment, Ticket } from '../../types/domain';
+import type { Ticket } from '../../types/domain';
 
 export const RealtimeContext = createContext<RealtimeContextType | undefined>(undefined);
 
@@ -37,7 +37,9 @@ export function useRealtimeContextValue({
 }: RealtimeContextValueArgs): RealtimeContextType {
   const { activeProjectId } = useActiveProject();
   const { activeTicket } = useActiveTicket();
-  const { projects, projectLookup } = useProjectContext();
+  const projectContext = React.useContext(ProjectContext);
+  const projects = projectContext?.projects || [];
+  const projectLookup = projectContext?.projectLookup || new Map();
   const queryClient = useQueryClient();
   const currentUserIdRef = useRef<string | undefined>(currentUserId ?? undefined);
   const activeTicketRef = useRef<Ticket | null>(activeTicket);
@@ -117,12 +119,12 @@ export function useRealtimeContextValue({
               }
 
               if (payloadTicketId) {
-                removeSseTicketEntries(queryClient, undefined, payloadTicketId, event.projectId || payloadTicket?.projectId);
+                removeSseTicketEntries(queryClient, undefined, payloadTicketId, event.projectId);
                 break;
               }
 
               if (event.ticketKey || cachedTicket?.id) {
-                removeSseTicketEntries(queryClient, event.ticketKey, cachedTicket?.id, event.projectId || payloadTicket?.projectId);
+                removeSseTicketEntries(queryClient, event.ticketKey, cachedTicket?.id, event.projectId);
                 break;
               }
 

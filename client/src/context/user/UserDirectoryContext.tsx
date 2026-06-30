@@ -44,7 +44,7 @@ export const UserDirectoryProvider: FC<{ children: ReactNode }> = ({ children })
       return { workspaceId: workspaceIdFromRoute };
     }
 
-    if (activeProject?.id) {
+    if (activeProject?.workspaceId) {
       return { workspaceId: activeProject.workspaceId };
     }
 

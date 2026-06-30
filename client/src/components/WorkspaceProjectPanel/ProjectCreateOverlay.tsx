@@ -5,6 +5,7 @@ import { FormSection } from '../FormSection';
 import { ModalDialog } from '../ModalDialog';
 
 export interface ProjectCreateOverlayProps {
+  isOpen: boolean;
   loading: boolean;
   errorMessage: string | null;
   onClose: () => void;
@@ -50,6 +51,7 @@ function buildValidatedPayload(input: ProjectCreatePayload): ProjectCreateValida
 }
 
 export function ProjectCreateOverlay({
+  isOpen,
   loading,
   errorMessage,
   onClose,
@@ -73,6 +75,12 @@ export function ProjectCreateOverlay({
       onClose();
     }
   }, [loading, onClose, resetForm]);
+
+  useEffect(() => {
+    if (isOpen) {
+      resetForm();
+    }
+  }, [isOpen, resetForm]);
 
   const handleSubmit = useCallback(
     async (event?: FormEvent<HTMLFormElement>) => {
@@ -124,7 +132,7 @@ export function ProjectCreateOverlay({
 
   return (
     <ModalDialog.Root
-      isOpen={true}
+      isOpen={isOpen}
       onClose={handleClose}
       size="md"
       style={{ maxWidth: '500px' }}

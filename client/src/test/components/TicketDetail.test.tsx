@@ -547,7 +547,7 @@ describe('TicketDetail', () => {
     });
 
     await user.click(sidebar.getByRole('button', { name: 'Add Blocker' }));
-    const blockerSearch = screen.getAllByPlaceholderText('Type to search tickets...')[1] as HTMLInputElement;
+    const blockerSearch = screen.getByPlaceholderText('Type to search tickets...');
     await user.type(blockerSearch, 'Searchable blocker target');
     await user.click(screen.getByRole('button', { name: /GRA-107/ }));
     await waitFor(() => {

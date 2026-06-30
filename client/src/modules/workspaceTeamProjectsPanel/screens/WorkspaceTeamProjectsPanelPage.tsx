@@ -423,14 +423,13 @@ export function WorkspaceTeamProjectsPanelPage({
         </WorkspaceManagementEditorSection>
       </div>
 
-      {isCreateModalOpen && (
-        <ProjectCreateOverlay
-          loading={projectCreateLoading}
-          errorMessage={projectCreateError}
-          onClose={() => setIsCreateModalOpen(false)}
-          onSubmitProject={handleCreateProject}
-        />
-      )}
+      <ProjectCreateOverlay
+        isOpen={isCreateModalOpen}
+        loading={projectCreateLoading}
+        errorMessage={projectCreateError}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSubmitProject={handleCreateProject}
+      />
 
       {isDeleteModalOpen && selectedProject && (
         <WorkspaceTeamProjectsDeleteModal

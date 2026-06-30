@@ -12,6 +12,7 @@ import { Plus } from 'lucide-react';
 import './CreateTicketModal.css';
 
 export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
+  isOpen = true,
   onClose,
   projects,
   labels,
@@ -38,6 +39,21 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
   );
 
   const { createLabel } = useLabels();
+
+  // Reset form state when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setTitle('');
+      setDescription(createEmptyRichTextValue());
+      setProjectId(parentTicket ? parentTicket.projectId : defaultProjectId);
+      setStatus(initialStatus || 'todo');
+      setPriority('no_priority');
+      setAssigneeId('');
+      setLabelIds([]);
+      setCycleId('');
+      setFormError(null);
+    }
+  }, [isOpen, parentTicket, defaultProjectId, initialStatus]);
 
   // `projectId` is initialized from props via useState above. The modal
   // component is mounted/unmounted when opened, so remounting will reset
@@ -109,7 +125,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
 
   return (
     <ModalDialog.Root
-      isOpen={true}
+      isOpen={isOpen}
       onClose={onClose}
       size="xl"
       style={{ maxWidth: '980px' }}

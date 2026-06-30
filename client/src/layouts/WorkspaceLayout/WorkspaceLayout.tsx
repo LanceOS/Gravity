@@ -1,10 +1,12 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode, useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Menu, MessageSquare, X } from 'lucide-react';
 import { Sidebar, type SidebarProps } from '../../components/Sidebar';
 import { DashboardLayout } from '../../components/DashboardLayout/DashboardLayout';
 import { Select } from '@library';
 import './WorkspaceLayout.css';
+import { safeAnime } from '../../utils/animationUtils';
+import anime from 'animejs';
 
 interface WorkspaceLayoutProps {
   sidebarProps: SidebarProps;
@@ -15,8 +17,53 @@ interface WorkspaceLayoutProps {
 
 export function WorkspaceLayout({ sidebarProps, children, rightPanels, isMobile }: WorkspaceLayoutProps) {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const backdropRef = useRef<HTMLDivElement>(null);
 
   const closeSidebar = () => setIsMobileSidebarOpen(false);
+
+  useEffect(() => {
+    if (!isMobile) return;
+
+    const drawer = drawerRef.current;
+    const backdrop = backdropRef.current;
+
+    if (!drawer || !backdrop) return;
+
+    if (isMobileSidebarOpen) {
+      anime.remove([drawer, backdrop]);
+      
+      safeAnime({
+        targets: backdrop,
+        opacity: [0, 1],
+        duration: 300,
+        easing: 'easeOutQuad',
+      });
+
+      safeAnime({
+        targets: drawer,
+        translateX: ['-100%', '0%'],
+        duration: 400,
+        easing: 'easeOutElastic(1, 0.85)',
+      });
+    } else {
+      anime.remove([drawer, backdrop]);
+      
+      safeAnime({
+        targets: backdrop,
+        opacity: [1, 0],
+        duration: 250,
+        easing: 'easeInQuad',
+      });
+
+      safeAnime({
+        targets: drawer,
+        translateX: ['0%', '-100%'],
+        duration: 250,
+        easing: 'easeInCubic',
+      });
+    }
+  }, [isMobileSidebarOpen, isMobile]);
 
   const wrapHandler = <T extends (...args: any[]) => any>(handler: T): T => {
     return ((...args: Parameters<T>) => {
@@ -125,8 +172,8 @@ export function WorkspaceLayout({ sidebarProps, children, rightPanels, isMobile 
       {isMobile && typeof document !== 'undefined'
         ? createPortal(
             <div className={`mobile-sidebar-overlay ${isMobileSidebarOpen ? 'mobile-sidebar-overlay--open' : ''}`}>
-              <div className="mobile-sidebar-backdrop" onClick={closeSidebar} />
-              <div className="mobile-sidebar-drawer">
+              <div ref={backdropRef} className="mobile-sidebar-backdrop" onClick={closeSidebar} />
+              <div ref={drawerRef} className="mobile-sidebar-drawer">
                 <Sidebar {...mobileSidebarProps} />
               </div>
             </div>,

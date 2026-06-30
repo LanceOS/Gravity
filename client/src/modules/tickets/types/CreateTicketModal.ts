@@ -13,6 +13,7 @@ export interface CreateTicketInput {
 }
 
 export interface CreateTicketModalProps {
+  isOpen?: boolean;
   onClose: () => void;
   projects: Project[];
   labels: Label[];

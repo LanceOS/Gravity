@@ -211,20 +211,19 @@ export function WorkspaceIssueSurface({
         />
       )}
 
-      {createTicketModal.isOpen ? (
-        <CreateTicketModal
-          onClose={createTicketModal.onClose}
-          projects={createTicketModal.projects}
-          labels={createTicketModal.labels}
-          cycles={createTicketModal.cycles}
-          users={createTicketModal.users}
-          parentTicket={createTicketModal.parentTicket}
-          defaultProjectId={createTicketModal.defaultProjectId}
-          onSubmitTicket={handleCreateTicketSubmit}
-          initialStatus={createTicketModal.initialStatus}
-          parentId={createTicketModal.parentId}
-        />
-      ) : null}
+      <CreateTicketModal
+        isOpen={createTicketModal.isOpen}
+        onClose={createTicketModal.onClose}
+        projects={createTicketModal.projects}
+        labels={createTicketModal.labels}
+        cycles={createTicketModal.cycles}
+        users={createTicketModal.users}
+        parentTicket={createTicketModal.parentTicket}
+        defaultProjectId={createTicketModal.defaultProjectId}
+        onSubmitTicket={handleCreateTicketSubmit}
+        initialStatus={createTicketModal.initialStatus}
+        parentId={createTicketModal.parentId}
+      />
     </>
   );
 }

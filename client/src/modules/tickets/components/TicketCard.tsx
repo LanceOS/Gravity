@@ -18,7 +18,7 @@ function TicketCardImpl({
 
   return (
     <Card
-      className="clickable"
+      className="ticket-card clickable"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onClick={onClick}
@@ -36,6 +36,8 @@ function TicketCardImpl({
         gap: '10px',
         cursor: 'grab',
         transition: 'all var(--transition-normal)',
+        transform: isHovered ? 'translateY(-2px)' : 'translateY(0)',
+        boxShadow: isHovered ? 'var(--shadow-md)' : 'var(--shadow-sm)',
         borderColor: isHovered ? 'var(--color-border-focus)' : 'var(--color-border-default)',
       }}
     >
