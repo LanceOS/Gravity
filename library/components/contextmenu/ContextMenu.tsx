@@ -93,6 +93,9 @@ export function ContextMenuRoot({ children, trigger, content, items }: ContextMe
             duration: 100,
             easing: 'easeOutQuart',
             complete: () => {
+              if (menuElement) {
+                menuElement.style.transform = '';
+              }
               setIsRendered(false);
               setActiveSubmenuId(null);
             }
@@ -133,7 +136,12 @@ export function ContextMenuRoot({ children, trigger, content, items }: ContextMe
       opacity: [0, 1],
       scale: [0.95, 1],
       duration: 100,
-      easing: 'easeOutQuart'
+      easing: 'easeOutQuart',
+      complete: () => {
+        if (menuElement) {
+          menuElement.style.transform = '';
+        }
+      }
     });
   }, [isRendered, coords, menuElement]);
 
@@ -401,7 +409,7 @@ export function ContextMenuItemComponent({
     <div
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      style={{ display: 'block', position: 'relative' }}
+      style={{ display: 'block', position: 'relative', paddingBottom: '3px' }}
     >
       <button
         ref={itemRef}
@@ -489,7 +497,12 @@ export function ContextMenuSubMenu({ children, parentItemRef, onClose }: Context
       opacity: [0, 1],
       scale: [0.95, 1],
       duration: 100,
-      easing: 'easeOutQuart'
+      easing: 'easeOutQuart',
+      complete: () => {
+        if (submenuElement) {
+          submenuElement.style.transform = '';
+        }
+      }
     });
   }, [parentItemRef, submenuElement]);
 

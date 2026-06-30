@@ -7,6 +7,7 @@ import { ModalDialog } from '../../../components/ModalDialog';
 const DEFAULT_LABEL_COLOR = '#3b82f6';
 
 export interface LabelCreateOverlayProps {
+  isOpen?: boolean;
   loading?: boolean;
   errorMessage?: string | null;
   onClose: () => void;
@@ -14,6 +15,7 @@ export interface LabelCreateOverlayProps {
 }
 
 export function LabelCreateOverlay({
+  isOpen,
   loading,
   errorMessage,
   onClose,
@@ -54,6 +56,15 @@ export function LabelCreateOverlay({
   };
 
   useEffect(() => {
+    if (isOpen) {
+      setLabelName('');
+      setLabelColor(DEFAULT_LABEL_COLOR);
+      setLabelDescription('');
+      setFormError(null);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         handleClose();
@@ -73,7 +84,7 @@ export function LabelCreateOverlay({
 
   return (
     <ModalDialog.Root
-      isOpen={true}
+      isOpen={!!isOpen}
       onClose={handleClose}
       size="sm"
       style={{ maxWidth: '400px' }}

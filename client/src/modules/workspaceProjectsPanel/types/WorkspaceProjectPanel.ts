@@ -65,6 +65,7 @@ export interface ProjectSelectionRailProps {
 }
 
 export interface ProjectCreateOverlayProps {
+  isOpen: boolean;
   loading: boolean;
   errorMessage: string | null;
   onClose: () => void;

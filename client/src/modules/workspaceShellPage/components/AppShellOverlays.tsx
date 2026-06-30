@@ -67,20 +67,19 @@ export function AppShellOverlays({
 }: AppShellOverlaysProps) {
   return (
     <>
-      {createTicket?.isOpen ? (
-        <CreateTicketModal
-          onClose={createTicket.onClose}
-          projects={createTicket.projects}
-          labels={createTicket.labels}
-          cycles={createTicket.cycles}
-          users={createTicket.users}
-          parentTicket={createTicket.parentTicket}
-          defaultProjectId={createTicket.defaultProjectId}
-          onSubmitTicket={createTicket.onSubmitTicket}
-          initialStatus={createTicket.initialStatus}
-          parentId={createTicket.parentId}
-        />
-      ) : null}
+      <CreateTicketModal
+        isOpen={!!createTicket?.isOpen}
+        onClose={createTicket?.onClose || (() => {})}
+        projects={createTicket?.projects || []}
+        labels={createTicket?.labels || []}
+        cycles={createTicket?.cycles || []}
+        users={createTicket?.users || []}
+        parentTicket={createTicket?.parentTicket || null}
+        defaultProjectId={createTicket?.defaultProjectId || ''}
+        onSubmitTicket={createTicket?.onSubmitTicket || (async () => false)}
+        initialStatus={createTicket?.initialStatus}
+        parentId={createTicket?.parentId}
+      />
 
       {onboarding}
 
@@ -88,23 +87,21 @@ export function AppShellOverlays({
         <WorkspaceMcpModal workspaceId={mcp.workspaceId} isOpen={mcp.isOpen} onClose={mcp.onClose} />
       ) : null}
 
-      {createProject.isOpen ? (
-        <ProjectCreateOverlay
-          loading={createProject.loading}
-          errorMessage={createProject.errorMessage}
-          onClose={createProject.onClose}
-          onSubmitProject={createProject.onSubmitProject}
-        />
-      ) : null}
+      <ProjectCreateOverlay
+        isOpen={createProject.isOpen}
+        loading={createProject.loading}
+        errorMessage={createProject.errorMessage}
+        onClose={createProject.onClose}
+        onSubmitProject={createProject.onSubmitProject}
+      />
 
-      {createLabel.isOpen ? (
-        <LabelCreateOverlay
-          loading={createLabel.loading}
-          errorMessage={createLabel.errorMessage}
-          onClose={createLabel.onClose}
-          onSubmitLabel={createLabel.onSubmitLabel}
-        />
-      ) : null}
+      <LabelCreateOverlay
+        isOpen={createLabel.isOpen}
+        loading={createLabel.loading}
+        errorMessage={createLabel.errorMessage}
+        onClose={createLabel.onClose}
+        onSubmitLabel={createLabel.onSubmitLabel}
+      />
     </>
   );
 }

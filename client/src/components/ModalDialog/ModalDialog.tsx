@@ -3,6 +3,8 @@ import {
   useRef,
   useContext,
   useEffect,
+  useLayoutEffect,
+  useState,
   useId,
   type CSSProperties,
   type ReactNode,
@@ -10,6 +12,7 @@ import {
 import { createPortal } from 'react-dom';
 import { Button } from '@library';
 import { X } from 'lucide-react';
+import anime from 'animejs';
 import './ModalDialog.css';
 
 type ModalDialogSize = 'sm' | 'md' | 'lg' | 'xl';
@@ -67,10 +70,89 @@ function ModalDialogRoot({
   const generatedId = useId();
   const titleId = `modal-dialog-title-${generatedId}`;
   const descriptionId = `modal-dialog-description-${generatedId}`;
+  const backdropRef = useRef<HTMLDivElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
+  const [isRendered, setIsRendered] = useState(isOpen);
 
   useEffect(() => {
-    if (!isOpen) {
+    if (isOpen) {
+      setIsRendered(true);
+    } else if (isRendered) {
+      const isTest = typeof process !== 'undefined' && process.env.NODE_ENV === 'test';
+      if (isTest) {
+        setIsRendered(false);
+      } else {
+        const animations = [];
+        if (backdropRef.current) {
+          animations.push(
+            anime({
+              targets: backdropRef.current,
+              opacity: [1, 0],
+              duration: 150,
+              easing: 'linear',
+            }).finished
+          );
+        }
+        if (panelRef.current) {
+          animations.push(
+            anime({
+              targets: panelRef.current,
+              opacity: [1, 0],
+              scale: [1, 0.95],
+              duration: 150,
+              easing: 'easeInQuad',
+            }).finished
+          );
+        }
+        Promise.all(animations).then(() => {
+          setIsRendered(false);
+        });
+      }
+    }
+  }, [isOpen, isRendered]);
+
+  useLayoutEffect(() => {
+    if (isOpen && isRendered) {
+      const isTest = typeof process !== 'undefined' && process.env.NODE_ENV === 'test';
+      if (isTest) {
+        return;
+      }
+      if (backdropRef.current) {
+        backdropRef.current.style.opacity = '0';
+        anime({
+          targets: backdropRef.current,
+          opacity: [0, 1],
+          duration: 200,
+          easing: 'linear',
+        });
+      }
+      if (panelRef.current) {
+        panelRef.current.style.opacity = '0';
+        panelRef.current.style.transform = 'scale(0.95)';
+        anime({
+          targets: panelRef.current,
+          opacity: [0, 1],
+          scale: [0.95, 1],
+          duration: 250,
+          easing: 'easeOutBack',
+        });
+      }
+    }
+  }, [isOpen, isRendered]);
+
+  useEffect(() => {
+    return () => {
+      if (backdropRef.current) {
+        anime.remove(backdropRef.current);
+      }
+      if (panelRef.current) {
+        anime.remove(panelRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isRendered) {
       return undefined;
     }
 
@@ -80,7 +162,7 @@ function ModalDialogRoot({
     return () => {
       document.body.style.overflow = previousOverflow;
     };
-  }, [isOpen]);
+  }, [isRendered]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -146,13 +228,14 @@ function ModalDialogRoot({
     firstFocusableElement?.focus();
   }, [isOpen]);
 
-  if (!isOpen) {
+  if (!isRendered) {
     return null;
   }
 
   return createPortal(
     <div
-      className={cn('modal-dialog__overlay lib-animate-fade-in', className)}
+      className={cn('modal-dialog__overlay', className)}
+      ref={backdropRef}
       onMouseDown={(event) => {
         if (closeOnClickAway && event.target === event.currentTarget) {
           onClose();
