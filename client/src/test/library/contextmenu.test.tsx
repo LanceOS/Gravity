@@ -47,7 +47,9 @@ describe('Declarative ContextMenu library component', () => {
 
     await user.click(screen.getByText('Todo'));
     expect(screen.getByTestId('status-val')).toHaveTextContent('todo');
-    expect(screen.queryByRole('menu', { name: 'Context Menu' })).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByRole('menu', { name: 'Context Menu' })).not.toBeInTheDocument();
+    });
   });
 
   it('handles nested submenus on hover/focus', async () => {
@@ -71,6 +73,8 @@ describe('Declarative ContextMenu library component', () => {
     
     await user.click(screen.getByText('High'));
     expect(screen.getByTestId('priority-val')).toHaveTextContent('high');
-    expect(screen.queryByRole('menu', { name: 'Context Menu' })).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByRole('menu', { name: 'Context Menu' })).not.toBeInTheDocument();
+    });
   });
 });

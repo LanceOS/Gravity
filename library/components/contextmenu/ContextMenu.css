@@ -1,38 +1,45 @@
 .context-menu-container {
   position: fixed;
   z-index: 2000;
-  padding: 4px;
+  padding: 8px;
   background-color: var(--color-surface-card);
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-lg);
-  min-width: 160px;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  min-width: 220px;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   outline: none;
-  animation: lib-fade-in var(--transition-fast);
+  font-family: 'Space Grotesk', var(--sans);
 }
 
 .context-menu-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
+  gap: 12px;
+  padding: 10px 14px;
   border-radius: var(--radius-sm);
-  font-size: 13px;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
   cursor: pointer;
-  color: var(--color-text-primary);
+  color: var(--color-text-secondary);
   background: transparent;
   border: none;
   width: 100%;
   text-align: left;
   outline: none;
   box-sizing: border-box;
-  transition: background-color var(--transition-fast), color var(--transition-fast);
+  transition: all var(--transition-fast);
   user-select: none;
+}
+
+.context-menu-item svg {
+  opacity: 0.5;
+  transition: transform var(--transition-fast), opacity var(--transition-fast);
 }
 
 .context-menu-item:hover,
@@ -42,9 +49,23 @@
   color: var(--color-text-primary);
 }
 
+.context-menu-item:hover svg,
+.context-menu-item:focus-visible svg,
+.context-menu-item[data-highlighted="true"] svg {
+  opacity: 1;
+  transform: scale(1.15) rotate(-5deg);
+  color: var(--color-primary);
+}
+
 .context-menu-item[aria-disabled="true"] {
-  opacity: 0.5;
+  opacity: 0.3;
   cursor: not-allowed;
+  transform: none !important;
+}
+
+.context-menu-item[aria-disabled="true"]:hover {
+  background-color: transparent;
+  color: var(--color-text-secondary);
 }
 
 .context-menu-item--danger {
@@ -54,7 +75,13 @@
 .context-menu-item--danger:hover,
 .context-menu-item--danger:focus-visible,
 .context-menu-item--danger[data-highlighted="true"] {
-  background-color: rgba(239, 68, 68, 0.1);
+  background-color: var(--color-error-light, rgba(239, 68, 68, 0.1));
+  color: var(--color-text-error);
+}
+
+.context-menu-item--danger:hover svg,
+.context-menu-item--danger:focus-visible svg,
+.context-menu-item--danger[data-highlighted="true"] svg {
   color: var(--color-text-error);
 }
 
@@ -65,5 +92,10 @@
   }
   .context-menu-item {
     transition: none !important;
+    transform: none !important;
+  }
+  .context-menu-item svg {
+    transition: none !important;
+    transform: none !important;
   }
 }
