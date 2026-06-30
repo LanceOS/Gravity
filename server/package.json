@@ -13,6 +13,7 @@
     "start": "node dist/index.js",
     "db:generate": "drizzle-kit generate",
     "db:push": "tsx src/db/prepush-team-backfill.ts && drizzle-kit push",
+    "db:seed": "tsx src/db/seed/seed.ts",
     "cleanup:orphaned-assets": "tsx src/jobs/cleanupOrphanedAssets.ts",
     "mcp": "tsx src/mcp/stdio.ts"
   },
