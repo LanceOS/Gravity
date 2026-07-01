@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { useInfiniteQuery, useIsFetching, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useInfiniteQuery, useIsFetching, useQuery, useQueries, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
 import type { SidebarNavigationState, SidebarProps } from '../../../components/Sidebar';
 import { WorkspaceLayout } from '../../../layouts/WorkspaceLayout/WorkspaceLayout';
@@ -329,75 +329,49 @@ export function WorkspaceShellPage() {
     exact: true,
   });
 
-  const buildWorkspaceProjectCacheFingerprint = useCallback(() => {
-    const signatureParts = new Array<string>(activeWorkspaceProjects.length);
-    const queryClientProxy = queryClient as unknown as {
-      getQueryState?: <T>(queryKey: readonly unknown[]) => {
-        data?: T;
-        dataUpdatedAt?: number;
-      } | undefined;
-      getQueryData?: <T>(queryKey: readonly unknown[]) => T | undefined;
-    };
+  const projectTicketsQueries = useQueries({
+    queries: activeWorkspaceProjects.map((project) => ({
+      queryKey: queryKeys.tickets(project.id),
+      queryFn: () => apiClient.get<Ticket[]>('/tickets', { projectId: project.id }),
+      enabled: false,
+      staleTime: CACHE_CONFIGS.ticketsList.staleTime,
+      gcTime: CACHE_CONFIGS.ticketsList.gcTime,
+    })),
+  });
 
-    for (let index = 0; index < activeWorkspaceProjects.length; index += 1) {
-      const project = activeWorkspaceProjects[index];
+  const projectLabelsQueries = useQueries({
+    queries: activeWorkspaceProjects.map((project) => ({
+      queryKey: queryKeys.labels(project.id),
+      queryFn: () => apiClient.get<Label[]>('/labels', { params: { projectId: project.id }, projectId: project.id }),
+      enabled: activeSection === 'projects',
+      staleTime: CACHE_CONFIGS.metadata.staleTime,
+      gcTime: CACHE_CONFIGS.metadata.gcTime,
+    })),
+  });
 
-      const ticketState = queryClientProxy.getQueryState?.<Ticket[]>(queryKeys.tickets(project.id));
-      const labelState = queryClientProxy.getQueryState?.<Label[]>(queryKeys.labels(project.id));
+  const ticketsByProjectIdFromQueries = useMemo(() => {
+    const map = new Map<string, Ticket[]>();
+    activeWorkspaceProjects.forEach((project, idx) => {
+      queryClient.getQueryData(queryKeys.tickets(project.id));
+      const data = projectTicketsQueries[idx]?.data;
+      if (Array.isArray(data)) {
+        map.set(project.id, data);
+      }
+    });
+    return map;
+  }, [activeWorkspaceProjects, projectTicketsQueries, queryClient]);
 
-      const ticketData = (Array.isArray(ticketState?.data)
-        ? ticketState.data
-        : (queryClientProxy.getQueryData?.<Ticket[]>(queryKeys.tickets(project.id)) ?? []));
-      const labelData = (Array.isArray(labelState?.data)
-        ? labelState.data
-        : (queryClientProxy.getQueryData?.<Label[]>(queryKeys.labels(project.id)) ?? []));
-
-      const ticketTimestamp = ticketState?.dataUpdatedAt || 0;
-      const labelTimestamp = labelState?.dataUpdatedAt || 0;
-
-      signatureParts[index] = `${project.id}:tickets:${ticketData.length}:${ticketTimestamp}:labels:${labelData.length}:${labelTimestamp}`;
-    }
-
-    return signatureParts.join('|');
-  }, [activeWorkspaceProjects, queryClient]);
-
-  const cacheFingerprint = useSyncExternalStore(
-    useCallback(
-      (onStoreChange) => {
-        let latestFingerprint = buildWorkspaceProjectCacheFingerprint();
-        const queryClientProxy = queryClient as unknown as {
-          subscribeAll?: (listener: (event?: { query?: { queryKey?: unknown } }) => void) => () => void;
-          getQueryCache?: () => { subscribe?: (listener: (event?: { query?: { queryKey?: unknown } }) => void) => () => void };
-        };
-        const notifyIfChanged = () => {
-          const nextFingerprint = buildWorkspaceProjectCacheFingerprint();
-          if (nextFingerprint === latestFingerprint) {
-            return;
-          }
-
-          latestFingerprint = nextFingerprint;
-          onStoreChange();
-        };
-        const notifyForEvent = () => {
-          notifyIfChanged();
-        };
-
-        if (typeof queryClientProxy.subscribeAll === 'function') {
-          return queryClientProxy.subscribeAll(notifyForEvent);
-        }
-
-        const queryCache = queryClientProxy.getQueryCache?.();
-        if (queryCache && typeof queryCache.subscribe === 'function') {
-          return queryCache.subscribe(notifyForEvent);
-        }
-
-        return () => undefined;
-      },
-      [queryClient, buildWorkspaceProjectCacheFingerprint]
-    ),
-    buildWorkspaceProjectCacheFingerprint,
-    buildWorkspaceProjectCacheFingerprint,
-  );
+  const labelsByProjectIdFromQueries = useMemo(() => {
+    const map = new Map<string, Label[]>();
+    activeWorkspaceProjects.forEach((project, idx) => {
+      queryClient.getQueryData(queryKeys.labels(project.id));
+      const data = projectLabelsQueries[idx]?.data;
+      if (Array.isArray(data)) {
+        map.set(project.id, data);
+      }
+    });
+    return map;
+  }, [activeWorkspaceProjects, projectLabelsQueries, queryClient]);
 
   const labelsByProject = useMemo(() => {
     const cachedLabelsByProject = new Map<string, Label[]>();
@@ -434,12 +408,12 @@ export function WorkspaceShellPage() {
     }
 
     for (const project of activeWorkspaceProjects) {
-      const cachedProjectLabels = queryClient.getQueryData<Label[]>(queryKeys.labels(project.id));
-      appendProjectLabels(project.id, Array.isArray(cachedProjectLabels) ? cachedProjectLabels : []);
+      const queryLabels = labelsByProjectIdFromQueries.get(project.id);
+      appendProjectLabels(project.id, queryLabels ?? []);
     }
 
     return cachedLabelsByProject;
-  }, [activeWorkspaceProjectIds, activeWorkspaceProjects, cacheFingerprint, queryClient, sidebarTree]);
+  }, [activeWorkspaceProjectIds, activeWorkspaceProjects, labelsByProjectIdFromQueries, sidebarTree]);
 
   const workspaceProjectLabels = useMemo(() => {
     const dedupedWorkspaceLabels = new Map<string, Label>();
@@ -599,10 +573,10 @@ export function WorkspaceShellPage() {
   const ticketCountsByProject = useMemo(() => {
     return createWorkspaceProjectCounts(
       activeWorkspaceProjects,
-      (projectId) => queryClient.getQueryData<Ticket[]>(queryKeys.tickets(projectId)),
+      (projectId) => ticketsByProjectIdFromQueries.get(projectId),
       currentUser?.id
     );
-  }, [activeWorkspaceProjects, cacheFingerprint, currentUser?.id, queryClient]);
+  }, [activeWorkspaceProjects, ticketsByProjectIdFromQueries, currentUser?.id]);
 
   const scopedTicketMaps = useMemo(() => {
     const mapByKey = new Map<string, Ticket>();
@@ -971,7 +945,7 @@ export function WorkspaceShellPage() {
       onSelectAllTasks: (teamId) => navigate(`/workspaces/${activeWorkspaceId}/teams/${teamId}/tasks`),
       projects: activeWorkspaceProjects,
       onPrefetchProject: fetchProjectData,
-      onHasCachedProjectData: (projectId) => queryClient.getQueryData<Ticket[]>(queryKeys.tickets(projectId)) !== undefined,
+      onHasCachedProjectData: (projectId) => ticketsByProjectIdFromQueries.has(projectId),
       labels,
       labelsByProject,
       cycles,
