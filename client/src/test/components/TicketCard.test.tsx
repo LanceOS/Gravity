@@ -42,6 +42,7 @@ describe('TicketCard', () => {
         ticket={ticket}
         onClick={onClick}
         onDragStart={onDragStart}
+        priority={ticket.priority}
         priorityIcon={<span data-testid="priority-icon">⬆</span>}
         priorityColor="#f59e0b"
         assigneeAvatar="avatar.png"

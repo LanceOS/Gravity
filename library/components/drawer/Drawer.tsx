@@ -5,6 +5,19 @@ import { FocusTrap } from '../../utilities';
 import { ClickAwayListener } from '../../utilities';
 import anime from 'animejs';
 
+const DRAWER_DURATION = 190;
+const DRAWER_EASING = 'cubic-bezier(0.2, 0, 0.38, 1)';
+
+function shouldReduceMotion(): boolean {
+  if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
+    return true;
+  }
+  if (typeof window === 'undefined') {
+    return false;
+  }
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
 export interface DrawerProps {
   isOpen: boolean;
   onClose: () => void;
@@ -19,67 +32,69 @@ export function Drawer({ isOpen, onClose, title, children, style }: DrawerProps)
   const contentRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
+    const reducedMotion = shouldReduceMotion();
+
     if (isOpen) {
       setIsRendered(true);
       document.body.style.overflow = 'hidden';
-    } else {
+    } else if (isRendered) {
       document.body.style.overflow = '';
-      if (isRendered) {
-        if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
-          setIsRendered(false);
-        } else {
-          if (backdropRef.current) {
-            anime.remove(backdropRef.current);
-            anime({
-              targets: backdropRef.current,
-              opacity: [1, 0],
-              duration: 75,
-              easing: 'linear',
-            });
-          }
-          if (contentRef.current) {
-            anime.remove(contentRef.current);
-            anime({
-              targets: contentRef.current,
-              translateX: ['0%', '100%'],
-              duration: 75,
-              easing: 'easeInCubic',
-            });
-          }
-          setTimeout(() => {
-            setIsRendered(false);
-          }, 75);
-        }
+
+      if (reducedMotion) {
+        setIsRendered(false);
+        return;
       }
+
+      if (backdropRef.current) {
+        anime.remove(backdropRef.current);
+        anime({
+          targets: backdropRef.current,
+          opacity: [1, 0],
+          duration: DRAWER_DURATION,
+          easing: DRAWER_EASING,
+        });
+      }
+      if (contentRef.current) {
+        anime.remove(contentRef.current);
+        anime({
+          targets: contentRef.current,
+          translateX: ['0%', '100%'],
+          duration: DRAWER_DURATION,
+          easing: DRAWER_EASING,
+        });
+      }
+      window.setTimeout(() => {
+        setIsRendered(false);
+      }, DRAWER_DURATION);
     }
+
     return () => {
       document.body.style.overflow = '';
     };
   }, [isOpen, isRendered]);
 
   React.useLayoutEffect(() => {
-    if (isOpen && isRendered) {
-      if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
-        return;
-      }
-      if (backdropRef.current) {
-        backdropRef.current.style.opacity = '0';
-        anime({
-          targets: backdropRef.current,
-          opacity: [0, 1],
-          duration: 75,
-          easing: 'linear',
-        });
-      }
-      if (contentRef.current) {
-        contentRef.current.style.transform = 'translateX(100%)';
-        anime({
-          targets: contentRef.current,
-          translateX: ['100%', '0%'],
-          duration: 75,
-          easing: 'easeOutCubic',
-        });
-      }
+    if (!isOpen || !isRendered || shouldReduceMotion()) {
+      return;
+    }
+
+    if (backdropRef.current) {
+      backdropRef.current.style.opacity = '0';
+      anime({
+        targets: backdropRef.current,
+        opacity: [0, 1],
+        duration: DRAWER_DURATION,
+        easing: DRAWER_EASING,
+      });
+    }
+    if (contentRef.current) {
+      contentRef.current.style.transform = 'translateX(100%)';
+      anime({
+        targets: contentRef.current,
+        translateX: ['100%', '0%'],
+        duration: DRAWER_DURATION,
+        easing: DRAWER_EASING,
+      });
     }
   }, [isOpen, isRendered]);
 
@@ -108,6 +123,7 @@ export function Drawer({ isOpen, onClose, title, children, style }: DrawerProps)
             bottom: 0,
             left: 0,
             backgroundColor: 'var(--color-overlay-scrim)',
+            backdropFilter: 'blur(10px)',
             zIndex: 1500,
             display: 'flex',
             justifyContent: 'flex-end',
@@ -124,7 +140,6 @@ export function Drawer({ isOpen, onClose, title, children, style }: DrawerProps)
                 height: '100%',
                 backgroundColor: 'var(--color-surface-overlay)',
                 borderLeft: '1px solid var(--color-border-default)',
-                boxShadow: 'var(--shadow-xl)',
                 display: 'flex',
                 flexDirection: 'column',
                 ...style,

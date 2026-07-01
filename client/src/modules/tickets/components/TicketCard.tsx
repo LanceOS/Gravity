@@ -1,48 +1,63 @@
-import { memo, useState } from 'react';
+import { memo } from 'react';
 import { GitMerge, GitPullRequest, Paperclip } from 'lucide-react';
 import { Card, Avatar, Badge, Flex } from '@library';
 import type { TicketCardProps } from '../types/TicketBoard';
 import { TicketRelationIndicators } from './TicketRelationIndicators';
 import { TicketStatusBadge } from './TicketStatusBadge';
+import { getPriorityIcon } from '../../../utils/ticketPresentation';
+import './TicketCard.css';
+
+type TicketLabelList = TicketCardProps['ticket']['labels'];
+
+function haveLabelSetsChanged(prevLabels?: TicketLabelList | null, nextLabels?: TicketLabelList | null): boolean {
+  if (prevLabels === nextLabels) {
+    return false;
+  }
+
+  if (!prevLabels || !nextLabels) {
+    return Boolean(prevLabels?.length || nextLabels?.length);
+  }
+
+  if (prevLabels.length !== nextLabels.length) {
+    return true;
+  }
+
+  for (let i = 0; i < prevLabels.length; i += 1) {
+    if (prevLabels[i]?.id !== nextLabels[i]?.id) {
+      return true;
+    }
+  }
+
+  return false;
+}
 
 function TicketCardImpl({
   ticket,
   onClick,
   onDragStart,
   priorityIcon,
+  priority,
   priorityColor,
   assigneeAvatar,
 }: TicketCardProps) {
-  const [isHovered, setIsHovered] = useState(false);
   const isCompleted = ticket.status === 'done' || ticket.status === 'canceled';
+  const truncatedTitle = ticket.title.length > 150 ? `${ticket.title.slice(0, 149)}…` : ticket.title;
+  const renderedPriorityIcon = priorityIcon ?? getPriorityIcon(priority);
 
   return (
     <Card
       className="ticket-card clickable"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
       onClick={onClick}
       draggable
       onDragStart={onDragStart}
       bodyStyle={{ padding: 0 }}
       style={{
-        backgroundColor: isHovered ? 'var(--color-surface-overlay)' : 'var(--color-surface-card)',
-        border: '1px solid var(--color-border-default)',
         borderLeft: `3px solid ${priorityColor}`,
-        borderRadius: '6px',
-        padding: '12px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '10px',
         cursor: 'grab',
-        transition: 'all var(--transition-normal)',
-        transform: isHovered ? 'translateY(-2px)' : 'translateY(0)',
-        boxShadow: isHovered ? 'var(--shadow-md)' : 'var(--shadow-sm)',
-        borderColor: isHovered ? 'var(--color-border-focus)' : 'var(--color-border-default)',
       }}
     >
       <Flex align="center" justify="space-between">
-        <span style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--color-text-disabled)' }}>
+        <span className="ticket-card__key">
           {ticket.key}
         </span>
 
@@ -55,59 +70,41 @@ function TicketCardImpl({
               style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', border: 'none' }}
               title={`PR ${ticket.prStatus}`}
             >
-              {ticket.prStatus === 'merged' ? <GitMerge size={12} /> : <GitPullRequest size={12} />}
+          {ticket.prStatus === 'merged' ? <GitMerge size={12} /> : <GitPullRequest size={12} />}
               {ticket.prStatus === 'merged' ? 'Merged' : 'Active'}
             </Badge>
           ) : null}
         </Flex>
       </Flex>
 
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          gap: '6px',
-          minWidth: 0,
-        }}
-      >
-        <TicketStatusBadge status={ticket.status} />
-
         <div
-          style={{
-            fontSize: '13px',
-            fontWeight: 500,
-            color: isCompleted ? 'var(--color-text-secondary)' : 'var(--color-text-primary)',
-            lineHeight: '1.4',
-            wordBreak: 'break-word',
-            display: '-webkit-box',
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: 'vertical',
-            overflow: 'hidden',
-            textDecoration: isCompleted ? 'line-through' : 'none',
-            opacity: isCompleted ? 0.85 : 1,
-            minWidth: 0,
-            flex: 1,
-          }}
+          className="ticket-card__title-line"
         >
-          {ticket.title}
-        </div>
+          <TicketStatusBadge status={ticket.status} />
+
+          <div
+            className="ticket-card__title"
+            style={{
+              color: isCompleted ? 'var(--color-text-secondary)' : 'var(--color-text-primary)',
+              textDecoration: isCompleted ? 'line-through' : 'none',
+              opacity: isCompleted ? 0.85 : 1,
+            }}
+          >
+            {truncatedTitle}
+          </div>
       </div>
 
       <Flex
         align="center"
         justify="space-between"
-        style={{
-          borderTop: '1px solid rgba(255,255,255,0.01)',
-          paddingTop: '8px',
-          marginTop: '2px',
-        }}
+        className="ticket-card__meta"
       >
         <Flex align="center" gap="8px">
-          <Flex align="center">{priorityIcon}</Flex>
+          <Flex align="center">{renderedPriorityIcon}</Flex>
           <TicketRelationIndicators ticket={ticket} />
 
           {ticket.labels && ticket.labels.length > 0 ? (
-            <Flex align="center" gap="4px" style={{ marginLeft: '4px' }}>
+            <Flex align="center" gap="4px" className="ticket-card__label-list">
               {ticket.labels.map((label) => (
                 <div
                   key={label.id}
@@ -134,4 +131,27 @@ function TicketCardImpl({
   );
 }
 
-export const TicketCard = memo(TicketCardImpl);
+function shouldRerenderTicketCard(prevProps: TicketCardProps, nextProps: TicketCardProps) {
+  const prevTicket = prevProps.ticket;
+  const nextTicket = nextProps.ticket;
+
+  return (
+    prevTicket.id === nextTicket.id &&
+    prevTicket.title === nextTicket.title &&
+    prevTicket.key === nextTicket.key &&
+    prevTicket.status === nextTicket.status &&
+    prevTicket.priority === nextTicket.priority &&
+    !haveLabelSetsChanged(prevTicket.labels, nextTicket.labels) &&
+    prevTicket.prStatus === nextTicket.prStatus &&
+    prevTicket.assigneeId === nextTicket.assigneeId &&
+    prevTicket.createdAt === nextTicket.createdAt &&
+    prevTicket.updatedAt === nextTicket.updatedAt &&
+    prevProps.onClick === nextProps.onClick &&
+    prevProps.onDragStart === nextProps.onDragStart &&
+    prevProps.priorityIcon === nextProps.priorityIcon &&
+    prevProps.priorityColor === nextProps.priorityColor &&
+    prevProps.assigneeAvatar === nextProps.assigneeAvatar
+  );
+}
+
+export const TicketCard = memo(TicketCardImpl, shouldRerenderTicketCard);

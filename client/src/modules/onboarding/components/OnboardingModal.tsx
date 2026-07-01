@@ -79,7 +79,8 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
                 height: '8px',
                 borderRadius: 'var(--radius-full)',
                 backgroundColor: i === step ? 'var(--color-primary)' : i < step ? 'var(--color-text-primary)' : 'var(--color-border-default)',
-                transition: 'all var(--transition-fast)'
+                opacity: i === step ? 1 : i < step ? 1 : 0.65,
+                transition: 'background-color var(--transition-fast), opacity var(--transition-fast)',
               }}
             />
           ))}

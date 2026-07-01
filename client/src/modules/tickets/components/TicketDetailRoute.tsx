@@ -56,6 +56,10 @@ export const TicketDetailRoute: React.FC<TicketDetailRouteProps> = ({
 }) => {
   const navigate = useNavigate();
   const { workspaceId, projectId, ticketKey } = useParams();
+  const ticketsByIdResolved = useMemo(
+    () => ticketsById ?? new Map(tickets.map((ticket) => [ticket.id, ticket])),
+    [tickets, ticketsById]
+  );
 
   const detailSubtasks = useMemo(
     () => {
@@ -69,10 +73,9 @@ export const TicketDetailRoute: React.FC<TicketDetailRouteProps> = ({
         rawSubtasks = activeTicketDetail.subtasks;
       }
 
-      const ticketsByIdResolved = ticketsById ?? new Map(tickets.map((ticket) => [ticket.id, ticket]));
       return rawSubtasks.map((t) => ticketsByIdResolved.get(t.id) || t);
     },
-    [activeTicket, tickets, activeTicketDetail?.subtasks, ticketsById]
+    [activeTicket, activeTicketDetail?.subtasks, ticketsByIdResolved, tickets]
   );
 
   const parentTicket = useMemo(
@@ -81,10 +84,9 @@ export const TicketDetailRoute: React.FC<TicketDetailRouteProps> = ({
         return null;
       }
 
-      const ticketsByIdResolved = ticketsById ?? new Map(tickets.map((ticket) => [ticket.id, ticket]));
       return ticketsByIdResolved.get(activeTicket.parentId) || null;
     },
-    [activeTicket?.parentId, tickets, ticketsById]
+    [activeTicket?.parentId, ticketsByIdResolved]
   );
 
   const completedDetailSubtasks = useMemo(

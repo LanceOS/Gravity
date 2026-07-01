@@ -42,7 +42,7 @@ function filtersReducer(state: TicketFiltersState, action: FilterAction, activeP
   }
 }
 
-const TicketFiltersContext = createContext<TicketFiltersContextType | undefined>(undefined);
+export const TicketFiltersContext = createContext<TicketFiltersContextType | undefined>(undefined);
 
 export const TicketFiltersProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { activeProjectId, activeProjectIdRef } = useActiveProject();

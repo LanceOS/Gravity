@@ -16,6 +16,20 @@ export interface ToastItem {
   type: ToastType;
 }
 
+const TOAST_IN_DURATION = 160;
+const TOAST_OUT_DURATION = 130;
+const TOAST_EASING = 'cubic-bezier(0.2, 0, 0.38, 1)';
+
+function shouldReduceMotion(): boolean {
+  if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
+    return true;
+  }
+  if (typeof window === 'undefined') {
+    return false;
+  }
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
 type ToastListener = (toasts: ToastItem[]) => void;
 
 let toastListeners: ToastListener[] = [];
@@ -84,14 +98,17 @@ function ToastItemComponent({ item, onExited }: ToastItemComponentProps) {
       if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
         return;
       }
+      if (shouldReduceMotion()) {
+        return;
+      }
       elementRef.current.style.opacity = '0';
-      elementRef.current.style.transform = 'translateY(20px)';
+      elementRef.current.style.transform = 'translateY(10px)';
       anime({
         targets: elementRef.current,
         opacity: [0, 1],
-        translateY: [20, 0],
-        duration: 250,
-        easing: 'easeOutBack',
+        translateY: [10, 0],
+        duration: TOAST_IN_DURATION,
+        easing: TOAST_EASING,
       });
     }
   }, [item.isExiting]);
@@ -102,12 +119,16 @@ function ToastItemComponent({ item, onExited }: ToastItemComponentProps) {
         onExited(item.id);
         return;
       }
+      if (shouldReduceMotion()) {
+        onExited(item.id);
+        return;
+      }
       anime({
         targets: elementRef.current,
         opacity: [1, 0],
-        translateX: [0, 40],
-        duration: 200,
-        easing: 'easeInQuad',
+        translateX: [0, 24],
+        duration: TOAST_OUT_DURATION,
+        easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
         complete: () => {
           onExited(item.id);
         },

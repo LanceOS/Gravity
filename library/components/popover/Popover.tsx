@@ -1,6 +1,7 @@
 import React from 'react';
-import { X, AlertCircle, Info, CheckCircle2, AlertTriangle } from 'lucide-react';
-import { ClickAwayListener, FocusTrap, Portal, getDropdownPosition } from '../../utilities';
+import { Portal } from '../../utilities';
+import { ClickAwayListener } from '../../utilities';
+import { getDropdownPosition } from '../../utilities';
 import anime from 'animejs';
 import './Popover.css';
 
@@ -12,6 +13,16 @@ export interface PopoverProps {
   style?: React.CSSProperties;
   align?: 'left' | 'right' | 'center';
   contentClassName?: string;
+}
+
+function shouldReduceMotion(): boolean {
+  if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
+    return true;
+  }
+  if (typeof window === 'undefined') {
+    return false;
+  }
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
 export function Popover({ trigger, children, isOpen: controlledIsOpen, onOpenChange, style, align = 'left', contentClassName = '' }: PopoverProps) {
@@ -117,47 +128,55 @@ export function Popover({ trigger, children, isOpen: controlledIsOpen, onOpenCha
   }, [shouldRender, syncPosition]);
 
   React.useLayoutEffect(() => {
-    if (shouldRender && !isAnimatingOut && popoverRef.current) {
-      if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
-        return;
-      }
-      popoverRef.current.style.opacity = '0';
-      popoverRef.current.style.transform = 'translateY(-8px)';
-      anime({
-        targets: popoverRef.current,
-        opacity: [0, 1],
-        translateY: [-8, 0],
-        duration: 150,
-        easing: 'easeOutQuad',
-      });
+    if (!shouldRender || isAnimatingOut || !popoverRef.current) {
+      return;
     }
+
+    if (shouldReduceMotion()) {
+      return;
+    }
+
+    popoverRef.current.style.opacity = '0';
+    popoverRef.current.style.transform = 'translateY(-4px)';
+    anime.remove(popoverRef.current);
+    anime({
+      targets: popoverRef.current,
+      opacity: [0, 1],
+      translateY: [-4, 0],
+      duration: 150,
+      easing: 'cubic-bezier(0.2, 0, 0.38, 1)',
+    });
   }, [shouldRender, isAnimatingOut]);
 
   React.useEffect(() => {
-    if (isAnimatingOut && popoverRef.current) {
-      if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
+    if (!isAnimatingOut || !popoverRef.current) {
+      return;
+    }
+
+    if (shouldReduceMotion()) {
+      setRenderState((prev) => ({
+        ...prev,
+        shouldRender: false,
+        isAnimatingOut: false,
+      }));
+      return;
+    }
+
+    anime.remove(popoverRef.current);
+    anime({
+      targets: popoverRef.current,
+      opacity: [1, 0],
+      translateY: [0, -4],
+      duration: 130,
+      easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+      complete: () => {
         setRenderState((prev) => ({
           ...prev,
           shouldRender: false,
           isAnimatingOut: false,
         }));
-        return;
-      }
-      anime({
-        targets: popoverRef.current,
-        opacity: [1, 0],
-        translateY: [0, -8],
-        duration: 120,
-        easing: 'easeInQuad',
-        complete: () => {
-          setRenderState((prev) => ({
-            ...prev,
-            shouldRender: false,
-            isAnimatingOut: false,
-          }));
-        },
-      });
-    }
+      },
+    });
   }, [isAnimatingOut]);
 
   React.useEffect(() => {

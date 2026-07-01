@@ -22,15 +22,23 @@ export function TicketAssignmentSubMenu({
 }: TicketAssignmentSubMenuProps) {
   const [search, setSearch] = useState('');
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const indexedTickets = useMemo(() => {
+    return tickets.map((ticket) => ({
+      ticket,
+      searchableText: buildSearchableText([ticket.key, ticket.title]),
+    }));
+  }, [tickets]);
 
   const filteredTickets = useMemo(() => {
     const normalizedSearch = normalizeSearchTerm(search);
     if (!normalizedSearch) {
-      return tickets;
+      return indexedTickets.map((entry) => entry.ticket);
     }
 
-    return tickets.filter((ticket) => buildSearchableText([ticket.key, ticket.title]).includes(normalizedSearch));
-  }, [search, tickets]);
+    return indexedTickets
+      .filter((entry) => entry.searchableText.includes(normalizedSearch))
+      .map((entry) => entry.ticket);
+  }, [indexedTickets, search]);
 
   useEffect(() => {
     const timerId = window.setTimeout(() => {

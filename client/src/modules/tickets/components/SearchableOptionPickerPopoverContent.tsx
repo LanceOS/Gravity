@@ -52,22 +52,29 @@ export const SearchableOptionPickerPopoverContent: React.FC<SearchableOptionPick
   const [isCreating, setIsCreating] = useState(false);
 
   const normalizedSearch = normalizeSearchTerm(search);
+  const indexedOptions = useMemo(() => {
+    return options.map((option) => ({
+      ...option,
+      normalizedLabel: normalizeSearchTerm(option.label),
+      searchableText: buildSearchableText([option.label, option.description, option.searchText]),
+    }));
+  }, [options]);
 
   const filteredOptions = useMemo(() => {
     if (!normalizedSearch) {
-      return options;
+      return indexedOptions;
     }
 
-    return options.filter((option) => buildSearchableText([option.label, option.description, option.searchText]).includes(normalizedSearch));
-  }, [normalizedSearch, options]);
+    return indexedOptions.filter((option) => option.searchableText.includes(normalizedSearch));
+  }, [indexedOptions, normalizedSearch]);
 
   const hasExactMatch = useMemo(() => {
     if (!onCreate || !normalizedSearch) {
       return true;
     }
 
-    return options.some((option) => normalizeSearchTerm(option.label) === normalizedSearch);
-  }, [normalizedSearch, onCreate, options]);
+    return indexedOptions.some((option) => option.normalizedLabel === normalizedSearch);
+  }, [indexedOptions, normalizedSearch, onCreate]);
 
   const handleCreate = async () => {
     if (!onCreate || !search.trim() || isCreating || hasExactMatch) {
@@ -132,7 +139,7 @@ export const SearchableOptionPickerPopoverContent: React.FC<SearchableOptionPick
               borderRadius: '4px',
               background: defaultBackground,
               userSelect: 'none',
-              transition: 'background 150ms ease',
+              transition: 'background-color var(--transition-fast)',
             } as const;
 
             const rowLabel = (
@@ -263,7 +270,7 @@ export const SearchableOptionPickerPopoverContent: React.FC<SearchableOptionPick
                   cursor: 'pointer',
                   padding: 0,
                   transform: selectedColor === color ? 'scale(1.1)' : 'none',
-                  transition: 'all 100ms ease',
+                  transition: 'transform var(--transition-fast), border-color var(--transition-fast)',
                 }}
               />
             ))}

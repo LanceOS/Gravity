@@ -1,6 +1,18 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import type { Ticket } from '../../../../context/TicketContextContext';
-import { Button, Select, MarkdownEditor, RichTextEditor, toast, ClickAwayListener, Accordion, Popover, createEmptyRichTextValue, isRichTextEmpty, serializeRichTextMarkdown } from '@library';
+import {
+  Button,
+  Select,
+  MarkdownEditor,
+  RichTextEditor,
+  toast,
+  Accordion,
+  Popover,
+  ClickAwayListener,
+  createEmptyRichTextValue,
+  isRichTextEmpty,
+  serializeRichTextMarkdown,
+} from '@library';
 import generateBranchName from '../../../../utils/branch';
 import TicketUtilities from '../TicketUtilities/TicketUtilities';
 import { safeAnime, prefersReducedMotion } from '../../../../utils/animationUtils';
@@ -78,7 +90,7 @@ import { MarkdownContent } from '../MarkdownContent';
 import { CommentEditor } from '../CommentEditor/CommentEditor';
 import { TicketRow } from '../TicketRow';
 import { TicketRowMobile } from '../TicketRowMobile/TicketRowMobile';
-import { getPriorityIcon, getAssigneeAvatar } from '../../utils/TicketList';
+import { getAssigneeAvatar } from '../../utils/TicketList';
 import type { TicketDetailProps } from '../../types/TicketDetail';
 import { PRIORITY_OPTIONS, STATUS_OPTIONS } from '../../utils/TicketDetail';
 import { useLabels } from '../../../../context/label/LabelContext';
@@ -88,6 +100,8 @@ import { TicketContextMenu } from '../TicketContextMenu';
 import { TicketRelationsSection } from './TicketRelationsSection';
 import { WorkspacePageLayout } from '../../../../layouts/WorkspacePageLayout/WorkspacePageLayout';
 import { ConfirmDialog } from '../../../../components/ConfirmDialog';
+import { useIsMobileTicketLayout } from '../useMobileTicketLayout';
+import { formatTicketDateTime } from '../../utils/ticketDateFormatter';
 import './TicketDetail.css';
 
 function TicketDescriptionEditor({ 
@@ -222,6 +236,8 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
 }) => {
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const isMobileTicketLayout = useIsMobileTicketLayout();
+  const userAvatarById = useMemo(() => Object.fromEntries(users.map((user) => [user.id, user.avatar])), [users]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -670,29 +686,29 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                     </span>
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {(() => {
-                      const userAvatarById = Object.fromEntries(users.map((u) => [u.id, u.avatar]));
-                      return subtasks.map((sub) => {
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {subtasks.map((sub) => {
                         const rowProps = {
                           ticket: sub,
                           onClick: onSelectTicket,
-                          priorityIcon: getPriorityIcon(sub.priority),
+                          priority: sub.priority,
                           assigneeAvatar: getAssigneeAvatar(userAvatarById, sub.assigneeId),
                         };
                         return (
                           <React.Fragment key={sub.id}>
-                            <div className="ticket-list__row-desktop">
-                              <TicketRow {...rowProps} />
-                            </div>
-                            <div className="ticket-list__row-mobile">
-                              <TicketRowMobile {...rowProps} />
-                            </div>
+                            {isMobileTicketLayout ? (
+                              <div className="ticket-list__row-mobile">
+                                <TicketRowMobile {...rowProps} />
+                              </div>
+                            ) : (
+                              <div className="ticket-list__row-desktop">
+                                <TicketRow {...rowProps} />
+                              </div>
+                            )}
                           </React.Fragment>
                         );
-                      });
-                    })()}
-                  </div>
+                      })}
+                    </div>
 
                 </div>
               ) : (
@@ -719,19 +735,19 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                     />
 
                     <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-primary)' }}>{comment.userName || 'Member'}</span>
-                          <span style={{ fontSize: '10px', color: 'var(--color-text-disabled)' }}>
-                            {new Date(comment.createdAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                        </div>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-primary)' }}>{comment.userName || 'Member'}</span>
+                              <span style={{ fontSize: '10px', color: 'var(--color-text-disabled)' }}>
+                                {formatTicketDateTime(comment.createdAt)}
+                              </span>
+                            </div>
 
                         <ClickAwayListener onClickAway={closeCommentMenu} active={openMenuCommentId === comment.id}>
                           <div style={{ position: 'relative' }}>
                             <button
                               type="button"
-                              onClick={() => setOpenMenuCommentId(openMenuCommentId === comment.id ? null : comment.id)}
+                              onClick={() => setOpenMenuCommentId((previous) => (previous === comment.id ? null : comment.id))}
                               style={{
                                 background: 'none',
                                 border: 'none',

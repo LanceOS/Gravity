@@ -30,28 +30,93 @@ export type TicketsByStatus = Record<Ticket['status'], Ticket[]>;
 
 export { BOARD_COLUMNS, LIST_STATUS_ORDER };
 
-function parseDateForSort(value: string): number | null {
-  const parsed = Date.parse(value);
-  return Number.isNaN(parsed) ? null : parsed;
+interface TicketSearchIndex {
+  title: string;
+  key: string;
+  description: string;
+  branchName: string;
+  normalizedTitle: string;
+  normalizedKey: string;
+  normalizedDescription: string;
+  normalizedBranchName: string;
 }
 
-function compareDateDescending(first: string, second: string): number {
-  const firstTime = parseDateForSort(first);
-  const secondTime = parseDateForSort(second);
+const ticketSearchCache = new WeakMap<Ticket, TicketSearchIndex>();
+const dateParseCache = new Map<string, number | null>();
+
+function getSearchIndex(ticket: Ticket): TicketSearchIndex {
+  const cached = ticketSearchCache.get(ticket);
+  if (cached) {
+    return cached;
+  }
+
+  const title = ticket.title.toLowerCase();
+  const key = ticket.key.toLowerCase();
+  const description = ticket.description.toLowerCase();
+  const branchName = ticket.branchName?.toLowerCase() ?? '';
+
+  const index: TicketSearchIndex = {
+    title,
+    key,
+    description,
+    branchName,
+    normalizedTitle: normalizeSearchToken(title),
+    normalizedKey: normalizeSearchToken(key),
+    normalizedDescription: normalizeSearchToken(description),
+    normalizedBranchName: normalizeSearchToken(branchName),
+  };
+
+  ticketSearchCache.set(ticket, index);
+  return index;
+}
+
+function parseDateForSort(value: string): number | null {
+  const cached = dateParseCache.get(value);
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  const parsed = Date.parse(value);
+  const parsedValue = Number.isNaN(parsed) ? null : parsed;
+  dateParseCache.set(value, parsedValue);
+  return parsedValue;
+}
+
+type DateForSortValue = string | number;
+
+function compareDateDescending(first: DateForSortValue, second: DateForSortValue): number {
+  const firstTime = typeof first === 'number' ? first : parseDateForSort(first);
+  const secondTime = typeof second === 'number' ? second : parseDateForSort(second);
 
   if (firstTime !== null && secondTime !== null) {
     return secondTime - firstTime;
   }
 
+  if (typeof first === 'number') {
+    return 1;
+  }
+
+  if (typeof second === 'number') {
+    return -1;
+  }
+
   return second.localeCompare(first);
 }
 
-function compareDateAscending(first: string, second: string): number {
-  const firstTime = parseDateForSort(first);
-  const secondTime = parseDateForSort(second);
+function compareDateAscending(first: DateForSortValue, second: DateForSortValue): number {
+  const firstTime = typeof first === 'number' ? first : parseDateForSort(first);
+  const secondTime = typeof second === 'number' ? second : parseDateForSort(second);
 
   if (firstTime !== null && secondTime !== null) {
     return firstTime - secondTime;
+  }
+
+  if (typeof first === 'number') {
+    return -1;
+  }
+
+  if (typeof second === 'number') {
+    return 1;
   }
 
   return first.localeCompare(second);
@@ -59,17 +124,40 @@ function compareDateAscending(first: string, second: string): number {
 
 export function filterTickets(tickets: Ticket[], filters: TicketFilters): Ticket[] {
   const selectedLabelId = filters.labelId ?? filters.domainId;
-  const statusFilters = filters.status
+  const hasStatusFilter = Boolean(filters.status);
+  const hasPriorityFilter = Boolean(filters.priority);
+  const hasProjectFilter = Boolean(filters.projectId);
+  const hasLabelIdFilter = Boolean(selectedLabelId);
+  const hasDomainFilter = Boolean(filters.domainId);
+  const normalizedLabelIds = (filters.labels || []).filter(Boolean);
+  const hasLabelsFilter = normalizedLabelIds.length > 0;
+  const hasCycleFilter = Boolean(filters.cycleId);
+  const hasAssigneeFilter = Boolean(filters.assigneeId);
+
+  if (!hasStatusFilter
+    && !hasPriorityFilter
+    && !hasProjectFilter
+    && !hasLabelIdFilter
+    && !hasDomainFilter
+    && !hasLabelsFilter
+    && !hasCycleFilter
+    && !hasAssigneeFilter
+    && !normalizeSearchTerm(filters.search)
+  ) {
+    return tickets;
+  }
+
+  const statusFilters = hasStatusFilter
     ? new Set(filters.status.split(',').map((status) => status.trim()).filter(Boolean))
     : null;
-  const priorityFilters = filters.priority
+  const priorityFilters = hasPriorityFilter
     ? new Set(filters.priority.split(',').map((priority) => priority.trim()).filter(Boolean))
     : null;
   const normalizedSearch = normalizeSearchTerm(filters.search);
   const normalizedSearchToken = normalizedSearch.length > 0 ? normalizeSearchToken(normalizedSearch) : '';
-  const normalizedLabelIds = (filters.labels || []).filter(Boolean);
-  const useAllLabelMode = (filters.labelMode || 'any') === 'all';
-  const useLabelsFilter = normalizedLabelIds.length > 0;
+  const labelMatchMode = filters.labelMode || 'any';
+  const useAllLabelMode = labelMatchMode === 'all';
+  const normalizedLabelSet = hasLabelsFilter ? new Set(normalizedLabelIds) : null;
 
   return tickets.filter((ticket) => {
     if (statusFilters && !statusFilters.has(ticket.status)) {
@@ -82,14 +170,18 @@ export function filterTickets(tickets: Ticket[], filters: TicketFilters): Ticket
 
     if (selectedLabelId && !ticket.labelIds?.includes(selectedLabelId)) return false;
 
-    if (useLabelsFilter) {
-      const mode = filters.labelMode || 'any';
-      if (mode === 'all' || useAllLabelMode) {
-        const hasAll = normalizedLabelIds.every((lId) => ticket.labelIds?.includes(lId));
-        if (!hasAll) return false;
+    if (hasLabelsFilter && normalizedLabelSet) {
+      if (useAllLabelMode) {
+        for (const labelId of normalizedLabelSet) {
+          if (!ticket.labelIds?.includes(labelId)) {
+            return false;
+          }
+        }
       } else {
-        const hasAny = normalizedLabelIds.some((lId) => ticket.labelIds?.includes(lId));
-        if (!hasAny) return false;
+        const matchedLabel = ticket.labelIds ? ticket.labelIds.some((labelId) => normalizedLabelSet.has(labelId)) : false;
+        if (!matchedLabel) {
+          return false;
+        }
       }
     }
     
@@ -97,30 +189,31 @@ export function filterTickets(tickets: Ticket[], filters: TicketFilters): Ticket
     if (filters.assigneeId && ticket.assigneeId !== filters.assigneeId) return false;
 
     if (normalizedSearch) {
-      const title = ticket.title?.toLowerCase() ?? '';
-      const key = ticket.key?.toLowerCase() ?? '';
-      const desc = ticket.description?.toLowerCase() ?? '';
-      const branch = ticket.branchName?.toLowerCase() ?? '';
+      const {
+        title,
+        key,
+        description,
+        branchName,
+        normalizedTitle,
+        normalizedKey,
+        normalizedDescription,
+        normalizedBranchName,
+      } = getSearchIndex(ticket);
 
       const titleMatch = title.includes(normalizedSearch);
       const keyMatch = key.includes(normalizedSearch);
-      const descMatch = desc.includes(normalizedSearch);
-      const branchMatch = branch.includes(normalizedSearch);
+      const descMatch = description.includes(normalizedSearch);
+      const branchMatch = branchName.includes(normalizedSearch);
 
       if (!titleMatch && !keyMatch && !descMatch && !branchMatch) {
         if (!normalizedSearchToken.length) {
           return false;
         }
 
-        const normalizedTitle = title.replace(/[^a-z0-9]+/g, '');
-        const normalizedKey = key.replace(/[^a-z0-9]+/g, '');
-        const normalizedDesc = desc.replace(/[^a-z0-9]+/g, '');
-        const normalizedBranch = branch.replace(/[^a-z0-9]+/g, '');
-
         const normalizedMatch = normalizedTitle.includes(normalizedSearchToken)
           || normalizedKey.includes(normalizedSearchToken)
-          || normalizedDesc.includes(normalizedSearchToken)
-          || normalizedBranch.includes(normalizedSearchToken);
+          || normalizedDescription.includes(normalizedSearchToken)
+          || normalizedBranchName.includes(normalizedSearchToken);
 
         if (!normalizedMatch) return false;
       }
@@ -160,15 +253,22 @@ export function sortTicketsForList(
   sort: TicketListSort,
 ): Ticket[] {
   if (sort === 'created') {
-    return [...tickets];
+    return tickets;
   }
 
   const priorityWeights = { urgent: 4, high: 3, medium: 2, low: 1, no_priority: 0 };
+  const enrichedTickets = tickets.map((ticket) => ({
+    ticket,
+    createdAtTime: parseDateForSort(ticket.createdAt) ?? ticket.createdAt,
+    updatedAtTime: parseDateForSort(ticket.updatedAt || ticket.createdAt) ?? (ticket.updatedAt || ticket.createdAt),
+  }));
 
-  return [...tickets].sort((first, second) => {
+  const sortedEnriched = enrichedTickets.sort((first, second) => {
+    const firstTicket = first.ticket;
+    const secondTicket = second.ticket;
     if (sort === 'label') {
-      const firstLabel = first.labelIds?.[0] ? labelById[first.labelIds[0]] : undefined;
-      const secondLabel = second.labelIds?.[0] ? labelById[second.labelIds[0]] : undefined;
+      const firstLabel = firstTicket.labelIds?.[0] ? labelById[firstTicket.labelIds[0]] : undefined;
+      const secondLabel = secondTicket.labelIds?.[0] ? labelById[secondTicket.labelIds[0]] : undefined;
 
       if (firstLabel && !secondLabel) return -1;
       if (!firstLabel && secondLabel) return 1;
@@ -176,50 +276,46 @@ export function sortTicketsForList(
         const labelComparison = firstLabel.name.localeCompare(secondLabel.name);
         if (labelComparison !== 0) return labelComparison;
       }
-      return compareDateAscending(first.createdAt, second.createdAt);
+      return compareDateAscending(first.createdAtTime, second.createdAtTime);
     }
 
     if (sort === 'newest') {
-      return compareDateDescending(first.createdAt, second.createdAt);
+      return compareDateDescending(first.createdAtTime, second.createdAtTime);
     }
     if (sort === 'newest_urgent') {
-      const priorityDiff = priorityWeights[second.priority] - priorityWeights[first.priority];
+      const priorityDiff = priorityWeights[secondTicket.priority] - priorityWeights[firstTicket.priority];
       if (priorityDiff !== 0) {
         return priorityDiff;
       }
 
-      return compareDateDescending(first.createdAt, second.createdAt);
+      return compareDateDescending(first.createdAtTime, second.createdAtTime);
     }
     if (sort === 'oldest') {
-      return compareDateAscending(first.createdAt, second.createdAt);
+      return compareDateAscending(first.createdAtTime, second.createdAtTime);
     }
 
     if (sort === 'priority_desc') {
-      const diff = priorityWeights[second.priority] - priorityWeights[first.priority];
+      const diff = priorityWeights[secondTicket.priority] - priorityWeights[firstTicket.priority];
       if (diff !== 0) return diff;
-      return compareDateDescending(first.createdAt, second.createdAt);
+      return compareDateDescending(first.createdAtTime, second.createdAtTime);
     }
     if (sort === 'priority_asc') {
-      const diff = priorityWeights[first.priority] - priorityWeights[second.priority];
+      const diff = priorityWeights[firstTicket.priority] - priorityWeights[secondTicket.priority];
       if (diff !== 0) return diff;
-      return compareDateAscending(first.createdAt, second.createdAt);
+      return compareDateAscending(first.createdAtTime, second.createdAtTime);
     }
 
     if (sort === 'updated_desc') {
-      return compareDateDescending(
-        first.updatedAt || first.createdAt,
-        second.updatedAt || second.createdAt
-      );
+      return compareDateDescending(first.updatedAtTime, second.updatedAtTime);
     }
     if (sort === 'updated_asc') {
-      return compareDateAscending(
-        first.updatedAt || first.createdAt,
-        second.updatedAt || second.createdAt
-      );
+      return compareDateAscending(first.updatedAtTime, second.updatedAtTime);
     }
 
-    return first.key.localeCompare(second.key);
+    return firstTicket.key.localeCompare(secondTicket.key);
   });
+
+  return sortedEnriched.map((entry) => entry.ticket);
 }
 
 export function hasActiveTicketFilters(filters: TicketFilters): boolean {

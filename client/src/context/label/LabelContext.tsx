@@ -7,6 +7,7 @@ import { useProjectContext } from '../project/ProjectContext';
 import { useAuth } from '../auth/AuthContext';
 import { patchTicketLabelAssignment, patchTicketInAllCaches, invalidateTicketCaches } from '../shared';
 import { toast } from '@library';
+import { TicketFiltersContext } from '../filters/TicketFiltersContext';
 import type { LabelContextType } from './LabelContext.types';
 import type { Label, Ticket } from '../../types/domain';
 
@@ -25,6 +26,8 @@ export const LabelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const { activeProjectId, activeProjectIdRef } = useActiveProject();
   const { currentUser } = useAuth();
   const { projects } = useProjectContext();
+  const filtersContext = useContext(TicketFiltersContext);
+  const isProjectScopeAligned = !filtersContext || filtersContext.filters.projectId === activeProjectId;
 
   const labelsQuery = useQuery({
     queryKey: queryKeys.labels(activeProjectId),
@@ -32,26 +35,32 @@ export const LabelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       params: { projectId: activeProjectId },
       projectId: activeProjectId,
     }),
-    enabled: !!activeProjectId && !!currentUser,
+    enabled: !!activeProjectId && isProjectScopeAligned && !!currentUser,
     ...CACHE_CONFIGS.metadata,
   });
 
   const labels = labelsQuery.data || [];
+  const labelById = useMemo(() => new Map(labels.map((label) => [label.id, label] as const)), [labels]);
 
   const findLabelQueryKey = useCallback(
     (labelId: string, projectId?: string | null) => {
       const projectIdsToProbe: string[] = [];
+      const seenProjectIds = new Set<string>();
+      const pushProjectId = (candidate: string) => {
+        if (!seenProjectIds.has(candidate)) {
+          seenProjectIds.add(candidate);
+          projectIdsToProbe.push(candidate);
+        }
+      };
 
       if (projectId) {
-        projectIdsToProbe.push(projectId);
+        pushProjectId(projectId);
       } else if (activeProjectId) {
-        projectIdsToProbe.push(activeProjectId);
+        pushProjectId(activeProjectId);
       }
 
       for (const project of projects) {
-        if (!projectIdsToProbe.includes(project.id)) {
-          projectIdsToProbe.push(project.id);
-        }
+        pushProjectId(project.id);
       }
 
       for (const probeProjectId of projectIdsToProbe) {
@@ -91,13 +100,13 @@ export const LabelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   );
 
   const handleTicketLabelUpdate = useCallback((ticketId: string, labelId: string, isAssigned: boolean) => {
-    const label = labels.find((entry) => entry.id === labelId);
+    const label = labelById.get(labelId);
     const projectId = resolveTicketProjectId(ticketId);
     patchTicketInAllCaches(queryClient, ticketId, (ticket) => 
       patchTicketLabelAssignment(ticket, labelId, isAssigned, label),
       projectId ? { projectId } : undefined
     );
-  }, [labels, queryClient, resolveTicketProjectId]);
+  }, [labelById, queryClient, resolveTicketProjectId]);
 
   const showLabelMutationError = useCallback((error: unknown, action: 'assign' | 'unassign') => {
     if (toast?.show) {
@@ -149,7 +158,7 @@ export const LabelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return apiClient.put<Label>(`/labels/${id}`, updates);
     },
     onMutate: async ({ id }) => {
-      const cachedLabel = labels.find((label) => label.id === id);
+      const cachedLabel = labelById.get(id);
       return { previousLabelProjectId: cachedLabel?.projectId };
     },
     onSuccess: (updatedLabel, { id }) => {
@@ -178,7 +187,7 @@ export const LabelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return id;
     },
     onMutate: async (id) => {
-      const cachedLabel = labels.find((label) => label.id === id);
+      const cachedLabel = labelById.get(id);
       return { projectId: cachedLabel?.projectId };
     },
     onSuccess: (_result, id, context: { projectId?: string | null } | undefined) => {

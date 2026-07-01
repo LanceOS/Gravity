@@ -56,7 +56,7 @@
   cursor: pointer;
   background: transparent;
   color: var(--color-text-disabled);
-  transition: all var(--transition-normal);
+  transition: color var(--transition-normal), background-color var(--transition-normal), transform var(--transition-normal);
 }
 
 .workspace-header__view-button:hover {
@@ -89,4 +89,3 @@
 .workspace-header--with-bottom {
   min-height: 96px;
 }
-

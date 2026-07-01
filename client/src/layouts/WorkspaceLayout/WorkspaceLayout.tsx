@@ -36,15 +36,15 @@ export function WorkspaceLayout({ sidebarProps, children, rightPanels, isMobile 
       safeAnime({
         targets: backdrop,
         opacity: [0, 1],
-        duration: 300,
-        easing: 'easeOutQuad',
+        duration: 200,
+        easing: 'cubic-bezier(0.2, 0, 0.38, 1)',
       });
 
       safeAnime({
         targets: drawer,
         translateX: ['-100%', '0%'],
-        duration: 400,
-        easing: 'easeOutElastic(1, 0.85)',
+        duration: 240,
+        easing: 'cubic-bezier(0.2, 0, 0.38, 1)',
       });
     } else {
       anime.remove([drawer, backdrop]);
@@ -52,15 +52,15 @@ export function WorkspaceLayout({ sidebarProps, children, rightPanels, isMobile 
       safeAnime({
         targets: backdrop,
         opacity: [1, 0],
-        duration: 250,
-        easing: 'easeInQuad',
+        duration: 170,
+        easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
       });
 
       safeAnime({
         targets: drawer,
         translateX: ['0%', '-100%'],
-        duration: 250,
-        easing: 'easeInCubic',
+        duration: 210,
+        easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
       });
     }
   }, [isMobileSidebarOpen, isMobile]);

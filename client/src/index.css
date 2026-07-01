@@ -18,10 +18,10 @@
     --table-row-height: 28px;
     --input-padding-y: 4px;
 
-    /* Performance snappy animations */
-    --transition-fast: 100ms cubic-bezier(0.16, 1, 0.3, 1);
-    --transition-normal: 200ms cubic-bezier(0.16, 1, 0.3, 1);
-    --transition-spring: 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    /* Friendly motion cadence for a smoother UI */
+    --transition-fast: 140ms cubic-bezier(0.2, 0, 0.38, 1);
+    --transition-normal: 210ms cubic-bezier(0.2, 0, 0.38, 1);
+    --transition-spring: 260ms cubic-bezier(0.19, 1, 0.22, 1);
   }
 }
 
@@ -94,17 +94,21 @@ textarea {
   background: var(--color-text-disabled);
 }
 
-/* Premium Glassmorphic Filters & Hover Micro-interactions */
+/* Modern flat surfaces and lightweight micro-interactions */
 .glass {
-  background: rgba(10, 10, 18, 0.65);
-  backdrop-filter: blur(16px) saturate(185%);
-  -webkit-backdrop-filter: blur(16px) saturate(185%);
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--color-surface-card) 70%, transparent);
+  backdrop-filter: blur(10px) saturate(140%);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  border: 1px solid color-mix(in srgb, var(--color-border-default) 50%, transparent);
 }
 
 .clickable {
   cursor: pointer;
-  transition: all var(--transition-normal);
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast),
+    border-color var(--transition-fast),
+    opacity var(--transition-fast);
 }
 
 .clickable:not(button):not(.btn):hover,
@@ -135,7 +139,11 @@ button.clickable:not(.btn):hover {
   background: var(--color-surface-card);
   color: var(--color-text-primary);
   font-family: inherit;
-  transition: all var(--transition-normal);
+  transition:
+    color var(--transition-fast),
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    transform var(--transition-fast);
   outline: none;
   text-decoration: none;
   line-height: 1.2;
@@ -145,17 +153,16 @@ button.clickable:not(.btn):hover {
   background: var(--color-base100);
   border-color: var(--color-border-focus);
   color: var(--color-text-primary);
-  transform: translateY(-1px);
   box-shadow: none;
 }
 
 .btn:active {
-  transform: scale(0.97) translateY(0);
+  transform: scale(0.985);
 }
 
 .btn:focus-visible {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-state-selected-bg);
+  box-shadow: 0 0 0 2px var(--color-state-selected-bg);
 }
 
 .btn:disabled {
@@ -248,7 +255,11 @@ button.clickable:not(.btn):hover {
   font-family: inherit;
   font-size: 13px;
   outline: none;
-  transition: all var(--transition-normal);
+  transition:
+    color var(--transition-normal),
+    border-color var(--transition-fast),
+    background-color var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 
 .input:focus {
@@ -318,7 +329,10 @@ button.clickable:not(.btn):hover {
   border: 1px solid var(--color-border-default);
   background: var(--color-base100);
   color: var(--color-text-secondary);
-  transition: all var(--transition-normal);
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .badge:hover {
@@ -358,16 +372,15 @@ button.tool-submit-active {
 
 @keyframes pulse {
   0% {
-    transform: scale(1);
+    opacity: 0.96;
   }
 
   50% {
-    transform: scale(1.03);
-    opacity: 0.85;
+    opacity: 0.78;
   }
 
   100% {
-    transform: scale(1);
+    opacity: 0.96;
   }
 }
 
@@ -394,9 +407,9 @@ button.tool-submit-active {
   background: var(--color-surface-card);
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-lg);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  box-shadow: none;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   min-width: 170px;
   padding: 5px;
   display: flex;
@@ -414,7 +427,7 @@ button.tool-submit-active {
   font-size: 12.5px;
   cursor: pointer;
   color: var(--color-text-secondary);
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
 }
 
 .dropdown-item:hover {
@@ -514,7 +527,7 @@ button.tool-submit-active {
   background-color: var(--color-surface-card);
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-lg);
+  box-shadow: none;
   padding: 4px;
   gap: 2px;
   align-items: center;
@@ -535,7 +548,7 @@ button.tool-submit-active {
   border-radius: var(--radius-sm);
   color: var(--color-text-secondary);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
 }
 
 .bubble-menu-btn:hover {

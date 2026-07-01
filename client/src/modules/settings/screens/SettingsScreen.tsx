@@ -141,15 +141,15 @@ export function SettingsScreen(props: SettingsScreenProps) {
                       alignItems: 'center',
                       gap: 'var(--space-md)',
                       padding: 'var(--space-md) var(--space-md)',
-                      border: '1px solid transparent',
-                      borderRadius: 'var(--radius-md)',
-                      background: isActive ? 'var(--color-surface-card)' : 'transparent',
-                      borderColor: isActive ? 'var(--color-border-default)' : 'transparent',
-                      cursor: 'pointer',
-                      color: isActive ? 'var(--color-text-primary)' : 'var(--color-text-disabled)',
-                      textAlign: 'left',
-                      transition: 'all var(--transition-fast)'
-                    }}
+                    border: '1px solid transparent',
+                    borderRadius: 'var(--radius-md)',
+                    background: isActive ? 'var(--color-surface-card)' : 'transparent',
+                    borderColor: isActive ? 'var(--color-border-default)' : 'transparent',
+                    cursor: 'pointer',
+                    color: isActive ? 'var(--color-text-primary)' : 'var(--color-text-disabled)',
+                    textAlign: 'left',
+                    transition: 'background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast)'
+                  }}
                     className="clickable lib-focus-ring"
                     onClick={() => setActiveCategory(category.id)}
                   >

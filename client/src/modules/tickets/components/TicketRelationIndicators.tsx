@@ -1,4 +1,4 @@
-import { type ComponentType, type CSSProperties } from 'react';
+import React, { memo, type ComponentType, type CSSProperties } from 'react';
 import type { LucideProps } from 'lucide-react';
 import { GitBranchPlus, GitMergeConflict } from 'lucide-react';
 import type { Ticket } from '../../../context/TicketContextContext';
@@ -27,7 +27,7 @@ const CHIP_STYLES = {
   },
 } as const;
 
-function RelationChip({
+const RelationChip = memo(function RelationChip({
   title,
   icon: Icon,
   color,
@@ -54,9 +54,14 @@ function RelationChip({
       <Icon size={iconSize} aria-hidden="true" focusable="false" />
     </span>
   );
-}
+}, (previousProps, nextProps) =>
+  previousProps.title === nextProps.title &&
+  previousProps.icon === nextProps.icon &&
+  previousProps.color === nextProps.color &&
+  previousProps.iconSize === nextProps.iconSize
+);
 
-export function TicketRelationIndicators({ ticket, size = 'sm', style }: TicketRelationIndicatorsProps) {
+const TicketRelationIndicatorsImpl = ({ ticket, size = 'sm', style }: TicketRelationIndicatorsProps) => {
   const chipSize = CHIP_SIZES[size];
 
   if (!ticket.isBlocked && !ticket.isDependency) {
@@ -91,4 +96,13 @@ export function TicketRelationIndicators({ ticket, size = 'sm', style }: TicketR
       ) : null}
     </span>
   );
-}
+};
+
+export const TicketRelationIndicators = memo(
+  TicketRelationIndicatorsImpl,
+  (previousProps, nextProps) =>
+    previousProps.ticket.isBlocked === nextProps.ticket.isBlocked &&
+    previousProps.ticket.isDependency === nextProps.ticket.isDependency &&
+    previousProps.size === nextProps.size &&
+    previousProps.style === nextProps.style
+);

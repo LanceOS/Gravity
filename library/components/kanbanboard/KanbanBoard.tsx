@@ -1,12 +1,14 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { User, ChevronLeft, ChevronRight, Folder, File, ChevronDown } from 'lucide-react';
+import React, { memo, useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import anime from 'animejs';
+import { DenseVirtualList } from '../densevirtuallist';
+import './KanbanBoard.css';
 
 export interface KanbanCard {
   id: string;
   status: string;
   title?: string;
   content: React.ReactNode;
+  contentVersion?: string | number;
 }
 
 export interface KanbanBoardProps {
@@ -23,7 +25,24 @@ interface KanbanCardComponentProps {
   onClearLastDropped: () => void;
 }
 
-function KanbanCardComponent({ card, isLastDropped, onClearLastDropped }: KanbanCardComponentProps) {
+const KANBAN_BOARD_VIRTUAL_THRESHOLD = 50;
+const KANBAN_BOARD_VIRTUAL_ROW_BUFFER = 6;
+const KANBAN_CARD_BASE_HEIGHT = 128;
+const KANBAN_CARD_LONG_TITLE_HEIGHT = 144;
+const KANBAN_CARD_LONG_LONG_TITLE_HEIGHT = 160;
+
+function getKanbanCardRowHeight(card: KanbanCard) {
+  const titleLength = card.title ? card.title.length : 0;
+  if (titleLength > 200) {
+    return KANBAN_CARD_LONG_LONG_TITLE_HEIGHT;
+  }
+  if (titleLength > 140) {
+    return KANBAN_CARD_LONG_TITLE_HEIGHT;
+  }
+  return KANBAN_CARD_BASE_HEIGHT;
+}
+
+const KanbanCardComponent = memo(function KanbanCardComponent({ card, isLastDropped, onClearLastDropped }: KanbanCardComponentProps) {
   const cardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -32,9 +51,9 @@ function KanbanCardComponent({ card, isLastDropped, onClearLastDropped }: Kanban
       if (!prefersReduced) {
         anime({
           targets: cardRef.current,
-          scale: [0.94, 1.04, 1],
+          translateY: [-2, 0],
           duration: 300,
-          easing: 'easeOutBack',
+          easing: 'cubic-bezier(0.2, 0, 0.38, 1)',
         });
       }
       onClearLastDropped();
@@ -44,10 +63,6 @@ function KanbanCardComponent({ card, isLastDropped, onClearLastDropped }: Kanban
   return (
     <div
       ref={cardRef}
-      draggable
-      onDragStart={(e) => {
-        e.dataTransfer.setData('text/plain', card.id);
-      }}
       style={{
         backgroundColor: card.title ? 'var(--color-surface-card)' : 'transparent',
         border: card.title ? '1px solid var(--color-border-default)' : 'none',
@@ -55,103 +70,298 @@ function KanbanCardComponent({ card, isLastDropped, onClearLastDropped }: Kanban
         padding: card.title ? '12px' : '0',
         boxShadow: card.title ? 'var(--shadow-sm)' : 'none',
         cursor: 'grab',
-        transition: 'all var(--transition-normal)',
+        transition: 'border-color var(--transition-normal)',
+        contain: 'layout style',
+        contentVisibility: 'auto',
+        containIntrinsicSize: '160px',
       }}
     >
-      {card.title && <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: '6px' }}>{card.title}</div>}
+      {typeof card.content !== 'string' && typeof card.content !== 'number' ? null : (
+        <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: '6px' }}>
+          {card.title}
+        </div>
+      )}
       <div>{card.content}</div>
     </div>
   );
+}, shouldRerenderKanbanCard);
+
+function shouldRerenderKanbanCard(prev: KanbanCardComponentProps, next: KanbanCardComponentProps) {
+  const prevContentIdentity = prev.card.contentVersion ?? prev.card.content;
+  const nextContentIdentity = next.card.contentVersion ?? next.card.content;
+
+  return prev.card.id === next.card.id
+    && prev.card.status === next.card.status
+    && prev.isLastDropped === next.isLastDropped
+    && prevContentIdentity === nextContentIdentity;
 }
 
-export function KanbanBoard({ columns, cards, onCardMove, renderColumnHeader, style }: KanbanBoardProps) {
-  const [dragOverColId, setDragOverColId] = useState<string | null>(null);
-  const [lastDroppedCardId, setLastDroppedCardId] = useState<string | null>(null);
+interface KanbanColumnProps {
+  column: {
+    id: string;
+    title: string;
+  };
+  cards: KanbanCard[];
+  isDragOver: boolean;
+  renderColumnHeader?: (columnId: string, title: string, count: number) => React.ReactNode;
+  lastDroppedCardId: string | null;
+  onClearLastDropped: () => void;
+  onDrop: (columnId: string, cardId: string) => void;
+  onDropComplete: () => void;
+  onDragEnter: (columnId: string) => void;
+  onDragLeave: (columnId: string, event: React.DragEvent) => void;
+  onDragOver: (event: React.DragEvent, columnId: string) => void;
+}
+
+const KanbanColumn = memo(function KanbanColumn({
+  column,
+  cards,
+  isDragOver,
+  renderColumnHeader,
+  lastDroppedCardId,
+  onClearLastDropped,
+  onDrop,
+  onDropComplete,
+  onDragEnter,
+  onDragLeave,
+  onDragOver,
+}: KanbanColumnProps) {
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const [bodyHeight, setBodyHeight] = useState(0);
+
+  useEffect(() => {
+    const node = bodyRef.current;
+    if (!node || typeof ResizeObserver === 'undefined') {
+      return;
+    }
+
+    const updateHeight = () => {
+      setBodyHeight(node.clientHeight);
+    };
+
+    const resizeObserver = new ResizeObserver(updateHeight);
+    resizeObserver.observe(node);
+    updateHeight();
+
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  const showVirtualCards = cards.length > KANBAN_BOARD_VIRTUAL_THRESHOLD && bodyHeight > 0;
+
+  const renderVirtualCard = useCallback((card: KanbanCard, _index: number, style: React.CSSProperties) => (
+    <div key={card.id} style={{ ...style, paddingRight: '2px', boxSizing: 'border-box' }}>
+      <KanbanCardComponent
+        card={card}
+        isLastDropped={card.id === lastDroppedCardId}
+        onClearLastDropped={onClearLastDropped}
+      />
+    </div>
+  ), [lastDroppedCardId, onClearLastDropped]);
+
+  const cardStack = showVirtualCards ? (
+    <DenseVirtualList
+      items={cards}
+      height={bodyHeight}
+      rowHeight={getKanbanCardRowHeight}
+      buffer={KANBAN_BOARD_VIRTUAL_ROW_BUFFER}
+      renderRow={renderVirtualCard}
+      containerStyle={{
+        border: 'none',
+        borderRadius: '0',
+        backgroundColor: 'transparent',
+      }}
+    />
+  ) : (
+    <div className="kanban-board__cards-list">
+      {cards.map((card) => (
+        <KanbanCardComponent
+          key={card.id}
+          card={card}
+          isLastDropped={card.id === lastDroppedCardId}
+          onClearLastDropped={onClearLastDropped}
+        />
+      ))}
+    </div>
+  );
+
+  const noTicketsIndicator = cards.length === 0 ? (
+    <div className="kanban-board__empty">
+      No tickets
+    </div>
+  ) : null;
+
+  const headerNode = renderColumnHeader
+    ? renderColumnHeader(column.id, column.title, cards.length)
+    : (
+      <div className="kanban-board__header">
+        <span>{column.title}</span>
+        <span>{cards.length}</span>
+      </div>
+    );
 
   return (
-    <div style={{ display: 'flex', gap: '16px', overflowX: 'auto', width: '100%', height: '100%', minHeight: '320px', ...style }}>
+    <div
+      className={`kanban-board__column ${isDragOver ? 'kanban-board__column--over' : ''}`}
+      onDragOver={(event) => onDragOver(event, column.id)}
+      onDragEnter={() => onDragEnter(column.id)}
+      onDragLeave={(event) => onDragLeave(column.id, event)}
+      onDrop={(event) => {
+        event.preventDefault();
+        const cardId = event.dataTransfer.getData('text/plain');
+        if (cardId) {
+          onDrop(column.id, cardId);
+        }
+        onDropComplete();
+      }}
+    >
+      {headerNode}
+
+      <div
+        className="kanban-board__cards"
+        ref={bodyRef}
+        onDragOver={(event) => onDragOver(event, column.id)}
+        onDragEnter={() => onDragEnter(column.id)}
+        onDragLeave={(event) => onDragLeave(column.id, event)}
+      >
+        {showVirtualCards || cards.length > 0 ? cardStack : noTicketsIndicator}
+      </div>
+    </div>
+  );
+});
+
+export const KanbanBoard = memo(function KanbanBoard({
+  columns,
+  cards,
+  onCardMove,
+  renderColumnHeader,
+  style,
+}: KanbanBoardProps) {
+  const [dragOverColId, setDragOverColId] = useState<string | null>(null);
+  const [lastDroppedCardId, setLastDroppedCardId] = useState<string | null>(null);
+  const dragOverRafRef = useRef<number | null>(null);
+  const pendingDragOverColIdRef = useRef<string | null>(null);
+  const clearLastDropped = useCallback(() => {
+    setLastDroppedCardId(null);
+  }, []);
+
+  const flushDragOverUpdate = useCallback(() => {
+    if (dragOverRafRef.current !== null) {
+      return;
+    }
+
+    dragOverRafRef.current = window.requestAnimationFrame(() => {
+      dragOverRafRef.current = null;
+      const next = pendingDragOverColIdRef.current;
+      pendingDragOverColIdRef.current = null;
+
+      setDragOverColId((previous) => (previous === next ? previous : next));
+    });
+  }, []);
+
+  const queueDragOverColumn = useCallback((columnId: string | null) => {
+    if (pendingDragOverColIdRef.current === columnId) {
+      return;
+    }
+
+    pendingDragOverColIdRef.current = columnId;
+    flushDragOverUpdate();
+  }, [flushDragOverUpdate]);
+
+  const clearDragOverColumn = useCallback(() => {
+    pendingDragOverColIdRef.current = null;
+    if (dragOverRafRef.current !== null) {
+      window.cancelAnimationFrame(dragOverRafRef.current);
+      dragOverRafRef.current = null;
+    }
+    setDragOverColId(null);
+  }, []);
+
+  const cardStatusById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const card of cards) {
+      map.set(card.id, card.status);
+    }
+    return map;
+  }, [cards]);
+
+  const handleDrop = useCallback((cardId: string, columnId: string) => {
+    const sourceStatus = cardStatusById.get(cardId);
+    if (!sourceStatus || sourceStatus === columnId) {
+      return;
+    }
+
+    if (!onCardMove) {
+      return;
+    }
+
+    setLastDroppedCardId(cardId);
+    onCardMove(cardId, columnId);
+  }, [cardStatusById, onCardMove]);
+
+  const cardsByColumn = useMemo(() => {
+    const buckets = new Map<string, KanbanCard[]>();
+
+    columns.forEach((column) => {
+      buckets.set(column.id, []);
+    });
+
+    cards.forEach((card) => {
+      const bucket = buckets.get(card.status) || [];
+      bucket.push(card);
+      buckets.set(card.status, bucket);
+    });
+
+    return buckets;
+  }, [cards, columns]);
+
+  const handleDragOver = useCallback((event: React.DragEvent, columnId: string) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    queueDragOverColumn(columnId);
+  }, [queueDragOverColumn]);
+
+  const handleDragEnter = useCallback((columnId: string) => {
+    queueDragOverColumn(columnId);
+  }, [queueDragOverColumn]);
+
+  const handleDragLeave = useCallback((columnId: string, event: React.DragEvent) => {
+    const nextTarget = event.relatedTarget as Node | null;
+    if (!nextTarget || !event.currentTarget.contains(nextTarget)) {
+      queueDragOverColumn(null);
+    }
+  }, [queueDragOverColumn]);
+
+  useEffect(() => {
+    return () => {
+      if (dragOverRafRef.current !== null) {
+        window.cancelAnimationFrame(dragOverRafRef.current);
+        dragOverRafRef.current = null;
+      }
+    };
+  }, []);
+
+  return (
+    <div className="kanban-board" style={style}>
       {columns.map((col) => {
-        const colCards = cards.filter((card) => card.status === col.id);
-        const isDragOver = dragOverColId === col.id;
+        const colCards = cardsByColumn.get(col.id) || [];
+
         return (
-          <div
+          <KanbanColumn
             key={col.id}
-            onDragOver={(e) => {
-              e.preventDefault();
-            }}
-            onDragEnter={() => setDragOverColId(col.id)}
-            onDragLeave={() => setDragOverColId((prev) => (prev === col.id ? null : prev))}
-            onDrop={(e) => {
-              e.preventDefault();
-              const cardId = e.dataTransfer.getData('text/plain');
-              if (cardId && onCardMove) {
-                setLastDroppedCardId(cardId);
-                onCardMove(cardId, col.id);
-              }
-              setDragOverColId(null);
-            }}
-            style={{
-              flex: 1,
-              minWidth: '240px',
-              backgroundColor: isDragOver ? 'var(--color-base200)' : 'var(--color-base100)',
-              borderRadius: 'var(--radius-md)',
-              padding: '12px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '12px',
-              border: isDragOver ? '1px solid var(--color-border-focus)' : '1px solid transparent',
-              transform: isDragOver ? 'scale(1.015)' : 'scale(1)',
-              boxShadow: isDragOver ? 'var(--shadow-md)' : 'none',
-              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-            }}
-          >
-            {renderColumnHeader ? (
-              renderColumnHeader(col.id, col.title, colCards.length)
-            ) : (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--color-text-primary)' }}>{col.title}</span>
-                <span
-                  style={{
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    backgroundColor: 'var(--color-border-default)',
-                    color: 'var(--color-text-disabled)',
-                    padding: '2px 6px',
-                    borderRadius: 'var(--radius-full)',
-                  }}
-                >
-                  {colCards.length}
-                </span>
-              </div>
-            )}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto', flexGrow: 1 }}>
-              {colCards.map((card) => (
-                <KanbanCardComponent
-                  key={card.id}
-                  card={card}
-                  isLastDropped={card.id === lastDroppedCardId}
-                  onClearLastDropped={() => setLastDroppedCardId(null)}
-                />
-              ))}
-              {colCards.length === 0 && (
-                <div
-                  style={{
-                    border: '1px dashed var(--color-border-default)',
-                    borderRadius: 'var(--radius-md)',
-                    padding: '24px 12px',
-                    textAlign: 'center',
-                    fontSize: '12px',
-                    color: 'var(--color-text-disabled)',
-                    opacity: 0.6,
-                  }}
-                >
-                  No tickets
-                </div>
-              )}
-            </div>
-          </div>
+            column={col}
+            cards={colCards}
+            isDragOver={dragOverColId === col.id}
+            renderColumnHeader={renderColumnHeader}
+            lastDroppedCardId={lastDroppedCardId}
+            onClearLastDropped={clearLastDropped}
+            onDrop={handleDrop}
+            onDropComplete={clearDragOverColumn}
+            onDragEnter={handleDragEnter}
+            onDragLeave={handleDragLeave}
+            onDragOver={handleDragOver}
+          />
         );
       })}
     </div>
   );
-}
+});

@@ -7,12 +7,16 @@ import { TicketCard } from './TicketCard';
 import { TicketContextMenu } from './TicketContextMenu';
 
 import type { TicketBoardProps } from '../types/TicketBoard';
-import { getAssigneeAvatar, getPriorityColor, getPriorityIcon } from '../utils/TicketBoard';
-import { safeAnime } from '../../../utils/animationUtils';
+import { getAssigneeAvatar, getPriorityColor } from '../utils/TicketBoard';
+import { safeAnime, prefersReducedMotion } from '../../../utils/animationUtils';
+import { profileComputation } from '../../../utils/performanceProfile';
 import anime from 'animejs';
 
 const INITIAL_CARDS_PER_COLUMN = 40;
 const LOAD_MORE_CARDS = 40;
+const TICKET_CARD_ANIMATION_DURATION = 240;
+const TICKET_CARD_ANIMATION_EASING = 'cubic-bezier(0.2, 0, 0.38, 1)';
+const MAX_TICKETS_FOR_BOARD_ANIMATION = 120;
 const BOARD_COLUMN_BY_ID = Object.fromEntries(BOARD_COLUMNS.map((column) => [column.id, column])) as Record<string, (typeof BOARD_COLUMNS)[number]>;
 
 export const TicketBoard = React.memo(({
@@ -26,41 +30,39 @@ export const TicketBoard = React.memo(({
   hasMoreRows,
   isLoadingMoreRows,
 }: TicketBoardProps) => {
-  const handleDragStart = useCallback((event: DragEvent, ticketId: string) => {
-    event.dataTransfer.setData('text/plain', ticketId);
-  }, []);
-
   const [visibleByColumn, setVisibleByColumn] = useState<Record<string, number>>(() =>
     Object.fromEntries(BOARD_COLUMNS.map((column) => [column.id, INITIAL_CARDS_PER_COLUMN])) as Record<string, number>
   );
+  const baseVisibleByColumn = useMemo(() => Object.fromEntries(BOARD_COLUMNS.map((column) => [column.id, INITIAL_CARDS_PER_COLUMN])) as Record<string, number>, []);
+  const previousVisibleCardCountRef = useRef(0);
+  const selectTicketHandlerCache = useRef(new WeakMap<Ticket, () => void>());
+  const dragStartHandlerCache = useRef(new WeakMap<Ticket, (event: DragEvent) => void>());
 
   const boardRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!boardRef.current) return;
-    const cards = boardRef.current.querySelectorAll('.ticket-card');
-    if (cards.length === 0) return;
-
-    // Set initial state before animating
-    anime.set(cards, { opacity: 0, scale: 0.96 });
-
-    safeAnime({
-      targets: cards,
-      scale: [0.96, 1],
-      opacity: [0, 1],
-      delay: anime.stagger(20),
-      duration: 300,
-      easing: 'easeOutBack',
-    });
-  }, [ticketsByColumn, visibleByColumn]);
-
-  const visibleByColumnSnapshot = useMemo(() => ticketsByColumn, [ticketsByColumn]);
+  const didRunBoardLoadAnimationRef = React.useRef(false);
+  const shouldAnimateBoardLoad = (formattedCount: number) => (
+    formattedCount > 0 &&
+    formattedCount <= MAX_TICKETS_FOR_BOARD_ANIMATION &&
+    !prefersReducedMotion()
+  );
+  const totalVisibleCards = useMemo(() => BOARD_COLUMNS.reduce(
+    (total, column) => total + (ticketsByColumn[column.id as keyof typeof ticketsByColumn]?.length || 0),
+    0
+  ), [ticketsByColumn]);
   const hasMoreRowsValue = hasMoreRows || false;
   const loadingMoreRows = isLoadingMoreRows || false;
 
   useEffect(() => {
-    setVisibleByColumn(Object.fromEntries(BOARD_COLUMNS.map((column) => [column.id, INITIAL_CARDS_PER_COLUMN])) as Record<string, number>);
-  }, [visibleByColumnSnapshot]);
+    setVisibleByColumn((previous) => {
+      if (previousVisibleCardCountRef.current > totalVisibleCards) {
+        previousVisibleCardCountRef.current = totalVisibleCards;
+        return baseVisibleByColumn;
+      }
+
+      previousVisibleCardCountRef.current = totalVisibleCards;
+      return previous;
+    });
+  }, [baseVisibleByColumn, totalVisibleCards]);
 
   const handleLoadMoreColumn = useCallback((columnId: string, totalInColumn: number) => {
     setVisibleByColumn((previous) => {
@@ -71,6 +73,35 @@ export const TicketBoard = React.memo(({
       }
       return { ...previous, [columnId]: nextLimit };
     });
+  }, []);
+
+  const clearTicketHandlerCaches = useCallback(() => {
+    selectTicketHandlerCache.current = new WeakMap<Ticket, () => void>();
+    dragStartHandlerCache.current = new WeakMap<Ticket, (event: DragEvent) => void>();
+  }, []);
+
+  const getSelectTicketHandler = useCallback((ticket: Ticket) => {
+    const cached = selectTicketHandlerCache.current.get(ticket);
+    if (cached) {
+      return cached;
+    }
+
+    const nextHandler = () => onSelectTicket(ticket);
+    selectTicketHandlerCache.current.set(ticket, nextHandler);
+    return nextHandler;
+  }, [onSelectTicket]);
+
+  const getDragStartHandler = useCallback((ticket: Ticket) => {
+    const cached = dragStartHandlerCache.current.get(ticket);
+    if (cached) {
+      return cached;
+    }
+
+    const nextHandler = (event: DragEvent) => {
+      event.dataTransfer.setData('text/plain', ticket.id);
+    };
+    dragStartHandlerCache.current.set(ticket, nextHandler);
+    return nextHandler;
   }, []);
 
   const renderColumnHeader = useCallback((columnId: string, title: string, count: number) => {
@@ -142,31 +173,72 @@ export const TicketBoard = React.memo(({
     );
   }, [handleLoadMoreColumn, onOpenCreateTicket, ticketsByColumn, visibleByColumn, loadingMoreRows]);
 
-  const formattedCards = useMemo(() => {
+  useEffect(() => {
+    clearTicketHandlerCaches();
+  }, [clearTicketHandlerCaches, onSelectTicket]);
+
+  const formattedCards = useMemo(() => profileComputation('TicketBoard:formatCards', () => {
     return BOARD_COLUMNS.flatMap((col) => {
       const fullTickets = ticketsByColumn[col.id as keyof typeof ticketsByColumn] || [];
       const visibleCount = visibleByColumn[col.id] ?? INITIAL_CARDS_PER_COLUMN;
       const colTickets = fullTickets.slice(0, visibleCount);
-      return colTickets.map((ticket) => {
-        return {
-          id: ticket.id,
-          status: ticket.status,
-          content: (
+        return colTickets.map((ticket) => {
+          return {
+            id: ticket.id,
+            title: ticket.title,
+            status: ticket.status,
+            contentVersion: ticket.updatedAt,
+            content: (
             <TicketContextMenu ticket={ticket} availableTickets={availableTickets}>
-              <TicketCard
-                ticket={ticket}
-                onClick={() => onSelectTicket(ticket)}
-                onDragStart={(e) => handleDragStart(e, ticket.id)}
-                priorityIcon={getPriorityIcon(ticket.priority)}
-                priorityColor={getPriorityColor(ticket.priority)}
-                assigneeAvatar={getAssigneeAvatar(userAvatarById, ticket.assigneeId)}
-              />
+                <TicketCard
+                  ticket={ticket}
+                  onClick={getSelectTicketHandler(ticket)}
+                  onDragStart={getDragStartHandler(ticket)}
+                  priority={ticket.priority}
+                  priorityColor={getPriorityColor(ticket.priority)}
+                  assigneeAvatar={getAssigneeAvatar(userAvatarById, ticket.assigneeId)}
+                />
             </TicketContextMenu>
           ),
-        };
+          };
       });
     });
-  }, [availableTickets, ticketsByColumn, userAvatarById, onSelectTicket, handleDragStart, visibleByColumn]);
+  }), [availableTickets, getDragStartHandler, getSelectTicketHandler, ticketsByColumn, userAvatarById, visibleByColumn]);
+
+  const visibleCardCount = formattedCards.length;
+
+  useEffect(() => {
+    if (visibleCardCount === 0) {
+      didRunBoardLoadAnimationRef.current = false;
+      return;
+    }
+
+    if (didRunBoardLoadAnimationRef.current || !shouldAnimateBoardLoad(visibleCardCount)) {
+      return;
+    }
+
+    if (!boardRef.current) return;
+    const cards = boardRef.current.querySelectorAll('.ticket-card');
+    if (cards.length === 0) return;
+
+    if (prefersReducedMotion()) {
+      anime.set(cards, { opacity: 1, translateY: 0 });
+      return;
+    }
+
+    // Set initial state before animating
+    anime.set(cards, { opacity: 0, translateY: 8 });
+
+    safeAnime({
+      targets: cards,
+      opacity: [0, 1],
+      translateY: [8, 0],
+      delay: anime.stagger(20),
+      duration: TICKET_CARD_ANIMATION_DURATION,
+      easing: TICKET_CARD_ANIMATION_EASING,
+    });
+    didRunBoardLoadAnimationRef.current = true;
+  }, [visibleCardCount]);
 
   const handleCardMove = useCallback((cardId: string, nextStatus: string) => {
     onMoveTicket(cardId, { status: nextStatus as Ticket['status'] });

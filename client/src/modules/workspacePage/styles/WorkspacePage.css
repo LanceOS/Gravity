@@ -234,7 +234,7 @@
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: all var(--transition-normal);
+  transition: border-color var(--transition-normal), background-color var(--transition-normal), transform var(--transition-normal);
 }
 
 .workspace-page__projects-button:hover {
@@ -410,7 +410,7 @@
   background: rgba(255, 255, 255, 0.015);
   color: var(--color-text-secondary);
   cursor: pointer;
-  transition: all var(--transition-spring);
+  transition: transform var(--transition-spring), border-color var(--transition-spring), background-color var(--transition-spring), box-shadow var(--transition-spring);
   box-shadow: var(--shadow-sm);
   position: relative;
   overflow: hidden;
@@ -535,7 +535,7 @@
   background: var(--color-surface-card);
   color: var(--color-text-primary);
   font: inherit;
-  transition: all var(--transition-normal);
+  transition: border-color var(--transition-normal), background-color var(--transition-normal), color var(--transition-normal), box-shadow var(--transition-normal);
 }
 
 .workspace-page__project-input:focus {
@@ -578,7 +578,7 @@
   background: rgba(255, 255, 255, 0.015);
   color: var(--color-text-secondary);
   cursor: pointer;
-  transition: all var(--transition-spring);
+  transition: transform var(--transition-spring), border-color var(--transition-spring), background-color var(--transition-spring), box-shadow var(--transition-spring);
   box-shadow: var(--shadow-sm);
 }
 
@@ -727,7 +727,7 @@
   font-size: 11.5px;
   font-weight: 600;
   font: inherit;
-  transition: all var(--transition-normal);
+  transition: border-color var(--transition-normal), background-color var(--transition-normal), color var(--transition-normal);
 }
 
 .workspace-page__domain-chip:hover {

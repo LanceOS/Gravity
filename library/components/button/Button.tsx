@@ -90,11 +90,12 @@ export function Button({
     border: border,
     cursor: disabled || loading ? 'not-allowed' : 'pointer',
     opacity: disabled || loading ? 0.6 : 1,
-    transition: 'all var(--transition-normal)',
+    transition:
+      'background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast)',
     width: fullWidth ? '100%' : 'auto',
     textAlign: 'center',
     userSelect: 'none',
-    boxShadow: variant === 'link' || variant === 'ghost' ? 'none' : 'var(--shadow-sm)',
+    boxShadow: 'none',
     ...style,
   };
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useInfiniteQuery, useIsFetching, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
 import type { SidebarNavigationState, SidebarProps } from '../../../components/Sidebar';
@@ -328,21 +328,32 @@ export function WorkspaceShellPage() {
   });
 
   const buildWorkspaceProjectCacheFingerprint = useCallback(() => {
-    const signatureParts = [];
-    for (const project of activeWorkspaceProjects) {
-      const rawCachedTickets = queryClient.getQueryData<unknown>(queryKeys.tickets(project.id));
-      const rawCachedLabels = queryClient.getQueryData<unknown>(queryKeys.labels(project.id));
-      const cachedTickets = Array.isArray(rawCachedTickets) ? rawCachedTickets as Ticket[] : [];
-      const cachedLabels = Array.isArray(rawCachedLabels) ? rawCachedLabels as Label[] : [];
+    const signatureParts = new Array<string>(activeWorkspaceProjects.length);
+    const queryClientProxy = queryClient as unknown as {
+      getQueryState?: <T>(queryKey: readonly unknown[]) => {
+        data?: T;
+        dataUpdatedAt?: number;
+      } | undefined;
+      getQueryData?: <T>(queryKey: readonly unknown[]) => T | undefined;
+    };
 
-      const ticketSignature = cachedTickets
-        .map((ticket) => `${ticket.id}:${ticket.updatedAt || ''}:${ticket.status || ''}:${ticket.assigneeId || ''}:${ticket.cycleId || ''}:${(ticket.labelIds ?? []).join(',')}`)
-        .join('|');
-      const labelSignature = cachedLabels
-        .map((label) => `${label.id}:${label.projectId || ''}:${label.name || ''}`)
-        .join('|');
+    for (let index = 0; index < activeWorkspaceProjects.length; index += 1) {
+      const project = activeWorkspaceProjects[index];
 
-      signatureParts.push(`${project.id}:tickets=${cachedTickets.length}:${ticketSignature}:labels=${cachedLabels.length}:${labelSignature}`);
+      const ticketState = queryClientProxy.getQueryState?.<Ticket[]>(queryKeys.tickets(project.id));
+      const labelState = queryClientProxy.getQueryState?.<Label[]>(queryKeys.labels(project.id));
+
+      const ticketData = (Array.isArray(ticketState?.data)
+        ? ticketState.data
+        : (queryClientProxy.getQueryData?.<Ticket[]>(queryKeys.tickets(project.id)) ?? []));
+      const labelData = (Array.isArray(labelState?.data)
+        ? labelState.data
+        : (queryClientProxy.getQueryData?.<Label[]>(queryKeys.labels(project.id)) ?? []));
+
+      const ticketTimestamp = ticketState?.dataUpdatedAt || 0;
+      const labelTimestamp = labelState?.dataUpdatedAt || 0;
+
+      signatureParts[index] = `${project.id}:tickets:${ticketData.length}:${ticketTimestamp}:labels:${labelData.length}:${labelTimestamp}`;
     }
 
     return signatureParts.join('|');
@@ -351,23 +362,36 @@ export function WorkspaceShellPage() {
   const cacheFingerprint = useSyncExternalStore(
     useCallback(
       (onStoreChange) => {
+        let latestFingerprint = buildWorkspaceProjectCacheFingerprint();
         const queryClientProxy = queryClient as unknown as {
-          subscribeAll?: (listener: () => void) => () => void;
-          getQueryCache?: () => { subscribe?: (listener: () => void) => () => void };
+          subscribeAll?: (listener: (event?: { query?: { queryKey?: unknown } }) => void) => () => void;
+          getQueryCache?: () => { subscribe?: (listener: (event?: { query?: { queryKey?: unknown } }) => void) => () => void };
+        };
+        const notifyIfChanged = () => {
+          const nextFingerprint = buildWorkspaceProjectCacheFingerprint();
+          if (nextFingerprint === latestFingerprint) {
+            return;
+          }
+
+          latestFingerprint = nextFingerprint;
+          onStoreChange();
+        };
+        const notifyForEvent = () => {
+          notifyIfChanged();
         };
 
         if (typeof queryClientProxy.subscribeAll === 'function') {
-          return queryClientProxy.subscribeAll(onStoreChange);
+          return queryClientProxy.subscribeAll(notifyForEvent);
         }
 
         const queryCache = queryClientProxy.getQueryCache?.();
         if (queryCache && typeof queryCache.subscribe === 'function') {
-          return queryCache.subscribe(onStoreChange);
+          return queryCache.subscribe(notifyForEvent);
         }
 
         return () => undefined;
       },
-      [queryClient]
+      [queryClient, buildWorkspaceProjectCacheFingerprint]
     ),
     buildWorkspaceProjectCacheFingerprint,
     buildWorkspaceProjectCacheFingerprint,
@@ -413,7 +437,7 @@ export function WorkspaceShellPage() {
     }
 
     return cachedLabelsByProject;
-  }, [activeWorkspaceProjectIds, activeWorkspaceProjects, cacheFingerprint, sidebarTree]);
+  }, [activeWorkspaceProjectIds, activeWorkspaceProjects, cacheFingerprint, queryClient, sidebarTree]);
 
   const workspaceProjectLabels = useMemo(() => {
     const dedupedWorkspaceLabels = new Map<string, Label>();
@@ -448,7 +472,7 @@ export function WorkspaceShellPage() {
         ...CACHE_CONFIGS.metadata,
       });
     }
-  }, [activeSection, activeWorkspaceProjects, currentUser]);
+  }, [activeSection, activeWorkspaceProjects, currentUser, queryClient]);
 
   const isScopedTicketsLoading = useMemo(
     () => {
@@ -490,18 +514,34 @@ export function WorkspaceShellPage() {
     ]
   );
 
+  const aggregateLoadMoreInFlightRef = useRef(false);
+
   const aggregateLoadMoreRows = useCallback(() => {
-    if (isWorkspaceAllTasksPath && !isAggregateDetailRoute && workspaceAggregateHasNextPage) {
-      void fetchWorkspaceAggregateNextPage();
+    if (aggregateLoadMoreInFlightRef.current || aggregateIsLoadingMoreRows) {
       return;
     }
 
-    if (isTeamAggregatePath && !isAggregateDetailRoute && teamAggregateHasNextPage) {
-      void fetchTeamAggregateNextPage();
+    let loadMoreRequest = undefined as ReturnType<typeof fetchWorkspaceAggregateNextPage> | ReturnType<typeof fetchTeamAggregateNextPage> | undefined;
+
+    if (isWorkspaceAllTasksPath && !isAggregateDetailRoute && workspaceAggregateHasNextPage) {
+      aggregateLoadMoreInFlightRef.current = true;
+      loadMoreRequest = fetchWorkspaceAggregateNextPage();
+    } else if (isTeamAggregatePath && !isAggregateDetailRoute && teamAggregateHasNextPage) {
+      aggregateLoadMoreInFlightRef.current = true;
+      loadMoreRequest = fetchTeamAggregateNextPage();
     }
+
+    if (!loadMoreRequest) {
+      return;
+    }
+
+    Promise.resolve(loadMoreRequest).finally(() => {
+      aggregateLoadMoreInFlightRef.current = false;
+    });
   }, [
     fetchTeamAggregateNextPage,
     fetchWorkspaceAggregateNextPage,
+    aggregateIsLoadingMoreRows,
     isAggregateDetailRoute,
     isTeamAggregatePath,
     isWorkspaceAllTasksPath,
@@ -510,6 +550,12 @@ export function WorkspaceShellPage() {
   ]);
 
   const aggregateHasMoreRows = isWorkspaceAllTasksPath ? aggregateWorkspaceHasMoreRows : aggregateTeamHasMoreRows;
+
+  useEffect(() => {
+    if (!aggregateIsLoadingMoreRows) {
+      aggregateLoadMoreInFlightRef.current = false;
+    }
+  }, [aggregateIsLoadingMoreRows]);
 
   const { data: teamCycles = [] } = useQuery<Cycle[]>({
     queryKey: ['teamCycles', route.teamIdParam],
@@ -575,6 +621,8 @@ export function WorkspaceShellPage() {
         continue;
       }
 
+      const projectCounts = countsByProject[project.id];
+
       for (const ticket of projectTickets) {
         if (ticket.projectId && ticket.projectId !== project.id) {
           continue;
@@ -583,26 +631,18 @@ export function WorkspaceShellPage() {
           continue;
         }
 
-        const existing = countsByProject[project.id];
-        const nextLabels = { ...existing.labels };
-        const nextCycles = { ...existing.cycles };
-
         if (ticket.labelIds?.length) {
           for (const labelId of ticket.labelIds) {
-            nextLabels[labelId] = (nextLabels[labelId] ?? 0) + 1;
+            projectCounts.labels[labelId] = (projectCounts.labels[labelId] ?? 0) + 1;
           }
         }
 
         if (ticket.cycleId) {
-          nextCycles[ticket.cycleId] = (nextCycles[ticket.cycleId] ?? 0) + 1;
+          projectCounts.cycles[ticket.cycleId] = (projectCounts.cycles[ticket.cycleId] ?? 0) + 1;
         }
 
-        countsByProject[project.id] = {
-          myIssues: existing.myIssues + (ticket.assigneeId === currentUser?.id ? 1 : 0),
-          activeProjectIssues: existing.activeProjectIssues + 1,
-          labels: nextLabels,
-          cycles: nextCycles,
-        };
+        projectCounts.myIssues += ticket.assigneeId === currentUser?.id ? 1 : 0;
+        projectCounts.activeProjectIssues += 1;
       }
     }
 
@@ -681,7 +721,7 @@ export function WorkspaceShellPage() {
     queryClient.setQueryData<WorkspaceMember[]>(queryKeys.workspaceMembers(activeWorkspaceId), (old) =>
       old ? old.map((member) => (member.id === userId ? { ...member, lastActiveAt } : member)) : []
     );
-  }, [activeWorkspaceId]);
+  }, [activeWorkspaceId, queryClient]);
 
   usePendingWorkspaceInvite({
     currentUser,
@@ -758,6 +798,7 @@ export function WorkspaceShellPage() {
     route.projectIdParam,
     route.teamIdParam,
     sidebarTeamIdByProjectId,
+    sidebarTree?.hierarchyMode,
     sidebarTree?.teams,
   ]);
 
@@ -918,7 +959,7 @@ export function WorkspaceShellPage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ completed: true }),
           });
-        } catch (e) {
+        } catch {
           // Ignore
         }
       }}
