@@ -227,17 +227,19 @@ export const TicketList = React.memo(({
     }
 
     if (!listRef.current) return;
-    const rows = listRef.current.querySelectorAll(isMobileTicketLayout ? '.ticket-row-mobile' : '.ticket-row');
-    if (rows.length === 0) return;
+
+    if (prefersReducedMotion()) {
+      anime.set(listRef.current, { opacity: 1, translateY: 0 });
+      return;
+    }
 
     // Set initial state before animating
-    anime.set(rows, { opacity: 0, translateY: 12 });
+    anime.set(listRef.current, { opacity: 0, translateY: 12 });
 
     safeAnime({
-      targets: rows,
+      targets: listRef.current,
       translateY: [12, 0],
       opacity: [0, 1],
-      delay: anime.stagger(25),
       duration: 350,
       easing: 'easeOutQuad',
     });

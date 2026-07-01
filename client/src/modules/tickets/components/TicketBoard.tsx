@@ -218,22 +218,19 @@ export const TicketBoard = React.memo(({
     }
 
     if (!boardRef.current) return;
-    const cards = boardRef.current.querySelectorAll('.ticket-card');
-    if (cards.length === 0) return;
 
     if (prefersReducedMotion()) {
-      anime.set(cards, { opacity: 1, translateY: 0 });
+      anime.set(boardRef.current, { opacity: 1, translateY: 0 });
       return;
     }
 
     // Set initial state before animating
-    anime.set(cards, { opacity: 0, translateY: 8 });
+    anime.set(boardRef.current, { opacity: 0, translateY: 8 });
 
     safeAnime({
-      targets: cards,
+      targets: boardRef.current,
       opacity: [0, 1],
       translateY: [8, 0],
-      delay: anime.stagger(20),
       duration: TICKET_CARD_ANIMATION_DURATION,
       easing: TICKET_CARD_ANIMATION_EASING,
     });
