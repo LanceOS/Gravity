@@ -432,7 +432,7 @@ export const TicketList = React.memo(({
     );
   }, [availableTickets, groupedTickets, handleLoadMoreStatus, isMobileTicketLayout, loadingMoreRows, onLoadMore, onSelectTicket, visibleByStatus]);
 
-  const shouldUseVirtualList = visibleTicketCount >= VIRTUAL_LIST_THRESHOLD && viewportHeight > 0;
+  const shouldUseVirtualList = visibleTicketCount >= VIRTUAL_LIST_THRESHOLD;
 
   return (
     <div
