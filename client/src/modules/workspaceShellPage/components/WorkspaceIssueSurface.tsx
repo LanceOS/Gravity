@@ -35,6 +35,7 @@ interface WorkspaceIssueSurfaceProps {
   routeTicketKey?: string;
   ticketsByKey: Map<string, Ticket>;
   ticketsById: Map<string, Ticket>;
+  ticketsByParentId: Map<string, Ticket[]>;
   isLoadingTickets: boolean;
   onOpenCreateTicket: (initialStatus?: Ticket['status']) => void;
   onOpenCreateSubtask: (parentId: string) => void;
@@ -91,6 +92,7 @@ export function WorkspaceIssueSurface({
   routeTicketKey,
   ticketsByKey,
   ticketsById,
+  ticketsByParentId,
   isLoadingTickets,
   onOpenCreateTicket,
   onOpenCreateSubtask,
@@ -170,6 +172,7 @@ export function WorkspaceIssueSurface({
           onAddBlocker={addTicketBlocker}
           onRemoveBlocker={removeTicketBlocker}
           ticketsById={ticketsById}
+          ticketsByParentId={ticketsByParentId}
           isLoading={isLoadingTickets}
         />
       ) : (

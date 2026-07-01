@@ -15,6 +15,7 @@ interface TicketDetailRouteProps {
   labels: Label[];
   cycles: Cycle[];
   ticketsById?: Map<string, Ticket>;
+  ticketsByParentId: Map<string, Ticket[]>;
   activeTicketDetail: TicketWithRelations | null;
   onSelectTicket: (ticket: Ticket | null) => void;
   onUpdateTicket: (id: string, updates: Partial<Ticket>, options?: { immediate?: boolean }) => Promise<void>;
@@ -52,6 +53,7 @@ export const TicketDetailRoute: React.FC<TicketDetailRouteProps> = ({
   onRemoveDependency,
   onAddBlocker,
   onRemoveBlocker,
+  ticketsByParentId,
   isLoading = false,
 }) => {
   const navigate = useNavigate();
@@ -67,7 +69,7 @@ export const TicketDetailRoute: React.FC<TicketDetailRouteProps> = ({
         return [];
       }
 
-      let rawSubtasks = tickets.filter((ticket) => ticket.parentId === activeTicket.id);
+      let rawSubtasks = ticketsByParentId.get(activeTicket.id) ?? [];
 
       if (activeTicketDetail?.subtasks && activeTicketDetail.subtasks.length > 0) {
         rawSubtasks = activeTicketDetail.subtasks;
@@ -75,7 +77,7 @@ export const TicketDetailRoute: React.FC<TicketDetailRouteProps> = ({
 
       return rawSubtasks.map((t) => ticketsByIdResolved.get(t.id) || t);
     },
-    [activeTicket, activeTicketDetail?.subtasks, ticketsByIdResolved, tickets]
+    [activeTicket, activeTicketDetail?.subtasks, ticketsByIdResolved, ticketsByParentId]
   );
 
   const parentTicket = useMemo(

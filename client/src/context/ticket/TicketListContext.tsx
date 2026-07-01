@@ -8,6 +8,7 @@ import { ActiveTicketContext } from './ActiveTicketContext';
 import {
   createTicketByIdMap,
   createTicketMap,
+  createTicketsByParentMap,
   createTicketsByProjectMap,
   resolveSyncedActiveTicket,
 } from './ticketListUtils';
@@ -70,6 +71,7 @@ export function useTicketListContextValue({
   const ticketMap = useMemo(() => createTicketMap(tickets), [tickets]);
   const ticketById = useMemo(() => createTicketByIdMap(tickets), [tickets]);
   const ticketsByProject = useMemo(() => createTicketsByProjectMap(tickets), [tickets]);
+  const ticketsByParentId = useMemo(() => createTicketsByParentMap(tickets), [tickets]);
 
   useEffect(() => {
     const syncedActiveTicket = resolveSyncedActiveTicket(activeTicket, ticketById);
@@ -85,12 +87,14 @@ export function useTicketListContextValue({
     ticketMap,
     ticketById,
     ticketsByProject,
+    ticketsByParentId,
   }), [
     activeTicket,
     setActiveTicket,
     ticketMap,
     ticketById,
     ticketsByProject,
+    ticketsByParentId,
     tickets,
     hasUserChanged,
   ]);

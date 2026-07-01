@@ -226,6 +226,43 @@ describe('TicketListContext', () => {
     });
   });
 
+  it('indexes subtasks by parent ticket id', async () => {
+    const queryClient = createQueryClient();
+    const subtaskTicket: Ticket = {
+      ...projectOneTickets[0],
+      id: 'ticket-3',
+      key: 'GRA-3',
+      title: 'Child ticket',
+      parentId: 'ticket-1',
+      createdAt: '2026-06-18T14:00:00.000Z',
+      updatedAt: '2026-06-18T14:00:00.000Z',
+    };
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const projectId = getProjectIdFromInit(init);
+      if (url === '/api/v1/tickets' && projectId === 'project-1') {
+        return Promise.resolve(jsonResponse([...projectOneTickets, subtaskTicket]));
+      }
+      return Promise.resolve(jsonResponse([]));
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderWithProviders(queryClient);
+
+    await waitFor(() => {
+      expect(currentProject).toBeDefined();
+    });
+
+    await act(async () => {
+      currentProject!.setActiveProjectId('project-1');
+    });
+
+    await waitFor(() => {
+      expect(currentValue.ticketsByParentId.get('ticket-1')?.map((ticket) => ticket.id)).toEqual(['ticket-3']);
+    });
+  });
+
   it('retains the previous list while the next project fetch is still pending', async () => {
     const queryClient = createQueryClient();
     let resolveProjectTwoTickets!: (response: Response) => void;

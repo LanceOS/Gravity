@@ -54,6 +54,7 @@ import {
   WorkspaceProjectPanel,
   WorkspaceTeamProjectsPanel,
 } from '../../workspaces';
+import { createWorkspaceProjectCounts } from '../../workspaces/utils/workspaceProjectCounts';
 import '../../workspaceProjectsPanel/styles/WorkspaceProjectsPage.css';
 import '../../workspacePage/styles/WorkspacePage.css';
 import { WorkspacePageLayout } from '../../../layouts/WorkspacePageLayout/WorkspacePageLayout';
@@ -77,6 +78,7 @@ export function WorkspaceShellPage() {
     tickets,
     activeTicket,
     setActiveTicket,
+    ticketsByParentId,
   } = useTicketListContext();
   const { activeProjectId, setActiveProjectId } = useActiveProject();
   const {
@@ -595,58 +597,11 @@ export function WorkspaceShellPage() {
     ]
   );
   const ticketCountsByProject = useMemo(() => {
-    const countsByProject: Record<
-      string,
-      {
-        myIssues: number;
-        activeProjectIssues: number;
-        labels: Record<string, number>;
-        cycles: Record<string, number>;
-      }
-    > = Object.fromEntries(
-      activeWorkspaceProjects.map((project) => [
-        project.id,
-        {
-          myIssues: 0,
-          activeProjectIssues: 0,
-          labels: {},
-          cycles: {},
-        },
-      ])
+    return createWorkspaceProjectCounts(
+      activeWorkspaceProjects,
+      (projectId) => queryClient.getQueryData<Ticket[]>(queryKeys.tickets(projectId)),
+      currentUser?.id
     );
-
-    for (const project of activeWorkspaceProjects) {
-      const projectTickets = queryClient.getQueryData<Ticket[]>(queryKeys.tickets(project.id)) ?? [];
-      if (!Array.isArray(projectTickets)) {
-        continue;
-      }
-
-      const projectCounts = countsByProject[project.id];
-
-      for (const ticket of projectTickets) {
-        if (ticket.projectId && ticket.projectId !== project.id) {
-          continue;
-        }
-        if (ticket.status === 'done' || ticket.status === 'canceled') {
-          continue;
-        }
-
-        if (ticket.labelIds?.length) {
-          for (const labelId of ticket.labelIds) {
-            projectCounts.labels[labelId] = (projectCounts.labels[labelId] ?? 0) + 1;
-          }
-        }
-
-        if (ticket.cycleId) {
-          projectCounts.cycles[ticket.cycleId] = (projectCounts.cycles[ticket.cycleId] ?? 0) + 1;
-        }
-
-        projectCounts.myIssues += ticket.assigneeId === currentUser?.id ? 1 : 0;
-        projectCounts.activeProjectIssues += 1;
-      }
-    }
-
-    return countsByProject;
   }, [activeWorkspaceProjects, cacheFingerprint, currentUser?.id, queryClient]);
 
   const scopedTicketMaps = useMemo(() => {
@@ -1206,6 +1161,7 @@ export function WorkspaceShellPage() {
               routeTicketKey={route.ticketKey}
               ticketsByKey={scopedTicketsByKey}
               ticketsById={scopedTicketsById}
+              ticketsByParentId={ticketsByParentId}
               isLoadingTickets={isScopedTicketsLoading}
               onOpenCreateTicket={handleOpenCreateTicket}
               onOpenCreateSubtask={handleOpenCreateSubtask}
