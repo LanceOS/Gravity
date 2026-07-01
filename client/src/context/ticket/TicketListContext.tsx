@@ -3,10 +3,12 @@ import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../../utils/apiClient';
 import { CACHE_CONFIGS, queryKeys } from '../../utils/queryClient';
 import { useActiveProject } from '../project/ActiveProjectContext';
+import { useTicketFilters } from '../filters/TicketFiltersContext';
 import { ActiveTicketContext } from './ActiveTicketContext';
 import {
   createTicketByIdMap,
   createTicketMap,
+  createTicketsByParentMap,
   createTicketsByProjectMap,
   resolveSyncedActiveTicket,
 } from './ticketListUtils';
@@ -30,11 +32,13 @@ export function useTicketListContextValue({
   currentUser,
 }: TicketListContextValueArgs): TicketListContextType {
   const { activeProjectId } = useActiveProject();
+  const { filters } = useTicketFilters();
   const [activeTicket, setActiveTicket] = useState<Ticket | null>(null);
   const previousTicketsRef = useRef<Ticket[] | undefined>(undefined);
   const currentUserId = currentUser?.id ?? null;
   const previousUserIdRef = useRef<string | null>(currentUserId);
   const hasUserChanged = previousUserIdRef.current !== currentUserId;
+  const isProjectScopeAligned = filters.projectId === activeProjectId;
 
   const ticketsQuery = useQuery({
     queryKey: queryKeys.tickets(activeProjectId),
@@ -42,7 +46,7 @@ export function useTicketListContextValue({
       const data = await apiClient.get<Ticket[]>(`/tickets`, { projectId: activeProjectId });
       return data;
     },
-    enabled: !!activeProjectId && !!currentUser,
+    enabled: !!activeProjectId && isProjectScopeAligned && !!currentUser,
     ...CACHE_CONFIGS.ticketsList,
   });
 
@@ -67,6 +71,7 @@ export function useTicketListContextValue({
   const ticketMap = useMemo(() => createTicketMap(tickets), [tickets]);
   const ticketById = useMemo(() => createTicketByIdMap(tickets), [tickets]);
   const ticketsByProject = useMemo(() => createTicketsByProjectMap(tickets), [tickets]);
+  const ticketsByParentId = useMemo(() => createTicketsByParentMap(tickets), [tickets]);
 
   useEffect(() => {
     const syncedActiveTicket = resolveSyncedActiveTicket(activeTicket, ticketById);
@@ -82,12 +87,14 @@ export function useTicketListContextValue({
     ticketMap,
     ticketById,
     ticketsByProject,
+    ticketsByParentId,
   }), [
     activeTicket,
     setActiveTicket,
     ticketMap,
     ticketById,
     ticketsByProject,
+    ticketsByParentId,
     tickets,
     hasUserChanged,
   ]);

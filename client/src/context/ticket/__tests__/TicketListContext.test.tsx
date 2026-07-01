@@ -3,6 +3,8 @@ import { act, render, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ActiveProjectProvider, useActiveProject } from '../../project/ActiveProjectContext';
+import { TicketFiltersProvider, useTicketFilters } from '../../filters/TicketFiltersContext';
+import type { TicketFiltersState } from '../../shared/filters';
 import { useActiveTicket } from '../ActiveTicketContext';
 import { TicketListProvider, useTicketListContext } from '../TicketListContext';
 import type { TicketListContextType } from '../TicketListContext.types';
@@ -109,11 +111,15 @@ const projectTwoTickets: Ticket[] = [
 let currentValue: TicketListContextType;
 let currentActiveTicket: ReturnType<typeof useActiveTicket> | undefined;
 let currentProject: ReturnType<typeof useActiveProject> | undefined;
+let setFilters: ((nextFilters: Partial<TicketFiltersState>) => void) | undefined;
 
 function Probe() {
   const value = useTicketListContext();
   const activeTicket = useActiveTicket();
   const project = useActiveProject();
+  const filtersContext = useTicketFilters();
+  const { setFilters: nextFilters } = filtersContext;
+  setFilters = nextFilters;
 
   React.useEffect(() => {
     currentValue = value;
@@ -134,9 +140,11 @@ function Harness({
   return (
     <QueryClientProvider client={queryClient}>
       <ActiveProjectProvider>
-        <TicketListProvider currentUser={harnessCurrentUser}>
-          <Probe />
-        </TicketListProvider>
+        <TicketFiltersProvider>
+          <TicketListProvider currentUser={harnessCurrentUser}>
+            <Probe />
+          </TicketListProvider>
+        </TicketFiltersProvider>
       </ActiveProjectProvider>
     </QueryClientProvider>
   );
@@ -153,6 +161,7 @@ describe('TicketListContext', () => {
     currentValue = undefined as unknown as TicketListContextType;
     currentActiveTicket = undefined;
     currentProject = undefined;
+    setFilters = undefined;
     vi.unstubAllGlobals();
   });
 
@@ -217,6 +226,43 @@ describe('TicketListContext', () => {
     });
   });
 
+  it('indexes subtasks by parent ticket id', async () => {
+    const queryClient = createQueryClient();
+    const subtaskTicket: Ticket = {
+      ...projectOneTickets[0],
+      id: 'ticket-3',
+      key: 'GRA-3',
+      title: 'Child ticket',
+      parentId: 'ticket-1',
+      createdAt: '2026-06-18T14:00:00.000Z',
+      updatedAt: '2026-06-18T14:00:00.000Z',
+    };
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const projectId = getProjectIdFromInit(init);
+      if (url === '/api/v1/tickets' && projectId === 'project-1') {
+        return Promise.resolve(jsonResponse([...projectOneTickets, subtaskTicket]));
+      }
+      return Promise.resolve(jsonResponse([]));
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderWithProviders(queryClient);
+
+    await waitFor(() => {
+      expect(currentProject).toBeDefined();
+    });
+
+    await act(async () => {
+      currentProject!.setActiveProjectId('project-1');
+    });
+
+    await waitFor(() => {
+      expect(currentValue.ticketsByParentId.get('ticket-1')?.map((ticket) => ticket.id)).toEqual(['ticket-3']);
+    });
+  });
+
   it('retains the previous list while the next project fetch is still pending', async () => {
     const queryClient = createQueryClient();
     let resolveProjectTwoTickets!: (response: Response) => void;
@@ -267,6 +313,43 @@ describe('TicketListContext', () => {
       expect(currentValue.ticketById.get('ticket-9')?.title).toBe('Project two ticket');
       expect(currentValue.ticketsByProject.get('project-2')?.map((ticket) => ticket.id)).toEqual(['ticket-9']);
     });
+  });
+
+  it('does not trigger another project query when filter scope changes away from active project', async () => {
+    const queryClient = createQueryClient();
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const projectId = getProjectIdFromInit(init);
+      if (url === '/api/v1/tickets' && projectId === 'project-1') {
+        return Promise.resolve(jsonResponse(projectOneTickets));
+      }
+      return Promise.resolve(jsonResponse([]));
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+    setFilters = undefined;
+
+    renderWithProviders(queryClient);
+
+    await waitFor(() => {
+      expect(currentProject).toBeDefined();
+    });
+
+    await act(async () => {
+      currentProject!.setActiveProjectId('project-1');
+    });
+
+    await waitFor(() => {
+      expect(currentValue).toBeDefined();
+      expect(currentValue.tickets.map((ticket) => ticket.id)).toEqual(['ticket-1', 'ticket-2']);
+    });
+
+    await act(async () => {
+      setFilters?.({ projectId: 'project-2' });
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(currentValue.tickets.map((ticket) => ticket.id)).toEqual(['ticket-1', 'ticket-2']);
   });
 
   it('clears preserved tickets and the active ticket when the authenticated user changes', async () => {

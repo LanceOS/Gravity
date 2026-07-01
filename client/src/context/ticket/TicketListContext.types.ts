@@ -8,6 +8,7 @@ export interface TicketListContextType {
   ticketMap: Map<string, Ticket>;
   ticketById: Map<string, Ticket>;
   ticketsByProject: Map<string, Ticket[]>;
+  ticketsByParentId: Map<string, Ticket[]>;
 }
 
 export interface TicketListContextValueArgs {

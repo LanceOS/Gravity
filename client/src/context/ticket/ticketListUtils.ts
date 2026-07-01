@@ -37,6 +37,26 @@ export function createTicketsByProjectMap(tickets: Ticket[]): Map<string, Ticket
   return map;
 }
 
+export function createTicketsByParentMap(tickets: Ticket[]): Map<string, Ticket[]> {
+  const map = new Map<string, Ticket[]>();
+
+  for (const ticket of tickets) {
+    if (!ticket.parentId) {
+      continue;
+    }
+
+    const current = map.get(ticket.parentId);
+    if (current) {
+      current.push(ticket);
+      continue;
+    }
+
+    map.set(ticket.parentId, [ticket]);
+  }
+
+  return map;
+}
+
 export function resolveSyncedActiveTicket(
   activeTicket: Ticket | null,
   ticketById: Map<string, Ticket>,

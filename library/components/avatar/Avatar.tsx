@@ -42,7 +42,13 @@ export function Avatar({ src, name, size = 'md', style }: AvatarProps) {
       }}
     >
       {src ? (
-        <img src={src} alt={name || 'Avatar'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        <img
+          src={src}
+          alt={name || 'Avatar'}
+          loading="lazy"
+          decoding="async"
+          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+        />
       ) : name ? (
         getInitials()
       ) : (

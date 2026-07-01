@@ -18,10 +18,12 @@ import { NotesList, NoteEditor } from '../../notes';
 import { WorkspaceHeader } from '../../workspaces';
 import { WorkspaceViewContainer } from '../../../components/WorkspaceViewContainer';
 import { WorkspacePageLayout } from '../../../layouts/WorkspacePageLayout/WorkspacePageLayout';
+import { profileComputation } from '../../../utils/performanceProfile';
 import { QueryErrorResetBoundary } from '@tanstack/react-query';
 import { ErrorBoundary } from '../../../components/ErrorBoundary';
 import { WorkspacePageContextMenu } from '../components/WorkspacePageContextMenu';
 import { apiClient } from '../../../utils/apiClient';
+import { formatTicketTimelineDate } from '../../tickets/utils/ticketDateFormatter';
 import '../styles/WorkspacePage.css';
 
 export type WorkspaceIssueView = 'board' | 'list' | 'timeline';
@@ -90,17 +92,15 @@ const PRIORITY_LABELS: Record<Ticket['priority'], string> = {
   urgent: 'Urgent',
 };
 
-function formatTimelineDate(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return 'No date';
-  }
-
-  return new Intl.DateTimeFormat(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(date);
+function createEmptyTicketsByStatus(): TicketsByStatus {
+  return {
+    backlog: [],
+    todo: [],
+    in_progress: [],
+    in_review: [],
+    done: [],
+    canceled: [],
+  };
 }
 
 function getTicketProjectName(ticket: Ticket, projectById: Record<string, Project>) {
@@ -145,7 +145,7 @@ export function WorkspacePage({
   const [activeNoteTitle, setActiveNoteTitle] = useState('');
   const [notesSort, setNotesSort] = useState<'desc' | 'asc'>('desc');
   const labels = labelItems ?? domainItems ?? [];
-  const filteredTickets = useMemo(() => filterTickets(tickets, filters), [tickets, filters]);
+  const filteredTickets = useMemo(() => profileComputation('WorkspacePage:filterTickets', () => filterTickets(tickets, filters)), [tickets, filters]);
   const hasFiltersApplied = useMemo(() => hasActiveTicketFilters(filters), [filters]);
   const headerTitle = useMemo(
     () => getWorkspaceHeaderTitle(filters, currentUser, projects, labels, cycles),
@@ -168,29 +168,41 @@ export function WorkspacePage({
   );
   // Show project badge on rows when viewing multiple projects at once (no single-project filter)
   const showProjectBadges = !filters.projectId && projects.length > 1;
-  const groupedTickets = useMemo(
-    () => (isTimelineView ? EMPTY_TICKETS_BY_STATUS : groupTicketsByStatus(filteredTickets)),
-    [filteredTickets, isTimelineView]
-  );
-  const listSortedTickets = useMemo(
-    () => (isListView ? sortTicketsForList(filteredTickets, labelById, listSort) : filteredTickets),
-    [filteredTickets, isListView, labelById, listSort]
-  );
-  const listGroupedTickets = useMemo(
-    () => (isListView ? groupTicketsByStatus(listSortedTickets) : groupedTickets),
-    [isListView, listSortedTickets, groupedTickets]
-  );
+  const groupedTickets = useMemo(() => profileComputation('WorkspacePage:groupTickets', () => {
+    if (isTimelineView) {
+      return EMPTY_TICKETS_BY_STATUS;
+    }
+
+    if (!isListView) {
+      return groupTicketsByStatus(filteredTickets);
+    }
+
+    if (listSort === 'created') {
+      return groupTicketsByStatus(filteredTickets);
+    }
+
+    const sortedTickets = sortTicketsForList(filteredTickets, labelById, listSort);
+    const groupedBySorted = createEmptyTicketsByStatus();
+
+    for (const ticket of sortedTickets) {
+      const status = ticket.status;
+      const normalizedStatus = status in groupedBySorted ? status : 'todo';
+      groupedBySorted[normalizedStatus].push(ticket);
+    }
+
+    return groupedBySorted;
+  }), [filteredTickets, isListView, isTimelineView, labelById, listSort]);
   const timelineEvents = useMemo(
     () => {
       if (!isTimelineView) {
         return [];
       }
 
-      return [...filteredTickets]
-        .sort((first, second) =>
-          (second.updatedAt || second.createdAt).localeCompare(first.updatedAt || first.createdAt)
-        )
-        .map((ticket) => {
+          return [...filteredTickets]
+            .sort((first, second) =>
+              (second.updatedAt || second.createdAt).localeCompare(first.updatedAt || first.createdAt)
+            )
+            .map((ticket) => {
           const projectName = getTicketProjectName(ticket, projectById);
           const meta = [
             projectName,
@@ -199,7 +211,7 @@ export function WorkspacePage({
           ].filter(Boolean);
 
           return {
-            time: formatTimelineDate(ticket.updatedAt || ticket.createdAt),
+            time: formatTicketTimelineDate(ticket.updatedAt || ticket.createdAt),
             title: (
               <button
                 type="button"
@@ -454,7 +466,7 @@ export function WorkspacePage({
                           <WorkspaceViewContainer>
                             <TicketList
                               filteredCount={filteredTickets.length}
-                              groupedTickets={listGroupedTickets}
+                              groupedTickets={groupedTickets}
                               availableTickets={filteredTickets}
                               userAvatarById={userAvatarById}
                               projectById={showProjectBadges ? projectById : undefined}

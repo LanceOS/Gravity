@@ -33,6 +33,9 @@ export function AIChatWindow({
   const chatEndRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
   const windowRef = useRef<HTMLDivElement>(null);
+  const isReduced = typeof window === 'undefined'
+    ? false
+    : window.matchMedia('(prefers-reduced-motion: reduce)').matches || (typeof process !== 'undefined' && process.env.NODE_ENV === 'test');
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -46,7 +49,7 @@ export function AIChatWindow({
   }, [messages, isGenerating]);
 
   useEffect(() => {
-    if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
+    if (isReduced) {
       return;
     }
     if (windowRef.current) {
@@ -54,23 +57,23 @@ export function AIChatWindow({
         anime({
           targets: windowRef.current,
           opacity: [1, 0],
-          translateY: [0, 20],
-          duration: 280,
-          easing: 'easeInCubic',
+          translateY: [0, 12],
+          duration: 180,
+          easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
         });
       } else {
         windowRef.current.style.opacity = '0';
-        windowRef.current.style.transform = 'translateY(20px)';
+        windowRef.current.style.transform = 'translateY(12px)';
         anime({
           targets: windowRef.current,
           opacity: [0, 1],
-          translateY: [20, 0],
-          duration: 300,
-          easing: 'easeOutCubic',
+          translateY: [12, 0],
+          duration: 220,
+          easing: 'cubic-bezier(0.2, 0, 0.38, 1)',
         });
       }
     }
-  }, [isClosing]);
+  }, [isClosing, isReduced]);
 
   useEffect(() => {
     return () => {

@@ -53,7 +53,7 @@
 .context-menu-item:focus-visible svg,
 .context-menu-item[data-highlighted="true"] svg {
   opacity: 1;
-  transform: scale(1.15) rotate(-5deg);
+  transform: translateX(2px);
   color: var(--color-primary);
 }
 

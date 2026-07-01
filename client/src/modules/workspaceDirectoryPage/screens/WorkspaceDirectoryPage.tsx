@@ -105,7 +105,7 @@ export function WorkspaceDirectoryPage({
               color: activeTab === 'create' ? 'var(--color-text-primary)' : 'var(--color-text-disabled)',
               borderBottom: activeTab === 'create' ? '2px solid var(--color-text-primary)' : '2px solid transparent',
               cursor: 'pointer',
-              transition: 'all var(--transition-fast)',
+              transition: 'color var(--transition-fast), border-color var(--transition-fast)',
             }}
           >
             Create
@@ -122,7 +122,7 @@ export function WorkspaceDirectoryPage({
               color: activeTab === 'join' ? 'var(--color-text-primary)' : 'var(--color-text-disabled)',
               borderBottom: activeTab === 'join' ? '2px solid var(--color-text-primary)' : '2px solid transparent',
               cursor: 'pointer',
-              transition: 'all var(--transition-fast)',
+              transition: 'color var(--transition-fast), border-color var(--transition-fast)',
             }}
           >
             Join Code

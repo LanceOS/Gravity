@@ -33,6 +33,7 @@ describe('TicketRowMobile', () => {
       <TicketRowMobile
         ticket={mockTicket}
         onClick={onClick}
+        priority={mockTicket.priority}
         priorityIcon={priorityIcon}
         assigneeAvatar={assigneeAvatar}
       />
@@ -66,6 +67,7 @@ describe('TicketRowMobile', () => {
       <TicketRowMobile
         ticket={ticketWithoutMeta}
         onClick={vi.fn()}
+        priority={ticketWithoutMeta.priority}
         priorityIcon={null as any}
         assigneeAvatar={null as any}
       />
@@ -82,6 +84,7 @@ describe('TicketRowMobile', () => {
       <TicketRowMobile
         ticket={{ ...mockTicket, status: 'done' }}
         onClick={vi.fn()}
+        priority={mockTicket.priority}
         priorityIcon={null as any}
         assigneeAvatar={null as any}
       />

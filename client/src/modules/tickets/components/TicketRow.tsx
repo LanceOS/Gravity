@@ -1,13 +1,50 @@
-import { memo, useState, useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { GitMerge, GitPullRequest, Paperclip } from 'lucide-react';
 import type { TicketRowProps } from '../types/TicketList';
 import { LabelBadge } from './LabelBadge';
 import { TicketRelationIndicators } from './TicketRelationIndicators';
 import { TicketStatusBadge } from './TicketStatusBadge';
+import { getPriorityIcon } from '../../../utils/ticketPresentation';
+import { formatTicketDate } from '../utils/ticketDateFormatter';
+import './TicketRow.css';
 
-function TicketRowImpl({ ticket, onClick, priorityIcon, assigneeAvatar, projectName, projectColor }: TicketRowProps) {
-  const [isHovered, setIsHovered] = useState(false);
+type TicketLabelList = TicketRowProps['ticket']['labels'];
+
+function haveLabelSetsChanged(prevLabels?: TicketLabelList | null, nextLabels?: TicketLabelList | null): boolean {
+  if (prevLabels === nextLabels) {
+    return false;
+  }
+
+  if (!prevLabels || !nextLabels) {
+    return Boolean(prevLabels?.length || nextLabels?.length);
+  }
+
+  if (prevLabels.length !== nextLabels.length) {
+    return true;
+  }
+
+  for (let i = 0; i < prevLabels.length; i += 1) {
+    if (prevLabels[i]?.id !== nextLabels[i]?.id) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function TicketRowImpl({
+  ticket,
+  onClick,
+  priorityIcon,
+  priority,
+  assigneeAvatar,
+  projectName,
+  projectColor,
+}: TicketRowProps) {
   const isCompleted = ticket.status === 'done' || ticket.status === 'canceled';
+  const renderedPriorityIcon = priorityIcon ?? getPriorityIcon(priority);
+  const formattedDate = formatTicketDate(ticket.createdAt);
+  const truncatedTitle = ticket.title.length > 150 ? `${ticket.title.slice(0, 149)}…` : ticket.title;
 
   const handleClick = useCallback(() => {
     onClick(ticket);
@@ -17,81 +54,23 @@ function TicketRowImpl({ ticket, onClick, priorityIcon, assigneeAvatar, projectN
     <div
       onClick={handleClick}
       className="ticket-row clickable"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '12px',
-        padding: '10px 16px',
-        background: isHovered ? 'var(--color-surface-overlay)' : 'var(--color-surface-card)',
-        border: '1px solid',
-        borderColor: isHovered ? 'var(--color-border-focus)' : 'var(--color-border-default)',
-        borderRadius: '6px',
-        transition: 'all 0.15s ease',
-        transform: isHovered ? 'translateX(3px)' : 'translateX(0)',
-        cursor: 'pointer',
-      }}
     >
-      <div className="ticket-row-priority" style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>{priorityIcon}</div>
+      <div className="ticket-row-priority">
+        {renderedPriorityIcon}
+      </div>
 
-      <div
-        className="ticket-row-title-wrap"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          flex: 1,
-          minWidth: 0,
-        }}
-      >
-        <span
-          className="ticket-row-key"
-          style={{
-            width: '72px',
-            fontFamily: 'var(--mono)',
-            fontSize: '12px',
-            color: 'var(--color-text-disabled)',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            flexShrink: 0,
-            whiteSpace: 'nowrap',
-          }}
-        >
+      <div className="ticket-row-title-wrap">
+        <span className="ticket-row-key">
           {ticket.key}
         </span>
 
         {projectName && (
           <span
             className="ticket-row-project"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '5px',
-              fontSize: '11px',
-              fontWeight: 500,
-              color: 'var(--color-text-secondary)',
-              background: 'var(--color-surface-overlay)',
-              border: '1px solid var(--color-border-default)',
-              borderRadius: '4px',
-              padding: '2px 7px',
-              flexShrink: 0,
-              maxWidth: '120px',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
+            title={projectName}
+            style={{ color: 'var(--color-text-secondary)' }}
           >
-            <span
-              aria-hidden="true"
-              style={{
-                width: '6px',
-                height: '6px',
-                borderRadius: '50%',
-                background: projectColor || 'var(--color-primary)',
-                flexShrink: 0,
-              }}
-            />
+            <span aria-hidden="true" className="ticket-row-project__dot" style={{ background: projectColor || 'var(--color-primary)' }} />
             {projectName}
           </span>
         )}
@@ -101,23 +80,16 @@ function TicketRowImpl({ ticket, onClick, priorityIcon, assigneeAvatar, projectN
         <span
           className="ticket-row-title"
           style={{
-            fontSize: '13px',
-            fontWeight: 500,
             color: isCompleted ? 'var(--color-text-secondary)' : 'var(--color-text-primary)',
             textDecoration: isCompleted ? 'line-through' : 'none',
             opacity: isCompleted ? 0.85 : 1,
-            flex: 1,
-            minWidth: 0,
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
           }}
         >
-          {ticket.title}
+          {truncatedTitle}
         </span>
       </div>
 
-      <div className="ticket-row-domain" style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
+      <div className="ticket-row-domain">
         <TicketRelationIndicators ticket={ticket} />
         {ticket.labels?.map((label) => (
           <LabelBadge key={label.id} label={label} size="sm" />
@@ -132,17 +104,9 @@ function TicketRowImpl({ ticket, onClick, priorityIcon, assigneeAvatar, projectN
           onClick={(event) => event.stopPropagation()}
           className="ticket-row-pr"
           style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '4px',
-            fontSize: '11px',
-            padding: '2px 6px',
-            borderRadius: '4px',
             background: ticket.prStatus === 'merged' ? 'rgba(16,185,129,0.1)' : 'rgba(59,130,246,0.1)',
             border: `1px solid ${ticket.prStatus === 'merged' ? '#10b98140' : '#3b82f640'}`,
             color: ticket.prStatus === 'merged' ? '#10b981' : '#3b82f6',
-            textDecoration: 'none',
-            flexShrink: 0,
           }}
         >
           {ticket.prStatus === 'merged' ? <GitMerge size={12} /> : <GitPullRequest size={12} />}
@@ -151,38 +115,55 @@ function TicketRowImpl({ ticket, onClick, priorityIcon, assigneeAvatar, projectN
       ) : null}
 
       {ticket.parentId ? (
-        <span
-          className="ticket-row-sub"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '2px',
-            fontSize: '11px',
-            color: 'var(--color-text-disabled)',
-            background: 'var(--color-base50)',
-            padding: '2px 6px',
-            borderRadius: '4px',
-            flexShrink: 0,
-          }}
-        >
+        <span className="ticket-row-sub">
           <Paperclip size={10} />
           <span>Sub</span>
         </span>
       ) : null}
 
-      <div className="ticket-row-avatar" style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'var(--color-base50)', border: '1px solid var(--color-border-default)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
+      <div className="ticket-row-avatar">
         {assigneeAvatar ? (
-          <img src={assigneeAvatar} alt="" style={{ width: '100%', height: '100%' }} />
+          <img
+            src={assigneeAvatar}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            className="ticket-row-avatar-img"
+          />
         ) : (
-          <span style={{ fontSize: '9px', color: 'var(--color-text-disabled)', fontWeight: 500 }}>--</span>
+          <span className="ticket-row-avatar-placeholder">--</span>
         )}
       </div>
 
-      <span className="ticket-row-date" style={{ fontSize: '11px', color: 'var(--color-text-disabled)', width: '70px', textAlign: 'right', flexShrink: 0 }}>
-        {new Date(ticket.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+      <span className="ticket-row-date">
+        {formattedDate}
       </span>
     </div>
   );
 }
 
-export const TicketRow = memo(TicketRowImpl);
+function shouldRerenderTicketRow(prevProps: TicketRowProps, nextProps: TicketRowProps) {
+  const prevTicket = prevProps.ticket;
+  const nextTicket = nextProps.ticket;
+
+  return (
+    prevTicket.id === nextTicket.id &&
+    prevTicket.title === nextTicket.title &&
+    prevTicket.key === nextTicket.key &&
+    prevTicket.status === nextTicket.status &&
+    prevTicket.priority === nextTicket.priority &&
+    prevTicket.parentId === nextTicket.parentId &&
+    prevTicket.prStatus === nextTicket.prStatus &&
+    prevTicket.assigneeId === nextTicket.assigneeId &&
+    prevTicket.createdAt === nextTicket.createdAt &&
+    prevTicket.updatedAt === nextTicket.updatedAt &&
+    !haveLabelSetsChanged(prevTicket.labels, nextTicket.labels) &&
+    prevProps.onClick === nextProps.onClick &&
+    prevProps.priorityIcon === nextProps.priorityIcon &&
+    prevProps.assigneeAvatar === nextProps.assigneeAvatar &&
+    prevProps.projectName === nextProps.projectName &&
+    prevProps.projectColor === nextProps.projectColor
+  );
+}
+
+export const TicketRow = memo(TicketRowImpl, shouldRerenderTicketRow);

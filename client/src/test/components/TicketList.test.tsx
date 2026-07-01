@@ -148,9 +148,9 @@ describe('TicketList', () => {
     expect(screen.getByText('DONE')).toBeInTheDocument();
 
     expect(screen.getByText('TicketRow GRA-1 avatar-1.png')).toBeInTheDocument();
-    expect(screen.getByText('TicketRowMobile GRA-1 avatar-1.png')).toBeInTheDocument();
+    expect(screen.queryByText('TicketRowMobile GRA-1 avatar-1.png')).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'TicketRowMobile GRA-1 avatar-1.png' }));
+    await user.click(screen.getByRole('button', { name: 'TicketRow GRA-1 avatar-1.png' }));
     expect(props.onSelectTicket).toHaveBeenCalledWith(backlogTicket);
   });
 });

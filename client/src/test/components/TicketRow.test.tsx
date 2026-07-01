@@ -32,6 +32,7 @@ describe('TicketRow', () => {
       <TicketRow
         ticket={ticket}
         onClick={onClick}
+        priority={ticket.priority}
         priorityIcon={priorityIcon}
         assigneeAvatar={null}
       />

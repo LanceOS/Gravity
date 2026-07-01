@@ -11,6 +11,19 @@ export interface TooltipProps {
   style?: React.CSSProperties;
 }
 
+const TOOLTIP_DURATION = 130;
+const TOOLTIP_EASING = 'cubic-bezier(0.2, 0, 0.38, 1)';
+
+function shouldReduceMotion(): boolean {
+  if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
+    return true;
+  }
+  if (typeof window === 'undefined') {
+    return false;
+  }
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
 export function Tooltip({ content, children, style }: TooltipProps) {
   const [show, setShow] = React.useState(false);
   const [isRendered, setIsRendered] = React.useState(false);
@@ -22,14 +35,16 @@ export function Tooltip({ content, children, style }: TooltipProps) {
     } else if (isRendered) {
       if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
         setIsRendered(false);
+      } else if (shouldReduceMotion()) {
+        setIsRendered(false);
       } else {
         if (tooltipRef.current) {
           anime({
             targets: tooltipRef.current,
             opacity: [1, 0],
-            scale: [1, 0.95],
-            duration: 100,
-            easing: 'easeInQuad',
+            translateY: [0, -4],
+            duration: TOOLTIP_DURATION,
+            easing: TOOLTIP_EASING,
             complete: () => {
               setIsRendered(false);
             },
@@ -46,14 +61,17 @@ export function Tooltip({ content, children, style }: TooltipProps) {
       if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
         return;
       }
+      if (shouldReduceMotion()) {
+        return;
+      }
       tooltipRef.current.style.opacity = '0';
-      tooltipRef.current.style.transform = 'scale(0.95)';
+      tooltipRef.current.style.transform = 'translateY(4px)';
       anime({
         targets: tooltipRef.current,
         opacity: [0, 1],
-        scale: [0.95, 1],
-        duration: 120,
-        easing: 'easeOutQuad',
+        translateY: [4, 0],
+        duration: TOOLTIP_DURATION,
+        easing: TOOLTIP_EASING,
       });
     }
   }, [show, isRendered]);
@@ -86,7 +104,6 @@ export function Tooltip({ content, children, style }: TooltipProps) {
               borderRadius: 'var(--radius-xs)',
               fontSize: '11px',
               zIndex: 9999,
-              boxShadow: 'var(--shadow-sm)',
               pointerEvents: 'none',
               ...style,
             }}

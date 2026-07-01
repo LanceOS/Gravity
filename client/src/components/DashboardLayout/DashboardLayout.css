@@ -15,15 +15,16 @@
 .dashboard-layout__header {
   grid-row: 1;
   grid-column: 1 / -1;
-  height: 52px;
+  height: 56px;
   border-bottom: 1px solid var(--color-border-default);
+  background: color-mix(in srgb, var(--color-base50) 84%, var(--color-surface-app) 16%);
+  backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 24px;
-  background: var(--color-base50);
+  padding: 0 var(--space-lg);
   flex-shrink: 0;
-  gap: 16px;
+  gap: var(--space-md);
   z-index: 10;
 }
 
@@ -31,7 +32,7 @@
 .dashboard-layout__sidebar {
   grid-row: 2;
   grid-column: 1;
-  background: var(--color-base50);
+  background: var(--color-surface-app);
   border-right: 1px solid var(--color-border-default);
   display: flex;
   flex-direction: column;

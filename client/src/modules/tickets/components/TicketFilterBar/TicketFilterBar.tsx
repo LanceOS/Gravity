@@ -27,6 +27,7 @@ export const TicketFilterBar: React.FC<TicketFilterBarProps> = ({
 }) => {
   const availableLabels = labels ?? domains ?? [];
   const selectedLabelIds = filters.labels ?? [];
+  const selectedLabelIdsSet = React.useMemo(() => new Set(selectedLabelIds), [selectedLabelIds]);
   const activeCount = [
     filters.priority,
     filters.status,
@@ -101,11 +102,11 @@ export const TicketFilterBar: React.FC<TicketFilterBarProps> = ({
               <span className="ticket-filter-bar__label" style={{ marginBottom: 0 }}>Labels</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span style={{ fontSize: '10px', color: 'var(--color-text-disabled)' }}>Match:</span>
-                <button
-                  type="button"
-                  onClick={() => onFilterChange({ labelMode: filters.labelMode === 'all' ? 'any' : 'all' })}
-                  className="clickable"
-                  style={{
+                  <button
+                    type="button"
+                    onClick={() => onFilterChange({ labelMode: filters.labelMode === 'all' ? 'any' : 'all' })}
+                    className="clickable"
+                    style={{
                     background: filters.labelMode === 'all' ? 'rgba(59,130,246,0.15)' : 'var(--color-base100)',
                     border: '1px solid var(--color-border-default)',
                     borderRadius: '4px',
@@ -114,7 +115,7 @@ export const TicketFilterBar: React.FC<TicketFilterBarProps> = ({
                     fontSize: '9px',
                     fontWeight: 600,
                     cursor: 'pointer',
-                    transition: 'all 150ms ease',
+                    transition: 'background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast)',
                   }}
                 >
                   {filters.labelMode === 'all' ? 'ALL (AND)' : 'ANY (OR)'}
@@ -135,7 +136,7 @@ export const TicketFilterBar: React.FC<TicketFilterBarProps> = ({
               }}
             >
               {availableLabels.map((l) => {
-                const isChecked = filters.labels?.includes(l.id) || false;
+                const isChecked = selectedLabelIdsSet.has(l.id);
                 return (
                   <label
                     key={l.id}

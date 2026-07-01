@@ -5,6 +5,19 @@ import { FocusTrap } from '../../utilities';
 import { ClickAwayListener } from '../../utilities';
 import anime from 'animejs';
 
+const MODAL_DURATION = 180;
+const MODAL_EASING = 'cubic-bezier(0.2, 0, 0.38, 1)';
+
+function shouldReduceMotion(): boolean {
+  if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
+    return true;
+  }
+  if (typeof window === 'undefined') {
+    return false;
+  }
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
 export interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -20,70 +33,73 @@ export function Modal({ isOpen, onClose, title, children, footer, style }: Modal
   const dialogRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
+    const reducedMotion = shouldReduceMotion();
+
     if (isOpen) {
       setIsRendered(true);
       document.body.style.overflow = 'hidden';
-    } else {
+    } else if (isRendered) {
       document.body.style.overflow = '';
-      if (isRendered) {
-        if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
-          setIsRendered(false);
-        } else {
-          if (backdropRef.current) {
-            anime.remove(backdropRef.current);
-            anime({
-              targets: backdropRef.current,
-              opacity: [1, 0],
-              duration: 75,
-              easing: 'linear',
-            });
-          }
-          if (dialogRef.current) {
-            anime.remove(dialogRef.current);
-            anime({
-              targets: dialogRef.current,
-              opacity: [1, 0],
-              translateY: ['0px', '16px'],
-              duration: 75,
-              easing: 'easeInQuad',
-            });
-          }
-          setTimeout(() => {
-            setIsRendered(false);
-          }, 75);
-        }
+
+      if (reducedMotion) {
+        setIsRendered(false);
+        return;
       }
+
+      if (backdropRef.current) {
+        anime.remove(backdropRef.current);
+        anime({
+          targets: backdropRef.current,
+          opacity: [1, 0],
+          duration: MODAL_DURATION,
+          easing: MODAL_EASING,
+        });
+      }
+      if (dialogRef.current) {
+        anime.remove(dialogRef.current);
+        anime({
+          targets: dialogRef.current,
+          opacity: [1, 0],
+          translateY: ['0px', '10px'],
+          duration: MODAL_DURATION,
+          easing: MODAL_EASING,
+        });
+      }
+
+      window.setTimeout(() => {
+        setIsRendered(false);
+      }, MODAL_DURATION);
     }
+
     return () => {
       document.body.style.overflow = '';
     };
   }, [isOpen, isRendered]);
 
   React.useLayoutEffect(() => {
-    if (isOpen && isRendered) {
-      if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
-        return;
-      }
-      if (backdropRef.current) {
-        backdropRef.current.style.opacity = '0';
-        anime({
-          targets: backdropRef.current,
-          opacity: [0, 1],
-          duration: 75,
-          easing: 'linear',
-        });
-      }
-      if (dialogRef.current) {
-        dialogRef.current.style.opacity = '0';
-        dialogRef.current.style.transform = 'translateY(16px)';
-        anime({
-          targets: dialogRef.current,
-          opacity: [0, 1],
-          translateY: ['16px', '0px'],
-          duration: 75,
-          easing: 'easeOutQuad',
-        });
-      }
+    if (!isOpen || !isRendered || shouldReduceMotion()) {
+      return;
+    }
+
+    if (backdropRef.current) {
+      backdropRef.current.style.opacity = '0';
+      anime({
+        targets: backdropRef.current,
+        opacity: [0, 1],
+        duration: MODAL_DURATION,
+        easing: MODAL_EASING,
+      });
+    }
+    if (dialogRef.current) {
+      dialogRef.current.style.opacity = '0';
+      dialogRef.current.style.transform = 'translateY(10px)';
+      anime({
+        targets: dialogRef.current,
+        opacity: [0, 1],
+        translateY: ['10px', '0px'],
+        duration: MODAL_DURATION,
+        easing: MODAL_EASING,
+      });
     }
   }, [isOpen, isRendered]);
 
@@ -112,7 +128,7 @@ export function Modal({ isOpen, onClose, title, children, footer, style }: Modal
             bottom: 0,
             left: 0,
             backgroundColor: 'var(--color-overlay-scrim)',
-            backdropFilter: 'blur(4px)',
+            backdropFilter: 'blur(10px)',
             zIndex: 1500,
             display: 'flex',
             alignItems: 'center',
@@ -132,7 +148,6 @@ export function Modal({ isOpen, onClose, title, children, footer, style }: Modal
                 backgroundColor: 'var(--color-surface-overlay)',
                 border: '1px solid var(--color-border-default)',
                 borderRadius: 'var(--radius-lg)',
-                boxShadow: 'var(--shadow-xl)',
                 display: 'flex',
                 flexDirection: 'column',
                 maxHeight: 'calc(100vh - 32px)',
@@ -164,7 +179,7 @@ export function Modal({ isOpen, onClose, title, children, footer, style }: Modal
                 </button>
               </div>
               <div style={{ padding: '20px', overflowY: 'auto', flexGrow: 1, fontSize: '13px' }}>{children}</div>
-              
+
               {footer && (
                 <div
                   style={{

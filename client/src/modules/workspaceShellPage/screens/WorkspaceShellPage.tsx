@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
-import { useInfiniteQuery, useIsFetching, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useInfiniteQuery, useIsFetching, useQuery, useQueries, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
 import type { SidebarNavigationState, SidebarProps } from '../../../components/Sidebar';
 import { WorkspaceLayout } from '../../../layouts/WorkspaceLayout/WorkspaceLayout';
@@ -54,6 +54,7 @@ import {
   WorkspaceProjectPanel,
   WorkspaceTeamProjectsPanel,
 } from '../../workspaces';
+import { createWorkspaceProjectCounts } from '../../workspaces/utils/workspaceProjectCounts';
 import '../../workspaceProjectsPanel/styles/WorkspaceProjectsPage.css';
 import '../../workspacePage/styles/WorkspacePage.css';
 import { WorkspacePageLayout } from '../../../layouts/WorkspacePageLayout/WorkspacePageLayout';
@@ -77,6 +78,7 @@ export function WorkspaceShellPage() {
     tickets,
     activeTicket,
     setActiveTicket,
+    ticketsByParentId,
   } = useTicketListContext();
   const { activeProjectId, setActiveProjectId } = useActiveProject();
   const {
@@ -327,51 +329,49 @@ export function WorkspaceShellPage() {
     exact: true,
   });
 
-  const buildWorkspaceProjectCacheFingerprint = useCallback(() => {
-    const signatureParts = [];
-    for (const project of activeWorkspaceProjects) {
-      const rawCachedTickets = queryClient.getQueryData<unknown>(queryKeys.tickets(project.id));
-      const rawCachedLabels = queryClient.getQueryData<unknown>(queryKeys.labels(project.id));
-      const cachedTickets = Array.isArray(rawCachedTickets) ? rawCachedTickets as Ticket[] : [];
-      const cachedLabels = Array.isArray(rawCachedLabels) ? rawCachedLabels as Label[] : [];
+  const projectTicketsQueries = useQueries({
+    queries: activeWorkspaceProjects.map((project) => ({
+      queryKey: queryKeys.tickets(project.id),
+      queryFn: () => apiClient.get<Ticket[]>('/tickets', { projectId: project.id }),
+      enabled: false,
+      staleTime: CACHE_CONFIGS.ticketsList.staleTime,
+      gcTime: CACHE_CONFIGS.ticketsList.gcTime,
+    })),
+  });
 
-      const ticketSignature = cachedTickets
-        .map((ticket) => `${ticket.id}:${ticket.updatedAt || ''}:${ticket.status || ''}:${ticket.assigneeId || ''}:${ticket.cycleId || ''}:${(ticket.labelIds ?? []).join(',')}`)
-        .join('|');
-      const labelSignature = cachedLabels
-        .map((label) => `${label.id}:${label.projectId || ''}:${label.name || ''}`)
-        .join('|');
+  const projectLabelsQueries = useQueries({
+    queries: activeWorkspaceProjects.map((project) => ({
+      queryKey: queryKeys.labels(project.id),
+      queryFn: () => apiClient.get<Label[]>('/labels', { params: { projectId: project.id }, projectId: project.id }),
+      enabled: activeSection === 'projects',
+      staleTime: CACHE_CONFIGS.metadata.staleTime,
+      gcTime: CACHE_CONFIGS.metadata.gcTime,
+    })),
+  });
 
-      signatureParts.push(`${project.id}:tickets=${cachedTickets.length}:${ticketSignature}:labels=${cachedLabels.length}:${labelSignature}`);
-    }
+  const ticketsByProjectIdFromQueries = useMemo(() => {
+    const map = new Map<string, Ticket[]>();
+    activeWorkspaceProjects.forEach((project, idx) => {
+      queryClient.getQueryData(queryKeys.tickets(project.id));
+      const data = projectTicketsQueries[idx]?.data;
+      if (Array.isArray(data)) {
+        map.set(project.id, data);
+      }
+    });
+    return map;
+  }, [activeWorkspaceProjects, projectTicketsQueries, queryClient]);
 
-    return signatureParts.join('|');
-  }, [activeWorkspaceProjects, queryClient]);
-
-  const cacheFingerprint = useSyncExternalStore(
-    useCallback(
-      (onStoreChange) => {
-        const queryClientProxy = queryClient as unknown as {
-          subscribeAll?: (listener: () => void) => () => void;
-          getQueryCache?: () => { subscribe?: (listener: () => void) => () => void };
-        };
-
-        if (typeof queryClientProxy.subscribeAll === 'function') {
-          return queryClientProxy.subscribeAll(onStoreChange);
-        }
-
-        const queryCache = queryClientProxy.getQueryCache?.();
-        if (queryCache && typeof queryCache.subscribe === 'function') {
-          return queryCache.subscribe(onStoreChange);
-        }
-
-        return () => undefined;
-      },
-      [queryClient]
-    ),
-    buildWorkspaceProjectCacheFingerprint,
-    buildWorkspaceProjectCacheFingerprint,
-  );
+  const labelsByProjectIdFromQueries = useMemo(() => {
+    const map = new Map<string, Label[]>();
+    activeWorkspaceProjects.forEach((project, idx) => {
+      queryClient.getQueryData(queryKeys.labels(project.id));
+      const data = projectLabelsQueries[idx]?.data;
+      if (Array.isArray(data)) {
+        map.set(project.id, data);
+      }
+    });
+    return map;
+  }, [activeWorkspaceProjects, projectLabelsQueries, queryClient]);
 
   const labelsByProject = useMemo(() => {
     const cachedLabelsByProject = new Map<string, Label[]>();
@@ -408,12 +408,12 @@ export function WorkspaceShellPage() {
     }
 
     for (const project of activeWorkspaceProjects) {
-      const cachedProjectLabels = queryClient.getQueryData<Label[]>(queryKeys.labels(project.id));
-      appendProjectLabels(project.id, Array.isArray(cachedProjectLabels) ? cachedProjectLabels : []);
+      const queryLabels = labelsByProjectIdFromQueries.get(project.id);
+      appendProjectLabels(project.id, queryLabels ?? []);
     }
 
     return cachedLabelsByProject;
-  }, [activeWorkspaceProjectIds, activeWorkspaceProjects, cacheFingerprint, sidebarTree]);
+  }, [activeWorkspaceProjectIds, activeWorkspaceProjects, labelsByProjectIdFromQueries, sidebarTree]);
 
   const workspaceProjectLabels = useMemo(() => {
     const dedupedWorkspaceLabels = new Map<string, Label>();
@@ -448,7 +448,7 @@ export function WorkspaceShellPage() {
         ...CACHE_CONFIGS.metadata,
       });
     }
-  }, [activeSection, activeWorkspaceProjects, currentUser]);
+  }, [activeSection, activeWorkspaceProjects, currentUser, queryClient]);
 
   const isScopedTicketsLoading = useMemo(
     () => {
@@ -490,18 +490,34 @@ export function WorkspaceShellPage() {
     ]
   );
 
+  const aggregateLoadMoreInFlightRef = useRef(false);
+
   const aggregateLoadMoreRows = useCallback(() => {
-    if (isWorkspaceAllTasksPath && !isAggregateDetailRoute && workspaceAggregateHasNextPage) {
-      void fetchWorkspaceAggregateNextPage();
+    if (aggregateLoadMoreInFlightRef.current || aggregateIsLoadingMoreRows) {
       return;
     }
 
-    if (isTeamAggregatePath && !isAggregateDetailRoute && teamAggregateHasNextPage) {
-      void fetchTeamAggregateNextPage();
+    let loadMoreRequest = undefined as ReturnType<typeof fetchWorkspaceAggregateNextPage> | ReturnType<typeof fetchTeamAggregateNextPage> | undefined;
+
+    if (isWorkspaceAllTasksPath && !isAggregateDetailRoute && workspaceAggregateHasNextPage) {
+      aggregateLoadMoreInFlightRef.current = true;
+      loadMoreRequest = fetchWorkspaceAggregateNextPage();
+    } else if (isTeamAggregatePath && !isAggregateDetailRoute && teamAggregateHasNextPage) {
+      aggregateLoadMoreInFlightRef.current = true;
+      loadMoreRequest = fetchTeamAggregateNextPage();
     }
+
+    if (!loadMoreRequest) {
+      return;
+    }
+
+    Promise.resolve(loadMoreRequest).finally(() => {
+      aggregateLoadMoreInFlightRef.current = false;
+    });
   }, [
     fetchTeamAggregateNextPage,
     fetchWorkspaceAggregateNextPage,
+    aggregateIsLoadingMoreRows,
     isAggregateDetailRoute,
     isTeamAggregatePath,
     isWorkspaceAllTasksPath,
@@ -510,6 +526,12 @@ export function WorkspaceShellPage() {
   ]);
 
   const aggregateHasMoreRows = isWorkspaceAllTasksPath ? aggregateWorkspaceHasMoreRows : aggregateTeamHasMoreRows;
+
+  useEffect(() => {
+    if (!aggregateIsLoadingMoreRows) {
+      aggregateLoadMoreInFlightRef.current = false;
+    }
+  }, [aggregateIsLoadingMoreRows]);
 
   const { data: teamCycles = [] } = useQuery<Cycle[]>({
     queryKey: ['teamCycles', route.teamIdParam],
@@ -549,65 +571,12 @@ export function WorkspaceShellPage() {
     ]
   );
   const ticketCountsByProject = useMemo(() => {
-    const countsByProject: Record<
-      string,
-      {
-        myIssues: number;
-        activeProjectIssues: number;
-        labels: Record<string, number>;
-        cycles: Record<string, number>;
-      }
-    > = Object.fromEntries(
-      activeWorkspaceProjects.map((project) => [
-        project.id,
-        {
-          myIssues: 0,
-          activeProjectIssues: 0,
-          labels: {},
-          cycles: {},
-        },
-      ])
+    return createWorkspaceProjectCounts(
+      activeWorkspaceProjects,
+      (projectId) => ticketsByProjectIdFromQueries.get(projectId),
+      currentUser?.id
     );
-
-    for (const project of activeWorkspaceProjects) {
-      const projectTickets = queryClient.getQueryData<Ticket[]>(queryKeys.tickets(project.id)) ?? [];
-      if (!Array.isArray(projectTickets)) {
-        continue;
-      }
-
-      for (const ticket of projectTickets) {
-        if (ticket.projectId && ticket.projectId !== project.id) {
-          continue;
-        }
-        if (ticket.status === 'done' || ticket.status === 'canceled') {
-          continue;
-        }
-
-        const existing = countsByProject[project.id];
-        const nextLabels = { ...existing.labels };
-        const nextCycles = { ...existing.cycles };
-
-        if (ticket.labelIds?.length) {
-          for (const labelId of ticket.labelIds) {
-            nextLabels[labelId] = (nextLabels[labelId] ?? 0) + 1;
-          }
-        }
-
-        if (ticket.cycleId) {
-          nextCycles[ticket.cycleId] = (nextCycles[ticket.cycleId] ?? 0) + 1;
-        }
-
-        countsByProject[project.id] = {
-          myIssues: existing.myIssues + (ticket.assigneeId === currentUser?.id ? 1 : 0),
-          activeProjectIssues: existing.activeProjectIssues + 1,
-          labels: nextLabels,
-          cycles: nextCycles,
-        };
-      }
-    }
-
-    return countsByProject;
-  }, [activeWorkspaceProjects, cacheFingerprint, currentUser?.id, queryClient]);
+  }, [activeWorkspaceProjects, ticketsByProjectIdFromQueries, currentUser?.id]);
 
   const scopedTicketMaps = useMemo(() => {
     const mapByKey = new Map<string, Ticket>();
@@ -681,7 +650,7 @@ export function WorkspaceShellPage() {
     queryClient.setQueryData<WorkspaceMember[]>(queryKeys.workspaceMembers(activeWorkspaceId), (old) =>
       old ? old.map((member) => (member.id === userId ? { ...member, lastActiveAt } : member)) : []
     );
-  }, [activeWorkspaceId]);
+  }, [activeWorkspaceId, queryClient]);
 
   usePendingWorkspaceInvite({
     currentUser,
@@ -758,6 +727,7 @@ export function WorkspaceShellPage() {
     route.projectIdParam,
     route.teamIdParam,
     sidebarTeamIdByProjectId,
+    sidebarTree?.hierarchyMode,
     sidebarTree?.teams,
   ]);
 
@@ -918,7 +888,7 @@ export function WorkspaceShellPage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ completed: true }),
           });
-        } catch (e) {
+        } catch {
           // Ignore
         }
       }}
@@ -975,7 +945,7 @@ export function WorkspaceShellPage() {
       onSelectAllTasks: (teamId) => navigate(`/workspaces/${activeWorkspaceId}/teams/${teamId}/tasks`),
       projects: activeWorkspaceProjects,
       onPrefetchProject: fetchProjectData,
-      onHasCachedProjectData: (projectId) => queryClient.getQueryData<Ticket[]>(queryKeys.tickets(projectId)) !== undefined,
+      onHasCachedProjectData: (projectId) => ticketsByProjectIdFromQueries.has(projectId),
       labels,
       labelsByProject,
       cycles,
@@ -1165,6 +1135,7 @@ export function WorkspaceShellPage() {
               routeTicketKey={route.ticketKey}
               ticketsByKey={scopedTicketsByKey}
               ticketsById={scopedTicketsById}
+              ticketsByParentId={ticketsByParentId}
               isLoadingTickets={isScopedTicketsLoading}
               onOpenCreateTicket={handleOpenCreateTicket}
               onOpenCreateSubtask={handleOpenCreateSubtask}

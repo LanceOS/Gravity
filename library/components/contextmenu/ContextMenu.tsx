@@ -4,6 +4,19 @@ import { Portal, FocusTrap, ClickAwayListener } from '../../utilities';
 import anime from 'animejs';
 import './ContextMenu.css';
 
+const CONTEXT_MENU_DURATION = 120;
+const CONTEXT_MENU_EASING = 'cubic-bezier(0.2, 0, 0.38, 1)';
+
+function shouldReduceMotion(): boolean {
+  if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
+    return true;
+  }
+  if (typeof window === 'undefined') {
+    return false;
+  }
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
 // ----------------------------------------------------
 // Interfaces & Types
 // ----------------------------------------------------
@@ -54,7 +67,7 @@ export const MenuLevelContext = React.createContext<{
 export interface ContextMenuRootProps {
   children: React.ReactNode; // Trigger when content/items is provided, or menu content if trigger is provided
   trigger?: React.ReactNode;
-  content?: React.ReactNode;
+  content?: React.ReactNode | (() => React.ReactNode);
   items?: ContextMenuItem[];
 }
 
@@ -78,10 +91,20 @@ export function ContextMenuRoot({ children, trigger, content, items }: ContextMe
   }, []);
 
   React.useEffect(() => {
+    const reducedMotion = shouldReduceMotion();
     if (isOpen) {
       setIsRendered(true);
     } else if (isRendered) {
+      if (reducedMotion) {
+        setIsRendered(false);
+        setActiveSubmenuId(null);
+        return;
+      }
+
       if (menuElement) {
+        menuElement.style.opacity = '1';
+        menuElement.style.transform = 'translateY(0px)';
+        anime.remove(menuElement);
         if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
           setIsRendered(false);
           setActiveSubmenuId(null);
@@ -89,9 +112,9 @@ export function ContextMenuRoot({ children, trigger, content, items }: ContextMe
           anime({
             targets: menuElement,
             opacity: [1, 0],
-            scale: [1, 0.95],
-            duration: 100,
-            easing: 'easeOutQuart',
+            translateY: [0, 4],
+            duration: CONTEXT_MENU_DURATION,
+            easing: CONTEXT_MENU_EASING,
             complete: () => {
               if (menuElement) {
                 menuElement.style.transform = '';
@@ -111,6 +134,7 @@ export function ContextMenuRoot({ children, trigger, content, items }: ContextMe
   // Handle positioning adjustments (edge-flipping)
   React.useLayoutEffect(() => {
     if (!isRendered || !menuElement) return;
+    if (shouldReduceMotion()) return;
     const menuRect = menuElement.getBoundingClientRect();
     const { x, y } = coords;
     
@@ -129,14 +153,15 @@ export function ContextMenuRoot({ children, trigger, content, items }: ContextMe
     menuElement.style.left = `${left}px`;
     menuElement.style.top = `${top}px`;
     menuElement.style.opacity = '0';
-    menuElement.style.transform = 'scale(0.95)';
+    menuElement.style.transform = 'translateY(4px)';
 
+    anime.remove(menuElement);
     anime({
       targets: menuElement,
       opacity: [0, 1],
-      scale: [0.95, 1],
-      duration: 100,
-      easing: 'easeOutQuart',
+      translateY: [4, 0],
+      duration: CONTEXT_MENU_DURATION,
+      easing: CONTEXT_MENU_EASING,
       complete: () => {
         if (menuElement) {
           menuElement.style.transform = '';
@@ -190,6 +215,9 @@ export function ContextMenuRoot({ children, trigger, content, items }: ContextMe
   // Determine actual trigger and menu content
   const actualTrigger = trigger || children;
   const actualContent = content || (trigger ? children : null);
+  const resolveActualContent = React.useCallback(() => {
+    return typeof actualContent === 'function' ? actualContent() : actualContent;
+  }, [actualContent]);
 
   const contextValue = React.useMemo(() => ({ closeMenu }), [closeMenu]);
   const timeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -288,7 +316,7 @@ export function ContextMenuRoot({ children, trigger, content, items }: ContextMe
                     opacity: 0,
                   }}
                 >
-                  {items && items.length > 0 ? renderLegacyItems(items) : actualContent}
+                  {items && items.length > 0 ? renderLegacyItems(items) : resolveActualContent()}
                 </div>
               </ClickAwayListener>
             </FocusTrap>
@@ -469,6 +497,7 @@ export function ContextMenuSubMenu({ children, parentItemRef, onClose }: Context
   // Position adjacent to parent item with edge-flipping logic
   React.useLayoutEffect(() => {
     if (!submenuElement || !parentItemRef?.current) return;
+    if (shouldReduceMotion()) return;
     const parentRect = parentItemRef.current.getBoundingClientRect();
     const subRect = submenuElement.getBoundingClientRect();
 
@@ -490,14 +519,15 @@ export function ContextMenuSubMenu({ children, parentItemRef, onClose }: Context
     submenuElement.style.left = `${left}px`;
     submenuElement.style.top = `${top}px`;
     submenuElement.style.opacity = '0';
-    submenuElement.style.transform = 'scale(0.95)';
+    submenuElement.style.transform = 'translateY(2px)';
 
+    anime.remove(submenuElement);
     anime({
       targets: submenuElement,
       opacity: [0, 1],
-      scale: [0.95, 1],
-      duration: 100,
-      easing: 'easeOutQuart',
+      translateY: [2, 0],
+      duration: CONTEXT_MENU_DURATION,
+      easing: CONTEXT_MENU_EASING,
       complete: () => {
         if (submenuElement) {
           submenuElement.style.transform = '';

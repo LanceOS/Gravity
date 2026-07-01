@@ -180,7 +180,7 @@
   cursor: pointer;
   color: var(--color-text-disabled);
   text-align: left;
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
 }
 
 .account-preferences-page__sidebar-button--active {
@@ -227,4 +227,3 @@
   font-size: 11px;
   color: var(--color-text-disabled);
 }
-
