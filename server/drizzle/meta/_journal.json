@@ -71,6 +71,13 @@
       "when": 1781415000000,
       "tag": "0009_restore_project_scoped_labels",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1781500000000,
+      "tag": "0011_add_chat_sessions_and_messages",
+      "breakpoints": true
     }
   ]
 }

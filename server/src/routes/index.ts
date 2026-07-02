@@ -10,6 +10,7 @@ import { createMcpRouter } from '../modules/mcp/index.js';
 import { createNotesRouter } from '../modules/notes/routes.js';
 import { createWebhookRouter } from '../modules/webhooks/routes.js';
 import { createTeamsRouter } from '../modules/workspaces/teams-routes.js';
+import { createChatsRouter } from '../modules/chats/routes.js';
 import { csrfProtect } from '../lib/csrf.js';
 import { subscribeToEvents } from '../realtime.js';
 import { createRateLimiter } from '../lib/rateLimit.js';
@@ -40,6 +41,7 @@ export function createApiRouter() {
   router.use(createTeamsRouter());
   router.use(createProjectsRouter());
   router.use(createTicketsRouter());
+  router.use(createChatsRouter());
   router.use(createAiRouter());
   router.use(createMcpRouter());
   router.use(createNotesRouter());
