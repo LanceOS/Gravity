@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useInfiniteQuery, useIsFetching, useQuery, useQueries, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
+import { Navigate } from 'react-router-dom';
 import type { SidebarNavigationState, SidebarProps } from '../../../components/Sidebar';
 import { WorkspaceLayout } from '../../../layouts/WorkspaceLayout/WorkspaceLayout';
 import { LocalAIChat } from '../../ai';
@@ -618,29 +619,6 @@ export function WorkspaceShellPage() {
     setFilters,
   });
 
-  useEffect(() => {
-    if (
-      !currentUser ||
-      !route.workspaceId ||
-      workspacesLoading ||
-      !workspacesResolvedForCurrentUser ||
-      workspaceDirectoryError ||
-      workspacesById.has(route.workspaceId)
-    ) {
-      return;
-    }
-
-    navigate('/workspace-access-denied', { replace: true });
-  }, [
-    currentUser,
-    navigate,
-    route.workspaceId,
-    workspaceDirectoryError,
-    workspacesById,
-    workspacesLoading,
-    workspacesResolvedForCurrentUser,
-  ]);
-
   const {
     setDensity,
     theme,
@@ -896,6 +874,16 @@ export function WorkspaceShellPage() {
 
   if (!currentUser) {
     return <AuthScreen />;
+  }
+
+  if (route.workspaceId && workspacesResolvedForCurrentUser && !workspacesLoading) {
+    if (workspaceDirectoryError) {
+      return <Navigate to="/workspace-access-error" replace />;
+    }
+
+    if (!workspacesById.has(route.workspaceId)) {
+      return <Navigate to="/workspace-access-denied" replace />;
+    }
   }
 
   if (!activeWorkspace) {

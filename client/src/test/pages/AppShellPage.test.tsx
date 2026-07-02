@@ -6,6 +6,7 @@ import { MemoryRouter, useLocation, Route, Routes } from 'react-router-dom';
 import { AppShellPage } from '../../pages/AppShellPage/AppShellPage.tsx';
 import { WorkspaceShellPage } from '../../pages/WorkspaceShellPage/WorkspaceShellPage.tsx';
 import WorkspaceAccessDeniedView from '../../pages/PlaceholderViews/WorkspaceAccessDeniedView.tsx';
+import WorkspaceAccessErrorView from '../../pages/PlaceholderViews/WorkspaceAccessErrorView.tsx';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { queryClient as sharedQueryClient, queryKeys } from '../../utils/queryClient';
 
@@ -649,6 +650,7 @@ function renderAppShell({
           <Route path="/workspaces/:workspaceId/teams/:teamId/projects/:projectId/tickets/:ticketKey" element={<WorkspaceShellPage />} />
           <Route path="/workspaces/:workspaceId" element={<WorkspaceShellPage />} />
           <Route path="/workspace-access-denied" element={<WorkspaceAccessDeniedView />} />
+          <Route path="/workspace-access-error" element={<WorkspaceAccessErrorView />} />
           <Route path="*" element={<AppShellPage />} />
         </Routes>
       </MemoryRouter>
@@ -880,6 +882,31 @@ describe('AppShellPage', () => {
     expect(screen.getByRole('heading', { name: 'You are not part of this workspace' })).toBeInTheDocument();
     expect(screen.queryByText('WorkspaceLayout')).not.toBeInTheDocument();
     expect(screen.queryByText('TicketDetailRoute Mock')).not.toBeInTheDocument();
+    expect(screen.queryByText('SEC-401')).not.toBeInTheDocument();
+  });
+
+  it('routes shared ticket links to a workspace access error page when the directory lookup fails', async () => {
+    renderAppShell({
+      tickets: buildUseTickets({
+        activeProjectId: '',
+        projects: [],
+        tickets: [],
+      }),
+      directory: buildWorkspaceDirectory({
+        workspaces: [],
+        loading: false,
+        resolvedUserId: 'user-1',
+        error: 'Failed to load workspaces.',
+      }),
+      initialEntries: ['/workspaces/workspace-private/projects/project-secret/tickets/SEC-401'],
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('location-display').textContent).toBe('/workspace-access-error');
+    });
+
+    expect(screen.getByRole('heading', { name: 'We could not verify access to this workspace' })).toBeInTheDocument();
+    expect(screen.queryByText('WorkspaceLayout')).not.toBeInTheDocument();
     expect(screen.queryByText('SEC-401')).not.toBeInTheDocument();
   });
 

@@ -16,6 +16,7 @@ import { LoadingPage } from '../pages/LoadingPage/LoadingPage';
 const WorkspaceExportView = lazy(() => import('../pages/PlaceholderViews/WorkspaceExportView'));
 const NotFoundView = lazy(() => import('../pages/PlaceholderViews/NotFoundView'));
 const WorkspaceAccessDeniedView = lazy(() => import('../pages/PlaceholderViews/WorkspaceAccessDeniedView'));
+const WorkspaceAccessErrorView = lazy(() => import('../pages/PlaceholderViews/WorkspaceAccessErrorView'));
 const PlaceholderPage = lazy(() => import('../pages/PlaceholderPage'));
 
 function ProjectHomeGuard() {
@@ -104,6 +105,14 @@ const staticProtectedRoutes = [
     element: (
       <Suspense fallback={<LoadingPage />}>
         <WorkspaceAccessDeniedView />
+      </Suspense>
+    ),
+  },
+  {
+    path: '/workspace-access-error',
+    element: (
+      <Suspense fallback={<LoadingPage />}>
+        <WorkspaceAccessErrorView />
       </Suspense>
     ),
   },
