@@ -7,6 +7,7 @@ import { createId } from '../../src/lib/platform.js';
 import { seedUser, seedWorkspaceFixture } from '../helpers/test-helpers.js';
 import { mcpToolsList } from '../../src/modules/mcp/tools.js';
 import { env } from '../../src/env.js';
+import { userSettings } from '../../src/modules/users/schema.js';
 
 async function createChatFixture() {
   const owner = await seedUser({
@@ -67,6 +68,7 @@ describe('ChatService', () => {
 
   it('includes project context, prior messages, and available tools in the model prompt', async () => {
     const { userId, chatId, project, workspace } = await createChatFixture();
+    const historyCreatedAt = new Date();
     await db.insert(chatMessages).values([
       {
         id: 'msg-history-user',
@@ -74,7 +76,7 @@ describe('ChatService', () => {
         role: 'user',
         content: 'Current sprint is healthy.',
         metadata: {},
-        createdAt: new Date(),
+        createdAt: historyCreatedAt,
       },
       {
         id: 'msg-history-assistant',
@@ -82,7 +84,7 @@ describe('ChatService', () => {
         role: 'assistant',
         content: 'Great, I noted it.',
         metadata: {},
-        createdAt: new Date(),
+        createdAt: new Date(historyCreatedAt.getTime() + 1000),
       },
     ]);
 
@@ -140,6 +142,11 @@ describe('ChatService', () => {
     expect(options.messages[3]).toMatchObject({ role: 'user', content: 'What should I do next?' });
     expect(options.messages[3].content.length).toBeGreaterThan(0);
 
+    const persistedMessage = await db
+      .select()
+      .from(chatMessages)
+      .where(eq(chatMessages.id, response.assistantMessageId))
+      .limit(1);
     const persistedMessages = await db
       .select()
       .from(chatMessages)
@@ -147,7 +154,8 @@ describe('ChatService', () => {
       .orderBy(asc(chatMessages.createdAt), asc(chatMessages.id));
 
     expect(persistedMessages).toHaveLength(4);
-    expect(persistedMessages.at(-1)).toMatchObject({
+    expect(persistedMessage).toHaveLength(1);
+    expect(persistedMessage[0]).toMatchObject({
       sessionId: chatId,
       role: 'assistant',
       content: 'Status looks good.',
@@ -181,6 +189,75 @@ describe('ChatService', () => {
     expect(chunks).toEqual([]);
     const [, , options] = (ai.chat as any).mock.calls[0];
     expect(options.onChunk).toBeUndefined();
+  });
+
+  it('assertStreamingProvider uses the resolved user default provider', async () => {
+    const { userId, chatId } = await createChatFixture();
+
+    await db.update(userSettings).set({ aiProvider: 'anthropic' }).where(eq(userSettings.userId, userId));
+
+    const ai = {
+      chat: vi.fn().mockResolvedValue({
+        content: 'No stream for default provider.',
+      }),
+    };
+
+    const chatService = new ChatService({ ai });
+    await expect(chatService.assertStreamingProvider(userId)).rejects.toThrow('Unsupported provider.');
+    await expect(chatService.assertStreamingProvider(userId, 'openai')).resolves.toBe('openai');
+  });
+
+  it('rejects streaming mode when provider does not support streaming', async () => {
+    const { userId, chatId, project } = await createChatFixture();
+
+    const ai = {
+      chat: vi.fn().mockResolvedValue({
+        content: 'Fallback should not happen.',
+      }),
+    };
+
+    const chatService = new ChatService({ ai });
+    await expect(
+      chatService.generateResponse({
+        projectId: project.id,
+        chatId,
+        userId,
+        provider: 'anthropic',
+        message: 'Can you stream this?',
+        onChunk: () => Promise.resolve(),
+        requireStreamingProvider: true,
+      }),
+    ).rejects.toThrow('Unsupported provider.');
+  });
+
+  it('does not synthesize fallback chunks after partial streaming begins', async () => {
+    const { userId, chatId, project } = await createChatFixture();
+
+    const ai = {
+      chat: vi.fn().mockImplementation(async (_userId: string, _provider: string, options: { onChunk?: (chunk: string) => Promise<void> | void }) => {
+        if (options.onChunk) {
+          await options.onChunk('live ');
+        }
+        throw new Error('Provider stream interrupted');
+      }),
+    };
+
+    const chatService = new ChatService({ ai });
+    const chunks: string[] = [];
+    const response = await chatService.generateResponse({
+      projectId: project.id,
+      chatId,
+      userId,
+      message: 'Streaming interrupted question.',
+      onChunk: (chunk) => {
+        chunks.push(chunk);
+      },
+    });
+
+    expect(chunks).toEqual(['live ']);
+    expect(response.fallback).toBe(true);
+    expect(response.fallbackReason).toBe('provider_error');
+    expect(response.content).toContain('I’m unable to produce a response right now');
   });
 
   it('executes MCP tools and continues the conversation after tool output', async () => {
@@ -228,11 +305,13 @@ describe('ChatService', () => {
     expect(executeTool).toHaveBeenCalledOnce();
     expect(executeTool).toHaveBeenCalledWith('list_tickets', { status: 'open' }, expect.any(String), userId);
 
-    const [, , toolRoundMessages] = (ai.chat as any).mock.calls[0];
-    const [, , finalMessages] = (ai.chat as any).mock.calls[1];
-    expect(toolRoundMessages.messages).toHaveLength(2);
-    expect(toolRoundMessages.messages[0].role).toBe('system');
-    expect(toolRoundMessages.messages[1]).toMatchObject({ role: 'user', content: 'Show me open tickets.' });
+    const [, , toolRoundRequest] = (ai.chat as any).mock.calls[0];
+    const [, , finalRequest] = (ai.chat as any).mock.calls[1];
+    const toolRoundMessages = toolRoundRequest.messages;
+    const finalMessages = finalRequest.messages;
+    expect(toolRoundMessages).toHaveLength(2);
+    expect(toolRoundMessages[0].role).toBe('system');
+    expect(toolRoundMessages[1]).toMatchObject({ role: 'user', content: 'Show me open tickets.' });
     expect(finalMessages).toHaveLength(4);
 
     const assistantToolMessage = finalMessages.find((m: { role: string; tool_calls?: unknown[] }) => m.role === 'assistant');

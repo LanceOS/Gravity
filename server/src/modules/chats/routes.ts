@@ -16,7 +16,7 @@ const DEFAULT_CHAT_LIMIT = 20;
 const MAX_CHAT_LIMIT = 100;
 const CHAT_STREAM_RATE_LIMIT_MAX = 30;
 const CHAT_STREAM_RATE_LIMIT_WINDOW_MS = 60_000;
-const CHAT_STREAM_ALLOWED_PROVIDERS = new Set(['openai', 'deepseek', 'ollama']);
+const CHAT_STREAM_SUPPORTED_PROVIDERS = new Set(['openai', 'anthropic', 'gemini', 'deepseek', 'ollama']);
 
 const createChatStreamLimiter = env.redisEnabled ? createRedisRateLimiter : createRateLimiter;
 const streamLimiter = createChatStreamLimiter({
@@ -482,15 +482,26 @@ export function createChatsRouter() {
       return;
     }
 
+    const userMessage = normalizeChatMessageText(req.body?.message);
+    if (!userMessage) {
+      res.status(400).json({ error: 'Message is required.' });
+      return;
+    }
+
     const requestedProvider = normalizeChatProvider(req.body?.provider ?? req.query.provider);
-    if (requestedProvider && !CHAT_STREAM_ALLOWED_PROVIDERS.has(requestedProvider)) {
+    if (requestedProvider && !CHAT_STREAM_SUPPORTED_PROVIDERS.has(requestedProvider)) {
       res.status(400).json({ error: 'Unsupported provider.' });
       return;
     }
 
-    const userMessage = normalizeChatMessageText(req.body?.message);
-    if (!userMessage) {
-      res.status(400).json({ error: 'Message is required.' });
+    try {
+      await chatService.assertStreamingProvider(auth.userId, requestedProvider);
+    } catch (error) {
+      if (error instanceof Error && error.message === 'Unsupported provider.') {
+        res.status(400).json({ error: 'Unsupported provider.' });
+        return;
+      }
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to validate stream provider.' });
       return;
     }
 
@@ -517,6 +528,7 @@ export function createChatsRouter() {
         provider: requestedProvider || undefined,
         model: messageModel.length > 0 ? messageModel : undefined,
         maxTokens,
+        requireStreamingProvider: true,
         onChunk: async (chunk) => {
           if (closed) {
             return;

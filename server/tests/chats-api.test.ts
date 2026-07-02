@@ -4,6 +4,7 @@ import { createAuthenticatedApi, seedWorkspaceFixture } from './helpers/test-hel
 import { db } from '../src/db/index.js';
 import { chatMessages, chatSessions } from '../src/modules/chats/schema.js';
 import { createId } from '../src/lib/platform.js';
+import { userSettings } from '../src/modules/users/schema.js';
 
 describe('chat sessions routes', () => {
   it('creates, lists, updates, retrieves with messages, paginates, and deletes chat sessions', async () => {
@@ -297,6 +298,112 @@ describe('chat sessions routes', () => {
       .send({
         message: 'What is the current status?',
         provider: 'anthropic',
+      });
+
+    expect(streamResponse.status).toBe(400);
+    expect(streamResponse.body).toEqual({ error: 'Unsupported provider.' });
+  });
+
+  it('rejects stream requests when default user provider is non-streaming', async () => {
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Streaming Defaults Owner',
+      email: 'stream-default-owner@example.com',
+      role: 'owner',
+    });
+
+    const { project } = await seedWorkspaceFixture({
+      owner: {
+        id: ownerApi.user.id,
+        name: ownerApi.user.name,
+        email: ownerApi.user.email,
+        role: 'owner',
+        avatarUrl: ownerApi.user.avatar,
+      },
+    });
+
+    await db
+      .update(userSettings)
+      .set({ aiProvider: 'anthropic' })
+      .where(eq(userSettings.userId, ownerApi.user.id));
+
+    const createResponse = await ownerApi
+      .post(`/api/v1/projects/${project.id}/chats`)
+      .send({ title: 'Streaming Defaults Chat' });
+    expect(createResponse.status).toBe(201);
+    const chatId = createResponse.body.id;
+
+    const streamResponse = await ownerApi
+      .post(`/api/v1/projects/${project.id}/chats/${chatId}/stream`)
+      .send({
+        message: 'What is the current status?',
+      });
+
+    expect(streamResponse.status).toBe(400);
+    expect(streamResponse.body).toEqual({ error: 'Unsupported provider.' });
+  });
+
+  it('rejects stream requests for unknown providers', async () => {
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Streaming Unknown Provider',
+      email: 'stream-unknown-provider@example.com',
+      role: 'owner',
+    });
+
+    const { project } = await seedWorkspaceFixture({
+      owner: {
+        id: ownerApi.user.id,
+        name: ownerApi.user.name,
+        email: ownerApi.user.email,
+        role: 'owner',
+        avatarUrl: ownerApi.user.avatar,
+      },
+    });
+
+    const createResponse = await ownerApi
+      .post(`/api/v1/projects/${project.id}/chats`)
+      .send({ title: 'Streaming Unknown Provider Chat' });
+    expect(createResponse.status).toBe(201);
+    const chatId = createResponse.body.id;
+
+    const streamResponse = await ownerApi
+      .post(`/api/v1/projects/${project.id}/chats/${chatId}/stream`)
+      .send({
+        message: 'What is the current status?',
+        provider: 'bad-provider',
+      });
+
+    expect(streamResponse.status).toBe(400);
+    expect(streamResponse.body).toEqual({ error: 'Unsupported provider.' });
+  });
+
+  it('rejects stream requests when unknown provider is sent via query parameter', async () => {
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Streaming Unknown Provider Query',
+      email: 'stream-query-provider@example.com',
+      role: 'owner',
+    });
+
+    const { project } = await seedWorkspaceFixture({
+      owner: {
+        id: ownerApi.user.id,
+        name: ownerApi.user.name,
+        email: ownerApi.user.email,
+        role: 'owner',
+        avatarUrl: ownerApi.user.avatar,
+      },
+    });
+
+    const createResponse = await ownerApi
+      .post(`/api/v1/projects/${project.id}/chats`)
+      .send({ title: 'Streaming Unknown Query Provider Chat' });
+    expect(createResponse.status).toBe(201);
+    const chatId = createResponse.body.id;
+
+    const streamResponse = await ownerApi
+      .post(`/api/v1/projects/${project.id}/chats/${chatId}/stream`)
+      .query({ provider: 'bad-provider' })
+      .send({
+        message: 'What is the current status?',
       });
 
     expect(streamResponse.status).toBe(400);

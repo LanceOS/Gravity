@@ -45,6 +45,7 @@ type ChatGenerationInput = {
   model?: string;
   maxTokens?: number;
   onChunk?: (chunk: string) => Promise<void> | void;
+  requireStreamingProvider?: boolean;
 };
 
 type ChatGenerationResult = {
@@ -159,6 +160,20 @@ export class ChatService {
     this.executeToolFn = dependencies?.executeTool ?? defaultExecuteTool;
   }
 
+  async resolveProviderForUser(userId: string, requestedProvider?: string): Promise<ChatProvider> {
+    const settings = await getUserSettingsRecord(userId);
+    return this.resolveProvider(requestedProvider, settings.aiProvider);
+  }
+
+  async assertStreamingProvider(userId: string, requestedProvider?: string): Promise<ChatProvider> {
+    const provider = await this.resolveProviderForUser(userId, requestedProvider);
+    if (!this.providerSupportsStreaming(provider)) {
+      throw new Error('Unsupported provider.');
+    }
+
+    return provider;
+  }
+
   async generateResponse(input: ChatGenerationInput): Promise<ChatGenerationResult> {
     const context = await this.loadContext(input.projectId, input.chatId, input.userId);
     const settings = await getUserSettingsRecord(input.userId);
@@ -166,6 +181,9 @@ export class ChatService {
     const resolvedProvider = this.resolveProvider(input.provider, settings.aiProvider);
     const resolvedModel = this.resolveModel(resolvedProvider, input.model, settings);
     const supportsStreaming = this.providerSupportsStreaming(resolvedProvider);
+    if (input.requireStreamingProvider && !supportsStreaming) {
+      throw new Error('Unsupported provider.');
+    }
 
     const requestOllamaUrl = resolvedProvider === 'ollama' ? settings.ollamaEndpoint : undefined;
     if (requestOllamaUrl) {
@@ -253,6 +271,7 @@ export class ChatService {
     });
 
     if (
+      !modelResult.fallback &&
       isFirstUserMessage &&
       userMessageText.length > 0 &&
       context.session.title === CHAT_TITLE_DEFAULT &&
@@ -492,7 +511,7 @@ Only operate in the workspace/project above.`,
           toolCalls: undefined,
           fallback: true,
           fallbackReason: this.toFallbackReason(error),
-          streamed: false,
+          streamed: params.enableStreaming ? streamedFromModel : false,
         };
       }
     }
@@ -502,7 +521,7 @@ Only operate in the workspace/project above.`,
       toolCalls: undefined,
       fallback: true,
       fallbackReason: 'tool_loop_limit',
-      streamed: false,
+      streamed: params.enableStreaming ? streamedFromModel : false,
     };
   }
 
@@ -631,6 +650,10 @@ Only operate in the workspace/project above.`,
       ],
       ...(params.ollamaUrl ? { ollamaUrl: params.ollamaUrl } : {}),
     });
+
+    if (!response || typeof response.content !== 'string') {
+      return '';
+    }
 
     return this.sanitizeTitle(response.content);
   }
