@@ -556,10 +556,18 @@ describe('projects and tickets routes', () => {
     });
     const unauthorizedResponse = await otherUserApi.get(`/api/v1/tickets/key/${ticket.key}`);
     expect(unauthorizedResponse.status).toBe(403);
+    expect(unauthorizedResponse.body).toEqual({ error: 'Access denied: not a member of the workspace.' });
+    expect(unauthorizedResponse.body).not.toHaveProperty('id');
+    expect(unauthorizedResponse.body).not.toHaveProperty('key');
+    expect(unauthorizedResponse.body).not.toHaveProperty('title');
 
+    const unauthorizedRelationsResponse = await otherUserApi
+      .get(`/api/v1/tickets/key/${ticket.key}`)
+      .query({ include: 'relations' });
+    expect(unauthorizedRelationsResponse.status).toBe(403);
+    expect(unauthorizedRelationsResponse.body).toEqual({ error: 'Access denied: not a member of the workspace.' });
 
-
-    // 5. Non-existent ticket key resolves to 404
+    // 3. Non-existent ticket key resolves to 404
     const notFoundResponse = await ownerApi.get('/api/v1/tickets/key/NONEXIST-999');
     expect(notFoundResponse.status).toBe(404);
   });

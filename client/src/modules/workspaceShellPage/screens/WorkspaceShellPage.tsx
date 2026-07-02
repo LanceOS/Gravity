@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useInfiniteQuery, useIsFetching, useQuery, useQueries, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
+import { Navigate } from 'react-router-dom';
 import type { SidebarNavigationState, SidebarProps } from '../../../components/Sidebar';
 import { WorkspaceLayout } from '../../../layouts/WorkspaceLayout/WorkspaceLayout';
 import { LocalAIChat } from '../../ai';
@@ -153,6 +154,7 @@ export function WorkspaceShellPage() {
     workspaces,
     loading: workspacesLoading,
     resolvedUserId: workspacesResolvedUserId,
+    error: workspaceDirectoryError,
     refreshWorkspaces,
     requestJoinByInvite,
   } = useWorkspaceDirectory({ currentUser });
@@ -570,6 +572,7 @@ export function WorkspaceShellPage() {
       routeAggregateDetailTickets,
     ]
   );
+  const sharedLinkFallbackRoute = `${pathname}${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
   const ticketCountsByProject = useMemo(() => {
     return createWorkspaceProjectCounts(
       activeWorkspaceProjects,
@@ -872,6 +875,16 @@ export function WorkspaceShellPage() {
 
   if (!currentUser) {
     return <AuthScreen />;
+  }
+
+  if (route.workspaceId && workspacesResolvedForCurrentUser && !workspacesLoading) {
+    if (workspaceDirectoryError) {
+      return <Navigate to="/workspace-access-error" replace state={{ from: sharedLinkFallbackRoute }} />;
+    }
+
+    if (!workspacesById.has(route.workspaceId)) {
+      return <Navigate to="/workspace-access-denied" replace />;
+    }
   }
 
   if (!activeWorkspace) {
