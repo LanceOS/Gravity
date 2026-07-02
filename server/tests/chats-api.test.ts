@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { createAuthenticatedApi, seedWorkspaceFixture } from './helpers/test-helpers.js';
 import { db } from '../src/db/index.js';
 import { chatMessages, chatSessions } from '../src/modules/chats/schema.js';
@@ -42,9 +42,18 @@ describe('chat sessions routes', () => {
     expect(createThird.status).toBe(201);
     const thirdChatId = createThird.body.id;
 
+    const sharedUpdatedAt = new Date('2026-01-01T00:00:00.000Z');
+    await db
+      .update(chatSessions)
+      .set({ updatedAt: sharedUpdatedAt })
+      .where(inArray(chatSessions.id, [firstChatId, secondChatId, thirdChatId]));
+
+    const expectedChatOrderByUpdatedAtThenIdDesc = [firstChatId, secondChatId, thirdChatId].sort((a, b) => b.localeCompare(a));
+
     const firstPage = await ownerApi.get(`/api/v1/projects/${project.id}/chats`).query({ limit: 2 });
     expect(firstPage.status).toBe(200);
     expect(firstPage.body).toHaveLength(2);
+    expect(firstPage.body.map((chat: { id: string }) => chat.id)).toEqual(expectedChatOrderByUpdatedAtThenIdDesc.slice(0, 2));
     expect(firstPage.body[0]).toMatchObject({
       title: expect.any(String),
       projectId: project.id,
@@ -54,6 +63,9 @@ describe('chat sessions routes', () => {
     const secondPage = await ownerApi.get(`/api/v1/projects/${project.id}/chats`).query({ limit: 2, offset: 2 });
     expect(secondPage.status).toBe(200);
     expect(secondPage.body).toHaveLength(1);
+    expect(secondPage.body.map((chat: { id: string }) => chat.id)).toEqual(
+      expectedChatOrderByUpdatedAtThenIdDesc.slice(2),
+    );
 
     expect(firstPage.body[0].id).not.toEqual(secondPage.body[0]?.id ?? '');
 
@@ -150,6 +162,27 @@ describe('chat sessions routes', () => {
     expect(getWithMessages.body.messages).toHaveLength(3);
     expect(getWithMessages.body.messages[0].content).toBe('Draft release strategy.');
     expect(getWithMessages.body.messages[1].content).toBe('Planned approach logged.');
+
+    const sharedMessageTime = new Date('2026-01-02T12:00:00.000Z');
+    await db
+      .update(chatMessages)
+      .set({ createdAt: sharedMessageTime })
+      .where(
+        inArray(chatMessages.id, [
+          userMessage.body.id,
+          assistantMessage.body.id,
+          listMetadataMessage.body.id,
+        ]),
+      );
+
+    const getWithMessagesTiebreak = await ownerApi.get(`/api/v1/projects/${project.id}/chats/${firstChatId}`);
+    expect(getWithMessagesTiebreak.status).toBe(200);
+    const expectedMessageOrderByCreatedAtThenIdAsc = [userMessage.body.id, assistantMessage.body.id, listMetadataMessage.body.id].sort(
+      (a, b) => a.localeCompare(b),
+    );
+    expect(getWithMessagesTiebreak.body.messages.map((message: { id: string }) => message.id)).toEqual(
+      expectedMessageOrderByCreatedAtThenIdAsc,
+    );
 
     const deleteResponse = await ownerApi.delete(`/api/v1/projects/${project.id}/chats/${firstChatId}`);
     expect(deleteResponse.status).toBe(200);

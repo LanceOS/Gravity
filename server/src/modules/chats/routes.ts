@@ -200,7 +200,7 @@ export function createChatsRouter() {
         .select()
         .from(chatSessions)
         .where(and(eq(chatSessions.projectId, projectId), eq(chatSessions.userId, auth.userId)))
-        .orderBy(desc(chatSessions.updatedAt))
+        .orderBy(desc(chatSessions.updatedAt), desc(chatSessions.id))
         .limit(limit)
         .offset(offset);
 
@@ -242,7 +242,7 @@ export function createChatsRouter() {
         .select()
         .from(chatMessages)
         .where(eq(chatMessages.sessionId, chatId))
-        .orderBy(asc(chatMessages.createdAt));
+        .orderBy(asc(chatMessages.createdAt), asc(chatMessages.id));
 
       res.json({
         ...mapChatSessionRow(session),
