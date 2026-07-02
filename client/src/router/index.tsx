@@ -15,6 +15,7 @@ import { LoadingPage } from '../pages/LoadingPage/LoadingPage';
 // Lazy load placeholder views for code-splitting
 const WorkspaceExportView = lazy(() => import('../pages/PlaceholderViews/WorkspaceExportView'));
 const NotFoundView = lazy(() => import('../pages/PlaceholderViews/NotFoundView'));
+const WorkspaceAccessDeniedView = lazy(() => import('../pages/PlaceholderViews/WorkspaceAccessDeniedView'));
 const PlaceholderPage = lazy(() => import('../pages/PlaceholderPage'));
 
 function ProjectHomeGuard() {
@@ -97,6 +98,14 @@ const staticProtectedRoutes = [
   {
     path: '/account',
     element: <AccountPreferencesPageRoute />,
+  },
+  {
+    path: '/workspace-access-denied',
+    element: (
+      <Suspense fallback={<LoadingPage />}>
+        <WorkspaceAccessDeniedView />
+      </Suspense>
+    ),
   },
 ];
 

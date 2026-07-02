@@ -153,6 +153,7 @@ export function WorkspaceShellPage() {
     workspaces,
     loading: workspacesLoading,
     resolvedUserId: workspacesResolvedUserId,
+    error: workspaceDirectoryError,
     refreshWorkspaces,
     requestJoinByInvite,
   } = useWorkspaceDirectory({ currentUser });
@@ -616,6 +617,29 @@ export function WorkspaceShellPage() {
     setActiveTicket,
     setFilters,
   });
+
+  useEffect(() => {
+    if (
+      !currentUser ||
+      !route.workspaceId ||
+      workspacesLoading ||
+      !workspacesResolvedForCurrentUser ||
+      workspaceDirectoryError ||
+      workspacesById.has(route.workspaceId)
+    ) {
+      return;
+    }
+
+    navigate('/workspace-access-denied', { replace: true });
+  }, [
+    currentUser,
+    navigate,
+    route.workspaceId,
+    workspaceDirectoryError,
+    workspacesById,
+    workspacesLoading,
+    workspacesResolvedForCurrentUser,
+  ]);
 
   const {
     setDensity,

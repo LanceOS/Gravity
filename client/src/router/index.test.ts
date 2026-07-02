@@ -19,5 +19,6 @@ describe('router configuration', () => {
     expect(staticProtectedRoutePaths).toContain('/workspaces/:workspaceId/teams/:teamId/domains/:domainId');
     expect(staticProtectedRoutePaths).toContain('/workspaces/:workspaceId/projects/:projectId');
     expect(staticProtectedRoutePaths).toContain('/workspaces/:workspaceId/settings');
+    expect(staticProtectedRoutePaths).toContain('/workspace-access-denied');
   });
 });
