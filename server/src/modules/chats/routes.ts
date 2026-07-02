@@ -1,13 +1,36 @@
 import { and, asc, desc, eq } from 'drizzle-orm';
 import { Router } from 'express';
 import { db } from '../../db/index.js';
+import { createRateLimiter } from '../../lib/rateLimit.js';
+import { createRedisRateLimiter } from '../../lib/rateLimitRedis.js';
+import { getRequestSourceIp } from '../../lib/request-ip.js';
 import { createId } from '../../lib/platform.js';
+import { env } from '../../env.js';
 import { chatMessages, chatSessions, projects } from '../../db/schema.js';
+import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
 import { authorizeProjectMemberAccess } from '../workspaces/services/membership.js';
+import { ChatService } from './services/chat-service.js';
 
 const CHAT_ROLES = ['user', 'assistant', 'system'] as const;
 const DEFAULT_CHAT_LIMIT = 20;
 const MAX_CHAT_LIMIT = 100;
+const CHAT_STREAM_RATE_LIMIT_MAX = 30;
+const CHAT_STREAM_RATE_LIMIT_WINDOW_MS = 60_000;
+const CHAT_STREAM_ALLOWED_PROVIDERS = new Set(['openai', 'anthropic', 'gemini', 'deepseek', 'ollama']);
+
+const createChatStreamLimiter = env.redisEnabled ? createRedisRateLimiter : createRateLimiter;
+const streamLimiter = createChatStreamLimiter({
+  windowMs: CHAT_STREAM_RATE_LIMIT_WINDOW_MS,
+  max: CHAT_STREAM_RATE_LIMIT_MAX,
+  keyFn: async (req) => {
+    const projectId = normalizeRouteParam(req.params.projectId);
+    const actorUserId = await resolveRequestActorUserId(req);
+    const source = actorUserId ?? getRequestSourceIp(req) ?? req.ip;
+    return `ai-chat:${projectId}:${source ?? 'anonymous'}`;
+  },
+});
+
+const chatService = new ChatService();
 
 type ChatRole = (typeof CHAT_ROLES)[number];
 
@@ -71,6 +94,45 @@ function normalizeChatMessageMetadata(value: unknown) {
   }
 
   return value;
+}
+
+function normalizeChatMessageText(value: unknown) {
+  if (typeof value !== 'string') {
+    return '';
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : '';
+}
+
+function normalizeChatProvider(value: unknown) {
+  const provider = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  return provider.length > 0 ? provider : '';
+}
+
+function normalizeChatModel(value: unknown) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function normalizeChatMaxTokens(value: unknown) {
+  if (typeof value !== 'string' && typeof value !== 'number') {
+    return undefined;
+  }
+
+  const parsed = Number.parseInt(String(value), 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return undefined;
+  }
+
+  return parsed;
+}
+
+function sendChatSseEvent(res: any, payload: unknown) {
+  if (res.writableEnded) {
+    return;
+  }
+
+  res.write(`data: ${JSON.stringify(payload)}\n\n`);
 }
 
 function normalizeChatRole(value: unknown): ChatRole | null {
@@ -402,6 +464,87 @@ export function createChatsRouter() {
       res.status(201).json(mapChatMessageRow(message));
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to append chat message.' });
+    }
+  });
+
+  router.get('/projects/:projectId/chats/:chatId/stream', streamLimiter, async (req, res) => {
+    const projectId = normalizeRouteParam(req.params.projectId);
+    const chatId = normalizeRouteParam(req.params.chatId);
+
+    if (!projectId || !chatId) {
+      res.status(400).json({ error: 'Project ID and chat ID are required.' });
+      return;
+    }
+
+    const auth = await authorizeProjectMemberAccess(req, projectId);
+    if (!auth.allowed) {
+      res.status(auth.status).json({ error: auth.error });
+      return;
+    }
+
+    const requestedProvider = normalizeChatProvider(req.query.provider ?? req.body?.provider);
+    if (requestedProvider && !CHAT_STREAM_ALLOWED_PROVIDERS.has(requestedProvider)) {
+      res.status(400).json({ error: 'Unsupported provider.' });
+      return;
+    }
+
+    const userMessage = normalizeChatMessageText(req.query.message ?? req.body?.message ?? req.body?.content);
+    const messageModel = normalizeChatModel(req.query.model ?? req.body?.model);
+    const maxTokens = normalizeChatMaxTokens(req.query.maxTokens ?? req.body?.maxTokens);
+
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+    });
+
+    let closed = false;
+    req.on('close', () => {
+      closed = true;
+    });
+
+    try {
+      const response = await chatService.generateResponse({
+        projectId,
+        chatId,
+        userId: auth.userId,
+        message: userMessage,
+        provider: requestedProvider || undefined,
+        model: messageModel.length > 0 ? messageModel : undefined,
+        maxTokens,
+        onChunk: async (chunk) => {
+          if (closed) {
+            return;
+          }
+
+          sendChatSseEvent(res, {
+            type: 'chunk',
+            delta: chunk,
+          });
+        },
+      });
+
+      if (!closed) {
+        sendChatSseEvent(res, {
+          type: 'done',
+          message: response.content,
+          messageId: response.assistantMessageId,
+          provider: response.provider,
+          model: response.model,
+          fallback: response.fallback,
+          fallbackReason: response.fallbackReason,
+          toolCalls: response.toolCalls ?? null,
+        });
+      }
+    } catch (error) {
+      if (!res.writableEnded) {
+        sendChatSseEvent(res, {
+          type: 'error',
+          message: error instanceof Error ? error.message : 'Failed to generate chat response.',
+        });
+      }
+    } finally {
+      res.end();
     }
   });
 
