@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { asc, eq } from 'drizzle-orm';
-import { ChatService } from '../../src/modules/chats/services/chat-service.js';
+import { ChatService, isStreamingChatProvider, isSupportedChatProvider } from '../../src/modules/chats/services/chat-service.js';
 import { db } from '../../src/db/index.js';
 import { chatMessages, chatSessions, projects } from '../../src/db/schema.js';
 import { createId } from '../../src/lib/platform.js';
@@ -161,6 +161,22 @@ describe('ChatService', () => {
       content: 'Status looks good.',
     });
     expect(response.provider).toBe('openai');
+  });
+
+  it('shares streaming provider capability checks', () => {
+    expect(isSupportedChatProvider('openai')).toBe(true);
+    expect(isSupportedChatProvider('anthropic')).toBe(true);
+    expect(isSupportedChatProvider('gemini')).toBe(true);
+    expect(isSupportedChatProvider('deepseek')).toBe(true);
+    expect(isSupportedChatProvider('ollama')).toBe(true);
+    expect(isSupportedChatProvider('invalid-provider')).toBe(false);
+
+    expect(isStreamingChatProvider('openai')).toBe(true);
+    expect(isStreamingChatProvider('deepseek')).toBe(true);
+    expect(isStreamingChatProvider('ollama')).toBe(true);
+    expect(isStreamingChatProvider('anthropic')).toBe(false);
+    expect(isStreamingChatProvider('gemini')).toBe(false);
+    expect(isStreamingChatProvider('invalid-provider')).toBe(false);
   });
 
   it('does not emit synthetic chunks for providers that do not support streaming', async () => {

@@ -106,7 +106,16 @@ const TOOL_ALIAS_BLOCKS: string[][] = [
 const CHAT_TITLE_DEFAULT = 'New Chat';
 const CHAT_TITLE_MAX_LENGTH = 60;
 const MAX_TOOL_ROUNDS = 2;
+
 const STREAMING_PROVIDERS = new Set<ChatProvider>(['openai', 'deepseek', 'ollama']);
+
+export function isSupportedChatProvider(value: string): value is ChatProvider {
+  return SUPPORTED_PROVIDERS.has(normalizeString(value).toLowerCase() as ChatProvider);
+}
+
+export function isStreamingChatProvider(value: string): value is ChatProvider {
+  return STREAMING_PROVIDERS.has(normalizeString(value).toLowerCase() as ChatProvider);
+}
 
 function normalizeString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -567,7 +576,7 @@ Only operate in the workspace/project above.`,
   }
 
   private providerSupportsStreaming(provider: ChatProvider): boolean {
-    return STREAMING_PROVIDERS.has(provider);
+    return isStreamingChatProvider(provider);
   }
 
   private async appendMessage(

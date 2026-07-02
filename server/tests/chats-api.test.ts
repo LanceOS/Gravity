@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { eq, inArray } from 'drizzle-orm';
+import { ChatService } from '../src/modules/chats/services/chat-service.js';
 import { createAuthenticatedApi, seedWorkspaceFixture } from './helpers/test-helpers.js';
 import { db } from '../src/db/index.js';
 import { chatMessages, chatSessions } from '../src/modules/chats/schema.js';
@@ -408,6 +409,225 @@ describe('chat sessions routes', () => {
 
     expect(streamResponse.status).toBe(400);
     expect(streamResponse.body).toEqual({ error: 'Unsupported provider.' });
+  });
+
+  it('requires a non-empty message for stream requests', async () => {
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Streaming Missing Message Owner',
+      email: 'stream-missing-message-owner@example.com',
+      role: 'owner',
+    });
+
+    const { project } = await seedWorkspaceFixture({
+      owner: {
+        id: ownerApi.user.id,
+        name: ownerApi.user.name,
+        email: ownerApi.user.email,
+        role: 'owner',
+        avatarUrl: ownerApi.user.avatar,
+      },
+    });
+
+    const createResponse = await ownerApi
+      .post(`/api/v1/projects/${project.id}/chats`)
+      .send({ title: 'Streaming Missing Message Chat' });
+    expect(createResponse.status).toBe(201);
+    const chatId = createResponse.body.id;
+
+    const streamResponse = await ownerApi
+      .post(`/api/v1/projects/${project.id}/chats/${chatId}/stream`)
+      .send({ message: '   ' });
+
+    expect(streamResponse.status).toBe(400);
+    expect(streamResponse.body).toEqual({ error: 'Message is required.' });
+  });
+
+  it('prioritizes provider validation before message validation when provider is explicitly unsupported', async () => {
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Streaming Invalid Provider Priority Owner',
+      email: 'stream-invalid-provider-priority-owner@example.com',
+      role: 'owner',
+    });
+
+    const { project } = await seedWorkspaceFixture({
+      owner: {
+        id: ownerApi.user.id,
+        name: ownerApi.user.name,
+        email: ownerApi.user.email,
+        role: 'owner',
+        avatarUrl: ownerApi.user.avatar,
+      },
+    });
+
+    const createResponse = await ownerApi
+      .post(`/api/v1/projects/${project.id}/chats`)
+      .send({ title: 'Streaming Invalid Provider Priority Chat' });
+    expect(createResponse.status).toBe(201);
+    const chatId = createResponse.body.id;
+
+    const streamResponse = await ownerApi
+      .post(`/api/v1/projects/${project.id}/chats/${chatId}/stream`)
+      .send({
+        message: '   ',
+        provider: 'bad-provider',
+      });
+
+    expect(streamResponse.status).toBe(400);
+    expect(streamResponse.body).toEqual({ error: 'Unsupported provider.' });
+  });
+
+  it('streams chunk events and a done event for stream requests', async () => {
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Streaming SSE Owner',
+      email: 'stream-sse-owner@example.com',
+      role: 'owner',
+    });
+
+    const { project } = await seedWorkspaceFixture({
+      owner: {
+        id: ownerApi.user.id,
+        name: ownerApi.user.name,
+        email: ownerApi.user.email,
+        role: 'owner',
+        avatarUrl: ownerApi.user.avatar,
+      },
+    });
+
+    const createResponse = await ownerApi
+      .post(`/api/v1/projects/${project.id}/chats`)
+      .send({ title: 'Streaming SSE Chat' });
+    expect(createResponse.status).toBe(201);
+    const chatId = createResponse.body.id;
+
+    const generateSpy = vi.spyOn(ChatService.prototype, 'generateResponse').mockImplementation(async (input) => {
+      await input.onChunk?.('hello ');
+      await input.onChunk?.('friend');
+      return {
+        assistantMessageId: 'chat-msg-stream',
+        content: 'hello friend',
+        provider: 'openai',
+        model: 'gpt-4o-mini',
+        toolCalls: undefined,
+        fallback: false,
+      };
+    });
+
+    try {
+      const streamResponse = await ownerApi
+        .post(`/api/v1/projects/${project.id}/chats/${chatId}/stream`)
+        .set('Accept', 'text/event-stream')
+        .send({
+          message: 'How do we ship this?',
+        });
+
+      expect(streamResponse.status).toBe(200);
+      expect(streamResponse.headers['content-type']).toContain('text/event-stream');
+
+      expect(streamResponse.text).toContain('data: {"type":"chunk","delta":"hello "}');
+      expect(streamResponse.text).toContain('data: {"type":"chunk","delta":"friend"}');
+      expect(streamResponse.text).toContain(
+        'data: {"type":"done","message":"hello friend","messageId":"chat-msg-stream","provider":"openai","model":"gpt-4o-mini","fallback":false,"toolCalls":null}',
+      );
+      expect(generateSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      generateSpy.mockRestore();
+    }
+  });
+
+  it('accepts provider values case-insensitively for stream requests', async () => {
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Streaming Case Owner',
+      email: 'stream-case-owner@example.com',
+      role: 'owner',
+    });
+
+    const { project } = await seedWorkspaceFixture({
+      owner: {
+        id: ownerApi.user.id,
+        name: ownerApi.user.name,
+        email: ownerApi.user.email,
+        role: 'owner',
+        avatarUrl: ownerApi.user.avatar,
+      },
+    });
+
+    const createResponse = await ownerApi
+      .post(`/api/v1/projects/${project.id}/chats`)
+      .send({ title: 'Streaming Case Chat' });
+    expect(createResponse.status).toBe(201);
+    const chatId = createResponse.body.id;
+
+    const generateSpy = vi.spyOn(ChatService.prototype, 'generateResponse').mockResolvedValue({
+      assistantMessageId: 'chat-msg-stream-case',
+      content: 'Ready.',
+      provider: 'openai',
+      model: 'gpt-4o-mini',
+      toolCalls: [],
+      fallback: false,
+    });
+
+    try {
+      const streamResponse = await ownerApi
+        .post(`/api/v1/projects/${project.id}/chats/${chatId}/stream`)
+        .send({
+          message: 'How do we ship this?',
+          provider: 'OpEnAI',
+        });
+
+      expect(streamResponse.status).toBe(200);
+      expect(streamResponse.headers['content-type']).toContain('text/event-stream');
+      expect(streamResponse.text).toContain(
+        'data: {"type":"done","message":"Ready.","messageId":"chat-msg-stream-case","provider":"openai","model":"gpt-4o-mini","fallback":false,"toolCalls":[]}',
+      );
+
+      const call = generateSpy.mock.calls[0]?.[0];
+      expect(call?.provider).toBe('openai');
+      expect(generateSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      generateSpy.mockRestore();
+    }
+  });
+
+  it('returns stream error events when generation fails', async () => {
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Streaming Failure Owner',
+      email: 'stream-failure-owner@example.com',
+      role: 'owner',
+    });
+
+    const { project } = await seedWorkspaceFixture({
+      owner: {
+        id: ownerApi.user.id,
+        name: ownerApi.user.name,
+        email: ownerApi.user.email,
+        role: 'owner',
+        avatarUrl: ownerApi.user.avatar,
+      },
+    });
+
+    const createResponse = await ownerApi
+      .post(`/api/v1/projects/${project.id}/chats`)
+      .send({ title: 'Streaming Failure Chat' });
+    expect(createResponse.status).toBe(201);
+    const chatId = createResponse.body.id;
+
+    const generateSpy = vi.spyOn(ChatService.prototype, 'generateResponse').mockRejectedValue(new Error('provider offline'));
+
+    try {
+      const streamResponse = await ownerApi
+        .post(`/api/v1/projects/${project.id}/chats/${chatId}/stream`)
+        .send({
+          message: 'Can you run?',
+        });
+
+      expect(streamResponse.status).toBe(200);
+      expect(streamResponse.headers['content-type']).toContain('text/event-stream');
+      expect(streamResponse.text).toContain('data: {"type":"error","message":"provider offline"}');
+      expect(streamResponse.text).not.toContain('"type":"done"');
+      expect(generateSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      generateSpy.mockRestore();
+    }
   });
 
   it('isolates chats to the owning user within a shared project', async () => {

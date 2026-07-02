@@ -9,14 +9,13 @@ import { env } from '../../env.js';
 import { chatMessages, chatSessions, projects } from '../../db/schema.js';
 import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
 import { authorizeProjectMemberAccess } from '../workspaces/services/membership.js';
-import { ChatService } from './services/chat-service.js';
+import { ChatService, isStreamingChatProvider } from './services/chat-service.js';
 
 const CHAT_ROLES = ['user', 'assistant', 'system'] as const;
 const DEFAULT_CHAT_LIMIT = 20;
 const MAX_CHAT_LIMIT = 100;
 const CHAT_STREAM_RATE_LIMIT_MAX = 30;
 const CHAT_STREAM_RATE_LIMIT_WINDOW_MS = 60_000;
-const CHAT_STREAM_SUPPORTED_PROVIDERS = new Set(['openai', 'anthropic', 'gemini', 'deepseek', 'ollama']);
 
 const createChatStreamLimiter = env.redisEnabled ? createRedisRateLimiter : createRateLimiter;
 const streamLimiter = createChatStreamLimiter({
@@ -482,15 +481,15 @@ export function createChatsRouter() {
       return;
     }
 
-    const userMessage = normalizeChatMessageText(req.body?.message);
-    if (!userMessage) {
-      res.status(400).json({ error: 'Message is required.' });
+    const requestedProvider = normalizeChatProvider(req.body?.provider ?? req.query.provider);
+    if (requestedProvider && !isStreamingChatProvider(requestedProvider)) {
+      res.status(400).json({ error: 'Unsupported provider.' });
       return;
     }
 
-    const requestedProvider = normalizeChatProvider(req.body?.provider ?? req.query.provider);
-    if (requestedProvider && !CHAT_STREAM_SUPPORTED_PROVIDERS.has(requestedProvider)) {
-      res.status(400).json({ error: 'Unsupported provider.' });
+    const userMessage = normalizeChatMessageText(req.body?.message);
+    if (!userMessage) {
+      res.status(400).json({ error: 'Message is required.' });
       return;
     }
 
