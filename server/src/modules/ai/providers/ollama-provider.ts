@@ -79,7 +79,8 @@ export class OllamaProvider implements IAiProvider {
   }
 
   async chat(options: ChatOptions): Promise<{ content: string; toolCalls?: any[] }> {
-    const { model, messages, tools, ollamaUrl: rawOllamaUrl } = options;
+    const { model, messages, tools, ollamaUrl: rawOllamaUrl, onChunk } = options;
+    const streamMode = typeof onChunk === 'function';
     const rawUrl = rawOllamaUrl || 'http://localhost:11434';
     const ollamaUrl = await this.resolveOllamaUrl(rawUrl);
 
@@ -92,7 +93,7 @@ export class OllamaProvider implements IAiProvider {
           body: JSON.stringify({
             model,
             messages: this.mapMessages(messages),
-            stream: false,
+            stream: streamMode,
             ...(tools ? { tools: this.formatTools(tools) } : {}),
           }),
         },
@@ -101,6 +102,10 @@ export class OllamaProvider implements IAiProvider {
 
       if (!response.ok) {
         throw new Error(await readErrorMessage(response, 'Failed to proxy request to Ollama.'));
+      }
+
+      if (streamMode) {
+        return this.consumeStreamingResponse(response, onChunk);
       }
 
       const data = (await response.json()) as any;
@@ -123,6 +128,67 @@ export class OllamaProvider implements IAiProvider {
       this.resolvedUrlCache.delete(normalizeOllamaUrl(rawUrl));
       throw error;
     }
+  }
+
+  private async consumeStreamingResponse(
+    response: Response,
+    onChunk?: (chunk: string) => Promise<void> | void,
+  ): Promise<{ content: string; toolCalls?: any[] }> {
+    if (!response.body) {
+      throw new Error('Provider returned no response body for streaming mode.');
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let content = '';
+    let finalToolCalls: any[] | undefined;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) {
+          continue;
+        }
+
+        let data: any;
+        try {
+          data = JSON.parse(trimmed);
+        } catch (_error) {
+          continue;
+        }
+
+        const chunkContent = data?.message?.content;
+        if (typeof chunkContent === 'string' && chunkContent.length > 0) {
+          content += chunkContent;
+          if (onChunk) {
+            await onChunk(chunkContent);
+          }
+        }
+
+        if (Array.isArray(data?.message?.tool_calls) && data?.message?.tool_calls.length > 0) {
+          finalToolCalls = data.message.tool_calls.map((tc: any, index: number) => ({
+            id: tc.id ?? `${tc.function?.name ?? 'tool'}_${index}`,
+            name: tc.function?.name,
+            arguments: tc.function?.arguments,
+          }));
+        }
+      }
+    }
+
+    return {
+      content,
+      ...(finalToolCalls ? { toolCalls: finalToolCalls } : {}),
+    };
   }
 
   async testConnection(options?: { apiKey?: string; ollamaUrl?: string }): Promise<void> {

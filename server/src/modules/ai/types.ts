@@ -13,6 +13,7 @@ export interface ChatOptions {
   apiKey?: string;
   ollamaUrl?: string;
   maxTokens?: number;
+  onChunk?: (chunk: string) => Promise<void> | void;
 }
 
 export interface IAiProvider {

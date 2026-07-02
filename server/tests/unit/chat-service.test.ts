@@ -155,6 +155,34 @@ describe('ChatService', () => {
     expect(response.provider).toBe('openai');
   });
 
+  it('does not emit synthetic chunks for providers that do not support streaming', async () => {
+    const { userId, chatId, project } = await createChatFixture();
+
+    const ai = {
+      chat: vi.fn().mockResolvedValue({
+        content: 'No streaming for this provider.',
+      }),
+    };
+
+    const chatService = new ChatService({ ai });
+    const chunks: string[] = [];
+    const response = await chatService.generateResponse({
+      projectId: project.id,
+      chatId,
+      userId,
+      provider: 'anthropic',
+      message: 'Can you summarize this?',
+      onChunk: (chunk) => {
+        chunks.push(chunk);
+      },
+    });
+
+    expect(response.content).toBe('No streaming for this provider.');
+    expect(chunks).toEqual([]);
+    const [, , options] = (ai.chat as any).mock.calls[0];
+    expect(options.onChunk).toBeUndefined();
+  });
+
   it('executes MCP tools and continues the conversation after tool output', async () => {
     const { userId, chatId, project } = await createChatFixture();
 

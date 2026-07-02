@@ -16,7 +16,7 @@ const DEFAULT_CHAT_LIMIT = 20;
 const MAX_CHAT_LIMIT = 100;
 const CHAT_STREAM_RATE_LIMIT_MAX = 30;
 const CHAT_STREAM_RATE_LIMIT_WINDOW_MS = 60_000;
-const CHAT_STREAM_ALLOWED_PROVIDERS = new Set(['openai', 'anthropic', 'gemini', 'deepseek', 'ollama']);
+const CHAT_STREAM_ALLOWED_PROVIDERS = new Set(['openai', 'deepseek', 'ollama']);
 
 const createChatStreamLimiter = env.redisEnabled ? createRedisRateLimiter : createRateLimiter;
 const streamLimiter = createChatStreamLimiter({
@@ -467,7 +467,7 @@ export function createChatsRouter() {
     }
   });
 
-  router.get('/projects/:projectId/chats/:chatId/stream', streamLimiter, async (req, res) => {
+  router.post('/projects/:projectId/chats/:chatId/stream', streamLimiter, async (req, res) => {
     const projectId = normalizeRouteParam(req.params.projectId);
     const chatId = normalizeRouteParam(req.params.chatId);
 
@@ -482,15 +482,20 @@ export function createChatsRouter() {
       return;
     }
 
-    const requestedProvider = normalizeChatProvider(req.query.provider ?? req.body?.provider);
+    const requestedProvider = normalizeChatProvider(req.body?.provider ?? req.query.provider);
     if (requestedProvider && !CHAT_STREAM_ALLOWED_PROVIDERS.has(requestedProvider)) {
       res.status(400).json({ error: 'Unsupported provider.' });
       return;
     }
 
-    const userMessage = normalizeChatMessageText(req.query.message ?? req.body?.message ?? req.body?.content);
-    const messageModel = normalizeChatModel(req.query.model ?? req.body?.model);
-    const maxTokens = normalizeChatMaxTokens(req.query.maxTokens ?? req.body?.maxTokens);
+    const userMessage = normalizeChatMessageText(req.body?.message);
+    if (!userMessage) {
+      res.status(400).json({ error: 'Message is required.' });
+      return;
+    }
+
+    const messageModel = normalizeChatModel(req.body?.model ?? req.query.model);
+    const maxTokens = normalizeChatMaxTokens(req.body?.maxTokens ?? req.query.maxTokens);
 
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',

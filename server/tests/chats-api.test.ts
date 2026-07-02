@@ -269,6 +269,40 @@ describe('chat sessions routes', () => {
     expect(unauthorizedMessage.body).toEqual({ error: 'Access denied: not a member of the project.' });
   });
 
+  it('rejects stream requests for providers without streaming support', async () => {
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Streaming Owner',
+      email: 'stream-owner@example.com',
+      role: 'owner',
+    });
+
+    const { project } = await seedWorkspaceFixture({
+      owner: {
+        id: ownerApi.user.id,
+        name: ownerApi.user.name,
+        email: ownerApi.user.email,
+        role: 'owner',
+        avatarUrl: ownerApi.user.avatar,
+      },
+    });
+
+    const createResponse = await ownerApi
+      .post(`/api/v1/projects/${project.id}/chats`)
+      .send({ title: 'Streaming Chat' });
+    expect(createResponse.status).toBe(201);
+    const chatId = createResponse.body.id;
+
+    const streamResponse = await ownerApi
+      .post(`/api/v1/projects/${project.id}/chats/${chatId}/stream`)
+      .send({
+        message: 'What is the current status?',
+        provider: 'anthropic',
+      });
+
+    expect(streamResponse.status).toBe(400);
+    expect(streamResponse.body).toEqual({ error: 'Unsupported provider.' });
+  });
+
   it('isolates chats to the owning user within a shared project', async () => {
     const ownerApi = await createAuthenticatedApi({
       name: 'Project Owner',

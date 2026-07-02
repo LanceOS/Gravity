@@ -24,6 +24,7 @@ type AiClient = {
       tools?: any[];
       ollamaUrl?: string;
       maxTokens?: number;
+      onChunk?: (chunk: string) => Promise<void> | void;
     },
   ): Promise<{ content: string; toolCalls?: any[] }>;
 };
@@ -54,6 +55,14 @@ type ChatGenerationResult = {
   toolCalls?: any[];
   fallback: boolean;
   fallbackReason?: string;
+};
+
+type ChatModelResult = {
+  content: string;
+  toolCalls?: any[];
+  fallback: boolean;
+  fallbackReason?: string;
+  streamed?: boolean;
 };
 
 type ProjectContext = {
@@ -96,6 +105,7 @@ const TOOL_ALIAS_BLOCKS: string[][] = [
 const CHAT_TITLE_DEFAULT = 'New Chat';
 const CHAT_TITLE_MAX_LENGTH = 60;
 const MAX_TOOL_ROUNDS = 2;
+const STREAMING_PROVIDERS = new Set<ChatProvider>(['openai', 'deepseek', 'ollama']);
 
 function normalizeString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -155,6 +165,7 @@ export class ChatService {
 
     const resolvedProvider = this.resolveProvider(input.provider, settings.aiProvider);
     const resolvedModel = this.resolveModel(resolvedProvider, input.model, settings);
+    const supportsStreaming = this.providerSupportsStreaming(resolvedProvider);
 
     const requestOllamaUrl = resolvedProvider === 'ollama' ? settings.ollamaEndpoint : undefined;
     if (requestOllamaUrl) {
@@ -221,9 +232,11 @@ export class ChatService {
       maxTokens: input.maxTokens,
       messages: conversation,
       toolDefinitions: activeToolDefs,
+      onChunk: input.onChunk,
+      enableStreaming: supportsStreaming,
     });
 
-    if (input.onChunk) {
+    if (input.onChunk && supportsStreaming && modelResult.streamed === false && modelResult.content.length > 0) {
       const chunkSize = Math.max(1, env.aiStreamChunkSize ?? 48);
       for (let i = 0; i < modelResult.content.length; i += chunkSize) {
         await input.onChunk(modelResult.content.slice(i, i + chunkSize));
@@ -403,8 +416,19 @@ Only operate in the workspace/project above.`,
     maxTokens?: number;
     messages: AiMessage[];
     toolDefinitions: any[];
-  }) {
+    onChunk?: (chunk: string) => Promise<void> | void;
+    enableStreaming: boolean;
+  }): Promise<ChatModelResult> {
     let messages: Message[] = [...params.messages];
+    let streamedFromModel = false;
+    const streamCallback = params.onChunk
+      ? params.enableStreaming
+        ? async (chunk: string) => {
+            streamedFromModel = true;
+            await params.onChunk?.(chunk);
+          }
+        : undefined
+      : undefined;
 
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
       try {
@@ -414,6 +438,7 @@ Only operate in the workspace/project above.`,
           tools: params.toolDefinitions,
           ...(params.ollamaUrl ? { ollamaUrl: params.ollamaUrl } : {}),
           ...(typeof params.maxTokens === 'number' ? { maxTokens: params.maxTokens } : {}),
+          ...(streamCallback ? { onChunk: streamCallback } : {}),
         });
 
         if (!modelResponse.toolCalls || modelResponse.toolCalls.length === 0) {
@@ -422,6 +447,7 @@ Only operate in the workspace/project above.`,
             toolCalls: modelResponse.toolCalls,
             fallback: false,
             fallbackReason: undefined,
+            streamed: params.enableStreaming ? streamedFromModel : false,
           };
         }
 
@@ -466,6 +492,7 @@ Only operate in the workspace/project above.`,
           toolCalls: undefined,
           fallback: true,
           fallbackReason: this.toFallbackReason(error),
+          streamed: false,
         };
       }
     }
@@ -475,6 +502,7 @@ Only operate in the workspace/project above.`,
       toolCalls: undefined,
       fallback: true,
       fallbackReason: 'tool_loop_limit',
+      streamed: false,
     };
   }
 
@@ -517,6 +545,10 @@ Only operate in the workspace/project above.`,
     }
 
     return typeof value === 'object' ? value : {};
+  }
+
+  private providerSupportsStreaming(provider: ChatProvider): boolean {
+    return STREAMING_PROVIDERS.has(provider);
   }
 
   private async appendMessage(
