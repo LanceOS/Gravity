@@ -910,6 +910,37 @@ describe('AppShellPage', () => {
     expect(screen.queryByText('SEC-401')).not.toBeInTheDocument();
   });
 
+  it('returns to the original shared route when retrying from the workspace access error page', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: '/workspace-access-error',
+            state: { from: '/workspaces/workspace-private/projects/project-secret/tickets/SEC-401' },
+          } as any,
+        ]}
+      >
+        <LocationDisplay />
+        <Routes>
+          <Route
+            path="/workspaces/workspace-private/projects/project-secret/tickets/SEC-401"
+            element={<div>Original shared route</div>}
+          />
+          <Route path="/workspace-access-error" element={<WorkspaceAccessErrorView />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('location-display').textContent).toBe('/workspaces/workspace-private/projects/project-secret/tickets/SEC-401');
+      expect(screen.getByText('Original shared route')).toBeInTheDocument();
+    });
+  });
+
   it('routes signed-in users without workspaces to the directory page', async () => {
     renderAppShell({
       directory: buildWorkspaceDirectory({ workspaces: [] }),

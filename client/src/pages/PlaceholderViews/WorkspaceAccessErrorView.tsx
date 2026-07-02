@@ -1,7 +1,11 @@
 import { RefreshCcw } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 export default function WorkspaceAccessErrorView() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const from = (location.state as { from?: string } | null)?.from;
+
   return (
     <main
       style={{
@@ -64,7 +68,7 @@ export default function WorkspaceAccessErrorView() {
           </Link>
           <button
             type="button"
-            onClick={() => window.location.reload()}
+            onClick={() => navigate(from || '/workspaces', { replace: true })}
             style={{
               display: 'inline-flex',
               alignItems: 'center',

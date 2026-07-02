@@ -572,6 +572,7 @@ export function WorkspaceShellPage() {
       routeAggregateDetailTickets,
     ]
   );
+  const sharedLinkFallbackRoute = `${pathname}${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
   const ticketCountsByProject = useMemo(() => {
     return createWorkspaceProjectCounts(
       activeWorkspaceProjects,
@@ -878,7 +879,7 @@ export function WorkspaceShellPage() {
 
   if (route.workspaceId && workspacesResolvedForCurrentUser && !workspacesLoading) {
     if (workspaceDirectoryError) {
-      return <Navigate to="/workspace-access-error" replace />;
+      return <Navigate to="/workspace-access-error" replace state={{ from: sharedLinkFallbackRoute }} />;
     }
 
     if (!workspacesById.has(route.workspaceId)) {
