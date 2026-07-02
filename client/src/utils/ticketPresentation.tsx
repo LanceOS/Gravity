@@ -19,19 +19,26 @@ export const PRIORITY_COLOR_BY_PRIORITY: Record<Ticket['priority'], string> = {
   no_priority: 'transparent',
 };
 
+const priorityIconsBySize = new Map<number, Record<Ticket['priority'], ReactNode>>();
+
+function buildPriorityIconsBySize(size: number): Record<Ticket['priority'], ReactNode> {
+  return {
+    urgent: <TriangleAlert size={size} className="priority-urgent" />,
+    high: <ArrowUp size={size} className="priority-high" />,
+    medium: <ArrowRight size={size} className="priority-medium" />,
+    low: <ArrowDown size={size} className="priority-low" />,
+    no_priority: <MinusCircle size={size} className="priority-no" />,
+  };
+}
+
 export const getPriorityIcon = (priority: Ticket['priority'], size = 12): ReactNode => {
-  switch (priority) {
-    case 'urgent':
-      return <TriangleAlert size={size} className="priority-urgent" />;
-    case 'high':
-      return <ArrowUp size={size} className="priority-high" />;
-    case 'medium':
-      return <ArrowRight size={size} className="priority-medium" />;
-    case 'low':
-      return <ArrowDown size={size} className="priority-low" />;
-    default:
-      return <MinusCircle size={size} className="priority-no" />;
+  let icons = priorityIconsBySize.get(size);
+  if (!icons) {
+    icons = buildPriorityIconsBySize(size);
+    priorityIconsBySize.set(size, icons);
   }
+
+  return icons[priority];
 };
 
 export const getPriorityColor = (priority: Ticket['priority']) =>
@@ -51,4 +58,3 @@ export const getStatusLabel = (status: Ticket['status']) => {
 
 export const getStatusColor = (status: Ticket['status']) =>
   STATUS_COLOR_MAP[status] ?? 'var(--color-text-disabled)';
-

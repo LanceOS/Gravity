@@ -393,6 +393,100 @@ export function useQuery<T>({ queryKey, queryFn, enabled = true, staleTime, gcTi
   };
 }
 
+interface UseQueriesOptions {
+  queries: Array<{
+    queryKey: QueryKey;
+    queryFn?: () => Promise<any>;
+    enabled?: boolean;
+    staleTime?: number;
+    gcTime?: number;
+  }>;
+}
+
+export function useQueries({ queries }: UseQueriesOptions) {
+  const client = useQueryClient();
+
+  const serializedKeys = JSON.stringify(queries.map((q) => q.queryKey));
+  const lastResultsRef = useRef<any[]>([]);
+
+  const getSnapshot = useCallback(() => {
+    const nextResults = queries.map((q) => {
+      const queryState = client.getOrCreateQuery(q.queryKey, { staleTime: q.staleTime, gcTime: q.gcTime });
+      return {
+        data: queryState.data,
+        error: queryState.error,
+        isLoading: queryState.status === 'pending' && queryState.fetchStatus === 'fetching',
+        isFetching: queryState.fetchStatus === 'fetching',
+        isError: queryState.status === 'error',
+        isSuccess: queryState.status === 'success',
+      };
+    });
+
+    const isEquivalent =
+      nextResults.length === lastResultsRef.current.length &&
+      nextResults.every((res, idx) => {
+        const prev = lastResultsRef.current[idx];
+        if (!prev) return false;
+        return (
+          res.data === prev.data &&
+          res.error === prev.error &&
+          res.isLoading === prev.isLoading &&
+          res.isFetching === prev.isFetching &&
+          res.isError === prev.isError &&
+          res.isSuccess === prev.isSuccess
+        );
+      });
+
+    if (isEquivalent) {
+      return lastResultsRef.current;
+    }
+
+    const resultsWithRefetch = nextResults.map((res, idx) => ({
+      ...res,
+      refetch: () => {
+        const q = queries[idx];
+        if (q && q.queryFn) {
+          client.fetchQuery(q.queryKey, q.queryFn, { staleTime: q.staleTime, gcTime: q.gcTime }).catch(console.error);
+        }
+      },
+    }));
+
+    lastResultsRef.current = resultsWithRefetch;
+    return resultsWithRefetch;
+  }, [client, serializedKeys]);
+
+  const subscribe = useCallback((callback: () => void) => {
+    const unsubscribes = queries.map((q) => client.subscribe(q.queryKey, callback));
+    return () => {
+      unsubscribes.forEach((unsub) => unsub());
+    };
+  }, [client, serializedKeys]);
+
+  const results = useSyncExternalStore(
+    subscribe,
+    getSnapshot,
+    getSnapshot
+  );
+
+  useEffect(() => {
+    queries.forEach((q) => {
+      const state = client.getOrCreateQuery(q.queryKey, { staleTime: q.staleTime, gcTime: q.gcTime });
+      const enabled = q.enabled ?? true;
+      const sTime = q.staleTime ?? 0;
+      const isStale = sTime === Infinity ? false : (state.updatedAt ? Date.now() - state.updatedAt >= sTime : true);
+
+      if (enabled && state.fetchStatus === 'idle') {
+        const shouldFetch = state.status === 'pending' || isStale;
+        if (shouldFetch && q.queryFn) {
+          client.fetchQuery(q.queryKey, q.queryFn, { staleTime: q.staleTime, gcTime: q.gcTime }).catch(console.error);
+        }
+      }
+    });
+  }, [serializedKeys, client]);
+
+  return results;
+}
+
 // --- useMutation Hook ---
 
 interface UseMutationOptions<TData, TVariables, TContext> {

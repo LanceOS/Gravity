@@ -4,6 +4,7 @@ import { apiClient } from '../../utils/apiClient';
 import { queryKeys, CACHE_CONFIGS } from '../../utils/queryClient';
 import { useActiveProject } from '../project/ActiveProjectContext';
 import { useAuth } from '../auth/AuthContext';
+import { TicketFiltersContext } from '../filters/TicketFiltersContext';
 import type { CycleContextType } from './CycleContext.types';
 import type { Cycle } from '../../types/domain';
 
@@ -20,11 +21,13 @@ export const useCycles = () => {
 export const CycleProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { activeProjectId } = useActiveProject();
   const { currentUser } = useAuth();
+  const filtersContext = useContext(TicketFiltersContext);
+  const isProjectScopeAligned = !filtersContext || filtersContext.filters.projectId === activeProjectId;
 
   const cyclesQuery = useQuery({
     queryKey: queryKeys.cycles(activeProjectId),
     queryFn: () => apiClient.get<Cycle[]>(`/cycles`, { projectId: activeProjectId }),
-    enabled: !!activeProjectId && !!currentUser,
+    enabled: !!activeProjectId && isProjectScopeAligned && !!currentUser,
     ...CACHE_CONFIGS.metadata,
   });
 

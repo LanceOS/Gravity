@@ -37,6 +37,14 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
     () => labels.filter((label) => label.projectId === projectId || !label.projectId),
     [labels, projectId],
   );
+  const projectLabelIds = useMemo(
+    () => new Set(projectLabels.map((label) => label.id)),
+    [projectLabels],
+  );
+  const labelById = useMemo(
+    () => new Map(labels.map((label) => [label.id, label] as const)),
+    [labels],
+  );
 
   const { createLabel } = useLabels();
 
@@ -61,8 +69,8 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
   // avoids cascading renders.
 
   useEffect(() => {
-    setLabelIds((currentLabelIds) => currentLabelIds.filter((labelId) => projectLabels.some((label) => label.id === labelId)));
-  }, [projectLabels]);
+    setLabelIds((currentLabelIds) => currentLabelIds.filter((labelId) => projectLabelIds.has(labelId)));
+  }, [projectLabelIds]);
 
   const handleSubmit = useCallback(async (e?: React.SubmitEvent<HTMLFormElement>) => {
     if (e) e.preventDefault();
@@ -213,7 +221,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
                   {labelIds.length > 0 && (
                     labelIds.map((id) => {
-                      const label = labels.find((l) => l.id === id);
+                      const label = labelById.get(id);
                       if (!label) return null;
                       return (
                         <LabelBadge
@@ -248,7 +256,8 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
                           fontWeight: 550,
                           cursor: 'pointer',
                           height: '20px',
-                          transition: 'all 150ms ease',
+                          transition:
+                            'border-color var(--transition-fast), color var(--transition-fast), background-color var(--transition-fast)',
                         }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.borderColor = 'var(--color-primary)';

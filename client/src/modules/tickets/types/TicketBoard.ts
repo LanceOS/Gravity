@@ -18,7 +18,8 @@ export interface TicketCardProps {
   ticket: Ticket;
   onClick: () => void;
   onDragStart: (event: DragEvent) => void;
-  priorityIcon: ReactNode;
+  priority: Ticket['priority'];
+  priorityIcon?: ReactNode;
   priorityColor: string;
   assigneeAvatar: string | null;
 }

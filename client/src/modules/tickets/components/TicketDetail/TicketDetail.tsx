@@ -1,10 +1,19 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import type { Ticket } from '../../../../context/TicketContextContext';
-import { Button, Select, MarkdownEditor, RichTextEditor, toast, ClickAwayListener, Accordion, Popover, createEmptyRichTextValue, isRichTextEmpty, serializeRichTextMarkdown } from '@library';
+import {
+  Button,
+  MarkdownEditor,
+  RichTextEditor,
+  toast,
+  Accordion,
+  createEmptyRichTextValue,
+} from '@library';
 import generateBranchName from '../../../../utils/branch';
-import TicketUtilities from '../TicketUtilities/TicketUtilities';
 import { safeAnime, prefersReducedMotion } from '../../../../utils/animationUtils';
 import anime from 'animejs';
+import { TicketPropertiesGrid } from './components/TicketPropertiesGrid';
+import { TicketSubtasksChecklist } from './components/TicketSubtasksChecklist';
+import { TicketCommentsThread } from './components/TicketCommentsThread';
 
 const DEFAULT_TICKET_URL_BASE = 'https://tickets.placeholder.local';
 
@@ -71,23 +80,13 @@ function sanitizeTicketUrlBase(raw?: string): string {
 
 const TICKET_URL_BASE = sanitizeTicketUrlBase((typeof import.meta !== 'undefined' && (import.meta as unknown as { env?: Record<string, string | undefined> }).env?.VITE_TICKET_URL_BASE) || undefined);
 import {
-  GitPullRequest, GitMerge, Send, Trash2,
-  Plus, Edit3, ChevronLeft, MoreHorizontal, Link, FileText, CornerLeftUp
+  Trash2, Plus, ChevronLeft, CornerLeftUp
 } from 'lucide-react';
-import { MarkdownContent } from '../MarkdownContent';
-import { CommentEditor } from '../CommentEditor/CommentEditor';
-import { TicketRow } from '../TicketRow';
-import { TicketRowMobile } from '../TicketRowMobile/TicketRowMobile';
-import { getPriorityIcon, getAssigneeAvatar } from '../../utils/TicketList';
 import type { TicketDetailProps } from '../../types/TicketDetail';
-import { PRIORITY_OPTIONS, STATUS_OPTIONS } from '../../utils/TicketDetail';
-import { useLabels } from '../../../../context/label/LabelContext';
-import { LabelBadge } from '../LabelBadge';
-import { SearchableOptionPickerPopoverContent } from '../SearchableOptionPickerPopoverContent';
 import { TicketContextMenu } from '../TicketContextMenu';
-import { TicketRelationsSection } from './TicketRelationsSection';
 import { WorkspacePageLayout } from '../../../../layouts/WorkspacePageLayout/WorkspacePageLayout';
 import { ConfirmDialog } from '../../../../components/ConfirmDialog';
+import { useIsMobileTicketLayout } from '../useMobileTicketLayout';
 import './TicketDetail.css';
 
 function TicketDescriptionEditor({ 
@@ -222,6 +221,8 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
 }) => {
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const isMobileTicketLayout = useIsMobileTicketLayout();
+  const userAvatarById = useMemo(() => Object.fromEntries(users.map((user) => [user.id, user.avatar])), [users]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -259,66 +260,6 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
       }
     });
   }, [onClose]);
-
-  const { assignLabelToTicket, unassignLabelFromTicket, createLabel: createLabelInContext } = useLabels();
-
-  const handleAssignLabel = useCallback(async (labelId: string) => {
-    await assignLabelToTicket(activeTicket.id, labelId);
-  }, [assignLabelToTicket, activeTicket.id]);
-
-  const handleUnassignLabel = useCallback(async (labelId: string) => {
-    await unassignLabelFromTicket(activeTicket.id, labelId);
-  }, [unassignLabelFromTicket, activeTicket.id]);
-
-  const labelOptions = useMemo(() => {
-    return labels
-      .filter((label) => label.projectId === activeTicket.projectId || !label.projectId)
-      .map((label) => ({
-        id: label.id,
-        label: label.name,
-        description: label.description || undefined,
-        color: label.color,
-        searchText: [label.name, label.description].filter(Boolean).join(' '),
-      }));
-  }, [labels, activeTicket.projectId]);
-
-  const handleCreateLabel = useCallback(async (name: string, color: string) => {
-    const newLabel = await createLabelInContext({
-      name,
-      color,
-      projectId: activeTicket.projectId,
-      description: '',
-    });
-    if (newLabel) {
-      await assignLabelToTicket(activeTicket.id, newLabel.id);
-    }
-  }, [createLabelInContext, assignLabelToTicket, activeTicket.id, activeTicket.projectId]);
-
-  const handleToggleLabel = useCallback(async (labelId: string, isSelected: boolean) => {
-    if (isSelected) {
-      await handleUnassignLabel(labelId);
-      return;
-    }
-
-    await handleAssignLabel(labelId);
-  }, [handleAssignLabel, handleUnassignLabel]);
-
-  const renderAddRelationTrigger = (buttonLabel: string) => (
-    <button
-      type="button"
-      className="ticket-detail__inline-trigger"
-    >
-      <Plus size={10} />
-      <span>{buttonLabel}</span>
-    </button>
-  );
-
-  const [openMenuCommentId, setOpenMenuCommentId] = useState<string | null>(null);
-  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
-  const [editingCommentBody, setEditingCommentBody] = useState<string>('');
-  const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
-
-  const closeCommentMenu = useCallback(() => setOpenMenuCommentId(null), []);
 
   const ticketLink = useMemo(() => customTicketLink || `${TICKET_URL_BASE}/${activeTicket.key}`, [customTicketLink, activeTicket.key]);
 
@@ -358,185 +299,27 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
     setIsDeleteConfirmOpen(false);
   };
 
-  const assigneeOptions = [{ value: '', label: 'Unassigned' }, ...users.map((user) => ({ value: user.id, label: user.name }))];
-  const projectOptions = projects.map((project) => ({ value: project.id, label: project.name }));
-  const cycleOptions = [{ value: '', label: 'No Cycle' }, ...cycles.map((cycle) => ({ value: cycle.id, label: cycle.name }))];
-
   const propertiesContent = (
-    <div className="ticket-detail__properties-grid">
-      <TicketUtilities
-        ticketLink={ticketLink}
-        generatedBranchName={generatedBranchName}
-        description={activeTicket.description || ''}
-        onCopy={copyToClipboard}
-      />
-
-      <div>
-        <span className="label">Ticket Key</span>
-        <span style={{ fontFamily: 'var(--mono)', fontSize: '15px', fontWeight: 600, color: 'var(--color-primary)', display: 'block', marginTop: '6px' }}>
-          {activeTicket.key}
-        </span>
-      </div>
-
-      <div>
-        <span className="label">Status</span>
-        <Select
-          value={activeTicket.status}
-          onValueChange={(nextStatus: string) => onUpdateTicket(activeTicket.id, { status: nextStatus as Ticket['status'] })}
-          options={STATUS_OPTIONS}
-          aria-label="Select ticket status"
-        />
-      </div>
-
-      <div>
-        <span className="label" style={{ marginBottom: '8px', display: 'block' }}>Labels</span>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
-          {activeTicket.labels && activeTicket.labels.length > 0 ? (
-            activeTicket.labels.map((l) => (
-              <LabelBadge
-                key={l.id}
-                label={l}
-                size="sm"
-                onRemove={() => handleUnassignLabel(l.id)}
-              />
-            ))
-          ) : (
-            <span style={{ fontSize: '12px', color: 'var(--color-text-disabled)', fontStyle: 'italic' }}>
-              No labels assigned
-            </span>
-          )}
-
-          <Popover
-            align="center"
-            contentClassName="ticket-detail__label-popover"
-            trigger={renderAddRelationTrigger('Add Label')}
-          >
-            <SearchableOptionPickerPopoverContent
-              title="Search or Create Label"
-              searchPlaceholder="Type to search or create..."
-              options={labelOptions}
-              selectedIds={new Set(activeTicket.labels?.map((l) => l.id) || [])}
-              onToggle={handleToggleLabel}
-              onCreate={handleCreateLabel}
-              createHeading="CREATE NEW LABEL:"
-              emptyStateLabel="No matching labels"
-            />
-          </Popover>
-        </div>
-      </div>
-
-      <div>
-        <span className="label">Priority</span>
-        <Select
-          value={activeTicket.priority}
-          onValueChange={(nextPriority: string) => onUpdateTicket(activeTicket.id, { priority: nextPriority as Ticket['priority'] })}
-          options={PRIORITY_OPTIONS}
-          aria-label="Select ticket priority"
-        />
-      </div>
-
-      <div>
-        <span className="label">Assignee</span>
-        <Select
-          value={activeTicket.assigneeId || ''}
-          onValueChange={(nextAssigneeId: string) => onUpdateTicket(activeTicket.id, { assigneeId: nextAssigneeId || null })}
-          options={assigneeOptions}
-          aria-label="Select ticket assignee"
-        />
-      </div>
-
-      <div>
-        <span className="label">Project</span>
-        <Select
-          value={activeTicket.projectId}
-          options={projectOptions}
-          aria-label="Select ticket project"
-          disabled
-        />
-        <div style={{ marginTop: '6px', fontSize: '11px', color: 'var(--color-text-disabled)', lineHeight: '1.4' }}>
-          Project moves are managed outside ticket details to keep ticket keys and related project data consistent.
-        </div>
-      </div>
-
-
-
-      <div>
-        <span className="label">Cycle / Milestone</span>
-        <Select
-          value={activeTicket.cycleId || ''}
-          onValueChange={(nextCycleId: string) => onUpdateTicket(activeTicket.id, { cycleId: nextCycleId || null })}
-          options={cycleOptions}
-          aria-label="Select ticket cycle"
-        />
-      </div>
-
-      <TicketRelationsSection
-        activeTicket={activeTicket}
-        activeTicketDetail={activeTicketDetail}
-        availableTickets={availableTickets}
-        ticketsById={ticketsById}
-        parentTicket={parentTicket}
-        users={users}
-        onSelectTicket={onSelectTicket}
-        onAddDependency={onAddDependency}
-        onRemoveDependency={onRemoveDependency}
-        onAddBlocker={onAddBlocker}
-        onRemoveBlocker={onRemoveBlocker}
-      />
-
-      <div style={{ gridColumn: '1 / -1', borderTop: '1px solid var(--color-border-default)', paddingTop: '16px', marginTop: '8px' }}>
-        <span className="label" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-          <GitPullRequest size={12} />
-          <span>GitHub Connection</span>
-        </span>
-
-        {activeTicket.prStatus !== 'none' ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '6px' }}>
-            <a
-              href={activeTicket.prUrl || '#'}
-              target="_blank"
-              rel="noreferrer"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px',
-                padding: '8px',
-                borderRadius: '6px',
-                background: activeTicket.prStatus === 'merged' ? 'rgba(16,185,129,0.1)' : 'rgba(59,130,246,0.1)',
-                border: `1px solid ${activeTicket.prStatus === 'merged' ? '#10b981' : '#3b82f6'}30`,
-                color: activeTicket.prStatus === 'merged' ? '#10b981' : '#3b82f6',
-                textDecoration: 'none',
-                fontWeight: 500,
-                fontSize: '12px'
-              }}
-              className="clickable"
-            >
-              {activeTicket.prStatus === 'merged' ? <GitMerge size={14} /> : <GitPullRequest size={14} />}
-              <span>PR Status: {activeTicket.prStatus.toUpperCase()}</span>
-            </a>
-            <span style={{ fontSize: '10px', color: 'var(--color-text-disabled)', textAlign: 'center' }}>
-              Auto-updated via webhook hooks
-            </span>
-          </div>
-        ) : (
-          <div
-            style={{
-              fontSize: '11px',
-              color: 'var(--color-text-disabled)',
-              background: 'rgba(255,255,255,0.01)',
-              border: '1px dashed var(--color-border-default)',
-              borderRadius: '6px',
-              padding: '10px',
-              marginTop: '6px',
-              lineHeight: '1.4'
-            }}
-          >
-            No PR linked. Mention key <strong>{activeTicket.key}</strong> in PR title or branch (e.g. <code>feature/{activeTicket.key}-auth</code>) to link automatically.
-          </div>
-        )}
-      </div>
-    </div>
+    <TicketPropertiesGrid
+      activeTicket={activeTicket}
+      activeTicketDetail={activeTicketDetail}
+      availableTickets={availableTickets}
+      ticketsById={ticketsById}
+      parentTicket={parentTicket}
+      users={users}
+      projects={projects}
+      labels={labels}
+      cycles={cycles}
+      ticketLink={ticketLink}
+      generatedBranchName={generatedBranchName}
+      onSelectTicket={onSelectTicket}
+      onUpdateTicket={onUpdateTicket}
+      onAddDependency={onAddDependency}
+      onRemoveDependency={onRemoveDependency}
+      onAddBlocker={onAddBlocker}
+      onRemoveBlocker={onRemoveBlocker}
+      copyToClipboard={copyToClipboard}
+    />
   );
   return (
     <div ref={containerRef} style={{ height: '100%', width: '100%', display: 'flex', flexDirection: 'column', flex: '1 1 auto', overflow: 'hidden' }}>
@@ -641,286 +424,25 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
               </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--color-border-default)', paddingBottom: '6px' }}>
-                <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase' }}>
-                  Sub-tasks Checklist
-                </span>
+            <TicketSubtasksChecklist
+              activeTicket={activeTicket}
+              subtasks={subtasks}
+              completedSubtasks={completedSubtasks}
+              subtaskProgressPercent={subtaskProgressPercent}
+              userAvatarById={userAvatarById}
+              isMobileTicketLayout={isMobileTicketLayout}
+              onSelectTicket={onSelectTicket}
+              onOpenCreateSubtask={onOpenCreateSubtask}
+            />
 
-                <Button
-                  onClick={() => onOpenCreateSubtask(activeTicket.id)}
-                  variant="ghost"
-                  size="sm"
-                  style={{ marginLeft: 'auto', padding: '2px 8px', fontSize: '11px' }}
-                >
-                  <Plus size={12} />
-                  <span>Add Subtask</span>
-                </Button>
-              </div>
-
-              {subtasks.length > 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ flex: 1, height: '4px', background: 'var(--color-border-default)', borderRadius: '2px', overflow: 'hidden' }}>
-                      <div style={{ width: `${subtaskProgressPercent}%`, height: '100%', background: 'var(--color-primary)', transition: 'width 0.2s ease' }} />
-                    </div>
-                    <span style={{ fontSize: '11px', color: 'var(--color-text-disabled)', whiteSpace: 'nowrap' }}>
-                      {completedSubtasks} of {subtasks.length} ({Math.round(subtaskProgressPercent)}%)
-                    </span>
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {(() => {
-                      const userAvatarById = Object.fromEntries(users.map((u) => [u.id, u.avatar]));
-                      return subtasks.map((sub) => {
-                        const rowProps = {
-                          ticket: sub,
-                          onClick: onSelectTicket,
-                          priorityIcon: getPriorityIcon(sub.priority),
-                          assigneeAvatar: getAssigneeAvatar(userAvatarById, sub.assigneeId),
-                        };
-                        return (
-                          <React.Fragment key={sub.id}>
-                            <div className="ticket-list__row-desktop">
-                              <TicketRow {...rowProps} />
-                            </div>
-                            <div className="ticket-list__row-mobile">
-                              <TicketRowMobile {...rowProps} />
-                            </div>
-                          </React.Fragment>
-                        );
-                      });
-                    })()}
-                  </div>
-
-                </div>
-              ) : (
-                <div style={{ fontSize: '12px', color: 'var(--color-text-disabled)', fontStyle: 'italic', padding: '8px 4px' }}>
-                  No sub-tasks defined. Break complex tasks down to improve trackability.
-                </div>
-              )}
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
-              <div style={{ borderBottom: '1px solid var(--color-border-default)', paddingBottom: '6px' }}>
-                <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase' }}>
-                  Activity Thread ({comments.length})
-                </span>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {comments.map((comment) => (
-                  <div key={comment.id} id={`comment-${comment.id}`} style={{ display: 'flex', gap: '12px' }}>
-                    <img
-                      src={comment.userAvatar || 'https://api.dicebear.com/7.x/bottts/svg?seed=guest'}
-                      alt={comment.userName}
-                      style={{ width: '24px', height: '24px', borderRadius: '50%', border: '1px solid var(--color-border-default)' }}
-                    />
-
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-primary)' }}>{comment.userName || 'Member'}</span>
-                          <span style={{ fontSize: '10px', color: 'var(--color-text-disabled)' }}>
-                            {new Date(comment.createdAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                        </div>
-
-                        <ClickAwayListener onClickAway={closeCommentMenu} active={openMenuCommentId === comment.id}>
-                          <div style={{ position: 'relative' }}>
-                            <button
-                              type="button"
-                              onClick={() => setOpenMenuCommentId(openMenuCommentId === comment.id ? null : comment.id)}
-                              style={{
-                                background: 'none',
-                                border: 'none',
-                                color: openMenuCommentId === comment.id ? 'var(--color-text-secondary)' : 'var(--color-text-disabled)',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                padding: '4px',
-                                borderRadius: 'var(--radius-xs)',
-                                transition: 'color var(--transition-fast), background var(--transition-fast)'
-                              }}
-                              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-secondary)'; e.currentTarget.style.background = 'var(--color-base100)'; }}
-                              onMouseLeave={(e) => { e.currentTarget.style.color = openMenuCommentId === comment.id ? 'var(--color-text-secondary)' : 'var(--color-text-disabled)'; e.currentTarget.style.background = 'none'; }}
-                              aria-label="Comment options"
-                            >
-                              <MoreHorizontal size={14} />
-                            </button>
-
-                            {openMenuCommentId === comment.id && (
-                              <div
-                                style={{
-                                  position: 'absolute',
-                                  top: 'calc(100% + 4px)',
-                                  right: 0,
-                                  zIndex: 200,
-                                  minWidth: '172px',
-                                  background: 'var(--color-surface-card)',
-                                  border: '1px solid var(--color-border-default)',
-                                  borderRadius: 'var(--radius-sm)',
-                                  boxShadow: 'var(--shadow-lg)',
-                                  padding: '4px',
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  gap: '1px',
-                                }}
-                              >
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setEditingCommentId(comment.id);
-                                    setEditingCommentBody(comment.body);
-                                    setOpenMenuCommentId(null);
-                                  }}
-                                  style={{
-                                    display: 'flex', alignItems: 'center', gap: '8px',
-                                    width: '100%', padding: '7px 10px',
-                                    background: 'none', border: 'none',
-                                    borderRadius: 'var(--radius-xs)',
-                                    color: 'var(--color-text-secondary)', cursor: 'pointer',
-                                    textAlign: 'left', fontSize: '12px',
-                                    transition: 'background var(--transition-fast)',
-                                  }}
-                                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-base100)'; }}
-                                  onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
-                                >
-                                  <Edit3 size={13} style={{ color: 'var(--color-text-disabled)', flexShrink: 0 }} />
-                                  <span>Edit Comment</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const url = `${window.location.origin}${window.location.pathname}#comment-${comment.id}`;
-                                    void copyToClipboard(url, 'Comment link copied');
-                                    setOpenMenuCommentId(null);
-                                  }}
-                                  style={{
-                                    display: 'flex', alignItems: 'center', gap: '8px',
-                                    width: '100%', padding: '7px 10px',
-                                    background: 'none', border: 'none',
-                                    borderRadius: 'var(--radius-xs)',
-                                    color: 'var(--color-text-secondary)', cursor: 'pointer',
-                                    textAlign: 'left', fontSize: '12px',
-                                    transition: 'background var(--transition-fast)',
-                                  }}
-                                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-base100)'; }}
-                                  onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
-                                >
-                                  <Link size={13} style={{ color: 'var(--color-text-disabled)', flexShrink: 0 }} />
-                                  <span>Grab Link</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    void copyToClipboard(serializeRichTextMarkdown(comment.body), 'Comment copied');
-                                    setOpenMenuCommentId(null);
-                                  }}
-                                  style={{
-                                    display: 'flex', alignItems: 'center', gap: '8px',
-                                    width: '100%', padding: '7px 10px',
-                                    background: 'none', border: 'none',
-                                    borderRadius: 'var(--radius-xs)',
-                                    color: 'var(--color-text-secondary)', cursor: 'pointer',
-                                    textAlign: 'left', fontSize: '12px',
-                                    transition: 'background var(--transition-fast)',
-                                  }}
-                                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-base100)'; }}
-                                  onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
-                                >
-                                  <FileText size={13} style={{ color: 'var(--color-text-disabled)', flexShrink: 0 }} />
-                                  <span>Copy Markdown</span>
-                                </button>
-
-                                <div style={{ height: '1px', background: 'var(--color-border-default)', margin: '3px 6px' }} />
-
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setDeletingCommentId(comment.id);
-                                    setOpenMenuCommentId(null);
-                                  }}
-                                  style={{
-                                    display: 'flex', alignItems: 'center', gap: '8px',
-                                    width: '100%', padding: '7px 10px',
-                                    background: 'none', border: 'none',
-                                    borderRadius: 'var(--radius-xs)',
-                                    color: 'var(--color-error)', cursor: 'pointer',
-                                    textAlign: 'left', fontSize: '12px',
-                                    transition: 'background var(--transition-fast)',
-                                  }}
-                                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-bg-error)'; }}
-                                  onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
-                                >
-                                  <Trash2 size={13} style={{ flexShrink: 0 }} />
-                                  <span>Delete Comment</span>
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        </ClickAwayListener>
-                      </div>
-
-                      <div
-                        style={{
-                          fontSize: '13px',
-                          color: 'var(--color-text-secondary)',
-                          background: 'var(--color-surface-card)',
-                          border: '1px solid var(--color-border-default)',
-                          borderRadius: '6px',
-                          padding: '10px 14px',
-                          lineHeight: '1.5'
-                        }}
-                      >
-                        {editingCommentId === comment.id ? (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
-                            <CommentEditor
-                              value={editingCommentBody}
-                              onChange={setEditingCommentBody}
-                              placeholder="Edit comment..."
-                              autoFocus
-                            />
-                            <div style={{ display: 'flex', gap: '6px', alignSelf: 'flex-end' }}>
-                              <Button
-                                onClick={async () => {
-                                  if (!isRichTextEmpty(editingCommentBody)) {
-                                    await onUpdateComment(activeTicket.id, comment.id, editingCommentBody);
-                                    setEditingCommentId(null);
-                                  }
-                                }}
-                                variant="primary"
-                                size="sm"
-                                style={{ padding: '2px 8px', fontSize: '11px' }}
-                              >
-                                Save
-                              </Button>
-                              <Button
-                                onClick={() => setEditingCommentId(null)}
-                                size="sm"
-                                style={{ padding: '2px 8px', fontSize: '11px' }}
-                              >
-                                Cancel
-                              </Button>
-                            </div>
-                          </div>
-                        ) : (
-                          <MarkdownContent text={comment.body} />
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <TicketCommentForm
-                ticketId={activeTicket.id}
-                onAddComment={onAddComment}
-              />
-
-            </div>
+            <TicketCommentsThread
+              activeTicket={activeTicket}
+              comments={comments}
+              onAddComment={onAddComment}
+              onUpdateComment={onUpdateComment}
+              onDeleteComment={onDeleteComment}
+              copyToClipboard={copyToClipboard}
+            />
 
           </div>
 
@@ -954,23 +476,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
         </ConfirmDialog.Root>
       )}
 
-      {deletingCommentId && (
-        <ConfirmDialog.Root isOpen={!!deletingCommentId} onClose={() => setDeletingCommentId(null)}>
-          <ConfirmDialog.Header
-            title="Delete this comment?"
-            description="This will permanently remove the comment from the activity thread."
-          />
-          <ConfirmDialog.Actions
-            cancelLabel="Cancel"
-            confirmLabel="Delete Comment"
-            onCancel={() => setDeletingCommentId(null)}
-            onConfirm={async () => {
-              await onDeleteComment(activeTicket.id, deletingCommentId);
-              setDeletingCommentId(null);
-            }}
-          />
-        </ConfirmDialog.Root>
-      )}
+
 
 
     </div>

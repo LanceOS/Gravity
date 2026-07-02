@@ -91,7 +91,7 @@
   align-items: center;
   justify-content: space-between;
   cursor: pointer;
-  transition: all var(--transition-normal);
+  transition: border-color var(--transition-normal), background-color var(--transition-normal), color var(--transition-normal);
 }
 
 .create-ticket-modal__labels-trigger:hover {

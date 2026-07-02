@@ -151,8 +151,8 @@ function SidebarNavigationCollapse({ collapsed, children }: SidebarNavigationCol
         targets: element,
         height: 0,
         opacity: 0,
-        duration: 220,
-        easing: 'easeInOutQuad',
+        duration: 180,
+        easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
         complete: () => {
           element.style.height = '0px';
         }
@@ -168,8 +168,8 @@ function SidebarNavigationCollapse({ collapsed, children }: SidebarNavigationCol
         targets: element,
         height: targetHeight,
         opacity: 1,
-        duration: 260,
-        easing: 'easeOutQuad',
+        duration: 210,
+        easing: 'cubic-bezier(0.2, 0, 0.38, 1)',
         complete: () => {
           element.style.height = 'auto';
         }

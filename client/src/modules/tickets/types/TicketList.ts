@@ -21,7 +21,8 @@ export interface TicketListPropsWithPerformance extends TicketListProps {
 export interface TicketRowProps {
   ticket: Ticket;
   onClick: (ticket: Ticket) => void;
-  priorityIcon: ReactNode;
+  priority: Ticket['priority'];
+  priorityIcon?: ReactNode;
   assigneeAvatar: string | null;
   /** When provided, renders a small project badge on the row. */
   projectName?: string;

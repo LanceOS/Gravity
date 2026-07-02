@@ -50,7 +50,7 @@
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
 }
 
 .note-editor__toolbar-btn:hover {

@@ -152,12 +152,12 @@
 }
 
 .lib-spinner {
-  animation: lib-spinner-rotate 0.9s cubic-bezier(0.5, 0.1, 0.4, 0.9) infinite;
+  animation: lib-spinner-rotate 1s linear infinite;
   color: var(--color-primary);
 }
 
 .lib-skeleton-pulse {
-  animation: lib-skeleton-pulse 1.8s ease-in-out infinite;
+  animation: lib-skeleton-pulse 1.6s ease-in-out infinite;
   border-radius: var(--radius-sm);
 }
 
@@ -192,7 +192,10 @@
 
 /* Overlay & Interactive elements style rules */
 .lib-focus-ring {
-  transition: box-shadow var(--transition-fast), border-color var(--transition-fast);
+  transition:
+    box-shadow var(--transition-fast),
+    border-color var(--transition-fast),
+    outline-color var(--transition-fast);
 }
 
 .lib-focus-ring:focus-visible {
@@ -246,7 +249,11 @@
   font: inherit;
   box-sizing: border-box;
   outline: none;
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background-color var(--transition-fast), color var(--transition-fast);
+  transition:
+    border-color var(--transition-fast),
+    background-color var(--transition-fast),
+    color var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 
 .input::placeholder {
@@ -278,7 +285,7 @@
 .input:-webkit-autofill:focus {
   -webkit-text-fill-color: var(--color-text-primary);
   -webkit-box-shadow: 0 0 0 1000px var(--color-surface-input) inset;
-  transition: background-color 5000s ease-in-out 0s;
+  transition: background-color 1ms;
 }
 
 .input--dense {
@@ -318,7 +325,10 @@
   justify-content: space-between;
   gap: 12px;
   cursor: pointer;
-  transition: all var(--transition-normal);
+  transition:
+    border-color var(--transition-fast),
+    background-color var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .select-trigger:hover {
@@ -371,9 +381,9 @@
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border-default);
   background: var(--color-surface-card);
-  box-shadow: var(--shadow-lg);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  box-shadow: none;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   overflow-y: auto;
   animation: lib-fade-in var(--transition-fast);
   display: flex;
@@ -398,7 +408,9 @@
   padding: 8px 10px;
   text-align: left;
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .select-option:hover,
@@ -432,7 +444,7 @@
   width: 100%;
   height: 100%;
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
 }
 
 .lib-virtual-grid-canvas {

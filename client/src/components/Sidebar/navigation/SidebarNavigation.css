@@ -88,6 +88,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  transition: color var(--transition-fast);
   color: inherit;
   background: transparent;
   border: 0;
@@ -103,6 +104,14 @@
   line-height: 1;
 }
 
+.sidebar-navigation__group-toggle svg {
+  transition: transform var(--transition-fast);
+}
+
+.sidebar-navigation__group-toggle[aria-expanded='true'] svg {
+  transform: rotate(180deg);
+}
+
 .sidebar-navigation__icon-button {
   display: inline-flex;
   align-items: center;
@@ -114,7 +123,7 @@
   background: transparent;
   color: var(--color-text-secondary);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: background var(--transition-fast), color var(--transition-fast);
   padding: 0;
   margin-right: 4px;
 }

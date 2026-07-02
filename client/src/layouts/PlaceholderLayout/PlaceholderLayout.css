@@ -79,7 +79,7 @@
   font-size: 13.5px;
   font-weight: 500;
   text-decoration: none;
-  transition: all 0.2s ease;
+  transition: color var(--transition-fast), background-color var(--transition-fast);
 }
 
 .placeholder-menu-item:hover, .placeholder-menu-item.active {
@@ -223,7 +223,7 @@
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 12px;
   padding: 24px;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform var(--transition-spring), background-color var(--transition-spring), border-color var(--transition-spring), box-shadow var(--transition-spring);
 }
 
 .placeholder-card:hover {
@@ -375,7 +375,7 @@
   border-radius: 8px;
   cursor: pointer;
   font-size: 14px;
-  transition: all 0.2s ease;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), background-color var(--transition-fast);
   box-shadow: 0 4px 20px rgba(255, 255, 255, 0.1);
 }
 

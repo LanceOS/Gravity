@@ -1,31 +1,60 @@
-import { memo, useState, useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { Paperclip } from 'lucide-react';
 import type { TicketRowProps } from '../../types/TicketList';
 import { LabelBadge } from '../LabelBadge';
 import { TicketRelationIndicators } from '../TicketRelationIndicators';
 import { TicketStatusBadge } from '../TicketStatusBadge';
+import { getPriorityIcon } from '../../../../utils/ticketPresentation';
+import { formatTicketDate } from '../../utils/ticketDateFormatter';
 import './TicketRowMobile.css';
 
-function TicketRowMobileImpl({ ticket, onClick, priorityIcon, assigneeAvatar, projectName }: TicketRowProps) {
-  const [isHovered, setIsHovered] = useState(false);
+function haveLabelSetsChanged(prevLabels?: TicketRowProps['ticket']['labels'], nextLabels?: TicketRowProps['ticket']['labels']): boolean {
+  if (prevLabels === nextLabels) {
+    return false;
+  }
+
+  if (!prevLabels || !nextLabels) {
+    return Boolean(prevLabels?.length || nextLabels?.length);
+  }
+
+  if (prevLabels.length !== nextLabels.length) {
+    return true;
+  }
+
+  for (let i = 0; i < prevLabels.length; i += 1) {
+    if (prevLabels[i]?.id !== nextLabels[i]?.id) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function TicketRowMobileImpl({
+  ticket,
+  onClick,
+  priorityIcon,
+  priority,
+  assigneeAvatar,
+  projectName,
+}: TicketRowProps) {
   const isCompleted = ticket.status === 'done' || ticket.status === 'canceled';
+  const renderedPriorityIcon = priorityIcon ?? getPriorityIcon(priority);
+  const formattedDate = formatTicketDate(ticket.createdAt);
+  const truncatedTitle = ticket.title.length > 150 ? `${ticket.title.slice(0, 149)}…` : ticket.title;
 
   const handleClick = useCallback(() => {
     onClick(ticket);
   }, [onClick, ticket]);
 
-  const formattedDate = new Date(ticket.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-
   return (
     <div
       onClick={handleClick}
-      className={`ticket-row-mobile clickable${isHovered ? ' ticket-row-mobile--hovered' : ''}`}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      className="ticket-row-mobile clickable"
     >
       {/* Main row: priority icon, title, avatar */}
       <div className="ticket-row-mobile__main">
-        <div className="ticket-row-mobile__priority">{priorityIcon}</div>
+          <div className="ticket-row-mobile__priority">{renderedPriorityIcon}</div>
 
         <div
           className="ticket-row-mobile__title-wrap"
@@ -42,20 +71,26 @@ function TicketRowMobileImpl({ ticket, onClick, priorityIcon, assigneeAvatar, pr
           <span
             className="ticket-row-mobile__title"
             style={{
-              color: isCompleted ? 'var(--color-text-secondary)' : 'var(--color-text-primary)',
-              textDecoration: isCompleted ? 'line-through' : 'none',
-              opacity: isCompleted ? 0.85 : 1,
-              minWidth: 0,
-              flex: 1,
-            }}
-          >
-            {ticket.title}
+            color: isCompleted ? 'var(--color-text-secondary)' : 'var(--color-text-primary)',
+            textDecoration: isCompleted ? 'line-through' : 'none',
+            opacity: isCompleted ? 0.85 : 1,
+            minWidth: 0,
+            flex: 1,
+          }}
+        >
+            {truncatedTitle}
           </span>
         </div>
 
         <div className="ticket-row-mobile__avatar">
           {assigneeAvatar ? (
-            <img src={assigneeAvatar} alt="" className="ticket-row-mobile__avatar-img" />
+            <img
+              src={assigneeAvatar}
+              alt=""
+              className="ticket-row-mobile__avatar-img"
+              loading="lazy"
+              decoding="async"
+            />
           ) : (
             <span className="ticket-row-mobile__avatar-placeholder">--</span>
           )}
@@ -89,4 +124,27 @@ function TicketRowMobileImpl({ ticket, onClick, priorityIcon, assigneeAvatar, pr
   );
 }
 
-export const TicketRowMobile = memo(TicketRowMobileImpl);
+function shouldRerenderTicketRowMobile(prevProps: TicketRowProps, nextProps: TicketRowProps) {
+  const prevTicket = prevProps.ticket;
+  const nextTicket = nextProps.ticket;
+
+  return (
+    prevTicket.id === nextTicket.id &&
+    prevTicket.title === nextTicket.title &&
+    prevTicket.key === nextTicket.key &&
+    prevTicket.status === nextTicket.status &&
+    prevTicket.priority === nextTicket.priority &&
+    prevTicket.parentId === nextTicket.parentId &&
+    prevTicket.prStatus === nextTicket.prStatus &&
+    prevTicket.assigneeId === nextTicket.assigneeId &&
+    prevTicket.createdAt === nextTicket.createdAt &&
+    prevTicket.updatedAt === nextTicket.updatedAt &&
+    !haveLabelSetsChanged(prevTicket.labels, nextTicket.labels) &&
+    prevProps.onClick === nextProps.onClick &&
+    prevProps.priorityIcon === nextProps.priorityIcon &&
+    prevProps.assigneeAvatar === nextProps.assigneeAvatar &&
+    prevProps.projectName === nextProps.projectName
+  );
+}
+
+export const TicketRowMobile = memo(TicketRowMobileImpl, shouldRerenderTicketRowMobile);

@@ -14,6 +14,7 @@ import { Button } from '@library';
 import { X } from 'lucide-react';
 import anime from 'animejs';
 import './ModalDialog.css';
+import { safeAnime, prefersReducedMotion } from '../../utils/animationUtils';
 
 type ModalDialogSize = 'sm' | 'md' | 'lg' | 'xl';
 type ModalDialogTone = 'default' | 'danger';
@@ -25,6 +26,9 @@ interface ModalDialogContextValue {
 }
 
 const ModalDialogContext = createContext<ModalDialogContextValue | null>(null);
+
+const MODAL_DIALOG_DURATION = 190;
+const MODAL_DIALOG_EASING = 'cubic-bezier(0.2, 0, 0.38, 1)';
 
 function cn(...classes: (string | undefined | null | false)[]) {
   return classes.filter(Boolean).join(' ');
@@ -79,31 +83,33 @@ function ModalDialogRoot({
       setIsRendered(true);
     } else if (isRendered) {
       const isTest = typeof process !== 'undefined' && process.env.NODE_ENV === 'test';
-      if (isTest) {
+      const isReducedMotion = isTest || prefersReducedMotion();
+
+      if (isReducedMotion) {
         setIsRendered(false);
       } else {
         if (backdropRef.current) {
           anime.remove(backdropRef.current);
-          anime({
+          safeAnime({
             targets: backdropRef.current,
             opacity: [1, 0],
-            duration: 75,
-            easing: 'linear',
+            duration: MODAL_DIALOG_DURATION,
+            easing: MODAL_DIALOG_EASING,
           });
         }
         if (panelRef.current) {
           anime.remove(panelRef.current);
-          anime({
+          safeAnime({
             targets: panelRef.current,
             opacity: [1, 0],
             translateY: ['0px', '16px'],
-            duration: 75,
-            easing: 'easeInQuad',
+            duration: MODAL_DIALOG_DURATION,
+            easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
           });
         }
         setTimeout(() => {
           setIsRendered(false);
-        }, 75);
+        }, MODAL_DIALOG_DURATION);
       }
     }
   }, [isOpen, isRendered]);
@@ -111,29 +117,31 @@ function ModalDialogRoot({
   useLayoutEffect(() => {
     if (isOpen && isRendered) {
       const isTest = typeof process !== 'undefined' && process.env.NODE_ENV === 'test';
-      if (isTest) {
+      const isReducedMotion = isTest || prefersReducedMotion();
+
+      if (isReducedMotion) {
         return;
       }
       if (backdropRef.current) {
         anime.remove(backdropRef.current);
         backdropRef.current.style.opacity = '0';
-        anime({
+        safeAnime({
           targets: backdropRef.current,
           opacity: [0, 1],
-          duration: 75,
-          easing: 'linear',
+          duration: MODAL_DIALOG_DURATION,
+          easing: MODAL_DIALOG_EASING,
         });
       }
       if (panelRef.current) {
         anime.remove(panelRef.current);
         panelRef.current.style.opacity = '0';
         panelRef.current.style.transform = 'translateY(16px)';
-        anime({
+        safeAnime({
           targets: panelRef.current,
           opacity: [0, 1],
           translateY: ['16px', '0px'],
-          duration: 75,
-          easing: 'easeOutQuad',
+          duration: MODAL_DIALOG_DURATION,
+          easing: MODAL_DIALOG_EASING,
         });
       }
     }
