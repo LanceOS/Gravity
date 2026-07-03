@@ -71,7 +71,7 @@ function InlineFormattedText({ text, customTokenRegex, renderCustomToken }: Form
           key={keyIndex++}
           href={safeHref}
           target="_blank"
-          rel="noreferrer"
+          rel="noopener noreferrer"
           style={{ color: 'var(--color-primary)', textDecoration: 'none' }}
           className="clickable"
         >
