@@ -161,7 +161,7 @@ export function ChatSidebar({
           gap: '6px',
           padding: '12px 10px',
           borderBottom: collapsed ? '1px solid var(--color-border-default)' : 'none',
-          justifyContent: 'center',
+          justifyContent: collapsed ? 'center' : 'flex-end',
         }}
       >
         {onToggleCollapsed && (
@@ -207,9 +207,11 @@ export function ChatSidebar({
         <div style={{ padding: '8px 0', display: 'flex', justifyContent: 'center', borderBottom: '1px solid var(--color-border-default)' }}>
           <button
             onClick={onCreateSession}
-            style={{ background: 'transparent', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer', padding: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px' }}
+            style={{ background: 'transparent', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer', padding: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', transition: 'color var(--transition-fast), background-color var(--transition-fast)' }}
             className="clickable"
             title="New Chat"
+            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-primary)'; e.currentTarget.style.backgroundColor = 'var(--color-base100)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-secondary)'; e.currentTarget.style.backgroundColor = 'transparent'; }}
           >
             <Plus size={16} />
           </button>
@@ -219,9 +221,11 @@ export function ChatSidebar({
           <span>CHATS</span>
           <button
             onClick={onCreateSession}
-            style={{ background: 'transparent', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px' }}
+            style={{ background: 'transparent', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', transition: 'color var(--transition-fast), background-color var(--transition-fast)' }}
             className="clickable"
             title="New Chat"
+            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-primary)'; e.currentTarget.style.backgroundColor = 'var(--color-base100)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-secondary)'; e.currentTarget.style.backgroundColor = 'transparent'; }}
           >
             <Plus size={14} />
           </button>

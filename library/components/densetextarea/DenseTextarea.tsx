@@ -16,6 +16,7 @@ export const DenseTextarea = React.forwardRef<HTMLTextAreaElement, DenseTextarea
     const localRef = useRef<HTMLTextAreaElement>(null);
     useImperativeHandle(ref, () => localRef.current!);
 
+
     useEffect(() => {
       if (autoGrow && localRef.current) {
         const textarea = localRef.current;
@@ -58,7 +59,7 @@ export const DenseTextarea = React.forwardRef<HTMLTextAreaElement, DenseTextarea
           style={{
             resize: autoGrow ? 'none' : 'vertical',
             minHeight: '32px',
-            overflowY: autoGrow ? 'hidden' : 'auto',
+            overflowY: 'auto',
             paddingTop: '6px',
             paddingBottom: '6px',
             lineHeight: '1.4',
