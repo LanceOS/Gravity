@@ -1,4 +1,4 @@
-import { CheckCircle, ChevronDown, ChevronRight, Database, FolderTree, Plus } from 'lucide-react';
+import { CheckCircle, ChevronDown, ChevronRight, Database, FolderTree, Plus, Sparkles } from 'lucide-react';
 import { useOptionalSidebarContext } from '../context/SidebarContext';
 import type { SidebarNavigationState, SidebarProjectSection } from '../types';
 import { getTeamCollapsedState } from '../utils';
@@ -70,20 +70,33 @@ export function TeamsSidebar(props: TeamsSidebarProps) {
   return (
     <SidebarNavigation>
       <SidebarNavigation.Group label="Workspace">
-        <SidebarNavigation.Item
-          active={activeScope === 'workspace'}
-          onClick={section.onSelectWorkspaceAllTasks}
-          leftIcon={<FolderTree size={13} />}
-        >
-          All Tasks
-        </SidebarNavigation.Item>
-        <SidebarNavigation.Item
-          active={activeScope === 'workspace-projects'}
-          onClick={section.onSelectWorkspaceProjects}
-          leftIcon={<Database size={13} />}
-        >
-          Projects
-        </SidebarNavigation.Item>
+        {section.onSelectWorkspaceAllTasks ? (
+          <SidebarNavigation.Item
+            active={activeScope === 'workspace'}
+            onClick={section.onSelectWorkspaceAllTasks}
+            leftIcon={<FolderTree size={13} />}
+          >
+            All Tasks
+          </SidebarNavigation.Item>
+        ) : null}
+        {section.onSelectWorkspaceProjects ? (
+          <SidebarNavigation.Item
+            active={activeScope === 'workspace-projects'}
+            onClick={section.onSelectWorkspaceProjects}
+            leftIcon={<Database size={13} />}
+          >
+            Projects
+          </SidebarNavigation.Item>
+        ) : null}
+        {section.onSelectWorkspaceChat ? (
+          <SidebarNavigation.Item
+            active={activeScope === 'workspace-chat'}
+            onClick={section.onSelectWorkspaceChat}
+            leftIcon={<Sparkles size={13} />}
+          >
+            AI Chat
+          </SidebarNavigation.Item>
+        ) : null}
       </SidebarNavigation.Group>
 
       <SidebarNavigation.Group

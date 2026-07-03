@@ -54,6 +54,10 @@ export const CACHE_CONFIGS = {
     staleTime: 2 * 60 * 1000,
     gcTime: 15 * 60 * 1000,
   },
+  chatSessions: {
+    staleTime: 15 * 1000,
+    gcTime: 5 * 60 * 1000,
+  },
 };
 
 export const queryKeys = {
@@ -78,4 +82,5 @@ export const queryKeys = {
   workspaceSidebarTree: (workspaceId: string) => toMutableQueryKey(['workspace', workspaceId, 'sidebar']),
   mcpTools: (workspaceId: string) => toMutableQueryKey(['ai', 'mcp', 'tools', { workspaceId }]),
   ollamaModels: (ollamaUrl: string) => toMutableQueryKey(['ai', 'ollama', 'models', { ollamaUrl }]),
+  chatSessions: (projectId: string, search = '') => toMutableQueryKey(['ai', 'chats', projectId, { search }]),
 };

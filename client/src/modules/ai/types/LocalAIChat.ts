@@ -2,13 +2,20 @@ import type { Project, Ticket, User } from '../../../context/TicketContextContex
 import type { WorkspaceSettings } from '../../../utils/settings';
 
 export interface LocalAIChatProps {
-  onClose: () => void;
+  onClose?: () => void;
   initialOllamaUrl: string;
   initialModel: string;
   settings: WorkspaceSettings;
   workspaceId?: string;
   projectId?: string;
   isClosing?: boolean;
+  variant?: 'floating' | 'embedded';
+  /** Seeds the cloud chat session id used for this conversation (e.g. when resuming a past chat). */
+  seedChatSessionId?: string;
+  /** Seeds the visible transcript (e.g. history loaded for a resumed chat session). */
+  seedMessages?: Message[];
+  /** Called when a cloud chat session is created (either lazily on first message or externally). */
+  onSessionCreated?: (chatId: string) => void;
 }
 
 export interface Message {

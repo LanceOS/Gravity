@@ -65,10 +65,10 @@
 }
 
 .workspace-projects-list-page__row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  gap: 12px;
   width: 100%;
   padding: 14px 16px;
   border: 1px solid var(--color-border-default);
@@ -78,11 +78,10 @@
   text-align: left;
   cursor: pointer;
   box-shadow: var(--shadow-sm);
-  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 }
 
 .workspace-projects-list-page__row:hover {
-  transform: translateY(-1px);
   border-color: var(--color-border-focus);
   background: var(--color-surface-overlay);
   box-shadow: none;
@@ -96,7 +95,7 @@
 .workspace-projects-list-page__row--active {
   border-color: var(--color-border-focus);
   background: var(--color-state-selected-bg);
-  box-shadow: 0 0 0 1px var(--color-border-focus);
+  box-shadow: none;
 }
 
 .workspace-projects-list-page__project-copy {
@@ -235,6 +234,7 @@
   }
 
   .workspace-projects-list-page__row {
+    display: flex;
     align-items: flex-start;
     flex-direction: column;
   }

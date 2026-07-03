@@ -1,6 +1,6 @@
 import { ReactNode, useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Menu, MessageSquare, X } from 'lucide-react';
+import { Menu, SendHorizonal, X } from 'lucide-react';
 import { Sidebar, type SidebarProps } from '../../components/Sidebar';
 import { DashboardLayout } from '../../components/DashboardLayout/DashboardLayout';
 import { Select } from '@library';
@@ -128,29 +128,35 @@ export function WorkspaceLayout({ sidebarProps, children, rightPanels, isMobile 
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button
             type="button"
-            className="clickable"
             onClick={sidebarProps.tools.onOpenOllama}
             aria-label={sidebarProps.tools.isOllamaOpen ? 'Close AI Assistant' : 'Ask Agent'}
             style={{
-              height: '32px',
-              padding: '0 12px',
-              borderRadius: '16px',
-              background: 'var(--color-primary)',
-              color: 'var(--color-text-on-accent)',
-              border: '1px solid var(--color-border-focus)',
+              background: 'none',
+              border: 'none',
+              padding: '4px 8px',
+              borderRadius: '6px',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
               gap: '6px',
               cursor: 'pointer',
+              color: sidebarProps.tools.isOllamaOpen ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+              fontSize: '13px',
               fontWeight: 500,
-              fontSize: '12px',
+              letterSpacing: '-0.01em',
               flexShrink: 0,
-              width: '105px',
               whiteSpace: 'nowrap',
+              transition: 'color 0.15s ease, background-color 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = 'var(--color-text-primary)';
+              e.currentTarget.style.backgroundColor = 'var(--color-base100)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = sidebarProps.tools.isOllamaOpen ? 'var(--color-primary)' : 'var(--color-text-secondary)';
+              e.currentTarget.style.backgroundColor = 'transparent';
             }}
           >
-            {sidebarProps.tools.isOllamaOpen ? <X size={14} /> : <MessageSquare size={14} />}
+            {sidebarProps.tools.isOllamaOpen ? <X size={13} /> : <SendHorizonal size={13} />}
             {sidebarProps.tools.isOllamaOpen ? 'Close' : 'Ask Agent'}
           </button>
 

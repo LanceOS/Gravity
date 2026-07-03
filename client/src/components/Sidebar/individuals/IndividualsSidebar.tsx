@@ -1,6 +1,6 @@
-import { CheckCircle, ChevronDown, ChevronRight, Database, FileText, FolderTree, Inbox } from 'lucide-react';
+import { CheckCircle, ChevronDown, ChevronRight, Database, FileText, FolderTree, Inbox, Sparkles } from 'lucide-react';
 import { useOptionalSidebarContext } from '../context/SidebarContext';
-import type { SidebarProjectSection } from '../types';
+import type { SidebarNavigationState, SidebarProjectSection } from '../types';
 import { countBadgeStyle, getProjectCollapsedState, isMyIssuesView, isNotesView, isProjectIssuesView } from '../utils';
 import { SidebarNavigation } from '../navigation';
 
@@ -8,6 +8,26 @@ interface IndividualsSidebarProps {
   section?: SidebarProjectSection;
   collapsedProjects?: Record<string, boolean>;
   onToggleProject?: (projectId: string) => void;
+}
+
+function resolveNavigationState(section: SidebarProjectSection): SidebarNavigationState {
+  if (section.navigationState) {
+    return section.navigationState;
+  }
+
+  if (section.activeProjectId) {
+    return {
+      activeTeam: section.activeTeamId ?? '',
+      activeScope: 'projects',
+      activeProject: section.activeProjectId,
+    };
+  }
+
+  return {
+    activeTeam: section.activeTeamId ?? '',
+    activeScope: 'workspace',
+    activeProject: '',
+  };
 }
 
 function dedupeLabelsById(labels: NonNullable<SidebarProjectSection['labels']>) {
@@ -42,9 +62,50 @@ export function IndividualsSidebar(props: IndividualsSidebarProps) {
   const labelCounts = section.counts.labels ?? section.counts.domains ?? {};
   const handleSelectLabel = section.onSelectLabel ?? (() => { });
   const countsByProject = section.counts.byProject ?? {};
+  const navigationState = resolveNavigationState(section);
+  const activeScope = navigationState.activeScope;
+
+  const activeWorkspaceActionButtons = [
+    section.onSelectWorkspaceAllTasks ? (
+      <SidebarNavigation.Item
+        key="workspace-all-tasks"
+        active={activeScope === 'workspace'}
+        onClick={section.onSelectWorkspaceAllTasks}
+        leftIcon={<FolderTree size={13} />}
+      >
+        All Tasks
+      </SidebarNavigation.Item>
+    ) : null,
+    section.onSelectWorkspaceProjects ? (
+      <SidebarNavigation.Item
+        key="workspace-projects"
+        active={activeScope === 'workspace-projects'}
+        onClick={section.onSelectWorkspaceProjects}
+        leftIcon={<Database size={13} />}
+      >
+        Projects
+      </SidebarNavigation.Item>
+    ) : null,
+    section.onSelectWorkspaceChat ? (
+      <SidebarNavigation.Item
+        key="workspace-chat"
+        active={activeScope === 'workspace-chat'}
+        onClick={section.onSelectWorkspaceChat}
+        leftIcon={<Sparkles size={13} />}
+      >
+        AI Chat
+      </SidebarNavigation.Item>
+    ) : null,
+  ].filter(Boolean);
 
   return (
     <SidebarNavigation>
+      {activeWorkspaceActionButtons.length > 0 ? (
+        <SidebarNavigation.Group label="Workspace">
+          {activeWorkspaceActionButtons}
+        </SidebarNavigation.Group>
+      ) : null}
+
       <SidebarNavigation.Group
         label={
           <SidebarNavigation.Label>Projects</SidebarNavigation.Label>

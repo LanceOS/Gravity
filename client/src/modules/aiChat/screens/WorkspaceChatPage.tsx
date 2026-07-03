@@ -1,0 +1,43 @@
+import { WorkspacePageLayout } from '../../../layouts/WorkspacePageLayout/WorkspacePageLayout';
+import { WorkspaceChatDock } from '../components/WorkspaceChatDock';
+import type { WorkspaceSettings } from '../../../utils/settings';
+
+interface WorkspaceChatPageProps {
+  workspaceId: string;
+  projectId: string;
+  initialOllamaUrl: string;
+  initialModel: string;
+  settings: WorkspaceSettings;
+  isMobile?: boolean;
+}
+
+export function WorkspaceChatPage({
+  workspaceId,
+  projectId,
+  initialOllamaUrl,
+  initialModel,
+  settings,
+  isMobile = false,
+}: WorkspaceChatPageProps) {
+  return (
+    <WorkspacePageLayout
+      pageClassName="workspace-chat-page"
+      contentClassName="workspace-chat-page__content"
+      contentShellClassName="workspace-chat-page__shell"
+      flushContent
+      bodyOverflow="visible"
+      wrapBody={false}
+    >
+      <WorkspaceChatDock
+        workspaceId={workspaceId}
+        projectId={projectId}
+        initialOllamaUrl={initialOllamaUrl}
+        initialModel={initialModel}
+        settings={settings}
+        isMobile={isMobile}
+        variant="embedded"
+        style={{ flex: 1, minHeight: 0 }}
+      />
+    </WorkspacePageLayout>
+  );
+}

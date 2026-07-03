@@ -9,12 +9,7 @@ export function getInitialModel(initialModel: string) {
 }
 
 export function getInitialMessages(): Message[] {
-  return [
-    {
-      role: 'assistant',
-      content: 'Hello! I am your **Gravity AI Assistant**. I can read the context of your active tickets to help you write descriptions, summarize comments, outline implementation checklists, or draft pull requests.\n\nType a question or select a **Quick Action** below to get started!',
-    },
-  ];
+  return [];
 }
 
 export function buildQuickActionPrompt(actionType: QuickActionType, context: QuickActionContext) {
