@@ -175,12 +175,14 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
   const [isGenerating, setIsGenerating] = useState(false);
   const [chatSessionId, setChatSessionId] = useState('');
   const chatSessionIdRef = useRef('');
+  const cloudContextVersionRef = useRef(0);
 
   useEffect(() => {
     chatSessionIdRef.current = chatSessionId;
   }, [chatSessionId]);
 
   useEffect(() => {
+    cloudContextVersionRef.current += 1;
     chatSessionIdRef.current = '';
     setChatSessionId('');
     if (isThirdParty) {
@@ -188,7 +190,7 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
     }
   }, [isThirdParty, projectId]);
 
-  const ensureCloudChatSession = async () => {
+  const ensureCloudChatSession = async (requestContextVersion: number) => {
     const activeProjectId = projectId?.trim() || '';
     if (!activeProjectId) {
       throw new Error(CLOUD_PROJECT_REQUIRED_MESSAGE);
@@ -198,15 +200,18 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
       return chatSessionIdRef.current;
     }
 
-    const session = await apiClient.post<{ id?: string }>(`/projects/${encodeURIComponent(activeProjectId)}/chats`, {
-      title: 'AI Assistant',
-    });
+    const session = await apiClient.post<{ id?: string }>(`/projects/${encodeURIComponent(activeProjectId)}/chats`, {});
     if (!session.id) {
       throw new Error('Failed to create chat session.');
     }
 
+    if (cloudContextVersionRef.current !== requestContextVersion) {
+      return session.id;
+    }
+
     chatSessionIdRef.current = session.id;
     setChatSessionId(session.id);
+
     return session.id;
   };
 
@@ -291,16 +296,23 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
     const newMessages: Message[] = autoRunMessages || [...messages, { role: 'user', content: textToSend }];
     setMessages(newMessages);
     if (!autoRunMessages) setIsGenerating(true);
+    const requestContextVersion = isThirdParty ? cloudContextVersionRef.current : 0;
 
     try {
       if (isThirdParty) {
         const activeProjectId = projectId?.trim() || '';
-        const chatId = await ensureCloudChatSession();
+        const chatId = await ensureCloudChatSession(requestContextVersion);
+        if (cloudContextVersionRef.current !== requestContextVersion) {
+          return;
+        }
         const doneEvent = await postChatCompletionSse(activeProjectId, chatId, {
           message: textToSend,
           provider: settings.aiProvider,
           ...(model ? { model } : {}),
         });
+        if (cloudContextVersionRef.current !== requestContextVersion) {
+          return;
+        }
         const aiResponse = doneEvent.message || '';
 
         if (aiResponse) {
@@ -407,6 +419,10 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
       if (isThirdParty) {
         if (error instanceof Error && error.message === CLOUD_PROJECT_REQUIRED_MESSAGE) {
           setMessages([...newMessages, { role: 'system', content: error.message }]);
+          return;
+        }
+
+        if (cloudContextVersionRef.current !== requestContextVersion) {
           return;
         }
 
