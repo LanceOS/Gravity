@@ -1017,6 +1017,7 @@ export function WorkspaceShellPage() {
 
   const createDefaultProjectId =
     activeProjectId || scopedProjects[0]?.id || activeWorkspaceProjects[0]?.id || '';
+  const aiChatProjectId = activeProjectId || activeTicket?.projectId || '';
   const isWorkspaceProjectsListActive = sidebarActiveScope === 'workspace-projects';
   const isIssueSurfaceActive =
     !isWorkspaceProjectsListActive && !isTeamsManager && !isTeamProjectsManager && activeSection !== 'projects';
@@ -1045,6 +1046,7 @@ export function WorkspaceShellPage() {
               }
               settings={accountSettings}
               workspaceId={activeWorkspaceId}
+              projectId={aiChatProjectId}
               isClosing={isOllamaClosing}
             />
           ) : null

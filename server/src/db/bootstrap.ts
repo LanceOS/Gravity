@@ -406,8 +406,6 @@ export async function initializeDatabase() {
       PRIMARY KEY (project_id, user_id)
     );
 
-
-
     CREATE TABLE IF NOT EXISTS labels (
       id TEXT PRIMARY KEY,
       team_id TEXT NOT NULL,
@@ -905,4 +903,32 @@ export async function initializeDatabase() {
 
   const { runMigrations } = await getMigrations(auth.options);
   await runMigrations();
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS chat_sessions (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL REFERENCES projects (id) ON DELETE CASCADE,
+      team_id TEXT NOT NULL REFERENCES teams (id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES "user" (id) ON DELETE CASCADE,
+      title TEXT NOT NULL DEFAULT 'New Chat',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS chat_messages (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL REFERENCES chat_sessions (id) ON DELETE CASCADE,
+      role TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
+      content TEXT NOT NULL,
+      metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS chat_sessions_project_id_user_id_updated_at_idx
+      ON chat_sessions (project_id, user_id, updated_at);
+    CREATE INDEX IF NOT EXISTS chat_messages_session_id_idx
+      ON chat_messages (session_id);
+    CREATE INDEX IF NOT EXISTS chat_messages_session_id_created_at_idx
+      ON chat_messages (session_id, created_at);
+  `);
 }

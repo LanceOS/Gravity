@@ -53,6 +53,9 @@ const envSchema = z.object({
       return v;
     }, z.boolean()).default(false),
   OLLAMA_DEFAULT_ENDPOINT: z.string().url().optional(),
+  AI_PROVIDER: z.string().optional(),
+  AI_MODEL: z.string().optional(),
+  AI_STREAM_CHUNK_SIZE: z.coerce.number().int().positive().default(48),
   MCP_STDIO_WORKSPACE_ID: z.string().optional(),
   MCP_STDIO_ACTOR_USER_ID: z.string().optional(),
   MCP_AGENT_COMMAND: z.string().optional(),
@@ -113,6 +116,9 @@ export const env = {
   ollamaDefaultEndpoint:
     parsed.OLLAMA_DEFAULT_ENDPOINT ??
     (parsed.NODE_ENV === 'test' ? 'http://localhost:11434' : 'http://host.docker.internal:11434'),
+  aiDefaultProvider: parsed.AI_PROVIDER?.trim().toLowerCase(),
+  aiDefaultModel: parsed.AI_MODEL?.trim() || undefined,
+  aiStreamChunkSize: parsed.AI_STREAM_CHUNK_SIZE,
   mcpStdioWorkspaceId: parsed.MCP_STDIO_WORKSPACE_ID?.trim() || undefined,
   mcpStdioActorUserId: parsed.MCP_STDIO_ACTOR_USER_ID?.trim() || undefined,
   mcpAgentCommand: parsed.MCP_AGENT_COMMAND?.trim() || undefined,

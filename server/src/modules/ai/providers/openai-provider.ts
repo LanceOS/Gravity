@@ -9,7 +9,8 @@ export class OpenAiProvider implements IAiProvider {
   }
 
   async chat(options: ChatOptions): Promise<{ content: string; toolCalls?: any[] }> {
-    const { model, messages, tools, apiKey } = options;
+    const { model, messages, tools, apiKey, onChunk } = options;
+    const streamMode = typeof onChunk === 'function';
     if (!apiKey) {
       throw new Error('API key is required for cloud providers.');
     }
@@ -25,7 +26,7 @@ export class OpenAiProvider implements IAiProvider {
         body: JSON.stringify({
           model,
           messages: this.mapMessages(messages),
-          stream: false,
+          stream: streamMode,
           ...(tools ? { tools: this.formatTools(tools) } : {}),
         }),
       },
@@ -36,6 +37,10 @@ export class OpenAiProvider implements IAiProvider {
     const providerLabel = this.isDeepSeek ? 'DeepSeek' : 'OpenAI';
     if (!response.ok) {
       throw new Error(await readErrorMessage(response, `Failed to contact ${providerLabel}.`));
+    }
+
+    if (streamMode) {
+      return this.consumeStreamingResponse(response, onChunk);
     }
 
     const data = (await response.json()) as any;
@@ -67,6 +72,108 @@ export class OpenAiProvider implements IAiProvider {
       content: msg?.content || '',
       ...(toolCalls ? { toolCalls } : {}),
     };
+  }
+
+  private async consumeStreamingResponse(response: Response, onChunk?: (chunk: string) => Promise<void> | void) {
+    if (!response.body) {
+      throw new Error('Provider returned no response body for streaming mode.');
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let content = '';
+    const toolCallsByIndex = new Map<number, { id?: string; name?: string; arguments: string }>();
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+
+      buffer += decoder.decode(value, { stream: true });
+      let boundary = buffer.indexOf('\n\n');
+      while (boundary >= 0) {
+        const event = buffer.slice(0, boundary).trim();
+        buffer = buffer.slice(boundary + 2);
+
+        const dataLine = event
+          .split('\n')
+          .map((line) => line.trim())
+          .filter((line) => line.startsWith('data:'))
+          .map((line) => line.replace(/^data:\s*/, ''))
+          .join('\n');
+
+        if (!dataLine || dataLine === '[DONE]') {
+          boundary = buffer.indexOf('\n\n');
+          continue;
+        }
+
+        let parsed: any;
+        try {
+          parsed = JSON.parse(dataLine);
+        } catch (_error) {
+          boundary = buffer.indexOf('\n\n');
+          continue;
+        }
+
+        const delta = parsed.choices?.[0]?.delta;
+        const deltaContent = typeof delta?.content === 'string' ? delta.content : '';
+        if (deltaContent) {
+          content += deltaContent;
+          if (onChunk) {
+            await onChunk(deltaContent);
+          }
+        }
+
+        const deltaToolCalls = Array.isArray(delta?.tool_calls) ? delta.tool_calls : [];
+        for (const rawCall of deltaToolCalls) {
+          const index = Number(rawCall?.index);
+          if (!Number.isInteger(index)) {
+            continue;
+          }
+
+          const current = toolCallsByIndex.get(index) ?? { arguments: '' };
+          if (typeof rawCall?.id === 'string') {
+            current.id = rawCall.id;
+          }
+
+          if (typeof rawCall?.function?.name === 'string') {
+            current.name = rawCall.function.name;
+          }
+
+          if (typeof rawCall?.function?.arguments === 'string') {
+            current.arguments = `${current.arguments}${rawCall.function.arguments}`;
+          }
+
+          toolCallsByIndex.set(index, current);
+        }
+
+        boundary = buffer.indexOf('\n\n');
+      }
+    }
+
+    const toolCalls = Array.from(toolCallsByIndex.values())
+      .filter((toolCall) => toolCall.id && toolCall.name)
+      .map((toolCall) => ({
+        id: toolCall.id,
+        name: toolCall.name,
+        arguments: this.safeParseArguments(toolCall.arguments),
+      }));
+
+    return {
+      content,
+      ...(toolCalls.length > 0 ? { toolCalls } : {}),
+    };
+  }
+
+  private safeParseArguments(value: string) {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed;
+    } catch (_error) {
+      return value;
+    }
   }
 
   async testConnection(options?: string | { apiKey?: string; ollamaUrl?: string }): Promise<void> {
