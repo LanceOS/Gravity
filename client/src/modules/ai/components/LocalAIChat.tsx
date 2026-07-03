@@ -3,7 +3,7 @@ import { useAuth } from '../../../context/auth/AuthContext';
 import { useProjectContext } from '../../../context/project/ProjectContext';
 import { useActiveTicket } from '../../../context/ticket/ActiveTicketContext';
 import { useUserDirectory } from '../../../context/user/UserDirectoryContext';
-import { FileText, ListPlus, Sparkles } from 'lucide-react';
+import { FileText, ListPlus, Sparkles, Wifi } from 'lucide-react';
 import { AIChatWindow } from '@library';
 import type { LocalAIChatProps, QuickActionType } from '../types/LocalAIChat';
 import { buildQuickActionPrompt } from '../utils/LocalAIChat';
@@ -35,6 +35,7 @@ const LocalAIChatInner: React.FC<LocalAIChatProps> = ({
     error,
     model,
     setModel,
+    modelStatus,
     detectedModels,
     isCheckingModel,
     sendMessage,
@@ -62,45 +63,49 @@ const LocalAIChatInner: React.FC<LocalAIChatProps> = ({
     <AIChatWindow
       isClosing={isClosing}
       title={
-        <select
-          value={model}
-          onChange={(e) => setModel(e.target.value)}
-          disabled={!isThirdParty && (isCheckingModel || detectedModels.length === 0)}
-          style={{
-            fontSize: '13px',
-            fontWeight: 600,
-            background: 'transparent',
-            color: 'var(--color-text-primary)',
-            border: 'none',
-            outline: 'none',
-            cursor: 'pointer',
-            padding: 0,
-            fontFamily: 'inherit',
-            letterSpacing: '-0.01em',
-            textOverflow: 'ellipsis',
-            overflow: 'hidden',
-            whiteSpace: 'nowrap',
-          }}
-          className="clickable"
-        >
-          {isThirdParty ? (
-            cloudModelsList.map((m) => (
-              <option key={m} value={m} style={{ background: 'var(--color-surface-card)', color: 'var(--color-text-primary)', fontSize: '12px', fontWeight: 500 }}>
-                {m}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Wifi size={14} style={{ color: modelStatus === 'connected' ? 'var(--color-success)' : 'var(--color-text-disabled)' }} />
+          <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>{modelStatus === 'connected' ? 'Active' : modelStatus === 'checking' ? 'Checking' : 'Offline'}</span>
+          <select
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+            disabled={!isThirdParty && (isCheckingModel || detectedModels.length === 0)}
+            style={{
+              fontSize: '13px',
+              fontWeight: 600,
+              background: 'transparent',
+              color: 'var(--color-text-primary)',
+              border: 'none',
+              outline: 'none',
+              cursor: 'pointer',
+              padding: 0,
+              fontFamily: 'inherit',
+              letterSpacing: '-0.01em',
+              textOverflow: 'ellipsis',
+              overflow: 'hidden',
+              whiteSpace: 'nowrap',
+            }}
+            className="clickable"
+          >
+            {isThirdParty ? (
+              cloudModelsList.map((m) => (
+                <option key={m} value={m} style={{ background: 'var(--color-surface-card)', color: 'var(--color-text-primary)', fontSize: '12px', fontWeight: 500 }}>
+                  {m}
+                </option>
+              ))
+            ) : detectedModels.length > 0 ? (
+              detectedModels.map((m) => (
+                <option key={m} value={m} style={{ background: 'var(--color-surface-card)', color: 'var(--color-text-primary)', fontSize: '12px', fontWeight: 500 }}>
+                  {m}
+                </option>
+              ))
+            ) : (
+              <option value="" style={{ background: 'var(--color-surface-card)', color: 'var(--color-text-disabled)' }}>
+                {isCheckingModel ? 'Checking...' : 'No models'}
               </option>
-            ))
-          ) : detectedModels.length > 0 ? (
-            detectedModels.map((m) => (
-              <option key={m} value={m} style={{ background: 'var(--color-surface-card)', color: 'var(--color-text-primary)', fontSize: '12px', fontWeight: 500 }}>
-                {m}
-              </option>
-            ))
-          ) : (
-            <option value="" style={{ background: 'var(--color-surface-card)', color: 'var(--color-text-disabled)' }}>
-              {isCheckingModel ? 'Checking...' : 'No models'}
-            </option>
-          )}
-        </select>
+            )}
+          </select>
+        </div>
       }
       onClose={onClose}
       messages={messages}
