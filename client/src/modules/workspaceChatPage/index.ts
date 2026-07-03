@@ -1,1 +1,1 @@
-export { WorkspaceChatPage } from './screens/WorkspaceChatPage';
+export { WorkspaceChatPage } from '../aiChat';

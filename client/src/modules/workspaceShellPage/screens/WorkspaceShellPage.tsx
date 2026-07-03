@@ -4,7 +4,7 @@ import { ArrowLeft } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
 import type { SidebarNavigationState, SidebarProps } from '../../../components/Sidebar';
 import { WorkspaceLayout } from '../../../layouts/WorkspaceLayout/WorkspaceLayout';
-import { AiChatDock } from '../../chats';
+import { AiChatDock, WorkspaceChatPage } from '../../aiChat';
 import { Button } from '@library';
 import { AuthScreen } from '../../auth';
 import type { TicketFilters, TicketListSort } from '../../tickets';
@@ -56,7 +56,6 @@ import {
   WorkspaceTeamProjectsPanel,
 } from '../../workspaces';
 import { createWorkspaceProjectCounts } from '../../workspaces/utils/workspaceProjectCounts';
-import { WorkspaceChatPage } from '../../workspaceChatPage';
 import '../../workspaceProjectsPanel/styles/WorkspaceProjectsPage.css';
 import '../../workspacePage/styles/WorkspacePage.css';
 import { WorkspacePageLayout } from '../../../layouts/WorkspacePageLayout/WorkspacePageLayout';

@@ -2,7 +2,7 @@ import type { ComponentProps } from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AiChatDock } from '../../modules/chats/components/AiChatDock';
+import { AiChatDock } from '../../modules/aiChat/components/AiChatDock';
 
 const mocks = vi.hoisted(() => ({
   useAuth: vi.fn(),

@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { WorkspaceChatDock } from '../../modules/chats/components/WorkspaceChatDock';
+import { WorkspaceChatDock } from '../../modules/aiChat/components/WorkspaceChatDock';
 
 const mocks = vi.hoisted(() => ({
   useAuth: vi.fn(),
