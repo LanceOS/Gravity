@@ -6,9 +6,62 @@ export interface FormattedMarkdownProps {
   text: string;
   customTokenRegex?: RegExp;
   renderCustomToken?: (match: RegExpMatchArray, key: number) => React.ReactNode | null;
+  tone?: 'default' | 'accent' | 'danger';
 }
 
-function InlineFormattedText({ text, customTokenRegex, renderCustomToken }: FormattedMarkdownProps) {
+interface MarkdownToneStyles {
+  textPrimary: string;
+  textSecondary: string;
+  accent: string;
+  border: string;
+  surface: string;
+  surfaceMuted: string;
+  surfaceSubtle: string;
+  inlineCodeBackground: string;
+  iconMuted: string;
+}
+
+const MARKDOWN_TONES: Record<NonNullable<FormattedMarkdownProps['tone']>, MarkdownToneStyles> = {
+  default: {
+    textPrimary: 'var(--color-text-primary)',
+    textSecondary: 'var(--color-text-secondary)',
+    accent: 'var(--color-primary)',
+    border: 'var(--color-border-default)',
+    surface: 'var(--color-surface-card)',
+    surfaceMuted: 'var(--color-surface-app)',
+    surfaceSubtle: 'var(--color-base50)',
+    inlineCodeBackground: 'var(--color-base100)',
+    iconMuted: 'var(--color-text-disabled)',
+  },
+  accent: {
+    textPrimary: 'var(--color-text-on-accent)',
+    textSecondary: 'color-mix(in srgb, var(--color-text-on-accent) 78%, transparent)',
+    accent: 'var(--color-text-on-accent)',
+    border: 'color-mix(in srgb, var(--color-text-on-accent) 18%, transparent)',
+    surface: 'color-mix(in srgb, var(--color-text-on-accent) 8%, transparent)',
+    surfaceMuted: 'color-mix(in srgb, var(--color-text-on-accent) 12%, transparent)',
+    surfaceSubtle: 'color-mix(in srgb, var(--color-text-on-accent) 10%, transparent)',
+    inlineCodeBackground: 'color-mix(in srgb, var(--color-text-on-accent) 14%, transparent)',
+    iconMuted: 'color-mix(in srgb, var(--color-text-on-accent) 68%, transparent)',
+  },
+  danger: {
+    textPrimary: 'var(--color-text-error)',
+    textSecondary: 'color-mix(in srgb, var(--color-text-error) 72%, var(--color-text-secondary))',
+    accent: 'var(--color-text-error)',
+    border: 'var(--color-border-error)',
+    surface: 'color-mix(in srgb, var(--color-bg-error) 86%, var(--color-surface-card))',
+    surfaceMuted: 'color-mix(in srgb, var(--color-bg-error) 92%, var(--color-surface-card))',
+    surfaceSubtle: 'color-mix(in srgb, var(--color-bg-error) 78%, var(--color-surface-card))',
+    inlineCodeBackground: 'color-mix(in srgb, var(--color-bg-error) 72%, var(--color-surface-card))',
+    iconMuted: 'color-mix(in srgb, var(--color-text-error) 66%, var(--color-text-secondary))',
+  },
+};
+
+interface InlineFormattedTextProps extends Omit<FormattedMarkdownProps, 'tone'> {
+  toneStyles: MarkdownToneStyles;
+}
+
+function InlineFormattedText({ text, customTokenRegex, renderCustomToken, toneStyles }: InlineFormattedTextProps) {
   const parts: React.ReactNode[] = [];
   let keyIndex = 0;
   let lastIndex = 0;
@@ -32,7 +85,7 @@ function InlineFormattedText({ text, customTokenRegex, renderCustomToken }: Form
 
     if (match[1]) {
       parts.push(
-        <strong key={keyIndex++} style={{ color: 'var(--color-text-primary)', fontWeight: 600 }}>
+        <strong key={keyIndex++} style={{ color: toneStyles.textPrimary, fontWeight: 600 }}>
           {match[1]}
         </strong>,
       );
@@ -53,12 +106,12 @@ function InlineFormattedText({ text, customTokenRegex, renderCustomToken }: Form
         <code
           key={keyIndex++}
           style={{
-            background: 'var(--color-base100)',
+            background: toneStyles.inlineCodeBackground,
             padding: '2px 4px',
             borderRadius: '4px',
             fontSize: '12px',
             fontFamily: 'var(--mono)',
-            color: 'var(--color-primary)',
+            color: toneStyles.accent,
           }}
         >
           {match[4]}
@@ -72,7 +125,7 @@ function InlineFormattedText({ text, customTokenRegex, renderCustomToken }: Form
           href={safeHref}
           target="_blank"
           rel="noopener noreferrer"
-          style={{ color: 'var(--color-primary)', textDecoration: 'none' }}
+          style={{ color: toneStyles.accent, textDecoration: 'underline', textDecorationColor: 'currentColor' }}
           className="clickable"
         >
           {match[5]}
@@ -102,9 +155,10 @@ function InlineFormattedText({ text, customTokenRegex, renderCustomToken }: Form
 interface CodeBlockProps {
   code: string;
   language?: string;
+  toneStyles: MarkdownToneStyles;
 }
 
-export function CodeBlock({ code, language }: CodeBlockProps) {
+export function CodeBlock({ code, language, toneStyles }: CodeBlockProps) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -122,9 +176,9 @@ export function CodeBlock({ code, language }: CodeBlockProps) {
       style={{
         margin: '12px 0',
         borderRadius: '8px',
-        border: '1px solid var(--color-border-default)',
+        border: `1px solid ${toneStyles.border}`,
         overflow: 'hidden',
-        background: 'var(--color-surface-card)',
+        background: toneStyles.surface,
       }}
     >
       <div
@@ -133,10 +187,10 @@ export function CodeBlock({ code, language }: CodeBlockProps) {
           justifyContent: 'space-between',
           alignItems: 'center',
           padding: '6px 12px',
-          background: 'var(--color-surface-app)',
-          borderBottom: '1px solid var(--color-border-default)',
+          background: toneStyles.surfaceMuted,
+          borderBottom: `1px solid ${toneStyles.border}`,
           fontSize: '11px',
-          color: 'var(--color-text-secondary)',
+          color: toneStyles.textSecondary,
           fontWeight: 500,
         }}
       >
@@ -148,7 +202,7 @@ export function CodeBlock({ code, language }: CodeBlockProps) {
           style={{
             background: 'transparent',
             border: 'none',
-            color: 'var(--color-text-secondary)',
+            color: toneStyles.textSecondary,
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
@@ -157,7 +211,7 @@ export function CodeBlock({ code, language }: CodeBlockProps) {
             borderRadius: '4px',
             transition: 'background var(--transition-fast)',
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-base100)'; }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = toneStyles.inlineCodeBackground; }}
           onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
         >
           {copied ? (
@@ -178,11 +232,11 @@ export function CodeBlock({ code, language }: CodeBlockProps) {
           margin: 0,
           padding: '12px',
           overflowX: 'auto',
-          background: 'var(--color-base50)',
+          background: toneStyles.surfaceSubtle,
           fontFamily: 'var(--mono)',
           fontSize: '12px',
           lineHeight: '1.5',
-          color: 'var(--color-text-primary)',
+          color: toneStyles.textPrimary,
         }}
       >
         <code>{code}</code>
@@ -204,10 +258,12 @@ interface MarkdownBlock {
   text?: string;
 }
 
-export function FormattedMarkdown({ text, customTokenRegex, renderCustomToken }: FormattedMarkdownProps) {
+export function FormattedMarkdown({ text, customTokenRegex, renderCustomToken, tone = 'default' }: FormattedMarkdownProps) {
   if (!text) {
     return null;
   }
+
+  const toneStyles = MARKDOWN_TONES[tone];
 
   // Parse markdown into blocks
   const parseBlocks = (): MarkdownBlock[] => {
@@ -371,7 +427,7 @@ export function FormattedMarkdown({ text, customTokenRegex, renderCustomToken }:
   const blocks = parseBlocks();
 
   return (
-    <div className="markdown-renderer" style={{ color: 'var(--color-text-primary)' }}>
+    <div className="markdown-renderer" style={{ color: toneStyles.textPrimary }}>
       {blocks.map((block, index) => {
         switch (block.type) {
           case 'heading': {
@@ -380,25 +436,25 @@ export function FormattedMarkdown({ text, customTokenRegex, renderCustomToken }:
               fontWeight: 600,
               marginTop: '16px',
               marginBottom: '8px',
-              color: 'var(--color-text-primary)',
+              color: toneStyles.textPrimary,
             };
             if (level === 1) {
               return (
                 <h1 key={index} style={{ ...headingStyle, fontSize: '20px' }}>
-                  <InlineFormattedText text={block.text || ''} customTokenRegex={customTokenRegex} renderCustomToken={renderCustomToken} />
+                  <InlineFormattedText text={block.text || ''} customTokenRegex={customTokenRegex} renderCustomToken={renderCustomToken} toneStyles={toneStyles} />
                 </h1>
               );
             }
             if (level === 2) {
               return (
                 <h2 key={index} style={{ ...headingStyle, fontSize: '16px' }}>
-                  <InlineFormattedText text={block.text || ''} customTokenRegex={customTokenRegex} renderCustomToken={renderCustomToken} />
+                  <InlineFormattedText text={block.text || ''} customTokenRegex={customTokenRegex} renderCustomToken={renderCustomToken} toneStyles={toneStyles} />
                 </h2>
               );
             }
             return (
               <h3 key={index} style={{ ...headingStyle, fontSize: '14px' }}>
-                <InlineFormattedText text={block.text || ''} customTokenRegex={customTokenRegex} renderCustomToken={renderCustomToken} />
+                <InlineFormattedText text={block.text || ''} customTokenRegex={customTokenRegex} renderCustomToken={renderCustomToken} toneStyles={toneStyles} />
               </h3>
             );
           }
@@ -407,14 +463,14 @@ export function FormattedMarkdown({ text, customTokenRegex, renderCustomToken }:
               <blockquote
                 key={index}
                 style={{
-                  borderLeft: '3px solid var(--color-border-default)',
+                  borderLeft: `3px solid ${toneStyles.border}`,
                   margin: '8px 0',
                   paddingLeft: '12px',
-                  color: 'var(--color-text-secondary)',
+                  color: toneStyles.textSecondary,
                   fontStyle: 'italic',
                 }}
               >
-                <InlineFormattedText text={block.text || ''} customTokenRegex={customTokenRegex} renderCustomToken={renderCustomToken} />
+                <InlineFormattedText text={block.text || ''} customTokenRegex={customTokenRegex} renderCustomToken={renderCustomToken} toneStyles={toneStyles} />
               </blockquote>
             );
           case 'list': {
@@ -442,20 +498,20 @@ export function FormattedMarkdown({ text, customTokenRegex, renderCustomToken }:
                       >
                         <div style={{ marginTop: '2px' }}>
                           {item.checked ? (
-                            <CheckSquare size={14} color="var(--color-primary)" />
+                            <CheckSquare size={14} color={toneStyles.accent} />
                           ) : (
-                            <Square size={14} color="var(--color-text-disabled)" />
+                            <Square size={14} color={toneStyles.iconMuted} />
                           )}
                         </div>
                         <span style={{ textDecoration: item.checked ? 'line-through' : 'none', opacity: item.checked ? 0.7 : 1 }}>
-                          <InlineFormattedText text={item.text} customTokenRegex={customTokenRegex} renderCustomToken={renderCustomToken} />
+                          <InlineFormattedText text={item.text} customTokenRegex={customTokenRegex} renderCustomToken={renderCustomToken} toneStyles={toneStyles} />
                         </span>
                       </li>
                     );
                   }
                   return (
                     <li key={itemIdx} style={{ margin: '2px 0' }}>
-                      <InlineFormattedText text={item.text} customTokenRegex={customTokenRegex} renderCustomToken={renderCustomToken} />
+                      <InlineFormattedText text={item.text} customTokenRegex={customTokenRegex} renderCustomToken={renderCustomToken} toneStyles={toneStyles} />
                     </li>
                   );
                 })}
@@ -463,13 +519,13 @@ export function FormattedMarkdown({ text, customTokenRegex, renderCustomToken }:
             );
           }
           case 'code-block':
-            return <CodeBlock key={index} code={block.code || ''} language={block.language} />;
+            return <CodeBlock key={index} code={block.code || ''} language={block.language} toneStyles={toneStyles} />;
           case 'table':
             return (
-              <div key={index} style={{ overflowX: 'auto', margin: '12px 0', borderRadius: '8px', border: '1px solid var(--color-border-default)' }}>
+              <div key={index} style={{ overflowX: 'auto', margin: '12px 0', borderRadius: '8px', border: `1px solid ${toneStyles.border}` }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', textAlign: 'left' }}>
                   <thead>
-                    <tr style={{ background: 'var(--color-surface-app)', borderBottom: '2px solid var(--color-border-default)' }}>
+                    <tr style={{ background: toneStyles.surfaceMuted, borderBottom: `2px solid ${toneStyles.border}` }}>
                       {block.headers?.map((header, colIdx) => (
                         <th
                           key={colIdx}
@@ -477,10 +533,10 @@ export function FormattedMarkdown({ text, customTokenRegex, renderCustomToken }:
                             padding: '8px 12px',
                             fontWeight: 600,
                             textAlign: block.alignments?.[colIdx] || 'left',
-                            color: 'var(--color-text-primary)',
+                            color: toneStyles.textPrimary,
                           }}
                         >
-                          <InlineFormattedText text={header} customTokenRegex={customTokenRegex} renderCustomToken={renderCustomToken} />
+                          <InlineFormattedText text={header} customTokenRegex={customTokenRegex} renderCustomToken={renderCustomToken} toneStyles={toneStyles} />
                         </th>
                       ))}
                     </tr>
@@ -490,8 +546,8 @@ export function FormattedMarkdown({ text, customTokenRegex, renderCustomToken }:
                       <tr
                         key={rowIdx}
                         style={{
-                          borderBottom: '1px solid var(--color-border-default)',
-                          background: rowIdx % 2 === 0 ? 'transparent' : 'var(--color-surface-app)',
+                          borderBottom: `1px solid ${toneStyles.border}`,
+                          background: rowIdx % 2 === 0 ? 'transparent' : toneStyles.surfaceMuted,
                         }}
                       >
                         {row.map((cell, cellIdx) => (
@@ -500,10 +556,10 @@ export function FormattedMarkdown({ text, customTokenRegex, renderCustomToken }:
                             style={{
                               padding: '8px 12px',
                               textAlign: block.alignments?.[cellIdx] || 'left',
-                              color: 'var(--color-text-secondary)',
+                              color: toneStyles.textSecondary,
                             }}
                           >
-                            <InlineFormattedText text={cell} customTokenRegex={customTokenRegex} renderCustomToken={renderCustomToken} />
+                            <InlineFormattedText text={cell} customTokenRegex={customTokenRegex} renderCustomToken={renderCustomToken} toneStyles={toneStyles} />
                           </td>
                         ))}
                       </tr>
@@ -518,7 +574,7 @@ export function FormattedMarkdown({ text, customTokenRegex, renderCustomToken }:
           default:
             return (
               <div key={index} style={{ margin: '4px 0', lineHeight: 1.5 }}>
-                <InlineFormattedText text={block.text || ''} customTokenRegex={customTokenRegex} renderCustomToken={renderCustomToken} />
+                <InlineFormattedText text={block.text || ''} customTokenRegex={customTokenRegex} renderCustomToken={renderCustomToken} toneStyles={toneStyles} />
               </div>
             );
         }
