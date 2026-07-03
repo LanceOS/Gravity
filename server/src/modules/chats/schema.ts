@@ -8,7 +8,7 @@ export const chatSessions = pgTable(
   {
     id: text('id').primaryKey(),
     projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
-    teamId: text('team_id').notNull().references(() => teams.id, { onDelete: 'cascade' }),
+    teamId: text('team_id').references(() => teams.id, { onDelete: 'cascade' }),
     userId: text('user_id').notNull().references(() => authUsers.id, { onDelete: 'cascade' }),
     title: text('title').notNull().default('New Chat'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
