@@ -55,16 +55,32 @@ describe('ChatSidebar', () => {
     expect(screen.getByText(/minute/)).toBeInTheDocument();
   });
 
+  it('keeps the sidebar locked to its default expanded width', () => {
+    render(<ChatSidebar {...baseProps({
+      sessions: [{
+        ...sessions[0],
+        title: 'An extremely long first message title that would otherwise try to stretch the sidebar beyond its intended width',
+        lastMessagePreview: 'A very long preview that should be clipped instead of making the sidebar itself wider than the standard dock size.',
+      }],
+    })} />);
+
+    expect(screen.getByTestId('chat-sidebar')).toHaveStyle({
+      width: '268px',
+      minWidth: '268px',
+      maxWidth: '268px',
+      flexBasis: '268px',
+      flexGrow: '0',
+      flexShrink: '0',
+      overflow: 'hidden',
+    });
+  });
+
   it('selects a session when its row is clicked', async () => {
     const user = userEvent.setup();
     const onSelectSession = vi.fn();
     render(<ChatSidebar {...baseProps({ onSelectSession })} />);
 
     await user.click(screen.getByText('Roadmap Planning'));
-    // Clicking the title itself enters rename mode instead of selecting.
-    expect(onSelectSession).not.toHaveBeenCalled();
-
-    await user.click(screen.getByText('Let us outline the Q3 roadmap.'));
     expect(onSelectSession).toHaveBeenCalledWith('chat-1');
   });
 
@@ -77,12 +93,12 @@ describe('ChatSidebar', () => {
     expect(onCreateSession).toHaveBeenCalledTimes(1);
   });
 
-  it('renames a chat inline via clicking the title', async () => {
+  it('renames a chat inline via double-clicking the title', async () => {
     const user = userEvent.setup();
     const onRenameSession = vi.fn();
     render(<ChatSidebar {...baseProps({ onRenameSession })} />);
 
-    await user.click(screen.getByText('Roadmap Planning'));
+    await user.dblClick(screen.getByText('Roadmap Planning'));
     const input = screen.getByLabelText('Chat title');
     await user.clear(input);
     await user.type(input, 'Renamed Roadmap{Enter}');
@@ -95,7 +111,7 @@ describe('ChatSidebar', () => {
     const onRenameSession = vi.fn();
     render(<ChatSidebar {...baseProps({ onRenameSession })} />);
 
-    await user.click(screen.getByText('Roadmap Planning'));
+    await user.dblClick(screen.getByText('Roadmap Planning'));
     const input = screen.getByLabelText('Chat title');
     await user.type(input, ' extra{Escape}');
 
@@ -161,6 +177,12 @@ describe('ChatSidebar', () => {
     expect(screen.queryByPlaceholderText('Search chats...')).not.toBeInTheDocument();
     expect(screen.queryByText('Roadmap Planning')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Expand chat history' })).toBeInTheDocument();
+    expect(screen.getByTestId('chat-sidebar')).toHaveStyle({
+      width: '52px',
+      minWidth: '52px',
+      maxWidth: '52px',
+      flexBasis: '52px',
+    });
   });
 
   it('loads more sessions when the scroll sentinel intersects and more pages remain', () => {

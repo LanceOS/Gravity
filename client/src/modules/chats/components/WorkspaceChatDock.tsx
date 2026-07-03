@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ChatSidebar } from '@library';
 import { LocalAIChat, type Message } from '../../ai';
 import type { WorkspaceSettings } from '../../../utils/settings';
@@ -45,18 +45,30 @@ export function WorkspaceChatDock({
     refreshSessions,
   } = useChatSessionsList(resolvedProjectId);
 
-  const [activeChatId, setActiveChatId] = useState('');
+  const [selectedChatId, setSelectedChatId] = useState('');
+  const [liveChatId, setLiveChatId] = useState('');
   const [activeMessages, setActiveMessages] = useState<Message[] | undefined>(undefined);
   const [isLoadingSession, setIsLoadingSession] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [chatViewVersion, setChatViewVersion] = useState(0);
+  const hasResolvedProjectIdRef = useRef(false);
 
   useEffect(() => {
-    setActiveChatId('');
+    if (!hasResolvedProjectIdRef.current) {
+      hasResolvedProjectIdRef.current = true;
+      return;
+    }
+
+    setSelectedChatId('');
+    setLiveChatId('');
     setActiveMessages(undefined);
+    setChatViewVersion((current) => current + 1);
   }, [resolvedProjectId]);
 
+  const activeSidebarChatId = selectedChatId || liveChatId;
+
   const handleSelectSession = async (chatId: string) => {
-    if (!resolvedProjectId || chatId === activeChatId) {
+    if (!resolvedProjectId || chatId === activeSidebarChatId) {
       return;
     }
 
@@ -67,7 +79,9 @@ export function WorkspaceChatDock({
         .filter((message) => message.role === 'user' || message.role === 'assistant')
         .map((message) => ({ role: message.role, content: message.content }));
       setActiveMessages(transcript);
-      setActiveChatId(chatId);
+      setSelectedChatId(chatId);
+      setLiveChatId(chatId);
+      setChatViewVersion((current) => current + 1);
     } catch (error) {
       console.error('Failed to load chat session:', error);
     } finally {
@@ -82,8 +96,10 @@ export function WorkspaceChatDock({
 
     try {
       const created = await createSession();
-      setActiveChatId(created.id);
+      setSelectedChatId(created.id);
+      setLiveChatId(created.id);
       setActiveMessages([]);
+      setChatViewVersion((current) => current + 1);
     } catch (error) {
       console.error('Failed to create chat session:', error);
     }
@@ -91,14 +107,16 @@ export function WorkspaceChatDock({
 
   const handleDeleteSession = (chatId: string) => {
     deleteSession(chatId);
-    if (chatId === activeChatId) {
-      setActiveChatId('');
+    if (chatId === selectedChatId || chatId === liveChatId) {
+      setSelectedChatId('');
+      setLiveChatId('');
       setActiveMessages(undefined);
+      setChatViewVersion((current) => current + 1);
     }
   };
 
   const handleSessionCreatedFromChatWindow = (chatId: string) => {
-    setActiveChatId(chatId);
+    setLiveChatId(chatId);
     refreshSessions();
   };
 
@@ -139,7 +157,7 @@ export function WorkspaceChatDock({
     >
       <ChatSidebar
         sessions={sidebarSessions}
-        activeSessionId={activeChatId}
+        activeSessionId={activeSidebarChatId}
         isLoading={isLoading || isLoadingSession}
         isFetchingNextPage={isFetchingNextPage}
         hasNextPage={hasNextPage}
@@ -158,13 +176,13 @@ export function WorkspaceChatDock({
 
       <div style={{ flex: 1, minWidth: 0, minHeight: 0 }}>
         <LocalAIChat
-          key={`${resolvedProjectId || 'no-project'}:${activeChatId || 'unstarted'}`}
+          key={`${resolvedProjectId || 'no-project'}:${chatViewVersion}`}
           initialOllamaUrl={initialOllamaUrl}
           initialModel={initialModel}
           settings={settings}
           workspaceId={workspaceId}
           projectId={resolvedProjectId}
-          seedChatSessionId={activeChatId}
+          seedChatSessionId={selectedChatId}
           seedMessages={activeMessages}
           onSessionCreated={handleSessionCreatedFromChatWindow}
           variant="embedded"

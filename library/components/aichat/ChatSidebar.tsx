@@ -84,6 +84,8 @@ export function ChatSidebar({
         targets: sidebarRef.current,
         width: [fromWidth, toWidth],
         minWidth: [fromWidth, toWidth],
+        maxWidth: [fromWidth, toWidth],
+        flexBasis: [fromWidth, toWidth],
         duration: 220,
         easing: 'cubicBezier(0.2, 0, 0.38, 1)',
       });
@@ -135,6 +137,7 @@ export function ChatSidebar({
 
   const trimmedSearch = searchValue.trim();
   const showEmptyState = !isLoading && sessions.length === 0;
+  const sidebarWidth = collapsed ? COLLAPSED_WIDTH : EXPANDED_WIDTH;
 
   return (
     <div
@@ -143,14 +146,19 @@ export function ChatSidebar({
       data-testid="chat-sidebar"
       data-collapsed={collapsed ? 'true' : 'false'}
       style={{
-        width: collapsed ? COLLAPSED_WIDTH : EXPANDED_WIDTH,
-        minWidth: collapsed ? COLLAPSED_WIDTH : EXPANDED_WIDTH,
+        width: sidebarWidth,
+        minWidth: sidebarWidth,
+        maxWidth: sidebarWidth,
+        flexBasis: sidebarWidth,
+        flexGrow: 0,
+        flexShrink: 0,
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
         borderRight: '1px solid var(--color-border-default)',
         background: 'var(--color-surface-app)',
         overflow: 'hidden',
+        boxSizing: 'border-box',
         ...style,
       }}
     >
@@ -235,6 +243,7 @@ export function ChatSidebar({
       <div
         style={{
           flex: 1,
+          minWidth: 0,
           overflowY: 'auto',
           padding: collapsed ? '12px 0' : '0 6px 6px',
           display: 'flex',
@@ -347,6 +356,8 @@ export function ChatSidebar({
                     position: 'relative',
                     display: 'flex',
                     flexDirection: 'column',
+                    minWidth: 0,
+                    maxWidth: '100%',
                     gap: '3px',
                     padding: '10px 12px 10px 18px',
                     borderRadius: 'var(--radius-sm)',
@@ -356,6 +367,8 @@ export function ChatSidebar({
                     transition: 'all var(--transition-fast)',
                     border: '1px solid transparent',
                     borderColor: isActive ? 'var(--color-border-focus)' : 'transparent',
+                    overflow: 'hidden',
+                    boxSizing: 'border-box',
                   }}
                 >
                   {isActive && (
@@ -405,7 +418,7 @@ export function ChatSidebar({
                     </div>
                   ) : (
                     <>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, maxWidth: '100%' }}>
                         {isEditing ? (
                           <input
                             autoFocus
@@ -437,14 +450,16 @@ export function ChatSidebar({
                           />
                         ) : (
                           <span
-                            onClick={(event) => {
+                            onDoubleClick={(event) => {
                               event.stopPropagation();
                               startEditing(session);
                             }}
-                            title="Click to rename"
+                            title="Double-click to rename"
                             style={{
+                              display: 'block',
                               flex: 1,
                               minWidth: 0,
+                              maxWidth: '100%',
                               fontSize: '12.5px',
                               fontWeight: 600,
                               color: isActive ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
@@ -487,8 +502,10 @@ export function ChatSidebar({
                       {session.lastMessagePreview && (
                         <span
                           style={{
+                            display: 'block',
                             fontSize: '11.5px',
                             color: 'var(--color-text-disabled)',
+                            maxWidth: '100%',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
                             whiteSpace: 'nowrap',
