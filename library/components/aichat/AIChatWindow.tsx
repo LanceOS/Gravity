@@ -93,6 +93,8 @@ export function AIChatWindow({
     setChatInput('');
   };
 
+  const isStartingOut = messages.length === 0 && !isGenerating;
+
   return (
     <div
       ref={windowRef}
@@ -101,19 +103,15 @@ export function AIChatWindow({
       <div
         style={{
           padding: '14px 16px',
-          borderBottom: '1px solid var(--color-border-default)',
           display: 'flex',
           alignItems: 'center',
           gap: '8px',
-          background: 'color-mix(in srgb, var(--color-surface-elevated) 85%, transparent)',
-          backdropFilter: 'blur(8px)',
-          WebkitBackdropFilter: 'blur(8px)',
+          background: 'transparent',
         }}
       >
-        <Sparkles size={16} color="var(--color-primary)" style={{ flexShrink: 0 }} />
-        <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--color-text-primary)', letterSpacing: '-0.01em' }}>
-          {title}
-        </span>
+        <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--color-text-primary)', letterSpacing: '-0.01em', display: 'flex', alignItems: 'center' }}>
+          {!isStartingOut && title}
+        </div>
 
         {onClose && (
           <button
@@ -160,13 +158,13 @@ export function AIChatWindow({
 
       <div
         style={{
-          flex: 1,
+          flex: isStartingOut ? 0 : 1,
           overflowY: 'auto',
-          padding: '20px 16px',
-          display: 'flex',
+          padding: isStartingOut ? 0 : '20px 16px',
+          display: isStartingOut ? 'none' : 'flex',
           flexDirection: 'column',
           gap: '18px',
-          background: 'color-mix(in srgb, var(--color-surface-elevated) 40%, var(--color-surface-app))',
+          background: 'transparent',
         }}
       >
         {messages.map((m, idx) => (
@@ -220,10 +218,24 @@ export function AIChatWindow({
       <div
         style={{
           padding: '12px 16px 16px',
-          borderTop: '1px solid var(--color-border-default)',
-          background: 'var(--color-surface-elevated)',
+          background: 'transparent',
+          ...(isStartingOut ? {
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center',
+            maxWidth: '600px',
+            margin: '0 auto',
+            width: '100%',
+          } : {})
         }}
       >
+        {isStartingOut && (
+          <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'center' }}>
+            {title}
+          </div>
+        )}
         <form
           onSubmit={handleSubmit}
           style={{
@@ -236,6 +248,7 @@ export function AIChatWindow({
             padding: '8px 10px 8px 14px',
             boxShadow: isFocused ? '0 0 0 3px var(--color-state-selected-bg)' : 'var(--shadow-sm)',
             transition: 'border-color var(--transition-fast), box-shadow var(--transition-fast)',
+            width: isStartingOut ? '100%' : undefined,
           }}
         >
           <DenseTextarea

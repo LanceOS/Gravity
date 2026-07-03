@@ -116,7 +116,7 @@ export function WorkspaceChatDock({
     width: isMobile ? '100%' : undefined,
     minWidth: isMobile ? 0 : undefined,
     height: isMobile ? '280px' : '100%',
-    borderRight: isEmbedded ? 'none' : (isMobile ? 'none' : undefined),
+    borderRight: isMobile ? 'none' : '1px solid var(--color-border-default)',
     borderBottom: isEmbedded ? 'none' : (isMobile ? '1px solid var(--color-border-default)' : undefined),
   };
 

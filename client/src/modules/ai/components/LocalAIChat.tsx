@@ -3,7 +3,7 @@ import { useAuth } from '../../../context/auth/AuthContext';
 import { useProjectContext } from '../../../context/project/ProjectContext';
 import { useActiveTicket } from '../../../context/ticket/ActiveTicketContext';
 import { useUserDirectory } from '../../../context/user/UserDirectoryContext';
-import { FileText, ListPlus, Sparkles, Wifi, WifiOff } from 'lucide-react';
+import { FileText, ListPlus, Sparkles, Wifi, WifiOff, Cpu } from 'lucide-react';
 import { DenseTextInput, AIChatWindow } from '@library';
 import type { LocalAIChatProps, Message, QuickActionType } from '../types/LocalAIChat';
 import { buildOllamaErrorMessage, buildQuickActionPrompt, getInitialMessages, getInitialModel, getInitialOllamaUrl } from '../utils/LocalAIChat';
@@ -499,94 +499,53 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({
   return (
     <AIChatWindow
       isClosing={isClosing}
-      title={isThirdParty ? `${getProviderName(settings.aiProvider)} Assistant` : 'Local AI Assistant'}
+      title={
+        <select
+          value={model}
+          onChange={(e) => setModel(e.target.value)}
+          disabled={!isThirdParty && (isCheckingModel || detectedModels.length === 0)}
+          style={{
+            fontSize: '13px',
+            fontWeight: 600,
+            background: 'transparent',
+            color: 'var(--color-text-primary)',
+            border: 'none',
+            outline: 'none',
+            cursor: 'pointer',
+            padding: 0,
+            fontFamily: 'inherit',
+            letterSpacing: '-0.01em',
+            textOverflow: 'ellipsis',
+            overflow: 'hidden',
+            whiteSpace: 'nowrap',
+          }}
+          className="clickable"
+        >
+          {isThirdParty ? (
+            cloudModelsList.map((m) => (
+              <option key={m} value={m} style={{ background: 'var(--color-surface-card)', color: 'var(--color-text-primary)', fontSize: '12px', fontWeight: 500 }}>
+                {m}
+              </option>
+            ))
+          ) : detectedModels.length > 0 ? (
+            detectedModels.map((m) => (
+              <option key={m} value={m} style={{ background: 'var(--color-surface-card)', color: 'var(--color-text-primary)', fontSize: '12px', fontWeight: 500 }}>
+                {m}
+              </option>
+            ))
+          ) : (
+            <option value="" style={{ background: 'var(--color-surface-card)', color: 'var(--color-text-disabled)' }}>
+              {isCheckingModel ? 'Checking...' : 'No models'}
+            </option>
+          )}
+        </select>
+      }
       onClose={onClose}
       messages={messages}
       onSendMessage={(text) => handleSendMessage(text)}
       isGenerating={isGenerating}
       placeholder={activeTicket ? "Ask about this ticket..." : "Ask AI a question..."}
       variant={variant}
-      settingsPanel={
-        <>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '11px' }}>
-            <span style={{ color: 'var(--color-text-disabled)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-              {isThirdParty ? 'Cloud Provider Status:' : 'Ollama Endpoint Status:'}
-            </span>
-            <span
-              onClick={() => !isThirdParty && void checkOllamaStatus()}
-              className={isThirdParty ? "" : "clickable"}
-              style={{
-                marginLeft: 'auto',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px',
-                fontWeight: 600,
-                color: modelStatus === 'connected' ? 'var(--color-success)' : modelStatus === 'checking' ? 'var(--color-text-secondary)' : 'var(--color-error)',
-                cursor: isThirdParty ? 'default' : 'pointer'
-              }}
-            >
-              {modelStatus === 'connected' ? <Wifi size={12} /> : <WifiOff size={12} />}
-              {modelStatus === 'connected' ? 'Active' : modelStatus === 'checking' ? 'Checking...' : 'Offline'}
-            </span>
-          </div>
-
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            {!isThirdParty ? (
-              <DenseTextInput
-                placeholder="http://localhost:11434"
-                value={ollamaUrl}
-                onChange={(e) => setOllamaUrl(e.target.value)}
-                onBlur={() => void checkOllamaStatus()}
-                style={{ fontSize: '11.5px', flex: 1 }}
-              />
-            ) : null}
-
-            <select
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              disabled={!isThirdParty && (isCheckingModel || detectedModels.length === 0)}
-              style={{
-                fontSize: '11.5px',
-                height: '32px',
-                borderRadius: '6px',
-                border: '1px solid var(--color-border-default)',
-                background: 'var(--color-surface-card)',
-                color: 'var(--color-text-secondary)',
-                padding: '0 8px',
-                outline: 'none',
-                cursor: 'pointer',
-                flex: isThirdParty ? 1 : '0 0 120px',
-                maxWidth: '100%',
-                transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
-              }}
-              className="clickable"
-            >
-              {isThirdParty ? (
-                cloudModelsList.map((m) => (
-                  <option key={m} value={m} style={{ background: 'var(--color-surface-card)', color: 'var(--color-text-secondary)' }}>
-                    {m}
-                  </option>
-                ))
-              ) : detectedModels.length > 0 ? (
-                detectedModels.map((m) => (
-                  <option key={m} value={m} style={{ background: 'var(--color-surface-card)', color: 'var(--color-text-secondary)' }}>
-                    {m}
-                  </option>
-                ))
-              ) : (
-                <option value="" style={{ background: 'var(--color-surface-card)', color: 'var(--color-text-disabled)' }}>
-                  {isCheckingModel ? 'Checking...' : 'No models'}
-                </option>
-              )}
-            </select>
-          </div>
-          {!model && !isCheckingModel && !isThirdParty ? (
-            <div style={{ fontSize: '11px', color: 'var(--color-text-disabled)', lineHeight: 1.4 }}>
-              No models detected. Ensure Ollama is running and has models installed.
-            </div>
-          ) : null}
-        </>
-      }
       quickActions={
         activeTicket ? (
           <>

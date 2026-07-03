@@ -19,7 +19,7 @@ export const getWindowStyle = (
       maxWidth: 'none',
       height: '100%',
       maxHeight: 'none',
-      background: 'var(--color-surface-elevated)',
+      background: 'transparent',
       border: 'none',
       borderRadius: 0,
       boxShadow: 'none',
@@ -34,10 +34,10 @@ export const getWindowStyle = (
 
   return {
     position: 'fixed',
-    top: isMobile ? undefined : '64px',
+    top: isMobile ? undefined : '50px',
     bottom: isMobile ? '16px' : undefined,
     left: isMobile ? '0' : undefined,
-    right: isMobile ? '0' : '24px',
+    right: isMobile ? '0' : '16px',
     margin: isMobile ? '0 auto' : undefined,
     width: isMobile ? 'calc(100% - 32px)' : '360px',
     maxWidth: isMobile ? '400px' : undefined,

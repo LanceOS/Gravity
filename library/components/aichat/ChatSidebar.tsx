@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Check, ChevronsLeft, ChevronsRight, MessageSquarePlus, Trash2, X } from 'lucide-react';
+import { Check, ChevronsLeft, ChevronsRight, MessageSquarePlus, Trash2, X, Plus } from 'lucide-react';
+import anime from 'animejs';
 import { Button } from '../button';
 import { SearchInput } from '../searchinput';
 import { EmptyState } from '../emptystate';
@@ -58,6 +59,36 @@ export function ChatSidebar({
   const [editingTitle, setEditingTitle] = useState('');
   const [confirmingDeleteId, setConfirmingDeleteId] = useState('');
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const prevCollapsed = useRef(collapsed);
+  const isFirstRender = useRef(true);
+  const isReduced = typeof window === 'undefined'
+    ? false
+    : window.matchMedia('(prefers-reduced-motion: reduce)').matches || (typeof process !== 'undefined' && process.env.NODE_ENV === 'test');
+
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    if (isReduced) {
+      return;
+    }
+    if (sidebarRef.current) {
+      const fromWidth = prevCollapsed.current ? COLLAPSED_WIDTH : EXPANDED_WIDTH;
+      const toWidth = collapsed ? COLLAPSED_WIDTH : EXPANDED_WIDTH;
+      prevCollapsed.current = collapsed;
+
+      anime.remove(sidebarRef.current);
+      anime({
+        targets: sidebarRef.current,
+        width: [fromWidth, toWidth],
+        minWidth: [fromWidth, toWidth],
+        duration: 220,
+        easing: 'cubicBezier(0.2, 0, 0.38, 1)',
+      });
+    }
+  }, [collapsed, isReduced]);
 
   useEffect(() => {
     if (collapsed || !onLoadMore) {
@@ -107,6 +138,7 @@ export function ChatSidebar({
 
   return (
     <div
+      ref={sidebarRef}
       className={className}
       data-testid="chat-sidebar"
       data-collapsed={collapsed ? 'true' : 'false'}
@@ -118,7 +150,6 @@ export function ChatSidebar({
         flexDirection: 'column',
         borderRight: '1px solid var(--color-border-default)',
         background: 'var(--color-surface-app)',
-        transition: 'width 0.22s cubic-bezier(0.2, 0, 0.38, 1), min-width 0.22s cubic-bezier(0.2, 0, 0.38, 1)',
         overflow: 'hidden',
         ...style,
       }}
@@ -129,8 +160,8 @@ export function ChatSidebar({
           alignItems: 'center',
           gap: '6px',
           padding: '12px 10px',
-          borderBottom: '1px solid var(--color-border-default)',
-          justifyContent: collapsed ? 'center' : 'flex-start',
+          borderBottom: collapsed ? '1px solid var(--color-border-default)' : 'none',
+          justifyContent: 'center',
         }}
       >
         {onToggleCollapsed && (
@@ -150,6 +181,8 @@ export function ChatSidebar({
               flexShrink: 0,
               borderRadius: 'var(--radius-sm)',
               transition: 'color var(--transition-fast), background-color var(--transition-fast)',
+              width: collapsed ? '100%' : 'auto',
+              justifyContent: collapsed ? 'center' : 'flex-start',
             }}
             onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-secondary)'; e.currentTarget.style.backgroundColor = 'var(--color-base100)'; }}
             onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-disabled)'; e.currentTarget.style.backgroundColor = 'transparent'; }}
@@ -157,29 +190,41 @@ export function ChatSidebar({
             {collapsed ? <ChevronsRight size={16} /> : <ChevronsLeft size={16} />}
           </button>
         )}
-
-        <Button
-          type="button"
-          variant="primary"
-          size="sm"
-          onClick={onCreateSession}
-          loading={isCreatingSession}
-          aria-label="New Chat"
-          style={collapsed ? { flex: 'none', width: '32px', height: '32px', padding: 0, borderRadius: '50%' } : { flex: 1 }}
-        >
-          <MessageSquarePlus size={14} />
-          {!collapsed && <span>New Chat</span>}
-        </Button>
       </div>
 
       {!collapsed && (
-        <div style={{ padding: '8px' }}>
+        <div style={{ padding: '0 8px 8px' }}>
           <SearchInput
             placeholder="Search chats..."
             value={searchValue}
             onChange={(event) => onSearchChange(event.target.value)}
             aria-label="Search chats"
           />
+        </div>
+      )}
+
+      {collapsed ? (
+        <div style={{ padding: '8px 0', display: 'flex', justifyContent: 'center', borderBottom: '1px solid var(--color-border-default)' }}>
+          <button
+            onClick={onCreateSession}
+            style={{ background: 'transparent', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer', padding: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px' }}
+            className="clickable"
+            title="New Chat"
+          >
+            <Plus size={16} />
+          </button>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px 4px', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', letterSpacing: '0.04em' }}>
+          <span>CHATS</span>
+          <button
+            onClick={onCreateSession}
+            style={{ background: 'transparent', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px' }}
+            className="clickable"
+            title="New Chat"
+          >
+            <Plus size={14} />
+          </button>
         </div>
       )}
 
