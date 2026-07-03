@@ -1,8 +1,9 @@
-import type { ComponentProps } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AiChatDock } from '../../modules/chats/components/AiChatDock';
+import { WorkspaceChatDock } from '../../modules/chats/components/WorkspaceChatDock';
 
 const mocks = vi.hoisted(() => ({
   useAuth: vi.fn(),
@@ -57,9 +58,13 @@ const mockSettings = {
   agentIntegration: 'third_party' as const,
 };
 
-function renderDock(overrides: Partial<ComponentProps<typeof AiChatDock>> = {}) {
+function Wrapper({ children }: { children: ReactNode }) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+}
+
+function renderDock(overrides: Partial<ComponentProps<typeof WorkspaceChatDock>> = {}) {
   const props = {
-    onClose: vi.fn(),
     initialOllamaUrl: '',
     initialModel: 'claude-3-haiku',
     settings: mockSettings,
@@ -78,10 +83,10 @@ function renderDock(overrides: Partial<ComponentProps<typeof AiChatDock>> = {}) 
   mocks.useActiveTicket.mockReturnValue({ activeTicket: null, setActiveTicket: vi.fn() });
   mocks.useProjectContext.mockReturnValue({ projects: [] });
 
-  return render(<AiChatDock {...props} />);
+  return render(<WorkspaceChatDock {...props} />, { wrapper: Wrapper });
 }
 
-describe('AiChatDock', () => {
+describe('WorkspaceChatDock', () => {
   beforeEach(() => {
     mocks.useAuth.mockReset();
     mocks.useUserDirectory.mockReset();
@@ -100,80 +105,55 @@ describe('AiChatDock', () => {
     vi.unstubAllGlobals();
   });
 
-  it('renders the quick chat window without a history sidebar', async () => {
+  it('renders the history sidebar alongside the embedded chat window', async () => {
     mocks.fetch.mockImplementation((url: string) => {
-      if (url === '/api/v1/mcp/sse') return Promise.resolve(createJsonResponse({ result: { tools: [] } }));
-      return Promise.resolve(createJsonResponse({}));
-    });
-
-    renderDock();
-
-    await waitFor(() => {
-      expect(screen.getByPlaceholderText('Ask AI a question...')).toBeInTheDocument();
-    });
-
-    expect(screen.queryByText('No conversations yet.')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'New Chat' })).not.toBeInTheDocument();
-    expect(screen.queryByPlaceholderText('Search chats...')).not.toBeInTheDocument();
-  });
-
-  it('creates a chat session on first send and reuses it for later messages', async () => {
-    const user = userEvent.setup();
-    mocks.fetch.mockImplementation((url: string, init?: RequestInit) => {
-      if (url === '/api/v1/mcp/sse') return Promise.resolve(createJsonResponse({ result: { tools: [] } }));
-      if (url === '/api/v1/projects/project-1/chats' && init?.method === 'POST') {
-        return Promise.resolve(createJsonResponse({
-          id: 'chat-new',
+      if (url.includes('/chats?')) {
+        return Promise.resolve(createJsonResponse([{
+          id: 'chat-old',
           projectId: 'project-1',
           teamId: 'team-1',
           userId: 'user-1',
-          title: 'New Chat',
-          lastMessagePreview: null,
+          title: 'Old Chat',
+          lastMessagePreview: 'Hi! How can I help?',
           createdAt: '2026-01-01T00:00:00.000Z',
           updatedAt: '2026-01-01T00:00:00.000Z',
-        }, 201));
+        }]));
       }
-      if (url === '/api/v1/projects/project-1/chats/chat-new/stream') {
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          text: vi.fn().mockResolvedValue(
-            'data: {"type":"done","message":"Hi there","messageId":"msg-1","provider":"anthropic","model":"claude-3-haiku","fallback":false,"toolCalls":null}\n\n'
-          ),
-        });
+      if (url === '/api/v1/mcp/sse') return Promise.resolve(createJsonResponse({ result: { tools: [] } }));
+      if (url === '/api/v1/projects/project-1/chats/chat-old') {
+        return Promise.resolve(createJsonResponse({
+          id: 'chat-old',
+          projectId: 'project-1',
+          teamId: 'team-1',
+          userId: 'user-1',
+          title: 'Old Chat',
+          lastMessagePreview: 'Hi! How can I help?',
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-01T00:00:00.000Z',
+          messages: [
+            { id: 'm1', sessionId: 'chat-old', role: 'user', content: 'Hello from before', metadata: {}, createdAt: '2026-01-01T00:00:01.000Z' },
+            { id: 'm2', sessionId: 'chat-old', role: 'assistant', content: 'Hi! How can I help?', metadata: {}, createdAt: '2026-01-01T00:00:02.000Z' },
+          ],
+        }));
       }
       return Promise.resolve(createJsonResponse({}));
     });
 
+    const user = userEvent.setup();
     renderDock();
 
-    const chatInput = await screen.findByPlaceholderText('Ask AI a question...');
-    await user.type(chatInput, 'Hello');
-    await user.click(screen.getByRole('button', { name: 'Send message' }));
-
     await waitFor(() => {
-      expect(screen.getAllByText('Hi there').length).toBeGreaterThan(0);
+      expect(screen.getByText('Old Chat')).toBeInTheDocument();
     });
 
-    const createCallsAfterFirstSend = mocks.fetch.mock.calls.filter(
-      (call) => call[0] === '/api/v1/projects/project-1/chats' && call[1]?.method === 'POST'
-    );
-    expect(createCallsAfterFirstSend).toHaveLength(1);
+    const sessionRow = screen.getByText('Old Chat').closest('[role="button"]');
+    expect(sessionRow).not.toBeNull();
 
-    await user.type(chatInput, 'Second prompt');
-    await user.click(screen.getByRole('button', { name: 'Send message' }));
+    await user.click(sessionRow as HTMLElement);
 
     await waitFor(() => {
-      expect(screen.getAllByText('Hi there').length).toBeGreaterThan(0);
+      expect(screen.getByText('Hello from before')).toBeInTheDocument();
+      expect(screen.getAllByText('Hi! How can I help?').length).toBeGreaterThan(0);
     });
-
-    const createCallsAfterSecondSend = mocks.fetch.mock.calls.filter(
-      (call) => call[0] === '/api/v1/projects/project-1/chats' && call[1]?.method === 'POST'
-    );
-    expect(createCallsAfterSecondSend).toHaveLength(1);
-
-    const streamCalls = mocks.fetch.mock.calls.filter((call) => call[0] === '/api/v1/projects/project-1/chats/chat-new/stream');
-    expect(streamCalls).toHaveLength(2);
   });
 });

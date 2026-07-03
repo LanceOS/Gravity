@@ -3,7 +3,7 @@ import { Cpu, Loader2, Send, X } from 'lucide-react';
 import { DenseTextarea } from '../densetextarea';
 import { AIChatMessageBubble } from './AIChatMessage';
 import type { AIChatMessage } from './types';
-import { getWindowStyle } from './styles';
+import { getWindowStyle, type AIChatWindowVariant } from './styles';
 import anime from 'animejs';
 
 export interface AIChatWindowProps {
@@ -16,6 +16,7 @@ export interface AIChatWindowProps {
   quickActions?: React.ReactNode;
   placeholder?: string;
   isClosing?: boolean;
+  variant?: AIChatWindowVariant;
 }
 
 export function AIChatWindow({
@@ -28,6 +29,7 @@ export function AIChatWindow({
   quickActions,
   placeholder = 'Ask AI a question...',
   isClosing = false,
+  variant = 'floating',
 }: AIChatWindowProps) {
   const [chatInput, setChatInput] = useState('');
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -53,7 +55,7 @@ export function AIChatWindow({
       return;
     }
     if (windowRef.current) {
-      if (isClosing) {
+      if (variant === 'floating' && isClosing) {
         anime({
           targets: windowRef.current,
           opacity: [1, 0],
@@ -61,7 +63,7 @@ export function AIChatWindow({
           duration: 180,
           easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
         });
-      } else {
+      } else if (variant === 'floating') {
         windowRef.current.style.opacity = '0';
         windowRef.current.style.transform = 'translateY(12px)';
         anime({
@@ -73,7 +75,7 @@ export function AIChatWindow({
         });
       }
     }
-  }, [isClosing, isReduced]);
+  }, [isClosing, isReduced, variant]);
 
   useEffect(() => {
     return () => {
@@ -93,7 +95,7 @@ export function AIChatWindow({
   return (
     <div
       ref={windowRef}
-      style={getWindowStyle(isMobile, isClosing)}
+      style={getWindowStyle(variant, isMobile, isClosing)}
     >
       <div
         style={{

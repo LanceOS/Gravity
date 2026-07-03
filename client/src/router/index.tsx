@@ -58,7 +58,7 @@ const appShellPaths = ['/', '/workspaces'];
 const workspaceShellRouteGroups = [
   {
     basePath: '/workspaces/:workspaceId',
-    suffixes: ['', '/projects', '/projects/list', '/teams', '/all'],
+    suffixes: ['', '/projects', '/projects/list', '/teams', '/all', '/chat'],
   },
   {
     basePath: '/workspaces/:workspaceId/teams/:teamId',

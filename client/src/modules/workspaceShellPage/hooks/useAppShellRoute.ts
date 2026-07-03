@@ -26,9 +26,14 @@ export function useAppShellRoute(currentUserId?: string) {
     pathname === `/workspaces/${workspaceId}/projects/list` ||
     pathname === `/workspaces/${workspaceId}/projects/list/`
   );
+  const isWorkspaceChatPath = !!workspaceId && (
+    pathname === `/workspaces/${workspaceId}/chat` ||
+    pathname === `/workspaces/${workspaceId}/chat/`
+  );
   const isTeamAggregatePath = !!teamIdParam && !projectIdParam;
   const shouldUseAggregateTicketScope = isWorkspaceAllTasksPath || isTeamAggregatePath;
-  const shouldKeepActiveProjectSelection = isWorkspaceAllTasksPath || isWorkspaceProjectsListPath || isTeamAggregatePath;
+  const shouldKeepActiveProjectSelection =
+    isWorkspaceAllTasksPath || isWorkspaceProjectsListPath || isWorkspaceChatPath || isTeamAggregatePath;
 
   useTicketRelationsSnapshot(ticketKey, currentUserId);
 
@@ -49,6 +54,7 @@ export function useAppShellRoute(currentUserId?: string) {
     navigate,
     isWorkspaceAllTasksPath,
     isWorkspaceProjectsListPath,
+    isWorkspaceChatPath,
     isTeamAggregatePath,
     shouldUseAggregateTicketScope,
     shouldKeepActiveProjectSelection,
@@ -58,6 +64,7 @@ export function useAppShellRoute(currentUserId?: string) {
     isTeamAggregatePath,
     isWorkspaceAllTasksPath,
     isWorkspaceProjectsListPath,
+    isWorkspaceChatPath,
     labelIdParam,
     legacyDomainIdParam,
     navigate,

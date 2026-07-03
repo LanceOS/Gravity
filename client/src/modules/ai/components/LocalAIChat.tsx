@@ -105,7 +105,19 @@ async function postChatCompletionSse(
   return doneEvent;
 }
 
-export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllamaUrl, initialModel, settings, workspaceId, projectId, isClosing, seedChatSessionId, seedMessages, onSessionCreated }) => {
+export const LocalAIChat: React.FC<LocalAIChatProps> = ({
+  onClose,
+  initialOllamaUrl,
+  initialModel,
+  settings,
+  workspaceId,
+  projectId,
+  isClosing,
+  variant = 'floating',
+  seedChatSessionId,
+  seedMessages,
+  onSessionCreated,
+}) => {
   const { activeTicket } = useActiveTicket();
   const { currentUser } = useAuth();
   const { users } = useUserDirectory();
@@ -181,6 +193,13 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
   useEffect(() => {
     chatSessionIdRef.current = chatSessionId;
   }, [chatSessionId]);
+
+  useEffect(() => {
+    const nextChatSessionId = seedChatSessionId || '';
+    chatSessionIdRef.current = nextChatSessionId;
+    setChatSessionId(nextChatSessionId);
+    setMessages(seedMessages && seedMessages.length > 0 ? seedMessages : getInitialMessages());
+  }, [seedChatSessionId, seedMessages]);
 
   useEffect(() => {
     if (isFirstProjectEffectRunRef.current) {
@@ -486,6 +505,7 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
       onSendMessage={(text) => handleSendMessage(text)}
       isGenerating={isGenerating}
       placeholder={activeTicket ? "Ask about this ticket..." : "Ask AI a question..."}
+      variant={variant}
       settingsPanel={
         <>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '11px' }}>

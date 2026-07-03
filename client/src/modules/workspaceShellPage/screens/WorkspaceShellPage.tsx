@@ -56,6 +56,7 @@ import {
   WorkspaceTeamProjectsPanel,
 } from '../../workspaces';
 import { createWorkspaceProjectCounts } from '../../workspaces/utils/workspaceProjectCounts';
+import { WorkspaceChatPage } from '../../workspaceChatPage';
 import '../../workspaceProjectsPanel/styles/WorkspaceProjectsPage.css';
 import '../../workspacePage/styles/WorkspacePage.css';
 import { WorkspacePageLayout } from '../../../layouts/WorkspacePageLayout/WorkspacePageLayout';
@@ -97,16 +98,19 @@ export function WorkspaceShellPage() {
   const { filters, setFilters } = useTicketFilters();
   const { activeView, setView } = useActiveView();
   const loading = authLoading || projectsLoading || usersLoading;
-  const [activeSection, setActiveSection] = useState<AppSection>('workspace');
+  const route = useAppShellRoute(currentUser?.id);
+  const [activeSection, setActiveSection] = useState<AppSection>(() => (route.isWorkspaceChatPath ? 'chat' : 'workspace'));
   const [localTutorialCompleted, setLocalTutorialCompleted] = useState(false);
-  const [activeWorkspaceId, setActiveWorkspaceId] = useState('');
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState(() => route.workspaceId || '');
   const [activeContext, setActiveContext] = useState<'issues' | 'notes'>('issues');
   const [activeNoteId, setActiveNoteId] = useState<string>('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
   const [isCreateLabelModalOpen, setIsCreateLabelModalOpen] = useState(false);
   const [isMcpOpen, setIsMcpOpen] = useState(false);
-  const [sidebarActiveScope, setSidebarActiveScope] = useState<SidebarNavigationState['activeScope']>('workspace');
+  const [sidebarActiveScope, setSidebarActiveScope] = useState<SidebarNavigationState['activeScope']>(
+    () => (route.isWorkspaceChatPath ? 'workspace-chat' : 'workspace')
+  );
   const { isOllamaOpen, isOllamaClosing, handleToggleOllama } = useOllamaPanel();
   const [createInitialStatus, setCreateInitialStatus] = useState<Ticket['status'] | undefined>(undefined);
   const [createParentId, setCreateParentId] = useState<string | undefined>(undefined);
@@ -136,7 +140,6 @@ export function WorkspaceShellPage() {
     search: filters?.search ?? '',
   }), [filters]);
 
-  const route = useAppShellRoute(currentUser?.id);
   const {
     projectIdParam,
     teamIdParam,
@@ -701,7 +704,9 @@ export function WorkspaceShellPage() {
       sidebarNavigationState: {
         activeTeam: resolvedSidebarActiveTeamId,
         activeScope:
-          route.teamIdParam
+          route.isWorkspaceChatPath
+            ? 'workspace-chat'
+            : route.teamIdParam
             ? route.projectIdParam
               ? 'projects'
               : route.cycleIdParam
@@ -710,10 +715,10 @@ export function WorkspaceShellPage() {
                   ? 'labels'
                   : 'views'
             : route.projectIdParam
-              ? 'projects'
-              : 'workspace',
+            ? 'projects'
+            : 'workspace',
         activeProject:
-          activeSection === 'projects' || activeSection === 'team-projects' || activeSection === 'workspace'
+          activeSection === 'projects' || activeSection === 'team-projects' || activeSection === 'workspace' || activeSection === 'chat'
             ? (projectIdParam || activeProjectId)
             : '',
       } as SidebarNavigationState,
@@ -725,6 +730,7 @@ export function WorkspaceShellPage() {
     activeWorkspace?.hierarchyMode,
     activeWorkspace?.memberRole,
     projectIdParam,
+    route.isWorkspaceChatPath,
     route.activeLabelIdParam,
     route.cycleIdParam,
     route.projectIdParam,
@@ -762,6 +768,7 @@ export function WorkspaceShellPage() {
     handleOpenTeamManager,
     handleOpenTeamProjectsManager,
     handleShowWorkspaceProjectList,
+    handleShowWorkspaceChat,
   } = useWorkspaceShellNavigation({
     route: { teamIdParam, projectIdParam },
     activeWorkspaceId,
@@ -951,6 +958,7 @@ export function WorkspaceShellPage() {
       activeLabelId: route.activeLabelIdParam,
       onSelectWorkspaceAllTasks: () => navigate(`/workspaces/${activeWorkspaceId}/all`),
       onSelectWorkspaceProjects: handleShowWorkspaceProjectList,
+      onSelectWorkspaceChat: handleShowWorkspaceChat,
       onSelectTeam: (teamId) => navigate(`/workspaces/${activeWorkspaceId}/teams/${teamId}/tasks`),
       onSelectView: (teamId, viewId) => {
         if (viewId === 'all') {
@@ -1023,10 +1031,11 @@ export function WorkspaceShellPage() {
 
   const createDefaultProjectId =
     activeProjectId || scopedProjects[0]?.id || activeWorkspaceProjects[0]?.id || '';
-  const aiChatProjectId = activeProjectId || activeTicket?.projectId || '';
+  const aiChatProjectId = activeProjectId || activeTicket?.projectId || activeWorkspace?.defaultProjectId || activeWorkspaceProjects[0]?.id || '';
   const isWorkspaceProjectsListActive = sidebarActiveScope === 'workspace-projects';
+  const isWorkspaceChatActive = activeSection === 'chat';
   const isIssueSurfaceActive =
-    !isWorkspaceProjectsListActive && !isTeamsManager && !isTeamProjectsManager && activeSection !== 'projects';
+    !isWorkspaceProjectsListActive && !isTeamsManager && !isTeamProjectsManager && activeSection !== 'projects' && !isWorkspaceChatActive;
   const workspaceWebMcpRegistration = isWebMcpSupported ? (
     <WorkspaceWebMcpRegistration
       tickets={tickets}
@@ -1059,7 +1068,7 @@ export function WorkspaceShellPage() {
           ) : null
         }
       >
-        {!isIssueSurfaceActive && workspaceWebMcpRegistration ? (
+        {!isIssueSurfaceActive && !isWorkspaceChatActive && workspaceWebMcpRegistration ? (
           <WorkspaceTicketActionProviders>
             {workspaceWebMcpRegistration}
           </WorkspaceTicketActionProviders>
@@ -1091,6 +1100,19 @@ export function WorkspaceShellPage() {
             onCreateProject={handleCreateProject}
             onUpdateProject={updateProject}
             onDeleteProject={deleteProject}
+          />
+        ) : activeSection === 'chat' ? (
+          <WorkspaceChatPage
+            workspaceId={activeWorkspaceId}
+            projectId={aiChatProjectId}
+            initialOllamaUrl={accountSettings.ollamaEndpoint}
+            initialModel={
+              accountSettings.agentIntegration === 'third_party'
+                ? preferredProviderModel
+                : (accountSettings.ollamaModel || ollamaModels[0] || '')
+            }
+            settings={accountSettings}
+            isMobile={isMobile}
           />
         ) : activeSection === 'projects' ? (
           <WorkspacePageLayout

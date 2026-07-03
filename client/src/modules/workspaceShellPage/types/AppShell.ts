@@ -1,1 +1,1 @@
-export type AppSection = 'directory' | 'workspace' | 'settings' | 'account' | 'projects' | 'teams' | 'team-projects';
+export type AppSection = 'directory' | 'workspace' | 'chat' | 'settings' | 'account' | 'projects' | 'teams' | 'team-projects';
