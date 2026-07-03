@@ -12,6 +12,7 @@ interface WorkspaceChatDockProps {
   workspaceId?: string;
   projectId?: string;
   isMobile?: boolean;
+  variant?: 'embedded' | 'framed';
   className?: string;
   style?: React.CSSProperties;
 }
@@ -23,6 +24,7 @@ export function WorkspaceChatDock({
   workspaceId,
   projectId,
   isMobile = false,
+  variant = 'embedded',
   className,
   style,
 }: WorkspaceChatDockProps) {
@@ -108,13 +110,14 @@ export function WorkspaceChatDock({
   }));
 
   const resolvedSidebarCollapsed = isMobile ? false : sidebarCollapsed;
+  const isEmbedded = variant === 'embedded';
   const sidebarStyle: React.CSSProperties = {
     flex: isMobile ? '0 0 auto' : '0 0 auto',
     width: isMobile ? '100%' : undefined,
     minWidth: isMobile ? 0 : undefined,
     height: isMobile ? '280px' : '100%',
-    borderRight: isMobile ? 'none' : undefined,
-    borderBottom: isMobile ? '1px solid var(--color-border-default)' : undefined,
+    borderRight: isEmbedded ? 'none' : (isMobile ? 'none' : undefined),
+    borderBottom: isEmbedded ? 'none' : (isMobile ? '1px solid var(--color-border-default)' : undefined),
   };
 
   return (
@@ -128,10 +131,10 @@ export function WorkspaceChatDock({
         display: 'flex',
         flexDirection: isMobile ? 'column' : 'row',
         overflow: 'hidden',
-        border: '1px solid var(--color-border-default)',
-        borderRadius: '20px',
-        background: 'var(--color-surface-elevated)',
-        boxShadow: 'var(--shadow-xl)',
+        border: isEmbedded ? 'none' : '1px solid var(--color-border-default)',
+        borderRadius: isEmbedded ? 0 : '20px',
+        background: isEmbedded ? 'transparent' : 'var(--color-surface-elevated)',
+        boxShadow: isEmbedded ? 'none' : 'var(--shadow-xl)',
       }}
     >
       <ChatSidebar

@@ -41,5 +41,6 @@ describe('WorkspaceChatPage', () => {
 
     expect(screen.getByTestId('workspace-chat-dock')).toBeInTheDocument();
     expect(screen.queryByText('AI Chat')).not.toBeInTheDocument();
+    expect(document.querySelector('.workspace-page-layout__content-shell--flush')).toBeTruthy();
   });
 });

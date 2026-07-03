@@ -140,10 +140,17 @@ describe('WorkspaceChatDock', () => {
     });
 
     const user = userEvent.setup();
-    renderDock();
+    const { container } = renderDock();
 
     await waitFor(() => {
       expect(screen.getByText('Old Chat')).toBeInTheDocument();
+    });
+
+    const dockStyle = (container.firstElementChild as HTMLElement).style.cssText;
+    expect(dockStyle).toContain('border-radius: 0');
+    expect(dockStyle).toContain('box-shadow: none');
+    expect(screen.getByTestId('chat-sidebar')).toHaveStyle({
+      borderRight: 'none',
     });
 
     const sessionRow = screen.getByText('Old Chat').closest('[role="button"]');

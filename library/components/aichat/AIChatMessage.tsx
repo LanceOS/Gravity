@@ -1,5 +1,4 @@
 import React from 'react';
-import { Cpu, Sparkles } from 'lucide-react';
 import type { AIChatMessage } from './types';
 import { FormattedMarkdown } from './FormattedMarkdown';
 
@@ -16,41 +15,46 @@ export function AIChatMessageBubble({ message: m }: AIChatMessageBubbleProps) {
     return null;
   }
 
+  const isUser = m.role === 'user';
+  const isSystem = m.role === 'system';
+
   return (
     <div
       style={{
         display: 'flex',
         flexDirection: 'column',
-        alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
+        alignSelf: isUser ? 'flex-end' : 'flex-start',
         maxWidth: '85%',
-          /* Ensure long continuous text wraps inside the bubble */
-          whiteSpace: 'pre-wrap',
-          overflowWrap: 'anywhere',
-          wordWrap: 'break-word',
-          wordBreak: 'break-word',
-        background:
-          m.role === 'user'
-            ? 'var(--color-base100)'
-            : m.role === 'system'
-            ? 'var(--color-error-light)'
-            : 'var(--color-surface-card)',
+        /* Ensure long continuous text wraps inside the bubble */
+        whiteSpace: 'pre-wrap',
+        overflowWrap: 'anywhere',
+        wordWrap: 'break-word',
+        wordBreak: 'break-word',
+        background: isUser
+          ? 'linear-gradient(135deg, var(--color-primary) 0%, color-mix(in srgb, var(--color-primary) 85%, #000) 100%)'
+          : isSystem
+          ? 'var(--color-bg-error)'
+          : 'var(--color-surface-card)',
         border: `1px solid ${
-          m.role === 'user'
-            ? 'var(--color-border-focus)'
-            : m.role === 'system'
-            ? 'var(--color-error-dark)'
+          isUser
+            ? 'transparent'
+            : isSystem
+            ? 'var(--color-border-error)'
             : 'var(--color-border-default)'
         }`,
-        borderRadius: '8px',
-        padding: '10px 12px',
-        fontSize: '12px',
-        lineHeight: '1.5',
-        color:
-          m.role === 'user'
-            ? 'var(--color-text-primary)'
-            : m.role === 'system'
-            ? 'var(--color-error-dark)'
-            : 'var(--color-text-secondary)',
+        borderRadius: isUser ? '16px 16px 4px 16px' : isSystem ? '12px' : '16px 16px 16px 4px',
+        padding: '12px 16px',
+        fontSize: '12.5px',
+        lineHeight: '1.6',
+        color: isUser
+          ? 'var(--color-text-on-accent)'
+          : isSystem
+          ? 'var(--color-text-on-danger)'
+          : 'var(--color-text-primary)',
+        boxShadow: isUser
+          ? '0 4px 12px color-mix(in srgb, var(--color-primary) 15%, transparent)'
+          : 'var(--shadow-sm)',
+        transition: 'all var(--transition-fast)',
       }}
     >
       {m.content && <FormattedMarkdown text={m.content} />}

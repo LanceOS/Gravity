@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Cpu, Loader2, Send, X } from 'lucide-react';
+import { Cpu, Loader2, Send, X, Sparkles } from 'lucide-react';
 import { DenseTextarea } from '../densetextarea';
 import { AIChatMessageBubble } from './AIChatMessage';
 import type { AIChatMessage } from './types';
@@ -32,6 +32,7 @@ export function AIChatWindow({
   variant = 'floating',
 }: AIChatWindowProps) {
   const [chatInput, setChatInput] = useState('');
+  const [isFocused, setIsFocused] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
   const windowRef = useRef<HTMLDivElement>(null);
@@ -85,7 +86,7 @@ export function AIChatWindow({
     };
   }, []);
 
-  const handleSubmit = (e: React.SubmitEvent<HTMLFormElement>) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!chatInput.trim() || isGenerating) return;
     onSendMessage(chatInput);
@@ -104,10 +105,13 @@ export function AIChatWindow({
           display: 'flex',
           alignItems: 'center',
           gap: '8px',
+          background: 'color-mix(in srgb, var(--color-surface-elevated) 85%, transparent)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
         }}
       >
-        <Cpu size={16} color="var(--color-primary)" />
-        <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--color-text-primary)' }}>
+        <Sparkles size={16} color="var(--color-primary)" style={{ flexShrink: 0 }} />
+        <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--color-text-primary)', letterSpacing: '-0.01em' }}>
           {title}
         </span>
 
@@ -123,9 +127,17 @@ export function AIChatWindow({
               background: 'transparent',
               color: 'var(--color-text-disabled)',
               cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '6px',
+              borderRadius: '50%',
+              transition: 'color var(--transition-fast), background-color var(--transition-fast)',
             }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-primary)'; e.currentTarget.style.backgroundColor = 'var(--color-base100)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-disabled)'; e.currentTarget.style.backgroundColor = 'transparent'; }}
           >
-            <X size={16} />
+            <X size={15} />
           </button>
         )}
       </div>
@@ -135,10 +147,11 @@ export function AIChatWindow({
           style={{
             padding: '12px 16px',
             borderBottom: '1px solid var(--color-border-default)',
-            background: 'var(--color-base50)',
+            background: 'var(--color-surface-app)',
             display: 'flex',
             flexDirection: 'column',
             gap: '8px',
+            opacity: 0.95,
           }}
         >
           {settingsPanel}
@@ -149,10 +162,11 @@ export function AIChatWindow({
         style={{
           flex: 1,
           overflowY: 'auto',
-          padding: '16px',
+          padding: '20px 16px',
           display: 'flex',
           flexDirection: 'column',
-          gap: '16px',
+          gap: '18px',
+          background: 'color-mix(in srgb, var(--color-surface-elevated) 40%, var(--color-surface-app))',
         }}
       >
         {messages.map((m, idx) => (
@@ -164,14 +178,16 @@ export function AIChatWindow({
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
+              gap: '8px',
               alignSelf: 'flex-start',
               background: 'var(--color-surface-card)',
               border: '1px solid var(--color-border-default)',
-              borderRadius: '8px',
-              padding: '10px 12px',
-              fontSize: '11px',
-              color: 'var(--color-text-disabled)',
+              borderRadius: '12px',
+              padding: '10px 14px',
+              fontSize: '11.5px',
+              color: 'var(--color-text-secondary)',
+              boxShadow: 'var(--shadow-sm)',
+              animation: 'pulse 2s infinite',
             }}
           >
             <Loader2
@@ -179,7 +195,7 @@ export function AIChatWindow({
               className="animate-spin"
               style={{ animation: 'spin 1s linear infinite' }}
             />
-            <span>Working...</span>
+            <span style={{ fontWeight: 500 }}>Generating answer...</span>
           </div>
         )}
         <div ref={chatEndRef} />
@@ -188,24 +204,46 @@ export function AIChatWindow({
       {quickActions && (
         <div
           style={{
-            padding: '8px 12px',
+            padding: '10px 16px',
             display: 'flex',
-            gap: '6px',
+            gap: '8px',
             overflowX: 'auto',
             borderTop: '1px solid var(--color-border-default)',
-            background: 'var(--color-base50)',
+            background: 'var(--color-surface-app)',
+            alignItems: 'center',
           }}
         >
           {quickActions}
         </div>
       )}
 
-      <div style={{ padding: '12px', borderTop: '1px solid var(--color-border-default)' }}>
-        <form onSubmit={handleSubmit} style={{ display: 'flex', alignItems: 'flex-end', gap: '6px' }}>
+      <div
+        style={{
+          padding: '12px 16px 16px',
+          borderTop: '1px solid var(--color-border-default)',
+          background: 'var(--color-surface-elevated)',
+        }}
+      >
+        <form
+          onSubmit={handleSubmit}
+          style={{
+            display: 'flex',
+            alignItems: 'flex-end',
+            gap: '8px',
+            background: 'var(--color-surface-card)',
+            border: isFocused ? '1px solid var(--color-primary)' : '1px solid var(--color-border-default)',
+            borderRadius: '16px',
+            padding: '8px 10px 8px 14px',
+            boxShadow: isFocused ? '0 0 0 3px var(--color-state-selected-bg)' : 'var(--shadow-sm)',
+            transition: 'border-color var(--transition-fast), box-shadow var(--transition-fast)',
+          }}
+        >
           <DenseTextarea
             placeholder={placeholder}
             value={chatInput}
             onChange={(e) => setChatInput(e.target.value)}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -216,13 +254,37 @@ export function AIChatWindow({
               }
             }}
             autoGrow
-            style={{ flex: 1 }}
+            className="input-seamless"
+            style={{
+              flex: 1,
+              minHeight: '24px',
+              maxHeight: '180px',
+              fontSize: '12.5px',
+              color: 'var(--color-text-primary)',
+              background: 'transparent',
+              padding: 0,
+            }}
           />
           <button
             type="submit"
             aria-label="Send message"
-            className="btn btn-primary clickable"
-            style={{ width: '32px', height: '32px', flexShrink: 0, padding: 0 }}
+            disabled={!chatInput.trim() || isGenerating}
+            className="clickable"
+            style={{
+              width: '30px',
+              height: '30px',
+              flexShrink: 0,
+              padding: 0,
+              borderRadius: '50%',
+              border: 'none',
+              background: chatInput.trim() && !isGenerating ? 'var(--color-primary)' : 'var(--color-base100)',
+              color: chatInput.trim() && !isGenerating ? 'var(--color-text-on-accent)' : 'var(--color-text-disabled)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: chatInput.trim() && !isGenerating ? 'pointer' : 'not-allowed',
+              transition: 'background-color var(--transition-fast), color var(--transition-fast)',
+            }}
           >
             <Send size={12} />
           </button>
