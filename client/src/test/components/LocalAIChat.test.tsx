@@ -24,6 +24,16 @@ function createJsonResponse(body: unknown, ok = true) {
   };
 }
 
+function createTextResponse(body: string, ok = true) {
+  return {
+    ok,
+    status: ok ? 200 : 500,
+    statusText: ok ? 'OK' : 'Server Error',
+    text: vi.fn().mockResolvedValue(body),
+    json: vi.fn().mockRejectedValue(new Error('Response is not JSON')),
+  };
+}
+
 vi.mock('../../context/auth/AuthContext', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../context/auth/AuthContext')>();
   return {
@@ -223,6 +233,165 @@ describe('LocalAIChat', () => {
     });
 
     expect(screen.getByText('Summarize the backlog')).toBeInTheDocument();
+  });
+
+  it('sends cloud provider chat through the project SSE stream', async () => {
+    const user = userEvent.setup();
+    mocks.fetch.mockImplementation((url: string) => {
+      if (url === '/api/v1/mcp/sse') return Promise.resolve(createJsonResponse({ result: { tools: [] } }));
+      if (url === '/api/v1/projects/project-1/chats') return Promise.resolve(createJsonResponse({ id: 'chat-1' }));
+      if (url === '/api/v1/projects/project-1/chats/chat-1/stream') {
+        return Promise.resolve(createTextResponse(
+          'data: {"type":"done","message":"Cloud says hello","messageId":"msg-1","provider":"anthropic","model":"claude-3-haiku","fallback":false,"toolCalls":null}\n\n',
+        ));
+      }
+      return Promise.resolve(createJsonResponse({}));
+    });
+
+    renderLocalAIChat({
+      initialModel: 'claude-3-haiku',
+      projectId: 'project-1',
+      settings: {
+        ...mockSettings,
+        aiProvider: 'anthropic',
+        agentIntegration: 'third_party',
+      },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Active')).toBeInTheDocument();
+    });
+
+    const chatInput = screen.getByPlaceholderText('Ask AI a question...');
+    await user.type(chatInput, 'Summarize the backlog');
+
+    const chatForm = chatInput.closest('form');
+    expect(chatForm).not.toBeNull();
+    fireEvent.submit(chatForm as HTMLFormElement);
+
+    await waitFor(() => {
+      expect(screen.getByText('Cloud says hello')).toBeInTheDocument();
+    });
+
+    const createChatRequest = mocks.fetch.mock.calls.find(call => call[0] === '/api/v1/projects/project-1/chats');
+    expect(createChatRequest).toBeDefined();
+    expect(createChatRequest![1]).toMatchObject({
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const streamRequest = mocks.fetch.mock.calls.find(call => call[0] === '/api/v1/projects/project-1/chats/chat-1/stream');
+    expect(streamRequest).toBeDefined();
+    expect(streamRequest![1]).toMatchObject({
+      method: 'POST',
+      headers: {
+        Accept: 'text/event-stream',
+        'Content-Type': 'application/json',
+      },
+    });
+    expect(JSON.parse(streamRequest![1]?.body as string)).toMatchObject({
+      message: 'Summarize the backlog',
+      provider: 'anthropic',
+      model: 'claude-3-haiku',
+    });
+    expect(mocks.fetch.mock.calls.some(call => call[0] === '/api/v1/ai/chat')).toBe(false);
+  });
+
+  it('requires an explicit project before starting cloud provider chat', async () => {
+    const user = userEvent.setup();
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mocks.fetch.mockImplementation((url: string) => {
+      if (url === '/api/v1/mcp/sse') return Promise.resolve(createJsonResponse({ result: { tools: [] } }));
+      return Promise.resolve(createJsonResponse({}));
+    });
+
+    renderLocalAIChat({
+      initialModel: 'claude-3-haiku',
+      settings: {
+        ...mockSettings,
+        aiProvider: 'anthropic',
+        agentIntegration: 'third_party',
+      },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Active')).toBeInTheDocument();
+    });
+
+    const chatInput = screen.getByPlaceholderText('Ask AI a question...');
+    await user.type(chatInput, 'Summarize the backlog');
+    fireEvent.submit(chatInput.closest('form') as HTMLFormElement);
+
+    await waitFor(() => {
+      expect(screen.getByText('Select a project before using cloud chat.')).toBeInTheDocument();
+    });
+
+    expect(mocks.fetch.mock.calls.some(call => String(call[0]).includes('/chats'))).toBe(false);
+    expect(mocks.fetch.mock.calls.some(call => call[0] === '/api/v1/ai/chat')).toBe(false);
+    consoleErrorSpy.mockRestore();
+  });
+
+  it('resets visible cloud chat messages when the active project changes', async () => {
+    const user = userEvent.setup();
+    mocks.fetch.mockImplementation((url: string) => {
+      if (url === '/api/v1/mcp/sse') return Promise.resolve(createJsonResponse({ result: { tools: [] } }));
+      if (url === '/api/v1/projects/project-1/chats') return Promise.resolve(createJsonResponse({ id: 'chat-1' }));
+      if (url === '/api/v1/projects/project-1/chats/chat-1/stream') {
+        return Promise.resolve(createTextResponse(
+          'data: {"type":"done","message":"Project one reply","messageId":"msg-1","provider":"anthropic","model":"claude-3-haiku","fallback":false,"toolCalls":null}\n\n',
+        ));
+      }
+      if (url === '/api/v1/projects/project-2/chats') return Promise.resolve(createJsonResponse({ id: 'chat-2' }));
+      if (url === '/api/v1/projects/project-2/chats/chat-2/stream') {
+        return Promise.resolve(createTextResponse(
+          'data: {"type":"done","message":"Project two reply","messageId":"msg-2","provider":"anthropic","model":"claude-3-haiku","fallback":false,"toolCalls":null}\n\n',
+        ));
+      }
+      return Promise.resolve(createJsonResponse({}));
+    });
+
+    const { props, rerender } = renderLocalAIChat({
+      initialModel: 'claude-3-haiku',
+      projectId: 'project-1',
+      settings: {
+        ...mockSettings,
+        aiProvider: 'anthropic',
+        agentIntegration: 'third_party',
+      },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Active')).toBeInTheDocument();
+    });
+
+    const chatInput = screen.getByPlaceholderText('Ask AI a question...');
+    await user.type(chatInput, 'First project prompt');
+    fireEvent.submit(chatInput.closest('form') as HTMLFormElement);
+
+    await waitFor(() => {
+      expect(screen.getByText('Project one reply')).toBeInTheDocument();
+    });
+
+    rerender(<LocalAIChat {...props} projectId="project-2" />);
+
+    await waitFor(() => {
+      expect(screen.queryByText('Project one reply')).not.toBeInTheDocument();
+    });
+
+    const nextChatInput = screen.getByPlaceholderText('Ask AI a question...');
+    await user.type(nextChatInput, 'Second project prompt');
+    fireEvent.submit(nextChatInput.closest('form') as HTMLFormElement);
+
+    await waitFor(() => {
+      expect(screen.getByText('Project two reply')).toBeInTheDocument();
+    });
+
+    const secondStreamRequest = mocks.fetch.mock.calls.find(call => call[0] === '/api/v1/projects/project-2/chats/chat-2/stream');
+    expect(secondStreamRequest).toBeDefined();
+    expect(JSON.parse(secondStreamRequest![1]?.body as string)).toMatchObject({
+      message: 'Second project prompt',
+      provider: 'anthropic',
+    });
   });
 
   it('sends a quick-action prompt from the active ticket context and surfaces Ollama errors', async () => {

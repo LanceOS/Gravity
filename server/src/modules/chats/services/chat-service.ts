@@ -312,7 +312,7 @@ export class ChatService {
     };
   }
 
-  private resolveProvider(requested: string | undefined, accountProvider: string) {
+  private resolveProvider(requested: string | undefined, accountProvider: string): ChatProvider {
     const requestedProvider = normalizeString(requested).toLowerCase();
     const preferred = normalizeString(accountProvider).toLowerCase();
     const configured = normalizeString(env.aiDefaultProvider).toLowerCase();
@@ -333,7 +333,7 @@ export class ChatService {
     provider: ChatProvider,
     requestedModel: string | undefined,
     settings: Awaited<ReturnType<typeof getUserSettingsRecord>>,
-  ) {
+  ): string {
     const requested = normalizeString(requestedModel);
     if (requested.length > 0) {
       return requested;
@@ -343,8 +343,9 @@ export class ChatService {
       return settings.preferredOllamaModel.trim();
     }
 
-    if (normalizeString(env.aiDefaultModel).length > 0) {
-      return env.aiDefaultModel;
+    const configuredModel = normalizeString(env.aiDefaultModel);
+    if (configuredModel.length > 0) {
+      return configuredModel;
     }
 
     return DEFAULT_MODELS[provider];

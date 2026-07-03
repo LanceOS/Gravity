@@ -1,4 +1,4 @@
-import React, { useEffect, useEffectEvent, useState } from 'react';
+import React, { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { useAuth } from '../../../context/auth/AuthContext';
 import { useProjectContext } from '../../../context/project/ProjectContext';
 import { useActiveTicket } from '../../../context/ticket/ActiveTicketContext';
@@ -16,6 +16,7 @@ const CLOUD_MODELS: Record<string, string[]> = {
   gemini: ['gemini-1.5-flash', 'gemini-1.5-pro'],
   deepseek: ['deepseek-chat'],
 };
+const CLOUD_PROJECT_REQUIRED_MESSAGE = 'Select a project before using cloud chat.';
 
 function parseToolArguments(argumentsPayload: Record<string, unknown> | string): Record<string, unknown> | string {
   if (typeof argumentsPayload !== 'string') {
@@ -29,7 +30,82 @@ function parseToolArguments(argumentsPayload: Record<string, unknown> | string):
   }
 }
 
-export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllamaUrl, initialModel, settings, workspaceId, isClosing }) => {
+type ChatSseDoneEvent = {
+  type: 'done';
+  message?: string;
+  toolCalls?: unknown;
+};
+
+type ChatSseErrorEvent = {
+  type: 'error';
+  message?: string;
+};
+
+type ChatSseEvent = ChatSseDoneEvent | ChatSseErrorEvent;
+
+function isChatSseEvent(value: unknown): value is ChatSseEvent {
+  return !!value && typeof value === 'object' && 'type' in value;
+}
+
+function parseChatSseEvents(streamText: string): ChatSseEvent[] {
+  return streamText
+    .split(/\r?\n\r?\n/)
+    .map((block) => block
+      .split(/\r?\n/)
+      .filter((line) => line.startsWith('data:'))
+      .map((line) => line.slice(5).trimStart())
+      .join('\n')
+      .trim())
+    .filter((payload) => payload.length > 0)
+    .map((payload) => JSON.parse(payload) as unknown)
+    .filter(isChatSseEvent);
+}
+
+async function readErrorMessage(response: Response) {
+  try {
+    const body = await response.json();
+    return body?.error || body?.message || response.statusText || 'Chat request failed.';
+  } catch {
+    return response.statusText || 'Chat request failed.';
+  }
+}
+
+async function postChatCompletionSse(
+  projectId: string,
+  chatId: string,
+  payload: { message: string; provider: string; model?: string },
+) {
+  const response = await fetch(`/api/v1/projects/${encodeURIComponent(projectId)}/chats/${encodeURIComponent(chatId)}/stream`, {
+    method: 'POST',
+    headers: {
+      Accept: 'text/event-stream',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const message = await readErrorMessage(response);
+    const error = new Error(message);
+    (error as Error & { status?: number }).status = response.status;
+    throw error;
+  }
+
+  const events = parseChatSseEvents(await response.text());
+  const errorEvent = events.find((event): event is ChatSseErrorEvent => event.type === 'error');
+  if (errorEvent) {
+    throw new Error(errorEvent.message || 'Chat generation failed.');
+  }
+
+  const doneEvent = [...events].reverse().find((event): event is ChatSseDoneEvent => event.type === 'done');
+  if (!doneEvent) {
+    throw new Error('Chat stream ended without a completion event.');
+  }
+
+  return doneEvent;
+}
+
+export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllamaUrl, initialModel, settings, workspaceId, projectId, isClosing }) => {
   const { activeTicket } = useActiveTicket();
   const { currentUser } = useAuth();
   const { users } = useUserDirectory();
@@ -97,6 +173,42 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
   // Chat state
   const [messages, setMessages] = useState<Message[]>(getInitialMessages);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [chatSessionId, setChatSessionId] = useState('');
+  const chatSessionIdRef = useRef('');
+
+  useEffect(() => {
+    chatSessionIdRef.current = chatSessionId;
+  }, [chatSessionId]);
+
+  useEffect(() => {
+    chatSessionIdRef.current = '';
+    setChatSessionId('');
+    if (isThirdParty) {
+      setMessages(getInitialMessages());
+    }
+  }, [isThirdParty, projectId]);
+
+  const ensureCloudChatSession = async () => {
+    const activeProjectId = projectId?.trim() || '';
+    if (!activeProjectId) {
+      throw new Error(CLOUD_PROJECT_REQUIRED_MESSAGE);
+    }
+
+    if (chatSessionIdRef.current) {
+      return chatSessionIdRef.current;
+    }
+
+    const session = await apiClient.post<{ id?: string }>(`/projects/${encodeURIComponent(activeProjectId)}/chats`, {
+      title: 'AI Assistant',
+    });
+    if (!session.id) {
+      throw new Error('Failed to create chat session.');
+    }
+
+    chatSessionIdRef.current = session.id;
+    setChatSessionId(session.id);
+    return session.id;
+  };
 
   const checkOllamaStatus = useEffectEvent(async (urlToTest = ollamaUrl, announceLoading = true) => {
     if (isThirdParty) {
@@ -181,6 +293,24 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
     if (!autoRunMessages) setIsGenerating(true);
 
     try {
+      if (isThirdParty) {
+        const activeProjectId = projectId?.trim() || '';
+        const chatId = await ensureCloudChatSession();
+        const doneEvent = await postChatCompletionSse(activeProjectId, chatId, {
+          message: textToSend,
+          provider: settings.aiProvider,
+          ...(model ? { model } : {}),
+        });
+        const aiResponse = doneEvent.message || '';
+
+        if (aiResponse) {
+          setMessages([...newMessages, { role: 'assistant', content: aiResponse }]);
+        } else {
+          setMessages([...newMessages, { role: 'system', content: `Sorry, I got an empty response from ${getProviderName(settings.aiProvider)}.` }]);
+        }
+        return;
+      }
+
       const payload: Record<string, any> = {
         model,
         messages: newMessages.map(m => ({
@@ -275,6 +405,11 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
 
       let errorContent: string;
       if (isThirdParty) {
+        if (error instanceof Error && error.message === CLOUD_PROJECT_REQUIRED_MESSAGE) {
+          setMessages([...newMessages, { role: 'system', content: error.message }]);
+          return;
+        }
+
         // Map HTTP status codes to safe, user-friendly messages.
         // The raw server error is intentionally not surfaced to avoid leaking
         // sensitive details (URLs, partial IDs, stack traces) into the chat UI.

@@ -1,5 +1,5 @@
 import { and, asc, desc, eq } from 'drizzle-orm';
-import { Router } from 'express';
+import { Router, type Request, type Response } from 'express';
 import { db } from '../../db/index.js';
 import { createRateLimiter } from '../../lib/rateLimit.js';
 import { createRedisRateLimiter } from '../../lib/rateLimitRedis.js';
@@ -9,7 +9,7 @@ import { env } from '../../env.js';
 import { chatMessages, chatSessions, projects } from '../../db/schema.js';
 import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
 import { authorizeProjectMemberAccess } from '../workspaces/services/membership.js';
-import { ChatService, isStreamingChatProvider } from './services/chat-service.js';
+import { ChatService, isSupportedChatProvider } from './services/chat-service.js';
 
 const CHAT_ROLES = ['user', 'assistant', 'system'] as const;
 const DEFAULT_CHAT_LIMIT = 20;
@@ -126,7 +126,7 @@ function normalizeChatMaxTokens(value: unknown) {
   return parsed;
 }
 
-function sendChatSseEvent(res: any, payload: unknown) {
+function sendChatSseEvent(res: Response, payload: unknown) {
   if (res.writableEnded) {
     return;
   }
@@ -466,7 +466,7 @@ export function createChatsRouter() {
     }
   });
 
-  router.post('/projects/:projectId/chats/:chatId/stream', streamLimiter, async (req, res) => {
+  const handleChatStreamRequest = async (req: Request, res: Response) => {
     const projectId = normalizeRouteParam(req.params.projectId);
     const chatId = normalizeRouteParam(req.params.chatId);
 
@@ -482,7 +482,7 @@ export function createChatsRouter() {
     }
 
     const requestedProvider = normalizeChatProvider(req.body?.provider ?? req.query.provider);
-    if (requestedProvider && !isStreamingChatProvider(requestedProvider)) {
+    if (requestedProvider && !isSupportedChatProvider(requestedProvider)) {
       res.status(400).json({ error: 'Unsupported provider.' });
       return;
     }
@@ -490,17 +490,6 @@ export function createChatsRouter() {
     const userMessage = normalizeChatMessageText(req.body?.message);
     if (!userMessage) {
       res.status(400).json({ error: 'Message is required.' });
-      return;
-    }
-
-    try {
-      await chatService.assertStreamingProvider(auth.userId, requestedProvider);
-    } catch (error) {
-      if (error instanceof Error && error.message === 'Unsupported provider.') {
-        res.status(400).json({ error: 'Unsupported provider.' });
-        return;
-      }
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to validate stream provider.' });
       return;
     }
 
@@ -527,17 +516,6 @@ export function createChatsRouter() {
         provider: requestedProvider || undefined,
         model: messageModel.length > 0 ? messageModel : undefined,
         maxTokens,
-        requireStreamingProvider: true,
-        onChunk: async (chunk) => {
-          if (closed) {
-            return;
-          }
-
-          sendChatSseEvent(res, {
-            type: 'chunk',
-            delta: chunk,
-          });
-        },
       });
 
       if (!closed) {
@@ -562,7 +540,9 @@ export function createChatsRouter() {
     } finally {
       res.end();
     }
-  });
+  };
+
+  router.post('/projects/:projectId/chats/:chatId/stream', streamLimiter, handleChatStreamRequest);
 
   return router;
 }

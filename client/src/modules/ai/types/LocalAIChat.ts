@@ -7,6 +7,7 @@ export interface LocalAIChatProps {
   initialModel: string;
   settings: WorkspaceSettings;
   workspaceId?: string;
+  projectId?: string;
   isClosing?: boolean;
 }
 

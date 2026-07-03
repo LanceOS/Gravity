@@ -271,7 +271,7 @@ describe('chat sessions routes', () => {
     expect(unauthorizedMessage.body).toEqual({ error: 'Access denied: not a member of the project.' });
   });
 
-  it('rejects stream requests for providers without streaming support', async () => {
+  it('accepts SSE completion requests for providers without token streaming support', async () => {
     const ownerApi = await createAuthenticatedApi({
       name: 'Streaming Owner',
       email: 'stream-owner@example.com',
@@ -294,18 +294,41 @@ describe('chat sessions routes', () => {
     expect(createResponse.status).toBe(201);
     const chatId = createResponse.body.id;
 
-    const streamResponse = await ownerApi
-      .post(`/api/v1/projects/${project.id}/chats/${chatId}/stream`)
-      .send({
-        message: 'What is the current status?',
+    const generateSpy = vi.spyOn(ChatService.prototype, 'generateResponse').mockResolvedValue({
+      assistantMessageId: 'chat-msg-stream-anthropic',
+      content: 'Ready.',
+      provider: 'anthropic',
+      model: 'claude-3-haiku',
+      toolCalls: [],
+      fallback: false,
+    });
+
+    try {
+      const streamResponse = await ownerApi
+        .post(`/api/v1/projects/${project.id}/chats/${chatId}/stream`)
+        .set('Accept', 'text/event-stream')
+        .send({
+          message: 'What is the current status?',
+          provider: 'anthropic',
+        });
+
+      expect(streamResponse.status).toBe(200);
+      expect(streamResponse.headers['content-type']).toContain('text/event-stream');
+      expect(streamResponse.text).toContain(
+        'data: {"type":"done","message":"Ready.","messageId":"chat-msg-stream-anthropic","provider":"anthropic","model":"claude-3-haiku","fallback":false,"toolCalls":[]}',
+      );
+      expect(generateSpy).toHaveBeenCalledTimes(1);
+      expect(generateSpy.mock.calls[0]?.[0]).toMatchObject({
         provider: 'anthropic',
       });
-
-    expect(streamResponse.status).toBe(400);
-    expect(streamResponse.body).toEqual({ error: 'Unsupported provider.' });
+      expect(generateSpy.mock.calls[0]?.[0]?.message).toBe('What is the current status?');
+      expect(generateSpy.mock.calls[0]?.[0]?.onChunk).toBeUndefined();
+    } finally {
+      generateSpy.mockRestore();
+    }
   });
 
-  it('rejects stream requests when default user provider is non-streaming', async () => {
+  it('uses the default user provider when none is supplied', async () => {
     const ownerApi = await createAuthenticatedApi({
       name: 'Streaming Defaults Owner',
       email: 'stream-default-owner@example.com',
@@ -333,14 +356,36 @@ describe('chat sessions routes', () => {
     expect(createResponse.status).toBe(201);
     const chatId = createResponse.body.id;
 
-    const streamResponse = await ownerApi
-      .post(`/api/v1/projects/${project.id}/chats/${chatId}/stream`)
-      .send({
+    const generateSpy = vi.spyOn(ChatService.prototype, 'generateResponse').mockResolvedValue({
+      assistantMessageId: 'chat-msg-stream-default',
+      content: 'Ready.',
+      provider: 'anthropic',
+      model: 'claude-3-haiku',
+      toolCalls: [],
+      fallback: false,
+    });
+
+    try {
+      const streamResponse = await ownerApi
+        .post(`/api/v1/projects/${project.id}/chats/${chatId}/stream`)
+        .set('Accept', 'text/event-stream')
+        .send({
+          message: 'What is the current status?',
+        });
+
+      expect(streamResponse.status).toBe(200);
+      expect(streamResponse.headers['content-type']).toContain('text/event-stream');
+      expect(streamResponse.text).toContain(
+        'data: {"type":"done","message":"Ready.","messageId":"chat-msg-stream-default","provider":"anthropic","model":"claude-3-haiku","fallback":false,"toolCalls":[]}',
+      );
+      expect(generateSpy).toHaveBeenCalledTimes(1);
+      expect(generateSpy.mock.calls[0]?.[0]).toMatchObject({
         message: 'What is the current status?',
       });
-
-    expect(streamResponse.status).toBe(400);
-    expect(streamResponse.body).toEqual({ error: 'Unsupported provider.' });
+      expect(generateSpy.mock.calls[0]?.[0]?.provider).toBeUndefined();
+    } finally {
+      generateSpy.mockRestore();
+    }
   });
 
   it('rejects stream requests for unknown providers', async () => {
@@ -476,7 +521,54 @@ describe('chat sessions routes', () => {
     expect(streamResponse.body).toEqual({ error: 'Unsupported provider.' });
   });
 
-  it('streams chunk events and a done event for stream requests', async () => {
+  it('does not expose a GET stream generation route', async () => {
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Streaming Get Owner',
+      email: 'stream-get-owner@example.com',
+      role: 'owner',
+    });
+
+    const { project } = await seedWorkspaceFixture({
+      owner: {
+        id: ownerApi.user.id,
+        name: ownerApi.user.name,
+        email: ownerApi.user.email,
+        role: 'owner',
+        avatarUrl: ownerApi.user.avatar,
+      },
+    });
+
+    const createResponse = await ownerApi
+      .post(`/api/v1/projects/${project.id}/chats`)
+      .send({ title: 'Streaming GET Chat' });
+    expect(createResponse.status).toBe(201);
+    const chatId = createResponse.body.id;
+
+    const generateSpy = vi.spyOn(ChatService.prototype, 'generateResponse').mockResolvedValue({
+      assistantMessageId: 'chat-msg-stream-get',
+      content: 'Ready.',
+      provider: 'openai',
+      model: 'gpt-4o-mini',
+      toolCalls: [],
+      fallback: false,
+    });
+
+    try {
+      const streamResponse = await ownerApi
+        .get(`/api/v1/projects/${project.id}/chats/${chatId}/stream`)
+        .query({
+          message: 'What is the current status?',
+          provider: 'openai',
+        });
+
+      expect(streamResponse.status).toBe(404);
+      expect(generateSpy).not.toHaveBeenCalled();
+    } finally {
+      generateSpy.mockRestore();
+    }
+  });
+
+  it('sends a completion SSE event without token chunk events', async () => {
     const ownerApi = await createAuthenticatedApi({
       name: 'Streaming SSE Owner',
       email: 'stream-sse-owner@example.com',
@@ -500,8 +592,7 @@ describe('chat sessions routes', () => {
     const chatId = createResponse.body.id;
 
     const generateSpy = vi.spyOn(ChatService.prototype, 'generateResponse').mockImplementation(async (input) => {
-      await input.onChunk?.('hello ');
-      await input.onChunk?.('friend');
+      expect(input.onChunk).toBeUndefined();
       return {
         assistantMessageId: 'chat-msg-stream',
         content: 'hello friend',
@@ -523,12 +614,12 @@ describe('chat sessions routes', () => {
       expect(streamResponse.status).toBe(200);
       expect(streamResponse.headers['content-type']).toContain('text/event-stream');
 
-      expect(streamResponse.text).toContain('data: {"type":"chunk","delta":"hello "}');
-      expect(streamResponse.text).toContain('data: {"type":"chunk","delta":"friend"}');
+      expect(streamResponse.text).not.toContain('"type":"chunk"');
       expect(streamResponse.text).toContain(
         'data: {"type":"done","message":"hello friend","messageId":"chat-msg-stream","provider":"openai","model":"gpt-4o-mini","fallback":false,"toolCalls":null}',
       );
       expect(generateSpy).toHaveBeenCalledTimes(1);
+      expect(generateSpy.mock.calls[0]?.[0]?.message).toBe('How do we ship this?');
     } finally {
       generateSpy.mockRestore();
     }
@@ -582,6 +673,7 @@ describe('chat sessions routes', () => {
 
       const call = generateSpy.mock.calls[0]?.[0];
       expect(call?.provider).toBe('openai');
+      expect(call?.message).toBe('How do we ship this?');
       expect(generateSpy).toHaveBeenCalledTimes(1);
     } finally {
       generateSpy.mockRestore();

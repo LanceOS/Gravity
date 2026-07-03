@@ -208,7 +208,7 @@ describe('ChatService', () => {
   });
 
   it('assertStreamingProvider uses the resolved user default provider', async () => {
-    const { userId, chatId } = await createChatFixture();
+    const { userId } = await createChatFixture();
 
     await db.update(userSettings).set({ aiProvider: 'anthropic' }).where(eq(userSettings.userId, userId));
 
