@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { CheckSquare, Square } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { CheckSquare, Square, Clipboard, Check } from 'lucide-react';
 import { isSafeHref } from '../../utilities/sanitizeHtml';
 
 export interface FormattedMarkdownProps {
@@ -8,14 +8,13 @@ export interface FormattedMarkdownProps {
   renderCustomToken?: (match: RegExpMatchArray, key: number) => React.ReactNode | null;
 }
 
-
 function InlineFormattedText({ text, customTokenRegex, renderCustomToken }: FormattedMarkdownProps) {
   const parts: React.ReactNode[] = [];
   let keyIndex = 0;
   let lastIndex = 0;
 
   const combinedRegex = useMemo(() => {
-    let pattern = '\\*\\*([^*]+)\\*\\*|`([^`]+)`|\\[([^\\]]+)\\]\\(([^)]+)\\)';
+    let pattern = '\\*\\*([^*]+)\\*\\*|\\*([^*]+)\\*|_([^_]+)_|`([^`]+)`|\\[([^\\]]+)\\]\\(([^)]+)\\)';
 
     if (customTokenRegex) {
       pattern += `|${customTokenRegex.source}`;
@@ -39,6 +38,18 @@ function InlineFormattedText({ text, customTokenRegex, renderCustomToken }: Form
       );
     } else if (match[2]) {
       parts.push(
+        <em key={keyIndex++}>
+          {match[2]}
+        </em>,
+      );
+    } else if (match[3]) {
+      parts.push(
+        <em key={keyIndex++}>
+          {match[3]}
+        </em>,
+      );
+    } else if (match[4]) {
+      parts.push(
         <code
           key={keyIndex++}
           style={{
@@ -50,11 +61,11 @@ function InlineFormattedText({ text, customTokenRegex, renderCustomToken }: Form
             color: 'var(--color-primary)',
           }}
         >
-          {match[2]}
+          {match[4]}
         </code>,
       );
-    } else if (match[3] && match[4]) {
-      const safeHref = isSafeHref(match[4]) ? match[4] : 'about:blank';
+    } else if (match[5] && match[6]) {
+      const safeHref = isSafeHref(match[6]) ? match[6] : 'about:blank';
       parts.push(
         <a
           key={keyIndex++}
@@ -64,7 +75,7 @@ function InlineFormattedText({ text, customTokenRegex, renderCustomToken }: Form
           style={{ color: 'var(--color-primary)', textDecoration: 'none' }}
           className="clickable"
         >
-          {match[3]}
+          {match[5]}
         </a>,
       );
     } else if (renderCustomToken) {
@@ -88,188 +99,430 @@ function InlineFormattedText({ text, customTokenRegex, renderCustomToken }: Form
   return <>{parts}</>;
 }
 
+interface CodeBlockProps {
+  code: string;
+  language?: string;
+}
+
+export function CodeBlock({ code, language }: CodeBlockProps) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy code: ', err);
+    }
+  };
+
+  return (
+    <div
+      style={{
+        margin: '12px 0',
+        borderRadius: '8px',
+        border: '1px solid var(--color-border-default)',
+        overflow: 'hidden',
+        background: 'var(--color-surface-card)',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '6px 12px',
+          background: 'var(--color-surface-app)',
+          borderBottom: '1px solid var(--color-border-default)',
+          fontSize: '11px',
+          color: 'var(--color-text-secondary)',
+          fontWeight: 500,
+        }}
+      >
+        <span>{language || 'code'}</span>
+        <button
+          type="button"
+          onClick={handleCopy}
+          aria-label="Copy code"
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: 'var(--color-text-secondary)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            padding: '2px 6px',
+            borderRadius: '4px',
+            transition: 'background var(--transition-fast)',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-base100)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+        >
+          {copied ? (
+            <>
+              <Check size={12} style={{ color: 'var(--color-success)' }} />
+              <span style={{ color: 'var(--color-success)' }}>Copied!</span>
+            </>
+          ) : (
+            <>
+              <Clipboard size={12} />
+              <span>Copy</span>
+            </>
+          )}
+        </button>
+      </div>
+      <pre
+        style={{
+          margin: 0,
+          padding: '12px',
+          overflowX: 'auto',
+          background: 'var(--color-base50)',
+          fontFamily: 'var(--mono)',
+          fontSize: '12px',
+          lineHeight: '1.5',
+          color: 'var(--color-text-primary)',
+        }}
+      >
+        <code>{code}</code>
+      </pre>
+    </div>
+  );
+}
+
+interface MarkdownBlock {
+  type: 'heading' | 'blockquote' | 'list' | 'code-block' | 'table' | 'paragraph' | 'break';
+  level?: number;
+  language?: string;
+  code?: string;
+  listType?: 'ul' | 'ol';
+  items?: { text: string; checked?: boolean }[];
+  headers?: string[];
+  alignments?: ('left' | 'center' | 'right' | null)[];
+  rows?: string[][];
+  text?: string;
+}
+
 export function FormattedMarkdown({ text, customTokenRegex, renderCustomToken }: FormattedMarkdownProps) {
   if (!text) {
     return null;
   }
 
-  const elements: React.ReactNode[] = [];
-  const listItems: React.ReactNode[] = [];
-  const lines = text.split('\n');
-  let activeListType: 'ul' | 'ol' | null = null;
+  // Parse markdown into blocks
+  const parseBlocks = (): MarkdownBlock[] => {
+    const lines = text.split('\n');
+    const blocks: MarkdownBlock[] = [];
+    let i = 0;
 
-  const flushList = (keySuffix: string | number) => {
-    if (!activeListType || listItems.length === 0) {
-      return;
+    const isDelimiterLine = (l: string): boolean => {
+      const trimmed = l.trim();
+      return /^\s*\|?\s*(:?-+:?\s*\|\s*)+(:?-+:?\s*\|?)?\s*$/.test(trimmed) && trimmed.includes('-');
+    };
+
+    const hasPipe = (l: string): boolean => l.includes('|');
+
+    while (i < lines.length) {
+      const line = lines[i];
+
+      // 1. Code Block
+      if (line.trim().startsWith('```')) {
+        const language = line.trim().slice(3).trim();
+        let code = '';
+        i++;
+        while (i < lines.length && !lines[i].trim().startsWith('```')) {
+          code += lines[i] + '\n';
+          i++;
+        }
+        if (code.endsWith('\n')) {
+          code = code.slice(0, -1);
+        }
+        blocks.push({ type: 'code-block', language, code });
+        i++; // Skip closing ```
+        continue;
+      }
+
+      // 2. Table Block
+      if (hasPipe(line) && i + 1 < lines.length && isDelimiterLine(lines[i + 1])) {
+        const headerRow = line;
+        const delimiterRow = lines[i + 1];
+
+        const parseTableRow = (rowStr: string): string[] => {
+          const rawParts = rowStr.split('|').map(s => s.trim());
+          let parts = [...rawParts];
+          if (rowStr.trim().startsWith('|')) {
+            parts.shift();
+          }
+          if (rowStr.trim().endsWith('|')) {
+            parts.pop();
+          }
+          return parts;
+        };
+
+        const headers = parseTableRow(headerRow);
+        const delimiterParts = parseTableRow(delimiterRow);
+
+        const alignments = delimiterParts.map(part => {
+          const left = part.startsWith(':');
+          const right = part.endsWith(':');
+          if (left && right) return 'center' as const;
+          if (right) return 'right' as const;
+          return 'left' as const;
+        });
+
+        const rows: string[][] = [];
+        i += 2;
+
+        while (i < lines.length && hasPipe(lines[i]) && !isDelimiterLine(lines[i])) {
+          rows.push(parseTableRow(lines[i]));
+          i++;
+        }
+
+        blocks.push({ type: 'table', headers, alignments, rows });
+        continue;
+      }
+
+      // 3. Headings
+      const headingMatch = line.match(/^(#{1,6})\s+(.*)$/);
+      if (headingMatch) {
+        blocks.push({
+          type: 'heading',
+          level: headingMatch[1].length,
+          text: headingMatch[2],
+        });
+        i++;
+        continue;
+      }
+
+      // 4. Blockquotes
+      if (line.trim().startsWith('>')) {
+        let quoteText = line.trim().slice(1).trim();
+        i++;
+        while (i < lines.length && lines[i].trim().startsWith('>')) {
+          quoteText += ' ' + lines[i].trim().slice(1).trim();
+          i++;
+        }
+        blocks.push({ type: 'blockquote', text: quoteText });
+        continue;
+      }
+
+      // 5. Lists (unordered, ordered, task list)
+      const taskListMatch = line.match(/^[-*]\s+\[([ xX])\]\s+(.*)$/);
+      const unorderedMatch = line.match(/^[-*]\s+(.*)$/);
+      const orderedMatch = line.match(/^(\d+)\.\s+(.*)$/);
+
+      if (taskListMatch || unorderedMatch || orderedMatch) {
+        const listType = orderedMatch ? 'ol' : 'ul';
+        const items: { text: string; checked?: boolean }[] = [];
+
+        while (i < lines.length) {
+          const curLine = lines[i];
+          const curTask = curLine.match(/^[-*]\s+\[([ xX])\]\s+(.*)$/);
+          const curUnordered = curLine.match(/^[-*]\s+(.*)$/);
+          const curOrdered = curLine.match(/^(\d+)\.\s+(.*)$/);
+
+          if (listType === 'ol' && curOrdered) {
+            items.push({ text: curOrdered[2] });
+          } else if (listType === 'ul' && curTask) {
+            items.push({ text: curTask[2], checked: curTask[1].toLowerCase() === 'x' });
+          } else if (listType === 'ul' && curUnordered) {
+            items.push({ text: curUnordered[1] });
+          } else {
+            break;
+          }
+          i++;
+        }
+
+        blocks.push({ type: 'list', listType, items });
+        continue;
+      }
+
+      // 6. Blank lines
+      if (line.trim() === '') {
+        blocks.push({ type: 'break' });
+        i++;
+        continue;
+      }
+
+      // 7. Paragraph
+      let paraText = line.trim();
+      i++;
+      while (i < lines.length) {
+        const nextLine = lines[i];
+        if (
+          nextLine.trim() === '' ||
+          nextLine.trim().startsWith('```') ||
+          nextLine.match(/^(#{1,6})\s+/) ||
+          nextLine.trim().startsWith('>') ||
+          nextLine.match(/^[-*]\s+/) ||
+          nextLine.match(/^(\d+)\.\s+/)
+        ) {
+          break;
+        }
+        paraText += '\n' + nextLine.trim();
+        i++;
+      }
+      blocks.push({ type: 'paragraph', text: paraText });
     }
 
-    elements.push(
-      activeListType === 'ul' ? (
-        <ul key={`ul-${keySuffix}`} style={{ margin: '8px 0', paddingLeft: '24px', listStyleType: 'disc' }}>
-          {listItems.splice(0, listItems.length)}
-        </ul>
-      ) : (
-        <ol key={`ol-${keySuffix}`} style={{ margin: '8px 0', paddingLeft: '24px', listStyleType: 'decimal' }}>
-          {listItems.splice(0, listItems.length)}
-        </ol>
-      ),
-    );
-
-    activeListType = null;
+    return blocks;
   };
 
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index];
-    const headingThreeMatch = line.match(/^###\s+(.*)$/);
-    const headingTwoMatch = line.match(/^##\s+(.*)$/);
-    const blockquoteMatch = line.match(/^>\s+(.*)$/);
-    const taskListMatch = line.match(/^[-*] \[([ x])\]\s+(.*)$/i);
-    const unorderedListMatch = line.match(/^[-*]\s+(.*)$/);
-    const orderedListMatch = line.match(/^(\d+)\.\s+(.*)$/);
-    const isListLine = Boolean(taskListMatch || unorderedListMatch || orderedListMatch);
-
-    if (activeListType && !isListLine) {
-      flushList(index);
-    }
-
-    if (headingThreeMatch) {
-      elements.push(
-        <h3
-          key={index}
-          style={{ fontSize: '14px', fontWeight: 600, marginTop: '16px', marginBottom: '8px', color: 'var(--color-text-primary)' }}
-        >
-          <InlineFormattedText
-            text={headingThreeMatch[1]}
-            customTokenRegex={customTokenRegex}
-            renderCustomToken={renderCustomToken}
-          />
-        </h3>,
-      );
-      continue;
-    }
-
-    if (headingTwoMatch) {
-      elements.push(
-        <h2
-          key={index}
-          style={{ fontSize: '16px', fontWeight: 600, marginTop: '16px', marginBottom: '8px', color: 'var(--color-text-primary)' }}
-        >
-          <InlineFormattedText
-            text={headingTwoMatch[1]}
-            customTokenRegex={customTokenRegex}
-            renderCustomToken={renderCustomToken}
-          />
-        </h2>,
-      );
-      continue;
-    }
-
-    if (blockquoteMatch) {
-      elements.push(
-        <blockquote
-          key={index}
-          style={{
-            borderLeft: '3px solid var(--color-border-default)',
-            margin: '8px 0',
-            paddingLeft: '12px',
-            color: 'var(--color-text-secondary)',
-            fontStyle: 'italic',
-          }}
-        >
-          <InlineFormattedText
-            text={blockquoteMatch[1]}
-            customTokenRegex={customTokenRegex}
-            renderCustomToken={renderCustomToken}
-          />
-        </blockquote>,
-      );
-      continue;
-    }
-
-    if (taskListMatch) {
-      activeListType = 'ul';
-      const isChecked = taskListMatch[1].toLowerCase() === 'x';
-
-      listItems.push(
-        <li
-          key={index}
-          style={{
-            listStyleType: 'none',
-            display: 'flex',
-            alignItems: 'flex-start',
-            gap: '8px',
-            margin: '4px 0',
-            marginLeft: '-24px',
-          }}
-        >
-          <div style={{ marginTop: '2px' }}>
-            {isChecked ? (
-              <CheckSquare size={14} color="var(--color-primary)" />
-            ) : (
-              <Square size={14} color="var(--color-text-disabled)" />
-            )}
-          </div>
-          <span style={{ textDecoration: isChecked ? 'line-through' : 'none', opacity: isChecked ? 0.7 : 1 }}>
-            <InlineFormattedText
-              text={taskListMatch[2]}
-              customTokenRegex={customTokenRegex}
-              renderCustomToken={renderCustomToken}
-            />
-          </span>
-        </li>,
-      );
-      continue;
-    }
-
-    if (unorderedListMatch) {
-      activeListType = 'ul';
-      listItems.push(
-        <li key={index} style={{ margin: '2px 0' }}>
-          <InlineFormattedText
-            text={unorderedListMatch[1]}
-            customTokenRegex={customTokenRegex}
-            renderCustomToken={renderCustomToken}
-          />
-        </li>,
-      );
-      continue;
-    }
-
-    if (orderedListMatch) {
-      activeListType = 'ol';
-      listItems.push(
-        <li key={index} style={{ margin: '2px 0' }}>
-          <InlineFormattedText
-            text={orderedListMatch[2]}
-            customTokenRegex={customTokenRegex}
-            renderCustomToken={renderCustomToken}
-          />
-        </li>,
-      );
-      continue;
-    }
-
-    if (line.trim() === '') {
-      elements.push(<div key={`br-${index}`} style={{ height: '8px' }} />);
-      continue;
-    }
-
-    elements.push(
-      <div key={index} style={{ margin: '4px 0', lineHeight: 1.5 }}>
-        <InlineFormattedText
-          text={line}
-          customTokenRegex={customTokenRegex}
-          renderCustomToken={renderCustomToken}
-        />
-      </div>,
-    );
-  }
-
-  flushList('end');
+  const blocks = parseBlocks();
 
   return (
     <div className="markdown-renderer" style={{ color: 'var(--color-text-primary)' }}>
-      {elements}
+      {blocks.map((block, index) => {
+        switch (block.type) {
+          case 'heading': {
+            const level = block.level || 3;
+            const headingStyle: React.CSSProperties = {
+              fontWeight: 600,
+              marginTop: '16px',
+              marginBottom: '8px',
+              color: 'var(--color-text-primary)',
+            };
+            if (level === 1) {
+              return (
+                <h1 key={index} style={{ ...headingStyle, fontSize: '20px' }}>
+                  <InlineFormattedText text={block.text || ''} customTokenRegex={customTokenRegex} renderCustomToken={renderCustomToken} />
+                </h1>
+              );
+            }
+            if (level === 2) {
+              return (
+                <h2 key={index} style={{ ...headingStyle, fontSize: '16px' }}>
+                  <InlineFormattedText text={block.text || ''} customTokenRegex={customTokenRegex} renderCustomToken={renderCustomToken} />
+                </h2>
+              );
+            }
+            return (
+              <h3 key={index} style={{ ...headingStyle, fontSize: '14px' }}>
+                <InlineFormattedText text={block.text || ''} customTokenRegex={customTokenRegex} renderCustomToken={renderCustomToken} />
+              </h3>
+            );
+          }
+          case 'blockquote':
+            return (
+              <blockquote
+                key={index}
+                style={{
+                  borderLeft: '3px solid var(--color-border-default)',
+                  margin: '8px 0',
+                  paddingLeft: '12px',
+                  color: 'var(--color-text-secondary)',
+                  fontStyle: 'italic',
+                }}
+              >
+                <InlineFormattedText text={block.text || ''} customTokenRegex={customTokenRegex} renderCustomToken={renderCustomToken} />
+              </blockquote>
+            );
+          case 'list': {
+            const ListTag = block.listType === 'ol' ? 'ol' : 'ul';
+            const listStyle: React.CSSProperties = {
+              margin: '8px 0',
+              paddingLeft: '24px',
+              listStyleType: block.listType === 'ol' ? 'decimal' : 'disc',
+            };
+            return (
+              <ListTag key={index} style={listStyle}>
+                {block.items?.map((item, itemIdx) => {
+                  if (item.checked !== undefined) {
+                    return (
+                      <li
+                        key={itemIdx}
+                        style={{
+                          listStyleType: 'none',
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: '8px',
+                          margin: '4px 0',
+                          marginLeft: '-24px',
+                        }}
+                      >
+                        <div style={{ marginTop: '2px' }}>
+                          {item.checked ? (
+                            <CheckSquare size={14} color="var(--color-primary)" />
+                          ) : (
+                            <Square size={14} color="var(--color-text-disabled)" />
+                          )}
+                        </div>
+                        <span style={{ textDecoration: item.checked ? 'line-through' : 'none', opacity: item.checked ? 0.7 : 1 }}>
+                          <InlineFormattedText text={item.text} customTokenRegex={customTokenRegex} renderCustomToken={renderCustomToken} />
+                        </span>
+                      </li>
+                    );
+                  }
+                  return (
+                    <li key={itemIdx} style={{ margin: '2px 0' }}>
+                      <InlineFormattedText text={item.text} customTokenRegex={customTokenRegex} renderCustomToken={renderCustomToken} />
+                    </li>
+                  );
+                })}
+              </ListTag>
+            );
+          }
+          case 'code-block':
+            return <CodeBlock key={index} code={block.code || ''} language={block.language} />;
+          case 'table':
+            return (
+              <div key={index} style={{ overflowX: 'auto', margin: '12px 0', borderRadius: '8px', border: '1px solid var(--color-border-default)' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', textAlign: 'left' }}>
+                  <thead>
+                    <tr style={{ background: 'var(--color-surface-app)', borderBottom: '2px solid var(--color-border-default)' }}>
+                      {block.headers?.map((header, colIdx) => (
+                        <th
+                          key={colIdx}
+                          style={{
+                            padding: '8px 12px',
+                            fontWeight: 600,
+                            textAlign: block.alignments?.[colIdx] || 'left',
+                            color: 'var(--color-text-primary)',
+                          }}
+                        >
+                          <InlineFormattedText text={header} customTokenRegex={customTokenRegex} renderCustomToken={renderCustomToken} />
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {block.rows?.map((row, rowIdx) => (
+                      <tr
+                        key={rowIdx}
+                        style={{
+                          borderBottom: '1px solid var(--color-border-default)',
+                          background: rowIdx % 2 === 0 ? 'transparent' : 'var(--color-surface-app)',
+                        }}
+                      >
+                        {row.map((cell, cellIdx) => (
+                          <td
+                            key={cellIdx}
+                            style={{
+                              padding: '8px 12px',
+                              textAlign: block.alignments?.[cellIdx] || 'left',
+                              color: 'var(--color-text-secondary)',
+                            }}
+                          >
+                            <InlineFormattedText text={cell} customTokenRegex={customTokenRegex} renderCustomToken={renderCustomToken} />
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            );
+          case 'break':
+            return <div key={index} style={{ height: '8px' }} />;
+          case 'paragraph':
+          default:
+            return (
+              <div key={index} style={{ margin: '4px 0', lineHeight: 1.5 }}>
+                <InlineFormattedText text={block.text || ''} customTokenRegex={customTokenRegex} renderCustomToken={renderCustomToken} />
+              </div>
+            );
+        }
+      })}
     </div>
   );
 }
