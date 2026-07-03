@@ -16,7 +16,7 @@ const DEFAULT_CHAT_LIMIT = 20;
 const MAX_CHAT_LIMIT = 100;
 const CHAT_STREAM_RATE_LIMIT_MAX = 30;
 const CHAT_STREAM_RATE_LIMIT_WINDOW_MS = 60_000;
-const CHAT_MESSAGE_PREVIEW_LENGTH = 80;
+const CHAT_MESSAGE_PREVIEW_LENGTH = 48;
 
 const createChatStreamLimiter = env.redisEnabled ? createRedisRateLimiter : createRateLimiter;
 const streamLimiter = createChatStreamLimiter({
@@ -47,12 +47,12 @@ function normalizeChatSearch(value: unknown) {
 }
 
 function buildMessagePreview(content: string) {
-  const trimmed = content.trim();
+  const trimmed = content.replace(/\s+/g, ' ').trim();
   if (trimmed.length <= CHAT_MESSAGE_PREVIEW_LENGTH) {
     return trimmed;
   }
 
-  return `${trimmed.slice(0, CHAT_MESSAGE_PREVIEW_LENGTH)}…`;
+  return `${trimmed.slice(0, CHAT_MESSAGE_PREVIEW_LENGTH - 1).trimEnd()}…`;
 }
 
 async function loadLastMessagePreviews(sessionIds: string[]): Promise<Map<string, string>> {

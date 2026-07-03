@@ -104,7 +104,7 @@ const TOOL_ALIAS_BLOCKS: string[][] = [
 ];
 
 const CHAT_TITLE_DEFAULT = 'New Chat';
-const CHAT_TITLE_MAX_LENGTH = 60;
+const CHAT_TITLE_MAX_LENGTH = 32;
 const MAX_TOOL_ROUNDS = 2;
 
 const STREAMING_PROVIDERS = new Set<ChatProvider>(['openai', 'deepseek', 'ollama']);
@@ -119,6 +119,30 @@ export function isStreamingChatProvider(value: string): value is ChatProvider {
 
 function normalizeString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
+}
+
+function collapseWhitespace(value: string): string {
+  return value.replace(/\s+/g, ' ').trim();
+}
+
+function truncateText(value: string, maxLength: number): string {
+  if (value.length <= maxLength) {
+    return value;
+  }
+
+  if (maxLength <= 1) {
+    return value.slice(0, maxLength);
+  }
+
+  const truncated = value.slice(0, maxLength - 1).trimEnd();
+  const lastSpaceIndex = truncated.lastIndexOf(' ');
+  const minimumWordBoundaryIndex = Math.floor((maxLength - 1) * 0.6);
+
+  if (lastSpaceIndex >= minimumWordBoundaryIndex) {
+    return `${truncated.slice(0, lastSpaceIndex).trimEnd()}…`;
+  }
+
+  return `${truncated}…`;
 }
 
 function isToolDisabled(name: string, disabledTools: string[]) {
@@ -224,6 +248,17 @@ export class ChatService {
         .update(chatSessions)
         .set({ updatedAt: new Date() })
         .where(eq(chatSessions.id, input.chatId));
+
+      if (isFirstUserMessage && context.session.title === CHAT_TITLE_DEFAULT) {
+        const derivedTitle = this.buildChatTitleFromMessage(userMessageText);
+        if (derivedTitle) {
+          await db
+            .update(chatSessions)
+            .set({ title: derivedTitle })
+            .where(and(eq(chatSessions.id, input.chatId), eq(chatSessions.title, CHAT_TITLE_DEFAULT)));
+          context.session.title = derivedTitle;
+        }
+      }
     } else {
       const hasExistingUserMessage = conversationRows.some((row) => row.role === 'user');
       if (!hasExistingUserMessage) {
@@ -278,28 +313,6 @@ export class ChatService {
       fallbackReason: modelResult.fallbackReason,
       toolCalls: modelResult.toolCalls ?? null,
     });
-
-    if (
-      !modelResult.fallback &&
-      isFirstUserMessage &&
-      userMessageText.length > 0 &&
-      context.session.title === CHAT_TITLE_DEFAULT &&
-      context.project.id.length > 0
-    ) {
-      this.enqueueTitleGeneration({
-        chatId: input.chatId,
-        userId: input.userId,
-        workspaceId: context.project.workspaceId,
-        projectName: context.project.name,
-        projectKey: context.project.key,
-        message: userMessageText,
-        provider: resolvedProvider,
-        model: resolvedModel,
-        ollamaUrl: requestOllamaUrl,
-      }).catch((error) => {
-        console.error('Chat title generation failed:', error);
-      });
-    }
 
     return {
       assistantMessageId: assistant.id,
@@ -606,80 +619,24 @@ Only operate in the workspace/project above.`,
     return row;
   }
 
-  private async enqueueTitleGeneration(params: {
-    chatId: string;
-    userId: string;
-    workspaceId: string;
-    projectName: string;
-    projectKey: string;
-    message: string;
-    provider: ChatProvider;
-    model: string;
-    ollamaUrl?: string;
-  }) {
-    await new Promise<void>((resolve) => {
-      setTimeout(() => {
-        resolve();
-      }, 0);
-    });
-
-    const generatedTitle = await this.generateChatTitle(params);
-    if (!generatedTitle) {
-      return;
-    }
-
-    await db
-      .update(chatSessions)
-      .set({
-        title: generatedTitle,
-      })
-      .where(and(eq(chatSessions.id, params.chatId), eq(chatSessions.title, CHAT_TITLE_DEFAULT)));
-  }
-
-  private async generateChatTitle(params: {
-    userId: string;
-    projectName: string;
-    projectKey: string;
-    message: string;
-    provider: ChatProvider;
-    model: string;
-    ollamaUrl?: string;
-  }) {
-    const response = await this.ai.chat(params.userId, params.provider, {
-      model: params.model,
-      messages: [
-        {
-          role: 'system',
-          content:
-            'You are a title generator for Gravity chat sessions. Return only a title, no punctuation, under 12 words.',
-        },
-        {
-          role: 'user',
-          content: `Project: ${params.projectName} (${params.projectKey})\nUser message: ${params.message}`,
-        },
-      ],
-      ...(params.ollamaUrl ? { ollamaUrl: params.ollamaUrl } : {}),
-    });
-
-    if (!response || typeof response.content !== 'string') {
-      return '';
-    }
-
-    return this.sanitizeTitle(response.content);
+  private buildChatTitleFromMessage(message: string) {
+    return this.sanitizeTitle(message);
   }
 
   private sanitizeTitle(value: string) {
-    const title = safeStringify(value)
+    const title = collapseWhitespace(
+      safeStringify(value)
       .replace(/^"|"$/g, '')
       .replace(/^'|'$/g, '')
       .split('\n')[0]
-      ?.trim() ?? '';
+      ?.trim() ?? '',
+    );
 
     if (!title) {
       return '';
     }
 
-    return title.slice(0, CHAT_TITLE_MAX_LENGTH);
+    return truncateText(title, CHAT_TITLE_MAX_LENGTH);
   }
 
   private toFallbackReason(error: unknown) {
