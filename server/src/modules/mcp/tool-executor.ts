@@ -1,4 +1,5 @@
 import { toolHandlers } from './tool-handlers/registry.js';
+import { audit } from '../../lib/logger.js';
 
 /**
  * @description Resolves a tool name against the registry and executes it with
@@ -21,6 +22,13 @@ export async function executeTool(
   if (!handler) {
     throw new Error(`Unknown tool: ${name}`);
   }
+
+  audit('mcp.tool_execute', {
+    toolName: name,
+    workspaceId: contextWorkspaceId,
+    actorUserId,
+    arguments: args,
+  });
 
   return handler(args, {
     workspaceId: contextWorkspaceId,
