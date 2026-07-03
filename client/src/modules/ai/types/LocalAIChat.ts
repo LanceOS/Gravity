@@ -9,6 +9,12 @@ export interface LocalAIChatProps {
   workspaceId?: string;
   projectId?: string;
   isClosing?: boolean;
+  /** Seeds the cloud chat session id used for this conversation (e.g. when resuming a past chat). */
+  seedChatSessionId?: string;
+  /** Seeds the visible transcript (e.g. history loaded for a resumed chat session). */
+  seedMessages?: Message[];
+  /** Called when a cloud chat session is created (either lazily on first message or externally). */
+  onSessionCreated?: (chatId: string) => void;
 }
 
 export interface Message {

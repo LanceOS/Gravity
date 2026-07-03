@@ -105,7 +105,7 @@ async function postChatCompletionSse(
   return doneEvent;
 }
 
-export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllamaUrl, initialModel, settings, workspaceId, projectId, isClosing }) => {
+export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllamaUrl, initialModel, settings, workspaceId, projectId, isClosing, seedChatSessionId, seedMessages, onSessionCreated }) => {
   const { activeTicket } = useActiveTicket();
   const { currentUser } = useAuth();
   const { users } = useUserDirectory();
@@ -171,17 +171,23 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
   }, [workspaceId]);
 
   // Chat state
-  const [messages, setMessages] = useState<Message[]>(getInitialMessages);
+  const [messages, setMessages] = useState<Message[]>(() => (seedMessages && seedMessages.length > 0 ? seedMessages : getInitialMessages()));
   const [isGenerating, setIsGenerating] = useState(false);
-  const [chatSessionId, setChatSessionId] = useState('');
-  const chatSessionIdRef = useRef('');
+  const [chatSessionId, setChatSessionId] = useState(() => seedChatSessionId || '');
+  const chatSessionIdRef = useRef(seedChatSessionId || '');
   const cloudContextVersionRef = useRef(0);
+  const isFirstProjectEffectRunRef = useRef(true);
 
   useEffect(() => {
     chatSessionIdRef.current = chatSessionId;
   }, [chatSessionId]);
 
   useEffect(() => {
+    if (isFirstProjectEffectRunRef.current) {
+      isFirstProjectEffectRunRef.current = false;
+      return;
+    }
+
     cloudContextVersionRef.current += 1;
     chatSessionIdRef.current = '';
     setChatSessionId('');
@@ -211,6 +217,7 @@ export const LocalAIChat: React.FC<LocalAIChatProps> = ({ onClose, initialOllama
 
     chatSessionIdRef.current = session.id;
     setChatSessionId(session.id);
+    onSessionCreated?.(session.id);
 
     return session.id;
   };

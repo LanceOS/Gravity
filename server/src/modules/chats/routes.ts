@@ -1,4 +1,4 @@
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, inArray } from 'drizzle-orm';
 import { Router, type Request, type Response } from 'express';
 import { db } from '../../db/index.js';
 import { createRateLimiter } from '../../lib/rateLimit.js';
@@ -16,6 +16,7 @@ const DEFAULT_CHAT_LIMIT = 20;
 const MAX_CHAT_LIMIT = 100;
 const CHAT_STREAM_RATE_LIMIT_MAX = 30;
 const CHAT_STREAM_RATE_LIMIT_WINDOW_MS = 60_000;
+const CHAT_MESSAGE_PREVIEW_LENGTH = 80;
 
 const createChatStreamLimiter = env.redisEnabled ? createRedisRateLimiter : createRateLimiter;
 const streamLimiter = createChatStreamLimiter({
@@ -35,6 +36,45 @@ type ChatRole = (typeof CHAT_ROLES)[number];
 
 function normalizeRouteParam(value: string | string[]) {
   return Array.isArray(value) ? value[0] ?? '' : value;
+}
+
+function normalizeChatSearch(value: unknown) {
+  if (typeof value !== 'string') {
+    return '';
+  }
+
+  return value.trim();
+}
+
+function buildMessagePreview(content: string) {
+  const trimmed = content.trim();
+  if (trimmed.length <= CHAT_MESSAGE_PREVIEW_LENGTH) {
+    return trimmed;
+  }
+
+  return `${trimmed.slice(0, CHAT_MESSAGE_PREVIEW_LENGTH)}…`;
+}
+
+async function loadLastMessagePreviews(sessionIds: string[]): Promise<Map<string, string>> {
+  if (sessionIds.length === 0) {
+    return new Map();
+  }
+
+  const rows = await db
+    .selectDistinctOn([chatMessages.sessionId], {
+      sessionId: chatMessages.sessionId,
+      content: chatMessages.content,
+    })
+    .from(chatMessages)
+    .where(inArray(chatMessages.sessionId, sessionIds))
+    .orderBy(chatMessages.sessionId, desc(chatMessages.createdAt), desc(chatMessages.id));
+
+  const previewBySessionId = new Map<string, string>();
+  for (const row of rows) {
+    previewBySessionId.set(row.sessionId, buildMessagePreview(row.content));
+  }
+
+  return previewBySessionId;
 }
 
 function normalizeChatTitle(value: unknown) {
@@ -164,13 +204,14 @@ function parseOffset(value: unknown) {
   return parsed;
 }
 
-function mapChatSessionRow(row: typeof chatSessions.$inferSelect) {
+function mapChatSessionRow(row: typeof chatSessions.$inferSelect, lastMessagePreview: string | null = null) {
   return {
     id: row.id,
     projectId: row.projectId,
     teamId: row.teamId,
     userId: row.userId,
     title: row.title,
+    lastMessagePreview,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -256,16 +297,27 @@ export function createChatsRouter() {
     try {
       const limit = parseLimit(req.query.limit);
       const offset = parseOffset(req.query.offset);
+      const search = normalizeChatSearch(req.query.search);
 
       const rows = await db
         .select()
         .from(chatSessions)
-        .where(and(eq(chatSessions.projectId, projectId), eq(chatSessions.userId, auth.userId)))
+        .where(
+          search
+            ? and(
+                eq(chatSessions.projectId, projectId),
+                eq(chatSessions.userId, auth.userId),
+                ilike(chatSessions.title, `%${search}%`),
+              )
+            : and(eq(chatSessions.projectId, projectId), eq(chatSessions.userId, auth.userId)),
+        )
         .orderBy(desc(chatSessions.updatedAt), desc(chatSessions.id))
         .limit(limit)
         .offset(offset);
 
-      res.json(rows.map(mapChatSessionRow));
+      const previewBySessionId = await loadLastMessagePreviews(rows.map((row) => row.id));
+
+      res.json(rows.map((row) => mapChatSessionRow(row, previewBySessionId.get(row.id) ?? null)));
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to list chat sessions.' });
     }

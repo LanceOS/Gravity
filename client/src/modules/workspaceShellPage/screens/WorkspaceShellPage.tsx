@@ -4,7 +4,7 @@ import { ArrowLeft } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
 import type { SidebarNavigationState, SidebarProps } from '../../../components/Sidebar';
 import { WorkspaceLayout } from '../../../layouts/WorkspaceLayout/WorkspaceLayout';
-import { LocalAIChat } from '../../ai';
+import { AiChatDock } from '../../chats';
 import { Button } from '@library';
 import { AuthScreen } from '../../auth';
 import type { TicketFilters, TicketListSort } from '../../tickets';
@@ -836,6 +836,12 @@ export function WorkspaceShellPage() {
 
   useEffect(() => {
     const handleGlobalKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === 'c') {
+        event.preventDefault();
+        handleToggleOllama();
+        return;
+      }
+
       const target = event.target as HTMLElement;
       if (
         target.tagName === 'INPUT' ||
@@ -858,7 +864,7 @@ export function WorkspaceShellPage() {
 
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [activeSection, activeWorkspaceId, handleOpenCreateTicket, navigate]);
+  }, [activeSection, activeWorkspaceId, handleOpenCreateTicket, handleToggleOllama, navigate]);
 
   const handleOpenCurrentTeamProjectsManager = useCallback(() => {
     if (sidebarActiveTeamId) {
@@ -1036,7 +1042,7 @@ export function WorkspaceShellPage() {
         isMobile={isMobile}
         rightPanels={
           isOllamaOpen || isOllamaClosing ? (
-            <LocalAIChat
+            <AiChatDock
               onClose={handleToggleOllama}
               initialOllamaUrl={accountSettings.ollamaEndpoint}
               initialModel={
@@ -1048,6 +1054,7 @@ export function WorkspaceShellPage() {
               workspaceId={activeWorkspaceId}
               projectId={aiChatProjectId}
               isClosing={isOllamaClosing}
+              isMobile={isMobile}
             />
           ) : null
         }

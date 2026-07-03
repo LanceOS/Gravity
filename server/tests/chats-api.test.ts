@@ -216,6 +216,72 @@ describe('chat sessions routes', () => {
     expect(removedChats.body.map((chat: { id: string }) => chat.id).sort()).toEqual(expect.arrayContaining(persistedChatIds));
   });
 
+  it('filters chats by title search and includes a last message preview', async () => {
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Preview Owner',
+      email: 'preview-owner@example.com',
+      role: 'owner',
+    });
+    const owner = ownerApi.user;
+
+    const { project } = await seedWorkspaceFixture({
+      owner: {
+        id: owner.id,
+        name: owner.name,
+        email: owner.email,
+        role: 'owner',
+        avatarUrl: owner.avatar,
+      },
+    });
+
+    const roadmapChat = await ownerApi
+      .post(`/api/v1/projects/${project.id}/chats`)
+      .send({ title: 'Roadmap Planning' });
+    expect(roadmapChat.status).toBe(201);
+    const roadmapChatId = roadmapChat.body.id;
+
+    const releaseChat = await ownerApi
+      .post(`/api/v1/projects/${project.id}/chats`)
+      .send({ title: 'Release Notes' });
+    expect(releaseChat.status).toBe(201);
+    const releaseChatId = releaseChat.body.id;
+
+    const noMessagesList = await ownerApi.get(`/api/v1/projects/${project.id}/chats`);
+    expect(noMessagesList.status).toBe(200);
+    for (const chat of noMessagesList.body) {
+      expect(chat.lastMessagePreview).toBeNull();
+    }
+
+    const longMessage = `a`.repeat(120);
+    await ownerApi
+      .post(`/api/v1/projects/${project.id}/chats/${roadmapChatId}/messages`)
+      .send({ role: 'user', content: 'First message in roadmap chat.' });
+    const latestRoadmapMessage = await ownerApi
+      .post(`/api/v1/projects/${project.id}/chats/${roadmapChatId}/messages`)
+      .send({ role: 'assistant', content: longMessage });
+    expect(latestRoadmapMessage.status).toBe(201);
+
+    await ownerApi
+      .post(`/api/v1/projects/${project.id}/chats/${releaseChatId}/messages`)
+      .send({ role: 'user', content: 'Short release update.' });
+
+    const previewList = await ownerApi.get(`/api/v1/projects/${project.id}/chats`).query({ limit: 10 });
+    expect(previewList.status).toBe(200);
+    const roadmapEntry = previewList.body.find((chat: { id: string }) => chat.id === roadmapChatId);
+    const releaseEntry = previewList.body.find((chat: { id: string }) => chat.id === releaseChatId);
+    expect(roadmapEntry.lastMessagePreview).toBe(`${'a'.repeat(80)}…`);
+    expect(releaseEntry.lastMessagePreview).toBe('Short release update.');
+
+    const searchByTitle = await ownerApi.get(`/api/v1/projects/${project.id}/chats`).query({ search: 'roadmap' });
+    expect(searchByTitle.status).toBe(200);
+    expect(searchByTitle.body).toHaveLength(1);
+    expect(searchByTitle.body[0].id).toBe(roadmapChatId);
+
+    const searchNoMatch = await ownerApi.get(`/api/v1/projects/${project.id}/chats`).query({ search: 'nonexistent-term' });
+    expect(searchNoMatch.status).toBe(200);
+    expect(searchNoMatch.body).toEqual([]);
+  });
+
   it('restricts chat access to users who are project members', async () => {
     const ownerApi = await createAuthenticatedApi({
       name: 'Authorized Owner',
