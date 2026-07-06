@@ -208,6 +208,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
   labels,
   cycles,
   onSelectTicket,
+  onSelectLabel,
   onUpdateTicket,
   onDeleteTicket,
   onAddComment,
@@ -330,6 +331,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
       ticketLink={ticketLink}
       generatedBranchName={generatedBranchName}
       onSelectTicket={onSelectTicket}
+      onSelectLabel={onSelectLabel}
       onUpdateTicket={onUpdateTicket}
       onAddDependency={onAddDependency}
       onRemoveDependency={onRemoveDependency}

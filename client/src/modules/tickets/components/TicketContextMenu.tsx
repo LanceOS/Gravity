@@ -453,6 +453,7 @@ function haveTicketContextInputsChanged(prevTicket: Ticket, nextTicket: Ticket):
 export const TicketContextMenu = React.memo(
   TicketContextMenuUnmemoized,
   (previous, next) =>
+    previous.children === next.children &&
     previous.availableTickets === next.availableTickets &&
     !haveTicketContextInputsChanged(previous.ticket, next.ticket),
 );

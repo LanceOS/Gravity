@@ -33,6 +33,7 @@ interface TicketPropertiesGridProps {
   onAddBlocker: (ticketId: string, blockerId: string) => Promise<boolean>;
   onRemoveBlocker: (ticketId: string, blockerId: string) => Promise<boolean>;
   copyToClipboard: (value: string, successMessage?: string) => Promise<void>;
+  onSelectLabel?: (projectId: string, labelId: string) => void;
 }
 
 export const TicketPropertiesGrid: React.FC<TicketPropertiesGridProps> = ({
@@ -54,6 +55,7 @@ export const TicketPropertiesGrid: React.FC<TicketPropertiesGridProps> = ({
   onAddBlocker,
   onRemoveBlocker,
   copyToClipboard,
+  onSelectLabel,
 }) => {
   const { assignLabelToTicket, unassignLabelFromTicket, createLabel: createLabelInContext } = useLabels();
 
@@ -147,6 +149,8 @@ export const TicketPropertiesGrid: React.FC<TicketPropertiesGridProps> = ({
                 key={l.id}
                 label={l}
                 size="sm"
+                interactive={!!onSelectLabel}
+                onClick={onSelectLabel ? () => onSelectLabel(activeTicket.projectId, l.id) : undefined}
                 onRemove={() => handleUnassignLabel(l.id)}
               />
             ))

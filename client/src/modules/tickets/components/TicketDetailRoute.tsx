@@ -18,6 +18,7 @@ interface TicketDetailRouteProps {
   ticketsByParentId: Map<string, Ticket[]>;
   activeTicketDetail: TicketWithRelations | null;
   onSelectTicket: (ticket: Ticket | null) => void;
+  onSelectLabel?: (projectId: string, labelId: string) => void;
   onUpdateTicket: (id: string, updates: Partial<Ticket>, options?: { immediate?: boolean }) => Promise<void>;
   onDeleteTicket: (ticketId: string) => Promise<void>;
   onAddComment: (ticketId: string, body: string) => Promise<void>;
@@ -42,6 +43,7 @@ export const TicketDetailRoute: React.FC<TicketDetailRouteProps> = ({
   labels,
   cycles,
   onSelectTicket,
+  onSelectLabel,
   onUpdateTicket,
   onDeleteTicket,
   onAddComment,
@@ -152,6 +154,7 @@ export const TicketDetailRoute: React.FC<TicketDetailRouteProps> = ({
         labels={labels}
         cycles={cycles}
         onSelectTicket={onSelectTicket}
+        onSelectLabel={onSelectLabel}
         onUpdateTicket={onUpdateTicket}
         onDeleteTicket={onDeleteTicket}
         onAddComment={onAddComment}
