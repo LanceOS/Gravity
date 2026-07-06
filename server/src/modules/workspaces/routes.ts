@@ -34,6 +34,7 @@ import {
   getWorkspaceSummary,
   invalidateUserWorkspacesCache,
   invalidateWorkspaceCache,
+  normalizeIsoDate,
   WorkspaceCacheInvalidationReason,
   listWorkspaceSummaries,
   normalizeEntityKey,
@@ -201,6 +202,15 @@ function createWorkspacePrivateKey() {
   return `sec_wsp_${randomUUID().replace(/-/g, '')}`;
 }
 
+function normalizeNullableIsoDate(value: unknown) {
+  return value ? normalizeIsoDate(value) : null;
+}
+
+function toExportFilenameSegment(value: string) {
+  const segment = value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return segment || 'workspace';
+}
+
 async function loadWorkspaceSettingsPayload(workspaceId: string) {
   const rows = await db
     .select({
@@ -233,6 +243,211 @@ async function loadWorkspaceSettingsPayload(workspaceId: string) {
     workspaceKey: settings.workspaceKey,
     defaultProjectId: settings.defaultProjectId,
     disabledMcpTools: settings.disabledMcpTools || [],
+  };
+}
+
+async function buildWorkspaceTasksExport(workspaceId: string, generatedBy: string) {
+  const [workspaceRows, taskRows] = await Promise.all([
+    db
+      .select({
+        id: workspaces.id,
+        name: workspaces.name,
+        key: workspaces.key,
+        createdAt: workspaces.createdAt,
+      })
+      .from(workspaces)
+      .where(eq(workspaces.id, workspaceId))
+      .limit(1),
+    db
+      .select({
+        id: tickets.id,
+        key: tickets.key,
+        title: tickets.title,
+        description: tickets.description,
+        status: tickets.status,
+        priority: tickets.priority,
+        assigneeId: tickets.assigneeId,
+        projectId: tickets.projectId,
+        cycleId: tickets.cycleId,
+        parentId: tickets.parentId,
+        prStatus: tickets.prStatus,
+        prUrl: tickets.prUrl,
+        branchName: tickets.branchName,
+        createdAt: tickets.createdAt,
+        updatedAt: tickets.updatedAt,
+        projectName: projects.name,
+        projectKey: projects.key,
+        teamId: teams.id,
+        teamName: teams.name,
+        cycleName: cycles.name,
+        cycleStartDate: cycles.startDate,
+        cycleEndDate: cycles.endDate,
+        cycleCompleted: cycles.completed,
+        assigneeName: authUsers.name,
+        assigneeEmail: authUsers.email,
+        assigneeImage: authUsers.image,
+        assigneeAvatarUrl: userProfiles.avatarUrl,
+      })
+      .from(tickets)
+      .innerJoin(projects, eq(projects.id, tickets.projectId))
+      .leftJoin(teams, eq(teams.id, projects.teamId))
+      .leftJoin(cycles, eq(cycles.id, tickets.cycleId))
+      .leftJoin(authUsers, eq(authUsers.id, tickets.assigneeId))
+      .leftJoin(userProfiles, eq(userProfiles.userId, authUsers.id))
+      .where(eq(projects.workspaceId, workspaceId))
+      .orderBy(asc(projects.name), asc(tickets.createdAt), asc(tickets.key)),
+  ]);
+
+  const workspace = workspaceRows[0];
+  if (!workspace) {
+    return null;
+  }
+
+  const taskIds = taskRows.map((task) => task.id);
+  const [labelRows, commentRows] = taskIds.length > 0
+    ? await Promise.all([
+        db
+          .select({
+            ticketId: ticketLabels.ticketId,
+            id: labels.id,
+            name: labels.name,
+            color: labels.color,
+            description: labels.description,
+            sortOrder: labels.sortOrder,
+          })
+          .from(ticketLabels)
+          .innerJoin(labels, eq(labels.id, ticketLabels.labelId))
+          .where(inArray(ticketLabels.ticketId, taskIds))
+          .orderBy(asc(ticketLabels.ticketId), asc(labels.sortOrder), asc(labels.name)),
+        db
+          .select({
+            id: comments.id,
+            ticketId: comments.ticketId,
+            userId: comments.userId,
+            body: comments.body,
+            createdAt: comments.createdAt,
+            userName: authUsers.name,
+            userEmail: authUsers.email,
+            userImage: authUsers.image,
+            userAvatarUrl: userProfiles.avatarUrl,
+            authorRole: userProfiles.role,
+          })
+          .from(comments)
+          .innerJoin(authUsers, eq(authUsers.id, comments.userId))
+          .leftJoin(userProfiles, eq(userProfiles.userId, authUsers.id))
+          .where(inArray(comments.ticketId, taskIds))
+          .orderBy(asc(comments.ticketId), asc(comments.createdAt)),
+      ])
+    : [[], []];
+
+  const labelsByTaskId = new Map<string, Array<{
+    id: string;
+    name: string;
+    color: string;
+    description: string;
+    sortOrder: number;
+  }>>();
+  for (const label of labelRows) {
+    const taskLabels = labelsByTaskId.get(label.ticketId) ?? [];
+    taskLabels.push({
+      id: label.id,
+      name: label.name,
+      color: label.color,
+      description: label.description ?? '',
+      sortOrder: Number(label.sortOrder ?? 0),
+    });
+    labelsByTaskId.set(label.ticketId, taskLabels);
+  }
+
+  const commentsByTaskId = new Map<string, Array<{
+    id: string;
+    body: string;
+    createdAt: string;
+    author: {
+      id: string;
+      name: string;
+      email: string;
+      avatarUrl: string;
+      role: string;
+    };
+  }>>();
+  for (const comment of commentRows) {
+    const taskComments = commentsByTaskId.get(comment.ticketId) ?? [];
+    taskComments.push({
+      id: comment.id,
+      body: comment.body,
+      createdAt: normalizeIsoDate(comment.createdAt),
+      author: {
+        id: comment.userId,
+        name: comment.userName ?? '',
+        email: comment.userEmail ?? '',
+        avatarUrl: comment.userAvatarUrl ?? comment.userImage ?? '',
+        role: comment.authorRole ?? 'guest_contributor',
+      },
+    });
+    commentsByTaskId.set(comment.ticketId, taskComments);
+  }
+
+  const generatedAt = new Date().toISOString();
+
+  return {
+    export: {
+      type: 'workspace_tasks',
+      version: 1,
+      generatedAt,
+      generatedBy,
+      taskCount: taskRows.length,
+    },
+    workspace: {
+      id: workspace.id,
+      name: workspace.name,
+      key: workspace.key,
+      createdAt: normalizeIsoDate(workspace.createdAt),
+    },
+    tasks: taskRows.map((task) => ({
+      id: task.id,
+      key: task.key,
+      title: task.title,
+      description: task.description,
+      status: task.status,
+      priority: task.priority,
+      assignee: task.assigneeId
+        ? {
+            id: task.assigneeId,
+            name: task.assigneeName ?? '',
+            email: task.assigneeEmail ?? '',
+            avatarUrl: task.assigneeAvatarUrl ?? task.assigneeImage ?? '',
+          }
+        : null,
+      project: {
+        id: task.projectId,
+        name: task.projectName,
+        key: task.projectKey,
+      },
+      team: task.teamId
+        ? {
+            id: task.teamId,
+            name: task.teamName ?? '',
+          }
+        : null,
+      cycle: task.cycleId
+        ? {
+            id: task.cycleId,
+            name: task.cycleName ?? '',
+            startDate: normalizeNullableIsoDate(task.cycleStartDate),
+            endDate: normalizeNullableIsoDate(task.cycleEndDate),
+            completed: Boolean(task.cycleCompleted),
+          }
+        : null,
+      parentId: task.parentId,
+      prStatus: task.prStatus,
+      prUrl: task.prUrl,
+      branchName: task.branchName,
+      createdAt: normalizeIsoDate(task.createdAt),
+      updatedAt: normalizeIsoDate(task.updatedAt),
+      labels: labelsByTaskId.get(task.id) ?? [],
+      comments: commentsByTaskId.get(task.id) ?? [],
+    })),
   };
 }
 
@@ -591,6 +806,43 @@ export function createWorkspacesRouter() {
       res.json(await loadWorkspaceSettingsPayload(workspaceId));
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to update workspace settings.' });
+    }
+  });
+
+  router.get('/workspaces/:workspaceId/export/tasks', async (req, res) => {
+    const workspaceId = getParamString(req.params.workspaceId);
+    if (!workspaceId) {
+      res.status(400).json({ error: 'Invalid workspace id.' });
+      return;
+    }
+
+    try {
+      const auth = await authorizeWorkspaceAccess(req, workspaceId);
+      if (!auth.allowed) {
+        res.status(auth.status).json({ error: auth.error });
+        return;
+      }
+
+      if (auth.workspaceRole !== 'owner') {
+        res.status(403).json({ error: 'Only workspace owners can export tasks.' });
+        return;
+      }
+
+      const payload = await buildWorkspaceTasksExport(workspaceId, auth.userId);
+      if (!payload) {
+        res.status(404).json({ error: 'Workspace not found.' });
+        return;
+      }
+
+      const filename = `gravity-${toExportFilenameSegment(payload.workspace.key)}-tasks-${payload.export.generatedAt.slice(0, 10)}.json`;
+      res.set('Cache-Control', 'no-store');
+      res.set('Pragma', 'no-cache');
+      res.set('X-Content-Type-Options', 'nosniff');
+      res.set('Content-Disposition', `attachment; filename="${filename}"`);
+      res.type('application/json');
+      res.json(payload);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to export workspace tasks.' });
     }
   });
 

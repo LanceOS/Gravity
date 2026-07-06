@@ -51,6 +51,9 @@ export function WorkspaceSettingsPageRoute() {
     createInvite,
     revokeInvite,
     approveJoinRequest,
+    exportTasks,
+    exportLoading,
+    exportError,
     deleteWorkspace,
     deleteLoading,
     deleteError,
@@ -143,6 +146,8 @@ export function WorkspaceSettingsPageRoute() {
         joinRequests={workspaceJoinRequests}
         approveLoadingId={approveLoadingId || null}
         revokeLoadingId={revokeLoadingId || null}
+        exportLoading={exportLoading}
+        exportError={exportError}
         deleteLoading={deleteLoading}
         deleteError={deleteError}
         onBackToWorkspace={() => navigate(`/workspaces/${workspaceId}`)}
@@ -152,6 +157,7 @@ export function WorkspaceSettingsPageRoute() {
         onCreateInvite={async (input) => Boolean(await createInvite(input))}
         onRevokeInvite={async (inviteId: string) => Boolean(await revokeInvite(inviteId))}
         onApproveJoinRequest={async (requestId: string) => Boolean(await approveJoinRequest(requestId))}
+        onExportTasks={async () => Boolean(await exportTasks())}
         onDeleteWorkspace={handleDeleteWorkspace}
         onClearDeleteError={clearDeleteError}
       />

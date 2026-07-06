@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { api, createAuthenticatedApi, seedWorkspaceFixture } from './helpers/test-helpers.js';
+import { db } from '../src/db/index.js';
+import { projectMembers, projects, workspaceMembers } from '../src/db/schema.js';
+import { getDefaultTeamId } from '../src/modules/workspaces/utils/default-team.js';
 
 describe('workspaces routes', () => {
   it('creates, lists, and updates workspaces with settings and members', async () => {
@@ -235,5 +238,178 @@ describe('workspaces routes', () => {
       reviewedBy: owner.id,
     });
 
+  });
+
+  it('exports all workspace tasks with metadata for owners only', async () => {
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Audit Owner',
+      email: 'audit-owner@example.com',
+      role: 'owner',
+      avatarUrl: 'https://example.com/audit-owner.png',
+    });
+    const owner = ownerApi.user;
+    const { workspace, project } = await seedWorkspaceFixture({
+      owner: {
+        id: owner.id,
+        name: owner.name,
+        email: owner.email,
+        role: 'owner',
+        avatarUrl: owner.avatar,
+      },
+      workspace: {
+        id: 'workspace-export',
+        key: 'AUD',
+        name: 'Audit Workspace',
+      },
+      project: {
+        id: 'project-export-1',
+        key: 'AUD',
+        name: 'Audit App',
+        inviteCode: 'INV-AUD-0001ABCD',
+      },
+    });
+
+    const memberApi = await createAuthenticatedApi({
+      name: 'Audit Member',
+      email: 'audit-member@example.com',
+      role: 'member',
+      avatarUrl: 'https://example.com/audit-member.png',
+    });
+    const member = memberApi.user;
+    const secondProjectId = 'project-export-2';
+
+    await db.insert(workspaceMembers).values({
+      workspaceId: workspace.id,
+      userId: member.id,
+      role: 'member',
+      provisionedByValidationId: null,
+      createdAt: new Date(),
+    });
+
+    await db.insert(projects).values({
+      id: secondProjectId,
+      workspaceId: workspace.id,
+      teamId: getDefaultTeamId(workspace.id),
+      name: 'Audit Ops',
+      description: 'Operational audit tasks',
+      key: 'OPS',
+      status: 'active',
+      inviteCode: 'INV-OPS-0001ABCD',
+      createdBy: owner.id,
+      githubRepoUrl: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    await db.insert(projectMembers).values([
+      {
+        projectId: project.id,
+        userId: member.id,
+        role: 'developer',
+        provisionedByValidationId: null,
+        createdAt: new Date(),
+      },
+      {
+        projectId: secondProjectId,
+        userId: owner.id,
+        role: 'owner',
+        provisionedByValidationId: null,
+        createdAt: new Date(),
+      },
+      {
+        projectId: secondProjectId,
+        userId: member.id,
+        role: 'developer',
+        provisionedByValidationId: null,
+        createdAt: new Date(),
+      },
+    ]);
+
+    const firstTicketResponse = await ownerApi
+      .post('/api/v1/tickets')
+      .set('x-project-id', project.id)
+      .send({
+        title: 'Review payment audit trail',
+        description: 'Verify exported ticket fields.',
+        status: 'in_progress',
+        priority: 'high',
+        assigneeId: member.id,
+      });
+    expect(firstTicketResponse.status).toBe(201);
+
+    const secondTicketResponse = await ownerApi
+      .post('/api/v1/tickets')
+      .set('x-project-id', secondProjectId)
+      .send({
+        title: 'Archive workspace evidence',
+        status: 'done',
+        priority: 'medium',
+      });
+    expect(secondTicketResponse.status).toBe(201);
+
+    const commentResponse = await ownerApi
+      .post(`/api/v1/tickets/${firstTicketResponse.body.id}/comments`)
+      .send({ body: 'Owner audit note.' });
+    expect(commentResponse.status).toBe(201);
+
+    const forbiddenResponse = await memberApi.get(`/api/v1/workspaces/${workspace.id}/export/tasks`);
+    expect(forbiddenResponse.status).toBe(403);
+    expect(forbiddenResponse.body).toEqual({ error: 'Only workspace owners can export tasks.' });
+
+    const exportResponse = await ownerApi.get(`/api/v1/workspaces/${workspace.id}/export/tasks`);
+    expect(exportResponse.status).toBe(200);
+    expect(exportResponse.headers['content-disposition']).toContain('gravity-aud-tasks');
+    expect(exportResponse.headers['cache-control']).toBe('no-store');
+
+    expect(exportResponse.body.export).toMatchObject({
+      type: 'workspace_tasks',
+      version: 1,
+      generatedBy: owner.id,
+      taskCount: 2,
+    });
+    expect(exportResponse.body.workspace).toMatchObject({
+      id: workspace.id,
+      key: workspace.key,
+    });
+
+    const exportedTasks = exportResponse.body.tasks;
+    expect(exportedTasks).toHaveLength(2);
+    expect(exportedTasks.map((task: { key: string }) => task.key)).toEqual(
+      expect.arrayContaining([firstTicketResponse.body.key, secondTicketResponse.body.key]),
+    );
+
+    const firstExportedTask = exportedTasks.find((task: { id: string }) => task.id === firstTicketResponse.body.id);
+    expect(firstExportedTask).toMatchObject({
+      title: 'Review payment audit trail',
+      status: 'in_progress',
+      priority: 'high',
+      assignee: {
+        id: member.id,
+        name: member.name,
+        email: member.email,
+      },
+      project: {
+        id: project.id,
+        name: project.name,
+      },
+    });
+    expect(firstExportedTask.createdAt).toEqual(expect.any(String));
+    expect(firstExportedTask.updatedAt).toEqual(expect.any(String));
+    expect(firstExportedTask.comments).toEqual([
+      expect.objectContaining({
+        body: 'Owner audit note.',
+        author: expect.objectContaining({
+          id: owner.id,
+          name: owner.name,
+          email: owner.email,
+        }),
+      }),
+    ]);
+
+    const secondExportedTask = exportedTasks.find((task: { id: string }) => task.id === secondTicketResponse.body.id);
+    expect(secondExportedTask.project).toMatchObject({
+      id: secondProjectId,
+      name: 'Audit Ops',
+    });
   });
 });

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Globe, Link2, Settings2, ShieldCheck, UserPlus, Users } from 'lucide-react';
+import { ArrowLeft, Download, Globe, Link2, Settings2, ShieldCheck, UserPlus, Users } from 'lucide-react';
 import { Button, Divider, Flex, Avatar, Stack, Alert } from '@library';
 import type { SettingsScreenProps, SettingsCategoryId } from '../types';
 import { useIsMobile } from '../../../hooks/useIsMobile';
@@ -11,12 +11,14 @@ import { AccessSection } from '../components/AccessSection';
 import { MembersSection } from '../components/MembersSection';
 import { RequestsSection } from '../components/RequestsSection';
 import { McpToolsSection } from '../components/McpToolsSection';
+import { ExportTasksSection } from '../components/ExportTasksSection';
 
 const SETTINGS_CATEGORIES: Array<{
   id: SettingsCategoryId;
   label: string;
   description: string;
   icon: typeof Settings2;
+  ownerOnly?: boolean;
 }> = [
   {
     id: 'overview',
@@ -29,6 +31,13 @@ const SETTINGS_CATEGORIES: Array<{
     label: 'MCP Tools',
     description: 'Enable or disable AI agent tools for this workspace.',
     icon: ShieldCheck,
+  },
+  {
+    id: 'export',
+    label: 'Export Tasks',
+    description: 'Download task audit data for this workspace.',
+    icon: Download,
+    ownerOnly: true,
   },
   {
     id: 'access',
@@ -67,8 +76,10 @@ export function SettingsScreen(props: SettingsScreenProps) {
   } = props;
   const [activeCategory, setActiveCategory] = useState<SettingsCategoryId>('overview');
   const isMobile = useIsMobile();
+  const isWorkspaceOwner = workspace.memberRole === 'owner';
+  const visibleCategories = SETTINGS_CATEGORIES.filter((category) => !category.ownerOnly || isWorkspaceOwner);
 
-  const activeCategoryMeta = SETTINGS_CATEGORIES.find((category) => category.id === activeCategory) || SETTINGS_CATEGORIES[0];
+  const activeCategoryMeta = visibleCategories.find((category) => category.id === activeCategory) || visibleCategories[0] || SETTINGS_CATEGORIES[0];
 
   return (
     <SettingsScreenContextProvider
@@ -128,7 +139,7 @@ export function SettingsScreen(props: SettingsScreenProps) {
             </div>
 
             <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              {SETTINGS_CATEGORIES.map((category) => {
+              {visibleCategories.map((category) => {
                 const Icon = category.icon;
                 const isActive = activeCategory === category.id;
 
@@ -213,6 +224,8 @@ export function SettingsScreen(props: SettingsScreenProps) {
             {(isMobile || activeCategory === 'requests') && <RequestsSection />}
 
             {(isMobile || activeCategory === 'mcp_tools') && <McpToolsSection />}
+
+            {isWorkspaceOwner && (isMobile || activeCategory === 'export') && <ExportTasksSection />}
 
             {isMobile && (
               <div style={{ display: 'flex', marginTop: 'var(--space-md)' }}>

@@ -16,7 +16,7 @@ export type {
   WorkspaceMember,
 };
 
-export type SettingsCategoryId = 'overview' | 'access' | 'members' | 'requests' | 'mcp_tools';
+export type SettingsCategoryId = 'overview' | 'access' | 'members' | 'requests' | 'mcp_tools' | 'export';
 
 export interface SettingsScreenData {
   currentUser: User;
@@ -34,6 +34,8 @@ export interface SettingsScreenData {
   joinRequests: WorkspaceJoinRequest[];
   approveLoadingId: string | null;
   revokeLoadingId: string | null;
+  exportLoading?: boolean;
+  exportError?: string | null;
 }
 
 export interface SettingsScreenActions {
@@ -44,6 +46,7 @@ export interface SettingsScreenActions {
   onCreateInvite: (input: CreateWorkspaceInviteInput) => Promise<boolean>;
   onRevokeInvite: (inviteId: string) => Promise<boolean>;
   onApproveJoinRequest: (requestId: string) => Promise<boolean>;
+  onExportTasks?: () => Promise<boolean>;
   deleteLoading?: boolean;
   deleteError?: string | null;
   onDeleteWorkspace?: () => Promise<void>;
