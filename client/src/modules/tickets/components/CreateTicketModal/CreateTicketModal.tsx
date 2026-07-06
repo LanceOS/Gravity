@@ -1,14 +1,13 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { Ticket } from '../../../../context/TicketContextContext';
 import { Button, Select, Textarea, Popover, RichTextEditor, createEmptyRichTextValue } from '@library';
-import { AlertCircle } from 'lucide-react';
+import { Plus, X } from 'lucide-react';
 import { ModalDialog } from '../../../../components/ModalDialog';
 import type { CreateTicketModalProps } from '../../types/CreateTicketModal';
 import { PRIORITY_OPTIONS, STATUS_OPTIONS } from '../../utils/CreateTicketModal';
 import { useLabels } from '../../../../context/label/LabelContext';
 import { SearchableOptionPickerPopoverContent } from '../SearchableOptionPickerPopoverContent';
 import { LabelBadge } from '../LabelBadge';
-import { Plus } from 'lucide-react';
 import './CreateTicketModal.css';
 
 export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
@@ -133,28 +132,29 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
 
   return (
     <ModalDialog.Root
+      ariaLabel={modalTitle}
+      className="create-ticket-modal__overlay"
       isOpen={isOpen}
       onClose={onClose}
+      panelClassName="create-ticket-modal__dialog"
       size="xl"
-      style={{ maxWidth: '980px' }}
+      style={{ maxWidth: '920px' }}
     >
-      <ModalDialog.Header title={modalTitle} />
-
-      <ModalDialog.Body>
+      <ModalDialog.Body className="create-ticket-modal__body">
         <form id="create-ticket-form" onSubmit={handleSubmit} className="create-ticket-modal" noValidate>
+          <h2 className="sr-only">{modalTitle}</h2>
           {formError ? <ModalDialog.Feedback type="error">{formError}</ModalDialog.Feedback> : null}
-          <div className="create-ticket-modal__layout">
-            <section className="create-ticket-modal__panel create-ticket-modal__panel--editor">
-              <div className="create-ticket-modal__panel-heading">Details</div>
-
+          <div className="create-ticket-modal__main">
+            <div className="create-ticket-modal__title-row">
               <Textarea
-                label="Issue Title"
-                placeholder="Add a concise issue title"
+                aria-label="Issue Title"
+                placeholder="Issue title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
+                  if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
                     e.preventDefault();
+                    void handleSubmit();
                   }
                 }}
                 autoGrow
@@ -162,26 +162,45 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
                 required
                 className="create-ticket-modal__title-input"
                 inputStyle={{
-                  minHeight: '58px',
-                  fontSize: '18px',
-                  fontWeight: 600,
-                  lineHeight: 1.35,
+                  minHeight: '52px',
+                  fontSize: '22px',
+                  fontWeight: 650,
+                  lineHeight: 1.25,
                 }}
               />
 
-              <RichTextEditor
-                value={description}
-                onChange={setDescription}
-                placeholder="Add a description..."
-                minHeight="190px"
-                className="create-ticket-modal__description-editor"
-                surface="bare"
-                toolbarMode="bubble"
-              />
-            </section>
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                aria-label="Close dialog"
+                className="create-ticket-modal__close-button"
+                onClick={onClose}
+              >
+                <X size={16} />
+              </Button>
+            </div>
 
-            <aside className="create-ticket-modal__panel create-ticket-modal__panel--sidebar">
-              <div className="create-ticket-modal__panel-heading">Properties</div>
+            <RichTextEditor
+              value={description}
+              onChange={setDescription}
+              placeholder="Add a description..."
+              minHeight="230px"
+              className="create-ticket-modal__description-editor"
+              surface="bare"
+              toolbarMode="bubble"
+            />
+
+            <section className="create-ticket-modal__properties" aria-label="Ticket properties">
+              {parentTicket ? (
+                <div className="create-ticket-modal__field create-ticket-modal__field--parent">
+                  <span className="label">Parent ticket</span>
+                  <div className="create-ticket-modal__parent-value">
+                    <span className="create-ticket-modal__parent-key">{parentTicket.key}</span>
+                    <span className="create-ticket-modal__parent-title">{parentTicket.title}</span>
+                  </div>
+                </div>
+              ) : null}
 
               <Select
                 label="Project"
@@ -189,7 +208,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
                 onValueChange={(nextProjectId: string) => setProjectId(nextProjectId)}
                 options={projectOptions}
                 aria-label="Select project"
-                disabled={!!parentId} // Sub-tasks lock to parent project
+                disabled={!!parentId}
               />
 
               <Select
@@ -216,23 +235,25 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
                 aria-label="Select assignee"
               />
 
-              <div className="create-ticket-modal__field">
-                <span className="label" style={{ marginBottom: '8px', display: 'block' }}>Labels</span>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
-                  {labelIds.length > 0 && (
-                    labelIds.map((id) => {
-                      const label = labelById.get(id);
-                      if (!label) return null;
-                      return (
-                        <LabelBadge
-                          key={label.id}
-                          label={label}
-                          size="sm"
-                          onRemove={() => setLabelIds((prev) => prev.filter(lId => lId !== id))}
-                        />
-                      );
-                    })
-                  )}
+              <div className="create-ticket-modal__field create-ticket-modal__field--labels">
+                <span className="label">Labels</span>
+                <div className="create-ticket-modal__labels-value">
+                  {labelIds.length > 0
+                    ? labelIds.map((id) => {
+                        const label = labelById.get(id);
+                        if (!label) return null;
+                        return (
+                          <LabelBadge
+                            key={label.id}
+                            label={label}
+                            size="sm"
+                            onRemove={() => setLabelIds((prev) => prev.filter(lId => lId !== id))}
+                          />
+                        );
+                      })
+                    : (
+                        <span className="create-ticket-modal__labels-empty-text">No labels</span>
+                      )}
 
                   <Popover
                     align="left"
@@ -241,32 +262,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
                     trigger={
                       <button
                         type="button"
-                        className="clickable"
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '4px',
-                          padding: '2px 8px',
-                          borderRadius: '12px',
-                          background: 'var(--color-base100)',
-                          border: '1px dashed var(--color-border-default)',
-                          color: 'var(--color-text-secondary)',
-                          fontSize: '11px',
-                          fontWeight: 550,
-                          cursor: 'pointer',
-                          height: '20px',
-                          transition:
-                            'border-color var(--transition-fast), color var(--transition-fast), background-color var(--transition-fast)',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.borderColor = 'var(--color-primary)';
-                          e.currentTarget.style.color = 'var(--color-text-primary)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.borderColor = 'var(--color-border-default)';
-                          e.currentTarget.style.color = 'var(--color-text-secondary)';
-                        }}
+                        className="create-ticket-modal__label-add-button clickable"
                       >
                         <Plus size={10} />
                         <span>Add Label</span>
@@ -306,24 +302,19 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
               </div>
 
               <Select
-                label="Cycle"
+                label="Cycle / Sprint"
                 value={cycleId}
                 onValueChange={(nextCycleId: string) => setCycleId(nextCycleId)}
                 options={cycleOptions}
                 aria-label="Select cycle"
               />
-            </aside>
+            </section>
           </div>
         </form>
       </ModalDialog.Body>
 
-      <ModalDialog.Footer align="between">
-        <span className="modal-dialog__hint create-ticket-modal__footer-hint">
-          <AlertCircle size={12} />
-          <span>Press <kbd>Ctrl+Enter</kbd> to submit</span>
-        </span>
-
-        <ModalDialog.Actions>
+      <ModalDialog.Footer align="end" className="create-ticket-modal__footer">
+        <ModalDialog.Actions className="create-ticket-modal__actions">
           <Button type="button" variant="secondary" onClick={onClose}>
             Cancel
           </Button>
