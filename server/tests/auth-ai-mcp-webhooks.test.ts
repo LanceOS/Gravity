@@ -109,27 +109,16 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
   it('proxies AI endpoints through fetch-backed providers', async () => {
     const fetchMock = vi
       .fn()
-
-      // GET /ai/ollama/models — Ollama tags (non-localhost, no probe step)
-      .mockResolvedValueOnce(jsonResponse({ models: [{ name: 'codellama' }] }))
       // POST /ai/test-key — OpenAI models list
       .mockResolvedValueOnce(jsonResponse({ data: [{ id: 'gpt-4o-mini' }] }))
       // POST /ai/test-connection — OpenAI models list
       .mockResolvedValueOnce(jsonResponse({ data: [{ id: 'gpt-4o-mini' }] }))
-      // POST /ai/chat (Ollama) — Ollama chat (non-localhost, no probe step)
-      .mockResolvedValueOnce(jsonResponse({ message: { role: 'assistant', content: 'Hello from Ollama' } }))
       // POST /ai/chat (OpenAI cloud) — chat completions
       .mockResolvedValueOnce(
         jsonResponse({ choices: [{ message: { role: 'assistant', content: 'Hello from GPT' } }] }),
       );
 
     vi.stubGlobal('fetch', fetchMock);
-
-
-
-    const modelsResponse = await api().get('/api/v1/ai/ollama/models').query({ ollamaUrl: 'http://ollama.test' });
-    expect(modelsResponse.status).toBe(200);
-    expect(modelsResponse.body).toMatchObject({ connected: true, models: ['codellama'] });
 
     const apiKeyResponse = await api().post('/api/v1/ai/test-key').send({ provider: 'openai', apiKey: 'sk-test' });
     expect(apiKeyResponse.status).toBe(200);
@@ -145,22 +134,6 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
       message: 'Connection verified successfully.',
     });
 
-    // Ollama chat proxy (non-localhost, no probe)
-    const chatResponse = await api().post('/api/v1/ai/chat').send({
-      provider: 'ollama',
-      ollamaUrl: 'http://ollama.test',
-      model: 'llama3',
-      messages: [{ role: 'user', content: 'Hello there' }],
-    });
-    const calledUrl = String(fetchMock.mock.calls[3][0]);
-    const pathPart = calledUrl.replace(/^https?:\/\/[^/]+/, '');
-    expect(pathPart).not.toContain('//');
-    expect(chatResponse.status).toBe(200);
-    expect(chatResponse.body).toEqual({
-      message: { role: 'assistant', content: 'Hello from Ollama' },
-    });
-
-    // Cloud provider chat proxy
     const cloudChatResponse = await api().post('/api/v1/ai/chat').send({
       provider: 'openai',
       apiKey: 'sk-test',

@@ -1,9 +1,7 @@
 import { Router } from 'express';
 import { aiService } from './index.js';
 import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
-import { validateOllamaUrl } from './utils/utils.js';
 import { systemPrompt } from './config/sysPrompt.js';
-import { getUserSettingsRecord } from '../../lib/platform.js';
 
 const API_KEY_MASK = '••••••••••••';
 
@@ -12,7 +10,6 @@ const PROVIDER_LABELS: Record<string, string> = {
   anthropic: 'Anthropic',
   gemini: 'Gemini',
   deepseek: 'DeepSeek',
-  ollama: 'Ollama',
 };
 
 const VALID_PROVIDERS = new Set(Object.keys(PROVIDER_LABELS));
@@ -78,16 +75,9 @@ function sanitizeAiError(
 
   if (message.includes('Security Exception')) {
     return {
-      status: provider === 'ollama' ? 400 : operation === 'chat' ? 502 : 400,
-      message:
-        provider === 'ollama'
-          ? 'Provided Ollama endpoint is not allowed.'
-          : 'Cloud AI provider configuration error.',
+      status: operation === 'chat' ? 502 : 400,
+      message: 'Cloud AI provider configuration error.',
     };
-  }
-
-  if (provider === 'ollama') {
-    return { status: operation === 'chat' ? 502 : 400, message: 'Could not connect to Ollama.' };
   }
 
   if (operation === 'chat') {
@@ -102,31 +92,6 @@ function sanitizeAiError(
 
 export function createAiRouter() {
   const router = Router();
-
-  router.get('/ai/ollama/models', async (req, res) => {
-    const actorUserId = await resolveRequestActorUserId(req);
-    if (!actorUserId) {
-      res.status(401).json({ error: 'Unauthorized.' });
-      return;
-    }
-
-    const rawUrl = typeof req.query.ollamaUrl === 'string' ? req.query.ollamaUrl : 'http://localhost:11434';
-    try {
-      const settings = await getUserSettingsRecord(actorUserId);
-      if (settings.agentIntegration !== 'ollama') {
-        res.json({ models: [], connected: false, error: 'Ollama integration is not enabled in settings.' });
-        return;
-      }
-
-      validateOllamaUrl(rawUrl);
-      const models = await aiService.getOllamaProvider().fetchOllamaModels(rawUrl);
-      res.json({ models, connected: true });
-    } catch (error) {
-      console.error('Failed to load Ollama models:', error);
-      const sanitized = sanitizeAiError(error, 'ollama', 'models');
-      res.json({ models: [], connected: false, error: sanitized.message });
-    }
-  });
 
   router.post('/ai/test-key', async (req, res) => {
     const actorUserId = await resolveRequestActorUserId(req);
@@ -190,13 +155,8 @@ export function createAiRouter() {
       return;
     }
 
-    const ollamaUrl = typeof req.body?.ollamaUrl === 'string' ? req.body.ollamaUrl.trim() : undefined;
-
     try {
-      if (ollamaUrl) {
-        validateOllamaUrl(ollamaUrl);
-      }
-      const latency = await aiService.testConnection(actorUserId, provider, { apiKey: parsedApiKey.value, ollamaUrl });
+      const latency = await aiService.testConnection(actorUserId, provider, { apiKey: parsedApiKey.value });
       res.json({
         connected: true,
         latency_ms: latency,
@@ -221,7 +181,7 @@ export function createAiRouter() {
       return;
     }
 
-    const provider = (typeof req.body?.provider === 'string' ? req.body.provider : 'ollama').toLowerCase();
+    const provider = (typeof req.body?.provider === 'string' ? req.body.provider : 'openai').toLowerCase();
     if (!VALID_PROVIDERS.has(provider)) {
       res.status(400).json({ error: 'Unsupported provider.' });
       return;
@@ -243,17 +203,10 @@ export function createAiRouter() {
     }
 
     try {
-      const rawOllamaUrl = typeof req.body?.ollamaUrl === 'string' ? req.body.ollamaUrl : undefined;
-      const ollamaUrl = provider === 'ollama' ? (rawOllamaUrl ?? 'http://localhost:11434') : undefined;
-      if (ollamaUrl) {
-        validateOllamaUrl(ollamaUrl);
-      }
-
       const result = await aiService.chat(actorUserId, provider, {
         model,
         messages,
         tools,
-        ...(ollamaUrl ? { ollamaUrl } : {}),
       });
 
       res.json({

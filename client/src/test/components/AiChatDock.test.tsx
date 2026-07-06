@@ -49,18 +49,14 @@ vi.mock('../../context/cycle/CycleContext', () => ({
 const mockSettings = {
   defaultView: 'board' as const,
   theme: 'dark' as const,
-  ollamaModel: '',
-  ollamaEndpoint: 'http://localhost:11434',
   projectLayout: 'standard' as const,
   apiKey: '',
   aiProvider: 'anthropic' as const,
-  agentIntegration: 'third_party' as const,
 };
 
 function renderDock(overrides: Partial<ComponentProps<typeof AiChatDock>> = {}) {
   const props = {
     onClose: vi.fn(),
-    initialOllamaUrl: '',
     initialModel: 'claude-3-haiku',
     settings: mockSettings,
     workspaceId: 'workspace-1',

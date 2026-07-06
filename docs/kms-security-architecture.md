@@ -84,14 +84,9 @@ Instead of fetching credentials and passing them around explicitly, the `AiServi
 
 In addition to envelope encryption, several defense-in-depth measures have been implemented:
 
-### SSRF Prevention (Server-Side Request Forgery)
-User-provided Ollama URLs (`OLLAMA_BASE_URL`) undergo strict validation before use.
-- Local loopback (`127.0.0.0/8`, `::1`), link-local, and private IP spaces (RFC-1918) are blocked in production mode.
-- Resolution caching is utilized to prevent DNS rebinding attacks while honoring a 60-second TTL.
-
 ### Resiliency and Rate Limiting Protection
 - **Exponential Backoff with Jitter:** Cloud LLM providers (OpenAI, Anthropic, Gemini) are wrapped with an async retry utility (`fetchWithTimeout`) to gracefully handle `429 Too Many Requests` and transient network failures.
-- **Fail-Open Caching:** In the event of persistent failures, local caches are cleared to trigger aggressive self-healing and fresh DNS resolution.
+- **Credential Isolation:** Provider credentials are decrypted just in time and are never returned to the client after storage.
 
 ### Transaction-Aware Updates
 Credential and settings updates utilize `db.transaction()` to prevent race conditions and ensure database integrity when handling user configuration state.

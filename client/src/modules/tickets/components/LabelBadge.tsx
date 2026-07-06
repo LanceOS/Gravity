@@ -36,9 +36,21 @@ export function LabelBadge({
 
   const [bg, setBg] = React.useState(baseBgColor);
 
+  const dot = (
+    <span
+      style={{
+        width: isSm ? '6px' : '8px',
+        height: isSm ? '6px' : '8px',
+        borderRadius: '50%',
+        background: label.color,
+        flexShrink: 0,
+      }}
+    />
+  );
+  const name = <span>{label.name}</span>;
+
   return (
     <span
-      onClick={onClick}
       onMouseEnter={() => interactive && setBg(hoverBgColor)}
       onMouseLeave={() => setBg(baseBgColor)}
       title={label.description || undefined}
@@ -53,22 +65,41 @@ export function LabelBadge({
         border: `1px solid ${borderBgColor}`,
         fontSize: isSm ? '11px' : '12px',
         fontWeight: 550,
+        lineHeight: 1.2,
         whiteSpace: 'nowrap',
         cursor: (interactive || onClick) ? 'pointer' : 'default',
         transition: 'background var(--transition-fast, 150ms) ease',
         userSelect: 'none',
       }}
     >
-      <span
-        style={{
-          width: isSm ? '6px' : '8px',
-          height: isSm ? '6px' : '8px',
-          borderRadius: '50%',
-          background: label.color,
-          flexShrink: 0,
-        }}
-      />
-      <span>{label.name}</span>
+      {onClick ? (
+        <button
+          type="button"
+          onClick={onClick}
+          aria-label={label.name}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: isSm ? '4px' : '6px',
+            padding: 0,
+            margin: 0,
+            background: 'none',
+            border: 'none',
+            color: 'inherit',
+            font: 'inherit',
+            lineHeight: 'inherit',
+            cursor: 'pointer',
+          }}
+        >
+          {dot}
+          {name}
+        </button>
+      ) : (
+        <>
+          {dot}
+          {name}
+        </>
+      )}
       {onRemove && (
         <button
           type="button"

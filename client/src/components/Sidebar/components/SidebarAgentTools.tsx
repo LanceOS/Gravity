@@ -7,8 +7,6 @@ interface SidebarAgentToolsProps {
 }
 
 export function SidebarAgentTools({ tools }: SidebarAgentToolsProps) {
-  const isThirdParty = tools.agentIntegration === 'third_party';
-  
   const getProviderName = (provider?: string) => {
     switch (provider) {
       case 'openai': return 'OpenAI';
@@ -19,9 +17,7 @@ export function SidebarAgentTools({ tools }: SidebarAgentToolsProps) {
     }
   };
 
-  const assistantLabel = isThirdParty 
-    ? `${getProviderName(tools.aiProvider)} AI Assistant` 
-    : 'Ollama AI Assistant';
+  const assistantLabel = `${getProviderName(tools.aiProvider)} AI Assistant`;
 
   return (
     <div style={{ marginTop: '24px', padding: '8px', background: 'rgba(255,255,255,0.02)', borderRadius: '6px', border: '1px solid var(--color-border-default)' }}>
@@ -32,7 +28,7 @@ export function SidebarAgentTools({ tools }: SidebarAgentToolsProps) {
 
       <button
         type="button"
-        onClick={tools.onOpenOllama}
+        onClick={tools.onOpenAgent}
         className="clickable"
         style={agentButtonStyle()}
       >

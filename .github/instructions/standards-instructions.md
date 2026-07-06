@@ -20,7 +20,7 @@ gravity/
 │   │   │   └── schema.ts         # Relational Drizzle table mappings
 │   │   ├── middleware/           # Auth, logging, and dynamic tenant routing rules
 │   │   ├── routes/               # API Router modules (Versioned: v1)
-│   │   ├── services/             # Dynamic business logic engines (Ollama, Anthropic, Handshakes)
+│   │   ├── services/             # Dynamic business logic engines (AI providers, Handshakes)
 │   │   ├── utils/                # Cryptographic helpers and validation utilities
 │   │   └── index.ts              # Server bootstrapper
 │   ├── tests/                    # Integration, unit, and mock connection suites
@@ -82,5 +82,4 @@ export const BUTTON_VARIANTS = {
   secondary: "bg-white text-neutral-800 border border-neutral-200 dark:bg-neutral-900 dark:text-neutral-200"
 };
 ```
-
 

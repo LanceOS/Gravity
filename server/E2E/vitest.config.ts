@@ -12,7 +12,6 @@ export default defineConfig({
       BETTER_AUTH_BASE_URL: 'http://localhost:8080',
       CORS_ORIGINS: 'http://localhost:5173',
       TRUSTED_ORIGINS: 'http://localhost:5173,http://localhost:8080',
-      OLLAMA_DEFAULT_ENDPOINT: 'http://localhost:11434',
       ALLOW_DEV_AUTH_BYPASS: 'true',
     },
   },

@@ -3,7 +3,7 @@ import type { ComponentType } from 'react';
 import type { AIProvider, SavedApiCredential, WorkspaceSettings } from '../../../utils/settings';
 import type { User } from '../../../types/domain';
 
-export type SettingsCategoryId = 'general' | 'providers' | 'ollama' | 'onboarding';
+export type SettingsCategoryId = 'general' | 'providers' | 'onboarding';
 
 export interface StatusMessage {
   success: boolean;
@@ -29,14 +29,11 @@ export interface AccountPreferencesPageProps {
   testing: boolean;
   testResult: StatusMessage | null;
   tutorialResult: StatusMessage | null;
-  ollamaModels: string[];
-  ollamaModelsLoading: boolean;
   onBack: () => void;
   onOpenDirectory: () => void;
   onChangeSettings: (updates: Partial<WorkspaceSettings>) => void;
   onResetProviderDraft: () => void;
   savedCredentials: SavedApiCredential[];
-  onRefreshOllamaModels: () => void;
   onResetTutorial: () => void;
   onSaveSettings: () => void;
   onTestApiKey: () => void;
@@ -49,4 +46,3 @@ export interface AccountPreferencesRouteState extends Omit<AccountPreferencesPag
   onboardingVisible: boolean;
   completeOnboarding: () => void;
 }
-

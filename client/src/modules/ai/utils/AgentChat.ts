@@ -1,8 +1,4 @@
-import type { AttachedTicketContext, Message, QuickActionContext, QuickActionType } from '../types/LocalAIChat';
-
-export function getInitialOllamaUrl(initialOllamaUrl: string) {
-  return initialOllamaUrl || 'http://localhost:11434';
-}
+import type { AttachedTicketContext, Message, QuickActionContext, QuickActionType } from '../types/AgentChat';
 
 export function getInitialModel(initialModel: string) {
   return initialModel || '';
@@ -82,11 +78,4 @@ export function buildAttachedTicketModelContext({ tickets, projects, users }: At
     'Attached ticket context for this message. Use it as supporting context for the user request.',
     ...ticketBlocks,
   ].join('\n\n');
-}
-
-export function buildOllamaErrorMessage(model: string, ollamaUrl: string, errorMessage: string): Message {
-  return {
-    role: 'system',
-    content: `❌ **Failed to contact local Ollama**\n\n* **Error details**: ${errorMessage}\n* **Troubleshooting**:\n  1. Verify Ollama is running in your terminal (\`ollama serve\` or check your desktop application).\n  2. Check if model \`${model}\` is installed. Run \`ollama pull ${model}\` to download it.\n  3. Verify the Ollama API port is open on \`${ollamaUrl}\`.`,
-  };
 }

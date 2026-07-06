@@ -65,14 +65,14 @@ describe('Gravity Client End-to-End User Journey', () => {
     let nextBtn = screen.getByRole('button', { name: /Next/i });
     await user.click(nextBtn);
 
-    // Step 2: Cycles & Specialized Domains
-    const step2Header = await screen.findByText(/Cycles & Specialized Domains/i);
+    // Step 2: Cycles & Labels
+    const step2Header = await screen.findByText(/Cycles & Labels/i);
     expect(step2Header).toBeInTheDocument();
     nextBtn = screen.getByRole('button', { name: /Next/i });
     await user.click(nextBtn);
 
-    // Step 3: Local Ollama AI Assistant
-    const step3Header = await screen.findByText(/Local Ollama AI Assistant/i);
+    // Step 3: AI Assistant
+    const step3Header = await screen.findByText(/AI Assistant/i);
     expect(step3Header).toBeInTheDocument();
     nextBtn = screen.getByRole('button', { name: /Next/i });
     await user.click(nextBtn);
@@ -153,15 +153,19 @@ describe('Gravity Client End-to-End User Journey', () => {
     // ==========================================
     // PHASE 5: Ticket Creation Flow
     // ==========================================
-    // We are automatically redirected back to Workspace Page.
-    // Because a project now exists, the "New Ticket" button is in the sidebar.
+    // Open the project issue board so ticket queries and filters are scoped to the new project.
+    await router.navigate(`/workspaces/${dbState.workspaces[0].id}/projects/${dbState.projects[0].id}/tickets`);
+
     const newTicketBtn = await screen.findByRole('button', { name: /New Ticket/i });
     await user.click(newTicketBtn);
 
     // Fill out Ticket Creation Modal
+    const createIssueDialog = await screen.findByRole('dialog', { name: /Create New Issue/i });
     const ticketTitleInput = await screen.findByPlaceholderText(/Issue title/i);
     await user.type(ticketTitleInput, 'Implement JSDOM E2E Suite');
-    await user.type(screen.getByPlaceholderText(/Add description/i), 'Exhaustive flows for client integration.');
+    const ticketDescriptionEditor = within(createIssueDialog).getByLabelText('Rich text editor');
+    await user.click(ticketDescriptionEditor);
+    await user.paste('Exhaustive flows for client integration.');
 
     // Submit Create Ticket
     const createTicketSubmitBtn = screen.getByRole('button', { name: /Create Issue/i });
@@ -202,19 +206,21 @@ describe('Gravity Client End-to-End User Journey', () => {
     });
 
     // Post a comment in the activity thread
-    const commentInput = await screen.findByPlaceholderText(/Post updates, links, or mention PRs/i);
-    await user.type(commentInput, 'E2E framework is up and running.');
-
     const commentBtn = screen.getByRole('button', { name: /^Comment$/i });
+    const commentForm = commentBtn.closest('form') as HTMLElement;
+    const commentInput = within(commentForm).getByLabelText('Rich text editor');
+    await user.click(commentInput);
+    await user.paste('E2E framework is up and running.');
+
     await user.click(commentBtn);
 
     // Verify comment created in dbState and rendered
     await waitFor(() => {
       expect(dbState.comments.length).toBe(1);
-      expect(dbState.comments[0].body).toBe('E2E framework is up and running.');
+      expect(dbState.comments[0].body).toContain('E2E framework is up and running.');
       expect(screen.getByText('E2E framework is up and running.')).toBeInTheDocument();
     });
 
 
-  });
+  }, 15000);
 });

@@ -52,8 +52,6 @@ describe('users and settings routes', () => {
     expect(getResponse.body).toMatchObject({
       userId: user.id,
       defaultView: 'board',
-      ollamaModel: '',
-      ollamaEndpoint: 'http://localhost:11434',
       theme: 'dark',
       aiProvider: 'openai',
       projectLayout: 'standard',
@@ -64,8 +62,6 @@ describe('users and settings routes', () => {
       .patch(`/api/v1/settings/${user.id}`)
       .send({
         defaultView: 'list',
-        ollamaModel: 'llama3.2',
-        ollamaEndpoint: 'http://ollama.internal:11434',
         theme: 'coffee',
         keyAction: 'update',
         apiKey: 'sk-test-123',
@@ -77,8 +73,6 @@ describe('users and settings routes', () => {
     expect(patchResponse.body).toMatchObject({
       userId: user.id,
       defaultView: 'list',
-      ollamaModel: 'llama3.2',
-      ollamaEndpoint: 'http://ollama.internal:11434',
       theme: 'coffee',
       apiKey: '••••••••••••',
       aiProvider: 'anthropic',

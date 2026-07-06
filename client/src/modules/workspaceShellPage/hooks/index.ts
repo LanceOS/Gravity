@@ -8,5 +8,5 @@ export {
 } from './useWorkspaceLifecycle';
 export { useWorkspaceDirectoryState } from './useWorkspaceDirectoryState';
 export { useWorkspaceViewMode } from './useWorkspaceViewMode';
-export { useOllamaPanel } from './useOllamaPanel';
+export { useAgentPanel } from './useAgentPanel';
 export { useWebMcpRegistration } from './useWebMcpRegistration';

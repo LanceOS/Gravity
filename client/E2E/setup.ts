@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { afterEach, beforeEach, vi } from 'vitest';
-import { cleanup } from '@testing-library/react';
+import { act, cleanup } from '@testing-library/react';
 import { queryClient } from '../src/utils/queryClient';
 import { router } from '../src/router';
 
@@ -25,6 +25,55 @@ if (!HTMLElement.prototype.scrollIntoView) {
   HTMLElement.prototype.scrollIntoView = () => {};
 }
 
+const emptyDomRect = {
+  x: 0,
+  y: 0,
+  width: 0,
+  height: 0,
+  top: 0,
+  right: 0,
+  bottom: 0,
+  left: 0,
+  toJSON: () => ({}),
+} as DOMRect;
+
+function makeDomRectList(): DOMRectList {
+  const rects = [emptyDomRect] as unknown as DOMRectList;
+  Object.defineProperty(rects, 'item', {
+    configurable: true,
+    value: (index: number) => rects[index] ?? null,
+  });
+  return rects;
+}
+
+if (!document.elementFromPoint) {
+  document.elementFromPoint = () => document.querySelector('.ProseMirror, .rich-text-editor__editor') || document.body;
+}
+
+if (!Element.prototype.getClientRects) {
+  Element.prototype.getClientRects = makeDomRectList;
+}
+
+if (!Element.prototype.getBoundingClientRect) {
+  Element.prototype.getBoundingClientRect = () => emptyDomRect;
+}
+
+if (typeof Range !== 'undefined') {
+  if (!Range.prototype.getClientRects) {
+    Range.prototype.getClientRects = makeDomRectList;
+  }
+  if (!Range.prototype.getBoundingClientRect) {
+    Range.prototype.getBoundingClientRect = () => emptyDomRect;
+  }
+}
+
+if (typeof Text !== 'undefined' && !('getClientRects' in Text.prototype)) {
+  Object.defineProperty(Text.prototype, 'getClientRects', {
+    configurable: true,
+    value: makeDomRectList,
+  });
+}
+
 type MockUser = {
   id: string;
   name: string;
@@ -43,8 +92,17 @@ type MockWorkspaceMember = {
 type MockWorkspace = {
   id: string;
   name: string;
+  description?: string;
+  key?: string;
   defaultProjectId: string | null;
   role: string;
+  hostUrl?: string;
+  joinMode?: 'approval_required' | 'auto_join';
+  projectCount?: number;
+  memberCount?: number;
+  pendingJoinRequestCount?: number;
+  memberRole?: string;
+  hierarchyMode?: 'flat' | 'teams';
 };
 
 type MockProject = {
@@ -110,6 +168,7 @@ type MockAccountSettings = {
   theme: 'dark' | 'light';
   projectLayout: 'condensed' | 'spacious';
   notificationsEnabled: boolean;
+  tutorialCompleted?: boolean;
 };
 
 type MockToolName =
@@ -184,6 +243,29 @@ function removeFromWorkspaceSet(workspaceId: string, source: MockEventSource) {
 
 function normalizeText(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
+}
+
+function toRichTextBody(value: string) {
+  try {
+    const parsed = JSON.parse(value);
+    if (parsed?.type === 'doc') {
+      return value;
+    }
+  } catch {
+    // Plain text from mock MCP/API calls is normalized below.
+  }
+
+  return JSON.stringify({
+    type: 'doc',
+    content: value
+      ? [
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: value }],
+        },
+      ]
+      : [{ type: 'paragraph' }],
+  });
 }
 
 function parseUrl(input: RequestInfo | URL): URL {
@@ -646,6 +728,7 @@ function publishTicketEvent(params: {
   type: string;
   data?: Record<string, unknown>;
 }) {
+  const eventData = params.data ?? {};
   broadcastWorkspaceEvent(params.workspaceId, params.type, {
     type: params.type,
     workspaceId: params.workspaceId,
@@ -654,7 +737,8 @@ function publishTicketEvent(params: {
     ticketKey: params.ticketKey,
     actorUserId: params.actorUserId,
     timestamp: new Date().toISOString(),
-    data: params.data ?? {},
+    ...eventData,
+    data: eventData,
   });
 }
 
@@ -719,10 +803,12 @@ class MockEventSource {
     }
 
     const event = new MessageEvent('message', { data });
-    this.onmessage?.(event);
-    for (const handler of this.messageHandlers) {
-      handler(event);
-    }
+    act(() => {
+      this.onmessage?.(event);
+      for (const handler of this.messageHandlers) {
+        handler(event);
+      }
+    });
   }
 
   emitError(): void {
@@ -732,10 +818,12 @@ class MockEventSource {
 
     this.readyState = 0;
     const event = new Event('error');
-    this.onerror?.(event);
-    for (const handler of this.errorHandlers) {
-      handler(event);
-    }
+    act(() => {
+      this.onerror?.(event);
+      for (const handler of this.errorHandlers) {
+        handler(event);
+      }
+    });
   }
 
   emitOpen(): void {
@@ -745,10 +833,12 @@ class MockEventSource {
 
     this.readyState = 1;
     const event = new Event('open');
-    this.onopen?.(event);
-    for (const handler of this.openHandlers) {
-      handler(event);
-    }
+    act(() => {
+      this.onopen?.(event);
+      for (const handler of this.openHandlers) {
+        handler(event);
+      }
+    });
   }
 
   close(): void {
@@ -813,6 +903,43 @@ function buildMemberList(workspaceId: string) {
         user: dbState.currentUser,
       }]
     : [];
+}
+
+function fallbackWorkspaceKey(workspace: MockWorkspace) {
+  const normalized = workspace.name
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '')
+    .slice(0, 12);
+  return normalized || 'WSP';
+}
+
+function serializeWorkspaceSummary(workspace: MockWorkspace) {
+  const projectCount = dbState.projects.filter((project) => project.workspaceId === workspace.id).length;
+  const memberCount = dbState.workspaceMembers.filter((member) => member.workspaceId === workspace.id).length;
+
+  return {
+    id: workspace.id,
+    name: workspace.name,
+    description: workspace.description ?? '',
+    key: workspace.key ?? fallbackWorkspaceKey(workspace),
+    defaultProjectId: workspace.defaultProjectId,
+    hostUrl: workspace.hostUrl ?? '',
+    joinMode: workspace.joinMode ?? 'approval_required',
+    projectCount: workspace.projectCount ?? projectCount,
+    memberCount: workspace.memberCount ?? (memberCount || (dbState.currentUser ? 1 : 0)),
+    pendingJoinRequestCount: workspace.pendingJoinRequestCount ?? 0,
+    memberRole: workspace.memberRole ?? workspace.role,
+    hierarchyMode: workspace.hierarchyMode ?? 'flat',
+    role: workspace.role,
+  };
+}
+
+function serializeWorkspaceSidebar(workspace: MockWorkspace) {
+  return {
+    workspaceId: workspace.id,
+    hierarchyMode: workspace.hierarchyMode ?? 'flat',
+    teams: [],
+  };
 }
 
 function buildTicketRecordFromBody(body: any, projectId: string) {
@@ -984,7 +1111,7 @@ async function executeMockMcpTool(workspaceId: string, actorUserId: string, tool
           ticketKey,
           actorUserId,
           type: 'ticket.updated',
-          data: { updatedFields: Object.keys(args) },
+          data: { ticketId: ticket.id, updatedFields: Object.keys(args) },
         });
       }
 
@@ -1007,7 +1134,7 @@ async function executeMockMcpTool(workspaceId: string, actorUserId: string, tool
       const comment: MockComment = {
         id: `cmt-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
         ticketId: ticket.id,
-        body,
+        body: toRichTextBody(body),
         userId: actorUserId,
         createdAt: typeof args.createdAt === 'string' ? args.createdAt : new Date().toISOString(),
         userName: dbState.currentUser?.name ?? 'Member',
@@ -1024,7 +1151,7 @@ async function executeMockMcpTool(workspaceId: string, actorUserId: string, tool
           ticketKey,
           actorUserId,
           type: 'comment.added',
-          data: { ticketId: ticket.id, commentId: comment.id },
+          data: { ticketId: ticket.id, commentId: comment.id, comment: serializeComment(comment) },
         });
       }
 
@@ -1060,6 +1187,7 @@ async function executeMockMcpTool(workspaceId: string, actorUserId: string, tool
           actorUserId,
           type: 'labels.added',
           data: {
+            ticketId: ticket.id,
             addedLabels: labelNames,
             finalLabels: resolved.map((label) => label.name),
           },
@@ -1088,6 +1216,7 @@ async function executeMockMcpTool(workspaceId: string, actorUserId: string, tool
           actorUserId,
           type: 'labels.removed',
           data: {
+            ticketId: ticket.id,
             removedLabels: labelNames,
             finalLabels: resolved.map((label) => label.name),
           },
@@ -1116,6 +1245,7 @@ async function executeMockMcpTool(workspaceId: string, actorUserId: string, tool
           actorUserId,
           type: 'labels.set',
           data: {
+            ticketId: ticket.id,
             labels: labelNames,
           },
         });
@@ -1154,7 +1284,7 @@ async function executeMockMcpTool(workspaceId: string, actorUserId: string, tool
           ticketKey,
           actorUserId,
           type: 'dependency.added',
-          data: { dependencyTicketKey },
+          data: { ticketId: ticket.id, dependencyTicketKey },
         });
       }
 
@@ -1185,7 +1315,7 @@ async function executeMockMcpTool(workspaceId: string, actorUserId: string, tool
           ticketKey,
           actorUserId,
           type: 'dependency.removed',
-          data: { dependencyTicketKey },
+          data: { ticketId: ticket.id, dependencyTicketKey },
         });
       }
 
@@ -1322,7 +1452,6 @@ globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
   const body = parseJsonBody(init);
   const path = url.pathname.replace(/\/+$/, '') || '/';
   const projectIdHeader = normalizeText(getHeader(init, 'x-project-id'));
-  console.log(`[mock-fetch] ${method} ${path}`, { hasUser: !!dbState.currentUser });
 
   if (path === '/api/auth/session' || path === '/api/auth/get-session') {
     if (dbState.currentUser) {
@@ -1351,6 +1480,7 @@ globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
       theme: 'dark',
       projectLayout: 'spacious',
       notificationsEnabled: true,
+      tutorialCompleted: false,
     };
     return jsonResponse(200, { user: dbState.currentUser });
   }
@@ -1372,6 +1502,7 @@ globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
       theme: 'dark',
       projectLayout: 'spacious',
       notificationsEnabled: true,
+      tutorialCompleted: false,
     };
     return jsonResponse(200, { user: dbState.currentUser });
   }
@@ -1390,21 +1521,34 @@ globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
   }
 
   if (path === '/api/v1/workspaces' && method === 'GET') {
-    return jsonResponse(200, dbState.currentUser ? dbState.workspaces : []);
+    return jsonResponse(200, dbState.currentUser ? dbState.workspaces.map(serializeWorkspaceSummary) : []);
   }
 
   if (path === '/api/v1/workspaces' && method === 'POST') {
     const workspace = {
       id: `wsp-${Date.now()}`,
       name: normalizeText(body?.name) || 'Untitled Workspace',
+      description: normalizeText(body?.description),
+      key: normalizeText(body?.key) || fallbackWorkspaceKey({ id: '', name: normalizeText(body?.name) || 'Untitled Workspace', defaultProjectId: null, role: 'owner' }),
       defaultProjectId: null,
       role: 'owner',
+      memberRole: 'owner',
+      hierarchyMode: body?.hierarchyMode === 'teams' ? 'teams' : 'flat',
     };
     dbState.workspaces.push(workspace);
     if (dbState.currentUser) {
       addWorkspaceMember(workspace.id, dbState.currentUser.id, 'owner');
     }
-    return jsonResponse(201, { workspace });
+    return jsonResponse(201, { workspace: serializeWorkspaceSummary(workspace) });
+  }
+
+  const workspaceSidebarMatch = path.match(/^\/api\/v1\/workspaces\/([^/]+)\/sidebar$/);
+  if (workspaceSidebarMatch && method === 'GET') {
+    const workspace = getWorkspaceById(workspaceSidebarMatch[1]);
+    if (!workspace) {
+      return jsonResponse(404, { error: 'Workspace not found' });
+    }
+    return jsonResponse(200, serializeWorkspaceSidebar(workspace));
   }
 
   const workspaceSettingsMatch = path.match(/^\/api\/v1\/workspaces\/([^/]+)\/settings$/);
@@ -1429,6 +1573,11 @@ globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
   const workspaceMembersMatch = path.match(/^\/api\/v1\/workspaces\/([^/]+)\/members$/);
   if (workspaceMembersMatch && method === 'GET') {
     return jsonResponse(200, buildMemberList(workspaceMembersMatch[1]));
+  }
+
+  const workspaceMemberActivityMatch = path.match(/^\/api\/v1\/workspaces\/([^/]+)\/members\/([^/]+)\/activity$/);
+  if (workspaceMemberActivityMatch && method === 'POST') {
+    return jsonResponse(200, { success: true });
   }
 
   if (path.includes('/peer-invites') && method === 'GET') {
@@ -1456,14 +1605,16 @@ globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
 
   if (path.includes('/tutorial') && method === 'PATCH') {
     dbState.tutorialCompleted = Boolean(body?.completed);
+    if (dbState.currentUser) {
+      dbState.currentUser.tutorial_completed = dbState.tutorialCompleted ? 1 : 0;
+    }
+    if (dbState.accountSettings) {
+      dbState.accountSettings = {
+        ...dbState.accountSettings,
+        tutorialCompleted: dbState.tutorialCompleted,
+      };
+    }
     return jsonResponse(200, { success: true });
-  }
-
-  if (path.includes('/api/v1/ai/ollama/models')) {
-    return jsonResponse(200, {
-      connected: true,
-      models: [{ name: 'llama3:latest' }, { name: 'mistral:latest' }],
-    });
   }
 
   if (path === '/api/v1/projects' && method === 'GET') {
@@ -1539,6 +1690,15 @@ globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
     return jsonResponse(200, dbState.currentUser ? [dbState.currentUser] : []);
   }
 
+  const ticketByKeyMatch = path.match(/^\/api\/v1\/tickets\/key\/([^/]+)$/);
+  if (ticketByKeyMatch && method === 'GET') {
+    const ticket = getTicketByKey(decodeURIComponent(ticketByKeyMatch[1]));
+    if (!ticket) {
+      return jsonResponse(404, { error: 'Ticket not found' });
+    }
+    return jsonResponse(200, responseForTicketKey(ticket.key));
+  }
+
   const ticketCommentsMatch = path.match(/^\/api\/v1\/tickets\/([^/]+)\/comments$/);
   if (ticketCommentsMatch && method === 'GET') {
     const ticket = getTicketById(ticketCommentsMatch[1]);
@@ -1562,7 +1722,7 @@ globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
     const comment = {
       id: `cmt-${Date.now()}`,
       ticketId: ticket.id,
-      body: commentBody,
+      body: toRichTextBody(commentBody),
       userId: dbState.currentUser?.id || 'anonymous',
       createdAt: new Date().toISOString(),
       userName: dbState.currentUser?.name ?? 'Member',

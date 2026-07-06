@@ -1495,9 +1495,13 @@ export function createWorkspacesRouter() {
     const workspaceId = Array.isArray(req.params.workspaceId) ? req.params.workspaceId[0] : (req.params.workspaceId as string);
 
     try {
-      const auth = await authorizeWorkspaceOwnerAccess(req, workspaceId);
+      const auth = await authorizeWorkspaceAccess(req, workspaceId);
       if (!auth.allowed) {
         res.status(auth.status).json({ error: auth.error });
+        return;
+      }
+      if (auth.workspaceRole !== 'owner') {
+        res.status(403).json({ error: 'Only a workspace owner can delete the workspace.' });
         return;
       }
 

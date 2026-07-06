@@ -81,6 +81,5 @@ export const queryKeys = {
   workspaceJoinRequests: (workspaceId: string) => toMutableQueryKey(['workspace', workspaceId, 'joinRequests']),
   workspaceSidebarTree: (workspaceId: string) => toMutableQueryKey(['workspace', workspaceId, 'sidebar']),
   mcpTools: (workspaceId: string) => toMutableQueryKey(['ai', 'mcp', 'tools', { workspaceId }]),
-  ollamaModels: (ollamaUrl: string) => toMutableQueryKey(['ai', 'ollama', 'models', { ollamaUrl }]),
   chatSessions: (projectId: string, search = '') => toMutableQueryKey(['ai', 'chats', projectId, { search }]),
 };

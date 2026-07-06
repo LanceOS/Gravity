@@ -102,7 +102,7 @@ export function CloudProviderSection({
         )}
 
         <Alert type="warning">
-          <strong>Token warning:</strong> Cloud requests consume external credits. Prefer Ollama when you want fully local execution.
+          <strong>Token warning:</strong> Cloud requests consume external provider credits.
         </Alert>
       </Stack>
     </Card>

@@ -31,12 +31,6 @@ export interface AccountPreferencesCloudContextValue {
   onRemoveCredential: (provider: AIProvider) => void;
 }
 
-export interface AccountPreferencesOllamaContextValue {
-  ollamaModels: string[];
-  ollamaModelsLoading: boolean;
-  onRefreshOllamaModels: () => void;
-}
-
 export interface AccountPreferencesOnboardingContextValue {
   tutorialResult: StatusMessage | null;
   onResetTutorial: () => void;
@@ -58,8 +52,6 @@ export const AccountPreferencesSettingsContext: Context<AccountPreferencesSettin
   createContext<AccountPreferencesSettingsContextValue | null>(null);
 export const AccountPreferencesCloudContext: Context<AccountPreferencesCloudContextValue | null> =
   createContext<AccountPreferencesCloudContextValue | null>(null);
-export const AccountPreferencesOllamaContext: Context<AccountPreferencesOllamaContextValue | null> =
-  createContext<AccountPreferencesOllamaContextValue | null>(null);
 export const AccountPreferencesOnboardingContext: Context<AccountPreferencesOnboardingContextValue | null> =
   createContext<AccountPreferencesOnboardingContextValue | null>(null);
 export const AccountPreferencesNavigationContext: Context<AccountPreferencesNavigationContextValue | null> =

@@ -127,7 +127,7 @@ vi.mock('../../modules/tickets', async (importOriginal) => {
 
 vi.mock('../../modules/ai', () => ({
   AgentSimulator: () => <div>AgentSimulator</div>,
-  LocalAIChat: () => <div>LocalAIChat</div>,
+  AgentChat: () => <div>AgentChat</div>,
 }));
 
 vi.mock('../../modules/onboarding', () => ({
@@ -321,9 +321,6 @@ function buildAccountSettings(overrides: Partial<Record<string, unknown>> = {}) 
       projectLayout: 'condensed',
       aiProvider: 'openai',
       apiKey: '',
-      ollamaEndpoint: 'http://localhost:11434',
-      ollamaModel: 'llama3',
-      agentIntegration: 'ollama',
     },
     settingsLoading: false,
       resetProviderDraft: vi.fn(),
@@ -334,13 +331,10 @@ function buildAccountSettings(overrides: Partial<Record<string, unknown>> = {}) 
     testing: false,
     testResult: null,
     tutorialResult: null,
-    ollamaModels: ['llama3'],
-    ollamaModelsLoading: false,
     updateSettings: vi.fn(),
     saveSettings: vi.fn(),
     testApiKey: vi.fn(),
     resetTutorial: vi.fn(),
-    refreshOllamaModels: vi.fn(),
     ...overrides,
   };
 }

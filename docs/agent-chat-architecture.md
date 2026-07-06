@@ -8,13 +8,13 @@ Gravity provides users with a dedicated AI project management assistant that int
 
 The chat UI lives behind the workspace header "Ask Agent" control. Recent chat sessions appear as a compact header row, and the adjacent history menu opens the full previous-chat list for the active project. Users can also attach one or more tickets below the chat input; those ticket summaries are sent as read-only, model-only context for the next message and are not inserted into the visible transcript.
 
-The system supports multiple providers including OpenAI, Anthropic, Gemini, DeepSeek, and local Ollama models.
+The system supports multiple providers including OpenAI, Anthropic, Gemini, and DeepSeek.
 
 ## Request Flow
 
 1. **User Input:** The user submits a chat message from the frontend client. Optional ticket attachments are serialized as supplemental context for that model turn.
-2. **Session Selection:** Third-party provider chats use a project-scoped chat session from `/api/v1/projects/:projectId/chats`. The frontend lazily creates a session when needed, or seeds `LocalAIChat` from a selected history item.
-3. **Authentication & Routing:** Third-party provider messages stream through `/api/v1/projects/:projectId/chats/:chatId/stream`, where project membership is validated. Direct local Ollama requests continue to use `/api/v1/ai/chat`.
+2. **Session Selection:** Provider-backed project chats use a project-scoped chat session from `/api/v1/projects/:projectId/chats`. The frontend lazily creates a session when needed, or seeds `AgentChat` from a selected history item.
+3. **Authentication & Routing:** Provider-backed project messages stream through `/api/v1/projects/:projectId/chats/:chatId/stream`, where project membership is validated. Direct one-off provider requests use `/api/v1/ai/chat` when callers need non-persisted completions.
 4. **Credential Decryption:** The AI services use the configured credential path to securely decrypt provider API keys on the fly.
 5. **Prompt Injection:** The backend injects a strict `systemPrompt` containing rules, identity, and forbidden actions before sending the context to the LLM. Supplemental ticket context is appended to the current user message for the model request only.
 6. **Tool Execution Loop:**

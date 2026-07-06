@@ -11,6 +11,7 @@ import { queryKeys } from '../../utils/queryClient';
 import {
   extractSseMessageFields,
   findCachedTicketByKeyOrId,
+  hydrateAndUpsertTicketByKeyFromSse,
   hydrateAndUpsertTicketFromSse,
   invalidateCommentCacheFromSse,
   removeSseComment,
@@ -86,6 +87,14 @@ export function useRealtimeContextValue({
           const eventTicketId = payloadTicketId || payloadComment?.ticketId || undefined;
           const cachedTicket = findCachedTicketByKeyOrId(queryClient, event.ticketKey, payloadTicketId, event.projectId || payloadTicket?.projectId);
           const projectId = event.projectId || cachedTicket?.projectId || payloadTicket?.projectId;
+          const hydrateCurrentTicket = async () => {
+            const hydratedById = await hydrateAndUpsertTicketFromSse(queryClient, payloadTicketId || event.ticketId, projectId);
+            if (hydratedById) {
+              return true;
+            }
+
+            return hydrateAndUpsertTicketByKeyFromSse(queryClient, event.ticketKey, projectId);
+          };
 
           switch (event.type) {
             case 'ticket.created':
@@ -98,15 +107,7 @@ export function useRealtimeContextValue({
                 break;
               }
 
-              if (cachedTicket) {
-                upsertTicketFromSse(queryClient, cachedTicket as Ticket);
-                if (projectId) {
-                  invalidateAggregateTicketQueries(queryClient, projectId);
-                }
-                break;
-              }
-
-              await hydrateAndUpsertTicketFromSse(queryClient, payloadTicketId || event.ticketId, projectId);
+              await hydrateCurrentTicket();
               if (projectId) {
                 invalidateAggregateTicketQueries(queryClient, projectId);
               }
@@ -183,15 +184,7 @@ export function useRealtimeContextValue({
                 break;
               }
 
-              if (cachedTicket) {
-                upsertTicketFromSse(queryClient, cachedTicket as Ticket);
-                if (projectId) {
-                  invalidateAggregateTicketQueries(queryClient, projectId);
-                }
-                break;
-              }
-
-              await hydrateAndUpsertTicketFromSse(queryClient, payloadTicketId || event.ticketId, projectId);
+              await hydrateCurrentTicket();
               if (projectId) {
                 invalidateAggregateTicketQueries(queryClient, projectId);
               }
@@ -206,15 +199,7 @@ export function useRealtimeContextValue({
                 break;
               }
 
-              if (cachedTicket) {
-                upsertTicketFromSse(queryClient, cachedTicket as Ticket);
-                if (projectId) {
-                  invalidateAggregateTicketQueries(queryClient, projectId);
-                }
-                break;
-              }
-
-              await hydrateAndUpsertTicketFromSse(queryClient, payloadTicketId || event.ticketId, projectId);
+              await hydrateCurrentTicket();
               if (projectId) {
                 invalidateAggregateTicketQueries(queryClient, projectId);
               }

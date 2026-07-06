@@ -18,7 +18,7 @@ interface TicketPropertiesGridProps {
   activeTicket: Ticket;
   activeTicketDetail?: TicketWithRelations | null;
   availableTickets: Ticket[];
-  ticketsById: Map<string, Ticket>;
+  ticketsById?: Map<string, Ticket>;
   parentTicket: Ticket | null;
   users: User[];
   projects: Project[];
@@ -26,13 +26,14 @@ interface TicketPropertiesGridProps {
   cycles: Cycle[];
   ticketLink: string;
   generatedBranchName: string;
-  onSelectTicket: (ticket: Ticket) => void;
+  onSelectTicket: (ticket: Ticket | null) => void;
   onUpdateTicket: (id: string, updates: Partial<Ticket>) => void;
   onAddDependency: (ticketId: string, dependencyId: string) => Promise<boolean>;
   onRemoveDependency: (ticketId: string, dependencyId: string) => Promise<boolean>;
   onAddBlocker: (ticketId: string, blockerId: string) => Promise<boolean>;
   onRemoveBlocker: (ticketId: string, blockerId: string) => Promise<boolean>;
   copyToClipboard: (value: string, successMessage?: string) => Promise<void>;
+  onSelectLabel?: (projectId: string, labelId: string) => void;
 }
 
 export const TicketPropertiesGrid: React.FC<TicketPropertiesGridProps> = ({
@@ -54,6 +55,7 @@ export const TicketPropertiesGrid: React.FC<TicketPropertiesGridProps> = ({
   onAddBlocker,
   onRemoveBlocker,
   copyToClipboard,
+  onSelectLabel,
 }) => {
   const { assignLabelToTicket, unassignLabelFromTicket, createLabel: createLabelInContext } = useLabels();
 
@@ -147,6 +149,8 @@ export const TicketPropertiesGrid: React.FC<TicketPropertiesGridProps> = ({
                 key={l.id}
                 label={l}
                 size="sm"
+                interactive={!!onSelectLabel}
+                onClick={onSelectLabel ? () => onSelectLabel(activeTicket.projectId, l.id) : undefined}
                 onRemove={() => handleUnassignLabel(l.id)}
               />
             ))
@@ -220,7 +224,7 @@ export const TicketPropertiesGrid: React.FC<TicketPropertiesGridProps> = ({
 
       <TicketRelationsSection
         activeTicket={activeTicket}
-        activeTicketDetail={activeTicketDetail}
+        activeTicketDetail={activeTicketDetail ?? null}
         availableTickets={availableTickets}
         ticketsById={ticketsById}
         parentTicket={parentTicket}

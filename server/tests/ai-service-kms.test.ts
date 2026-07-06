@@ -7,9 +7,6 @@ import { userExternalCredentials } from '../src/db/schema.js';
 import { db } from '../src/db/index.js';
 import { and, eq } from 'drizzle-orm';
 import { seedUser } from './helpers/test-helpers.js';
-import { OllamaProvider } from '../src/modules/ai/providers/ollama-provider.js';
-import { validateOllamaUrl } from '../src/modules/ai/utils/utils.js';
-import { env } from '../src/env.js';
 
 // ---------------------------------------------------------------------------
 // Helper — minimal JSON fetch mock
@@ -40,26 +37,6 @@ describe('AiService', () => {
     ).rejects.toThrow(/Unsupported provider/i);
   });
 
-  it('routes ollama chat directly without loading stored credentials', async () => {
-    const service = new AiService(credentialManager);
-    const executeSpy = vi.spyOn(credentialManager, 'ExecuteWithCredential');
-
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(makeResponse({ message: { content: 'hi from ollama' } })),
-    );
-
-    const result = await service.chat('any-user', 'ollama', {
-      model: 'llama3',
-      messages: [{ role: 'user', content: 'hello' }],
-      ollamaUrl: 'http://ollama.test',
-    });
-
-    expect(result.content).toBe('hi from ollama');
-    // Credential decryption must NOT have been called for local inference
-    expect(executeSpy).not.toHaveBeenCalled();
-  });
-
   it('decrypts stored credentials and forwards them to cloud providers in chat()', async () => {
     const user = await seedUser({ id: 'aiservice-user-2', email: 'aiservice2@example.com' });
     const targetKey = 'sk-cloud-key-xyz';
@@ -79,19 +56,6 @@ describe('AiService', () => {
     });
 
     expect(result.content).toBe('from cloud');
-  });
-
-  it('testConnection returns elapsed ms for a valid ollama URL', async () => {
-    const service = new AiService(credentialManager);
-
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(makeResponse({ models: [] })),
-    );
-
-    const elapsed = await service.testConnection('user-x', 'ollama', { ollamaUrl: 'http://ollama.test' });
-    expect(typeof elapsed).toBe('number');
-    expect(elapsed).toBeGreaterThanOrEqual(0);
   });
 
   it('testConnection uses a supplied apiKey without loading stored credentials', async () => {
@@ -294,81 +258,5 @@ describe('CredentialManager with a mock IKMSProvider', () => {
       expect(key).toBe('sk-real-key');
     });
     expect(decryptSpy).toHaveBeenCalledTimes(1);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Security Hardening & Optimizations Integrations
-// ---------------------------------------------------------------------------
-
-describe('Security Hardening & Optimizations', () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it('OllamaProvider caches resolved URL tag probes for 60 seconds', async () => {
-    const provider = new OllamaProvider();
-    
-    // Stub fetch to capture probes
-    const fetchSpy = vi.fn().mockResolvedValue(makeResponse({ models: [] }));
-    vi.stubGlobal('fetch', fetchSpy);
-
-    // First resolve
-    const url1 = await provider.resolveOllamaUrl('http://localhost:11434');
-    expect(url1).toBeDefined();
-    const callCountAfterFirst = fetchSpy.mock.calls.length;
-    expect(callCountAfterFirst).toBeGreaterThan(0);
-
-    // Second resolve (should be hit from cache, so no new fetches)
-    const url2 = await provider.resolveOllamaUrl('http://localhost:11434');
-    expect(url2).toBe(url1);
-    expect(fetchSpy.mock.calls.length).toBe(callCountAfterFirst);
-  });
-
-  it('OllamaProvider invalidates cache on request failure', async () => {
-    const provider = new OllamaProvider();
-
-    // Stub successful fetch first to populate cache
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(makeResponse({ models: [] })));
-    await provider.resolveOllamaUrl('http://localhost:11434');
-
-    // Stub failing fetch
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Connection failed')));
-    
-    await expect(provider.fetchOllamaModels('http://localhost:11434')).rejects.toThrow();
-
-    // Now if we resolve again, it should execute fetch since the cache was deleted on failure
-    const fetchSpy = vi.fn().mockResolvedValue(makeResponse({ models: [] }));
-    vi.stubGlobal('fetch', fetchSpy);
-    await provider.resolveOllamaUrl('http://localhost:11434');
-    expect(fetchSpy).toHaveBeenCalled();
-  });
-
-  it('validateOllamaUrl allows loopback and local URLs in development/test mode', () => {
-    const original = env.nodeEnv;
-    env.nodeEnv = 'test';
-    try {
-      expect(() => validateOllamaUrl('http://localhost:11434')).not.toThrow();
-      expect(() => validateOllamaUrl('http://127.0.0.1:11434')).not.toThrow();
-      expect(() => validateOllamaUrl('http://host.docker.internal:11434')).not.toThrow();
-    } finally {
-      env.nodeEnv = original;
-    }
-  });
-
-  it('validateOllamaUrl throws security exception for loopback and private subnets in production mode', () => {
-    const original = env.nodeEnv;
-    env.nodeEnv = 'production';
-    try {
-      expect(() => validateOllamaUrl('http://localhost:11434')).toThrow(/Security Exception/i);
-      expect(() => validateOllamaUrl('http://127.0.0.1:11434')).toThrow(/Security Exception/i);
-      expect(() => validateOllamaUrl('http://192.168.1.5:11434')).toThrow(/Security Exception/i);
-      expect(() => validateOllamaUrl('http://10.0.0.1:11434')).toThrow(/Security Exception/i);
-      expect(() => validateOllamaUrl('http://172.16.5.5:11434')).toThrow(/Security Exception/i);
-      expect(() => validateOllamaUrl('http://169.254.169.254/metadata')).toThrow(/Security Exception/i);
-      expect(() => validateOllamaUrl('https://google.com')).not.toThrow();
-    } finally {
-      env.nodeEnv = original;
-    }
   });
 });

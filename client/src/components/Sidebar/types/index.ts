@@ -82,13 +82,12 @@ export interface SidebarProjectSection {
 }
 
 export interface SidebarToolSection {
-  onOpenOllama: () => void;
-  isOllamaOpen?: boolean;
+  onOpenAgent: () => void;
+  isAgentOpen?: boolean;
   onOpenSimulator: () => void;
   onOpenCreateTicket: () => void;
   onOpenCreateProject?: () => void;
   onOpenCreateLabel?: () => void;
-  agentIntegration?: 'ollama' | 'third_party';
   aiProvider?: 'openai' | 'anthropic' | 'gemini' | 'deepseek';
 }
 

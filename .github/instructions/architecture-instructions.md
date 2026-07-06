@@ -51,7 +51,7 @@ gravity/
 │   │   └── Settings/               # Fullscreen settings page (Replaces sidebar layout)
 │   │       ├── index.tsx           # Page coordinator
 │   │       ├── SettingsSidebar.tsx # Category menu selectors
-│   │       └── CategoryPanel.tsx   # Panel layouts (Ollama, API Keys, General)
+│   │       └── CategoryPanel.tsx   # Panel layouts (API Keys, General)
 │   └── utils/
 │       ├── api.ts                  # Axios client wrapper mapping dynamic Host URLs
 │       └── crypto.ts               # Local secure key helpers
@@ -91,8 +91,8 @@ export const workspaceSettings = pgTable('workspace_settings', {
   tutorialCompleted: boolean('tutorial_completed').default(false).notNull(),
   theme: themeEnum('theme').default('dark').notNull(),
   defaultView: layoutEnum('default_view').default('board').notNull(),
-  ollamaEndpoint: text('ollama_endpoint').default('http://host.docker.internal:11434').notNull(),
-  preferredOllamaModel: text('preferred_ollama_model'),
+  aiProvider: aiProviderEnum('ai_provider').default('openai').notNull(),
+  projectLayout: text('project_layout').default('standard').notNull(),
 });
 
 export const userAiCredentials = pgTable('user_ai_credentials', {
@@ -227,15 +227,13 @@ When a user wants to access a workspace hosted on the server, they must be authe
 
 ## 5. Polymorphic AI Integration Engine
 
-### Dynamic Local Ollama Hook
+### Dynamic AI Provider Hook
 
-To resolve connection crashes and hardcoding failures:
+To keep provider credentials isolated and testable:
 
-
-1. When navigating to settings or chat, the hook invokes `GET /api/ai/ollama/models`.
-2. The server pings the local Ollama instance `/api/tags` utilizing `host.docker.internal` (safely resolving through container networks to the local OS ports).
-3. If successful, it parses tags and assigns the first tag as the user's active setting.
-4. If connection is refused, it catches the error and serves an empty collection `[]` cleanly, preventing UI crashes.
+1. When navigating to settings, the hook loads the user's saved provider and masked credential state.
+2. Provider keys are stored server-side and are only shown to the client as masked placeholders.
+3. Connection tests call the backend wrapper, which validates credentials against the selected provider.
 
 ```
 // src/hooks/useAIConfig.ts
@@ -243,28 +241,13 @@ import { useState, useEffect } from 'react';
 import { api } from '@/utils/api';
 
 export function useAIConfig() {
-  const [models, setModels] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  const fetchLocalOllamaModels = async () => {
-    setIsLoading(true);
-    try {
-      const response = await api.get<string[]>('/ai/ollama/models');
-      setModels(response);
-    } catch (err) {
-      console.warn("Ollama local connection unavailable. Returning clean empty state.");
-      setModels([]); // Clean failover
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const testConnection = async (provider: string, key: string) => {
-    // Standard RPC connection tester
     return await api.post('/ai/test-connection', { provider, key });
   };
 
-  return { models, isLoading, fetchLocalOllamaModels, testConnection };
+  return { isLoading, testConnection };
 }
 ```
 
@@ -348,5 +331,4 @@ export const Button: React.FC<ButtonProps> = ({ children, variant = 'primary', .
   );
 };
 ```
-
 

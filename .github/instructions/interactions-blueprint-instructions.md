@@ -80,10 +80,10 @@ When navigating to `/settings`, the global application shell is unmounted. It is
 ├───────────────────────┬────────────────────────────────────────────────┤
 │ Settings Category List│ Detail Panel                                   │
 │                       │                                                │
-│ • General Preferences │ • Ollama Host Endpoint URL                     │
-│ • Integrations        │   [ http://host.docker.internal:11434 ]        │
+│ • General Preferences │ • AI Provider                                  │
+│ • Integrations        │   [ OpenAI ]                                   │
 │ • AI Credentials      │                                                │
-│ • Team & Validation   │ • Preferred Model Select                       │
+│ • Team & Validation   │ • API Key                                      │
 │                       │   [ llama3.1 (Auto-Detected)    ▼ ]            │
 │                       │                                                │
 │                       │ • API Key Configuration                        │

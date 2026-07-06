@@ -98,7 +98,7 @@ export function WorkspaceLayout({
     },
     tools: {
       ...sidebarProps.tools,
-      onOpenOllama: wrapHandler(sidebarProps.tools.onOpenOllama),
+      onOpenAgent: wrapHandler(sidebarProps.tools.onOpenAgent),
       onOpenCreateTicket: wrapHandler(sidebarProps.tools.onOpenCreateTicket),
     },
     userMenu: {
@@ -146,8 +146,8 @@ export function WorkspaceLayout({
           <button
             type="button"
             className="workspace-header-ask-agent-button"
-            onClick={sidebarProps.tools.onOpenOllama}
-            aria-label={sidebarProps.tools.isOllamaOpen ? 'Close AI Assistant' : 'Ask Agent'}
+            onClick={sidebarProps.tools.onOpenAgent}
+            aria-label={sidebarProps.tools.isAgentOpen ? 'Close AI Assistant' : 'Ask Agent'}
             style={{
               background: 'none',
               border: 'none',
@@ -157,7 +157,7 @@ export function WorkspaceLayout({
               alignItems: 'center',
               gap: '6px',
               cursor: 'pointer',
-              color: sidebarProps.tools.isOllamaOpen ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+              color: sidebarProps.tools.isAgentOpen ? 'var(--color-primary)' : 'var(--color-text-secondary)',
               fontSize: '13px',
               fontWeight: 500,
               letterSpacing: 0,
@@ -170,12 +170,12 @@ export function WorkspaceLayout({
               e.currentTarget.style.backgroundColor = 'var(--color-base100)';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.color = sidebarProps.tools.isOllamaOpen ? 'var(--color-primary)' : 'var(--color-text-secondary)';
+              e.currentTarget.style.color = sidebarProps.tools.isAgentOpen ? 'var(--color-primary)' : 'var(--color-text-secondary)';
               e.currentTarget.style.backgroundColor = 'transparent';
             }}
           >
-            {sidebarProps.tools.isOllamaOpen ? <X size={13} /> : <SendHorizonal size={13} />}
-            {sidebarProps.tools.isOllamaOpen ? 'Close' : 'Ask Agent'}
+            {sidebarProps.tools.isAgentOpen ? <X size={13} /> : <SendHorizonal size={13} />}
+            {sidebarProps.tools.isAgentOpen ? 'Close' : 'Ask Agent'}
           </button>
 
           {isMobile && (

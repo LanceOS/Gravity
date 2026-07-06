@@ -322,6 +322,33 @@ export async function hydrateAndUpsertTicketFromSse(
   }
 }
 
+export async function hydrateAndUpsertTicketByKeyFromSse(
+  queryClient: QueryClient,
+  ticketKey?: string,
+  projectId?: string,
+): Promise<boolean> {
+  const normalizedTicketKey = ticketKey?.trim().toUpperCase();
+  if (!normalizedTicketKey) {
+    return false;
+  }
+
+  try {
+    const ticket = await apiClient.get<TicketWithRelations>(`/tickets/key/${encodeURIComponent(normalizedTicketKey)}`, {
+      projectId,
+      params: { include: 'relations' },
+    });
+    const normalizedTicket = normalizeTicketPayload(ticket);
+    if (!normalizedTicket) {
+      return false;
+    }
+
+    upsertTicketFromSse(queryClient, normalizedTicket);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function extractSseMessageFields(message: unknown) {
   if (!isRecord(message)) {
     return null;

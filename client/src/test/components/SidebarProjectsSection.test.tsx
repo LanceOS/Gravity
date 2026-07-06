@@ -109,10 +109,10 @@ describe('SidebarProjectsSection', () => {
     expect(screen.getByText('Labels')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Board$/i })).not.toBeInTheDocument();
     const projectsButtons = screen.getAllByRole('button', { name: /Projects/i });
-    expect(projectsButtons[1]).toBeInTheDocument();
+    expect(projectsButtons[0]).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Proj 1/i })).toBeInTheDocument();
 
-    await user.click(projectsButtons[1]);
+    await user.click(projectsButtons[0]);
     expect(props.onToggleTeamProjects).toHaveBeenCalledWith('team-1');
 
     rerender(

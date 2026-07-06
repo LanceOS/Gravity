@@ -115,9 +115,9 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
             <div style={iconContainerStyle}>
               <Sparkles size={40} color="var(--color-primary)" />
             </div>
-            <h3 style={stepTitleStyle}>Local Ollama AI Assistant</h3>
+            <h3 style={stepTitleStyle}>AI Assistant</h3>
             <p style={descriptionStyle}>
-              Chat with a completely local Ollama language model directly in your sidebar! Ask it to summarize your backlog, write code snippets, or analyze open tickets without leaking any sensitive data.
+              Chat with your configured AI provider directly in the sidebar. Ask it to summarize your backlog, draft release notes, or analyze open tickets with project context.
             </p>
           </Stack>
         )}

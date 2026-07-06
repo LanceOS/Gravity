@@ -1,18 +1,15 @@
 import React from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { ChatContextProvider, useChat } from '../../modules/ai';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ChatContextProvider, useChat } from '../../modules/ai';
 
 const mockSettings = {
   defaultView: 'board' as const,
   theme: 'dark' as const,
-  ollamaModel: '',
-  ollamaEndpoint: 'http://localhost:11434',
   projectLayout: 'standard' as const,
   apiKey: '',
   aiProvider: 'openai' as const,
-  agentIntegration: 'ollama' as const,
 };
 
 const mocks = vi.hoisted(() => ({
@@ -22,7 +19,20 @@ const mocks = vi.hoisted(() => ({
 function createJsonResponse(body: unknown, ok = true) {
   return {
     ok,
+    status: ok ? 200 : 500,
     json: vi.fn().mockResolvedValue(body),
+    text: vi.fn().mockResolvedValue(JSON.stringify(body)),
+    statusText: ok ? 'OK' : 'Error',
+  };
+}
+
+function createSseResponse(payloads: unknown[], ok = true) {
+  return {
+    ok,
+    status: ok ? 200 : 500,
+    json: vi.fn().mockResolvedValue(payloads[0] ?? {}),
+    text: vi.fn().mockResolvedValue(payloads.map((payload) => `data: ${JSON.stringify(payload)}\n\n`).join('')),
+    statusText: ok ? 'OK' : 'Error',
   };
 }
 
@@ -49,7 +59,7 @@ const TestComponent = () => {
       <div data-testid="msg-list">
         {messages.map((m, i) => (
           <div key={i} data-testid={`msg-${m.role}`}>
-            {m.name ? `[${m.name}] ` : ''}{m.content}
+            {m.content}
           </div>
         ))}
       </div>
@@ -71,7 +81,7 @@ describe('ChatContextProvider integration', () => {
     mocks.fetch.mockImplementation((url: string) => {
       if (url === '/api/v1/mcp/sse') {
         return Promise.resolve(createJsonResponse({
-          result: { tools: [{ name: 'list_tickets', description: 'Lists tickets' }] }
+          result: { tools: [{ name: 'list_tickets', description: 'Lists tickets' }] },
         }));
       }
       return Promise.resolve(createJsonResponse({}));
@@ -80,57 +90,37 @@ describe('ChatContextProvider integration', () => {
     render(
       <Wrapper>
         <ChatContextProvider
-          initialOllamaUrl="http://localhost:11434"
-          initialModel="llama3"
+          initialModel="gpt-4o-mini"
           settings={mockSettings}
           workspaceId="w-1"
+          projectId="p-1"
         >
           <TestComponent />
         </ChatContextProvider>
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
       expect(screen.getByTestId('tools-count')).toHaveTextContent('1');
     });
 
-    const calls = mocks.fetch.mock.calls;
-    const mcpCall = calls.find(call => call[0] === '/api/v1/mcp/sse');
+    const mcpCall = mocks.fetch.mock.calls.find((call) => call[0] === '/api/v1/mcp/sse');
     expect(mcpCall).toBeDefined();
     expect(JSON.parse(mcpCall![1]?.body as string)).toMatchObject({
       method: 'tools/list',
     });
   });
 
-  it('coordinates a successful tool execution loop and returns results to LLM', async () => {
-    let chatCount = 0;
+  it('creates a chat session and appends the streamed assistant response', async () => {
     mocks.fetch.mockImplementation((url: string) => {
       if (url === '/api/v1/mcp/sse') {
-        // First call is tools/list, subsequent is tools/call
-        const body = JSON.parse(mocks.fetch.mock.calls.find(call => call[0] === url && JSON.parse(call[1]?.body as string).id === 1)?.[1]?.body as string || '{}');
-        const reqBody = JSON.parse(mocks.fetch.mock.calls[mocks.fetch.mock.calls.length - 1][1]?.body as string);
-        if (reqBody.method === 'tools/list') {
-          return Promise.resolve(createJsonResponse({ result: { tools: [{ name: 'list_workspace_members' }] } }));
-        }
-        return Promise.resolve(createJsonResponse({ result: { content: [{ type: 'text', text: 'Alice, Bob' }] } }));
+        return Promise.resolve(createJsonResponse({ result: { tools: [] } }));
       }
-      if (url === '/api/v1/ai/chat') {
-        chatCount++;
-        if (chatCount === 1) {
-          return Promise.resolve(createJsonResponse({
-            message: {
-              role: 'assistant',
-              content: '',
-              tool_calls: [{ id: 'tc-1', name: 'list_workspace_members', arguments: {} }]
-            }
-          }));
-        }
-        return Promise.resolve(createJsonResponse({
-          message: {
-            role: 'assistant',
-            content: 'Members are Alice and Bob.'
-          }
-        }));
+      if (url === '/api/v1/projects/p-1/chats') {
+        return Promise.resolve(createJsonResponse({ id: 'chat-1' }));
+      }
+      if (url === '/api/v1/projects/p-1/chats/chat-1/stream') {
+        return Promise.resolve(createSseResponse([{ type: 'done', message: 'Hello from OpenAI.' }]));
       }
       return Promise.resolve(createJsonResponse({}));
     });
@@ -138,130 +128,22 @@ describe('ChatContextProvider integration', () => {
     render(
       <Wrapper>
         <ChatContextProvider
-          initialOllamaUrl="http://localhost:11434"
-          initialModel="llama3"
+          initialModel="gpt-4o-mini"
           settings={mockSettings}
           workspaceId="w-1"
+          projectId="p-1"
         >
           <TestComponent />
         </ChatContextProvider>
-      </Wrapper>
+      </Wrapper>,
     );
-
-    await waitFor(() => {
-      expect(screen.getByTestId('tools-count')).toHaveTextContent('1');
-    });
 
     fireEvent.click(screen.getByTestId('send-btn'));
 
     await waitFor(() => {
-      expect(screen.getByText('Members are Alice and Bob.')).toBeInTheDocument();
+      expect(screen.getByText('Hello from OpenAI.')).toBeInTheDocument();
     });
-
-    // Check all intermediate messages were saved
     expect(screen.getByText('Hello')).toBeInTheDocument();
-    expect(screen.getByText('[list_workspace_members] Alice, Bob')).toBeInTheDocument();
     expect(screen.getByTestId('is-generating')).toHaveTextContent('no');
-  });
-
-  it('prevents runaway tool calling loop when depth limit is exceeded', async () => {
-    mocks.fetch.mockImplementation((url: string) => {
-      if (url === '/api/v1/mcp/sse') {
-        const reqBody = JSON.parse(mocks.fetch.mock.calls[mocks.fetch.mock.calls.length - 1][1]?.body as string);
-        if (reqBody.method === 'tools/list') {
-          return Promise.resolve(createJsonResponse({ result: { tools: [{ name: 'list_tickets' }] } }));
-        }
-        return Promise.resolve(createJsonResponse({ result: { content: [{ type: 'text', text: 'Result' }] } }));
-      }
-      if (url === '/api/v1/ai/chat') {
-        // Always reply with a tool call to simulate a loop
-        return Promise.resolve(createJsonResponse({
-          message: {
-            role: 'assistant',
-            content: '',
-            tool_calls: [{ id: `tc-${Date.now()}`, name: 'list_tickets', arguments: {} }]
-          }
-        }));
-      }
-      return Promise.resolve(createJsonResponse({}));
-    });
-
-    render(
-      <Wrapper>
-        <ChatContextProvider
-          initialOllamaUrl="http://localhost:11434"
-          initialModel="llama3"
-          settings={mockSettings}
-          workspaceId="w-1"
-        >
-          <TestComponent />
-        </ChatContextProvider>
-      </Wrapper>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByTestId('tools-count')).toHaveTextContent('1');
-    });
-
-    fireEvent.click(screen.getByTestId('send-btn'));
-
-    await waitFor(() => {
-      expect(screen.getByText(/Agentic loop stopped/)).toBeInTheDocument();
-    }, { timeout: 8000 });
-
-    expect(screen.getByTestId('is-generating')).toHaveTextContent('no');
-  });
-
-  it('handles tool call failures gracefully and records the error', async () => {
-    let chatCount = 0;
-    mocks.fetch.mockImplementation((url: string) => {
-      if (url === '/api/v1/mcp/sse') {
-        const reqBody = JSON.parse(mocks.fetch.mock.calls[mocks.fetch.mock.calls.length - 1][1]?.body as string);
-        if (reqBody.method === 'tools/list') {
-          return Promise.resolve(createJsonResponse({ result: { tools: [{ name: 'list_tickets' }] } }));
-        }
-        return Promise.resolve(createJsonResponse({ error: { code: -32603, message: 'API error occurred' } }));
-      }
-      if (url === '/api/v1/ai/chat') {
-        chatCount++;
-        if (chatCount === 1) {
-          return Promise.resolve(createJsonResponse({
-            message: {
-              role: 'assistant',
-              content: '',
-              tool_calls: [{ id: 'tc-1', name: 'list_tickets', arguments: {} }]
-            }
-          }));
-        }
-        return Promise.resolve(createJsonResponse({
-          message: { role: 'assistant', content: 'Failing tool call output seen.' }
-        }));
-      }
-      return Promise.resolve(createJsonResponse({}));
-    });
-
-    render(
-      <Wrapper>
-        <ChatContextProvider
-          initialOllamaUrl="http://localhost:11434"
-          initialModel="llama3"
-          settings={mockSettings}
-          workspaceId="w-1"
-        >
-          <TestComponent />
-        </ChatContextProvider>
-      </Wrapper>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByTestId('tools-count')).toHaveTextContent('1');
-    });
-
-    fireEvent.click(screen.getByTestId('send-btn'));
-
-    await waitFor(() => {
-      expect(screen.getByText('[list_tickets] Error: API error occurred')).toBeInTheDocument();
-      expect(screen.getByText('Failing tool call output seen.')).toBeInTheDocument();
-    });
   });
 });

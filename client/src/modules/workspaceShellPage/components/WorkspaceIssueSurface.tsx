@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 
 import type { Ticket } from '../../../context/TicketContextContext';
 import { useCommentContext } from '../../../context/comment/CommentContext';
@@ -147,6 +147,28 @@ export function WorkspaceIssueSurface({
     ? ticketsByKey.get(routeTicketKey.toUpperCase()) || activeTicket
     : activeTicket;
 
+  const handleSelectLabel = useCallback(
+    (projectId: string, labelId: string) => {
+      if (!projectId || !labelId) {
+        return;
+      }
+
+      navigation.setActiveTicket(null);
+      navigation.navigate(`${navigation.buildProjectScopedPath(projectId)}?labels=${encodeURIComponent(labelId)}`);
+    },
+    [navigation],
+  );
+
+  useEffect(() => {
+    if (!routeTicketKey || !activeRouteTicket) {
+      return;
+    }
+
+    if (activeTicket?.id !== activeRouteTicket.id) {
+      navigation.setActiveTicket(activeRouteTicket);
+    }
+  }, [activeRouteTicket, activeTicket?.id, navigation, routeTicketKey]);
+
   return (
     <>
       {routeTicketKey ? (
@@ -161,6 +183,7 @@ export function WorkspaceIssueSurface({
           labels={labels}
           cycles={cycles}
           onSelectTicket={onSelectTicket}
+          onSelectLabel={handleSelectLabel}
           onUpdateTicket={updateTicket}
           onDeleteTicket={handleDeleteTicket}
           onAddComment={addComment}

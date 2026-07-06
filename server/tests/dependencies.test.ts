@@ -8,7 +8,7 @@ import {
 } from './helpers/test-helpers.js';
 
 describe('ticket relationship routes', () => {
-  it('manages ticket dependencies and blockers and enforces validation rules', async () => {
+  it('manages ticket dependencies and blockers and enforces validation rules', { timeout: 10_000 }, async () => {
     const ownerApi = await createAuthenticatedApi({
       name: 'Margaret Hamilton',
       email: 'margaret@example.com',

@@ -4,9 +4,8 @@ import type { WorkspaceSettings } from '../../../utils/settings';
 
 export type TicketAttachmentScopeMode = 'project' | 'team';
 
-export interface LocalAIChatProps {
+export interface AgentChatProps {
   onClose?: () => void;
-  initialOllamaUrl: string;
   initialModel: string;
   settings: WorkspaceSettings;
   workspaceId?: string;

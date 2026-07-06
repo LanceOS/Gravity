@@ -175,9 +175,9 @@ vi.mock('../../utils/webmcp', () => ({
 
 vi.mock('../../modules/ai', () => ({
   AgentSimulator: () => <div>AgentSimulator</div>,
-  LocalAIChat: ({ seedChatSessionId, seedMessages }: any) => (
+  AgentChat: ({ seedChatSessionId, seedMessages }: any) => (
     <div>
-      <div>LocalAIChat</div>
+      <div>AgentChat</div>
       <div data-testid="local-ai-chat-session">{seedChatSessionId || ''}</div>
       <div data-testid="local-ai-chat-messages">{JSON.stringify(seedMessages ?? [])}</div>
     </div>
@@ -490,8 +490,6 @@ function buildAccountSettings(overrides: Partial<Record<string, unknown>> = {}) 
       projectLayout: 'standard',
       aiProvider: 'openai',
       apiKey: '',
-      ollamaEndpoint: 'http://localhost:11434',
-      ollamaModel: 'llama3',
     },
     settingsLoading: false,
     saveLoading: false,
@@ -502,13 +500,10 @@ function buildAccountSettings(overrides: Partial<Record<string, unknown>> = {}) 
     testing: false,
     testResult: null,
     tutorialResult: null,
-    ollamaModels: ['llama3'],
-    ollamaModelsLoading: false,
     updateSettings: vi.fn(),
     saveSettings: vi.fn(),
     testApiKey: vi.fn(),
     resetTutorial: vi.fn(),
-    refreshOllamaModels: vi.fn(),
     ...overrides,
   };
 }
@@ -1014,8 +1009,6 @@ describe('AppShellPage', () => {
           projectLayout: 'standard',
           aiProvider: 'openai',
           apiKey: '',
-          ollamaEndpoint: 'http://localhost:11434',
-          ollamaModel: 'llama3',
           tutorialCompleted: true,
         },
       }),

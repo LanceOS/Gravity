@@ -1,7 +1,7 @@
 import { Select, Stack, Grid, Card, Alert } from '@library';
 
 import { useIsMobile } from '../../../../hooks/useIsMobile';
-import { AGENT_INTEGRATION_OPTIONS, PROJECT_LAYOUT_OPTIONS, THEME_OPTIONS, VIEW_MODE_OPTIONS } from '../../utils/accountPreferences';
+import { PROJECT_LAYOUT_OPTIONS, THEME_OPTIONS, VIEW_MODE_OPTIONS } from '../../utils/accountPreferences';
 import { useAccountPreferencesSettingsContext } from '../../../../context/accountPreferencesPage/accountPreferencesPageContextHooks';
 import type { WorkspaceSettings } from '../../../../utils/settings';
 
@@ -59,12 +59,6 @@ export function GeneralSettingsSection({
             options={PROJECT_LAYOUT_OPTIONS}
           />
 
-          <Select
-            label="Active Agent Integration"
-            value={settings.agentIntegration}
-            onChange={(event) => onChangeSettings({ agentIntegration: event.target.value as WorkspaceSettings['agentIntegration'] })}
-            options={AGENT_INTEGRATION_OPTIONS}
-          />
         </Grid>
       </Stack>
     </Card>

@@ -4,7 +4,7 @@
 This document outlines how the Gravity server implements the Model Context Protocol (MCP) to execute workspace actions, and how AI agents interact with it. Gravity runs its own internal MCP server to expose specific tools (e.g., ticket creation, workspace membership reads) that allow AI agents to securely act on behalf of a user.
 
 ## Non-Goals or Boundary Limits
-- This document does not cover the inner workings of external AI providers (OpenAI, Anthropic, Gemini, Deepseek, Ollama).
+- This document does not cover the inner workings of external AI providers (OpenAI, Anthropic, Gemini, DeepSeek).
 - It does not map the full data model of tickets or workspaces (see related domain docs).
 - Focus is on the protocol dispatch, JSON-RPC parsing, and execution bounds.
 

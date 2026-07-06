@@ -81,9 +81,10 @@ When entering `/settings`, the global app navigation structure (containing proje
 ├──────────────────────┬────────────────────────────────────────────────────────────┤
 │ Categories List      │ Active Preferences Configurator Panel                      │
 │                      │                                                            │
-│ • General            │ Ollama Configuration:                                      │
-│ • AI Integrations    │ Local Host: [http://host.docker.internal:11434      ]      │
-│                      │ Preferred Model: [ l## 4. Single-Host Invitation & Join Flow
+│ • General            │ AI Provider Configuration:                                 │
+│ • AI Integrations    │ Provider: [OpenAI                                      ]   │
+│                      │ API Key:  [••••••••••••                              ]    │
+## 4. Single-Host Invitation & Join Flow
 
 This flow handles how a user accesses a workspace via an invitation link on a centralized host. Authentication is required before or during the join process.
 

@@ -6,8 +6,6 @@ import App from '../src/App';
 import { dbState } from './setup';
 import { router } from '../src/router';
 
-console.log('E2E test module loaded: label-filter-navigation');
-
 describe('Label filter navigation E2E', () => {
   it('navigates to label-filtered view when clicking a label from ticket detail', async () => {
     const user = userEvent.setup();
@@ -85,7 +83,7 @@ describe('Label filter navigation E2E', () => {
 
     // Click the label badge in the detail view
     const detailContainer = document.querySelector('.ticket-detail')!;
-    const labelBadge = await within(detailContainer as HTMLElement).findByRole('button', { name: /Frontend/i });
+    const labelBadge = await within(detailContainer as HTMLElement).findByRole('button', { name: /^Frontend$/i });
     await user.click(labelBadge);
 
     // Detail should close

@@ -15,12 +15,12 @@ This document focuses exclusively on the UI/UX structural changes for settings a
 
 ### 1. Vertical Stacking vs. Sidebar Routing
 On the desktop viewport, the `SettingsScreen` and `AccountPreferencesPage` utilize a two-column layout:
-- **Left Column**: A navigational sidebar (e.g., Overview, Invites, Members / General, Provider, Ollama, Onboarding).
+- **Left Column**: A navigational sidebar (e.g., Overview, Invites, Members / General, Provider, Onboarding).
 - **Right Column**: The active content pane matching the selected tab.
 
 On mobile viewports (`window.innerWidth <= 768`), this tabbed navigation model is completely removed.
 - **Stacked Rendering**: Instead of rendering a single active tab, the components render *all* sections simultaneously.
-- **Ordering**: The sections are stacked vertically in a single continuous scrolling view (e.g., General -> Provider -> Ollama -> Onboarding).
+- **Ordering**: The sections are stacked vertically in a single continuous scrolling view (e.g., General -> Provider -> Onboarding).
 - **Header Suppression**: The top-level settings header text is conditionally hidden on mobile to avoid redundant titling and save vertical space.
 - **Action Buttons**: The "Save Changes" or persistent action buttons are repositioned to span the full width at the bottom of the stacked layout.
 

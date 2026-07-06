@@ -8,7 +8,6 @@ import {
   AccountPreferencesCloudContextProvider,
   AccountPreferencesNavigationContextProvider,
   AccountPreferencesOnboardingContextProvider,
-  AccountPreferencesOllamaContextProvider,
   AccountPreferencesRuntimeContextProvider,
   AccountPreferencesSettingsContextProvider,
 } from '../../../context/accountPreferencesPage/accountPreferencesPageContexts';
@@ -50,37 +49,29 @@ export function AccountPreferencesPageProviders({
             onRemoveCredential: props.onRemoveCredential,
           }}
         >
-          <AccountPreferencesOllamaContextProvider
+          <AccountPreferencesOnboardingContextProvider
             value={{
-              ollamaModels: props.ollamaModels,
-              ollamaModelsLoading: props.ollamaModelsLoading,
-              onRefreshOllamaModels: props.onRefreshOllamaModels,
+              tutorialResult: props.tutorialResult,
+              onResetTutorial: props.onResetTutorial,
             }}
           >
-            <AccountPreferencesOnboardingContextProvider
+            <AccountPreferencesCategoryContextProvider
               value={{
-                tutorialResult: props.tutorialResult,
-                onResetTutorial: props.onResetTutorial,
+                activeCategory,
+                categories: SETTINGS_CATEGORIES,
+                setActiveCategory,
               }}
             >
-              <AccountPreferencesCategoryContextProvider
+              <AccountPreferencesNavigationContextProvider
                 value={{
-                  activeCategory,
-                  categories: SETTINGS_CATEGORIES,
-                  setActiveCategory,
+                  onBack: props.onBack,
+                  onOpenDirectory: props.onOpenDirectory,
                 }}
               >
-                <AccountPreferencesNavigationContextProvider
-                  value={{
-                    onBack: props.onBack,
-                    onOpenDirectory: props.onOpenDirectory,
-                  }}
-                >
-                  {children}
-                </AccountPreferencesNavigationContextProvider>
-              </AccountPreferencesCategoryContextProvider>
-            </AccountPreferencesOnboardingContextProvider>
-          </AccountPreferencesOllamaContextProvider>
+                {children}
+              </AccountPreferencesNavigationContextProvider>
+            </AccountPreferencesCategoryContextProvider>
+          </AccountPreferencesOnboardingContextProvider>
         </AccountPreferencesCloudContextProvider>
       </AccountPreferencesSettingsContextProvider>
     </AccountPreferencesRuntimeContextProvider>
