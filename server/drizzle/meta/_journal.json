@@ -78,6 +78,13 @@
       "when": 1781500000000,
       "tag": "0011_add_chat_sessions_and_messages",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1783117580803,
+      "tag": "0011_freezing_the_stranger",
+      "breakpoints": true
     }
   ]
 }

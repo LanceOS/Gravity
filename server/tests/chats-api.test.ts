@@ -90,6 +90,7 @@ describe('chat sessions routes', () => {
     expect(getResponse.body).toMatchObject({
       id: firstChatId,
       title: 'Roadmap Chat (Renamed)',
+      lastMessagePreview: null,
       messages: [],
     });
 
@@ -164,6 +165,10 @@ describe('chat sessions routes', () => {
     expect(getWithMessages.body.messages).toHaveLength(3);
     expect(getWithMessages.body.messages[0].content).toBe('Draft release strategy.');
     expect(getWithMessages.body.messages[1].content).toBe('Planned approach logged.');
+    // The single-session detail endpoint must compute a real preview from its own
+    // message rows, not hardcode null — the client falls back to this text when a
+    // chat's transcript renders empty, so a stale null silently blanks the chat.
+    expect(getWithMessages.body.lastMessagePreview).toBe('Context references updated.');
 
     const sharedMessageTime = new Date('2026-01-02T12:00:00.000Z');
     await db
@@ -269,7 +274,7 @@ describe('chat sessions routes', () => {
     expect(previewList.status).toBe(200);
     const roadmapEntry = previewList.body.find((chat: { id: string }) => chat.id === roadmapChatId);
     const releaseEntry = previewList.body.find((chat: { id: string }) => chat.id === releaseChatId);
-    expect(roadmapEntry.lastMessagePreview).toBe(`${'a'.repeat(80)}…`);
+    expect(roadmapEntry.lastMessagePreview).toBe(`${'a'.repeat(47)}…`);
     expect(releaseEntry.lastMessagePreview).toBe('Short release update.');
 
     const searchByTitle = await ownerApi.get(`/api/v1/projects/${project.id}/chats`).query({ search: 'roadmap' });
@@ -389,6 +394,60 @@ describe('chat sessions routes', () => {
       });
       expect(generateSpy.mock.calls[0]?.[0]?.message).toBe('What is the current status?');
       expect(generateSpy.mock.calls[0]?.[0]?.onChunk).toBeUndefined();
+    } finally {
+      generateSpy.mockRestore();
+    }
+  });
+
+  it('passes stream message context separately from the visible message', async () => {
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Streaming Context Owner',
+      email: 'stream-context-owner@example.com',
+      role: 'owner',
+    });
+
+    const { project } = await seedWorkspaceFixture({
+      owner: {
+        id: ownerApi.user.id,
+        name: ownerApi.user.name,
+        email: ownerApi.user.email,
+        role: 'owner',
+        avatarUrl: ownerApi.user.avatar,
+      },
+    });
+
+    const createResponse = await ownerApi
+      .post(`/api/v1/projects/${project.id}/chats`)
+      .send({ title: 'Streaming Context Chat' });
+    expect(createResponse.status).toBe(201);
+    const chatId = createResponse.body.id;
+
+    const generateSpy = vi.spyOn(ChatService.prototype, 'generateResponse').mockResolvedValue({
+      assistantMessageId: 'chat-msg-stream-context',
+      content: 'Ready.',
+      provider: 'anthropic',
+      model: 'claude-3-haiku',
+      toolCalls: [],
+      fallback: false,
+    });
+
+    try {
+      const streamResponse = await ownerApi
+        .post(`/api/v1/projects/${project.id}/chats/${chatId}/stream`)
+        .set('Accept', 'text/event-stream')
+        .send({
+          message: 'What is risky here?',
+          context: 'Attached ticket context:\nGRA-202: Export fails on retry.',
+          provider: 'anthropic',
+        });
+
+      expect(streamResponse.status).toBe(200);
+      expect(generateSpy).toHaveBeenCalledTimes(1);
+      expect(generateSpy.mock.calls[0]?.[0]).toMatchObject({
+        message: 'What is risky here?',
+        messageContext: 'Attached ticket context:\nGRA-202: Export fails on retry.',
+        provider: 'anthropic',
+      });
     } finally {
       generateSpy.mockRestore();
     }

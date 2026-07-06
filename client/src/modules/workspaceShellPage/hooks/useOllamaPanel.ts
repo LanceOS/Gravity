@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 export function useOllamaPanel() {
   const [isOllamaOpen, setIsOllamaOpen] = useState(false);
@@ -13,7 +13,17 @@ export function useOllamaPanel() {
     };
   }, [ollamaCloseTimer]);
 
-  const handleToggleOllama = () => {
+  const handleOpenOllama = useCallback(() => {
+    if (ollamaCloseTimer) {
+      clearTimeout(ollamaCloseTimer);
+      setOllamaCloseTimer(null);
+    }
+
+    setIsOllamaClosing(false);
+    setIsOllamaOpen(true);
+  }, [ollamaCloseTimer]);
+
+  const handleToggleOllama = useCallback(() => {
     if (isOllamaClosing) {
       return;
     }
@@ -36,11 +46,12 @@ export function useOllamaPanel() {
     }
 
     setIsOllamaOpen(true);
-  };
+  }, [isOllamaClosing, isOllamaOpen, ollamaCloseTimer]);
 
   return {
     isOllamaOpen,
     isOllamaClosing,
+    handleOpenOllama,
     handleToggleOllama,
   };
 }

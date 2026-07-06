@@ -4,7 +4,7 @@ import { ArrowLeft } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
 import type { SidebarNavigationState, SidebarProps } from '../../../components/Sidebar';
 import { WorkspaceLayout } from '../../../layouts/WorkspaceLayout/WorkspaceLayout';
-import { AiChatDock, WorkspaceChatPage } from '../../aiChat';
+import { AiChatDock } from '../../aiChat';
 import { Button } from '@library';
 import { AuthScreen } from '../../auth';
 import type { TicketFilters, TicketListSort } from '../../tickets';
@@ -44,6 +44,8 @@ import { useWorkspaceViewMode } from '../hooks/useWorkspaceViewMode';
 import type { AppSection } from '../types/AppShell';
 import { LoadingPage } from '../../loadingPage';
 import { CACHE_CONFIGS, queryKeys } from '../../../utils/queryClient';
+import { ChatHistoryHeaderRow, ChatHistoryMenuButton, getChatSession, toChatMessages, useChatSessionsList } from '../../chats';
+import type { Message } from '../../ai';
 import {
   useWorkspaceCreateLabelDialog,
   useWorkspaceCreateProjectDialog,
@@ -98,7 +100,7 @@ export function WorkspaceShellPage() {
   const { activeView, setView } = useActiveView();
   const loading = authLoading || projectsLoading || usersLoading;
   const route = useAppShellRoute(currentUser?.id);
-  const [activeSection, setActiveSection] = useState<AppSection>(() => (route.isWorkspaceChatPath ? 'chat' : 'workspace'));
+  const [activeSection, setActiveSection] = useState<AppSection>('workspace');
   const [localTutorialCompleted, setLocalTutorialCompleted] = useState(false);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState(() => route.workspaceId || '');
   const [activeContext, setActiveContext] = useState<'issues' | 'notes'>('issues');
@@ -107,10 +109,14 @@ export function WorkspaceShellPage() {
   const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
   const [isCreateLabelModalOpen, setIsCreateLabelModalOpen] = useState(false);
   const [isMcpOpen, setIsMcpOpen] = useState(false);
-  const [sidebarActiveScope, setSidebarActiveScope] = useState<SidebarNavigationState['activeScope']>(
-    () => (route.isWorkspaceChatPath ? 'workspace-chat' : 'workspace')
-  );
-  const { isOllamaOpen, isOllamaClosing, handleToggleOllama } = useOllamaPanel();
+  const [sidebarActiveScope, setSidebarActiveScope] = useState<SidebarNavigationState['activeScope']>('workspace');
+  const { isOllamaOpen, isOllamaClosing, handleOpenOllama, handleToggleOllama } = useOllamaPanel();
+  const [seedAiChatSessionId, setSeedAiChatSessionId] = useState('');
+  const [liveAiChatSessionId, setLiveAiChatSessionId] = useState('');
+  const [seedAiChatMessages, setSeedAiChatMessages] = useState<Message[] | undefined>(undefined);
+  const [activeAiChatSessionProjectId, setActiveAiChatSessionProjectId] = useState('');
+  const aiChatHistoryRequestIdRef = useRef(0);
+  const latestAiChatProjectIdRef = useRef('');
   const [createInitialStatus, setCreateInitialStatus] = useState<Ticket['status'] | undefined>(undefined);
   const [createParentId, setCreateParentId] = useState<string | undefined>(undefined);
   const [listSort, setListSort] = useState<TicketListSort>('newest_urgent');
@@ -173,6 +179,23 @@ export function WorkspaceShellPage() {
     () => projectsByWorkspaceId.get(activeWorkspaceId) || [],
     [activeWorkspaceId, projectsByWorkspaceId]
   );
+  const aiChatProjectId = activeProjectId || activeTicket?.projectId || activeWorkspace?.defaultProjectId || activeWorkspaceProjects[0]?.id || '';
+  const {
+    sessions: aiChatSessions,
+    isLoading: aiChatSessionsLoading,
+    isFetchingNextPage: aiChatSessionsFetchingNextPage,
+    hasNextPage: aiChatSessionsHasNextPage,
+    fetchNextPage: fetchNextAiChatSessionsPage,
+    refreshSessions: refreshAiChatSessions,
+  } = useChatSessionsList(aiChatProjectId);
+  const isAiChatSessionProjectCurrent = activeAiChatSessionProjectId === aiChatProjectId;
+  const currentSeedAiChatSessionId = isAiChatSessionProjectCurrent ? seedAiChatSessionId : '';
+  const currentLiveAiChatSessionId = isAiChatSessionProjectCurrent ? liveAiChatSessionId : '';
+  const currentSeedAiChatMessages = isAiChatSessionProjectCurrent ? seedAiChatMessages : undefined;
+
+  useEffect(() => {
+    latestAiChatProjectIdRef.current = aiChatProjectId;
+  }, [aiChatProjectId]);
   const activeWorkspaceProjectIds = useMemo(
     () => new Set(activeWorkspaceProjects.map((project) => project.id)),
     [activeWorkspaceProjects]
@@ -702,10 +725,7 @@ export function WorkspaceShellPage() {
       sidebarActiveTeamId: resolvedSidebarActiveTeamId,
       sidebarNavigationState: {
         activeTeam: resolvedSidebarActiveTeamId,
-        activeScope:
-          route.isWorkspaceChatPath
-            ? 'workspace-chat'
-            : route.teamIdParam
+        activeScope: route.teamIdParam
             ? route.projectIdParam
               ? 'projects'
               : route.cycleIdParam
@@ -717,7 +737,7 @@ export function WorkspaceShellPage() {
             ? 'projects'
             : 'workspace',
         activeProject:
-          activeSection === 'projects' || activeSection === 'team-projects' || activeSection === 'workspace' || activeSection === 'chat'
+          activeSection === 'projects' || activeSection === 'team-projects' || activeSection === 'workspace'
             ? (projectIdParam || activeProjectId)
             : '',
       } as SidebarNavigationState,
@@ -729,14 +749,12 @@ export function WorkspaceShellPage() {
     activeWorkspace?.hierarchyMode,
     activeWorkspace?.memberRole,
     projectIdParam,
-    route.isWorkspaceChatPath,
     route.activeLabelIdParam,
     route.cycleIdParam,
     route.projectIdParam,
     route.teamIdParam,
     sidebarTeamIdByProjectId,
     sidebarTree?.hierarchyMode,
-    sidebarTree?.teams,
   ]);
 
   const accountCredentialByProvider = useMemo(() => {
@@ -767,7 +785,6 @@ export function WorkspaceShellPage() {
     handleOpenTeamManager,
     handleOpenTeamProjectsManager,
     handleShowWorkspaceProjectList,
-    handleShowWorkspaceChat,
   } = useWorkspaceShellNavigation({
     route: { teamIdParam, projectIdParam },
     activeWorkspaceId,
@@ -810,6 +827,61 @@ export function WorkspaceShellPage() {
     setSearchParams,
   });
 
+  const handleToggleAskAgent = useCallback(() => {
+    if (!isOllamaOpen && !isOllamaClosing) {
+      setSeedAiChatSessionId('');
+      setLiveAiChatSessionId('');
+      setSeedAiChatMessages(undefined);
+      setActiveAiChatSessionProjectId(aiChatProjectId);
+    }
+
+    handleToggleOllama();
+  }, [aiChatProjectId, handleToggleOllama, isOllamaClosing, isOllamaOpen]);
+
+  const handleAiChatSessionCreated = useCallback((chatId: string) => {
+    setLiveAiChatSessionId(chatId);
+    setActiveAiChatSessionProjectId(aiChatProjectId);
+    refreshAiChatSessions();
+  }, [aiChatProjectId, refreshAiChatSessions]);
+
+  const handleSelectAiChatHistory = useCallback(async (chatId: string) => {
+    if (!aiChatProjectId) {
+      return;
+    }
+
+    const requestProjectId = aiChatProjectId;
+    const requestId = aiChatHistoryRequestIdRef.current + 1;
+    aiChatHistoryRequestIdRef.current = requestId;
+    const isLatestRequest = () =>
+      aiChatHistoryRequestIdRef.current === requestId && latestAiChatProjectIdRef.current === requestProjectId;
+
+    try {
+      const detail = await getChatSession(requestProjectId, chatId);
+      if (!isLatestRequest()) {
+        return;
+      }
+
+      setSeedAiChatSessionId(chatId);
+      setLiveAiChatSessionId(chatId);
+      setSeedAiChatMessages(toChatMessages(detail));
+      setActiveAiChatSessionProjectId(requestProjectId);
+    } catch (error) {
+      if (!isLatestRequest()) {
+        return;
+      }
+
+      console.error('Failed to load chat session:', error);
+      setSeedAiChatSessionId(chatId);
+      setLiveAiChatSessionId(chatId);
+      setSeedAiChatMessages([{ role: 'system', content: 'Failed to load this chat. Please try again.' }]);
+      setActiveAiChatSessionProjectId(requestProjectId);
+    } finally {
+      if (isLatestRequest()) {
+        handleOpenOllama();
+      }
+    }
+  }, [aiChatProjectId, handleOpenOllama]);
+
   const { handleOpenCreateTicket, handleOpenCreateSubtask } = useWorkspaceCreateTicketDialog({
     hasActiveWorkspaceProjects: activeWorkspaceProjects.length > 0,
     setCreateInitialStatus,
@@ -844,7 +916,7 @@ export function WorkspaceShellPage() {
     const handleGlobalKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === 'c') {
         event.preventDefault();
-        handleToggleOllama();
+        handleToggleAskAgent();
         return;
       }
 
@@ -870,7 +942,7 @@ export function WorkspaceShellPage() {
 
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [activeSection, activeWorkspaceId, handleOpenCreateTicket, handleToggleOllama, navigate]);
+  }, [activeSection, activeWorkspaceId, handleOpenCreateTicket, handleToggleAskAgent, navigate]);
 
   const handleOpenCurrentTeamProjectsManager = useCallback(() => {
     if (sidebarActiveTeamId) {
@@ -957,7 +1029,6 @@ export function WorkspaceShellPage() {
       activeLabelId: route.activeLabelIdParam,
       onSelectWorkspaceAllTasks: () => navigate(`/workspaces/${activeWorkspaceId}/all`),
       onSelectWorkspaceProjects: handleShowWorkspaceProjectList,
-      onSelectWorkspaceChat: handleShowWorkspaceChat,
       onSelectTeam: (teamId) => navigate(`/workspaces/${activeWorkspaceId}/teams/${teamId}/tasks`),
       onSelectView: (teamId, viewId) => {
         if (viewId === 'all') {
@@ -997,7 +1068,7 @@ export function WorkspaceShellPage() {
       onOpenCreateTeam: () => navigate(`/workspaces/${activeWorkspaceId}/teams?create=true`),
     },
     tools: {
-      onOpenOllama: handleToggleOllama,
+      onOpenOllama: handleToggleAskAgent,
       isOllamaOpen,
       onOpenSimulator: () => {},
       onOpenCreateTicket: activeSection === 'workspace' ? handleOpenCreateTicket : () => navigate(`/workspaces/${activeWorkspaceId}`),
@@ -1030,11 +1101,9 @@ export function WorkspaceShellPage() {
 
   const createDefaultProjectId =
     activeProjectId || scopedProjects[0]?.id || activeWorkspaceProjects[0]?.id || '';
-  const aiChatProjectId = activeProjectId || activeTicket?.projectId || activeWorkspace?.defaultProjectId || activeWorkspaceProjects[0]?.id || '';
   const isWorkspaceProjectsListActive = sidebarActiveScope === 'workspace-projects';
-  const isWorkspaceChatActive = activeSection === 'chat';
   const isIssueSurfaceActive =
-    !isWorkspaceProjectsListActive && !isTeamsManager && !isTeamProjectsManager && activeSection !== 'projects' && !isWorkspaceChatActive;
+    !isWorkspaceProjectsListActive && !isTeamsManager && !isTeamProjectsManager && activeSection !== 'projects';
   const workspaceWebMcpRegistration = isWebMcpSupported ? (
     <WorkspaceWebMcpRegistration
       tickets={tickets}
@@ -1048,6 +1117,25 @@ export function WorkspaceShellPage() {
       <WorkspaceLayout
         sidebarProps={sidebarProps}
         isMobile={isMobile}
+        headerChatHistory={
+          <ChatHistoryHeaderRow
+            sessions={aiChatSessions}
+            activeSessionId={currentSeedAiChatSessionId || currentLiveAiChatSessionId}
+            isLoading={aiChatSessionsLoading}
+            onSelectSession={(chatId) => void handleSelectAiChatHistory(chatId)}
+          />
+        }
+        headerChatHistoryMenu={
+          <ChatHistoryMenuButton
+            sessions={aiChatSessions}
+            activeSessionId={currentSeedAiChatSessionId || currentLiveAiChatSessionId}
+            isLoading={aiChatSessionsLoading}
+            isFetchingMoreSessions={aiChatSessionsFetchingNextPage}
+            hasMoreSessions={aiChatSessionsHasNextPage}
+            onLoadMoreSessions={() => void fetchNextAiChatSessionsPage()}
+            onSelectSession={(chatId) => void handleSelectAiChatHistory(chatId)}
+          />
+        }
         rightPanels={
           isOllamaOpen || isOllamaClosing ? (
             <AiChatDock
@@ -1063,11 +1151,18 @@ export function WorkspaceShellPage() {
               projectId={aiChatProjectId}
               isClosing={isOllamaClosing}
               isMobile={isMobile}
+              seedChatSessionId={currentSeedAiChatSessionId}
+              seedMessages={currentSeedAiChatMessages}
+              onSessionCreated={handleAiChatSessionCreated}
+              ticketAttachmentScopeMode={isTeamWorkspace ? 'team' : 'project'}
+              ticketAttachmentProjects={activeWorkspaceProjects}
+              ticketAttachmentTeams={sidebarTree?.teams ?? []}
+              ticketAttachmentDefaultScopeId={isTeamWorkspace ? sidebarActiveTeamId : aiChatProjectId}
             />
           ) : null
         }
       >
-        {!isIssueSurfaceActive && !isWorkspaceChatActive && workspaceWebMcpRegistration ? (
+        {!isIssueSurfaceActive && workspaceWebMcpRegistration ? (
           <WorkspaceTicketActionProviders>
             {workspaceWebMcpRegistration}
           </WorkspaceTicketActionProviders>
@@ -1099,19 +1194,6 @@ export function WorkspaceShellPage() {
             onCreateProject={handleCreateProject}
             onUpdateProject={updateProject}
             onDeleteProject={deleteProject}
-          />
-        ) : activeSection === 'chat' ? (
-          <WorkspaceChatPage
-            workspaceId={activeWorkspaceId}
-            projectId={aiChatProjectId}
-            initialOllamaUrl={accountSettings.ollamaEndpoint}
-            initialModel={
-              accountSettings.agentIntegration === 'third_party'
-                ? preferredProviderModel
-                : (accountSettings.ollamaModel || ollamaModels[0] || '')
-            }
-            settings={accountSettings}
-            isMobile={isMobile}
           />
         ) : activeSection === 'projects' ? (
           <WorkspacePageLayout

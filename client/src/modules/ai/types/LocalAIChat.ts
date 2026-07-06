@@ -1,5 +1,8 @@
 import type { Project, Ticket, User } from '../../../context/TicketContextContext';
+import type { SidebarTeam } from '../../../types/domain';
 import type { WorkspaceSettings } from '../../../utils/settings';
+
+export type TicketAttachmentScopeMode = 'project' | 'team';
 
 export interface LocalAIChatProps {
   onClose?: () => void;
@@ -16,11 +19,17 @@ export interface LocalAIChatProps {
   seedMessages?: Message[];
   /** Called when a cloud chat session is created (either lazily on first message or externally). */
   onSessionCreated?: (chatId: string) => void;
+  ticketAttachmentScopeMode?: TicketAttachmentScopeMode;
+  ticketAttachmentProjects?: Project[];
+  ticketAttachmentTeams?: SidebarTeam[];
+  ticketAttachmentDefaultScopeId?: string;
 }
 
 export interface Message {
   role: 'user' | 'assistant' | 'system' | 'tool';
   content: string;
+  /** Extra context sent to the model with this visible message but not rendered in the transcript. */
+  modelContext?: string;
   tool_calls?: Array<{
     id: string;
     name: string;
@@ -36,6 +45,16 @@ export interface QuickActionContext {
   activeTicket: Ticket;
   projects: Project[];
   users: User[];
+}
+
+export interface AttachedTicketContext {
+  tickets: Ticket[];
+  projects: Project[];
+  users: User[];
+}
+
+export interface SendMessageOptions {
+  modelContext?: string;
 }
 
 export interface MarkdownTextProps {

@@ -82,7 +82,6 @@ export function useAppShellRouteSync({
       searchParams,
       isWorkspaceAllTasksPath,
       isWorkspaceProjectsListPath,
-      isWorkspaceChatPath,
       shouldKeepActiveProjectSelection,
     } = route;
 
@@ -144,14 +143,6 @@ export function useAppShellRouteSync({
       return;
     }
 
-    if (isWorkspaceChatPath) {
-      setActiveSection('chat');
-      setActiveTicket(null);
-      setActiveNoteId('');
-      setSidebarActiveScope('workspace-chat');
-      return;
-    }
-
     if (isTeamProjectsManagementPath) {
       setActiveSection('team-projects');
       setActiveTicket(null);
@@ -183,9 +174,7 @@ export function useAppShellRouteSync({
         ? 'workspace'
         : isWorkspaceProjectsListPath
           ? 'workspace-projects'
-          : isWorkspaceChatPath
-            ? 'workspace-chat'
-            : nextSidebarScope
+          : nextSidebarScope
     );
 
     if (isNotesPath) {

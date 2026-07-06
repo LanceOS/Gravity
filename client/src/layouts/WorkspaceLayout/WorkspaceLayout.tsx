@@ -12,10 +12,19 @@ interface WorkspaceLayoutProps {
   sidebarProps: SidebarProps;
   children: ReactNode;
   rightPanels?: ReactNode;
+  headerChatHistory?: ReactNode;
+  headerChatHistoryMenu?: ReactNode;
   isMobile?: boolean;
 }
 
-export function WorkspaceLayout({ sidebarProps, children, rightPanels, isMobile }: WorkspaceLayoutProps) {
+export function WorkspaceLayout({
+  sidebarProps,
+  children,
+  rightPanels,
+  headerChatHistory,
+  headerChatHistoryMenu,
+  isMobile,
+}: WorkspaceLayoutProps) {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const drawerRef = useRef<HTMLDivElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
@@ -65,11 +74,11 @@ export function WorkspaceLayout({ sidebarProps, children, rightPanels, isMobile 
     }
   }, [isMobileSidebarOpen, isMobile]);
 
-  const wrapHandler = <T extends (...args: any[]) => any>(handler: T): T => {
-    return ((...args: Parameters<T>) => {
+  const wrapHandler = <Args extends unknown[], ReturnValue>(handler: (...args: Args) => ReturnValue) => {
+    return (...args: Args): ReturnValue => {
       closeSidebar();
       return handler(...args);
-    }) as T;
+    };
   };
 
   const mobileSidebarProps = {
@@ -125,9 +134,18 @@ export function WorkspaceLayout({ sidebarProps, children, rightPanels, isMobile 
           />
         </div>
 
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        {headerChatHistory ? (
+          <div className="workspace-header-chat-history-slot">
+            {headerChatHistory}
+          </div>
+        ) : null}
+
+        <div className="workspace-header-actions">
+          {headerChatHistoryMenu}
+
           <button
             type="button"
+            className="workspace-header-ask-agent-button"
             onClick={sidebarProps.tools.onOpenOllama}
             aria-label={sidebarProps.tools.isOllamaOpen ? 'Close AI Assistant' : 'Ask Agent'}
             style={{
@@ -142,7 +160,7 @@ export function WorkspaceLayout({ sidebarProps, children, rightPanels, isMobile 
               color: sidebarProps.tools.isOllamaOpen ? 'var(--color-primary)' : 'var(--color-text-secondary)',
               fontSize: '13px',
               fontWeight: 500,
-              letterSpacing: '-0.01em',
+              letterSpacing: 0,
               flexShrink: 0,
               whiteSpace: 'nowrap',
               transition: 'color 0.15s ease, background-color 0.15s ease',

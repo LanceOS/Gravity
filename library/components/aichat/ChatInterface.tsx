@@ -150,6 +150,7 @@ export function ChatInterface({
 
           const isUser = m.role === 'user';
           const isSystem = m.role === 'system';
+          const markdownTone = isUser ? 'accent' : isSystem ? 'danger' : 'default';
 
           return (
             <div
@@ -220,14 +221,14 @@ export function ChatInterface({
                     color: isUser
                       ? 'var(--color-text-on-accent)'
                       : isSystem
-                      ? 'var(--color-text-on-danger)'
+                      ? 'var(--color-text-error)'
                       : 'var(--color-text-primary)',
                     boxShadow: isUser
                       ? '0 4px 12px color-mix(in srgb, var(--color-primary) 15%, transparent)'
                       : 'var(--shadow-sm)',
                   }}
                 >
-                  {m.content && <FormattedMarkdown text={m.content} />}
+                  {m.content && <FormattedMarkdown text={m.content} tone={markdownTone} />}
                 </div>
 
                 {/* Actions (Only for AI Assistant responses) */}

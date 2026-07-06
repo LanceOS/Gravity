@@ -47,10 +47,6 @@ async function createChatFixture() {
   };
 }
 
-function flushAsync() {
-  return new Promise((resolve) => setTimeout(resolve, 0));
-}
-
 function asJsonMetadata(metadata: unknown) {
   return metadata === null || typeof metadata !== 'object' ? {} : metadata as Record<string, unknown>;
 }
@@ -161,6 +157,43 @@ describe('ChatService', () => {
       content: 'Status looks good.',
     });
     expect(response.provider).toBe('openai');
+  });
+
+  it('adds client-supplied message context to the model prompt without persisting it', async () => {
+    const { userId, chatId, project } = await createChatFixture();
+
+    const ai = {
+      chat: vi.fn().mockResolvedValue({
+        content: 'Attachment-aware response.',
+      }),
+    };
+
+    const chatService = new ChatService({ ai });
+    await chatService.generateResponse({
+      projectId: project.id,
+      chatId,
+      userId,
+      message: 'What should I watch for?',
+      messageContext: 'Attached ticket context:\nGRA-202: Export fails on retry.',
+    });
+
+    const [, , options] = (ai.chat as any).mock.calls[0];
+    expect(options.messages.at(-1)).toMatchObject({
+      role: 'user',
+      content: expect.stringContaining('What should I watch for?'),
+    });
+    expect(options.messages.at(-1).content).toContain('Attached ticket context');
+    expect(options.messages.at(-1).content).toContain('GRA-202: Export fails on retry.');
+
+    const storedRows = await db
+      .select()
+      .from(chatMessages)
+      .where(eq(chatMessages.sessionId, chatId))
+      .orderBy(asc(chatMessages.createdAt), asc(chatMessages.id));
+    const storedUserMessage = storedRows.find((row) => row.role === 'user');
+    expect(storedUserMessage?.content).toBe('What should I watch for?');
+    expect(storedUserMessage?.content).not.toContain('Attached ticket context');
+    expect(asJsonMetadata(storedUserMessage?.metadata).modelContext).toBe('client-supplied');
   });
 
   it('shares streaming provider capability checks', () => {
@@ -407,7 +440,7 @@ describe('ChatService', () => {
     expect(result.content).toContain('too large');
   });
 
-  it('auto-generates chat titles after first user message only', async () => {
+  it('derives chat titles from the first user message only', async () => {
     const { userId, chatId, project } = await createChatFixture();
 
     const originalChunkSize = env.aiStreamChunkSize;
@@ -417,7 +450,6 @@ describe('ChatService', () => {
       chat: vi
         .fn()
         .mockResolvedValueOnce({ content: 'This is your first response.' })
-        .mockResolvedValueOnce({ content: 'Sprint Plan' })
         .mockResolvedValueOnce({ content: 'Follow-up response.' }),
     };
 
@@ -428,11 +460,9 @@ describe('ChatService', () => {
         projectId: project.id,
         chatId,
         userId,
-        message: 'How should we plan the sprint?',
+        message: 'How should we plan the sprint and keep the discussion aligned with release priorities?',
       });
       expect(firstTurn.fallback).toBe(false);
-      await flushAsync();
-      await flushAsync();
 
       const titledSessions = await db
         .select({ id: chatSessions.id, title: chatSessions.title })
@@ -440,7 +470,7 @@ describe('ChatService', () => {
         .where(eq(chatSessions.id, chatId))
         .limit(1);
       const firstSession = titledSessions[0];
-      expect(firstSession?.title).toBe('Sprint Plan');
+      expect(firstSession?.title).toBe('How should we plan the sprint…');
 
       const secondTurn = await chatService.generateResponse({
         projectId: project.id,
@@ -449,16 +479,15 @@ describe('ChatService', () => {
         message: 'Give me more details.',
       });
       expect(secondTurn.fallback).toBe(false);
-      await flushAsync();
       const secondSessionRows = await db
         .select()
         .from(chatSessions)
         .where(eq(chatSessions.id, chatId))
         .limit(1);
       expect(secondSessionRows).toHaveLength(1);
-      expect(secondSessionRows[0].title).toBe('Sprint Plan');
+      expect(secondSessionRows[0].title).toBe('How should we plan the sprint…');
 
-      expect(ai.chat).toHaveBeenCalledTimes(3);
+      expect(ai.chat).toHaveBeenCalledTimes(2);
       expect(secondTurn.content).toBe('Follow-up response.');
       expect(secondTurn.toolCalls).toBeUndefined();
       expect(firstSession?.title).toBe(secondSessionRows[0].title);

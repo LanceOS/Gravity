@@ -1,6 +1,8 @@
+import { hashPassword } from 'better-auth/crypto';
 import { db } from '../index.js';
 import {
   authUsers,
+  authSessions,
   authAccounts,
   userProfiles,
   workspaces,
@@ -15,6 +17,8 @@ import {
   ticketLabels,
   ticketRelationships,
   comments,
+  chatSessions,
+  chatMessages,
 } from '../schema.js';
 import { eq, inArray, like } from 'drizzle-orm';
 
@@ -33,20 +37,64 @@ function randomBoolean(chance = 0.5) {
 const SEED_PREFIX = 'seed-';
 const TEST_USER_ID = `${SEED_PREFIX}test-user`;
 
-// Hash for 'password123' using better-auth/crypto
-const TEST_USER_PASSWORD_HASH = '36f9442c31bb59aaddda66b21dea011b:42db6d551c9d2980725170922e9c24ff9bc4889ffbb7a6bd19489e59637348fff8eec8f2ed8f62dc4112a0a19ace67238988f8aea80d756ffb8fbf6e87703b32';
+type SeedAIConversation = {
+  title: string;
+  userPrompt: (projectName: string, projectKey: string) => string;
+  assistantReply: (projectName: string, projectKey: string) => string;
+};
+
+const AI_CHAT_SEEDS: SeedAIConversation[] = [
+  {
+    title: 'Sprint planning assistant',
+    userPrompt: (projectName, projectKey) =>
+      `Can you suggest a 2-week sprint plan for ${projectName} (${projectKey})?`,
+    assistantReply: (projectName) =>
+      `For ${projectName}, start with one stability ticket, then one cross-team feature, then polish and regression checks. Keep WIP low and end with a release note pass.`,
+  },
+  {
+    title: 'Bug triage assistant',
+    userPrompt: (projectName, projectKey) =>
+      `What are the biggest risks in ${projectName} (${projectKey}) right now?`,
+    assistantReply: (_projectName, projectKey) =>
+      `${projectKey} has the highest risk around regressions and edge-case behavior in the newer UI flows. Prioritize reproduction steps, then automate the top 3 repeatable cases before coding.`,
+  },
+  {
+    title: 'Release readiness check',
+    userPrompt: (_projectName, projectKey) =>
+      `Prepare a quick release checklist for ${projectKey} with no blockers.`,
+    assistantReply: (_projectName, projectKey) =>
+      `${projectKey} checklist: run tests and lint, verify workspace roles, confirm ticket status consistency, validate API auth, then post release notes and a short rollback plan.`,
+  },
+];
 
 async function main() {
   console.log('🌱 Starting database seed...');
+  // Keep the seed password aligned with the currently installed Better Auth hash format.
+  const testUserPasswordHash = await hashPassword('password123');
 
   // 1. Cleanup old seed data
   console.log('🧹 Cleaning up old seed data...');
   
   const allSeedUsersQuery = await db.select({ id: authUsers.id }).from(authUsers).where(like(authUsers.id, `${SEED_PREFIX}%`));
   const seedUserIds = allSeedUsersQuery.map(u => u.id);
+
+  const allSeedChatSessionsQuery = await db.select({ id: chatSessions.id }).from(chatSessions).where(like(chatSessions.id, `${SEED_PREFIX}%`));
+  const seedChatSessionIds = allSeedChatSessionsQuery.map(session => session.id);
   
   if (seedUserIds.length > 0) {
     await db.delete(comments).where(inArray(comments.userId, seedUserIds));
+  }
+
+  if (seedChatSessionIds.length > 0) {
+    await db.delete(chatSessions).where(inArray(chatSessions.id, seedChatSessionIds));
+  }
+  
+  if (seedUserIds.length > 0) {
+    const allSeedSessionsQuery = await db.select({ id: authSessions.id }).from(authSessions).where(inArray(authSessions.userId, seedUserIds));
+    const seedSessionIds = allSeedSessionsQuery.map(session => session.id);
+    if (seedSessionIds.length > 0) {
+      await db.delete(authSessions).where(inArray(authSessions.id, seedSessionIds));
+    }
   }
   
   const allSeedTicketsQuery = await db.select({ id: tickets.id }).from(tickets).where(like(tickets.id, `${SEED_PREFIX}%`));
@@ -93,8 +141,20 @@ async function main() {
     name: 'Test User',
     email: 'test@example.com',
     emailVerified: true,
+    image: null,
+    tutorial_completed: false,
     createdAt: new Date(),
     updatedAt: new Date(),
+  }).onConflictDoUpdate({
+    target: authUsers.id,
+    set: {
+      name: 'Test User',
+      email: 'test@example.com',
+      emailVerified: true,
+      image: null,
+      tutorial_completed: false,
+      updatedAt: new Date(),
+    },
   });
 
   await db.insert(authAccounts).values({
@@ -102,15 +162,31 @@ async function main() {
     accountId: 'test@example.com',
     providerId: 'credential',
     userId: TEST_USER_ID,
-    password: TEST_USER_PASSWORD_HASH,
+    password: testUserPasswordHash,
     createdAt: new Date(),
     updatedAt: new Date(),
+  }).onConflictDoUpdate({
+    target: authAccounts.id,
+    set: {
+      accountId: 'test@example.com',
+      providerId: 'credential',
+      userId: TEST_USER_ID,
+      password: testUserPasswordHash,
+      updatedAt: new Date(),
+    },
   });
 
   await db.insert(userProfiles).values({
     userId: TEST_USER_ID,
     role: 'admin',
+    avatarUrl: null,
     createdAt: new Date(),
+  }).onConflictDoUpdate({
+    target: userProfiles.userId,
+    set: {
+      role: 'admin',
+      avatarUrl: null,
+    },
   });
 
   // Define data configurations
@@ -202,12 +278,25 @@ async function main() {
         emailVerified: true,
         createdAt: new Date(),
         updatedAt: new Date(),
+      }).onConflictDoUpdate({
+        target: authUsers.id,
+        set: {
+          name: `Seed ${config.key} User ${u}`,
+          email: `seed-${config.key.toLowerCase()}-${u}@example.com`,
+          emailVerified: true,
+          updatedAt: new Date(),
+        },
       });
 
       await db.insert(userProfiles).values({
         userId,
         role: u === 1 && config.testUserRole !== 'owner' ? 'admin' : 'guest_contributor',
         createdAt: new Date(),
+      }).onConflictDoUpdate({
+        target: userProfiles.userId,
+        set: {
+          role: u === 1 && config.testUserRole !== 'owner' ? 'admin' : 'guest_contributor',
+        },
       });
     }
 
@@ -221,6 +310,14 @@ async function main() {
       workspaceKey: config.key,
       createdBy: adminUserId,
       createdAt: new Date(),
+    }).onConflictDoUpdate({
+      target: workspaces.id,
+      set: {
+        name: config.name,
+        key: config.key,
+        workspaceKey: config.key,
+        createdBy: adminUserId,
+      },
     });
 
     await db.insert(workspaceSettings).values({
@@ -228,6 +325,12 @@ async function main() {
       hierarchyMode: config.hierarchyMode,
       createdAt: new Date(),
       updatedAt: new Date(),
+    }).onConflictDoUpdate({
+      target: workspaceSettings.workspaceId,
+      set: {
+        hierarchyMode: config.hierarchyMode,
+        updatedAt: new Date(),
+      },
     });
 
     for (const userId of userIds) {
@@ -236,6 +339,11 @@ async function main() {
         userId,
         role: userId === TEST_USER_ID ? config.testUserRole : (userId === adminUserId ? 'owner' : 'member'),
         createdAt: new Date(),
+      }).onConflictDoUpdate({
+        target: [workspaceMembers.workspaceId, workspaceMembers.userId],
+        set: {
+          role: userId === TEST_USER_ID ? config.testUserRole : (userId === adminUserId ? 'owner' : 'member'),
+        },
       });
     }
 
@@ -253,6 +361,14 @@ async function main() {
         description: 'Seeded team',
         createdAt: new Date(),
         updatedAt: new Date(),
+      }).onConflictDoUpdate({
+        target: teams.id,
+        set: {
+          workspaceId: config.id,
+          name: config.hierarchyMode === 'teams' ? `Team ${t}` : `Default Team`,
+          description: 'Seeded team',
+          updatedAt: new Date(),
+        },
       });
       
       // Cycles are not implemented yet, skipping cycle generation.
@@ -270,6 +386,14 @@ async function main() {
             color: label.color,
             description: `Issues related to ${label.name}`,
             createdAt: new Date(),
+          }).onConflictDoUpdate({
+            target: labels.id,
+            set: {
+              teamId,
+              name: label.name,
+              color: label.color,
+              description: `Issues related to ${label.name}`,
+            },
           });
         }
       }
@@ -290,6 +414,18 @@ async function main() {
           createdBy: adminUserId,
           createdAt: new Date(),
           updatedAt: new Date(),
+        }).onConflictDoUpdate({
+          target: projects.id,
+          set: {
+            workspaceId: config.id,
+            teamId,
+            name: `Project ${p} (Team ${t})`,
+            key: projKey,
+            status: 'active',
+            inviteCode: `INVITE-${projKey}`,
+            createdBy: adminUserId,
+            updatedAt: new Date(),
+          },
         });
 
         // Add all users to the project
@@ -299,6 +435,11 @@ async function main() {
             userId,
             role: userId === TEST_USER_ID ? (config.testUserRole === 'owner' ? 'admin' : 'developer') : (userId === adminUserId ? 'admin' : 'developer'),
             createdAt: new Date(),
+          }).onConflictDoUpdate({
+            target: [projectMembers.projectId, projectMembers.userId],
+            set: {
+              role: userId === TEST_USER_ID ? (config.testUserRole === 'owner' ? 'admin' : 'developer') : (userId === adminUserId ? 'admin' : 'developer'),
+            },
           });
         }
 
@@ -316,6 +457,72 @@ async function main() {
               color: label.color,
               description: `Issues related to ${label.name}`,
               createdAt: new Date(),
+            }).onConflictDoUpdate({
+              target: labels.id,
+              set: {
+                teamId,
+                projectId,
+                name: label.name,
+                color: label.color,
+                description: `Issues related to ${label.name}`,
+              },
+            });
+          }
+        }
+
+        const chatOwnerId = config.testUserRole === 'owner' ? TEST_USER_ID : adminUserId;
+        const chatBaseDate = new Date(now);
+        chatBaseDate.setDate(chatBaseDate.getDate() - randomInt(1, 14));
+
+        for (let chatIndex = 0; chatIndex < AI_CHAT_SEEDS.length; chatIndex++) {
+          const seed = AI_CHAT_SEEDS[chatIndex];
+          const chatId = `${projectId}-chat-${chatIndex + 1}`;
+          const sessionCreatedAt = new Date(chatBaseDate);
+          sessionCreatedAt.setHours(sessionCreatedAt.getHours() + (chatIndex * 2));
+
+          await db.insert(chatSessions).values({
+            id: chatId,
+            projectId,
+            teamId,
+            userId: chatOwnerId,
+            title: seed.title,
+            createdAt: sessionCreatedAt,
+            updatedAt: new Date(sessionCreatedAt.getTime()),
+          }).onConflictDoUpdate({
+            target: chatSessions.id,
+            set: {
+              projectId,
+              teamId,
+              userId: chatOwnerId,
+              title: seed.title,
+              updatedAt: new Date(sessionCreatedAt.getTime()),
+            },
+          });
+
+          const conversation: Array<{ role: 'user' | 'assistant' | 'system'; content: string }> = [
+            { role: 'user', content: seed.userPrompt(`Project ${p} (Team ${t})`, projKey) },
+            { role: 'assistant', content: seed.assistantReply(`Project ${p} (Team ${t})`, projKey) },
+          ];
+
+          for (let messageIndex = 0; messageIndex < conversation.length; messageIndex++) {
+            const message = conversation[messageIndex];
+            const messageDate = new Date(sessionCreatedAt);
+            messageDate.setMinutes(messageDate.getMinutes() + messageIndex * 3);
+
+            await db.insert(chatMessages).values({
+              id: `${chatId}-message-${messageIndex + 1}`,
+              sessionId: chatId,
+              role: message.role,
+              content: message.content,
+              createdAt: messageDate,
+            }).onConflictDoUpdate({
+              target: chatMessages.id,
+              set: {
+                sessionId: chatId,
+                role: message.role,
+                content: message.content,
+                createdAt: messageDate,
+              },
             });
           }
         }
@@ -346,6 +553,19 @@ async function main() {
             parentId,
             createdAt: pastDate,
             updatedAt: new Date(),
+          }).onConflictDoUpdate({
+            target: tickets.id,
+            set: {
+              key: `${projKey}-${idx}`,
+              title: `${randomElement(sampleTitles)} [${ticketCounter}]`,
+              description: randomElement(sampleDescriptions),
+              status: randomElement(statuses),
+              priority: randomElement(priorities),
+              assigneeId: randomBoolean(0.7) ? randomElement(userIds) : null,
+              projectId,
+              parentId,
+              updatedAt: new Date(),
+            },
           });
 
           // Assign labels
@@ -364,7 +584,7 @@ async function main() {
             await db.insert(ticketLabels).values({
               ticketId,
               labelId,
-            });
+            }).onConflictDoNothing();
           }
 
           // Add comments
@@ -380,6 +600,14 @@ async function main() {
                 userId: randomElement(userIds),
                 body: `This is a sample comment about ${randomElement(sampleTitles).toLowerCase()}.`,
                 createdAt: commentDate > now ? now : commentDate,
+              }).onConflictDoUpdate({
+                target: comments.id,
+                set: {
+                  ticketId,
+                  userId: randomElement(userIds),
+                  body: `This is a sample comment about ${randomElement(sampleTitles).toLowerCase()}.`,
+                  createdAt: commentDate > now ? now : commentDate,
+                },
               });
             }
           }

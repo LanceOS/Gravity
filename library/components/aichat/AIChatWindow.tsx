@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Cpu, Loader2, Send, X, Sparkles } from 'lucide-react';
+import { Cpu, Send, X, Sparkles } from 'lucide-react';
 import { DenseTextarea } from '../densetextarea';
 import { AIChatMessageBubble } from './AIChatMessage';
 import type { AIChatMessage } from './types';
@@ -14,6 +14,10 @@ export interface AIChatWindowProps {
   isGenerating?: boolean;
   settingsPanel?: React.ReactNode;
   quickActions?: React.ReactNode;
+  inputAccessory?: React.ReactNode;
+  error?: React.ReactNode;
+  onRetry?: () => void;
+  onRegenerate?: () => void;
   placeholder?: string;
   isClosing?: boolean;
   variant?: AIChatWindowVariant;
@@ -27,6 +31,7 @@ export function AIChatWindow({
   isGenerating = false,
   settingsPanel,
   quickActions,
+  inputAccessory,
   placeholder = 'Ask AI a question...',
   isClosing = false,
   variant = 'floating',
@@ -94,12 +99,30 @@ export function AIChatWindow({
   };
 
   const isStartingOut = messages.length === 0 && !isGenerating;
+  const generatingIconAnimation = isReduced ? 'none' : 'chat-generating-pulse 1.8s ease-in-out infinite';
+  const generatingSparkleAnimation = isReduced ? 'none' : 'chat-generating-twinkle 1.2s ease-in-out infinite';
+  const generatingHaloAnimation = isReduced ? 'none' : 'chat-generating-halo 1.8s ease-in-out infinite';
 
   return (
     <div
       ref={windowRef}
       style={getWindowStyle(variant, isMobile, isClosing)}
     >
+      <style>{`
+        @keyframes chat-generating-pulse {
+          0%, 100% { transform: scale(1) rotate(0deg); }
+          35% { transform: scale(1.08) rotate(-6deg); }
+          70% { transform: scale(0.96) rotate(4deg); }
+        }
+        @keyframes chat-generating-twinkle {
+          0%, 100% { opacity: 0.45; transform: scale(0.85) rotate(0deg); }
+          50% { opacity: 1; transform: scale(1.18) rotate(12deg); }
+        }
+        @keyframes chat-generating-halo {
+          0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-primary) 18%, transparent); }
+          50% { box-shadow: 0 0 0 8px color-mix(in srgb, var(--color-primary) 0%, transparent); }
+        }
+      `}</style>
       <div
         style={{
           padding: '14px 16px',
@@ -188,11 +211,42 @@ export function AIChatWindow({
               animation: 'pulse 2s infinite',
             }}
           >
-            <Loader2
-              size={12}
-              className="animate-spin"
-              style={{ animation: 'spin 1s linear infinite' }}
-            />
+            <div
+              data-testid="chat-generating-icon"
+              aria-hidden="true"
+              style={{
+                position: 'relative',
+                width: '22px',
+                height: '22px',
+                borderRadius: '999px',
+                display: 'grid',
+                placeItems: 'center',
+                background: 'var(--color-state-selected-bg)',
+                border: '1px solid var(--color-border-focus)',
+                color: 'var(--color-primary)',
+                animation: generatingHaloAnimation,
+                flexShrink: 0,
+              }}
+            >
+              <Cpu
+                size={12}
+                style={{
+                  animation: generatingIconAnimation,
+                  transformOrigin: 'center',
+                }}
+              />
+              <Sparkles
+                size={9}
+                style={{
+                  position: 'absolute',
+                  top: '-4px',
+                  right: '-4px',
+                  color: 'var(--color-primary)',
+                  animation: generatingSparkleAnimation,
+                  transformOrigin: 'center',
+                }}
+              />
+            </div>
             <span style={{ fontWeight: 500 }}>Generating answer...</span>
           </div>
         )}
@@ -302,6 +356,16 @@ export function AIChatWindow({
             <Send size={12} />
           </button>
         </form>
+        {inputAccessory && (
+          <div
+            style={{
+              marginTop: '8px',
+              width: '100%',
+            }}
+          >
+            {inputAccessory}
+          </div>
+        )}
       </div>
     </div>
   );
