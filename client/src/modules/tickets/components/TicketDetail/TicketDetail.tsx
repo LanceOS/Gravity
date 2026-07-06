@@ -7,6 +7,7 @@ import {
   toast,
   Accordion,
   createEmptyRichTextValue,
+  isRichTextEmpty,
 } from '@library';
 import generateBranchName from '../../../../utils/branch';
 import { safeAnime, prefersReducedMotion } from '../../../../utils/animationUtils';
@@ -14,6 +15,7 @@ import anime from 'animejs';
 import { TicketPropertiesGrid } from './components/TicketPropertiesGrid';
 import { TicketSubtasksChecklist } from './components/TicketSubtasksChecklist';
 import { TicketCommentsThread } from './components/TicketCommentsThread';
+import type { TicketWithRelations } from '../../utils/ticketRelations';
 
 const DEFAULT_TICKET_URL_BASE = 'https://tickets.placeholder.local';
 
@@ -80,13 +82,14 @@ function sanitizeTicketUrlBase(raw?: string): string {
 
 const TICKET_URL_BASE = sanitizeTicketUrlBase((typeof import.meta !== 'undefined' && (import.meta as unknown as { env?: Record<string, string | undefined> }).env?.VITE_TICKET_URL_BASE) || undefined);
 import {
-  Trash2, Plus, ChevronLeft, CornerLeftUp
+  Trash2, Plus, ChevronLeft, CornerLeftUp, Send
 } from 'lucide-react';
 import type { TicketDetailProps } from '../../types/TicketDetail';
 import { TicketContextMenu } from '../TicketContextMenu';
 import { WorkspacePageLayout } from '../../../../layouts/WorkspacePageLayout/WorkspacePageLayout';
 import { ConfirmDialog } from '../../../../components/ConfirmDialog';
 import { useIsMobileTicketLayout } from '../useMobileTicketLayout';
+import { CommentEditor } from '../CommentEditor/CommentEditor';
 import './TicketDetail.css';
 
 function TicketDescriptionEditor({ 
@@ -294,6 +297,20 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
     setIsDeleteConfirmOpen(true);
   };
 
+  const resolvedParentTicket = parentTicket ?? null;
+  const resolvedActiveTicketDetail = useMemo<TicketWithRelations | null>(() => {
+    if (!activeTicketDetail) {
+      return null;
+    }
+
+    return {
+      ...activeTicketDetail,
+      relatedTicketIds: 'relatedTicketIds' in activeTicketDetail ? activeTicketDetail.relatedTicketIds : [],
+    } as TicketWithRelations;
+  }, [activeTicketDetail]);
+  const handleAddBlocker = onAddBlocker ?? (async () => false);
+  const handleRemoveBlocker = onRemoveBlocker ?? (async () => false);
+
   const confirmDelete = async () => {
     await onDeleteTicket(activeTicket.id);
     setIsDeleteConfirmOpen(false);
@@ -302,10 +319,10 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
   const propertiesContent = (
     <TicketPropertiesGrid
       activeTicket={activeTicket}
-      activeTicketDetail={activeTicketDetail}
+      activeTicketDetail={resolvedActiveTicketDetail}
       availableTickets={availableTickets}
       ticketsById={ticketsById}
-      parentTicket={parentTicket}
+      parentTicket={resolvedParentTicket}
       users={users}
       projects={projects}
       labels={labels}
@@ -316,8 +333,8 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
       onUpdateTicket={onUpdateTicket}
       onAddDependency={onAddDependency}
       onRemoveDependency={onRemoveDependency}
-      onAddBlocker={onAddBlocker}
-      onRemoveBlocker={onRemoveBlocker}
+      onAddBlocker={handleAddBlocker}
+      onRemoveBlocker={handleRemoveBlocker}
       copyToClipboard={copyToClipboard}
     />
   );

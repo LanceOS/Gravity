@@ -182,7 +182,7 @@ export const TicketRelationsSection: React.FC<TicketRelationsSectionProps> = ({
                   }
                 }}
                 disabled={!entry.resolvedTicket}
-                aria-label={`${entry.key} - ${entry.title}`}
+                aria-label={entry.relation === 'Sub-ticket of' ? `${entry.relation}: ${entry.key} - ${entry.title}` : `${entry.key} - ${entry.title}`}
               >
                 <span className="ticket-configurations__relation">{entry.relation}</span>
 

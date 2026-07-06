@@ -1,4 +1,5 @@
 import type { Comment, Cycle, Label, Project, Ticket, User } from '../../../context/TicketContextContext';
+import type { TicketWithRelations } from '../utils/ticketRelations';
 
 export interface TicketDetailProps {
   activeTicket: Ticket;
@@ -13,7 +14,7 @@ export interface TicketDetailProps {
   labels: Label[];
   cycles: Cycle[];
   parentTicket?: Ticket | null;
-  activeTicketDetail: Ticket | null;
+  activeTicketDetail: TicketWithRelations | Ticket | null;
   onSelectTicket: (ticket: Ticket | null) => void;
   onUpdateTicket: (id: string, updates: Partial<Ticket>, options?: { immediate?: boolean }) => Promise<void>;
   onDeleteTicket: (ticketId: string) => Promise<void>;

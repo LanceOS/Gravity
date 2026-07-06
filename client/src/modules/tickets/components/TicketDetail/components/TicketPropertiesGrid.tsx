@@ -18,7 +18,7 @@ interface TicketPropertiesGridProps {
   activeTicket: Ticket;
   activeTicketDetail?: TicketWithRelations | null;
   availableTickets: Ticket[];
-  ticketsById: Map<string, Ticket>;
+  ticketsById?: Map<string, Ticket>;
   parentTicket: Ticket | null;
   users: User[];
   projects: Project[];
@@ -26,7 +26,7 @@ interface TicketPropertiesGridProps {
   cycles: Cycle[];
   ticketLink: string;
   generatedBranchName: string;
-  onSelectTicket: (ticket: Ticket) => void;
+  onSelectTicket: (ticket: Ticket | null) => void;
   onUpdateTicket: (id: string, updates: Partial<Ticket>) => void;
   onAddDependency: (ticketId: string, dependencyId: string) => Promise<boolean>;
   onRemoveDependency: (ticketId: string, dependencyId: string) => Promise<boolean>;
@@ -220,7 +220,7 @@ export const TicketPropertiesGrid: React.FC<TicketPropertiesGridProps> = ({
 
       <TicketRelationsSection
         activeTicket={activeTicket}
-        activeTicketDetail={activeTicketDetail}
+        activeTicketDetail={activeTicketDetail ?? null}
         availableTickets={availableTickets}
         ticketsById={ticketsById}
         parentTicket={parentTicket}
