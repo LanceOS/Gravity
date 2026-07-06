@@ -4,22 +4,25 @@ This document outlines how the Gravity AI Assistant operates within the applicat
 
 ## Overview
 
-Gravity provides users with a dedicated AI project management assistant that interacts with their workspace via chat. Rather than giving the AI unrestricted access to the database, the agent interacts with Gravity exclusively through the **Model Context Protocol (MCP)**. This creates a sandboxed environment where the AI can only perform actions explicitly defined by our tool handlers (e.g., `list_tickets`, `create_ticket`).
+Gravity provides users with a dedicated AI project management assistant that interacts with their workspace via chat. For workspace reads and mutations, the agent interacts with Gravity through the **Model Context Protocol (MCP)** rather than receiving unrestricted database access. This creates a sandboxed environment where the AI can only perform actions explicitly defined by our tool handlers (e.g., `list_tickets`, `create_ticket`).
+
+The chat UI lives behind the workspace header "Ask Agent" control. Recent chat sessions appear as a compact header row, and the adjacent history menu opens the full previous-chat list for the active project. Users can also attach one or more tickets below the chat input; those ticket summaries are sent as read-only, model-only context for the next message and are not inserted into the visible transcript.
 
 The system supports multiple providers including OpenAI, Anthropic, Gemini, and DeepSeek.
 
 ## Request Flow
 
-1. **User Input:** The user submits a chat message from the frontend client.
-2. **Authentication & Routing:** The request hits the backend `/api/v1/ai/chat` endpoint, where user session and workspace authorization are validated.
-3. **Credential Decryption:** The `AiService` uses the `CredentialManager` to securely decrypt the user's configured API keys on the fly.
-4. **Prompt Injection:** The backend injects a strict `systemPrompt` containing rules, identity, and forbidden actions before sending the context to the LLM.
-5. **Tool Execution Loop:**
+1. **User Input:** The user submits a chat message from the frontend client. Optional ticket attachments are serialized as supplemental context for that model turn.
+2. **Session Selection:** Provider-backed project chats use a project-scoped chat session from `/api/v1/projects/:projectId/chats`. The frontend lazily creates a session when needed, or seeds `AgentChat` from a selected history item.
+3. **Authentication & Routing:** Provider-backed project messages stream through `/api/v1/projects/:projectId/chats/:chatId/stream`, where project membership is validated. Direct one-off provider requests use `/api/v1/ai/chat` when callers need non-persisted completions.
+4. **Credential Decryption:** The AI services use the configured credential path to securely decrypt provider API keys on the fly.
+5. **Prompt Injection:** The backend injects a strict `systemPrompt` containing rules, identity, and forbidden actions before sending the context to the LLM. Supplemental ticket context is appended to the current user message for the model request only.
+6. **Tool Execution Loop:**
    - The LLM decides if it needs to call an MCP tool to fulfill the request.
    - If a tool is called, the request routes through the `McpRequestHandler`.
    - The handler verifies authorization and proxies the request to the specific tool class (e.g., `TicketTools`).
-6. **State Sanitization:** Before the tool output is returned to the LLM, it passes through the `StateMap` sanitization layer (see Safeguards below).
-7. **Final Response:** The LLM receives the sanitized tool output and synthesizes a final, human-readable response back to the user.
+7. **State Sanitization:** Before the tool output is returned to the LLM, it passes through the `StateMap` sanitization layer (see Safeguards below).
+8. **Persistence & Final Response:** Project chat sessions persist the visible user and assistant messages in `chat_sessions` and `chat_messages`. Model-only ticket context is not persisted in the visible message body. The LLM response is streamed back to the user and stored with the session.
 
 ## Limitations & Safeguards
 

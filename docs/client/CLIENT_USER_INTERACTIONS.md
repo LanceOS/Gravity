@@ -20,15 +20,20 @@ This document covers the primary user workflows and integrated tools provided by
 3. **Detail View**: Clicking a ticket opens the `TicketDetail` sliding right panel. Here users can edit markdown descriptions (`MarkdownContent`), update status, or add comments.
 
 ### 4.2 AI Chat
-1. **Invocation**: Users click the AI chat button in the sidebar or tools menu, which toggles the agent panel in `WorkspaceShellPage`.
-2. **Conversation**: `AgentChat` renders in a slide-out panel and uses the provider configured via `AccountPreferencesPage`.
-3. **MCP Integration**: Project chat requests are routed through the server chat API, which can invoke MCP tools on behalf of the assistant. Separately, `registerWebMCPTools` is called on app load from `AppShellPage` to expose browser-side tools (such as `list-tickets`, `create-ticket`, `update-ticket`, and `add-comment`) through WebMCP-capable APIs.
+1. **Invocation**: Users click the "Ask Agent" control in the workspace header, which toggles the `AiChatDock` panel from `WorkspaceShellPage`.
+2. **History Access**: Recent project chat sessions render as a compact row in the workspace header. The adjacent history icon opens a popover list for older sessions; selecting one seeds `AgentChat` with the persisted session id and visible transcript.
+3. **Conversation**: `AiChatDock` renders `AgentChat` in a slide-out panel and uses the provider configured via `AccountPreferencesPage`.
+4. **Ticket Attachments**: `TicketContextAttachmentBar` renders below the chat input when the workspace shell provides a ticket attachment scope. Team workspaces require a team selection; individual workspaces use project selection. Users can attach multiple tickets, and the attachment summary is sent as model-only context for the next message rather than being inserted into the visible transcript.
+5. **Ticket Quick Actions**: Ticket-scoped actions such as Analyze Ticket, Create Checklist, and Draft Release still use the active ticket from `ActiveTicketContext` and are independent from manually attached chat tickets.
+6. **MCP Integration**: Project chat requests are routed through the server chat API, which can invoke MCP tools on behalf of the assistant. Separately, `registerWebMCPTools` is called on app load from `AppShellPage` to expose browser-side tools (such as `list-tickets`, `create-ticket`, `update-ticket`, and `add-comment`) through WebMCP-capable APIs.
 
 ## 5. Data Stores and Resources
+- **Chat Sessions**: Project-scoped third-party chats are created and resumed through `/api/v1/projects/:projectId/chats` and are displayed in the workspace header history controls.
+- **Ticket Attachment Context**: Ticket attachments are fetched through the regular ticket APIs using either a selected `projectId` or `teamId`; attached tickets become one-turn model context and do not change the visible chat message body.
 - **WebMCP**: Integrates local browser context (e.g., currently loaded tickets) into the AI chat interface seamlessly.
 
 ## 6. Interfaces and Contracts
-- `AgentChat.tsx` acts as the primary boundary between human users and the AI assistant. It receives the active `workspaceId` and `projectId` as props, and the selected `aiProvider` is supplied via the `settings` prop.
+- `AgentChat.tsx` acts as the primary boundary between human users and the configured model. It receives the active `workspaceId`, optional `projectId`, optional seeded chat session state, and optional ticket attachment scope as props; the selected `aiProvider` is supplied via the `settings` prop.
 - Global Keydown listener:
   ```typescript
   const target = event.target as HTMLElement;
@@ -51,6 +56,10 @@ This document covers the primary user workflows and integrated tools provided by
 - `client/src/modules/tickets/components/CreateTicketModal.tsx`
 - `client/src/modules/tickets/components/TicketDetail.tsx`
 - `client/src/modules/ai/components/AgentChat.tsx`
+- `client/src/modules/ai/components/TicketContextAttachmentBar.tsx`
+- `client/src/modules/chats/components/AiChatDock.tsx`
+- `client/src/modules/chats/components/ChatHistoryHeaderRow.tsx`
+- `client/src/modules/chats/components/ChatHistoryMenuButton.tsx`
 - `client/src/utils/webmcp.ts`
 
 ## 8. Permissions, Guards, or Tenant Boundaries

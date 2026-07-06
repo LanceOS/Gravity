@@ -6,6 +6,7 @@ The `ai` module (`server/src/modules/ai/`) handles all integrations with externa
 ## 2. Non-Goals or Boundary Limits
 - Does not store API keys directly; it relies on the `auth` module's KMS features to decrypt API credentials just-in-time.
 - Does not expose MCP tools itself. It acts as an internal engine that other features might utilize.
+- Does not own persisted chat sessions. Project chat history is handled by the separate `chats` module, which calls AI provider services when it needs a streamed response.
 
 ## 3. Entry Points
 - **REST Routes**: `src/modules/ai/routes.ts` mounted on `/api/v1/ai`. Allows clients to test credentials and dispatch direct provider-backed queries.
@@ -20,7 +21,8 @@ The `ai` module (`server/src/modules/ai/`) handles all integrations with externa
 ## 5. Data Stores and Resources
 - Reads provider-related configuration and user/workspace settings as needed to determine which AI provider and credentials should be used.
 - Uses encrypted external provider credentials via `src/modules/auth/kms/credential-manager.ts`, which decrypts API keys just-in-time for outbound requests.
-- Does not persist AI chat history in `ai_conversations` or `ai_messages`; the current module operates on request-time input and provider responses.
+- Direct `/api/v1/ai/chat` requests remain request-time provider completions and do not persist conversation history.
+- Project-scoped chat history is persisted by `src/modules/chats/` in `chat_sessions` and `chat_messages`; that module passes visible messages plus any one-turn model context into the provider request without storing model-only context in the visible message body.
 
 ## 6. Interfaces and Contracts
 - **`IAiProvider`**: Defined in `src/modules/ai/types.ts`. All new providers must implement this interface to ensure standardized input/output formatting.
@@ -30,6 +32,7 @@ The `ai` module (`server/src/modules/ai/`) handles all integrations with externa
 - `providers/openai-provider.ts`: The OpenAI API adapter.
 - `providers/anthropic-provider.ts`: The Anthropic API adapter.
 - `types.ts`: Defines the generic AI interaction interfaces.
+- `../chats/services/chat-service.ts`: Consumes AI providers for persisted, project-scoped chat streams.
 
 ## 8. Permissions, Guards, or Tenant Boundaries
 - Validates that the requesting user has the authority to use the configured workspace API keys. Falls back to user-level keys if allowed.

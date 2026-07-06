@@ -32,6 +32,7 @@ This document outlines the high-level architecture of the `server/src/` director
 The architecture is structured under `src/modules/`:
 - **`auth/`**: Handles authentication compatibility, envelope encryption via KMS, and request actor resolution (`request-auth.ts`).
 - **`ai/`**: Connects to AI providers (OpenAI, Anthropic, Gemini, DeepSeek) and manages system prompts.
+- **`chats/`**: Manages project-scoped AI chat sessions, persisted chat messages, and streamed third-party agent responses.
 - **`tickets/`**: Manages ticket records, comments, and specific MCP tool handlers.
 - **`workspaces/`**: Manages workspaces, projects, members, activities, and specific MCP tool handlers.
 - **`mcp/`**: The core framework for the Model Context Protocol, including stdio configurations and tool execution dispatchers.
