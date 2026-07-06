@@ -71,6 +71,11 @@ const defaultSettings = (workspaceId: string): WorkspaceAdminSettings => ({
   disabledMcpTools: [],
 });
 
+function resolveDownloadFilename(contentDisposition: string | null, workspaceId: string) {
+  const match = contentDisposition?.match(/filename="?([^";]+)"?/i);
+  return match?.[1] || `gravity-${workspaceId}-tasks-export.json`;
+}
+
 function normalizeWorkspaceInvite(invite: Record<string, unknown>): WorkspaceInvite {
   return {
     id: String(invite.id ?? ''),
@@ -92,6 +97,7 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
   const [saveErrorState, setSaveError] = useState<string | null>(null);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   const enabled = !!currentUser && !!activeWorkspaceId;
   const userId = currentUser?.id;
@@ -332,6 +338,45 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
     },
   });
 
+  // Export Tasks Mutation
+  const exportTasksMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`/api/v1/workspaces/${activeWorkspaceId}/export/tasks`, {
+        method: 'GET',
+        headers: buildHeaders(),
+      });
+
+      if (!response.ok) {
+        let data: { error?: string; message?: string } | null = null;
+        try {
+          data = await response.json();
+        } catch {
+          data = null;
+        }
+
+        const message = data?.error || data?.message || response.statusText || 'Failed to export tasks.';
+        throw new ApiError(response.status, message, data);
+      }
+
+      const blob = await response.blob();
+      const filename = resolveDownloadFilename(response.headers.get('Content-Disposition'), activeWorkspaceId);
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.URL.revokeObjectURL(url);
+    },
+    onMutate: () => {
+      setExportError(null);
+    },
+    onError: (err: Error) => {
+      setExportError(err.message || 'Failed to export tasks.');
+    },
+  });
+
   // --- Exposed Callbacks ---
 
   const updateSettings = useCallback((updates: Partial<WorkspaceAdminSettings>) => {
@@ -380,6 +425,15 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
     }
   }, [deleteWorkspaceMutation]);
 
+  const exportTasks = useCallback(async () => {
+    try {
+      await exportTasksMutation.mutateAsync();
+      return true;
+    } catch {
+      return false;
+    }
+  }, [exportTasksMutation]);
+
   const clearDeleteError = useCallback(() => setDeleteError(null), []);
 
   const updateMemberActivity = useCallback((userId: string, lastActiveAt: string) => {
@@ -404,6 +458,8 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
     inviteError,
     approveLoadingId: approveJoinRequestMutation.isPending ? approveJoinRequestMutation.variables : null,
     revokeLoadingId: revokeInviteMutation.isPending ? revokeInviteMutation.variables : null,
+    exportLoading: exportTasksMutation.isPending,
+    exportError,
     deleteLoading: deleteWorkspaceMutation.isPending,
     deleteError,
     updateSettings,
@@ -412,6 +468,7 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
     revokeInvite,
     approveJoinRequest,
     refreshWorkspaceAdmin,
+    exportTasks,
     deleteWorkspace,
     clearDeleteError,
     updateMemberActivity,

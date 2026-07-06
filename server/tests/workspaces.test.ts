@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { api, createAuthenticatedApi, seedWorkspaceFixture } from './helpers/test-helpers.js';
+import { db } from '../src/db/index.js';
+import { projectMembers, projects, tickets, workspaceMembers } from '../src/db/schema.js';
+import { getDefaultTeamId } from '../src/modules/workspaces/utils/default-team.js';
 
 describe('workspaces routes', () => {
   it('creates, lists, and updates workspaces with settings and members', async () => {
@@ -235,5 +238,365 @@ describe('workspaces routes', () => {
       reviewedBy: owner.id,
     });
 
+  });
+
+  it('exports all workspace tasks with metadata for owners only', async () => {
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Audit Owner',
+      email: 'audit-owner@example.com',
+      role: 'owner',
+      avatarUrl: 'https://example.com/audit-owner.png',
+    });
+    const owner = ownerApi.user;
+    const { workspace, project } = await seedWorkspaceFixture({
+      owner: {
+        id: owner.id,
+        name: owner.name,
+        email: owner.email,
+        role: 'owner',
+        avatarUrl: owner.avatar,
+      },
+      workspace: {
+        id: 'workspace-export',
+        key: 'AUD',
+        name: 'Audit Workspace',
+      },
+      project: {
+        id: 'project-export-1',
+        key: 'AUD',
+        name: 'Audit App',
+        inviteCode: 'INV-AUD-0001ABCD',
+      },
+    });
+
+    const memberApi = await createAuthenticatedApi({
+      name: 'Audit Member',
+      email: 'audit-member@example.com',
+      role: 'member',
+      avatarUrl: 'https://example.com/audit-member.png',
+    });
+    const member = memberApi.user;
+    const secondProjectId = 'project-export-2';
+
+    await db.insert(workspaceMembers).values({
+      workspaceId: workspace.id,
+      userId: member.id,
+      role: 'member',
+      provisionedByValidationId: null,
+      createdAt: new Date(),
+    });
+
+    await db.insert(projects).values({
+      id: secondProjectId,
+      workspaceId: workspace.id,
+      teamId: getDefaultTeamId(workspace.id),
+      name: 'Audit Ops',
+      description: 'Operational audit tasks',
+      key: 'OPS',
+      status: 'active',
+      inviteCode: 'INV-OPS-0001ABCD',
+      createdBy: owner.id,
+      githubRepoUrl: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    await db.insert(projectMembers).values([
+      {
+        projectId: project.id,
+        userId: member.id,
+        role: 'developer',
+        provisionedByValidationId: null,
+        createdAt: new Date(),
+      },
+      {
+        projectId: secondProjectId,
+        userId: owner.id,
+        role: 'owner',
+        provisionedByValidationId: null,
+        createdAt: new Date(),
+      },
+      {
+        projectId: secondProjectId,
+        userId: member.id,
+        role: 'developer',
+        provisionedByValidationId: null,
+        createdAt: new Date(),
+      },
+    ]);
+
+    const firstTicketResponse = await ownerApi
+      .post('/api/v1/tickets')
+      .set('x-project-id', project.id)
+      .send({
+        title: 'Review payment audit trail',
+        description: 'Verify exported ticket fields.',
+        status: 'in_progress',
+        priority: 'high',
+        assigneeId: member.id,
+      });
+    expect(firstTicketResponse.status).toBe(201);
+
+    const secondTicketResponse = await ownerApi
+      .post('/api/v1/tickets')
+      .set('x-project-id', secondProjectId)
+      .send({
+        title: 'Archive workspace evidence',
+        status: 'done',
+        priority: 'medium',
+      });
+    expect(secondTicketResponse.status).toBe(201);
+
+    const commentResponse = await ownerApi
+      .post(`/api/v1/tickets/${firstTicketResponse.body.id}/comments`)
+      .send({ body: 'Owner audit note.' });
+    expect(commentResponse.status).toBe(201);
+
+    const forbiddenResponse = await memberApi.get(`/api/v1/workspaces/${workspace.id}/export/tasks`);
+    expect(forbiddenResponse.status).toBe(403);
+    expect(forbiddenResponse.body).toEqual({ error: 'Only workspace owners can export tasks.' });
+
+    const exportResponse = await ownerApi.get(`/api/v1/workspaces/${workspace.id}/export/tasks`);
+    expect(exportResponse.status).toBe(200);
+    expect(exportResponse.headers['content-disposition']).toContain('gravity-aud-tasks');
+    expect(exportResponse.headers['cache-control']).toBe('no-store');
+
+    expect(exportResponse.body.export).toMatchObject({
+      type: 'workspace_tasks',
+      version: 1,
+      generatedBy: owner.id,
+      taskCount: 2,
+      taskCountExact: '2',
+    });
+    expect(exportResponse.body.workspace).toMatchObject({
+      id: workspace.id,
+      key: workspace.key,
+    });
+    expect(exportResponse.body.taskExport).toEqual({
+      taskCount: '2',
+      expectedTaskCount: '2',
+      complete: true,
+    });
+
+    const exportedTasks = exportResponse.body.tasks;
+    expect(exportedTasks).toHaveLength(2);
+    expect(exportedTasks.map((task: { key: string }) => task.key)).toEqual(
+      expect.arrayContaining([firstTicketResponse.body.key, secondTicketResponse.body.key]),
+    );
+
+    const firstExportedTask = exportedTasks.find((task: { id: string }) => task.id === firstTicketResponse.body.id);
+    expect(firstExportedTask).toMatchObject({
+      title: 'Review payment audit trail',
+      status: 'in_progress',
+      priority: 'high',
+      assignee: {
+        id: member.id,
+        name: member.name,
+        email: member.email,
+      },
+      project: {
+        id: project.id,
+        name: project.name,
+      },
+    });
+    expect(firstExportedTask.createdAt).toEqual(expect.any(String));
+    expect(firstExportedTask.updatedAt).toEqual(expect.any(String));
+    expect(firstExportedTask.comments).toEqual([
+      expect.objectContaining({
+        body: 'Owner audit note.',
+        author: expect.objectContaining({
+          id: owner.id,
+          name: owner.name,
+          email: owner.email,
+        }),
+      }),
+    ]);
+
+    const secondExportedTask = exportedTasks.find((task: { id: string }) => task.id === secondTicketResponse.body.id);
+    expect(secondExportedTask.project).toMatchObject({
+      id: secondProjectId,
+      name: 'Audit Ops',
+    });
+  });
+
+  it('streams complete workspace task export for large workspaces', async () => {
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Bulk Export Owner',
+      email: 'bulk-export-owner@example.com',
+      role: 'owner',
+      avatarUrl: 'https://example.com/bulk-export-owner.png',
+    });
+    const owner = ownerApi.user;
+    const { workspace, project } = await seedWorkspaceFixture({
+      owner: {
+        id: owner.id,
+        name: owner.name,
+        email: owner.email,
+        role: 'owner',
+        avatarUrl: owner.avatar,
+      },
+      workspace: {
+        id: 'workspace-export-large',
+        key: 'BULK',
+        name: 'Bulk Audit Workspace',
+      },
+      project: {
+        id: 'project-export-large-1',
+        key: 'LAA',
+        name: 'Audit App',
+        inviteCode: 'INV-LAA-0001ABCD',
+      },
+    });
+
+    const secondProjectId = 'project-export-large-2';
+    await db.insert(projects).values({
+      id: secondProjectId,
+      workspaceId: workspace.id,
+      teamId: getDefaultTeamId(workspace.id),
+      name: 'Audit Operations',
+      description: 'Operational audit tasks',
+      key: 'OPS',
+      status: 'active',
+      inviteCode: 'INV-OPS-0002ABCD',
+      createdBy: owner.id,
+      githubRepoUrl: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    await db.insert(projectMembers).values([
+      {
+        projectId: secondProjectId,
+        userId: owner.id,
+        role: 'owner',
+        provisionedByValidationId: null,
+        createdAt: new Date(),
+      },
+    ]);
+
+    const baseCreatedAt = new Date('2026-01-01T00:00:00.000Z');
+    const tasksPerProject = 260;
+    const bulkTasks = [];
+
+    for (let i = 0; i < tasksPerProject; i += 1) {
+      bulkTasks.push({
+        id: `bulk-export-task-a-${String(i).padStart(3, '0')}`,
+        key: `LAA-${String(i).padStart(4, '0')}`,
+        title: `Audit App Task ${i + 1}`,
+        description: 'Large export stress coverage.',
+        status: i % 3 === 0 ? 'in_progress' : i % 3 === 1 ? 'todo' : 'done',
+        priority: i % 2 === 0 ? 'high' : 'medium',
+        assigneeId: i === 0 ? owner.id : null,
+        projectId: project.id,
+        cycleId: null,
+        parentId: null,
+        prStatus: 'none',
+        prUrl: null,
+        createdAt: new Date(baseCreatedAt.getTime() + i * 60000),
+        updatedAt: new Date(baseCreatedAt.getTime() + i * 60000),
+      });
+    }
+
+    for (let i = 0; i < tasksPerProject; i += 1) {
+      bulkTasks.push({
+        id: `bulk-export-task-b-${String(i).padStart(3, '0')}`,
+        key: `OPS-${String(i).padStart(4, '0')}`,
+        title: `Audit Ops Task ${i + 1}`,
+        description: 'Large export stress coverage.',
+        status: i % 3 === 0 ? 'done' : i % 3 === 1 ? 'in_progress' : 'todo',
+        priority: i % 2 === 0 ? 'low' : 'medium',
+        assigneeId: i === 0 ? owner.id : null,
+        projectId: secondProjectId,
+        cycleId: null,
+        parentId: null,
+        prStatus: 'none',
+        prUrl: null,
+        createdAt: new Date(baseCreatedAt.getTime() + 10 * 60000 + i * 60000),
+        updatedAt: new Date(baseCreatedAt.getTime() + 10 * 60000 + i * 60000),
+      });
+    }
+
+    await db.insert(tickets).values(bulkTasks);
+
+    const commentResponse = await ownerApi.post(`/api/v1/tickets/${bulkTasks[0].id}/comments`).send({
+      body: 'Owner bulk export note.',
+    });
+    expect(commentResponse.status).toBe(201);
+
+    const exportResponse = await ownerApi.get(`/api/v1/workspaces/${workspace.id}/export/tasks`);
+    expect(exportResponse.status).toBe(200);
+    expect(exportResponse.headers['content-disposition']).toContain('gravity-bulk-tasks');
+    expect(exportResponse.headers['cache-control']).toBe('no-store');
+
+    const expectedTaskCount = bulkTasks.length;
+    expect(exportResponse.body.export).toMatchObject({
+      type: 'workspace_tasks',
+      version: 1,
+      generatedBy: owner.id,
+      taskCount: expectedTaskCount,
+      taskCountExact: String(expectedTaskCount),
+    });
+    expect(exportResponse.body.workspace).toMatchObject({
+      id: workspace.id,
+      key: workspace.key,
+    });
+    expect(exportResponse.body.taskExport).toMatchObject({
+      taskCount: String(expectedTaskCount),
+      expectedTaskCount: String(expectedTaskCount),
+      complete: true,
+    });
+
+    const exportedTasks = exportResponse.body.tasks;
+    expect(exportedTasks).toHaveLength(expectedTaskCount);
+
+    const expectedOrder = [...bulkTasks]
+      .map((task) => ({
+        id: task.id,
+        projectName: task.projectId === project.id ? 'Audit App' : 'Audit Operations',
+        createdAt: task.createdAt,
+        key: task.key,
+      }))
+      .sort((left, right) => {
+        const projectComparison = left.projectName.localeCompare(right.projectName);
+        if (projectComparison !== 0) {
+          return projectComparison;
+        }
+        const createdAtComparison = left.createdAt.getTime() - right.createdAt.getTime();
+        if (createdAtComparison !== 0) {
+          return createdAtComparison;
+        }
+        return left.key.localeCompare(right.key);
+      })
+      .map((row) => row.id);
+
+    expect(exportedTasks.map((task: { id: string }) => task.id)).toEqual(expectedOrder);
+
+    const firstExportedTask = exportedTasks.find((task: { id: string }) => task.id === bulkTasks[0].id);
+    expect(firstExportedTask).toMatchObject({
+      id: bulkTasks[0].id,
+      status: bulkTasks[0].status,
+      priority: bulkTasks[0].priority,
+      assignee: {
+        id: owner.id,
+        name: owner.name,
+        email: owner.email,
+      },
+      project: {
+        name: 'Audit App',
+        key: 'LAA',
+      },
+      comments: [
+        expect.objectContaining({
+          body: 'Owner bulk export note.',
+          author: expect.objectContaining({
+            id: owner.id,
+            name: owner.name,
+            email: owner.email,
+          }),
+        }),
+      ],
+    });
+    expect(firstExportedTask.createdAt).toEqual(expect.any(String));
+    expect(firstExportedTask.updatedAt).toEqual(expect.any(String));
   });
 });

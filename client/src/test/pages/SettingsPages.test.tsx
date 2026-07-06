@@ -125,6 +125,7 @@ function renderSettingsPage(overrides: Partial<Parameters<typeof SettingsPage>[0
     onCreateInvite: vi.fn().mockResolvedValue(true),
     onRevokeInvite: vi.fn().mockResolvedValue(true),
     onApproveJoinRequest: vi.fn().mockResolvedValue(true),
+    onExportTasks: vi.fn().mockResolvedValue(true),
   };
 
   const props = { ...baseProps, ...overrides };
@@ -314,6 +315,26 @@ describe('SettingsPage', () => {
     const readOnlyRow = screen.getAllByTestId(/mcp-tool-row-/)[0];
     const readOnlySwitch = within(readOnlyRow).getByRole('switch');
     expect(readOnlySwitch).toBeDisabled();
+  });
+
+  it('shows task export only to workspace owners', async () => {
+    const user = userEvent.setup();
+    const { props, unmount } = renderSettingsPage({
+      exportError: 'Export failed.',
+    });
+
+    await user.click(screen.getByRole('button', { name: /Download task audit data/i }));
+    expect(screen.getByText('Export failed.')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Export Tasks' }));
+    expect(props.onExportTasks).toHaveBeenCalledTimes(1);
+
+    unmount();
+    renderSettingsPage({
+      workspace: { ...workspace, memberRole: 'member' },
+    });
+
+    expect(screen.queryByRole('button', { name: /Download task audit data/i })).not.toBeInTheDocument();
   });
 
   it('renders all sections stacked on mobile viewport', () => {

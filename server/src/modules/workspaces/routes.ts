@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm';
 import { Router } from 'express';
 import { db } from '../../db/index.js';
 import {
@@ -34,6 +34,7 @@ import {
   getWorkspaceSummary,
   invalidateUserWorkspacesCache,
   invalidateWorkspaceCache,
+  normalizeIsoDate,
   WorkspaceCacheInvalidationReason,
   listWorkspaceSummaries,
   normalizeEntityKey,
@@ -201,6 +202,15 @@ function createWorkspacePrivateKey() {
   return `sec_wsp_${randomUUID().replace(/-/g, '')}`;
 }
 
+function normalizeNullableIsoDate(value: unknown) {
+  return value ? normalizeIsoDate(value) : null;
+}
+
+function toExportFilenameSegment(value: string) {
+  const segment = value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return segment || 'workspace';
+}
+
 async function loadWorkspaceSettingsPayload(workspaceId: string) {
   const rows = await db
     .select({
@@ -234,6 +244,376 @@ async function loadWorkspaceSettingsPayload(workspaceId: string) {
     defaultProjectId: settings.defaultProjectId,
     disabledMcpTools: settings.disabledMcpTools || [],
   };
+}
+
+const WORKSPACE_TASK_EXPORT_BATCH_SIZE = 500;
+const TASK_COUNT_SAFE_MAX = BigInt(Number.MAX_SAFE_INTEGER);
+
+type WorkspaceTaskExportCursor = {
+  projectName: string;
+  createdAt: Date;
+  key: string;
+};
+
+type WorkspaceTaskExportMetadata = {
+  export: {
+    type: 'workspace_tasks';
+    version: 1;
+    generatedAt: string;
+    generatedBy: string;
+    taskCount: number;
+    taskCountExact: string;
+    taskCountOverflow: boolean;
+  };
+  workspace: {
+    id: string;
+    name: string;
+    key: string;
+    createdAt: string;
+  };
+};
+
+type WorkspaceTaskExportSummary = {
+  taskCount: string;
+  expectedTaskCount: string;
+  complete: boolean;
+  error?: string;
+};
+
+function normalizeTaskCount(rawTaskCount: unknown) {
+  const rawText = rawTaskCount == null ? '0' : String(rawTaskCount);
+  let parsedCount = 0n;
+
+  try {
+    parsedCount = BigInt(rawText);
+  } catch {
+    parsedCount = 0n;
+  }
+
+  return {
+    taskCount: parsedCount <= TASK_COUNT_SAFE_MAX ? Number(parsedCount) : Number.MAX_SAFE_INTEGER,
+    taskCountExact: parsedCount.toString(),
+    taskCountOverflow: parsedCount > TASK_COUNT_SAFE_MAX,
+  };
+}
+
+function buildWorkspaceTaskExportSummary(
+  exportedTaskCount: bigint,
+  expectedTaskCount: string,
+  complete: boolean,
+  errorMessage?: string,
+) {
+  const summary: WorkspaceTaskExportSummary = {
+    taskCount: exportedTaskCount.toString(),
+    expectedTaskCount,
+    complete,
+  };
+
+  if (!complete && errorMessage) {
+    summary.error = errorMessage;
+  }
+
+  return JSON.stringify(summary);
+}
+
+function buildExportTaskPayload(task: {
+  id: string;
+  key: string;
+  title: string;
+  description: string | null;
+  status: string;
+  priority: string;
+  assigneeId: string | null;
+  projectId: string;
+  projectName: string;
+  projectKey: string;
+  teamId: string | null;
+  teamName: string | null;
+  cycleId: string | null;
+  cycleName: string | null;
+  cycleStartDate: Date | null;
+  cycleEndDate: Date | null;
+  cycleCompleted: boolean | null;
+  parentId: string | null;
+  prStatus: string | null;
+  prUrl: string | null;
+  branchName: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  assigneeName: string | null;
+  assigneeEmail: string | null;
+  assigneeImage: string | null;
+  assigneeAvatarUrl: string | null;
+}, labelsByTaskId: Map<
+  string,
+  Array<{
+    id: string;
+    name: string;
+    color: string;
+    description: string;
+    sortOrder: number;
+  }>
+>, commentsByTaskId: Map<
+  string,
+  Array<{
+    id: string;
+    body: string;
+    createdAt: string;
+    author: {
+      id: string;
+      name: string;
+      email: string;
+      avatarUrl: string;
+      role: string;
+    };
+  }>
+> ) {
+  return {
+    id: task.id,
+    key: task.key,
+    title: task.title,
+    description: task.description,
+    status: task.status,
+    priority: task.priority,
+    assignee: task.assigneeId
+      ? {
+          id: task.assigneeId,
+          name: task.assigneeName ?? '',
+          email: task.assigneeEmail ?? '',
+          avatarUrl: task.assigneeAvatarUrl ?? task.assigneeImage ?? '',
+        }
+      : null,
+    project: {
+      id: task.projectId,
+      name: task.projectName,
+      key: task.projectKey,
+    },
+    team: task.teamId
+      ? {
+          id: task.teamId,
+          name: task.teamName ?? '',
+        }
+      : null,
+    cycle: task.cycleId
+      ? {
+          id: task.cycleId,
+          name: task.cycleName ?? '',
+          startDate: normalizeNullableIsoDate(task.cycleStartDate),
+          endDate: normalizeNullableIsoDate(task.cycleEndDate),
+          completed: Boolean(task.cycleCompleted),
+        }
+      : null,
+    parentId: task.parentId,
+    prStatus: task.prStatus,
+    prUrl: task.prUrl,
+    branchName: task.branchName,
+    createdAt: normalizeIsoDate(task.createdAt),
+    updatedAt: normalizeIsoDate(task.updatedAt),
+    labels: labelsByTaskId.get(task.id) ?? [],
+    comments: commentsByTaskId.get(task.id) ?? [],
+  };
+}
+
+async function getWorkspaceTaskExportMetadata(workspaceId: string, generatedBy: string): Promise<WorkspaceTaskExportMetadata | null> {
+  const [workspaceRows, taskCountRows] = await Promise.all([
+    db
+      .select({
+        id: workspaces.id,
+        name: workspaces.name,
+        key: workspaces.key,
+        createdAt: workspaces.createdAt,
+      })
+      .from(workspaces)
+      .where(eq(workspaces.id, workspaceId))
+      .limit(1),
+    db
+      .select({ count: sql`count(*)` })
+      .from(tickets)
+      .innerJoin(projects, eq(projects.id, tickets.projectId))
+      .where(eq(projects.workspaceId, workspaceId)),
+  ]);
+  const rawTaskCount = taskCountRows[0]?.count ?? 0;
+  const normalizedTaskCount = normalizeTaskCount(rawTaskCount);
+
+  const workspace = workspaceRows[0];
+  if (!workspace) {
+    return null;
+  }
+
+  return {
+    export: {
+      type: 'workspace_tasks',
+      version: 1,
+      generatedAt: new Date().toISOString(),
+      generatedBy,
+      taskCount: normalizedTaskCount.taskCount,
+      taskCountExact: normalizedTaskCount.taskCountExact,
+      taskCountOverflow: normalizedTaskCount.taskCountOverflow,
+    },
+    workspace: {
+      id: workspace.id,
+      name: workspace.name,
+      key: workspace.key,
+      createdAt: normalizeIsoDate(workspace.createdAt),
+    },
+  };
+}
+
+async function fetchWorkspaceTaskExportBatch(workspaceId: string, cursor: WorkspaceTaskExportCursor | null) {
+  const whereClause = cursor
+    ? and(
+        eq(projects.workspaceId, workspaceId),
+        or(
+          gt(projects.name, cursor.projectName),
+          and(eq(projects.name, cursor.projectName), gt(tickets.createdAt, cursor.createdAt)),
+          and(eq(projects.name, cursor.projectName), eq(tickets.createdAt, cursor.createdAt), gt(tickets.key, cursor.key))
+        )
+      )
+    : eq(projects.workspaceId, workspaceId);
+
+  return db
+    .select({
+      id: tickets.id,
+      key: tickets.key,
+      title: tickets.title,
+      description: tickets.description,
+      status: tickets.status,
+      priority: tickets.priority,
+      assigneeId: tickets.assigneeId,
+      projectId: tickets.projectId,
+      cycleId: tickets.cycleId,
+      parentId: tickets.parentId,
+      prStatus: tickets.prStatus,
+      prUrl: tickets.prUrl,
+      branchName: tickets.branchName,
+      createdAt: tickets.createdAt,
+      updatedAt: tickets.updatedAt,
+      projectName: projects.name,
+      projectKey: projects.key,
+      teamId: teams.id,
+      teamName: teams.name,
+      cycleName: cycles.name,
+      cycleStartDate: cycles.startDate,
+      cycleEndDate: cycles.endDate,
+      cycleCompleted: cycles.completed,
+      assigneeName: authUsers.name,
+      assigneeEmail: authUsers.email,
+      assigneeImage: authUsers.image,
+      assigneeAvatarUrl: userProfiles.avatarUrl,
+    })
+    .from(tickets)
+    .innerJoin(projects, eq(projects.id, tickets.projectId))
+    .leftJoin(teams, eq(teams.id, projects.teamId))
+    .leftJoin(cycles, eq(cycles.id, tickets.cycleId))
+    .leftJoin(authUsers, eq(authUsers.id, tickets.assigneeId))
+    .leftJoin(userProfiles, eq(userProfiles.userId, authUsers.id))
+    .where(whereClause)
+    .orderBy(asc(projects.name), asc(tickets.createdAt), asc(tickets.key))
+    .limit(WORKSPACE_TASK_EXPORT_BATCH_SIZE);
+}
+
+async function loadExportBatchMetadata(taskIds: string[]) {
+  const [labelRows, commentRows] = taskIds.length > 0
+    ? await Promise.all([
+        db
+          .select({
+            ticketId: ticketLabels.ticketId,
+            id: labels.id,
+            name: labels.name,
+            color: labels.color,
+            description: labels.description,
+            sortOrder: labels.sortOrder,
+          })
+          .from(ticketLabels)
+          .innerJoin(labels, eq(labels.id, ticketLabels.labelId))
+          .where(inArray(ticketLabels.ticketId, taskIds))
+          .orderBy(asc(ticketLabels.ticketId), asc(labels.sortOrder), asc(labels.name)),
+        db
+          .select({
+            id: comments.id,
+            ticketId: comments.ticketId,
+            userId: comments.userId,
+            body: comments.body,
+            createdAt: comments.createdAt,
+            userName: authUsers.name,
+            userEmail: authUsers.email,
+            userImage: authUsers.image,
+            userAvatarUrl: userProfiles.avatarUrl,
+            authorRole: userProfiles.role,
+          })
+          .from(comments)
+          .leftJoin(authUsers, eq(authUsers.id, comments.userId))
+          .leftJoin(userProfiles, eq(userProfiles.userId, comments.userId))
+          .where(inArray(comments.ticketId, taskIds))
+          .orderBy(asc(comments.ticketId), asc(comments.createdAt)),
+      ])
+    : [[], []];
+
+  const labelsByTaskId = new Map<string, Array<{
+    id: string;
+    name: string;
+    color: string;
+    description: string;
+    sortOrder: number;
+  }>>();
+  for (const label of labelRows) {
+    const taskLabels = labelsByTaskId.get(label.ticketId) ?? [];
+    taskLabels.push({
+      id: label.id,
+      name: label.name,
+      color: label.color,
+      description: label.description ?? '',
+      sortOrder: Number(label.sortOrder ?? 0),
+    });
+    labelsByTaskId.set(label.ticketId, taskLabels);
+  }
+
+  const commentsByTaskId = new Map<string, Array<{
+    id: string;
+    body: string;
+    createdAt: string;
+    author: {
+      id: string;
+      name: string;
+      email: string;
+      avatarUrl: string;
+      role: string;
+    };
+  }>>();
+  for (const comment of commentRows) {
+    const taskComments = commentsByTaskId.get(comment.ticketId) ?? [];
+    taskComments.push({
+      id: comment.id,
+      body: comment.body,
+      createdAt: normalizeIsoDate(comment.createdAt),
+      author: {
+        id: comment.userId,
+        name: comment.userName ?? '',
+        email: comment.userEmail ?? '',
+        avatarUrl: comment.userAvatarUrl ?? comment.userImage ?? '',
+        role: comment.authorRole ?? 'guest_contributor',
+      },
+    });
+    commentsByTaskId.set(comment.ticketId, taskComments);
+  }
+
+  return { labelsByTaskId, commentsByTaskId };
+}
+
+async function writeExportChunk(
+  res: {
+    write: (chunk: string) => boolean;
+    once: (event: 'drain' | 'error', listener: (...args: any[]) => void) => void;
+  },
+  chunk: string,
+) {
+  if (res.write(chunk)) {
+    return;
+  }
+  await new Promise<void>((resolve, reject) => {
+    res.once('drain', () => resolve());
+    res.once('error', (error) => reject(error));
+  });
 }
 
 function mapPeerInvite(invite: {
@@ -591,6 +971,103 @@ export function createWorkspacesRouter() {
       res.json(await loadWorkspaceSettingsPayload(workspaceId));
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to update workspace settings.' });
+    }
+  });
+
+  router.get('/workspaces/:workspaceId/export/tasks', async (req, res) => {
+    const workspaceId = getParamString(req.params.workspaceId);
+    if (!workspaceId) {
+      res.status(400).json({ error: 'Invalid workspace id.' });
+      return;
+    }
+
+    let metadata: WorkspaceTaskExportMetadata | null = null;
+    let expectedTaskCount = '0';
+    let exportedTaskCount = 0n;
+    try {
+      const auth = await authorizeWorkspaceAccess(req, workspaceId);
+      if (!auth.allowed) {
+        res.status(auth.status).json({ error: auth.error });
+        return;
+      }
+
+      if (auth.workspaceRole !== 'owner') {
+        res.status(403).json({ error: 'Only workspace owners can export tasks.' });
+        return;
+      }
+
+      metadata = await getWorkspaceTaskExportMetadata(workspaceId, auth.userId);
+      if (!metadata) {
+        res.status(404).json({ error: 'Workspace not found.' });
+        return;
+      }
+
+      expectedTaskCount = metadata.export.taskCountExact;
+
+      const filename = `gravity-${toExportFilenameSegment(metadata.workspace.key)}-tasks-${metadata.export.generatedAt.slice(
+        0,
+        10
+      )}.json`;
+      res.set('Cache-Control', 'no-store');
+      res.set('Pragma', 'no-cache');
+      res.set('X-Content-Type-Options', 'nosniff');
+      res.set('Content-Disposition', `attachment; filename="${filename}"`);
+      res.type('application/json');
+      res.status(200);
+
+      await writeExportChunk(
+        res,
+        `{"export":${JSON.stringify(metadata.export)},"workspace":${JSON.stringify(metadata.workspace)},"tasks":[`
+      );
+
+      let cursor: WorkspaceTaskExportCursor | null = null;
+      let isFirst = true;
+      while (true) {
+        const taskRows = await fetchWorkspaceTaskExportBatch(workspaceId, cursor);
+        if (taskRows.length === 0) {
+          break;
+        }
+
+        const taskIds = taskRows.map((task) => task.id);
+        const { labelsByTaskId, commentsByTaskId } = await loadExportBatchMetadata(taskIds);
+        for (const task of taskRows) {
+          const chunk = JSON.stringify(buildExportTaskPayload(task, labelsByTaskId, commentsByTaskId));
+          await writeExportChunk(res, `${isFirst ? '' : ','}${chunk}`);
+          isFirst = false;
+          exportedTaskCount += 1n;
+        }
+
+        const lastTask = taskRows[taskRows.length - 1];
+        cursor = {
+          projectName: lastTask.projectName,
+          key: lastTask.key,
+          createdAt: lastTask.createdAt,
+        };
+      }
+
+      await writeExportChunk(
+        res,
+        `],"taskExport":${buildWorkspaceTaskExportSummary(exportedTaskCount, expectedTaskCount, true)}`
+      );
+      res.end();
+    } catch (error) {
+      const exportError = error instanceof Error ? error : new Error('Failed to export workspace tasks.');
+      console.error('Failed to stream workspace task export:', exportError);
+      if (res.headersSent && !res.writableEnded) {
+        try {
+          await writeExportChunk(
+            res,
+            `],"taskExport":${buildWorkspaceTaskExportSummary(exportedTaskCount, expectedTaskCount, false, exportError.message)}`
+          );
+          res.end();
+        } catch {
+          res.destroy(exportError);
+        }
+        return;
+      }
+      if (!res.headersSent) {
+        res.status(500).json({ error: exportError.message });
+      }
     }
   });
 
