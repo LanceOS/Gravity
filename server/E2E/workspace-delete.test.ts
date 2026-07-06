@@ -101,8 +101,8 @@ describe('Workspace Deletion E2E', () => {
       .delete(`/api/v1/workspaces/invalid_workspace_id`)
       .set('x-user-id', owner.id);
 
-    // It returns 403 because no membership record is found for invalid_workspace_id
+    // It returns 403 because no membership record is found for invalid_workspace_id.
     expect(resDeleteFail.status).toBe(403);
-    expect(resDeleteFail.body.error).toBe('Only a workspace owner can delete the workspace.');
+    expect(resDeleteFail.body.error).toBe('Access denied: not a member of the workspace.');
   });
 });

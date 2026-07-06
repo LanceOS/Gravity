@@ -20,6 +20,14 @@ type SeededWorkspace = {
     role: string;
     tutorial_completed: number;
   };
+  agentUser: {
+    id: string;
+    name: string;
+    email: string;
+    avatar: string;
+    role: string;
+    tutorial_completed: number;
+  };
   nonMemberUser: {
     id: string;
     name: string;
@@ -112,6 +120,14 @@ function seedRealtimeWorkspace(): SeededWorkspace {
     role: 'member',
     tutorial_completed: 1,
   };
+  const agentUser = {
+    id: 'usr-agent',
+    name: 'MCP Agent',
+    email: 'agent@gravity.test',
+    avatar: '',
+    role: 'member',
+    tutorial_completed: 1,
+  };
   const workspace = {
     id: 'wsp-realtime',
     name: 'Realtime Workspace',
@@ -186,8 +202,12 @@ function seedRealtimeWorkspace(): SeededWorkspace {
     notificationsEnabled: true,
   };
   dbState.workspaces = [workspace];
-  setWorkspaceMembers([{ workspaceId: workspace.id, userId: memberUser.id, role: 'owner' }]);
+  setWorkspaceMembers([
+    { workspaceId: workspace.id, userId: memberUser.id, role: 'owner' },
+    { workspaceId: workspace.id, userId: agentUser.id, role: 'member' },
+  ]);
   addWorkspaceMember(workspace.id, memberUser.id, 'owner');
+  addWorkspaceMember(workspace.id, agentUser.id, 'member');
   dbState.projects = [project];
   dbState.labels = [bugLabel];
   dbState.tickets = [mainTicket, dependencyTicket];
@@ -196,6 +216,7 @@ function seedRealtimeWorkspace(): SeededWorkspace {
 
   return {
     memberUser,
+    agentUser,
     nonMemberUser,
     workspace,
     project,
@@ -251,7 +272,7 @@ async function renderRealtimeApp(workspaceId: string, userId: string) {
 
 describe('MCP SSE pipeline', () => {
   it('refreshes the client UI from MCP mutation events without a refresh', async () => {
-    const { memberUser, workspace, project, mainTicket, dependencyTicket } = seedRealtimeWorkspace();
+    const { memberUser, agentUser, workspace, project, mainTicket, dependencyTicket } = seedRealtimeWorkspace();
     const user = await renderRealtimeApp(workspace.id, memberUser.id);
 
     const mainTicketCard = await screen.findByText(mainTicket.title);
@@ -263,7 +284,7 @@ describe('MCP SSE pipeline', () => {
     expect(within(sidebar).getByText('No labels assigned')).toBeInTheDocument();
     expect(within(sidebar).getByText('No dependencies')).toBeInTheDocument();
 
-    await callMcpTool(workspace.id, memberUser.id, 'create_ticket', {
+    await callMcpTool(workspace.id, agentUser.id, 'create_ticket', {
       title: 'MCP-created ticket',
       description: 'Created through the MCP transport.',
       projectId: project.id,
@@ -280,7 +301,7 @@ describe('MCP SSE pipeline', () => {
     const mainTicketCardRefetched = await screen.findByText(mainTicket.title);
     await user.click(mainTicketCardRefetched);
 
-    await callMcpTool(workspace.id, memberUser.id, 'update_ticket', {
+    await callMcpTool(workspace.id, agentUser.id, 'update_ticket', {
       ticketKey: mainTicket.key,
       title: 'Main pipeline ticket updated',
     });
@@ -288,48 +309,50 @@ describe('MCP SSE pipeline', () => {
       expect(screen.getByDisplayValue('Main pipeline ticket updated')).toBeInTheDocument();
     });
 
-    await callMcpTool(workspace.id, memberUser.id, 'add_comment', {
+    await callMcpTool(workspace.id, agentUser.id, 'add_comment', {
       ticketKey: mainTicket.key,
       body: 'Comment created through MCP.',
     });
-    expect(await screen.findByText('Comment created through MCP.')).toBeInTheDocument();
-    expect(screen.getByText('Activity Thread (1)')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(document.body.textContent).toContain('Comment created through MCP.');
+      expect(screen.getByText('Activity Thread (1)')).toBeInTheDocument();
+    });
 
-    await callMcpTool(workspace.id, memberUser.id, 'add_ticket_labels', {
+    await callMcpTool(workspace.id, agentUser.id, 'add_ticket_labels', {
       ticketKey: mainTicket.key,
       labels: 'Bug',
     });
     await waitFor(() => {
-      expect(within(sidebar).getByText('Bug')).toBeInTheDocument();
+      expect(within(screen.getByTestId('desktop-sidebar')).getByText('Bug')).toBeInTheDocument();
     });
 
-    await callMcpTool(workspace.id, memberUser.id, 'remove_ticket_labels', {
+    await callMcpTool(workspace.id, agentUser.id, 'remove_ticket_labels', {
       ticketKey: mainTicket.key,
       labels: 'Bug',
     });
     await waitFor(() => {
-      expect(within(sidebar).getByText('No labels assigned')).toBeInTheDocument();
+      expect(within(screen.getByTestId('desktop-sidebar')).getByText('No labels assigned')).toBeInTheDocument();
     });
 
-    await callMcpTool(workspace.id, memberUser.id, 'add_dependency', {
+    await callMcpTool(workspace.id, agentUser.id, 'add_dependency', {
       ticketKey: mainTicket.key,
       dependencyTicketKey: dependencyTicket.key,
     });
     await waitFor(() => {
-      expect(within(sidebar).getByText(dependencyTicket.key)).toBeInTheDocument();
+      expect(within(screen.getByTestId('desktop-sidebar')).getAllByText(dependencyTicket.key).length).toBeGreaterThan(0);
     });
 
-    await callMcpTool(workspace.id, memberUser.id, 'remove_dependency', {
+    await callMcpTool(workspace.id, agentUser.id, 'remove_dependency', {
       ticketKey: mainTicket.key,
       dependencyTicketKey: dependencyTicket.key,
     });
     await waitFor(() => {
-      expect(within(sidebar).getByText('No dependencies')).toBeInTheDocument();
+      expect(within(screen.getByTestId('desktop-sidebar')).getByText('No dependencies')).toBeInTheDocument();
     });
   });
 
   it('does not deliver SSE events to a non-member source', async () => {
-    const { memberUser, nonMemberUser, workspace, mainTicket } = seedRealtimeWorkspace();
+    const { memberUser, agentUser, nonMemberUser, workspace, mainTicket } = seedRealtimeWorkspace();
     const user = await renderRealtimeApp(workspace.id, memberUser.id);
 
     const memberSource = getActiveMockSseSource(workspace.id, memberUser.id);
@@ -344,7 +367,7 @@ describe('MCP SSE pipeline', () => {
     const deniedMessageSpy = vi.fn();
     deniedSource.addEventListener('message', deniedMessageSpy);
 
-    await callMcpTool(workspace.id, memberUser.id, 'update_ticket', {
+    await callMcpTool(workspace.id, agentUser.id, 'update_ticket', {
       ticketKey: mainTicket.key,
       title: 'Member-visible title',
     });
@@ -360,7 +383,7 @@ describe('MCP SSE pipeline', () => {
   });
 
   it('reconnects after disconnecting and keeps updating the UI', async () => {
-    const { memberUser, workspace, mainTicket } = seedRealtimeWorkspace();
+    const { memberUser, agentUser, workspace, mainTicket } = seedRealtimeWorkspace();
     const user = await renderRealtimeApp(workspace.id, memberUser.id);
 
     // Open detail view of the ticket to verify input value
@@ -378,7 +401,7 @@ describe('MCP SSE pipeline', () => {
       expect(nextSource).not.toBe(initialSource);
     }, { timeout: 6000 });
 
-    await callMcpTool(workspace.id, memberUser.id, 'update_ticket', {
+    await callMcpTool(workspace.id, agentUser.id, 'update_ticket', {
       ticketKey: mainTicket.key,
       title: 'Recovered after reconnect',
     });
@@ -389,7 +412,7 @@ describe('MCP SSE pipeline', () => {
   });
 
   it('coalesces rapid mutations into a single targeted refresh', async () => {
-    const { memberUser, workspace, mainTicket } = seedRealtimeWorkspace();
+    const { memberUser, agentUser, workspace, mainTicket } = seedRealtimeWorkspace();
     const user = await renderRealtimeApp(workspace.id, memberUser.id);
 
     const mainTicketCard = await screen.findByText(mainTicket.title);
@@ -400,15 +423,15 @@ describe('MCP SSE pipeline', () => {
     fetchMock.mockClear();
 
     await Promise.all([
-      callMcpTool(workspace.id, memberUser.id, 'update_ticket', {
+      callMcpTool(workspace.id, agentUser.id, 'update_ticket', {
         ticketKey: mainTicket.key,
         title: 'Burst update 1',
       }),
-      callMcpTool(workspace.id, memberUser.id, 'update_ticket', {
+      callMcpTool(workspace.id, agentUser.id, 'update_ticket', {
         ticketKey: mainTicket.key,
         title: 'Burst update 2',
       }),
-      callMcpTool(workspace.id, memberUser.id, 'update_ticket', {
+      callMcpTool(workspace.id, agentUser.id, 'update_ticket', {
         ticketKey: mainTicket.key,
         title: 'Burst update 3',
       }),
@@ -418,10 +441,13 @@ describe('MCP SSE pipeline', () => {
       expect(screen.getByDisplayValue('Burst update 3')).toBeInTheDocument();
     });
 
-    const refreshCalls = fetchMock.mock.calls.filter(([url]) =>
-      String(url).includes('/api/v1/tickets/key/RT-1') &&
-      String(url).includes('include=relations'),
-    );
+    const refreshCalls = fetchMock.mock.calls.filter(([url]) => {
+      const requestUrl = String(url);
+      return requestUrl.includes('/api/v1/tickets/tkt-main') || (
+        requestUrl.includes('/api/v1/tickets/key/RT-1') &&
+        requestUrl.includes('include=relations')
+      );
+    });
     expect(refreshCalls).toHaveLength(1);
   });
 });

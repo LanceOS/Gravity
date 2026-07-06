@@ -35,8 +35,6 @@ describe('Server Workspaces Flow E2E', () => {
         key: 'ROPS',
         workspaceKey: 'ROPS-SECRET',
         ownerId,
-        defaultProjectName: 'Remote Ops',
-        defaultProjectKey: 'ROPS',
       });
 
     expect(resCreateWorkspace.status).toBe(201);
@@ -45,8 +43,22 @@ describe('Server Workspaces Flow E2E', () => {
     const workspaceId = resCreateWorkspace.body.workspace.id;
     expect(workspaceId).toBeDefined();
 
-    // 2b. POST /api/v1/projects to create a project manually
+    // 2b. POST /api/v1/projects to create projects manually
     const resCreateProject = await request(app)
+      .post('/api/v1/projects')
+      .set('x-user-id', ownerId)
+      .send({
+        name: 'Remote Ops Core',
+        key: 'ROPS1',
+        ownerId,
+        workspaceId,
+      });
+
+    expect(resCreateProject.status).toBe(201);
+    const coreProjectId = resCreateProject.body.id;
+    expect(coreProjectId).toBeDefined();
+
+    const resCreateExtraProject = await request(app)
       .post('/api/v1/projects')
       .set('x-user-id', ownerId)
       .send({
@@ -56,8 +68,8 @@ describe('Server Workspaces Flow E2E', () => {
         workspaceId,
       });
 
-    expect(resCreateProject.status).toBe(201);
-    const extraProjectId = resCreateProject.body.id;
+    expect(resCreateExtraProject.status).toBe(201);
+    const extraProjectId = resCreateExtraProject.body.id;
     expect(extraProjectId).toBeDefined();
 
     // 3. GET /api/v1/workspaces to verify owner workspace listing
