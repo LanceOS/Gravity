@@ -13,10 +13,18 @@ interface WorkspaceLayoutProps {
   children: ReactNode;
   rightPanels?: ReactNode;
   headerChatHistory?: ReactNode;
+  headerChatHistoryMenu?: ReactNode;
   isMobile?: boolean;
 }
 
-export function WorkspaceLayout({ sidebarProps, children, rightPanels, headerChatHistory, isMobile }: WorkspaceLayoutProps) {
+export function WorkspaceLayout({
+  sidebarProps,
+  children,
+  rightPanels,
+  headerChatHistory,
+  headerChatHistoryMenu,
+  isMobile,
+}: WorkspaceLayoutProps) {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const drawerRef = useRef<HTMLDivElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
@@ -133,6 +141,8 @@ export function WorkspaceLayout({ sidebarProps, children, rightPanels, headerCha
         ) : null}
 
         <div className="workspace-header-actions">
+          {headerChatHistoryMenu}
+
           <button
             type="button"
             onClick={sidebarProps.tools.onOpenOllama}

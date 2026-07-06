@@ -44,7 +44,7 @@ import { useWorkspaceViewMode } from '../hooks/useWorkspaceViewMode';
 import type { AppSection } from '../types/AppShell';
 import { LoadingPage } from '../../loadingPage';
 import { CACHE_CONFIGS, queryKeys } from '../../../utils/queryClient';
-import { ChatHistoryHeaderRow, getChatSession, toChatMessages, useChatSessionsList } from '../../chats';
+import { ChatHistoryHeaderRow, ChatHistoryMenuButton, getChatSession, toChatMessages, useChatSessionsList } from '../../chats';
 import type { Message } from '../../ai';
 import {
   useWorkspaceCreateLabelDialog,
@@ -183,6 +183,9 @@ export function WorkspaceShellPage() {
   const {
     sessions: aiChatSessions,
     isLoading: aiChatSessionsLoading,
+    isFetchingNextPage: aiChatSessionsFetchingNextPage,
+    hasNextPage: aiChatSessionsHasNextPage,
+    fetchNextPage: fetchNextAiChatSessionsPage,
     refreshSessions: refreshAiChatSessions,
   } = useChatSessionsList(aiChatProjectId);
   const isAiChatSessionProjectCurrent = activeAiChatSessionProjectId === aiChatProjectId;
@@ -1119,6 +1122,17 @@ export function WorkspaceShellPage() {
             sessions={aiChatSessions}
             activeSessionId={currentSeedAiChatSessionId || currentLiveAiChatSessionId}
             isLoading={aiChatSessionsLoading}
+            onSelectSession={(chatId) => void handleSelectAiChatHistory(chatId)}
+          />
+        }
+        headerChatHistoryMenu={
+          <ChatHistoryMenuButton
+            sessions={aiChatSessions}
+            activeSessionId={currentSeedAiChatSessionId || currentLiveAiChatSessionId}
+            isLoading={aiChatSessionsLoading}
+            isFetchingMoreSessions={aiChatSessionsFetchingNextPage}
+            hasMoreSessions={aiChatSessionsHasNextPage}
+            onLoadMoreSessions={() => void fetchNextAiChatSessionsPage()}
             onSelectSession={(chatId) => void handleSelectAiChatHistory(chatId)}
           />
         }

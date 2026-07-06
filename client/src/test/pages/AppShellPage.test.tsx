@@ -38,6 +38,7 @@ type WorkspaceLayoutMockProps = {
   children?: ReactNode;
   rightPanels?: ReactNode;
   headerChatHistory?: ReactNode;
+  headerChatHistoryMenu?: ReactNode;
 };
 
 type WorkspacePageMockProps = {
@@ -219,10 +220,17 @@ vi.mock('../../modules/onboarding', () => ({
 }));
 
 vi.mock('../../layouts/WorkspaceLayout/WorkspaceLayout', () => ({
-  WorkspaceLayout: ({ sidebarProps, children, rightPanels, headerChatHistory }: WorkspaceLayoutMockProps) => (
+  WorkspaceLayout: ({
+    sidebarProps,
+    children,
+    rightPanels,
+    headerChatHistory,
+    headerChatHistoryMenu,
+  }: WorkspaceLayoutMockProps) => (
     <div>
       <div>WorkspaceLayout</div>
       {headerChatHistory}
+      {headerChatHistoryMenu}
       {sidebarProps.projects?.counts?.byProject ? (
         <pre data-testid="sidebar-counts-by-project">
           {JSON.stringify(sidebarProps.projects.counts.byProject)}
