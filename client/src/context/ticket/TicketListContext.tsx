@@ -38,7 +38,7 @@ export function useTicketListContextValue({
   const currentUserId = currentUser?.id ?? null;
   const previousUserIdRef = useRef<string | null>(currentUserId);
   const hasUserChanged = previousUserIdRef.current !== currentUserId;
-  const isProjectScopeAligned = filters.projectId === activeProjectId;
+  const isProjectScopeAligned = !filters.projectId || filters.projectId === activeProjectId;
 
   const ticketsQuery = useQuery({
     queryKey: queryKeys.tickets(activeProjectId),

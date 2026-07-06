@@ -3,8 +3,8 @@ import { act, render, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ActiveProjectProvider, useActiveProject } from '../../project/ActiveProjectContext';
-import { TicketFiltersProvider, useTicketFilters } from '../../filters/TicketFiltersContext';
-import type { TicketFiltersState } from '../../shared/filters';
+import { TicketFiltersContext, TicketFiltersProvider, useTicketFilters } from '../../filters/TicketFiltersContext';
+import { initialFilters, type TicketFiltersState } from '../../shared/filters';
 import { useActiveTicket } from '../ActiveTicketContext';
 import { TicketListProvider, useTicketListContext } from '../TicketListContext';
 import type { TicketListContextType } from '../TicketListContext.types';
@@ -416,5 +416,73 @@ describe('TicketListContext', () => {
       expect(currentValue.tickets).toEqual([]);
       expect(currentValue.activeTicket).toBeNull();
     });
+  });
+
+  it('fetches the active project when filter scope is temporarily empty', async () => {
+    const queryClient = createQueryClient();
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const projectId = getProjectIdFromInit(init);
+      if (url === '/api/v1/tickets' && projectId === 'project-1') {
+        return Promise.resolve(jsonResponse(projectOneTickets));
+      }
+      return Promise.resolve(jsonResponse([]));
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    let localValue: TicketListContextType | undefined;
+    let localProject: ReturnType<typeof useActiveProject> | undefined;
+    const emptyFilterState: TicketFiltersState = {
+      ...initialFilters,
+      projectId: '',
+    };
+
+    function StaticFilterHarness() {
+      return (
+        <TicketFiltersContext.Provider
+          value={{
+            filters: emptyFilterState,
+            setFilters: vi.fn(),
+            resetFilters: vi.fn(),
+          }}
+        >
+          <TicketListProvider currentUser={currentUser}>
+            <Probe />
+          </TicketListProvider>
+        </TicketFiltersContext.Provider>
+      );
+    }
+
+    function Probe() {
+      const value = useTicketListContext();
+      const project = useActiveProject();
+      localValue = value;
+      localProject = project;
+
+      return null;
+    }
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ActiveProjectProvider>
+          <StaticFilterHarness />
+        </ActiveProjectProvider>
+      </QueryClientProvider>
+    );
+
+    await waitFor(() => {
+      expect(localProject).toBeDefined();
+    });
+
+    await act(async () => {
+      localProject?.setActiveProjectId('project-1');
+    });
+
+    await waitFor(() => {
+      expect(localValue?.tickets.map((ticket) => ticket.id)).toEqual(['ticket-1', 'ticket-2']);
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
