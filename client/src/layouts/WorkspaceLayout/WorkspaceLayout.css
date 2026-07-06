@@ -41,6 +41,90 @@
   flex-shrink: 0;
 }
 
+.workspace-header-chat-history-slot {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-left: 14px;
+  display: flex;
+  align-items: center;
+}
+
+.workspace-header-chat-history {
+  min-width: 0;
+  max-width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.workspace-header-chat-history::-webkit-scrollbar {
+  display: none;
+}
+
+.workspace-header-chat-history__loading {
+  color: var(--color-text-disabled);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.workspace-header-chat-history__item {
+  height: 32px;
+  max-width: 210px;
+  min-width: 0;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 9px;
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--color-surface-app) 78%, transparent);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  transition: color var(--transition-fast), border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.workspace-header-chat-history__item:hover,
+.workspace-header-chat-history__item:focus-visible {
+  color: var(--color-text-primary);
+  border-color: var(--color-border-focus);
+  background: var(--color-base100);
+}
+
+.workspace-header-chat-history__item--active {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+  background: var(--color-state-selected-bg);
+}
+
+.workspace-header-chat-history__title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-header-chat-history__time {
+  flex: 0 0 auto;
+  color: var(--color-text-disabled);
+  font-size: 11px;
+}
+
+.workspace-header-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 .workspace-header-hamburger {
   display: none;
 }
@@ -72,6 +156,10 @@
   .workspace-header-workspace-select > div {
     width: 100%;
     min-width: 100px;
+  }
+
+  .workspace-header-chat-history-slot {
+    display: none;
   }
 
   .workspace-header-hamburger {

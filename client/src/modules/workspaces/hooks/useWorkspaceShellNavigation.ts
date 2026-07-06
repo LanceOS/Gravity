@@ -40,7 +40,6 @@ interface UseWorkspaceShellNavigationResult {
   handleOpenTeamProjectsManager: (teamId: string) => void;
   handleOpenWorkspaceDirectory: () => void;
   handleShowWorkspaceProjectList: () => void;
-  handleShowWorkspaceChat: () => void;
 }
 
 export function useWorkspaceShellNavigation({
@@ -213,16 +212,6 @@ export function useWorkspaceShellNavigation({
     navigate(`/workspaces/${activeWorkspaceId}/projects/list`);
   }, [activeWorkspaceId, navigate]);
 
-  const handleShowWorkspaceChat = useCallback(() => {
-    if (!activeWorkspaceAvailable) {
-      navigate('/workspaces');
-      return;
-    }
-
-    setSidebarActiveScope('workspace-chat');
-    navigate(`/workspaces/${activeWorkspaceId}/chat`);
-  }, [activeWorkspaceAvailable, activeWorkspaceId, navigate, setSidebarActiveScope]);
-
   return {
     buildProjectScopedPath: buildProjectScopedPathCallback,
     handleSelectProject,
@@ -241,6 +230,5 @@ export function useWorkspaceShellNavigation({
     handleOpenTeamProjectsManager,
     handleOpenWorkspaceDirectory,
     handleShowWorkspaceProjectList,
-    handleShowWorkspaceChat,
   };
 }

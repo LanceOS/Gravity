@@ -1,4 +1,4 @@
-import { CheckCircle, ChevronDown, ChevronRight, Database, FileText, FolderTree, Inbox, Sparkles } from 'lucide-react';
+import { CheckCircle, ChevronDown, ChevronRight, Database, FileText, FolderTree, Inbox } from 'lucide-react';
 import { useOptionalSidebarContext } from '../context/SidebarContext';
 import type { SidebarNavigationState, SidebarProjectSection } from '../types';
 import { countBadgeStyle, getProjectCollapsedState, isMyIssuesView, isNotesView, isProjectIssuesView } from '../utils';
@@ -84,16 +84,6 @@ export function IndividualsSidebar(props: IndividualsSidebarProps) {
         leftIcon={<Database size={13} />}
       >
         Projects
-      </SidebarNavigation.Item>
-    ) : null,
-    section.onSelectWorkspaceChat ? (
-      <SidebarNavigation.Item
-        key="workspace-chat"
-        active={activeScope === 'workspace-chat'}
-        onClick={section.onSelectWorkspaceChat}
-        leftIcon={<Sparkles size={13} />}
-      >
-        AI Chat
       </SidebarNavigation.Item>
     ) : null,
   ].filter(Boolean);
