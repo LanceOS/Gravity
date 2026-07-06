@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { api, createAuthenticatedApi, seedWorkspaceFixture } from './helpers/test-helpers.js';
 import { db } from '../src/db/index.js';
-import { projectMembers, projects, workspaceMembers } from '../src/db/schema.js';
+import { projectMembers, projects, tickets, workspaceMembers } from '../src/db/schema.js';
 import { getDefaultTeamId } from '../src/modules/workspaces/utils/default-team.js';
 
 describe('workspaces routes', () => {
@@ -366,10 +366,16 @@ describe('workspaces routes', () => {
       version: 1,
       generatedBy: owner.id,
       taskCount: 2,
+      taskCountExact: '2',
     });
     expect(exportResponse.body.workspace).toMatchObject({
       id: workspace.id,
       key: workspace.key,
+    });
+    expect(exportResponse.body.taskExport).toEqual({
+      taskCount: '2',
+      expectedTaskCount: '2',
+      complete: true,
     });
 
     const exportedTasks = exportResponse.body.tasks;
@@ -411,5 +417,186 @@ describe('workspaces routes', () => {
       id: secondProjectId,
       name: 'Audit Ops',
     });
+  });
+
+  it('streams complete workspace task export for large workspaces', async () => {
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Bulk Export Owner',
+      email: 'bulk-export-owner@example.com',
+      role: 'owner',
+      avatarUrl: 'https://example.com/bulk-export-owner.png',
+    });
+    const owner = ownerApi.user;
+    const { workspace, project } = await seedWorkspaceFixture({
+      owner: {
+        id: owner.id,
+        name: owner.name,
+        email: owner.email,
+        role: 'owner',
+        avatarUrl: owner.avatar,
+      },
+      workspace: {
+        id: 'workspace-export-large',
+        key: 'BULK',
+        name: 'Bulk Audit Workspace',
+      },
+      project: {
+        id: 'project-export-large-1',
+        key: 'LAA',
+        name: 'Audit App',
+        inviteCode: 'INV-LAA-0001ABCD',
+      },
+    });
+
+    const secondProjectId = 'project-export-large-2';
+    await db.insert(projects).values({
+      id: secondProjectId,
+      workspaceId: workspace.id,
+      teamId: getDefaultTeamId(workspace.id),
+      name: 'Audit Operations',
+      description: 'Operational audit tasks',
+      key: 'OPS',
+      status: 'active',
+      inviteCode: 'INV-OPS-0002ABCD',
+      createdBy: owner.id,
+      githubRepoUrl: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    await db.insert(projectMembers).values([
+      {
+        projectId: secondProjectId,
+        userId: owner.id,
+        role: 'owner',
+        provisionedByValidationId: null,
+        createdAt: new Date(),
+      },
+    ]);
+
+    const baseCreatedAt = new Date('2026-01-01T00:00:00.000Z');
+    const tasksPerProject = 260;
+    const bulkTasks = [];
+
+    for (let i = 0; i < tasksPerProject; i += 1) {
+      bulkTasks.push({
+        id: `bulk-export-task-a-${String(i).padStart(3, '0')}`,
+        key: `LAA-${String(i).padStart(4, '0')}`,
+        title: `Audit App Task ${i + 1}`,
+        description: 'Large export stress coverage.',
+        status: i % 3 === 0 ? 'in_progress' : i % 3 === 1 ? 'todo' : 'done',
+        priority: i % 2 === 0 ? 'high' : 'medium',
+        assigneeId: i === 0 ? owner.id : null,
+        projectId: project.id,
+        cycleId: null,
+        parentId: null,
+        prStatus: 'none',
+        prUrl: null,
+        createdAt: new Date(baseCreatedAt.getTime() + i * 60000),
+        updatedAt: new Date(baseCreatedAt.getTime() + i * 60000),
+      });
+    }
+
+    for (let i = 0; i < tasksPerProject; i += 1) {
+      bulkTasks.push({
+        id: `bulk-export-task-b-${String(i).padStart(3, '0')}`,
+        key: `OPS-${String(i).padStart(4, '0')}`,
+        title: `Audit Ops Task ${i + 1}`,
+        description: 'Large export stress coverage.',
+        status: i % 3 === 0 ? 'done' : i % 3 === 1 ? 'in_progress' : 'todo',
+        priority: i % 2 === 0 ? 'low' : 'medium',
+        assigneeId: i === 0 ? owner.id : null,
+        projectId: secondProjectId,
+        cycleId: null,
+        parentId: null,
+        prStatus: 'none',
+        prUrl: null,
+        createdAt: new Date(baseCreatedAt.getTime() + 10 * 60000 + i * 60000),
+        updatedAt: new Date(baseCreatedAt.getTime() + 10 * 60000 + i * 60000),
+      });
+    }
+
+    await db.insert(tickets).values(bulkTasks);
+
+    const commentResponse = await ownerApi.post(`/api/v1/tickets/${bulkTasks[0].id}/comments`).send({
+      body: 'Owner bulk export note.',
+    });
+    expect(commentResponse.status).toBe(201);
+
+    const exportResponse = await ownerApi.get(`/api/v1/workspaces/${workspace.id}/export/tasks`);
+    expect(exportResponse.status).toBe(200);
+    expect(exportResponse.headers['content-disposition']).toContain('gravity-bulk-tasks');
+    expect(exportResponse.headers['cache-control']).toBe('no-store');
+
+    const expectedTaskCount = bulkTasks.length;
+    expect(exportResponse.body.export).toMatchObject({
+      type: 'workspace_tasks',
+      version: 1,
+      generatedBy: owner.id,
+      taskCount: expectedTaskCount,
+      taskCountExact: String(expectedTaskCount),
+    });
+    expect(exportResponse.body.workspace).toMatchObject({
+      id: workspace.id,
+      key: workspace.key,
+    });
+    expect(exportResponse.body.taskExport).toMatchObject({
+      taskCount: String(expectedTaskCount),
+      expectedTaskCount: String(expectedTaskCount),
+      complete: true,
+    });
+
+    const exportedTasks = exportResponse.body.tasks;
+    expect(exportedTasks).toHaveLength(expectedTaskCount);
+
+    const expectedOrder = [...bulkTasks]
+      .map((task) => ({
+        id: task.id,
+        projectName: task.projectId === project.id ? 'Audit App' : 'Audit Operations',
+        createdAt: task.createdAt,
+        key: task.key,
+      }))
+      .sort((left, right) => {
+        const projectComparison = left.projectName.localeCompare(right.projectName);
+        if (projectComparison !== 0) {
+          return projectComparison;
+        }
+        const createdAtComparison = left.createdAt.getTime() - right.createdAt.getTime();
+        if (createdAtComparison !== 0) {
+          return createdAtComparison;
+        }
+        return left.key.localeCompare(right.key);
+      })
+      .map((row) => row.id);
+
+    expect(exportedTasks.map((task: { id: string }) => task.id)).toEqual(expectedOrder);
+
+    const firstExportedTask = exportedTasks.find((task: { id: string }) => task.id === bulkTasks[0].id);
+    expect(firstExportedTask).toMatchObject({
+      id: bulkTasks[0].id,
+      status: bulkTasks[0].status,
+      priority: bulkTasks[0].priority,
+      assignee: {
+        id: owner.id,
+        name: owner.name,
+        email: owner.email,
+      },
+      project: {
+        name: 'Audit App',
+        key: 'LAA',
+      },
+      comments: [
+        expect.objectContaining({
+          body: 'Owner bulk export note.',
+          author: expect.objectContaining({
+            id: owner.id,
+            name: owner.name,
+            email: owner.email,
+          }),
+        }),
+      ],
+    });
+    expect(firstExportedTask.createdAt).toEqual(expect.any(String));
+    expect(firstExportedTask.updatedAt).toEqual(expect.any(String));
   });
 });
