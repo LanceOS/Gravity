@@ -11,13 +11,12 @@ export interface ChatOptions {
   messages: Message[];
   tools?: any[];
   apiKey?: string;
-  ollamaUrl?: string;
   maxTokens?: number;
   onChunk?: (chunk: string) => Promise<void> | void;
 }
 
 export interface IAiProvider {
   chat(options: ChatOptions): Promise<{ content: string; toolCalls?: any[] }>;
-  testConnection(options?: string | { apiKey?: string; ollamaUrl?: string }): Promise<void>;
+  testConnection(options?: string | { apiKey?: string }): Promise<void>;
   fetchModels?(apiKey: string): Promise<string[]>;
 }

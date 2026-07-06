@@ -3,7 +3,6 @@ import { db } from '../../../db/index.js';
 import { chatMessages, chatSessions, projects, workspaces } from '../../../db/schema.js';
 import { env } from '../../../env.js';
 import { createId, getUserSettingsRecord } from '../../../lib/platform.js';
-import { validateOllamaUrl } from '../../ai/utils/utils.js';
 import { Message, Message as AiMessage } from '../../ai/types.js';
 import { systemPrompt } from '../../ai/config/sysPrompt.js';
 import { aiService } from '../../ai/index.js';
@@ -12,7 +11,7 @@ import { getDisabledTools } from '../../mcp/workspace-tools.js';
 import { mcpToolsList } from '../../mcp/tools.js';
 import type { McpToolDefinition } from '../../mcp/types.js';
 
-type ChatProvider = 'openai' | 'anthropic' | 'gemini' | 'deepseek' | 'ollama';
+type ChatProvider = 'openai' | 'anthropic' | 'gemini' | 'deepseek';
 
 type AiClient = {
   chat(
@@ -22,7 +21,6 @@ type AiClient = {
       model: string;
       messages: Message[];
       tools?: any[];
-      ollamaUrl?: string;
       maxTokens?: number;
       onChunk?: (chunk: string) => Promise<void> | void;
     },
@@ -88,14 +86,13 @@ type ProjectContext = {
   };
 };
 
-const SUPPORTED_PROVIDERS = new Set<ChatProvider>(['openai', 'anthropic', 'gemini', 'deepseek', 'ollama']);
+const SUPPORTED_PROVIDERS = new Set<ChatProvider>(['openai', 'anthropic', 'gemini', 'deepseek']);
 
 const DEFAULT_MODELS: Record<ChatProvider, string> = {
   openai: 'gpt-4o-mini',
   anthropic: 'claude-3-haiku',
   gemini: 'gemini-1.5-flash',
   deepseek: 'deepseek-chat',
-  ollama: 'llama3.1',
 };
 
 const TOOL_ALIAS_BLOCKS: string[][] = [
@@ -108,7 +105,7 @@ const CHAT_TITLE_DEFAULT = 'New Chat';
 const CHAT_TITLE_MAX_LENGTH = 32;
 const MAX_TOOL_ROUNDS = 2;
 
-const STREAMING_PROVIDERS = new Set<ChatProvider>(['openai', 'deepseek', 'ollama']);
+const STREAMING_PROVIDERS = new Set<ChatProvider>(['openai', 'deepseek']);
 
 export function isSupportedChatProvider(value: string): value is ChatProvider {
   return SUPPORTED_PROVIDERS.has(normalizeString(value).toLowerCase() as ChatProvider);
@@ -219,11 +216,6 @@ export class ChatService {
       throw new Error('Unsupported provider.');
     }
 
-    const requestOllamaUrl = resolvedProvider === 'ollama' ? settings.ollamaEndpoint : undefined;
-    if (requestOllamaUrl) {
-      validateOllamaUrl(requestOllamaUrl);
-    }
-
     const priorRows = await db
       .select()
       .from(chatMessages)
@@ -297,7 +289,6 @@ export class ChatService {
       workspaceId: context.project.workspaceId,
       provider: resolvedProvider,
       model: resolvedModel,
-      ollamaUrl: requestOllamaUrl,
       maxTokens: input.maxTokens,
       messages: conversation,
       toolDefinitions: activeToolDefs,
@@ -357,10 +348,6 @@ export class ChatService {
     const requested = normalizeString(requestedModel);
     if (requested.length > 0) {
       return requested;
-    }
-
-    if (provider === 'ollama' && settings.preferredOllamaModel?.trim()) {
-      return settings.preferredOllamaModel.trim();
     }
 
     const configuredModel = normalizeString(env.aiDefaultModel);
@@ -461,7 +448,6 @@ Only operate in the workspace/project above.`,
     workspaceId: string;
     provider: ChatProvider;
     model: string;
-    ollamaUrl?: string;
     maxTokens?: number;
     messages: AiMessage[];
     toolDefinitions: any[];
@@ -485,7 +471,6 @@ Only operate in the workspace/project above.`,
           model: params.model,
           messages,
           tools: params.toolDefinitions,
-          ...(params.ollamaUrl ? { ollamaUrl: params.ollamaUrl } : {}),
           ...(typeof params.maxTokens === 'number' ? { maxTokens: params.maxTokens } : {}),
           ...(streamCallback ? { onChunk: streamCallback } : {}),
         });

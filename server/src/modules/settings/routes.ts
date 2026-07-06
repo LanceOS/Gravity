@@ -5,7 +5,6 @@ import { userSettings } from '../../db/schema.js';
 import { credentialManager } from '../auth/kms/index.js';
 import { getUserSettingsRecord } from '../../lib/platform.js';
 import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
-import { validateOllamaUrl } from '../ai/utils/utils.js';
 import { aiService } from '../ai/index.js';
 
 const DEFAULT_VIEWS = new Set(['board', 'list']);
@@ -16,7 +15,6 @@ const THEME_ALIASES = new Map<string, string>([
   ['noir', 'dark'],
 ]);
 const AI_PROVIDERS = new Set(['openai', 'anthropic', 'gemini', 'deepseek']);
-const AGENT_INTEGRATIONS = new Set(['ollama', 'third_party']);
 const PROJECT_LAYOUTS = new Set(['standard', 'condensed']);
 const KEY_ACTIONS = new Set(['update', 'clear', 'keep']);
 const API_KEY_MASK = '••••••••••••';
@@ -49,12 +47,9 @@ function toSettingsResponse(
     userId: settings.userId,
     tutorialCompleted: settings.tutorialCompleted,
     defaultView: settings.defaultView,
-    ollamaModel: settings.preferredOllamaModel ?? '',
-    ollamaEndpoint: settings.ollamaEndpoint,
     theme: settings.theme,
     apiKey,
     aiProvider: settings.aiProvider,
-    agentIntegration: settings.agentIntegration,
     projectLayout: settings.projectLayout,
     savedCredentials,
   };
@@ -198,27 +193,6 @@ export function createSettingsRouter() {
         return;
       }
 
-      const agentIntegration = getOptionalEnumValue(req.body, 'agentIntegration', AGENT_INTEGRATIONS);
-      if (!agentIntegration.ok) {
-        res.status(400).json({ error: agentIntegration.error });
-        return;
-      }
-
-      const ollamaEndpoint = typeof req.body?.ollamaEndpoint === 'string' ? req.body.ollamaEndpoint : undefined;
-      if (ollamaEndpoint) {
-        try {
-          validateOllamaUrl(ollamaEndpoint);
-        } catch (error) {
-          const message = error instanceof Error ? error.message : 'Invalid ollamaEndpoint.';
-          const safe =
-            message === 'Invalid URL format.' || message === 'URL scheme must be http or https.'
-              ? message
-              : 'Invalid Ollama endpoint.';
-          res.status(400).json({ error: safe });
-          return;
-        }
-      }
-
       const current = await getUserSettingsRecord(userId);
 
       const credentialProvider = getOptionalEnumValue(req.body, 'credentialProvider', AI_PROVIDERS);
@@ -286,12 +260,8 @@ export function createSettingsRouter() {
         const nextSettings = {
           ...current,
           defaultView: defaultView.value ?? current.defaultView,
-          preferredOllamaModel:
-            typeof req.body?.ollamaModel === 'string' ? req.body.ollamaModel : current.preferredOllamaModel,
-          ollamaEndpoint: ollamaEndpoint ?? current.ollamaEndpoint,
           theme: theme.value ?? current.theme,
           aiProvider: aiProvider.value ?? current.aiProvider,
-          agentIntegration: agentIntegration.value ?? current.agentIntegration,
           projectLayout: projectLayout.value ?? current.projectLayout,
         };
 
@@ -301,11 +271,8 @@ export function createSettingsRouter() {
           .update(userSettings)
           .set({
             defaultView: nextSettings.defaultView,
-            preferredOllamaModel: nextSettings.preferredOllamaModel,
-            ollamaEndpoint: nextSettings.ollamaEndpoint,
             theme: nextSettings.theme,
             aiProvider: nextSettings.aiProvider,
-            agentIntegration: nextSettings.agentIntegration,
             projectLayout: nextSettings.projectLayout,
             updatedAt: new Date(),
           })

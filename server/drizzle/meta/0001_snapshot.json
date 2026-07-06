@@ -228,32 +228,12 @@
           "notNull": true,
           "default": "'board'"
         },
-        "ollama_endpoint": {
-          "name": "ollama_endpoint",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'http://host.docker.internal:11434'"
-        },
-        "preferred_ollama_model": {
-          "name": "preferred_ollama_model",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "ai_provider": {
           "name": "ai_provider",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
           "default": "'openai'"
-        },
-        "agent_integration": {
-          "name": "agent_integration",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'ollama'"
         },
         "project_layout": {
           "name": "project_layout",

@@ -2,7 +2,6 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { OpenAiProvider } from '../src/modules/ai/providers/openai-provider.js';
 import { AnthropicProvider } from '../src/modules/ai/providers/anthropic-provider.js';
 import { GeminiProvider } from '../src/modules/ai/providers/gemini-provider.js';
-import { OllamaProvider } from '../src/modules/ai/providers/ollama-provider.js';
 import { fetchWithTimeout, readErrorMessage } from '../src/modules/ai/utils/utils.js';
 
 // ---------------------------------------------------------------------------
@@ -468,86 +467,5 @@ describe('GeminiProvider', () => {
 
     const calledUrl = String(fetchMock.mock.calls[0][0]);
     expect(calledUrl).toContain('key=my-gemini-key');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// OllamaProvider — resolveOllamaUrl Docker fallback logic
-// ---------------------------------------------------------------------------
-
-describe('OllamaProvider.resolveOllamaUrl', () => {
-  let provider: OllamaProvider;
-
-  beforeEach(() => {
-    provider = new OllamaProvider();
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
-    vi.restoreAllMocks();
-  });
-
-  it('returns non-localhost URLs unchanged without probing', async () => {
-    // Should not call fetch at all for remote URLs
-    const fetchMock = vi.fn();
-    vi.stubGlobal('fetch', fetchMock);
-
-    const resolved = await provider.resolveOllamaUrl('http://ollama.internal:11434');
-    expect(resolved).toBe('http://ollama.internal:11434');
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it('returns the Docker host URL when Docker probe succeeds', async () => {
-    const fetchMock = vi
-      .fn()
-      // First call: Docker internal probe succeeds
-      .mockResolvedValueOnce(makeResponse({ models: [] }));
-    vi.stubGlobal('fetch', fetchMock);
-
-    const resolved = await provider.resolveOllamaUrl('http://localhost:11434');
-    expect(resolved).toContain('host.docker.internal');
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-  });
-
-  it('falls back to the original localhost URL when Docker probe fails', async () => {
-    const fetchMock = vi
-      .fn()
-      // First call: Docker internal probe fails
-      .mockRejectedValueOnce(new Error('ECONNREFUSED'))
-      // Second call: localhost probe succeeds
-      .mockResolvedValueOnce(makeResponse({ models: [] }));
-    vi.stubGlobal('fetch', fetchMock);
-
-    const resolved = await provider.resolveOllamaUrl('http://localhost:11434');
-    expect(resolved).toBe('http://localhost:11434');
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-  });
-
-  it('returns the original URL when both probes fail (best-effort)', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockRejectedValueOnce(new Error('ECONNREFUSED'))
-      .mockRejectedValueOnce(new Error('ECONNREFUSED'));
-    vi.stubGlobal('fetch', fetchMock);
-
-    const resolved = await provider.resolveOllamaUrl('http://localhost:11434');
-    // Returns original so caller can surface a descriptive error to the user
-    expect(resolved).toBe('http://localhost:11434');
-  });
-
-  it('fetches models and filters out entries without a name', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn()
-        // Docker probe fails
-        .mockRejectedValueOnce(new Error('ECONNREFUSED'))
-        // localhost probe for resolveOllamaUrl
-        .mockResolvedValueOnce(makeResponse({ models: [] }))
-        // Actual fetchOllamaModels call
-        .mockResolvedValueOnce(makeResponse({ models: [{ name: 'llama3' }, {}, { name: 'codellama' }] })),
-    );
-
-    const models = await provider.fetchOllamaModels('http://localhost:11434');
-    expect(models).toEqual(['llama3', 'codellama']);
   });
 });

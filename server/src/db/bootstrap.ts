@@ -273,10 +273,7 @@ export async function initializeDatabase() {
       tutorial_completed BOOLEAN NOT NULL DEFAULT FALSE,
       theme TEXT NOT NULL DEFAULT 'dark',
       default_view TEXT NOT NULL DEFAULT 'board',
-      ollama_endpoint TEXT NOT NULL DEFAULT '${env.ollamaDefaultEndpoint}',
-      preferred_ollama_model TEXT,
       ai_provider TEXT NOT NULL DEFAULT 'openai',
-      agent_integration TEXT NOT NULL DEFAULT 'ollama',
       project_layout TEXT NOT NULL DEFAULT 'standard',
       encrypted_api_key TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -531,16 +528,8 @@ export async function initializeDatabase() {
     ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS default_view TEXT NOT NULL DEFAULT 'board';
   `);
 
-  await pool.query(
-    `
-    ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS ollama_endpoint TEXT NOT NULL DEFAULT '${env.ollamaDefaultEndpoint.replace(/'/g, "''")}';
-  `
-  );
-
   await pool.query(`
-    ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS preferred_ollama_model TEXT;
     ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS ai_provider TEXT NOT NULL DEFAULT 'openai';
-    ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS agent_integration TEXT NOT NULL DEFAULT 'ollama';
     ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS project_layout TEXT NOT NULL DEFAULT 'standard';
     ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS encrypted_api_key TEXT;
     ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();

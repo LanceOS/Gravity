@@ -13,7 +13,6 @@ import {
   workspaces,
   workspaceSettings,
 } from '../db/schema.js';
-import { env } from '../env.js';
 import { getWorkspaceMemberRole } from '../modules/workspaces/services/membership.js';
 
 export type ClientUser = {
@@ -39,10 +38,7 @@ type RawSettingsRow = {
   tutorialCompleted: boolean;
   theme: string;
   defaultView: string;
-  ollamaEndpoint: string;
-  preferredOllamaModel: string | null;
   aiProvider: string;
-  agentIntegration: string;
   projectLayout: string;
   encryptedApiKey: string | null;
 };
@@ -87,10 +83,6 @@ export function getProjectIdFromRequest(req: Request) {
   return fromHeader || fromQuery || fromBody || '';
 }
 
-export function normalizeOllamaUrl(url: string) {
-  return url.replace(/\/$/, '');
-}
-
 export async function ensureUserDefaults(userId: string) {
   await db
     .insert(userProfiles)
@@ -107,9 +99,7 @@ export async function ensureUserDefaults(userId: string) {
       userId,
       theme: 'dark',
       defaultView: 'board',
-      ollamaEndpoint: env.ollamaDefaultEndpoint,
       aiProvider: 'openai',
-      agentIntegration: 'ollama',
       projectLayout: 'standard',
       tutorialCompleted: false,
     })
@@ -299,10 +289,7 @@ export async function getUserSettingsRecord(userId: string): Promise<RawSettings
     tutorialCompleted: row?.tutorialCompleted ?? false,
     theme: row?.theme ?? 'dark',
     defaultView: row?.defaultView ?? 'board',
-    ollamaEndpoint: row?.ollamaEndpoint ?? env.ollamaDefaultEndpoint,
-    preferredOllamaModel: row?.preferredOllamaModel ?? null,
     aiProvider: row?.aiProvider ?? 'openai',
-    agentIntegration: row?.agentIntegration ?? 'ollama',
     projectLayout: row?.projectLayout ?? 'standard',
     encryptedApiKey: row?.encryptedApiKey ?? null,
   };

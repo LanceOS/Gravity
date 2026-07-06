@@ -201,12 +201,10 @@ describe('ChatService', () => {
     expect(isSupportedChatProvider('anthropic')).toBe(true);
     expect(isSupportedChatProvider('gemini')).toBe(true);
     expect(isSupportedChatProvider('deepseek')).toBe(true);
-    expect(isSupportedChatProvider('ollama')).toBe(true);
     expect(isSupportedChatProvider('invalid-provider')).toBe(false);
 
     expect(isStreamingChatProvider('openai')).toBe(true);
     expect(isStreamingChatProvider('deepseek')).toBe(true);
-    expect(isStreamingChatProvider('ollama')).toBe(true);
     expect(isStreamingChatProvider('anthropic')).toBe(false);
     expect(isStreamingChatProvider('gemini')).toBe(false);
     expect(isStreamingChatProvider('invalid-provider')).toBe(false);

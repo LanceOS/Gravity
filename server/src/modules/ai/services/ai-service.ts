@@ -3,7 +3,6 @@ import { CredentialManager } from '../../auth/kms/credential-manager.js';
 import { OpenAiProvider } from '../providers/openai-provider.js';
 import { AnthropicProvider } from '../providers/anthropic-provider.js';
 import { GeminiProvider } from '../providers/gemini-provider.js';
-import { OllamaProvider } from '../providers/ollama-provider.js';
 import { ChatOptions, IAiProvider } from '../types.js';
 import { env } from '../../../env.js';
 import { chooseBestMcpModel } from '../utils/utils.js';
@@ -23,7 +22,6 @@ function createDefaultAiProviders(): AiProviderMap {
     deepseek: new OpenAiProvider(true),
     anthropic: new AnthropicProvider(),
     gemini: new GeminiProvider(),
-    ollama: new OllamaProvider(),
   };
 }
 
@@ -41,10 +39,6 @@ export class AiService {
     providers: AiProviderMap = createDefaultAiProviders(),
   ) {
     this.providers = providers;
-  }
-
-  getOllamaProvider(): OllamaProvider {
-    return this.providers.ollama as OllamaProvider;
   }
 
   private getProvider(provider: string): IAiProvider {
@@ -96,11 +90,6 @@ export class AiService {
     provider: string,
     options: Omit<ChatOptions, 'apiKey'>,
   ): Promise<{ content: string; toolCalls?: any[] }> {
-    const lower = provider.toLowerCase();
-    if (lower === 'ollama') {
-      return this.getProvider('ollama').chat(options);
-    }
-
     // Validate provider existence first (throws if unsupported)
     this.getProvider(provider);
 
@@ -112,21 +101,14 @@ export class AiService {
 
   /**
    * Tests the connection of the specified provider, using either newly provided
-   * parameters (apiKey or ollamaUrl) or loading and decrypting the saved credentials.
+   * parameters or loading and decrypting the saved credentials.
    */
   async testConnection(
     userId: string,
     provider: string,
-    options?: { apiKey?: string; ollamaUrl?: string },
+    options?: { apiKey?: string },
   ): Promise<number> {
     const startedAt = Date.now();
-    const lower = provider.toLowerCase();
-
-    if (lower === 'ollama') {
-      const ollamaUrl = (this.providers.ollama as OllamaProvider);
-      await ollamaUrl.testConnection({ ollamaUrl: options?.ollamaUrl || 'http://localhost:11434' });
-      return Date.now() - startedAt;
-    }
 
     const providerInst = this.getProvider(provider);
 

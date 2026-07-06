@@ -62,7 +62,7 @@ export class AnthropicProvider implements IAiProvider {
     };
   }
 
-  async testConnection(options?: string | { apiKey?: string; ollamaUrl?: string }): Promise<void> {
+  async testConnection(options?: string | { apiKey?: string }): Promise<void> {
     const apiKey = typeof options === 'string' ? options : options?.apiKey;
     if (!apiKey) {
       throw new Error('API key is required.');

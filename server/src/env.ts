@@ -52,7 +52,6 @@ const envSchema = z.object({
       if (s === 'false' || s === '0' || s === '') return false;
       return v;
     }, z.boolean()).default(false),
-  OLLAMA_DEFAULT_ENDPOINT: z.string().url().optional(),
   AI_PROVIDER: z.string().optional(),
   AI_MODEL: z.string().optional(),
   AI_STREAM_CHUNK_SIZE: z.coerce.number().int().positive().default(48),
@@ -113,9 +112,6 @@ export const env = {
   trustedServiceTokens: splitList(parsed.TRUSTED_SERVICE_TOKENS),
   trustedServiceTokensFile: parsed.TRUSTED_SERVICE_TOKENS_FILE?.trim() || undefined,
   trustedServiceTokensRefreshIntervalMs: parsed.TRUSTED_SERVICE_TOKENS_REFRESH_INTERVAL_MS,
-  ollamaDefaultEndpoint:
-    parsed.OLLAMA_DEFAULT_ENDPOINT ??
-    (parsed.NODE_ENV === 'test' ? 'http://localhost:11434' : 'http://host.docker.internal:11434'),
   aiDefaultProvider: parsed.AI_PROVIDER?.trim().toLowerCase(),
   aiDefaultModel: parsed.AI_MODEL?.trim() || undefined,
   aiStreamChunkSize: parsed.AI_STREAM_CHUNK_SIZE,
