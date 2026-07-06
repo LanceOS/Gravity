@@ -1,3 +1,4 @@
+import { StrictMode } from 'react';
 import type { ComponentProps, ReactNode } from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -73,7 +74,16 @@ function Wrapper({ children }: { children: ReactNode }) {
   return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
 }
 
-function renderDock(overrides: Partial<ComponentProps<typeof WorkspaceChatDock>> = {}) {
+function StrictWrapper({ children }: { children: ReactNode }) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return (
+    <StrictMode>
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    </StrictMode>
+  );
+}
+
+function renderDock(overrides: Partial<ComponentProps<typeof WorkspaceChatDock>> = {}, options: { strict?: boolean } = {}) {
   const props = {
     initialOllamaUrl: '',
     initialModel: 'claude-3-haiku',
@@ -93,7 +103,7 @@ function renderDock(overrides: Partial<ComponentProps<typeof WorkspaceChatDock>>
   mocks.useActiveTicket.mockReturnValue({ activeTicket: null, setActiveTicket: vi.fn() });
   mocks.useProjectContext.mockReturnValue({ projects: [] });
 
-  return render(<WorkspaceChatDock {...props} />, { wrapper: Wrapper });
+  return render(<WorkspaceChatDock {...props} />, { wrapper: options.strict ? StrictWrapper : Wrapper });
 }
 
 describe('WorkspaceChatDock', () => {
@@ -218,6 +228,64 @@ describe('WorkspaceChatDock', () => {
       expect(screen.getByText('Hello from before')).toBeInTheDocument();
       expect(screen.getAllByText('Hi! How can I help?').length).toBeGreaterThan(0);
     });
+  });
+
+  it('keeps a loaded chat transcript visible under StrictMode double-invoked effects', async () => {
+    // Regression test: React 18 StrictMode intentionally double-invokes mount
+    // effects in development. A ref-based "have I run before" guard can flip
+    // on the first (phantom) invocation and then fail to protect the second
+    // (also still-initial) invocation, causing a reset effect to fire for
+    // real and wipe a just-loaded transcript back to empty. Production builds
+    // and the default (non-strict) RTL render don't double-invoke, so this
+    // only reproduces under StrictMode.
+    mocks.fetch.mockImplementation((url: string) => {
+      if (url.includes('/chats?')) {
+        return Promise.resolve(createJsonResponse([{
+          id: 'chat-old',
+          projectId: 'project-1',
+          teamId: 'team-1',
+          userId: 'user-1',
+          title: 'Old Chat',
+          lastMessagePreview: 'Hi! How can I help?',
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-01T00:00:00.000Z',
+        }]));
+      }
+      if (url === '/api/v1/mcp/sse') return Promise.resolve(createJsonResponse({ result: { tools: [] } }));
+      if (url === '/api/v1/projects/project-1/chats/chat-old') {
+        return Promise.resolve(createJsonResponse({
+          id: 'chat-old',
+          projectId: 'project-1',
+          teamId: 'team-1',
+          userId: 'user-1',
+          title: 'Old Chat',
+          lastMessagePreview: 'Hi! How can I help?',
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-01T00:00:00.000Z',
+          messages: [
+            { id: 'm1', sessionId: 'chat-old', role: 'user', content: 'Hello from before', metadata: {}, createdAt: '2026-01-01T00:00:01.000Z' },
+            { id: 'm2', sessionId: 'chat-old', role: 'assistant', content: 'Hi! How can I help?', metadata: {}, createdAt: '2026-01-01T00:00:02.000Z' },
+          ],
+        }));
+      }
+      return Promise.resolve(createJsonResponse({}));
+    });
+
+    const user = userEvent.setup();
+    renderDock({}, { strict: true });
+
+    const title = await screen.findByText('Old Chat');
+    await user.click(title);
+
+    await waitFor(() => {
+      expect(screen.getByText('Hello from before')).toBeInTheDocument();
+    });
+
+    // Give any delayed/duplicated effect a chance to run before re-asserting.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(screen.getByText('Hello from before')).toBeInTheDocument();
+    expect(screen.getAllByText('Hi! How can I help?').length).toBeGreaterThan(0);
   });
 
   it('preserves the live transcript when the first message creates a chat session', async () => {

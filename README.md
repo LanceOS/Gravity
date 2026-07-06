@@ -34,7 +34,7 @@ cd server
 npm run db:seed
 ```
 
-This script is idempotent. It deletes specifically named seed objects (e.g., `seed@example.com` and related projects/tickets) before inserting fresh data, so it can be safely run multiple times without causing duplicates or destroying other user data.
+This script is idempotent. It refreshes the default `test@example.com` / `password123` seed user and deletes specifically named seed objects (for example, the `seed-*` workspaces, projects, and tickets) before inserting fresh data, so it can be safely run multiple times without causing duplicates or destroying other user data.
 
 Docs
 -----

@@ -90,6 +90,7 @@ describe('chat sessions routes', () => {
     expect(getResponse.body).toMatchObject({
       id: firstChatId,
       title: 'Roadmap Chat (Renamed)',
+      lastMessagePreview: null,
       messages: [],
     });
 
@@ -164,6 +165,10 @@ describe('chat sessions routes', () => {
     expect(getWithMessages.body.messages).toHaveLength(3);
     expect(getWithMessages.body.messages[0].content).toBe('Draft release strategy.');
     expect(getWithMessages.body.messages[1].content).toBe('Planned approach logged.');
+    // The single-session detail endpoint must compute a real preview from its own
+    // message rows, not hardcode null — the client falls back to this text when a
+    // chat's transcript renders empty, so a stale null silently blanks the chat.
+    expect(getWithMessages.body.lastMessagePreview).toBe('Context references updated.');
 
     const sharedMessageTime = new Date('2026-01-02T12:00:00.000Z');
     await db

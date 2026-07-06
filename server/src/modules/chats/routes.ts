@@ -357,8 +357,11 @@ export function createChatsRouter() {
         .where(eq(chatMessages.sessionId, chatId))
         .orderBy(asc(chatMessages.createdAt), asc(chatMessages.id));
 
+      const lastMessage = messageRows[messageRows.length - 1];
+      const lastMessagePreview = lastMessage ? buildMessagePreview(lastMessage.content) : null;
+
       res.json({
-        ...mapChatSessionRow(session),
+        ...mapChatSessionRow(session, lastMessagePreview),
         messages: messageRows.map(mapChatMessageRow),
       });
     } catch (error) {

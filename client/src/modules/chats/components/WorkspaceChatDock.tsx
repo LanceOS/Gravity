@@ -17,6 +17,23 @@ interface WorkspaceChatDockProps {
   style?: React.CSSProperties;
 }
 
+function normalizeChatHistoryRole(role: string): Message['role'] {
+  switch (role.trim().toLowerCase()) {
+    case 'user':
+    case 'human':
+      return 'user';
+    case 'assistant':
+    case 'ai':
+    case 'model':
+      return 'assistant';
+    case 'tool':
+      return 'tool';
+    case 'system':
+    default:
+      return 'system';
+  }
+}
+
 export function WorkspaceChatDock({
   initialOllamaUrl,
   initialModel,
@@ -51,14 +68,17 @@ export function WorkspaceChatDock({
   const [isLoadingSession, setIsLoadingSession] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [chatViewVersion, setChatViewVersion] = useState(0);
-  const hasResolvedProjectIdRef = useRef(false);
+  const latestSessionRequestId = useRef(0);
+  const lastResolvedProjectIdRef = useRef(resolvedProjectId);
 
   useEffect(() => {
-    if (!hasResolvedProjectIdRef.current) {
-      hasResolvedProjectIdRef.current = true;
+    if (lastResolvedProjectIdRef.current === resolvedProjectId) {
       return;
     }
+    lastResolvedProjectIdRef.current = resolvedProjectId;
 
+    latestSessionRequestId.current += 1;
+    setIsLoadingSession(false);
     setSelectedChatId('');
     setLiveChatId('');
     setActiveMessages(undefined);
@@ -72,20 +92,44 @@ export function WorkspaceChatDock({
       return;
     }
 
+    const requestId = latestSessionRequestId.current + 1;
+    latestSessionRequestId.current = requestId;
     setIsLoadingSession(true);
     try {
       const detail = await getChatSession(resolvedProjectId, chatId);
-      const transcript: Message[] = detail.messages
-        .filter((message) => message.role === 'user' || message.role === 'assistant')
-        .map((message) => ({ role: message.role, content: message.content }));
-      setActiveMessages(transcript);
+      if (requestId !== latestSessionRequestId.current) {
+        return;
+      }
+
+      const transcript = detail.messages
+        .map((message) => ({
+          role: normalizeChatHistoryRole(message.role),
+          content: message.content,
+        }))
+        .filter((message) => message.content.trim().length > 0);
+
+      setActiveMessages(
+        transcript.length > 0
+          ? transcript
+          : detail.lastMessagePreview?.trim()
+            ? [{ role: 'system', content: `Latest activity: ${detail.lastMessagePreview.trim()}` }]
+            : []
+      );
       setSelectedChatId(chatId);
       setLiveChatId(chatId);
       setChatViewVersion((current) => current + 1);
     } catch (error) {
       console.error('Failed to load chat session:', error);
+      if (requestId === latestSessionRequestId.current) {
+        setActiveMessages([{ role: 'system', content: 'Failed to load this chat. Please try again.' }]);
+        setSelectedChatId(chatId);
+        setLiveChatId(chatId);
+        setChatViewVersion((current) => current + 1);
+      }
     } finally {
-      setIsLoadingSession(false);
+      if (requestId === latestSessionRequestId.current) {
+        setIsLoadingSession(false);
+      }
     }
   };
 

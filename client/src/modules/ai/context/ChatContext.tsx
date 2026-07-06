@@ -186,7 +186,7 @@ export const ChatContextProvider: React.FC<ChatProviderProps> = ({
 
   const chatSessionIdRef = useRef(seedChatSessionId || '');
   const cloudContextVersionRef = useRef(0);
-  const isFirstProjectEffectRunRef = useRef(true);
+  const lastProjectResetKeyRef = useRef(`${isThirdParty}:${projectId ?? ''}`);
 
   useEffect(() => {
     chatSessionIdRef.current = chatSessionId;
@@ -201,10 +201,12 @@ export const ChatContextProvider: React.FC<ChatProviderProps> = ({
   }, [seedChatSessionId, seedMessages]);
 
   useEffect(() => {
-    if (isFirstProjectEffectRunRef.current) {
-      isFirstProjectEffectRunRef.current = false;
+    const nextResetKey = `${isThirdParty}:${projectId ?? ''}`;
+    if (lastProjectResetKeyRef.current === nextResetKey) {
       return;
     }
+    lastProjectResetKeyRef.current = nextResetKey;
+
     cloudContextVersionRef.current += 1;
     chatSessionIdRef.current = '';
     setChatSessionId('');
