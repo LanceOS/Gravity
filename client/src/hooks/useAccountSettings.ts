@@ -93,8 +93,6 @@ export function useAccountSettings({
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<StatusMessage | null>(null);
   const [tutorialResult, setTutorialResult] = useState<StatusMessage | null>(null);
-  const [ollamaModels, setOllamaModels] = useState<string[]>([]);
-  const [ollamaModelsLoading, setOllamaModelsLoading] = useState(false);
   const [settingsHydrated, setSettingsHydrated] = useState(false);
   const [savedCredentials, setSavedCredentials] = useState<SavedApiCredential[]>([]);
   const [apiKeyState, setApiKeyState] = useState<'stored' | 'cleared' | 'pending'>('cleared');
@@ -139,7 +137,6 @@ export function useAccountSettings({
     setSaveError(null);
     setTestResult(null);
     setTutorialResult(null);
-    setOllamaModels([]);
     setSavedCredentials([]);
     setApiKeyState('cleared');
     setSettingsHydrated(false);
@@ -212,57 +209,6 @@ export function useAccountSettings({
     };
   }, [currentUserId, setTheme, setView]);
 
-  const refreshOllamaModels = useCallback(async (endpoint?: string) => {
-    const ollamaUrl = (endpoint ?? settings.ollamaEndpoint).trim();
-    if (!ollamaUrl) {
-      setOllamaModels([]);
-      return;
-    }
-
-    setOllamaModelsLoading(true);
-    try {
-      const response = await fetch(`/api/v1/ai/ollama/models?ollamaUrl=${encodeURIComponent(ollamaUrl)}`);
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to detect Ollama models.');
-      }
-
-      // Handle both the legacy raw-array format and the new { models, connected } format
-      const rawModels = Array.isArray(data)
-        ? data
-        : Array.isArray(data.models)
-          ? data.models
-          : [];
-      const nextModels = rawModels.filter((model: unknown): model is string => typeof model === 'string' && model.length > 0);
-
-      setOllamaModels(nextModels);
-      setSettings((current) => {
-        if (nextModels.length === 0 || nextModels.includes(current.ollamaModel)) {
-          return current;
-        }
-
-        return { ...current, ollamaModel: nextModels[0] };
-      });
-    } catch {
-      setOllamaModels([]);
-    } finally {
-      setOllamaModelsLoading(false);
-    }
-  }, [settings.ollamaEndpoint]);
-
-  useEffect(() => {
-    if (!currentUser || !settingsHydrated) {
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      void refreshOllamaModels(settings.ollamaEndpoint);
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [currentUser, settings.ollamaEndpoint, settingsHydrated, refreshOllamaModels]);
-
   const updateSettings = useCallback((updates: Partial<WorkspaceSettings>) => {
     const nextUpdates = { ...updates };
     if (typeof nextUpdates.apiKey === 'string') {
@@ -293,9 +239,6 @@ export function useAccountSettings({
       setTestResult(null);
     }
 
-    if (nextUpdates.ollamaEndpoint !== undefined) {
-      setOllamaModels([]);
-    }
   }, [savedCredentialByProvider]);
 
   const saveSettings = useCallback(async () => {
@@ -317,7 +260,6 @@ export function useAccountSettings({
         theme: requestedTheme,
         keyAction,
         apiKey: keyAction === 'update' ? normalizedApiKey : undefined,
-        ollamaModel: ollamaModels.length > 0 ? settings.ollamaModel : '',
       };
 
       const response = await fetch(`/api/v1/settings/${currentUser.id}`, {
@@ -364,7 +306,7 @@ export function useAccountSettings({
         setSaveLoading(false);
       }
     }
-  }, [currentUser, activeView, settings, apiKeyState, ollamaModels, setTheme, setView]);
+  }, [currentUser, activeView, settings, apiKeyState, setTheme, setView]);
 
   const removeCredential = useCallback(async (provider: WorkspaceSettings['aiProvider']) => {
     if (!currentUser) {
@@ -497,17 +439,11 @@ export function useAccountSettings({
       defaultView: settings.defaultView,
       theme: settings.theme,
       projectLayout: settings.projectLayout,
-      agentIntegration: settings.agentIntegration,
-      ollamaModel: settings.ollamaModel,
-      ollamaEndpoint: settings.ollamaEndpoint,
     },
     {
       defaultView: baselineSettings.defaultView,
       theme: baselineSettings.theme,
       projectLayout: baselineSettings.projectLayout,
-      agentIntegration: baselineSettings.agentIntegration,
-      ollamaModel: baselineSettings.ollamaModel,
-      ollamaEndpoint: baselineSettings.ollamaEndpoint,
     }
   );
   const baselineApiKeyState = baselineSettings.apiKey === API_KEY_MASK ? 'stored' : 'cleared';
@@ -524,15 +460,12 @@ export function useAccountSettings({
     testResult,
     tutorialResult,
     savedCredentials,
-    ollamaModels,
-    ollamaModelsLoading,
     updateSettings,
     saveSettings,
     removeCredential,
     resetProviderDraft,
     testApiKey,
     resetTutorial,
-    refreshOllamaModels,
     hasProviderChanges,
     hasChanges,
     settingsHydrated,

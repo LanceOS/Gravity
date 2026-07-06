@@ -4,14 +4,12 @@ import {
   AccountPreferencesCloudContext,
   AccountPreferencesNavigationContext,
   AccountPreferencesOnboardingContext,
-  AccountPreferencesOllamaContext,
   AccountPreferencesRuntimeContext,
   AccountPreferencesSettingsContext,
   type AccountPreferencesCategoryContextValue,
   type AccountPreferencesCloudContextValue,
   type AccountPreferencesNavigationContextValue,
   type AccountPreferencesOnboardingContextValue,
-  type AccountPreferencesOllamaContextValue,
   type AccountPreferencesRuntimeContextValue,
   type AccountPreferencesSettingsContextValue,
 } from './accountPreferencesPageContextState';
@@ -43,17 +41,6 @@ export function useAccountPreferencesCloudContext(): AccountPreferencesCloudCont
   if (!context) {
     throw new Error(
       'useAccountPreferencesCloudContext must be used within AccountPreferencesCloudContextProvider.'
-    );
-  }
-
-  return context;
-}
-
-export function useAccountPreferencesOllamaContext(): AccountPreferencesOllamaContextValue {
-  const context = useContext(AccountPreferencesOllamaContext);
-  if (!context) {
-    throw new Error(
-      'useAccountPreferencesOllamaContext must be used within AccountPreferencesOllamaContextProvider.'
     );
   }
 

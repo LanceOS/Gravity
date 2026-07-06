@@ -5,7 +5,6 @@ import { useIsMobile } from '../../../hooks/useIsMobile';
 import { CloudProviderSection } from '../components/sections/CloudProviderSection';
 import { GeneralSettingsSection } from '../components/sections/GeneralSettingsSection';
 import { OnboardingSection } from '../components/sections/OnboardingSection';
-import { OllamaSettingsSection } from '../components/sections/OllamaSettingsSection';
 import { SavedKeysCard } from '../components/sections/SavedKeysCard';
 import { AccountPreferencesSidebar } from '../layout/AccountPreferencesSidebar';
 import { AccountPreferencesPageProps } from '../types';
@@ -14,7 +13,6 @@ import {
   useAccountPreferencesCloudContext,
   useAccountPreferencesNavigationContext,
   useAccountPreferencesOnboardingContext,
-  useAccountPreferencesOllamaContext,
   useAccountPreferencesRuntimeContext,
   useAccountPreferencesSettingsContext,
 } from '../../../context/accountPreferencesPage/accountPreferencesPageContextHooks';
@@ -44,7 +42,6 @@ function AccountPreferencesPageContent() {
     savedCredentials,
   } = useAccountPreferencesCloudContext();
   const { tutorialResult, onResetTutorial } = useAccountPreferencesOnboardingContext();
-  const { ollamaModels, ollamaModelsLoading, onRefreshOllamaModels } = useAccountPreferencesOllamaContext();
 
   const activeCategoryMeta =
     categories.find((category) => category.id === activeCategory) || categories[0];
@@ -140,17 +137,6 @@ function AccountPreferencesPageContent() {
                 onRemoveCredential={onRemoveCredential}
               />
             </Stack>
-          )}
-
-          {(isMobile || activeCategory === 'ollama') && (
-            <OllamaSettingsSection
-              settings={settings}
-              ollamaModels={ollamaModels}
-              ollamaModelsLoading={ollamaModelsLoading}
-              onChangeSettings={onChangeSettings}
-              onRefreshOllamaModels={onRefreshOllamaModels}
-              isMobile={isMobile}
-            />
           )}
 
           {(isMobile || activeCategory === 'onboarding') && (

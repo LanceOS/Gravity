@@ -1,9 +1,9 @@
-import React, { createContext, useContext, useState, useEffect, useRef, useEffectEvent } from 'react';
-import type { Message, SendMessageOptions } from '../types/LocalAIChat';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import type { Message, SendMessageOptions } from '../types/AgentChat';
 import type { WorkspaceSettings } from '../../../utils/settings';
 import { apiClient } from '../../../utils/apiClient';
 import { queryClient, queryKeys, CACHE_CONFIGS } from '../../../utils/queryClient';
-import { getInitialMessages, getInitialModel, getInitialOllamaUrl, buildOllamaErrorMessage } from '../utils/LocalAIChat';
+import { getInitialMessages, getInitialModel } from '../utils/AgentChat';
 
 export interface ChatContextType {
   messages: Message[];
@@ -13,17 +13,12 @@ export interface ChatContextType {
   error: string | null;
   model: string;
   setModel: (model: string) => void;
-  ollamaUrl: string;
-  setOllamaUrl: (url: string) => void;
   modelStatus: 'connected' | 'disconnected' | 'checking';
-  detectedModels: string[];
-  isCheckingModel: boolean;
   sendMessage: (content: string, options?: SendMessageOptions) => Promise<void>;
   regenerate: () => Promise<void>;
   retry: () => Promise<void>;
   clearChat: () => void;
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
-  checkOllamaStatus: (urlToTest?: string, announceLoading?: boolean) => Promise<void>;
   setChatSessionId: (chatId: string) => void;
 }
 
@@ -37,18 +32,6 @@ const CLOUD_MODELS: Record<string, string[]> = {
 };
 
 const CLOUD_PROJECT_REQUIRED_MESSAGE = 'Select a project before using cloud chat.';
-const MAX_TOOL_CALL_DEPTH = 10;
-
-function parseToolArguments(argumentsPayload: Record<string, unknown> | string): Record<string, unknown> | string {
-  if (typeof argumentsPayload !== 'string') {
-    return argumentsPayload;
-  }
-  try {
-    return JSON.parse(argumentsPayload);
-  } catch {
-    return argumentsPayload;
-  }
-}
 
 type ChatSseDoneEvent = {
   type: 'done';
@@ -125,18 +108,8 @@ async function postChatCompletionSse(
   return doneEvent;
 }
 
-function getMessageContentForModel(message: Message) {
-  const modelContext = message.modelContext?.trim();
-  if (!modelContext) {
-    return message.content;
-  }
-
-  return `${message.content}\n\n${modelContext}`;
-}
-
 export interface ChatProviderProps {
   children: React.ReactNode;
-  initialOllamaUrl: string;
   initialModel: string;
   settings: WorkspaceSettings;
   workspaceId?: string;
@@ -148,7 +121,6 @@ export interface ChatProviderProps {
 
 export const ChatContextProvider: React.FC<ChatProviderProps> = ({
   children,
-  initialOllamaUrl,
   initialModel,
   settings,
   workspaceId,
@@ -157,7 +129,6 @@ export const ChatContextProvider: React.FC<ChatProviderProps> = ({
   seedMessages,
   onSessionCreated,
 }) => {
-  const isThirdParty = settings.agentIntegration === 'third_party';
   const cloudModelsList = CLOUD_MODELS[settings.aiProvider] || ['gpt-4o-mini'];
 
   const getProviderName = (provider?: string) => {
@@ -170,17 +141,11 @@ export const ChatContextProvider: React.FC<ChatProviderProps> = ({
     }
   };
 
-  // Settings states
-  const [ollamaUrl, setOllamaUrl] = useState(() => getInitialOllamaUrl(initialOllamaUrl));
   const [model, setModel] = useState(() => {
-    if (isThirdParty) {
-      return cloudModelsList.includes(initialModel) ? initialModel : cloudModelsList[0];
-    }
-    return getInitialModel(initialModel);
+    const initial = getInitialModel(initialModel);
+    return cloudModelsList.includes(initial) ? initial : cloudModelsList[0];
   });
-  const [isCheckingModel, setIsCheckingModel] = useState(false);
-  const [modelStatus, setModelStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
-  const [detectedModels, setDetectedModels] = useState<string[]>([]);
+  const [modelStatus, setModelStatus] = useState<'connected' | 'disconnected' | 'checking'>('connected');
 
   // MCP Tools
   const [mcpTools, setMcpTools] = useState<any[]>([]);
@@ -195,7 +160,7 @@ export const ChatContextProvider: React.FC<ChatProviderProps> = ({
 
   const chatSessionIdRef = useRef(seedChatSessionId || '');
   const cloudContextVersionRef = useRef(0);
-  const lastProjectResetKeyRef = useRef(`${isThirdParty}:${projectId ?? ''}`);
+  const lastProjectResetKeyRef = useRef(projectId ?? '');
 
   useEffect(() => {
     chatSessionIdRef.current = chatSessionId;
@@ -210,7 +175,7 @@ export const ChatContextProvider: React.FC<ChatProviderProps> = ({
   }, [seedChatSessionId, seedMessages]);
 
   useEffect(() => {
-    const nextResetKey = `${isThirdParty}:${projectId ?? ''}`;
+    const nextResetKey = projectId ?? '';
     if (lastProjectResetKeyRef.current === nextResetKey) {
       return;
     }
@@ -220,31 +185,15 @@ export const ChatContextProvider: React.FC<ChatProviderProps> = ({
     chatSessionIdRef.current = '';
     setChatSessionId('');
     setErrorState(null);
-    if (isThirdParty) {
-      setMessages(getInitialMessages());
-    }
-  }, [isThirdParty, projectId]);
-
-  // Synchronize Ollama settings
-  useEffect(() => {
-    if (!isThirdParty) {
-      const activeUrl = getInitialOllamaUrl(initialOllamaUrl);
-      setOllamaUrl(activeUrl);
-      void checkOllamaStatus(activeUrl, false);
-    }
-  }, [initialOllamaUrl, isThirdParty]);
+    setMessages(getInitialMessages());
+  }, [projectId]);
 
   useEffect(() => {
-    if (isThirdParty) {
-      const defaultCloudModel = cloudModelsList.includes(initialModel) ? initialModel : cloudModelsList[0];
-      setModel(defaultCloudModel);
-      setModelStatus('connected');
-    } else {
-      if (initialModel) {
-        setModel(initialModel);
-      }
-    }
-  }, [isThirdParty, settings.aiProvider, initialModel]);
+    const initial = getInitialModel(initialModel);
+    const defaultCloudModel = cloudModelsList.includes(initial) ? initial : cloudModelsList[0];
+    setModel(defaultCloudModel);
+    setModelStatus('connected');
+  }, [settings.aiProvider, initialModel]);
 
   // Fetch MCP tools
   useEffect(() => {
@@ -303,60 +252,9 @@ export const ChatContextProvider: React.FC<ChatProviderProps> = ({
     return session.id;
   };
 
-  const checkOllamaStatus = useEffectEvent(async (urlToTest = ollamaUrl, announceLoading = true) => {
-    if (isThirdParty) {
-      setModelStatus('connected');
-      return;
-    }
-
-    if (announceLoading) {
-      setIsCheckingModel(true);
-      setModelStatus('checking');
-    }
-
-    try {
-      const data = await queryClient.fetchQuery(
-        queryKeys.ollamaModels(urlToTest),
-        () =>
-          apiClient.get<{ models?: string[]; connected?: boolean }>('/ai/ollama/models', {
-            params: {
-              ollamaUrl: urlToTest,
-            },
-          }),
-        {
-          staleTime: CACHE_CONFIGS.aiModels.staleTime,
-          gcTime: CACHE_CONFIGS.aiModels.gcTime,
-        }
-      );
-
-      const nextModels = Array.isArray(data.models)
-        ? data.models.filter((m): m is string => typeof m === 'string' && m.length > 0)
-        : [];
-
-      setDetectedModels(nextModels);
-      if (data.connected && nextModels.length > 0) {
-        if (!model || !nextModels.includes(model)) {
-          setModel(nextModels[0]);
-        }
-        setModelStatus('connected');
-      } else if (data.connected && nextModels.length === 0) {
-        setModelStatus('connected');
-      } else {
-        setModelStatus('disconnected');
-        setDetectedModels([]);
-      }
-    } catch {
-      setModelStatus('disconnected');
-      setDetectedModels([]);
-    } finally {
-      setIsCheckingModel(false);
-    }
-  });
-
   const handleSendMessage = async (
     textToSend: string,
     autoRunMessages?: Message[],
-    toolCallDepth = 0,
     options: SendMessageOptions = {},
   ) => {
     if (!autoRunMessages && (!textToSend.trim() || isGenerating)) return;
@@ -371,163 +269,55 @@ export const ChatContextProvider: React.FC<ChatProviderProps> = ({
     const newMessages: Message[] = autoRunMessages || [...messages, userMessage];
     setMessages(newMessages);
     if (!autoRunMessages) setIsGenerating(true);
-    const requestContextVersion = isThirdParty ? cloudContextVersionRef.current : 0;
+    const requestContextVersion = cloudContextVersionRef.current;
 
     try {
-      if (isThirdParty) {
-        const activeProjectId = projectId?.trim() || '';
-        const chatId = await ensureCloudChatSession(requestContextVersion);
-        if (cloudContextVersionRef.current !== requestContextVersion) {
-          return;
-        }
-        const doneEvent = await postChatCompletionSse(activeProjectId, chatId, {
-          message: textToSend,
-          provider: settings.aiProvider,
-          ...(model ? { model } : {}),
-          ...(normalizedModelContext ? { context: normalizedModelContext } : {}),
-        });
-        if (cloudContextVersionRef.current !== requestContextVersion) {
-          return;
-        }
-        const aiResponse = doneEvent.message || '';
+      const activeProjectId = projectId?.trim() || '';
+      const chatId = await ensureCloudChatSession(requestContextVersion);
+      if (cloudContextVersionRef.current !== requestContextVersion) {
+        return;
+      }
+      const doneEvent = await postChatCompletionSse(activeProjectId, chatId, {
+        message: textToSend,
+        provider: settings.aiProvider,
+        ...(model ? { model } : {}),
+        ...(normalizedModelContext ? { context: normalizedModelContext } : {}),
+      });
+      if (cloudContextVersionRef.current !== requestContextVersion) {
+        return;
+      }
+      const aiResponse = doneEvent.message || '';
 
-        if (aiResponse) {
-          setMessages([...newMessages, { role: 'assistant', content: aiResponse }]);
-        } else {
-          setMessages([...newMessages, { role: 'system', content: `Sorry, I got an empty response from ${getProviderName(settings.aiProvider)}.` }]);
-        }
+      if (aiResponse) {
+        setMessages([...newMessages, { role: 'assistant', content: aiResponse }]);
+      } else {
+        setMessages([...newMessages, { role: 'system', content: `Sorry, I got an empty response from ${getProviderName(settings.aiProvider)}.` }]);
+      }
+    } catch (error) {
+      const providerLabel = getProviderName(settings.aiProvider);
+      console.error(error);
+
+      if (error instanceof Error && error.message === CLOUD_PROJECT_REQUIRED_MESSAGE) {
+        setMessages([...newMessages, { role: 'system', content: error.message }]);
         return;
       }
 
-      const payload: Record<string, any> = {
-        model,
-        messages: newMessages.map(m => ({
-          role: m.role,
-          content: getMessageContentForModel(m),
-          ...(m.tool_calls ? { tool_calls: m.tool_calls } : {}),
-          ...(m.tool_call_id ? { tool_call_id: m.tool_call_id, name: m.name } : {})
-        })),
-        provider: isThirdParty ? settings.aiProvider : 'ollama',
-        ...(mcpTools.length > 0 ? { tools: mcpTools } : {})
-      };
-
-      if (!isThirdParty) {
-        payload.ollamaUrl = ollamaUrl;
+      if (cloudContextVersionRef.current !== requestContextVersion) {
+        return;
       }
 
-      const data = await apiClient.post<{ message?: { content?: string; tool_calls?: Array<{ id: string; name: string; arguments: Record<string, unknown> | string }> } }>('/ai/chat', payload, {
-        headers: {
-          'X-Mcp-Sanitize': 'true',
-        },
-      });
-
-      const providerLabel = isThirdParty ? getProviderName(settings.aiProvider) : 'Ollama';
-      const aiResponse = data.message?.content || '';
-      const toolCalls = data.message?.tool_calls;
-
-      const assistantMessage: Message = {
-        role: 'assistant',
-        content: aiResponse,
-        ...(toolCalls ? { tool_calls: toolCalls } : {})
-      };
-
-      const nextMessages = [...newMessages, assistantMessage];
-      setMessages(nextMessages);
-
-      if (toolCalls && toolCalls.length > 0) {
-        // Execute tools
-        const toolMessages: Message[] = [];
-        for (const tc of toolCalls) {
-          try {
-            const toolData = await apiClient.post<{ result?: { content?: { text?: string }[] }; error?: { message?: string } }>(
-              '/mcp/sse',
-              {
-                jsonrpc: '2.0',
-                id: Date.now(),
-                method: 'tools/call',
-                params: {
-                  name: tc.name,
-                  arguments: parseToolArguments(tc.arguments),
-                },
-              },
-              {
-                headers: {
-                  'X-Mcp-Sanitize': 'true',
-                  ...(workspaceId ? { 'X-Workspace-Id': workspaceId } : {}),
-                },
-              }
-            );
-            
-            if (toolData.error) {
-              toolMessages.push({
-                role: 'tool',
-                tool_call_id: tc.id,
-                name: tc.name,
-                content: `Error: ${toolData.error.message}`
-              });
-            } else {
-              const toolResult = toolData.result?.content?.[0]?.text || JSON.stringify(toolData);
-              toolMessages.push({
-                role: 'tool',
-                tool_call_id: tc.id,
-                name: tc.name,
-                content: toolResult
-              });
-            }
-          } catch (e: any) {
-            toolMessages.push({
-              role: 'tool',
-              tool_call_id: tc.id,
-              name: tc.name,
-              content: `Error: ${e.message}`
-            });
-          }
-        }
-
-        // Auto-continue chat with tool results, but guard against unbounded recursion.
-        if (toolCallDepth >= MAX_TOOL_CALL_DEPTH) {
-          setMessages([...nextMessages, ...toolMessages, {
-            role: 'system',
-            content: `⚠️ **Agentic loop stopped** — the assistant made more than ${MAX_TOOL_CALL_DEPTH} consecutive tool calls. Please review the conversation and try a more specific prompt.`
-          }]);
-        } else {
-          await handleSendMessage('', [...nextMessages, ...toolMessages], toolCallDepth + 1);
-        }
-
-      } else if (!aiResponse) {
-        setMessages([...newMessages, { role: 'system', content: `Sorry, I got an empty response from ${providerLabel}.` }]);
-      }
-    } catch (error) {
-      const providerLabel = isThirdParty ? getProviderName(settings.aiProvider) : 'Ollama';
-      console.error(error);
-
-      let errorContent: string;
-      if (isThirdParty) {
-        if (error instanceof Error && error.message === CLOUD_PROJECT_REQUIRED_MESSAGE) {
-          setMessages([...newMessages, { role: 'system', content: error.message }]);
-          return;
-        }
-
-        if (cloudContextVersionRef.current !== requestContextVersion) {
-          return;
-        }
-
-        const statusCode = error instanceof Error && 'status' in error ? (error as any).status : undefined;
-        let detail: string;
-        if (statusCode === 401 || statusCode === 403) {
-          detail = 'Your API key appears to be invalid or lacks the required permissions. Please update it in **Account Preferences**.';
-        } else if (statusCode === 429) {
-          detail = 'The provider is rate-limiting your requests. Please wait a moment and try again.';
-        } else if (statusCode === 402) {
-          detail = 'Your provider account may have insufficient credits. Please check your billing settings.';
-        } else {
-          detail = 'Please check your internet connection and verify that your API key is correctly configured in **Account Preferences**.';
-        }
-        errorContent = `### ⚠️ Connection Error\n\nFailed to contact the **${providerLabel}** API.\n\n${detail}`;
+      const statusCode = error instanceof Error && 'status' in error ? (error as any).status : undefined;
+      let detail: string;
+      if (statusCode === 401 || statusCode === 403) {
+        detail = 'Your API key appears to be invalid or lacks the required permissions. Please update it in **Account Preferences**.';
+      } else if (statusCode === 429) {
+        detail = 'The provider is rate-limiting your requests. Please wait a moment and try again.';
+      } else if (statusCode === 402) {
+        detail = 'Your provider account may have insufficient credits. Please check your billing settings.';
       } else {
-        const message = error instanceof Error ? error.message : `Unknown ${providerLabel} error.`;
-        errorContent = buildOllamaErrorMessage(model, ollamaUrl, message).content;
+        detail = 'Please check your internet connection and verify that your API key is correctly configured in **Account Preferences**.';
       }
+      const errorContent = `### ⚠️ Connection Error\n\nFailed to contact the **${providerLabel}** API.\n\n${detail}`;
 
       setErrorState(errorContent);
       setMessages([...newMessages, { role: 'system', content: errorContent }]);
@@ -539,7 +329,7 @@ export const ChatContextProvider: React.FC<ChatProviderProps> = ({
   };
 
   const sendMessage = async (content: string, options?: SendMessageOptions) => {
-    return handleSendMessage(content, undefined, 0, options);
+    return handleSendMessage(content, undefined, options);
   };
 
   const regenerate = async () => {
@@ -549,7 +339,7 @@ export const ChatContextProvider: React.FC<ChatProviderProps> = ({
     const idx = messages.length - 1 - lastUserMsgIdx;
     const userMsg = messages[idx];
     const newMessages = [...messages.slice(0, idx), userMsg];
-    await handleSendMessage(userMsg.content, newMessages, 0, { modelContext: userMsg.modelContext });
+    await handleSendMessage(userMsg.content, newMessages, { modelContext: userMsg.modelContext });
   };
 
   const retry = async () => {
@@ -559,7 +349,7 @@ export const ChatContextProvider: React.FC<ChatProviderProps> = ({
     const idx = messages.length - 1 - lastUserMsgIdx;
     const userMsg = messages[idx];
     const newMessages = [...messages.slice(0, idx), userMsg];
-    await handleSendMessage(userMsg.content, newMessages, 0, { modelContext: userMsg.modelContext });
+    await handleSendMessage(userMsg.content, newMessages, { modelContext: userMsg.modelContext });
   };
 
   const clearChat = () => {
@@ -575,17 +365,12 @@ export const ChatContextProvider: React.FC<ChatProviderProps> = ({
     error: errorState,
     model,
     setModel,
-    ollamaUrl,
-    setOllamaUrl,
     modelStatus,
-    detectedModels,
-    isCheckingModel,
     sendMessage,
     regenerate,
     retry,
     clearChat,
     setMessages,
-    checkOllamaStatus,
     setChatSessionId,
   };
 

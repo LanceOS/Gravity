@@ -33,8 +33,6 @@ describe('useAccountSettings', () => {
           tutorialCompleted: true,
           defaultView: 'list',
           theme: 'coffee',
-          ollamaModel: 'llama3.2',
-          ollamaEndpoint: 'http://ollama.internal:11434',
           projectLayout: 'condensed',
           apiKey: API_KEY_MASK,
           aiProvider: 'anthropic',
@@ -43,8 +41,7 @@ describe('useAccountSettings', () => {
             { provider: 'anthropic', apiKey: API_KEY_MASK },
           ],
         })
-      )
-      .mockResolvedValueOnce(jsonResponse({ models: ['llama3.2'] }));
+      );
 
     vi.stubGlobal('fetch', fetchMock);
 
@@ -79,14 +76,13 @@ describe('useAccountSettings', () => {
       theme: 'coffee',
       projectLayout: 'condensed',
       aiProvider: 'anthropic',
-      ollamaModel: 'llama3.2',
     });
     expect(result.current.savedCredentials).toHaveLength(2);
     expect(setTheme).toHaveBeenCalledWith('coffee');
     expect(setView).toHaveBeenCalledWith('list');
 
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
     });
 
     act(() => {
@@ -132,7 +128,7 @@ describe('useAccountSettings', () => {
       expect(result.current.settings.defaultView).toBe('list');
     });
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('decouples general settings hasChanges from cloud provider/api key hasProviderChanges', async () => {
@@ -152,8 +148,6 @@ describe('useAccountSettings', () => {
           userId: currentUser.id,
           defaultView: 'board',
           theme: 'dark',
-          ollamaModel: 'llama3',
-          ollamaEndpoint: 'http://localhost:11434',
           projectLayout: 'standard',
           apiKey: '',
           aiProvider: 'openai',

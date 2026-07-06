@@ -1,11 +1,10 @@
-import { LocalAIChat, type LocalAIChatProps, type Message } from '../../ai';
+import { AgentChat, type AgentChatProps, type Message } from '../../ai';
 import type { Project } from '../../../context/TicketContextContext';
 import type { SidebarTeam } from '../../../types/domain';
 import type { WorkspaceSettings } from '../../../utils/settings';
 
 export interface AiChatDockProps {
   onClose: () => void;
-  initialOllamaUrl: string;
   initialModel: string;
   settings: WorkspaceSettings;
   workspaceId?: string;
@@ -15,7 +14,7 @@ export interface AiChatDockProps {
   seedChatSessionId?: string;
   seedMessages?: Message[];
   onSessionCreated?: (chatId: string) => void;
-  ticketAttachmentScopeMode?: LocalAIChatProps['ticketAttachmentScopeMode'];
+  ticketAttachmentScopeMode?: AgentChatProps['ticketAttachmentScopeMode'];
   ticketAttachmentProjects?: Project[];
   ticketAttachmentTeams?: SidebarTeam[];
   ticketAttachmentDefaultScopeId?: string;
@@ -23,7 +22,6 @@ export interface AiChatDockProps {
 
 export function AiChatDock({
   onClose,
-  initialOllamaUrl,
   initialModel,
   settings,
   workspaceId,
@@ -37,9 +35,8 @@ export function AiChatDock({
   ticketAttachmentTeams,
   ticketAttachmentDefaultScopeId,
 }: AiChatDockProps) {
-  const chatProps: LocalAIChatProps = {
+  const chatProps: AgentChatProps = {
     onClose,
-    initialOllamaUrl,
     initialModel,
     settings,
     workspaceId,
@@ -55,5 +52,5 @@ export function AiChatDock({
     ticketAttachmentDefaultScopeId,
   };
 
-  return <LocalAIChat {...chatProps} />;
+  return <AgentChat {...chatProps} />;
 }

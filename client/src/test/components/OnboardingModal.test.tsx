@@ -105,7 +105,7 @@ describe('OnboardingModal', () => {
     expect(screen.getByText('Cycles & Labels')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Next' }));
-    expect(screen.getByText('Local Ollama AI Assistant')).toBeInTheDocument();
+    expect(screen.getByText('AI Assistant')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Next' }));
     expect(screen.getByText('MCP Agent Integrations')).toBeInTheDocument();

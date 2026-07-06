@@ -210,7 +210,7 @@ function renderSidebar(overrides: Partial<SidebarProps> = {}) {
       onSelectTeamLabel: vi.fn(),
     },
     tools: {
-      onOpenOllama: vi.fn(),
+      onOpenAgent: vi.fn(),
       onOpenSimulator: vi.fn(),
       onOpenCreateTicket: vi.fn(),
     },

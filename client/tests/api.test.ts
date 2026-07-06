@@ -303,7 +303,6 @@ const tests = [
       assert(settings.userId === testUserId, 'Should return settings mapped to correct userId');
       assert(settings.defaultView === 'board', 'Should fallback to default view: board');
       assert(settings.theme === 'dark', 'Should fallback to default theme: dark');
-      assert(settings.ollamaEndpoint === 'http://localhost:11434', 'Should fallback to default local Ollama endpoint');
     }
   },
   {
@@ -316,9 +315,8 @@ const tests = [
         body: JSON.stringify({
           defaultView: 'list',
           theme: 'light',
-          ollamaModel: 'qwen2.5-coder',
-          ollamaEndpoint: 'http://localhost:11434',
-          projectLayout: 'compact'
+          projectLayout: 'condensed',
+          keyAction: 'keep'
         })
       });
 
@@ -326,15 +324,13 @@ const tests = [
       let settings = await res.json() as any;
       assert(settings.defaultView === 'list', 'Theme preferences should be patched');
       assert(settings.theme === 'light', 'Theme should be light');
-      assert(settings.ollamaModel === 'qwen2.5-coder', 'Ollama model should be patched');
-      assert(settings.projectLayout === 'compact', 'Project layout density should be patched');
+      assert(settings.projectLayout === 'condensed', 'Project layout density should be patched');
 
       // 2. GET back Jane's settings to verify SQL database persistence
       res = await fetch(`${BASE_URL}/api/settings/${testUserId}`);
       assert(res.ok, 'GET settings should succeed');
       const loaded = await res.json() as any;
-      assert(loaded.ollamaModel === 'qwen2.5-coder', 'Verify model retrieved matches patched value');
-      assert(loaded.projectLayout === 'compact', 'Verify layout density matches patched value');
+      assert(loaded.projectLayout === 'condensed', 'Verify layout density matches patched value');
     }
   },
   {
@@ -530,7 +526,7 @@ const tests = [
           'X-Project-Id': aiProjectId,
         },
         body: JSON.stringify({
-          title: 'Tune Ollama Llama3 prompts',
+          title: 'Tune AI assistant prompts',
           description: 'Refine system instruction templates.',
           status: 'todo',
           priority: 'medium',
@@ -1059,16 +1055,6 @@ const tests = [
     }
   },
   {
-    name: 'Ollama Model Discovery Wrapper - Safe Empty Array Failover',
-    fn: async () => {
-      const res = await fetch(`${BASE_URL}/api/ai/ollama/models?ollamaUrl=${encodeURIComponent('http://localhost:9999')}`);
-      assert(res.status === 200, 'Offline Ollama model discovery should return 200 for safe failover');
-      const data = await res.json() as any;
-      assert(Array.isArray(data), 'Ollama model discovery should return an array payload');
-      assert(data.length === 0, 'Offline Ollama model discovery should return an empty array');
-    }
-  },
-  {
     name: 'Provider Connection Wrapper API - Structured Failure Payload',
     fn: async () => {
       const res = await fetch(`${BASE_URL}/api/ai/test-connection`, {
@@ -1104,25 +1090,6 @@ const tests = [
       assert(data.error !== undefined, 'Error message should be returned in body');
     }
   },
-  {
-    name: 'Local Ollama proxy router - Extended Timeout Check',
-    fn: async () => {
-      // Testing with a fake offline endpoint to ensure the proxy handles connection refusals gracefully
-      const res = await fetch(`${BASE_URL}/api/ai/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ollamaUrl: 'http://localhost:9999', // offline port
-          model: 'llama3',
-          messages: [{ role: 'user', content: 'hello' }]
-        })
-      });
-
-      assert(res.status === 502, 'Should return 502 Bad Gateway for offline/refused proxy connections');
-      const data = await res.json() as any;
-      assert(data.error.includes('Could not connect to Ollama'), 'Should report connection failure warning');
-    }
-  }
 ];
 
 // Main runner

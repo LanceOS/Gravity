@@ -6,7 +6,7 @@ import type { Project, Ticket } from '../../../context/TicketContextContext';
 import type { SidebarTeam } from '../../../types/domain';
 import { apiClient } from '../../../utils/apiClient';
 import { CACHE_CONFIGS } from '../../../utils/queryClient';
-import type { TicketAttachmentScopeMode } from '../types/LocalAIChat';
+import type { TicketAttachmentScopeMode } from '../types/AgentChat';
 import './TicketContextAttachmentBar.css';
 
 interface TicketContextAttachmentBarProps {

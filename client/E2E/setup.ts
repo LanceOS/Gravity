@@ -1459,13 +1459,6 @@ globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
     return jsonResponse(200, { success: true });
   }
 
-  if (path.includes('/api/v1/ai/ollama/models')) {
-    return jsonResponse(200, {
-      connected: true,
-      models: [{ name: 'llama3:latest' }, { name: 'mistral:latest' }],
-    });
-  }
-
   if (path === '/api/v1/projects' && method === 'GET') {
     return jsonResponse(200, dbState.projects);
   }

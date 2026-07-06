@@ -71,8 +71,8 @@ describe('Gravity Client End-to-End User Journey', () => {
     nextBtn = screen.getByRole('button', { name: /Next/i });
     await user.click(nextBtn);
 
-    // Step 3: Local Ollama AI Assistant
-    const step3Header = await screen.findByText(/Local Ollama AI Assistant/i);
+    // Step 3: AI Assistant
+    const step3Header = await screen.findByText(/AI Assistant/i);
     expect(step3Header).toBeInTheDocument();
     nextBtn = screen.getByRole('button', { name: /Next/i });
     await user.click(nextBtn);

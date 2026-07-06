@@ -39,7 +39,7 @@ import {
   useWorkspaceMemberActivity,
   useWorkspaceProjectSelection,
 } from '../hooks/useWorkspaceLifecycle';
-import { useOllamaPanel } from '../hooks/useOllamaPanel';
+import { useAgentPanel } from '../hooks/useAgentPanel';
 import { useWorkspaceViewMode } from '../hooks/useWorkspaceViewMode';
 import type { AppSection } from '../types/AppShell';
 import { LoadingPage } from '../../loadingPage';
@@ -110,7 +110,7 @@ export function WorkspaceShellPage() {
   const [isCreateLabelModalOpen, setIsCreateLabelModalOpen] = useState(false);
   const [isMcpOpen, setIsMcpOpen] = useState(false);
   const [sidebarActiveScope, setSidebarActiveScope] = useState<SidebarNavigationState['activeScope']>('workspace');
-  const { isOllamaOpen, isOllamaClosing, handleOpenOllama, handleToggleOllama } = useOllamaPanel();
+  const { isAgentOpen, isAgentClosing, handleOpenAgent, handleToggleAgent } = useAgentPanel();
   const [seedAiChatSessionId, setSeedAiChatSessionId] = useState('');
   const [liveAiChatSessionId, setLiveAiChatSessionId] = useState('');
   const [seedAiChatMessages, setSeedAiChatMessages] = useState<Message[] | undefined>(undefined);
@@ -654,7 +654,6 @@ export function WorkspaceShellPage() {
   const {
     settings: accountSettings,
     settingsHydrated = true,
-    ollamaModels,
     savedCredentials: accountSavedCredentials,
   } = useAccountSettings({
     currentUser,
@@ -828,15 +827,15 @@ export function WorkspaceShellPage() {
   });
 
   const handleToggleAskAgent = useCallback(() => {
-    if (!isOllamaOpen && !isOllamaClosing) {
+    if (!isAgentOpen && !isAgentClosing) {
       setSeedAiChatSessionId('');
       setLiveAiChatSessionId('');
       setSeedAiChatMessages(undefined);
       setActiveAiChatSessionProjectId(aiChatProjectId);
     }
 
-    handleToggleOllama();
-  }, [aiChatProjectId, handleToggleOllama, isOllamaClosing, isOllamaOpen]);
+    handleToggleAgent();
+  }, [aiChatProjectId, handleToggleAgent, isAgentClosing, isAgentOpen]);
 
   const handleAiChatSessionCreated = useCallback((chatId: string) => {
     setLiveAiChatSessionId(chatId);
@@ -877,10 +876,10 @@ export function WorkspaceShellPage() {
       setActiveAiChatSessionProjectId(requestProjectId);
     } finally {
       if (isLatestRequest()) {
-        handleOpenOllama();
+        handleOpenAgent();
       }
     }
-  }, [aiChatProjectId, handleOpenOllama]);
+  }, [aiChatProjectId, handleOpenAgent]);
 
   const { handleOpenCreateTicket, handleOpenCreateSubtask } = useWorkspaceCreateTicketDialog({
     hasActiveWorkspaceProjects: activeWorkspaceProjects.length > 0,
@@ -1068,13 +1067,12 @@ export function WorkspaceShellPage() {
       onOpenCreateTeam: () => navigate(`/workspaces/${activeWorkspaceId}/teams?create=true`),
     },
     tools: {
-      onOpenOllama: handleToggleAskAgent,
-      isOllamaOpen,
+      onOpenAgent: handleToggleAskAgent,
+      isAgentOpen,
       onOpenSimulator: () => {},
       onOpenCreateTicket: activeSection === 'workspace' ? handleOpenCreateTicket : () => navigate(`/workspaces/${activeWorkspaceId}`),
       onOpenCreateProject: handleOpenCreateProject,
       onOpenCreateLabel: handleOpenCreateLabel,
-      agentIntegration: accountSettings.agentIntegration,
       aiProvider: accountSettings.aiProvider,
     },
     userMenu: {
@@ -1137,19 +1135,14 @@ export function WorkspaceShellPage() {
           />
         }
         rightPanels={
-          isOllamaOpen || isOllamaClosing ? (
+          isAgentOpen || isAgentClosing ? (
             <AiChatDock
-              onClose={handleToggleOllama}
-              initialOllamaUrl={accountSettings.ollamaEndpoint}
-              initialModel={
-                accountSettings.agentIntegration === 'third_party'
-                  ? preferredProviderModel
-                  : (accountSettings.ollamaModel || ollamaModels[0] || '')
-              }
+              onClose={handleToggleAgent}
+              initialModel={preferredProviderModel}
               settings={accountSettings}
               workspaceId={activeWorkspaceId}
               projectId={aiChatProjectId}
-              isClosing={isOllamaClosing}
+              isClosing={isAgentClosing}
               isMobile={isMobile}
               seedChatSessionId={currentSeedAiChatSessionId}
               seedMessages={currentSeedAiChatMessages}

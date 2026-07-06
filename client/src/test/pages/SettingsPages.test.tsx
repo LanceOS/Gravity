@@ -144,9 +144,6 @@ function renderAccountPreferencesPage(overrides: Partial<Parameters<typeof Accou
       projectLayout: 'standard' as const,
       aiProvider: 'openai' as const,
       apiKey: '',
-      ollamaEndpoint: 'http://localhost:11434',
-      ollamaModel: 'llama3',
-      agentIntegration: 'ollama' as const,
     },
     settingsLoading: false,
     saveLoading: false,
@@ -157,13 +154,10 @@ function renderAccountPreferencesPage(overrides: Partial<Parameters<typeof Accou
     testResult: null,
     savedCredentials: [],
     tutorialResult: null,
-    ollamaModels: ['llama3', 'phi3'],
-    ollamaModelsLoading: false,
     onBack: vi.fn(),
     onOpenDirectory: vi.fn(),
     onChangeSettings: vi.fn(),
     onResetProviderDraft: vi.fn(),
-    onRefreshOllamaModels: vi.fn(),
     onResetTutorial: vi.fn(),
     onSaveSettings: vi.fn(),
     onTestApiKey: vi.fn(),
@@ -378,7 +372,7 @@ describe('AccountPreferencesPage', () => {
     expect(props.onSaveSettings).toHaveBeenCalledTimes(1);
   });
 
-  it('switches provider, ollama, and onboarding sections and forwards actions', async () => {
+  it('switches provider and onboarding sections and forwards actions', async () => {
     const user = userEvent.setup();
     const { props } = renderAccountPreferencesPage({
       hasProviderChanges: true,
@@ -397,14 +391,6 @@ describe('AccountPreferencesPage', () => {
     await user.click(screen.getByRole('button', { name: 'Save Key' }));
     expect(props.onSaveSettings).toHaveBeenCalledTimes(1);
     expect(screen.getByText('Provider connection ok.')).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: /Ollama/i }));
-    expect(screen.getByText('Local Ollama assistant')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Refresh' }));
-    expect(props.onRefreshOllamaModels).toHaveBeenCalledTimes(1);
-    await user.click(screen.getByRole('button', { name: 'Detected Ollama Model' }));
-    await user.click(screen.getByRole('option', { name: 'phi3' }));
-    expect(props.onChangeSettings).toHaveBeenCalledWith({ ollamaModel: 'phi3' });
 
     await user.click(screen.getByRole('button', { name: /Onboarding/i }));
     expect(screen.getByText('Onboarding and guidance')).toBeInTheDocument();
@@ -464,7 +450,6 @@ describe('AccountPreferencesPage', () => {
     // Sections are rendered simultaneously
     expect(screen.getByText('Local account preferences')).toBeInTheDocument(); // General
     expect(screen.getByText('Cloud AI provider')).toBeInTheDocument(); // Providers
-    expect(screen.getByText('Local Ollama assistant')).toBeInTheDocument(); // Ollama
     expect(screen.getByText('Onboarding and guidance')).toBeInTheDocument(); // Onboarding
 
     // Warning about list mode only on mobile

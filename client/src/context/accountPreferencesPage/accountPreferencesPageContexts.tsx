@@ -8,8 +8,6 @@ import {
   AccountPreferencesNavigationContextValue,
   AccountPreferencesOnboardingContext,
   AccountPreferencesOnboardingContextValue,
-  AccountPreferencesOllamaContext,
-  AccountPreferencesOllamaContextValue,
   AccountPreferencesRuntimeContext,
   AccountPreferencesRuntimeContextValue,
   AccountPreferencesSettingsContext,
@@ -46,17 +44,6 @@ export function AccountPreferencesCloudContextProvider({
     <AccountPreferencesCloudContext.Provider value={value}>
       {children}
     </AccountPreferencesCloudContext.Provider>
-  );
-}
-
-export function AccountPreferencesOllamaContextProvider({
-  children,
-  value,
-}: PropsWithChildren<{ value: AccountPreferencesOllamaContextValue }>): JSX.Element {
-  return (
-    <AccountPreferencesOllamaContext.Provider value={value}>
-      {children}
-    </AccountPreferencesOllamaContext.Provider>
   );
 }
 
@@ -98,7 +85,6 @@ export type {
   AccountPreferencesCategoryContextValue,
   AccountPreferencesNavigationContextValue,
   AccountPreferencesOnboardingContextValue,
-  AccountPreferencesOllamaContextValue,
   AccountPreferencesRuntimeContextValue,
   AccountPreferencesSettingsContextValue,
 } from './accountPreferencesPageContextState';

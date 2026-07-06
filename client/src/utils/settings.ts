@@ -1,19 +1,15 @@
 import { isThemeMode, type ThemeMode } from '../context/theme/ThemeContext.types';
 
 export type AIProvider = 'openai' | 'anthropic' | 'gemini' | 'deepseek';
-export type AgentIntegration = 'ollama' | 'third_party';
 
 export const API_KEY_MASK = '••••••••••••';
 
 export interface WorkspaceSettings {
   defaultView: 'board' | 'list';
   theme: ThemeMode;
-  ollamaModel: string;
-  ollamaEndpoint: string;
   projectLayout: 'standard' | 'condensed';
   apiKey: string;
   aiProvider: AIProvider;
-  agentIntegration: AgentIntegration;
   tutorialCompleted?: boolean;
 }
 
@@ -64,12 +60,9 @@ export const AI_PROVIDER_OPTIONS: ProviderOption[] = [
 export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
   defaultView: 'board',
   theme: 'marble-blue',
-  ollamaModel: '',
-  ollamaEndpoint: 'http://localhost:11434',
   projectLayout: 'standard',
   apiKey: '',
   aiProvider: 'openai',
-  agentIntegration: 'ollama',
 };
 
 export const isAIProvider = (value: unknown): value is AIProvider =>
@@ -85,14 +78,8 @@ export const normalizeWorkspaceSettings = (
 ): WorkspaceSettings => ({
   defaultView: raw?.defaultView === 'list' || raw?.defaultView === 'board' ? raw.defaultView : activeView,
   theme: isThemeMode(raw?.theme) ? raw.theme : theme,
-  ollamaModel: typeof raw?.ollamaModel === 'string' ? raw.ollamaModel : DEFAULT_WORKSPACE_SETTINGS.ollamaModel,
-  ollamaEndpoint:
-    typeof raw?.ollamaEndpoint === 'string' && raw.ollamaEndpoint.trim().length > 0
-      ? raw.ollamaEndpoint
-      : DEFAULT_WORKSPACE_SETTINGS.ollamaEndpoint,
   projectLayout: raw?.projectLayout === 'condensed' ? 'condensed' : 'standard',
   apiKey: typeof raw?.apiKey === 'string' ? raw.apiKey : DEFAULT_WORKSPACE_SETTINGS.apiKey,
   aiProvider: isAIProvider(raw?.aiProvider) ? raw.aiProvider : DEFAULT_WORKSPACE_SETTINGS.aiProvider,
-  agentIntegration: raw?.agentIntegration === 'third_party' ? 'third_party' : 'ollama',
   tutorialCompleted: typeof raw?.tutorialCompleted === 'boolean' ? raw.tutorialCompleted : undefined,
 });

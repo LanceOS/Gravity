@@ -5,8 +5,8 @@ import { useUserDirectory } from '../../../context/user/UserDirectoryContext';
 import type { Ticket } from '../../../context/TicketContextContext';
 import { FileText, ListPlus, Sparkles, Wifi } from 'lucide-react';
 import { AIChatWindow } from '@library';
-import type { LocalAIChatProps, QuickActionType, TicketAttachmentScopeMode } from '../types/LocalAIChat';
-import { buildAttachedTicketModelContext, buildQuickActionPrompt } from '../utils/LocalAIChat';
+import type { AgentChatProps, QuickActionType, TicketAttachmentScopeMode } from '../types/AgentChat';
+import { buildAttachedTicketModelContext, buildQuickActionPrompt } from '../utils/AgentChat';
 import { ChatContextProvider, useChat } from '../context/ChatContext';
 import { TicketContextAttachmentBar } from './TicketContextAttachmentBar';
 
@@ -21,7 +21,7 @@ function buildAttachmentScopeKey(scopeMode: TicketAttachmentScopeMode | undefine
   return `${scopeMode ?? 'none'}:${scopeId}`;
 }
 
-const LocalAIChatInner: React.FC<LocalAIChatProps> = ({
+const AgentChatInner: React.FC<AgentChatProps> = ({
   onClose,
   isClosing,
   variant = 'floating',
@@ -40,7 +40,6 @@ const LocalAIChatInner: React.FC<LocalAIChatProps> = ({
     tickets: [],
   });
 
-  const isThirdParty = settings.agentIntegration === 'third_party';
   const cloudModelsList = CLOUD_MODELS[settings.aiProvider] || ['gpt-4o-mini'];
   const attachmentProjects = ticketAttachmentProjects ?? projects;
   const attachmentScopeIds = React.useMemo(
@@ -96,8 +95,6 @@ const LocalAIChatInner: React.FC<LocalAIChatProps> = ({
     model,
     setModel,
     modelStatus,
-    detectedModels,
-    isCheckingModel,
     sendMessage,
     regenerate,
     retry,
@@ -139,7 +136,6 @@ const LocalAIChatInner: React.FC<LocalAIChatProps> = ({
           <select
             value={model}
             onChange={(e) => setModel(e.target.value)}
-            disabled={!isThirdParty && (isCheckingModel || detectedModels.length === 0)}
             style={{
               fontSize: '13px',
               fontWeight: 600,
@@ -150,30 +146,18 @@ const LocalAIChatInner: React.FC<LocalAIChatProps> = ({
               cursor: 'pointer',
               padding: 0,
               fontFamily: 'inherit',
-              letterSpacing: '-0.01em',
+              letterSpacing: 0,
               textOverflow: 'ellipsis',
               overflow: 'hidden',
               whiteSpace: 'nowrap',
             }}
             className="clickable"
           >
-            {isThirdParty ? (
-              cloudModelsList.map((m) => (
-                <option key={m} value={m} style={{ background: 'var(--color-surface-card)', color: 'var(--color-text-primary)', fontSize: '12px', fontWeight: 500 }}>
-                  {m}
-                </option>
-              ))
-            ) : detectedModels.length > 0 ? (
-              detectedModels.map((m) => (
-                <option key={m} value={m} style={{ background: 'var(--color-surface-card)', color: 'var(--color-text-primary)', fontSize: '12px', fontWeight: 500 }}>
-                  {m}
-                </option>
-              ))
-            ) : (
-              <option value="" style={{ background: 'var(--color-surface-card)', color: 'var(--color-text-disabled)' }}>
-                {isCheckingModel ? 'Checking...' : 'No models'}
+            {cloudModelsList.map((m) => (
+              <option key={m} value={m} style={{ background: 'var(--color-surface-card)', color: 'var(--color-text-primary)', fontSize: '12px', fontWeight: 500 }}>
+                {m}
               </option>
-            )}
+            ))}
           </select>
         </div>
       }
@@ -235,10 +219,10 @@ const LocalAIChatInner: React.FC<LocalAIChatProps> = ({
   );
 };
 
-export const LocalAIChat: React.FC<LocalAIChatProps> = (props) => {
+export const AgentChat: React.FC<AgentChatProps> = (props) => {
   return (
     <ChatContextProvider {...props}>
-      <LocalAIChatInner {...props} />
+      <AgentChatInner {...props} />
     </ChatContextProvider>
   );
 };
