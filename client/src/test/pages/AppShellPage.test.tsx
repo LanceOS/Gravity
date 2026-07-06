@@ -37,6 +37,7 @@ type WorkspaceLayoutMockProps = {
   };
   children?: ReactNode;
   rightPanels?: ReactNode;
+  headerChatHistory?: ReactNode;
 };
 
 type WorkspacePageMockProps = {
@@ -173,7 +174,13 @@ vi.mock('../../utils/webmcp', () => ({
 
 vi.mock('../../modules/ai', () => ({
   AgentSimulator: () => <div>AgentSimulator</div>,
-  LocalAIChat: () => <div>LocalAIChat</div>,
+  LocalAIChat: ({ seedChatSessionId, seedMessages }: any) => (
+    <div>
+      <div>LocalAIChat</div>
+      <div data-testid="local-ai-chat-session">{seedChatSessionId || ''}</div>
+      <div data-testid="local-ai-chat-messages">{JSON.stringify(seedMessages ?? [])}</div>
+    </div>
+  ),
 }));
 
 vi.mock('../../modules/auth', () => ({
@@ -212,9 +219,10 @@ vi.mock('../../modules/onboarding', () => ({
 }));
 
 vi.mock('../../layouts/WorkspaceLayout/WorkspaceLayout', () => ({
-  WorkspaceLayout: ({ sidebarProps, children, rightPanels }: WorkspaceLayoutMockProps) => (
+  WorkspaceLayout: ({ sidebarProps, children, rightPanels, headerChatHistory }: WorkspaceLayoutMockProps) => (
     <div>
       <div>WorkspaceLayout</div>
+      {headerChatHistory}
       {sidebarProps.projects?.counts?.byProject ? (
         <pre data-testid="sidebar-counts-by-project">
           {JSON.stringify(sidebarProps.projects.counts.byProject)}
@@ -1093,6 +1101,111 @@ describe('AppShellPage', () => {
     });
 
     expect(screen.getByTestId('location-display').textContent).toBe('/workspaces/workspace-1/projects/list');
+  });
+
+  it('keeps the latest selected AI chat history item when detail requests resolve out of order', async () => {
+    const user = userEvent.setup();
+    let resolveOldChat!: (response: Response) => void;
+    let resolveNewChat!: (response: Response) => void;
+    const oldChatDetail = new Promise<Response>((resolve) => {
+      resolveOldChat = resolve;
+    });
+    const newChatDetail = new Promise<Response>((resolve) => {
+      resolveNewChat = resolve;
+    });
+
+    mocks.fetch.mockImplementation((input: RequestInfo | URL) => {
+      const inputUrl = typeof input === 'string' ? input : input.toString();
+      const parsedUrl = inputUrl.startsWith('http')
+        ? new URL(inputUrl)
+        : new URL(inputUrl, 'http://localhost');
+
+      if (parsedUrl.pathname === '/api/v1/workspaces/workspace-1/sidebar') {
+        return Promise.resolve(jsonResponse({ hierarchyMode: 'workspace', teams: [] }));
+      }
+
+      if (parsedUrl.pathname === '/api/v1/projects/project-1/chats') {
+        return Promise.resolve(jsonResponse([
+          {
+            id: 'chat-old',
+            projectId: 'project-1',
+            teamId: 'team-1',
+            userId: 'user-1',
+            title: 'Old Chat',
+            lastMessagePreview: 'Old preview',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+          },
+          {
+            id: 'chat-new',
+            projectId: 'project-1',
+            teamId: 'team-1',
+            userId: 'user-1',
+            title: 'New Chat',
+            lastMessagePreview: 'New preview',
+            createdAt: '2026-01-02T00:00:00.000Z',
+            updatedAt: '2026-01-02T00:00:00.000Z',
+          },
+        ]));
+      }
+
+      if (parsedUrl.pathname === '/api/v1/projects/project-1/chats/chat-old') {
+        return oldChatDetail;
+      }
+
+      if (parsedUrl.pathname === '/api/v1/projects/project-1/chats/chat-new') {
+        return newChatDetail;
+      }
+
+      return Promise.resolve(jsonResponse({ success: true, lastActiveAt: '2026-05-26T10:00:00.000Z' }));
+    });
+
+    renderAppShell();
+
+    const oldChatTitle = await screen.findByText('Old Chat');
+    const newChatTitle = await screen.findByText('New Chat');
+
+    await user.click(oldChatTitle.closest('button') as HTMLButtonElement);
+    await user.click(newChatTitle.closest('button') as HTMLButtonElement);
+
+    resolveNewChat(jsonResponse({
+      id: 'chat-new',
+      projectId: 'project-1',
+      teamId: 'team-1',
+      userId: 'user-1',
+      title: 'New Chat',
+      lastMessagePreview: 'New preview',
+      createdAt: '2026-01-02T00:00:00.000Z',
+      updatedAt: '2026-01-02T00:00:00.000Z',
+      messages: [
+        { id: 'new-message', sessionId: 'chat-new', role: 'assistant', content: 'New transcript', metadata: {}, createdAt: '2026-01-02T00:00:00.000Z' },
+      ],
+    }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('local-ai-chat-session')).toHaveTextContent('chat-new');
+      expect(screen.getByTestId('local-ai-chat-messages')).toHaveTextContent('New transcript');
+    });
+
+    resolveOldChat(jsonResponse({
+      id: 'chat-old',
+      projectId: 'project-1',
+      teamId: 'team-1',
+      userId: 'user-1',
+      title: 'Old Chat',
+      lastMessagePreview: 'Old preview',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      messages: [
+        { id: 'old-message', sessionId: 'chat-old', role: 'assistant', content: 'Old transcript', metadata: {}, createdAt: '2026-01-01T00:00:00.000Z' },
+      ],
+    }));
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(screen.getByTestId('local-ai-chat-session')).toHaveTextContent('chat-new');
+    expect(screen.getByTestId('local-ai-chat-messages')).toHaveTextContent('New transcript');
+    expect(screen.getByTestId('local-ai-chat-messages')).not.toHaveTextContent('Old transcript');
   });
 
   it('mounts ticket actions for issue routes but not management routes without WebMCP support', async () => {

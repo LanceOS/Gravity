@@ -115,6 +115,8 @@ export function WorkspaceShellPage() {
   const [liveAiChatSessionId, setLiveAiChatSessionId] = useState('');
   const [seedAiChatMessages, setSeedAiChatMessages] = useState<Message[] | undefined>(undefined);
   const [activeAiChatSessionProjectId, setActiveAiChatSessionProjectId] = useState('');
+  const aiChatHistoryRequestIdRef = useRef(0);
+  const latestAiChatProjectIdRef = useRef('');
   const [createInitialStatus, setCreateInitialStatus] = useState<Ticket['status'] | undefined>(undefined);
   const [createParentId, setCreateParentId] = useState<string | undefined>(undefined);
   const [listSort, setListSort] = useState<TicketListSort>('newest_urgent');
@@ -187,6 +189,10 @@ export function WorkspaceShellPage() {
   const currentSeedAiChatSessionId = isAiChatSessionProjectCurrent ? seedAiChatSessionId : '';
   const currentLiveAiChatSessionId = isAiChatSessionProjectCurrent ? liveAiChatSessionId : '';
   const currentSeedAiChatMessages = isAiChatSessionProjectCurrent ? seedAiChatMessages : undefined;
+
+  useEffect(() => {
+    latestAiChatProjectIdRef.current = aiChatProjectId;
+  }, [aiChatProjectId]);
   const activeWorkspaceProjectIds = useMemo(
     () => new Set(activeWorkspaceProjects.map((project) => project.id)),
     [activeWorkspaceProjects]
@@ -840,20 +846,36 @@ export function WorkspaceShellPage() {
       return;
     }
 
+    const requestProjectId = aiChatProjectId;
+    const requestId = aiChatHistoryRequestIdRef.current + 1;
+    aiChatHistoryRequestIdRef.current = requestId;
+    const isLatestRequest = () =>
+      aiChatHistoryRequestIdRef.current === requestId && latestAiChatProjectIdRef.current === requestProjectId;
+
     try {
-      const detail = await getChatSession(aiChatProjectId, chatId);
+      const detail = await getChatSession(requestProjectId, chatId);
+      if (!isLatestRequest()) {
+        return;
+      }
+
       setSeedAiChatSessionId(chatId);
       setLiveAiChatSessionId(chatId);
       setSeedAiChatMessages(toChatMessages(detail));
-      setActiveAiChatSessionProjectId(aiChatProjectId);
+      setActiveAiChatSessionProjectId(requestProjectId);
     } catch (error) {
+      if (!isLatestRequest()) {
+        return;
+      }
+
       console.error('Failed to load chat session:', error);
       setSeedAiChatSessionId(chatId);
       setLiveAiChatSessionId(chatId);
       setSeedAiChatMessages([{ role: 'system', content: 'Failed to load this chat. Please try again.' }]);
-      setActiveAiChatSessionProjectId(aiChatProjectId);
+      setActiveAiChatSessionProjectId(requestProjectId);
     } finally {
-      handleOpenOllama();
+      if (isLatestRequest()) {
+        handleOpenOllama();
+      }
     }
   }, [aiChatProjectId, handleOpenOllama]);
 

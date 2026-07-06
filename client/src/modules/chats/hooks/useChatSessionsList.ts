@@ -31,7 +31,9 @@ export function useChatSessionsList(projectId: string) {
         search: debouncedSearch || undefined,
       }),
     getNextPageParam: (lastPage, allPages) =>
-      lastPage.length < CHAT_SESSIONS_PAGE_SIZE ? undefined : allPages.length * CHAT_SESSIONS_PAGE_SIZE,
+      Array.isArray(lastPage) && lastPage.length >= CHAT_SESSIONS_PAGE_SIZE
+        ? allPages.length * CHAT_SESSIONS_PAGE_SIZE
+        : undefined,
     initialPageParam: 0,
     enabled: !!projectId,
     staleTime: CACHE_CONFIGS.chatSessions.staleTime,
@@ -58,7 +60,7 @@ export function useChatSessionsList(projectId: string) {
     onSuccess: refreshSessions,
   });
 
-  const sessions = query.data?.pages.flat() ?? [];
+  const sessions = query.data?.pages.flatMap((page) => (Array.isArray(page) ? page : [])) ?? [];
 
   return {
     sessions,
