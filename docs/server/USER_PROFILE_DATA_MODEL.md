@@ -33,7 +33,7 @@ This document details the data architecture for User Profiles and Settings withi
 - **Key Fields**: 
   - `userId` (Primary Key).
   - UI preferences: `theme`, `defaultView`, `projectLayout`, `tutorialCompleted`.
-  - AI integrations: `ollamaEndpoint`, `preferredOllamaModel`, `aiProvider`, `agentIntegration`.
+  - AI integrations: `aiProvider`.
   - Storage: `encryptedApiKey`.
 
 ## 6. Interfaces and Contracts
@@ -51,7 +51,7 @@ This document details the data architecture for User Profiles and Settings withi
 
 ## 9. Failure Modes, Observability, or Operational Notes
 
-- If the AI provider strings (`aiProvider`, `agentIntegration`) fall out of sync with the frontend enum structures, it can lead to unhandled UI states or failed agent integrations.
+- If the AI provider string (`aiProvider`) falls out of sync with the frontend enum structures, it can lead to unhandled UI states or failed agent integrations.
 
 ## 10. Change Hazards, Invariants, or Migration Constraints
 

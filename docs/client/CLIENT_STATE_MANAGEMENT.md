@@ -33,7 +33,7 @@ This document outlines how the React client manages application state, data fetc
 - **Custom Hooks**:
   - `useWorkspaceDirectory`: manages workspaces list and workspace join/create requests.
   - `useWorkspaceSettings`: manages workspace settings and members for the active workspace.
-  - `useAccountSettings`: manages personal account preferences and Local AI settings.
+  - `useAccountSettings`: manages personal account preferences and AI provider credentials.
 
 ## 6. Interfaces and Contracts
 - `TicketContextType` in `TicketContext.tsx` defines the shape of the global state and mutations.

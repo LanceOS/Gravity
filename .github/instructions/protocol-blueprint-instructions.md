@@ -107,21 +107,11 @@ To prevent the client application from briefly flashing placeholder data, the co
 }
 ```
 
-## 3. Polymorphic AI API Payload Routing
+## 3. AI API Payload Routing
 
-To handle local Ollama detection and fallbacks alongside secure cloud key configurations, the backend provides a singular wrapper API:
+To handle secure provider key configurations, the backend provides wrapper APIs for credential validation and provider-backed chat requests.
 
-### A. Fetch Ollama Model List
-
-* **Method:** `GET /api/v1/ai/ollama/models`
-* **Logic:** The host engine pings the docker interface `http://host.docker.internal:11434/api/tags`.
-* **Connection Error Return (Safe Failover):** If the server fails to connect to Ollama, it must return a clean `200 OK` status with an empty array to indicate no models are available, rather than throwing a `500 Server Error`.
-
-```
-[]
-```
-
-### B. Test Cloud Integration Connection
+### A. Test Cloud Integration Connection
 
 * **Method:** `POST /api/v1/ai/test-connection`
 * **Payload Shape:**
@@ -143,5 +133,4 @@ To handle local Ollama detection and fallbacks alongside secure cloud key config
   "message": "Connection verified successfully."
 }
 ```
-
 

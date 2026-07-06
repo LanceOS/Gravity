@@ -6,7 +6,7 @@ This document outlines how the Gravity AI Assistant operates within the applicat
 
 Gravity provides users with a dedicated AI project management assistant that interacts with their workspace via chat. Rather than giving the AI unrestricted access to the database, the agent interacts with Gravity exclusively through the **Model Context Protocol (MCP)**. This creates a sandboxed environment where the AI can only perform actions explicitly defined by our tool handlers (e.g., `list_tickets`, `create_ticket`).
 
-The system supports multiple providers including OpenAI, Anthropic, Gemini, DeepSeek, and local Ollama models.
+The system supports multiple providers including OpenAI, Anthropic, Gemini, and DeepSeek.
 
 ## Request Flow
 

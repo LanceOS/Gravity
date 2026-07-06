@@ -1,7 +1,7 @@
 # Client Architecture Overview
 
 ## 1. Purpose and Scope
-This document outlines the high-level architecture of the React-based client application. The client is a Single Page Application (SPA) built with React and Vite. It serves as the primary user interface for workspaces, project ticketing, AI interactions (via LocalAIChat and MCP), and account settings.
+This document outlines the high-level architecture of the React-based client application. The client is a Single Page Application (SPA) built with React and Vite. It serves as the primary user interface for workspaces, project ticketing, AI interactions (via AgentChat and MCP), and account settings.
 
 ## 2. Non-Goals or Boundary Limits
 - **Not covered:** Server-side API implementation, database schemas, and external API rate limits.
@@ -26,7 +26,7 @@ This document outlines the high-level architecture of the React-based client app
 
 ## 7. Key Files and Modules
 The client codebase is heavily modularized using a domain-driven structure under `client/src/modules/`.
-- **`modules/ai/`**: Components and hooks for interacting with local LLMs (Ollama) and the Agent Simulator.
+- **`modules/ai/`**: Components and hooks for interacting with configured AI providers and the Agent Simulator.
 - **`modules/auth/`**: Login screens and onboarding flows.
 - **`modules/onboarding/`**: New user tutorials and setup modals.
 - **`modules/settings/`**: Account and workspace settings, including theme providers and MCP tool configurations.

@@ -1,14 +1,14 @@
 # Server AI Module
 
 ## 1. Purpose and Scope
-The `ai` module (`server/src/modules/ai/`) handles all integrations with external artificial intelligence providers. It is responsible for formatting system prompts, executing chat completions, interpreting agent responses, and abstracting the provider differences (e.g., OpenAI vs. Anthropic vs. Ollama).
+The `ai` module (`server/src/modules/ai/`) handles all integrations with external artificial intelligence providers. It is responsible for formatting system prompts, executing chat completions, interpreting agent responses, and abstracting provider differences.
 
 ## 2. Non-Goals or Boundary Limits
 - Does not store API keys directly; it relies on the `auth` module's KMS features to decrypt API credentials just-in-time.
 - Does not expose MCP tools itself. It acts as an internal engine that other features might utilize.
 
 ## 3. Entry Points
-- **REST Routes**: `src/modules/ai/routes.ts` mounted on `/api/v1/ai`. Allows clients to dispatch direct queries or list available models.
+- **REST Routes**: `src/modules/ai/routes.ts` mounted on `/api/v1/ai`. Allows clients to test credentials and dispatch direct provider-backed queries.
 - **Provider Adapters**: `src/modules/ai/providers/` contains adapters for specific AI vendors.
 
 ## 4. Flow Steps
@@ -23,7 +23,7 @@ The `ai` module (`server/src/modules/ai/`) handles all integrations with externa
 - Does not persist AI chat history in `ai_conversations` or `ai_messages`; the current module operates on request-time input and provider responses.
 
 ## 6. Interfaces and Contracts
-- **`IAiProvider`**: Defined in `src/modules/ai/types.ts`. All new providers (e.g., Gemini, Ollama) must implement this interface to ensure standardized input/output formatting.
+- **`IAiProvider`**: Defined in `src/modules/ai/types.ts`. All new providers must implement this interface to ensure standardized input/output formatting.
 
 ## 7. Key Files and Modules
 - `routes.ts`: Exposes the AI chatting endpoints.

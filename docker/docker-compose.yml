@@ -73,7 +73,6 @@ services:
       BETTER_AUTH_BASE_URL: ${GRAVITY_BACKEND_PUBLIC_URL:-http://localhost:8080}
       CORS_ORIGINS: ${GRAVITY_FRONTEND_PUBLIC_URL:-http://localhost:5173}
       TRUSTED_ORIGINS: ${GRAVITY_FRONTEND_PUBLIC_URL:-http://localhost:5173},${GRAVITY_BACKEND_PUBLIC_URL:-http://localhost:8080}
-      OLLAMA_DEFAULT_ENDPOINT: ${OLLAMA_DEFAULT_ENDPOINT:-http://host.docker.internal:11434}
       NODE_ENV: ${NODE_ENV:-production}
       RUSTFS_ENDPOINT: ${RUSTFS_ENDPOINT:-http://rustfs:9000}
       RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:-admin}
