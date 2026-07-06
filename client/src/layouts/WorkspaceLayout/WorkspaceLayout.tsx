@@ -145,6 +145,7 @@ export function WorkspaceLayout({
 
           <button
             type="button"
+            className="workspace-header-ask-agent-button"
             onClick={sidebarProps.tools.onOpenOllama}
             aria-label={sidebarProps.tools.isOllamaOpen ? 'Close AI Assistant' : 'Ask Agent'}
             style={{
@@ -159,7 +160,7 @@ export function WorkspaceLayout({
               color: sidebarProps.tools.isOllamaOpen ? 'var(--color-primary)' : 'var(--color-text-secondary)',
               fontSize: '13px',
               fontWeight: 500,
-              letterSpacing: '-0.01em',
+              letterSpacing: 0,
               flexShrink: 0,
               whiteSpace: 'nowrap',
               transition: 'color 0.15s ease, background-color 0.15s ease',

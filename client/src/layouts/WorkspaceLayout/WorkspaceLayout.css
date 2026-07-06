@@ -118,11 +118,18 @@
 }
 
 .workspace-header-actions {
+  width: 136px;
   margin-left: auto;
   display: flex;
   align-items: center;
   gap: 8px;
+  justify-content: flex-end;
   flex-shrink: 0;
+}
+
+.workspace-header-ask-agent-button {
+  width: 96px;
+  justify-content: center;
 }
 
 .workspace-header-chat-menu-trigger {
@@ -364,6 +371,10 @@
 
   .workspace-header-chat-history-slot {
     display: none;
+  }
+
+  .workspace-header-actions {
+    width: auto;
   }
 
   .workspace-header-hamburger {
