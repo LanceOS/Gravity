@@ -41,6 +41,7 @@ type ChatGenerationInput = {
   chatId: string;
   userId: string;
   message?: string;
+  messageContext?: string;
   provider?: string;
   model?: string;
   maxTokens?: number;
@@ -230,8 +231,10 @@ export class ChatService {
       .orderBy(asc(chatMessages.createdAt), asc(chatMessages.id));
 
     const userMessageText = normalizeString(input.message);
+    const userMessageContext = normalizeString(input.messageContext);
     const conversationRows = [...priorRows];
     let insertedUserMessage = null;
+    let insertedUserMessageId = '';
     let isFirstUserMessage = false;
 
     if (userMessageText.length > 0) {
@@ -239,9 +242,11 @@ export class ChatService {
       isFirstUserMessage = !hasUserMessage;
 
       insertedUserMessage = await this.appendMessage(input.chatId, 'user', userMessageText, {
-        source: 'chat-client',
-        provider: resolvedProvider,
-      });
+          source: 'chat-client',
+          provider: resolvedProvider,
+          ...(userMessageContext.length > 0 ? { modelContext: 'client-supplied' } : {}),
+        });
+      insertedUserMessageId = insertedUserMessage.id;
       conversationRows.push(insertedUserMessage);
 
       await db
@@ -280,7 +285,9 @@ export class ChatService {
       },
       ...conversationRows.map((row) => ({
         role: row.role,
-        content: row.content,
+        content: row.id === insertedUserMessageId && userMessageContext.length > 0
+          ? `${row.content}\n\n${userMessageContext}`
+          : row.content,
       } as Message)),
     ];
 

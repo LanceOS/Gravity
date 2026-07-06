@@ -14,6 +14,10 @@ export interface AIChatWindowProps {
   isGenerating?: boolean;
   settingsPanel?: React.ReactNode;
   quickActions?: React.ReactNode;
+  inputAccessory?: React.ReactNode;
+  error?: React.ReactNode;
+  onRetry?: () => void;
+  onRegenerate?: () => void;
   placeholder?: string;
   isClosing?: boolean;
   variant?: AIChatWindowVariant;
@@ -27,6 +31,7 @@ export function AIChatWindow({
   isGenerating = false,
   settingsPanel,
   quickActions,
+  inputAccessory,
   placeholder = 'Ask AI a question...',
   isClosing = false,
   variant = 'floating',
@@ -351,6 +356,16 @@ export function AIChatWindow({
             <Send size={12} />
           </button>
         </form>
+        {inputAccessory && (
+          <div
+            style={{
+              marginTop: '8px',
+              width: '100%',
+            }}
+          >
+            {inputAccessory}
+          </div>
+        )}
       </div>
     </div>
   );

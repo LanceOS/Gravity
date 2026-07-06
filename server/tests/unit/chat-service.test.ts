@@ -159,6 +159,43 @@ describe('ChatService', () => {
     expect(response.provider).toBe('openai');
   });
 
+  it('adds client-supplied message context to the model prompt without persisting it', async () => {
+    const { userId, chatId, project } = await createChatFixture();
+
+    const ai = {
+      chat: vi.fn().mockResolvedValue({
+        content: 'Attachment-aware response.',
+      }),
+    };
+
+    const chatService = new ChatService({ ai });
+    await chatService.generateResponse({
+      projectId: project.id,
+      chatId,
+      userId,
+      message: 'What should I watch for?',
+      messageContext: 'Attached ticket context:\nGRA-202: Export fails on retry.',
+    });
+
+    const [, , options] = (ai.chat as any).mock.calls[0];
+    expect(options.messages.at(-1)).toMatchObject({
+      role: 'user',
+      content: expect.stringContaining('What should I watch for?'),
+    });
+    expect(options.messages.at(-1).content).toContain('Attached ticket context');
+    expect(options.messages.at(-1).content).toContain('GRA-202: Export fails on retry.');
+
+    const storedRows = await db
+      .select()
+      .from(chatMessages)
+      .where(eq(chatMessages.sessionId, chatId))
+      .orderBy(asc(chatMessages.createdAt), asc(chatMessages.id));
+    const storedUserMessage = storedRows.find((row) => row.role === 'user');
+    expect(storedUserMessage?.content).toBe('What should I watch for?');
+    expect(storedUserMessage?.content).not.toContain('Attached ticket context');
+    expect(asJsonMetadata(storedUserMessage?.metadata).modelContext).toBe('client-supplied');
+  });
+
   it('shares streaming provider capability checks', () => {
     expect(isSupportedChatProvider('openai')).toBe(true);
     expect(isSupportedChatProvider('anthropic')).toBe(true);

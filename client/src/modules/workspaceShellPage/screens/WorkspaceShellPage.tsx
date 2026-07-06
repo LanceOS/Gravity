@@ -1154,6 +1154,10 @@ export function WorkspaceShellPage() {
               seedChatSessionId={currentSeedAiChatSessionId}
               seedMessages={currentSeedAiChatMessages}
               onSessionCreated={handleAiChatSessionCreated}
+              ticketAttachmentScopeMode={isTeamWorkspace ? 'team' : 'project'}
+              ticketAttachmentProjects={activeWorkspaceProjects}
+              ticketAttachmentTeams={sidebarTree?.teams ?? []}
+              ticketAttachmentDefaultScopeId={isTeamWorkspace ? sidebarActiveTeamId : aiChatProjectId}
             />
           ) : null
         }

@@ -1,13 +1,14 @@
 import React from 'react';
-import { useAuth } from '../../../context/auth/AuthContext';
 import { useProjectContext } from '../../../context/project/ProjectContext';
 import { useActiveTicket } from '../../../context/ticket/ActiveTicketContext';
 import { useUserDirectory } from '../../../context/user/UserDirectoryContext';
+import type { Ticket } from '../../../context/TicketContextContext';
 import { FileText, ListPlus, Sparkles, Wifi } from 'lucide-react';
 import { AIChatWindow } from '@library';
-import type { LocalAIChatProps, QuickActionType } from '../types/LocalAIChat';
-import { buildQuickActionPrompt } from '../utils/LocalAIChat';
+import type { LocalAIChatProps, QuickActionType, TicketAttachmentScopeMode } from '../types/LocalAIChat';
+import { buildAttachedTicketModelContext, buildQuickActionPrompt } from '../utils/LocalAIChat';
 import { ChatContextProvider, useChat } from '../context/ChatContext';
+import { TicketContextAttachmentBar } from './TicketContextAttachmentBar';
 
 const CLOUD_MODELS: Record<string, string[]> = {
   openai: ['gpt-4o-mini', 'gpt-4o'],
@@ -16,18 +17,77 @@ const CLOUD_MODELS: Record<string, string[]> = {
   deepseek: ['deepseek-chat'],
 };
 
+function buildAttachmentScopeKey(scopeMode: TicketAttachmentScopeMode | undefined, scopeId: string) {
+  return `${scopeMode ?? 'none'}:${scopeId}`;
+}
+
 const LocalAIChatInner: React.FC<LocalAIChatProps> = ({
   onClose,
   isClosing,
   variant = 'floating',
   settings,
+  ticketAttachmentScopeMode,
+  ticketAttachmentProjects,
+  ticketAttachmentTeams = [],
+  ticketAttachmentDefaultScopeId,
 }) => {
   const { activeTicket } = useActiveTicket();
   const { users } = useUserDirectory();
   const { projects } = useProjectContext();
+  const [manualAttachmentScopeId, setManualAttachmentScopeId] = React.useState('');
+  const [attachedTicketState, setAttachedTicketState] = React.useState<{ scopeKey: string; tickets: Ticket[] }>({
+    scopeKey: '',
+    tickets: [],
+  });
 
   const isThirdParty = settings.agentIntegration === 'third_party';
   const cloudModelsList = CLOUD_MODELS[settings.aiProvider] || ['gpt-4o-mini'];
+  const attachmentProjects = ticketAttachmentProjects ?? projects;
+  const attachmentScopeIds = React.useMemo(
+    () => new Set((ticketAttachmentScopeMode === 'team' ? ticketAttachmentTeams : attachmentProjects).map((scope) => scope.id)),
+    [attachmentProjects, ticketAttachmentScopeMode, ticketAttachmentTeams],
+  );
+  const selectedAttachmentScopeId = React.useMemo(() => {
+    if (!ticketAttachmentScopeMode) {
+      return '';
+    }
+
+    if (manualAttachmentScopeId && attachmentScopeIds.has(manualAttachmentScopeId)) {
+      return manualAttachmentScopeId;
+    }
+
+    if (ticketAttachmentDefaultScopeId && attachmentScopeIds.has(ticketAttachmentDefaultScopeId)) {
+      return ticketAttachmentDefaultScopeId;
+    }
+
+    return ticketAttachmentScopeMode === 'team'
+      ? ticketAttachmentTeams[0]?.id || ''
+      : attachmentProjects[0]?.id || '';
+  }, [
+    attachmentProjects,
+    attachmentScopeIds,
+    manualAttachmentScopeId,
+    ticketAttachmentDefaultScopeId,
+    ticketAttachmentScopeMode,
+    ticketAttachmentTeams,
+  ]);
+  const attachmentScopeKey = buildAttachmentScopeKey(ticketAttachmentScopeMode, selectedAttachmentScopeId);
+  const attachedTickets = attachedTicketState.scopeKey === attachmentScopeKey ? attachedTicketState.tickets : [];
+
+  const handleAttachmentScopeChange = React.useCallback((scopeId: string) => {
+    setManualAttachmentScopeId(scopeId);
+    setAttachedTicketState({
+      scopeKey: buildAttachmentScopeKey(ticketAttachmentScopeMode, scopeId),
+      tickets: [],
+    });
+  }, [ticketAttachmentScopeMode]);
+
+  const handleAttachedTicketsChange = React.useCallback((tickets: Ticket[]) => {
+    setAttachedTicketState({
+      scopeKey: attachmentScopeKey,
+      tickets,
+    });
+  }, [attachmentScopeKey]);
 
   const {
     messages,
@@ -57,6 +117,16 @@ const LocalAIChatInner: React.FC<LocalAIChatProps> = ({
     }
 
     void sendMessage(buildQuickActionPrompt(actionType, { activeTicket, projects, users }));
+  };
+
+  const handleSendMessage = (text: string) => {
+    const modelContext = buildAttachedTicketModelContext({
+      tickets: attachedTickets,
+      projects: attachmentProjects,
+      users,
+    });
+
+    void sendMessage(text, modelContext ? { modelContext } : undefined);
   };
 
   return (
@@ -109,7 +179,7 @@ const LocalAIChatInner: React.FC<LocalAIChatProps> = ({
       }
       onClose={onClose}
       messages={messages}
-      onSendMessage={(text) => void sendMessage(text)}
+      onSendMessage={handleSendMessage}
       isGenerating={isGenerating}
       placeholder={activeTicket ? "Ask about this ticket..." : "Ask AI a question..."}
       variant={variant}
@@ -146,6 +216,19 @@ const LocalAIChatInner: React.FC<LocalAIChatProps> = ({
               <span>Draft Release</span>
             </button>
           </>
+        ) : undefined
+      }
+      inputAccessory={
+        ticketAttachmentScopeMode ? (
+          <TicketContextAttachmentBar
+            scopeMode={ticketAttachmentScopeMode}
+            projects={attachmentProjects}
+            teams={ticketAttachmentTeams}
+            selectedScopeId={selectedAttachmentScopeId}
+            onScopeChange={handleAttachmentScopeChange}
+            attachedTickets={attachedTickets}
+            onAttachedTicketsChange={handleAttachedTicketsChange}
+          />
         ) : undefined
       }
     />

@@ -17,6 +17,7 @@ const MAX_CHAT_LIMIT = 100;
 const CHAT_STREAM_RATE_LIMIT_MAX = 30;
 const CHAT_STREAM_RATE_LIMIT_WINDOW_MS = 60_000;
 const CHAT_MESSAGE_PREVIEW_LENGTH = 48;
+const CHAT_MESSAGE_CONTEXT_MAX_LENGTH = 30_000;
 
 const createChatStreamLimiter = env.redisEnabled ? createRedisRateLimiter : createRateLimiter;
 const streamLimiter = createChatStreamLimiter({
@@ -142,6 +143,19 @@ function normalizeChatMessageText(value: unknown) {
 
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : '';
+}
+
+function normalizeChatMessageContext(value: unknown) {
+  if (typeof value !== 'string') {
+    return '';
+  }
+
+  const trimmed = value.trim();
+  if (trimmed.length <= CHAT_MESSAGE_CONTEXT_MAX_LENGTH) {
+    return trimmed;
+  }
+
+  return trimmed.slice(0, CHAT_MESSAGE_CONTEXT_MAX_LENGTH);
 }
 
 function normalizeChatProvider(value: unknown) {
@@ -548,6 +562,7 @@ export function createChatsRouter() {
       return;
     }
 
+    const messageContext = normalizeChatMessageContext(req.body?.context);
     const messageModel = normalizeChatModel(req.body?.model ?? req.query.model);
     const maxTokens = normalizeChatMaxTokens(req.body?.maxTokens ?? req.query.maxTokens);
 
@@ -568,6 +583,7 @@ export function createChatsRouter() {
         chatId,
         userId: auth.userId,
         message: userMessage,
+        messageContext: messageContext || undefined,
         provider: requestedProvider || undefined,
         model: messageModel.length > 0 ? messageModel : undefined,
         maxTokens,

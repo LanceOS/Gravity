@@ -1,8 +1,10 @@
-import type { CSSProperties, ChangeEvent, InputHTMLAttributes } from 'react';
+import type { ChangeEvent, InputHTMLAttributes } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { QueryClientProvider } from '@tanstack/react-query';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LocalAIChat } from '../../modules/ai';
+import { queryClient } from '../../utils/queryClient';
 
 const mocks = vi.hoisted(() => ({
   useAuth: vi.fn(),
@@ -98,6 +100,24 @@ const activeTicket = {
   updatedAt: '2026-05-01T00:00:00.000Z',
 };
 
+const attachmentTicket = {
+  id: 'ticket-2',
+  key: 'GRA-202',
+  title: 'Export fails on retry',
+  description: 'Retrying a failed export leaves the job in a stale pending state.',
+  status: 'in_progress' as const,
+  priority: 'urgent' as const,
+  assigneeId: 'user-1',
+  projectId: 'project-1',
+  domainId: 'domain-1',
+  cycleId: null,
+  parentId: null,
+  prStatus: 'none' as const,
+  prUrl: null,
+  createdAt: '2026-05-02T00:00:00.000Z',
+  updatedAt: '2026-05-02T00:00:00.000Z',
+};
+
 const projects = [
   {
     id: 'project-1',
@@ -108,6 +128,15 @@ const projects = [
     workspaceId: 'workspace-1',
   },
 ];
+
+const projectTwo = {
+  id: 'project-2',
+  name: 'Gravity Mobile',
+  description: 'Mobile project',
+  key: 'MOB',
+  status: 'active' as const,
+  workspaceId: 'workspace-1',
+};
 
 const users = [
   {
@@ -165,8 +194,16 @@ function renderLocalAIChat(overrides: Partial<Parameters<typeof LocalAIChat>[0]>
     projects,
   });
 
+  const chat = <LocalAIChat {...props} />;
+
   return {
-    ...render(<LocalAIChat {...props} />),
+    ...render(
+      props.ticketAttachmentScopeMode ? (
+        <QueryClientProvider client={queryClient}>
+          {chat}
+        </QueryClientProvider>
+      ) : chat
+    ),
     props,
   };
 }
@@ -178,6 +215,7 @@ describe('LocalAIChat', () => {
     mocks.useActiveTicket.mockReset();
     mocks.useProjectContext.mockReset();
     mocks.fetch.mockReset();
+    queryClient.clear();
     vi.stubGlobal('fetch', mocks.fetch);
   });
 
@@ -233,6 +271,103 @@ describe('LocalAIChat', () => {
     });
 
     expect(screen.getByText('Summarize the backlog')).toBeInTheDocument();
+  });
+
+  it('includes attached ticket context in local provider messages without rendering it', async () => {
+    const user = userEvent.setup();
+    mocks.fetch.mockImplementation((url: string) => {
+      if (url === '/api/v1/mcp/sse') return Promise.resolve(createJsonResponse({ result: { tools: [] } }));
+      if (url.includes('ollama/models')) return Promise.resolve(createJsonResponse({ models: ['llama3'], connected: true }));
+      if (url === '/api/v1/tickets?projectId=project-1') return Promise.resolve(createJsonResponse([attachmentTicket]));
+      if (url === '/api/v1/ai/chat') return Promise.resolve(createJsonResponse({ message: { content: 'Local context answer' } }));
+      return Promise.resolve(createJsonResponse({}));
+    });
+
+    renderLocalAIChat({
+      ticketAttachmentScopeMode: 'project',
+      ticketAttachmentProjects: projects,
+      ticketAttachmentDefaultScopeId: 'project-1',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Active')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Attach tickets' }));
+    const attachmentOption = await screen.findByRole('option', { name: 'Attach GRA-202' });
+    await user.click(attachmentOption);
+
+    const chatInput = screen.getByPlaceholderText('Ask AI a question...');
+    await user.type(chatInput, 'Summarize attachment risk');
+    fireEvent.submit(chatInput.closest('form') as HTMLFormElement);
+
+    await waitFor(() => {
+      expect(screen.getByText('Local context answer')).toBeInTheDocument();
+    });
+
+    const chatRequest = mocks.fetch.mock.calls.find(call => call[0] === '/api/v1/ai/chat');
+    expect(chatRequest).toBeDefined();
+    const payload = JSON.parse(chatRequest![1]?.body as string);
+    const userMessage = payload.messages.at(-1)?.content;
+    expect(userMessage).toContain('Summarize attachment risk');
+    expect(userMessage).toContain('Attached ticket context');
+    expect(userMessage).toContain('GRA-202: Export fails on retry');
+    expect(screen.getByText('Summarize attachment risk')).toBeInTheDocument();
+    expect(screen.queryByText(/Attached ticket context for this message/)).not.toBeInTheDocument();
+  });
+
+  it('does not send attached ticket context after the attachment scope changes', async () => {
+    const user = userEvent.setup();
+    const attachmentProjects = [...projects, projectTwo];
+    mocks.fetch.mockImplementation((url: string) => {
+      if (url === '/api/v1/mcp/sse') return Promise.resolve(createJsonResponse({ result: { tools: [] } }));
+      if (url.includes('ollama/models')) return Promise.resolve(createJsonResponse({ models: ['llama3'], connected: true }));
+      if (url === '/api/v1/tickets?projectId=project-1') return Promise.resolve(createJsonResponse([attachmentTicket]));
+      if (url === '/api/v1/tickets?projectId=project-2') return Promise.resolve(createJsonResponse([]));
+      if (url === '/api/v1/ai/chat') return Promise.resolve(createJsonResponse({ message: { content: 'New scope answer' } }));
+      return Promise.resolve(createJsonResponse({}));
+    });
+
+    const { props, rerender } = renderLocalAIChat({
+      ticketAttachmentScopeMode: 'project',
+      ticketAttachmentProjects: attachmentProjects,
+      ticketAttachmentDefaultScopeId: 'project-1',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Active')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Attach tickets' }));
+    const attachmentOption = await screen.findByRole('option', { name: 'Attach GRA-202' });
+    await user.click(attachmentOption);
+
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <LocalAIChat
+          {...props}
+          ticketAttachmentScopeMode="project"
+          ticketAttachmentProjects={attachmentProjects}
+          ticketAttachmentDefaultScopeId="project-2"
+        />
+      </QueryClientProvider>
+    );
+
+    const chatInput = screen.getByPlaceholderText('Ask AI a question...');
+    await user.type(chatInput, 'Summarize this scope');
+    fireEvent.submit(chatInput.closest('form') as HTMLFormElement);
+
+    await waitFor(() => {
+      expect(screen.getByText('New scope answer')).toBeInTheDocument();
+    });
+
+    const chatRequest = mocks.fetch.mock.calls.find(call => call[0] === '/api/v1/ai/chat');
+    expect(chatRequest).toBeDefined();
+    const payload = JSON.parse(chatRequest![1]?.body as string);
+    const userMessage = payload.messages.at(-1)?.content;
+    expect(userMessage).toContain('Summarize this scope');
+    expect(userMessage).not.toContain('Attached ticket context');
+    expect(userMessage).not.toContain('GRA-202');
   });
 
   it('sends cloud provider chat through the project SSE stream', async () => {
@@ -296,6 +431,60 @@ describe('LocalAIChat', () => {
       model: 'claude-3-haiku',
     });
     expect(mocks.fetch.mock.calls.some(call => call[0] === '/api/v1/ai/chat')).toBe(false);
+  });
+
+  it('sends attached ticket context separately for cloud provider chat', async () => {
+    const user = userEvent.setup();
+    mocks.fetch.mockImplementation((url: string) => {
+      if (url === '/api/v1/mcp/sse') return Promise.resolve(createJsonResponse({ result: { tools: [] } }));
+      if (url === '/api/v1/tickets?projectId=project-1') return Promise.resolve(createJsonResponse([attachmentTicket]));
+      if (url === '/api/v1/projects/project-1/chats') return Promise.resolve(createJsonResponse({ id: 'chat-1' }));
+      if (url === '/api/v1/projects/project-1/chats/chat-1/stream') {
+        return Promise.resolve(createTextResponse(
+          'data: {"type":"done","message":"Cloud context answer","messageId":"msg-1","provider":"anthropic","model":"claude-3-haiku","fallback":false,"toolCalls":null}\n\n',
+        ));
+      }
+      return Promise.resolve(createJsonResponse({}));
+    });
+
+    renderLocalAIChat({
+      initialModel: 'claude-3-haiku',
+      projectId: 'project-1',
+      ticketAttachmentScopeMode: 'project',
+      ticketAttachmentProjects: projects,
+      ticketAttachmentDefaultScopeId: 'project-1',
+      settings: {
+        ...mockSettings,
+        aiProvider: 'anthropic',
+        agentIntegration: 'third_party',
+      },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Active')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Attach tickets' }));
+    const attachmentOption = await screen.findByRole('option', { name: 'Attach GRA-202' });
+    await user.click(attachmentOption);
+
+    const chatInput = screen.getByPlaceholderText('Ask AI a question...');
+    await user.type(chatInput, 'What should I watch for?');
+    fireEvent.submit(chatInput.closest('form') as HTMLFormElement);
+
+    await waitFor(() => {
+      expect(screen.getByText('Cloud context answer')).toBeInTheDocument();
+    });
+
+    const streamRequest = mocks.fetch.mock.calls.find(call => call[0] === '/api/v1/projects/project-1/chats/chat-1/stream');
+    expect(streamRequest).toBeDefined();
+    expect(JSON.parse(streamRequest![1]?.body as string)).toMatchObject({
+      message: 'What should I watch for?',
+      context: expect.stringContaining('GRA-202: Export fails on retry'),
+      provider: 'anthropic',
+    });
+    expect(screen.getByText('What should I watch for?')).toBeInTheDocument();
+    expect(screen.queryByText(/Attached ticket context for this message/)).not.toBeInTheDocument();
   });
 
   it('requires an explicit project before starting cloud provider chat', async () => {
@@ -508,6 +697,50 @@ describe('LocalAIChat', () => {
     expect(screen.getByText(/chat exploded/i)).toBeInTheDocument();
 
     consoleErrorSpy.mockRestore();
+  });
+
+  it('keeps attached ticket context out of ticket quick actions', async () => {
+    const user = userEvent.setup();
+
+    mocks.fetch.mockImplementation((url: string) => {
+      if (url === '/api/v1/mcp/sse') return Promise.resolve(createJsonResponse({ result: { tools: [] } }));
+      if (url.includes('ollama/models')) return Promise.resolve(createJsonResponse({ models: ['codellama'], connected: true }));
+      if (url === '/api/v1/tickets?projectId=project-1') return Promise.resolve(createJsonResponse([attachmentTicket]));
+      if (url === '/api/v1/ai/chat') return Promise.resolve(createJsonResponse({ message: { content: 'Quick action answer' } }));
+      return Promise.resolve(createJsonResponse({}));
+    });
+
+    renderLocalAIChat(
+      {
+        initialOllamaUrl: 'http://ollama.internal:11434',
+        initialModel: 'codellama',
+        ticketAttachmentScopeMode: 'project',
+        ticketAttachmentProjects: projects,
+        ticketAttachmentDefaultScopeId: 'project-1',
+      },
+      { activeTicket }
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Analyze Ticket')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Attach tickets' }));
+    const attachmentOption = await screen.findByRole('option', { name: 'Attach GRA-202' });
+    await user.click(attachmentOption);
+    await user.click(screen.getByRole('button', { name: 'Analyze Ticket' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Quick action answer')).toBeInTheDocument();
+    });
+
+    const quickActionRequest = mocks.fetch.mock.calls.find(call => call[0] === '/api/v1/ai/chat');
+    expect(quickActionRequest).toBeDefined();
+    const payload = JSON.parse(quickActionRequest![1]?.body as string);
+    const quickActionMessage = payload.messages.at(-1)?.content;
+    expect(quickActionMessage).toContain('Key: GRA-101');
+    expect(quickActionMessage).not.toContain('Attached ticket context');
+    expect(quickActionMessage).not.toContain('GRA-202');
   });
 
   it('fetches MCP tools on mount and executes them automatically', async () => {

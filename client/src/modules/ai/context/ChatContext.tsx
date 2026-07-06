@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useEffectEvent } from 'react';
-import type { Message } from '../types/LocalAIChat';
+import type { Message, SendMessageOptions } from '../types/LocalAIChat';
 import type { WorkspaceSettings } from '../../../utils/settings';
 import { apiClient } from '../../../utils/apiClient';
 import { queryClient, queryKeys, CACHE_CONFIGS } from '../../../utils/queryClient';
@@ -18,7 +18,7 @@ export interface ChatContextType {
   modelStatus: 'connected' | 'disconnected' | 'checking';
   detectedModels: string[];
   isCheckingModel: boolean;
-  sendMessage: (content: string) => Promise<void>;
+  sendMessage: (content: string, options?: SendMessageOptions) => Promise<void>;
   regenerate: () => Promise<void>;
   retry: () => Promise<void>;
   clearChat: () => void;
@@ -93,7 +93,7 @@ async function readErrorMessage(response: Response) {
 async function postChatCompletionSse(
   projectId: string,
   chatId: string,
-  payload: { message: string; provider: string; model?: string },
+  payload: { message: string; provider: string; model?: string; context?: string },
 ) {
   const response = await fetch(`/api/v1/projects/${encodeURIComponent(projectId)}/chats/${encodeURIComponent(chatId)}/stream`, {
     method: 'POST',
@@ -123,6 +123,15 @@ async function postChatCompletionSse(
   }
 
   return doneEvent;
+}
+
+function getMessageContentForModel(message: Message) {
+  const modelContext = message.modelContext?.trim();
+  if (!modelContext) {
+    return message.content;
+  }
+
+  return `${message.content}\n\n${modelContext}`;
 }
 
 export interface ChatProviderProps {
@@ -344,11 +353,22 @@ export const ChatContextProvider: React.FC<ChatProviderProps> = ({
     }
   });
 
-  const handleSendMessage = async (textToSend: string, autoRunMessages?: Message[], toolCallDepth = 0) => {
+  const handleSendMessage = async (
+    textToSend: string,
+    autoRunMessages?: Message[],
+    toolCallDepth = 0,
+    options: SendMessageOptions = {},
+  ) => {
     if (!autoRunMessages && (!textToSend.trim() || isGenerating)) return;
 
     setErrorState(null);
-    const newMessages: Message[] = autoRunMessages || [...messages, { role: 'user', content: textToSend }];
+    const normalizedModelContext = options.modelContext?.trim();
+    const userMessage: Message = {
+      role: 'user',
+      content: textToSend,
+      ...(normalizedModelContext ? { modelContext: normalizedModelContext } : {}),
+    };
+    const newMessages: Message[] = autoRunMessages || [...messages, userMessage];
     setMessages(newMessages);
     if (!autoRunMessages) setIsGenerating(true);
     const requestContextVersion = isThirdParty ? cloudContextVersionRef.current : 0;
@@ -364,6 +384,7 @@ export const ChatContextProvider: React.FC<ChatProviderProps> = ({
           message: textToSend,
           provider: settings.aiProvider,
           ...(model ? { model } : {}),
+          ...(normalizedModelContext ? { context: normalizedModelContext } : {}),
         });
         if (cloudContextVersionRef.current !== requestContextVersion) {
           return;
@@ -382,7 +403,7 @@ export const ChatContextProvider: React.FC<ChatProviderProps> = ({
         model,
         messages: newMessages.map(m => ({
           role: m.role,
-          content: m.content,
+          content: getMessageContentForModel(m),
           ...(m.tool_calls ? { tool_calls: m.tool_calls } : {}),
           ...(m.tool_call_id ? { tool_call_id: m.tool_call_id, name: m.name } : {})
         })),
@@ -517,8 +538,8 @@ export const ChatContextProvider: React.FC<ChatProviderProps> = ({
     }
   };
 
-  const sendMessage = async (content: string) => {
-    return handleSendMessage(content);
+  const sendMessage = async (content: string, options?: SendMessageOptions) => {
+    return handleSendMessage(content, undefined, 0, options);
   };
 
   const regenerate = async () => {
@@ -527,8 +548,8 @@ export const ChatContextProvider: React.FC<ChatProviderProps> = ({
     if (lastUserMsgIdx === -1) return;
     const idx = messages.length - 1 - lastUserMsgIdx;
     const userMsg = messages[idx];
-    const newMessages = messages.slice(0, idx);
-    await handleSendMessage(userMsg.content, newMessages);
+    const newMessages = [...messages.slice(0, idx), userMsg];
+    await handleSendMessage(userMsg.content, newMessages, 0, { modelContext: userMsg.modelContext });
   };
 
   const retry = async () => {
@@ -537,8 +558,8 @@ export const ChatContextProvider: React.FC<ChatProviderProps> = ({
     if (lastUserMsgIdx === -1) return;
     const idx = messages.length - 1 - lastUserMsgIdx;
     const userMsg = messages[idx];
-    const newMessages = messages.slice(0, idx);
-    await handleSendMessage(userMsg.content, newMessages);
+    const newMessages = [...messages.slice(0, idx), userMsg];
+    await handleSendMessage(userMsg.content, newMessages, 0, { modelContext: userMsg.modelContext });
   };
 
   const clearChat = () => {

@@ -15,4 +15,16 @@ describe('AIChatWindow', () => {
     expect(screen.getByText('Generating answer...')).toBeInTheDocument();
     expect(screen.getByTestId('chat-generating-icon')).toBeInTheDocument();
   });
+
+  it('renders input accessories below the composer', () => {
+    render(
+      <AIChatWindow
+        messages={[]}
+        onSendMessage={() => {}}
+        inputAccessory={<div>Attach ticket controls</div>}
+      />
+    );
+
+    expect(screen.getByText('Attach ticket controls')).toBeInTheDocument();
+  });
 });
