@@ -7,6 +7,7 @@ import { AppShellPage } from '../../pages/AppShellPage/AppShellPage.tsx';
 import { WorkspaceShellPage } from '../../pages/WorkspaceShellPage/WorkspaceShellPage.tsx';
 import WorkspaceAccessDeniedView from '../../pages/PlaceholderViews/WorkspaceAccessDeniedView.tsx';
 import WorkspaceAccessErrorView from '../../pages/PlaceholderViews/WorkspaceAccessErrorView.tsx';
+import { AccountPreferencesPageRoute } from '../../pages/AccountPreferencesPage/AccountPreferencesPage.tsx';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { queryClient as sharedQueryClient, queryKeys } from '../../utils/queryClient';
 
@@ -53,6 +54,8 @@ type WorkspacePageMockProps = {
   tickets?: unknown[];
   viewModeLocked?: boolean;
 };
+
+type AccountSettingsInput = Record<string, unknown> | (() => Record<string, unknown>);
 
 const mocks = vi.hoisted(() => ({
   useAuth: vi.fn(),
@@ -274,7 +277,19 @@ vi.mock('../../modules/loadingPage', () => ({
 }));
 
 vi.mock('../../modules/workspaceDirectoryPage', () => ({
-  WorkspaceDirectoryPage: () => <div>WorkspaceDirectoryPage</div>,
+  WorkspaceDirectoryPage: ({ onOpenWorkspace }: any) => (
+    <div>
+      <div>WorkspaceDirectoryPage</div>
+      {onOpenWorkspace ? (
+        <button
+          type="button"
+          onClick={() => onOpenWorkspace('workspace-1')}
+        >
+          Open workspace
+        </button>
+      ) : null}
+    </div>
+  ),
 }));
 
 vi.mock('../../modules/workspacePage', () => ({
@@ -337,8 +352,43 @@ vi.mock('../../modules/workspaceTeamProjectsPage', () => ({
   ),
 }));
 
-vi.mock('../../pages/AccountPreferencesPage/AccountPreferencesPage', () => ({
-  AccountPreferencesPage: () => <div>AccountPreferencesPage</div>,
+vi.mock('../../pages/AccountPreferencesPage/AccountPreferencesPage', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../pages/AccountPreferencesPage/AccountPreferencesPage')>();
+
+  return {
+    ...actual,
+  AccountPreferencesPage: ({ onResetTutorial, onBack, onOpenDirectory }: any) => (
+    <div>
+      <div>AccountPreferencesPage</div>
+      <button type="button" onClick={onResetTutorial}>
+        Reset &amp; Start Tutorial
+      </button>
+      <button type="button" onClick={onBack}>
+        Back to Workspace
+      </button>
+      <button type="button" onClick={onOpenDirectory}>
+        Open workspace directory
+      </button>
+    </div>
+  ),
+  };
+});
+
+vi.mock('../../modules/accountPreferencesPage/screens/AccountPreferencesPage', () => ({
+  AccountPreferencesPage: ({ onResetTutorial, onBack, onOpenDirectory }: any) => (
+    <div>
+      <div>AccountPreferencesPage</div>
+      <button type="button" onClick={onResetTutorial}>
+        Reset &amp; Start Tutorial
+      </button>
+      <button type="button" onClick={onBack}>
+        Back to Workspace
+      </button>
+      <button type="button" onClick={onOpenDirectory}>
+        Open workspace directory
+      </button>
+    </div>
+  ),
 }));
 
 function makeCurrentUser(overrides: Partial<Record<string, unknown>> = {}) {
@@ -491,9 +541,10 @@ function buildAccountSettings(overrides: Partial<Record<string, unknown>> = {}) 
       aiProvider: 'openai',
       apiKey: '',
     },
+    settingsHydrated: true,
     settingsLoading: false,
     saveLoading: false,
-      resetProviderDraft: vi.fn(),
+    resetProviderDraft: vi.fn(),
     saveSuccess: false,
     saveError: null,
     hasProviderChanges: false,
@@ -551,7 +602,7 @@ function renderAppShell({
 }: {
   tickets?: Record<string, unknown>;
   directory?: Record<string, unknown>;
-  account?: Record<string, unknown>;
+  account?: AccountSettingsInput;
   workspaceSettings?: Record<string, unknown>;
   initialEntries?: string[];
   queryClient?: QueryClient;
@@ -623,7 +674,9 @@ function renderAppShell({
   });
   mocks.useTicketMutations.mockReturnValue(buildUseTicketMutations());
   mocks.useWorkspaceDirectory.mockReturnValue(directory);
-  mocks.useAccountSettings.mockReturnValue(account);
+  mocks.useAccountSettings.mockImplementation(() => (
+    typeof account === 'function' ? account() : account
+  ));
   mocks.useWorkspaceSettings.mockReturnValue(workspaceSettings);
   mocks.useTicketFilters.mockReturnValue({
     filters: ticketState.filters,
@@ -662,6 +715,7 @@ function renderAppShell({
           <Route path="/workspaces/:workspaceId" element={<WorkspaceShellPage />} />
           <Route path="/workspace-access-denied" element={<WorkspaceAccessDeniedView />} />
           <Route path="/workspace-access-error" element={<WorkspaceAccessErrorView />} />
+          <Route path="/account" element={<AccountPreferencesPageRoute />} />
           <Route path="*" element={<AppShellPage />} />
         </Routes>
       </MemoryRouter>
@@ -994,6 +1048,93 @@ describe('AppShellPage', () => {
           body: JSON.stringify({ completed: true }),
       })
       );
+    });
+  });
+
+  it('returns to the board after reset and then completing onboarding from account preferences without remounting', async () => {
+    const user = userEvent.setup();
+    const accountState = {
+      settings: {
+        defaultView: 'board',
+        theme: 'dark',
+        projectLayout: 'standard',
+        apiKey: '',
+        aiProvider: 'openai',
+        tutorialCompleted: true,
+      },
+    };
+    const account = () => {
+      const baseAccount = buildAccountSettings({ settings: accountState.settings });
+      return {
+        ...baseAccount,
+        resetTutorial: vi.fn(async () => {
+          await mocks.fetch('/api/v1/users/user-1/tutorial', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ completed: false }),
+          });
+          accountState.settings = {
+            ...accountState.settings,
+            tutorialCompleted: false,
+          };
+        }),
+      };
+    };
+
+    const tickets = buildUseTickets({
+      currentUser: makeCurrentUser(),
+    });
+
+    renderAppShell({ tickets, account });
+
+    await waitFor(() => {
+      expect(screen.getByText('WorkspaceLayout')).toBeInTheDocument();
+      expect(screen.getByText('WorkspacePage')).toBeInTheDocument();
+      expect(screen.queryByText('OnboardingModal')).not.toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Open account preferences' }));
+    await waitFor(() => {
+      expect(screen.getByText('AccountPreferencesPage')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Reset & Start Tutorial' }));
+    await waitFor(() => {
+      expect(mocks.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/v1/users/user-1/tutorial'),
+        expect.objectContaining({
+          method: 'PATCH',
+          body: JSON.stringify({ completed: false }),
+        }),
+      );
+      expect(accountState.settings.tutorialCompleted).toBe(false);
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Back to Workspace' }));
+    await waitFor(() => {
+      expect(screen.getByText('WorkspaceDirectoryPage')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Open workspace' }));
+    await waitFor(() => {
+      expect(screen.getByTestId('location-display').textContent).toBe('/workspaces/workspace-1');
+      expect(screen.getByText('OnboardingModal')).toBeInTheDocument();
+      expect(screen.getByText('WorkspaceLayout')).toBeInTheDocument();
+      expect(screen.getByTestId('workspace-page-state')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Complete onboarding' }));
+    await waitFor(() => {
+      expect(mocks.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/v1/users/user-1/tutorial'),
+        expect.objectContaining({
+          method: 'PATCH',
+          body: JSON.stringify({ completed: true }),
+        }),
+      );
+      expect(screen.queryByText('OnboardingModal')).not.toBeInTheDocument();
+      expect(screen.getByTestId('location-display').textContent).toBe('/workspaces/workspace-1');
+      expect(screen.getByTestId('workspace-page-state')).toHaveAttribute('data-ticket-count', '1');
     });
   });
 
