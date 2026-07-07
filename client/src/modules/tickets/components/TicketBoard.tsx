@@ -17,6 +17,7 @@ const LOAD_MORE_CARDS = 40;
 const TICKET_CARD_ANIMATION_DURATION = 240;
 const TICKET_CARD_ANIMATION_EASING = 'cubic-bezier(0.2, 0, 0.38, 1)';
 const MAX_TICKETS_FOR_BOARD_ANIMATION = 120;
+const DRAG_TICKET_DATA_TYPE = 'application/x-gravity-ticket';
 const BOARD_COLUMN_BY_ID = Object.fromEntries(BOARD_COLUMNS.map((column) => [column.id, column])) as Record<string, (typeof BOARD_COLUMNS)[number]>;
 
 export const TicketBoard = React.memo(({
@@ -98,7 +99,9 @@ export const TicketBoard = React.memo(({
     }
 
     const nextHandler = (event: DragEvent) => {
+      event.dataTransfer.effectAllowed = 'move';
       event.dataTransfer.setData('text/plain', ticket.id);
+      event.dataTransfer.setData(DRAG_TICKET_DATA_TYPE, ticket.id);
     };
     dragStartHandlerCache.current.set(ticket, nextHandler);
     return nextHandler;
