@@ -7,3 +7,4 @@ export * from './dropdownPosition';
 export * from './dateHelpers';
 export * from './sanitizeHtml';
 export * from './richtext';
+export * from './anime';

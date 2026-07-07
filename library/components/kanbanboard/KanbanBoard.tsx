@@ -1,6 +1,7 @@
 import React, { memo, useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import anime from 'animejs';
 import { DenseVirtualList } from '../densevirtuallist';
+import { runAnime } from '../../utilities';
 import './KanbanBoard.css';
 
 export interface KanbanCard {
@@ -76,7 +77,7 @@ const KanbanCardComponent = memo(function KanbanCardComponent({
     if (isLastDropped && cardRef.current) {
       const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       if (!prefersReduced) {
-        anime({
+        runAnime({
           targets: cardRef.current,
           translateY: [-2, 0],
           duration: 300,

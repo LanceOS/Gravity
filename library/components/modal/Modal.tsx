@@ -1,8 +1,6 @@
 import React from 'react';
 import { X } from 'lucide-react';
-import { Portal } from '../../utilities';
-import { FocusTrap } from '../../utilities';
-import { ClickAwayListener } from '../../utilities';
+import { Portal, FocusTrap, ClickAwayListener, runAnime } from '../../utilities';
 import anime from 'animejs';
 
 const MODAL_DURATION = 180;
@@ -48,7 +46,7 @@ export function Modal({ isOpen, onClose, title, children, footer, style }: Modal
 
       if (backdropRef.current) {
         anime.remove(backdropRef.current);
-        anime({
+        runAnime({
           targets: backdropRef.current,
           opacity: [1, 0],
           duration: MODAL_DURATION,
@@ -57,7 +55,7 @@ export function Modal({ isOpen, onClose, title, children, footer, style }: Modal
       }
       if (dialogRef.current) {
         anime.remove(dialogRef.current);
-        anime({
+        runAnime({
           targets: dialogRef.current,
           opacity: [1, 0],
           translateY: ['0px', '10px'],
@@ -83,7 +81,7 @@ export function Modal({ isOpen, onClose, title, children, footer, style }: Modal
 
     if (backdropRef.current) {
       backdropRef.current.style.opacity = '0';
-      anime({
+      runAnime({
         targets: backdropRef.current,
         opacity: [0, 1],
         duration: MODAL_DURATION,
@@ -93,7 +91,7 @@ export function Modal({ isOpen, onClose, title, children, footer, style }: Modal
     if (dialogRef.current) {
       dialogRef.current.style.opacity = '0';
       dialogRef.current.style.transform = 'translateY(10px)';
-      anime({
+      runAnime({
         targets: dialogRef.current,
         opacity: [0, 1],
         translateY: ['10px', '0px'],
