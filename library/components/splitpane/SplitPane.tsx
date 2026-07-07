@@ -9,24 +9,42 @@ export interface SplitPaneProps extends React.HTMLAttributes<HTMLDivElement> {
 export function SplitPane({ left, right, initialWidth = 240, style, className = '', ...props }: SplitPaneProps) {
   const [width, setWidth] = React.useState(initialWidth);
   const containerRef = React.useRef<HTMLDivElement | null>(null);
+  const isDraggingRef = React.useRef(false);
+  const startXRef = React.useRef(0);
+  const startWidthRef = React.useRef(initialWidth);
+
+  const handleMouseMove = React.useCallback((moveEvent: MouseEvent) => {
+    if (!isDraggingRef.current) return;
+    const deltaX = moveEvent.clientX - startXRef.current;
+    setWidth(Math.max(120, Math.min(600, startWidthRef.current + deltaX)));
+  }, []);
+
+  const stopDrag = React.useCallback(() => {
+    if (!isDraggingRef.current) return;
+    isDraggingRef.current = false;
+    document.removeEventListener('mousemove', handleMouseMove);
+    document.removeEventListener('mouseup', stopDrag);
+  }, [handleMouseMove]);
+
+  React.useEffect(() => {
+    return () => {
+      stopDrag();
+    };
+  }, [stopDrag]);
+
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
+    if (isDraggingRef.current) return;
+
     const startX = e.clientX;
     const startWidth = width;
-
-    const handleMouseMove = (moveEvent: MouseEvent) => {
-      const deltaX = moveEvent.clientX - startX;
-      setWidth(Math.max(120, Math.min(600, startWidth + deltaX)));
-    };
-
-    const handleMouseUp = () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
+    isDraggingRef.current = true;
+    startXRef.current = startX;
+    startWidthRef.current = startWidth;
 
     document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('mouseup', stopDrag);
   };
 
   return (
