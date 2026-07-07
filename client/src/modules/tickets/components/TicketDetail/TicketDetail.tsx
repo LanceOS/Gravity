@@ -232,7 +232,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
     if (!containerRef.current) return;
 
     // Reset initial state before animating
-    anime.set(containerRef.current, { transform: 'translateX(30px)', opacity: 0 });
+    anime.set(containerRef.current, { translateX: 30, opacity: 0 });
 
     safeAnime({
       targets: containerRef.current,

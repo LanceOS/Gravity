@@ -32,13 +32,16 @@ This document details the data architecture for Tickets and Comments in the Grav
   - Foreign Keys: `projectId`, `assigneeId`, `domainId`, `cycleId`, `parentId` (For subtasks).
   - Integration state: `prStatus`, `prUrl`.
 
-### `ticket_dependencies` Table
+### `ticket_relationships` Table
 - **Purpose**: Stores directed ticket relationships used for both dependencies and blockers.
 - **Created By**: Ticket dependency/blocker actions in the UI or API.
 - **Key Fields**:
   - `ticket_id`: the blocking ticket.
   - `blocked_ticket_id`: the ticket being blocked.
+  - `project_id`: the relationship scope used by the backend for scoping and event fanout.
+  - `created_at`: when the relationship was created.
 - **Behavior**: A ticket can block many other tickets and can also be blocked by many tickets. The UI resolves both directions from this relation table.
+- **Legacy note**: Older backups and pre-rename migrations may still use `ticket_dependencies`. The server bootstrap migrates that legacy table into `ticket_relationships` on startup.
 
 ### `comments` Table
 - **Purpose**: Represents communication logs on a ticket.

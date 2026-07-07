@@ -19,6 +19,8 @@ All ticket dependency relationships are stored in the `ticket_relationships` jun
 ### Legacy vs Current Architecture
 Historically, relationships were handled via a single `blockedTicketId` column on the `tickets` table. This only permitted a 1-to-many relationship (a ticket could only have one blocker). The migration to a dedicated `ticket_relationships` junction table allows for robust Many-to-Many configurations (a ticket can be blocked by multiple tickets, and block multiple tickets).
 
+Older dumps created before the rename to `ticket_relationships` may still contain a `ticket_dependencies` table or a legacy `tickets.blocked_ticket_id` column. The server bootstrap migrates both forms forward during startup, so restored backups can be normalized without manual SQL edits.
+
 ---
 
 ## 2. API Endpoints
