@@ -10,39 +10,62 @@ export interface RangeSliderProps {
 
 export function RangeSlider({ min, max, value, onChange, label }: RangeSliderProps) {
   const trackRef = React.useRef<HTMLDivElement | null>(null);
+  const activeThumbRef = React.useRef<0 | 1 | null>(null);
+  const latestValueRef = React.useRef(value);
+  const latestMinRef = React.useRef(min);
+  const latestMaxRef = React.useRef(max);
+  const latestOnChangeRef = React.useRef(onChange);
 
-  const calculatePercentage = (val: number) => {
+  React.useEffect(() => {
+    latestValueRef.current = value;
+    latestMinRef.current = min;
+    latestMaxRef.current = max;
+    latestOnChangeRef.current = onChange;
+  }, [value, min, max, onChange]);
+
+  const handleMouseMove = React.useCallback((moveEvent: MouseEvent) => {
+    if (activeThumbRef.current === null || !trackRef.current) return;
+
+    const rect = trackRef.current.getBoundingClientRect();
+    const clickX = moveEvent.clientX - rect.left;
+    const percentage = Math.max(0, Math.min(100, (clickX / rect.width) * 100));
+    const rawVal = Math.round(
+      latestMinRef.current + (percentage / 100) * (latestMaxRef.current - latestMinRef.current),
+    );
+
+    const nextVal = [...latestValueRef.current] as [number, number];
+    if (activeThumbRef.current === 0) {
+      nextVal[0] = Math.min(rawVal, latestValueRef.current[1] - 1);
+    } else {
+      nextVal[1] = Math.max(rawVal, latestValueRef.current[0] + 1);
+    }
+    latestOnChangeRef.current(nextVal);
+  }, []);
+
+  const stopDrag = React.useCallback(() => {
+    if (activeThumbRef.current === null) return;
+    activeThumbRef.current = null;
+    document.removeEventListener('mousemove', handleMouseMove);
+    document.removeEventListener('mouseup', stopDrag);
+  }, [handleMouseMove]);
+
+  React.useEffect(() => {
+    return () => {
+      stopDrag();
+    };
+  }, [stopDrag]);
+
+  const calculatePercentage = React.useCallback((val: number) => {
     return ((val - min) / (max - min)) * 100;
-  };
+  }, [min, max]);
 
   const handleDrag = (e: React.MouseEvent, thumbIndex: 0 | 1) => {
     e.preventDefault();
-    if (!trackRef.current) return;
+    if (activeThumbRef.current !== null) return;
 
-    const track = trackRef.current;
-
-    const handleMouseMove = (moveEvent: MouseEvent) => {
-      const rect = track.getBoundingClientRect();
-      const clickX = moveEvent.clientX - rect.left;
-      const percentage = Math.max(0, Math.min(100, (clickX / rect.width) * 100));
-      const rawVal = Math.round(min + (percentage / 100) * (max - min));
-
-      const nextVal = [...value] as [number, number];
-      if (thumbIndex === 0) {
-        nextVal[0] = Math.min(rawVal, value[1] - 1);
-      } else {
-        nextVal[1] = Math.max(rawVal, value[0] + 1);
-      }
-      onChange(nextVal);
-    };
-
-    const handleMouseUp = () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-
+    activeThumbRef.current = thumbIndex;
     document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('mouseup', stopDrag);
   };
 
   const leftPercent = calculatePercentage(value[0]);

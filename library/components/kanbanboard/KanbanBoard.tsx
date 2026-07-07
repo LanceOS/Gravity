@@ -23,6 +23,8 @@ interface KanbanCardComponentProps {
   card: KanbanCard;
   isLastDropped: boolean;
   onClearLastDropped: () => void;
+  onDragStartCard: (cardId: string) => void;
+  onDragEndCard: () => void;
 }
 
 const KANBAN_BOARD_VIRTUAL_THRESHOLD = 50;
@@ -30,6 +32,24 @@ const KANBAN_BOARD_VIRTUAL_ROW_BUFFER = 6;
 const KANBAN_CARD_BASE_HEIGHT = 128;
 const KANBAN_CARD_LONG_TITLE_HEIGHT = 144;
 const KANBAN_CARD_LONG_LONG_TITLE_HEIGHT = 160;
+const DRAG_DATA_TYPES = ['text/plain', 'application/x-gravity-ticket'] as const;
+const DRAG_DATA_TYPE_TEXT = 'text';
+const DRAG_DATA_TYPE_TICKET = 'application/x-gravity-ticket';
+
+function getKanbanCardIdFromDragEvent(event: React.DragEvent): string {
+  const explicitCardId = DRAG_DATA_TYPES.reduce((foundId, type) => {
+    if (foundId) {
+      return foundId;
+    }
+    return event.dataTransfer.getData(type);
+  }, '');
+
+  if (explicitCardId) {
+    return explicitCardId;
+  }
+
+  return event.dataTransfer.getData(DRAG_DATA_TYPE_TEXT);
+}
 
 function getKanbanCardRowHeight(card: KanbanCard) {
   const titleLength = card.title ? card.title.length : 0;
@@ -42,8 +62,15 @@ function getKanbanCardRowHeight(card: KanbanCard) {
   return KANBAN_CARD_BASE_HEIGHT;
 }
 
-const KanbanCardComponent = memo(function KanbanCardComponent({ card, isLastDropped, onClearLastDropped }: KanbanCardComponentProps) {
+const KanbanCardComponent = memo(function KanbanCardComponent({
+  card,
+  isLastDropped,
+  onClearLastDropped,
+  onDragStartCard,
+  onDragEndCard,
+}: KanbanCardComponentProps) {
   const cardRef = useRef<HTMLDivElement>(null);
+  const isTextCard = typeof card.content === 'string' || typeof card.content === 'number';
 
   useEffect(() => {
     if (isLastDropped && cardRef.current) {
@@ -60,27 +87,59 @@ const KanbanCardComponent = memo(function KanbanCardComponent({ card, isLastDrop
     }
   }, [isLastDropped, onClearLastDropped]);
 
-  return (
-    <div
-      ref={cardRef}
-      style={{
+  const cardStyle: React.CSSProperties = isTextCard
+    ? {
         backgroundColor: card.title ? 'var(--color-surface-card)' : 'transparent',
         border: card.title ? '1px solid var(--color-border-default)' : 'none',
         borderRadius: card.title ? 'var(--radius-md)' : '0',
         padding: card.title ? '12px' : '0',
         boxShadow: card.title ? 'var(--shadow-sm)' : 'none',
         cursor: 'grab',
-        transition: 'border-color var(--transition-normal)',
         contain: 'layout style',
         contentVisibility: 'auto',
         containIntrinsicSize: '160px',
+      }
+    : {
+        width: '100%',
+        cursor: 'grab',
+        padding: 0,
+        margin: 0,
+        background: 'transparent',
+        border: 'none',
+        borderRadius: '0',
+        boxShadow: 'none',
+        contain: 'layout style',
+        contentVisibility: 'auto',
+        containIntrinsicSize: '160px',
+      };
+
+  const handleDragStart = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    onDragStartCard(card.id);
+    event.dataTransfer.setData('text/plain', card.id);
+    event.dataTransfer.setData(DRAG_DATA_TYPE_TICKET, card.id);
+    event.dataTransfer.effectAllowed = 'move';
+  }, [card.id, onDragStartCard]);
+
+  const handleDragEnd = useCallback(() => {
+    onDragEndCard();
+  }, [onDragEndCard]);
+
+  return (
+    <div
+      ref={cardRef}
+      draggable
+      onDragStartCapture={handleDragStart}
+      onDragEndCapture={handleDragEnd}
+      style={{
+        transition: 'border-color var(--transition-normal)',
+        ...cardStyle,
       }}
     >
-      {typeof card.content !== 'string' && typeof card.content !== 'number' ? null : (
+      {isTextCard ? (
         <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: '6px' }}>
           {card.title}
         </div>
-      )}
+      ) : null}
       <div>{card.content}</div>
     </div>
   );
@@ -106,11 +165,14 @@ interface KanbanColumnProps {
   renderColumnHeader?: (columnId: string, title: string, count: number) => React.ReactNode;
   lastDroppedCardId: string | null;
   onClearLastDropped: () => void;
-  onDrop: (columnId: string, cardId: string) => void;
+  onDragStartCard: (cardId: string) => void;
+  onDragEndCard: () => void;
+  onDrop: (cardId: string, columnId: string) => void;
   onDropComplete: () => void;
   onDragEnter: (columnId: string) => void;
   onDragLeave: (columnId: string, event: React.DragEvent) => void;
   onDragOver: (event: React.DragEvent, columnId: string) => void;
+  getActiveDragCardId: () => string;
 }
 
 const KanbanColumn = memo(function KanbanColumn({
@@ -120,11 +182,14 @@ const KanbanColumn = memo(function KanbanColumn({
   renderColumnHeader,
   lastDroppedCardId,
   onClearLastDropped,
+  onDragStartCard,
+  onDragEndCard,
   onDrop,
   onDropComplete,
   onDragEnter,
   onDragLeave,
   onDragOver,
+  getActiveDragCardId,
 }: KanbanColumnProps) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const [bodyHeight, setBodyHeight] = useState(0);
@@ -154,9 +219,11 @@ const KanbanColumn = memo(function KanbanColumn({
         card={card}
         isLastDropped={card.id === lastDroppedCardId}
         onClearLastDropped={onClearLastDropped}
+        onDragStartCard={onDragStartCard}
+        onDragEndCard={onDragEndCard}
       />
     </div>
-  ), [lastDroppedCardId, onClearLastDropped]);
+  ), [lastDroppedCardId, onClearLastDropped, onDragEndCard, onDragStartCard]);
 
   const cardStack = showVirtualCards ? (
     <DenseVirtualList
@@ -179,6 +246,8 @@ const KanbanColumn = memo(function KanbanColumn({
           card={card}
           isLastDropped={card.id === lastDroppedCardId}
           onClearLastDropped={onClearLastDropped}
+          onDragStartCard={onDragStartCard}
+          onDragEndCard={onDragEndCard}
         />
       ))}
     </div>
@@ -207,9 +276,9 @@ const KanbanColumn = memo(function KanbanColumn({
       onDragLeave={(event) => onDragLeave(column.id, event)}
       onDrop={(event) => {
         event.preventDefault();
-        const cardId = event.dataTransfer.getData('text/plain');
+        const cardId = getKanbanCardIdFromDragEvent(event) || getActiveDragCardId();
         if (cardId) {
-          onDrop(column.id, cardId);
+          onDrop(cardId, column.id);
         }
         onDropComplete();
       }}
@@ -240,9 +309,20 @@ export const KanbanBoard = memo(function KanbanBoard({
   const [lastDroppedCardId, setLastDroppedCardId] = useState<string | null>(null);
   const dragOverRafRef = useRef<number | null>(null);
   const pendingDragOverColIdRef = useRef<string | null>(null);
+  const activeDragCardIdRef = useRef<string | null>(null);
   const clearLastDropped = useCallback(() => {
     setLastDroppedCardId(null);
   }, []);
+
+  const handleCardDragStart = useCallback((cardId: string) => {
+    activeDragCardIdRef.current = cardId;
+  }, []);
+
+  const clearActiveDragCard = useCallback(() => {
+    activeDragCardIdRef.current = null;
+  }, []);
+
+  const getActiveDragCardId = useCallback(() => activeDragCardIdRef.current ?? '', []);
 
   const flushDragOverUpdate = useCallback(() => {
     if (dragOverRafRef.current !== null) {
@@ -273,8 +353,9 @@ export const KanbanBoard = memo(function KanbanBoard({
       window.cancelAnimationFrame(dragOverRafRef.current);
       dragOverRafRef.current = null;
     }
+    clearActiveDragCard();
     setDragOverColId(null);
-  }, []);
+  }, [clearActiveDragCard]);
 
   const cardStatusById = useMemo(() => {
     const map = new Map<string, string>();
@@ -354,11 +435,14 @@ export const KanbanBoard = memo(function KanbanBoard({
             renderColumnHeader={renderColumnHeader}
             lastDroppedCardId={lastDroppedCardId}
             onClearLastDropped={clearLastDropped}
+            onDragStartCard={handleCardDragStart}
+            onDragEndCard={clearActiveDragCard}
             onDrop={handleDrop}
             onDropComplete={clearDragOverColumn}
             onDragEnter={handleDragEnter}
             onDragLeave={handleDragLeave}
             onDragOver={handleDragOver}
+            getActiveDragCardId={getActiveDragCardId}
           />
         );
       })}
