@@ -55,6 +55,8 @@ type WorkspacePageMockProps = {
   viewModeLocked?: boolean;
 };
 
+type AccountSettingsInput = Record<string, unknown> | (() => Record<string, unknown>);
+
 const mocks = vi.hoisted(() => ({
   useAuth: vi.fn(),
   useUserDirectory: vi.fn(),
@@ -600,7 +602,7 @@ function renderAppShell({
 }: {
   tickets?: Record<string, unknown>;
   directory?: Record<string, unknown>;
-  account?: Record<string, unknown>;
+  account?: AccountSettingsInput;
   workspaceSettings?: Record<string, unknown>;
   initialEntries?: string[];
   queryClient?: QueryClient;
@@ -672,7 +674,9 @@ function renderAppShell({
   });
   mocks.useTicketMutations.mockReturnValue(buildUseTicketMutations());
   mocks.useWorkspaceDirectory.mockReturnValue(directory);
-  mocks.useAccountSettings.mockReturnValue(account);
+  mocks.useAccountSettings.mockImplementation(() => (
+    typeof account === 'function' ? account() : account
+  ));
   mocks.useWorkspaceSettings.mockReturnValue(workspaceSettings);
   mocks.useTicketFilters.mockReturnValue({
     filters: ticketState.filters,
@@ -1049,7 +1053,7 @@ describe('AppShellPage', () => {
 
   it('returns to the board after reset and then completing onboarding from account preferences without remounting', async () => {
     const user = userEvent.setup();
-    const account = buildAccountSettings({
+    const accountState = {
       settings: {
         defaultView: 'board',
         theme: 'dark',
@@ -1058,16 +1062,24 @@ describe('AppShellPage', () => {
         aiProvider: 'openai',
         tutorialCompleted: true,
       },
-    }) as any;
-
-    account.resetTutorial = vi.fn(async () => {
-      account.settings.tutorialCompleted = false;
-      await mocks.fetch('/api/v1/users/user-1/tutorial', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ completed: false }),
-      });
-    });
+    };
+    const account = () => {
+      const baseAccount = buildAccountSettings({ settings: accountState.settings });
+      return {
+        ...baseAccount,
+        resetTutorial: vi.fn(async () => {
+          await mocks.fetch('/api/v1/users/user-1/tutorial', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ completed: false }),
+          });
+          accountState.settings = {
+            ...accountState.settings,
+            tutorialCompleted: false,
+          };
+        }),
+      };
+    };
 
     const tickets = buildUseTickets({
       currentUser: makeCurrentUser(),
@@ -1095,7 +1107,7 @@ describe('AppShellPage', () => {
           body: JSON.stringify({ completed: false }),
         }),
       );
-      expect(account.settings.tutorialCompleted).toBe(false);
+      expect(accountState.settings.tutorialCompleted).toBe(false);
     });
 
     await user.click(screen.getByRole('button', { name: 'Back to Workspace' }));
@@ -1121,6 +1133,7 @@ describe('AppShellPage', () => {
         }),
       );
       expect(screen.queryByText('OnboardingModal')).not.toBeInTheDocument();
+      expect(screen.getByTestId('location-display').textContent).toBe('/workspaces/workspace-1');
       expect(screen.getByTestId('workspace-page-state')).toHaveAttribute('data-ticket-count', '1');
     });
   });
