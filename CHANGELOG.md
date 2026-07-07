@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.1] - 2026-07-06
+
+### UI Stability
+- Fixed the shared AnimeJS easing handling used by the AI chat dock and overlay components so cubic-bezier values no longer crash the app.
+- Stabilized ticket detail animation behavior after the latest ticket relationship changes.
+
 ## [0.8.0] - 2026-07-06
 
 ### Workspace, Routing, and Shell
