@@ -32,6 +32,11 @@ export function createApp() {
 
   const app = express();
 
+  app.use((_req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    next();
+  });
+
   app.use(
     cors({
       origin: env.corsOrigins.length > 0 ? env.corsOrigins : true,
