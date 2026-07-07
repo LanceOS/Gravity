@@ -4,6 +4,7 @@ import { DenseTextarea } from '../densetextarea';
 import { AIChatMessageBubble } from './AIChatMessage';
 import type { AIChatMessage } from './types';
 import { getWindowStyle, type AIChatWindowVariant } from './styles';
+import { runAnime } from '../../utilities';
 import anime from 'animejs';
 
 export interface AIChatWindowProps {
@@ -62,7 +63,7 @@ export function AIChatWindow({
     }
     if (windowRef.current) {
       if (variant === 'floating' && isClosing) {
-        anime({
+        runAnime({
           targets: windowRef.current,
           opacity: [1, 0],
           translateY: [0, 12],
@@ -72,7 +73,7 @@ export function AIChatWindow({
       } else if (variant === 'floating') {
         windowRef.current.style.opacity = '0';
         windowRef.current.style.transform = 'translateY(12px)';
-        anime({
+        runAnime({
           targets: windowRef.current,
           opacity: [0, 1],
           translateY: [12, 0],

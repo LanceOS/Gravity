@@ -1,6 +1,6 @@
 import React from 'react';
 import { X } from 'lucide-react';
-import { Portal } from '../../utilities';
+import { Portal, runAnime } from '../../utilities';
 import anime from 'animejs';
 
 export type ToastType = 'error' | 'warning' | 'info' | 'success';
@@ -103,7 +103,7 @@ function ToastItemComponent({ item, onExited }: ToastItemComponentProps) {
       }
       elementRef.current.style.opacity = '0';
       elementRef.current.style.transform = 'translateY(10px)';
-      anime({
+      runAnime({
         targets: elementRef.current,
         opacity: [0, 1],
         translateY: [10, 0],
@@ -123,7 +123,7 @@ function ToastItemComponent({ item, onExited }: ToastItemComponentProps) {
         onExited(item.id);
         return;
       }
-      anime({
+      runAnime({
         targets: elementRef.current,
         opacity: [1, 0],
         translateX: [0, 24],

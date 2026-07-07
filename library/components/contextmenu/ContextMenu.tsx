@@ -1,6 +1,6 @@
 import React, { useId } from 'react';
 import { ChevronRight } from 'lucide-react';
-import { Portal, FocusTrap, ClickAwayListener } from '../../utilities';
+import { Portal, FocusTrap, ClickAwayListener, runAnime } from '../../utilities';
 import anime from 'animejs';
 import './ContextMenu.css';
 
@@ -109,7 +109,7 @@ export function ContextMenuRoot({ children, trigger, content, items }: ContextMe
           setIsRendered(false);
           setActiveSubmenuId(null);
         } else {
-          anime({
+          runAnime({
             targets: menuElement,
             opacity: [1, 0],
             translateY: [0, 4],
@@ -156,7 +156,7 @@ export function ContextMenuRoot({ children, trigger, content, items }: ContextMe
     menuElement.style.transform = 'translateY(4px)';
 
     anime.remove(menuElement);
-    anime({
+    runAnime({
       targets: menuElement,
       opacity: [0, 1],
       translateY: [4, 0],
@@ -522,7 +522,7 @@ export function ContextMenuSubMenu({ children, parentItemRef, onClose }: Context
     submenuElement.style.transform = 'translateY(2px)';
 
     anime.remove(submenuElement);
-    anime({
+    runAnime({
       targets: submenuElement,
       opacity: [0, 1],
       translateY: [2, 0],

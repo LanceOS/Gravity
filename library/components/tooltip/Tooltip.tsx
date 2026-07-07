@@ -1,8 +1,6 @@
 import React from 'react';
 import { X, AlertCircle, Info, CheckCircle2, AlertTriangle } from 'lucide-react';
-import { Portal } from '../../utilities';
-import { FocusTrap } from '../../utilities';
-import { ClickAwayListener } from '../../utilities';
+import { Portal, FocusTrap, ClickAwayListener, runAnime } from '../../utilities';
 import anime from 'animejs';
 
 export interface TooltipProps {
@@ -39,7 +37,7 @@ export function Tooltip({ content, children, style }: TooltipProps) {
         setIsRendered(false);
       } else {
         if (tooltipRef.current) {
-          anime({
+          runAnime({
             targets: tooltipRef.current,
             opacity: [1, 0],
             translateY: [0, -4],
@@ -66,7 +64,7 @@ export function Tooltip({ content, children, style }: TooltipProps) {
       }
       tooltipRef.current.style.opacity = '0';
       tooltipRef.current.style.transform = 'translateY(4px)';
-      anime({
+      runAnime({
         targets: tooltipRef.current,
         opacity: [0, 1],
         translateY: [4, 0],

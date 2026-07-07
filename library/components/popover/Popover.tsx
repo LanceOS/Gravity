@@ -1,7 +1,5 @@
 import React from 'react';
-import { Portal } from '../../utilities';
-import { ClickAwayListener } from '../../utilities';
-import { getDropdownPosition } from '../../utilities';
+import { Portal, ClickAwayListener, getDropdownPosition, runAnime } from '../../utilities';
 import anime from 'animejs';
 import './Popover.css';
 
@@ -139,7 +137,7 @@ export function Popover({ trigger, children, isOpen: controlledIsOpen, onOpenCha
     popoverRef.current.style.opacity = '0';
     popoverRef.current.style.transform = 'translateY(-4px)';
     anime.remove(popoverRef.current);
-    anime({
+    runAnime({
       targets: popoverRef.current,
       opacity: [0, 1],
       translateY: [-4, 0],
@@ -163,7 +161,7 @@ export function Popover({ trigger, children, isOpen: controlledIsOpen, onOpenCha
     }
 
     anime.remove(popoverRef.current);
-    anime({
+    runAnime({
       targets: popoverRef.current,
       opacity: [1, 0],
       translateY: [0, -4],

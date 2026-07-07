@@ -1,5 +1,5 @@
 import React from 'react';
-import { ClickAwayListener } from '../../utilities';
+import { ClickAwayListener, runAnime } from '../../utilities';
 import anime from 'animejs';
 
 const DROPDOWN_DURATION = 130;
@@ -47,7 +47,7 @@ export function DropdownMenu({ trigger, children }: DropdownMenuProps) {
       menuRef.current.style.opacity = '1';
       menuRef.current.style.transform = 'translateY(0)';
       anime.remove(menuRef.current);
-      anime({
+      runAnime({
         targets: menuRef.current,
         opacity: [1, 0],
         translateY: [0, -4],
@@ -71,7 +71,7 @@ export function DropdownMenu({ trigger, children }: DropdownMenuProps) {
       menuRef.current.style.opacity = '0';
       menuRef.current.style.transform = 'translateY(4px)';
       anime.remove(menuRef.current);
-      anime({
+      runAnime({
         targets: menuRef.current,
         opacity: [0, 1],
         translateY: [4, 0],

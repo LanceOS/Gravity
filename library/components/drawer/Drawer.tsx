@@ -1,8 +1,6 @@
 import React from 'react';
 import { X } from 'lucide-react';
-import { Portal } from '../../utilities';
-import { FocusTrap } from '../../utilities';
-import { ClickAwayListener } from '../../utilities';
+import { Portal, FocusTrap, ClickAwayListener, runAnime } from '../../utilities';
 import anime from 'animejs';
 
 const DRAWER_DURATION = 190;
@@ -47,7 +45,7 @@ export function Drawer({ isOpen, onClose, title, children, style }: DrawerProps)
 
       if (backdropRef.current) {
         anime.remove(backdropRef.current);
-        anime({
+        runAnime({
           targets: backdropRef.current,
           opacity: [1, 0],
           duration: DRAWER_DURATION,
@@ -56,7 +54,7 @@ export function Drawer({ isOpen, onClose, title, children, style }: DrawerProps)
       }
       if (contentRef.current) {
         anime.remove(contentRef.current);
-        anime({
+        runAnime({
           targets: contentRef.current,
           translateX: ['0%', '100%'],
           duration: DRAWER_DURATION,
@@ -80,7 +78,7 @@ export function Drawer({ isOpen, onClose, title, children, style }: DrawerProps)
 
     if (backdropRef.current) {
       backdropRef.current.style.opacity = '0';
-      anime({
+      runAnime({
         targets: backdropRef.current,
         opacity: [0, 1],
         duration: DRAWER_DURATION,
@@ -89,7 +87,7 @@ export function Drawer({ isOpen, onClose, title, children, style }: DrawerProps)
     }
     if (contentRef.current) {
       contentRef.current.style.transform = 'translateX(100%)';
-      anime({
+      runAnime({
         targets: contentRef.current,
         translateX: ['100%', '0%'],
         duration: DRAWER_DURATION,
