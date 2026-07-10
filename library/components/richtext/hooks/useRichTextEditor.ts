@@ -8,7 +8,7 @@ import { baseKeymap, chainCommands, createParagraphNear, liftEmptyBlock, splitBl
 import { liftListItem, sinkListItem, splitListItemKeepMarks } from 'prosemirror-schema-list';
 
 import { parseRichTextValue, richTextSchema, serializeRichTextJson } from '../../../utilities/richtext';
-import { sanitizeHtml } from '../../../utilities/sanitizeHtml';
+import { sanitizeHtml } from '../../../utilities/sanitize';
 import { cn } from '../../../utilities/cn';
 import { buildInputRules, toggleHeading, toggleBlockQuote, toggleList, toggleCodeBlock } from '../utilities/commands';
 import { placeholderPlugin } from '../plugins/placeholder';

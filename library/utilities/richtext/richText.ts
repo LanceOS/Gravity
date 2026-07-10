@@ -2,7 +2,7 @@ import { DOMSerializer, Node as ProseMirrorNode, Schema } from 'prosemirror-mode
 import { defaultMarkdownParser, defaultMarkdownSerializer } from 'prosemirror-markdown';
 import { schema as basicSchema } from 'prosemirror-schema-basic';
 import { addListNodes } from 'prosemirror-schema-list';
-import { sanitizeHtml } from '../sanitizeHtml';
+import { sanitizeHtml } from '../sanitize';
 
 export interface RichTextDocumentJSON {
   type: 'doc';

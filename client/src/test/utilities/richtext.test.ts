@@ -71,7 +71,7 @@ describe('rich text utilities', () => {
     expect(markdown).toContain('[docs](https://example.com/docs)');
     expect(markdown).toContain('**ship**');
     expect(html).toContain('<h1>');
-    expect(html).toContain('<a href="https://example.com/docs">');
+    expect(html).toContain('<a href="https://example.com/docs" target="_blank" rel="noopener noreferrer">');
     expect(html).toContain('<strong>ship</strong>');
   });
 
