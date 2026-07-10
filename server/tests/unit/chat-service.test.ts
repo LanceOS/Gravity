@@ -386,6 +386,259 @@ describe('ChatService', () => {
     expect(asJsonMetadata(toolOutputRows[0].metadata).toolCall).toMatchObject({ name: 'list_tickets' });
   });
 
+  it('treats an unparsed pseudo tool-call response as a fallback instead of leaking it to the user', async () => {
+    const { userId, chatId, project } = await createChatFixture();
+
+    mcpToolsList.push({
+      name: 'create_ticket',
+      description: 'Create a new ticket or sub-ticket in the workspace.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          title: { type: 'string' },
+          projectId: { type: 'string' },
+        },
+        required: ['title', 'projectId'],
+      },
+    });
+
+    const hallucinatedToolCall = [
+      '<tool_calls>',
+      '<invoke name="createticket">',
+      '<parameter name="projectId">seed-ws-proj-2-team-1-proj-1</parameter>',
+      '<parameter name="title">Modularize authentication flows</parameter>',
+      '</invoke>',
+      '</tool_calls>',
+    ].join('\n');
+
+    const ai = {
+      chat: vi.fn().mockResolvedValue({ content: hallucinatedToolCall }),
+    };
+
+    const chatService = new ChatService({ ai });
+    const chunks: string[] = [];
+    const result = await chatService.generateResponse({
+      projectId: project.id,
+      chatId,
+      userId,
+      message: 'Create a ticket to modularize auth flows.',
+      onChunk: (chunk) => {
+        chunks.push(chunk);
+      },
+    });
+
+    expect(result.fallback).toBe(true);
+    expect(result.fallbackReason).toBe('malformed_tool_call');
+    expect(result.content).not.toContain('<invoke');
+    expect(result.content).not.toContain('tool_calls');
+    expect(chunks.join('')).not.toContain('<invoke');
+
+    const storedRows = await db
+      .select()
+      .from(chatMessages)
+      .where(eq(chatMessages.sessionId, chatId))
+      .orderBy(asc(chatMessages.createdAt), asc(chatMessages.id));
+    const assistantMessage = storedRows.at(-1);
+    expect(assistantMessage?.content).not.toContain('<invoke');
+  });
+
+  it('recovers from a mid-loop hallucinated tool-call by synthesizing from already-gathered tool results', async () => {
+    const { userId, chatId, project } = await createChatFixture();
+
+    mcpToolsList.push({
+      name: 'list_tickets',
+      description: 'List tickets with optional status filtering.',
+      inputSchema: {
+        type: 'object',
+        properties: { status: { type: 'string' } },
+      },
+    });
+
+    const hallucinatedToolCall = [
+      '<tool_calls>',
+      '<invoke name="createticket">',
+      '<parameter name="title">Modularize authentication flows</parameter>',
+      '</invoke>',
+      '</tool_calls>',
+    ].join('\n');
+
+    const ai = {
+      chat: vi
+        .fn()
+        .mockResolvedValueOnce({
+          content: '',
+          toolCalls: [{ id: 'tool-1', name: 'list_tickets', arguments: { status: 'open' } }],
+        })
+        .mockResolvedValueOnce({ content: hallucinatedToolCall })
+        .mockResolvedValueOnce({ content: 'There are 3 open tickets: GRV-1, GRV-2, GRV-3.' }),
+    };
+
+    const executeTool = vi.fn(async () => ({ result: [{ id: 'GRV-1' }, { id: 'GRV-2' }, { id: 'GRV-3' }] }));
+
+    const chatService = new ChatService({ ai, executeTool });
+    const result = await chatService.generateResponse({
+      projectId: project.id,
+      chatId,
+      userId,
+      message: 'Show me open tickets and create one for auth flows.',
+    });
+
+    expect(result.fallback).toBe(false);
+    expect(result.content).toBe('There are 3 open tickets: GRV-1, GRV-2, GRV-3.');
+    expect(executeTool).toHaveBeenCalledOnce();
+    expect(ai.chat).toHaveBeenCalledTimes(3);
+
+    const thirdCallOptions = (ai.chat as any).mock.calls[2][2];
+    expect(thirdCallOptions.tools).toBeUndefined();
+    // The real tool result from round 1 must still be present in what the
+    // recovery call sees, proving it wasn't discarded.
+    const toolResultMessage = thirdCallOptions.messages.find((m: { role: string }) => m.role === 'tool');
+    expect(toolResultMessage?.content).toContain('GRV-1');
+  });
+
+  it('still streams tool-bearing rounds live for well-behaved responses', async () => {
+    const { userId, chatId, project } = await createChatFixture();
+
+    mcpToolsList.push({
+      name: 'list_tickets',
+      description: 'List tickets with optional status filtering.',
+      inputSchema: {
+        type: 'object',
+        properties: { status: { type: 'string' } },
+      },
+    });
+
+    const ai = {
+      chat: vi.fn().mockImplementation(async (_userId: string, _provider: string, options: { onChunk?: (chunk: string) => Promise<void> | void }) => {
+        await options.onChunk?.('Here ');
+        await options.onChunk?.('is your answer.');
+        return { content: 'Here is your answer.' };
+      }),
+    };
+
+    const chatService = new ChatService({ ai });
+    const chunks: string[] = [];
+    const result = await chatService.generateResponse({
+      projectId: project.id,
+      chatId,
+      userId,
+      message: 'What tickets are open?',
+      onChunk: (chunk) => {
+        chunks.push(chunk);
+      },
+    });
+
+    expect(result.content).toBe('Here is your answer.');
+    const [, , options] = (ai.chat as any).mock.calls[0];
+    expect(options.onChunk).toBeInstanceOf(Function);
+    // Content that doesn't open with '<' is forwarded immediately with no
+    // buffering delay, so the client sees the same two live chunks.
+    expect(chunks).toEqual(['Here ', 'is your answer.']);
+  });
+
+  it('suppresses a hallucinated pseudo tool-call while it is still streaming, before it can reach the user', async () => {
+    const { userId, chatId, project } = await createChatFixture();
+
+    mcpToolsList.push({
+      name: 'create_ticket',
+      description: 'Create a new ticket or sub-ticket in the workspace.',
+      inputSchema: {
+        type: 'object',
+        properties: { title: { type: 'string' }, projectId: { type: 'string' } },
+        required: ['title', 'projectId'],
+      },
+    });
+
+    const hallucinatedToolCall = [
+      '<tool_calls>',
+      '<invoke name="createticket">',
+      '<parameter name="title">Modularize authentication flows</parameter>',
+      '</invoke>',
+      '</tool_calls>',
+    ].join('\n');
+
+    const ai = {
+      chat: vi.fn().mockImplementation(async (_userId: string, _provider: string, options: { onChunk?: (chunk: string) => Promise<void> | void; tools?: unknown[] }) => {
+        if (options.tools) {
+          for (const piece of hallucinatedToolCall.split('\n')) {
+            await options.onChunk?.(`${piece}\n`);
+          }
+          return { content: hallucinatedToolCall };
+        }
+
+        return { content: 'Modularize authentication flows is already tracked as GRAV-42.' };
+      }),
+    };
+
+    const chatService = new ChatService({ ai });
+    const chunks: string[] = [];
+    const result = await chatService.generateResponse({
+      projectId: project.id,
+      chatId,
+      userId,
+      message: 'Create a ticket to modularize auth flows.',
+      onChunk: (chunk) => {
+        chunks.push(chunk);
+      },
+    });
+
+    expect(result.fallback).toBe(false);
+    expect(result.content).toBe('Modularize authentication flows is already tracked as GRAV-42.');
+    expect(chunks.join('')).not.toContain('<invoke');
+    expect(chunks.join('')).not.toContain('tool_calls');
+  });
+
+  it('synthesizes a final answer from tool results when the tool round limit is reached', async () => {
+    const { userId, chatId, project } = await createChatFixture();
+
+    mcpToolsList.push({
+      name: 'list_tickets',
+      description: 'List tickets with optional status filtering.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          status: {
+            type: 'string',
+            description: 'Ticket status.',
+          },
+        },
+      },
+    });
+
+    const ai = {
+      chat: vi.fn(async (_userId: string, _provider: string, options: { tools?: unknown[] }) => {
+        if (options.tools) {
+          return {
+            content: '',
+            toolCalls: [{ id: 'tool-call', name: 'list_tickets', arguments: { status: 'open' } }],
+          };
+        }
+
+        return { content: 'Based on the tool results, there are 3 open tickets.' };
+      }),
+    };
+
+    const executeTool = vi.fn(async () => ({ result: [{ id: 'GRV-1' }] }));
+
+    const chatService = new ChatService({ ai, executeTool });
+    const result = await chatService.generateResponse({
+      projectId: project.id,
+      chatId,
+      userId,
+      message: 'Show me open tickets.',
+    });
+
+    expect(result.fallback).toBe(false);
+    expect(result.fallbackReason).toBeUndefined();
+    expect(result.content).toBe('Based on the tool results, there are 3 open tickets.');
+    // 6 tool rounds exhaust the loop, then one final call without tools forces a text answer.
+    expect(ai.chat).toHaveBeenCalledTimes(7);
+    expect(executeTool).toHaveBeenCalledTimes(6);
+
+    const finalCallOptions = (ai.chat as any).mock.calls.at(-1)[2];
+    expect(finalCallOptions.tools).toBeUndefined();
+  });
+
   it('returns graceful fallback text when provider times out', async () => {
     const { userId, chatId, project } = await createChatFixture();
 
