@@ -5,6 +5,6 @@ export * from './visuallyhidden';
 export * from './cn';
 export * from './dropdownPosition';
 export * from './dateHelpers';
-export * from './sanitizeHtml';
+export * from './sanitize';
 export * from './richtext';
 export * from './anime';

@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { CheckSquare, Square, Clipboard, Check } from 'lucide-react';
-import { isSafeHref } from '../../utilities/sanitizeHtml';
+import { isSafeHref } from '../../utilities/sanitize';
 
 export interface FormattedMarkdownProps {
   text: string;
