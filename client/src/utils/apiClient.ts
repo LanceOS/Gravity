@@ -1,6 +1,5 @@
 const API_BASE_URL = '/api/v1';
 const RETRY_BASE_DELAY_MS = 300;
-const IDEMPOTENT_METHODS = new Set(['GET', 'HEAD']);
 
 export class ApiError extends Error {
   public status: number;
@@ -15,9 +14,11 @@ export class ApiError extends Error {
 }
 
 interface RequestOptions extends RequestInit {
+  /** Injects the `x-project-id` header. For a differently-cased project header, pass it via `headers` instead. */
   projectId?: string;
   params?: Record<string, string | undefined | null>;
   skipContentTypeHeader?: boolean;
+  /** Retries on transport-level failures only (thrown/rejected fetch), never on HTTP error responses. Opt-in — 0 by default so it doesn't stack with a caller's own retry policy (e.g. React Query's). */
   retries?: number;
 }
 
@@ -58,8 +59,8 @@ function buildConfig(options: RequestOptions): RequestInit {
   return config;
 }
 
-function defaultRetries(method?: string): number {
-  return IDEMPOTENT_METHODS.has((method || 'GET').toUpperCase()) ? 2 : 0;
+function isAbortError(err: unknown): boolean {
+  return err instanceof DOMException && err.name === 'AbortError';
 }
 
 function wait(ms: number): Promise<void> {
@@ -72,7 +73,7 @@ async function fetchWithRetry(url: string, config: RequestInit, retries: number)
     try {
       return await fetch(url, config);
     } catch (err) {
-      if (attempt >= retries) {
+      if (isAbortError(err) || attempt >= retries) {
         throw err;
       }
       await wait(RETRY_BASE_DELAY_MS * 2 ** attempt);
@@ -84,7 +85,7 @@ async function fetchWithRetry(url: string, config: RequestInit, retries: number)
 async function request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
   const url = resolveUrl(endpoint, options.params);
   const config = buildConfig(options);
-  const retries = options.retries ?? defaultRetries(config.method);
+  const retries = options.retries ?? 0;
 
   const response = await fetchWithRetry(url, config, retries);
 
@@ -106,7 +107,7 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
 async function requestRaw(endpoint: string, options: RequestOptions = {}): Promise<Response> {
   const url = resolveUrl(endpoint, options.params);
   const config = buildConfig({ method: 'GET', ...options });
-  const retries = options.retries ?? defaultRetries(config.method);
+  const retries = options.retries ?? 0;
 
   return fetchWithRetry(url, config, retries);
 }

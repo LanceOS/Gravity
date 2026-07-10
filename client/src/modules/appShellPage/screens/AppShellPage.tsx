@@ -10,7 +10,7 @@ import { LoadingPage } from '../../loadingPage';
 import { WorkspaceDirectoryPage } from '../../workspaceDirectoryPage';
 import { usePendingWorkspaceInvite, useWorkspaceDirectoryState } from '../../workspaceShellPage/hooks';
 import { apiClient } from '../../../utils/apiClient';
-import { setTutorialCompleted as patchTutorialCompleted } from '../../../utils/tutorialApi';
+import { patchTutorialCompleted } from '../../../utils/tutorialApi';
 import './AppShellPage.css';
 
 export function AppShellPage() {

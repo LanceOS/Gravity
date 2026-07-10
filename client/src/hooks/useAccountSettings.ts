@@ -10,7 +10,7 @@ import {
 import { setStoredWorkspaceDefaultView } from '../utils/workspacePreferences';
 import { isThemeMode, type ThemeMode } from '../context/theme/ThemeContext.types';
 import { apiClient } from '../utils/apiClient';
-import { setTutorialCompleted } from '../utils/tutorialApi';
+import { patchTutorialCompleted } from '../utils/tutorialApi';
 
 interface StatusMessage {
   success: boolean;
@@ -380,7 +380,7 @@ export function useAccountSettings({
     setTutorialResult(null);
 
     try {
-      await setTutorialCompleted(currentUser.id, false);
+      await patchTutorialCompleted(currentUser.id, false);
 
       setTutorialResult({
         success: true,
