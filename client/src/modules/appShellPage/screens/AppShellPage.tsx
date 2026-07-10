@@ -9,6 +9,8 @@ import { useWorkspaceDirectory } from '../../../hooks/useWorkspaceDirectory';
 import { LoadingPage } from '../../loadingPage';
 import { WorkspaceDirectoryPage } from '../../workspaceDirectoryPage';
 import { usePendingWorkspaceInvite, useWorkspaceDirectoryState } from '../../workspaceShellPage/hooks';
+import { apiClient } from '../../../utils/apiClient';
+import { setTutorialCompleted as patchTutorialCompleted } from '../../../utils/tutorialApi';
 import './AppShellPage.css';
 
 export function AppShellPage() {
@@ -62,8 +64,7 @@ function AppShellLandingPage() {
   useEffect(() => {
     if (!currentUser) return;
     let cancelled = false;
-    fetch(`/api/v1/settings/${currentUser.id}`)
-      .then(res => res.json())
+    apiClient.get<{ tutorialCompleted?: boolean }>(`/settings/${currentUser.id}`)
       .then(data => {
         if (!cancelled) setTutorialCompleted(data.tutorialCompleted ?? true);
       })
@@ -111,11 +112,7 @@ function AppShellLandingPage() {
       onComplete={async () => {
         setTutorialCompleted(true);
         try {
-          await fetch(`/api/v1/users/${currentUser.id}/tutorial`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ completed: true }),
-          });
+          await patchTutorialCompleted(currentUser.id, true);
         } catch (e) {
           // Ignore
         }

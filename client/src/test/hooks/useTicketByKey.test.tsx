@@ -106,12 +106,14 @@ describe('useTicketByKey', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(fetchMock).toHaveBeenNthCalledWith(1, `/api/v1/tickets/key/${ticketKey}`, {
+      method: 'GET',
       headers: {
         'Content-Type': 'application/json',
         'X-User-Id': owner.id,
       },
     });
     expect(fetchMock).toHaveBeenNthCalledWith(2, `/api/v1/tickets/key/${ticketKey}`, {
+      method: 'GET',
       headers: {
         'Content-Type': 'application/json',
         'X-User-Id': member.id,

@@ -341,8 +341,7 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
   // Export Tasks Mutation
   const exportTasksMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch(`/api/v1/workspaces/${activeWorkspaceId}/export/tasks`, {
-        method: 'GET',
+      const response = await apiClient.raw(`/workspaces/${activeWorkspaceId}/export/tasks`, {
         headers: buildHeaders(),
       });
 

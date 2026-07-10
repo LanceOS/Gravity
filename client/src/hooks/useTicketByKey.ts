@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useCurrentUser } from '../context/auth/useCurrentUser';
 import { useTicketListContext } from '../context/ticket/TicketListContext';
 import { queryKeys, CACHE_CONFIGS } from '../utils/queryClient';
+import { apiClient } from '../utils/apiClient';
 
 /**
  * @description A custom React hook that looks up and fetches ticket details by its key.
@@ -18,34 +19,9 @@ export function useTicketByKey(ticketKey: string) {
 
   const query = useQuery({
     queryKey: queryKeys.ticket(normalizedKey, currentUser?.id),
-    queryFn: async () => {
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
-      if (currentUser?.id) {
-        headers['X-User-Id'] = currentUser.id;
-      }
-
-      const res = await fetch(`/api/v1/tickets/key/${normalizedKey}`, { headers });
-      if (!res.ok) {
-        let serverError: string | undefined;
-        try {
-          const errorBody = await res.json();
-          if (errorBody && typeof errorBody.error === 'string') {
-            serverError = errorBody.error;
-          }
-        } catch {
-          // Ignore JSON parsing failures
-        }
-
-        if (res.status === 401) throw new Error(serverError || 'Unauthorized');
-        if (res.status === 403) throw new Error(serverError || 'Forbidden');
-        if (res.status === 404) throw new Error(serverError || 'Ticket not found');
-
-        throw new Error(serverError || `Request failed with status ${res.status}`);
-      }
-      return res.json();
-    },
+    queryFn: async () => apiClient.get<any>(`/tickets/key/${normalizedKey}`, {
+      headers: currentUser?.id ? { 'X-User-Id': currentUser.id } : undefined,
+    }),
     enabled: !!normalizedKey && !localTicket,
     ...CACHE_CONFIGS.ticketDetail,
   });

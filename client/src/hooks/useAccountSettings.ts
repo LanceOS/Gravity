@@ -9,6 +9,8 @@ import {
 } from '../utils/settings';
 import { setStoredWorkspaceDefaultView } from '../utils/workspacePreferences';
 import { isThemeMode, type ThemeMode } from '../context/theme/ThemeContext.types';
+import { apiClient } from '../utils/apiClient';
+import { setTutorialCompleted } from '../utils/tutorialApi';
 
 interface StatusMessage {
   success: boolean;
@@ -161,14 +163,7 @@ export function useAccountSettings({
       }
     }, ACCOUNT_SETTINGS_HYDRATION_TIMEOUT_MS);
 
-    fetch(`/api/v1/settings/${currentUserId}`)
-      .then(async (response) => {
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to load account settings.');
-        }
-        return data;
-      })
+    apiClient.get<any>(`/settings/${currentUserId}`)
       .then((data) => {
         if (cancelled || requestId <= saveRequestId.current) {
           return;
@@ -262,16 +257,7 @@ export function useAccountSettings({
         apiKey: keyAction === 'update' ? normalizedApiKey : undefined,
       };
 
-      const response = await fetch(`/api/v1/settings/${currentUser.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to save account settings.');
-      }
+      const data = await apiClient.patch<any>(`/settings/${currentUser.id}`, payload);
 
       if (currentSaveRequestId !== saveRequestId.current) {
         return;
@@ -317,19 +303,10 @@ export function useAccountSettings({
     setSaveError(null);
 
     try {
-      const response = await fetch(`/api/v1/settings/${currentUser.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          credentialProvider: provider,
-          keyAction: 'clear',
-        }),
+      const data = await apiClient.patch<any>(`/settings/${currentUser.id}`, {
+        credentialProvider: provider,
+        keyAction: 'clear',
       });
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to remove credential.');
-      }
 
       setSavedCredentials(normalizeSavedCredentials(data.savedCredentials));
 
@@ -381,20 +358,10 @@ export function useAccountSettings({
     setTestResult(null);
 
     try {
-      const response = await fetch('/api/v1/ai/test-connection', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          provider: settings.aiProvider,
-          apiKey: keyAction === 'update' ? normalizedApiKey : undefined
-        }),
+      const data = await apiClient.post<any>('/ai/test-connection', {
+        provider: settings.aiProvider,
+        apiKey: keyAction === 'update' ? normalizedApiKey : undefined,
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Connection test failed.');
-      }
 
       setTestResult({ success: Boolean(data.connected ?? true), message: data.message || 'Connection verified successfully.' });
     } catch (error) {
@@ -413,16 +380,7 @@ export function useAccountSettings({
     setTutorialResult(null);
 
     try {
-      const response = await fetch(`/api/v1/users/${currentUser.id}/tutorial`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ completed: false }),
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to reset tutorial.');
-      }
+      await setTutorialCompleted(currentUser.id, false);
 
       setTutorialResult({
         success: true,
