@@ -33,6 +33,21 @@ export const SANITIZE_CONFIG: SanitizeHtmlConfig = {
 const EXPLICITLY_FORBIDDEN_TAGS = ['script', 'style', 'iframe', 'object', 'embed', 'form', 'input'];
 const EXPLICITLY_FORBIDDEN_ATTRIBUTES = ['style', 'onclick', 'onerror', 'onload', 'onmouseover'];
 
+// Attributes that only make sense on a specific tag. Anything not listed here
+// (e.g. class, title) is allowed on any tag from SANITIZE_CONFIG.allowedTags.
+const ATTRIBUTE_TAG_SCOPE: Partial<Record<string, readonly string[]>> = {
+  href: ['a'],
+  target: ['a'],
+  rel: ['a'],
+  src: ['img'],
+  alt: ['img'],
+};
+
+function isAttributeAllowedForTag(tag: string, attrName: string): boolean {
+  const scopedTags = ATTRIBUTE_TAG_SCOPE[attrName];
+  return !scopedTags || scopedTags.includes(tag);
+}
+
 // Matches an absolute URI whose scheme is in SANITIZE_CONFIG.allowedUriSchemes,
 // or a scheme-less relative reference (path, fragment, query, protocol-relative
 // "//"). Anything else - including javascript:, data:, and vbscript: - fails
@@ -55,13 +70,36 @@ function isExternalUrl(href: string): boolean {
   return /^(?:[a-z][a-z0-9+.-]*:)?\/\//i.test(href.trim());
 }
 
+const REQUIRED_SAFE_REL_TOKENS = ['noopener', 'noreferrer'];
+
+// Adds the required safe-navigation tokens to whatever `rel` the author
+// already supplied (e.g. `rel="me"`) instead of clobbering it.
+function withSafeRelTokens(existingRel: string | null): string {
+  const tokens = new Set((existingRel ?? '').split(/\s+/).filter(Boolean));
+  REQUIRED_SAFE_REL_TOKENS.forEach((token) => tokens.add(token));
+  return Array.from(tokens).join(' ');
+}
+
 const DANGEROUS_URI_SCHEME_REGEXP = /^\s*(?:javascript|data|vbscript):/i;
 
-// DOMPurify allows data: URIs on img/audio/video `src` by default even when
-// ALLOWED_URI_REGEXP would otherwise reject them. Explicitly reject the
-// schemes we never want on href/src, regardless of tag, as defense-in-depth
-// on top of ALLOWED_URI_REGEXP.
-DOMPurify.addHook('uponSanitizeAttribute', (_node, data) => {
+// Hooks are registered on DOMPurify's shared singleton, so re-evaluating this
+// module (e.g. Vite HMR) would otherwise stack duplicate hooks indefinitely.
+// This is the only file allowed to touch DOMPurify hooks/config, so a clean
+// slate here is safe.
+DOMPurify.removeAllHooks();
+
+DOMPurify.addHook('uponSanitizeAttribute', (node, data) => {
+  const tag = node.tagName.toLowerCase();
+
+  if (!isAttributeAllowedForTag(tag, data.attrName)) {
+    data.keepAttr = false;
+    return;
+  }
+
+  // DOMPurify allows data: URIs on img/audio/video `src` by default even when
+  // ALLOWED_URI_REGEXP would otherwise reject them. Explicitly reject the
+  // schemes we never want on href/src, regardless of tag, as defense-in-depth
+  // on top of ALLOWED_URI_REGEXP.
   if ((data.attrName === 'href' || data.attrName === 'src') && DANGEROUS_URI_SCHEME_REGEXP.test(data.attrValue)) {
     data.keepAttr = false;
   }
@@ -79,7 +117,7 @@ DOMPurify.addHook('afterSanitizeAttributes', (node) => {
 
   if (opensNewTab || (href && isExternalUrl(href))) {
     node.setAttribute('target', '_blank');
-    node.setAttribute('rel', 'noopener noreferrer');
+    node.setAttribute('rel', withSafeRelTokens(node.getAttribute('rel')));
   }
 });
 

@@ -89,6 +89,35 @@ describe('sanitizeHtml', () => {
     expect(sanitized).not.toContain('target=');
     expect(sanitized).not.toContain('rel=');
   });
+
+  it('merges required rel tokens into an author-supplied rel instead of overwriting it', () => {
+    const sanitized = sanitizeHtml('<a href="https://example.com" target="_blank" rel="me">go</a>');
+
+    expect(sanitized).toMatch(/rel="[^"]*\bme\b[^"]*"/);
+    expect(sanitized).toMatch(/rel="[^"]*\bnoopener\b[^"]*"/);
+    expect(sanitized).toMatch(/rel="[^"]*\bnoreferrer\b[^"]*"/);
+  });
+
+  it('strips href/target/rel/src/alt from tags they do not belong on', () => {
+    const sanitizedParagraph = sanitizeHtml('<p src="https://example.com/x.png" target="_blank" alt="y" href="https://example.com" rel="me">text</p>');
+
+    expect(sanitizedParagraph).not.toContain('src=');
+    expect(sanitizedParagraph).not.toContain('target=');
+    expect(sanitizedParagraph).not.toContain('alt=');
+    expect(sanitizedParagraph).not.toContain('href=');
+    expect(sanitizedParagraph).not.toContain('rel=');
+    expect(sanitizedParagraph).toContain('text');
+  });
+
+  it('only keeps src/alt (not href/target/rel) on images', () => {
+    const sanitizedImage = sanitizeHtml('<img href="https://example.com" target="_blank" rel="me" src="https://example.com/x.png" alt="pic">');
+
+    expect(sanitizedImage).not.toContain('href=');
+    expect(sanitizedImage).not.toContain('target=');
+    expect(sanitizedImage).not.toContain('rel=');
+    expect(sanitizedImage).toContain('src="https://example.com/x.png"');
+    expect(sanitizedImage).toContain('alt="pic"');
+  });
 });
 
 describe('isSafeHref', () => {
