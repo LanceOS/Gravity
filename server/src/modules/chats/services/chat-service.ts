@@ -103,7 +103,7 @@ const TOOL_ALIAS_BLOCKS: string[][] = [
 
 const CHAT_TITLE_DEFAULT = 'New Chat';
 const CHAT_TITLE_MAX_LENGTH = 32;
-const MAX_TOOL_ROUNDS = 2;
+const MAX_TOOL_ROUNDS = 6;
 
 const STREAMING_PROVIDERS = new Set<ChatProvider>(['openai', 'deepseek']);
 
@@ -531,13 +531,34 @@ Only operate in the workspace/project above.`,
       }
     }
 
-    return {
-      content: 'I need one more step to answer this request, but I reached the tool call limit.',
-      toolCalls: undefined,
-      fallback: true,
-      fallbackReason: 'tool_loop_limit',
-      streamed: params.enableStreaming ? streamedFromModel : false,
-    };
+    // The model used all tool rounds without producing a final text response.
+    // Give it one last chance to synthesize an answer from accumulated tool
+    // results by calling the model WITHOUT tools so it must respond with text.
+    try {
+      const finalResponse = await this.ai.chat(params.userId, params.provider, {
+        model: params.model,
+        messages,
+        // No tools — force a text-only response
+        ...(typeof params.maxTokens === 'number' ? { maxTokens: params.maxTokens } : {}),
+        ...(streamCallback ? { onChunk: streamCallback } : {}),
+      });
+
+      return {
+        content: finalResponse.content || 'I reached the tool call limit and was unable to produce a final answer.',
+        toolCalls: undefined,
+        fallback: false,
+        fallbackReason: undefined,
+        streamed: params.enableStreaming ? streamedFromModel : false,
+      };
+    } catch (error) {
+      return {
+        content: this.toFallbackContent(error),
+        toolCalls: undefined,
+        fallback: true,
+        fallbackReason: this.toFallbackReason(error),
+        streamed: params.enableStreaming ? streamedFromModel : false,
+      };
+    }
   }
 
   private async safeExecuteTool(

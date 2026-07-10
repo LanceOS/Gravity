@@ -386,6 +386,57 @@ describe('ChatService', () => {
     expect(asJsonMetadata(toolOutputRows[0].metadata).toolCall).toMatchObject({ name: 'list_tickets' });
   });
 
+  it('synthesizes a final answer from tool results when the tool round limit is reached', async () => {
+    const { userId, chatId, project } = await createChatFixture();
+
+    mcpToolsList.push({
+      name: 'list_tickets',
+      description: 'List tickets with optional status filtering.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          status: {
+            type: 'string',
+            description: 'Ticket status.',
+          },
+        },
+      },
+    });
+
+    const ai = {
+      chat: vi.fn(async (_userId: string, _provider: string, options: { tools?: unknown[] }) => {
+        if (options.tools) {
+          return {
+            content: '',
+            toolCalls: [{ id: 'tool-call', name: 'list_tickets', arguments: { status: 'open' } }],
+          };
+        }
+
+        return { content: 'Based on the tool results, there are 3 open tickets.' };
+      }),
+    };
+
+    const executeTool = vi.fn(async () => ({ result: [{ id: 'GRV-1' }] }));
+
+    const chatService = new ChatService({ ai, executeTool });
+    const result = await chatService.generateResponse({
+      projectId: project.id,
+      chatId,
+      userId,
+      message: 'Show me open tickets.',
+    });
+
+    expect(result.fallback).toBe(false);
+    expect(result.fallbackReason).toBeUndefined();
+    expect(result.content).toBe('Based on the tool results, there are 3 open tickets.');
+    // 6 tool rounds exhaust the loop, then one final call without tools forces a text answer.
+    expect(ai.chat).toHaveBeenCalledTimes(7);
+    expect(executeTool).toHaveBeenCalledTimes(6);
+
+    const finalCallOptions = (ai.chat as any).mock.calls.at(-1)[2];
+    expect(finalCallOptions.tools).toBeUndefined();
+  });
+
   it('returns graceful fallback text when provider times out', async () => {
     const { userId, chatId, project } = await createChatFixture();
 
