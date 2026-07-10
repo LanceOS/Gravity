@@ -192,6 +192,55 @@ function looksLikeUnparsedToolCallAttempt(content: string): boolean {
   return content.length > 0 && UNPARSED_TOOL_CALL_PATTERN.test(content);
 }
 
+const MALFORMED_TOOL_CALL_MESSAGE =
+  'I attempted to perform an action but the request could not be completed properly. Please try again.';
+
+// The hallucinated tool-call shape we've seen only ever opens with '<', so
+// content that clearly isn't heading that way can be forwarded immediately
+// with no added latency. Content that does open with '<' is held back just
+// long enough (a short prefix, or up to the first newline) to tell a
+// genuine markup snippet apart from a fake tool invocation before any of it
+// reaches the user live.
+const STREAM_SNIFF_LENGTH = 40;
+
+function createGuardedStreamForwarder(forward: (chunk: string) => Promise<void> | void) {
+  let buffer = '';
+  let decided = false;
+  let suppressed = false;
+
+  return async (chunk: string) => {
+    if (suppressed) {
+      return;
+    }
+
+    if (decided) {
+      await forward(chunk);
+      return;
+    }
+
+    buffer += chunk;
+    const trimmedStart = buffer.trimStart();
+
+    if (trimmedStart.length > 0 && !trimmedStart.startsWith('<')) {
+      decided = true;
+      await forward(buffer);
+      return;
+    }
+
+    if (buffer.length < STREAM_SNIFF_LENGTH && !buffer.includes('\n')) {
+      return;
+    }
+
+    decided = true;
+    if (looksLikeUnparsedToolCallAttempt(buffer)) {
+      suppressed = true;
+      return;
+    }
+
+    await forward(buffer);
+  };
+}
+
 export class ChatService {
   private readonly ai: AiClient;
   private readonly executeToolFn: ExecuteToolFn;
@@ -466,21 +515,13 @@ Only operate in the workspace/project above.`,
   }): Promise<ChatModelResult> {
     let messages: Message[] = [...params.messages];
     let streamedFromModel = false;
-    const streamCallback = params.onChunk
-      ? params.enableStreaming
+    const forwardChunk =
+      params.onChunk && params.enableStreaming
         ? async (chunk: string) => {
             streamedFromModel = true;
             await params.onChunk?.(chunk);
           }
-        : undefined
-      : undefined;
-
-    // Whenever real tools are offered, a round's response might turn out to
-    // be a hallucinated pseudo tool-call instead of genuine text (seen in
-    // production), so it must be fully buffered and validated before any of
-    // it reaches the user. Only stream a round live when there is nothing to
-    // call, since in that case the model can only produce plain text.
-    const canStreamRoundLive = params.toolDefinitions.length === 0;
+        : undefined;
 
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
       try {
@@ -489,18 +530,16 @@ Only operate in the workspace/project above.`,
           messages,
           tools: params.toolDefinitions,
           ...(typeof params.maxTokens === 'number' ? { maxTokens: params.maxTokens } : {}),
-          ...(streamCallback && canStreamRoundLive ? { onChunk: streamCallback } : {}),
+          ...(forwardChunk ? { onChunk: createGuardedStreamForwarder(forwardChunk) } : {}),
         });
 
         if (!modelResponse.toolCalls || modelResponse.toolCalls.length === 0) {
           if (looksLikeUnparsedToolCallAttempt(modelResponse.content)) {
-            return {
-              content: 'I attempted to perform an action but the request could not be completed properly. Please try again.',
-              toolCalls: undefined,
-              fallback: true,
-              fallbackReason: 'malformed_tool_call',
-              streamed: params.enableStreaming ? streamedFromModel : false,
-            };
+            // Real tool calls may have already run in an earlier round of
+            // this same loop — don't discard that work. Give the model one
+            // more shot at synthesizing a real answer from it, the same
+            // recovery used when the round budget runs out below.
+            return this.synthesizeFinalAnswer(params, messages, forwardChunk, () => streamedFromModel);
           }
 
           return {
@@ -561,22 +600,37 @@ Only operate in the workspace/project above.`,
     // The model used all tool rounds without producing a final text response.
     // Give it one last chance to synthesize an answer from accumulated tool
     // results by calling the model WITHOUT tools so it must respond with text.
+    return this.synthesizeFinalAnswer(params, messages, forwardChunk, () => streamedFromModel);
+  }
+
+  private async synthesizeFinalAnswer(
+    params: {
+      userId: string;
+      provider: ChatProvider;
+      model: string;
+      maxTokens?: number;
+      enableStreaming: boolean;
+    },
+    messages: Message[],
+    forwardChunk: ((chunk: string) => Promise<void>) | undefined,
+    getStreamedFromModel: () => boolean,
+  ): Promise<ChatModelResult> {
     try {
       const finalResponse = await this.ai.chat(params.userId, params.provider, {
         model: params.model,
         messages,
         // No tools — force a text-only response
         ...(typeof params.maxTokens === 'number' ? { maxTokens: params.maxTokens } : {}),
-        ...(streamCallback ? { onChunk: streamCallback } : {}),
+        ...(forwardChunk ? { onChunk: createGuardedStreamForwarder(forwardChunk) } : {}),
       });
 
       if (looksLikeUnparsedToolCallAttempt(finalResponse.content)) {
         return {
-          content: 'I attempted to perform an action but the request could not be completed properly. Please try again.',
+          content: MALFORMED_TOOL_CALL_MESSAGE,
           toolCalls: undefined,
           fallback: true,
           fallbackReason: 'malformed_tool_call',
-          streamed: params.enableStreaming ? streamedFromModel : false,
+          streamed: params.enableStreaming ? getStreamedFromModel() : false,
         };
       }
 
@@ -585,7 +639,7 @@ Only operate in the workspace/project above.`,
         toolCalls: undefined,
         fallback: false,
         fallbackReason: undefined,
-        streamed: params.enableStreaming ? streamedFromModel : false,
+        streamed: params.enableStreaming ? getStreamedFromModel() : false,
       };
     } catch (error) {
       return {
@@ -593,7 +647,7 @@ Only operate in the workspace/project above.`,
         toolCalls: undefined,
         fallback: true,
         fallbackReason: this.toFallbackReason(error),
-        streamed: params.enableStreaming ? streamedFromModel : false,
+        streamed: params.enableStreaming ? getStreamedFromModel() : false,
       };
     }
   }
