@@ -182,6 +182,16 @@ function isTokenLimitError(error: unknown): boolean {
   return /token|context|limit|too many/i.test(message);
 }
 
+// Some providers occasionally fail to populate a structured tool_calls
+// response and instead have the model free-text an imitation tool
+// invocation (e.g. XML-ish `<invoke name="...">` tags). That text is not a
+// usable answer and must never reach the user verbatim.
+const UNPARSED_TOOL_CALL_PATTERN = /<\/?\s*(?:tool_calls?|function_calls?|invoke)\b|<\/?\s*parameter\s+name\s*=/i;
+
+function looksLikeUnparsedToolCallAttempt(content: string): boolean {
+  return content.length > 0 && UNPARSED_TOOL_CALL_PATTERN.test(content);
+}
+
 export class ChatService {
   private readonly ai: AiClient;
   private readonly executeToolFn: ExecuteToolFn;
@@ -465,6 +475,13 @@ Only operate in the workspace/project above.`,
         : undefined
       : undefined;
 
+    // Whenever real tools are offered, a round's response might turn out to
+    // be a hallucinated pseudo tool-call instead of genuine text (seen in
+    // production), so it must be fully buffered and validated before any of
+    // it reaches the user. Only stream a round live when there is nothing to
+    // call, since in that case the model can only produce plain text.
+    const canStreamRoundLive = params.toolDefinitions.length === 0;
+
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
       try {
         const modelResponse = await this.ai.chat(params.userId, params.provider, {
@@ -472,10 +489,20 @@ Only operate in the workspace/project above.`,
           messages,
           tools: params.toolDefinitions,
           ...(typeof params.maxTokens === 'number' ? { maxTokens: params.maxTokens } : {}),
-          ...(streamCallback ? { onChunk: streamCallback } : {}),
+          ...(streamCallback && canStreamRoundLive ? { onChunk: streamCallback } : {}),
         });
 
         if (!modelResponse.toolCalls || modelResponse.toolCalls.length === 0) {
+          if (looksLikeUnparsedToolCallAttempt(modelResponse.content)) {
+            return {
+              content: 'I attempted to perform an action but the request could not be completed properly. Please try again.',
+              toolCalls: undefined,
+              fallback: true,
+              fallbackReason: 'malformed_tool_call',
+              streamed: params.enableStreaming ? streamedFromModel : false,
+            };
+          }
+
           return {
             content: modelResponse.content || '',
             toolCalls: modelResponse.toolCalls,
@@ -542,6 +569,16 @@ Only operate in the workspace/project above.`,
         ...(typeof params.maxTokens === 'number' ? { maxTokens: params.maxTokens } : {}),
         ...(streamCallback ? { onChunk: streamCallback } : {}),
       });
+
+      if (looksLikeUnparsedToolCallAttempt(finalResponse.content)) {
+        return {
+          content: 'I attempted to perform an action but the request could not be completed properly. Please try again.',
+          toolCalls: undefined,
+          fallback: true,
+          fallbackReason: 'malformed_tool_call',
+          streamed: params.enableStreaming ? streamedFromModel : false,
+        };
+      }
 
       return {
         content: finalResponse.content || 'I reached the tool call limit and was unable to produce a final answer.',

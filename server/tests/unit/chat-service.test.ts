@@ -386,6 +386,96 @@ describe('ChatService', () => {
     expect(asJsonMetadata(toolOutputRows[0].metadata).toolCall).toMatchObject({ name: 'list_tickets' });
   });
 
+  it('treats an unparsed pseudo tool-call response as a fallback instead of leaking it to the user', async () => {
+    const { userId, chatId, project } = await createChatFixture();
+
+    mcpToolsList.push({
+      name: 'create_ticket',
+      description: 'Create a new ticket or sub-ticket in the workspace.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          title: { type: 'string' },
+          projectId: { type: 'string' },
+        },
+        required: ['title', 'projectId'],
+      },
+    });
+
+    const hallucinatedToolCall = [
+      '<tool_calls>',
+      '<invoke name="createticket">',
+      '<parameter name="projectId">seed-ws-proj-2-team-1-proj-1</parameter>',
+      '<parameter name="title">Modularize authentication flows</parameter>',
+      '</invoke>',
+      '</tool_calls>',
+    ].join('\n');
+
+    const ai = {
+      chat: vi.fn().mockResolvedValue({ content: hallucinatedToolCall }),
+    };
+
+    const chatService = new ChatService({ ai });
+    const chunks: string[] = [];
+    const result = await chatService.generateResponse({
+      projectId: project.id,
+      chatId,
+      userId,
+      message: 'Create a ticket to modularize auth flows.',
+      onChunk: (chunk) => {
+        chunks.push(chunk);
+      },
+    });
+
+    expect(result.fallback).toBe(true);
+    expect(result.fallbackReason).toBe('malformed_tool_call');
+    expect(result.content).not.toContain('<invoke');
+    expect(result.content).not.toContain('tool_calls');
+    expect(chunks.join('')).not.toContain('<invoke');
+
+    const storedRows = await db
+      .select()
+      .from(chatMessages)
+      .where(eq(chatMessages.sessionId, chatId))
+      .orderBy(asc(chatMessages.createdAt), asc(chatMessages.id));
+    const assistantMessage = storedRows.at(-1);
+    expect(assistantMessage?.content).not.toContain('<invoke');
+  });
+
+  it('does not stream tool-bearing rounds live, only the resolved content', async () => {
+    const { userId, chatId, project } = await createChatFixture();
+
+    mcpToolsList.push({
+      name: 'list_tickets',
+      description: 'List tickets with optional status filtering.',
+      inputSchema: {
+        type: 'object',
+        properties: { status: { type: 'string' } },
+      },
+    });
+
+    const ai = {
+      chat: vi.fn().mockResolvedValue({ content: 'Here is your answer.' }),
+    };
+
+    const chatService = new ChatService({ ai });
+    const chunks: string[] = [];
+    const result = await chatService.generateResponse({
+      projectId: project.id,
+      chatId,
+      userId,
+      message: 'What tickets are open?',
+      onChunk: (chunk) => {
+        chunks.push(chunk);
+      },
+    });
+
+    expect(result.content).toBe('Here is your answer.');
+    const [, , options] = (ai.chat as any).mock.calls[0];
+    expect(options.onChunk).toBeUndefined();
+    expect(chunks.join('')).toBe('Here is your answer.');
+  });
+
   it('synthesizes a final answer from tool results when the tool round limit is reached', async () => {
     const { userId, chatId, project } = await createChatFixture();
 
