@@ -84,6 +84,11 @@ function escapeRegex(value: string) {
   return value.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
 }
 
+function getSafeUrlAttribute<T extends string | undefined>(element: HTMLElement, attrName: string, fallback: T): string | T {
+  const raw = element.getAttribute(attrName);
+  return raw && isSafeHref(raw) ? raw : fallback;
+}
+
 function renderTextWithTicketLinks(text: string, ticketRegex: RegExp): React.ReactNode[] {
   const nodes: React.ReactNode[] = [];
   let lastIndex = 0;
@@ -242,8 +247,7 @@ function renderNode(
         </pre>
       );
     case 'a': {
-      const rawHref = element.getAttribute('href');
-      const href = rawHref && isSafeHref(rawHref) ? rawHref : 'about:blank';
+      const href = getSafeUrlAttribute(element, 'href', 'about:blank');
       return (
         <a
           key={keyPrefix}
@@ -258,8 +262,7 @@ function renderNode(
       );
     }
     case 'img': {
-      const rawSrc = element.getAttribute('src');
-      const src = rawSrc && isSafeHref(rawSrc) ? rawSrc : undefined;
+      const src = getSafeUrlAttribute(element, 'src', undefined);
       return (
         <img
           key={keyPrefix}
