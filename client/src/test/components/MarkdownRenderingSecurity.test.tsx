@@ -96,15 +96,8 @@ describe('markdown link sanitization', () => {
   it('neutralizes a malicious link/image stored directly in a rich-text JSON doc', () => {
     render(<MarkdownContent text={maliciousRichTextBody()} />);
 
-    const maybeLink = screen.queryByRole('link', { name: 'Click me' });
-    if (maybeLink) {
-      expect(maybeLink).toHaveAttribute('href', 'about:blank');
-    }
-
-    const maybeImg = screen.queryByAltText('evil') as HTMLImageElement | null;
-    if (maybeImg) {
-      expect(maybeImg.getAttribute('src') || '').not.toContain('javascript:');
-    }
+    expect(screen.getByRole('link', { name: 'Click me' })).toHaveAttribute('href', 'about:blank');
+    expect(screen.getByAltText('evil')).not.toHaveAttribute('src');
   });
 
   it('neutralizes a malicious link in a rendered ticket comment body', () => {
@@ -131,11 +124,7 @@ describe('markdown link sanitization', () => {
       />
     );
 
-    const maybeLink = screen.queryByRole('link', { name: 'Click me' });
-    if (maybeLink) {
-      expect(maybeLink).toHaveAttribute('href', 'about:blank');
-    }
-
+    expect(screen.getByRole('link', { name: 'Click me' })).toHaveAttribute('href', 'about:blank');
     expect(document.querySelector('script')).not.toBeInTheDocument();
     expect(document.body.innerHTML).not.toContain('javascript:');
   });
