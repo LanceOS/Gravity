@@ -78,12 +78,9 @@ async function postChatCompletionSse(
   chatId: string,
   payload: { message: string; provider: string; model?: string; context?: string },
 ) {
-  const response = await fetch(`/api/v1/projects/${encodeURIComponent(projectId)}/chats/${encodeURIComponent(chatId)}/stream`, {
+  const response = await apiClient.raw(`/projects/${encodeURIComponent(projectId)}/chats/${encodeURIComponent(chatId)}/stream`, {
     method: 'POST',
-    headers: {
-      Accept: 'text/event-stream',
-      'Content-Type': 'application/json',
-    },
+    headers: { Accept: 'text/event-stream' },
     body: JSON.stringify(payload),
   });
 

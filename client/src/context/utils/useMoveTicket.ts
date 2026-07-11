@@ -3,6 +3,7 @@ import { useMutation, type QueryClient } from '@tanstack/react-query';
 import type { Ticket } from '../../types/domain';
 import { queryKeys } from '../../utils/queryClient';
 import type { TicketFiltersState } from '../TicketContextContext';
+import { apiClient } from '../../utils/apiClient';
 
 type MoveTicketVariables = {
   id: string;
@@ -79,8 +80,6 @@ interface UseMoveTicketArgs {
   setActiveTicket: React.Dispatch<React.SetStateAction<Ticket | null>>;
 }
 
-const API_URL = '/api/v1';
-
 export function useMoveTicket({
   queryClient,
   activeProjectIdRef,
@@ -90,18 +89,9 @@ export function useMoveTicket({
   setActiveTicket,
 }: UseMoveTicketArgs) {
   const moveTicketMutation = useMutation({
-    mutationFn: async ({ id, sourceProjectId, targetProjectId }: MoveTicketVariables) => {
-      const response = await fetch(`${API_URL}/tickets/${id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Project-Id': sourceProjectId,
-        },
-        body: JSON.stringify({ projectId: targetProjectId }),
-      });
-      if (!response.ok) throw new Error('Failed to move ticket');
-      return response.json() as Promise<Ticket>;
-    },
+    mutationFn: async ({ id, sourceProjectId, targetProjectId }: MoveTicketVariables) => apiClient.patch<Ticket>(`/tickets/${id}`, { projectId: targetProjectId }, {
+      headers: { 'X-Project-Id': sourceProjectId },
+    }),
     onMutate: async ({ id, sourceProjectId, targetProjectId }): Promise<MoveTicketContext> => {
       const sourceKey = queryKeys.tickets(sourceProjectId);
       const targetKey = queryKeys.tickets(targetProjectId);

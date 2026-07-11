@@ -44,6 +44,7 @@ import { useWorkspaceViewMode } from '../hooks/useWorkspaceViewMode';
 import type { AppSection } from '../types/AppShell';
 import { LoadingPage } from '../../loadingPage';
 import { CACHE_CONFIGS, queryKeys } from '../../../utils/queryClient';
+import { patchTutorialCompleted } from '../../../utils/tutorialApi';
 import { ChatHistoryHeaderRow, ChatHistoryMenuButton, getChatSession, toChatMessages, useChatSessionsList } from '../../chats';
 import type { Message } from '../../ai';
 import {
@@ -979,11 +980,7 @@ export function WorkspaceShellPage() {
       onComplete={async () => {
         setLocalTutorialCompleted(true);
         try {
-          await fetch(`/api/v1/users/${currentUser.id}/tutorial`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ completed: true }),
-          });
+          await patchTutorialCompleted(currentUser.id, true);
         } catch {
           // Ignore
         }

@@ -9,6 +9,7 @@ import { useWorkspaceSettings } from '../../../hooks/useWorkspaceSettings';
 import { useAuth } from '../../../context/auth/AuthContext';
 import { useActiveView } from '../../../context/ui/ActiveViewContext';
 import { LoadingPage } from '../../../pages/LoadingPage/LoadingPage';
+import { patchTutorialCompleted } from '../../../utils/tutorialApi';
 
 export function WorkspaceSettingsPageRoute() {
   const { workspaceId = '' } = useParams<{ workspaceId: string }>();
@@ -108,11 +109,7 @@ export function WorkspaceSettingsPageRoute() {
         onComplete={async () => {
           setLocalTutorialCompleted(true);
           try {
-            await fetch(`/api/v1/users/${currentUser.id}/tutorial`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ completed: true }),
-            });
+            await patchTutorialCompleted(currentUser.id, true);
           } catch (e) {
             // Ignore
           }

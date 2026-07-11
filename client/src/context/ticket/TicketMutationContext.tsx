@@ -5,6 +5,7 @@ import { useTicketFilters } from '../filters/TicketFiltersContext';
 import { useActiveTicket } from './ActiveTicketContext';
 import { useMoveTicket } from '../utils/useMoveTicket';
 import { queryKeys } from '../../utils/queryClient';
+import { apiClient } from '../../utils/apiClient';
 import {
   combineTicketDetails,
   findCachedTicketByKeyOrId,
@@ -23,7 +24,7 @@ import type {
   InFlightTicketUpdateBatch, 
   TicketUpdateOptions 
 } from './TicketMutationContext.types';
-import { API_URL, TICKET_UPDATE_DEBOUNCE_MS } from './ticketMutationUtils';
+import { TICKET_UPDATE_DEBOUNCE_MS } from './ticketMutationUtils';
 
 export const TicketMutationContext = createContext<TicketMutationContextType | undefined>(undefined);
 
@@ -94,18 +95,9 @@ export const TicketMutationProvider: React.FC<{ children: React.ReactNode }> = (
   }, []);
 
   const createTicketMutation = useMutation({
-    mutationFn: async (ticketInput: CreateTicketInput) => {
-      const response = await fetch(`${API_URL}/tickets`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Project-Id': ticketInput.projectId,
-        },
-        body: JSON.stringify(ticketInput),
-      });
-      if (!response.ok) throw new Error('Failed to create ticket');
-      return response.json() as Promise<Ticket>;
-    },
+    mutationFn: async (ticketInput: CreateTicketInput) => apiClient.post<Ticket>('/tickets', ticketInput, {
+      headers: { 'X-Project-Id': ticketInput.projectId },
+    }),
     onSuccess: (createdTicket, ticketInput) => {
       const normalizedTicket: Ticket = {
         ...createdTicket,
@@ -139,18 +131,9 @@ export const TicketMutationProvider: React.FC<{ children: React.ReactNode }> = (
   });
 
   const updateTicketMutation = useMutation({
-    mutationFn: async ({ id, updates, projectId }: { id: string; updates: Partial<Ticket>; projectId: string }) => {
-      const response = await fetch(`${API_URL}/tickets/${id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Project-Id': projectId,
-        },
-        body: JSON.stringify(updates),
-      });
-      if (!response.ok) throw new Error('Failed to update ticket');
-      return response.json() as Promise<Ticket>;
-    },
+    mutationFn: async ({ id, updates, projectId }: { id: string; updates: Partial<Ticket>; projectId: string }) => apiClient.patch<Ticket>(`/tickets/${id}`, updates, {
+      headers: { 'X-Project-Id': projectId },
+    }),
   });
 
   const flushPendingTicketUpdate = useCallback(async function flushPendingTicketUpdateInner(ticketId: string) {
@@ -343,9 +326,9 @@ export const TicketMutationProvider: React.FC<{ children: React.ReactNode }> = (
 
   const deleteTicketMutation = useMutation({
     mutationFn: async (id: string) => {
-      await fetch(`${API_URL}/tickets/${id}`, {
-        method: 'DELETE',
+      await apiClient.delete(`/tickets/${id}`, {
         headers: { 'X-Project-Id': activeProjectIdRef.current },
+        skipContentTypeHeader: true,
       });
     },
     onMutate: async (id) => {
