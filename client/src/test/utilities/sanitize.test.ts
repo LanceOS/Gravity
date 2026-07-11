@@ -216,6 +216,25 @@ describe('sanitizeHtml - event handler attributes', () => {
   });
 });
 
+describe('sanitizeHtml - disallowed attributes', () => {
+  it('strips inline style (a CSS-based injection surface) while keeping the element', () => {
+    const sanitized = sanitizeHtml('<p style="color:red;background:url(javascript:alert(1))">text</p>');
+
+    expect(sanitized).toContain('text');
+    expect(sanitized).not.toContain('style');
+    expect(sanitized).not.toContain('javascript:');
+    expect(parseHtml(sanitized).querySelector('p')?.getAttribute('style')).toBeNull();
+  });
+
+  it('strips data-* attributes', () => {
+    const sanitized = sanitizeHtml('<p data-foo="bar" data-x="y">text</p>');
+
+    expect(sanitized).toContain('text');
+    expect(sanitized).not.toContain('data-foo');
+    expect(sanitized).not.toContain('data-x');
+  });
+});
+
 describe('sanitizeHtml - URI scheme filtering', () => {
   it('blocks a javascript: URI on an image source', () => {
     const sanitized = sanitizeHtml('<img src="javascript:alert(1)" alt="x">');
@@ -283,6 +302,14 @@ describe('sanitizeHtml - URI scheme filtering', () => {
     const sanitized = sanitizeHtml('<a href="//evil.example/path">x</a>');
 
     expect(sanitized).toContain('href="//evil.example/path"');
+    expect(sanitized).toContain('target="_blank"');
+    expect(sanitized).toContain('rel="noopener noreferrer"');
+  });
+
+  it('forces safe rel on a relative link that still opts into opening a new tab', () => {
+    const sanitized = sanitizeHtml('<a href="/internal/path" target="_blank">x</a>');
+
+    expect(sanitized).toContain('href="/internal/path"');
     expect(sanitized).toContain('target="_blank"');
     expect(sanitized).toContain('rel="noopener noreferrer"');
   });
