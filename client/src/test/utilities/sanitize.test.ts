@@ -5,6 +5,10 @@ import { isSafeHref, sanitizeHtml } from '@library';
 // (mutation XSS, HTML-entity smuggling) only reveal themselves once the
 // browser re-parses the "safe" string, so string matching alone is not
 // enough - we assert against the resulting element tree.
+//
+// Caveat: this uses jsdom's HTML parser, which is close to but not identical
+// to Chrome/Firefox. A green re-parse assertion here is strong evidence, not
+// an absolute guarantee across every real-world browser parser.
 function parseHtml(html: string): HTMLElement {
   const container = document.createElement('div');
   container.innerHTML = html;
@@ -243,7 +247,9 @@ describe('sanitizeHtml - URI scheme filtering', () => {
     const sanitized = sanitizeHtml(`<a href="${href}">x</a>`);
 
     expect(sanitized).not.toContain('href=');
-    expect(sanitized.toLowerCase()).not.toContain('javascript');
+    // Collapse whitespace first: the scheme is only dangerous once the browser
+    // strips the embedded tab/newline back into a contiguous `javascript:`.
+    expect(sanitized.toLowerCase().replace(/\s/g, '')).not.toContain('javascript:');
   });
 
   it.each([
@@ -310,7 +316,14 @@ describe('sanitizeHtml - mutation XSS (mXSS) variants', () => {
     ['nested style breakout', '<style><style/><img src=x onerror=alert(1)>'],
     ['comment breakout', '<!--<img src=x onerror=alert(1)>-->'],
   ])('neutralizes the %s payload after re-parsing', (_label, html) => {
-    const parsed = parseHtml(sanitizeHtml(html));
+    const sanitized = sanitizeHtml(html);
+
+    // String-level guard: holds even when the payload is dropped entirely and
+    // no <img> survives for the element-level checks below to inspect.
+    expect(sanitized).not.toContain('onerror');
+    expect(sanitized).not.toContain('alert(1)');
+
+    const parsed = parseHtml(sanitized);
 
     expect(parsed.querySelector('script')).toBeNull();
     expect(hasEventHandlerAttribute(parsed)).toBe(false);
