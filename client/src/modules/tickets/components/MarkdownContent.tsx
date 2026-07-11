@@ -6,7 +6,7 @@ import { useActiveProject } from '../../../context/project/ActiveProjectContext'
 import { useProjectContext } from '../../../context/project/ProjectContext';
 import { useTicketByKey } from '../../../hooks/useTicketByKey';
 import { getStatusColor } from '../utils/TicketDetail';
-import { renderRichTextHtml } from '@library';
+import { renderRichTextHtml, isSafeHref } from '@library';
 
 /**
  * @description A component that renders an interactive ticket link for a given ticket key.
@@ -242,7 +242,8 @@ function renderNode(
         </pre>
       );
     case 'a': {
-      const href = element.getAttribute('href') || 'about:blank';
+      const rawHref = element.getAttribute('href');
+      const href = rawHref && isSafeHref(rawHref) ? rawHref : 'about:blank';
       return (
         <a
           key={keyPrefix}
@@ -256,16 +257,19 @@ function renderNode(
         </a>
       );
     }
-    case 'img':
+    case 'img': {
+      const rawSrc = element.getAttribute('src');
+      const src = rawSrc && isSafeHref(rawSrc) ? rawSrc : undefined;
       return (
         <img
           key={keyPrefix}
-          src={element.getAttribute('src') || ''}
+          src={src}
           alt={element.getAttribute('alt') || ''}
           title={element.getAttribute('title') || undefined}
           style={{ maxWidth: '100%', height: 'auto', borderRadius: '6px', margin: '8px 0' }}
         />
       );
+    }
     case 'br':
       return <br key={keyPrefix} />;
     default:
