@@ -1,7 +1,9 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { MarkdownContent } from '../../modules/tickets/components/MarkdownContent';
+import { TicketCommentsThread } from '../../modules/tickets/components/TicketDetail/components/TicketCommentsThread';
 import { FormattedMarkdown } from '../../../../library/components/aichat/FormattedMarkdown';
+import type { Comment, Ticket } from '../../types/domain';
 
 vi.mock('../../context/ticket/TicketListContext', () => ({
   useTicketListContext: () => ({
@@ -70,5 +72,60 @@ describe('markdown link sanitization', () => {
     render(<FormattedMarkdown text={"[Click Me](java\tscript:alert(1))"} />);
 
     expect(screen.getByRole('link', { name: 'Click Me' })).toHaveAttribute('href', 'about:blank');
+  });
+
+  function maliciousRichTextBody(): string {
+    return JSON.stringify({
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            {
+              type: 'text',
+              text: 'Click me',
+              marks: [{ type: 'link', attrs: { href: 'javascript:alert(1)', title: null } }],
+            },
+            { type: 'image', attrs: { src: 'javascript:alert(2)', alt: 'evil', title: null } },
+          ],
+        },
+      ],
+    });
+  }
+
+  it('neutralizes a malicious link/image stored directly in a rich-text JSON doc', () => {
+    render(<MarkdownContent text={maliciousRichTextBody()} />);
+
+    expect(screen.getByRole('link', { name: 'Click me' })).toHaveAttribute('href', 'about:blank');
+    expect(screen.getByAltText('evil')).not.toHaveAttribute('src');
+  });
+
+  it('neutralizes a malicious link in a rendered ticket comment body', () => {
+    const activeTicket = { id: 'ticket-1', key: 'GRA-1' } as unknown as Ticket;
+    const comments = [
+      {
+        id: 'comment-1',
+        ticketId: 'ticket-1',
+        userId: 'user-1',
+        body: maliciousRichTextBody(),
+        createdAt: '2026-05-03T15:00:00.000Z',
+        userName: 'Casey Carter',
+      } as unknown as Comment,
+    ];
+
+    render(
+      <TicketCommentsThread
+        activeTicket={activeTicket}
+        comments={comments}
+        onAddComment={vi.fn()}
+        onUpdateComment={vi.fn()}
+        onDeleteComment={vi.fn()}
+        copyToClipboard={vi.fn().mockResolvedValue(undefined)}
+      />
+    );
+
+    expect(screen.getByRole('link', { name: 'Click me' })).toHaveAttribute('href', 'about:blank');
+    expect(document.querySelector('script')).not.toBeInTheDocument();
+    expect(document.body.innerHTML).not.toContain('javascript:');
   });
 });

@@ -6,7 +6,7 @@ import { useActiveProject } from '../../../context/project/ActiveProjectContext'
 import { useProjectContext } from '../../../context/project/ProjectContext';
 import { useTicketByKey } from '../../../hooks/useTicketByKey';
 import { getStatusColor } from '../utils/TicketDetail';
-import { renderRichTextHtml } from '@library';
+import { renderRichTextHtml, isSafeHref } from '@library';
 
 /**
  * @description A component that renders an interactive ticket link for a given ticket key.
@@ -82,6 +82,11 @@ export function TicketLink({ ticketKey }: { ticketKey: string }) {
 
 function escapeRegex(value: string) {
   return value.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+}
+
+function getSafeUrlAttribute<T extends string | undefined>(element: HTMLElement, attrName: string, fallback: T): string | T {
+  const raw = element.getAttribute(attrName);
+  return raw && isSafeHref(raw) ? raw : fallback;
 }
 
 function renderTextWithTicketLinks(text: string, ticketRegex: RegExp): React.ReactNode[] {
@@ -242,7 +247,7 @@ function renderNode(
         </pre>
       );
     case 'a': {
-      const href = element.getAttribute('href') || 'about:blank';
+      const href = getSafeUrlAttribute(element, 'href', 'about:blank');
       return (
         <a
           key={keyPrefix}
@@ -256,16 +261,18 @@ function renderNode(
         </a>
       );
     }
-    case 'img':
+    case 'img': {
+      const src = getSafeUrlAttribute(element, 'src', undefined);
       return (
         <img
           key={keyPrefix}
-          src={element.getAttribute('src') || ''}
+          src={src}
           alt={element.getAttribute('alt') || ''}
           title={element.getAttribute('title') || undefined}
           style={{ maxWidth: '100%', height: 'auto', borderRadius: '6px', margin: '8px 0' }}
         />
       );
+    }
     case 'br':
       return <br key={keyPrefix} />;
     default:
