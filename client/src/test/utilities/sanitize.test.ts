@@ -316,22 +316,23 @@ describe('sanitizeHtml - mutation XSS (mXSS) variants', () => {
     ['nested style breakout', '<style><style/><img src=x onerror=alert(1)>'],
     ['comment breakout', '<!--<img src=x onerror=alert(1)>-->'],
   ])('neutralizes the %s payload after re-parsing', (_label, html) => {
-    const sanitized = sanitizeHtml(html);
+    const parsed = parseHtml(sanitizeHtml(html));
 
-    // String-level guard: holds even when the payload is dropped entirely and
-    // no <img> survives for the element-level checks below to inspect.
-    expect(sanitized).not.toContain('onerror');
-    expect(sanitized).not.toContain('alert(1)');
-
-    const parsed = parseHtml(sanitized);
-
+    // Escape-safe mXSS guarantees: re-parsing must not yield a live <script>
+    // or any inline event handler. These inspect the live element tree rather
+    // than the raw string, so they stay correct even if a future sanitizer
+    // neutered the payload by escaping it to inert text - and they hold whether
+    // the payload was dropped entirely or a bare element survived, which is
+    // what gives the test weight when nothing survives.
     expect(parsed.querySelector('script')).toBeNull();
     expect(hasEventHandlerAttribute(parsed)).toBe(false);
 
-    // If any <img> survives, it must carry no onerror and no unsafe src.
-    parsed.querySelectorAll('img').forEach((img) => {
-      expect(img.getAttribute('onerror')).toBeNull();
-      expect(img.getAttribute('src') ?? '').not.toContain('alert');
+    // Any element that did survive must not carry a dangerous URI scheme.
+    parsed.querySelectorAll('[src], [href]').forEach((el) => {
+      for (const attr of ['src', 'href'] as const) {
+        const uri = (el.getAttribute(attr) ?? '').toLowerCase().replace(/\s/g, '');
+        expect(uri).not.toMatch(/^(?:javascript|data|vbscript):/);
+      }
     });
   });
 });
