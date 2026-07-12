@@ -1,27 +1,31 @@
 import React from 'react';
-import { X, AlertCircle, Info, CheckCircle2, AlertTriangle } from 'lucide-react';
-import { Portal } from '../../utilities';
-import { FocusTrap } from '../../utilities';
 import { ClickAwayListener } from '../../utilities';
 
 export interface PopconfirmProps {
   title: string;
   onConfirm: () => void;
-  children: React.ReactElement;
+  children: React.ReactElement<ClickableTriggerProps>;
   style?: React.CSSProperties;
 }
 
-export function Popconfirm({ title, onConfirm, children, style }: PopconfirmProps) {
+interface ClickableTriggerProps {
+  onClick?: React.MouseEventHandler<HTMLElement>;
+}
+
+export const Popconfirm = React.forwardRef<HTMLDivElement, PopconfirmProps>(function Popconfirm(
+  { title, onConfirm, children, style },
+  ref,
+) {
   const [isOpen, setIsOpen] = React.useState(false);
 
   return (
     <ClickAwayListener onClickAway={() => setIsOpen(false)}>
-      <div style={{ position: 'relative', display: 'inline-block' }}>
-        {React.cloneElement(children as React.ReactElement<any>, {
-          onClick: (e: React.MouseEvent) => {
-            e.preventDefault();
-            setIsOpen(!isOpen);
-            (children.props as any).onClick?.(e);
+      <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
+        {React.cloneElement(children, {
+          onClick: (event: React.MouseEvent<HTMLElement>) => {
+            event.preventDefault();
+            setIsOpen((wasOpen) => !wasOpen);
+            children.props.onClick?.(event);
           },
         })}
         {isOpen && (
@@ -72,4 +76,6 @@ export function Popconfirm({ title, onConfirm, children, style }: PopconfirmProp
       </div>
     </ClickAwayListener>
   );
-}
+});
+
+Popconfirm.displayName = 'Popconfirm';
