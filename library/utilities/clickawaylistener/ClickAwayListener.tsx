@@ -62,13 +62,13 @@ export const ClickAwayListener = React.forwardRef<Element, ClickAwayListenerProp
 
   const setChildRef = React.useCallback(
     (node: Element | null) => {
-      childRef.current = node;
-
+      // React 19 always detaches via the cleanup function returned below, so this
+      // callback is only ever invoked with a non-null node.
       if (node === null) {
-        assignRef(child.props.ref, node);
-        assignRef(forwardedRef, node);
         return;
       }
+
+      childRef.current = node;
 
       const childRefCleanup = assignRef(child.props.ref, node);
       const forwardedRefCleanup = assignRef(forwardedRef, node);
