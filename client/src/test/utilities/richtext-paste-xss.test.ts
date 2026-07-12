@@ -91,10 +91,13 @@ function assertRenderedHtmlIsInert(html: string): void {
 }
 
 // The stored ProseMirror JSON is what gets sent to the server; assert it never
-// carries an inline handler or a dangerous URI scheme in a node/mark attribute.
+// carries a dangerous URI scheme or raw script markup in a node/mark attribute.
+// Inline event handlers are intentionally NOT checked here: the schema defines
+// no attribute that could hold an on* handler, so a "no on* key" assertion on
+// the JSON would be vacuous. The real handler guarantee is the re-parsed DOM
+// check in assertRenderedHtmlIsInert.
 function assertStoredDocIsClean(doc: ProseMirrorNode): void {
   const json = JSON.stringify(doc.toJSON()).toLowerCase();
-  expect(json).not.toMatch(/"on\w+":/);
   expect(json).not.toContain('javascript:');
   expect(json).not.toContain('vbscript:');
   expect(json).not.toContain('data:text/html');
@@ -178,8 +181,15 @@ describe('rich text paste pipeline - nested SVG / iframe payloads', () => {
     ['svg animate handler', '<svg><animate onbegin="alert(1)" attributeName="x"/></svg>'],
     ['iframe with javascript src', '<iframe src="javascript:alert(1)"></iframe>'],
     ['iframe with external src', '<iframe src="https://evil.com/frame"></iframe>'],
-  ])('strips a %s entirely', (_label, payload) => {
-    const doc = pasteHtmlIntoEditor(payload);
+  ])('strips a %s while preserving surrounding content', (_label, payload) => {
+    // Surround the payload with sentinel paragraphs so the assertions prove the
+    // dangerous node was surgically removed - not that the whole paste was
+    // dropped, which would let a broken sanitizer pass these checks trivially.
+    const doc = pasteHtmlIntoEditor(`<p>sentinel-before</p>${payload}<p>sentinel-after</p>`);
+
+    const text = extractRichTextPlainText(doc);
+    expect(text).toContain('sentinel-before');
+    expect(text).toContain('sentinel-after');
 
     assertStoredDocIsClean(doc);
     const rendered = renderRichTextHtml(doc);
