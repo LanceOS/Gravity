@@ -2,29 +2,62 @@ import { isValidElement, type ReactNode, type ReactPortal } from 'react';
 
 type PropertyBag = Record<PropertyKey, unknown>;
 const REACT_PORTAL_TYPE = Symbol.for('react.portal');
+// Bounds hostile proxy chains while comfortably exceeding ordinary class inheritance depth.
+const MAX_PROTOTYPE_DEPTH = 32;
+const NATIVE_FUNCTION = /\{\s*\[native code\]\s*\}$/;
 
 function isPropertyBag(value: unknown): value is PropertyBag {
   return (typeof value === 'object' && value !== null) || typeof value === 'function';
 }
 
-function hasColumnKey(row: PropertyBag, key: PropertyKey): boolean {
-  let current: object | null = row;
+function isUserDefinedGetter(descriptor: PropertyDescriptor): boolean {
+  const getter = descriptor.get;
 
-  while (current !== null && current !== Object.prototype && current !== Function.prototype) {
-    if (Object.hasOwn(current, key)) {
-      return true;
-    }
-
-    current = Object.getPrototypeOf(current);
+  if (typeof getter !== 'function') {
+    return false;
   }
 
-  return false;
+  try {
+    return !NATIVE_FUNCTION.test(Function.prototype.toString.call(getter));
+  } catch {
+    return false;
+  }
+}
+
+function hasColumnKey(row: PropertyBag, key: PropertyKey): boolean {
+  try {
+    if (!Reflect.has(row, key)) {
+      return false;
+    }
+
+    const visited = new WeakSet<object>();
+    let current: object | null = row;
+
+    for (let depth = 0; current !== null && depth < MAX_PROTOTYPE_DEPTH; depth += 1) {
+      if (visited.has(current)) {
+        return false;
+      }
+
+      visited.add(current);
+      const descriptor = Object.getOwnPropertyDescriptor(current, key);
+      if (descriptor) {
+        return current === row || isUserDefinedGetter(descriptor);
+      }
+
+      current = Object.getPrototypeOf(current);
+    }
+
+    return current === null;
+  } catch {
+    return false;
+  }
 }
 
 /**
  * Reads a property from an arbitrary row without assuming it has an index
- * signature. Own keys and custom prototype getters are supported, while
- * built-in prototype members are ignored for dynamically supplied keys.
+ * signature. Own keys and custom prototype getters are supported. Inherited
+ * methods, native members, and unsafe prototype traversals are ignored for
+ * dynamically supplied keys.
  */
 export function getCellValue(row: unknown, key: PropertyKey): unknown {
   if (!isPropertyBag(row) || !hasColumnKey(row, key)) {

@@ -14,6 +14,10 @@ class GetterRow {
   get label() {
     return this.value;
   }
+
+  format() {
+    return this.value.toUpperCase();
+  }
 }
 
 describe('DataGrid and Table cell rendering', () => {
@@ -31,9 +35,69 @@ describe('DataGrid and Table cell rendering', () => {
     expect(screen.getAllByText('Getter-backed cell')).toHaveLength(2);
   });
 
-  it('ignores built-in prototype members for dynamic keys', () => {
+  it('keeps custom getters but ignores inherited method members', () => {
+    const row = new GetterRow('Getter-backed cell');
+
+    expect(getCellValue(row, 'label')).toBe('Getter-backed cell');
+    expect(getCellValue(row, 'format')).toBeUndefined();
+    expect(getCellValue(row, 'constructor')).toBeUndefined();
     expect(getCellValue({ label: 'Plain row' }, 'toString')).toBeUndefined();
     expect(getCellValue(() => undefined, 'bind')).toBeUndefined();
+    expect(getCellValue([], 'map')).toBeUndefined();
+    expect(getCellValue(new Date(), 'getTime')).toBeUndefined();
+    expect(getCellValue(new Map(), 'size')).toBeUndefined();
+  });
+
+  it('does not loop on a cyclic proxy prototype', () => {
+    let prototypeReads = 0;
+    let row: object = {};
+
+    row = new Proxy({}, {
+      has: (_target, key) => key === 'missing',
+      getPrototypeOf: () => {
+        prototypeReads += 1;
+
+        if (prototypeReads > 1) {
+          throw new Error('prototype cycle was traversed more than once');
+        }
+
+        return row;
+      },
+    });
+
+    expect(getCellValue(row, 'missing')).toBeUndefined();
+    expect(prototypeReads).toBeLessThanOrEqual(1);
+  });
+
+  it('resolves virtual proxy-backed cell keys through has/get traps', () => {
+    let hasReads = 0;
+    let valueReads = 0;
+    let blockedValueReads = 0;
+    const row = new Proxy({}, {
+      has: (_target, key) => {
+        hasReads += 1;
+        return key === 'virtual' || key === 'toString';
+      },
+      get: (_target, key) => {
+        valueReads += 1;
+        if (key === 'virtual') {
+          return 'Proxy-backed cell';
+        }
+
+        if (key === 'toString') {
+          blockedValueReads += 1;
+          return 'Blocked proxy value';
+        }
+
+        return undefined;
+      },
+    });
+
+    expect(getCellValue(row, 'virtual')).toBe('Proxy-backed cell');
+    expect(getCellValue(row, 'toString')).toBeUndefined();
+    expect(hasReads).toBeGreaterThan(0);
+    expect(valueReads).toBe(1);
+    expect(blockedValueReads).toBe(0);
   });
 
   it('renders iterable ReactNode cell values', () => {
