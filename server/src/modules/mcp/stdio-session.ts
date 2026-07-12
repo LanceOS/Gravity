@@ -331,6 +331,19 @@ export class McpStdioSession {
             this.send(createMcpErrorResponse(payload.id ?? null, -32001, 'Invalid or expired token.'));
             return;
           }
+          // Defense in depth: a valid token only proves it was minted for this
+          // workspace, not that its issuer still belongs to it. Re-check
+          // membership so a token whose issuer lost access can no longer
+          // establish a session with accessChecked short-circuiting later
+          // request handling.
+          const { isWorkspaceMember } = await import('../workspaces/services/membership.js');
+          const issuerIsMember = tokenRow.generatedBy
+            ? await isWorkspaceMember(workspaceId, tokenRow.generatedBy)
+            : false;
+          if (!issuerIsMember) {
+            this.send(createMcpErrorResponse(payload.id ?? null, -32001, 'Unauthorized workspace access.'));
+            return;
+          }
           this.options.workspaceId = workspaceId;
           this.options.actorUserId = tokenRow.generatedBy;
           this.options.tokenScopes = Array.isArray(tokenRow.scopes) ? tokenRow.scopes : [];

@@ -128,6 +128,17 @@ export class McpRouterFactory {
 
                                         tokenScopes = Array.isArray(tokenRow.scopes) ? tokenRow.scopes : [];
                                         actorUserId = tokenRow.generatedBy;
+                                        // Defense in depth: a valid token only proves it was
+                                        // minted for this workspace, not that its issuer still
+                                        // belongs to it. Re-check membership so a token whose
+                                        // issuer lost access can no longer be used.
+                                        const issuerHasAccess = actorUserId
+                                            ? await this.workspaceAccessService.hasWorkspaceAccess(workspaceId, actorUserId)
+                                            : false;
+                                        if (!issuerHasAccess) {
+                                            res.status(403).json({ error: 'Unauthorized workspace access.' });
+                                            return;
+                                        }
                                         accessChecked = true;
                                     } catch (err) {
                                         res.status(401).json({ error: 'Invalid token.' });
@@ -144,8 +155,11 @@ export class McpRouterFactory {
 
                         // tokenScopes propagated to handler (no debug log here)
 
+                        // Pass the real access-check result (not a hardcoded true) so the
+                        // handler re-runs its membership backstop if any future path reaches
+                        // here without the transport having verified access.
                         const response = await handleMcpRequest(req.body, workspaceId, actorUserId ?? undefined, {
-                            accessChecked: true,
+                            accessChecked,
                             sanitize: req.header('x-mcp-sanitize') === 'true',
                             tokenScopes,
                         });

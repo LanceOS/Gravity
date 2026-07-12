@@ -8,8 +8,16 @@ vi.mock('../src/modules/mcp/request-handler.js', () => ({
 vi.mock('../src/modules/mcp/responses.js', () => ({
   createMcpErrorResponse: (id: any, code: number, message: string) => ({ jsonrpc: '2.0', id, error: { code, message } }),
 }));
+vi.mock('../src/modules/mcp/connection.js', () => ({
+  verifyAndConsumeToken: vi.fn(),
+}));
+vi.mock('../src/modules/workspaces/services/membership.js', () => ({
+  isWorkspaceMember: vi.fn(),
+}));
 
 import { McpStdioSession } from '../src/modules/mcp/stdio-session.js';
+import { verifyAndConsumeToken } from '../src/modules/mcp/connection.js';
+import { isWorkspaceMember } from '../src/modules/workspaces/services/membership.js';
 
 function collectOutput(stream: PassThrough) {
   const chunks: Buffer[] = [];
@@ -102,5 +110,70 @@ describe('McpStdioSession framing', () => {
     outStream.end();
     // Expect an error response produced by createMcpErrorResponse
     expect(out).toContain('Content-Length too large');
+  });
+});
+
+describe('McpStdioSession token handshake membership guard', () => {
+  async function runTokenHandshake() {
+    const inStream = new PassThrough();
+    const outStream = new PassThrough();
+    const readAll = collectOutput(outStream);
+
+    const session = new McpStdioSession(inStream, outStream, { maxMessageSize: 4096, allowHandshake: true });
+    session.start();
+
+    const body = JSON.stringify({
+      jsonrpc: '2.0',
+      id: 100,
+      method: 'stdio/handshake',
+      params: { token: 'raw-token', workspaceId: 'workspace-1' },
+    });
+    const header = `Content-Length: ${Buffer.byteLength(body, 'utf8')}\r\n\r\n`;
+
+    const p = new Promise((res) => outStream.once('data', res));
+    inStream.write(header + body);
+    await p;
+
+    const out = readAll();
+    session.stop();
+    inStream.end();
+    outStream.end();
+
+    const idx = out.indexOf('\r\n\r\n');
+    return JSON.parse(out.slice(idx + 4));
+  }
+
+  it('accepts a token handshake when the issuer is still a workspace member', async () => {
+    (verifyAndConsumeToken as any).mockResolvedValueOnce({
+      id: 't1',
+      workspaceId: 'workspace-1',
+      generatedBy: 'user-1',
+      scopes: ['tools/list'],
+      connectionType: 'stdio',
+    });
+    (isWorkspaceMember as any).mockResolvedValueOnce(true);
+
+    const parsed = await runTokenHandshake();
+
+    expect(isWorkspaceMember).toHaveBeenCalledWith('workspace-1', 'user-1');
+    expect(parsed).toHaveProperty('result');
+    expect(parsed.result).toHaveProperty('ok', true);
+  });
+
+  it('rejects a token handshake when the issuer is no longer a workspace member', async () => {
+    (verifyAndConsumeToken as any).mockResolvedValueOnce({
+      id: 't2',
+      workspaceId: 'workspace-1',
+      generatedBy: 'removed-user',
+      scopes: ['tools/list'],
+      connectionType: 'stdio',
+    });
+    (isWorkspaceMember as any).mockResolvedValueOnce(false);
+
+    const parsed = await runTokenHandshake();
+
+    expect(isWorkspaceMember).toHaveBeenCalledWith('workspace-1', 'removed-user');
+    expect(parsed).toHaveProperty('error');
+    expect(parsed.error).toMatchObject({ message: 'Unauthorized workspace access.' });
   });
 });
