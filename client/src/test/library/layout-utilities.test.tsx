@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useState } from 'react';
+import { createRef, type ReactElement, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import {
   AspectRatio,
@@ -136,6 +136,12 @@ describe('library layout and utilities', () => {
   it('fires click-away callbacks and traps focus while active', async () => {
     const user = userEvent.setup();
     const onClickAway = vi.fn();
+    const listenerRef = createRef<HTMLDivElement>();
+    const clickAwayChild: ReactElement = (
+      <div data-testid="click-away-root">
+        <button type="button">Inside target</button>
+      </div>
+    );
 
     render(
       <div>
@@ -143,14 +149,14 @@ describe('library layout and utilities', () => {
         <div role="dialog" aria-label="Other dialog">
           <button type="button">Inside other dialog</button>
         </div>
-        <ClickAwayListener onClickAway={onClickAway}>
-          <div>
-            <button type="button">Inside target</button>
-          </div>
+        <ClickAwayListener ref={listenerRef} onClickAway={onClickAway}>
+          {clickAwayChild}
         </ClickAwayListener>
         <FocusTrapHarness />
       </div>
     );
+
+    expect(listenerRef.current).toBe(screen.getByTestId('click-away-root'));
 
     await user.click(screen.getByRole('button', { name: 'Inside target' }));
     expect(onClickAway).not.toHaveBeenCalled();

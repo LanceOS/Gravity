@@ -1,5 +1,6 @@
 import React from 'react';
 import { type ColumnConfig } from '../datagrid';
+import { getCellValue, renderCellValue } from '../datagrid/renderCellValue';
 
 export interface TableProps<T> {
   columns: ColumnConfig<T>[];
@@ -25,7 +26,7 @@ export function Table<T>({ columns, data, style }: TableProps<T>) {
             <tr key={rIdx} style={{ borderBottom: rIdx < data.length - 1 ? '1px solid var(--color-border-default)' : 'none' }}>
               {columns.map((col, cIdx) => (
                 <td key={cIdx} style={{ padding: '10px 12px', color: 'var(--color-text-primary)' }}>
-                  {col.render ? col.render(row) : (row[col.key as keyof T] as any)}
+                  {col.render ? col.render(row) : renderCellValue(getCellValue(row, col.key))}
                 </td>
               ))}
             </tr>

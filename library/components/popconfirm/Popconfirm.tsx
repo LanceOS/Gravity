@@ -1,7 +1,4 @@
 import React from 'react';
-import { X, AlertCircle, Info, CheckCircle2, AlertTriangle } from 'lucide-react';
-import { Portal } from '../../utilities';
-import { FocusTrap } from '../../utilities';
 import { ClickAwayListener } from '../../utilities';
 
 export interface PopconfirmProps {
@@ -11,17 +8,27 @@ export interface PopconfirmProps {
   style?: React.CSSProperties;
 }
 
-export function Popconfirm({ title, onConfirm, children, style }: PopconfirmProps) {
+interface ClickableTriggerProps {
+  onClick?: React.MouseEventHandler<Element>;
+}
+
+export const Popconfirm = React.forwardRef<HTMLDivElement, PopconfirmProps>(function Popconfirm(
+  { title, onConfirm, children, style },
+  ref,
+) {
   const [isOpen, setIsOpen] = React.useState(false);
+  // The public trigger contract remains broad; only its optional click handler
+  // is composed when cloning the element.
+  const trigger = children as React.ReactElement<ClickableTriggerProps>;
 
   return (
     <ClickAwayListener onClickAway={() => setIsOpen(false)}>
-      <div style={{ position: 'relative', display: 'inline-block' }}>
-        {React.cloneElement(children as React.ReactElement<any>, {
-          onClick: (e: React.MouseEvent) => {
-            e.preventDefault();
-            setIsOpen(!isOpen);
-            (children.props as any).onClick?.(e);
+      <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
+        {React.cloneElement(trigger, {
+          onClick: (event: React.MouseEvent<Element>) => {
+            event.preventDefault();
+            setIsOpen((wasOpen) => !wasOpen);
+            trigger.props.onClick?.(event);
           },
         })}
         {isOpen && (
@@ -72,4 +79,6 @@ export function Popconfirm({ title, onConfirm, children, style }: PopconfirmProp
       </div>
     </ClickAwayListener>
   );
-}
+});
+
+Popconfirm.displayName = 'Popconfirm';

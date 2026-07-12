@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { createRef, type ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import {
   Alert,
@@ -138,11 +139,13 @@ describe('library feedback components', () => {
   it('handles confirm, tooltip, and popover interactions', async () => {
     const user = userEvent.setup();
     const onConfirm = vi.fn();
+    const popconfirmRef = createRef<HTMLDivElement>();
+    const popconfirmChild: ReactElement = <button type="button">Delete</button>;
 
     render(
       <div>
-        <Popconfirm title="Delete item?" onConfirm={onConfirm}>
-          <button type="button">Delete</button>
+        <Popconfirm ref={popconfirmRef} title="Delete item?" onConfirm={onConfirm}>
+          {popconfirmChild}
         </Popconfirm>
         <Tooltip content="Helpful tip">
           <button type="button">Help</button>
@@ -152,6 +155,8 @@ describe('library feedback components', () => {
         </Popover>
       </div>
     );
+
+    expect(popconfirmRef.current).toBeInstanceOf(HTMLDivElement);
 
     await user.click(screen.getByRole('button', { name: 'Delete' }));
     expect(screen.getByText('Delete item?')).toBeInTheDocument();

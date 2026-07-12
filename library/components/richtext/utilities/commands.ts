@@ -43,7 +43,15 @@ export function isMarkActive(state: EditorState, markName: string) {
   return state.doc.rangeHasMark(from, to, markType);
 }
 
-export function inlineMarkInputRule(regexp: RegExp, markType: MarkType, delimiterLength: number, getAttrs?: any): InputRule {
+type InlineMarkAttrs = Record<string, unknown>;
+type GetInlineMarkAttrs = InlineMarkAttrs | ((match: RegExpMatchArray) => InlineMarkAttrs | null);
+
+export function inlineMarkInputRule(
+  regexp: RegExp,
+  markType: MarkType,
+  delimiterLength: number,
+  getAttrs?: GetInlineMarkAttrs,
+): InputRule {
   return new InputRule(regexp, (state, match, start, end) => {
     const attrs = getAttrs instanceof Function ? getAttrs(match) : getAttrs;
     const { tr } = state;

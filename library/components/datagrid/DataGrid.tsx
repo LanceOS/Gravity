@@ -1,5 +1,6 @@
 import React from 'react';
 import { User, ChevronLeft, ChevronRight, Folder, File, ChevronDown } from 'lucide-react';
+import { getCellValue, renderCellValue } from './renderCellValue';
 
 export interface ColumnConfig<T> {
   key: keyof T | string;
@@ -126,7 +127,7 @@ export function DataGrid<T>({ columns, data, rowHeight = 36, height = 360, style
           >
             {columns.map((col, cIdx) => (
               <div key={cIdx} style={{ flex: 1, padding: '0 12px', width: col.width, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--color-text-primary)' }}>
-                {col.render ? col.render(row.item) : (row.item[col.key as keyof T] as any)}
+                {col.render ? col.render(row.item) : renderCellValue(getCellValue(row.item, col.key))}
               </div>
             ))}
           </div>
