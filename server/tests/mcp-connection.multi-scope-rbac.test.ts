@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { api, createAuthenticatedApi, seedWorkspaceFixture } from './helpers/test-helpers.js';
+import { and, eq } from 'drizzle-orm';
+import { api, createAuthenticatedApi, seedUser, seedWorkspaceFixture } from './helpers/test-helpers.js';
+import { db } from '../src/db/index.js';
+import { workspaceMembers } from '../src/db/schema.js';
+import { createConnectionToken } from '../src/modules/mcp/connection.js';
+import { invalidateWorkspaceMembershipCache } from '../src/modules/workspaces/services/membership.js';
 
 describe('MCP token multi-use, scopes, and RBAC', () => {
   it('allows multi-use tokens when singleUse=false', async () => {
@@ -98,5 +103,62 @@ describe('MCP token multi-use, scopes, and RBAC', () => {
     const revokeRes = await otherApi.post(`/api/v1/workspaces/${workspace.id}/mcp/connection/${tokenId}/revoke`).send({});
     expect(revokeRes.status).toBe(403);
     expect(revokeRes.body).toEqual({ error: 'Access denied: not a member of the workspace.' });
+  });
+
+  it('rejects a valid token whose issuer is no longer a workspace member', async () => {
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Stale Issuer Owner',
+      email: 'stale-owner@example.com',
+      role: 'owner',
+      avatarUrl: 'https://example.com/owner.png',
+    });
+    const owner = ownerApi.user;
+    const { workspace } = await seedWorkspaceFixture({
+      owner: { id: owner.id, name: owner.name, email: owner.email, role: owner.role, avatarUrl: owner.avatar },
+    });
+
+    // A non-owner member mints a token, then loses workspace membership. A
+    // non-owner is required because the membership check treats the workspace
+    // creator as an implicit owner regardless of the workspace_members table.
+    const member = await seedUser({
+      id: 'stale-member-1',
+      name: 'Stale Member',
+      email: 'stale-member@example.com',
+      role: 'guest_contributor',
+      avatarUrl: 'https://example.com/member.png',
+    });
+    await db.insert(workspaceMembers).values({
+      workspaceId: workspace.id,
+      userId: member.id,
+      role: 'member',
+      provisionedByValidationId: null,
+      createdAt: new Date(),
+    });
+
+    // Multi-use token so the issuer removal (not single-use consumption) is the
+    // only thing that could cause a rejection.
+    const token = await createConnectionToken({
+      workspaceId: workspace.id,
+      generatedBy: member.id,
+      scopes: ['tools/list'],
+      singleUse: false,
+    });
+
+    // Remove the issuer from the workspace after the token was minted.
+    await db
+      .delete(workspaceMembers)
+      .where(and(eq(workspaceMembers.workspaceId, workspace.id), eq(workspaceMembers.userId, member.id)));
+    await invalidateWorkspaceMembershipCache(workspace.id, member.id);
+
+    const res = await api()
+      .post('/api/v1/mcp/sse')
+      .set('Authorization', `Bearer ${token.rawToken}`)
+      .set('X-Workspace-Id', workspace.id)
+      .send({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} });
+
+    // A 403 (not 401) proves the token verified successfully and was rejected
+    // solely because its issuer is no longer a workspace member.
+    expect(res.status).toBe(403);
+    expect(res.body).toEqual({ error: 'Unauthorized workspace access.' });
   });
 });
