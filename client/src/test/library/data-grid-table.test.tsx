@@ -2,6 +2,7 @@ import { render, screen, within } from '@testing-library/react';
 import { createPortal } from 'react-dom';
 import { describe, expect, it } from 'vitest';
 import { DataGrid, Table } from '@library';
+import { getCellValue } from '@library/components/datagrid/renderCellValue';
 
 class GetterRow {
   private readonly value: string;
@@ -28,6 +29,11 @@ describe('DataGrid and Table cell rendering', () => {
     );
 
     expect(screen.getAllByText('Getter-backed cell')).toHaveLength(2);
+  });
+
+  it('ignores built-in prototype members for dynamic keys', () => {
+    expect(getCellValue({ label: 'Plain row' }, 'toString')).toBeUndefined();
+    expect(getCellValue(() => undefined, 'bind')).toBeUndefined();
   });
 
   it('renders iterable ReactNode cell values', () => {

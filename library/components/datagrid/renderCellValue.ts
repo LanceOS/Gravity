@@ -7,13 +7,27 @@ function isPropertyBag(value: unknown): value is PropertyBag {
   return (typeof value === 'object' && value !== null) || typeof value === 'function';
 }
 
+function hasColumnKey(row: PropertyBag, key: PropertyKey): boolean {
+  let current: object | null = row;
+
+  while (current !== null && current !== Object.prototype && current !== Function.prototype) {
+    if (Object.hasOwn(current, key)) {
+      return true;
+    }
+
+    current = Object.getPrototypeOf(current);
+  }
+
+  return false;
+}
+
 /**
  * Reads a property from an arbitrary row without assuming it has an index
- * signature. This preserves normal JavaScript property access, including
- * getters declared on a row's prototype.
+ * signature. Own keys and custom prototype getters are supported, while
+ * built-in prototype members are ignored for dynamically supplied keys.
  */
 export function getCellValue(row: unknown, key: PropertyKey): unknown {
-  if (!isPropertyBag(row) || !(key in row)) {
+  if (!isPropertyBag(row) || !hasColumnKey(row, key)) {
     return undefined;
   }
 
