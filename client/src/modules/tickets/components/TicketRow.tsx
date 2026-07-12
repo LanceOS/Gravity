@@ -6,6 +6,7 @@ import { TicketRelationIndicators } from './TicketRelationIndicators';
 import { TicketStatusBadge } from './TicketStatusBadge';
 import { getPriorityIcon } from '../../../utils/ticketPresentation';
 import { formatTicketDate } from '../utils/ticketDateFormatter';
+import { safeExternalLinkProps } from '@library';
 import './TicketRow.css';
 
 type TicketLabelList = TicketRowProps['ticket']['labels'];
@@ -98,9 +99,7 @@ function TicketRowImpl({
 
       {ticket.prStatus !== 'none' ? (
         <a
-          href={ticket.prUrl || '#'}
-          target="_blank"
-          rel="noreferrer"
+          {...safeExternalLinkProps(ticket.prUrl, '#')}
           onClick={(event) => event.stopPropagation()}
           className="ticket-row-pr"
           style={{

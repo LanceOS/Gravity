@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isSafeHref, sanitizeHtml } from '@library';
+import { isSafeHref, sanitizeHtml, safeExternalLinkProps, SAFE_EXTERNAL_LINK_REL } from '@library';
 
 // Re-parse sanitized output into a live DOM subtree. Several XSS classes
 // (mutation XSS, HTML-entity smuggling) only reveal themselves once the
@@ -443,5 +443,45 @@ describe('isSafeHref', () => {
     expect(isSafeHref('')).toBe(false);
     expect(isSafeHref(null as unknown as string)).toBe(false);
     expect(isSafeHref(undefined as unknown as string)).toBe(false);
+  });
+});
+
+describe('safeExternalLinkProps', () => {
+  it('forces target="_blank" and rel="noopener noreferrer" on every link', () => {
+    expect(SAFE_EXTERNAL_LINK_REL).toBe('noopener noreferrer');
+    const props = safeExternalLinkProps('https://example.com');
+    expect(props.target).toBe('_blank');
+    expect(props.rel).toBe('noopener noreferrer');
+  });
+
+  it('passes through safe http, https, and mailto URLs unchanged', () => {
+    expect(safeExternalLinkProps('https://example.com/docs').href).toBe('https://example.com/docs');
+    expect(safeExternalLinkProps('http://example.com').href).toBe('http://example.com');
+    expect(safeExternalLinkProps('mailto:someone@example.com').href).toBe('mailto:someone@example.com');
+  });
+
+  it('passes through relative and fragment URLs unchanged', () => {
+    expect(safeExternalLinkProps('/internal/path').href).toBe('/internal/path');
+    expect(safeExternalLinkProps('#section').href).toBe('#section');
+  });
+
+  it('replaces dangerous schemes with the fallback href', () => {
+    expect(safeExternalLinkProps('javascript:alert(1)').href).toBe('about:blank');
+    expect(safeExternalLinkProps('data:text/html,<script>alert(1)</script>').href).toBe('about:blank');
+    expect(safeExternalLinkProps('vbscript:msgbox(1)').href).toBe('about:blank');
+    expect(safeExternalLinkProps('  JavaScript:alert(1)').href).toBe('about:blank');
+  });
+
+  it('uses about:blank for empty, null, and undefined hrefs by default', () => {
+    expect(safeExternalLinkProps('').href).toBe('about:blank');
+    expect(safeExternalLinkProps(null).href).toBe('about:blank');
+    expect(safeExternalLinkProps(undefined).href).toBe('about:blank');
+  });
+
+  it('honors a caller-supplied fallback for unsafe or missing hrefs', () => {
+    expect(safeExternalLinkProps('javascript:alert(1)', '#').href).toBe('#');
+    expect(safeExternalLinkProps(undefined, '#').href).toBe('#');
+    // A safe href is still returned even when a fallback is provided.
+    expect(safeExternalLinkProps('https://example.com', '#').href).toBe('https://example.com');
   });
 });
