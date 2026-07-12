@@ -164,7 +164,7 @@ export const SAFE_EXTERNAL_LINK_REL = REQUIRED_SAFE_REL_TOKENS.join(' ');
 export interface SafeExternalLinkProps {
   readonly href: string;
   readonly target: '_blank';
-  readonly rel: typeof SAFE_EXTERNAL_LINK_REL;
+  readonly rel: string;
 }
 
 /**
@@ -175,6 +175,11 @@ export interface SafeExternalLinkProps {
  * path: unsafe schemes (javascript:, data:, vbscript:, ...) fall back to
  * `fallbackHref`, the link opens in a new tab, and `rel` is forced to
  * `noopener noreferrer`.
+ *
+ * `href` is treated as untrusted and validated through `isSafeHref`.
+ * `fallbackHref` is NOT validated - it is used verbatim when `href` is unsafe or
+ * missing, so callers must pass a trusted, known-safe constant (e.g. the default
+ * `about:blank`, or `'#'`), never user-derived input.
  */
 export function safeExternalLinkProps(
   href: string | null | undefined,
