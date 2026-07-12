@@ -1,9 +1,9 @@
 import React from 'react';
 
-type RefForwardingChild = React.ReactElement<React.RefAttributes<HTMLElement>>;
+type RefForwardingChild = React.ReactElement<React.RefAttributes<Element>>;
 
 export interface ClickAwayListenerProps {
-  children: RefForwardingChild;
+  children: React.ReactElement;
   onClickAway: (event: MouseEvent | TouchEvent) => void;
   active?: boolean;
 }
@@ -19,11 +19,14 @@ function assignRef<T>(ref: React.Ref<T> | undefined, node: T | null): (() => voi
   return undefined;
 }
 
-export const ClickAwayListener = React.forwardRef<HTMLElement, ClickAwayListenerProps>(function ClickAwayListener(
+export const ClickAwayListener = React.forwardRef<Element, ClickAwayListenerProps>(function ClickAwayListener(
   { children, onClickAway, active = true },
   forwardedRef,
 ) {
-  const childRef = React.useRef<HTMLElement | null>(null);
+  // Keep the established broad child contract while limiting the clone boundary
+  // to the optional ref shape it needs to compose.
+  const child = children as RefForwardingChild;
+  const childRef = React.useRef<Element | null>(null);
 
   React.useEffect(() => {
     if (!active) return;
@@ -58,16 +61,16 @@ export const ClickAwayListener = React.forwardRef<HTMLElement, ClickAwayListener
   }, [onClickAway, active]);
 
   const setChildRef = React.useCallback(
-    (node: HTMLElement | null) => {
+    (node: Element | null) => {
       childRef.current = node;
 
       if (node === null) {
-        assignRef(children.props.ref, node);
+        assignRef(child.props.ref, node);
         assignRef(forwardedRef, node);
         return;
       }
 
-      const childRefCleanup = assignRef(children.props.ref, node);
+      const childRefCleanup = assignRef(child.props.ref, node);
       const forwardedRefCleanup = assignRef(forwardedRef, node);
 
       return () => {
@@ -76,7 +79,7 @@ export const ClickAwayListener = React.forwardRef<HTMLElement, ClickAwayListener
         if (childRefCleanup) {
           childRefCleanup();
         } else {
-          assignRef(children.props.ref, null);
+          assignRef(child.props.ref, null);
         }
 
         if (forwardedRefCleanup) {
@@ -86,10 +89,10 @@ export const ClickAwayListener = React.forwardRef<HTMLElement, ClickAwayListener
         }
       };
     },
-    [children.props.ref, forwardedRef],
+    [child.props.ref, forwardedRef],
   );
 
-  return React.cloneElement(children, {
+  return React.cloneElement(child, {
     ref: setChildRef,
   });
 });

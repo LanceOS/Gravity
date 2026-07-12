@@ -4,12 +4,12 @@ import { ClickAwayListener } from '../../utilities';
 export interface PopconfirmProps {
   title: string;
   onConfirm: () => void;
-  children: React.ReactElement<ClickableTriggerProps>;
+  children: React.ReactElement;
   style?: React.CSSProperties;
 }
 
 interface ClickableTriggerProps {
-  onClick?: React.MouseEventHandler<HTMLElement>;
+  onClick?: React.MouseEventHandler<Element>;
 }
 
 export const Popconfirm = React.forwardRef<HTMLDivElement, PopconfirmProps>(function Popconfirm(
@@ -17,15 +17,18 @@ export const Popconfirm = React.forwardRef<HTMLDivElement, PopconfirmProps>(func
   ref,
 ) {
   const [isOpen, setIsOpen] = React.useState(false);
+  // The public trigger contract remains broad; only its optional click handler
+  // is composed when cloning the element.
+  const trigger = children as React.ReactElement<ClickableTriggerProps>;
 
   return (
     <ClickAwayListener onClickAway={() => setIsOpen(false)}>
       <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
-        {React.cloneElement(children, {
-          onClick: (event: React.MouseEvent<HTMLElement>) => {
+        {React.cloneElement(trigger, {
+          onClick: (event: React.MouseEvent<Element>) => {
             event.preventDefault();
             setIsOpen((wasOpen) => !wasOpen);
-            children.props.onClick?.(event);
+            trigger.props.onClick?.(event);
           },
         })}
         {isOpen && (
