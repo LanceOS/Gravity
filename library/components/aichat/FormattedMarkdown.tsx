@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { CheckSquare, Square, Clipboard, Check } from 'lucide-react';
-import { isSafeHref } from '../../utilities/sanitize';
+import { safeExternalLinkProps } from '../../utilities/sanitize';
 
 export interface FormattedMarkdownProps {
   text: string;
@@ -118,13 +118,10 @@ function InlineFormattedText({ text, customTokenRegex, renderCustomToken, toneSt
         </code>,
       );
     } else if (match[5] && match[6]) {
-      const safeHref = isSafeHref(match[6]) ? match[6] : 'about:blank';
       parts.push(
         <a
           key={keyIndex++}
-          href={safeHref}
-          target="_blank"
-          rel="noopener noreferrer"
+          {...safeExternalLinkProps(match[6])}
           style={{ color: toneStyles.accent, textDecoration: 'underline', textDecorationColor: 'currentColor' }}
           className="clickable"
         >

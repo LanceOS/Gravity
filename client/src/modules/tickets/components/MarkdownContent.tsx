@@ -6,7 +6,7 @@ import { useActiveProject } from '../../../context/project/ActiveProjectContext'
 import { useProjectContext } from '../../../context/project/ProjectContext';
 import { useTicketByKey } from '../../../hooks/useTicketByKey';
 import { getStatusColor } from '../utils/TicketDetail';
-import { renderRichTextHtml, isSafeHref } from '@library';
+import { renderRichTextHtml, isSafeHref, safeExternalLinkProps } from '@library';
 
 /**
  * @description A component that renders an interactive ticket link for a given ticket key.
@@ -247,13 +247,10 @@ function renderNode(
         </pre>
       );
     case 'a': {
-      const href = getSafeUrlAttribute(element, 'href', 'about:blank');
       return (
         <a
           key={keyPrefix}
-          href={href}
-          target="_blank"
-          rel="noreferrer"
+          {...safeExternalLinkProps(element.getAttribute('href'))}
           style={{ color: 'var(--color-primary)', textDecoration: 'none' }}
           className="clickable"
         >

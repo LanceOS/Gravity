@@ -5,7 +5,8 @@ import DOMPurify from 'dompurify';
  * for what HTML survives sanitization anywhere in the app (rich text paste,
  * rendered rich text, markdown-derived links, AI output, etc). Do not call
  * DOMPurify directly outside this file - route all sanitization through
- * `sanitizeHtml` / `isSafeHref` so the policy stays in one auditable place.
+ * `sanitizeHtml` / `isSafeHref` / `safeExternalLinkProps` so the policy stays
+ * in one auditable place.
  */
 export interface SanitizeHtmlConfig {
   /** Explicit tag allowlist. Anything not listed here is stripped. */
@@ -151,4 +152,37 @@ export function isSafeHref(href: string): boolean {
 
   const normalized = href.replace(/[\s\t\r\n]/g, '');
   return DOMPurify.isValidAttribute('a', 'href', normalized);
+}
+
+/**
+ * The `rel` value forced onto every external link. `noreferrer` alone implies
+ * `noopener` in modern browsers, but we set both tokens explicitly so the policy
+ * is unambiguous and matches what `sanitizeHtml` writes on the HTML-string path.
+ */
+export const SAFE_EXTERNAL_LINK_REL = REQUIRED_SAFE_REL_TOKENS.join(' ');
+
+export interface SafeExternalLinkProps {
+  readonly href: string;
+  readonly target: '_blank';
+  readonly rel: typeof SAFE_EXTERNAL_LINK_REL;
+}
+
+/**
+ * Build the href/target/rel props for rendering an untrusted URL as an external
+ * link in React (the JSX render path). This is the single source of truth for
+ * link safety when we render anchors as React elements rather than sanitized
+ * HTML, and it mirrors the policy `sanitizeHtml` enforces on the HTML-string
+ * path: unsafe schemes (javascript:, data:, vbscript:, ...) fall back to
+ * `fallbackHref`, the link opens in a new tab, and `rel` is forced to
+ * `noopener noreferrer`.
+ */
+export function safeExternalLinkProps(
+  href: string | null | undefined,
+  fallbackHref = 'about:blank',
+): SafeExternalLinkProps {
+  return {
+    href: href && isSafeHref(href) ? href : fallbackHref,
+    target: '_blank',
+    rel: SAFE_EXTERNAL_LINK_REL,
+  };
 }

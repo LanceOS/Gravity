@@ -5,6 +5,7 @@ import type { User, Project, Cycle, Label } from '../../../../../types/domain';
 import {
   Select,
   Popover,
+  safeExternalLinkProps,
 } from '@library';
 import { GitPullRequest, GitMerge, Plus } from 'lucide-react';
 import TicketUtilities from '../../TicketUtilities/TicketUtilities';
@@ -245,9 +246,7 @@ export const TicketPropertiesGrid: React.FC<TicketPropertiesGridProps> = ({
         {activeTicket.prStatus !== 'none' ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '6px' }}>
             <a
-              href={activeTicket.prUrl || '#'}
-              target="_blank"
-              rel="noreferrer"
+              {...safeExternalLinkProps(activeTicket.prUrl, '#')}
               style={{
                 display: 'flex',
                 alignItems: 'center',
