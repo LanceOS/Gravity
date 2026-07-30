@@ -19,7 +19,7 @@ describe('SidebarNavigation', () => {
   });
 
   it('collapses nested sidebar content', () => {
-    const { container } = render(
+    const { container, rerender } = render(
       <SidebarNavigation.Collapse collapsed>
         <SidebarNavigation.SubItems>
           <SidebarNavigation.Empty>No projects</SidebarNavigation.Empty>
@@ -28,6 +28,30 @@ describe('SidebarNavigation', () => {
     );
 
     expect(container.firstChild).toHaveClass('sidebar-navigation__collapse--collapsed');
+    expect(container.firstChild).toHaveAttribute('aria-hidden', 'true');
     expect(screen.getByText('No projects')).not.toBeVisible();
+
+    rerender(
+      <SidebarNavigation.Collapse collapsed={false}>
+        <SidebarNavigation.SubItems>
+          <SidebarNavigation.Empty>No projects</SidebarNavigation.Empty>
+        </SidebarNavigation.SubItems>
+      </SidebarNavigation.Collapse>
+    );
+
+    expect(container.firstChild).not.toHaveClass('sidebar-navigation__collapse--collapsed');
+    expect(container.firstChild).toHaveAttribute('aria-hidden', 'false');
+    expect(screen.getByText('No projects')).toBeVisible();
+
+    rerender(
+      <SidebarNavigation.Collapse collapsed>
+        <SidebarNavigation.SubItems>
+          <SidebarNavigation.Empty>No projects</SidebarNavigation.Empty>
+        </SidebarNavigation.SubItems>
+      </SidebarNavigation.Collapse>
+    );
+
+    expect(container.firstChild).toHaveClass('sidebar-navigation__collapse--collapsed');
+    expect(container.firstChild).toHaveAttribute('aria-hidden', 'true');
   });
 });
