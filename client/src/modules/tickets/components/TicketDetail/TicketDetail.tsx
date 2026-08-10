@@ -16,71 +16,7 @@ import { TicketPropertiesGrid } from './components/TicketPropertiesGrid';
 import { TicketSubtasksChecklist } from './components/TicketSubtasksChecklist';
 import { TicketCommentsThread } from './components/TicketCommentsThread';
 import type { TicketWithRelations } from '../../utils/ticketRelations';
-
-const DEFAULT_TICKET_URL_BASE = 'https://tickets.placeholder.local';
-
-const RAW_ALLOWED_TICKET_HOSTS = (typeof import.meta !== 'undefined' && (import.meta as unknown as { env?: Record<string, string | undefined> }).env?.VITE_ALLOWED_TICKET_HOSTS) || undefined;
-
-function parseAllowedHosts(raw?: string): string[] {
-  if (!raw) return [new URL(DEFAULT_TICKET_URL_BASE).hostname];
-  return raw.split(',').map((s: string) => s.trim()).filter(Boolean);
-}
-
-const ALLOWED_TICKET_HOSTS = parseAllowedHosts(RAW_ALLOWED_TICKET_HOSTS);
-
-/**
- * Determine whether a parsed URL matches any allowlist entry.
- * Supported allowlist entry formats:
- *  - exact hostname: example.com
- *  - wildcard subdomain: *.example.com  (matches a.example.com but not example.com)
- *  - host with port: example.com:8080
- *  - '*' to allow any host (not recommended)
- */
-function isHostAllowed(url: URL, allowed: string[]): boolean {
-  const hostname = url.hostname.toLowerCase();
-  const hostWithPort = url.host.toLowerCase();
-
-  for (const rawEntry of allowed) {
-    const entry = rawEntry.toLowerCase();
-    if (!entry) continue;
-    if (entry === '*') return true;
-
-    // Explicit host:port match
-    if (entry.includes(':')) {
-      if (hostWithPort === entry) return true;
-      continue;
-    }
-
-    // Wildcard subdomain match: *.example.com matches api.example.com
-    if (entry.startsWith('*.')) {
-      const root = entry.slice(2);
-      if (!root) continue;
-      if (hostname === root) continue; // do not match root domain for wildcard
-      if (hostname.endsWith('.' + root)) return true;
-      continue;
-    }
-
-    // Exact hostname match
-    if (hostname === entry) return true;
-  }
-
-  return false;
-}
-
-function sanitizeTicketUrlBase(raw?: string): string {
-  if (!raw) return DEFAULT_TICKET_URL_BASE;
-  if (raw.startsWith('/')) return raw.replace(/\/$/, '');
-  try {
-    const url = new URL(raw);
-    if (url.protocol !== 'https:') return DEFAULT_TICKET_URL_BASE;
-    if (!isHostAllowed(url, ALLOWED_TICKET_HOSTS)) return DEFAULT_TICKET_URL_BASE;
-    return url.origin.replace(/\/$/, '');
-  } catch {
-    return DEFAULT_TICKET_URL_BASE;
-  }
-}
-
-const TICKET_URL_BASE = sanitizeTicketUrlBase((typeof import.meta !== 'undefined' && (import.meta as unknown as { env?: Record<string, string | undefined> }).env?.VITE_TICKET_URL_BASE) || undefined);
+import { buildTicketUrl, parseAllowedTicketHosts, sanitizeTicketUrlBase } from '../../utils/ticketUrl';
 import {
   Trash2, Plus, ChevronLeft, CornerLeftUp, Send
 } from 'lucide-react';
@@ -91,6 +27,12 @@ import { ConfirmDialog } from '../../../../components/ConfirmDialog';
 import { useIsMobileTicketLayout } from '../useMobileTicketLayout';
 import { CommentEditor } from '../CommentEditor/CommentEditor';
 import './TicketDetail.css';
+
+const CLIENT_ENV = typeof import.meta !== 'undefined'
+  ? (import.meta as unknown as { env?: Record<string, string | undefined> }).env
+  : undefined;
+const ALLOWED_TICKET_HOSTS = parseAllowedTicketHosts(CLIENT_ENV?.VITE_ALLOWED_TICKET_HOSTS);
+const TICKET_URL_BASE = sanitizeTicketUrlBase(CLIENT_ENV?.VITE_TICKET_URL_BASE, ALLOWED_TICKET_HOSTS);
 
 function TicketDescriptionEditor({ 
   initialDescription, 
@@ -265,7 +207,10 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
     });
   }, [onClose]);
 
-  const ticketLink = useMemo(() => customTicketLink || `${TICKET_URL_BASE}/${activeTicket.key}`, [customTicketLink, activeTicket.key]);
+  const ticketLink = useMemo(
+    () => customTicketLink || buildTicketUrl(TICKET_URL_BASE, activeTicket.key),
+    [customTicketLink, activeTicket.key],
+  );
 
   const generatedBranchName = useMemo(
     () => (activeTicket.branchName ? activeTicket.branchName : generateBranchName(activeTicket.key, activeTicket.title)),

@@ -9,10 +9,11 @@ This document explains two environment variables used by the client to build tic
 
 Supported `VITE_ALLOWED_TICKET_HOSTS` entry formats:
 
-* Exact host: `example.com` — matches `example.com`.
-* Wildcard subdomain: `*.example.com` — matches `api.example.com`, `tools.api.example.com`, etc. Does not match the root `example.com` unless `example.com` is also provided explicitly.
+* Exact host: `example.com` — matches `example.com` on the default HTTPS port.
+* Wildcard subdomain: `*.example.com` — matches `api.example.com`, `tools.api.example.com`, etc. on the default HTTPS port. Does not match the root `example.com` unless `example.com` is also provided explicitly.
 * Host with port: `example.com:8080` — matches that specific host and port pair.
-* Wildcard all: `*` — allows any host (not recommended).
+
+`*` is intentionally not supported because it disables the external-host restriction.
 
 Examples:
 
@@ -21,7 +22,6 @@ VITE_ALLOWED_TICKET_HOSTS=example.com,\*.example.com,tickets.example.com:8080
 Security guidance
 
 * Set both variables at build/deploy time under your CI/CD (do not accept user input for these values at runtime).
-* Prefer explicit hostnames or specific wildcard subdomains over `*`.
-* If you use a relative `VITE_TICKET_URL_BASE` (starting with `/`), you do not need allowlist entries.
-
+* Prefer explicit hostnames; use a specific wildcard subdomain only when needed.
+* If you use a relative `VITE_TICKET_URL_BASE` (starting with a single `/`), you do not need allowlist entries. Protocol-relative (`//host`) and backslash-based paths are rejected.
 
