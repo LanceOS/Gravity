@@ -48,4 +48,40 @@ describe('logger redaction and trace propagation', () => {
     const logged = JSON.parse(infoSpy.mock.calls[0][0]);
     expect(logged.traceId).toBe('header-id');
   });
+
+  it('marks security failures as alertable errors and redacts sensitive context', () => {
+    const delivered = logger.securityAlert('security.service_token_refresh_failed', {
+      failureReason: 'configured_token_file_unreadable',
+      token: 'supersecret',
+    });
+
+    expect(delivered).toBe(true);
+    expect(errorSpy).toHaveBeenCalledOnce();
+    const logged = JSON.parse(errorSpy.mock.calls[0][0]);
+    expect(logged.level).toBe('error');
+    expect(logged.message).toBe('security.service_token_refresh_failed');
+    expect(logged.securityAlert).toBe(true);
+    expect(logged.failureReason).toBe('configured_token_file_unreadable');
+    expect(logged.token).toBe('[REDACTED]');
+  });
+
+  it('uses a non-sensitive stderr fallback when the primary alert sink fails', () => {
+    errorSpy.mockImplementationOnce(() => {
+      throw new Error('primary alert sink unavailable');
+    });
+    const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+
+    const delivered = logger.securityAlert('security.service_token_refresh_failed', {
+      failureReason: 'configured_token_file_unreadable',
+      token: 'supersecret',
+    });
+
+    expect(delivered).toBe(true);
+    expect(stderrSpy).toHaveBeenCalledOnce();
+    const fallback = String(stderrSpy.mock.calls[0][0]);
+    expect(fallback).toContain('security.service_token_refresh_failed');
+    expect(fallback).toContain('configured_token_file_unreadable');
+    expect(fallback).not.toContain('supersecret');
+    expect(fallback).toContain('[REDACTED]');
+  });
 });

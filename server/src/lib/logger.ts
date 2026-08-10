@@ -76,7 +76,7 @@ function extractTraceId(data?: Record<string, unknown>): string | undefined {
   return undefined;
 }
 
-function baseLog(level: string, messageOrEvent: string, data?: Record<string, unknown>, isAudit = false) {
+function serializeLog(level: string, messageOrEvent: string, data?: Record<string, unknown>, isAudit = false): string {
   const ts = new Date().toISOString();
   const rawData = data || {};
 
@@ -89,10 +89,16 @@ function baseLog(level: string, messageOrEvent: string, data?: Record<string, un
   if (traceId) log.traceId = traceId;
   Object.assign(log, redacted);
 
+  return JSON.stringify(log);
+}
+
+function baseLog(level: string, messageOrEvent: string, data?: Record<string, unknown>, isAudit = false) {
+  const serialized = serializeLog(level, messageOrEvent, data, isAudit);
+
   // eslint-disable-next-line no-console
-  if (level === 'error') console.error(JSON.stringify(log));
-  else if (level === 'warn') console.warn(JSON.stringify(log));
-  else console.info(JSON.stringify(log));
+  if (level === 'error') console.error(serialized);
+  else if (level === 'warn') console.warn(serialized);
+  else console.info(serialized);
 }
 
 export function audit(event: string, data: Record<string, unknown> = {}) {
@@ -111,4 +117,41 @@ export function error(message: string, data?: Record<string, unknown>) {
   baseLog('error', message, data, false);
 }
 
-export default { audit, info, warn, error };
+/**
+ * Emits a structured error intended for security monitoring and alerting.
+ * Callers must supply only non-sensitive diagnostic context; all fields are
+ * still passed through the standard redaction policy before they are emitted.
+ */
+export function securityAlert(event: string, data: Record<string, unknown> = {}): boolean {
+  let serialized: string;
+  try {
+    serialized = serializeLog('error', event, { ...data, securityAlert: true }, false);
+  } catch {
+    // If sanitization or serialization itself fails, omit all caller data.
+    serialized = JSON.stringify({
+      ts: new Date().toISOString(),
+      level: 'error',
+      message: 'security_alert_serialization_failed',
+      securityAlert: true,
+      failedSecurityEvent: event,
+    });
+  }
+
+  try {
+    // eslint-disable-next-line no-console
+    console.error(serialized);
+    return true;
+  } catch {
+    // Keep security-critical operations independent from the primary logging
+    // sink. The serialized payload has already passed through redaction; if
+    // that failed, it contains only the minimal fallback assembled above.
+    try {
+      process.stderr.write(`${serialized}\n`);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
+export default { audit, info, warn, error, securityAlert };
