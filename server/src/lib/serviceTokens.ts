@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { env } from '../env.js';
+import { securityAlert } from './logger.js';
 
 // Runtime abstraction for trusted service tokens with a simple placeholder
 // 'secrets manager' implementation. Current behavior:
@@ -12,15 +13,42 @@ import { env } from '../env.js';
 
 let cachedTokens: string[] = Array.isArray(env.trustedServiceTokens) ? env.trustedServiceTokens : [];
 let refreshInterval: NodeJS.Timeout | null = null;
+type RefreshFailureReason =
+  | 'configured_token_file_invalid_json'
+  | 'configured_token_file_missing'
+  | 'configured_token_file_empty'
+  | 'configured_token_file_unreadable';
+let lastRefreshFailureReason: RefreshFailureReason | null = null;
 
-function parseTokens(raw: string): string[] {
+function reportRefreshFailure(failureReason: RefreshFailureReason): void {
+  if (lastRefreshFailureReason === failureReason) return;
+
+  const delivered = securityAlert('security.service_token_refresh_failed', {
+    failureReason,
+    source: 'trusted_service_tokens_file',
+  });
+  if (delivered) lastRefreshFailureReason = failureReason;
+}
+
+function clearRefreshFailure(): void {
+  lastRefreshFailureReason = null;
+}
+
+function parseTokens(raw: string): string[] | null {
   const t = String(raw ?? '').trim();
   if (!t) return [];
-  try {
-    const maybeJson = JSON.parse(t);
-    if (Array.isArray(maybeJson)) return maybeJson.map(String).map((s) => s.trim()).filter(Boolean);
-  } catch (e) {
-    // ignore JSON parse errors and fall back to line/comma parsing
+
+  // Only attempt JSON parsing for the documented JSON-array format. This
+  // avoids treating normal comma/newline configurations as parse failures.
+  if (t.startsWith('[')) {
+    try {
+      const maybeJson = JSON.parse(t);
+      if (Array.isArray(maybeJson)) return maybeJson.map(String).map((s) => s.trim()).filter(Boolean);
+      return [];
+    } catch {
+      reportRefreshFailure('configured_token_file_invalid_json');
+      return null;
+    }
   }
 
   return t.split(/\r?\n|,/).map((s) => s.trim()).filter(Boolean);
@@ -36,28 +64,33 @@ export function setTrustedServiceTokens(tokens: string[]) {
 
 export async function refreshFromSecretManager(): Promise<void> {
   // Priority: file (if configured) -> env list
-  try {
-    if (env.trustedServiceTokensFile) {
+  if (env.trustedServiceTokensFile) {
+    const filePath = env.trustedServiceTokensFile;
+    if (!existsSync(filePath)) {
+      reportRefreshFailure('configured_token_file_missing');
+    } else {
       try {
-        const filePath = env.trustedServiceTokensFile;
-        if (existsSync(filePath)) {
-          const content = await fs.readFile(filePath, 'utf8');
-          const tokens = parseTokens(content);
-          if (tokens.length > 0) {
-            setTrustedServiceTokens(tokens);
-            return;
-          }
+        const content = await fs.readFile(filePath, 'utf8');
+        const tokens = parseTokens(content);
+        if (tokens && tokens.length > 0) {
+          setTrustedServiceTokens(tokens);
+          clearRefreshFailure();
+          return;
         }
-      } catch (err) {
-        // if file read fails, fall back to env below
+
+        if (tokens !== null) {
+          reportRefreshFailure('configured_token_file_empty');
+        }
+      } catch {
+        reportRefreshFailure('configured_token_file_unreadable');
       }
     }
-
-    // Fallback to env-provided tokens
-    setTrustedServiceTokens(Array.isArray(env.trustedServiceTokens) ? env.trustedServiceTokens : []);
-  } catch (e) {
-    // best-effort: swallow errors
   }
+
+  // Preserve the existing fallback when no usable file-backed configuration is
+  // available, while making that security-relevant condition observable above.
+  setTrustedServiceTokens(Array.isArray(env.trustedServiceTokens) ? env.trustedServiceTokens : []);
+  if (!env.trustedServiceTokensFile) clearRefreshFailure();
 }
 
 export function startAutoRefresh(intervalMs?: number) {

@@ -4,7 +4,7 @@ import { db } from '../../db/index.js';
 import { mcpConnectionTokens } from '../../db/schema.js';
 import { createId } from '../../lib/platform.js';
 import { env } from '../../env.js';
-import { audit } from '../../lib/logger.js';
+import { audit, securityAlert } from '../../lib/logger.js';
 
 const DEFAULT_MCP_SCOPES = ['tools/list'];
 
@@ -27,6 +27,22 @@ type ConnectionTokenPayload = {
   singleUse: boolean;
   connectionType: string;
 };
+
+function auditConnectionTokenEvent(event: string, data: Record<string, unknown>): void {
+  try {
+    audit(event, data);
+  } catch {
+    // Do not include the caught error: logging sinks can include sensitive
+    // configuration in their error text. The stable reason is sufficient for
+    // alert routing and correlation with the operation below.
+    securityAlert('security.audit_log_failed', {
+      failureReason: 'audit_sink_unavailable',
+      failedAuditEvent: event,
+      mcpConnectionId: typeof data.id === 'string' ? data.id : undefined,
+      workspaceId: typeof data.workspaceId === 'string' ? data.workspaceId : undefined,
+    });
+  }
+}
 
 export async function createConnectionToken(opts: CreateOptions): Promise<ConnectionTokenPayload> {
   const id = createId('mct');
@@ -57,23 +73,19 @@ export async function createConnectionToken(opts: CreateOptions): Promise<Connec
   });
 
   // Audit: token created (do not include raw token)
-  try {
-    const masked = `${raw.slice(0, 8)}...${raw.slice(-4)}`;
-    audit('mcp.token.created', {
-      id,
-      workspaceId: opts.workspaceId,
-      generatedBy: opts.generatedBy,
-      scopes: normalizedScopes,
-      singleUse: opts.singleUse !== undefined ? opts.singleUse : true,
-      connectionType: opts.connectionType ?? 'http-post',
-      sourceIp: opts.sourceIp ?? null,
-      expiresAt: expiresAt.toISOString(),
-      hmacKeyId,
-      maskedToken: masked,
-    });
-  } catch (e) {
-    // best-effort logging
-  }
+  const masked = `${raw.slice(0, 8)}...${raw.slice(-4)}`;
+  auditConnectionTokenEvent('mcp.token.created', {
+    id,
+    workspaceId: opts.workspaceId,
+    generatedBy: opts.generatedBy,
+    scopes: normalizedScopes,
+    singleUse: opts.singleUse !== undefined ? opts.singleUse : true,
+    connectionType: opts.connectionType ?? 'http-post',
+    sourceIp: opts.sourceIp ?? null,
+    expiresAt: expiresAt.toISOString(),
+    hmacKeyId,
+    maskedToken: masked,
+  });
 
   return {
     id,
@@ -94,22 +106,22 @@ export async function revokeConnectionToken(tokenId: string, requestingUserId: s
   try {
     const realtime = await import('../../realtime.js');
     disconnectedCount = await realtime.disconnectSseConnectionsByToken(tokenId);
-  } catch (err) {
-    // best-effort
-  }
-  try {
-    audit('mcp.token.revoked', {
-      id: tokenId,
+  } catch {
+    securityAlert('security.connection_disconnect_failed', {
+      failureReason: 'revoked_token_sse_disconnect_failed',
+      mcpConnectionId: tokenId,
       workspaceId: tokenRow?.workspaceId ?? null,
-      generatedBy: tokenRow?.generatedBy ?? null,
-      revokedBy: requestingUserId,
-      connectionType: tokenRow?.connectionType ?? null,
-      scopes: tokenRow?.scopes ?? null,
-      disconnectedSseConnections: disconnectedCount,
     });
-  } catch (e) {
-    // best-effort
   }
+  auditConnectionTokenEvent('mcp.token.revoked', {
+    id: tokenId,
+    workspaceId: tokenRow?.workspaceId ?? null,
+    generatedBy: tokenRow?.generatedBy ?? null,
+    revokedBy: requestingUserId,
+    connectionType: tokenRow?.connectionType ?? null,
+    scopes: tokenRow?.scopes ?? null,
+    disconnectedSseConnections: disconnectedCount,
+  });
 }
 
 export async function refreshConnectionToken(
@@ -139,22 +151,18 @@ export async function refreshConnectionToken(
   }).where(eq(mcpConnectionTokens.id, tokenId));
 
   // Audit: token refreshed
-  try {
-    const masked = `${raw.slice(0, 8)}...${raw.slice(-4)}`;
-    audit('mcp.token.refreshed', {
-      id: row.id,
-      workspaceId: row.workspaceId,
-      generatedBy: row.generatedBy,
-      scopes: row.scopes,
-      singleUse: row.singleUse,
-      connectionType: row.connectionType,
-      sourceIp: opts.sourceIp ?? row.sourceIp,
-      expiresAt: expiresAt.toISOString(),
-      maskedToken: masked,
-    });
-  } catch (e) {
-    // best-effort
-  }
+  const masked = `${raw.slice(0, 8)}...${raw.slice(-4)}`;
+  auditConnectionTokenEvent('mcp.token.refreshed', {
+    id: row.id,
+    workspaceId: row.workspaceId,
+    generatedBy: row.generatedBy,
+    scopes: row.scopes,
+    singleUse: row.singleUse,
+    connectionType: row.connectionType,
+    sourceIp: opts.sourceIp ?? row.sourceIp,
+    expiresAt: expiresAt.toISOString(),
+    maskedToken: masked,
+  });
 
   return {
     id: row.id,
@@ -290,17 +298,13 @@ export async function verifyAndConsumeToken(rawToken: string, workspaceId: strin
   if (!rowOrUpdated) return null;
 
   // Audit: token consumed (do not log raw token)
-  try {
-    audit('mcp.token.consumed', {
-      id: rowOrUpdated.id,
-      workspaceId: rowOrUpdated.workspaceId,
-      generatedBy: rowOrUpdated.generatedBy,
-      scopes: rowOrUpdated.scopes,
-      connectionType: rowOrUpdated.connectionType,
-    });
-  } catch (e) {
-    // best-effort
-  }
+  auditConnectionTokenEvent('mcp.token.consumed', {
+    id: rowOrUpdated.id,
+    workspaceId: rowOrUpdated.workspaceId,
+    generatedBy: rowOrUpdated.generatedBy,
+    scopes: rowOrUpdated.scopes,
+    connectionType: rowOrUpdated.connectionType,
+  });
 
   return {
     id: rowOrUpdated.id,

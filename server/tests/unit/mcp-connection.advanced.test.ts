@@ -12,6 +12,7 @@ describe('MCP connection advanced flows', () => {
     // Keep env clean between tests that mutate it and ensure DB schema
     delete process.env.BETTER_AUTH_SECRET;
     delete process.env.BETTER_AUTH_OLD_SECRETS;
+    vi.restoreAllMocks();
     await resetTestApp();
   });
 
@@ -113,6 +114,73 @@ describe('MCP connection advanced flows', () => {
     // Wrong IP should be rejected
     const bad = await conn.verifyAndConsumeToken(rawToken, workspace.id, { sourceIp: '5.6.7.8' });
     expect(bad).toBeNull();
+  });
+
+  it('emits a security alert when a connection-token audit write fails', async () => {
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Audit Failure Owner',
+      email: `audit-failure-owner+${Date.now()}@example.com`,
+      role: 'owner',
+    });
+    const owner = ownerApi.user;
+    const { workspace } = await seedWorkspaceFixture({
+      owner: { id: owner.id, name: owner.name, email: owner.email, role: owner.role, avatarUrl: owner.avatar },
+    });
+    const auditSinkSpy = vi.spyOn(console, 'info').mockImplementation(() => {
+      throw new Error('audit sink unavailable');
+    });
+    const alertSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const conn = await import('../../src/modules/mcp/connection.js');
+
+    const payload = await conn.createConnectionToken({ workspaceId: workspace.id, generatedBy: owner.id });
+
+    expect(payload).toBeTruthy();
+    expect(auditSinkSpy).toHaveBeenCalledOnce();
+    expect(alertSpy).toHaveBeenCalledOnce();
+    const alert = JSON.parse(alertSpy.mock.calls[0][0]);
+    expect(alert).toMatchObject({
+      level: 'error',
+      message: 'security.audit_log_failed',
+      securityAlert: true,
+      failureReason: 'audit_sink_unavailable',
+      failedAuditEvent: 'mcp.token.created',
+      mcpConnectionId: payload.id,
+      workspaceId: workspace.id,
+    });
+  });
+
+  it('does not fail token creation when all audit alert sinks fail', async () => {
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Audit Outage Owner',
+      email: `audit-outage-owner+${Date.now()}@example.com`,
+      role: 'owner',
+    });
+    const owner = ownerApi.user;
+    const { workspace } = await seedWorkspaceFixture({
+      owner: { id: owner.id, name: owner.name, email: owner.email, role: owner.role, avatarUrl: owner.avatar },
+    });
+    vi.spyOn(console, 'info').mockImplementationOnce(() => {
+      throw new Error('audit sink unavailable');
+    });
+    vi.spyOn(console, 'error').mockImplementationOnce(() => {
+      throw new Error('primary alert sink unavailable');
+    });
+    vi.spyOn(process.stderr, 'write').mockImplementationOnce(() => {
+      throw new Error('fallback alert sink unavailable');
+    });
+    const conn = await import('../../src/modules/mcp/connection.js');
+
+    const payload = await conn.createConnectionToken({ workspaceId: workspace.id, generatedBy: owner.id });
+
+    expect(payload.rawToken).toBeTruthy();
+    const { db: currentDb } = await import('../../src/db/index.js');
+    const { mcpConnectionTokens: currentMcpConnectionTokens } = await import('../../src/db/schema.js');
+    const rows = await currentDb
+      .select()
+      .from(currentMcpConnectionTokens)
+      .where(eq(currentMcpConnectionTokens.id, payload.id))
+      .limit(1);
+    expect(rows[0]?.status).toBe('active');
   });
 });
 
