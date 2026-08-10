@@ -6,9 +6,13 @@ import { ThemeProvider as AppThemeProvider } from '../../context/theme/ThemeCont
 import { ThemeProvider as SettingsThemeProvider } from '../../modules/settings';
 import { WorkspaceShellPage } from '../../pages/WorkspaceShellPage/WorkspaceShellPage.tsx';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import '../../../public/theme-bootstrap.js';
+
+declare global {
+  interface Window {
+    gravityBootstrapTheme: () => void;
+  }
+}
 
 const mocks = vi.hoisted(() => ({
   useAuth: vi.fn(),
@@ -377,22 +381,6 @@ function buildWorkspaceSettings(overrides: Partial<Record<string, unknown>> = {}
   };
 }
 
-const themeBootstrapScript = (() => {
-  const html = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../../../index.html'), 'utf8');
-  const scriptCandidates = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((match) => match[1]);
-  const scriptMatch = scriptCandidates.find(
-    (scriptContent) => scriptContent.includes('readThemePreference') || scriptContent.includes('gravity_active_view')
-  );
-  if (!scriptMatch) {
-    throw new Error('Unable to locate inline bootstrap script in client/index.html.');
-  }
-  return scriptMatch;
-})();
-
-function runThemeBootstrapScript() {
-  return new Function(themeBootstrapScript)();
-}
-
 function renderAppShell() {
   mocks.useWorkspaceDirectory.mockReturnValue(buildWorkspaceDirectory());
   mocks.useAccountSettings.mockReturnValue(buildAccountSettings());
@@ -543,7 +531,7 @@ describe('AppShellPage theme integration', () => {
     window.localStorage.setItem('gravity_theme', 'dark');
     window.localStorage.setItem('gravity_active_view', 'list');
 
-    runThemeBootstrapScript();
+    window.gravityBootstrapTheme();
 
     expect(document.documentElement).toHaveClass('dark-theme');
     expect(document.documentElement).toHaveAttribute('data-theme', 'dark');

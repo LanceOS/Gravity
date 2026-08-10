@@ -6,7 +6,7 @@ import { useActiveProject } from '../../../context/project/ActiveProjectContext'
 import { useProjectContext } from '../../../context/project/ProjectContext';
 import { useTicketByKey } from '../../../hooks/useTicketByKey';
 import { getStatusColor } from '../utils/TicketDetail';
-import { renderRichTextHtml, isSafeHref, safeExternalLinkProps } from '@library';
+import { renderRichTextHtml, isSafeHref, safeExternalLinkProps, sanitizeTrustedHtml } from '@library';
 
 /**
  * @description A component that renders an interactive ticket link for a given ticket key.
@@ -301,7 +301,9 @@ export function MarkdownContent({ text }: MarkdownTextProps) {
     }
 
     const template = document.createElement('template');
-    template.innerHTML = html;
+    // TypeScript's DOM declarations still type innerHTML as `string`, while
+    // browsers accept the TrustedHTML value produced by the sanitizer.
+    template.innerHTML = sanitizeTrustedHtml(html) as unknown as string;
 
     return Array.from(template.content.childNodes).flatMap((node, index) => {
       const renderedNode = renderNode(node, ticketRegex, `richtext-${index}`, false);

@@ -109,21 +109,6 @@ export function AIChatWindow({
       ref={windowRef}
       style={getWindowStyle(variant, isMobile, isClosing)}
     >
-      <style>{`
-        @keyframes chat-generating-pulse {
-          0%, 100% { transform: scale(1) rotate(0deg); }
-          35% { transform: scale(1.08) rotate(-6deg); }
-          70% { transform: scale(0.96) rotate(4deg); }
-        }
-        @keyframes chat-generating-twinkle {
-          0%, 100% { opacity: 0.45; transform: scale(0.85) rotate(0deg); }
-          50% { opacity: 1; transform: scale(1.18) rotate(12deg); }
-        }
-        @keyframes chat-generating-halo {
-          0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-primary) 18%, transparent); }
-          50% { box-shadow: 0 0 0 8px color-mix(in srgb, var(--color-primary) 0%, transparent); }
-        }
-      `}</style>
       <div
         style={{
           padding: '14px 16px',

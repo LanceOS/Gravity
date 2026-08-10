@@ -8,7 +8,7 @@ import { baseKeymap, chainCommands, createParagraphNear, liftEmptyBlock, splitBl
 import { liftListItem, sinkListItem, splitListItemKeepMarks } from 'prosemirror-schema-list';
 
 import { parseRichTextValue, richTextSchema, serializeRichTextJson } from '../../../utilities/richtext';
-import { sanitizeHtml } from '../../../utilities/sanitize';
+import { sanitizeTrustedHtml } from '../../../utilities/sanitize';
 import { cn } from '../../../utilities/cn';
 import { buildInputRules, toggleHeading, toggleBlockQuote, toggleList, toggleCodeBlock } from '../utilities/commands';
 import { placeholderPlugin } from '../plugins/placeholder';
@@ -165,12 +165,15 @@ export function useRichTextEditor({
           const html = event.clipboardData?.getData('text/html');
           if (!html) return false;
 
-          const sanitized = sanitizeHtml(html);
-          if (!sanitized.trim()) return false;
+          const sanitized = sanitizeTrustedHtml(html);
+          if (!String(sanitized).trim()) return false;
 
           event.preventDefault();
           const container = document.createElement('div');
-          container.innerHTML = sanitized;
+          // TypeScript's DOM declarations still type innerHTML as `string`,
+          // while browsers accept the TrustedHTML returned above. Preserve the
+          // runtime TrustedHTML value so CSP enforcement can verify this sink.
+          container.innerHTML = sanitized as unknown as string;
           const slice = ProseMirrorDOMParser.fromSchema(richTextSchema).parseSlice(container);
           viewInstance.dispatch(viewInstance.state.tr.replaceSelection(slice).scrollIntoView());
           return true;
