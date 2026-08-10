@@ -68,6 +68,30 @@ describe('SidebarProjectsSection', () => {
     expect(projectButton.querySelector('.sidebar-item__icon .sidebar-navigation__item-icon')).toBeInTheDocument();
   });
 
+  it('selects only the Projects tab on the flat workspace projects route', () => {
+    const props = makeProps({
+      section: {
+        ...makeProps().section,
+        navigationState: {
+          activeTeam: '',
+          activeScope: 'workspace-projects',
+          activeProject: '',
+        },
+        onSelectWorkspaceAllTasks: vi.fn(),
+        onSelectWorkspaceProjects: vi.fn(),
+      },
+    });
+
+    render(
+      // @ts-expect-error narrow props for test
+      <SidebarProjectsSection {...props} />
+    );
+
+    expect(screen.getByRole('button', { name: 'Projects' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('button', { name: 'All Tasks' })).not.toHaveAttribute('aria-current');
+    expect(screen.getByRole('button', { name: /Proj 1/i })).not.toHaveAttribute('aria-current');
+  });
+
   it('renders teams as primary navigation with scoped tabs and collapsible projects', async () => {
     const user = userEvent.setup();
     const onSelectWorkspaceAllTasks = vi.fn();

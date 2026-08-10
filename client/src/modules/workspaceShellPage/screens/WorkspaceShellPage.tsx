@@ -725,17 +725,7 @@ export function WorkspaceShellPage() {
       sidebarActiveTeamId: resolvedSidebarActiveTeamId,
       sidebarNavigationState: {
         activeTeam: resolvedSidebarActiveTeamId,
-        activeScope: route.teamIdParam
-            ? route.projectIdParam
-              ? 'projects'
-              : route.cycleIdParam
-                ? 'cycles'
-                : route.activeLabelIdParam
-                  ? 'labels'
-                  : 'views'
-            : route.projectIdParam
-            ? 'projects'
-            : 'workspace',
+        activeScope: sidebarActiveScope,
         activeProject:
           activeSection === 'projects' || activeSection === 'team-projects' || activeSection === 'workspace'
             ? (projectIdParam || activeProjectId)
@@ -749,10 +739,9 @@ export function WorkspaceShellPage() {
     activeWorkspace?.hierarchyMode,
     activeWorkspace?.memberRole,
     projectIdParam,
-    route.activeLabelIdParam,
-    route.cycleIdParam,
     route.projectIdParam,
     route.teamIdParam,
+    sidebarActiveScope,
     sidebarTeamIdByProjectId,
     sidebarTree?.hierarchyMode,
   ]);

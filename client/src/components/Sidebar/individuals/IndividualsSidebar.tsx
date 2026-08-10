@@ -103,7 +103,7 @@ export function IndividualsSidebar(props: IndividualsSidebarProps) {
       >
         <SidebarNavigation.List>
           {section.projects.map((project) => {
-            const isActiveProject = project.id === section.activeProjectId;
+            const isActiveProject = activeScope === 'projects' && project.id === section.activeProjectId;
             const isCollapsed = getProjectCollapsedState(collapsedProjects, project.id, section.activeProjectId);
             const isProjectExpanded = !isCollapsed;
             const isProjectIssueRoute = isActiveProject && showProjectIssues;
