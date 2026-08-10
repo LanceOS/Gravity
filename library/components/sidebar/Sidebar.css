@@ -128,7 +128,6 @@
   padding-left: var(--space-2);
 }
 
-.sidebar--collapsed .sidebar-group-label,
 .sidebar--collapsed .sidebar-item__content,
 .sidebar--collapsed .sidebar-item__right {
   position: absolute;
@@ -140,6 +139,10 @@
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+.sidebar--collapsed .sidebar-group-label {
+  display: none;
 }
 
 .sidebar--collapsed .sidebar-item {

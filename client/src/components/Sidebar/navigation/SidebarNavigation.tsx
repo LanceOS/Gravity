@@ -103,15 +103,15 @@ function SidebarNavigationBranch({ children }: SidebarNavigationBranchProps): JS
 
 function SidebarNavigationItemLabel({ icon, children }: SidebarNavigationItemLabelProps): JSX.Element {
   return (
-    <div className="sidebar-navigation__item-label">
+    <span className="sidebar-navigation__item-label">
       {icon}
       <span className="sidebar-navigation__item-label-text">{children}</span>
-    </div>
+    </span>
   );
 }
 
 function SidebarNavigationItemIcon({ children }: SidebarNavigationItemIconProps): JSX.Element {
-  return <div className="sidebar-navigation__item-icon">{children}</div>;
+  return <span className="sidebar-navigation__item-icon">{children}</span>;
 }
 
 function SidebarNavigationCollapse({ collapsed, children }: SidebarNavigationCollapseProps): JSX.Element {

@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { Sidebar as LibSidebar } from '@library';
 import { SidebarProjectsSection } from '../../components/Sidebar/components/SidebarProjectsSection.tsx';
 
 function makeProps(overrides = {}) {
@@ -51,6 +52,20 @@ describe('SidebarProjectsSection', () => {
     await user.click(screen.getByRole('button', { name: /Label One/i }));
 
     expect(props.section.onSelectLabel).toHaveBeenCalledWith('project-1', 'd-1');
+  });
+
+  it('keeps each flat-workspace project icon visible in compact mode', () => {
+    const props = makeProps();
+
+    render(
+      <LibSidebar className="sidebar--collapsed">
+        {/* @ts-expect-error narrow props for test */}
+        <SidebarProjectsSection {...props} />
+      </LibSidebar>
+    );
+
+    const projectButton = screen.getByRole('button', { name: /Proj 1/i });
+    expect(projectButton.querySelector('.sidebar-item__icon .sidebar-navigation__item-icon')).toBeInTheDocument();
   });
 
   it('renders teams as primary navigation with scoped tabs and collapsible projects', async () => {

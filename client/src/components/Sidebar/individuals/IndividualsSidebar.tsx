@@ -129,11 +129,14 @@ export function IndividualsSidebar(props: IndividualsSidebarProps) {
                   onClick={() => {
                     toggleProject(project.id);
                   }}
-                  leftIcon={isProjectExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                  leftIcon={(
+                    <SidebarNavigation.ItemIcon>
+                      {isProjectExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                      <Database size={14} />
+                    </SidebarNavigation.ItemIcon>
+                  )}
                 >
-                  <SidebarNavigation.ItemLabel icon={<Database size={14} />}>
-                    {project.name}
-                  </SidebarNavigation.ItemLabel>
+                  <SidebarNavigation.ItemLabel>{project.name}</SidebarNavigation.ItemLabel>
                 </SidebarNavigation.Item>
 
                 <SidebarNavigation.Collapse collapsed={!isProjectExpanded}>
