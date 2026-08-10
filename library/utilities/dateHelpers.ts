@@ -1,9 +1,25 @@
-export function getDaysInMonth(year: number, month: number) {
-  return new Date(year, month + 1, 0).getDate();
+/**
+ * Returns the number of days in a Gregorian calendar month.
+ *
+ * `month` uses JavaScript's zero-based month convention (`0` for January
+ * through `11` for December). The calculation uses UTC so it is unaffected by
+ * the runtime time zone or locale.
+ */
+export function getDaysInMonth(year: number, month: number): number {
+  return new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
 }
 
-export function getFirstDayOfMonth(year: number, month: number) {
-  return new Date(year, month, 1).getDay();
+/**
+ * Returns the weekday of the first day in a Gregorian calendar month.
+ *
+ * `month` uses JavaScript's zero-based month convention (`0` for January
+ * through `11` for December). The returned index is fixed at `0` for Sunday
+ * through `6` for Saturday to match this library's Sunday-first calendar
+ * grids; it is not locale-specific. The calculation uses UTC so it is
+ * unaffected by the runtime time zone.
+ */
+export function getFirstDayOfMonth(year: number, month: number): number {
+  return new Date(Date.UTC(year, month, 1)).getUTCDay();
 }
 
 /**
