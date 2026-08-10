@@ -18,6 +18,20 @@ describe('SidebarNavigation', () => {
     expect(screen.getByRole('button', { name: /Gravity/i })).toHaveAttribute('title', 'Gravity');
   });
 
+  it('does not infer page semantics from visual active state', () => {
+    const { rerender } = render(
+      <SidebarNavigation.Item active>Gravity</SidebarNavigation.Item>
+    );
+
+    expect(screen.getByRole('button', { name: 'Gravity' })).not.toHaveAttribute('aria-current');
+
+    rerender(
+      <SidebarNavigation.Item active aria-current="page">Gravity</SidebarNavigation.Item>
+    );
+
+    expect(screen.getByRole('button', { name: 'Gravity' })).toHaveAttribute('aria-current', 'page');
+  });
+
   it('collapses nested sidebar content', () => {
     const { container, rerender } = render(
       <SidebarNavigation.Collapse collapsed>

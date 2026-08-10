@@ -73,6 +73,7 @@ export function TeamsSidebar(props: TeamsSidebarProps) {
         {section.onSelectWorkspaceAllTasks ? (
           <SidebarNavigation.Item
             active={activeScope === 'workspace'}
+            aria-current={activeScope === 'workspace' ? 'page' : undefined}
             onClick={section.onSelectWorkspaceAllTasks}
             leftIcon={<FolderTree size={13} />}
           >
@@ -82,6 +83,7 @@ export function TeamsSidebar(props: TeamsSidebarProps) {
         {section.onSelectWorkspaceProjects ? (
           <SidebarNavigation.Item
             active={activeScope === 'workspace-projects'}
+            aria-current={activeScope === 'workspace-projects' ? 'page' : undefined}
             onClick={section.onSelectWorkspaceProjects}
             leftIcon={<Database size={13} />}
           >
@@ -125,6 +127,7 @@ export function TeamsSidebar(props: TeamsSidebarProps) {
                   isTeamActive &&
                   (activeScope !== 'projects' || teamCollapsed || projectsCollapsed || (activeScope === 'projects' && !activeProjectId))
                 }
+                aria-expanded={!teamCollapsed}
                 onClick={() => toggleTeam(team.id)}
                 leftIcon={
                   <SidebarNavigation.ItemIcon>
@@ -144,6 +147,7 @@ export function TeamsSidebar(props: TeamsSidebarProps) {
                         key={view.id}
                         nested
                         active={isTeamActive && activeScope === 'views' && activeViewId === view.id}
+                        aria-current={isTeamActive && activeScope === 'views' && activeViewId === view.id ? 'page' : undefined}
                         onClick={() => {
                           if (view.id === 'all') {
                             section.onSelectAllTasks?.(team.id);
@@ -166,6 +170,7 @@ export function TeamsSidebar(props: TeamsSidebarProps) {
                           key={cycle.id}
                           nested
                           active={isTeamActive && activeScope === 'cycles' && section.activeCycleId === cycle.id}
+                          aria-current={isTeamActive && activeScope === 'cycles' && section.activeCycleId === cycle.id ? 'page' : undefined}
                           onClick={() => section.onSelectCycle?.(team.id, cycle.id)}
                           leftIcon={<CheckCircle size={13} color={cycle.completed ? 'var(--color-text-disabled)' : 'var(--color-primary)'} />}
                         >
@@ -188,6 +193,7 @@ export function TeamsSidebar(props: TeamsSidebarProps) {
                           key={label.id}
                           nested
                           active={isTeamActive && activeScope === 'labels' && section.activeLabelId === label.id}
+                          aria-current={isTeamActive && activeScope === 'labels' && section.activeLabelId === label.id ? 'page' : undefined}
                           onClick={() => section.onSelectTeamLabel?.(team.id, label.id)}
                           leftIcon={<SidebarNavigation.Dot color={label.color} />}
                         >
@@ -217,6 +223,7 @@ export function TeamsSidebar(props: TeamsSidebarProps) {
                             key={project.id}
                             nested
                             active={isTeamActive && activeScope === 'projects' && project.id === activeProjectId}
+                            aria-current={isTeamActive && activeScope === 'projects' && project.id === activeProjectId ? 'page' : undefined}
                             onClick={() => section.onSelectProject(project.id)}
                             leftIcon={<Database size={13} />}
                           >

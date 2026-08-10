@@ -92,6 +92,29 @@ describe('SidebarProjectsSection', () => {
     expect(screen.getByRole('button', { name: /Proj 1/i })).not.toHaveAttribute('aria-current');
   });
 
+  it('exposes multi-select labels as pressed filters instead of current pages', () => {
+    const props = makeProps({
+      section: {
+        ...makeProps().section,
+        filters: {
+          ...makeProps().section.filters,
+          labels: ['d-1', 'd-2'],
+        },
+      },
+    });
+
+    render(
+      // @ts-expect-error narrow props for test
+      <SidebarProjectsSection {...props} />
+    );
+
+    for (const label of ['Label One', 'Label Two']) {
+      const button = screen.getByRole('button', { name: new RegExp(label, 'i') });
+      expect(button).toHaveAttribute('aria-pressed', 'true');
+      expect(button).not.toHaveAttribute('aria-current');
+    }
+  });
+
   it('renders teams as primary navigation with scoped tabs and collapsible projects', async () => {
     const user = userEvent.setup();
     const onSelectWorkspaceAllTasks = vi.fn();

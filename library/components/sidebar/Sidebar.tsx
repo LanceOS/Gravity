@@ -114,7 +114,6 @@ export function SidebarItem({
         active ? 'sidebar-item--active' : undefined,
         className,
       )}
-      aria-current={active ? 'page' : undefined}
       {...props}
       type="button"
       title={title ?? (itemLabel || undefined)}
