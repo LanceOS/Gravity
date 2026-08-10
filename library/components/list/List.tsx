@@ -1,5 +1,4 @@
 import React from 'react';
-import { User, ChevronLeft, ChevronRight, Folder, File, ChevronDown } from 'lucide-react';
 import { cn } from '../../utilities';
 
 export interface ListProps {
