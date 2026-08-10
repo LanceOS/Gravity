@@ -49,7 +49,8 @@ const MAX_TICKETS_FOR_LIST_ANIMATION = 240;
 const VIRTUAL_LIST_THRESHOLD = 120;
 const LIST_DEFAULT_VIRTUAL_HEIGHT = 560;
 const STATUS_HEADER_ROW_HEIGHT = 34;
-const TICKET_LIST_ROW_HEIGHT = 82;
+const DESKTOP_TICKET_LIST_ROW_HEIGHT = 64;
+const MOBILE_TICKET_LIST_ROW_HEIGHT = 84;
 const STATUS_LOAD_MORE_ROW_HEIGHT = 44;
 const GLOBAL_LOAD_MORE_ROW_HEIGHT = 50;
 const EMPTY_STATE_ROW_HEIGHT = 180;
@@ -270,8 +271,8 @@ export const TicketList = React.memo(({
       return EMPTY_STATE_ROW_HEIGHT;
     }
 
-    return TICKET_LIST_ROW_HEIGHT;
-  }, []);
+    return isMobileTicketLayout ? MOBILE_TICKET_LIST_ROW_HEIGHT : DESKTOP_TICKET_LIST_ROW_HEIGHT;
+  }, [isMobileTicketLayout]);
 
   const renderVirtualRow = useCallback((item: TicketListItem, _index: number, style: React.CSSProperties) => {
     if (item.kind === 'status-header') {

@@ -28,6 +28,12 @@ type MockSelectProps = Omit<SelectHTMLAttributes<HTMLSelectElement>, 'onChange'>
   onValueChange: (value: string) => void;
 };
 
+type MockDenseVirtualListProps = {
+  items: unknown[];
+  rowHeight: number | ((item: unknown, index: number) => number);
+  renderRow: (item: unknown, index: number, style: CSSProperties) => ReactNode;
+};
+
 vi.mock('@library', () => ({
   Button: ({ children, ...props }: MockButtonProps) => {
     const buttonProps = { ...props };
@@ -44,6 +50,14 @@ vi.mock('@library', () => ({
         </option>
       ))}
     </select>
+  ),
+  DenseVirtualList: ({ items, rowHeight, renderRow }: MockDenseVirtualListProps) => (
+    <div data-testid="virtual-ticket-list">
+      {items.map((item, index) => {
+        const height = typeof rowHeight === 'function' ? rowHeight(item, index) : rowHeight;
+        return renderRow(item, index, { height: `${height}px` });
+      })}
+    </div>
   ),
 }));
 
@@ -152,5 +166,32 @@ describe('TicketList', () => {
 
     await user.click(screen.getByRole('button', { name: 'TicketRow GRA-1 avatar-1.png' }));
     expect(props.onSelectTicket).toHaveBeenCalledWith(backlogTicket);
+  });
+
+  it('uses the rendered desktop row pitch after loading enough tickets to virtualize', async () => {
+    const user = userEvent.setup();
+    const tickets = Array.from({ length: 120 }, (_, index) => ({
+      ...backlogTicket,
+      id: `ticket-${index + 1}`,
+      key: `GRA-${index + 1}`,
+    }));
+
+    renderTicketList({
+      filteredCount: tickets.length,
+      groupedTickets: {
+        backlog: tickets,
+        todo: [],
+        in_progress: [],
+        in_review: [],
+        done: [],
+        canceled: [],
+      },
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Load more 70 remaining' }));
+    await user.click(screen.getByRole('button', { name: 'Load more 20 remaining' }));
+
+    const firstTicketRow = screen.getByText('TicketRow GRA-1 avatar-1.png').closest('.ticket-list__row-desktop');
+    expect(firstTicketRow?.parentElement).toHaveStyle({ height: '64px' });
   });
 });
