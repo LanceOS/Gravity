@@ -1,8 +1,6 @@
-import { type ButtonHTMLAttributes, type JSX, type ReactNode, useRef, useEffect } from 'react';
+import { type ButtonHTMLAttributes, type JSX, type ReactNode } from 'react';
 import { SidebarGroup, SidebarItem, type SidebarGroupProps, type SidebarItemProps } from '@library';
 import './SidebarNavigation.css';
-import { safeAnime, prefersReducedMotion } from '../../../utils/animationUtils';
-import anime from 'animejs';
 
 interface SidebarNavigationRootProps {
   className?: string;
@@ -105,91 +103,21 @@ function SidebarNavigationBranch({ children }: SidebarNavigationBranchProps): JS
 
 function SidebarNavigationItemLabel({ icon, children }: SidebarNavigationItemLabelProps): JSX.Element {
   return (
-    <div className="sidebar-navigation__item-label">
+    <span className="sidebar-navigation__item-label">
       {icon}
       <span className="sidebar-navigation__item-label-text">{children}</span>
-    </div>
+    </span>
   );
 }
 
 function SidebarNavigationItemIcon({ children }: SidebarNavigationItemIconProps): JSX.Element {
-  return <div className="sidebar-navigation__item-icon">{children}</div>;
+  return <span className="sidebar-navigation__item-icon">{children}</span>;
 }
 
 function SidebarNavigationCollapse({ collapsed, children }: SidebarNavigationCollapseProps): JSX.Element {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const isFirstMount = useRef(true);
-  const isTransitionDisabled = prefersReducedMotion() || (typeof process !== 'undefined' && process.env.NODE_ENV === 'test');
-
-  useEffect(() => {
-    if (isTransitionDisabled) return;
-
-    const element = containerRef.current;
-    if (!element) return;
-
-    if (isFirstMount.current) {
-      isFirstMount.current = false;
-      if (collapsed) {
-        element.style.height = '0px';
-        element.style.opacity = '0';
-        element.style.pointerEvents = 'none';
-      } else {
-        element.style.height = 'auto';
-        element.style.opacity = '1';
-        element.style.pointerEvents = 'auto';
-      }
-      return;
-    }
-
-    if (collapsed) {
-      // Collapse
-      const currentHeight = element.scrollHeight;
-      element.style.height = `${currentHeight}px`;
-      element.style.pointerEvents = 'none';
-
-      safeAnime({
-        targets: element,
-        height: 0,
-        opacity: 0,
-        duration: 180,
-        easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
-        complete: () => {
-          element.style.height = '0px';
-        }
-      });
-    } else {
-      // Expand
-      element.style.height = '0px';
-      element.style.opacity = '0';
-      element.style.pointerEvents = 'auto';
-      const targetHeight = element.scrollHeight;
-
-      safeAnime({
-        targets: element,
-        height: targetHeight,
-        opacity: 1,
-        duration: 210,
-        easing: 'cubic-bezier(0.2, 0, 0.38, 1)',
-        complete: () => {
-          element.style.height = 'auto';
-        }
-      });
-    }
-  }, [collapsed, isTransitionDisabled]);
-
   return (
     <div
-      ref={containerRef}
-      className={joinClassNames(
-        'sidebar-navigation__collapse',
-        collapsed && 'sidebar-navigation__collapse--collapsed'
-      )}
-      style={isTransitionDisabled ? {
-        height: collapsed ? '0px' : 'auto',
-        opacity: collapsed ? 0 : 1,
-        pointerEvents: collapsed ? 'none' : 'auto',
-        overflow: 'hidden'
-      } : { overflow: 'hidden' }}
+      className={joinClassNames('sidebar-navigation__collapse', collapsed && 'sidebar-navigation__collapse--collapsed')}
       aria-hidden={collapsed}
     >
       <div className="sidebar-navigation__collapse-inner">
@@ -208,7 +136,11 @@ function SidebarNavigationEmpty({ children }: SidebarNavigationLabelProps): JSX.
 }
 
 function SidebarNavigationDot({ color }: SidebarNavigationDotProps): JSX.Element {
-  return <div className="sidebar-navigation__dot" style={{ background: color }} />;
+  return (
+    <svg className="sidebar-navigation__dot" viewBox="0 0 8 8" aria-hidden="true">
+      <circle cx="4" cy="4" r="4" fill={color} />
+    </svg>
+  );
 }
 
 function SidebarNavigationCompletedText({ children }: SidebarNavigationLabelProps): JSX.Element {

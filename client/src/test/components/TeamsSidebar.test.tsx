@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { Sidebar as LibSidebar } from '@library';
 import { TeamsSidebar } from '../../components/Sidebar/teams/TeamsSidebar.tsx';
 import type { SidebarProjectSection } from '../../components/Sidebar/types';
 
@@ -142,5 +143,22 @@ describe('TeamsSidebar', () => {
     await user.click(screen.getAllByRole('button', { name: 'Projects' })[0]);
 
     expect(onSelectWorkspaceProjects).toHaveBeenCalledTimes(1);
+  });
+
+  it('removes team header controls from the compact sidebar', () => {
+    render(
+      <LibSidebar className="sidebar--collapsed">
+        <TeamsSidebar
+          section={buildSection({ isWorkspaceOwner: true, onOpenTeamManager: vi.fn() })}
+          collapsedTeams={{}}
+          collapsedTeamProjects={{}}
+          onToggleTeam={vi.fn()}
+          onToggleTeamProjects={vi.fn()}
+        />
+      </LibSidebar>
+    );
+
+    expect(screen.getByRole('button', { name: 'Manage Teams', hidden: true })).not.toBeVisible();
+    expect(screen.getAllByRole('button', { name: 'Projects', hidden: true })[1]).not.toBeVisible();
   });
 });

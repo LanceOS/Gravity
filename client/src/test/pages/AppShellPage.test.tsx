@@ -34,6 +34,9 @@ type WorkspaceLayoutMockProps = {
       onSelectWorkspaceProjects?: () => void;
       onOpenCreateTeam?: () => void;
       counts?: any;
+      navigationState?: {
+        activeScope?: string;
+      };
     };
   };
   children?: ReactNode;
@@ -239,6 +242,9 @@ vi.mock('../../layouts/WorkspaceLayout/WorkspaceLayout', () => ({
           {JSON.stringify(sidebarProps.projects.counts.byProject)}
         </pre>
       ) : null}
+      <div data-testid="sidebar-active-scope">
+        {sidebarProps.projects?.navigationState?.activeScope}
+      </div>
       <button type="button" onClick={sidebarProps.userMenu.onOpenSettings}>
         Open settings
       </button>
@@ -1243,6 +1249,7 @@ describe('AppShellPage', () => {
     });
 
     expect(screen.getByTestId('location-display').textContent).toBe('/workspaces/workspace-1/projects/list');
+    expect(screen.getByTestId('sidebar-active-scope')).toHaveTextContent('workspace-projects');
   });
 
   it('keeps the latest selected AI chat history item when detail requests resolve out of order', async () => {

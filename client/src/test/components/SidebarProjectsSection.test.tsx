@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { Sidebar as LibSidebar } from '@library';
 import { SidebarProjectsSection } from '../../components/Sidebar/components/SidebarProjectsSection.tsx';
 
 function makeProps(overrides = {}) {
@@ -51,6 +52,67 @@ describe('SidebarProjectsSection', () => {
     await user.click(screen.getByRole('button', { name: /Label One/i }));
 
     expect(props.section.onSelectLabel).toHaveBeenCalledWith('project-1', 'd-1');
+  });
+
+  it('keeps each flat-workspace project icon visible in compact mode', () => {
+    const props = makeProps();
+
+    render(
+      <LibSidebar className="sidebar--collapsed">
+        {/* @ts-expect-error narrow props for test */}
+        <SidebarProjectsSection {...props} />
+      </LibSidebar>
+    );
+
+    const projectButton = screen.getByRole('button', { name: /Proj 1/i });
+    expect(projectButton.querySelector('.sidebar-item__icon .sidebar-navigation__item-icon')).toBeInTheDocument();
+  });
+
+  it('selects only the Projects tab on the flat workspace projects route', () => {
+    const props = makeProps({
+      section: {
+        ...makeProps().section,
+        navigationState: {
+          activeTeam: '',
+          activeScope: 'workspace-projects',
+          activeProject: '',
+        },
+        onSelectWorkspaceAllTasks: vi.fn(),
+        onSelectWorkspaceProjects: vi.fn(),
+      },
+    });
+
+    render(
+      // @ts-expect-error narrow props for test
+      <SidebarProjectsSection {...props} />
+    );
+
+    expect(screen.getByRole('button', { name: 'Projects' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('button', { name: 'All Tasks' })).not.toHaveAttribute('aria-current');
+    expect(screen.getByRole('button', { name: /Proj 1/i })).not.toHaveAttribute('aria-current');
+  });
+
+  it('exposes multi-select labels as pressed filters instead of current pages', () => {
+    const props = makeProps({
+      section: {
+        ...makeProps().section,
+        filters: {
+          ...makeProps().section.filters,
+          labels: ['d-1', 'd-2'],
+        },
+      },
+    });
+
+    render(
+      // @ts-expect-error narrow props for test
+      <SidebarProjectsSection {...props} />
+    );
+
+    for (const label of ['Label One', 'Label Two']) {
+      const button = screen.getByRole('button', { name: new RegExp(label, 'i') });
+      expect(button).toHaveAttribute('aria-pressed', 'true');
+      expect(button).not.toHaveAttribute('aria-current');
+    }
   });
 
   it('renders teams as primary navigation with scoped tabs and collapsible projects', async () => {

@@ -4,8 +4,13 @@ import { SidebarProjectsSection, SidebarUserMenu } from './components';
 import { SidebarProvider } from './context/SidebarContext';
 import { useSidebarViewModel } from './hooks/useSidebarViewModel';
 import type { SidebarProps } from './types';
+import './Sidebar.css';
 
-export function Sidebar({ projects, tools, userMenu }: SidebarProps) {
+interface SidebarComponentProps extends SidebarProps {
+  collapsed?: boolean;
+}
+
+export function Sidebar({ projects, tools, userMenu, collapsed = false }: SidebarComponentProps) {
   const sidebarViewModel = useSidebarViewModel(
     projects.activeProjectId,
     projects.activeTeamId ?? '',
@@ -21,18 +26,18 @@ export function Sidebar({ projects, tools, userMenu }: SidebarProps) {
     (projects.teams ?? []).some((t) => t.projects && t.projects.length > 0);
 
   return (
-    <LibSidebar>
+    <LibSidebar className={`app-sidebar${collapsed ? ' sidebar--collapsed' : ''}`}>
       {hasAnyProject ? (
         <SidebarHeader>
           <button
             type="button"
             onClick={tools.onOpenCreateTicket}
-            className="btn btn-primary clickable"
-            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '8px' }}
+            className="btn btn-primary sidebar-new-ticket"
+            title="New Ticket"
           >
             <Sparkles size={14} />
-            <span>New Ticket</span>
-            <span aria-hidden="true" style={{ fontSize: '10px', opacity: 0.6, marginLeft: 'auto', background: 'rgba(255,255,255,0.2)', padding: '1px 5px', borderRadius: '3px' }}>N</span>
+            <span className="sidebar-new-ticket__label">New Ticket</span>
+            <span aria-hidden="true" className="sidebar-new-ticket__shortcut">N</span>
           </button>
         </SidebarHeader>
       ) : null}

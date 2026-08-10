@@ -1,24 +1,34 @@
-import React, { CSSProperties } from 'react';
+import React from 'react';
 import './Sidebar.css';
 
 export interface SidebarProps extends React.HTMLAttributes<HTMLElement> {
   children: React.ReactNode;
 }
 
-export function Sidebar({ children, className, style, ...props }: SidebarProps) {
+function joinClassNames(...classNames: Array<string | undefined>): string {
+  return classNames.filter(Boolean).join(' ');
+}
+
+function getTextContent(node: React.ReactNode): string {
+  if (typeof node === 'string' || typeof node === 'number') {
+    return String(node);
+  }
+
+  if (Array.isArray(node)) {
+    return node.map(getTextContent).join('');
+  }
+
+  if (React.isValidElement<{ children?: React.ReactNode }>(node)) {
+    return getTextContent(node.props.children);
+  }
+
+  return '';
+}
+
+export function Sidebar({ children, className, ...props }: SidebarProps) {
   return (
     <aside
-      className={className}
-      style={{
-        width: '240px',
-        height: '100%',
-        backgroundColor: 'var(--color-base50)',
-        borderRight: '1px solid var(--color-border-default)',
-        display: 'flex',
-        flexDirection: 'column',
-        flexShrink: 0,
-        ...style,
-      }}
+      className={joinClassNames('sidebar', className)}
       {...props}
     >
       {children}
@@ -26,15 +36,10 @@ export function Sidebar({ children, className, style, ...props }: SidebarProps) 
   );
 }
 
-export function SidebarHeader({ children, className, style, ...props }: SidebarProps) {
+export function SidebarHeader({ children, className, ...props }: SidebarProps) {
   return (
     <div
-      className={className}
-      style={{
-        padding: '16px 16px 8px 16px',
-        flexShrink: 0,
-        ...style,
-      }}
+      className={joinClassNames('sidebar__header', className)}
       {...props}
     >
       {children}
@@ -42,16 +47,10 @@ export function SidebarHeader({ children, className, style, ...props }: SidebarP
   );
 }
 
-export function SidebarContent({ children, className, style, ...props }: SidebarProps) {
+export function SidebarContent({ children, className, ...props }: SidebarProps) {
   return (
     <div
-      className={className}
-      style={{
-        flex: 1,
-        overflowY: 'auto',
-        padding: '12px 8px',
-        ...style,
-      }}
+      className={joinClassNames('sidebar__content', className)}
       {...props}
     >
       {children}
@@ -59,16 +58,10 @@ export function SidebarContent({ children, className, style, ...props }: Sidebar
   );
 }
 
-export function SidebarFooter({ children, className, style, ...props }: SidebarProps) {
+export function SidebarFooter({ children, className, ...props }: SidebarProps) {
   return (
     <div
-      className={className}
-      style={{
-        padding: '8px',
-        borderTop: '1px solid transparent', // Optional visual break
-        flexShrink: 0,
-        ...style,
-      }}
+      className={joinClassNames('sidebar__footer', className)}
       {...props}
     >
       {children}
@@ -81,24 +74,13 @@ export interface SidebarGroupProps extends React.HTMLAttributes<HTMLDivElement> 
   children: React.ReactNode;
 }
 
-export function SidebarGroup({ label, children, className, style, ...props }: SidebarGroupProps) {
+export function SidebarGroup({ label, children, className, ...props }: SidebarGroupProps) {
   return (
-    <div className={className} style={{ marginBottom: '6px', ...style }} {...props}>
+    <div className={joinClassNames('sidebar-group', className)} {...props}>
       {label && (
-        <div
-          className="sidebar-group-label"
-          style={{
-            fontWeight: 600,
-            color: 'var(--color-text-disabled)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.04em',
-            marginBottom: '4px',
-          }}
-        >
-          {label}
-        </div>
+        <div className="sidebar-group-label">{label}</div>
       )}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+      <div className="sidebar-group__items">
         {children}
       </div>
     </div>
@@ -119,49 +101,28 @@ export function SidebarItem({
   nested,
   children,
   className,
-  style,
-  onMouseEnter,
-  onMouseLeave,
+  title,
   ...props
 }: SidebarItemProps) {
-  const [isHovered, setIsHovered] = React.useState(false);
-
-  const baseStyle: CSSProperties = {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-    borderRadius: '6px',
-    color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-    background: active ? 'var(--color-state-selected-bg)' : isHovered ? 'var(--color-state-hover-overlay)' : 'transparent',
-    fontWeight: 400,
-    cursor: 'pointer',
-    border: 'none',
-    textAlign: 'left',
-    width: '100%',
-    transition: 'background 0.1s, color 0.1s, box-shadow 0.1s',
-    ...style,
-  };
+  const itemLabel = getTextContent(children).trim();
 
   return (
     <button
-      className={`sidebar-item ${nested ? 'sidebar-item-nested' : ''} ${className || ''}`}
-      style={baseStyle}
-      onMouseEnter={(e) => {
-        setIsHovered(true);
-        onMouseEnter?.(e);
-      }}
-      onMouseLeave={(e) => {
-        setIsHovered(false);
-        onMouseLeave?.(e);
-      }}
+      className={joinClassNames(
+        'sidebar-item',
+        nested ? 'sidebar-item--nested' : undefined,
+        active ? 'sidebar-item--active' : undefined,
+        className,
+      )}
       {...props}
       type="button"
+      title={title ?? (itemLabel || undefined)}
     >
-      {leftIcon && <span style={{ display: 'flex', alignItems: 'center' }}>{leftIcon}</span>}
-      <div style={{ flex: 1, minWidth: 0, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+      {leftIcon && <span className="sidebar-item__icon">{leftIcon}</span>}
+      <span className="sidebar-item__content">
         {children}
-      </div>
-      {rightElement && <span>{rightElement}</span>}
+      </span>
+      {rightElement && <span className="sidebar-item__right">{rightElement}</span>}
     </button>
   );
 }

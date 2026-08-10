@@ -41,6 +41,13 @@ function renderUserMenu(overrides: Partial<SidebarUserMenuSection> = {}) {
 }
 
 describe('SidebarUserMenu', () => {
+  it('uses native buttons instead of menu roles that require arrow-key behavior', () => {
+    renderUserMenu();
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Workspaces' })).toBeInTheDocument();
+  });
+
   it('shows Manage Projects by default', async () => {
     const user = userEvent.setup();
     const { onCloseUserDropdown, userMenu } = renderUserMenu();

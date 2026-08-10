@@ -1,6 +1,6 @@
 import { ReactNode, useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Menu, SendHorizonal, X } from 'lucide-react';
+import { Menu, PanelLeftClose, PanelLeftOpen, SendHorizonal, X } from 'lucide-react';
 import { Sidebar, type SidebarProps } from '../../components/Sidebar';
 import { DashboardLayout } from '../../components/DashboardLayout/DashboardLayout';
 import { Select } from '@library';
@@ -26,6 +26,7 @@ export function WorkspaceLayout({
   isMobile,
 }: WorkspaceLayoutProps) {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const drawerRef = useRef<HTMLDivElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
 
@@ -112,7 +113,7 @@ export function WorkspaceLayout({
   };
 
   return (
-    <DashboardLayout>
+    <DashboardLayout sidebarCollapsed={isSidebarCollapsed}>
       <DashboardLayout.Header>
         <div className="workspace-header-logo">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -129,8 +130,7 @@ export function WorkspaceLayout({
             onValueChange={(val: string) => sidebarProps.workspace.onSelectWorkspace(val)}
             options={sidebarProps.workspace.workspaces.map((item) => ({ value: item.id, label: item.name }))}
             aria-label="Select workspace"
-            className="input"
-            style={{ width: '100%', minHeight: '34px', padding: '0 10px', fontSize: '13px' }}
+            className="input workspace-header-workspace-select-control"
           />
         </div>
 
@@ -145,38 +145,25 @@ export function WorkspaceLayout({
 
           <button
             type="button"
-            className="workspace-header-ask-agent-button"
+            className={`workspace-header-ask-agent-button${sidebarProps.tools.isAgentOpen ? ' workspace-header-ask-agent-button--active' : ''}`}
             onClick={sidebarProps.tools.onOpenAgent}
             aria-label={sidebarProps.tools.isAgentOpen ? 'Close AI Assistant' : 'Ask Agent'}
-            style={{
-              background: 'none',
-              border: 'none',
-              padding: '4px 8px',
-              borderRadius: '6px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              cursor: 'pointer',
-              color: sidebarProps.tools.isAgentOpen ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-              fontSize: '13px',
-              fontWeight: 500,
-              letterSpacing: 0,
-              flexShrink: 0,
-              whiteSpace: 'nowrap',
-              transition: 'color 0.15s ease, background-color 0.15s ease',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = 'var(--color-text-primary)';
-              e.currentTarget.style.backgroundColor = 'var(--color-base100)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = sidebarProps.tools.isAgentOpen ? 'var(--color-primary)' : 'var(--color-text-secondary)';
-              e.currentTarget.style.backgroundColor = 'transparent';
-            }}
           >
             {sidebarProps.tools.isAgentOpen ? <X size={13} /> : <SendHorizonal size={13} />}
             {sidebarProps.tools.isAgentOpen ? 'Close' : 'Ask Agent'}
           </button>
+
+          {!isMobile ? (
+            <button
+              type="button"
+              className="workspace-header-sidebar-toggle"
+              onClick={() => setIsSidebarCollapsed((collapsed) => !collapsed)}
+              aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              {isSidebarCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+            </button>
+          ) : null}
 
           {isMobile && (
             <button
@@ -191,14 +178,14 @@ export function WorkspaceLayout({
         </div>
       </DashboardLayout.Header>
 
-      {isMobile ? null : <Sidebar {...sidebarProps} />}
+      {isMobile ? null : <Sidebar {...sidebarProps} collapsed={isSidebarCollapsed} />}
 
       {isMobile && typeof document !== 'undefined'
         ? createPortal(
             <div className={`mobile-sidebar-overlay ${isMobileSidebarOpen ? 'mobile-sidebar-overlay--open' : ''}`}>
               <div ref={backdropRef} className="mobile-sidebar-backdrop" onClick={closeSidebar} />
               <div ref={drawerRef} className="mobile-sidebar-drawer">
-                <Sidebar {...mobileSidebarProps} />
+                <Sidebar {...mobileSidebarProps} collapsed={false} />
               </div>
             </div>,
             document.body

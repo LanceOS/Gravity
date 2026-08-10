@@ -1,31 +1,176 @@
-.sidebar-item {
-  font-size: 14px;
-  padding: 6px 10px;
+.sidebar {
+  width: var(--sidebar-width);
+  height: 100%;
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  background: var(--sidebar-background);
+  border-right: 1px solid var(--sidebar-border-color);
+  color: var(--sidebar-item-color);
+  transition: width var(--transition-normal);
 }
 
-.sidebar-item-nested {
-  font-size: 13px;
-  padding: 5px 8px;
+.sidebar__header {
+  flex-shrink: 0;
+  padding: var(--sidebar-header-padding);
+}
+
+.sidebar__content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-3) var(--sidebar-padding);
+}
+
+.sidebar__footer {
+  flex-shrink: 0;
+  padding: var(--sidebar-padding);
+  border-top: 1px solid transparent;
+}
+
+.sidebar-group {
+  margin-bottom: var(--space-2);
 }
 
 .sidebar-group-label {
-  font-size: 11px;
-  padding: 4px 8px 0 8px;
+  margin-bottom: var(--space-1);
+  padding-block: var(--space-1) 0;
+  padding-inline: var(--space-3);
+  color: var(--sidebar-section-label-color);
+  font-size: var(--sidebar-section-label-font-size);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 1.25;
+  text-transform: uppercase;
+}
+
+.sidebar-group__items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar-item {
+  width: 100%;
+  min-height: var(--sidebar-item-min-height);
+  display: flex;
+  align-items: center;
+  gap: var(--sidebar-item-gap);
+  padding: var(--sidebar-item-padding);
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--sidebar-item-radius);
+  box-shadow: inset 2px 0 0 transparent;
+  background: transparent;
+  color: var(--sidebar-item-color);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--sidebar-item-font-size);
+  font-weight: 500;
+  line-height: 1.25;
+  text-align: left;
+  transition: color var(--transition-fast), background-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.sidebar-item:hover {
+  background: var(--sidebar-item-background-hover);
+  color: var(--sidebar-item-color-active);
+}
+
+.sidebar-item--active,
+.sidebar-item--active:hover {
+  background: var(--sidebar-item-background-active);
+  box-shadow: inset 2px 0 0 var(--sidebar-item-active-indicator);
+  color: var(--sidebar-item-color-active);
+}
+
+.sidebar-item:focus-visible {
+  outline: 2px solid var(--sidebar-focus-ring);
+  outline-offset: -2px;
+}
+
+.sidebar-item--nested {
+  min-height: var(--sidebar-item-nested-min-height);
+  padding: var(--sidebar-item-padding-nested);
+  font-size: var(--sidebar-item-nested-font-size);
+  font-weight: 500;
+}
+
+.sidebar-item__icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  color: currentColor;
+}
+
+.sidebar-item__content {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-item__right {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+}
+
+.sidebar--collapsed {
+  width: var(--sidebar-collapsed-width);
+}
+
+.sidebar--collapsed .sidebar__header,
+.sidebar--collapsed .sidebar__content,
+.sidebar--collapsed .sidebar__footer {
+  padding-right: var(--space-2);
+  padding-left: var(--space-2);
+}
+
+.sidebar--collapsed .sidebar-item__content,
+.sidebar--collapsed .sidebar-item__right {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.sidebar--collapsed .sidebar-group-label {
+  display: none;
+}
+
+.sidebar--collapsed .sidebar-item {
+  justify-content: center;
+  padding-right: var(--space-2);
+  padding-left: var(--space-2);
+}
+
+.sidebar--collapsed .sidebar-navigation__sub-items {
+  margin-left: 0;
+  padding-left: 0;
+  border-left-color: transparent;
 }
 
 @media (max-width: 768px) {
-  .sidebar-item {
-    font-size: 16px;
-    padding: 8px 12px;
-  }
-
-  .sidebar-item-nested {
-    font-size: 15px;
-    padding: 8px 10px;
+  .sidebar {
+    width: 100%;
+    --sidebar-item-min-height: 40px;
+    --sidebar-item-nested-min-height: 40px;
+    --sidebar-item-padding: var(--space-2) var(--space-3);
+    --sidebar-item-padding-nested: var(--space-2) var(--space-3);
+    --sidebar-item-font-size: 16px;
+    --sidebar-item-nested-font-size: 15px;
+    --sidebar-section-label-font-size: 13px;
   }
 
   .sidebar-group-label {
-    font-size: 13px;
-    padding: 8px 12px 0 12px;
+    padding-block-start: var(--space-2);
   }
 }

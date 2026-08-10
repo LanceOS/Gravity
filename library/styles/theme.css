@@ -52,6 +52,32 @@
   --space-md: var(--space-4);
   --space-lg: var(--space-6);
   --space-xl: var(--space-8);
+
+  /* Sidebar system: one visual language for workspace, team, and mobile navigation. */
+  --sidebar-width: 240px;
+  --sidebar-collapsed-width: 64px;
+  --sidebar-mobile-width: 320px;
+  --sidebar-background: var(--color-base50);
+  --sidebar-border-color: var(--color-border-default);
+  --sidebar-padding: var(--space-2);
+  --sidebar-header-padding: var(--space-4) var(--space-4) var(--space-2);
+  --sidebar-item-min-height: 32px;
+  --sidebar-item-nested-min-height: 28px;
+  --sidebar-item-padding: var(--space-2) var(--space-3);
+  --sidebar-item-padding-nested: 6px var(--space-2);
+  --sidebar-item-gap: var(--space-2);
+  --sidebar-item-radius: var(--radius-sm);
+  --sidebar-item-font-size: 13px;
+  --sidebar-item-nested-font-size: 12px;
+  --sidebar-item-color: var(--color-text-secondary);
+  --sidebar-item-color-active: var(--color-text-primary);
+  --sidebar-item-background-hover: var(--color-state-hover-overlay);
+  --sidebar-item-background-active: var(--color-state-selected-bg);
+  --sidebar-item-active-indicator: var(--color-primary);
+  --sidebar-section-label-color: var(--color-text-disabled);
+  --sidebar-section-label-font-size: 11px;
+  --sidebar-focus-ring: var(--color-state-focus-ring);
+  --sidebar-overlay-scrim: var(--color-overlay-scrim);
 }
 
 /* Accessibility: Respect system motion preference */

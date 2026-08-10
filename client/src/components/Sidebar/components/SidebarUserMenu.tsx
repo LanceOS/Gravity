@@ -1,7 +1,6 @@
 import type { RefObject } from 'react';
 import { ChevronDown, FolderTree, LogOut, Settings2, Sliders } from 'lucide-react';
 import type { SidebarUserMenuSection } from '../types';
-import { dropdownItemStyle } from '../utils';
 
 interface SidebarUserMenuProps {
   userMenu: SidebarUserMenuSection;
@@ -9,6 +8,10 @@ interface SidebarUserMenuProps {
   onToggleUserDropdown: () => void;
   onCloseUserDropdown: () => void;
   profileRef: RefObject<HTMLDivElement | null>;
+}
+
+function getMenuItemClassName(activeArea: SidebarUserMenuSection['activeArea'], area?: SidebarUserMenuSection['activeArea']): string {
+  return `sidebar-user-menu__item${area && activeArea === area ? ' sidebar-user-menu__item--active' : ''}`;
 }
 
 export function SidebarUserMenu({
@@ -25,148 +28,110 @@ export function SidebarUserMenu({
   return (
     <div
       ref={profileRef}
-      style={{
-        position: 'relative',
-      }}
+      className="sidebar-user-menu"
     >
-      <div
+      <button
+        type="button"
         onClick={onToggleUserDropdown}
-        className="clickable"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          padding: '6px',
-          borderRadius: '6px',
-          cursor: 'pointer',
-        }}
+        className="sidebar-user-menu__trigger"
+        aria-expanded={showUserDropdown}
       >
         <img
           src={userMenu.currentUser.avatar || 'https://api.dicebear.com/7.x/bottts/svg?seed=guest'}
           alt={userMenu.currentUser.name}
-          style={{ width: '28px', height: '28px', borderRadius: '50%', border: '1px solid var(--color-border-default)' }}
+          className="sidebar-user-menu__avatar"
         />
-        <div style={{ overflow: 'hidden' }}>
-          <div style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-text-primary)', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+        <div className="sidebar-user-menu__identity">
+          <div className="sidebar-user-menu__name">
             {userMenu.currentUser.name}
           </div>
-          <div style={{ fontSize: '12px', color: 'var(--color-text-disabled)', textTransform: 'capitalize' }}>
+          <div className="sidebar-user-menu__role">
             {userMenu.currentUser.role || 'User'}
           </div>
         </div>
-        <ChevronDown size={14} style={{ marginLeft: 'auto', color: 'var(--color-text-disabled)' }} />
-      </div>
+        <ChevronDown size={14} className="sidebar-user-menu__chevron" />
+      </button>
 
       <div
-        style={{
-          position: 'absolute',
-          bottom: '100%',
-          left: '0',
-          right: '0',
-          background: 'var(--color-surface-card)',
-          border: '1px solid var(--color-border-default)',
-          borderRadius: '8px',
-          padding: '6px',
-          zIndex: 200,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '2px',
-          marginBottom: '6px',
-          opacity: showUserDropdown ? 1 : 0,
-          visibility: showUserDropdown ? 'visible' : 'hidden',
-          transform: showUserDropdown ? 'translateY(0)' : 'translateY(8px)',
-          transition: 'opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-          pointerEvents: showUserDropdown ? 'auto' : 'none',
-        }}
+        className={`sidebar-user-menu__dropdown${showUserDropdown ? ' sidebar-user-menu__dropdown--open' : ''}`}
       >
-        <div style={{ padding: '6px 10px', fontSize: '12px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase', borderBottom: '1px solid var(--color-border-default)', marginBottom: '4px' }}>
+        <div className="sidebar-user-menu__dropdown-label">
           Account & Settings
         </div>
 
-        <div
+        <button
+          type="button"
           onClick={() => {
             onCloseUserDropdown();
             userMenu.onOpenWorkspaceDirectory();
           }}
-          className="clickable"
-          style={dropdownItemStyle(userMenu.activeArea)}
+          className={getMenuItemClassName(userMenu.activeArea)}
         >
           <FolderTree size={14} color="var(--color-primary)" />
           <span>Workspaces</span>
-        </div>
+        </button>
 
-        <div
+        <button
+          type="button"
           onClick={() => {
             onCloseUserDropdown();
             userMenu.onOpenAccountPreferences();
           }}
-          className="clickable"
-          style={dropdownItemStyle(userMenu.activeArea, 'account')}
+          className={getMenuItemClassName(userMenu.activeArea, 'account')}
         >
           <Sliders size={14} color="var(--color-primary)" />
           <span>Account Preferences</span>
-        </div>
+        </button>
 
         {showWorkspaceManagement ? (
-          <div
+          <button
+            type="button"
             onClick={() => {
               onCloseUserDropdown();
               userMenu.onOpenProjectManager();
             }}
-            className="clickable"
-            style={dropdownItemStyle(userMenu.activeArea, workspaceManagementArea)}
+            className={getMenuItemClassName(userMenu.activeArea, workspaceManagementArea)}
           >
             <FolderTree size={14} color="var(--color-primary)" />
             <span>{workspaceManagementLabel}</span>
-          </div>
+          </button>
         ) : null}
 
-        <div
+        <button
+          type="button"
           onClick={() => {
             onCloseUserDropdown();
             userMenu.onOpenSettings();
           }}
-          className="clickable"
-          style={dropdownItemStyle(userMenu.activeArea, 'settings')}
+          className={getMenuItemClassName(userMenu.activeArea, 'settings')}
         >
           <Settings2 size={14} color="var(--color-primary)" />
           <span>Workspace Settings</span>
-        </div>
+        </button>
 
-        <div
+        <button
+          type="button"
           onClick={() => {
             onCloseUserDropdown();
             userMenu.onOpenMcp();
           }}
-          className="clickable"
-          style={dropdownItemStyle(userMenu.activeArea)}
+          className={getMenuItemClassName(userMenu.activeArea)}
         >
           <Settings2 size={14} color="var(--color-primary)" />
           <span>Connect External AI</span>
-        </div>
+        </button>
 
-        <div
+        <button
+          type="button"
           onClick={() => {
             onCloseUserDropdown();
             userMenu.onSignOut();
           }}
-          className="clickable"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '8px 10px',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '13px',
-            borderTop: '1px solid var(--color-border-default)',
-            marginTop: '4px',
-            color: 'var(--color-primary)',
-          }}
+          className="sidebar-user-menu__item sidebar-user-menu__item--danger"
         >
           <LogOut size={14} />
           <span>Log Out</span>
-        </div>
+        </button>
       </div>
     </div>
   );

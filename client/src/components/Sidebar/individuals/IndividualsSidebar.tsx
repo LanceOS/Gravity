@@ -1,7 +1,7 @@
 import { CheckCircle, ChevronDown, ChevronRight, Database, FileText, FolderTree, Inbox } from 'lucide-react';
 import { useOptionalSidebarContext } from '../context/SidebarContext';
 import type { SidebarNavigationState, SidebarProjectSection } from '../types';
-import { countBadgeStyle, getProjectCollapsedState, isMyIssuesView, isNotesView, isProjectIssuesView } from '../utils';
+import { getProjectCollapsedState, isMyIssuesView, isNotesView, isProjectIssuesView } from '../utils';
 import { SidebarNavigation } from '../navigation';
 
 interface IndividualsSidebarProps {
@@ -70,6 +70,7 @@ export function IndividualsSidebar(props: IndividualsSidebarProps) {
       <SidebarNavigation.Item
         key="workspace-all-tasks"
         active={activeScope === 'workspace'}
+        aria-current={activeScope === 'workspace' ? 'page' : undefined}
         onClick={section.onSelectWorkspaceAllTasks}
         leftIcon={<FolderTree size={13} />}
       >
@@ -80,6 +81,7 @@ export function IndividualsSidebar(props: IndividualsSidebarProps) {
       <SidebarNavigation.Item
         key="workspace-projects"
         active={activeScope === 'workspace-projects'}
+        aria-current={activeScope === 'workspace-projects' ? 'page' : undefined}
         onClick={section.onSelectWorkspaceProjects}
         leftIcon={<Database size={13} />}
       >
@@ -103,7 +105,7 @@ export function IndividualsSidebar(props: IndividualsSidebarProps) {
       >
         <SidebarNavigation.List>
           {section.projects.map((project) => {
-            const isActiveProject = project.id === section.activeProjectId;
+            const isActiveProject = activeScope === 'projects' && project.id === section.activeProjectId;
             const isCollapsed = getProjectCollapsedState(collapsedProjects, project.id, section.activeProjectId);
             const isProjectExpanded = !isCollapsed;
             const isProjectIssueRoute = isActiveProject && showProjectIssues;
@@ -126,14 +128,18 @@ export function IndividualsSidebar(props: IndividualsSidebarProps) {
               <SidebarNavigation.Branch key={project.id}>
                 <SidebarNavigation.Item
                   active={isActiveProject}
+                  aria-expanded={isProjectExpanded}
                   onClick={() => {
                     toggleProject(project.id);
                   }}
-                  leftIcon={isProjectExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                  leftIcon={(
+                    <SidebarNavigation.ItemIcon>
+                      {isProjectExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                      <Database size={14} />
+                    </SidebarNavigation.ItemIcon>
+                  )}
                 >
-                  <SidebarNavigation.ItemLabel icon={<Database size={14} />}>
-                    {project.name}
-                  </SidebarNavigation.ItemLabel>
+                  <SidebarNavigation.ItemLabel>{project.name}</SidebarNavigation.ItemLabel>
                 </SidebarNavigation.Item>
 
                 <SidebarNavigation.Collapse collapsed={!isProjectExpanded}>
@@ -142,10 +148,11 @@ export function IndividualsSidebar(props: IndividualsSidebarProps) {
                       <SidebarNavigation.Item
                         nested
                         active={isProjectIssueRoute}
+                        aria-current={isProjectIssueRoute ? 'page' : undefined}
                         onClick={() => section.onShowProjectIssues?.(project.id)}
                         leftIcon={<FolderTree size={13} />}
                         rightElement={(
-                          <span style={countBadgeStyle()}>
+                          <span className="sidebar-count-badge">
                             {countsByProject[project.id]?.activeProjectIssues ?? section.counts.activeProjectIssues}
                           </span>
                         )}
@@ -156,10 +163,11 @@ export function IndividualsSidebar(props: IndividualsSidebarProps) {
                       <SidebarNavigation.Item
                         nested
                         active={isProjectMyIssueRoute}
+                        aria-current={isProjectMyIssueRoute ? 'page' : undefined}
                         onClick={() => section.onShowMyIssues?.(project.id)}
                         leftIcon={<Inbox size={13} />}
                         rightElement={(
-                          <span style={countBadgeStyle()}>
+                          <span className="sidebar-count-badge">
                             {countsByProject[project.id]?.myIssues ?? section.counts.myIssues}
                           </span>
                         )}
@@ -170,6 +178,7 @@ export function IndividualsSidebar(props: IndividualsSidebarProps) {
                       <SidebarNavigation.Item
                         nested
                         active={isProjectNotesRoute}
+                        aria-current={isProjectNotesRoute ? 'page' : undefined}
                         onClick={() => section.onShowNotes?.(project.id)}
                         leftIcon={<FileText size={13} />}
                       >
@@ -183,9 +192,10 @@ export function IndividualsSidebar(props: IndividualsSidebarProps) {
                           key={cycle.id}
                           nested
                           active={section.filters.cycleId === cycle.id}
+                          aria-pressed={section.filters.cycleId === cycle.id}
                           onClick={() => section.onSelectCycleLegacy?.(project.id, cycle.id)}
                           leftIcon={<CheckCircle size={13} color={cycle.completed ? 'var(--color-text-disabled)' : 'var(--color-primary)'} />}
-                          rightElement={<span style={countBadgeStyle()}>{projectCycleCounts[cycle.id] || 0}</span>}
+                          rightElement={<span className="sidebar-count-badge">{projectCycleCounts[cycle.id] || 0}</span>}
                         >
                           {cycle.completed ? (
                             <SidebarNavigation.CompletedText>{cycle.name}</SidebarNavigation.CompletedText>
@@ -202,9 +212,10 @@ export function IndividualsSidebar(props: IndividualsSidebarProps) {
                           key={label.id}
                           nested
                           active={project.id === section.activeProjectId && section.filters.labels?.includes(label.id)}
+                          aria-pressed={project.id === section.activeProjectId && section.filters.labels?.includes(label.id)}
                           onClick={() => handleSelectLabel(project.id, label.id)}
                           leftIcon={<SidebarNavigation.Dot color={label.color} />}
-                          rightElement={<span style={countBadgeStyle()}>{projectLabelCounts[label.id] || 0}</span>}
+                          rightElement={<span className="sidebar-count-badge">{projectLabelCounts[label.id] || 0}</span>}
                         >
                           {label.name}
                         </SidebarNavigation.Item>
