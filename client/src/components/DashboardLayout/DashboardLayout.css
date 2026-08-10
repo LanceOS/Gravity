@@ -3,13 +3,17 @@
 .dashboard-layout {
   display: grid;
   grid-template-rows: auto 1fr;
-  grid-template-columns: 240px 1fr;
+  grid-template-columns: var(--sidebar-width) 1fr;
   width: 100vw;
   height: 100vh;
   overflow: hidden;
   background: var(--color-surface-app);
   color: var(--color-text-secondary);
   position: relative;
+}
+
+.dashboard-layout--sidebar-collapsed {
+  grid-template-columns: var(--sidebar-collapsed-width) 1fr;
 }
 
 .dashboard-layout__header {
@@ -32,8 +36,8 @@
 .dashboard-layout__sidebar {
   grid-row: 2;
   grid-column: 1;
-  background: var(--color-surface-app);
-  border-right: 1px solid var(--color-border-default);
+  background: var(--sidebar-background);
+  border-right: 1px solid var(--sidebar-border-color);
   display: flex;
   flex-direction: column;
   height: 100%;

@@ -3,10 +3,11 @@ import './DashboardLayout.css';
 
 interface DashboardLayoutProps {
   children: ReactNode;
+  sidebarCollapsed?: boolean;
 }
 
-export function DashboardLayout({ children }: DashboardLayoutProps) {
-  return <div className="dashboard-layout">{children}</div>;
+export function DashboardLayout({ children, sidebarCollapsed = false }: DashboardLayoutProps) {
+  return <div className={`dashboard-layout${sidebarCollapsed ? ' dashboard-layout--sidebar-collapsed' : ''}`}>{children}</div>;
 }
 
 interface SidebarProps {
