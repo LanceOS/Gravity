@@ -62,6 +62,7 @@
   --sidebar-padding: var(--space-2);
   --sidebar-header-padding: var(--space-4) var(--space-4) var(--space-2);
   --sidebar-item-min-height: 32px;
+  --sidebar-item-nested-min-height: 28px;
   --sidebar-item-padding: var(--space-2) var(--space-3);
   --sidebar-item-padding-nested: 6px var(--space-2);
   --sidebar-item-gap: var(--space-2);
