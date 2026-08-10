@@ -1,5 +1,4 @@
 import React from 'react';
-import { User, ChevronLeft, ChevronRight, Folder, File, ChevronDown } from 'lucide-react';
 
 export interface ImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
   fallback?: string;

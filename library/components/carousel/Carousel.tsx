@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, ChevronLeft, ChevronRight, Folder, File, ChevronDown } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 export interface CarouselProps {
   images: string[];

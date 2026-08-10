@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, ChevronLeft, ChevronRight, Folder, File, ChevronDown } from 'lucide-react';
+import { ChevronDown, File, Folder } from 'lucide-react';
 
 export interface TreeViewNode {
   id: string;
