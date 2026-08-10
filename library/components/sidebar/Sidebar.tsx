@@ -9,6 +9,22 @@ function joinClassNames(...classNames: Array<string | undefined>): string {
   return classNames.filter(Boolean).join(' ');
 }
 
+function getTextContent(node: React.ReactNode): string {
+  if (typeof node === 'string' || typeof node === 'number') {
+    return String(node);
+  }
+
+  if (Array.isArray(node)) {
+    return node.map(getTextContent).join('');
+  }
+
+  if (React.isValidElement<{ children?: React.ReactNode }>(node)) {
+    return getTextContent(node.props.children);
+  }
+
+  return '';
+}
+
 export function Sidebar({ children, className, ...props }: SidebarProps) {
   return (
     <aside
@@ -85,8 +101,11 @@ export function SidebarItem({
   nested,
   children,
   className,
+  title,
   ...props
 }: SidebarItemProps) {
+  const itemLabel = getTextContent(children).trim();
+
   return (
     <button
       className={joinClassNames(
@@ -98,6 +117,7 @@ export function SidebarItem({
       aria-current={active ? 'page' : undefined}
       {...props}
       type="button"
+      title={title ?? (itemLabel || undefined)}
     >
       {leftIcon && <span className="sidebar-item__icon">{leftIcon}</span>}
       <span className="sidebar-item__content">

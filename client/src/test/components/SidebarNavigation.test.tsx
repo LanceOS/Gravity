@@ -15,7 +15,7 @@ describe('SidebarNavigation', () => {
     );
 
     expect(screen.getByText('Projects')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Gravity/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Gravity/i })).toHaveAttribute('title', 'Gravity');
   });
 
   it('collapses nested sidebar content', () => {
