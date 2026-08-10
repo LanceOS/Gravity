@@ -10,7 +10,9 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "vitest run -c E2E/vitest.config.ts"
+    "test:e2e": "vitest run -c E2E/vitest.config.ts",
+    "install:production-csp-browser": "playwright install chromium",
+    "test:production-csp": "node scripts/production-csp-browser-test.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.28.0",
@@ -50,6 +52,7 @@
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.6.0",
     "jsdom": "^26.1.0",
+    "playwright": "1.59.1",
     "ts-morph": "^28.0.0",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.59.2",

@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { isSafeHref, sanitizeHtml, safeExternalLinkProps, SAFE_EXTERNAL_LINK_REL } from '@library';
+import { describe, expect, it, vi } from 'vitest';
+import { isSafeHref, sanitizeHtml, sanitizeTrustedHtml, safeExternalLinkProps, SAFE_EXTERNAL_LINK_REL } from '@library';
 
 // Re-parse sanitized output into a live DOM subtree. Several XSS classes
 // (mutation XSS, HTML-entity smuggling) only reveal themselves once the
@@ -139,6 +139,42 @@ describe('sanitizeHtml', () => {
     expect(sanitizedImage).not.toContain('rel=');
     expect(sanitizedImage).toContain('src="https://example.com/x.png"');
     expect(sanitizedImage).toContain('alt="pic"');
+  });
+});
+
+describe('sanitizeTrustedHtml', () => {
+  it('preserves the sanitizer policy while producing output for HTML sinks', () => {
+    const sanitized = sanitizeTrustedHtml('<p onclick="alert(1)">safe</p><script>alert(1)</script>');
+
+    expect(String(sanitized)).toBe('<p>safe</p>');
+  });
+
+  it('asks DOMPurify for TrustedHTML rather than relying on global config', async () => {
+    const trustedHtml = { toString: () => '<p>safe</p>' };
+    const purify = {
+      removeAllHooks: vi.fn(),
+      addHook: vi.fn(),
+      sanitize: vi.fn((_html: string, config?: { RETURN_TRUSTED_TYPE?: boolean }) => (
+        config?.RETURN_TRUSTED_TYPE ? trustedHtml : '<p>safe</p>'
+      )),
+    };
+
+    vi.doMock('dompurify', () => ({ default: purify }));
+    vi.resetModules();
+
+    try {
+      const { sanitizeTrustedHtml: sanitizeWithTrustedTypes } = await import('@library');
+      const sanitized = sanitizeWithTrustedTypes('<p>safe</p>');
+
+      expect(sanitized).toBe(trustedHtml);
+      expect(purify.sanitize).toHaveBeenLastCalledWith(
+        '<p>safe</p>',
+        expect.objectContaining({ RETURN_TRUSTED_TYPE: true }),
+      );
+    } finally {
+      vi.doUnmock('dompurify');
+      vi.resetModules();
+    }
   });
 });
 
@@ -435,6 +471,15 @@ describe('isSafeHref', () => {
     expect(isSafeHref('java\nscript:alert(1)')).toBe(false);
   });
 
+  it.each([
+    ['leading NUL javascript:', '\u0000javascript:alert(1)'],
+    ['leading NUL data:', '\u0000data:text/html,<script>alert(1)</script>'],
+    ['embedded NUL javascript:', 'java\u0000script:alert(1)'],
+    ['non-breaking-space javascript:', '\u00A0javascript:alert(1)'],
+  ])('rejects a %s URI', (_label, href) => {
+    expect(isSafeHref(href)).toBe(false);
+  });
+
   it('rejects harmless-but-non-allowlisted schemes (tel:)', () => {
     expect(isSafeHref('tel:+15551234')).toBe(false);
   });
@@ -470,6 +515,8 @@ describe('safeExternalLinkProps', () => {
     expect(safeExternalLinkProps('data:text/html,<script>alert(1)</script>').href).toBe('about:blank');
     expect(safeExternalLinkProps('vbscript:msgbox(1)').href).toBe('about:blank');
     expect(safeExternalLinkProps('  JavaScript:alert(1)').href).toBe('about:blank');
+    expect(safeExternalLinkProps('\u0000javascript:alert(1)').href).toBe('about:blank');
+    expect(safeExternalLinkProps('\u0000data:text/html,<script>alert(1)</script>').href).toBe('about:blank');
   });
 
   it('uses about:blank for empty, null, and undefined hrefs by default', () => {

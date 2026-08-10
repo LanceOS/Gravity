@@ -81,7 +81,17 @@ function withSafeRelTokens(existingRel: string | null): string {
   return Array.from(tokens).join(' ');
 }
 
-const DANGEROUS_URI_SCHEME_REGEXP = /^\s*(?:javascript|data|vbscript):/i;
+// Keep URI validation aligned with DOMPurify's ATTR_WHITESPACE expression.
+// URL parsers ignore these characters around (and, for some characters, in)
+// schemes, so a value such as `\u0000javascript:` must not be treated as a
+// harmless relative URL by the JSX-rendering path.
+// eslint-disable-next-line no-control-regex -- mirrors DOMPurify ATTR_WHITESPACE.
+const URI_CONTROL_OR_WHITESPACE_REGEXP = /[\u0000-\u0020\u00A0\u1680\u180E\u2000-\u2029\u205F\u3000]/g;
+const DANGEROUS_URI_SCHEME_REGEXP = /^(?:javascript|data|vbscript):/i;
+
+function normalizeUriForSchemeValidation(uri: string): string {
+  return uri.replace(URI_CONTROL_OR_WHITESPACE_REGEXP, '');
+}
 
 // Hooks are registered on DOMPurify's shared singleton, so re-evaluating this
 // module (e.g. Vite HMR) would otherwise stack duplicate hooks indefinitely.
@@ -101,7 +111,10 @@ DOMPurify.addHook('uponSanitizeAttribute', (node, data) => {
   // ALLOWED_URI_REGEXP would otherwise reject them. Explicitly reject the
   // schemes we never want on href/src, regardless of tag, as defense-in-depth
   // on top of ALLOWED_URI_REGEXP.
-  if ((data.attrName === 'href' || data.attrName === 'src') && DANGEROUS_URI_SCHEME_REGEXP.test(data.attrValue)) {
+  if (
+    (data.attrName === 'href' || data.attrName === 'src')
+    && DANGEROUS_URI_SCHEME_REGEXP.test(normalizeUriForSchemeValidation(data.attrValue))
+  ) {
     data.keepAttr = false;
   }
 });
@@ -122,8 +135,6 @@ DOMPurify.addHook('afterSanitizeAttributes', (node) => {
   }
 });
 
-DOMPurify.setConfig(PURIFY_CONFIG);
-
 /**
  * Sanitize untrusted HTML for safe rendering or parsing.
  *
@@ -142,6 +153,26 @@ export function sanitizeHtml(html: string): string {
 }
 
 /**
+ * Sanitize untrusted HTML for assignment to an HTML sink protected by
+ * `require-trusted-types-for 'script'`.
+ *
+ * DOMPurify creates and uses its `dompurify` Trusted Types policy when the
+ * browser supports Trusted Types, so the CSP must allow that policy name. In
+ * browsers without that API it falls back to a string, so callers can use this
+ * function without feature detection.
+ *
+ * Keep the configuration per-call instead of using `DOMPurify.setConfig()`:
+ * once a global config is set, DOMPurify deliberately ignores all per-call
+ * config, including `RETURN_TRUSTED_TYPE`.
+ */
+export function sanitizeTrustedHtml(html: string): TrustedHTML {
+  return DOMPurify.sanitize(html || '', {
+    ...PURIFY_CONFIG,
+    RETURN_TRUSTED_TYPE: true,
+  });
+}
+
+/**
  * Check whether a URL is safe to use as an `href`, under the same URI-scheme
  * allowlist enforced by `sanitizeHtml` (blocks javascript:, data:, vbscript:, ...).
  */
@@ -150,8 +181,8 @@ export function isSafeHref(href: string): boolean {
     return false;
   }
 
-  const normalized = href.replace(/[\s\t\r\n]/g, '');
-  return DOMPurify.isValidAttribute('a', 'href', normalized);
+  const normalized = normalizeUriForSchemeValidation(href);
+  return !DANGEROUS_URI_SCHEME_REGEXP.test(normalized) && ALLOWED_URI_REGEXP.test(normalized);
 }
 
 /**

@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { createApp } from '../src/app.js';
+import { fileURLToPath } from 'node:url';
+import { APP_SHELL_CONTENT_SECURITY_POLICY, createApp } from '../src/app.js';
 
 describe('createApp', () => {
   it('returns the ready payload at the root route', async () => {
@@ -40,7 +41,19 @@ describe('createApp', () => {
     expect(response.headers['x-content-type-options']).toBe('nosniff');
   });
 
-  it('sets X-Content-Type-Options: nosniff on the SPA fallback and unknown API routes', async () => {
+  it('keeps the nginx and Express application-shell CSPs aligned', async () => {
+    const nginxTemplate = await fs.readFile(
+      fileURLToPath(new URL('../../client/nginx.template.conf', import.meta.url)),
+      'utf8',
+    );
+    const nginxPolicy = nginxTemplate.match(
+      /add_header\s+Content-Security-Policy\s+"([^"]+)"\s+always;/,
+    )?.[1];
+
+    expect(nginxPolicy).toBe(APP_SHELL_CONTENT_SECURITY_POLICY);
+  });
+
+  it('sets security headers on the SPA fallback, direct shell request, and unknown API routes', async () => {
     const mockCwd = vi.spyOn(process, 'cwd');
     let fixturesRoot: string | null = null;
 
@@ -60,6 +73,12 @@ describe('createApp', () => {
       expect(spaResponse.text).toContain('gravity-spa-fallback');
       expect(spaResponse.headers['content-type']).toContain('text/html');
       expect(spaResponse.headers['x-content-type-options']).toBe('nosniff');
+      expect(spaResponse.headers['content-security-policy']).toBe(APP_SHELL_CONTENT_SECURITY_POLICY);
+
+      const directShellResponse = await request(createApp()).get('/index.html');
+
+      expect(directShellResponse.status).toBe(200);
+      expect(directShellResponse.headers['content-security-policy']).toBe(APP_SHELL_CONTENT_SECURITY_POLICY);
     } finally {
       mockCwd.mockRestore();
       if (fixturesRoot) {

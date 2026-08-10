@@ -123,13 +123,6 @@ export function ChatInterface({
         ...style,
       }}
     >
-      <style>{`
-        @keyframes bounce {
-          0%, 80%, 100% { transform: scale(0); }
-          40% { transform: scale(1.0); }
-        }
-      `}</style>
-
       {/* Messages Scroll Container */}
       <div
         ref={scrollContainerRef}
@@ -349,9 +342,9 @@ export function ChatInterface({
               <span style={{ fontSize: '11.5px', color: 'var(--color-text-secondary)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                 Generating answer
                 <span style={{ display: 'inline-flex', gap: '3px', marginLeft: '2px' }} data-testid="typing-dots">
-                  <span style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: 'var(--color-text-secondary)', animation: 'bounce 1.4s infinite ease-in-out both', animationDelay: '-0.32s' }} />
-                  <span style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: 'var(--color-text-secondary)', animation: 'bounce 1.4s infinite ease-in-out both', animationDelay: '-0.16s' }} />
-                  <span style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: 'var(--color-text-secondary)', animation: 'bounce 1.4s infinite ease-in-out both' }} />
+                  <span style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: 'var(--color-text-secondary)', animation: 'gravity-chat-bounce 1.4s infinite ease-in-out both', animationDelay: '-0.32s' }} />
+                  <span style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: 'var(--color-text-secondary)', animation: 'gravity-chat-bounce 1.4s infinite ease-in-out both', animationDelay: '-0.16s' }} />
+                  <span style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: 'var(--color-text-secondary)', animation: 'gravity-chat-bounce 1.4s infinite ease-in-out both' }} />
                 </span>
               </span>
             </div>

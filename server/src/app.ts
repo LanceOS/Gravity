@@ -13,6 +13,31 @@ import path from 'path';
 
 let mcpRegistriesBootstrapped = false;
 
+/**
+ * Policy for HTML documents that bootstrap the single-page application.
+ *
+ * The frontend is served independently by nginx in the default deployment,
+ * but the server image can also serve the same built assets from `public/`.
+ * Keep this policy in sync with `client/nginx.template.conf`.
+ */
+export const APP_SHELL_CONTENT_SECURITY_POLICY = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "object-src 'none'",
+  "script-src 'self'",
+  "style-src 'self' https://fonts.googleapis.com",
+  // Keep React's existing style attributes working without permitting inline <style> blocks.
+  "style-src-attr 'unsafe-inline'",
+  "font-src 'self' https://fonts.gstatic.com",
+  "img-src 'self' https:",
+  "connect-src 'self'",
+  "frame-ancestors 'none'",
+  "form-action 'self'",
+  "manifest-src 'self'",
+  'trusted-types dompurify ProseMirrorClipboard',
+  "require-trusted-types-for 'script'",
+].join('; ');
+
 export function bootstrapMcpRegistries() {
   if (mcpRegistriesBootstrapped) {
     return;
@@ -66,13 +91,21 @@ export function createApp() {
   // Serve built client files when available. The build process copies the
   // client's `dist` into `public/` in the final image.
   const clientDist = path.join(process.cwd(), 'public');
-  app.use(express.static(clientDist, { index: false }));
+  app.use(express.static(clientDist, {
+    index: false,
+    setHeaders(res, filePath) {
+      if (filePath.endsWith('.html')) {
+        res.setHeader('Content-Security-Policy', APP_SHELL_CONTENT_SECURITY_POLICY);
+      }
+    },
+  }));
 
   // For any non-API request, serve the client's index.html (SPA fallback).
   app.get(/.*/, (req, res, next) => {
     if (req.path.startsWith('/api')) {
       return next();
     }
+    res.setHeader('Content-Security-Policy', APP_SHELL_CONTENT_SECURITY_POLICY);
     res.sendFile(path.join(clientDist, 'index.html'), (err) => {
       if (err) next(err);
     });
