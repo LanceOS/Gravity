@@ -1,7 +1,7 @@
 import { CheckCircle, ChevronDown, ChevronRight, Database, FileText, FolderTree, Inbox } from 'lucide-react';
 import { useOptionalSidebarContext } from '../context/SidebarContext';
 import type { SidebarNavigationState, SidebarProjectSection } from '../types';
-import { countBadgeStyle, getProjectCollapsedState, isMyIssuesView, isNotesView, isProjectIssuesView } from '../utils';
+import { getProjectCollapsedState, isMyIssuesView, isNotesView, isProjectIssuesView } from '../utils';
 import { SidebarNavigation } from '../navigation';
 
 interface IndividualsSidebarProps {
@@ -145,7 +145,7 @@ export function IndividualsSidebar(props: IndividualsSidebarProps) {
                         onClick={() => section.onShowProjectIssues?.(project.id)}
                         leftIcon={<FolderTree size={13} />}
                         rightElement={(
-                          <span style={countBadgeStyle()}>
+                          <span className="sidebar-count-badge">
                             {countsByProject[project.id]?.activeProjectIssues ?? section.counts.activeProjectIssues}
                           </span>
                         )}
@@ -159,7 +159,7 @@ export function IndividualsSidebar(props: IndividualsSidebarProps) {
                         onClick={() => section.onShowMyIssues?.(project.id)}
                         leftIcon={<Inbox size={13} />}
                         rightElement={(
-                          <span style={countBadgeStyle()}>
+                          <span className="sidebar-count-badge">
                             {countsByProject[project.id]?.myIssues ?? section.counts.myIssues}
                           </span>
                         )}
@@ -185,7 +185,7 @@ export function IndividualsSidebar(props: IndividualsSidebarProps) {
                           active={section.filters.cycleId === cycle.id}
                           onClick={() => section.onSelectCycleLegacy?.(project.id, cycle.id)}
                           leftIcon={<CheckCircle size={13} color={cycle.completed ? 'var(--color-text-disabled)' : 'var(--color-primary)'} />}
-                          rightElement={<span style={countBadgeStyle()}>{projectCycleCounts[cycle.id] || 0}</span>}
+                          rightElement={<span className="sidebar-count-badge">{projectCycleCounts[cycle.id] || 0}</span>}
                         >
                           {cycle.completed ? (
                             <SidebarNavigation.CompletedText>{cycle.name}</SidebarNavigation.CompletedText>
@@ -204,7 +204,7 @@ export function IndividualsSidebar(props: IndividualsSidebarProps) {
                           active={project.id === section.activeProjectId && section.filters.labels?.includes(label.id)}
                           onClick={() => handleSelectLabel(project.id, label.id)}
                           leftIcon={<SidebarNavigation.Dot color={label.color} />}
-                          rightElement={<span style={countBadgeStyle()}>{projectLabelCounts[label.id] || 0}</span>}
+                          rightElement={<span className="sidebar-count-badge">{projectLabelCounts[label.id] || 0}</span>}
                         >
                           {label.name}
                         </SidebarNavigation.Item>

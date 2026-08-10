@@ -136,7 +136,11 @@ function SidebarNavigationEmpty({ children }: SidebarNavigationLabelProps): JSX.
 }
 
 function SidebarNavigationDot({ color }: SidebarNavigationDotProps): JSX.Element {
-  return <div className="sidebar-navigation__dot" style={{ background: color }} />;
+  return (
+    <svg className="sidebar-navigation__dot" viewBox="0 0 8 8" aria-hidden="true">
+      <circle cx="4" cy="4" r="4" fill={color} />
+    </svg>
+  );
 }
 
 function SidebarNavigationCompletedText({ children }: SidebarNavigationLabelProps): JSX.Element {
