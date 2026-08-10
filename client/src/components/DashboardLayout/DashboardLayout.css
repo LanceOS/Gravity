@@ -45,6 +45,11 @@
   transition: width var(--transition-normal);
 }
 
+.dashboard-layout > aside.sidebar--collapsed {
+  overflow: visible;
+  z-index: 2;
+}
+
 .dashboard-layout__main {
   grid-row: 2;
   grid-column: 2;

@@ -78,6 +78,21 @@ describe('WorkspaceLayout sidebar controls', () => {
     expect(sidebar).not.toHaveClass('sidebar--collapsed');
   });
 
+  it('allows the user menu to escape the compact sidebar column', async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <WorkspaceLayout sidebarProps={sidebarProps}>Content</WorkspaceLayout>,
+    );
+    const sidebar = container.querySelector<HTMLElement>('aside.app-sidebar');
+
+    await user.click(screen.getByRole('button', { name: 'Collapse sidebar' }));
+    await user.click(container.querySelector<HTMLButtonElement>('.sidebar-user-menu__trigger')!);
+
+    expect(sidebar).toHaveClass('sidebar--collapsed');
+    expect(sidebar).toHaveStyle({ overflow: 'visible', zIndex: '2' });
+    expect(container.querySelector('.sidebar-user-menu__dropdown')).toHaveClass('sidebar-user-menu__dropdown--open');
+  });
+
   it('opens the full sidebar in the mobile drawer', () => {
     const { container } = render(
       <WorkspaceLayout sidebarProps={sidebarProps} isMobile>Content</WorkspaceLayout>,
