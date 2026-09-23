@@ -51,6 +51,8 @@ describe('createApp', () => {
     )?.[1];
 
     expect(nginxPolicy).toBe(APP_SHELL_CONTENT_SECURITY_POLICY);
+    expect(nginxPolicy).toContain('trusted-types gravity-editor dompurify ProseMirrorClipboard');
+    expect(nginxPolicy).toContain("require-trusted-types-for 'script'");
   });
 
   it('sets security headers on the SPA fallback, direct shell request, and unknown API routes', async () => {

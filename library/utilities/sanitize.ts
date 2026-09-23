@@ -1,12 +1,15 @@
 import DOMPurify from 'dompurify';
+import type { TrustedTypePolicy } from 'trusted-types';
+import type { Schema } from 'prosemirror-model';
+import { normalizeClipboardSliceMetadata, validateClipboardSliceContext } from './richtext/clipboardMetadata';
 
 /**
  * Centralized HTML sanitization policy. This is the single source of truth
  * for what HTML survives sanitization anywhere in the app (rich text paste,
  * rendered rich text, markdown-derived links, AI output, etc). Do not call
  * DOMPurify directly outside this file - route all sanitization through
- * `sanitizeHtml` / `isSafeHref` / `safeExternalLinkProps` so the policy stays
- * in one auditable place.
+ * `sanitizeHtml` / `sanitizeTrustedHtml` / `isSafeHref` / `safeExternalLinkProps`
+ * so the policy stays in one auditable place.
  */
 export interface SanitizeHtmlConfig {
   /** Explicit tag allowlist. Anything not listed here is stripped. */
@@ -23,9 +26,9 @@ export const SANITIZE_CONFIG: SanitizeHtmlConfig = {
     'ul', 'ol', 'li',
     'code', 'pre', 'blockquote',
     'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-    'p', 'br', 'img',
+    'p', 'br', 'hr', 'img',
   ],
-  allowedAttributes: ['href', 'src', 'alt', 'title', 'target', 'rel', 'class'],
+  allowedAttributes: ['href', 'src', 'alt', 'title', 'target', 'rel', 'class', 'start'],
   allowedUriSchemes: ['http', 'https', 'mailto'],
 };
 
@@ -42,6 +45,7 @@ const ATTRIBUTE_TAG_SCOPE: Partial<Record<string, readonly string[]>> = {
   rel: ['a'],
   src: ['img'],
   alt: ['img'],
+  start: ['ol'],
 };
 
 function isAttributeAllowedForTag(tag: string, attrName: string): boolean {
@@ -102,8 +106,31 @@ DOMPurify.removeAllHooks();
 DOMPurify.addHook('uponSanitizeAttribute', (node, data) => {
   const tag = node.tagName.toLowerCase();
 
+  if (data.attrName === 'data-pm-slice') {
+    const metadata = normalizeClipboardSliceMetadata(data.attrValue);
+    if (metadata === null) data.keepAttr = false;
+    else data.attrValue = metadata;
+    // Only sanitizeRichTextClipboardHtml allows this attribute in its config.
+    return;
+  }
+
   if (!isAttributeAllowedForTag(tag, data.attrName)) {
     data.keepAttr = false;
+    return;
+  }
+
+  if (data.attrName === 'start') {
+    // ProseMirror coerces this attribute with Number(), so malformed values
+    // become NaN/Infinity and serialize as null, making the saved doc invalid.
+    // Match the signed 32-bit integer range of HTMLOListElement.start and
+    // normalize accepted decimal values before they reach the document model.
+    const value = data.attrValue.trim();
+    const order = Number(value);
+    if (!/^[+-]?\d+$/.test(value) || !Number.isInteger(order) || order < -2147483648 || order > 2147483647) {
+      data.keepAttr = false;
+    } else {
+      data.attrValue = String(order);
+    }
     return;
   }
 
@@ -149,27 +176,62 @@ export function sanitizeHtml(html: string): string {
     return '';
   }
 
-  return DOMPurify.sanitize(html, PURIFY_CONFIG);
+  // A createPolicy.createHTML callback must return a string. Keep this explicit
+  // and per-call; DOMPurify.setConfig() would override per-call options.
+  return DOMPurify.sanitize(html, { ...PURIFY_CONFIG, RETURN_TRUSTED_TYPE: false });
+}
+
+export const EDITOR_HTML_POLICY_NAME = 'gravity-editor';
+
+/** Sanitize ProseMirror clipboard HTML while retaining validated slice context. */
+export function sanitizeRichTextClipboardHtml(html: string, schema: Schema): string {
+  if (!html) return '';
+  const root = DOMPurify.sanitize(html, {
+    ...PURIFY_CONFIG,
+    ADD_ATTR: ['data-pm-slice'],
+    RETURN_DOM: true,
+    RETURN_TRUSTED_TYPE: false,
+  });
+  validateClipboardSliceContext(root as HTMLElement, schema);
+  return (root as HTMLElement).innerHTML;
+}
+
+interface EditorHtmlPolicyState {
+  policy?: Pick<TrustedTypePolicy, 'createHTML'>;
+  sanitize: typeof sanitizeHtml;
+}
+
+// Policy names cannot be registered twice under our CSP. Keep the policy over
+// Vite hot updates, but route its callback through the current sanitizer so
+// edits to the allowlist take effect without retaining an outdated closure.
+const hotData = import.meta.hot?.data;
+const editorHtmlPolicyState: EditorHtmlPolicyState = hotData?.editorHtmlPolicyState
+  ?? { sanitize: sanitizeHtml };
+editorHtmlPolicyState.sanitize = sanitizeHtml;
+if (hotData) {
+  hotData.editorHtmlPolicyState = editorHtmlPolicyState;
 }
 
 /**
  * Sanitize untrusted HTML for assignment to an HTML sink protected by
  * `require-trusted-types-for 'script'`.
  *
- * DOMPurify creates and uses its `dompurify` Trusted Types policy when the
- * browser supports Trusted Types, so the CSP must allow that policy name. In
- * browsers without that API it falls back to a string, so callers can use this
- * function without feature detection.
- *
- * Keep the configuration per-call instead of using `DOMPurify.setConfig()`:
- * once a global config is set, DOMPurify deliberately ignores all per-call
- * config, including `RETURN_TRUSTED_TYPE`.
+ * The browser wraps only the DOMPurify-sanitized string in TrustedHTML. CSP
+ * must allow `gravity-editor` and DOMPurify's internal `dompurify` parsing
+ * policy. Never pass this wrapping policy back to DOMPurify: that would recurse.
+ * Browsers without the API get the same sanitized HTML as a string. Policy
+ * creation errors deliberately propagate instead of downgrading enforcement.
  */
-export function sanitizeTrustedHtml(html: string): TrustedHTML {
-  return DOMPurify.sanitize(html || '', {
-    ...PURIFY_CONFIG,
-    RETURN_TRUSTED_TYPE: true,
+export function sanitizeTrustedHtml(html: string): string | TrustedHTML {
+  const trustedTypes = typeof window !== 'undefined' ? window.trustedTypes : undefined;
+  if (typeof trustedTypes?.createPolicy !== 'function') {
+    return sanitizeHtml(html);
+  }
+
+  editorHtmlPolicyState.policy ??= trustedTypes.createPolicy(EDITOR_HTML_POLICY_NAME, {
+    createHTML: (input: string) => editorHtmlPolicyState.sanitize(input),
   });
+  return editorHtmlPolicyState.policy.createHTML(html || '');
 }
 
 /**

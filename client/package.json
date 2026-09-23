@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "test:e2e": "vitest run -c E2E/vitest.config.ts",
     "install:production-csp-browser": "playwright install chromium",
-    "test:production-csp": "node scripts/production-csp-browser-test.mjs"
+    "test:production-csp": "node scripts/production-csp-browser-test.mjs",
+    "test:editor-trusted-types": "node scripts/editor-trusted-types-browser-test.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.28.0",

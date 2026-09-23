@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { isSafeHref, sanitizeHtml, sanitizeTrustedHtml, safeExternalLinkProps, SAFE_EXTERNAL_LINK_REL } from '@library';
 
 // Re-parse sanitized output into a live DOM subtree. Several XSS classes
@@ -140,41 +140,123 @@ describe('sanitizeHtml', () => {
     expect(sanitizedImage).toContain('src="https://example.com/x.png"');
     expect(sanitizedImage).toContain('alt="pic"');
   });
+
+  it('retains ordered-list start numbers only on ordered lists', () => {
+    const parsed = parseHtml(sanitizeHtml('<ol start="7"><li start="2">item</li></ol><p start="3">text</p>'));
+
+    expect(parsed.querySelector('ol')?.getAttribute('start')).toBe('7');
+    expect(parsed.querySelector('li')?.hasAttribute('start')).toBe(false);
+    expect(parsed.querySelector('p')?.hasAttribute('start')).toBe(false);
+  });
+
+  it.each(['abc', '1e999', 'Infinity', 'NaN', '1.5', '1e2', '0x10', '2px', '', '2147483648', '-2147483649'])(
+    'strips invalid ordered-list start %j so parsing uses the default',
+    (start) => {
+      const parsed = parseHtml(sanitizeHtml(`<ol start="${start}"><li>item</li></ol>`));
+
+      expect(parsed.querySelector('ol')?.hasAttribute('start')).toBe(false);
+      expect(parsed.textContent).toBe('item');
+    },
+  );
+
+  it.each([
+    ['-2147483648', '-2147483648'],
+    ['-7', '-7'],
+    ['-0', '0'],
+    ['0', '0'],
+    ['  +0007  ', '7'],
+    ['2147483647', '2147483647'],
+  ])('normalizes supported ordered-list start %j to %j', (start, expected) => {
+    const parsed = parseHtml(sanitizeHtml(`<ol start="${start}"><li>item</li></ol>`));
+
+    expect(parsed.querySelector('ol')?.getAttribute('start')).toBe(expected);
+  });
 });
 
 describe('sanitizeTrustedHtml', () => {
-  it('preserves the sanitizer policy while producing output for HTML sinks', () => {
-    const sanitized = sanitizeTrustedHtml('<p onclick="alert(1)">safe</p><script>alert(1)</script>');
-
-    expect(String(sanitized)).toBe('<p>safe</p>');
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    vi.resetModules();
   });
 
-  it('asks DOMPurify for TrustedHTML rather than relying on global config', async () => {
-    const trustedHtml = { toString: () => '<p>safe</p>' };
-    const purify = {
-      removeAllHooks: vi.fn(),
-      addHook: vi.fn(),
-      sanitize: vi.fn((_html: string, config?: { RETURN_TRUSTED_TYPE?: boolean }) => (
-        config?.RETURN_TRUSTED_TYPE ? trustedHtml : '<p>safe</p>'
-      )),
-    };
+  it('returns a sanitized string when the browser has no Trusted Types API', () => {
+    vi.stubGlobal('trustedTypes', undefined);
+    const sanitized = sanitizeTrustedHtml('<p onclick="alert(1)">safe</p><script>alert(1)</script>');
 
-    vi.doMock('dompurify', () => ({ default: purify }));
+    expect(typeof sanitized).toBe('string');
+    expect(sanitized).toBe('<p>safe</p>');
+  });
+
+  it('falls back to sanitization when createPolicy is unavailable', async () => {
     vi.resetModules();
+    const { sanitizeTrustedHtml: sanitizeForSink } = await import('@library/utilities/sanitize');
+    vi.stubGlobal('trustedTypes', {});
 
-    try {
-      const { sanitizeTrustedHtml: sanitizeWithTrustedTypes } = await import('@library');
-      const sanitized = sanitizeWithTrustedTypes('<p>safe</p>');
+    expect(sanitizeForSink('<a href="javascript:alert(1)">safe</a>')).toBe('<a>safe</a>');
+  });
 
-      expect(sanitized).toBe(trustedHtml);
-      expect(purify.sanitize).toHaveBeenLastCalledWith(
-        '<p>safe</p>',
-        expect.objectContaining({ RETURN_TRUSTED_TYPE: true }),
-      );
-    } finally {
-      vi.doUnmock('dompurify');
-      vi.resetModules();
-    }
+  it('lazily creates one named policy and sanitizes every createHTML call', async () => {
+    vi.resetModules();
+    // Import before stubbing the API so DOMPurify uses its jsdom string path.
+    // These mocks test policy routing, not native Trusted Types enforcement.
+    const { sanitizeTrustedHtml: sanitizeForSink } = await import('@library/utilities/sanitize');
+    const { default: purify } = await import('dompurify');
+    const sanitizeSpy = vi.spyOn(purify, 'sanitize');
+    const results: { toString: () => string }[] = [];
+    const createHTML = vi.fn();
+    const createPolicy = vi.fn((_name: string, rules: { createHTML: (html: string) => string }) => {
+      createHTML.mockImplementation((html: string) => {
+        const cleaned = rules.createHTML(html);
+        expect(typeof cleaned).toBe('string');
+        const result = { toString: () => cleaned };
+        results.push(result);
+        return result;
+      });
+      return { createHTML };
+    });
+    vi.stubGlobal('trustedTypes', { createPolicy });
+
+    expect(createPolicy).not.toHaveBeenCalled();
+
+    const dirty = '<p onclick="alert(1)">safe <strong>bold</strong></p><script>alert(1)</script>'
+      + '<a href="javascript:alert(1)">bad link</a><img src="data:image/png;base64,AAAA">';
+    const first = sanitizeForSink(dirty);
+    const second = sanitizeForSink('<a href="https://example.com">docs</a>');
+    const empty = sanitizeForSink('');
+
+    expect(createPolicy).toHaveBeenCalledExactlyOnceWith('gravity-editor', expect.objectContaining({
+      createHTML: expect.any(Function),
+    }));
+    expect(createHTML).toHaveBeenCalledTimes(3);
+    expect(first).toBe(results[0]);
+    expect(second).toBe(results[1]);
+    expect(empty).toBe(results[2]);
+    expect(String(empty)).toBe('');
+    expect(sanitizeSpy).toHaveBeenCalledWith(dirty, expect.objectContaining({ RETURN_TRUSTED_TYPE: false }));
+
+    const parsed = parseHtml(String(first));
+    expect(parsed.querySelector('strong')?.textContent).toBe('bold');
+    expect(parsed.querySelector('script')).toBeNull();
+    expect(hasEventHandlerAttribute(parsed)).toBe(false);
+    expect(parsed.querySelector('a')?.getAttribute('href')).toBeNull();
+    expect(parsed.querySelector('img')?.getAttribute('src')).toBeNull();
+
+    const safeLink = parseHtml(String(second)).querySelector('a');
+    expect(safeLink?.getAttribute('href')).toBe('https://example.com');
+    expect(safeLink?.getAttribute('target')).toBe('_blank');
+    expect(safeLink?.getAttribute('rel')).toBe('noopener noreferrer');
+  });
+
+  it('propagates policy creation failures instead of downgrading to strings', async () => {
+    vi.resetModules();
+    const { sanitizeTrustedHtml: sanitizeForSink } = await import('@library/utilities/sanitize');
+    const rejected = new TypeError('Policy creation was rejected by CSP');
+    const createPolicy = vi.fn(() => { throw rejected; });
+    vi.stubGlobal('trustedTypes', { createPolicy });
+
+    expect(() => sanitizeForSink('<p>safe</p>')).toThrow(rejected);
+    expect(createPolicy).toHaveBeenCalledWith('gravity-editor', expect.any(Object));
   });
 });
 
