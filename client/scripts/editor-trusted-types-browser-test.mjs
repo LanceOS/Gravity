@@ -161,6 +161,40 @@ async function verifyEditor(origin, fallback, browserName) {
       assert.equal(await page.getByTestId('drop-target').locator('li').textContent(), 'Saved list');
     }
 
+    // Browser clipboard serializers mark converted ordinary spaces differently.
+    // ProseMirror must see the same text after our allowlist removes the spans.
+    const chromeSpace = browserName === 'chromium' ? ' ' : '\u00a0';
+    const safariSpace = browserName === 'webkit' ? ' ' : '\u00a0';
+    const clipboardSpaces = [
+      { name: 'plain Chrome marker', html: '<span>&nbsp;</span>', expected: chromeSpace },
+      { name: 'Safari marker', html: '<span class="Apple-converted-space">&nbsp;</span>', expected: safariSpace },
+      { name: 'intentional bare nonbreaking space', html: '&nbsp;', expected: '\u00a0' },
+      { name: 'classed span', html: '<span class="literal-space">&nbsp;</span>', expected: '\u00a0' },
+      { name: 'styled span', html: '<span style="white-space: pre">&nbsp;</span>', expected: '\u00a0' },
+      { name: 'multiple nonbreaking spaces', html: '<span>&nbsp;&nbsp;</span>', expected: '\u00a0\u00a0' },
+      { name: 'single child wrapper', html: '<span><em>&nbsp;</em></span>', expected: chromeSpace },
+      { name: 'multiple children', html: '<span>&nbsp;<em></em></span>', expected: '\u00a0' },
+      { name: 'marker with malicious attributes', html: '<span onclick="window.__editorXss=true">&nbsp;</span>', expected: chromeSpace },
+      { name: 'marker after clobbered form', prefix: '<form><input name="matches"><input name="nodeName"></form>', html: '<span>&nbsp;</span>', expected: chromeSpace },
+    ];
+    const documentText = (node) => node.text || (node.content || []).map(documentText).join('');
+    for (const testCase of clipboardSpaces) {
+      const html = `${testCase.prefix || ''}<p>one${testCase.html}two</p>`;
+      const expected = `one${testCase.expected}two`;
+      const dropped = await page.evaluate((untrustedHtml) => window.__editorTrustedTypesTest.dropHTML(untrustedHtml), html);
+      assert.equal(dropped.prevented, true);
+      assert.equal(documentText(dropped.document), `A${expected}B`, `${testCase.name}: dropped spaces must retain ProseMirror's browser semantics.`);
+      assert.equal(dropped.serialized, dropped.reloaded, `${testCase.name}: dropped spaces must survive save/reload.`);
+      const pasted = await page.evaluate((untrustedHtml) => window.__editorTrustedTypesTest.pasteAndReload(untrustedHtml), html);
+      assert.equal(documentText(JSON.parse(pasted.reloaded)), expected, `${testCase.name}: pasted spaces must retain ProseMirror's browser semantics.`);
+      assert.equal(pasted.serialized, pasted.reloaded, `${testCase.name}: pasted spaces must survive save/reload.`);
+      if (testCase.name === 'single child wrapper' && browserName === 'chromium') {
+        assert.doesNotMatch(dropped.serialized, /"type":"em"/, 'Restored ordinary spaces must replace the entire browser marker.');
+        assert.doesNotMatch(pasted.serialized, /"type":"em"/, 'Restored ordinary spaces must replace the entire browser marker.');
+      }
+      assert.equal(await page.getByTestId('drop-target').locator('span,form,input,[onclick],p[style],p [style],[class="literal-space"]').count(), 0, `${testCase.name}: clipboard-only markers and unsafe attributes must be stripped.`);
+    }
+
     await surface.click();
     await page.keyboard.type('Typed text');
     await page.keyboard.press('ControlOrMeta+a');
@@ -197,7 +231,7 @@ async function verifyEditor(origin, fallback, browserName) {
     assert.equal(finalState.xssExecuted, false);
     assert.deepEqual(finalState.violations, [], 'Editor operations must not violate CSP.');
     assert.deepEqual(errors, [], 'Editor operations must not produce browser errors.');
-    console.info(`[editor-trusted-types] ${browserName}: ${fallback ? 'simulated missing-API fallback' : 'native enforcement'} passed: sanitization, rendered content, typing, formatting, undo/redo, clipboard/programmatic paste, cross-editor drops, hostile slice metadata and list save/reload.`);
+    console.info(`[editor-trusted-types] ${browserName}: ${fallback ? 'simulated missing-API fallback' : 'native enforcement'} passed: sanitization, rendered content, typing, formatting, undo/redo, clipboard/programmatic paste, cross-editor drops, browser clipboard spaces, hostile slice metadata and list save/reload.`);
   } finally {
     await page.close();
   }

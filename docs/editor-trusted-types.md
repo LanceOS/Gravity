@@ -68,6 +68,12 @@ context wrapper must admit its partial content. Invalid metadata is discarded.
 Generic HTML sanitization and the `gravity-editor` policy still remove all data
 attributes, including clipboard metadata.
 
+Clipboard sanitization also restores browser-generated space markers before
+DOMPurify removes their `span` wrappers. This follows ProseMirror's browser rules:
+plain spans in Chromium and `Apple-converted-space` spans in Safari. Intentional
+nonbreaking spaces stay intact. The temporary sanitizer hook is removed on both
+success and failure, so generic HTML sanitization keeps its existing behavior.
+
 ## Verification
 
 ```sh

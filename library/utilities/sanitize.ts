@@ -186,14 +186,37 @@ export const EDITOR_HTML_POLICY_NAME = 'gravity-editor';
 /** Sanitize ProseMirror clipboard HTML while retaining validated slice context. */
 export function sanitizeRichTextClipboardHtml(html: string, schema: Schema): string {
   if (!html) return '';
-  const root = DOMPurify.sanitize(html, {
-    ...PURIFY_CONFIG,
-    ADD_ATTR: ['data-pm-slice'],
-    RETURN_DOM: true,
-    RETURN_TRUSTED_TYPE: false,
-  });
-  validateClipboardSliceContext(root as HTMLElement, schema);
-  return (root as HTMLElement).innerHTML;
+  // ProseMirror restores browser-generated spaces after parsing clipboard HTML.
+  // Match that behavior before DOMPurify removes span wrappers and their style
+  // attributes, which distinguish converted spaces from intentional NBSPs.
+  const webkit = typeof document !== 'undefined'
+    && 'webkitFontSmoothing' in document.documentElement.style;
+  const userAgent = typeof navigator === 'undefined' ? '' : navigator.userAgent;
+  const chrome = /Chrome\/\d+/.test(userAgent)
+    && !/Edge\/\d+|MSIE \d|Trident\//.test(userAgent);
+  const selector = chrome ? 'span:not([class]):not([style])' : 'span.Apple-converted-space';
+  const restoreSpaces = (node: Node) => {
+    if (webkit && node.nodeType === 1 && node.nodeName === 'SPAN' && (node as Element).matches(selector)
+      && node.childNodes.length === 1 && node.textContent === '\u00a0') {
+      node.textContent = ' ';
+    }
+  };
+
+  DOMPurify.addHook('beforeSanitizeElements', restoreSpaces);
+  try {
+    const root = DOMPurify.sanitize(html, {
+      ...PURIFY_CONFIG,
+      ADD_ATTR: ['data-pm-slice'],
+      RETURN_DOM: true,
+      RETURN_TRUSTED_TYPE: false,
+    });
+    validateClipboardSliceContext(root as HTMLElement, schema);
+    return (root as HTMLElement).innerHTML;
+  } finally {
+    // Sanitization is synchronous. Never leave this clipboard-only hook active
+    // for generic HTML sinks, even when sanitization or schema parsing throws.
+    DOMPurify.removeHook('beforeSanitizeElements', restoreSpaces);
+  }
 }
 
 interface EditorHtmlPolicyState {

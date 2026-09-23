@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import DOMPurify from 'dompurify';
 import { AllSelection, EditorState, TextSelection } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { sanitizeHtml, sanitizeRichTextClipboardHtml, sanitizeTrustedHtml } from '@library/utilities/sanitize';
@@ -28,6 +29,64 @@ function paste(view: EditorView, html: string) {
 afterEach(() => {
   views.splice(0).forEach((view) => view.destroy());
   document.body.replaceChildren();
+  vi.restoreAllMocks();
+});
+
+describe('browser-converted clipboard spaces', () => {
+  const chromeUserAgent = 'Mozilla/5.0 AppleWebKit/537.36 Chrome/145.0.0.0 Safari/537.36';
+  const safariUserAgent = 'Mozilla/5.0 AppleWebKit/605.1.15 Version/26.0 Safari/605.1.15';
+
+  it.each([
+    ['plain Chrome marker', chromeUserAgent, '<span>&nbsp;</span>', ' '],
+    ['Apple marker', safariUserAgent, '<span class="Apple-converted-space">&nbsp;</span>', ' '],
+    ['Chrome span with style', chromeUserAgent, '<span style="color: red">&nbsp;</span>', '\u00a0'],
+    ['Chrome span with class', chromeUserAgent, '<span class="intentional">&nbsp;</span>', '\u00a0'],
+    ['bare NBSP', chromeUserAgent, '&nbsp;', '\u00a0'],
+    ['multiple NBSPs', chromeUserAgent, '<span>&nbsp;&nbsp;</span>', '\u00a0\u00a0'],
+    ['nested single child', chromeUserAgent, '<span><em>&nbsp;</em></span>', ' '],
+    ['multiple children', chromeUserAgent, '<span>&nbsp;<em></em></span>', '\u00a0'],
+    ['marker with unsafe attributes', chromeUserAgent, '<span onclick="alert(1)">&nbsp;</span>', ' '],
+  ])('preserves ProseMirror whitespace behavior for %s', (_name, userAgent, marker, expected) => {
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(userAgent);
+    const html = `<p data-pm-slice="1 1 []">one${marker}two</p>`;
+    const cleaned = cleanClipboard(html);
+    expect(cleaned).not.toMatch(/<span|onclick|style=/);
+    const doc = paste(editor(), html);
+    expect(doc.textContent).toBe(`Aone${expected}twoB`);
+    expect(parseRichTextValue(serializeRichTextJson(doc)).toJSON()).toEqual(doc.toJSON());
+    if (_name === 'nested single child') {
+      doc.descendants((node) => {
+        if (node.isText) expect(node.marks).toHaveLength(0);
+      });
+    }
+  });
+
+  it('does not restore converted spaces when the browser lacks WebKit support', () => {
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(chromeUserAgent);
+    vi.spyOn(document.documentElement, 'style', 'get').mockReturnValue({} as CSSStyleDeclaration);
+    expect(cleanClipboard('<p>one<span>&nbsp;</span>two</p>')).toBe('<p>one&nbsp;two</p>');
+  });
+
+  it('ignores form elements with clobbered DOM methods before sanitization', () => {
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(chromeUserAgent);
+    const html = '<form><input name="matches"><input name="nodeName"></form>'
+      + '<p>one<span>&nbsp;</span>two</p>';
+    expect(cleanClipboard(html)).toBe('<p>one two</p>');
+  });
+
+  it.each([false, true])('keeps generic sanitization unchanged after clipboard processing (throws=%s)', (throws) => {
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(chromeUserAgent);
+    const html = '<p>one<span>&nbsp;</span>two</p>';
+    if (throws) {
+      vi.spyOn(DOMPurify, 'sanitize').mockImplementationOnce(() => { throw new Error('Sanitization failed'); });
+      expect(() => cleanClipboard(html)).toThrow('Sanitization failed');
+    } else {
+      expect(cleanClipboard(html)).toBe('<p>one two</p>');
+    }
+    expect(sanitizeHtml(html)).toBe('<p>one&nbsp;two</p>');
+    expect(String(sanitizeTrustedHtml(html))).toBe('<p>one&nbsp;two</p>');
+    expect(cleanClipboard(html)).toBe('<p>one two</p>');
+  });
 });
 
 describe('sanitized ProseMirror clipboard metadata', () => {
