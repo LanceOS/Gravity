@@ -1,8 +1,9 @@
-import { DOMSerializer, Node as ProseMirrorNode, Schema } from 'prosemirror-model';
+import { DOMSerializer, Node as ProseMirrorNode } from 'prosemirror-model';
 import { defaultMarkdownParser, defaultMarkdownSerializer } from 'prosemirror-markdown';
-import { schema as basicSchema } from 'prosemirror-schema-basic';
-import { addListNodes } from 'prosemirror-schema-list';
+import { richTextSchema } from '../../../server/src/lib/rich-text-schema';
 import { sanitizeHtml } from '../sanitize';
+
+export { richTextSchema };
 
 export interface RichTextDocumentJSON {
   type: 'doc';
@@ -13,13 +14,6 @@ export const EMPTY_RICH_TEXT_DOCUMENT: RichTextDocumentJSON = {
   type: 'doc',
   content: [{ type: 'paragraph' }],
 };
-
-const richTextNodes = addListNodes(basicSchema.spec.nodes, 'paragraph block*', 'block');
-
-export const richTextSchema = new Schema({
-  nodes: richTextNodes,
-  marks: basicSchema.spec.marks,
-});
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);

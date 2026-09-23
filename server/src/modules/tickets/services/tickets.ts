@@ -2,6 +2,12 @@ import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { db } from '../../../db/index.js';
 import { authUsers, comments, tickets, ticketRelationships, userProfiles, projects, cycles, labels, ticketLabels, workspaceSettings } from '../../../db/schema.js';
 import { createId, getProjectByKeyPrefix, nextTicketKey, normalizeIsoDate } from '../../../lib/platform.js';
+import { audit } from '../../../lib/logger.js';
+import {
+  isSanitizedEditorContentEmpty,
+  sanitizeEditorContent,
+  type EditorContentSanitizationResult,
+} from '../../../lib/html-sanitization.js';
 import { isProjectMember, isWorkspaceMember } from '../../workspaces/services/membership.js';
 import generateBranchName from '../utils/branch.js';
 
@@ -50,6 +56,37 @@ export type TicketUpdateEffects = {
 };
 
 export const TICKET_ASSIGNEE_SCOPE_VIOLATION = 'TICKET_ASSIGNEE_SCOPE_VIOLATION';
+export const COMMENT_BODY_EMPTY_AFTER_SANITIZATION = 'COMMENT_BODY_EMPTY_AFTER_SANITIZATION';
+
+type EditorContentAuditContext = {
+  operation: 'ticket_create' | 'ticket_update' | 'comment_create' | 'comment_update';
+  field: 'description' | 'body';
+  ticketId: string;
+  projectId?: string;
+  commentId?: string;
+};
+
+/**
+ * Enforce the editor-content trust boundary at the persistence service layer.
+ * This covers REST, MCP, and webhook callers without ever writing attacker
+ * supplied content to audit logs.
+ */
+function sanitizeEditorContentForPersistence(
+  content: string,
+  context: EditorContentAuditContext,
+): EditorContentSanitizationResult {
+  const result = sanitizeEditorContent(content);
+
+  if (result.stripped) {
+    audit('tickets.editor_content_sanitized', {
+      ...context,
+      contentFormat: result.format,
+      strippedCount: result.strippedCount,
+    });
+  }
+
+  return result;
+}
 
 function normalizeAssigneeId(value: string | null | undefined): string | null {
   if (typeof value !== 'string') {
@@ -838,16 +875,23 @@ export async function createTicketRecord(input: {
   updatedAt?: Date;
 }) {
   const key = await nextTicketKey(input.projectId);
+  const ticketId = createId('ti');
   const sanitizedTitle = sanitizeTitle(input.title);
+  const sanitizedDescription = sanitizeEditorContentForPersistence(input.description ?? '', {
+    operation: 'ticket_create',
+    field: 'description',
+    ticketId,
+    projectId: input.projectId,
+  });
   const nextAssigneeId = normalizeAssigneeId(input.assigneeId);
   const result = await db.transaction(async (tx) => {
     const rows = await tx
       .insert(tickets)
       .values({
-        id: createId('ti'),
+        id: ticketId,
         key,
         title: sanitizedTitle,
-        description: input.description ?? '',
+        description: sanitizedDescription.content,
         status: canonicalizeStatus(input.status ?? 'todo'),
         priority: canonicalizePriority(input.priority ?? 'no_priority'),
         projectId: input.projectId,
@@ -1029,9 +1073,18 @@ export async function updateTicketRecordWithEffects(
     ? await getTicketRelationshipCleanupEffect(ticketId)
     : { removedRelationCount: 0, affectedTickets: [] };
 
+  const sanitizedDescription = updates.description !== undefined
+    ? sanitizeEditorContentForPersistence(updates.description as string, {
+        operation: 'ticket_update',
+        field: 'description',
+        ticketId,
+        projectId: existingTicket.projectId,
+      })
+    : undefined;
+
   const payload = {
     ...(updates.title !== undefined ? { title: sanitizeTitle(updates.title as string) } : {}),
-    ...(updates.description !== undefined ? { description: updates.description } : {}),
+    ...(sanitizedDescription !== undefined ? { description: sanitizedDescription.content } : {}),
     ...(updates.status !== undefined ? { status: nextStatus } : {}),
     ...(updates.priority !== undefined ? { priority: canonicalizePriority(updates.priority as string) } : {}),
     ...(nextAssigneeId !== undefined ? { assigneeId: nextAssigneeId } : {}),
@@ -1158,11 +1211,22 @@ export async function deleteTicketRecord(ticketId: string, projectId?: string) {
 }
 
 export async function addCommentRecord(ticketId: string, userId: string, body: string, createdAt?: Date) {
+  const commentId = createId('co');
+  const sanitizedBody = sanitizeEditorContentForPersistence(body, {
+    operation: 'comment_create',
+    field: 'body',
+    ticketId,
+    commentId,
+  });
+  if (isSanitizedEditorContentEmpty(sanitizedBody.content)) {
+    throw new Error(COMMENT_BODY_EMPTY_AFTER_SANITIZATION);
+  }
+
   await db.insert(comments).values({
-    id: createId('co'),
+    id: commentId,
     ticketId,
     userId,
-    body,
+    body: sanitizedBody.content,
     createdAt: createdAt ?? new Date(),
   });
 
@@ -1171,9 +1235,19 @@ export async function addCommentRecord(ticketId: string, userId: string, body: s
 }
 
 export async function updateCommentRecord(commentId: string, ticketId: string, body: string) {
+  const sanitizedBody = sanitizeEditorContentForPersistence(body, {
+    operation: 'comment_update',
+    field: 'body',
+    ticketId,
+    commentId,
+  });
+  if (isSanitizedEditorContentEmpty(sanitizedBody.content)) {
+    throw new Error(COMMENT_BODY_EMPTY_AFTER_SANITIZATION);
+  }
+
   await db
     .update(comments)
-    .set({ body })
+    .set({ body: sanitizedBody.content })
     .where(and(eq(comments.id, commentId), eq(comments.ticketId, ticketId)));
 
   const allComments = await listComments(ticketId);
