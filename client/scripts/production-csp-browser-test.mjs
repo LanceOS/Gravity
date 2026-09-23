@@ -28,6 +28,7 @@ function assertCspHeader(response) {
 
   assert.ok(policy, 'The production HTML response must include an enforcing CSP header.');
   assert.match(policy, /(?:^|;)\s*script-src\s+'self'(?:\s|;|$)/i);
+  assert.match(policy, /(?:^|;)\s*trusted-types\s+[^;]*\bgravity-editor\b/i);
   assert.match(policy, /(?:^|;)\s*trusted-types\s+[^;]*\bdompurify\b/i);
   assert.match(policy, /(?:^|;)\s*trusted-types\s+[^;]*\bProseMirrorClipboard\b/i);
   assert.match(policy, /(?:^|;)\s*require-trusted-types-for\s+'script'(?:\s|;|$)/i);

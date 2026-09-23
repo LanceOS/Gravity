@@ -34,7 +34,7 @@ export const APP_SHELL_CONTENT_SECURITY_POLICY = [
   "frame-ancestors 'none'",
   "form-action 'self'",
   "manifest-src 'self'",
-  'trusted-types dompurify ProseMirrorClipboard',
+  'trusted-types gravity-editor dompurify ProseMirrorClipboard',
   "require-trusted-types-for 'script'",
 ].join('; ');
 

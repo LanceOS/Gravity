@@ -155,6 +155,7 @@ assert_production_csp() {
   assert_csp_directive_contains "$policy" 'manifest-src' "'self'"
   assert_csp_directive_contains "$policy" 'require-trusted-types-for' "'script'"
   assert_csp_directive_contains "$policy" 'trusted-types' 'dompurify'
+  assert_csp_directive_contains "$policy" 'trusted-types' 'gravity-editor'
   assert_csp_directive_contains "$policy" 'trusted-types' 'ProseMirrorClipboard'
 
   script_src="$(csp_directive_value "$policy" 'script-src')"
@@ -203,6 +204,9 @@ assert_production_csp "${FRONTEND_PUBLIC_URL}/csp-contract-check"
 
 log 'Installing Chromium for the production CSP browser smoke test'
 npm exec --prefix "$ROOT_DIR" -- playwright install chromium
+
+log 'Validating editor Trusted Types enforcement and unsupported-browser fallback'
+npm run --prefix "$CLIENT_DIR" test:editor-trusted-types
 
 log 'Validating CSP and Trusted Types in a production browser'
 GRAVITY_CSP_TEST_URL="$FRONTEND_PUBLIC_URL" npm run --prefix "$CLIENT_DIR" test:production-csp

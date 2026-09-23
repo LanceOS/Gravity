@@ -8,7 +8,7 @@ import { baseKeymap, chainCommands, createParagraphNear, liftEmptyBlock, splitBl
 import { liftListItem, sinkListItem, splitListItemKeepMarks } from 'prosemirror-schema-list';
 
 import { parseRichTextValue, richTextSchema, serializeRichTextJson } from '../../../utilities/richtext';
-import { sanitizeTrustedHtml } from '../../../utilities/sanitize';
+import { sanitizeRichTextClipboardHtml, sanitizeTrustedHtml } from '../../../utilities/sanitize';
 import { cn } from '../../../utilities/cn';
 import { buildInputRules, toggleHeading, toggleBlockQuote, toggleList, toggleCodeBlock } from '../utilities/commands';
 import { placeholderPlugin } from '../plugins/placeholder';
@@ -142,6 +142,9 @@ export function useRichTextEditor({
     const view = new EditorView(mountRef.current, {
       state,
       editable: () => !readOnly,
+      // ProseMirror also parses HTML for drops, programmatic pasteHTML(), and
+      // native clipboard fallbacks via its own Trusted Types parsing policy.
+      transformPastedHTML: (html) => sanitizeRichTextClipboardHtml(html, richTextSchema),
       dispatchTransaction(transaction) {
         const currentView = viewRef.current;
         if (!currentView) return;
@@ -165,14 +168,20 @@ export function useRichTextEditor({
           const html = event.clipboardData?.getData('text/html');
           if (!html) return false;
 
-          const sanitized = sanitizeTrustedHtml(html);
-          if (!String(sanitized).trim()) return false;
-
           event.preventDefault();
+          const sanitized = sanitizeTrustedHtml(html);
+          if (!String(sanitized).trim()) {
+            // Do not let ProseMirror retry the original, rejected HTML. Its
+            // plain-text parser preserves newlines without an HTML assignment.
+            const text = event.clipboardData?.getData('text/plain');
+            if (text) viewInstance.pasteText(text, event);
+            return true;
+          }
+
           const container = document.createElement('div');
           // TypeScript's DOM declarations still type innerHTML as `string`,
-          // while browsers accept the TrustedHTML returned above. Preserve the
-          // runtime TrustedHTML value so CSP enforcement can verify this sink.
+          // while supporting browsers require the policy's TrustedHTML object.
+          // This cast preserves that object; never stringify it at the sink.
           container.innerHTML = sanitized as unknown as string;
           const slice = ProseMirrorDOMParser.fromSchema(richTextSchema).parseSlice(container);
           viewInstance.dispatch(viewInstance.state.tr.replaceSelection(slice).scrollIntoView());

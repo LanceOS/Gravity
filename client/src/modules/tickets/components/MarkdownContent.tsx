@@ -302,7 +302,8 @@ export function MarkdownContent({ text }: MarkdownTextProps) {
 
     const template = document.createElement('template');
     // TypeScript's DOM declarations still type innerHTML as `string`, while
-    // browsers accept the TrustedHTML value produced by the sanitizer.
+    // supporting browsers require the gravity-editor policy's TrustedHTML.
+    // The cast preserves the runtime object (or sanitized fallback string).
     template.innerHTML = sanitizeTrustedHtml(html) as unknown as string;
 
     return Array.from(template.content.childNodes).flatMap((node, index) => {

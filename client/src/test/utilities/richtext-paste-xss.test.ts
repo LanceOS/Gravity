@@ -7,7 +7,7 @@ import {
   parseRichTextValue,
   renderRichTextHtml,
   richTextSchema,
-  sanitizeHtml,
+  sanitizeTrustedHtml,
   serializeRichTextJson,
 } from '@library';
 
@@ -34,17 +34,17 @@ import {
 // HTML, parse the sanitized string into a slice against the editor schema, and
 // insert it into an empty document. Returns the resulting editor document.
 function pasteHtmlIntoEditor(html: string): ProseMirrorNode {
-  const sanitized = sanitizeHtml(html);
+  const sanitized = sanitizeTrustedHtml(html);
   const state = EditorState.create({ schema: richTextSchema, doc: createEmptyRichTextDoc() });
 
-  // The real handler bails out (returns false) when sanitization leaves nothing
-  // to paste, so the editor keeps its existing (empty) document.
-  if (!sanitized.trim()) {
+  // The real handler consumes HTML that sanitizes to nothing. Without a
+  // text/plain alternative, the editor keeps its existing document.
+  if (!String(sanitized).trim()) {
     return state.doc;
   }
 
   const container = document.createElement('div');
-  container.innerHTML = sanitized;
+  container.innerHTML = sanitized as unknown as string;
   const slice = ProseMirrorDOMParser.fromSchema(richTextSchema).parseSlice(container);
   const next = state.apply(state.tr.replaceSelection(slice));
   return next.doc;
@@ -266,14 +266,14 @@ describe('rich text paste pipeline - safe formatting is preserved', () => {
   });
 
   it('preserves bullet and ordered lists', () => {
-    const doc = pasteHtmlIntoEditor('<ul><li>one</li><li>two</li></ul><ol><li>first</li></ol>');
+    const doc = pasteHtmlIntoEditor('<ul><li>one</li><li>two</li></ul><ol start="7"><li>seventh</li></ol>');
 
     const rendered = renderRichTextHtml(doc);
     expect(rendered).toContain('<ul>');
-    expect(rendered).toContain('<ol>');
+    expect(rendered).toContain('<ol start="7">');
     expect(rendered).toContain('<li>');
     expect(extractRichTextPlainText(doc)).toContain('one');
-    expect(extractRichTextPlainText(doc)).toContain('first');
+    expect(extractRichTextPlainText(doc)).toContain('seventh');
   });
 
   it('preserves blockquotes and code blocks', () => {
