@@ -17,6 +17,8 @@ services:
       - ./client:/app/client
       - frontend_node_modules:/app/client/node_modules
       - ./library:/app/library
+      - ./server/src/lib/html-sanitization-policy.ts:/app/server/src/lib/html-sanitization-policy.ts:ro
+      - ./server/src/lib/rich-text-schema.ts:/app/server/src/lib/rich-text-schema.ts:ro
     # Vite needs --host to bind to 0.0.0.0 in the container
     command: ["npm", "run", "dev", "--", "--host"]
     environment:

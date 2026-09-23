@@ -32,6 +32,9 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     resolve: {
+      // Shared server schema imports must use the editor's runtime, including
+      // Docker builds that install server and client dependencies separately.
+      dedupe: ['prosemirror-model', 'prosemirror-state', 'prosemirror-transform', 'prosemirror-view'],
       alias: {
         '@library': resolve(__dirname, '../library'),
         '@tanstack/react-query': resolve(__dirname, 'src/utils/react-query-mock.tsx'),

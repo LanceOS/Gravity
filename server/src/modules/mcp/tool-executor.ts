@@ -27,7 +27,9 @@ export async function executeTool(
     toolName: name,
     workspaceId: contextWorkspaceId,
     actorUserId,
-    arguments: args,
+    // Values can contain rich text or other private user content. Record the
+    // operation's shape without copying that content into the audit log.
+    argumentNames: Object.keys(args).sort(),
   });
 
   return handler(args, {

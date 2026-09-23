@@ -1,55 +1,87 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { createAuthenticatedApi, seedWorkspaceFixture } from './helpers/test-helpers.js';
 import { db } from '../src/db/index.js';
 import { comments, tickets } from '../src/db/schema.js';
+import { richTextSchema } from '../src/lib/rich-text-schema.js';
 
-/**
- * Server-side trust-boundary coverage for rich-text XSS.
- *
- * The server is deliberately NOT the HTML-sanitization layer. It is a JSON API
- * that persists ticket descriptions and comment bodies as opaque rich-text data
- * (ProseMirror JSON in practice, but any string) and never renders them to
- * HTML. XSS safety is enforced entirely on the client at render time by
- * `renderRichTextHtml` (see client/src/test/utilities/richtext-paste-xss.test.ts).
- *
- * Because the server does not sanitize, a crafted payload can be written
- * straight to the API without ever passing through the editor's paste handler.
- * These tests pin that contract in two directions:
- *
- *   1. Malicious rich-text content is stored and returned BYTE-FOR-BYTE
- *      unchanged - proving the server treats it as inert, opaque data (it does
- *      not execute, interpret, partially strip, or otherwise mangle it), which
- *      is exactly what lets the client be the single sanitization boundary.
- *   2. If someone later assumes "the server already sanitized this" and drops a
- *      client-side guard, or accidentally starts transforming rich text on the
- *      server, this test fails and forces a deliberate re-evaluation.
- */
+const RAW_CONTENT_MARKER = 'server-editor-xss-audit-marker-51cbf6';
 
-const XSS_PAYLOADS: Array<[string, string]> = [
-  ['inline script tag', '<script>alert(1)</script>'],
-  ['img onerror handler', '<img src=x onerror="alert(1)">'],
-  ['javascript: link', '<a href="javascript:alert(1)">click</a>'],
-  ['svg onload handler', '<svg onload="alert(1)"></svg>'],
-  ['iframe payload', '<iframe src="https://evil.com/frame"></iframe>'],
-  // What the client actually persists: ProseMirror JSON. A dangerous href can
-  // be smuggled into stored JSON; the server must keep it verbatim (the client
-  // strips it on render) rather than silently rewrite it.
-  [
-    'prosemirror json with javascript href',
-    JSON.stringify({
-      type: 'doc',
-      content: [
-        {
-          type: 'paragraph',
-          content: [
-            { type: 'text', text: 'click', marks: [{ type: 'link', attrs: { href: 'javascript:alert(1)', title: null } }] },
-          ],
-        },
-      ],
-    }),
-  ],
-];
+type ProseMirrorTextNode = {
+  type: string;
+  text?: string;
+  marks?: Array<{
+    type: string;
+    attrs?: Record<string, unknown>;
+  }>;
+};
+
+type ProseMirrorDocument = {
+  type: string;
+  content: Array<{
+    type: string;
+    content?: ProseMirrorTextNode[];
+  }>;
+};
+
+function unsafeHtml(safeText: string): string {
+  return [
+    `<p>${safeText}</p>`,
+    `<script>window.${RAW_CONTENT_MARKER} = true</script>`,
+    `<img src="https://images.example.test/safe.png" onerror="window.${RAW_CONTENT_MARKER} = true" alt="safe image">`,
+    `<a href="javascript:window.${RAW_CONTENT_MARKER} = true">unsafe link</a>`,
+    '<iframe src="https://evil.example.test/payload"></iframe>',
+  ].join('');
+}
+
+function unsafeProseMirrorLink(label: string): string {
+  return JSON.stringify({
+    type: 'doc',
+    content: [
+      {
+        type: 'paragraph',
+        content: [
+          {
+            type: 'text',
+            text: label,
+            marks: [
+              {
+                type: 'link',
+                attrs: {
+                  href: `java\nscript:window.${RAW_CONTENT_MARKER} = true`,
+                  title: null,
+                },
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  } satisfies ProseMirrorDocument);
+}
+
+function expectRawHtmlToBeSafe(content: string, safeText: string): void {
+  const doc = richTextSchema.nodeFromJSON(JSON.parse(content));
+  expect(doc.textContent).toContain(safeText);
+  expect(content).toContain('"src":"https://images.example.test/safe.png"');
+  expect(content).toContain('"alt":"safe image"');
+  expect(content.toLowerCase()).not.toContain('<script');
+  expect(content.toLowerCase()).not.toContain('<iframe');
+  expect(content.toLowerCase()).not.toContain('onerror=');
+  expect(content.toLowerCase()).not.toContain('javascript:');
+  expect(content).not.toContain(RAW_CONTENT_MARKER);
+}
+
+function expectUnsafeProseMirrorLinkToBeRemoved(content: string, label: string): void {
+  const document = JSON.parse(content) as ProseMirrorDocument;
+  const textNode = document.content[0]?.content?.[0];
+
+  expect(document.type).toBe('doc');
+  expect(textNode?.text).toBe(label);
+  expect(textNode?.marks).toEqual([]);
+  expect(content.toLowerCase()).not.toContain('javascript:');
+  expect(content).not.toContain(RAW_CONTENT_MARKER);
+}
 
 async function setupOwnerAndProject() {
   const ownerApi = await createAuthenticatedApi({
@@ -70,108 +102,294 @@ async function setupOwnerAndProject() {
   return { ownerApi, owner, project };
 }
 
-describe('ticket rich-text server trust boundary', () => {
-  it('stores and returns a malicious ticket description verbatim without sanitizing', async () => {
+function sanitizedAuditEntries(infoSpy: ReturnType<typeof vi.spyOn>) {
+  return infoSpy.mock.calls.flatMap(([message]) => {
+    const line = String(message);
+
+    try {
+      const entry = JSON.parse(line) as Record<string, unknown>;
+      return entry.event === 'tickets.editor_content_sanitized' ? [{ line, entry }] : [];
+    } catch {
+      return [];
+    }
+  });
+}
+
+describe('ticket rich-text server sanitization', () => {
+  it('preserves Markdown descriptions and comments through create and update', async () => {
     const { ownerApi, project } = await setupOwnerAndProject();
+    const markdown = 'Use `<button>` and `a && b`.\n\n```html\n<script>literal code</script>\n```\n\n<dev@example.test>';
+    const create = await ownerApi.post('/api/v1/tickets').send({
+      projectId: project.id,
+      title: 'Markdown round trip',
+      description: markdown,
+    });
+    expect(create.status).toBe(201);
+    expect(create.body.description).toBe(markdown);
 
-    for (const [, payload] of XSS_PAYLOADS) {
-      const createResponse = await ownerApi.post('/api/v1/tickets').send({
-        projectId: project.id,
-        title: 'Rich text boundary check',
-        description: payload,
-        priority: 'medium',
-      });
+    const update = await ownerApi.patch(`/api/v1/tickets/${create.body.id}`)
+      .set('x-project-id', project.id).send({ description: `${markdown}\n\nMore text.` });
+    expect(update.status).toBe(200);
+    expect(update.body.description).toBe(`${markdown}\n\nMore text.`);
 
-      expect(createResponse.status).toBe(201);
-      // The create response echoes the description back untouched.
-      expect(createResponse.body.description).toBe(payload);
+    const comment = await ownerApi.post(`/api/v1/tickets/${create.body.id}/comments`)
+      .send({ body: '<https://example.test>' });
+    expect(comment.status).toBe(201);
+    expect(comment.body.body).toBe('<https://example.test>');
 
-      const ticketId = createResponse.body.id as string;
-
-      // A fresh read returns the same opaque payload...
-      const detailResponse = await ownerApi
-        .get(`/api/v1/tickets/${ticketId}`)
-        .query({ projectId: project.id });
-
-      expect(detailResponse.status).toBe(200);
-      expect(detailResponse.body.description).toBe(payload);
-
-      // ...and it is persisted verbatim at rest, not transformed on write.
-      const [row] = await db
-        .select({ description: tickets.description })
-        .from(tickets)
-        .where(eq(tickets.id, ticketId));
-      expect(row?.description).toBe(payload);
-    }
+    const commentUpdate = await ownerApi.patch(`/api/v1/tickets/${create.body.id}/comments/${comment.body.id}`)
+      .send({ body: markdown });
+    expect(commentUpdate.status).toBe(200);
+    const [stored] = await db.select().from(comments).where(eq(comments.id, comment.body.id));
+    expect(stored?.body).toBe(markdown);
   });
 
-  it('stores and returns a malicious comment body verbatim without sanitizing', async () => {
-    const { ownerApi, owner, project } = await setupOwnerAndProject();
-
-    const createTicketResponse = await ownerApi.post('/api/v1/tickets').send({
+  it('sanitizes ticket creation and update before returning and persisting descriptions', async () => {
+    const { ownerApi, project } = await setupOwnerAndProject();
+    const createSafeText = 'Ticket create safe content';
+    const createResponse = await ownerApi.post('/api/v1/tickets').send({
       projectId: project.id,
-      title: 'Comment boundary check',
-      description: 'plain description',
+      title: 'Ticket sanitization coverage',
+      description: unsafeHtml(createSafeText),
       priority: 'medium',
     });
-    expect(createTicketResponse.status).toBe(201);
-    const ticketId = createTicketResponse.body.id as string;
 
-    for (const [, payload] of XSS_PAYLOADS) {
-      const commentResponse = await ownerApi
-        .post(`/api/v1/tickets/${ticketId}/comments`)
-        .send({ userId: owner.id, body: payload });
+    expect(createResponse.status).toBe(201);
+    expectRawHtmlToBeSafe(createResponse.body.description, createSafeText);
 
-      expect(commentResponse.status).toBe(201);
-      expect(commentResponse.body.body).toBe(payload);
+    const ticketId = createResponse.body.id as string;
+    const [createdRow] = await db
+      .select({ description: tickets.description })
+      .from(tickets)
+      .where(eq(tickets.id, ticketId));
+    expect(createdRow?.description).toBe(createResponse.body.description);
 
-      const commentId = commentResponse.body.id as string;
-
-      // The list endpoint returns the stored body unchanged.
-      const listResponse = await ownerApi.get(`/api/v1/tickets/${ticketId}/comments`);
-      expect(listResponse.status).toBe(200);
-      const stored = listResponse.body.find((c: { id: string }) => c.id === commentId);
-      expect(stored?.body).toBe(payload);
-
-      // And it is persisted verbatim at rest.
-      const [row] = await db
-        .select({ body: comments.body })
-        .from(comments)
-        .where(eq(comments.id, commentId));
-      expect(row?.body).toBe(payload);
-    }
-  });
-
-  it('preserves a malicious payload through a comment update (still no server sanitizing)', async () => {
-    const { ownerApi, owner, project } = await setupOwnerAndProject();
-
-    const createTicketResponse = await ownerApi.post('/api/v1/tickets').send({
-      projectId: project.id,
-      title: 'Comment update boundary check',
-      description: 'plain description',
-      priority: 'medium',
-    });
-    expect(createTicketResponse.status).toBe(201);
-    const ticketId = createTicketResponse.body.id as string;
-
-    const commentResponse = await ownerApi
-      .post(`/api/v1/tickets/${ticketId}/comments`)
-      .send({ userId: owner.id, body: 'harmless first draft' });
-    expect(commentResponse.status).toBe(201);
-    const commentId = commentResponse.body.id as string;
-
-    const payload = '<img src=x onerror="alert(1)"><script>alert(2)</script>';
+    const updateLabel = 'Ticket update keeps this text';
     const updateResponse = await ownerApi
-      .patch(`/api/v1/tickets/${ticketId}/comments/${commentId}`)
-      .send({ body: payload });
+      .patch(`/api/v1/tickets/${ticketId}`)
+      .set('x-project-id', project.id)
+      .send({ description: unsafeProseMirrorLink(updateLabel) });
 
     expect(updateResponse.status).toBe(200);
-    expect(updateResponse.body.body).toBe(payload);
+    expectUnsafeProseMirrorLinkToBeRemoved(updateResponse.body.description, updateLabel);
+
+    const [updatedRow] = await db
+      .select({ description: tickets.description })
+      .from(tickets)
+      .where(eq(tickets.id, ticketId));
+    expect(updatedRow?.description).toBe(updateResponse.body.description);
+  });
+
+  it('sanitizes comment creation and update before returning and persisting bodies', async () => {
+    const { ownerApi, project } = await setupOwnerAndProject();
+    const ticketResponse = await ownerApi.post('/api/v1/tickets').send({
+      projectId: project.id,
+      title: 'Comment sanitization coverage',
+      description: 'safe ticket description',
+      priority: 'medium',
+    });
+    expect(ticketResponse.status).toBe(201);
+    const ticketId = ticketResponse.body.id as string;
+
+    const createSafeText = 'Comment create safe content';
+    const commentResponse = await ownerApi
+      .post(`/api/v1/tickets/${ticketId}/comments`)
+      .send({ body: unsafeHtml(createSafeText) });
+
+    expect(commentResponse.status).toBe(201);
+    expectRawHtmlToBeSafe(commentResponse.body.body, createSafeText);
+    const commentId = commentResponse.body.id as string;
+
+    const [createdRow] = await db
+      .select({ body: comments.body })
+      .from(comments)
+      .where(eq(comments.id, commentId));
+    expect(createdRow?.body).toBe(commentResponse.body.body);
+
+    const updateLabel = 'Comment update keeps this text';
+    const updateResponse = await ownerApi
+      .patch(`/api/v1/tickets/${ticketId}/comments/${commentId}`)
+      .send({ body: unsafeProseMirrorLink(updateLabel) });
+
+    expect(updateResponse.status).toBe(200);
+    expectUnsafeProseMirrorLinkToBeRemoved(updateResponse.body.body, updateLabel);
+
+    const [updatedRow] = await db
+      .select({ body: comments.body })
+      .from(comments)
+      .where(eq(comments.id, commentId));
+    expect(updatedRow?.body).toBe(updateResponse.body.body);
+  });
+
+  it('rejects comments when sanitization removes all meaningful content', async () => {
+    const { ownerApi, project } = await setupOwnerAndProject();
+    const ticketResponse = await ownerApi.post('/api/v1/tickets').send({
+      projectId: project.id,
+      title: 'Empty comment sanitization coverage',
+      description: 'safe ticket description',
+      priority: 'medium',
+    });
+    expect(ticketResponse.status).toBe(201);
+    const ticketId = ticketResponse.body.id as string;
+
+    for (const body of [
+      '<script>alert(1)</script>',
+      '<img src="javascript:alert(1)" alt="unsafe image">',
+      JSON.stringify({ type: 'doc', content: [{ type: ['image'], attrs: { src: 'javascript:alert(1)' } }] }),
+    ]) {
+      const rejectedCreate = await ownerApi
+        .post(`/api/v1/tickets/${ticketId}/comments`)
+        .send({ body });
+      expect(rejectedCreate.status).toBe(400);
+      expect(rejectedCreate.body.error).toBe('Comment body must contain safe content.');
+    }
+    expect(await ownerApi.get(`/api/v1/tickets/${ticketId}/comments`)).toMatchObject({
+      status: 200,
+      body: [],
+    });
+
+    const safeComment = await ownerApi
+      .post(`/api/v1/tickets/${ticketId}/comments`)
+      .send({ body: 'A safe comment' });
+    expect(safeComment.status).toBe(201);
+    const commentId = safeComment.body.id as string;
+
+    const rejectedUpdate = await ownerApi
+      .patch(`/api/v1/tickets/${ticketId}/comments/${commentId}`)
+      .send({ body: '<script>alert(2)</script>' });
+    expect(rejectedUpdate.status).toBe(400);
+    expect(rejectedUpdate.body.error).toBe('Comment body must contain safe content.');
 
     const [row] = await db
       .select({ body: comments.body })
       .from(comments)
       .where(eq(comments.id, commentId));
-    expect(row?.body).toBe(payload);
+    expect(row?.body).toBe('A safe comment');
+  });
+
+  it('removes coercible node and mark types before descriptions and comments reach storage', async () => {
+    const { ownerApi, project } = await setupOwnerAndProject();
+    const unsafeContent = (text: string) => JSON.stringify({
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [
+        { type: 'text', text, marks: [{ type: ['link'], attrs: { href: 'javascript:alert(1)' } }] },
+        { type: ['image'], attrs: { src: 'data:image/svg+xml,<svg onload="alert(1)"/>' } },
+      ] }],
+    });
+    const expectSafeDocument = (content: string, text: string) => {
+      const doc = richTextSchema.nodeFromJSON(JSON.parse(content));
+      doc.check();
+      expect(doc.textContent).toBe(text);
+      expect(doc.firstChild?.childCount).toBe(1);
+      expect(doc.firstChild?.firstChild?.marks).toEqual([]);
+      expect(content).not.toMatch(/javascript:|data:image/);
+    };
+
+    const create = await ownerApi.post('/api/v1/tickets').send({
+      projectId: project.id,
+      title: 'Coercible editor types',
+      description: unsafeContent('Created description'),
+    });
+    expect(create.status).toBe(201);
+    expectSafeDocument(create.body.description, 'Created description');
+
+    const update = await ownerApi.patch(`/api/v1/tickets/${create.body.id}`)
+      .set('x-project-id', project.id).send({ description: unsafeContent('Updated description') });
+    expect(update.status).toBe(200);
+    expectSafeDocument(update.body.description, 'Updated description');
+    const [storedTicket] = await db.select().from(tickets).where(eq(tickets.id, create.body.id));
+    expect(storedTicket.description).toBe(update.body.description);
+
+    const comment = await ownerApi.post(`/api/v1/tickets/${create.body.id}/comments`)
+      .send({ body: unsafeContent('Created comment') });
+    expect(comment.status).toBe(201);
+    expectSafeDocument(comment.body.body, 'Created comment');
+
+    const commentUpdate = await ownerApi.patch(`/api/v1/tickets/${create.body.id}/comments/${comment.body.id}`)
+      .send({ body: unsafeContent('Updated comment') });
+    expect(commentUpdate.status).toBe(200);
+    expectSafeDocument(commentUpdate.body.body, 'Updated comment');
+    const [storedComment] = await db.select().from(comments).where(eq(comments.id, comment.body.id));
+    expect(storedComment.body).toBe(commentUpdate.body.body);
+  });
+
+  it('emits structured audit events for stripped content without logging the raw payload', async () => {
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+    const { ownerApi, project } = await setupOwnerAndProject();
+
+    const createResponse = await ownerApi.post('/api/v1/tickets').send({
+      projectId: project.id,
+      title: 'Audit sanitization coverage',
+      description: unsafeHtml('Ticket audit content'),
+      priority: 'medium',
+    });
+    expect(createResponse.status).toBe(201);
+    const ticketId = createResponse.body.id as string;
+
+    const ticketUpdateResponse = await ownerApi
+      .patch(`/api/v1/tickets/${ticketId}`)
+      .set('x-project-id', project.id)
+      .send({ description: unsafeProseMirrorLink('Ticket update audit content') });
+    expect(ticketUpdateResponse.status).toBe(200);
+
+    const commentResponse = await ownerApi
+      .post(`/api/v1/tickets/${ticketId}/comments`)
+      .send({ body: unsafeHtml('Comment audit content') });
+    expect(commentResponse.status).toBe(201);
+    const commentId = commentResponse.body.id as string;
+
+    const commentUpdateResponse = await ownerApi
+      .patch(`/api/v1/tickets/${ticketId}/comments/${commentId}`)
+      .send({ body: unsafeProseMirrorLink('Comment update audit content') });
+    expect(commentUpdateResponse.status).toBe(200);
+
+    const auditEntries = sanitizedAuditEntries(infoSpy);
+    expect(auditEntries).toHaveLength(4);
+    expect(auditEntries.map(({ entry }) => entry)).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        event: 'tickets.editor_content_sanitized',
+        operation: 'ticket_create',
+        field: 'description',
+        ticketId,
+        projectId: project.id,
+        contentFormat: 'html_or_text',
+        strippedCount: expect.any(Number),
+      }),
+      expect.objectContaining({
+        event: 'tickets.editor_content_sanitized',
+        operation: 'ticket_update',
+        field: 'description',
+        ticketId,
+        projectId: project.id,
+        contentFormat: 'prosemirror_json',
+        strippedCount: expect.any(Number),
+      }),
+      expect.objectContaining({
+        event: 'tickets.editor_content_sanitized',
+        operation: 'comment_create',
+        field: 'body',
+        ticketId,
+        commentId,
+        contentFormat: 'html_or_text',
+        strippedCount: expect.any(Number),
+      }),
+      expect.objectContaining({
+        event: 'tickets.editor_content_sanitized',
+        operation: 'comment_update',
+        field: 'body',
+        ticketId,
+        commentId,
+        contentFormat: 'prosemirror_json',
+        strippedCount: expect.any(Number),
+      }),
+    ]));
+
+    for (const { line, entry } of auditEntries) {
+      expect(entry).not.toHaveProperty('content');
+      expect(entry).not.toHaveProperty('description');
+      expect(entry).not.toHaveProperty('body');
+      expect(line).not.toContain(RAW_CONTENT_MARKER);
+      expect(JSON.stringify(entry)).not.toContain(RAW_CONTENT_MARKER);
+    }
   });
 });

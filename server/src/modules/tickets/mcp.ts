@@ -26,6 +26,7 @@ import {
   updateTicketRecord,
   updateTicketRecordWithEffects,
   getProjectScope,
+  COMMENT_BODY_EMPTY_AFTER_SANITIZATION,
   TICKET_ASSIGNEE_SCOPE_VIOLATION,
 } from './services/tickets.js';
 import { ToolExecutionContext, ToolHandler } from '../mcp/tool-handlers/types.js';
@@ -851,7 +852,15 @@ export class TicketTools {
     }
 
     const createdAt = parseDateArg(args.createdAt, 'createdAt');
-    const comment = await addCommentRecord(ticket.id, userId, body, createdAt);
+    let comment;
+    try {
+      comment = await addCommentRecord(ticket.id, userId, body, createdAt);
+    } catch (error) {
+      if (error instanceof Error && error.message === COMMENT_BODY_EMPTY_AFTER_SANITIZATION) {
+        throw new McpToolValidationError('Comment body must contain safe content.');
+      }
+      throw error;
+    }
 
     const scope = await getProjectScope(ticket.projectId);
     if (scope) {
@@ -945,7 +954,15 @@ export class TicketTools {
       throw new Error('commentId and body are required for update_comment.');
     }
 
-    const comment = await updateCommentRecord(commentId, ticket.id, body);
+    let comment;
+    try {
+      comment = await updateCommentRecord(commentId, ticket.id, body);
+    } catch (error) {
+      if (error instanceof Error && error.message === COMMENT_BODY_EMPTY_AFTER_SANITIZATION) {
+        throw new McpToolValidationError('Comment body must contain safe content.');
+      }
+      throw error;
+    }
 
     if (comment) {
       const scope = await getProjectScope(ticket.projectId);
