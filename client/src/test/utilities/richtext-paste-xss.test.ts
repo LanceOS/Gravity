@@ -24,11 +24,9 @@ import {
  *     lands in the editor AND on the HTML it renders back to.
  *
  *  2. The RENDER pipeline (`renderRichTextHtml`) is the enforced XSS boundary
- *     for STORED content. Rich text is persisted as opaque ProseMirror JSON and
- *     the server does not sanitize it, so a document can reach the browser
- *     without ever passing through the paste handler (e.g. written straight to
- *     the API). Those tests feed hand-crafted malicious ProseMirror JSON to the
- *     render path to prove it is neutralized on the way out.
+ *     for STORED content. The server sanitizes new writes, but older records
+ *     can still contain unsafe ProseMirror JSON. These tests feed hand-crafted
+ *     malicious documents to the render path to preserve defense in depth.
  */
 
 // Reproduces the ProseMirror paste handler in
@@ -327,10 +325,10 @@ describe('rich text paste pipeline - safe formatting is preserved', () => {
 });
 
 describe('rich text render pipeline - untrusted stored documents are sanitized', () => {
-  // Rich text is stored as ProseMirror JSON and the server never sanitizes it,
-  // so a malicious document can reach the render path without going through the
-  // paste handler. These craft such documents directly and prove the render
-  // path (renderRichTextHtml) is the enforced XSS boundary for stored content.
+  // The server sanitizes new writes, but legacy ProseMirror JSON can still
+  // contain malicious content that bypassed the paste handler. These craft
+  // such documents directly and verify that renderRichTextHtml continues to
+  // sanitize stored content as defense in depth.
 
   function renderStored(doc: unknown): string {
     return renderRichTextHtml(JSON.stringify(doc));

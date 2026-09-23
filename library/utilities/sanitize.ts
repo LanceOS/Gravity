@@ -1,12 +1,24 @@
 import DOMPurify from 'dompurify';
+import {
+  ALLOWED_URI_REGEXP,
+  DANGEROUS_URI_SCHEME_REGEXP,
+  EXPLICITLY_FORBIDDEN_ATTRIBUTES,
+  EXPLICITLY_FORBIDDEN_TAGS,
+  HTML_SANITIZATION_POLICY,
+  isAttributeAllowedForTag,
+  isExternalUrl,
+  isSafeOrderedListStart,
+  isSafeSanitizationUri,
+  normalizeUriForSchemeValidation,
+  REQUIRED_SAFE_REL_TOKENS,
+  withSafeRelTokens,
+} from '../../server/src/lib/html-sanitization-policy';
 
 /**
- * Centralized HTML sanitization policy. This is the single source of truth
- * for what HTML survives sanitization anywhere in the app (rich text paste,
- * rendered rich text, markdown-derived links, AI output, etc). Do not call
- * DOMPurify directly outside this file - route all sanitization through
- * `sanitizeHtml` / `isSafeHref` / `safeExternalLinkProps` so the policy stays
- * in one auditable place.
+ * The DOM-free policy itself lives in the server library so the API and
+ * browser adapters consume exactly the same allowlist. This browser adapter
+ * owns DOMPurify hooks and public browser-facing helpers. Do not call
+ * DOMPurify directly outside this file.
  */
 export interface SanitizeHtmlConfig {
   /** Explicit tag allowlist. Anything not listed here is stripped. */
@@ -17,81 +29,16 @@ export interface SanitizeHtmlConfig {
   readonly allowedUriSchemes: readonly string[];
 }
 
-export const SANITIZE_CONFIG: SanitizeHtmlConfig = {
-  allowedTags: [
-    'b', 'i', 'em', 'strong', 'a',
-    'ul', 'ol', 'li',
-    'code', 'pre', 'blockquote',
-    'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-    'p', 'br', 'img',
-  ],
-  allowedAttributes: ['href', 'src', 'alt', 'title', 'target', 'rel', 'class'],
-  allowedUriSchemes: ['http', 'https', 'mailto'],
-};
-
-// Called out explicitly for auditability, even though the allowlists above
-// already exclude these by construction (anything not allowlisted is dropped).
-const EXPLICITLY_FORBIDDEN_TAGS = ['script', 'style', 'iframe', 'object', 'embed', 'form', 'input'];
-const EXPLICITLY_FORBIDDEN_ATTRIBUTES = ['style', 'onclick', 'onerror', 'onload', 'onmouseover'];
-
-// Attributes that only make sense on a specific tag. Anything not listed here
-// (e.g. class, title) is allowed on any tag from SANITIZE_CONFIG.allowedTags.
-const ATTRIBUTE_TAG_SCOPE: Partial<Record<string, readonly string[]>> = {
-  href: ['a'],
-  target: ['a'],
-  rel: ['a'],
-  src: ['img'],
-  alt: ['img'],
-};
-
-function isAttributeAllowedForTag(tag: string, attrName: string): boolean {
-  const scopedTags = ATTRIBUTE_TAG_SCOPE[attrName];
-  return !scopedTags || scopedTags.includes(tag);
-}
-
-// Matches an absolute URI whose scheme is in SANITIZE_CONFIG.allowedUriSchemes,
-// or a scheme-less relative reference (path, fragment, query, protocol-relative
-// "//"). Anything else - including javascript:, data:, and vbscript: - fails
-// to match and the attribute is stripped by DOMPurify.
-const ALLOWED_URI_REGEXP = new RegExp(
-  `^(?:(?:${SANITIZE_CONFIG.allowedUriSchemes.join('|')}):|[^a-z]|[a-z0-9+.-]+(?:[^a-z0-9+.:-]|$))`,
-  'i',
-);
+export const SANITIZE_CONFIG: SanitizeHtmlConfig = HTML_SANITIZATION_POLICY;
 
 const PURIFY_CONFIG = {
   ALLOWED_TAGS: [...SANITIZE_CONFIG.allowedTags],
   ALLOWED_ATTR: [...SANITIZE_CONFIG.allowedAttributes],
   ALLOWED_URI_REGEXP,
-  FORBID_TAGS: EXPLICITLY_FORBIDDEN_TAGS,
-  FORBID_ATTR: EXPLICITLY_FORBIDDEN_ATTRIBUTES,
+  FORBID_TAGS: [...EXPLICITLY_FORBIDDEN_TAGS],
+  FORBID_ATTR: [...EXPLICITLY_FORBIDDEN_ATTRIBUTES],
   ALLOW_DATA_ATTR: false,
 };
-
-function isExternalUrl(href: string): boolean {
-  return /^(?:[a-z][a-z0-9+.-]*:)?\/\//i.test(href.trim());
-}
-
-const REQUIRED_SAFE_REL_TOKENS = ['noopener', 'noreferrer'];
-
-// Adds the required safe-navigation tokens to whatever `rel` the author
-// already supplied (e.g. `rel="me"`) instead of clobbering it.
-function withSafeRelTokens(existingRel: string | null): string {
-  const tokens = new Set((existingRel ?? '').split(/\s+/).filter(Boolean));
-  REQUIRED_SAFE_REL_TOKENS.forEach((token) => tokens.add(token));
-  return Array.from(tokens).join(' ');
-}
-
-// Keep URI validation aligned with DOMPurify's ATTR_WHITESPACE expression.
-// URL parsers ignore these characters around (and, for some characters, in)
-// schemes, so a value such as `\u0000javascript:` must not be treated as a
-// harmless relative URL by the JSX-rendering path.
-// eslint-disable-next-line no-control-regex -- mirrors DOMPurify ATTR_WHITESPACE.
-const URI_CONTROL_OR_WHITESPACE_REGEXP = /[\u0000-\u0020\u00A0\u1680\u180E\u2000-\u2029\u205F\u3000]/g;
-const DANGEROUS_URI_SCHEME_REGEXP = /^(?:javascript|data|vbscript):/i;
-
-function normalizeUriForSchemeValidation(uri: string): string {
-  return uri.replace(URI_CONTROL_OR_WHITESPACE_REGEXP, '');
-}
 
 // Hooks are registered on DOMPurify's shared singleton, so re-evaluating this
 // module (e.g. Vite HMR) would otherwise stack duplicate hooks indefinitely.
@@ -105,6 +52,10 @@ DOMPurify.addHook('uponSanitizeAttribute', (node, data) => {
   if (!isAttributeAllowedForTag(tag, data.attrName)) {
     data.keepAttr = false;
     return;
+  }
+
+  if (data.attrName === 'start' && !isSafeOrderedListStart(data.attrValue)) {
+    data.keepAttr = false;
   }
 
   // DOMPurify allows data: URIs on img/audio/video `src` by default even when
@@ -177,12 +128,7 @@ export function sanitizeTrustedHtml(html: string): TrustedHTML {
  * allowlist enforced by `sanitizeHtml` (blocks javascript:, data:, vbscript:, ...).
  */
 export function isSafeHref(href: string): boolean {
-  if (!href) {
-    return false;
-  }
-
-  const normalized = normalizeUriForSchemeValidation(href);
-  return !DANGEROUS_URI_SCHEME_REGEXP.test(normalized) && ALLOWED_URI_REGEXP.test(normalized);
+  return isSafeSanitizationUri(href);
 }
 
 /**

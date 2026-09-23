@@ -78,12 +78,14 @@ podman run -d --rm --userns=keep-id --name gravity_frontend_dev_run \
   -p 5173:5173 \
   -v "$(pwd)/client":/app/client:Z \
   -v "$(pwd)/library":/app/library:Z \
+  -v "$(pwd)/server":/app/server:Z \
   -v "$(pwd)/client/node_modules":/app/client/node_modules:Z \
   -w /app/client node:20-slim \
   sh -c "npm run dev -- --host 0.0.0.0 --port 5173"
 ```
 
 Notes:
+- The server source mount provides the shared HTML-sanitization policy and rich-text schema used by the frontend build.
 - Frontend Dockerfile lives at `client/Dockerfile`, and the API container Dockerfile lives at `server/Dockerfile`.
 -- If you want that nginx container on `5173` to rebuild automatically on frontend changes,
   use `docker/docker-compose.dev.yml` with `docker compose watch`.

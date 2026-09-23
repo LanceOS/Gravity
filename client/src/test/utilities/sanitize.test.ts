@@ -51,6 +51,19 @@ describe('sanitizeHtml', () => {
     expect(sanitized).toContain('alt="pic"');
   });
 
+  it('preserves editor horizontal rules and ordered-list numbering', () => {
+    const result = parseHtml(sanitizeHtml('<hr><ol start="3"><li>third</li></ol><p start="3">text</p>'));
+    expect(result.querySelector('hr')).not.toBeNull();
+    expect(result.querySelector('ol')?.getAttribute('start')).toBe('3');
+    expect(result.querySelector('p')?.hasAttribute('start')).toBe(false);
+  });
+
+  it('drops invalid list numbering and prototype-named attributes safely', () => {
+    const result = parseHtml(sanitizeHtml('<ol start="Infinity"><li>item</li></ol><p constructor="x" __proto__="x">safe</p>'));
+    expect(result.querySelector('ol')?.hasAttribute('start')).toBe(false);
+    expect(result.querySelector('p')?.outerHTML).toBe('<p>safe</p>');
+  });
+
   it('strips dangerous tags entirely', () => {
     const html = '<script>alert(1)</script><style>body{color:red}</style><iframe src="https://evil.com"></iframe>'
       + '<object data="evil.swf"></object><embed src="evil.swf"><form action="/x"><input type="text"></form>';

@@ -18,6 +18,9 @@ const resolvePkgDir = (name: string) => {
 export default defineConfig({
   plugins: [react()],
   resolve: {
+    // Match the editor runtime when shared server schema imports resolve
+    // through a separately installed server dependency tree.
+    dedupe: ['prosemirror-model', 'prosemirror-state', 'prosemirror-transform', 'prosemirror-view'],
     alias: {
       '@library': resolve(__dirname, '../library'),
       '@tanstack/react-query': resolve(__dirname, 'src/utils/react-query-mock.tsx'),

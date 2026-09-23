@@ -5,7 +5,7 @@ WORKDIR /app/client
 ENV NODE_ENV=development
 
 # Setup directories and non-root node user permissions
-RUN mkdir -p /app/client /app/library && chown -R node:node /app
+RUN mkdir -p /app/client /app/library /app/server/src/lib && chown -R node:node /app
 
 USER node
 
@@ -17,6 +17,8 @@ RUN mkdir -p /app && ln -sf /app/client/node_modules /app/node_modules
 # Copy source and shared library for live-sync into the container
 COPY --chown=node:node client ./
 COPY --chown=node:node library /app/library
+COPY --chown=node:node server/src/lib/html-sanitization-policy.ts /app/server/src/lib/html-sanitization-policy.ts
+COPY --chown=node:node server/src/lib/rich-text-schema.ts /app/server/src/lib/rich-text-schema.ts
 
 EXPOSE 5173
 
@@ -26,7 +28,7 @@ FROM docker.io/library/node:20-slim AS builder
 
 WORKDIR /app/client
 
-RUN mkdir -p /app/client /app/library && chown -R node:node /app
+RUN mkdir -p /app/client /app/library /app/server/src/lib && chown -R node:node /app
 
 USER node
 
@@ -36,6 +38,8 @@ RUN mkdir -p /app && ln -sf /app/client/node_modules /app/node_modules
 
 COPY --chown=node:node client ./
 COPY --chown=node:node library ../library
+COPY --chown=node:node server/src/lib/html-sanitization-policy.ts ../server/src/lib/html-sanitization-policy.ts
+COPY --chown=node:node server/src/lib/rich-text-schema.ts ../server/src/lib/rich-text-schema.ts
 
 # Keep Docker builds moving even if repo-level TypeScript checks are temporarily broken.
 # Type-checking is useful, but production frontend assets still need to be generated.

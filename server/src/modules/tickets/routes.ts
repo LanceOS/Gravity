@@ -31,6 +31,7 @@ import {
   deleteCommentRecord,
   removeTicketDependencyRelation,
   getProjectScope,
+  COMMENT_BODY_EMPTY_AFTER_SANITIZATION,
   TICKET_ASSIGNEE_SCOPE_VIOLATION,
   type TicketRelationshipCleanupEffect,
 } from './services/tickets.js';
@@ -511,6 +512,10 @@ export function createTicketsRouter() {
         }, userId);
         res.status(201).json(comment);
       } catch (error) {
+        if (error instanceof Error && error.message === COMMENT_BODY_EMPTY_AFTER_SANITIZATION) {
+          res.status(400).json({ error: 'Comment body must contain safe content.' });
+          return;
+        }
         res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to add comment.' });
       }
     });
@@ -541,6 +546,10 @@ export function createTicketsRouter() {
         }, userId);
         res.json(comment);
       } catch (error) {
+        if (error instanceof Error && error.message === COMMENT_BODY_EMPTY_AFTER_SANITIZATION) {
+          res.status(400).json({ error: 'Comment body must contain safe content.' });
+          return;
+        }
         res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to update comment.' });
       }
     });
