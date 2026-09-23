@@ -235,6 +235,7 @@ describe('ticket rich-text server sanitization', () => {
     for (const body of [
       '<script>alert(1)</script>',
       '<img src="javascript:alert(1)" alt="unsafe image">',
+      JSON.stringify({ type: 'doc', content: [{ type: ['image'], attrs: { src: 'javascript:alert(1)' } }] }),
     ]) {
       const rejectedCreate = await ownerApi
         .post(`/api/v1/tickets/${ticketId}/comments`)
@@ -264,6 +265,52 @@ describe('ticket rich-text server sanitization', () => {
       .from(comments)
       .where(eq(comments.id, commentId));
     expect(row?.body).toBe('A safe comment');
+  });
+
+  it('removes coercible node and mark types before descriptions and comments reach storage', async () => {
+    const { ownerApi, project } = await setupOwnerAndProject();
+    const unsafeContent = (text: string) => JSON.stringify({
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [
+        { type: 'text', text, marks: [{ type: ['link'], attrs: { href: 'javascript:alert(1)' } }] },
+        { type: ['image'], attrs: { src: 'data:image/svg+xml,<svg onload="alert(1)"/>' } },
+      ] }],
+    });
+    const expectSafeDocument = (content: string, text: string) => {
+      const doc = richTextSchema.nodeFromJSON(JSON.parse(content));
+      doc.check();
+      expect(doc.textContent).toBe(text);
+      expect(doc.firstChild?.childCount).toBe(1);
+      expect(doc.firstChild?.firstChild?.marks).toEqual([]);
+      expect(content).not.toMatch(/javascript:|data:image/);
+    };
+
+    const create = await ownerApi.post('/api/v1/tickets').send({
+      projectId: project.id,
+      title: 'Coercible editor types',
+      description: unsafeContent('Created description'),
+    });
+    expect(create.status).toBe(201);
+    expectSafeDocument(create.body.description, 'Created description');
+
+    const update = await ownerApi.patch(`/api/v1/tickets/${create.body.id}`)
+      .set('x-project-id', project.id).send({ description: unsafeContent('Updated description') });
+    expect(update.status).toBe(200);
+    expectSafeDocument(update.body.description, 'Updated description');
+    const [storedTicket] = await db.select().from(tickets).where(eq(tickets.id, create.body.id));
+    expect(storedTicket.description).toBe(update.body.description);
+
+    const comment = await ownerApi.post(`/api/v1/tickets/${create.body.id}/comments`)
+      .send({ body: unsafeContent('Created comment') });
+    expect(comment.status).toBe(201);
+    expectSafeDocument(comment.body.body, 'Created comment');
+
+    const commentUpdate = await ownerApi.patch(`/api/v1/tickets/${create.body.id}/comments/${comment.body.id}`)
+      .send({ body: unsafeContent('Updated comment') });
+    expect(commentUpdate.status).toBe(200);
+    expectSafeDocument(commentUpdate.body.body, 'Updated comment');
+    const [storedComment] = await db.select().from(comments).where(eq(comments.id, comment.body.id));
+    expect(storedComment.body).toBe(commentUpdate.body.body);
   });
 
   it('emits structured audit events for stripped content without logging the raw payload', async () => {

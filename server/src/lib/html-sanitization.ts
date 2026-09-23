@@ -194,6 +194,13 @@ function stripUnsupportedProseMirrorAttributes(
  * alone would miss a malicious `link.attrs.href` or `image.attrs.src`.
  */
 function sanitizeProseMirrorNode(value: JsonRecord): SanitizedJsonValue {
+  // ProseMirror coerces JSON type values when looking up schema nodes/marks.
+  // Reject malformed types before a value such as ['image'] can bypass the
+  // string comparisons that enforce URI safety below.
+  if (typeof value.type !== 'string') {
+    return { value: null, strippedCount: 1 };
+  }
+
   let strippedCount = 0;
   const next: JsonRecord = { ...value };
 
@@ -228,6 +235,11 @@ function sanitizeProseMirrorNode(value: JsonRecord): SanitizedJsonValue {
     for (const mark of value.marks) {
       if (!isRecord(mark)) {
         marks.push(mark);
+        continue;
+      }
+
+      if (typeof mark.type !== 'string') {
+        strippedCount += 1;
         continue;
       }
 

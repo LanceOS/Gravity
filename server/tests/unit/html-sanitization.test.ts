@@ -217,6 +217,64 @@ describe('sanitizeEditorContent', () => {
     });
   });
 
+  it.each([
+    { label: 'array', type: ['link'] },
+    { label: 'nested array', type: [['link']] },
+    { label: 'object', type: { toString: 'link' } },
+    { label: 'null', type: null },
+    { label: 'number', type: 1 },
+  ])('drops a $label mark type while retaining its text', ({ type }) => {
+    const result = sanitizeEditorContent(JSON.stringify({
+      type: 'doc',
+      content: [{
+        type: 'paragraph',
+        content: [{
+          type: 'text',
+          text: 'Keep this label',
+          marks: [{ type, attrs: { href: 'javascript:alert(1)' } }],
+        }],
+      }],
+    }));
+
+    expect(result).toMatchObject({ format: 'prosemirror_json', stripped: true, strippedCount: 1 });
+    const doc = editorDocument(result.content);
+    expect(doc.textContent).toBe('Keep this label');
+    expect(doc.firstChild?.firstChild?.marks).toEqual([]);
+    expect(result.content).not.toContain('javascript:');
+  });
+
+  it.each([
+    { label: 'array', type: ['image'] },
+    { label: 'nested array', type: [['image']] },
+    { label: 'object', type: { toString: 'image' } },
+    { label: 'null', type: null },
+    { label: 'number', type: 1 },
+  ])('drops a $label image type before the editor can coerce it', ({ type }) => {
+    const result = sanitizeEditorContent(JSON.stringify({
+      type: 'doc',
+      content: [{
+        type: 'paragraph',
+        content: [{ type, attrs: { src: 'data:image/svg+xml,<svg onload="alert(1)"/>' } }],
+      }],
+    }));
+
+    expect(result).toMatchObject({ format: 'prosemirror_json', stripped: true, strippedCount: 1 });
+    expect(editorDocument(result.content).firstChild?.childCount).toBe(0);
+    expect(isSanitizedEditorContentEmpty(result.content)).toBe(true);
+    expect(result.content).not.toContain('data:');
+  });
+
+  it('normalizes the document when its only node has a non-string type', () => {
+    const result = sanitizeEditorContent(JSON.stringify({
+      type: 'doc',
+      content: [{ type: ['paragraph'], content: [{ type: 'text', text: 'Malformed node' }] }],
+    }));
+
+    expect(result).toMatchObject({ format: 'prosemirror_json', stripped: true, strippedCount: 1 });
+    expect(JSON.parse(result.content)).toEqual({ type: 'doc', content: [{ type: 'paragraph' }] });
+    expect(isSanitizedEditorContentEmpty(result.content)).toBe(true);
+  });
+
   it('normalizes a document emptied by an unsafe image into a valid empty document', () => {
     const result = sanitizeEditorContent(JSON.stringify({
       type: 'doc',
