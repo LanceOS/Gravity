@@ -20,25 +20,24 @@ export type McpSessionOptions = {
   allowHandshake?: boolean;
   // Maximum allowed message size in bytes. Defaults to 10 MiB.
   maxMessageSize?: number;
-  // When true, responses will be written in the legacy newline-delimited
-  // JSON format instead of Content-Length framed responses. Default: false.
+  // Nonstandard compatibility mode for older Gravity clients.
+  framedOutput?: boolean;
+  /** @deprecated Standard MCP output is already newline-delimited. */
   legacyOutput?: boolean;
+  onStop?: () => void | Promise<void>;
 };
 
 // Default maximum allowed message size in bytes. Exported for reuse.
 export const DEFAULT_MAX_MESSAGE_SIZE = 10 * 1024 * 1024;
 
-/**
- * McpStdioSession implements a Content-Length framed protocol (LSP-style)
- * for robustness when reading from stdio. It also accepts the legacy
- * single-line JSON messages as a fallback (but those must remain compact
- * single-line JSON objects).
- */
+/** Standard MCP newline framing with an input compatibility path for old framed clients. */
 export class McpStdioSession {
   // Efficient chunk queue to avoid repeated Buffer.concat on each data event.
   private chunks: Buffer[] = [];
   private totalLength = 0;
   private running = false;
+  private connectionTokenId: string | null = null;
+  private connectionTokenHash: string | null = null;
   private maxMessageSize: number;
   // Queue for outgoing messages when the writable signals backpressure.
   private sendQueue: string[] = [];
@@ -75,7 +74,7 @@ export class McpStdioSession {
     void this.stop();
   };
   private onInputClose = () => {
-    void this.stop();
+    void this.processingPromise.finally(() => this.stop());
   };
   // Serializes request handling to avoid races (handshake mutates session state).
   private processingPromise: Promise<void> = Promise.resolve();
@@ -105,7 +104,8 @@ export class McpStdioSession {
     });
 
     this.input.on('end', () => {
-      void this.stop();
+      // Finish already-read messages before shutting down the output.
+      void this.processingPromise.finally(() => this.stop());
     });
     this.input.on('error', () => {
       void this.stop();
@@ -116,108 +116,52 @@ export class McpStdioSession {
   }
 
   private processBuffer() {
-    // Loop to extract multiple messages if present in the chunk queue.
-    // We prefer a Content-Length framed protocol (LSP-style). As a fallback
-    // we accept legacy newline-delimited JSON, but that fallback is strictly
-    // limited: legacy messages must be single-line (no embedded CR/LF) and
-    // kept small to avoid unbounded buffering.
-    const MAX_HEADER_SCAN = 64 * 1024; // reasonable header limit for scanning headers
-    const LEGACY_LINE_LIMIT = Math.min(this.maxMessageSize, 64 * 1024); // single-line fallback cap
-
     while (this.totalLength > 0) {
-      // Peek up to header scan limit to find header terminator.
-      const peekLen = Math.min(this.totalLength, MAX_HEADER_SCAN);
-      const peek = this.peekUpTo(peekLen);
-
-      let headerEnd = peek.indexOf('\r\n\r\n');
-      let headerTermLen = 4;
-      if (headerEnd === -1) {
-        headerEnd = peek.indexOf('\n\n');
-        if (headerEnd !== -1) headerTermLen = 2;
-      }
-
-      if (headerEnd !== -1) {
-        // We have a header block available in `peek` buffer (within MAX_HEADER_SCAN).
-        const headerBlock = peek.slice(0, headerEnd).toString('ascii');
-
-        const m = headerBlock.match(/Content-Length:\s*(\d+)/i);
-        if (!m) {
-          // Header block present but missing Content-Length — reject explicitly.
-          this.consumeBytes(headerEnd + headerTermLen);
-          this.send(createMcpErrorResponse(null, ERR_MISSING_CONTENT_LENGTH, 'Missing Content-Length header'));
-          continue;
-        }
-
-        const length = parseInt(m[1], 10);
-        if (!Number.isFinite(length) || length < 0) {
-          this.consumeBytes(headerEnd + headerTermLen);
-          this.send(createMcpErrorResponse(null, ERR_INVALID_CONTENT_LENGTH, 'Invalid Content-Length header'));
-          continue;
-        }
-
-        // Early guard: reject declared lengths that exceed configured limit.
-        if (length > this.maxMessageSize) {
-          this.consumeBytes(headerEnd + headerTermLen);
-          this.send(createMcpErrorResponse(null, ERR_CONTENT_LENGTH_TOO_LARGE, 'Content-Length too large'));
-          continue;
-        }
-
-        const totalNeeded = headerEnd + headerTermLen + length;
-        if (this.totalLength < totalNeeded) {
-          // Not enough data yet; wait for more. Also guard overall buffer size.
-          if (this.totalLength > this.maxMessageSize) {
+      const prefix = this.peekUpTo(Math.min(this.totalLength, 64 * 1024)).toString('utf8');
+      const headerName = 'content-length:';
+      const isFramed = prefix.toLowerCase().startsWith(headerName)
+        || headerName.startsWith(prefix.toLowerCase());
+      if (isFramed) {
+        let headerEnd = prefix.indexOf('\r\n\r\n');
+        let separatorLength = 4;
+        if (headerEnd < 0) { headerEnd = prefix.indexOf('\n\n'); separatorLength = 2; }
+        if (headerEnd < 0) {
+          if (this.totalLength > 64 * 1024) {
             this.clearChunks();
-            this.send(createMcpErrorResponse(null, ERR_MESSAGE_TOO_LARGE, 'Message too large'));
+            this.send(createMcpErrorResponse(null, ERR_MISSING_CONTENT_LENGTH, 'Invalid framing header'));
           }
           return;
         }
-
-        // Consume header and body as a contiguous message.
-        this.consumeBytes(headerEnd + headerTermLen); // drop header
-        const bodyBuf = this.readBytes(length);
-        const bodyStr = bodyBuf.toString('utf8');
-        this.handleRawJson(bodyStr);
+        const match = prefix.slice(0, headerEnd).match(/^Content-Length:\s*(\d+)\s*$/i);
+        const length = match ? Number(match[1]) : NaN;
+        if (!Number.isSafeInteger(length) || length < 0 || length > this.maxMessageSize) {
+          this.clearChunks();
+          this.send(createMcpErrorResponse(null, length > this.maxMessageSize ? ERR_CONTENT_LENGTH_TOO_LARGE : ERR_INVALID_CONTENT_LENGTH,
+            length > this.maxMessageSize ? 'Content-Length too large' : 'Invalid Content-Length header'));
+          return;
+        }
+        if (this.totalLength < headerEnd + separatorLength + length) return;
+        this.consumeBytes(headerEnd + separatorLength);
+        this.handleRawJson(this.readBytes(length).toString('utf8'));
         continue;
       }
 
-      // No header terminator found within the scanned window. Try to locate a
-      // newline for legacy single-line JSON, but only within the safe legacy cap.
-      const nlSearchLen = Math.min(this.totalLength, LEGACY_LINE_LIMIT);
-      const nlPeek = this.peekUpTo(nlSearchLen);
-      const nlIndex = nlPeek.indexOf('\n');
-      if (nlIndex !== -1) {
-        // Found a newline within the safe window: extract the line (without the newline).
-        const lineBuf = this.readBytes(nlIndex);
-        // consume the newline byte
-        this.consumeBytes(1);
-
-        // Defensive guards for legacy input: enforce size and single-line constraint.
-        if (lineBuf.length > LEGACY_LINE_LIMIT) {
+      const newline = this.indexOfByte(10);
+      if (newline < 0) {
+        if (this.totalLength > this.maxMessageSize) {
           this.clearChunks();
           this.send(createMcpErrorResponse(null, ERR_MESSAGE_TOO_LARGE, 'Message too large'));
-          continue;
         }
-
-        const line = lineBuf.toString('utf8');
-        if (!line.trim()) continue;
-        // Reject if line contains any stray CR or LF characters (enforces single-line JSON)
-        if (line.includes('\r') || line.includes('\n')) {
-          this.send(createMcpErrorResponse(null, ERR_MESSAGE_TOO_LARGE, 'Malformed legacy message'));
-          continue;
-        }
-
-        this.handleRawJson(line);
+        return;
+      }
+      if (newline > this.maxMessageSize) {
+        this.consumeBytes(newline + 1);
+        this.send(createMcpErrorResponse(null, ERR_MESSAGE_TOO_LARGE, 'Message too large'));
         continue;
       }
-
-      // If we don't find a newline within the legacy cap and the buffered data
-      // already exceeds the cap, reject to avoid unbounded buffering.
-      if (this.totalLength > LEGACY_LINE_LIMIT) {
-        this.clearChunks();
-        this.send(createMcpErrorResponse(null, ERR_MESSAGE_TOO_LARGE, 'Message too large'));
-      }
-
-      return;
+      const line = this.readBytes(newline).toString('utf8').replace(/\r$/, '');
+      this.consumeBytes(1);
+      if (line.trim()) this.handleRawJson(line);
     }
   }
 
@@ -320,6 +264,14 @@ export class McpStdioSession {
     // Optional handshake flow for dynamic token-based auth.
     if (this.options.allowHandshake && payload?.method === 'stdio/handshake') {
       const params = payload.params ?? {};
+      // Reauthentication must never retain a previous authenticated identity.
+      if (params.token || params.workspaceId) {
+        this.connectionTokenId = null;
+        this.connectionTokenHash = null;
+        this.options.workspaceId = undefined;
+        this.options.actorUserId = undefined;
+        this.options.tokenScopes = undefined;
+      }
       const token = typeof params.token === 'string' ? params.token.trim() : '';
       const workspaceId = typeof params.workspaceId === 'string' ? params.workspaceId.trim() : '';
 
@@ -327,7 +279,7 @@ export class McpStdioSession {
         try {
           const { verifyAndConsumeToken } = await import('./connection.js');
           const tokenRow = await verifyAndConsumeToken(token, workspaceId, {});
-          if (!tokenRow) {
+          if (!tokenRow || tokenRow.singleUse) {
             this.send(createMcpErrorResponse(payload.id ?? null, -32001, 'Invalid or expired token.'));
             return;
           }
@@ -336,14 +288,16 @@ export class McpStdioSession {
           // membership so a token whose issuer lost access can no longer
           // establish a session with accessChecked short-circuiting later
           // request handling.
-          const { isWorkspaceMember } = await import('../workspaces/services/membership.js');
+          const { isMcpWorkspaceMember } = await import('./access.js');
           const issuerIsMember = tokenRow.generatedBy
-            ? await isWorkspaceMember(workspaceId, tokenRow.generatedBy)
+            ? await isMcpWorkspaceMember(workspaceId, tokenRow.generatedBy)
             : false;
           if (!issuerIsMember) {
             this.send(createMcpErrorResponse(payload.id ?? null, -32001, 'Unauthorized workspace access.'));
             return;
           }
+          this.connectionTokenId = tokenRow.id;
+          this.connectionTokenHash = tokenRow.tokenHash;
           this.options.workspaceId = workspaceId;
           this.options.actorUserId = tokenRow.generatedBy;
           this.options.tokenScopes = Array.isArray(tokenRow.scopes) ? tokenRow.scopes : [];
@@ -373,12 +327,21 @@ export class McpStdioSession {
     }
 
     try {
+      if (this.connectionTokenId) {
+        const { verifyConnectionTokenSession } = await import('./connection.js');
+        const token = await verifyConnectionTokenSession(this.connectionTokenId, workspaceId, actorUserId, this.connectionTokenHash);
+        if (!token) {
+          this.send(createMcpErrorResponse(payload?.id ?? null, -32001, 'Invalid or expired token.'));
+          return;
+        }
+        this.options.tokenScopes = token.scopes;
+      }
       const resp = await handleMcpRequest(request, workspaceId, actorUserId, {
-        accessChecked: Array.isArray(this.options.tokenScopes),
+        accessChecked: false,
         sanitize: !!this.options.sanitize,
         tokenScopes: this.options.tokenScopes,
       });
-      this.send(resp);
+      if (resp !== null) this.send(resp);
     } catch (err) {
       this.send(createMcpErrorResponse(payload?.id ?? null, -32603, err instanceof Error ? err.message : String(err)));
     }
@@ -396,7 +359,7 @@ export class McpStdioSession {
 
       const s = JSON.stringify(msg);
       // Prepare payload
-      const payload = this.options.legacyOutput ? s + '\n' : `Content-Length: ${Buffer.byteLength(s, 'utf8')}\r\n\r\n` + s;
+      const payload = this.options.framedOutput ? `Content-Length: ${Buffer.byteLength(s, 'utf8')}\r\n\r\n` + s : s + '\n';
 
       // If we're currently under backpressure or already have queued messages,
       // enqueue the payload and return. It will be flushed on 'drain'.
@@ -450,6 +413,7 @@ export class McpStdioSession {
         // ignore
       }
       await this.processingPromise.catch(() => {});
+      await this.options.onStop?.();
       this.sendQueue.length = 0;
     } catch (e) {
       // ignore

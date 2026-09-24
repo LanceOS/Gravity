@@ -69,6 +69,7 @@ services:
       DATABASE_URL: postgresql://${GRAVITY_POSTGRES_USER:-gravity_user}:${GRAVITY_POSTGRES_PASSWORD:-admin}@postgres:5432/${GRAVITY_POSTGRES_DB:-gravity_workspace}
       REDIS_URL: redis://default:${GRAVITY_REDIS_PASSWORD:-admin}@redis:6379
       REDIS_ENABLED: ${REDIS_ENABLED:-true}
+      MCP_EVENT_NAMESPACE: ${MCP_EVENT_NAMESPACE:-default}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-test-secret}
       BETTER_AUTH_BASE_URL: ${GRAVITY_FRONTEND_PUBLIC_URL:-http://localhost:5173}
       NODE_IDENTITY_MASTER_KEY: ${NODE_IDENTITY_MASTER_KEY:-test-master-key}

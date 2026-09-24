@@ -7,8 +7,12 @@ export interface AccountPreferencesPageState {
   setActiveCategory: (categoryId: SettingsCategoryId) => void;
 }
 
-export function useAccountPreferencesPageState(onResetProviderDraft: () => void): AccountPreferencesPageState {
-  const [activeCategory, setActiveCategory] = useState<SettingsCategoryId>('general');
+export function useAccountPreferencesPageState(onResetProviderDraft: () => void, initialCategory: SettingsCategoryId = 'general'): AccountPreferencesPageState {
+  const [activeCategory, setActiveCategory] = useState<SettingsCategoryId>(initialCategory);
+
+  useEffect(() => {
+    setActiveCategory(initialCategory);
+  }, [initialCategory]);
 
   useEffect(() => {
     if (activeCategory !== 'providers') {
@@ -23,4 +27,3 @@ export function useAccountPreferencesPageState(onResetProviderDraft: () => void)
     setActiveCategory,
   };
 }
-

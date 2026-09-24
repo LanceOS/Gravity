@@ -1,5 +1,9 @@
 import { toolHandlers } from './tool-handlers/registry.js';
 import { audit } from '../../lib/logger.js';
+import { assertToolExecutionAllowed } from './policy.js';
+import { getToolDefinition } from './tools.js';
+import { validateToolArguments } from './validation.js';
+import { McpToolError } from './errors.js';
 
 /**
  * @description Resolves a tool name against the registry and executes it with
@@ -17,11 +21,15 @@ export async function executeTool(
   args: Record<string, unknown>,
   contextWorkspaceId: string,
   actorUserId: string,
+  options: { tokenScopes?: string[] } = {},
 ) {
-  const handler = toolHandlers[name];
-  if (!handler) {
-    throw new Error(`Unknown tool: ${name}`);
+  const definition = getToolDefinition(name);
+  const handler = Object.hasOwn(toolHandlers, name) ? toolHandlers[name] : undefined;
+  if (!handler || !definition) {
+    throw new McpToolError(`Unknown tool: ${name}`, -32602);
   }
+  validateToolArguments(definition, args);
+  await assertToolExecutionAllowed(name, args, contextWorkspaceId, actorUserId, options);
 
   audit('mcp.tool_execute', {
     toolName: name,

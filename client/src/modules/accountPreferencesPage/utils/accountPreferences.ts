@@ -1,4 +1,4 @@
-import { Bot, Settings2, WandSparkles } from 'lucide-react';
+import { Bot, Plug, Settings2, WandSparkles } from 'lucide-react';
 
 import { API_KEY_MASK, AI_PROVIDER_OPTIONS } from '../../../utils/settings';
 import type { AccountPreferencesCategoryMeta, SettingsCategoryId } from '../types';
@@ -15,6 +15,12 @@ export const SETTINGS_CATEGORIES: AccountPreferencesCategoryMeta[] = [
     label: 'Cloud AI',
     description: 'Provider selection and API credentials for your account.',
     icon: WandSparkles,
+  },
+  {
+    id: 'connections',
+    label: 'Connect External AI',
+    description: 'Manage your AI connections across workspaces.',
+    icon: Plug,
   },
   {
     id: 'onboarding',

@@ -15,10 +15,12 @@
     "db:push": "tsx src/db/prepush-team-backfill.ts && drizzle-kit push",
     "db:seed": "tsx src/db/seed/seed.ts",
     "cleanup:orphaned-assets": "tsx src/jobs/cleanupOrphanedAssets.ts",
-    "mcp": "tsx src/mcp/stdio.ts"
+    "mcp": "tsx src/modules/mcp/stdio.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1064.0",
+    "@modelcontextprotocol/sdk": "^1.30.1",
+    "ajv": "^8.20.0",
     "better-auth": "^1.6.11",
     "cors": "^2.8.5",
     "dompurify": "^3.4.6",

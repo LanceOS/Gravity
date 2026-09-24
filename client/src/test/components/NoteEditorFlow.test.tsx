@@ -31,7 +31,6 @@ vi.mock('../../modules/tickets/components/TicketBoard', () => ({ TicketBoard: ()
 vi.mock('../../modules/tickets/components/TicketList', () => ({ TicketList: () => null }));
 vi.mock('../../modules/tickets/components/TicketDetail', () => ({ TicketDetail: () => null }));
 vi.mock('../../modules/tickets/components/TicketFilterBar', () => ({ TicketFilterBar: () => null }));
-vi.mock('../../modules/workspaces/components/WorkspaceMcpModal', () => ({ default: () => null }));
 vi.mock('../../modules/workspaces', () => ({
   WorkspaceHeader: Object.assign(
     ({ children }: any) => <div>{children}</div>,

@@ -6,6 +6,7 @@ import { CloudProviderSection } from '../components/sections/CloudProviderSectio
 import { GeneralSettingsSection } from '../components/sections/GeneralSettingsSection';
 import { OnboardingSection } from '../components/sections/OnboardingSection';
 import { SavedKeysCard } from '../components/sections/SavedKeysCard';
+import { ExternalAiSection } from '../components/sections/ExternalAiSection';
 import { AccountPreferencesSidebar } from '../layout/AccountPreferencesSidebar';
 import { AccountPreferencesPageProps } from '../types';
 import {
@@ -24,6 +25,7 @@ function AccountPreferencesPageContent() {
   const isMobile = useIsMobile();
   const { activeCategory, categories } = useAccountPreferencesCategoryContext();
   const {
+    currentUser,
     settingsLoading,
     saveError,
     hasChanges,
@@ -67,7 +69,7 @@ function AccountPreferencesPageContent() {
 
             <div>
               <h1 className="account-preferences-page__title">Account Preferences</h1>
-              <p className="account-preferences-page__title-description">Configure your local user environment</p>
+              <p className="account-preferences-page__title-description">Manage your preferences and connections</p>
             </div>
           </Flex>
         )
@@ -77,11 +79,11 @@ function AccountPreferencesPageContent() {
           <Button variant="ghost" size="sm" onClick={onOpenDirectory} leftIcon={<Globe size={14} />}>
             Workspaces
           </Button>
-        ) : (
+        ) : activeCategory !== 'connections' ? (
           <Button variant="accent" size="sm" onClick={onSaveSettings} loading={saveLoading} disabled={!hasChanges}>
             {saveSuccess ? 'Changes Saved' : 'Save Changes'}
           </Button>
-        )
+        ) : null
       }
       sidebar={<AccountPreferencesSidebar />}
     >
@@ -144,6 +146,10 @@ function AccountPreferencesPageContent() {
               tutorialResult={tutorialResult}
               onResetTutorial={onResetTutorial}
             />
+          )}
+
+          {(isMobile || activeCategory === 'connections') && (
+            <ExternalAiSection key={currentUser.id} currentUser={currentUser} />
           )}
 
           {isMobile && (

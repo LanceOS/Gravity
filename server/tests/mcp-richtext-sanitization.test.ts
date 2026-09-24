@@ -32,7 +32,7 @@ async function setupMcpTicket() {
 
 describe('MCP rich-text sanitization', () => {
   it.each(['add_comment', 'create_comment', 'update_comment'])(
-    'reports unsafe-only %s bodies as invalid parameters and preserves comments',
+    'reports unsafe-only %s bodies as tool errors and preserves comments',
     async (toolName) => {
       const { ticket, commentId, callTool } = await setupMcpTicket();
       const body = JSON.stringify({
@@ -51,9 +51,12 @@ describe('MCP rich-text sanitization', () => {
       expect(response).toMatchObject({
         jsonrpc: '2.0',
         id: 1,
-        error: {
-          code: -32602,
-          message: 'Comment body must contain safe content.',
+        result: {
+          isError: true,
+          structuredContent: { error: {
+            code: 'INVALID_ARGUMENTS',
+            message: 'Comment body must contain safe content.',
+          } },
         },
       });
       expect(await db.select().from(comments).where(eq(comments.ticketId, ticket.id)))

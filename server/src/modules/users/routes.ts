@@ -1,7 +1,7 @@
-import { eq } from 'drizzle-orm';
+import { and, desc, eq, or } from 'drizzle-orm';
 import { Router } from 'express';
 import { db } from '../../db/index.js';
-import { userSettings, authUsers } from '../../db/schema.js';
+import { userSettings, authUsers, mcpConnectionTokens, mcpOAuthClients, mcpOAuthGrants, workspaces, workspaceMembers } from '../../db/schema.js';
 import { broadcastEvent } from '../../realtime.js';
 import { ensureUserDefaults, getUserById, listUsers } from '../../lib/platform.js';
 import { audit } from '../../lib/logger.js';
@@ -10,6 +10,61 @@ import { authorizeProjectAccess, authorizeTeamAccess, authorizeWorkspaceAccess }
 
 export function createUsersRouter() {
   const router = Router();
+
+  // Account settings show only this user's credentials, even in workspaces
+  // where they can administer other users' credentials. Read membership fresh.
+  router.get('/users/me/mcp/connections', async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    const actorUserId = await resolveRequestActorUserId(req);
+    if (!actorUserId) {
+      res.status(401).json({ error: 'Authentication required.' });
+      return;
+    }
+
+    try {
+      const rows = await db.select({
+        id: mcpConnectionTokens.id,
+        generatedBy: mcpConnectionTokens.generatedBy,
+        scopes: mcpConnectionTokens.scopes,
+        singleUse: mcpConnectionTokens.singleUse,
+        status: mcpConnectionTokens.status,
+        connectionType: mcpConnectionTokens.connectionType,
+        clientMetadata: mcpOAuthClients.metadata,
+        createdAt: mcpConnectionTokens.createdAt,
+        expiresAt: mcpConnectionTokens.expiresAt,
+        usedAt: mcpConnectionTokens.usedAt,
+        revokedAt: mcpConnectionTokens.revokedAt,
+        workspaceId: workspaces.id,
+        workspaceName: workspaces.name,
+        workspaceKey: workspaces.key,
+        workspaceOwnerId: workspaces.createdBy,
+        membershipRole: workspaceMembers.role,
+      }).from(mcpConnectionTokens)
+        .innerJoin(workspaces, eq(workspaces.id, mcpConnectionTokens.workspaceId))
+        .leftJoin(mcpOAuthGrants, eq(mcpOAuthGrants.connectionId, mcpConnectionTokens.id))
+        .leftJoin(mcpOAuthClients, eq(mcpOAuthClients.id, mcpOAuthGrants.clientId))
+        .leftJoin(workspaceMembers, and(
+          eq(workspaceMembers.workspaceId, workspaces.id), eq(workspaceMembers.userId, actorUserId),
+        ))
+        .where(and(
+          eq(mcpConnectionTokens.generatedBy, actorUserId),
+          or(eq(workspaces.createdBy, actorUserId), eq(workspaceMembers.userId, actorUserId)),
+        ))
+        .orderBy(desc(mcpConnectionTokens.createdAt), desc(mcpConnectionTokens.id));
+
+      res.json(rows.map(({ workspaceOwnerId, membershipRole, clientMetadata, ...connection }) => ({
+        ...connection,
+        clientName: clientMetadata?.client_name ?? null,
+        workspaceRole: workspaceOwnerId === actorUserId ? 'owner' : membershipRole,
+        createdAt: connection.createdAt?.toISOString() ?? null,
+        expiresAt: connection.expiresAt?.toISOString() ?? null,
+        usedAt: connection.usedAt?.toISOString() ?? null,
+        revokedAt: connection.revokedAt?.toISOString() ?? null,
+      })));
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to list your connection tokens.' });
+    }
+  });
 
   router.get('/users', async (req, res) => {
     try {

@@ -5,13 +5,11 @@ import { auth } from './modules/auth/auth.js';
 import { env } from './env.js';
 import { createApiRouter } from './routes/index.js';
 import { createAuthCompatibilityRouter } from './modules/auth/routes.js';
-import { registerToolHandlers } from './modules/mcp/tool-handlers/registry.js';
-import { registerMcpTools } from './modules/mcp/tools.js';
-import { ticketToolDefinitions, ticketToolHandlers } from './modules/tickets/mcp.js';
-import { workspaceToolDefinitions, workspaceToolHandlers } from './modules/workspaces/mcp.js';
+import { bootstrapMcpRegistries } from './modules/mcp/bootstrap.js';
 import path from 'path';
+import { createOAuthAuthorizationRouter } from './modules/mcp/oauth.js';
 
-let mcpRegistriesBootstrapped = false;
+export { bootstrapMcpRegistries } from './modules/mcp/bootstrap.js';
 
 /**
  * Policy for HTML documents that bootstrap the single-page application.
@@ -37,20 +35,6 @@ export const APP_SHELL_CONTENT_SECURITY_POLICY = [
   'trusted-types gravity-editor dompurify ProseMirrorClipboard',
   "require-trusted-types-for 'script'",
 ].join('; ');
-
-export function bootstrapMcpRegistries() {
-  if (mcpRegistriesBootstrapped) {
-    return;
-  }
-
-  registerToolHandlers(ticketToolHandlers);
-  registerToolHandlers(workspaceToolHandlers);
-
-  registerMcpTools(ticketToolDefinitions);
-  registerMcpTools(workspaceToolDefinitions);
-
-  mcpRegistriesBootstrapped = true;
-}
 
 export function createApp() {
   bootstrapMcpRegistries();
@@ -86,6 +70,7 @@ export function createApp() {
   // All other routes use the standard JSON body parser.
   app.use(express.json({ limit: '1mb' }));
 
+  app.use(createOAuthAuthorizationRouter());
   app.use('/api/v1', createApiRouter());
 
   // Serve built client files when available. The build process copies the

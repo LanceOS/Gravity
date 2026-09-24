@@ -18,7 +18,7 @@ describe('MCP concurrency', () => {
       owner: { id: owner.id, name: owner.name, email: owner.email, role: owner.role, avatarUrl: owner.avatar },
     });
 
-    const createRes = await ownerApi.post(`/api/v1/workspaces/${workspace.id}/mcp/connection`).send({});
+    const createRes = await ownerApi.post(`/api/v1/workspaces/${workspace.id}/mcp/connection`).send({ singleUse: true });
     expect(createRes.status).toBe(201);
     const rawToken = createRes.body.auth.token;
 

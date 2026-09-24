@@ -6,6 +6,23 @@ import { AccountPreferencesPage } from '../../pages/AccountPreferencesPage/Accou
 import type { WorkspaceSummary } from '../../hooks/useWorkspaceDirectory.ts';
 import { API_KEY_MASK } from '../../utils/settings.ts';
 
+vi.mock('../../modules/accountPreferencesPage/hooks/useAccountMcpConnections', () => ({
+  useAccountMcpConnections: () => ({ workspaces: [], connections: [], loading: false, error: null, refresh: vi.fn() }),
+  revokeAccountMcpConnection: vi.fn(),
+  accountConnectionError: (error: Error) => error.message,
+}));
+
+vi.mock('../../hooks/useMcpCatalog', () => ({
+  useMcpCatalog: () => ({ loading: false, error: null, tools: [
+    { name: 'list_tickets', description: 'List tickets', annotations: { readOnlyHint: true } },
+    { name: 'search_tickets', description: 'Search tickets', policyParents: ['list_tickets'], annotations: { readOnlyHint: true } },
+    { name: 'create_ticket', description: 'Create tickets', annotations: { readOnlyHint: false } },
+    { name: 'update_ticket', description: 'Update ticket fields', aliases: ['legacy_update_ticket'], annotations: { readOnlyHint: false } },
+    { name: 'set_ticket_cycle', description: 'Set ticket scheduling', policyParents: ['update_ticket'], annotations: { readOnlyHint: false } },
+    { name: 'get_ticket_details', description: 'Read ticket', aliases: ['read_ticket_details'], annotations: { readOnlyHint: true } },
+  ] }),
+}));
+
 const currentUser = {
   id: 'user-1',
   name: 'Casey Carter',
@@ -274,6 +291,7 @@ describe('SettingsPage', () => {
     const createTicketSwitch = within(createTicketRow).getByRole('switch');
     expect(createTicketSwitch).toBeInTheDocument();
     expect(createTicketSwitch).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByTestId('mcp-tool-row-set_ticket_cycle')).toBeInTheDocument();
 
     // Toggle create_ticket (disabling it: adding to disabledMcpTools)
     await user.click(createTicketSwitch);
@@ -315,6 +333,52 @@ describe('SettingsPage', () => {
     const readOnlyRow = screen.getAllByTestId(/mcp-tool-row-/)[0];
     const readOnlySwitch = within(readOnlyRow).getByRole('switch');
     expect(readOnlySwitch).toBeDisabled();
+  });
+
+  it('treats disabled compatibility aliases as one canonical setting', async () => {
+    const user = userEvent.setup();
+    const { props } = renderSettingsPage({ settings: {
+      workspaceId: workspace.id, key: workspace.key, hostUrl: '', joinMode: 'approval_required', hierarchyMode: 'flat', workspaceKey: '',
+      disabledMcpTools: ['read_ticket_details'],
+    } });
+    await user.click(screen.getByRole('button', { name: /MCP Tools/i }));
+    const control = within(screen.getByTestId('mcp-tool-row-get_ticket_details')).getByRole('switch');
+    expect(control).toHaveAttribute('aria-checked', 'false');
+    await user.click(control);
+    expect(props.onChangeSettings).toHaveBeenCalledWith({ disabledMcpTools: [] });
+    expect(screen.queryByTestId('mcp-tool-row-read_ticket_details')).not.toBeInTheDocument();
+  });
+
+  it.each([false, true])('reflects inherited tool policies and preserves the individual disabled setting (%s)', async individuallyDisabled => {
+    const user = userEvent.setup();
+    const ownDisabled = individuallyDisabled ? ['set_ticket_cycle'] : [];
+    const { props, rerender } = renderSettingsPage({ settings: {
+      workspaceId: workspace.id, key: workspace.key, hostUrl: '', joinMode: 'approval_required', hierarchyMode: 'flat', workspaceKey: '',
+      disabledMcpTools: ['legacy_update_ticket', 'list_tickets', ...ownDisabled],
+    } });
+    await user.click(screen.getByRole('button', { name: /MCP Tools/i }));
+
+    for (const name of ['set_ticket_cycle', 'search_tickets']) {
+      const row = within(screen.getByTestId(`mcp-tool-row-${name}`));
+      const control = row.getByRole('switch');
+      expect(control).toHaveAttribute('aria-checked', 'false');
+      expect(control).toBeDisabled();
+      expect(row.getByText(/before using this tool/)).toBeInTheDocument();
+      await user.click(control);
+    }
+    expect(props.onChangeSettings).not.toHaveBeenCalled();
+
+    await user.click(within(screen.getByTestId('mcp-tool-row-update_ticket')).getByRole('switch'));
+    expect(props.onChangeSettings).toHaveBeenCalledWith({ disabledMcpTools: ['list_tickets', ...ownDisabled] });
+    rerender(<SettingsPage {...props} settings={{ ...props.settings, disabledMcpTools: ownDisabled }} />);
+
+    const cycleControl = within(screen.getByTestId('mcp-tool-row-set_ticket_cycle')).getByRole('switch');
+    expect(cycleControl).toBeEnabled();
+    expect(cycleControl).toHaveAttribute('aria-checked', String(!individuallyDisabled));
+    const searchControl = within(screen.getByTestId('mcp-tool-row-search_tickets')).getByRole('switch');
+    expect(searchControl).toBeEnabled();
+    expect(searchControl).toHaveAttribute('aria-checked', 'true');
+    expect(screen.queryByText(/before using this tool/)).not.toBeInTheDocument();
   });
 
   it('shows task export only to workspace owners', async () => {
@@ -368,6 +432,21 @@ describe('SettingsPage', () => {
 });
 
 describe('AccountPreferencesPage', () => {
+  it('opens connections directly when returning from OAuth setup', () => {
+    renderAccountPreferencesPage({ initialCategory: 'connections' });
+    expect(screen.getByText('Your AI connections')).toBeInTheDocument();
+    expect(screen.queryByText('Local account preferences')).not.toBeInTheDocument();
+  });
+
+  it('opens external AI connection management from account settings without a preferences save action', async () => {
+    const user = userEvent.setup();
+    renderAccountPreferencesPage();
+    await user.click(screen.getByRole('button', { name: /Connect External AI/i }));
+    expect(screen.getByText('Your AI connections')).toBeInTheDocument();
+    expect(screen.getByText('Join or create a workspace to connect an external AI client.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Save Changes' })).not.toBeInTheDocument();
+  });
+
   it('renders the general section and forwards navigation, save, and settings updates', async () => {
     const user = userEvent.setup();
     const { props } = renderAccountPreferencesPage({
@@ -474,7 +553,7 @@ describe('AccountPreferencesPage', () => {
     expect(screen.getByText('Onboarding and guidance')).toBeInTheDocument(); // Onboarding
 
     // Warning about list mode only on mobile
-    expect(screen.getByText(/Only/)).toHaveTextContent(/List mode/);
+    expect(screen.getByText(/is available on mobile/)).toHaveTextContent(/List mode/);
 
     window.innerWidth = originalInnerWidth;
   });

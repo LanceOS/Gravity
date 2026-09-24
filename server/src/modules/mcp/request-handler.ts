@@ -1,193 +1,122 @@
 import { assertMcpWorkspaceAccess } from './access.js';
-import { McpToolError } from './errors.js';
+import { McpToolError, McpToolValidationError } from './errors.js';
 import { executeTool } from './tool-executor.js';
 import { resolveMcpContext } from './request-context.js';
 import { createMcpErrorResponse } from './responses.js';
-import { mcpToolsList } from './tools.js';
+import { getToolDefinition } from './tools.js';
 import { createWorkspaceScopeViolationError } from './scope.js';
 import type { McpRequestPayload } from './types.js';
 import { getDisabledTools } from './workspace-tools.js';
-import { desanitize, sanitize } from './state-map.js';
+import { desanitize, sanitize, withMcpStateScope } from './state-map.js';
+import { getAvailableTools, hasToolCallScope } from './policy.js';
+import { validateToolArguments } from './validation.js';
 
-function normalizeContextValue(value: unknown) {
-  return typeof value === 'string' ? value.trim() : '';
-}
+export const SUPPORTED_MCP_PROTOCOL_VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'] as const;
 
-const TOOL_ALIAS_GROUPS: string[][] = [
-  ['add_comment', 'create_comment'],
-  ['add_dependency', 'add_ticket_dependency', 'mark_ticket_blocked'],
-  ['remove_dependency', 'remove_ticket_dependency', 'unmark_ticket_blocked'],
-];
-
-function getToolAliasGroup(toolName: string) {
-  return TOOL_ALIAS_GROUPS.find((group) => group.includes(toolName)) ?? null;
-}
-
-function isToolDisabled(toolName: string, disabledTools: string[]) {
-  const group = getToolAliasGroup(toolName);
-  if (group) {
-    return group.some((name) => disabledTools.includes(name));
-  }
-
-  return disabledTools.includes(toolName);
-}
-
-/**
- * @description Lets transports skip the membership query when they already
- * performed the same access check earlier in the request pipeline.
- */
 type McpRequestHandlerOptions = {
   accessChecked?: boolean;
   sanitize?: boolean;
   tokenScopes?: string[];
 };
 
-/**
- * @description Processes MCP JSON-RPC requests after the transport has already
- * established any trusted workspace and actor context.
- */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function toolResult(data: unknown, isError = false) {
+  return {
+    content: [{ type: 'text' as const, text: JSON.stringify(data ?? null, null, 2) }],
+    structuredContent: isError ? { error: data } : { data: data ?? null },
+    isError,
+  };
+}
+
+/** Transport-independent protocol handling. All actual dispatch policy lives in the executor. */
 export class McpRequestHandler {
-  /**
-   * @description Handles the JSON-RPC portion of the MCP protocol after the
-   * transport has supplied any trusted workspace or actor context.
-   * @param request Incoming JSON-RPC request payload.
-   * @param workspaceId Trusted workspace id from the transport.
-   * @param actorUserId Trusted actor id from the transport.
-   * @param options Handler execution options.
-   * @return The JSON-RPC response payload for the requested MCP method.
-   */
-  async handle(
-    request: unknown,
-    workspaceId = '',
-    actorUserId = '',
-    options: McpRequestHandlerOptions = {},
-  ) {
-    const payload = request as McpRequestPayload;
-    const context = resolveMcpContext(payload, { workspaceId, actorUserId });
-    const accessChecked = options.accessChecked === true;
-    const tokenScopes = Array.isArray(options.tokenScopes) ? options.tokenScopes : undefined;
-
-    // tokenScopes is available when requests were authenticated via connection tokens.
-
-    try {
-      if (payload.method === 'initialize') {
-        // Initialization is transport-agnostic and does not require workspace access.
-        return {
-          jsonrpc: '2.0',
-          id: payload.id ?? null,
-          result: {
-            protocolVersion: '2024-11-05',
-            capabilities: { tools: {} },
-            serverInfo: { name: 'gravity-mcp-server', version: '2.0.0' },
-          },
-        };
-      }
-
-      if (payload.method === 'tools/list') {
-        // If the transport supplied token scopes (external clients), enforce them here.
-        if (tokenScopes && !tokenScopes.includes('tools/list')) {
-          return createMcpErrorResponse(payload.id ?? null, -32001, 'Insufficient token scopes.');
-        }
-        // HTTP may have already checked membership; stdio and direct callers rely on the handler.
-        if (!accessChecked) {
-          await assertMcpWorkspaceAccess(context);
-        }
-        const disabledTools = await getDisabledTools(context.workspaceId);
-        const activeTools = mcpToolsList.filter((tool) => {
-          return !isToolDisabled(tool.name, disabledTools);
-        });
-        return {
-          jsonrpc: '2.0',
-          id: payload.id ?? null,
-          result: { tools: activeTools },
-        };
-      }
-
-      if (payload.method === 'tools/call') {
-        const toolName = payload.params?.name ?? '';
-        // Enforce token scopes for external clients when provided.
-        if (tokenScopes) {
-          const hasGlobalCall = tokenScopes.includes('tools/call') || tokenScopes.includes('tools/call:*');
-          const hasExactCall = typeof toolName === 'string' && toolName.length > 0 && tokenScopes.includes(`tools/call:${toolName}`);
-          if (!hasGlobalCall && !hasExactCall) {
-            return createMcpErrorResponse(payload.id ?? null, -32001, 'Insufficient token scopes.');
-          }
-        }
-        const requestedWorkspaceId = normalizeContextValue(payload.params?.workspaceId);
-        if (requestedWorkspaceId && requestedWorkspaceId !== context.workspaceId) {
-          const toolScopeError = await createWorkspaceScopeViolationError(context.workspaceId, {
-            action: 'tools/call',
-            toolName: toolName,
-            requestedWorkspaceId,
-            actorUserId: context.actorUserId || undefined,
-            requestId: payload.id,
-          });
-          return createMcpErrorResponse(payload.id ?? null, toolScopeError.code, toolScopeError.message, toolScopeError.data);
-        }
-
-        // Tool execution always uses the trusted context resolved above.
-        if (!accessChecked) {
-          await assertMcpWorkspaceAccess(context);
-        }
-        const disabledTools = await getDisabledTools(context.workspaceId);
-
-        if (isToolDisabled(toolName, disabledTools)) {
-          throw new Error(`MCP tool "${toolName}" is disabled in this workspace.`);
-        }
-
-        const shouldSanitize = options.sanitize === true;
-        const rawArgs = payload.params?.arguments ?? {};
-        const desanitizedArgs = shouldSanitize ? desanitize(rawArgs) : rawArgs;
-
-        const result = await executeTool(
-          toolName,
-          desanitizedArgs,
-          context.workspaceId,
-          context.actorUserId,
-        );
-
-        const sanitizedResult = shouldSanitize ? sanitize(result) : result;
-
-        return {
-          jsonrpc: '2.0',
-          id: payload.id ?? null,
-          result: {
-            content: [{ type: 'text', text: JSON.stringify(sanitizedResult, null, 2) }],
-          },
-        };
-      }
-
-      return createMcpErrorResponse(payload.id, -32601, `Method not found: ${payload.method ?? 'unknown'}`);
-    } catch (error) {
-      if (error instanceof McpToolError) {
-        return createMcpErrorResponse(payload.id, error.code, error.message, error.data);
-      }
-
-      return createMcpErrorResponse(
-        payload.id,
-        -32603,
-        error instanceof Error ? error.message : 'Internal error executing tool',
-      );
+  async handle(request: unknown, workspaceId = '', actorUserId = '', options: McpRequestHandlerOptions = {}) {
+    if (!isRecord(request) || request.jsonrpc !== '2.0' || typeof request.method !== 'string'
+      || (request.params !== undefined && !isRecord(request.params))
+      || (request.id !== undefined && typeof request.id !== 'string'
+        && !(typeof request.id === 'number' && Number.isFinite(request.id)))) {
+      return createMcpErrorResponse(isRecord(request) && (typeof request.id === 'string' || typeof request.id === 'number') ? request.id : null,
+        -32600, 'Invalid JSON-RPC request.');
     }
+    const payload = request as McpRequestPayload;
+    // Notifications never receive a response and cannot invoke request methods.
+    if (payload.id === undefined) return null;
+    const context = resolveMcpContext(payload, { workspaceId, actorUserId });
+    return withMcpStateScope(JSON.stringify([context.workspaceId, context.actorUserId]), async () => {
+      try {
+        if (payload.method === 'initialize') {
+          const requested = payload.params?.protocolVersion;
+          const protocolVersion = SUPPORTED_MCP_PROTOCOL_VERSIONS.find((version) => version === requested)
+            ?? SUPPORTED_MCP_PROTOCOL_VERSIONS[0];
+          return { jsonrpc: '2.0', id: payload.id, result: {
+            protocolVersion, capabilities: { tools: {} },
+            serverInfo: { name: 'gravity-mcp-server', version: '0.8.1' },
+            instructions: 'Use discovery tools to resolve project, cycle, assignee and label references. All operations are bound to the authorized workspace.',
+          } };
+        }
+        if (payload.method === 'ping') return { jsonrpc: '2.0', id: payload.id, result: {} };
+        if (payload.method === 'tools/list') {
+          if (options.tokenScopes && !options.tokenScopes.includes('tools/list')) {
+            return createMcpErrorResponse(payload.id, -32001, 'Insufficient token scopes.');
+          }
+          if (!options.accessChecked) await assertMcpWorkspaceAccess(context);
+          const disabled = await getDisabledTools(context.workspaceId);
+          const tools = getAvailableTools(disabled, options.tokenScopes);
+          return { jsonrpc: '2.0', id: payload.id, result: { tools } };
+        }
+        if (payload.method !== 'tools/call') {
+          return createMcpErrorResponse(payload.id, -32601, `Method not found: ${payload.method}`);
+        }
+        const name = payload.params?.name;
+        if (typeof name !== 'string' || !name.trim()) {
+          return createMcpErrorResponse(payload.id, -32602, 'Tool name is required.');
+        }
+        if (!hasToolCallScope(name, options.tokenScopes)) {
+          return createMcpErrorResponse(payload.id, -32001, 'Insufficient token scopes.');
+        }
+        const requestedWorkspaceId = typeof payload.params?.workspaceId === 'string' ? payload.params.workspaceId.trim() : '';
+        if (requestedWorkspaceId && requestedWorkspaceId !== context.workspaceId) {
+          const error = await createWorkspaceScopeViolationError(context.workspaceId, {
+            action: 'tools/call', toolName: name, requestedWorkspaceId,
+            actorUserId: context.actorUserId || undefined, requestId: payload.id,
+          });
+          return createMcpErrorResponse(payload.id, error.code, error.message, error.data);
+        }
+        const definition = getToolDefinition(name);
+        if (!definition) return createMcpErrorResponse(payload.id, -32602, `Unknown tool: ${name}`);
+        const rawArgs = payload.params?.arguments === undefined ? {} : payload.params.arguments;
+        const args: unknown = options.sanitize ? desanitize(rawArgs) : rawArgs;
+        // Schema errors describe a malformed call and must never reach a handler.
+        validateToolArguments(definition, args);
+        try {
+          const result = await executeTool(name, args, context.workspaceId, context.actorUserId, { tokenScopes: options.tokenScopes });
+          const data = options.sanitize ? sanitize(result) : result;
+          const domainFailure = isRecord(data) && data.ok === false;
+          return { jsonrpc: '2.0', id: payload.id, result: toolResult(data, domainFailure) };
+        } catch (error) {
+          // Authorization failures remain protocol errors. Domain errors are
+          // visible to the model as tool failures so it can correct its input.
+          if (error instanceof McpToolError && !(error instanceof McpToolValidationError)) throw error;
+          const failure = {
+            code: error instanceof McpToolValidationError ? 'INVALID_ARGUMENTS' : 'TOOL_EXECUTION_FAILED',
+            message: error instanceof Error ? error.message : 'Tool execution failed.',
+            ...(error instanceof McpToolError && error.data ? { details: error.data } : {}),
+          };
+          return { jsonrpc: '2.0', id: payload.id, result: toolResult(failure, true) };
+        }
+      } catch (error) {
+        return createMcpErrorResponse(payload.id, error instanceof McpToolError ? error.code : -32603,
+          error instanceof Error ? error.message : 'Internal error handling MCP request.',
+          error instanceof McpToolError ? error.data : undefined);
+      }
+    });
   }
 }
 
 const defaultRequestHandler = new McpRequestHandler();
-
-/**
- * @description Convenience wrapper for the default request handler used by both
- * transports.
- * @param request Incoming JSON-RPC request payload.
- * @param workspaceId Trusted workspace id from the transport.
- * @param actorUserId Trusted actor id from the transport.
- * @param options Handler execution options.
- * @return The JSON-RPC response payload produced by the default handler.
- */
-export async function handleMcpRequest(
-  request: unknown,
-  workspaceId = '',
-  actorUserId = '',
-  options: McpRequestHandlerOptions = {},
-) {
+export function handleMcpRequest(request: unknown, workspaceId = '', actorUserId = '', options: McpRequestHandlerOptions = {}) {
   return defaultRequestHandler.handle(request, workspaceId, actorUserId, options);
 }

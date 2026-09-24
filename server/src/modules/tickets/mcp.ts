@@ -1,6 +1,6 @@
 import { asc, eq, and, inArray, isNull } from 'drizzle-orm';
 import { db } from '../../db/index.js';
-import { projects, labels, teams, ticketLabels, workspaceSettings } from '../../db/schema.js';
+import { projects, labels, teams, ticketLabels, tickets } from '../../db/schema.js';
 import { audit } from '../../lib/logger.js';
 import { mcpEventBus } from '../../lib/mcp-event-bus.js';
 import { McpToolValidationError } from '../mcp/errors.js';
@@ -14,6 +14,7 @@ import {
   getTicketById,
   getTicketByKey,
   getTicketDetailsByKey,
+  getTicketDetails,
   hasCircularDependency,
   hasTicketDependencyRelation,
   listComments,
@@ -30,7 +31,18 @@ import {
   TICKET_ASSIGNEE_SCOPE_VIOLATION,
 } from './services/tickets.js';
 import { ToolExecutionContext, ToolHandler } from '../mcp/tool-handlers/types.js';
-import { McpToolDefinition } from '../mcp/types.js';
+import { JsonSchema, McpToolDefinition } from '../mcp/types.js';
+
+function readLabelArray(value: unknown, field: string, required = false): string[] | undefined {
+  if (value === undefined && !required) return undefined;
+  const values = typeof value === 'string' && field === 'labels'
+    ? value.split(',').map(item => item.trim()).filter(Boolean)
+    : value;
+  if (!Array.isArray(values) || values.some(item => typeof item !== 'string' || !item.trim())) {
+    throw new McpToolValidationError(`${field} must be an array of nonempty strings.`);
+  }
+  return [...new Set(values.map(item => item.trim()))];
+}
 
 function parseDateArg(value: unknown, fieldName: string): Date | undefined {
   if (typeof value !== 'string') return undefined;
@@ -112,14 +124,33 @@ export class TicketTools {
    * @return The matching ticket list for the requested workspace scope.
    * @throws When a requested project falls outside the authorized workspace.
    */
-  async listTickets(args: Record<string, unknown>, context: ToolExecutionContext) {
+  async listTickets(args: Record<string, unknown>, context: ToolExecutionContext, extra = 0) {
     const explicitProjectId = typeof args.projectId === 'string' ? args.projectId : undefined;
+    const limit = typeof args.limit === 'number' ? args.limit : 50;
+    const offset = typeof args.offset === 'number' ? args.offset : 0;
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100 || !Number.isInteger(offset) || offset < 0 || offset > 1_000_000) {
+      throw new McpToolValidationError('limit must be 1–100 and offset must be 0–1000000.');
+    }
+    if (typeof args.teamId === 'string') {
+      const [team] = await db.select({ id: teams.id }).from(teams)
+        .where(and(eq(teams.id, args.teamId), eq(teams.workspaceId, context.workspaceId))).limit(1);
+      if (!team) throw new McpToolValidationError('Team not found in this workspace.');
+    }
     const filters = {
+      limit: limit + extra,
+      offset,
+      teamId: typeof args.teamId === 'string' ? args.teamId : undefined,
+      query: typeof args.query === 'string' ? args.query.trim() : undefined,
+      parentId: typeof args.parentId === 'string' || args.parentId === null ? args.parentId : undefined,
+      createdAfter: parseDateArg(args.createdAfter, 'createdAfter'),
+      createdBefore: parseDateArg(args.createdBefore, 'createdBefore'),
+      updatedAfter: parseDateArg(args.updatedAfter, 'updatedAfter'),
+      updatedBefore: parseDateArg(args.updatedBefore, 'updatedBefore'),
       status: typeof args.status === 'string' ? args.status : undefined,
       priority: typeof args.priority === 'string' ? args.priority : undefined,
       assigneeId: typeof args.assigneeId === 'string' ? args.assigneeId : undefined,
       cycleId: typeof args.cycleId === 'string' ? args.cycleId : undefined,
-      labels: typeof args.labels === 'string' ? args.labels.split(',').filter(Boolean) : Array.isArray(args.labels) ? args.labels.map(String) : undefined,
+      labels: readLabelArray(args.labelIds, 'labelIds') ?? readLabelArray(args.labels, 'labels'),
       labelMode: (args.labelMode === 'all' || args.labelMode === 'any' ? args.labelMode : undefined) as 'all' | 'any' | undefined,
     };
 
@@ -136,6 +167,26 @@ export class TicketTools {
     const projectIds = validProjects.map((project) => project.id);
 
     return listWorkspaceTickets(projectIds, filters);
+  }
+
+  async searchTickets(args: Record<string, unknown>, context: ToolExecutionContext) {
+    let offset = 0;
+    if (args.cursor !== undefined) {
+      try {
+        const decoded = JSON.parse(Buffer.from(String(args.cursor), 'base64url').toString('utf8'));
+        if (!Number.isInteger(decoded.offset) || decoded.offset < 0 || decoded.offset > 1_000_000) throw new Error();
+        offset = decoded.offset;
+      } catch {
+        throw new McpToolValidationError('Invalid ticket search cursor.');
+      }
+    }
+    const limit = typeof args.limit === 'number' ? args.limit : 50;
+    const rows = await this.listTickets({ ...args, offset }, context, 1);
+    return {
+      tickets: rows.slice(0, limit),
+      nextCursor: rows.length > limit ? Buffer.from(JSON.stringify({ offset: offset + limit })).toString('base64url') : null,
+      scope: { workspaceId: context.workspaceId, projectId: args.projectId ?? null, teamId: args.teamId ?? null },
+    };
   }
 
   /**
@@ -207,7 +258,7 @@ export class TicketTools {
         cycleId: typeof args.cycleId === 'string' ? args.cycleId : null,
         assigneeId: typeof args.assigneeId === 'string' ? args.assigneeId : null,
         parentId: typeof args.parentId === 'string' ? args.parentId : null,
-        labelIds: typeof args.labels === 'string' ? args.labels.split(',').filter(Boolean) : Array.isArray(args.labels) ? args.labels.map(String) : Array.isArray(args.labelIds) ? args.labelIds.map(String) : undefined,
+        labelIds: readLabelArray(args.labelIds, 'labelIds') ?? readLabelArray(args.labels, 'labels'),
         createdAt: parseDateArg(args.createdAt, 'createdAt'),
         updatedAt: parseDateArg(args.updatedAt, 'updatedAt'),
       });
@@ -314,6 +365,8 @@ export class TicketTools {
 
     await this.assertProjectInWorkspace(ticket.projectId, context.workspaceId);
 
+    if (typeof args.projectId === 'string') await this.assertProjectInWorkspace(args.projectId, context.workspaceId);
+
     const createdAt = parseDateArg(args.createdAt, 'createdAt');
     const updatedAt = parseDateArg(args.updatedAt, 'updatedAt');
 
@@ -326,12 +379,13 @@ export class TicketTools {
           ...(typeof args.description === 'string' ? { description: args.description } : {}),
           ...(typeof args.status === 'string' ? { status: args.status } : {}),
           ...(typeof args.priority === 'string' ? { priority: args.priority } : {}),
-          ...(typeof args.assigneeId === 'string' ? { assigneeId: args.assigneeId } : {}),
-          ...(typeof args.cycleId === 'string' ? { cycleId: args.cycleId } : {}),
-          ...(typeof args.parentId === 'string' ? { parentId: args.parentId } : {}),
+          ...(typeof args.assigneeId === 'string' || args.assigneeId === null ? { assigneeId: args.assigneeId } : {}),
+          ...(typeof args.cycleId === 'string' || args.cycleId === null ? { cycleId: args.cycleId } : {}),
+          ...(typeof args.parentId === 'string' || args.parentId === null ? { parentId: args.parentId } : {}),
+          ...(typeof args.projectId === 'string' ? { projectId: args.projectId } : {}),
           ...(typeof args.prStatus === 'string' ? { prStatus: args.prStatus } : {}),
-          ...(typeof args.prUrl === 'string' ? { prUrl: args.prUrl } : {}),
-          ...(typeof args.labels === 'string' ? { labelIds: args.labels.split(',').filter(Boolean) } : Array.isArray(args.labels) ? { labelIds: args.labels.map(String) } : Array.isArray(args.labelIds) ? { labelIds: args.labelIds.map(String) } : {}),
+          ...(typeof args.prUrl === 'string' || args.prUrl === null ? { prUrl: args.prUrl } : {}),
+          ...((args.labels !== undefined || args.labelIds !== undefined) ? { labelIds: readLabelArray(args.labelIds, 'labelIds') ?? readLabelArray(args.labels, 'labels', true) } : {}),
           ...(createdAt ? { createdAt } : {}),
           ...(updatedAt ? { updatedAt } : {}),
         },
@@ -352,7 +406,11 @@ export class TicketTools {
 
       throw error;
     }
-    const updated = updateResult?.ticket ?? null;
+    if (!updateResult) throw new McpToolValidationError('Ticket moved or was deleted; reload it and retry.');
+    const updated = updateResult.ticket;
+    const eventTicket = updated.projectId !== ticket.projectId || updateResult.hierarchyChange.affectedTickets.length > 0
+      ? await getTicketDetails(updated.id, updated.projectId)
+      : updated;
 
     const scope = await getProjectScope(ticket.projectId);
     if (scope) {
@@ -364,15 +422,28 @@ export class TicketTools {
         ticketKey,
         actorUserId: context.actorUserId,
         timestamp: new Date().toISOString(),
-        data: { ticket: updated },
+        data: { ticket: eventTicket },
       });
     }
 
-    if (updateResult?.relationshipCleanup.affectedTickets.length) {
+    if (updated && updated.projectId !== ticket.projectId) {
+      const destination = await getProjectScope(updated.projectId);
+      if (destination) mcpEventBus.publish({
+        type: 'ticket.updated', workspaceId: destination.workspaceId, projectId: destination.id,
+        teamId: destination.teamId, ticketKey, actorUserId: context.actorUserId,
+        timestamp: new Date().toISOString(), data: { ticket: eventTicket, previousProjectId: ticket.projectId },
+      });
+    }
+
+    const affectedTickets = [...new Map([
+      ...updateResult.relationshipCleanup.affectedTickets,
+      ...updateResult.hierarchyChange.affectedTickets,
+    ].map(affected => [affected.id, affected])).values()];
+    if (affectedTickets.length > 0) {
       const relatedTicketEvents = await Promise.all(
-        updateResult.relationshipCleanup.affectedTickets.map(async ({ id, projectId }) => {
+        affectedTickets.map(async ({ id, projectId }) => {
           const [relatedTicket, relatedScope] = await Promise.all([
-            getTicketById(id, projectId),
+            getTicketDetails(id, projectId),
             getProjectScope(projectId),
           ]);
 
@@ -775,7 +846,8 @@ export class TicketTools {
       };
     }
 
-    if (await hasTicketDependencyRelation(dependentTicket.id, blockerTicket.id)) {
+    const explicitDirection = Boolean(readStringArg(args, ['blocker_ticket_key', 'blockerTicketKey', 'dependent_ticket_key', 'dependentTicketKey']));
+    if (!explicitDirection && await hasTicketDependencyRelation(dependentTicket.id, blockerTicket.id)) {
       return {
         ok: true,
         operation,
@@ -850,6 +922,8 @@ export class TicketTools {
     if (!body) {
       throw new Error('body is required to add a comment.');
     }
+
+    if (typeof args.projectId === 'string') await this.assertProjectInWorkspace(args.projectId, context.workspaceId);
 
     const createdAt = parseDateArg(args.createdAt, 'createdAt');
     let comment;
@@ -996,350 +1070,95 @@ export class TicketTools {
    * @throws When the ticket does not exist or belongs to another workspace.
    */
   async getTicketLabels(args: Record<string, unknown>, context: ToolExecutionContext) {
-    const ticketKey = String(args.ticketKey ?? '').toUpperCase();
-    const ticket = await getTicketByKey(ticketKey);
-    if (!ticket) {
-      throw new Error(`Ticket ${ticketKey} not found.`);
-    }
-
-    await this.assertProjectInWorkspace(ticket.projectId, context.workspaceId);
-
-    // getTicketByKey does not join label rows — query directly.
-    const rows = await db
-      .select({
-        name: labels.name,
-        color: labels.color,
-        description: labels.description,
-      })
-      .from(ticketLabels)
-      .innerJoin(labels, eq(labels.id, ticketLabels.labelId))
-      .where(eq(ticketLabels.ticketId, ticket.id))
-      .orderBy(asc(labels.sortOrder), asc(labels.name));
-
-    return { labels: rows };
-  }
-
-  /**
-   * @description Adds one or more labels to a ticket without removing existing ones.
-   * Duplicate labels are silently skipped.
-   * @param args Tool arguments containing the ticket key and label names to add.
-   * @param context Trusted tool execution context.
-   * @return Confirmation with the updated full list of labels on the ticket.
-   * @throws When the ticket does not exist, belongs to another workspace, or any
-   *   specified label does not exist in the project/team scope.
-   */
-  async addTicketLabels(args: Record<string, unknown>, context: ToolExecutionContext) {
-    const ticketKey = String(args.ticketKey ?? '').toUpperCase();
-    const ticket = await getTicketByKey(ticketKey);
-    if (!ticket) {
-      throw new Error(`Ticket ${ticketKey} not found.`);
-    }
-
-    await this.assertProjectInWorkspace(ticket.projectId, context.workspaceId);
-
-    const labelsToAdd = typeof args.labels === 'string'
-      ? args.labels.split(',').map(s => s.trim()).filter(Boolean)
-      : Array.isArray(args.labels)
-        ? args.labels.map(String)
-        : [];
-
-    if (labelsToAdd.length === 0) {
-      // Nothing to add — return current labels.
-      const current = await db
-        .select({ name: labels.name, color: labels.color, description: labels.description })
-        .from(ticketLabels)
-        .innerJoin(labels, eq(labels.id, ticketLabels.labelId))
-        .where(eq(ticketLabels.ticketId, ticket.id))
-        .orderBy(asc(labels.sortOrder), asc(labels.name));
-      return { labels: current };
-    }
-
-    const projectScope = await getProjectScope(ticket.projectId);
-    if (!projectScope) {
-      throw new Error(`Project ${ticket.projectId} not found.`);
-    }
-    const scopeLabel = projectScope.hierarchyMode === 'flat' ? 'project' : 'team';
-
-    // Resolve requested label names to IDs within the correct scope.
-    const resolvedNew = await db
-      .select({ id: labels.id, name: labels.name })
-      .from(labels)
-      .where(
-        projectScope.hierarchyMode === 'flat'
-          ? and(eq(labels.projectId, ticket.projectId), inArray(labels.name, labelsToAdd))
-          : and(eq(labels.teamId, projectScope.teamId), isNull(labels.projectId), inArray(labels.name, labelsToAdd)),
-      );
-
-    if (resolvedNew.length !== labelsToAdd.length) {
-      const foundNames = new Set(resolvedNew.map(l => l.name));
-      const missing = labelsToAdd.filter(n => !foundNames.has(n));
-      throw new Error(
-        `The following labels do not exist in this ${scopeLabel}: ${missing.join(', ')}. ` +
-        `Use list_workspace_labels to see available labels.`,
-      );
-    }
-
-    // Fetch IDs already on the ticket so we avoid inserting duplicates.
-    const existingRows = await db
-      .select({ labelId: ticketLabels.labelId })
-      .from(ticketLabels)
+    const ticket = await this.getTicketInWorkspace(args, context.workspaceId);
+    const available = await this.listWorkspaceLabels({ projectId: ticket.projectId }, context);
+    const allowed = new Set(available.labels.map(label => label.id));
+    const rows = await db.select({ labelId: ticketLabels.labelId }).from(ticketLabels)
       .where(eq(ticketLabels.ticketId, ticket.id));
-    const existingLabelIds = new Set(existingRows.map(r => r.labelId));
-
-    const newEntries = resolvedNew
-      .filter(l => !existingLabelIds.has(l.id))
-      .map(l => ({ ticketId: ticket.id, labelId: l.id }));
-
-    if (newEntries.length > 0) {
-      await db.insert(ticketLabels).values(newEntries).onConflictDoNothing();
-    }
-
-    // Return the full updated label list.
-    const updated = await db
-      .select({ name: labels.name, color: labels.color, description: labels.description })
-      .from(ticketLabels)
-      .innerJoin(labels, eq(labels.id, ticketLabels.labelId))
-      .where(eq(ticketLabels.ticketId, ticket.id))
-      .orderBy(asc(labels.sortOrder), asc(labels.name));
-
-    audit('add_ticket_labels', {
-      workspaceId: context.workspaceId,
-      actorUserId: context.actorUserId,
-      ticketKey,
-      addedLabels: labelsToAdd,
-      finalLabels: updated.map(l => l.name),
-    });
-
-    mcpEventBus.publish({
-      type: 'labels.added',
-      workspaceId: context.workspaceId,
-      projectId: ticket.projectId,
-      teamId: projectScope.teamId,
-      ticketKey,
-      actorUserId: context.actorUserId,
-      timestamp: new Date().toISOString(),
-      data: { addedLabels: labelsToAdd, finalLabels: updated.map(l => l.name) },
-    });
-
-    return { labels: updated };
+    const assigned = new Set(rows.filter(row => allowed.has(row.labelId)).map(row => row.labelId));
+    return { labels: available.labels.filter(label => assigned.has(label.id)) };
   }
 
-  /**
-   * @description Lists all labels available in the authorized workspace.
-   * Scopes the query to the workspace resolved from the trusted context;
-   * an optional projectId narrows results further.
-   * @param args Tool arguments optionally containing a projectId.
-   * @param context Trusted tool execution context.
-   * @return An array of label objects available in the workspace/project.
-   */
   async listWorkspaceLabels(args: Record<string, unknown>, context: ToolExecutionContext) {
-    const explicitProjectId = typeof args.projectId === 'string' && args.projectId.trim().length > 0
-      ? args.projectId.trim()
-      : undefined;
-
-    if (explicitProjectId) {
-      // Validate the project belongs to the authorized workspace.
-      await this.assertProjectInWorkspace(explicitProjectId, context.workspaceId);
-
-      const rows = await db
-        .select({
-          name: labels.name,
-          color: labels.color,
-          description: labels.description,
-          projectId: labels.projectId,
-        })
-        .from(labels)
-        .where(eq(labels.projectId, explicitProjectId))
-        .orderBy(asc(labels.sortOrder), asc(labels.name));
-
-      return { labels: rows.map(r => ({ name: r.name, color: r.color, description: r.description, projectId: r.projectId ?? undefined })) };
+    const fields = { id: labels.id, name: labels.name, color: labels.color, description: labels.description,
+      teamId: labels.teamId, projectId: labels.projectId };
+    if (typeof args.projectId === 'string') {
+      await this.assertProjectInWorkspace(args.projectId, context.workspaceId);
+      const scope = (await getProjectScope(args.projectId))!;
+      const rows = await db.select(fields).from(labels).where(scope.hierarchyMode === 'flat'
+        ? eq(labels.projectId, scope.id)
+        : and(eq(labels.teamId, scope.teamId), isNull(labels.projectId)))
+        .orderBy(asc(labels.sortOrder), asc(labels.name), asc(labels.id));
+      return { labels: rows };
     }
-
-    // No explicit project — return all labels scoped to the workspace via team membership.
-    const rows = await db
-      .select({
-        name: labels.name,
-        color: labels.color,
-        description: labels.description,
-        teamId: labels.teamId,
-        projectId: labels.projectId,
-      })
-      .from(labels)
-      .innerJoin(teams, eq(teams.id, labels.teamId))
-      .where(eq(teams.workspaceId, context.workspaceId))
-      .orderBy(asc(labels.sortOrder), asc(labels.name));
-
-    return {
-      labels: rows.map(r => ({
-        name: r.name,
-        color: r.color,
-        description: r.description,
-        ...(r.projectId ? { projectId: r.projectId } : { teamId: r.teamId }),
-      })),
-    };
+    return { labels: await db.select(fields).from(labels).innerJoin(teams, eq(teams.id, labels.teamId))
+      .where(eq(teams.workspaceId, context.workspaceId)).orderBy(asc(labels.sortOrder), asc(labels.name), asc(labels.id)) };
   }
 
-  /**
-   * @description Removes one or more labels from a ticket by name.
-   * Specified labels not present on the ticket are silently skipped.
-   * @param args Tool arguments containing the ticket key and label names to remove.
-   * @param context Trusted tool execution context.
-   * @return The updated list of label objects on the ticket.
-   * @throws When the ticket does not exist or belongs to another workspace.
-   */
+  async addTicketLabels(args: Record<string, unknown>, context: ToolExecutionContext) {
+    return this.mutateLabels('add', args, context);
+  }
+
   async removeTicketLabels(args: Record<string, unknown>, context: ToolExecutionContext) {
-    const ticketKey = String(args.ticketKey ?? '').toUpperCase();
-    const ticket = await getTicketByKey(ticketKey);
-    if (!ticket) {
-      throw new Error(`Ticket ${ticketKey} not found.`);
-    }
-
-    await this.assertProjectInWorkspace(ticket.projectId, context.workspaceId);
-
-    const labelsToRemove = typeof args.labels === 'string'
-      ? args.labels.split(',').map(s => s.trim()).filter(Boolean)
-      : Array.isArray(args.labels)
-        ? args.labels.map(String)
-        : [];
-
-    // getTicketByKey does not join label rows — query the current label set directly.
-    const currentLabelRows = await db
-      .select({ id: labels.id, name: labels.name })
-      .from(ticketLabels)
-      .innerJoin(labels, eq(labels.id, ticketLabels.labelId))
-      .where(eq(ticketLabels.ticketId, ticket.id));
-
-    if (labelsToRemove.length === 0) {
-      const full = await db
-        .select({ name: labels.name, color: labels.color, description: labels.description })
-        .from(ticketLabels)
-        .innerJoin(labels, eq(labels.id, ticketLabels.labelId))
-        .where(eq(ticketLabels.ticketId, ticket.id))
-        .orderBy(asc(labels.sortOrder), asc(labels.name));
-      return { labels: full };
-    }
-
-    const namesToRemoveSet = new Set(labelsToRemove);
-    const newLabelNames = currentLabelRows.map(l => l.name).filter(name => !namesToRemoveSet.has(name));
-
-    const projectScope = await getProjectScope(ticket.projectId);
-    if (!projectScope) {
-      throw new Error(`Project ${ticket.projectId} not found.`);
-    }
-
-    const resolvedLabels = newLabelNames.length > 0
-      ? await db.select({ id: labels.id, name: labels.name }).from(labels).where(
-        projectScope.hierarchyMode === 'flat'
-          ? and(eq(labels.projectId, ticket.projectId), inArray(labels.name, newLabelNames))
-          : and(eq(labels.teamId, projectScope.teamId), isNull(labels.projectId), inArray(labels.name, newLabelNames)),
-      )
-      : [];
-
-    const labelIds = resolvedLabels.map(l => l.id);
-    await updateTicketRecord(ticket.id, { labelIds }, ticket.projectId);
-
-    audit('remove_ticket_labels', {
-      workspaceId: context.workspaceId,
-      actorUserId: context.actorUserId,
-      ticketKey,
-      removedLabels: labelsToRemove,
-      finalLabels: newLabelNames,
-    });
-
-    mcpEventBus.publish({
-      type: 'labels.removed',
-      workspaceId: projectScope.workspaceId,
-      projectId: ticket.projectId,
-      teamId: projectScope.teamId,
-      ticketKey,
-      actorUserId: context.actorUserId,
-      timestamp: new Date().toISOString(),
-      data: { removedLabels: labelsToRemove, finalLabels: newLabelNames },
-    });
-
-    // Return the full updated label list as rich objects.
-    const updated = await db
-      .select({ name: labels.name, color: labels.color, description: labels.description })
-      .from(ticketLabels)
-      .innerJoin(labels, eq(labels.id, ticketLabels.labelId))
-      .where(eq(ticketLabels.ticketId, ticket.id))
-      .orderBy(asc(labels.sortOrder), asc(labels.name));
-
-    return { labels: updated };
+    return this.mutateLabels('remove', args, context);
   }
 
-  /**
-   * @description Replaces all labels on a ticket with a new set of label names.
-   * @param args Tool arguments containing the ticket key and the new label names.
-   * @param context Trusted tool execution context.
-   * @return The updated list of label names on the ticket.
-   * @throws When the ticket does not exist, belongs to another workspace, or label resolution fails.
-   */
   async setTicketLabels(args: Record<string, unknown>, context: ToolExecutionContext) {
-    const ticketKey = String(args.ticketKey ?? '').toUpperCase();
-    const ticket = await getTicketByKey(ticketKey);
-    if (!ticket) {
-      throw new Error(`Ticket ${ticketKey} not found.`);
+    return this.mutateLabels('set', args, context);
+  }
+
+  private async mutateLabels(operation: 'add' | 'remove' | 'set', args: Record<string, unknown>, context: ToolExecutionContext) {
+    if (args.labels !== undefined && args.labelIds !== undefined) {
+      throw new McpToolValidationError('Provide either labelIds or labels, not both.');
     }
-
-    await this.assertProjectInWorkspace(ticket.projectId, context.workspaceId);
-
-    const labelNames = typeof args.labels === 'string'
-      ? args.labels.split(',').map(s => s.trim()).filter(Boolean)
-      : Array.isArray(args.labels)
-        ? args.labels.map(String)
-        : [];
-
-    const projectScope = await getProjectScope(ticket.projectId);
-    if (!projectScope) {
-      throw new Error(`Project ${ticket.projectId} not found.`);
+    const byId = args.labelIds !== undefined;
+    const requested = readLabelArray(byId ? args.labelIds : args.labels, byId ? 'labelIds' : 'labels', true)!;
+    const ticket = await this.getTicketInWorkspace(args, context.workspaceId);
+    const scope = (await getProjectScope(ticket.projectId))!;
+    const available = (await this.listWorkspaceLabels({ projectId: ticket.projectId }, context)).labels;
+    const requestedSet = new Set(requested);
+    const resolved = available.filter(label => requestedSet.has(byId ? label.id : label.name));
+    if (operation !== 'remove' && resolved.length !== requested.length) {
+      throw new McpToolValidationError('One or more labels were not found for this project. Use list_workspace_labels.');
     }
-    const scopeLabel = projectScope.hierarchyMode === 'flat' ? 'project' : 'team';
-
-    const resolvedLabels = labelNames.length > 0
-      ? await db.select({ id: labels.id, name: labels.name }).from(labels).where(
-        projectScope.hierarchyMode === 'flat'
-          ? and(eq(labels.projectId, ticket.projectId), inArray(labels.name, labelNames))
-          : and(eq(labels.teamId, projectScope.teamId), isNull(labels.projectId), inArray(labels.name, labelNames)),
-      )
-      : [];
-
-    if (resolvedLabels.length !== labelNames.length) {
-      const foundNames = new Set(resolvedLabels.map(l => l.name));
-      const missing = labelNames.filter(n => !foundNames.has(n));
-      throw new Error(`The following labels do not exist in this ${scopeLabel}: ${missing.join(', ')}`);
+    const selected = new Set(resolved.map(label => label.id));
+    if (operation === 'set') {
+      const updated = await updateTicketRecord(ticket.id, { labelIds: [...selected] }, ticket.projectId);
+      if (!updated) throw new McpToolValidationError('Ticket moved or was deleted; reload it and retry.');
+    } else {
+      // Apply additive/subtractive changes to exact IDs so concurrent calls do not replace each other's labels.
+      await db.transaction(async tx => {
+        await tx.select({ id: projects.id }).from(projects).where(eq(projects.id, ticket.projectId)).for('update');
+        const [currentTicket] = await tx.select({ id: tickets.id }).from(tickets)
+          .where(and(eq(tickets.id, ticket.id), eq(tickets.projectId, ticket.projectId))).limit(1);
+        if (!currentTicket) throw new McpToolValidationError('Ticket moved or was deleted; reload it and retry.');
+        if (selected.size > 0 && operation === 'add') {
+          await tx.insert(ticketLabels).values([...selected].map(labelId => ({ ticketId: ticket.id, labelId }))).onConflictDoNothing();
+        } else if (selected.size > 0) {
+          await tx.delete(ticketLabels).where(and(eq(ticketLabels.ticketId, ticket.id), inArray(ticketLabels.labelId, [...selected])));
+        }
+        await tx.update(tickets).set({ updatedAt: new Date() }).where(eq(tickets.id, ticket.id));
+      });
     }
-
-    const labelIds = resolvedLabels.map(l => l.id);
-    await updateTicketRecord(ticket.id, { labelIds }, ticket.projectId);
-
-    audit('set_ticket_labels', {
-      workspaceId: context.workspaceId,
-      actorUserId: context.actorUserId,
-      ticketKey,
-      newLabels: labelNames,
-    });
-
+    const updated = await this.getTicketLabels(args, context);
+    const namesById = new Map(available.map(label => [label.id, label.name]));
+    const requestedNames = byId ? requested.map(id => namesById.get(id)).filter((name): name is string => name !== undefined) : requested;
+    const finalNames = updated.labels.map(label => label.name);
+    const finalIds = updated.labels.map(label => label.id);
+    audit(`${operation}_ticket_labels`, { workspaceId: context.workspaceId, actorUserId: context.actorUserId, ticketKey: ticket.key, labelIds: finalIds });
     mcpEventBus.publish({
-      type: 'labels.set',
-      workspaceId: projectScope.workspaceId,
-      projectId: ticket.projectId,
-      teamId: projectScope.teamId,
-      ticketKey,
-      actorUserId: context.actorUserId,
-      timestamp: new Date().toISOString(),
-      data: { labels: labelNames },
+      type: operation === 'add' ? 'labels.added' : operation === 'remove' ? 'labels.removed' : 'labels.set',
+      workspaceId: context.workspaceId, projectId: ticket.projectId, teamId: scope.teamId,
+      ticketKey: ticket.key, actorUserId: context.actorUserId, timestamp: new Date().toISOString(),
+      data: {
+        labels: operation === 'set' ? requestedNames : finalNames,
+        labelIds: finalIds,
+        ...(operation === 'add' ? { addedLabels: requestedNames, finalLabels: finalNames } : {}),
+        ...(operation === 'remove' ? { removedLabels: requestedNames, finalLabels: finalNames } : {}),
+        ...(operation === 'set' ? { newLabels: requestedNames } : {}),
+      },
     });
-
-    // Return the full updated label list as rich objects.
-    const updatedRows = await db
-      .select({ name: labels.name, color: labels.color, description: labels.description })
-      .from(ticketLabels)
-      .innerJoin(labels, eq(labels.id, ticketLabels.labelId))
-      .where(eq(ticketLabels.ticketId, ticket.id))
-      .orderBy(asc(labels.sortOrder), asc(labels.name));
-
-    return { labels: updatedRows };
+    return updated;
   }
 
   /**
@@ -1858,3 +1677,131 @@ export const ticketToolDefinitions: McpToolDefinition[] = [
     },
   },
 ];
+
+// A focused handler forwards only its advertised fields, even for direct in-process callers.
+function focusedUpdate(fields: string[], defaults: Record<string, unknown> = {}): ToolHandler {
+  return (args, context) => ticketTools.updateTicket({
+    ticketKey: args.ticketKey,
+    ...Object.fromEntries(fields.filter(field => args[field] !== undefined).map(field => [field, args[field]])),
+    ...defaults,
+  }, context);
+}
+
+Object.assign(ticketToolHandlers, {
+  get_ticket: ticketToolHandlers.get_ticket_details,
+  search_tickets: (args: Record<string, unknown>, context: ToolExecutionContext) => ticketTools.searchTickets(args, context),
+  set_ticket_status: focusedUpdate(['status']),
+  set_ticket_priority: focusedUpdate(['priority']),
+  assign_ticket: focusedUpdate(['assigneeId']),
+  unassign_ticket: focusedUpdate([], { assigneeId: null }),
+  set_ticket_cycle: focusedUpdate(['cycleId']),
+  clear_ticket_cycle: focusedUpdate([], { cycleId: null }),
+  set_ticket_parent: focusedUpdate(['parentId']),
+  clear_ticket_parent: focusedUpdate([], { parentId: null }),
+  edit_ticket_content: focusedUpdate(['title', 'description']),
+  set_ticket_pr: focusedUpdate(['prStatus', 'prUrl']),
+  move_ticket: focusedUpdate(['projectId']),
+});
+
+const idSchema: JsonSchema = { type: 'string', minLength: 1 };
+const nullableIdSchema: JsonSchema = { type: ['string', 'null'], minLength: 1 };
+const labelIdsSchema: JsonSchema = { type: 'array', items: idSchema };
+const legacyLabelsSchema: JsonSchema = {
+  anyOf: [labelIdsSchema, { type: 'string' }],
+  description: 'Array of label IDs for ticket create/update/search; label names for label tools. Legacy comma-separated strings are accepted. Prefer labelIds for stable IDs.',
+};
+const statusSchema: JsonSchema = { type: 'string', enum: ['backlog', 'todo', 'in_progress', 'in_review', 'done', 'canceled'] };
+const prioritySchema: JsonSchema = { type: 'string', enum: ['no_priority', 'low', 'medium', 'high', 'urgent'] };
+const prStatusSchema: JsonSchema = { type: 'string', enum: ['none', 'open', 'merged', 'closed'] };
+const searchProperties: Record<string, JsonSchema> = {
+  query: { type: 'string', maxLength: 500 }, projectId: idSchema, teamId: idSchema,
+  status: statusSchema, priority: prioritySchema, assigneeId: idSchema, cycleId: idSchema,
+  parentId: nullableIdSchema, labelIds: labelIdsSchema, labels: legacyLabelsSchema,
+  labelMode: { type: 'string', enum: ['all', 'any'] },
+  limit: { type: 'integer', minimum: 1, maximum: 100 },
+  createdAfter: { type: 'string' }, createdBefore: { type: 'string' },
+  updatedAfter: { type: 'string' }, updatedBefore: { type: 'string' },
+};
+
+function focusedTool(name: string, description: string, properties: Record<string, JsonSchema> = {}, required: string[] = []): McpToolDefinition {
+  return { name, description, annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    inputSchema: { type: 'object', properties: { ticketKey: idSchema, ...properties }, required: ['ticketKey', ...required], additionalProperties: false } };
+}
+
+for (const definition of ticketToolDefinitions) {
+  const schema = definition.inputSchema;
+  schema.additionalProperties = false;
+  definition.annotations = {
+    readOnlyHint: /^(list_|get_|read_|preview_)/.test(definition.name),
+    destructiveHint: /^(delete_|remove_|unmark_|set_ticket_labels)/.test(definition.name),
+    idempotentHint: !/^(create_|add_comment|add_ticket_dependency|mark_ticket_blocked|add_dependency)/.test(definition.name),
+    openWorldHint: false,
+  };
+  if (schema.properties.labels) {
+    schema.properties.labels = legacyLabelsSchema;
+    schema.properties.labelIds = labelIdsSchema;
+  }
+  if (['create_ticket', 'update_ticket'].includes(definition.name)) {
+    for (const field of ['assigneeId', 'cycleId', 'parentId']) schema.properties[field] = nullableIdSchema;
+    schema.properties.status = statusSchema;
+    schema.properties.priority = prioritySchema;
+    schema.properties.title = { type: 'string', minLength: 1, maxLength: 1000 };
+  }
+  if (definition.name === 'update_ticket') {
+    schema.properties.prUrl = { type: ['string', 'null'] };
+    schema.properties.prStatus = prStatusSchema;
+  }
+  if (definition.name === 'list_tickets') {
+    schema.properties = { ...searchProperties, offset: { type: 'integer', minimum: 0, maximum: 1_000_000 } };
+    definition.description = 'List tickets in the authorized workspace or project. Defaults to 50, maximum 100; use offset or search_tickets for pagination.';
+  }
+  if (['add_ticket_labels', 'remove_ticket_labels', 'set_ticket_labels'].includes(definition.name)) {
+    schema.required = ['ticketKey'];
+    schema.anyOf = [{ required: ['labelIds'] }, { required: ['labels'] }];
+  }
+  if (['mark_ticket_blocked', 'add_ticket_dependency', 'unmark_ticket_blocked', 'remove_ticket_dependency', 'preview_ticket_dependency'].includes(definition.name)) {
+    schema.required = definition.name === 'preview_ticket_dependency' ? ['operation'] : [];
+    schema.anyOf = [
+      { required: ['blocker_ticket_key', 'dependent_ticket_key'] },
+      { required: ['blockerTicketKey', 'dependentTicketKey'] },
+      { required: ['ticketKey', 'dependencyTicketKey'] },
+      { required: ['ticket_key', 'dependency_ticket_key'] },
+    ];
+    for (const field of ['blocker_ticket_key', 'dependent_ticket_key', 'blockerTicketKey', 'dependentTicketKey', 'ticketKey', 'dependencyTicketKey', 'ticket_key', 'dependency_ticket_key']) schema.properties[field] = idSchema;
+  }
+  if (definition.name === 'list_ticket_dependencies') {
+    schema.required = [];
+    schema.anyOf = [{ required: ['ticket_key'] }, { required: ['ticketKey'] }];
+  }
+}
+
+ticketToolDefinitions.push(
+  { name: 'get_ticket', aliases: ['get_ticket_details', 'read_ticket_details'], description: 'Read a ticket and its authorized related details by ticket key.',
+    inputSchema: { type: 'object', properties: { ticketKey: idSchema }, required: ['ticketKey'], additionalProperties: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
+  { name: 'search_tickets', description: 'Search workspace tickets with bounded pages ordered by creation time and ID. Pass nextCursor with the same filters for the next page.',
+    inputSchema: { type: 'object', properties: { ...searchProperties, cursor: { type: 'string', maxLength: 256 } }, additionalProperties: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
+  focusedTool('set_ticket_status', 'Set only the ticket workflow status.', { status: statusSchema }, ['status']),
+  focusedTool('set_ticket_priority', 'Set only the ticket priority.', { priority: prioritySchema }, ['priority']),
+  focusedTool('assign_ticket', 'Assign a ticket to an eligible project user. Discover IDs with list_project_assignees.', { assigneeId: idSchema }, ['assigneeId']),
+  focusedTool('unassign_ticket', 'Clear the ticket assignee.'),
+  focusedTool('set_ticket_cycle', 'Schedule a ticket in a cycle belonging to its project team.', { cycleId: idSchema }, ['cycleId']),
+  focusedTool('clear_ticket_cycle', 'Remove the ticket from its cycle.'),
+  focusedTool('set_ticket_parent', 'Make a ticket a subtask of a ticket in the same project. Self and ancestor cycles are rejected.', { parentId: idSchema }, ['parentId']),
+  focusedTool('clear_ticket_parent', 'Detach a ticket from its parent.'),
+  { ...focusedTool('edit_ticket_content', 'Edit the title or description of a ticket.', { title: { type: 'string', minLength: 1, maxLength: 1000 }, description: { type: 'string' } }),
+    inputSchema: { ...focusedTool('', '').inputSchema, properties: { ticketKey: idSchema, title: { type: 'string', minLength: 1, maxLength: 1000 }, description: { type: 'string' } }, anyOf: [{ required: ['title'] }, { required: ['description'] }] } },
+  { ...focusedTool('set_ticket_pr', 'Set the ticket pull-request status or URL; null clears its URL.', { prStatus: prStatusSchema, prUrl: { type: ['string', 'null'] } }),
+    inputSchema: { ...focusedTool('', '').inputSchema, properties: { ticketKey: idSchema, prStatus: prStatusSchema, prUrl: { type: ['string', 'null'] } }, anyOf: [{ required: ['prStatus'] }, { required: ['prUrl'] }] } },
+  focusedTool('move_ticket', 'Move a ticket to a project in the same workspace. Detaches parent and children; clears incompatible cycles/labels. An assigned user must be eligible in the destination.', { projectId: idSchema }, ['projectId']),
+);
+
+// Keep each required alternative self-contained for strict JSON Schema validators.
+for (const definition of ticketToolDefinitions) {
+  for (const alternative of definition.inputSchema.anyOf ?? []) {
+    if (!alternative.required) continue;
+    alternative.type = 'object';
+    alternative.properties = Object.fromEntries(alternative.required.map(field => [field, definition.inputSchema.properties[field]]));
+  }
+}

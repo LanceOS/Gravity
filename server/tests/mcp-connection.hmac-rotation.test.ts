@@ -23,7 +23,7 @@ describe('MCP HMAC key rotation simulation', () => {
       const oldSecret = 'old-rot-secret-test-1';
       const restoreOld = setSecretsForTest({ betterAuthSecret: oldSecret, betterAuthOldSecrets: [] });
 
-      const createRes = await ownerApi.post(`/api/v1/workspaces/${workspace.id}/mcp/connection`).send({});
+      const createRes = await ownerApi.post(`/api/v1/workspaces/${workspace.id}/mcp/connection`).send({ singleUse: true });
       expect(createRes.status).toBe(201);
       const rawToken = createRes.body.auth.token;
 

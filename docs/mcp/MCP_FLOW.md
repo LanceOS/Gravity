@@ -1,122 +1,109 @@
-# MCP and Agent Interactions
+# MCP and agent interactions
 
-## Purpose and Scope
-This document outlines how the Gravity server implements the Model Context Protocol (MCP) to execute workspace actions, and how AI agents interact with it. Gravity runs its own internal MCP server to expose specific tools (e.g., ticket creation, workspace membership reads) that allow AI agents to securely act on behalf of a user.
+Gravity shares tool definitions and execution policy across external MCP clients, built-in AI chat, and browser WebMCP. The current catalog advertises 38 canonical tools; compatibility aliases remain callable. This document describes the implementation after the September 23, 2026 repairs. See [Transports](TRANSPORTS.md) for client configuration and token lifecycle details, and the [implementation review](IMPLEMENTATION_REVIEW_2026-09-23.md) for historical findings and remaining limits.
 
-## Non-Goals or Boundary Limits
-- This document does not cover the inner workings of external AI providers (OpenAI, Anthropic, Gemini, DeepSeek).
-- It does not map the full data model of tickets or workspaces (see related domain docs).
-- Focus is on the protocol dispatch, JSON-RPC parsing, and execution bounds.
+## Entry points and execution
 
-## Entry Points
-Gravity exposes two distinct MCP transports:
-- **HTTP/SSE Transport**: `POST /api/v1/mcp/sse` (mounted via `server/src/mcp/router.ts`). Although named "sse", the primary command channel acts as an HTTP POST JSON-RPC endpoint.
-- **Stdio Transport**: Executed as a standalone process via `server/src/mcp/stdio.ts` (`node dist/src/mcp/stdio.js`), listening for line-delimited JSON-RPC messages on standard input and output.
+| Entry point | Path to the shared executor |
+| --- | --- |
+| External HTTP MCP | `POST /api/v1/mcp` → session/connection-token authentication → JSON-RPC handler → executor |
+| ChatGPT / OAuth MCP | `POST /api/v1/workspaces/:workspaceId/mcp` → workspace-bound OAuth token → JSON-RPC handler → executor |
+| Standalone stdio | `npm run --silent -w server mcp` → trusted environment context → JSON-RPC handler → executor |
+| Built-in AI chat | Chat service → provider tool call → executor |
+| Browser WebMCP | Browser-discovered tool → authenticated HTTP MCP request → JSON-RPC handler → executor |
 
-## Flow Steps
+`POST /api/v1/mcp/sse` remains a compatibility alias for the HTTP endpoint. Both URLs implement stateless Streamable HTTP with JSON responses. They do not establish a legacy SSE transport. Application realtime SSE is separate. Initialization negotiates a supported protocol version; notifications have no JSON-RPC response, and HTTP notifications return 202. GET and DELETE return 405 because there is no server-initiated stream or session resource.
 
-1. **Agent Tool Formatting**: `AiService` (`server/src/lib/ai/ai-service.ts`) passes tool definitions (`mcpToolsList`) directly to configured providers (OpenAI, Anthropic, Gemini). When a provider decides to invoke a tool, it returns a tool call payload.
-2. **Request Construction**: The agent, acting as an MCP client, sends a JSON-RPC request to the server (e.g., `method: "tools/call"`).
-3. **Transport Authentication**:
-   - For HTTP: The request is authenticated using standard session cookies via `resolveRequestActorUserId`.
-   - For Stdio: The identity is rigidly bound at process startup using the `MCP_STDIO_WORKSPACE_ID` and `MCP_STDIO_ACTOR_USER_ID` environment variables.
-4. **Workspace Guard**: The server mandates an `X-Workspace-Id` HTTP header or a `params.workspaceId` property. It verifies that the authenticated user actually has a valid membership in the target workspace (`workspaceMembers` table).
-5. **JSON-RPC Handling**: The `McpRequestHandler` (`server/src/mcp/request-handler.ts`) processes the validated request.
-6. **Tool Disabling Check**: The system cross-references the requested tool against the workspace's `disabledMcpTools` settings (retrieved via `getDisabledTools`). If disabled, an exception is thrown.
-7. **Execution**: The `executeTool` function (`server/src/mcp/tool-executor.ts`) dispatches the arguments to the registered handler (`server/src/mcp/tool-handlers/registry.ts`).
-8. **Response**: A JSON-RPC response containing the result or error is serialized and returned to the agent.
+The standalone entry point is `server/src/modules/mcp/stdio.ts`, compiled to `server/dist/modules/mcp/stdio.js`. It initializes the database and registry before serving newline-delimited JSON-RPC. Startup, audit, and diagnostic logs go to stderr. Its trusted workspace/actor settings come from `MCP_STDIO_WORKSPACE_ID` and `MCP_STDIO_ACTOR_USER_ID`; request arguments cannot override identity.
 
-## Realtime Mutation Events and SSE Fan-Out
+Built-in chat calls the executor directly rather than manufacturing JSON-RPC requests. External transports and browser tools use `McpRequestHandler`. All of these paths pass through `executeTool`, where runtime argument validation and policy enforcement happen before a domain handler is invoked.
 
-Tool handlers that mutate tickets, comments, labels, or dependencies also publish typed events to `mcpEventBus` (`server/src/lib/mcp-event-bus.ts`). The realtime service (`server/src/realtime.ts`) subscribes to that bus and broadcasts the events to workspace-scoped SSE clients. The client-side `TicketContext` then coalesces bursts of events and refetches only the data that changed.
+## Catalog, schemas, and permissions
 
-### Event Envelope
+`server/src/modules/mcp/bootstrap.ts` registers domain definitions and handlers for both transports. `tools.ts` normalizes metadata, groups compatibility aliases, and exposes canonical discovery. `validation.ts` compiles strict JSON Schemas without coercion or silent argument removal. `policy.ts` checks workspace access, disabled tools, and exact or broad connection scopes on every execution.
 
-Each SSE payload uses a consistent envelope:
+Workspace settings and the external-connection modal use GET `/api/v1/workspaces/:workspaceId/mcp/tools`. This catalog includes schemas, aliases, read/write/destructive annotations, exact scopes, and whether the current user can grant a capability. MCP `tools/list` includes only canonical tools that are enabled and callable by that credential. Workspace settings still recognize old names, and disabling a canonical tool blocks its aliases. Disabling `update_ticket` also blocks its focused mutation tools; generic updates cannot bypass disabled focused field operations.
 
-- `type`: the event name, such as `ticket.created` or `comment.added`
-- `workspaceId`: workspace scope for delivery
-- `projectId`: project scope when the mutation is project-bound
-- `teamId`: team scope when the mutation is team-bound
-- `ticketKey`: the affected ticket key when applicable
-- `actorUserId`: the user who triggered the mutation
-- `timestamp`: ISO-8601 event timestamp
-- `data`: event-specific payload
+The canonical catalog is:
 
-### Event Types
+| Capability | Tools |
+| --- | --- |
+| Context and discovery | `get_workspace`, `list_projects`, `get_project`, `list_teams`, `list_cycles`, `list_ticket_options`, `list_project_assignees`, `list_workspace_members` |
+| Ticket reads | `list_tickets`, `search_tickets`, `get_ticket` |
+| Ticket creation, broad update, deletion | `create_ticket`, `update_ticket`, `delete_ticket` |
+| Focused ticket mutations | `edit_ticket_content`, `set_ticket_status`, `set_ticket_priority`, `assign_ticket`, `unassign_ticket`, `set_ticket_cycle`, `clear_ticket_cycle`, `set_ticket_parent`, `clear_ticket_parent`, `set_ticket_pr`, `move_ticket` |
+| Labels | `list_workspace_labels`, `get_ticket_labels`, `add_ticket_labels`, `remove_ticket_labels`, `set_ticket_labels` |
+| Dependencies | `mark_ticket_blocked`, `unmark_ticket_blocked`, `preview_ticket_dependency`, `list_ticket_dependencies` |
+| Comments | `create_comment`, `read_comments`, `update_comment`, `delete_comment` |
 
-The current typed event set is:
+`get_ticket_details` and `read_ticket_details` share the `get_ticket` capability. `add_comment` aliases `create_comment`; dependency add/remove aliases retain their legacy input schemas. New clients should prefer canonical names and explicit blocker/dependent keys for directional dependency changes.
 
-- `ticket.created`: fired after a ticket is created
-- `ticket.updated`: fired after ticket fields change
-- `ticket.deleted`: fired after a ticket is deleted
-- `comment.added`: fired after a comment is created
-- `comment.updated`: fired after a comment is edited
-- `comment.deleted`: fired after a comment is removed
-- `labels.added`: fired after labels are attached to a ticket
-- `labels.removed`: fired after labels are detached from a ticket
-- `labels.set`: fired when the full label set is replaced
-- `dependency.added`: fired after a ticket dependency is created
-- `dependency.removed`: fired after a ticket dependency is removed
+The catalog is the authoritative source for tool names and schemas. Add new definitions and handlers together, declare compatibility aliases deliberately, and ensure every execution route reaches the shared executor. Tool annotations describe behavior; the server-side policy, rather than annotations alone, grants access.
 
-For backward compatibility, the SSE stream still accepts legacy broad-refresh events:
+## Credentials and workspace boundaries
 
-- `tickets-updated`
-- `comments-updated`
-- `users-updated`
-- `init`
+HTTP requests use authenticated session cookies or a workspace-bound bearer credential, with `X-Workspace-Id` identifying the workspace. For compatibility, the transport accepts `params.workspaceId`; conflicting workspace IDs in tool calls are rejected. Credentials execute as their issuer, not as a privileged agent account.
 
-### Client Refresh Behavior
+Connection credentials are reusable by default, expire after 24 hours by default, and are not IP-bound unless requested. Omitting scopes creates a discovery-only credential. The UI selects exact tool scopes, defaults to read-only tools, offers expiry selection, and exports endpoint plus authorization/workspace headers. It also lists and revokes connections. Explicit single-use tokens remain supported for one-off calls and cannot complete an ordinary multi-request client lifecycle.
 
-The current client does not fully replace local state with the SSE payload. Instead, it uses the event type to choose a targeted refresh:
+Connection management lives in **Account Preferences → Connect External AI**, with your own connections grouped across accessible workspaces. The account metadata endpoint is `GET /api/v1/users/me/mcp/connections`; it filters by authenticated issuer and fresh membership, even for workspace administrators. The setup dialog offers copyable fields, JSON export for custom-header clients, and a separate ChatGPT OAuth setup path.
 
-- Ticket, label, and dependency events refetch the active ticket detail with relations.
-- Comment events refetch the comment thread for the affected ticket.
-- A coalescer batches rapid mutations so a burst of updates can collapse into one network refresh.
+OAuth uses a workspace-specific resource URL, so ChatGPT needs no custom workspace header. The official MCP SDK handles authorization-code/PKCE protocol endpoints; Gravity supplies durable client, consent, grant, and hashed-token storage. Users sign in through the existing account session, review the client callback and workspace, and approve a subset of allowed tool scopes. A grant lasts 30 days, with one-hour access tokens and rotating refresh tokens. The same account revoke control ends both access and renewal. See [OAuth setup and deployment](TRANSPORTS.md#oauth-transport).
 
-## Data Stores and Resources
-- **`workspaceMembers`**: Read during transport validation to ensure the requesting user is a legitimate member of the workspace they are trying to act upon.
-- **`workspaces` (Settings)**: Read by `workspace-tools.ts` to retrieve `disabledMcpTools`, ensuring agents cannot bypass workspace owner controls.
-- **`tickets`, `projects`, `comments`**: Mutated or read by the specific tool handlers under `src/mcp/tool-handlers/`.
-- **`mcpEventBus`**: The in-process mutation event bus used to bridge domain writes into the realtime SSE layer.
+Workspace members can issue exact read-only scopes. Owner/admin permission is required for write scopes or the broad `tools/call` / `tools/call:*` grants. Execution rechecks write-credential role eligibility. Credentials do not currently support narrower project-specific grants. MCP transport/execution access reads current database membership rather than the application membership cache. Stdio token sessions also recheck issuer access; write-role checks read current membership directly. Token verification atomically matches the observed token hash so refresh invalidates stale credentials even when verification races with rotation.
 
-## Interfaces and Contracts
+Domain services independently constrain referenced resources. Ticket cycles must belong to the project's team. Parents must belong to the same project, and self/ancestor cycles are rejected under project locks. Moving a ticket within its workspace detaches its parent and direct children, clears incompatible cycles/labels, and validates the retained assignee against the destination. Cross-workspace moves fail. These rules apply to service callers beyond MCP as well.
 
-### `mcpToolsList` (`server/src/mcp/tools.ts`)
-The source of truth for the available tools. These definitions follow standard MCP JSON Schema formats and are translated into the native tool-calling formats of various AI providers.
-Examples: `list_tickets`, `create_ticket`, `add_comment`, `list_workspace_members`.
+## Arguments, results, and stable references
 
-### `McpRequestHandler` (`server/src/mcp/request-handler.ts`)
-The unified JSON-RPC dispatcher.
-- Accepts: `McpRequestPayload` (containing `jsonrpc`, `id`, `method`, `params`).
-- Returns: MCP-compliant responses (containing `result` or `error`).
+Omitted update fields preserve existing values. Explicit null clears supported nullable fields, while focused unassign/clear tools expose that intent separately. Labels have stable IDs, names, scope, color, and description. Typed `labelIds` arrays are preferred; legacy `labels` strings remain supported. An explicit empty replacement clears labels, while a missing or incorrectly typed replacement fails before mutation. Additive and subtractive label operations target exact IDs to preserve concurrent independent changes.
 
-## Key Files and Modules
-- **`server/src/mcp/router.ts`**: The HTTP transport boundary. Handles authentication, workspace checks, and delegates to the handler.
-- **`server/src/mcp/request-handler.ts`**: The protocol logic. Validates methods (`initialize`, `tools/list`, `tools/call`), processes tool filters, and calls the executor.
-- **`server/src/mcp/tool-executor.ts`**: Safely looks up and invokes the right function from the tool registry.
-- **`server/src/mcp/tool-handlers/registry.ts`**: Maps tool string names to actual implementation functions.
-- **`server/src/lib/mcp-event-bus.ts`**: Shared mutation event definitions and publish/subscribe helpers.
-- **`server/src/realtime.ts`**: Converts mutation events into client-facing SSE broadcasts.
-- **`server/src/lib/ai/ai-service.ts`**: Connects AI models to tool definitions and handles the bidirectional translation.
-- **`server/tests/auth-ai-mcp-webhooks.test.ts`**: Integration tests confirming that disabled tools fail and that unauthenticated/unauthorized users are denied.
+`list_tickets` returns an array with a default limit of 50 and maximum of 100; `offset` selects later pages. `search_tickets` returns `{ tickets, nextCursor, scope }` and supports project, team, text, workflow, assignee, cycle, label, parent, and date filters. Ordering is creation time followed by ID. A cursor is offset-based and should be reused with the same filters; it does not freeze the underlying dataset.
 
-## Permissions, Guards, or Tenant Boundaries
-- **Strict Tenant Bound**: Every MCP execution *must* be bound to a single Workspace ID. The MCP protocol implementation fails if a workspace ID is omitted or invalid.
-- **Identity Bound**: Actions execute on behalf of the `actorUserId`. The system does not use a superuser "agent" account; the agent assumes the permissions of the user driving it.
-- **Workspace Tool Control**: Workspace owners can explicitly disable specific MCP tools via their workspace settings (`PATCH /api/v1/workspaces/:id/settings`). `tools/list` omits disabled tools, and `tools/call` blocks them aggressively.
+Successful MCP tool results include text plus `structuredContent: { data: ... }`. Domain execution failures use `isError: true` and structured error information. Invalid tool arguments, unknown tools, and authorization failures are JSON-RPC errors. Output schemas currently describe the common envelope rather than every nested domain object.
 
-## Failure Modes, Observability, or Operational Notes
-- If an agent attempts to hallucinate a tool or call a disabled tool, the JSON-RPC response will contain an error object (e.g., `-32601 Method not found` or a `-32603 Internal error` wrapped exception).
-- Stdio transport failures due to malformed JSON lines will emit standard JSON-RPC parse errors without crashing the stdio process listener.
-- `req.body.params.workspaceId` vs `X-Workspace-Id`: The transport allows either, prioritizing the header. Ensure clients don't mistakenly send conflicting IDs.
+Stable authorized database IDs are the default and work across replicas. Optional legacy `X-MCP-Sanitize: true` references are scoped by workspace/actor, bounded, and expire after one hour of inactivity. They remain process-local and are not an authorization boundary.
 
-## Change Hazards, Invariants, or Migration Constraints
-- **Do not bypass the handler**: Any new transport (e.g., WebSockets) must still route through `McpRequestHandler`. It enforces tool disablement rules that should not be skipped.
-- **Tool name aliases**: Notice that `add_comment` and `create_comment` are aliased in the logic (`disablementAlias`). Altering these tool names requires careful synchronization to ensure workspace disablement settings continue to function.
+## Chat and browser behavior
 
-## Related Docs
-- [Link-Based MCP Connection](LINK_BASED_MCP_CONNECTION.md)
-- [Adding MCP SSE Events](ADDING_MCP_SSE_EVENTS.md)
-- [Client State Management](../client/CLIENT_STATE_MANAGEMENT.md)
-- [Server Architecture Overview](../server/SERVER_ARCHITECTURE_OVERVIEW.md)
+`server/src/modules/chats/services/chat-service.ts` presents enabled canonical tools to the configured provider and forwards model-selected calls to the executor. It retains function names and call IDs with results. Saved exchanges reconstruct assistant calls and tool-role data on subsequent turns; ticket/comment content is never promoted to a system instruction. Only the application-generated system prompt receives the system role.
+
+Provider adapters live under `server/src/modules/ai/providers/`. Gemini uses JSON Schema declarations through `parametersJsonSchema`, includes function names in responses, groups parallel responses in one user turn, and preserves original provider call IDs/parts/signatures for replay. Provider payload tests do not constitute live external-model validation.
+
+Browser registration lives in `client/src/utils/webmcp.ts`. It discovers tools from the server and registers them through `document.modelContext`. The browser executes authenticated MCP requests and resolves only after receiving the server result, including `isError`; it no longer reports success based on an unfinished optimistic React action or reads an active-project cache as if it were the workspace.
+
+The September 17, 2026 WebMCP draft supports `registerTool(tool, { signal })`. Cleanup aborts that signal; an explicit `unregisterTool` method is not required. Gravity calls the older method only when available as a compatibility fallback. Per-call cancellation is combined with registration lifetime cancellation. [WebMCP registration options](https://webmachinelearning.github.io/webmcp/#dictdef-modelcontextregistertooloptions).
+
+## Realtime mutation delivery
+
+Ticket, comment, label, dependency, and subtask handlers publish typed events through `server/src/lib/mcp-event-bus.ts`. `server/src/realtime.ts` forwards them to workspace-scoped application SSE subscribers. Events contain type, workspace/project/team IDs, ticket key, actor ID, timestamp, and mutation-specific data.
+
+The client invalidates/refetches affected data and coalesces bursts. It accepts same-user events because external clients and other tabs can write on that user's behalf. An actor match alone does not establish that the current tab already applied a mutation.
+
+When Redis is enabled, `server/src/lib/mcp-event-bridge.ts` relays events across HTTP, stdio, and other HTTP processes. Origin IDs and bounded duplicate tracking prevent echo loops. Remote messages reach local subscribers without being published again. Pending publications are bounded, Redis failures leave local delivery available, and startup/shutdown hooks own dedicated pubsub clients.
+
+Channels include the logical database from `REDIS_URL` (database `0` when omitted) and `MCP_EVENT_NAMESPACE` (default `default`). Set a distinct `MCP_EVENT_NAMESPACE` for deployments that share the same Redis database, and use the same value for HTTP replicas and their stdio clients. Credentials and hostnames are never included in channel names. This explicit boundary is required because Redis Pub/Sub itself ignores database numbers. Standalone stdio closes its bridge, shared Redis client, and database pool on stdin EOF, SIGINT, and SIGTERM.
+
+The bridge is best-effort pubsub, with no outbox, durable replay, or delivery guarantee while disconnected. Consumers must reload current state after reconnecting. Without Redis, notifications remain process-local. Bridge regression tests use fake adapters; a live Redis check additionally verified relay between matching processes and isolation across logical databases and deployment namespaces. Full application delivery across multiple HTTP replicas remains a deployment check.
+
+## Key files and verification
+
+| File | Responsibility |
+| --- | --- |
+| `server/src/modules/mcp/bootstrap.ts` | Shared registry initialization |
+| `server/src/modules/mcp/tools.ts` | Catalog, canonical names, aliases, metadata |
+| `server/src/modules/mcp/validation.ts` | Strict runtime input schemas |
+| `server/src/modules/mcp/policy.ts` | Execution-time workspace, scope, and capability rules |
+| `server/src/modules/mcp/router.ts` | HTTP transport and authentication |
+| `server/src/modules/mcp/oauth.ts` | OAuth registration, discovery, consent, token exchange, refresh, and verification |
+| `server/src/modules/mcp/stdio.ts`, `stdio-session.ts` | Standalone startup, lifecycle, and framing |
+| `server/src/modules/mcp/request-handler.ts` | JSON-RPC lifecycle and result/error translation |
+| `server/src/modules/mcp/tool-executor.ts` | Validated, authorized handler dispatch |
+| `server/src/modules/tickets/mcp.ts`, `workspaces/mcp.ts` | Domain tool definitions and handlers |
+| `server/src/modules/tickets/services/tickets.ts` | Shared ticket persistence and reference constraints |
+| `server/src/modules/chats/services/chat-service.ts` | Provider loop and trusted-role reconstruction |
+| `client/src/utils/mcp.ts`, `webmcp.ts` | Browser discovery, configuration export, and execution |
+| `client/src/modules/accountPreferencesPage/components/sections/ExternalAiSection.tsx` | Account-wide connection management |
+| `client/src/modules/mcpOAuth/OAuthConsentPage.tsx` | Authenticated workspace/tool consent |
+
+The official SDK transport tests (`mcp-transport-lifecycle.test.ts` and `mcp-stdio-sdk.test.ts`) exercise discovery and a write/read round trip over actual transport boundaries. Separate suites cover schema/policy enforcement, aliases, relationship safety, pagination, labels, provider payloads/history, registration cleanup, same-user realtime updates, and event bridging. Final aggregate test totals belong to the repair run's validation report rather than this architecture document.

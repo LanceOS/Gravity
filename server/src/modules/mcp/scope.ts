@@ -3,7 +3,7 @@ import { audit } from '../../lib/logger.js';
 import { db } from '../../db/index.js';
 import { workspaces } from '../../db/schema.js';
 import type { McpErrorData } from './errors.js';
-import { McpToolValidationError } from './errors.js';
+import { McpWorkspaceScopeError } from './errors.js';
 
 const WORKSPACE_SCOPE_ERROR_TEMPLATE =
   'This action is scoped to workspace %s and cannot be performed on resources in other workspaces.';
@@ -37,7 +37,7 @@ function scopeViolationMessage(workspaceName: string) {
 export async function createWorkspaceScopeViolationError(
   contextWorkspaceId: string,
   details: McpErrorData = {},
-): Promise<McpToolValidationError> {
+): Promise<McpWorkspaceScopeError> {
   const workspaceName = await resolveWorkspaceName(contextWorkspaceId);
   const message = scopeViolationMessage(workspaceName);
 
@@ -48,7 +48,7 @@ export async function createWorkspaceScopeViolationError(
     ...details,
   });
 
-  return new McpToolValidationError(message, {
+  return new McpWorkspaceScopeError(message, {
     workspaceId: contextWorkspaceId,
     workspaceName,
     ...details,

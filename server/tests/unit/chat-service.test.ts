@@ -747,3 +747,56 @@ describe('ChatService', () => {
     }
   });
 });
+
+describe('ChatService MCP integration regressions', () => {
+  afterEach(() => { mcpToolsList.splice(0); vi.restoreAllMocks(); });
+
+  it('rejects a disabled tool returned by a model even when it was not advertised', async () => {
+    const { userId, chatId, projectId, workspace } = await createChatFixture();
+    const { workspaceSettings } = await import('../../src/db/schema.js');
+    await db.update(workspaceSettings).set({ disabledMcpTools: ['update_ticket'] })
+      .where(eq(workspaceSettings.workspaceId, workspace.id));
+    const ai = { chat: vi.fn()
+      .mockResolvedValueOnce({ content: '', toolCalls: [{ id: 'disabled', name: 'set_ticket_status', arguments: { ticketKey: 'GRV-1', status: 'done' } }] })
+      .mockResolvedValueOnce({ content: 'This operation is disabled.' }) };
+    const executeTool = vi.fn();
+    await new ChatService({ ai, executeTool }).generateResponse({ userId, chatId, projectId, message: 'Change its status' });
+    expect(executeTool).not.toHaveBeenCalled();
+    const result = ai.chat.mock.calls[1][2].messages.find((message: any) => message.role === 'tool');
+    expect(JSON.parse(result.content)).toMatchObject({ isError: true, error: { message: expect.stringContaining('disabled') } });
+  });
+
+  it('replays new and legacy tool output as matched tool messages, never system instructions', async () => {
+    const { userId, chatId, projectId } = await createChatFixture();
+    await db.insert(chatMessages).values({ id: 'legacy-output', sessionId: chatId, role: 'system',
+      content: 'LEGACY_UNTRUSTED_DATA', metadata: { source: 'tool', toolCall: { id: 'legacy', name: 'get_ticket', arguments: { ticketKey: 'GRV-1' } } }, createdAt: new Date(0) });
+    const ai = { chat: vi.fn()
+      .mockResolvedValueOnce({ content: '', toolCalls: [{ id: 'read', name: 'list_tickets', arguments: {} }] })
+      .mockResolvedValue({ content: 'Finished' }) };
+    const service = new ChatService({ ai, executeTool: vi.fn().mockResolvedValue({ description: 'NEW_UNTRUSTED_DATA' }) });
+    await service.generateResponse({ userId, chatId, projectId, message: 'Read tickets' });
+    await service.generateResponse({ userId, chatId, projectId, message: 'Continue' });
+    const messages = ai.chat.mock.calls[2][2].messages;
+    expect(messages.filter((message: any) => message.role === 'system')).toHaveLength(1);
+    expect(messages.filter((message: any) => message.role === 'system').some((message: any) => /UNTRUSTED_DATA/.test(message.content))).toBe(false);
+    expect(messages).toContainEqual(expect.objectContaining({ role: 'tool', name: 'get_ticket', tool_call_id: 'legacy', content: 'LEGACY_UNTRUSTED_DATA' }));
+    expect(messages).toContainEqual(expect.objectContaining({ role: 'tool', name: 'list_tickets', tool_call_id: 'read', content: expect.stringContaining('NEW_UNTRUSTED_DATA') }));
+  });
+
+  it('provides Gemini function names, call IDs and thought signatures through a real tool round trip', async () => {
+    const { userId, chatId, projectId } = await createChatFixture();
+    const { GeminiProvider } = await import('../../src/modules/ai/providers/gemini-provider.js');
+    const part = { functionCall: { id: 'gemini-call', name: 'list_tickets', args: {} }, thoughtSignature: 'provider-signature' };
+    const requests: any[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (_url, init) => {
+      requests.push(JSON.parse(init.body));
+      return new Response(JSON.stringify({ candidates: [{ content: { parts: requests.length === 1 ? [part] : [{ text: 'Finished' }] } }] }), { status: 200 });
+    }));
+    const gemini = new GeminiProvider();
+    const ai = { chat: (_user: string, _provider: string, options: any) => gemini.chat({ ...options, apiKey: 'fixture-key' }) };
+    await new ChatService({ ai, executeTool: vi.fn().mockResolvedValue([]) }).generateResponse({ userId, chatId, projectId, provider: 'gemini', model: 'fixture-model', message: 'List tickets' });
+    const parts = requests[1].contents.flatMap((message: any) => message.parts);
+    expect(parts).toContainEqual(part);
+    expect(parts).toContainEqual(expect.objectContaining({ functionResponse: expect.objectContaining({ id: 'gemini-call', name: 'list_tickets' }) }));
+  });
+});

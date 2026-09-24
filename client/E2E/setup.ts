@@ -1,8 +1,21 @@
-import '@testing-library/jest-dom/vitest';
-import { afterEach, beforeEach, vi } from 'vitest';
+import * as matchers from '@testing-library/jest-dom/matchers';
+import { afterEach, beforeEach, expect, vi } from 'vitest';
 import { act, cleanup } from '@testing-library/react';
 import { queryClient } from '../src/utils/queryClient';
 import { router } from '../src/router';
+import { transferableAbortController } from 'node:util';
+
+expect.extend(matchers);
+
+// Node's fetch Request and jsdom's AbortSignal can come from incompatible realms.
+// React Router uses both, so keep its abort primitives in the fetch realm.
+try {
+  new Request('http://localhost/', { signal: new AbortController().signal });
+} catch {
+  const nativeController = transferableAbortController();
+  vi.stubGlobal('AbortController', nativeController.constructor);
+  vi.stubGlobal('AbortSignal', nativeController.signal.constructor);
+}
 
 // Mock standard JSDOM/browser API gaps
 if (!window.matchMedia) {

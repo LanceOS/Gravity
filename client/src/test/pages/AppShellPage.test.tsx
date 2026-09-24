@@ -75,7 +75,7 @@ const mocks = vi.hoisted(() => ({
   useWorkspaceSettings: vi.fn(),
   useTicketFilters: vi.fn(),
   useActiveView: vi.fn(),
-  registerWebMCPTools: vi.fn(() => null),
+  registerWebMCPTools: vi.fn(() => ({ dispose: vi.fn(), ready: Promise.resolve() })),
   fetch: vi.fn(),
 }));
 
@@ -175,7 +175,8 @@ vi.mock('../../modules/settings', () => ({
   SettingsScreen: () => <div>SettingsPage</div>,
 }));
 
-vi.mock('../../utils/webmcp', () => ({
+vi.mock('../../utils/webmcp', async importOriginal => ({
+  ...await importOriginal<typeof import('../../utils/webmcp')>(),
   registerWebMCPTools: mocks.registerWebMCPTools,
 }));
 
@@ -890,11 +891,13 @@ function mockAggregateApiResponses() {
 describe('AppShellPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    delete (navigator as any).modelContext;
+    delete (document as any).modelContext;
     window.localStorage.clear();
     sharedQueryClient.clear();
-    mocks.fetch.mockImplementation(() =>
-      Promise.resolve(jsonResponse({ success: true, lastActiveAt: '2026-05-26T10:00:00.000Z' }))
+    mocks.fetch.mockImplementation((input: string | URL | Request) =>
+      Promise.resolve(jsonResponse(String(input).endsWith('/mcp')
+        ? { jsonrpc: '2.0', result: { tools: [] } }
+        : { success: true, lastActiveAt: '2026-05-26T10:00:00.000Z' }))
     );
     vi.stubGlobal('fetch', mocks.fetch);
   });
@@ -1376,10 +1379,11 @@ describe('AppShellPage', () => {
   });
 
   it('keeps the WebMCP action bridge available on management routes when native WebMCP is supported', async () => {
-    Object.defineProperty(navigator, 'modelContext', {
+    Object.defineProperty(document, 'modelContext', {
       configurable: true,
       value: {
         registerTool: vi.fn(),
+        unregisterTool: vi.fn(),
       },
     });
 

@@ -11,6 +11,7 @@ import { RealtimeProvider, useRealtimeContext } from '../RealtimeContext';
 import type { RealtimeContextType } from '../RealtimeContext.types';
 import type { Comment, Project, Ticket } from '../../../types/domain';
 import { queryKeys } from '../../../utils/queryClient';
+import type { TicketWithRelations } from '../../../modules/tickets/utils/ticketRelations';
 
 type MockSseHandler = (event: MessageEvent | Event) => void;
 
@@ -216,7 +217,7 @@ describe('RealtimeContext', () => {
     serviceRegistry.clear();
   });
 
-  it('updates ticket caches from SSE events and skips self-originated messages', async () => {
+  it('updates ticket caches from SSE events including the same user in another client', async () => {
     const queryClient = createQueryClient();
     queryClient.setQueryData(queryKeys.tickets('project-1'), [] as Ticket[]);
     vi.spyOn(queryClient, 'invalidateQueries');
@@ -292,10 +293,13 @@ describe('RealtimeContext', () => {
       ticketKey: updatedTicket.key,
       ticketId: updatedTicket.id,
       projectId: updatedTicket.projectId,
-      data: { ticket: { ...updatedTicket, title: 'Ignored self update' } },
+      data: { ticket: { ...updatedTicket, title: 'External agent update', updatedAt: '2026-06-18T15:00:00.000Z' } },
     });
 
-    expect(queryClient.getQueryData<Ticket[]>(queryKeys.tickets('project-1'))?.[0]?.title).toBe('Updated from SSE');
+    await waitFor(() => {
+      expect(queryClient.getQueryData<Ticket[]>(queryKeys.tickets('project-1'))?.[0]?.title).toBe('External agent update');
+      expect(queryClient.getQueryData<Ticket>(queryKeys.ticketDetail('ticket-1'))?.title).toBe('External agent update');
+    });
 
     queryClient.setQueryData(queryKeys.comments('ticket-1'), [
       {
@@ -365,6 +369,48 @@ describe('RealtimeContext', () => {
 
     await waitFor(() => {
       expect(queryClient.getQueryData<Comment[]>(queryKeys.comments('ticket-1'))).toEqual([]);
+    });
+  });
+
+  it('updates cached parent subtasks from a newer same-user MCP hierarchy snapshot', async () => {
+    const queryClient = createQueryClient();
+    const child: Ticket = { ...baseTicket, id: 'ticket-child', key: 'GRA-2', parentId: baseTicket.id };
+    const parent: TicketWithRelations = { ...baseTicket, subtasks: [child], relatedTicketIds: [] };
+    const detailKeys = [
+      queryKeys.ticketDetail(parent.id),
+      queryKeys.ticket(parent.key, 'user-1'),
+      queryKeys.ticketRelations(parent.key, 'user-1'),
+    ];
+    for (const key of detailKeys) queryClient.setQueryData(key, parent);
+    queryClient.setQueryData(queryKeys.tickets('project-1'), [parent, child]);
+    vi.stubGlobal('EventSource', class {});
+    renderWithProviders(queryClient);
+    await waitFor(() => expect(currentProject).toBeDefined());
+    await act(async () => { currentProject!.setActiveProjectId('project-1'); });
+    await waitFor(() => expect(currentRealtime.workspaceId).toBe('workspace-1'));
+
+    serviceRegistry.get('workspace-1')!.emitMessage({
+      type: 'ticket.updated', actorUserId: 'user-1', ticketKey: parent.key,
+      ticketId: parent.id, projectId: parent.projectId,
+      data: { ticket: { ...baseTicket, title: 'Updated parent', updatedAt: '2026-06-18T12:00:00.001Z' } },
+    });
+    await waitFor(() => {
+      expect(queryClient.getQueryData<TicketWithRelations>(detailKeys[0])).toMatchObject({ title: 'Updated parent', subtasks: [child] });
+    });
+
+    const updatedParent = { ...parent, subtasks: [], updatedAt: '2026-06-18T12:00:00.002Z' };
+    serviceRegistry.get('workspace-1')!.emitMessage({
+      type: 'ticket.updated', actorUserId: 'user-1', ticketKey: parent.key,
+      ticketId: parent.id, projectId: parent.projectId, data: { ticket: updatedParent },
+    });
+
+    await waitFor(() => {
+      for (const key of detailKeys) {
+        expect(queryClient.getQueryData<TicketWithRelations>(key)).toMatchObject({
+          subtasks: [], updatedAt: updatedParent.updatedAt,
+        });
+      }
+      expect(queryClient.getQueryData<TicketWithRelations[]>(queryKeys.tickets('project-1'))?.[0].subtasks).toEqual([]);
     });
   });
 

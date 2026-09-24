@@ -1,59 +1,25 @@
 import { useEffect } from 'react';
-import type { Project, Ticket, User } from '../../../types/domain';
-import { registerWebMCPTools } from '../../../utils/webmcp';
+import { listMcpTools } from '../../../utils/mcp';
+import { registerWebMCPTools, supportsWebMcpRegistration } from '../../../utils/webmcp';
 
-interface UseWebMcpRegistrationArgs {
-  enabled?: boolean;
-  tickets: Ticket[];
-  users: User[];
-  projects: Project[];
-  createTicket: Parameters<typeof registerWebMCPTools>[0]['createTicket'];
-  updateTicket: Parameters<typeof registerWebMCPTools>[0]['updateTicket'];
-  addComment: Parameters<typeof registerWebMCPTools>[0]['addComment'];
-  addTicketBlocker: Parameters<typeof registerWebMCPTools>[0]['addBlocker'];
-  removeTicketBlocker: Parameters<typeof registerWebMCPTools>[0]['removeBlocker'];
-}
+export { supportsWebMcpRegistration } from '../../../utils/webmcp';
 
-export function supportsWebMcpRegistration() {
-  if (typeof navigator === 'undefined') {
-    return false;
-  }
-
-  const modelContext = (navigator as any).modelContext;
-  return !!modelContext && typeof modelContext.registerTool === 'function';
-}
-
-export function useWebMcpRegistration({
-  enabled = true,
-  tickets,
-  users,
-  projects,
-  createTicket,
-  updateTicket,
-  addComment,
-  addTicketBlocker,
-  removeTicketBlocker,
-}: UseWebMcpRegistrationArgs) {
+export function useWebMcpRegistration({ workspaceId, enabled = true }: { workspaceId?: string; enabled?: boolean }) {
   useEffect(() => {
-    if (!enabled) {
-      return;
-    }
-
-    const controller = registerWebMCPTools({
-      createTicket,
-      updateTicket,
-      addComment,
-      addBlocker: addTicketBlocker,
-      removeBlocker: removeTicketBlocker,
-      getTickets: () => tickets,
-      getUsers: () => users,
-      getProjects: () => projects,
+    if (!enabled || !workspaceId || !supportsWebMcpRegistration()) return;
+    const controller = new AbortController();
+    let unregister: (() => void) | undefined;
+    void listMcpTools(workspaceId, controller.signal).then(tools => {
+      if (controller.signal.aborted) return;
+      const registration = registerWebMCPTools(workspaceId, tools);
+      unregister = registration.dispose;
+      return registration.ready;
+    }).catch(error => {
+      if (!controller.signal.aborted) console.error('Gravity: WebMCP tool registration failed:', error);
     });
-
     return () => {
-      if (controller) {
-        controller.abort();
-      }
+      controller.abort();
+      unregister?.();
     };
-  }, [enabled, tickets, users, projects, createTicket, updateTicket, addComment, addTicketBlocker, removeTicketBlocker]);
+  }, [enabled, workspaceId]);
 }

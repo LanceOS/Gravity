@@ -47,6 +47,10 @@ export default defineConfig(({ mode }) => {
         '/api': {
           target: backendUpstream,
           changeOrigin: true,
+        },
+        '^/(\\.well-known/oauth-(authorization-server|protected-resource)(/.*)?|authorize|token|register|revoke)$': {
+          target: backendUpstream,
+          changeOrigin: true,
         }
       }
     }

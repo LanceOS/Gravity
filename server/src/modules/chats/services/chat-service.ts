@@ -8,7 +8,8 @@ import { systemPrompt } from '../../ai/config/sysPrompt.js';
 import { aiService } from '../../ai/index.js';
 import { executeTool as defaultExecuteTool } from '../../mcp/tool-executor.js';
 import { getDisabledTools } from '../../mcp/workspace-tools.js';
-import { mcpToolsList } from '../../mcp/tools.js';
+import { getAvailableTools, isToolDisabled } from '../../mcp/policy.js';
+import { McpToolValidationError } from '../../mcp/errors.js';
 import type { McpToolDefinition } from '../../mcp/types.js';
 
 type ChatProvider = 'openai' | 'anthropic' | 'gemini' | 'deepseek';
@@ -95,12 +96,6 @@ const DEFAULT_MODELS: Record<ChatProvider, string> = {
   deepseek: 'deepseek-chat',
 };
 
-const TOOL_ALIAS_BLOCKS: string[][] = [
-  ['add_comment', 'create_comment'],
-  ['add_dependency', 'add_ticket_dependency', 'mark_ticket_blocked'],
-  ['remove_dependency', 'remove_ticket_dependency', 'unmark_ticket_blocked'],
-];
-
 const CHAT_TITLE_DEFAULT = 'New Chat';
 const CHAT_TITLE_MAX_LENGTH = 32;
 const MAX_TOOL_ROUNDS = 6;
@@ -141,15 +136,6 @@ function truncateText(value: string, maxLength: number): string {
   }
 
   return `${truncated}…`;
-}
-
-function isToolDisabled(name: string, disabledTools: string[]) {
-  const aliasGroup = TOOL_ALIAS_BLOCKS.find((group) => group.includes(name));
-  if (aliasGroup) {
-    return aliasGroup.some((alias) => disabledTools.includes(alias));
-  }
-
-  return disabledTools.includes(name);
 }
 
 function safeStringify(value: unknown) {
@@ -334,12 +320,34 @@ export class ChatService {
         role: 'system',
         content: this.buildSystemPrompt(context, activeTools),
       },
-      ...conversationRows.map((row) => ({
-        role: row.role,
-        content: row.id === insertedUserMessageId && userMessageContext.length > 0
-          ? `${row.content}\n\n${userMessageContext}`
-          : row.content,
-      } as Message)),
+      ...conversationRows.flatMap((row): Message[] => {
+        const metadata = row.metadata && typeof row.metadata === 'object'
+          ? row.metadata as Record<string, any> : {};
+        if (metadata.source === 'tool') {
+          const calls = Array.isArray(metadata.toolCalls) ? metadata.toolCalls
+            : metadata.toolCall ? [metadata.toolCall] : [];
+          const validCalls = calls.filter((call: any) => typeof call?.id === 'string' && typeof call?.name === 'string');
+          if (validCalls.length === 0) return []; // Never replay tool data as instructions.
+          const results = Array.isArray(metadata.toolResults) ? metadata.toolResults : [];
+          return [
+            { role: 'assistant', content: '', tool_calls: validCalls },
+            ...validCalls.map((call: any): Message => {
+              const result = results.find((entry: any) => entry.id === call.id);
+              return {
+                role: 'tool', name: call.name, tool_call_id: call.id,
+                // Old rows have only text. They still belong in the tool channel.
+                content: result ? safeStringify(result.result) : row.content,
+              };
+            }),
+          ];
+        }
+        return [{
+          // Only the application-generated prompt above is trusted instruction.
+          role: row.role === 'system' ? 'user' : row.role,
+          content: row.id === insertedUserMessageId && userMessageContext.length > 0
+            ? `${row.content}\n\n${userMessageContext}` : row.content,
+        }];
+      }),
     ];
 
     const modelResult = await this.generateWithToolLoop({
@@ -473,7 +481,7 @@ export class ChatService {
 
   private async loadActiveTools(workspaceId: string): Promise<McpToolDefinition[]> {
     const disabledTools = await getDisabledTools(workspaceId);
-    return mcpToolsList.filter((tool) => !isToolDisabled(tool.name, disabledTools));
+    return getAvailableTools(disabledTools);
   }
 
   private buildSystemPrompt(context: ProjectContext, activeTools: McpToolDefinition[]) {
@@ -551,39 +559,24 @@ Only operate in the workspace/project above.`,
           };
         }
 
-        for (const toolCall of modelResponse.toolCalls) {
-          const args = this.normalizeToolArgs(toolCall.arguments);
-          const toolOutput = await this.safeExecuteTool(params.userId, params.workspaceId, {
-            id: toolCall.id,
-            name: toolCall.name,
-            arguments: args,
-          });
-
-          messages = [
-            ...messages,
-            {
-              role: 'assistant',
-              content: '',
-              tool_calls: [
-                {
-                  id: toolCall.id,
-                  name: toolCall.name,
-                  arguments: args,
-                },
-              ],
-            },
-            {
-              role: 'tool',
-              content: safeStringify(toolOutput.result),
-              tool_call_id: toolCall.id,
-            },
-          ];
-
-          await this.appendMessage(params.chatId, 'system', `Tool output (${toolCall.name}): ${safeStringify(toolOutput.result)}`, {
-            source: 'tool',
-            toolCall,
-          });
+        const calls = modelResponse.toolCalls.map((call) => ({ ...call }));
+        messages = [...messages, { role: 'assistant', content: modelResponse.content || '', tool_calls: calls }];
+        const toolResults: Array<{ id: string; name: string; result: unknown }> = [];
+        for (const toolCall of calls) {
+          const toolOutput = await this.safeExecuteTool(params.userId, params.workspaceId, toolCall);
+          messages = [...messages, {
+            role: 'tool', name: toolCall.name,
+            content: safeStringify(toolOutput.result), tool_call_id: toolCall.id,
+          }];
+          toolResults.push({ id: toolCall.id, name: toolCall.name, result: toolOutput.result });
         }
+        // Storage role is retained for backwards-compatible clients; replay above
+        // reconstructs typed tool exchanges and never forwards it as system data.
+        await this.appendMessage(params.chatId, 'system',
+          `Tool output (${calls.map((call) => call.name).join(', ')}): ${safeStringify(toolResults.map((entry) => entry.result))}`, {
+            source: 'tool', toolCalls: calls, toolResults,
+            ...(calls.length === 1 ? { toolCall: calls[0] } : {}),
+          });
 
         continue;
       } catch (error) {
@@ -659,6 +652,10 @@ Only operate in the workspace/project above.`,
   ) {
     try {
       const args = this.normalizeToolArgs(call.arguments);
+      const disabled = await getDisabledTools(workspaceId);
+      if (isToolDisabled(call.name, disabled)) {
+        throw new Error(`MCP tool "${call.name}" is disabled in this workspace.`);
+      }
       const result = await this.executeToolFn(call.name, args as Record<string, unknown>, workspaceId, userId);
       return {
         toolCallId: call.id,
@@ -670,27 +667,23 @@ Only operate in the workspace/project above.`,
       return {
         toolCallId: call.id,
         toolName: call.name,
-        args: this.normalizeToolArgs(call.arguments),
-        result: `Tool execution failed: ${error instanceof Error ? error.message : String(error)}`,
+        args: call.arguments,
+        result: { isError: true, error: { code: 'TOOL_EXECUTION_FAILED', message: error instanceof Error ? error.message : String(error) } },
       };
     }
   }
 
-  private normalizeToolArgs(value: unknown) {
-    if (value === undefined || value === null) {
-      return {};
-    }
-
+  private normalizeToolArgs(value: unknown): Record<string, unknown> {
+    if (value === undefined) return {};
+    let parsed = value;
     if (typeof value === 'string') {
-      try {
-        const parsed = JSON.parse(value);
-        return typeof parsed === 'object' && parsed !== null ? parsed : {};
-      } catch (_error) {
-        return {};
-      }
+      try { parsed = JSON.parse(value); }
+      catch { throw new McpToolValidationError('Tool arguments must be valid JSON.'); }
     }
-
-    return typeof value === 'object' ? value : {};
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new McpToolValidationError('Tool arguments must be an object.');
+    }
+    return parsed as Record<string, unknown>;
   }
 
   private providerSupportsStreaming(provider: ChatProvider): boolean {

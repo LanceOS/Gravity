@@ -18,6 +18,7 @@ const NotFoundView = lazy(() => import('../pages/PlaceholderViews/NotFoundView')
 const WorkspaceAccessDeniedView = lazy(() => import('../pages/PlaceholderViews/WorkspaceAccessDeniedView'));
 const WorkspaceAccessErrorView = lazy(() => import('../pages/PlaceholderViews/WorkspaceAccessErrorView'));
 const PlaceholderPage = lazy(() => import('../pages/PlaceholderPage'));
+const OAuthConsentPage = lazy(() => import('../modules/mcpOAuth/OAuthConsentPage'));
 
 function ProjectHomeGuard() {
   const { workspaceId, projectId } = useParams();
@@ -99,6 +100,10 @@ const staticProtectedRoutes = [
   {
     path: '/account',
     element: <AccountPreferencesPageRoute />,
+  },
+  {
+    path: '/oauth/consent',
+    element: <Suspense fallback={<LoadingPage />}><OAuthConsentPage /></Suspense>,
   },
   {
     path: '/workspace-access-denied',

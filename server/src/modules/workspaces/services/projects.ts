@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNotNull, isNull, notInArray, or, sql } from 'drizzle-orm';
 import { db } from '../../../db/index.js';
 import { comments, cycles, labels, projectMembers, projects, teams, ticketLabels, tickets, workspaceMembers, workspaces, workspaceSettings } from '../../../db/schema.js';
 import {
@@ -243,14 +243,12 @@ export async function createProjectRecord(params: {
 }
 
 export async function updateProjectRecord(projectId: string, params: { name?: string; description?: string; status?: string; githubRepoUrl?: string | null; teamId?: string }) {
-  const currentRows = await db
-    .select({ teamId: projects.teamId, workspaceId: projects.workspaceId })
-    .from(projects)
-    .where(eq(projects.id, projectId))
-    .limit(1);
-  const currentProject = currentRows[0];
-
   const rows = await db.transaction(async (tx) => {
+    const [currentProject] = await tx
+      .select({ teamId: projects.teamId })
+      .from(projects)
+      .where(eq(projects.id, projectId))
+      .limit(1).for('update');
     const updatedRows = await tx
       .update(projects)
       .set({
@@ -266,6 +264,11 @@ export async function updateProjectRecord(projectId: string, params: { name?: st
 
     if (updatedRows[0] && typeof params.teamId === 'string' && currentProject?.teamId && currentProject.teamId !== updatedRows[0].teamId) {
       await tx.update(labels).set({ teamId: updatedRows[0].teamId }).where(eq(labels.projectId, projectId));
+      const availableCycles = await tx.select({ id: cycles.id }).from(cycles).where(eq(cycles.teamId, updatedRows[0].teamId));
+      await tx.update(tickets).set({ cycleId: null, updatedAt: new Date() }).where(and(
+        eq(tickets.projectId, projectId),
+        availableCycles.length > 0 ? notInArray(tickets.cycleId, availableCycles.map(cycle => cycle.id)) : isNotNull(tickets.cycleId),
+      ));
     }
 
     return updatedRows;

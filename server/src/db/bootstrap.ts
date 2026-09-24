@@ -76,6 +76,13 @@ async function ensureConstraint(tableName: string, constraintName: string, defin
   await pool.query(`ALTER TABLE "${tableName}" ADD CONSTRAINT "${constraintName}" ${definition}`);
 }
 
+export async function migrateLegacyCycleProjectConstraint() {
+  if (!(await hasColumn('cycles', 'project_id'))) return;
+  // Team-scoped cycle writes no longer supply the legacy project column.
+  // Retain existing project references while allowing current inserts.
+  await pool.query('ALTER TABLE cycles ALTER COLUMN project_id DROP NOT NULL;');
+}
+
 async function migrateFlatWorkspaceTicketLabelAssignments() {
   const sourceRows = await pool.query(`
     SELECT
@@ -657,6 +664,8 @@ export async function initializeDatabase() {
     });
   }
 
+  await migrateLegacyCycleProjectConstraint();
+
   if (hasLabelsTable && hasProjectsTable && labelsHaveProjectId) {
     await pool.query(`
       UPDATE labels
@@ -888,6 +897,47 @@ export async function initializeDatabase() {
     ALTER TABLE mcp_connection_tokens ADD COLUMN IF NOT EXISTS usage_count INTEGER NOT NULL DEFAULT 0;
     CREATE INDEX IF NOT EXISTS mcp_connection_tokens_workspace_id_idx ON mcp_connection_tokens (workspace_id);
     CREATE INDEX IF NOT EXISTS mcp_connection_tokens_token_hash_idx ON mcp_connection_tokens (token_hash);
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS mcp_oauth_clients (
+      id TEXT PRIMARY KEY,
+      metadata JSONB NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS mcp_oauth_requests (
+      id TEXT PRIMARY KEY,
+      client_id TEXT NOT NULL REFERENCES mcp_oauth_clients(id) ON DELETE CASCADE,
+      workspace_id TEXT NOT NULL,
+      resource TEXT NOT NULL,
+      redirect_uri TEXT NOT NULL,
+      state TEXT,
+      code_challenge TEXT NOT NULL,
+      requested_scopes JSONB NOT NULL,
+      approved_scopes JSONB,
+      actor_user_id TEXT,
+      session_id TEXT,
+      status TEXT NOT NULL DEFAULT 'pending',
+      code_hash TEXT UNIQUE,
+      code_expires_at TIMESTAMPTZ,
+      expires_at TIMESTAMPTZ NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS mcp_oauth_grants (
+      connection_id TEXT PRIMARY KEY REFERENCES mcp_connection_tokens(id) ON DELETE CASCADE,
+      client_id TEXT NOT NULL REFERENCES mcp_oauth_clients(id) ON DELETE CASCADE,
+      resource TEXT NOT NULL,
+      access_expires_at TIMESTAMPTZ NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS mcp_oauth_refresh_tokens (
+      token_hash TEXT PRIMARY KEY,
+      connection_id TEXT NOT NULL REFERENCES mcp_oauth_grants(connection_id) ON DELETE CASCADE,
+      expires_at TIMESTAMPTZ NOT NULL,
+      used_at TIMESTAMPTZ
+    );
+    CREATE INDEX IF NOT EXISTS mcp_oauth_requests_expiry_idx ON mcp_oauth_requests (expires_at);
+    CREATE INDEX IF NOT EXISTS mcp_oauth_refresh_tokens_connection_idx ON mcp_oauth_refresh_tokens (connection_id);
+    CREATE INDEX IF NOT EXISTS mcp_connection_tokens_generated_by_idx ON mcp_connection_tokens (generated_by);
   `);
 
   const { runMigrations } = await getMigrations(auth.options);

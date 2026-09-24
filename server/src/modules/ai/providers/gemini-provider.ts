@@ -57,6 +57,8 @@ export class GeminiProvider implements IAiProvider {
         id: tc.functionCall.id ?? tc.functionCall.callId ?? `${tc.functionCall.name}_${index}`,
         name: tc.functionCall.name,
         arguments: tc.functionCall.args,
+        // Preserve provider-specific thought signatures and call IDs unchanged.
+        geminiPart: tc,
       }));
     }
 
@@ -106,10 +108,14 @@ export class GeminiProvider implements IAiProvider {
 
   private mapMessages(messages: any[]): any[] {
     const result: any[] = [];
+    const calls = new Map<string, any>();
     for (const m of messages) {
       if (m.role === 'system') continue;
 
       if (m.role === 'tool') {
+        const call = calls.get(m.tool_call_id);
+        const name = m.name ?? call?.name;
+        if (!name) throw new Error('Gemini tool results require a matching function name.');
         let contentObj;
         if (typeof m.content === 'string') {
           try {
@@ -121,14 +127,26 @@ export class GeminiProvider implements IAiProvider {
           contentObj = m.content;
         }
 
-        result.push({
-          role: 'user',
-          parts: [{ functionResponse: { name: m.name, response: { name: m.name, content: contentObj } } }],
-        });
+        const part = {
+          functionResponse: {
+            name,
+            ...(call?.geminiPart?.functionCall?.id ? { id: call.geminiPart.functionCall.id } : {}),
+            response: { content: contentObj },
+          },
+        };
+        const previous = result.at(-1);
+        // Parallel calls belong to one model turn and must receive all their
+        // responses together in the following user turn.
+        if (previous?.role === 'user' && previous.parts.every((p: any) => p.functionResponse)) {
+          previous.parts.push(part);
+        } else {
+          result.push({ role: 'user', parts: [part] });
+        }
       } else if (m.role === 'assistant' && m.tool_calls?.length) {
         const parts: any[] = [];
         if (m.content) parts.push({ text: m.content });
         for (const tc of m.tool_calls) {
+          calls.set(tc.id, tc);
           let args = tc.arguments;
           if (typeof tc.arguments === 'string') {
             try {
@@ -137,7 +155,7 @@ export class GeminiProvider implements IAiProvider {
               args = tc.arguments;
             }
           }
-          parts.push({ functionCall: { name: tc.name, args } });
+          parts.push(tc.geminiPart ?? { functionCall: { name: tc.name, args } });
         }
         result.push({ role: 'model', parts });
       } else {
@@ -153,7 +171,7 @@ export class GeminiProvider implements IAiProvider {
         functionDeclarations: tools.map((t) => ({
           name: t.name,
           description: t.description,
-          parameters: t.inputSchema,
+          parametersJsonSchema: t.inputSchema,
         })),
       },
     ];

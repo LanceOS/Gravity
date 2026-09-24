@@ -6,7 +6,7 @@ export function generateBranchName(ticketKey: string, title: string): string {
     (title || '')
     .toLowerCase()
     // Remove characters that commonly break branch names, then normalize separators.
-    .replace(/[#*_`~>[\]{}()]/g, '')
+    .replace(/[#*`~>[\]{}()]/g, '')
     .replace(/[^a-z0-9]+/g, '-')
   );
 

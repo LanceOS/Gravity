@@ -52,6 +52,7 @@ export type McpMutationEvent = {
 const workspaceChannel = (workspaceId: string) => `ws:${workspaceId}`;
 /** Channel name used by subscribers that want every event. */
 const GLOBAL_CHANNEL = '__all__';
+const LOCAL_CHANNEL = '__local__';
 
 // ---------------------------------------------------------------------------
 // McpEventBus
@@ -86,6 +87,19 @@ export class McpEventBus {
   publish(event: McpMutationEvent): void {
     this.emitter.emit(workspaceChannel(event.workspaceId), event);
     this.emitter.emit(GLOBAL_CHANNEL, event);
+    this.emitter.emit(LOCAL_CHANNEL, event);
+  }
+
+  /** Deliver a remote mutation locally without publishing it back to the transport. */
+  receiveRemote(event: McpMutationEvent): void {
+    this.emitter.emit(workspaceChannel(event.workspaceId), event);
+    this.emitter.emit(GLOBAL_CHANNEL, event);
+  }
+
+  /** Subscribe only to mutations originated by this process, for cross-process forwarding. */
+  subscribeLocal(handler: (event: McpMutationEvent) => void): () => void {
+    this.emitter.on(LOCAL_CHANNEL, handler);
+    return () => this.emitter.off(LOCAL_CHANNEL, handler);
   }
 
   /**

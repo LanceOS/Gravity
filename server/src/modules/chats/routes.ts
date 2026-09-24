@@ -21,6 +21,7 @@ const CHAT_MESSAGE_CONTEXT_MAX_LENGTH = 30_000;
 
 const createChatStreamLimiter = env.redisEnabled ? createRedisRateLimiter : createRateLimiter;
 const streamLimiter = createChatStreamLimiter({
+  namespace: 'chat.stream',
   windowMs: CHAT_STREAM_RATE_LIMIT_WINDOW_MS,
   max: CHAT_STREAM_RATE_LIMIT_MAX,
   keyFn: async (req) => {

@@ -16,6 +16,7 @@ describe('router configuration', () => {
 
   it('includes static protected route paths for legacy and account screens', () => {
     expect(staticProtectedRoutePaths).toContain('/account');
+    expect(staticProtectedRoutePaths).toContain('/oauth/consent');
     expect(staticProtectedRoutePaths).toContain('/workspaces/:workspaceId/teams/:teamId/domains/:domainId');
     expect(staticProtectedRoutePaths).toContain('/workspaces/:workspaceId/projects/:projectId');
     expect(staticProtectedRoutePaths).toContain('/workspaces/:workspaceId/settings');

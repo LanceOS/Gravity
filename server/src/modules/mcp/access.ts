@@ -1,5 +1,23 @@
 import type { McpContext } from './types.js';
-import { isWorkspaceMember } from '../workspaces/services/membership.js';
+import { and, eq } from 'drizzle-orm';
+import { db } from '../../db/index.js';
+import { workspaces, workspaceMembers } from '../workspaces/schema.js';
+
+/** Fresh roles are required for both execution and connection administration. */
+export async function getMcpWorkspaceRole(workspaceId: string, userId: string, query: Pick<typeof db, 'select'> = db): Promise<string | null> {
+  if (!workspaceId || !userId) return null;
+  const [row] = await query.select({ ownerId: workspaces.createdBy, role: workspaceMembers.role })
+    .from(workspaces)
+    .leftJoin(workspaceMembers, and(eq(workspaceMembers.workspaceId, workspaces.id), eq(workspaceMembers.userId, userId)))
+    .where(eq(workspaces.id, workspaceId)).limit(1);
+  if (!row) return null;
+  return row.ownerId === userId ? 'owner' : row.role;
+}
+
+/** MCP credentials must stop granting access immediately after issuer removal. */
+export async function isMcpWorkspaceMember(workspaceId: string, userId: string): Promise<boolean> {
+  return await getMcpWorkspaceRole(workspaceId, userId) !== null;
+}
 
 export interface WorkspaceMembershipChecker {
   isWorkspaceMember(workspaceId: string, userId: string): Promise<boolean>;
@@ -13,7 +31,7 @@ export class McpWorkspaceAccessService {
   private readonly checker: WorkspaceMembershipChecker;
 
   constructor(dependencies: McpWorkspaceAccessDependencies = {}) {
-    this.checker = dependencies.workspaceMembershipChecker ?? { isWorkspaceMember };
+    this.checker = dependencies.workspaceMembershipChecker ?? { isWorkspaceMember: isMcpWorkspaceMember };
   }
 
   async hasWorkspaceAccess(workspaceId: string, actorUserId: string): Promise<boolean> {
