@@ -293,20 +293,7 @@ export const TicketList = React.memo(({
             paddingRight: '2px',
           }}
         >
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      fontSize: '11px',
-                      fontWeight: 600,
-                      color: 'var(--color-text-disabled)',
-                      textTransform: 'uppercase',
-                      marginBottom: '8px',
-                      borderBottom: '1px solid var(--color-border-default)',
-                      paddingBottom: '4px',
-                    }}
-                  >
+          <div className="ticket-list__status-header">
             <span
               aria-hidden="true"
               style={{
@@ -318,14 +305,7 @@ export const TicketList = React.memo(({
               }}
             />
             <span>{statusMeta.label}</span>
-            <span
-              style={{
-                background: 'var(--color-border-default)',
-                padding: '1px 5px',
-                borderRadius: '4px',
-                fontSize: '10px',
-              }}
-            >
+            <span className="ticket-list__status-count">
               {item.count}
             </span>
           </div>
@@ -390,7 +370,8 @@ export const TicketList = React.memo(({
             disabled={loadingMoreRows}
             style={{
               color: 'var(--color-text-disabled)',
-              border: '1px dashed var(--color-border-default)',
+              border: '1px solid var(--border-subtle)',
+              background: 'var(--surface-glass-subtle)',
             }}
           >
             <PlusCircle size={12} style={{ marginRight: '4px' }} />
@@ -493,34 +474,21 @@ export const TicketList = React.memo(({
 
               return (
                 <div key={status} style={{ marginBottom: '24px' }}>
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      fontSize: '11px',
-                      fontWeight: 600,
-                      color: 'var(--color-text-disabled)',
-                      textTransform: 'uppercase',
-                      marginBottom: '8px',
-                    borderBottom: '1px solid var(--color-border-default)',
-                    paddingBottom: '4px',
-                  }}
-                >
-                  <span
-                    aria-hidden="true"
-                    style={{
-                      width: '8px',
-                      height: '8px',
-                      borderRadius: '50%',
-                      backgroundColor: statusMeta.color,
-                      flexShrink: 0,
-                    }}
-                  />
-                  <span>{statusMeta.label}</span>
-                  <span style={{ background: 'var(--color-border-default)', padding: '1px 5px', borderRadius: '4px', fontSize: '10px' }}>
-                    {ticketsInGroup.length}
-                  </span>
+                  <div className="ticket-list__status-header">
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        backgroundColor: statusMeta.color,
+                        flexShrink: 0,
+                      }}
+                    />
+                    <span>{statusMeta.label}</span>
+                    <span className="ticket-list__status-count">
+                      {ticketsInGroup.length}
+                    </span>
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: TICKET_ROW_GAP }}>
@@ -560,7 +528,8 @@ export const TicketList = React.memo(({
                       style={{
                         marginTop: '8px',
                         color: 'var(--color-text-disabled)',
-                        border: '1px dashed var(--color-border-default)',
+                        border: '1px solid var(--border-subtle)',
+                        background: 'var(--surface-glass-subtle)',
                       }}
                     >
                       <PlusCircle size={12} style={{ marginRight: '4px' }} />

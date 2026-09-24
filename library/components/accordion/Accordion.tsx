@@ -19,18 +19,18 @@ export function Accordion({ items, style }: AccordionProps) {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%', ...style }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', ...style }}>
       {items.map((item) => {
         const isOpen = !!openIds[item.id];
         return (
-          <div key={item.id} style={{ border: '1px solid var(--color-border-default)', borderRadius: 'var(--radius-md)' }}>
+          <div key={item.id} style={{ border: '1px solid var(--border-subtle)', background: 'var(--surface-glass-subtle)', borderRadius: 'var(--radius-md)' }}>
             <button
               type="button"
               onClick={() => toggle(item.id)}
               className="clickable"
               style={{
                 width: '100%',
-                padding: '12px 16px',
+                padding: '16px 18px',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
@@ -54,11 +54,11 @@ export function Accordion({ items, style }: AccordionProps) {
               }}
             >
               <div style={{ overflow: 'hidden' }}>
-                <div style={{ 
-                  padding: '12px 16px', 
-                  borderTop: '1px solid var(--color-border-default)', 
-                  fontSize: '13px', 
-                  color: 'var(--color-text-secondary)' 
+                <div style={{
+                  padding: '16px 18px',
+                  borderTop: '1px solid var(--border-subtle)',
+                  fontSize: '13px',
+                  color: 'var(--color-text-secondary)'
                 }}>
                   {item.content}
                 </div>

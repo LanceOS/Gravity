@@ -49,13 +49,13 @@ export const AuthScreen: React.FC = () => {
         <div style={headerStyle}>
           <div style={logoContainerStyle}>
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="12" cy="12" r="10" stroke="var(--color-text-primary)" strokeWidth="2.5" />
-              <circle cx="12" cy="12" r="6" stroke="var(--color-primary)" strokeWidth="2" strokeDasharray="4 2" />
+              <circle cx="12" cy="12" r="10" stroke="var(--color-text-primary)" strokeWidth="1.5" />
+              <circle cx="12" cy="12" r="6" stroke="var(--color-primary)" strokeWidth="1.5" strokeDasharray="4 2" />
               <circle cx="12" cy="12" r="2" fill="var(--color-text-primary)" />
             </svg>
           </div>
           <h1 style={titleStyle}>Gravity</h1>
-          <p style={subtitleStyle}>Production-grade Project Management Workspace</p>
+          <p style={subtitleStyle}>A little clarity for everything you’re building.</p>
         </div>
 
         {errorMsg && <div style={errorStyle}>{errorMsg}</div>}
@@ -102,6 +102,7 @@ export const AuthScreen: React.FC = () => {
 
         <div style={footerStyle}>
           <button
+            className="lib-focus-ring"
             onClick={() => {
               setIsSignUp(!isSignUp);
               setErrorMsg('');
@@ -122,19 +123,21 @@ const containerStyle: React.CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
   width: '100vw',
-  height: '100vh',
-  background: 'var(--color-surface-app)',
-  overflow: 'hidden',
+  minHeight: '100dvh',
+  padding: '32px 20px',
+  background: 'var(--app-background)',
+  overflow: 'auto',
   position: 'relative',
   fontFamily: 'var(--sans)'
 };
 
 const cardStyle: React.CSSProperties = {
-  width: '400px',
-  padding: '40px',
-  borderRadius: '8px',
-  border: '1px solid var(--color-border-default)',
-  background: 'var(--color-surface-card)',
+  width: '420px',
+  maxWidth: '100%',
+  padding: 'clamp(24px, 6vw, 40px)',
+  borderRadius: 'var(--radius-xl)',
+  border: '1px solid var(--border-glass)',
+  background: 'var(--surface-glass)',
   zIndex: 10,
   boxShadow: 'var(--shadow-lg)',
   display: 'flex',
@@ -152,14 +155,14 @@ const headerStyle: React.CSSProperties = {
 
 const logoContainerStyle: React.CSSProperties = {
   padding: '12px',
-  borderRadius: '8px',
-  background: 'var(--color-base50)',
-  border: '1px solid var(--color-border-default)',
+  borderRadius: 'var(--radius-lg)',
+  background: 'var(--surface-glass-strong)',
+  boxShadow: 'var(--shadow-sm)',
   marginBottom: '8px'
 };
 
 const titleStyle: React.CSSProperties = {
-  fontSize: '24px',
+  fontSize: '30px',
   fontWeight: 600,
   color: 'var(--color-text-primary)',
   letterSpacing: '-0.5px'
@@ -167,7 +170,7 @@ const titleStyle: React.CSSProperties = {
 
 const subtitleStyle: React.CSSProperties = {
   fontSize: '13px',
-  color: 'var(--color-text-disabled)',
+  color: 'var(--color-text-secondary)',
   lineHeight: '1.4'
 };
 
@@ -198,6 +201,5 @@ const toggleButtonStyle: React.CSSProperties = {
   color: 'var(--color-primary)',
   fontSize: '12px',
   cursor: 'pointer',
-  outline: 'none',
   transition: 'color var(--transition-fast)'
 };

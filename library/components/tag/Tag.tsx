@@ -13,10 +13,10 @@ export function Tag({ label, onClose, style }: TagProps) {
         display: 'inline-flex',
         alignItems: 'center',
         gap: '6px',
-        padding: '2px 8px',
-        borderRadius: 'var(--radius-sm)',
+        padding: '3px 10px',
+        borderRadius: 'var(--radius-full)',
         backgroundColor: 'var(--color-base50)',
-        border: '1px solid var(--color-border-default)',
+        border: '1px solid var(--border-subtle)',
         fontSize: '12px',
         color: 'var(--color-text-secondary)',
         ...style,
@@ -27,6 +27,7 @@ export function Tag({ label, onClose, style }: TagProps) {
         <button
           type="button"
           onClick={onClose}
+          className="lib-focus-ring"
           style={{
             background: 'none',
             border: 'none',

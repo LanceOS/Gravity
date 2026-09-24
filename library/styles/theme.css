@@ -1,8 +1,6 @@
-/* Zero-Runtime CSS Custom Properties Theming System - Gravity Premium Design */
+/* Shared geometry, materials, and motion for every Gravity theme. */
 
 :root {
-  /* --- NEW GRANULAR COLOR PALETTE SYSTEM (LIGHT MODE DEFAULT) --- */
-  /* --- GEOMETRY & TYPOGRAPHY PRIMITIVES --- */
   --sans: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --mono: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
@@ -11,7 +9,7 @@
   line-height: 1.5;
   color: var(--color-text-secondary);
   background-color: var(--color-surface-app);
-  color-scheme: light dark;
+  color-scheme: light;
 
   /* Spacing Grid system */
   --space-1: 4px;
@@ -25,18 +23,27 @@
   --space-12: 48px;
 
   /* Radius Tokens */
-  --radius-xs: 5px;
-  --radius-sm: 8px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-xl: 18px;
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 26px;
   --radius-full: 9999px;
 
-  /* Flat Design System - No Blurry Drop Shadows */
-  --shadow-sm: none;
-  --shadow-md: none;
-  --shadow-lg: none;
-  --shadow-xl: none;
+  /* Low contrast depth replaces heavy outlines. */
+  --shadow-sm: 0 2px 6px rgb(32 53 83 / 4%), 0 1px 2px rgb(32 53 83 / 3%);
+  --shadow-md: 0 8px 28px -12px rgb(32 53 83 / 14%), 0 2px 6px rgb(32 53 83 / 3%);
+  --shadow-lg: 0 18px 56px -18px rgb(32 53 83 / 20%), 0 4px 12px rgb(32 53 83 / 4%);
+  --shadow-xl: 0 32px 90px -24px rgb(32 53 83 / 24%), 0 8px 24px rgb(32 53 83 / 6%);
+
+  /* Opaque fallbacks keep content readable without backdrop-filter. */
+  --surface-glass: var(--color-surface-card);
+  --surface-glass-strong: var(--color-surface-overlay);
+  --surface-glass-subtle: var(--color-surface-app);
+  --border-glass: color-mix(in srgb, var(--color-border-default) 55%, var(--color-surface-card));
+  --border-subtle: color-mix(in srgb, var(--color-border-default) 55%, transparent);
+  --glass-blur: 20px;
+  --glass-saturate: 140%;
 
   /* Transition Speeds - Snappy Premium Motion */
   --transition-fast: 150ms cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -57,30 +64,47 @@
   --sidebar-width: 240px;
   --sidebar-collapsed-width: 64px;
   --sidebar-mobile-width: 320px;
-  --sidebar-background: var(--color-base50);
-  --sidebar-border-color: var(--color-border-default);
-  --sidebar-padding: var(--space-2);
-  --sidebar-header-padding: var(--space-4) var(--space-4) var(--space-2);
-  --sidebar-item-min-height: 32px;
-  --sidebar-item-nested-min-height: 28px;
+  --sidebar-background: var(--surface-glass-subtle);
+  --sidebar-border-color: var(--border-subtle);
+  --sidebar-padding: var(--space-3);
+  --sidebar-header-padding: var(--space-5) var(--space-4) var(--space-3);
+  --sidebar-item-min-height: 36px;
+  --sidebar-item-nested-min-height: 32px;
   --sidebar-item-padding: var(--space-2) var(--space-3);
   --sidebar-item-padding-nested: 6px var(--space-2);
   --sidebar-item-gap: var(--space-2);
-  --sidebar-row-gap: calc(var(--space-1) / 2);
+  --sidebar-row-gap: var(--space-1);
   --sidebar-item-line-height: 1.25;
-  --sidebar-item-indicator-width: 2px;
+  --sidebar-item-indicator-width: 0px;
   --sidebar-item-radius: var(--radius-sm);
   --sidebar-item-font-size: 13px;
   --sidebar-item-nested-font-size: 12px;
   --sidebar-item-color: var(--color-text-secondary);
-  --sidebar-item-color-active: var(--color-text-primary);
+  --sidebar-item-color-active: var(--color-text-brand);
   --sidebar-item-background-hover: var(--color-state-hover-overlay);
   --sidebar-item-background-active: var(--color-state-selected-bg);
   --sidebar-item-active-indicator: var(--color-primary);
-  --sidebar-section-label-color: var(--color-text-disabled);
+  --sidebar-section-label-color: var(--color-text-secondary);
   --sidebar-section-label-font-size: 11px;
   --sidebar-focus-ring: var(--color-state-focus-ring);
   --sidebar-overlay-scrim: var(--color-overlay-scrim);
+}
+
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root {
+    --surface-glass: color-mix(in srgb, var(--color-surface-card) 76%, transparent);
+    --surface-glass-strong: color-mix(in srgb, var(--color-surface-overlay) 94%, transparent);
+    --surface-glass-subtle: color-mix(in srgb, var(--color-surface-card) 52%, transparent);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --surface-glass: var(--color-surface-card);
+    --surface-glass-strong: var(--color-surface-overlay);
+    --surface-glass-subtle: var(--color-surface-app);
+    --glass-blur: 0px;
+  }
 }
 
 /* Accessibility: Respect system motion preference */
@@ -93,14 +117,13 @@
   }
 }
 
-/* Dark Mode Palette Override - Premium Dark Slate */
 .dark-theme,
 [data-theme="dark"] {
-  /* Flat shadows in dark mode */
-  --shadow-sm: none;
-  --shadow-md: none;
-  --shadow-lg: none;
-  --shadow-xl: none;
+  color-scheme: dark;
+  --shadow-sm: 0 2px 6px rgb(0 0 0 / 10%);
+  --shadow-md: 0 8px 28px -12px rgb(0 0 0 / 32%);
+  --shadow-lg: 0 18px 56px -18px rgb(0 0 0 / 45%);
+  --shadow-xl: 0 32px 90px -24px rgb(0 0 0 / 55%);
 }
 
 /* AI Chat Animations */

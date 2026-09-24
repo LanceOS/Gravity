@@ -33,22 +33,22 @@
   display: flex;
   align-items: stretch;
   justify-content: space-between;
-  gap: var(--space-md);
-  padding: var(--space-md) var(--space-md);
-  border: 1px solid var(--color-border-default);
+  gap: 24px;
+  padding: 8px 0 12px;
+  border: 0;
   border-radius: var(--radius-lg);
-  background: var(--color-surface-card);
-  box-shadow: var(--shadow-sm);
+  background: transparent;
+  box-shadow: none;
 }
 
 .workspace-teams-page__eyebrow,
 .workspace-teams-page__section-kicker {
   margin-bottom: 4px;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--color-primary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--color-text-secondary);
 }
 
 .workspace-teams-page__hero-header {
@@ -66,8 +66,9 @@
 }
 
 .workspace-teams-page__hero-header h2 {
-  font-size: 22px;
-  font-weight: 850;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.04em;
 }
 
 .workspace-teams-page__hero-description {
@@ -98,37 +99,37 @@
   align-items: center;
   gap: 6px;
   padding: 4px 8px;
-  border: 1px solid var(--color-border-default);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-full);
   background: var(--color-state-hover-overlay);
   color: var(--color-text-secondary);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .workspace-teams-page__hero-stat {
-  min-width: 120px;
+  min-width: 92px;
   display: grid;
   place-items: center;
   align-content: center;
   gap: 4px;
-  border: 1px solid var(--color-border-default);
+  border: 0;
   border-radius: var(--radius-md);
-  background: var(--color-state-hover-overlay);
+  background: transparent;
   color: var(--color-primary);
 }
 
 .workspace-teams-page__hero-stat span {
-  font-size: 24px;
-  font-weight: 850;
+  font-size: 28px;
+  font-weight: 500;
   color: var(--color-text-primary);
 }
 
 .workspace-teams-page__hero-stat small {
   color: var(--color-text-disabled);
   font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 .workspace-teams-page__feedback {
@@ -138,13 +139,13 @@
 }
 
 .workspace-teams-page__feedback--success {
-  border: 1px solid var(--color-success);
+  border: 1px solid color-mix(in srgb, var(--color-success) 18%, transparent);
   background: var(--color-success-light);
   color: var(--color-text-success);
 }
 
 .workspace-teams-page__feedback--error {
-  border: 1px solid var(--color-error);
+  border: 1px solid color-mix(in srgb, var(--color-error) 18%, transparent);
   background: var(--color-error-light);
   color: var(--color-text-error);
 }
@@ -160,7 +161,7 @@
 @media (min-width: 960px) {
   .workspace-teams-page__layout {
     display: grid;
-    grid-template-columns: 340px 1fr;
+    grid-template-columns: 340px minmax(0, 1fr);
     align-items: stretch;
     gap: var(--space-lg);
   }
@@ -170,9 +171,9 @@
 .workspace-teams-page__editor-card,
 .workspace-teams-page__empty-shell,
 .workspace-teams-page__empty {
-  border: 1px solid var(--color-border-default);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
-  background: var(--color-surface-card);
+  background: var(--surface-glass);
   box-shadow: var(--shadow-sm);
   display: flex;
   flex-direction: column;
@@ -186,7 +187,7 @@
 }
 
 .workspace-teams-page__editor-card {
-  padding: var(--space-md);
+  padding: 24px;
   display: flex;
   flex-direction: column;
 }
@@ -194,8 +195,8 @@
 .workspace-teams-page__section-header {
   display: flex;
   flex-direction: column;
-  gap: var(--space-xs);
-  margin-bottom: var(--space-sm);
+  gap: 6px;
+  margin-bottom: 20px;
   flex-shrink: 0;
 }
 
@@ -212,21 +213,22 @@
   width: 100%;
   display: grid;
   gap: var(--space-sm);
-  padding: var(--space-sm);
-  border: 1px solid var(--color-border-default);
+  padding: 14px;
+  border: 1px solid transparent;
   border-radius: var(--radius-md);
-  background: var(--color-state-hover-overlay);
+  background: transparent;
   text-align: left;
   cursor: pointer;
   transition: border-color 0.18s ease, transform 0.18s ease, background-color 0.18s ease;
 }
 
 .workspace-teams-page__team-card-item:hover {
-  border-color: var(--color-border-focus);
+  border-color: transparent;
+  background: var(--color-state-hover-overlay);
 }
 
 .workspace-teams-page__team-card-item--active {
-  border-color: var(--color-border-focus);
+  border-color: transparent;
   background: var(--color-state-selected-bg);
 }
 
@@ -241,8 +243,8 @@
 .workspace-teams-page__team-name {
   margin: 0;
   color: var(--color-text-primary);
-  font-size: 16px;
-  font-weight: 800;
+  font-size: 14px;
+  font-weight: 600;
   flex: 1;
 }
 
@@ -251,7 +253,7 @@
   height: 12px;
   border-radius: var(--radius-full);
   flex-shrink: 0;
-  border: 2px solid var(--color-border-default);
+  border: 2px solid var(--border-subtle);
 }
 
 .workspace-teams-page__team-card-item-body p {
@@ -281,12 +283,12 @@
   align-items: center;
   gap: var(--space-xs);
   padding: 3px 6px;
-  border: 1px solid var(--color-border-default);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-full);
   background: var(--color-state-hover-overlay);
   color: var(--color-text-secondary);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .workspace-teams-page__team-card-item-action-text {
@@ -339,7 +341,7 @@
 }
 
 .workspace-teams-page__form-sidebar > *:not(:last-child) {
-  border-bottom: 1px solid var(--color-border-default);
+  border-bottom: 1px solid var(--border-subtle);
   padding-bottom: var(--space-md);
 }
 
@@ -353,7 +355,7 @@
   }
 
   .workspace-teams-page__form-sidebar {
-    border-left: 1px solid var(--color-border-default);
+    border-left: 1px solid var(--border-subtle);
     padding-left: var(--space-xl);
     overflow-y: auto;
     padding-right: var(--space-sm);
@@ -409,7 +411,7 @@
   background: var(--color-state-hover-overlay);
   color: var(--color-text-primary);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .workspace-teams-page__meta {
@@ -446,7 +448,7 @@
   background: var(--color-state-hover-overlay);
   color: var(--color-text-primary);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .workspace-teams-page__label-pill-dot {
@@ -473,7 +475,7 @@
   height: 22px;
   padding: 2px 10px;
   border-radius: 999px;
-  border: 1px dashed var(--color-border-default);
+  border: 1px dashed var(--border-subtle);
   background: transparent;
   color: var(--color-text-secondary);
   font-size: 11px;
@@ -521,7 +523,7 @@
   justify-content: flex-end;
   gap: var(--space-sm);
   margin-top: var(--space-sm);
-  border-top: 1px solid var(--color-border-default);
+  border-top: 1px solid var(--border-subtle);
   padding-top: var(--space-md);
 }
 
@@ -553,7 +555,7 @@
 
 .workspace-teams-page__danger-note {
   padding: 10px 12px;
-  border: 1px solid var(--color-error);
+  border: 1px solid color-mix(in srgb, var(--color-error) 18%, transparent);
   border-radius: var(--radius-sm);
   background: var(--color-error-light);
   color: var(--color-text-error);
@@ -579,7 +581,7 @@
 .workspace-teams-page__empty-title {
   color: var(--color-text-primary);
   font-size: 15px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 
@@ -663,4 +665,13 @@
   display: inline-flex;
   align-items: center;
   margin-right: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace-teams-page__hero,
+  .workspace-teams-page__layout,
+  .workspace-teams-page__feedback,
+  .workspace-teams-page__empty-shell {
+    animation: none;
+  }
 }

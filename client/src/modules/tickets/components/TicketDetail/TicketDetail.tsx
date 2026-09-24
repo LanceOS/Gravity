@@ -372,9 +372,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--color-border-default)', paddingBottom: '6px' }}>
-                <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase' }}>Description</span>
-              </div>
+              <div className="ticket-detail__section-heading">Description</div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
                 <TicketDescriptionEditor
@@ -408,7 +406,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
           </div>
 
           <div className="ticket-detail__sidebar" data-testid="desktop-sidebar">
-            <div style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-disabled)', marginBottom: '16px' }}>
+            <div className="ticket-detail__sidebar-heading">
               Properties
             </div>
             {propertiesContent}

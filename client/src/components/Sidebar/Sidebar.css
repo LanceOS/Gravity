@@ -4,30 +4,42 @@
 
 .sidebar-new-ticket {
   width: 100%;
-  min-height: 34px;
+  min-height: 38px;
   justify-content: flex-start;
   padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-sm);
+  background: var(--surface-glass-strong);
+  color: var(--color-text-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.sidebar-new-ticket:hover {
+  background: var(--color-state-hover-overlay);
+  color: var(--color-text-primary);
+  border-color: var(--border-subtle);
 }
 
 .sidebar-new-ticket__shortcut {
   margin-left: auto;
-  padding: 1px var(--space-1);
+  padding: 2px 5px;
   border-radius: var(--radius-xs);
-  background: color-mix(in srgb, var(--color-text-on-accent) 20%, transparent);
-  color: currentColor;
+  background: var(--color-state-hover-overlay);
+  color: var(--color-text-secondary);
   font-size: 10px;
   font-weight: 600;
   line-height: 1.2;
   opacity: 0.72;
+  border: 1px solid var(--border-subtle);
 }
 
 .sidebar-count-badge {
   min-width: 18px;
   padding: 1px var(--space-1);
   border-radius: var(--radius-xs);
-  background: var(--sidebar-item-background-hover);
+  background: transparent;
   color: var(--color-text-disabled);
-  font-size: 11px;
+  font-size: 10px;
   font-variant-numeric: tabular-nums;
   line-height: var(--sidebar-item-line-height);
   text-align: center;
@@ -67,10 +79,10 @@
 }
 
 .sidebar-user-menu__avatar {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   flex: 0 0 auto;
-  border: 1px solid var(--sidebar-border-color);
+  border: 1px solid var(--border-glass);
   border-radius: var(--radius-full);
   object-fit: cover;
 }
@@ -120,15 +132,18 @@
   display: flex;
   flex-direction: column;
   gap: var(--sidebar-row-gap);
-  padding: var(--space-2);
-  border: 1px solid var(--sidebar-border-color);
+  padding: 8px;
+  border: 1px solid var(--border-glass);
   border-radius: var(--radius-md);
-  background: var(--color-surface-card);
+  background: var(--surface-glass-strong);
   opacity: 0;
   pointer-events: none;
   transform: translateY(var(--space-2));
   transition: opacity var(--transition-normal), transform var(--transition-normal), visibility var(--transition-normal);
   visibility: hidden;
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  box-shadow: var(--shadow-lg);
 }
 
 .sidebar-user-menu__dropdown--open {
@@ -141,12 +156,12 @@
 .sidebar-user-menu__dropdown-label {
   margin-bottom: var(--space-1);
   padding: 6px var(--space-2);
-  border-bottom: 1px solid var(--sidebar-border-color);
+  border-bottom: 1px solid var(--border-subtle);
   color: var(--sidebar-section-label-color);
   font-size: var(--sidebar-section-label-font-size);
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .sidebar-user-menu__item {
@@ -177,7 +192,7 @@
 .sidebar-user-menu__item--active,
 .sidebar-user-menu__item--active:hover {
   background: var(--sidebar-item-background-active);
-  box-shadow: inset var(--sidebar-item-indicator-width) 0 0 var(--sidebar-item-active-indicator);
+  box-shadow: var(--shadow-sm);
   color: var(--sidebar-item-color-active);
 }
 
@@ -195,9 +210,9 @@
 .sidebar-agent-tools {
   margin-top: var(--space-6);
   padding: var(--sidebar-padding);
-  border: 1px solid var(--sidebar-border-color);
-  border-radius: var(--sidebar-item-radius);
-  background: color-mix(in srgb, var(--sidebar-background) 76%, var(--color-surface-card));
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-glass-subtle);
 }
 
 .sidebar-agent-tools__title {
@@ -208,8 +223,8 @@
   color: var(--sidebar-section-label-color);
   font-size: var(--sidebar-section-label-font-size);
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .sidebar-agent-tools__button {
@@ -219,9 +234,9 @@
   align-items: center;
   gap: var(--sidebar-item-gap);
   padding: 6px var(--space-2);
-  border: 1px solid var(--sidebar-border-color);
+  border: 1px solid transparent;
   border-radius: var(--sidebar-item-radius);
-  background: var(--sidebar-item-background-hover);
+  background: transparent;
   color: var(--sidebar-item-color-active);
   cursor: pointer;
   font: inherit;

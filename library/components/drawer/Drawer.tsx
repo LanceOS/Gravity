@@ -122,10 +122,12 @@ export function Drawer({ isOpen, onClose, title, children, style }: DrawerProps)
             bottom: 0,
             left: 0,
             backgroundColor: 'var(--color-overlay-scrim)',
-            backdropFilter: 'blur(10px)',
+            backdropFilter: 'blur(6px)',
+            WebkitBackdropFilter: 'blur(6px)',
             zIndex: 1500,
             display: 'flex',
             justifyContent: 'flex-end',
+            padding: '12px',
           }}
         >
           <ClickAwayListener onClickAway={onClose}>
@@ -138,8 +140,12 @@ export function Drawer({ isOpen, onClose, title, children, style }: DrawerProps)
                 width: '100%',
                 maxWidth: '400px',
                 height: '100%',
-                backgroundColor: 'var(--color-surface-overlay)',
-                borderLeft: '1px solid var(--color-border-default)',
+                backgroundColor: 'var(--surface-glass-strong)',
+                border: '1px solid var(--border-glass)',
+                borderRadius: 'var(--radius-xl)',
+                boxShadow: 'var(--shadow-xl)',
+                backdropFilter: 'blur(var(--glass-blur)) saturate(var(--glass-saturate))',
+                WebkitBackdropFilter: 'blur(var(--glass-blur)) saturate(var(--glass-saturate))',
                 display: 'flex',
                 flexDirection: 'column',
                 ...style,
@@ -150,8 +156,8 @@ export function Drawer({ isOpen, onClose, title, children, style }: DrawerProps)
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  padding: '16px 20px',
-                  borderBottom: '1px solid var(--color-border-default)',
+                  padding: '22px 24px 16px',
+                  borderBottom: '1px solid var(--border-subtle)',
                 }}
               >
                 {title && (
@@ -164,12 +170,12 @@ export function Drawer({ isOpen, onClose, title, children, style }: DrawerProps)
                   onClick={onClose}
                   aria-label="Close sidebar"
                   className="btn btn-ghost clickable"
-                  style={{ padding: '4px', minHeight: 'auto' }}
+                  style={{ padding: '6px', minHeight: 'auto', borderRadius: 'var(--radius-sm)' }}
                 >
                   <X size={16} />
                 </button>
               </div>
-              <div style={{ padding: '20px', overflowY: 'auto', flexGrow: 1, fontSize: '13px' }}>{children}</div>
+              <div style={{ padding: '24px', overflowY: 'auto', flexGrow: 1, fontSize: '13px' }}>{children}</div>
             </div>
           </ClickAwayListener>
         </div>

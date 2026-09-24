@@ -237,7 +237,7 @@ export const TicketPropertiesGrid: React.FC<TicketPropertiesGridProps> = ({
         onRemoveBlocker={onRemoveBlocker}
       />
 
-      <div style={{ gridColumn: '1 / -1', borderTop: '1px solid var(--color-border-default)', paddingTop: '16px', marginTop: '8px' }}>
+      <div style={{ gridColumn: '1 / -1', borderTop: '1px solid var(--border-subtle)', paddingTop: '16px', marginTop: '8px' }}>
         <span className="label" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           <GitPullRequest size={12} />
           <span>GitHub Connection</span>
@@ -253,7 +253,7 @@ export const TicketPropertiesGrid: React.FC<TicketPropertiesGridProps> = ({
                 justifyContent: 'center',
                 gap: '6px',
                 padding: '8px',
-                borderRadius: '6px',
+                borderRadius: 'var(--radius-sm)',
                 background: activeTicket.prStatus === 'merged' ? 'rgba(16,185,129,0.1)' : 'rgba(59,130,246,0.1)',
                 border: `1px solid ${activeTicket.prStatus === 'merged' ? '#10b981' : '#3b82f6'}30`,
                 color: activeTicket.prStatus === 'merged' ? '#10b981' : '#3b82f6',
@@ -275,9 +275,9 @@ export const TicketPropertiesGrid: React.FC<TicketPropertiesGridProps> = ({
             style={{
               fontSize: '11px',
               color: 'var(--color-text-disabled)',
-              background: 'rgba(255,255,255,0.01)',
-              border: '1px dashed var(--color-border-default)',
-              borderRadius: '6px',
+              background: 'var(--surface-glass-subtle)',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: 'var(--radius-sm)',
               padding: '10px',
               marginTop: '6px',
               lineHeight: '1.4'

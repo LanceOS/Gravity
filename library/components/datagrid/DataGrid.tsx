@@ -76,8 +76,8 @@ export function DataGrid<T>({ columns, data, rowHeight = 36, height = 360, style
         position: 'relative',
         overflow: 'auto',
         height: `${height}px`,
-        border: '1px solid var(--color-border-default)',
-        borderRadius: 'var(--radius-md)',
+        border: '1px solid var(--border-subtle)',
+        borderRadius: 'var(--radius-lg)',
         backgroundColor: 'var(--color-surface-card)',
         width: '100%',
         ...style,
@@ -91,17 +91,17 @@ export function DataGrid<T>({ columns, data, rowHeight = 36, height = 360, style
           right: 0,
           zIndex: 10,
           backgroundColor: 'var(--color-base50)',
-          borderBottom: '1px solid var(--color-border-default)',
+          borderBottom: '1px solid var(--border-subtle)',
           display: 'flex',
           height: `${rowHeight}px`,
           alignItems: 'center',
           fontWeight: 500,
           fontSize: '13px',
-          color: 'var(--color-text-disabled)',
+          color: 'var(--color-text-secondary)',
         }}
       >
         {columns.map((col, idx) => (
-          <div key={idx} style={{ flex: 1, padding: '0 12px', width: col.width, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div key={idx} style={{ flex: 1, padding: '0 16px', width: col.width, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {col.title || col.header || String(col.key)}
           </div>
         ))}
@@ -119,13 +119,13 @@ export function DataGrid<T>({ columns, data, rowHeight = 36, height = 360, style
               height: `${rowHeight}px`,
               display: 'flex',
               alignItems: 'center',
-              borderBottom: '1px solid var(--color-border-default)',
+              borderBottom: '1px solid var(--border-subtle)',
               backgroundColor: 'var(--color-surface-card)',
               fontSize: '13px',
             }}
           >
             {columns.map((col, cIdx) => (
-              <div key={cIdx} style={{ flex: 1, padding: '0 12px', width: col.width, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--color-text-primary)' }}>
+              <div key={cIdx} style={{ flex: 1, padding: '0 16px', width: col.width, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--color-text-primary)' }}>
                 {col.render ? col.render(row.item) : renderCellValue(getCellValue(row.item, col.key))}
               </div>
             ))}

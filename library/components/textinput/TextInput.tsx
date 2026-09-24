@@ -12,7 +12,7 @@ export function TextInput({ label, error, className = '', id, style, ...props }:
   const errorId = `${inputId}-error`;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%', ...style }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%', ...style }}>
       {label && (
         <label htmlFor={inputId} className="label" style={{ color: 'var(--color-text-primary)', fontWeight: 500 }}>
           {label}

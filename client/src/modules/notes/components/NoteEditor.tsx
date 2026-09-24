@@ -150,10 +150,9 @@ export function NoteEditor({ projectId, noteId, onTitleChange }: NoteEditorProps
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
-      data-color-mode="dark"
     >
       <div className="note-editor__header">
-        <div className="note-editor__status">
+        <div className="note-editor__status" role="status">
           {saveError ? (
             <span className="note-editor__status--error">Failed to save: {saveError}</span>
           ) : saving ? (
@@ -178,6 +177,7 @@ export function NoteEditor({ projectId, noteId, onTitleChange }: NoteEditorProps
             type="text"
             className="note-editor__title-input"
             placeholder="Title..."
+            aria-label="Note title"
             value={title}
             onChange={handleTitleChange}
             style={{ flex: 1 }}

@@ -5,6 +5,7 @@ import type { TicketCardProps } from '../types/TicketBoard';
 import { TicketRelationIndicators } from './TicketRelationIndicators';
 import { TicketStatusBadge } from './TicketStatusBadge';
 import { getPriorityIcon } from '../../../utils/ticketPresentation';
+import { TICKET_CARD_HEIGHT } from '../utils/ticketBoardLayout';
 import './TicketCard.css';
 
 type TicketLabelList = TicketCardProps['ticket']['labels'];
@@ -50,11 +51,8 @@ function TicketCardImpl({
       onClick={onClick}
       draggable
       onDragStart={onDragStart}
-      bodyStyle={{ padding: 0 }}
-      style={{
-        borderLeft: `3px solid ${priorityColor}`,
-        cursor: 'grab',
-      }}
+      style={{ height: TICKET_CARD_HEIGHT }}
+      bodyStyle={{ padding: 0, height: '100%', display: 'flex', flexDirection: 'column', gap: '14px' }}
     >
       <Flex align="center" justify="space-between">
         <span className="ticket-card__key">
@@ -100,7 +98,7 @@ function TicketCardImpl({
         className="ticket-card__meta"
       >
         <Flex align="center" gap="8px">
-          <Flex align="center">{renderedPriorityIcon}</Flex>
+          <Flex align="center" style={{ color: priorityColor }}>{renderedPriorityIcon}</Flex>
           <TicketRelationIndicators ticket={ticket} />
 
           {ticket.labels && ticket.labels.length > 0 ? (

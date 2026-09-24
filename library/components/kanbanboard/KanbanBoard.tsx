@@ -17,6 +17,8 @@ export interface KanbanBoardProps {
   cards: KanbanCard[];
   onCardMove?: (cardId: string, nextStatus: string) => void;
   renderColumnHeader?: (columnId: string, title: string, count: number) => React.ReactNode;
+  /** Virtual row height in pixels, including the gap, for custom card content. */
+  cardRowHeight?: number;
   style?: React.CSSProperties;
 }
 
@@ -90,8 +92,8 @@ const KanbanCardComponent = memo(function KanbanCardComponent({
 
   const cardStyle: React.CSSProperties = isTextCard
     ? {
-        backgroundColor: card.title ? 'var(--color-surface-card)' : 'transparent',
-        border: card.title ? '1px solid var(--color-border-default)' : 'none',
+        backgroundColor: card.title ? 'var(--surface-glass-strong)' : 'transparent',
+        border: card.title ? '1px solid var(--border-glass)' : 'none',
         borderRadius: card.title ? 'var(--radius-md)' : '0',
         padding: card.title ? '12px' : '0',
         boxShadow: card.title ? 'var(--shadow-sm)' : 'none',
@@ -162,6 +164,7 @@ interface KanbanColumnProps {
     title: string;
   };
   cards: KanbanCard[];
+  cardRowHeight?: number;
   isDragOver: boolean;
   renderColumnHeader?: (columnId: string, title: string, count: number) => React.ReactNode;
   lastDroppedCardId: string | null;
@@ -179,6 +182,7 @@ interface KanbanColumnProps {
 const KanbanColumn = memo(function KanbanColumn({
   column,
   cards,
+  cardRowHeight,
   isDragOver,
   renderColumnHeader,
   lastDroppedCardId,
@@ -230,7 +234,7 @@ const KanbanColumn = memo(function KanbanColumn({
     <DenseVirtualList
       items={cards}
       height={bodyHeight}
-      rowHeight={getKanbanCardRowHeight}
+      rowHeight={cardRowHeight ?? getKanbanCardRowHeight}
       buffer={KANBAN_BOARD_VIRTUAL_ROW_BUFFER}
       renderRow={renderVirtualCard}
       containerStyle={{
@@ -304,6 +308,7 @@ export const KanbanBoard = memo(function KanbanBoard({
   cards,
   onCardMove,
   renderColumnHeader,
+  cardRowHeight,
   style,
 }: KanbanBoardProps) {
   const [dragOverColId, setDragOverColId] = useState<string | null>(null);
@@ -432,6 +437,7 @@ export const KanbanBoard = memo(function KanbanBoard({
             key={col.id}
             column={col}
             cards={colCards}
+            cardRowHeight={cardRowHeight}
             isDragOver={dragOverColId === col.id}
             renderColumnHeader={renderColumnHeader}
             lastDroppedCardId={lastDroppedCardId}

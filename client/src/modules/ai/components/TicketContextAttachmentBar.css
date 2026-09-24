@@ -3,7 +3,7 @@
   min-width: 0;
   box-sizing: border-box;
   padding: 8px;
-  font-family: 'Space Grotesk', var(--sans);
+  font-family: var(--sans);
 }
 
 .ai-ticket-attachment-popover__content {
@@ -26,11 +26,10 @@
 }
 
 .ai-ticket-attachment-popover__title {
-  font-size: 11px;
-  font-weight: 650;
+  font-size: 12px;
+  font-weight: 500;
   color: var(--color-text-disabled);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0;
 }
 
 .ai-ticket-attachment-popover__description {
@@ -41,11 +40,11 @@
 
 .ai-ticket-attachment-popover__search {
   width: 100%;
-  padding: 6px 8px;
+  padding: 9px 12px;
   font-size: 12px;
-  background: var(--color-base50);
-  border: 1px solid var(--color-border-default);
-  border-radius: 4px;
+  background: var(--surface-glass-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
   color: var(--color-text-primary);
   outline: none;
   box-sizing: border-box;
@@ -151,7 +150,7 @@
   padding: 0 8px;
   gap: 6px;
   border-radius: 8px;
-  background: var(--color-surface-card);
+  background: var(--surface-glass-subtle);
   font-size: 11px;
   line-height: 1;
 }
@@ -163,4 +162,10 @@
 .ai-ticket-attachment-scope-select .select-trigger__icon {
   width: 12px;
   height: 12px;
+}
+
+
+.ai-ticket-attachment-popover__search:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
 }

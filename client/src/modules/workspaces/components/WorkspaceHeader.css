@@ -1,11 +1,11 @@
-/* Gravity WorkspaceHeader Premium Redesign Stylesheet */
+/* Keep this surface unfiltered so fixed-position pickers retain viewport coordinates. */
 
 .workspace-header {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 12px 24px;
-  background: var(--color-base50); /* Clean solid background to avoid backdrop-filter viewport-containing-block issue for Select dropdowns */
+  gap: 16px;
+  padding: 20px 28px 16px;
+  background: transparent;
   flex-shrink: 0;
   z-index: 10;
 }
@@ -25,9 +25,9 @@
 }
 
 .workspace-header__title {
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
   color: var(--color-text-primary);
   white-space: nowrap;
   overflow: hidden;
@@ -38,10 +38,11 @@
   display: flex;
   align-items: center;
   gap: 2px;
-  background: var(--color-border-default);
-  padding: 3px;
+  background: var(--surface-glass-subtle);
+  padding: 4px;
   border-radius: var(--radius-full);
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
+  box-shadow: none;
+  border: 1px solid var(--border-subtle);
 }
 
 .workspace-header__view-button {
@@ -49,13 +50,13 @@
   align-items: center;
   gap: 6px;
   border: none;
-  padding: 5px 12px;
+  padding: 6px 12px;
   border-radius: var(--radius-full);
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 500;
   cursor: pointer;
   background: transparent;
-  color: var(--color-text-disabled);
+  color: var(--color-text-secondary);
   transition: color var(--transition-normal), background-color var(--transition-normal), transform var(--transition-normal);
 }
 
@@ -64,8 +65,8 @@
 }
 
 .workspace-header__view-button--active {
-  background: var(--color-surface-card);
-  color: var(--color-primary);
+  background: var(--surface-glass-strong);
+  color: var(--color-text-primary);
   box-shadow: var(--shadow-sm);
 }
 

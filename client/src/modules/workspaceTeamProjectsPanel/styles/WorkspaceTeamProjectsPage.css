@@ -33,22 +33,22 @@
   display: flex;
   align-items: stretch;
   justify-content: space-between;
-  gap: var(--space-md);
-  padding: var(--space-md) var(--space-md);
-  border: 1px solid var(--color-border-default);
+  gap: 24px;
+  padding: 8px 0 12px;
+  border: 0;
   border-radius: var(--radius-lg);
-  background: var(--color-surface-card);
-  box-shadow: var(--shadow-sm);
+  background: transparent;
+  box-shadow: none;
 }
 
 .workspace-team-projects-page__eyebrow,
 .workspace-team-projects-page__section-kicker {
   margin-bottom: 4px;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--color-primary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--color-text-secondary);
 }
 
 .workspace-team-projects-page__hero-header {
@@ -66,8 +66,9 @@
 }
 
 .workspace-team-projects-page__hero-header h2 {
-  font-size: 22px;
-  font-weight: 850;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.04em;
 }
 
 .workspace-team-projects-page__hero-description {
@@ -99,37 +100,37 @@
   align-items: center;
   gap: 6px;
   padding: 4px 8px;
-  border: 1px solid var(--color-border-default);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-full);
   background: var(--color-state-hover-overlay);
   color: var(--color-text-secondary);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .workspace-team-projects-page__hero-stat {
-  min-width: 120px;
+  min-width: 92px;
   display: grid;
   place-items: center;
   align-content: center;
   gap: 4px;
-  border: 1px solid var(--color-border-default);
+  border: 0;
   border-radius: var(--radius-md);
-  background: var(--color-state-hover-overlay);
+  background: transparent;
   color: var(--color-primary);
 }
 
 .workspace-team-projects-page__hero-stat span {
-  font-size: 24px;
-  font-weight: 850;
+  font-size: 28px;
+  font-weight: 500;
   color: var(--color-text-primary);
 }
 
 .workspace-team-projects-page__hero-stat small {
   color: var(--color-text-disabled);
   font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 .workspace-team-projects-page__feedback {
@@ -139,13 +140,13 @@
 }
 
 .workspace-team-projects-page__feedback--success {
-  border: 1px solid var(--color-success);
+  border: 1px solid color-mix(in srgb, var(--color-success) 18%, transparent);
   background: var(--color-success-light);
   color: var(--color-text-success);
 }
 
 .workspace-team-projects-page__feedback--error {
-  border: 1px solid var(--color-error);
+  border: 1px solid color-mix(in srgb, var(--color-error) 18%, transparent);
   background: var(--color-error-light);
   color: var(--color-text-error);
 }
@@ -171,9 +172,9 @@
 .workspace-team-projects-page__editor-card,
 .workspace-team-projects-page__empty-shell,
 .workspace-team-projects-page__empty {
-  border: 1px solid var(--color-border-default);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
-  background: var(--color-surface-card);
+  background: var(--surface-glass);
   box-shadow: var(--shadow-sm);
   display: flex;
   flex-direction: column;
@@ -185,14 +186,14 @@
 }
 
 .workspace-team-projects-page__editor-card {
-  padding: var(--space-md);
+  padding: 24px;
 }
 
 .workspace-team-projects-page__section-header {
   display: flex;
   flex-direction: column;
-  gap: var(--space-xs);
-  margin-bottom: var(--space-sm);
+  gap: 6px;
+  margin-bottom: 20px;
   flex-shrink: 0;
 }
 
@@ -209,21 +210,22 @@
   width: 100%;
   display: grid;
   gap: var(--space-sm);
-  padding: var(--space-sm);
-  border: 1px solid var(--color-border-default);
+  padding: 14px;
+  border: 1px solid transparent;
   border-radius: var(--radius-md);
-  background: var(--color-state-hover-overlay);
+  background: transparent;
   text-align: left;
   cursor: pointer;
   transition: border-color 0.18s ease, transform 0.18s ease, background-color 0.18s ease;
 }
 
 .workspace-team-projects-page__project-card:hover {
-  border-color: var(--color-border-focus);
+  border-color: transparent;
+  background: var(--color-state-hover-overlay);
 }
 
 .workspace-team-projects-page__project-card--active {
-  border-color: var(--color-border-focus);
+  border-color: transparent;
   background: var(--color-state-selected-bg);
 }
 
@@ -249,13 +251,13 @@
   padding: 4px 8px;
   border-radius: var(--radius-full);
   font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: none;
 }
 
 .workspace-team-projects-page__project-key {
-  border: 1px solid var(--color-border-default);
+  border: 1px solid var(--border-subtle);
   background: var(--color-state-hover-overlay);
   color: var(--color-text-secondary);
 }
@@ -278,8 +280,8 @@
 .workspace-team-projects-page__project-name {
   margin: 0;
   color: var(--color-text-primary);
-  font-size: 16px;
-  font-weight: 800;
+  font-size: 14px;
+  font-weight: 600;
 }
 
 .workspace-team-projects-page__project-card-footer {
@@ -316,7 +318,7 @@
 .workspace-team-projects-page textarea {
   width: 100%;
   box-sizing: border-box;
-  border: 1px solid var(--color-border-default);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
   background: var(--color-surface-app);
   color: var(--color-text-primary);
@@ -385,7 +387,7 @@
 .workspace-team-projects-page__empty-title {
   color: var(--color-text-primary);
   font-size: 15px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 
@@ -411,5 +413,14 @@
 
   .workspace-team-projects-page__field-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace-team-projects-page__hero,
+  .workspace-team-projects-page__layout,
+  .workspace-team-projects-page__feedback,
+  .workspace-team-projects-page__empty-shell {
+    animation: none;
   }
 }

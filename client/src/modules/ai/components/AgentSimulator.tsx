@@ -132,8 +132,9 @@ export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
     <div 
       style={{
         width: '340px',
-        borderLeft: '1px solid var(--color-border-default)',
-        background: 'var(--color-surface-app)', // Theme-aware terminal background
+        maxWidth: '100%',
+        borderLeft: '1px solid var(--border-subtle)',
+        background: 'var(--surface-glass)',
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
@@ -144,11 +145,11 @@ export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
       <div 
         style={{
           padding: '14px 16px',
-          borderBottom: '1px solid var(--color-border-default)',
+          borderBottom: '1px solid var(--border-subtle)',
           display: 'flex',
           alignItems: 'center',
           gap: '8px',
-          background: 'var(--color-base50)'
+          background: 'var(--surface-glass-subtle)'
         }}
       >
         <Terminal size={16} color="var(--color-primary)" />
@@ -158,6 +159,7 @@ export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
 
         <button 
           onClick={onClose}
+          aria-label="Close agent simulator"
           className="clickable"
           style={{
             marginLeft: 'auto',
@@ -191,10 +193,10 @@ export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
             key={idx}
             style={{
               padding: '6px 8px',
-              borderRadius: '4px',
+              borderRadius: 'var(--radius-sm)',
               background: log.type === 'thought' ? 'rgba(192, 132, 252, 0.04)' : log.type === 'tool' ? 'rgba(59, 130, 246, 0.04)' : log.type === 'success' ? 'rgba(16, 185, 129, 0.04)' : log.type === 'error' ? 'rgba(239, 68, 68, 0.05)' : 'transparent',
-              border: log.type === 'thought' ? '1px dashed #c084fc30' : log.type === 'tool' ? '1px solid #3b82f630' : log.type === 'success' ? '1px solid #10b98130' : log.type === 'error' ? '1px solid #ef444430' : 'none',
-              color: log.type === 'thought' ? '#c084fc' : log.type === 'tool' ? '#60a5fa' : log.type === 'success' ? '#34d399' : log.type === 'error' ? '#f87171' : '#a1a1aa',
+              border: '1px solid transparent',
+              color: log.type === 'thought' ? 'var(--color-secondary)' : log.type === 'tool' ? 'var(--color-primary)' : log.type === 'success' ? 'var(--color-text-success)' : log.type === 'error' ? 'var(--color-text-error)' : 'var(--color-text-secondary)',
               whiteSpace: 'pre-wrap',
               wordBreak: 'break-all'
             }}
@@ -204,7 +206,7 @@ export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
         ))}
 
         {isRunning && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#c084fc', paddingLeft: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-secondary)', paddingLeft: '8px' }}>
             <Loader2 size={12} className="animate-spin" style={{ animation: 'spin 1s linear infinite' }} />
             <span>Agent is thinking...</span>
           </div>
@@ -216,8 +218,8 @@ export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
       <div 
         style={{
           padding: '12px',
-          borderTop: '1px solid var(--color-border-default)',
-          background: 'var(--color-base50)'
+          borderTop: '1px solid var(--border-subtle)',
+          background: 'var(--surface-glass-subtle)'
         }}
       >
         <form onSubmit={handleRunSimulation} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>

@@ -5,3 +5,30 @@
 .ticket-list__virtual-row .ticket-row-mobile {
   height: 100%;
 }
+
+
+.ticket-list__status-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 26px;
+  margin-bottom: 8px;
+  padding: 0 4px 4px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  box-sizing: border-box;
+}
+
+.ticket-list__status-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  background: var(--surface-glass);
+  color: var(--color-text-secondary);
+  font-size: 10px;
+  line-height: 1.4;
+}

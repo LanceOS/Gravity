@@ -14,9 +14,9 @@
     --space-xl: 32px;
 
     /* Spatial density attributes */
-    --space-base-multiplier: 0.75;
-    --table-row-height: 28px;
-    --input-padding-y: 4px;
+    --space-base-multiplier: 1;
+    --table-row-height: 36px;
+    --input-padding-y: 8px;
 
     /* Friendly motion cadence for a smoother UI */
     --transition-fast: 140ms cubic-bezier(0.2, 0, 0.38, 1);
@@ -28,16 +28,28 @@
 :root {
   font-family: var(--sans);
   font-size: 13px;
-  /* Slightly more compact & professional */
   line-height: 1.5;
   color: var(--color-text-secondary);
   background-color: var(--color-surface-app);
-  color-scheme: light dark;
+
 }
 
-/* Dark Mode Palette Override - Crisp Gray Scale */
-.dark-theme {
-  /* Inherits from themes configuration */
+:root {
+  --app-background:
+    radial-gradient(ellipse at 6% 0%, color-mix(in srgb, var(--color-primary) 7%, transparent), transparent 44%),
+    radial-gradient(ellipse at 96% 98%, color-mix(in srgb, var(--color-secondary) 6%, transparent), transparent 48%),
+    var(--color-surface-app);
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+}
+
+::selection {
+  background: var(--color-state-selected-bg);
+  color: var(--color-text-primary);
 }
 
 * {
@@ -50,7 +62,7 @@ body {
   margin: 0;
   overflow: hidden;
   /* We handle scrolling inside components */
-  background: var(--color-surface-app);
+  background: var(--app-background);
   color: var(--color-text-secondary);
   font-family: var(--sans);
   -webkit-font-smoothing: antialiased;
@@ -69,7 +81,7 @@ textarea {
   display: flex;
   height: 100vh;
   width: 100vw;
-  background: var(--color-surface-app);
+  background: var(--app-background);
   color: var(--color-text-secondary);
   overflow: hidden;
 }
@@ -94,12 +106,13 @@ textarea {
   background: var(--color-text-disabled);
 }
 
-/* Modern flat surfaces and lightweight micro-interactions */
+/* Shared frosted material for standalone client surfaces. */
 .glass {
-  background: color-mix(in srgb, var(--color-surface-card) 70%, transparent);
-  backdrop-filter: blur(10px) saturate(140%);
-  -webkit-backdrop-filter: blur(10px) saturate(140%);
-  border: 1px solid color-mix(in srgb, var(--color-border-default) 50%, transparent);
+  background: var(--surface-glass);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border: 1px solid var(--border-glass);
+  box-shadow: var(--shadow-md);
 }
 
 .clickable {
@@ -130,12 +143,12 @@ button.clickable:not(.btn):hover {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 6px 14px;
+  padding: 8px 16px;
   border-radius: var(--radius-sm);
   font-size: 12.5px;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
-  border: 1px solid var(--color-border-default);
+  border: 1px solid var(--border-glass);
   background: var(--color-surface-card);
   color: var(--color-text-primary);
   font-family: inherit;
@@ -151,7 +164,7 @@ button.clickable:not(.btn):hover {
 
 .btn:hover {
   background: var(--color-base100);
-  border-color: var(--color-border-focus);
+  border-color: var(--color-border-default);
   color: var(--color-text-primary);
   box-shadow: none;
 }
@@ -161,8 +174,8 @@ button.clickable:not(.btn):hover {
 }
 
 .btn:focus-visible {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px var(--color-state-selected-bg);
+  outline: 2px solid var(--color-state-focus-ring);
+  outline-offset: 3px;
 }
 
 .btn:disabled {
@@ -180,7 +193,7 @@ button.clickable:not(.btn):hover {
 }
 
 .btn-md {
-  min-height: 34px;
+  min-height: 38px;
 }
 
 .btn-lg {
@@ -215,15 +228,15 @@ button.clickable:not(.btn):hover {
 }
 
 .btn-ghost:hover {
-  background: var(--color-base100);
+  background: var(--color-state-hover-overlay);
   color: var(--color-text-primary);
-  border-color: var(--color-border-default);
+  border-color: transparent;
 }
 
 .btn-accent {
   background: var(--color-state-selected-bg);
   color: var(--color-primary);
-  border-color: var(--color-border-focus);
+  border-color: var(--color-border-default);
 }
 
 .btn-accent:hover {
@@ -233,49 +246,22 @@ button.clickable:not(.btn):hover {
 }
 
 .btn-danger {
-  background: var(--color-bg-error);
+  background: var(--color-error);
   color: var(--color-text-on-danger);
   border-color: var(--color-border-error);
 }
 
 .btn-danger:hover {
-  background: var(--color-error-light);
+  background: var(--color-error-dark);
   color: var(--color-text-on-danger);
   border-color: var(--color-border-error);
 }
 
-/* Inputs & Form Elements */
-.input {
-  width: 100%;
-  padding: 8px 12px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border-default);
-  background: var(--color-surface-card);
-  color: var(--color-text-primary);
-  font-family: inherit;
-  font-size: 13px;
-  outline: none;
-  transition:
-    color var(--transition-normal),
-    border-color var(--transition-fast),
-    background-color var(--transition-fast),
-    box-shadow var(--transition-fast);
-}
-
-.input:focus {
-  border-color: var(--color-primary);
-  background-color: var(--color-surface-card);
-}
-
+/* App-specific input layouts; visual treatment comes from the library. */
 .input.auto-grow {
   field-sizing: content;
   resize: none;
   overflow-y: hidden;
-}
-
-.input::placeholder {
-  color: var(--color-text-disabled);
-  opacity: 0.8;
 }
 
 .input-seamless {
@@ -307,26 +293,16 @@ button.clickable:not(.btn):hover {
   outline: none !important;
 }
 
-.label {
-  display: block;
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--color-text-disabled);
-  margin-bottom: 6px;
-}
-
 /* Status & Priority Badge Colors */
 .badge {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 3px 8px;
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-full);
   font-size: 11px;
-  font-weight: 600;
-  border: 1px solid var(--color-border-default);
+  font-weight: 500;
+  border: 1px solid var(--border-glass);
   background: var(--color-base100);
   color: var(--color-text-secondary);
   transition:
@@ -336,7 +312,7 @@ button.clickable:not(.btn):hover {
 }
 
 .badge:hover {
-  border-color: var(--color-border-focus);
+  border-color: var(--color-border-default);
 }
 
 .priority-urgent {
@@ -392,7 +368,7 @@ button.tool-submit-active {
   min-width: 290px;
   max-width: 320px;
   background: transparent;
-  border-right: 1px solid var(--color-border-default);
+  border-right: none;
   height: 100%;
 }
 
@@ -404,12 +380,12 @@ button.tool-submit-active {
 .dropdown-menu {
   position: absolute;
   z-index: 100;
-  background: var(--color-surface-card);
-  border: 1px solid var(--color-border-default);
+  background: var(--surface-glass-strong);
+  border: 1px solid var(--border-glass);
   border-radius: var(--radius-md);
-  box-shadow: none;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
   min-width: 170px;
   padding: 5px;
   display: flex;
@@ -454,7 +430,7 @@ button.tool-submit-active {
 .markdown-content code {
   font-family: var(--mono);
   background: var(--color-base100);
-  border: 1px solid var(--color-border-default);
+  border: 1px solid var(--border-glass);
   padding: 2px 5px;
   border-radius: var(--radius-xs);
   font-size: 11.5px;
@@ -502,7 +478,7 @@ button.tool-submit-active {
 .ProseMirror code {
   font-family: var(--mono);
   background: var(--color-base100);
-  border: 1px solid var(--color-border-default);
+  border: 1px solid var(--border-glass);
   padding: 2px 5px;
   border-radius: var(--radius-xs);
   font-size: 11.5px;
@@ -524,15 +500,15 @@ button.tool-submit-active {
   position: fixed;
   display: flex;
   flex-wrap: wrap;
-  background-color: var(--color-surface-card);
-  border: 1px solid var(--color-border-default);
+  background-color: var(--surface-glass-strong);
+  border: 1px solid var(--border-glass);
   border-radius: var(--radius-md);
-  box-shadow: none;
+  box-shadow: var(--shadow-lg);
   padding: 4px;
   gap: 2px;
   align-items: center;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
   z-index: 1700;
   max-width: min(420px, calc(100vw - 32px));
 }

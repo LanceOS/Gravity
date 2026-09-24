@@ -2,7 +2,7 @@
   margin-top: var(--space-1);
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-3);
 }
 
 .sidebar-navigation__label {
@@ -42,9 +42,10 @@
 }
 
 .sidebar-navigation__dot {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   flex-shrink: 0;
+  border-radius: var(--radius-full);
 }
 
 .sidebar-navigation__collapse {
@@ -78,9 +79,9 @@
 }
 
 .sidebar-navigation__sub-items {
-  margin-left: var(--space-3);
+  margin-left: 18px;
   padding: var(--space-1) 0 var(--space-1) var(--space-2);
-  border-left: 1px solid var(--sidebar-border-color);
+  border-left: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
@@ -114,9 +115,9 @@
   border: 0;
   padding: 0;
   font: inherit;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
   cursor: pointer;
 }
 

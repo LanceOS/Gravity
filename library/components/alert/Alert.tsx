@@ -38,7 +38,7 @@ export function Alert({ type = 'info', title, children, style }: AlertProps) {
         gap: '12px',
         padding: '12px 16px',
         backgroundColor: bgColors[type],
-        border: `1px solid ${borderColors[type]}`,
+        border: `1px solid color-mix(in srgb, ${borderColors[type]} 20%, transparent)`,
         borderRadius: 'var(--radius-md)',
         fontSize: '13px',
         ...style,

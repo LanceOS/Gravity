@@ -60,8 +60,8 @@ export function DenseTable<T>({
       style={{
         overflowX: 'auto',
         width: '100%',
-        border: '1px solid var(--color-border-default)',
-        borderRadius: 'var(--radius-sm)',
+        border: '1px solid var(--border-subtle)',
+        borderRadius: 'var(--radius-md)',
         backgroundColor: 'var(--color-surface-card)'
       }}
     >
@@ -80,7 +80,7 @@ export function DenseTable<T>({
           <tr
             style={{
               backgroundColor: 'var(--color-base50)',
-              borderBottom: '1px solid var(--color-border-default)',
+              borderBottom: '1px solid var(--border-subtle)',
               height: 'var(--table-row-height, 26px)'
             }}
           >
@@ -90,7 +90,7 @@ export function DenseTable<T>({
                 style={{
                   padding: '2px var(--space-2, 8px)',
                   fontWeight: 600,
-                  color: 'var(--color-text-disabled)',
+                  color: 'var(--color-text-secondary)',
                   width: col.width,
                   textAlign: col.align || 'left',
                   textTransform: 'uppercase',
@@ -115,7 +115,7 @@ export function DenseTable<T>({
                 tabIndex={0}
                 onClick={() => onRowClick?.(row)}
                 style={{
-                  borderBottom: '1px solid var(--color-border-default)',
+                  borderBottom: '1px solid var(--border-subtle)',
                   height: 'var(--table-row-height, 26px)',
                   cursor: onRowClick ? 'pointer' : 'default',
                   backgroundColor: isSelected ? 'var(--color-state-selected-bg)' : 'transparent',

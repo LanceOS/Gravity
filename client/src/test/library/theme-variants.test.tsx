@@ -17,15 +17,15 @@ describe('library theme variants', () => {
     const dangerButton = screen.getByRole('button', { name: 'Danger' });
 
     expect(defaultButton).toHaveStyle({
-      backgroundColor: 'var(--color-surface-card)',
-      color: 'var(--color-text-secondary)',
-      border: '1px solid var(--color-border-default)',
+      backgroundColor: 'var(--surface-glass-strong)',
+      color: 'var(--color-text-primary)',
+      border: '1px solid var(--border-glass)',
     });
 
     expect(secondaryButton).toHaveStyle({
       backgroundColor: 'var(--color-state-selected-bg)',
       color: 'var(--color-primary)',
-      border: '1px solid var(--color-border-focus)',
+      border: '1px solid transparent',
     });
 
     fireEvent.mouseEnter(secondaryButton);
@@ -54,14 +54,14 @@ describe('library theme variants', () => {
     const blockedBadge = screen.getByText('Blocked');
 
     expect(alert.getAttribute('style')).toContain('background-color: var(--color-bg-warning)');
-    expect(alert.getAttribute('style')).toContain('border: 1px solid var(--color-warning)');
+    expect(alert.getAttribute('style')).toContain('border: 1px solid color-mix(in srgb, var(--color-warning) 20%, transparent)');
 
     expect(readyBadge.getAttribute('style')).toContain('background-color: var(--color-bg-success)');
     expect(readyBadge.getAttribute('style')).toContain('color: var(--color-text-success)');
-    expect(readyBadge.getAttribute('style')).toContain('border-color: var(--color-success)');
+    expect(readyBadge.getAttribute('style')).toContain('border: 1px solid transparent');
 
     expect(blockedBadge.getAttribute('style')).toContain('background-color: var(--color-bg-error)');
     expect(blockedBadge.getAttribute('style')).toContain('color: var(--color-text-error)');
-    expect(blockedBadge.getAttribute('style')).toContain('border-color: var(--color-border-error)');
+    expect(blockedBadge.getAttribute('style')).toContain('border: 1px solid transparent');
   });
 });

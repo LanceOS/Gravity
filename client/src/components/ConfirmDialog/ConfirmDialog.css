@@ -1,5 +1,5 @@
 .confirm-dialog__panel {
-  border-color: var(--color-border-error);
+  border-color: var(--border-glass);
 }
 
 .confirm-dialog__footer {

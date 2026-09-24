@@ -6,9 +6,10 @@
 
 /* Override the default library rich text editor styles for the comment box */
 .comment-editor-container .rich-text-editor {
-  border: 1px solid var(--color-border-default);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
-  background: var(--color-surface-card);
+  background: var(--surface-glass);
+  box-shadow: var(--shadow-sm);
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
   overflow: visible;
   height: auto;
@@ -16,20 +17,20 @@
 
 .comment-editor-container .rich-text-editor:focus-within {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px rgba(var(--color-primary-rgb), 0.15);
+  box-shadow: 0 0 0 2px var(--color-state-selected-bg);
 }
 
 .comment-editor-container .rich-text-editor__editor {
-  padding: 8px 12px;
+  padding: 12px 16px;
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.6;
   color: var(--color-text-primary);
   min-height: 40px;
 }
 
 .comment-editor-container .rich-text-editor__placeholder {
-  top: 8px;
-  left: 12px;
+  top: 12px;
+  left: 16px;
   font-size: 13px;
   color: var(--color-text-disabled);
   opacity: 0.75;
