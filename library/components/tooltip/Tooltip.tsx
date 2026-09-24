@@ -1,6 +1,5 @@
 import React from 'react';
-import { X, AlertCircle, Info, CheckCircle2, AlertTriangle } from 'lucide-react';
-import { Portal, FocusTrap, ClickAwayListener, runAnime } from '../../utilities';
+import { Portal, runAnime } from '../../utilities';
 import anime from 'animejs';
 
 export interface TooltipProps {
