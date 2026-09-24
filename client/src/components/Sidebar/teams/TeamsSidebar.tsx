@@ -210,7 +210,7 @@ export function TeamsSidebar(props: TeamsSidebarProps) {
                       <SidebarNavigation.GroupToggle
                         onClick={() => toggleTeamProjects(team.id)}
                         expanded={!projectsCollapsed}
-                        icon={projectsCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+                        icon={<ChevronRight size={12} />}
                       >
                         Projects
                       </SidebarNavigation.GroupToggle>

@@ -43,6 +43,7 @@ describe('SidebarNavigation', () => {
 
     expect(container.firstChild).toHaveClass('sidebar-navigation__collapse--collapsed');
     expect(container.firstChild).toHaveAttribute('aria-hidden', 'true');
+    expect(container.firstChild).toHaveAttribute('inert');
     expect(screen.getByText('No projects')).not.toBeVisible();
 
     rerender(
@@ -55,6 +56,7 @@ describe('SidebarNavigation', () => {
 
     expect(container.firstChild).not.toHaveClass('sidebar-navigation__collapse--collapsed');
     expect(container.firstChild).toHaveAttribute('aria-hidden', 'false');
+    expect(container.firstChild).not.toHaveAttribute('inert');
     expect(screen.getByText('No projects')).toBeVisible();
 
     rerender(
@@ -67,5 +69,6 @@ describe('SidebarNavigation', () => {
 
     expect(container.firstChild).toHaveClass('sidebar-navigation__collapse--collapsed');
     expect(container.firstChild).toHaveAttribute('aria-hidden', 'true');
+    expect(container.firstChild).toHaveAttribute('inert');
   });
 });

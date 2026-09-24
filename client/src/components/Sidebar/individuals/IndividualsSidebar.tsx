@@ -191,8 +191,8 @@ export function IndividualsSidebar(props: IndividualsSidebarProps) {
                         <SidebarNavigation.Item
                           key={cycle.id}
                           nested
-                          active={section.filters.cycleId === cycle.id}
-                          aria-pressed={section.filters.cycleId === cycle.id}
+                          active={isActiveProject && section.filters.cycleId === cycle.id}
+                          aria-pressed={isActiveProject && section.filters.cycleId === cycle.id}
                           onClick={() => section.onSelectCycleLegacy?.(project.id, cycle.id)}
                           leftIcon={<CheckCircle size={13} color={cycle.completed ? 'var(--color-text-disabled)' : 'var(--color-primary)'} />}
                           rightElement={<span className="sidebar-count-badge">{projectCycleCounts[cycle.id] || 0}</span>}

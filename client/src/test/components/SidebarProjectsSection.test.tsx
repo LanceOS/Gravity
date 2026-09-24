@@ -115,6 +115,37 @@ describe('SidebarProjectsSection', () => {
     }
   });
 
+  it('highlights a cycle filter only in the active project and project scope', () => {
+    const base = makeProps().section;
+    const props = makeProps({
+      section: {
+        ...base,
+        projects: [...base.projects, { ...base.projects[0], id: 'project-2', name: 'Proj 2' }],
+        cycles: [{ id: 'cycle-1', name: 'Sprint 1', startDate: '', endDate: '', completed: 0 }],
+        filters: { ...base.filters, cycleId: 'cycle-1' },
+      },
+      collapsedProjects: { 'project-1': false, 'project-2': false },
+    });
+    // @ts-expect-error narrow props for test
+    const { rerender } = render(<SidebarProjectsSection {...props} />);
+    const cycles = screen.getAllByRole('button', { name: /Sprint 1/ });
+    expect(cycles[0]).toHaveAttribute('aria-pressed', 'true');
+    expect(cycles[0]).toHaveClass('sidebar-item--active');
+    expect(cycles[1]).toHaveAttribute('aria-pressed', 'false');
+    expect(cycles[1]).not.toHaveClass('sidebar-item--active');
+
+    rerender(
+      // @ts-expect-error narrow props for test
+      <SidebarProjectsSection {...props} section={{ ...props.section, navigationState: {
+        activeTeam: '', activeScope: 'workspace', activeProject: '',
+      } }} />
+    );
+    for (const cycle of screen.getAllByRole('button', { name: /Sprint 1/ })) {
+      expect(cycle).toHaveAttribute('aria-pressed', 'false');
+      expect(cycle).not.toHaveClass('sidebar-item--active');
+    }
+  });
+
   it('renders teams as primary navigation with scoped tabs and collapsible projects', async () => {
     const user = userEvent.setup();
     const onSelectWorkspaceAllTasks = vi.fn();
