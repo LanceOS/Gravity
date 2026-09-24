@@ -5,14 +5,15 @@ import {
   ProjectContextProviders,
   WorkspaceTicketProviders,
 } from '../context/TicketContext';
-import { AccountPreferencesPageRoute } from '../pages/AccountPreferencesPage/AccountPreferencesPage';
-import { AppShellPage } from '../pages/AppShellPage/AppShellPage';
-import { WorkspaceShellPage } from '../pages/WorkspaceShellPage/WorkspaceShellPage';
-import { WorkspaceSettingsPageRoute } from '../pages/WorkspaceSettingsPage/WorkspaceSettingsPage';
 import { ProtectedRoute } from './ProtectedRoute';
 import { LoadingPage } from '../pages/LoadingPage/LoadingPage';
 
-// Lazy load placeholder views for code-splitting
+// Keep workspace, editor, chat, and settings code out of the sign-in bundle.
+const AppShellPage = lazy(() => import('../pages/AppShellPage/AppShellPage').then((module) => ({ default: module.AppShellPage })));
+const WorkspaceShellPage = lazy(() => import('../pages/WorkspaceShellPage/WorkspaceShellPage').then((module) => ({ default: module.WorkspaceShellPage })));
+const AccountPreferencesPageRoute = lazy(() => import('../pages/AccountPreferencesPage/AccountPreferencesPage').then((module) => ({ default: module.AccountPreferencesPageRoute })));
+const WorkspaceSettingsPageRoute = lazy(() => import('../pages/WorkspaceSettingsPage/WorkspaceSettingsPage').then((module) => ({ default: module.WorkspaceSettingsPageRoute })));
+
 const WorkspaceExportView = lazy(() => import('../pages/PlaceholderViews/WorkspaceExportView'));
 const NotFoundView = lazy(() => import('../pages/PlaceholderViews/NotFoundView'));
 const WorkspaceAccessDeniedView = lazy(() => import('../pages/PlaceholderViews/WorkspaceAccessDeniedView'));
@@ -31,7 +32,11 @@ function TeamLabelRedirect() {
 }
 
 function protectedElement(children: ReactNode) {
-  return <ProtectedRoute>{children}</ProtectedRoute>;
+  return (
+    <ProtectedRoute>
+      <Suspense fallback={<LoadingPage />}>{children}</Suspense>
+    </ProtectedRoute>
+  );
 }
 
 function projectElement(children: ReactNode) {
@@ -103,23 +108,15 @@ const staticProtectedRoutes = [
   },
   {
     path: '/oauth/consent',
-    element: <Suspense fallback={<LoadingPage />}><OAuthConsentPage /></Suspense>,
+    element: <OAuthConsentPage />,
   },
   {
     path: '/workspace-access-denied',
-    element: (
-      <Suspense fallback={<LoadingPage />}>
-        <WorkspaceAccessDeniedView />
-      </Suspense>
-    ),
+    element: <WorkspaceAccessDeniedView />,
   },
   {
     path: '/workspace-access-error',
-    element: (
-      <Suspense fallback={<LoadingPage />}>
-        <WorkspaceAccessErrorView />
-      </Suspense>
-    ),
+    element: <WorkspaceAccessErrorView />,
   },
 ];
 
@@ -136,21 +133,13 @@ export const router = createBrowserRouter([
   // Export tasks/notes
   {
     path: '/workspaces/:workspaceId/settings/export',
-    element: protectedElement(
-      <Suspense fallback={<LoadingPage />}>
-        <WorkspaceExportView />
-      </Suspense>
-    ),
+    element: protectedElement(<WorkspaceExportView />),
   },
 
   // Backward compatibility with legacy placeholder page
   {
     path: '/placeholder/:id',
-    element: protectedElement(
-      <Suspense fallback={<LoadingPage />}>
-        <PlaceholderPage />
-      </Suspense>
-    ),
+    element: protectedElement(<PlaceholderPage />),
   },
 
   // 404 Route for invalid paths

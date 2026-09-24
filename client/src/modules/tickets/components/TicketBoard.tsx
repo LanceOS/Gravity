@@ -37,7 +37,6 @@ export const TicketBoard = React.memo(({
   );
   const baseVisibleByColumn = useMemo(() => Object.fromEntries(BOARD_COLUMNS.map((column) => [column.id, INITIAL_CARDS_PER_COLUMN])) as Record<string, number>, []);
   const previousVisibleCardCountRef = useRef(0);
-  const selectTicketHandlerCache = useRef(new WeakMap<Ticket, () => void>());
   const dragStartHandlerCache = useRef(new WeakMap<Ticket, (event: DragEvent) => void>());
 
   const boardRef = useRef<HTMLDivElement>(null);
@@ -77,20 +76,18 @@ export const TicketBoard = React.memo(({
     });
   }, []);
 
-  const clearTicketHandlerCaches = useCallback(() => {
-    selectTicketHandlerCache.current = new WeakMap<Ticket, () => void>();
-    dragStartHandlerCache.current = new WeakMap<Ticket, (event: DragEvent) => void>();
-  }, []);
+  const getSelectTicketHandler = useMemo(() => {
+    const handlers = new WeakMap<Ticket, () => void>();
+    return (ticket: Ticket) => {
+      const cached = handlers.get(ticket);
+      if (cached) {
+        return cached;
+      }
 
-  const getSelectTicketHandler = useCallback((ticket: Ticket) => {
-    const cached = selectTicketHandlerCache.current.get(ticket);
-    if (cached) {
-      return cached;
-    }
-
-    const nextHandler = () => onSelectTicket(ticket);
-    selectTicketHandlerCache.current.set(ticket, nextHandler);
-    return nextHandler;
+      const nextHandler = () => onSelectTicket(ticket);
+      handlers.set(ticket, nextHandler);
+      return nextHandler;
+    };
   }, [onSelectTicket]);
 
   const getDragStartHandler = useCallback((ticket: Ticket) => {
@@ -177,10 +174,6 @@ export const TicketBoard = React.memo(({
     );
   }, [handleLoadMoreColumn, onOpenCreateTicket, ticketsByColumn, visibleByColumn, loadingMoreRows]);
 
-  useEffect(() => {
-    clearTicketHandlerCaches();
-  }, [clearTicketHandlerCaches, onSelectTicket]);
-
   const formattedCards = useMemo(() => profileComputation('TicketBoard:formatCards', () => {
     return BOARD_COLUMNS.flatMap((col) => {
       const fullTickets = ticketsByColumn[col.id as keyof typeof ticketsByColumn] || [];
@@ -191,7 +184,6 @@ export const TicketBoard = React.memo(({
             id: ticket.id,
             title: ticket.title,
             status: ticket.status,
-            contentVersion: ticket.updatedAt,
             content: (
             <TicketContextMenu ticket={ticket} availableTickets={availableTickets}>
                 <TicketCard

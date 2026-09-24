@@ -300,16 +300,18 @@ function collectRelatedTicketIds({
   return Array.from(relatedTicketIds);
 }
 
-async function getTicketRelationshipFlags(ticketIds: string[]) {
-  if (ticketIds.length === 0) {
+async function getTicketRelationshipFlags(ticketRows: Pick<TicketRecord, 'id' | 'status'>[]) {
+  if (ticketRows.length === 0) {
     return {
       blockedIds: new Set<string>(),
       dependencyIds: new Set<string>(),
     };
   }
 
-  const ticketStatusMap = await getTicketStatusMap(ticketIds);
-  const activeTicketIds = ticketIds.filter((ticketId) => !isTerminalTicketStatus(ticketStatusMap.get(ticketId)));
+  const ticketStatusMap = new Map(ticketRows.map((ticket) => [ticket.id, ticket.status]));
+  const activeTicketIds = ticketRows
+    .filter((ticket) => !isTerminalTicketStatus(ticket.status))
+    .map((ticket) => ticket.id);
   if (activeTicketIds.length === 0) {
     return {
       blockedIds: new Set<string>(),
@@ -344,18 +346,24 @@ async function getTicketRelationshipFlags(ticketIds: string[]) {
     relatedTicketIds.add(row.blockedTicketId);
   }
 
-  const relatedTicketStatusMap = await getTicketStatusMap(Array.from(relatedTicketIds));
+  // List queries already include statuses for most related tickets. Only load
+  // endpoints outside the result set (for example, on another page/project).
+  const missingTicketIds = Array.from(relatedTicketIds).filter((id) => !ticketStatusMap.has(id));
+  const missingTicketStatuses = await getTicketStatusMap(missingTicketIds);
+  for (const [id, status] of missingTicketStatuses) {
+    ticketStatusMap.set(id, status);
+  }
   const filteredBlockedIds = new Set<string>();
   const filteredDependencyIds = new Set<string>();
 
   for (const row of blockedRows) {
-    if (!isTerminalTicketStatus(relatedTicketStatusMap.get(row.ticketId))) {
+    if (!isTerminalTicketStatus(ticketStatusMap.get(row.ticketId))) {
       filteredBlockedIds.add(row.blockedTicketId);
     }
   }
 
   for (const row of dependencyRows) {
-    if (!isTerminalTicketStatus(relatedTicketStatusMap.get(row.blockedTicketId))) {
+    if (!isTerminalTicketStatus(ticketStatusMap.get(row.blockedTicketId))) {
       filteredDependencyIds.add(row.ticketId);
     }
   }
@@ -499,55 +507,7 @@ export function canonicalizeBranchName(name?: string | null): string {
 }
 
 export async function listTickets(projectId: string, filters: TicketFilters = {}) {
-  let query = db
-    .select({ ticket: tickets, projectName: projects.name })
-    .from(tickets)
-    .innerJoin(projects, eq(projects.id, tickets.projectId))
-    .where(and(...buildTicketFilterConditions([projectId], filters)))
-    .orderBy(asc(tickets.createdAt), asc(tickets.id))
-    .$dynamic();
-
-  if (typeof filters.limit === 'number' && filters.limit > 0) {
-    query = query.limit(filters.limit);
-  }
-
-  if (typeof filters.offset === 'number' && filters.offset >= 0) {
-    query = query.offset(filters.offset);
-  }
-
-  const rows = await query;
-
-  if (rows.length === 0) {
-    return [];
-  }
-
-  const ticketIds = rows.map((r) => r.ticket.id);
-  const { blockedIds, dependencyIds } = await getTicketRelationshipFlags(ticketIds);
-  const allLabels = await db
-    .select({
-      ticketId: ticketLabels.ticketId,
-      label: labelSelectFields,
-    })
-    .from(ticketLabels)
-    .innerJoin(labels, eq(labels.id, ticketLabels.labelId))
-    .where(inArray(ticketLabels.ticketId, ticketIds));
-
-  const labelsByTicketId = new Map<string, any[]>();
-  for (const row of allLabels) {
-    const list = labelsByTicketId.get(row.ticketId) ?? [];
-    list.push(row.label);
-    labelsByTicketId.set(row.ticketId, list);
-  }
-
-  return rows.map((r) => ({
-    ...mapTicket(
-      r.ticket,
-      labelsByTicketId.get(r.ticket.id) || [],
-      blockedIds.has(r.ticket.id),
-      dependencyIds.has(r.ticket.id),
-    ),
-    projectName: r.projectName,
-  }));
+  return listWorkspaceTickets([projectId], filters);
 }
 
 export async function listWorkspaceTickets(projectIds: string[], filters: TicketFilters = {}) {
@@ -578,15 +538,17 @@ export async function listWorkspaceTickets(projectIds: string[], filters: Ticket
   }
 
   const ticketIds = rows.map((r) => r.ticket.id);
-  const { blockedIds, dependencyIds } = await getTicketRelationshipFlags(ticketIds);
-  const allLabels = await db
-    .select({
-      ticketId: ticketLabels.ticketId,
-      label: labelSelectFields,
-    })
-    .from(ticketLabels)
-    .innerJoin(labels, eq(labels.id, ticketLabels.labelId))
-    .where(inArray(ticketLabels.ticketId, ticketIds));
+  const [{ blockedIds, dependencyIds }, allLabels] = await Promise.all([
+    getTicketRelationshipFlags(rows.map((row) => row.ticket)),
+    db
+      .select({
+        ticketId: ticketLabels.ticketId,
+        label: labelSelectFields,
+      })
+      .from(ticketLabels)
+      .innerJoin(labels, eq(labels.id, ticketLabels.labelId))
+      .where(inArray(ticketLabels.ticketId, ticketIds)),
+  ]);
 
   const labelsByTicketId = new Map<string, any[]>();
   for (const row of allLabels) {
@@ -613,7 +575,7 @@ export async function getTicketById(ticketId: string, projectId?: string) {
     return null;
   }
 
-  const { blockedIds, dependencyIds } = await getTicketRelationshipFlags([row.id]);
+  const { blockedIds, dependencyIds } = await getTicketRelationshipFlags([row]);
   return mapTicket(row, [], blockedIds.has(row.id), dependencyIds.has(row.id));
 }
 
@@ -624,7 +586,7 @@ export async function getTicketByKey(ticketKey: string) {
     return null;
   }
 
-  const { blockedIds, dependencyIds } = await getTicketRelationshipFlags([row.id]);
+  const { blockedIds, dependencyIds } = await getTicketRelationshipFlags([row]);
   return mapTicket(row, [], blockedIds.has(row.id), dependencyIds.has(row.id));
 }
 
@@ -771,8 +733,8 @@ export async function removeTicketDependencyRelation(ticketId: string, blockedTi
     .where(and(eq(ticketRelationships.ticketId, ticketId), eq(ticketRelationships.blockedTicketId, blockedTicketId)));
 }
 
-export async function listComments(ticketId: string) {
-  const rows = await db
+async function readComments(ticketId: string, commentId?: string) {
+  let query = db
     .select({
       id: comments.id,
       ticketId: comments.ticketId,
@@ -787,8 +749,16 @@ export async function listComments(ticketId: string) {
     .from(comments)
     .innerJoin(authUsers, eq(authUsers.id, comments.userId))
     .leftJoin(userProfiles, eq(userProfiles.userId, authUsers.id))
-    .where(eq(comments.ticketId, ticketId))
-    .orderBy(asc(comments.createdAt));
+    .where(commentId !== undefined
+      ? and(eq(comments.ticketId, ticketId), eq(comments.id, commentId))
+      : eq(comments.ticketId, ticketId))
+    .orderBy(asc(comments.createdAt))
+    .$dynamic();
+
+  if (commentId !== undefined) {
+    query = query.limit(1);
+  }
+  const rows = await query;
 
   return rows.map((row) => ({
     id: String(row.id),
@@ -805,6 +775,10 @@ export async function listComments(ticketId: string) {
       role: String(row.authorRole ?? 'guest_contributor'),
     },
   }));
+}
+
+export async function listComments(ticketId: string) {
+  return readComments(ticketId);
 }
 
 export async function getTicketDetails(ticketId: string, projectId?: string) {
@@ -1262,7 +1236,7 @@ export async function updateTicketRecordWithEffects(
     return null;
   }
 
-  const { blockedIds, dependencyIds } = await getTicketRelationshipFlags([ticketId]);
+  const { blockedIds, dependencyIds } = await getTicketRelationshipFlags([result.ticket]);
   return {
     ticket: mapTicket(result.ticket, result.labels, blockedIds.has(ticketId), dependencyIds.has(ticketId)),
     relationshipCleanup,
@@ -1328,8 +1302,8 @@ export async function addCommentRecord(ticketId: string, userId: string, body: s
     createdAt: createdAt ?? new Date(),
   });
 
-  const allComments = await listComments(ticketId);
-  return allComments[allComments.length - 1] ?? null;
+  const [comment] = await readComments(ticketId, commentId);
+  return comment ?? null;
 }
 
 export async function updateCommentRecord(commentId: string, ticketId: string, body: string) {
@@ -1348,8 +1322,8 @@ export async function updateCommentRecord(commentId: string, ticketId: string, b
     .set({ body: sanitizedBody.content })
     .where(and(eq(comments.id, commentId), eq(comments.ticketId, ticketId)));
 
-  const allComments = await listComments(ticketId);
-  return allComments.find((c) => c.id === commentId) ?? null;
+  const [comment] = await readComments(ticketId, commentId);
+  return comment ?? null;
 }
 
 export async function deleteCommentRecord(commentId: string, ticketId: string) {

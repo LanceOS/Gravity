@@ -6,6 +6,7 @@ import type { AIChatMessage } from './types';
 import { getWindowStyle, type AIChatWindowVariant } from './styles';
 import { runAnime } from '../../utilities';
 import anime from 'animejs';
+import { useReducedMotion } from '../../utilities/useReducedMotion';
 
 export interface AIChatWindowProps {
   title?: React.ReactNode;
@@ -42,9 +43,8 @@ export function AIChatWindow({
   const chatEndRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
   const windowRef = useRef<HTMLDivElement>(null);
-  const isReduced = typeof window === 'undefined'
-    ? false
-    : window.matchMedia('(prefers-reduced-motion: reduce)').matches || (typeof process !== 'undefined' && process.env.NODE_ENV === 'test');
+  const prefersReducedMotion = useReducedMotion();
+  const isReduced = prefersReducedMotion || (typeof process !== 'undefined' && process.env.NODE_ENV === 'test');
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -54,43 +54,46 @@ export function AIChatWindow({
   }, []);
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isGenerating]);
+    chatEndRef.current?.scrollIntoView({ behavior: isReduced ? 'auto' : 'smooth' });
+  }, [messages, isGenerating, isReduced]);
 
   useEffect(() => {
-    if (isReduced) {
+    const windowElement = windowRef.current;
+    if (!windowElement) {
       return;
     }
-    if (windowRef.current) {
-      if (variant === 'floating' && isClosing) {
-        runAnime({
-          targets: windowRef.current,
-          opacity: [1, 0],
-          translateY: [0, 12],
-          duration: 180,
-          easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
-        });
-      } else if (variant === 'floating') {
-        windowRef.current.style.opacity = '0';
-        windowRef.current.style.transform = 'translateY(12px)';
-        runAnime({
-          targets: windowRef.current,
-          opacity: [0, 1],
-          translateY: [12, 0],
-          duration: 220,
-          easing: 'cubic-bezier(0.2, 0, 0.38, 1)',
-        });
-      }
+    if (isReduced || variant !== 'floating') {
+      // An interrupted animation may leave the window partially hidden or moved.
+      windowElement.style.opacity = '';
+      windowElement.style.transform = '';
+      return;
     }
-  }, [isClosing, isReduced, variant]);
+    if (isClosing) {
+      runAnime({
+        targets: windowElement,
+        opacity: [1, 0],
+        translateY: [0, 12],
+        duration: 180,
+        easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+      });
+    } else {
+      windowElement.style.opacity = '0';
+      windowElement.style.transform = 'translateY(12px)';
+      runAnime({
+        targets: windowElement,
+        opacity: [0, 1],
+        translateY: [12, 0],
+        duration: 220,
+        easing: 'cubic-bezier(0.2, 0, 0.38, 1)',
+      });
+    }
 
-  useEffect(() => {
+    // Capture the element before React clears its ref, and cancel an interrupted
+    // entrance/exit before the next animation starts.
     return () => {
-      if (windowRef.current) {
-        anime.remove(windowRef.current);
-      }
+      anime.remove(windowElement);
     };
-  }, []);
+  }, [isClosing, isReduced, variant]);
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -194,7 +197,7 @@ export function AIChatWindow({
               fontSize: '11.5px',
               color: 'var(--color-text-secondary)',
               boxShadow: 'var(--shadow-sm)',
-              animation: 'pulse 2s infinite',
+              animation: isReduced ? 'none' : 'pulse 2s infinite',
             }}
           >
             <div
