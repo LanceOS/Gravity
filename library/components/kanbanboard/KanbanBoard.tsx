@@ -1,5 +1,4 @@
 import React, { memo, useCallback, useMemo, useRef, useState, useEffect } from 'react';
-import anime from 'animejs';
 import { DenseVirtualList } from '../densevirtuallist';
 import { runAnime } from '../../utilities';
 import './KanbanBoard.css';
@@ -19,6 +18,7 @@ export interface KanbanBoardProps {
   renderColumnHeader?: (columnId: string, title: string, count: number) => React.ReactNode;
   /** Virtual row height in pixels, including the gap, for custom card content. */
   cardRowHeight?: number;
+  cardFocusSelector?: string;
   style?: React.CSSProperties;
 }
 
@@ -30,8 +30,9 @@ interface KanbanCardComponentProps {
   onDragEndCard: () => void;
 }
 
-const KANBAN_BOARD_VIRTUAL_THRESHOLD = 50;
-const KANBAN_BOARD_VIRTUAL_ROW_BUFFER = 6;
+const KANBAN_BOARD_VIRTUAL_THRESHOLD = 20;
+const KANBAN_BOARD_VIRTUAL_ROW_BUFFER = 3;
+const cardKey = (card: KanbanCard) => card.id;
 const KANBAN_CARD_BASE_HEIGHT = 128;
 const KANBAN_CARD_LONG_TITLE_HEIGHT = 144;
 const KANBAN_CARD_LONG_LONG_TITLE_HEIGHT = 160;
@@ -165,6 +166,7 @@ interface KanbanColumnProps {
   };
   cards: KanbanCard[];
   cardRowHeight?: number;
+  cardFocusSelector?: string;
   isDragOver: boolean;
   renderColumnHeader?: (columnId: string, title: string, count: number) => React.ReactNode;
   lastDroppedCardId: string | null;
@@ -183,6 +185,7 @@ const KanbanColumn = memo(function KanbanColumn({
   column,
   cards,
   cardRowHeight,
+  cardFocusSelector,
   isDragOver,
   renderColumnHeader,
   lastDroppedCardId,
@@ -216,7 +219,7 @@ const KanbanColumn = memo(function KanbanColumn({
     return () => resizeObserver.disconnect();
   }, []);
 
-  const showVirtualCards = cards.length > KANBAN_BOARD_VIRTUAL_THRESHOLD && bodyHeight > 0;
+  const showVirtualCards = cards.length > KANBAN_BOARD_VIRTUAL_THRESHOLD;
 
   const renderVirtualCard = useCallback((card: KanbanCard, _index: number, style: React.CSSProperties) => (
     <div key={card.id} style={{ ...style, paddingRight: '2px', boxSizing: 'border-box' }}>
@@ -230,10 +233,15 @@ const KanbanColumn = memo(function KanbanColumn({
     </div>
   ), [lastDroppedCardId, onClearLastDropped, onDragEndCard, onDragStartCard]);
 
-  const cardStack = showVirtualCards ? (
+  // Fixed-height custom cards keep their DOM and keyboard state across the
+  // threshold. Small generic cards retain their natural flow layout.
+  const cardStack = cardRowHeight !== undefined || showVirtualCards ? (
     <DenseVirtualList
       items={cards}
-      height={bodyHeight}
+      virtualize={showVirtualCards}
+      height={bodyHeight || 400}
+      getItemKey={cardKey}
+      itemFocusSelector={cardFocusSelector}
       rowHeight={cardRowHeight ?? getKanbanCardRowHeight}
       buffer={KANBAN_BOARD_VIRTUAL_ROW_BUFFER}
       renderRow={renderVirtualCard}
@@ -309,6 +317,7 @@ export const KanbanBoard = memo(function KanbanBoard({
   onCardMove,
   renderColumnHeader,
   cardRowHeight,
+  cardFocusSelector,
   style,
 }: KanbanBoardProps) {
   const [dragOverColId, setDragOverColId] = useState<string | null>(null);
@@ -438,6 +447,7 @@ export const KanbanBoard = memo(function KanbanBoard({
             column={col}
             cards={colCards}
             cardRowHeight={cardRowHeight}
+            cardFocusSelector={cardFocusSelector}
             isDragOver={dragOverColId === col.id}
             renderColumnHeader={renderColumnHeader}
             lastDroppedCardId={lastDroppedCardId}

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { KanbanBoard } from '@library';
 
@@ -19,6 +19,33 @@ function createDataTransfer() {
 }
 
 describe('KanbanBoard', () => {
+  it('preserves focused custom cards when crossing the virtualization threshold', () => {
+    const cards = Array.from({ length: 21 }, (_, index) => ({
+      id: `c-${index}`,
+      status: 'todo',
+      content: <button type="button">Ticket {index}</button>,
+    }));
+    const board = (count: number) => (
+      <KanbanBoard
+        columns={[{ id: 'todo', title: 'Todo' }]}
+        cards={cards.slice(0, count)}
+        cardRowHeight={168}
+        cardFocusSelector="button"
+      />
+    );
+    const { rerender } = render(board(21));
+    const focusedCard = screen.getByRole('button', { name: 'Ticket 0' });
+    act(() => focusedCard.focus());
+
+    rerender(board(20));
+    expect(screen.getByRole('button', { name: 'Ticket 0' })).toBe(focusedCard);
+    expect(focusedCard).toHaveFocus();
+
+    rerender(board(21));
+    expect(screen.getByRole('button', { name: 'Ticket 0' })).toBe(focusedCard);
+    expect(focusedCard).toHaveFocus();
+  });
+
   it('moves a dropped card into the destination column', () => {
     const onCardMove = vi.fn();
 

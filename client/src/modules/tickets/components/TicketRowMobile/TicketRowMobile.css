@@ -94,3 +94,7 @@
   border-radius: var(--radius-full);
   flex-shrink: 0;
 }
+.ticket-row-mobile:focus-visible {
+  outline: 2px solid var(--color-state-focus-ring);
+  outline-offset: -2px;
+}
