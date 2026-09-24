@@ -1,5 +1,6 @@
 import { createContext, type FormEvent, type JSX, useCallback, useContext, useMemo, type PropsWithChildren, useState } from 'react';
 
+import { ConfirmDialog } from '../../../components/ConfirmDialog';
 import type { Label } from '../../../context/TicketContextContext';
 import {
   createProjectSettingsFeedback,
@@ -97,9 +98,7 @@ export function WorkspaceProjectPanelActionsContextProvider({
     clearLabelEditor,
   } = useWorkspaceProjectPanelLabelStateContext();
 
-  const deleteLabelConfirmation =
-    confirmDeleteLabel ??
-    ((message: string) => (typeof window === 'undefined' ? true : window.confirm(message)));
+  const [labelToDelete, setLabelToDelete] = useState<Label | null>(null);
   const [isDeletingProject, setIsDeletingProject] = useState(false);
   const canDeleteProject = !!onDeleteProject;
 
@@ -232,30 +231,30 @@ export function WorkspaceProjectPanelActionsContextProvider({
     ]
   );
 
-  const deleteLabel = useCallback(async () => {
-    if (!activeLabel) {
-      return;
-    }
-
-    const confirmDelete = await deleteLabelConfirmation(
-      `Delete label "${activeLabel.name}"? It will be removed from all tickets.`
-    );
-    if (!confirmDelete) {
-      return;
-    }
-
+  const performDeleteLabel = useCallback(async (label: Label) => {
     setEditingLabelLoading(true);
     setEditingLabelError(null);
 
     try {
-      await onDeleteLabel(activeLabel.id);
+      await onDeleteLabel(label.id);
       clearLabelEditor();
     } catch (error) {
       setEditingLabelError(error instanceof Error ? error.message : 'Failed to delete label.');
     } finally {
       setEditingLabelLoading(false);
     }
-  }, [activeLabel, clearLabelEditor, deleteLabelConfirmation, onDeleteLabel, setEditingLabelError, setEditingLabelLoading]);
+  }, [clearLabelEditor, onDeleteLabel, setEditingLabelError, setEditingLabelLoading]);
+
+  const deleteLabel = useCallback(async () => {
+    if (!activeLabel) return;
+    if (confirmDeleteLabel) {
+      if (await confirmDeleteLabel(`Delete label "${activeLabel.name}"? It will be removed from all tickets.`)) {
+        await performDeleteLabel(activeLabel);
+      }
+    } else {
+      setLabelToDelete(activeLabel);
+    }
+  }, [activeLabel, confirmDeleteLabel, performDeleteLabel]);
 
   const selectProject = useCallback(
     (projectId: string) => {
@@ -355,6 +354,23 @@ export function WorkspaceProjectPanelActionsContextProvider({
   return (
     <WorkspaceProjectPanelActionsContext.Provider value={contextValue}>
       {children}
+      {labelToDelete && (
+        <ConfirmDialog.Root isOpen onClose={() => setLabelToDelete(null)}>
+          <ConfirmDialog.Header
+            title={`Delete label "${labelToDelete.name}"?`}
+            description="It will be removed from all tickets."
+          />
+          <ConfirmDialog.Actions
+            confirmLabel="Delete Label"
+            onCancel={() => setLabelToDelete(null)}
+            onConfirm={async () => {
+              if (!labelToDelete) return;
+              setLabelToDelete(null);
+              await performDeleteLabel(labelToDelete);
+            }}
+          />
+        </ConfirmDialog.Root>
+      )}
     </WorkspaceProjectPanelActionsContext.Provider>
   );
 }

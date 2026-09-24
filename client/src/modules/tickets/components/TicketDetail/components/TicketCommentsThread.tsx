@@ -19,7 +19,7 @@ interface TicketCommentsThreadProps {
   onAddComment: (ticketId: string, commentInput: string) => void;
   onUpdateComment: (ticketId: string, commentId: string, commentInput: string) => void;
   onDeleteComment: (ticketId: string, commentId: string) => void;
-  copyToClipboard: (value: string, successMessage?: string) => Promise<void>;
+  copyToClipboard: (value: string, successMessage?: string) => Promise<boolean>;
 }
 
 function TicketCommentForm({

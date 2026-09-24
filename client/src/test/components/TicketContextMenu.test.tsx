@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { TicketContextMenu } from '../../modules/tickets/components/TicketContextMenu';
@@ -94,7 +94,7 @@ function makeProjectContext(projects: Project[]) {
 }
 
 describe('TicketContextMenu', () => {
-  it('filters projects by workspace for Move to Project', async () => {
+  it('filters projects by workspace and confirms ticket deletion', async () => {
     const user = userEvent.setup();
     const updateTicketMock = vi.fn();
     const moveTicketMock = vi.fn();
@@ -163,6 +163,20 @@ describe('TicketContextMenu', () => {
     await user.click(screen.getByText('Orbit Delivery'));
     expect(moveTicketMock).toHaveBeenCalledWith('ticket-1', 'project-1', 'project-2');
     expect(updateTicketMock).not.toHaveBeenCalledWith('ticket-1', { projectId: 'project-2' });
+
+    fireEvent.contextMenu(triggerElement);
+    await user.click(await screen.findByText('Delete Ticket'));
+    const dialog = screen.getByRole('alertdialog', { name: 'Delete GRA-1?' });
+    expect(within(dialog).getByRole('button', { name: 'Cancel' })).toHaveFocus();
+    expect(deleteTicketMock).not.toHaveBeenCalled();
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(deleteTicketMock).not.toHaveBeenCalled();
+    fireEvent.contextMenu(triggerElement);
+    await user.click(await screen.findByText('Delete Ticket'));
+    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete Ticket' }));
+    expect(deleteTicketMock).toHaveBeenCalledExactlyOnceWith('ticket-1');
+
   });
 
   it('assigns the ticket as a dependency or blocker from the Assign As submenu', async () => {

@@ -3,7 +3,7 @@ import { serializeRichTextMarkdown } from '@library';
 import type { TicketUtilitiesProps } from '../../types/TicketUtilities';
 import './TicketUtilities.css';
 
-export default function TicketUtilities({ ticketLink, generatedBranchName, description, onCopy }: TicketUtilitiesProps) {
+export default function TicketUtilities({ ticketLink, onCopyBranchName, description, onCopy }: TicketUtilitiesProps) {
   return (
     <div className="ticket-utilities">
       <span className="ticket-utilities__title">
@@ -24,8 +24,8 @@ export default function TicketUtilities({ ticketLink, generatedBranchName, descr
         <button
           type="button"
           aria-label="Copy Branch Name"
-          title="Generated Branch Name"
-          onClick={() => void onCopy(generatedBranchName, 'Branch name copied')}
+          title="Copy branch name and move ticket to In Progress"
+          onClick={() => void onCopyBranchName()}
           className="ticket-utilities__action ticket-utilities__copy-button clickable"
         >
           <GitBranch size={14} aria-hidden="true" focusable="false" />

@@ -1,4 +1,4 @@
-import React, { useContext, useMemo } from 'react';
+import React, { useContext, useMemo, useState } from 'react';
 import type { Label, Project, Ticket } from '../../../types/domain';
 import { ProjectContext } from '../../../context/project/ProjectContext';
 import { useLabels } from '../../../context/label/LabelContext';
@@ -12,6 +12,7 @@ import { Check, User, Folder, Tag, AlertCircle, CheckSquare, Trash2, Calendar, L
 import { STATUS_OPTIONS, PRIORITY_OPTIONS } from '../utils/TicketDetail';
 import { getPriorityIcon } from '../utils/TicketBoard';
 import { TicketAssignmentSubMenu } from './TicketAssignmentSubMenu';
+import { ConfirmDialog } from '../../../components/ConfirmDialog';
 
 const EMPTY_USER_IDS: string[] = [];
 const EMPTY_LABELS: Label[] = [];
@@ -46,11 +47,12 @@ interface TicketContextMenuProps {
 }
 
 interface TicketContextMenuContentProps {
+  onDelete: () => void;
   ticket: Ticket;
   availableTickets?: Ticket[];
 }
 
-const TicketContextMenuContent = ({ ticket, availableTickets }: TicketContextMenuContentProps) => {
+const TicketContextMenuContent = ({ ticket, availableTickets, onDelete }: TicketContextMenuContentProps) => {
   const projectContext = useContext(ProjectContext);
   const {
     tickets,
@@ -392,12 +394,7 @@ const TicketContextMenuContent = ({ ticket, availableTickets }: TicketContextMen
       <ContextMenu.Item
         danger
         icon={<Trash2 size={13} />}
-        onClick={async () => {
-          if (window.confirm(`Are you sure you want to delete ${ticket.key}?`)) {
-            await deleteTicket(ticket.id);
-            toast.show('Ticket deleted successfully', 'success');
-          }
-        }}
+        onClick={onDelete}
       >
         Delete Ticket
       </ContextMenu.Item>
@@ -408,22 +405,44 @@ const TicketContextMenuContent = ({ ticket, availableTickets }: TicketContextMen
 const TicketContextMenuUnmemoized: React.FC<TicketContextMenuProps> = ({ ticket, children, availableTickets }) => {
   const projectContext = useContext(ProjectContext);
   const ticketMutations = useOptionalTicketMutations();
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
 
   if (!projectContext || !ticketMutations?.updateTicket || !ticketMutations.moveTicket || !ticketMutations.deleteTicket) {
     return <>{children}</>;
   }
 
   return (
-    <ContextMenu.Root
-      content={() => (
-        <TicketContextMenuContent
-          ticket={ticket}
-          availableTickets={availableTickets}
-        />
+    <>
+      <ContextMenu.Root
+        content={() => (
+          <TicketContextMenuContent
+            ticket={ticket}
+            availableTickets={availableTickets}
+            onDelete={() => setIsDeleteOpen(true)}
+          />
+        )}
+      >
+        {children}
+      </ContextMenu.Root>
+      {isDeleteOpen && (
+        <ConfirmDialog.Root isOpen onClose={() => setIsDeleteOpen(false)}>
+          <ConfirmDialog.Header title={`Delete ${ticket.key}?`} description="This removes the ticket and all its activity. This action cannot be undone." />
+          <ConfirmDialog.Actions
+            confirmLabel="Delete Ticket"
+            onCancel={() => setIsDeleteOpen(false)}
+            onConfirm={async () => {
+              setIsDeleteOpen(false);
+              try {
+                await ticketMutations.deleteTicket(ticket.id);
+                toast.show('Ticket deleted successfully', 'success');
+              } catch {
+                toast.show('Failed to delete ticket', 'error');
+              }
+            }}
+          />
+        </ConfirmDialog.Root>
       )}
-    >
-      {children}
-    </ContextMenu.Root>
+    </>
   );
 };
 

@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { Button, Select, Tabs, TextInput } from '@library';
+import { Button, Select, Tabs, TextInput, useCopyToClipboard } from '@library';
 import { FormSection } from '../../../components/FormSection';
 import { ModalDialog } from '../../../components/ModalDialog';
 import useWorkspaceMcp from '../../../hooks/useWorkspaceMcp';
@@ -76,7 +76,7 @@ export function WorkspaceMcpModal({ workspaceId, workspaceName, isOpen, onClose,
   const [selectedTools, setSelectedTools] = useState<string[]>([]);
   const [ttlSeconds, setTtlSeconds] = useState(86400);
   const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState<string | null>(null);
+  const { copy, copiedKey: copied, error: copyError, reset: resetCopy } = useCopyToClipboard();
   const setupId = useId();
   const requestVersion = useRef(0);
   const generatedConnectionRef = useRef<HTMLDivElement>(null);
@@ -114,7 +114,7 @@ export function WorkspaceMcpModal({ workspaceId, workspaceName, isOpen, onClose,
     setClientMode('headers');
     setShowGeneratedSuccess(false);
     setError(null);
-    setCopied(null);
+    resetCopy();
     setLoading(false);
     setRevokingId(null);
     setConnections([]);
@@ -132,7 +132,7 @@ export function WorkspaceMcpModal({ workspaceId, workspaceName, isOpen, onClose,
       if (requestVersion.current === version) setConnectionsLoading(false);
     });
     return () => { controller.abort(); requestVersion.current++; };
-  }, [isOpen, workspaceId, mcp, showConnections]);
+  }, [isOpen, workspaceId, mcp, showConnections, resetCopy]);
 
   function notifyConnectionsChanged() {
     // Inventory refresh is independent of this modal's lifetime or current workspace.
@@ -144,7 +144,7 @@ export function WorkspaceMcpModal({ workspaceId, workspaceName, isOpen, onClose,
     setLoading(true);
     setShowGeneratedSuccess(false);
     setError(null);
-    setCopied(null);
+    resetCopy();
     try {
       const scopes = ['tools/list', ...allowedTools.filter(tool => selectedTools.includes(tool.name)).map(tool => tool.scope || `tools/call:${tool.name}`)];
       const payload = await mcp.createConnection({ scopes, ttlSeconds, singleUse: false, bindToIp: false });
@@ -166,16 +166,8 @@ export function WorkspaceMcpModal({ workspaceId, workspaceName, isOpen, onClose,
     }
   }
 
-  async function handleCopy(value = configText, field = 'json') {
-    const version = requestVersion.current;
-    try {
-      await navigator.clipboard.writeText(value);
-      if (requestVersion.current === version) { setCopied(field); setError(null); }
-    } catch {
-      if (requestVersion.current === version) setError(clientMode === 'chatgpt'
-        ? 'Unable to copy. Select the value to copy it manually.'
-        : 'Unable to copy. Select the value to copy it manually, or download the JSON configuration.');
-    }
+  function handleCopy(value = configText, field = 'json') {
+    return copy(value, field);
   }
 
   function handleDownload() {
@@ -196,7 +188,7 @@ export function WorkspaceMcpModal({ workspaceId, workspaceName, isOpen, onClose,
       await mcp.revokeConnection(id);
       notifyConnectionsChanged();
       if (requestVersion.current !== version) return;
-      if (result?.id === id) { setResult(null); setShowGeneratedSuccess(false); setCopied(null); }
+      if (result?.id === id) { setResult(null); setShowGeneratedSuccess(false); resetCopy(); }
       setConnections(items => items.map(item => item.id === id ? { ...item, status: 'revoked', revokedAt: new Date().toISOString() } : item));
     } catch (err) {
       if (requestVersion.current === version) setError(connectionRequestError(err, 'Unable to revoke connection.'));
@@ -209,7 +201,7 @@ export function WorkspaceMcpModal({ workspaceId, workspaceName, isOpen, onClose,
     requestVersion.current++;
     setResult(null);
     setShowGeneratedSuccess(false);
-    setCopied(null);
+    resetCopy();
     onClose();
   }
 
@@ -221,12 +213,15 @@ export function WorkspaceMcpModal({ workspaceId, workspaceName, isOpen, onClose,
       <ModalDialog.Body>
         <FormSection.Root as="div">
           {error && <ModalDialog.Feedback type="error">{error}</ModalDialog.Feedback>}
+          {copyError && <ModalDialog.Feedback type="error">{clientMode === 'chatgpt'
+            ? 'Unable to copy. Select the value to copy it manually.'
+            : 'Unable to copy. Select the value to copy it manually, or download the JSON configuration.'}</ModalDialog.Feedback>}
           <div onKeyDown={event => {
             if (event.key === 'Escape' && event.defaultPrevented) event.stopPropagation();
           }}>
             <Select label="AI client" value={clientMode} disabled={loading}
               options={[{ value: 'headers', label: 'Other clients (custom headers)' }, { value: 'chatgpt', label: 'ChatGPT (OAuth sign-in)' }]}
-              onValueChange={value => { setClientMode(value as 'headers' | 'chatgpt'); setError(null); setCopied(null); }} />
+              onValueChange={value => { setClientMode(value as 'headers' | 'chatgpt'); setError(null); resetCopy(); }} />
           </div>
           {clientMode === 'chatgpt' ? (
             <FormSection.Body>

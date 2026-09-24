@@ -6,7 +6,7 @@ import type {
   SelectHTMLAttributes,
   TextareaHTMLAttributes,
 } from 'react';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { TicketDetail } from '../../modules/tickets/components/TicketDetail/TicketDetail';
@@ -618,9 +618,72 @@ describe('TicketDetail', () => {
     });
   });
 
+  it.each([undefined, 'feature/custom-branch'])('moves a ticket to In Progress after copying its branch (%s)', async (branchName) => {
+    const user = userEvent.setup();
+    const { props } = renderTicketDetail({ activeTicket: { ...activeTicket, branchName } });
+    let finishCopy!: () => void;
+    const writeText = vi.spyOn(navigator.clipboard, 'writeText').mockImplementation(() => new Promise<void>(resolve => {
+      finishCopy = resolve;
+    }));
+    const sidebar = within(screen.getByTestId('desktop-sidebar'));
+
+    await user.click(sidebar.getByRole('button', { name: 'Copy Branch Name' }));
+    expect(writeText).toHaveBeenCalledWith(branchName || 'feature/gra-101-fix-sync-retries');
+    expect(props.onUpdateTicket).not.toHaveBeenCalled();
+    await act(async () => { finishCopy(); });
+    expect(props.onUpdateTicket).toHaveBeenCalledExactlyOnceWith('ticket-1', { status: 'in_progress' });
+  });
+
+  it('still starts work when another copy completes before the branch copy', async () => {
+    const user = userEvent.setup();
+    const { props } = renderTicketDetail();
+    let finishBranchCopy!: () => void;
+    vi.spyOn(navigator.clipboard, 'writeText')
+      .mockImplementationOnce(() => new Promise<void>(resolve => { finishBranchCopy = resolve; }))
+      .mockResolvedValue(undefined);
+    const toastSpy = vi.spyOn(toast, 'show').mockImplementation(() => 'mock-toast-id');
+    const sidebar = within(screen.getByTestId('desktop-sidebar'));
+
+    await user.click(sidebar.getByRole('button', { name: 'Copy Branch Name' }));
+    await user.click(sidebar.getByRole('button', { name: 'Copy Ticket Link' }));
+    expect(props.onUpdateTicket).not.toHaveBeenCalled();
+    await act(async () => { finishBranchCopy(); });
+    expect(props.onUpdateTicket).toHaveBeenCalledExactlyOnceWith('ticket-1', { status: 'in_progress' });
+    expect(toastSpy).not.toHaveBeenCalledWith('Failed to copy', 'error');
+  });
+
+  it('does not change ticket status when copying the branch fails', async () => {
+    const user = userEvent.setup();
+    const { props } = renderTicketDetail();
+    vi.spyOn(navigator.clipboard, 'writeText').mockRejectedValue(new Error('Copy denied'));
+    const toastSpy = vi.spyOn(toast, 'show').mockImplementation(() => 'mock-toast-id');
+    await user.click(within(screen.getByTestId('desktop-sidebar')).getByRole('button', { name: 'Copy Branch Name' }));
+    expect(props.onUpdateTicket).not.toHaveBeenCalled();
+    expect(toastSpy).toHaveBeenCalledWith('Failed to copy', 'error');
+  });
+
+  it('copies without a redundant update when the ticket is already In Progress', async () => {
+    const user = userEvent.setup();
+    const { props } = renderTicketDetail({ activeTicket: { ...activeTicket, status: 'in_progress' } });
+    const writeText = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
+    await user.click(within(screen.getByTestId('desktop-sidebar')).getByRole('button', { name: 'Copy Branch Name' }));
+    expect(writeText).toHaveBeenCalledWith('feature/gra-101-fix-sync-retries');
+    expect(props.onUpdateTicket).not.toHaveBeenCalled();
+  });
+
+  it('reports a status update failure separately from a successful branch copy', async () => {
+    const user = userEvent.setup();
+    renderTicketDetail({ onUpdateTicket: vi.fn().mockRejectedValue(new Error('Update denied')) });
+    const writeText = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
+    const toastSpy = vi.spyOn(toast, 'show').mockImplementation(() => 'mock-toast-id');
+    await user.click(within(screen.getByTestId('desktop-sidebar')).getByRole('button', { name: 'Copy Branch Name' }));
+    expect(writeText).toHaveBeenCalledWith('feature/gra-101-fix-sync-retries');
+    expect(toastSpy).toHaveBeenCalledWith('Branch name copied, but the ticket could not be moved to In Progress', 'error');
+  });
+
   it('copies sidebar utility values for ticket link, branch name, markdown description, and ticket key', async () => {
     const user = userEvent.setup();
-    renderTicketDetail({
+    const { props } = renderTicketDetail({
       activeTicket: {
         ...activeTicket,
         title: '***',
@@ -636,15 +699,19 @@ describe('TicketDetail', () => {
     await user.click(sidebar.getByRole('button', { name: 'Copy Ticket Link' }));
     expect(writeTextSpy).toHaveBeenCalledWith('https://tickets.placeholder.local/GRA-101');
     expect(toastSpy).toHaveBeenCalledWith('Ticket link copied', 'success');
+    expect(props.onUpdateTicket).not.toHaveBeenCalled();
     expect(sidebar.getByRole('button', { name: 'Copy Branch Name' })).toBeInTheDocument();
 
     await user.click(sidebar.getByRole('button', { name: 'Copy Branch Name' }));
     expect(writeTextSpy).toHaveBeenCalledWith('feature/gra-101-update-ticket');
     expect(toastSpy).toHaveBeenCalledWith('Branch name copied', 'success');
+    expect(props.onUpdateTicket).toHaveBeenCalledExactlyOnceWith('ticket-1', { status: 'in_progress' });
+    vi.mocked(props.onUpdateTicket).mockClear();
 
     await user.click(sidebar.getByRole('button', { name: 'Copy as Markdown' }));
     expect(writeTextSpy).toHaveBeenCalledWith('');
     expect(toastSpy).toHaveBeenCalledWith('Description copied', 'success');
+    expect(props.onUpdateTicket).not.toHaveBeenCalled();
   });
 
   it('displays the ticket key in the right sidebar and handles comment actions dropdown/inline editing/deletion', async () => {

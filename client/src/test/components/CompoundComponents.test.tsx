@@ -66,6 +66,42 @@ describe('compound UI primitives', () => {
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 
+  it('focuses a confirmation opened after mount, traps Tab, handles Escape, and restores focus', async () => {
+    const user = userEvent.setup();
+    const onCancel = vi.fn();
+    const onConfirm = vi.fn();
+    const dialog = (isOpen: boolean) => (
+      <>
+        <button type="button">Open confirmation</button>
+        <ConfirmDialog.Root isOpen={isOpen} onClose={onCancel}>
+          <ConfirmDialog.Header title="Delete item?" description="This cannot be undone." />
+          <ConfirmDialog.Actions cancelLabel="Keep" confirmLabel="Delete" onCancel={onCancel} onConfirm={onConfirm} />
+        </ConfirmDialog.Root>
+      </>
+    );
+    const { rerender } = render(dialog(false));
+    const trigger = screen.getByRole('button', { name: 'Open confirmation' });
+    await user.click(trigger);
+    rerender(dialog(true));
+    const cancel = screen.getByRole('button', { name: 'Keep' });
+    const confirm = screen.getByRole('button', { name: 'Delete' });
+    expect(screen.getByRole('alertdialog')).toHaveAccessibleDescription('This cannot be undone.');
+    expect(cancel).toHaveFocus();
+    await user.tab({ shift: true });
+    expect(confirm).toHaveFocus();
+    await user.tab();
+    expect(cancel).toHaveFocus();
+    await user.tab();
+    expect(confirm).toHaveFocus();
+    await user.keyboard('{Enter}');
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    await user.keyboard('{Escape}');
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    rerender(dialog(false));
+    expect(trigger).toHaveFocus();
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+  });
+
   it('renders form sections with fields, color inputs, feedback, and actions', () => {
     render(
       <FormSection.Root aria-label="Example form">
