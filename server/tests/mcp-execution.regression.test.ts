@@ -53,6 +53,19 @@ describe('MCP execution boundary', () => {
     await expect(executeTool('update_ticket', { ticketKey: ticket.key, title: 'Allowed edit' }, workspace.id, owner.id)).resolves.toBeDefined();
   });
 
+  it.each(['assign_ticket', 'update_ticket'])('cannot clear an assignee with whitespace through %s', async (name) => {
+    const { workspace, owner, ticket } = await fixture(['unassign_ticket']);
+    await db.update(tickets).set({ assigneeId: owner.id }).where(eq(tickets.id, ticket.id));
+    for (const assigneeId of [' ', '\t\n', '\u00a0']) {
+      await expect(executeTool(name, { ticketKey: ticket.key, assigneeId }, workspace.id, owner.id))
+        .rejects.toMatchObject({ code: -32602 });
+      const [stored] = await db.select().from(tickets).where(eq(tickets.id, ticket.id));
+      expect(stored.assigneeId).toBe(owner.id);
+    }
+    await expect(executeTool(name, { ticketKey: ticket.key, assigneeId: owner.id }, workspace.id, owner.id))
+      .resolves.toBeDefined();
+  });
+
   it('advertises one canonical alias and only scoped callable tools', async () => {
     const { workspace, owner } = await fixture();
     const response: any = await handleMcpRequest({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, workspace.id, owner.id, {

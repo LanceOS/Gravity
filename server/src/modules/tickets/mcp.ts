@@ -27,6 +27,7 @@ import {
   updateTicketRecord,
   updateTicketRecordWithEffects,
   getProjectScope,
+  lockTicketProjectScopes,
   COMMENT_BODY_EMPTY_AFTER_SANITIZATION,
   TICKET_ASSIGNEE_SCOPE_VIOLATION,
 } from './services/tickets.js';
@@ -1128,7 +1129,7 @@ export class TicketTools {
     } else {
       // Apply additive/subtractive changes to exact IDs so concurrent calls do not replace each other's labels.
       await db.transaction(async tx => {
-        await tx.select({ id: projects.id }).from(projects).where(eq(projects.id, ticket.projectId)).for('update');
+        await lockTicketProjectScopes(tx, [scope]);
         const [currentTicket] = await tx.select({ id: tickets.id }).from(tickets)
           .where(and(eq(tickets.id, ticket.id), eq(tickets.projectId, ticket.projectId))).limit(1);
         if (!currentTicket) throw new McpToolValidationError('Ticket moved or was deleted; reload it and retry.');
@@ -1703,8 +1704,8 @@ Object.assign(ticketToolHandlers, {
   move_ticket: focusedUpdate(['projectId']),
 });
 
-const idSchema: JsonSchema = { type: 'string', minLength: 1 };
-const nullableIdSchema: JsonSchema = { type: ['string', 'null'], minLength: 1 };
+const idSchema: JsonSchema = { type: 'string', minLength: 1, pattern: '\\S' };
+const nullableIdSchema: JsonSchema = { type: ['string', 'null'], minLength: 1, pattern: '\\S' };
 const labelIdsSchema: JsonSchema = { type: 'array', items: idSchema };
 const legacyLabelsSchema: JsonSchema = {
   anyOf: [labelIdsSchema, { type: 'string' }],

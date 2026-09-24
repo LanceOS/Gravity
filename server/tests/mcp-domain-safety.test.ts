@@ -211,6 +211,57 @@ describe('MCP domain safety and discovery', () => {
     } finally { gate.release(); gate.restore(); unsubscribe(); }
   });
 
+  it.each(['create', 'update', 'move', 'add_labels'])('rejects %s when a project changes team before the write lock', async operation => {
+    const base = await fixture();
+    await db.update(workspaceSettings).set({ hierarchyMode: 'teams' }).where(eq(workspaceSettings.workspaceId, base.workspace.id));
+    const targetProjectId = operation === 'move' ? await secondProject(base) : base.project.id;
+    await db.insert(teams).values({ id: 'concurrent-destination-team', workspaceId: base.workspace.id, name: 'Destination' });
+    const oldCycle = await seedCycle(base.scope.teamId, 'concurrent-old-cycle');
+    await db.insert(labels).values({ id: 'concurrent-old-label', teamId: base.scope.teamId, name: 'Old team label' });
+    const ticket = await createTicketRecord({ projectId: base.project.id, title: 'Original', cycleId: oldCycle });
+    const gate = pauseNextTransaction();
+    const outcome = (operation === 'create'
+      ? createTicketRecord({ projectId: targetProjectId, title: 'Rejected creation', cycleId: oldCycle })
+      : operation === 'update'
+        ? updateTicketRecord(ticket.id, { cycleId: oldCycle, title: 'Rejected update' }, base.project.id)
+        : operation === 'move'
+          ? updateTicketRecord(ticket.id, { projectId: targetProjectId }, base.project.id)
+          : base.tools.addTicketLabels({ ticketKey: ticket.key, labelIds: ['concurrent-old-label'] }, base.context))
+      .catch(error => error);
+    try {
+      await gate.entered;
+      await updateProjectRecord(targetProjectId, { teamId: 'concurrent-destination-team' });
+      gate.release();
+      expect(await outcome).toMatchObject({ message: 'Project scope changed; reload it and retry.' });
+      expect(await db.select().from(tickets)).toEqual([
+        expect.objectContaining({ id: ticket.id, title: 'Original', projectId: base.project.id,
+          cycleId: operation === 'move' ? oldCycle : null }),
+      ]);
+      expect(await db.select().from(ticketLabels)).toEqual([]);
+      // A fresh request can use the new scope normally after the rejected write.
+      await expect(updateTicketRecord(ticket.id, { title: 'Fresh update' }, base.project.id))
+        .resolves.toMatchObject({ title: 'Fresh update' });
+    } finally { gate.release(); gate.restore(); }
+  });
+
+  it.each(['create', 'update'])('validates %s assignees using the active transaction connection', async operation => {
+    const base = await fixture();
+    await db.update(workspaceSettings).set({ hierarchyMode: 'teams' }).where(eq(workspaceSettings.workspaceId, base.workspace.id));
+    // The creator remains a workspace member even without an explicit row.
+    await db.delete(workspaceMembers).where(and(eq(workspaceMembers.workspaceId, base.workspace.id), eq(workspaceMembers.userId, base.owner.id)));
+    const ticket = await createTicketRecord({ projectId: base.project.id, title: 'Unassigned' });
+    const originalTransaction = db.transaction.bind(db);
+    vi.spyOn(db, 'transaction').mockImplementationOnce((callback, config) => originalTransaction(async tx => {
+      // Simulate a fully occupied pool: requesting another connection here is invalid.
+      const globalSelect = vi.spyOn(db, 'select').mockImplementation(() => { throw new Error('Nested pool connection requested'); });
+      try { return await callback(tx); } finally { globalSelect.mockRestore(); }
+    }, config));
+    const result = operation === 'create'
+      ? await createTicketRecord({ projectId: base.project.id, title: 'Assigned creation', assigneeId: base.owner.id })
+      : await updateTicketRecord(ticket.id, { assigneeId: base.owner.id }, base.project.id);
+    expect(result).toMatchObject({ assigneeId: base.owner.id });
+  });
+
   it('validates retained cycle and parent references from the current locked ticket', async () => {
     const base = await fixture();
     const parent = await createTicketRecord({ projectId: base.project.id, title: 'Old parent' });

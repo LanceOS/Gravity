@@ -48,7 +48,8 @@ export default defineConfig(({ mode }) => {
           target: backendUpstream,
           changeOrigin: true,
         },
-        '^/(\\.well-known/oauth-(authorization-server|protected-resource)(/.*)?|authorize|token|register|revoke)$': {
+        // Vite matches req.url including its query string, which /authorize needs.
+        '^/(\\.well-known/oauth-(authorization-server|protected-resource)(/[^?]*)?|authorize|token|register|revoke)(?:\\?|$)': {
           target: backendUpstream,
           changeOrigin: true,
         }

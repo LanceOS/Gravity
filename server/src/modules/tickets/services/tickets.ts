@@ -1,6 +1,6 @@
 import { and, asc, eq, gte, ilike, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import { db } from '../../../db/index.js';
-import { authUsers, comments, tickets, ticketRelationships, userProfiles, projects, cycles, labels, ticketLabels, workspaceSettings } from '../../../db/schema.js';
+import { authUsers, comments, tickets, ticketRelationships, userProfiles, projects, cycles, labels, ticketLabels, workspaceSettings, workspaceMembers, workspaces, projectMembers } from '../../../db/schema.js';
 import { createId, getProjectByKeyPrefix, nextTicketKey, normalizeIsoDate } from '../../../lib/platform.js';
 import { audit } from '../../../lib/logger.js';
 import {
@@ -8,7 +8,7 @@ import {
   sanitizeEditorContent,
   type EditorContentSanitizationResult,
 } from '../../../lib/html-sanitization.js';
-import { isProjectMember, isWorkspaceMember } from '../../workspaces/services/membership.js';
+import { isWorkspaceMember } from '../../workspaces/services/membership.js';
 import generateBranchName from '../utils/branch.js';
 
 type TicketRecord = typeof tickets.$inferSelect;
@@ -108,22 +108,37 @@ function normalizeAssigneeId(value: string | null | undefined): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
-async function assertAssigneeInProjectScope(project: ProjectScope, assigneeId: string | null): Promise<void> {
+async function assertAssigneeInProjectScope(tx: Pick<typeof db, 'select'>, project: ProjectScope, assigneeId: string | null): Promise<void> {
   if (!assigneeId) {
     return;
   }
 
-  const isWorkspaceMemberId = await isWorkspaceMember(project.workspaceId, assigneeId);
-  if (!isWorkspaceMemberId) {
+  // Use the write transaction's connection so validation cannot wait on a
+  // second pool connection while this transaction holds the project lock.
+  const [workspace] = await tx.select({ ownerId: workspaces.createdBy, memberId: workspaceMembers.userId })
+    .from(workspaces).leftJoin(workspaceMembers, and(eq(workspaceMembers.workspaceId, workspaces.id), eq(workspaceMembers.userId, assigneeId)))
+    .where(eq(workspaces.id, project.workspaceId)).limit(1);
+  if (!workspace || (workspace.ownerId !== assigneeId && !workspace.memberId)) {
     throw new Error(TICKET_ASSIGNEE_SCOPE_VIOLATION);
   }
 
-  const isAllowed = project.hierarchyMode === 'teams'
-    ? await isProjectMember(project.id, assigneeId)
-    : true;
+  if (project.hierarchyMode === 'teams') {
+    const [membership] = await tx.select({ userId: projectMembers.userId }).from(projectMembers)
+      .where(and(eq(projectMembers.projectId, project.id), eq(projectMembers.userId, assigneeId))).limit(1);
+    if (!membership) throw new Error(TICKET_ASSIGNEE_SCOPE_VIOLATION);
+  }
+}
 
-  if (!isAllowed) {
-    throw new Error(TICKET_ASSIGNEE_SCOPE_VIOLATION);
+/** Serialize ticket writes and reject scopes that changed before lock acquisition. */
+export async function lockTicketProjectScopes(tx: Pick<typeof db, 'select'>, scopes: ProjectScope[]) {
+  const lockedProjects = await tx.select({ id: projects.id, workspaceId: projects.workspaceId, teamId: projects.teamId })
+    .from(projects).where(inArray(projects.id, [...new Set(scopes.map(scope => scope.id))]))
+    .orderBy(asc(projects.id)).for('update');
+  for (const scope of scopes) {
+    const current = lockedProjects.find(project => project.id === scope.id);
+    if (!current || current.workspaceId !== scope.workspaceId || current.teamId !== scope.teamId) {
+      throw new Error('Project scope changed; reload it and retry.');
+    }
   }
 }
 
@@ -952,9 +967,9 @@ export async function createTicketRecord(input: {
   const nextAssigneeId = normalizeAssigneeId(input.assigneeId);
   const projectScope = await getProjectScope(input.projectId);
   if (!projectScope) throw new Error(`Project ${input.projectId} is missing.`);
-  await assertAssigneeInProjectScope(projectScope, nextAssigneeId);
   const result = await db.transaction(async (tx) => {
-    await tx.select({ id: projects.id }).from(projects).where(eq(projects.id, input.projectId)).for('update');
+    await lockTicketProjectScopes(tx, [projectScope]);
+    await assertAssigneeInProjectScope(tx, projectScope, nextAssigneeId);
     await assertTicketRelationships(tx, projectScope, ticketId, input.cycleId, input.parentId);
     const rows = await tx
       .insert(tickets)
@@ -1152,15 +1167,13 @@ export async function updateTicketRecordWithEffects(
 
   const result = await db.transaction(async (tx) => {
     // Serialize hierarchy writes per project so concurrent parent changes cannot create a cycle.
-    await tx.select({ id: projects.id }).from(projects)
-      .where(inArray(projects.id, [...new Set([sourceProject.id, targetProject.id])]))
-      .orderBy(asc(projects.id)).for('update');
+    await lockTicketProjectScopes(tx, [sourceProject, targetProject]);
     const [currentTicket] = await tx.select().from(tickets)
       .where(and(eq(tickets.id, ticketId), eq(tickets.projectId, sourceProject.id))).limit(1);
     // Another move may have completed between the initial lookup and acquiring the project lock.
     if (!currentTicket) return null;
     if (nextAssigneeId !== undefined || isProjectMove) {
-      await assertAssigneeInProjectScope(targetProject, nextAssigneeId !== undefined ? nextAssigneeId : currentTicket.assigneeId);
+      await assertAssigneeInProjectScope(tx, targetProject, nextAssigneeId !== undefined ? nextAssigneeId : currentTicket.assigneeId);
     }
     await assertTicketRelationships(tx, targetProject, ticketId,
       nextCycleId !== undefined ? nextCycleId : currentTicket.cycleId,

@@ -11,6 +11,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "vitest run -c E2E/vitest.config.ts",
+    "test:oauth-proxy": "node --test scripts/oauth-proxy.test.mjs",
     "install:production-csp-browser": "playwright install chromium",
     "test:production-csp": "node scripts/production-csp-browser-test.mjs",
     "test:editor-trusted-types": "node scripts/editor-trusted-types-browser-test.mjs"
