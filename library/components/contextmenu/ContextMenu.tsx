@@ -134,7 +134,6 @@ export function ContextMenuRoot({ children, trigger, content, items }: ContextMe
   // Handle positioning adjustments (edge-flipping)
   React.useLayoutEffect(() => {
     if (!isRendered || !menuElement) return;
-    if (shouldReduceMotion()) return;
     const menuRect = menuElement.getBoundingClientRect();
     const { x, y } = coords;
     
@@ -152,6 +151,10 @@ export function ContextMenuRoot({ children, trigger, content, items }: ContextMe
 
     menuElement.style.left = `${left}px`;
     menuElement.style.top = `${top}px`;
+    if (shouldReduceMotion()) {
+      menuElement.style.opacity = '1';
+      return;
+    }
     menuElement.style.opacity = '0';
     menuElement.style.transform = 'translateY(4px)';
 
@@ -497,7 +500,6 @@ export function ContextMenuSubMenu({ children, parentItemRef, onClose }: Context
   // Position adjacent to parent item with edge-flipping logic
   React.useLayoutEffect(() => {
     if (!submenuElement || !parentItemRef?.current) return;
-    if (shouldReduceMotion()) return;
     const parentRect = parentItemRef.current.getBoundingClientRect();
     const subRect = submenuElement.getBoundingClientRect();
 
@@ -518,6 +520,7 @@ export function ContextMenuSubMenu({ children, parentItemRef, onClose }: Context
 
     submenuElement.style.left = `${left}px`;
     submenuElement.style.top = `${top}px`;
+    if (shouldReduceMotion()) return;
     submenuElement.style.opacity = '0';
     submenuElement.style.transform = 'translateY(2px)';
 

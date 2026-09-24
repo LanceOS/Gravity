@@ -148,6 +148,7 @@
     justify-content: space-between;
   }
   .ticket-filter-popover-content {
+    width: auto;
     left: 8px !important;
     right: 8px !important;
     max-width: calc(100vw - 16px) !important;
