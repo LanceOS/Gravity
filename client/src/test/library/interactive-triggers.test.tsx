@@ -114,6 +114,47 @@ it('keeps controlled popovers open during content interaction and returns focus 
   expect(screen.getByRole('button', { name: 'Open' })).toHaveFocus();
 });
 
+it('lets popover content consume Escape before dismissing and stops a handled Escape at the disclosure', async () => {
+  const user = userEvent.setup();
+  const parentEscape = vi.fn();
+  const onOpenChange = vi.fn();
+  function Harness() {
+    const [open, setOpen] = useState(false);
+    const [editing, setEditing] = useState(true);
+    return <div onKeyDown={event => { if (event.key === 'Escape') parentEscape(); }}>
+      <Popover trigger={<button>Open editor</button>} isOpen={open}
+        onOpenChange={next => { onOpenChange(next); setOpen(next); }}>
+        <input aria-label="Draft" onKeyDown={event => {
+          if (event.key === 'Escape' && editing) {
+            event.preventDefault();
+            setEditing(false);
+          }
+        }} />
+      </Popover>
+    </div>;
+  }
+  render(<Harness />);
+  const trigger = screen.getByRole('button', { name: 'Open editor' });
+  await user.click(trigger);
+  await user.click(screen.getByRole('textbox', { name: 'Draft' }));
+  onOpenChange.mockClear();
+  await user.keyboard('{Escape}');
+  expect(screen.getByRole('dialog')).toBeInTheDocument();
+  expect(screen.getByRole('textbox', { name: 'Draft' })).toHaveFocus();
+  expect(onOpenChange).not.toHaveBeenCalled();
+  // A child may prevent dismissal without stopping the event from bubbling.
+  expect(parentEscape).toHaveBeenCalledOnce();
+  parentEscape.mockClear();
+  await user.keyboard('{Escape}');
+  expect(onOpenChange).toHaveBeenCalledExactlyOnceWith(false);
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(trigger).toHaveFocus();
+  expect(parentEscape).not.toHaveBeenCalled();
+  await user.keyboard('{Escape}');
+  expect(parentEscape).toHaveBeenCalledOnce();
+  expect(onOpenChange).toHaveBeenCalledOnce();
+});
+
 describe('ContextMenu keyboard triggers', () => {
   it.each(['{Shift>}{F10}{/Shift}', '{ContextMenu}'])('opens with %s at the target and returns focus on Escape', async (key) => {
     const user = userEvent.setup();

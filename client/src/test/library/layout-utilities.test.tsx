@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { createRef, type ReactElement, useState } from 'react';
+import { createRef, type ReactElement, StrictMode, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import {
   AspectRatio,
@@ -77,6 +77,60 @@ function SelectHarness() {
 }
 
 describe('library layout and utilities', () => {
+  it('restores focus on deactivation and captures the new origin on reactivation', async () => {
+    const user = userEvent.setup();
+    const view = (active: boolean) => <StrictMode>
+      <button>First opener</button>
+      <button>Second opener</button>
+      <FocusTrap active={active}><button>Trapped action</button></FocusTrap>
+    </StrictMode>;
+    const { rerender } = render(view(false));
+    await user.click(screen.getByRole('button', { name: 'First opener' }));
+    rerender(view(true));
+    expect(screen.getByRole('button', { name: 'Trapped action' })).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole('button', { name: 'Trapped action' })).toHaveFocus();
+    await user.tab({ shift: true });
+    expect(screen.getByRole('button', { name: 'Trapped action' })).toHaveFocus();
+
+    rerender(view(false));
+    expect(screen.getByRole('button', { name: 'First opener' })).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole('button', { name: 'Second opener' })).toHaveFocus();
+    rerender(view(true));
+    expect(screen.getByRole('button', { name: 'Trapped action' })).toHaveFocus();
+    rerender(view(false));
+    expect(screen.getByRole('button', { name: 'Second opener' })).toHaveFocus();
+    screen.getByRole('button', { name: 'Trapped action' }).focus();
+    expect(fireEvent.keyDown(screen.getByRole('button', { name: 'Trapped action' }), { key: 'Tab' })).toBe(true);
+  });
+
+  it('prevents Tab in an empty trap and releases its document listener on unmount', () => {
+    const { unmount } = render(<FocusTrap><span>No controls</span></FocusTrap>);
+    expect(fireEvent.keyDown(document, { key: 'Tab' })).toBe(false);
+    expect(fireEvent.keyDown(document, { key: 'Tab', shiftKey: true })).toBe(false);
+    unmount();
+    expect(fireEvent.keyDown(document, { key: 'Tab' })).toBe(true);
+    expect(fireEvent.keyDown(document, { key: 'Tab', shiftKey: true })).toBe(true);
+  });
+
+  it('rechecks focusable children when controls are added or disabled', async () => {
+    const user = userEvent.setup();
+    const view = (updated: boolean) => <FocusTrap>
+      <button>First action</button>
+      <button disabled={updated}>Original last action</button>
+      {updated && <button>New last action</button>}
+    </FocusTrap>;
+    const { rerender } = render(view(false));
+    rerender(view(true));
+    await user.tab({ shift: true });
+    expect(screen.getByRole('button', { name: 'New last action' })).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole('button', { name: 'First action' })).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole('button', { name: 'New last action' })).toHaveFocus();
+  });
+
   it('ignores hidden, inert, disabled and negative-tabindex controls without checkVisibility', async () => {
     const user = userEvent.setup();
     const excluded = <>
