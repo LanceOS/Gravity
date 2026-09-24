@@ -1,0 +1,150 @@
+{
+  "date": "2026-09-24T21:49:29.090Z",
+  "browser": "153.0.8010.53",
+  "baseline": false,
+  "viewport": "1600x900",
+  "results": [
+    {
+      "count": 1000,
+      "view": "list",
+      "initial": {
+        "renders": [
+          10.399999976158142,
+          1.0999999642372131,
+          2.5000000596046448
+        ],
+        "derivations": [
+          1.899999976158142
+        ],
+        "dom": 458,
+        "tickets": 21
+      },
+      "unrelated": {
+        "frameMs": 48.19999998807907,
+        "renderMs": 0
+      },
+      "filter": {
+        "frameMs": 48.09999996423721,
+        "renderMs": 8.199999928474426
+      },
+      "scroll": {
+        "frameMs": 41.89999997615814,
+        "renderMs": 6.800000011920929
+      },
+      "scrollDom": 649
+    },
+    {
+      "count": 1000,
+      "view": "board",
+      "initial": {
+        "renders": [
+          20.70000010728836,
+          2.900000035762787,
+          4.599999964237213
+        ],
+        "derivations": [
+          0.5
+        ],
+        "dom": 1308,
+        "tickets": 48
+      },
+      "unrelated": {
+        "frameMs": 47.5,
+        "renderMs": 0
+      },
+      "filter": {
+        "frameMs": 48.80000001192093,
+        "renderMs": 8.699999988079071
+      },
+      "load": {
+        "frameMs": 66.80000001192093,
+        "renderMs": 1.199999988079071
+      },
+      "scroll": {
+        "frameMs": 36.5,
+        "renderMs": 2.299999952316284
+      },
+      "scrollDom": 1380
+    },
+    {
+      "count": 5000,
+      "view": "list",
+      "initial": {
+        "renders": [
+          10.099999964237213,
+          0.699999988079071,
+          2.599999964237213
+        ],
+        "derivations": [
+          7
+        ],
+        "dom": 459,
+        "tickets": 21
+      },
+      "unrelated": {
+        "frameMs": 49,
+        "renderMs": 0
+      },
+      "filter": {
+        "frameMs": 66.19999998807907,
+        "renderMs": 8.399999976158142
+      },
+      "scroll": {
+        "frameMs": 41.5,
+        "renderMs": 6.899999976158142
+      },
+      "scrollDom": 635
+    },
+    {
+      "count": 5000,
+      "view": "board",
+      "initial": {
+        "renders": [
+          22.59999990463257,
+          1.5,
+          6.199999988079071
+        ],
+        "derivations": [
+          0.699999988079071
+        ],
+        "dom": 1308,
+        "tickets": 48
+      },
+      "unrelated": {
+        "frameMs": 44.90000003576279,
+        "renderMs": 0
+      },
+      "filter": {
+        "frameMs": 71.60000002384186,
+        "renderMs": 6.199999988079071
+      },
+      "load": {
+        "frameMs": 65.70000004768372,
+        "renderMs": 1.199999988079071
+      },
+      "scroll": {
+        "frameMs": 36.10000002384186,
+        "renderMs": 3
+      },
+      "scrollDom": 1380
+    }
+  ],
+  "acceptance": [
+    {
+      "view": "list",
+      "skewedTickets": 5000,
+      "viewportHeight": 480,
+      "result": "passed"
+    },
+    {
+      "view": "board",
+      "skewedTickets": 5000,
+      "viewportHeight": 480,
+      "result": "passed"
+    },
+    {
+      "scenario": "review regressions",
+      "result": "passed"
+    }
+  ]
+}

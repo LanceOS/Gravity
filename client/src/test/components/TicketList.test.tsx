@@ -1,5 +1,5 @@
 import type { ButtonHTMLAttributes, ChangeEvent, CSSProperties, ReactNode, SelectHTMLAttributes } from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { TicketList } from '../../modules/tickets';
@@ -141,6 +141,20 @@ function renderTicketList(overrides: Partial<Parameters<typeof TicketList>[0]> =
 }
 
 describe('TicketList', () => {
+  it('preserves the focused ticket DOM node when the dataset crosses the threshold in either direction', () => {
+    const tickets = Array.from({ length: 120 }, (_, index) => ({ ...backlogTicket, id: `ticket-${index}`, key: `GRA-${index}` }));
+    const { rerender, props } = renderTicketList({ filteredCount: 120,
+      groupedTickets: { backlog: tickets, todo: [], in_progress: [], in_review: [], done: [], canceled: [] } });
+    const focused = screen.getByRole('button', { name: 'TicketRow GRA-0 avatar-1.png' });
+    act(() => focused.focus());
+    rerender(<TicketList {...props} filteredCount={119} groupedTickets={{ ...props.groupedTickets, backlog: tickets.slice(0, 119) }} />);
+    expect(screen.getByRole('button', { name: 'TicketRow GRA-0 avatar-1.png' })).toBe(focused);
+    expect(focused).toHaveFocus();
+    rerender(<TicketList {...props} />);
+    expect(screen.getByRole('button', { name: 'TicketRow GRA-0 avatar-1.png' })).toBe(focused);
+    expect(focused).toHaveFocus();
+  });
+
   it('clears filters and selects grouped rows', async () => {
     const user = userEvent.setup();
     const { props } = renderTicketList({
@@ -157,7 +171,7 @@ describe('TicketList', () => {
     expect(props.onSelectTicket).toHaveBeenCalledWith(backlogTicket);
   });
 
-  it('uses the rendered desktop row pitch after loading enough tickets to virtualize', async () => {
+  it('virtualizes a large single-status list from its first page and preserves row pitch after loading', async () => {
     const user = userEvent.setup();
     const tickets = Array.from({ length: 120 }, (_, index) => ({
       ...backlogTicket,
@@ -177,10 +191,15 @@ describe('TicketList', () => {
       },
     });
 
-    await user.click(screen.getByRole('button', { name: 'Load more 70 remaining' }));
-    await user.click(screen.getByRole('button', { name: 'Load more 20 remaining' }));
+    const grid = screen.getByRole('grid');
+    fireEvent.scroll(grid, { target: { scrollTop: 2200 } });
+    await user.click(await screen.findByRole('button', { name: 'Load more 70 remaining' }));
+    expect(screen.getByRole('button', { name: 'Load more 20 remaining' })).toHaveFocus();
+    fireEvent.scroll(grid, { target: { scrollTop: 4700 } });
+    await user.click(await screen.findByRole('button', { name: 'Load more 20 remaining' }));
+    fireEvent.scroll(grid, { target: { scrollTop: 0 } });
 
-    const firstTicketRow = screen.getByText('TicketRow GRA-1 avatar-1.png').closest('.ticket-list__row-desktop');
+    const firstTicketRow = (await screen.findByText('TicketRow GRA-1 avatar-1.png')).closest('.ticket-list__row-desktop');
     expect(firstTicketRow?.parentElement).toHaveStyle({ height: '50.5px' });
   });
 

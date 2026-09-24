@@ -1,0 +1,130 @@
+{
+  "date": "2026-09-24T21:16:22.143Z",
+  "browser": "153.0.8010.53",
+  "baseline": true,
+  "viewport": "1600x900",
+  "results": [
+    {
+      "count": 1000,
+      "view": "list",
+      "initial": {
+        "renders": [
+          20.900000035762787,
+          0.8999999761581421,
+          3.5
+        ],
+        "derivations": [
+          3.100000023841858
+        ],
+        "dom": 437,
+        "tickets": 21
+      },
+      "unrelated": {
+        "frameMs": 64.5,
+        "renderMs": 0
+      },
+      "filter": {
+        "frameMs": 66.69999998807907,
+        "renderMs": 10.899999976158142
+      },
+      "scroll": {
+        "frameMs": 46.30000001192093,
+        "renderMs": 10.399999976158142
+      },
+      "scrollDom": 622
+    },
+    {
+      "count": 1000,
+      "view": "board",
+      "initial": {
+        "renders": [
+          83.10000002384186,
+          2.1999999284744263
+        ],
+        "derivations": [
+          0.5
+        ],
+        "dom": 5698,
+        "tickets": 240
+      },
+      "unrelated": {
+        "frameMs": 63.40000003576279,
+        "renderMs": 0
+      },
+      "filter": {
+        "frameMs": 115.30000001192093,
+        "renderMs": 39.09999990463257
+      },
+      "load": {
+        "frameMs": 99.89999997615814,
+        "renderMs": 5.899999976158142
+      },
+      "scroll": {
+        "frameMs": 43.89999997615814,
+        "renderMs": 4.800000011920929
+      },
+      "scrollDom": 5235
+    },
+    {
+      "count": 5000,
+      "view": "list",
+      "initial": {
+        "renders": [
+          13.999999940395355,
+          0.699999988079071,
+          4.100000023841858
+        ],
+        "derivations": [
+          12.199999988079071
+        ],
+        "dom": 438,
+        "tickets": 21
+      },
+      "unrelated": {
+        "frameMs": 62.30000001192093,
+        "renderMs": 0.10000002384185791
+      },
+      "filter": {
+        "frameMs": 80.30000001192093,
+        "renderMs": 10.5
+      },
+      "scroll": {
+        "frameMs": 45.69999998807907,
+        "renderMs": 10.499999940395355
+      },
+      "scrollDom": 608
+    },
+    {
+      "count": 5000,
+      "view": "board",
+      "initial": {
+        "renders": [
+          94.59999978542328,
+          1.899999976158142
+        ],
+        "derivations": [
+          1.199999988079071
+        ],
+        "dom": 5698,
+        "tickets": 240
+      },
+      "unrelated": {
+        "frameMs": 45.60000002384186,
+        "renderMs": 0
+      },
+      "filter": {
+        "frameMs": 145.5999999642372,
+        "renderMs": 26.59999978542328
+      },
+      "load": {
+        "frameMs": 99.89999997615814,
+        "renderMs": 6.099999964237213
+      },
+      "scroll": {
+        "frameMs": 44.09999996423721,
+        "renderMs": 5.199999988079071
+      },
+      "scrollDom": 5235
+    }
+  ]
+}

@@ -49,6 +49,15 @@ function TicketCardImpl({
     <Card
       className="ticket-card clickable"
       onClick={onClick}
+      tabIndex={0}
+      role="button"
+      aria-label={`${ticket.key}: ${ticket.title}`}
+      onKeyDown={(event) => {
+        if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
+          event.preventDefault();
+          onClick();
+        }
+      }}
       draggable
       onDragStart={onDragStart}
       style={{ height: TICKET_CARD_HEIGHT }}

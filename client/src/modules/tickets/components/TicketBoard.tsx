@@ -105,7 +105,7 @@ export const TicketBoard = React.memo(({
     return nextHandler;
   }, []);
 
-  const renderColumnHeader = useCallback((columnId: string, title: string, count: number) => {
+  const renderColumnHeader = useCallback((columnId: string, title: string) => {
     const col = BOARD_COLUMN_BY_ID[columnId];
     const columnCount = visibleByColumn[columnId] ?? INITIAL_CARDS_PER_COLUMN;
     const fullColumnTickets = ticketsByColumn[columnId as keyof typeof ticketsByColumn] || [];
@@ -134,7 +134,7 @@ export const TicketBoard = React.memo(({
             marginLeft: '4px'
           }}
         >
-          {count}
+          {fullColumnTickets.length}
         </span>
 
         <Button
@@ -246,6 +246,7 @@ export const TicketBoard = React.memo(({
           columns={BOARD_COLUMNS}
           cards={formattedCards}
           cardRowHeight={TICKET_CARD_ROW_HEIGHT}
+          cardFocusSelector=".ticket-card"
           onCardMove={handleCardMove}
           renderColumnHeader={renderColumnHeader}
         />

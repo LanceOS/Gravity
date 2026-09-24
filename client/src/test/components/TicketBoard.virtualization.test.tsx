@@ -19,7 +19,7 @@ afterEach(() => {
 });
 
 describe('TicketBoard virtualization', () => {
-  it('keeps room for card content and the stack gap after loading more than 50 cards', () => {
+  it('virtualizes the initial page and keeps the card pitch when loading more', () => {
     vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(400);
     vi.stubGlobal('ResizeObserver', class {
       observe() {}
@@ -55,7 +55,9 @@ describe('TicketBoard virtualization', () => {
       />,
     );
 
-    expect(container.querySelectorAll('.ticket-card')).toHaveLength(40);
+    expect(container.querySelectorAll('.ticket-card').length).toBeLessThan(20);
+    expect(screen.getByRole('grid')).toHaveAttribute('aria-rowcount', '40');
+    expect(screen.getByText('60')).toBeInTheDocument(); // Header counts all tickets, not just the page.
     const cardHeight = Number.parseFloat(getComputedStyle(container.querySelector('.ticket-card')!).height);
     expect(cardHeight).toBeGreaterThanOrEqual(153); // Two title lines plus a PR badge need roughly 153px.
 

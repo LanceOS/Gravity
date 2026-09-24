@@ -1,9 +1,13 @@
 /* Fill the virtual row's content box so only its bottom padding separates cards. */
 .ticket-list__virtual-row > .ticket-list__row-desktop,
-.ticket-list__virtual-row > .ticket-list__row-mobile,
-.ticket-list__virtual-row .ticket-row,
-.ticket-list__virtual-row .ticket-row-mobile {
+.ticket-list__virtual-row .ticket-row {
   height: 100%;
+}
+
+/* Mobile labels wrap. Measure the full natural height, including overscan rows. */
+.ticket-list__virtual-row .ticket-row-mobile {
+  height: auto;
+  content-visibility: visible;
 }
 
 

@@ -7,6 +7,38 @@ export interface DenseVirtualListProps<T> {
   buffer?: number;
   renderRow: (item: T, index: number, style: React.CSSProperties) => React.ReactNode;
   containerStyle?: React.CSSProperties;
+  /** Stable identity retains focused and dragged rows outside the visible window. */
+  getItemKey?: (item: T) => React.Key;
+  /** Opt in to Arrow/Home/End and Tab navigation across virtual boundaries. */
+  itemFocusSelector?: string;
+  isItemFocusable?: (item: T) => boolean;
+  /** Keep the same row tree for small lists while rendering every item. */
+  virtualize?: boolean;
+  /** Measure natural row content instead of imposing the estimated rowHeight. */
+  measureRows?: boolean;
+}
+
+function MeasuredRow<T>({ children, rowKey, item, onMeasure }: {
+  children: React.ReactNode;
+  rowKey: React.Key;
+  item: T;
+  onMeasure: (key: React.Key, item: T, height: number, width: number) => void;
+}) {
+  const ref = React.useRef<HTMLDivElement>(null);
+  React.useLayoutEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    const measure = () => {
+      const rect = node.getBoundingClientRect();
+      if (rect.height > 0 && rect.width > 0) onMeasure(rowKey, item, rect.height, rect.width);
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [onMeasure, rowKey, item]);
+  return <div ref={ref} style={{ display: 'flow-root' }}>{children}</div>;
 }
 
 function resolveRowHeight<T>(item: T, index: number, rowHeight: number | ((item: T, index: number) => number)): number {
@@ -46,10 +78,40 @@ export function DenseVirtualList<T>({
   buffer = 5,
   renderRow,
   containerStyle,
+  getItemKey,
+  itemFocusSelector,
+  isItemFocusable,
+  virtualize = true,
+  measureRows = false,
 }: DenseVirtualListProps<T>) {
+  const [focusedKey, setFocusedKey] = React.useState<React.Key | null>(null);
+  const [draggedKey, setDraggedKey] = React.useState<React.Key | null>(null);
+  const pendingFocus = React.useRef<{ index: number; last: boolean } | null>(null);
+  const keyboardFocusKey = React.useRef<React.Key | null>(null);
+  const keyboardScrollTop = React.useRef(0);
+  const keyIndexes = React.useMemo(() => new Map(items.map((item, index) => [getItemKey?.(item) ?? index, index])), [items, getItemKey]);
+  const focusedIndex = focusedKey === null ? undefined : keyIndexes.get(focusedKey);
+  const draggedIndex = draggedKey === null ? undefined : keyIndexes.get(draggedKey);
+  const [measurements, setMeasurements] = React.useState<{ width: number; rows: Map<React.Key, { item: T; height: number }> }>(
+    () => ({ width: 0, rows: new Map() })
+  );
+  const recordMeasurement = React.useCallback((key: React.Key, item: T, measuredHeight: number, width: number) => {
+    setMeasurements(previous => {
+      const cached = previous.rows.get(key);
+      if (previous.width === width && cached?.item === item && cached.height === measuredHeight) return previous;
+      // Width changes invalidate offscreen measurements too: labels may wrap differently.
+      const rows = previous.width === width
+        ? new Map([...previous.rows].filter(([key]) => keyIndexes.has(key))) : new Map();
+      rows.set(key, { item, height: measuredHeight });
+      return { width, rows };
+    });
+  }, [keyIndexes]);
   const rowHeights = React.useMemo(
-    () => items.map((item, index) => resolveRowHeight(item, index, rowHeight)),
-    [items, rowHeight]
+    () => items.map((item, index) => {
+      const cached = measureRows ? measurements.rows.get(getItemKey?.(item) ?? index) : undefined;
+      return cached?.item === item ? cached.height : resolveRowHeight(item, index, rowHeight);
+    }),
+    [items, rowHeight, measureRows, measurements, getItemKey]
   );
 
   const prefixHeights = React.useMemo(() => {
@@ -77,6 +139,7 @@ export function DenseVirtualList<T>({
       if (items.length === 0) {
         return { startIndex: 0, endIndex: -1 };
       }
+      if (!virtualize) return { startIndex: 0, endIndex: items.length - 1 };
 
       const visibleBufferPx = Math.max(0, buffer) * maxRowHeight;
       const bufferedTop = Math.max(0, scrollTop - visibleBufferPx);
@@ -88,7 +151,7 @@ export function DenseVirtualList<T>({
 
       return { startIndex, endIndex };
     },
-    [buffer, height, items.length, prefixHeights, maxRowHeight]
+    [buffer, height, items.length, prefixHeights, maxRowHeight, virtualize]
   );
 
   const [scrollRange, setScrollRange] = React.useState({
@@ -99,6 +162,81 @@ export function DenseVirtualList<T>({
   const containerRef = React.useRef<HTMLDivElement>(null);
   const rafIdRef = React.useRef<number | null>(null);
   const latestScrollTopRef = React.useRef(0);
+  const focusWasInside = React.useRef(false);
+
+  const rowFromTarget = (target: EventTarget | null) => target instanceof Element
+    ? target.closest<HTMLElement>('[data-virtual-index]') : null;
+  const keyFromTarget = (target: EventTarget | null) => {
+    const row = rowFromTarget(target);
+    const index = row ? Number(row.dataset.virtualIndex) : -1;
+    return items[index] ? getItemKey?.(items[index]) ?? index : null;
+  };
+  const tabbables = (row: Element) => Array.from(row.querySelectorAll<HTMLElement>(
+    'button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]'
+  ));
+
+  const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!itemFocusSelector || event.altKey || event.ctrlKey || event.metaKey) return;
+    const row = rowFromTarget(event.target);
+    if (!row) return;
+    const current = Number(row.dataset.virtualIndex);
+    const backwards = event.key === 'ArrowUp' || (event.key === 'Tab' && event.shiftKey) || event.key === 'Home';
+    if (!['ArrowUp', 'ArrowDown', 'Home', 'End', 'Tab'].includes(event.key)) return;
+    if (event.key === 'Tab') {
+      const controls = tabbables(row);
+      if (event.target !== (backwards ? controls[0] : controls.at(-1))) return;
+    } else if (!(event.target instanceof Element) || !event.target.matches(itemFocusSelector)) return;
+    const step = backwards ? -1 : 1;
+    let index = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 : current + step;
+    while (index >= 0 && index < items.length && isItemFocusable && !isItemFocusable(items[index])) {
+      index += event.key === 'Home' ? 1 : event.key === 'End' ? -1 : step;
+    }
+    if (index < 0 || index >= items.length) return; // Let Tab leave the list.
+    event.preventDefault();
+    pendingFocus.current = { index, last: event.key === 'Tab' && backwards };
+    keyboardFocusKey.current = getItemKey?.(items[index]) ?? index;
+    setFocusedKey(getItemKey?.(items[index]) ?? index);
+    const container = containerRef.current;
+    if (container) {
+      const top = prefixHeights[index];
+      const bottom = prefixHeights[index + 1];
+      if (top < container.scrollTop) container.scrollTop = top;
+      else if (bottom > container.scrollTop + height) container.scrollTop = bottom - height;
+      keyboardScrollTop.current = container.scrollTop;
+      setScrollRange(getScrollRange(container.scrollTop));
+    }
+  };
+
+  React.useLayoutEffect(() => {
+    const pending = pendingFocus.current;
+    if (pending) {
+      const row = containerRef.current?.querySelector(`[data-virtual-index="${pending.index}"]`);
+      const target = row && (pending.last ? tabbables(row).at(-1) : row.querySelector<HTMLElement>(itemFocusSelector!));
+      target?.focus({ preventScroll: true });
+      pendingFocus.current = null;
+    } else if (focusedKey !== null && focusedIndex === undefined) {
+      // Filtering/deleting the focused item must not silently send focus to body.
+      if (focusWasInside.current && document.activeElement === document.body) containerRef.current?.focus({ preventScroll: true });
+    } else if (focusedIndex !== undefined && itemFocusSelector && focusWasInside.current && document.activeElement === document.body) {
+      // Responsive row variants can replace the control while keeping its item.
+      containerRef.current?.querySelector(`[data-virtual-index="${focusedIndex}"]`)
+        ?.querySelector<HTMLElement>(itemFocusSelector)?.focus({ preventScroll: true });
+    }
+    // Jumping to an unmeasured row (e.g. End) first uses estimated offsets.
+    // Keep the keyboard target visible as its newly mounted neighbours report
+    // their real sizes. Pointer/touch scrolling cancels this reveal intent.
+    const container = containerRef.current;
+    const active = document.activeElement;
+    if (measureRows && focusedKey !== null && keyboardFocusKey.current === focusedKey
+      && container && active instanceof HTMLElement && container.contains(active)) {
+      const viewport = container.getBoundingClientRect();
+      const control = active.getBoundingClientRect();
+      const adjustment = control.top < viewport.top ? control.top - viewport.top
+        : control.bottom > viewport.bottom ? Math.min(control.top - viewport.top, control.bottom - viewport.bottom) : 0;
+      if (adjustment) container.scrollTop += adjustment;
+      keyboardScrollTop.current = container.scrollTop;
+    }
+  });
 
   React.useLayoutEffect(() => {
     // A queued scroll frame still uses the previous item sizes and count.
@@ -119,6 +257,7 @@ export function DenseVirtualList<T>({
   }, [getScrollRange]);
 
   const onScroll = React.useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    if (e.currentTarget.scrollTop !== keyboardScrollTop.current) keyboardFocusKey.current = null;
     latestScrollTopRef.current = e.currentTarget.scrollTop;
 
     if (rafIdRef.current !== null) {
@@ -139,6 +278,17 @@ export function DenseVirtualList<T>({
   }, [getScrollRange]);
 
   React.useEffect(() => {
+    if (draggedKey === null) return;
+    const clearDrag = () => setDraggedKey(null);
+    document.addEventListener('dragend', clearDrag);
+    document.addEventListener('drop', clearDrag);
+    return () => {
+      document.removeEventListener('dragend', clearDrag);
+      document.removeEventListener('drop', clearDrag);
+    };
+  }, [draggedKey]);
+
+  React.useEffect(() => {
     return () => {
       if (rafIdRef.current !== null) {
         window.cancelAnimationFrame(rafIdRef.current);
@@ -153,11 +303,11 @@ export function DenseVirtualList<T>({
   const visibleItems = React.useMemo(() => {
     const renderedRange: React.ReactNode[] = [];
 
-    if (startIndex > endIndex) {
-      return renderedRange;
-    }
-
-    for (let index = startIndex; index <= endIndex; index += 1) {
+    const indexes = new Set<number>();
+    for (let index = startIndex; index <= endIndex; index += 1) indexes.add(index);
+    if (focusedIndex !== undefined) indexes.add(focusedIndex);
+    if (draggedIndex !== undefined) indexes.add(draggedIndex);
+    for (const index of [...indexes].sort((a, b) => a - b)) {
       const item = items[index];
       if (!item) {
         continue;
@@ -175,18 +325,47 @@ export function DenseVirtualList<T>({
         contain: 'layout style',
       };
 
-      renderedRange.push(renderRow(item, index, style));
+      const key = getItemKey?.(item) ?? index;
+      const rendered = renderRow(item, index, measureRows ? { width: '100%' } : style);
+      renderedRange.push(getItemKey || itemFocusSelector || measureRows ? (
+        <div key={key} data-virtual-index={index} style={measureRows ? { ...style, height: 'auto' } : { display: 'contents' }}
+          onFocusCapture={() => {
+            focusWasInside.current = true;
+            if (keyboardFocusKey.current !== key) keyboardFocusKey.current = null;
+            setFocusedKey(key);
+          }}>
+          {measureRows ? <MeasuredRow rowKey={key} item={item} onMeasure={recordMeasurement}>{rendered}</MeasuredRow> : rendered}
+        </div>
+      ) : rendered);
     }
 
     return renderedRange;
-  }, [startIndex, endIndex, items, rowHeights, prefixHeights, renderRow]);
+  }, [startIndex, endIndex, items, rowHeights, prefixHeights, renderRow, focusedIndex, draggedIndex, getItemKey, itemFocusSelector, measureRows, recordMeasurement]);
 
   return (
     <div
       ref={containerRef}
       onScroll={onScroll}
+      tabIndex={-1}
+      onKeyDown={onKeyDown}
+      onWheelCapture={() => { keyboardFocusKey.current = null; }}
+      onPointerDownCapture={() => { keyboardFocusKey.current = null; }}
+      onTouchMoveCapture={() => { keyboardFocusKey.current = null; }}
+      onFocusCapture={(event) => {
+        focusWasInside.current = true;
+        if (event.target === event.currentTarget) setFocusedKey(null);
+      }}
+      onBlurCapture={() => {
+        focusWasInside.current = false;
+        // React focus events follow row ownership through portals. Wait for the
+        // next focus event before deciding whether focus actually left the row tree.
+        queueMicrotask(() => { if (!focusWasInside.current) setFocusedKey(null); });
+      }}
+      onDragStartCapture={(event) => setDraggedKey(keyFromTarget(event.target))}
+      onDragEndCapture={() => setDraggedKey(null)}
       style={{
         height: `${height}px`,
+        flexShrink: 0,
         overflowY: 'auto',
         overflowX: 'hidden',
         position: 'relative',

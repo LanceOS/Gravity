@@ -57,6 +57,7 @@ const MOBILE_TICKET_ROW_HEIGHT = 76;
 const STATUS_LOAD_MORE_ROW_HEIGHT = 44;
 const GLOBAL_LOAD_MORE_ROW_HEIGHT = 50;
 const EMPTY_STATE_ROW_HEIGHT = 180;
+const listItemKey = (item: TicketListItem) => item.id;
 const STATUS_META = {
   backlog: {
     label: getStatusLabel('backlog'),
@@ -101,6 +102,9 @@ export const TicketList = React.memo(({
   const baseVisibleByStatus = useMemo(() => Object.fromEntries(LIST_STATUS_ORDER.map((status) => [status, INITIAL_TICKETS_PER_STATUS])) as Record<string, number>, []);
   const showMoreButton = hasMoreRows || false;
   const loadingMoreRows = isLoadingMoreRows || false;
+  const isListItemFocusable = useCallback((item: TicketListItem) => item.kind === 'ticket'
+    || (!loadingMoreRows && (item.kind === 'status-load-more' || (item.kind === 'global-load-more' && !!onLoadMore))),
+  [loadingMoreRows, onLoadMore]);
   const listRef = useRef<HTMLDivElement>(null);
   const didRunListLoadAnimationRef = React.useRef(false);
   const [viewportHeight, setViewportHeight] = useState(0);
@@ -422,7 +426,9 @@ export const TicketList = React.memo(({
     );
   }, [availableTickets, groupedTickets, handleLoadMoreStatus, isMobileTicketLayout, loadingMoreRows, onLoadMore, onSelectTicket, visibleByStatus]);
 
-  const shouldUseVirtualList = visibleTicketCount >= VIRTUAL_LIST_THRESHOLD;
+  // Keep the same keyed row tree on both sides of the threshold. Only the
+  // rendered range changes, preserving focus when data grows or shrinks.
+  const shouldUseVirtualList = filteredCount >= VIRTUAL_LIST_THRESHOLD;
 
   return (
     <div
@@ -436,131 +442,18 @@ export const TicketList = React.memo(({
         overflow: 'hidden',
       }}
     >
-      <div
-        style={{
-          flex: 1,
-          minHeight: 0,
-          overflowY: 'auto',
-          overflowX: 'hidden',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: shouldUseVirtualList ? 0 : '0',
-        }}
-      >
-        {shouldUseVirtualList ? (
-          <DenseVirtualList
-            items={listItems}
-            height={Math.max(viewportHeight, LIST_DEFAULT_VIRTUAL_HEIGHT)}
-            rowHeight={rowHeight}
-            renderRow={renderVirtualRow}
-            containerStyle={{
-              border: 'none',
-              borderRadius: '0',
-              backgroundColor: 'transparent',
-            }}
-          />
-        ) : (
-          <>
-            {LIST_STATUS_ORDER.map((status) => {
-              const ticketsInGroup = groupedTickets[status];
-              if (!ticketsInGroup || ticketsInGroup.length === 0) {
-                return null;
-              }
-
-              const visibleCount = visibleByStatus[status] ?? INITIAL_TICKETS_PER_STATUS;
-              const visibleTickets = ticketsInGroup.slice(0, visibleCount);
-              const hasMoreInStatus = visibleTickets.length < ticketsInGroup.length;
-              const statusMeta = STATUS_META[status as keyof typeof STATUS_META];
-
-              return (
-                <div key={status} style={{ marginBottom: '24px' }}>
-                  <div className="ticket-list__status-header">
-                    <span
-                      aria-hidden="true"
-                      style={{
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        backgroundColor: statusMeta.color,
-                        flexShrink: 0,
-                      }}
-                    />
-                    <span>{statusMeta.label}</span>
-                    <span className="ticket-list__status-count">
-                      {ticketsInGroup.length}
-                    </span>
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: TICKET_ROW_GAP }}>
-                    {visibleTickets.map((ticket) => {
-                      const project = projectById?.[ticket.projectId];
-                      const rowProps = {
-                        ticket,
-                        onClick: onSelectTicket,
-                        priority: ticket.priority,
-                        assigneeAvatar: getAssigneeAvatar(userAvatarById, ticket.assigneeId),
-                        projectName: project?.name,
-                      };
-                      return (
-                        <React.Fragment key={ticket.id}>
-                          {isMobileTicketLayout ? (
-                            <div className="ticket-list__row-mobile">
-                              <TicketRowMobile {...rowProps} />
-                            </div>
-                          ) : (
-                            <div className="ticket-list__row-desktop">
-                              <TicketContextMenu ticket={ticket} availableTickets={availableTickets}>
-                                <TicketRow {...rowProps} />
-                              </TicketContextMenu>
-                            </div>
-                          )}
-                        </React.Fragment>
-                      );
-                    })}
-                  </div>
-
-                  {hasMoreInStatus ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleLoadMoreStatus(status, ticketsInGroup.length)}
-                      disabled={loadingMoreRows}
-                      style={{
-                        marginTop: '8px',
-                        color: 'var(--color-text-disabled)',
-                        border: '1px solid var(--border-subtle)',
-                        background: 'var(--surface-glass-subtle)',
-                      }}
-                    >
-                      <PlusCircle size={12} style={{ marginRight: '4px' }} />
-                      {loadingMoreRows ? 'Loading…' : `Load more ${Math.max(0, ticketsInGroup.length - visibleCount)} remaining`}
-                    </Button>
-                  ) : null}
-                </div>
-              );
-            })}
-
-            {showMoreButton ? (
-              <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'center' }}>
-                <Button
-                  variant="primary"
-                  onClick={onLoadMore}
-                  disabled={!onLoadMore || loadingMoreRows}
-                >
-                  {loadingMoreRows ? 'Loading more tickets…' : 'Load more tickets'}
-                </Button>
-              </div>
-            ) : null}
-
-            {filteredCount === 0 && (
-              <div style={{ padding: '48px', textAlign: 'center', color: 'var(--color-text-disabled)' }}>
-                <Compass size={48} style={{ strokeWidth: 1, marginBottom: '12px', color: 'var(--color-border-focus)' }} />
-                <div>No tickets match your active filters.</div>
-              </div>
-            )}
-          </>
-        )}
-      </div>
+      <DenseVirtualList
+        items={listItems}
+        height={viewportHeight || LIST_DEFAULT_VIRTUAL_HEIGHT}
+        getItemKey={listItemKey}
+        itemFocusSelector=".ticket-row, .ticket-row-mobile, button:not(:disabled)"
+        isItemFocusable={isListItemFocusable}
+        virtualize={shouldUseVirtualList}
+        measureRows={isMobileTicketLayout}
+        rowHeight={rowHeight}
+        renderRow={renderVirtualRow}
+        containerStyle={{ border: 'none', borderRadius: '0', backgroundColor: 'transparent' }}
+      />
     </div>
   );
 });

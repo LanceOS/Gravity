@@ -50,6 +50,15 @@ function TicketRowMobileImpl({
   return (
     <div
       onClick={handleClick}
+      tabIndex={0}
+      role="button"
+      aria-label={`${ticket.key}: ${ticket.title}`}
+      onKeyDown={(event) => {
+        if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
+          event.preventDefault();
+          handleClick();
+        }
+      }}
       className="ticket-row-mobile clickable"
     >
       {/* Main row: priority icon, title, avatar */}
