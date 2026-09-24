@@ -1,60 +1,56 @@
-import { initializeDatabase } from '../../db/bootstrap.js';
-import { env } from '../../env.js';
-import { getMcpStdioContext } from './stdio-config.js';
-import { McpStdioSession } from './stdio-session.js';
 import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
 
-/**
- * @description Runs the MCP server over stdio using a single trusted workspace
- * and actor identity resolved at startup.
- */
+/** Standalone MCP stdio server; stdout contains only newline-delimited JSON-RPC. */
 export class McpStdioServer {
-  /**
-   * @description Starts the stdio transport and listens for framed JSON-RPC
-   * messages using a Content-Length header (LSP-style). For backwards
-   * compatibility it also accepts legacy single-line JSON messages as a
-   * fallback. Legacy messages must be single-line (no embedded CR/LF) and are
-   * strictly limited in size (typically capped at 64 KiB) to avoid unbounded
-   * buffering — Content-Length framing is strongly preferred for production.
-   * @param opts.initDb When true the server will initialize the database
-   * before installing the listener. When false the caller is responsible for
-   * ensuring the DB is initialized.
-   * @return Resolves once the stdio listener has been installed.
-   */
   async start(opts: { initDb?: boolean } = {}) {
-    // Stdio never trusts per-request identity, so startup fails if the env is incomplete.
+    // Install before loading application modules: imports can emit startup logs.
+    console.log = console.error.bind(console);
+    console.info = console.error.bind(console);
+    const [{ env }, { getMcpStdioContext }, { McpStdioSession }, { bootstrapMcpRegistries }] = await Promise.all([
+      import('../../env.js'),
+      import('./stdio-config.js'),
+      import('./stdio-session.js'),
+      import('./bootstrap.js'),
+    ]);
     const context = getMcpStdioContext(env);
-
     if (opts.initDb) {
+      const { initializeDatabase } = await import('../../db/bootstrap.js');
       await initializeDatabase();
     }
-
+    bootstrapMcpRegistries();
+    const { startMcpEventBridge } = await import('../../lib/mcp-event-bridge.js');
+    const stopEventBridge = startMcpEventBridge();
+    const onSignal = () => { void session.stop(); };
     const session = new McpStdioSession(process.stdin, process.stdout, {
       workspaceId: context.workspaceId,
       actorUserId: context.actorUserId,
       allowHandshake: false,
+      onStop: async () => {
+        process.removeListener('SIGINT', onSignal);
+        process.removeListener('SIGTERM', onSignal);
+        process.stdin.pause();
+        await stopEventBridge();
+        // The standalone registry also opens the shared cache client and DB
+        // pool. Release them on EOF as well as signals so the process can exit.
+        const [{ client }, { pool }] = await Promise.all([
+          import('../../lib/redis.js'), import('../../db/index.js'),
+        ]);
+        if (client?.isOpen) client.destroy();
+        await pool.end();
+      },
     });
-
     session.start();
-
+    process.once('SIGINT', onSignal);
+    process.once('SIGTERM', onSignal);
     console.error('Gravity MCP Stdio Server running...');
+    return session;
   }
 }
 
-/**
- * @description Starts the standalone stdio entry point used by local MCP
- * clients.
- * @return Resolves once the stdio server has started.
- */
-async function main() {
-  const server = new McpStdioServer();
-  await server.start({ initDb: true });
-}
-
-// Only run the standalone main when this module is executed directly.
-const isMain = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
+const isMain = process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1]);
 if (isMain) {
-  main().catch((error) => {
+  new McpStdioServer().start({ initDb: true }).catch((error) => {
     console.error(error);
     process.exitCode = 1;
   });

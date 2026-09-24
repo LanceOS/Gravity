@@ -19,3 +19,11 @@ export class McpToolValidationError extends McpToolError {
     this.name = 'McpToolValidationError';
   }
 }
+
+/** Tenant boundaries are authorization failures, not correctable domain writes. */
+export class McpWorkspaceScopeError extends McpToolError {
+  constructor(message: string, data: McpErrorData) {
+    super(message, -32602, data);
+    this.name = 'McpWorkspaceScopeError';
+  }
+}

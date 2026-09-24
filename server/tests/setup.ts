@@ -86,12 +86,14 @@ vi.mock('../src/lib/rustfs.js', () => {
 });
 const { initializeDatabase } = await import('../src/db/bootstrap.js');
 const { resetDatabase } = await import('./helpers/test-helpers.js');
+const { _clearInMemoryRateLimitStore } = await import('../src/lib/rateLimit.js');
 
 beforeAll(async () => {
   await initializeDatabase();
 });
 
 beforeEach(async () => {
+  _clearInMemoryRateLimitStore();
   await resetDatabase();
 });
 

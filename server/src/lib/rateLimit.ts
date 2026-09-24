@@ -1,6 +1,8 @@
 import type { Request, Response, NextFunction } from 'express';
 
 type RateLimitOptions = {
+  /** Stable policy identity, shared across middleware instances and replicas. */
+  namespace: string;
   windowMs: number;
   max: number;
   keyFn?: (req: Request) => Promise<string> | string;
@@ -20,7 +22,6 @@ type StoreEntry = {
 
 const centralStore = new Map<string, StoreEntry>();
 let cleanupTimer: NodeJS.Timeout | null = null;
-let limiterCounter = 0;
 
 // Tunables
 const CLEANUP_INTERVAL_MS = 60_000; // 1 minute
@@ -59,8 +60,8 @@ function ensureCleanupTimerStarted() {
 }
 
 export function createRateLimiter(options: RateLimitOptions) {
-  const { windowMs, max, keyFn } = options;
-  const limiterId = `rl:${++limiterCounter}`;
+  const { namespace, windowMs, max, keyFn } = options;
+  const limiterId = `rl:${encodeURIComponent(namespace)}:${windowMs}:${max}`;
   ensureCleanupTimerStarted();
 
   return async function rateLimiter(req: Request, res: Response, next: NextFunction) {
@@ -85,7 +86,9 @@ export function createRateLimiter(options: RateLimitOptions) {
       if (entry.timestamps.length >= max) {
         entry.lastSeen = now;
         centralStore.set(compositeKey, entry);
-        res.status(429).json({ error: 'Too many requests; rate limit exceeded.' });
+        const retryAfterSeconds = Math.max(1, Math.ceil((entry.timestamps[0] + windowMs - now) / 1000));
+        res.setHeader('Retry-After', String(retryAfterSeconds));
+        res.status(429).json({ error: 'Too many requests; rate limit exceeded.', retryAfterSeconds });
         return;
       }
 

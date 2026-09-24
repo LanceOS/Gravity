@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { useAccountSettings } from '../../../hooks/useAccountSettings';
 import { useTheme } from '../../settings';
 import { useAuth } from '../../../context/auth/AuthContext';
 import { useActiveView } from '../../../context/ui/ActiveViewContext';
-import { isOnboardingNeeded } from '../utils/accountPreferences';
+import { isOnboardingNeeded, SETTINGS_CATEGORY_IDS } from '../utils/accountPreferences';
 import { patchTutorialCompleted } from '../../../utils/tutorialApi';
-import type { AccountPreferencesRouteState } from '../types';
+import type { AccountPreferencesRouteState, SettingsCategoryId } from '../types';
 
 export function useAccountPreferencesPageRoute(): AccountPreferencesRouteState {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const requestedCategory = searchParams.get('section') as SettingsCategoryId;
   const [localTutorialCompleted, setLocalTutorialCompleted] = useState(false);
   const { currentUser, loading } = useAuth();
   const { activeView, setView } = useActiveView();
@@ -55,6 +57,7 @@ export function useAccountPreferencesPageRoute(): AccountPreferencesRouteState {
   };
 
   return {
+    initialCategory: SETTINGS_CATEGORY_IDS.includes(requestedCategory) ? requestedCategory : 'general',
     loading,
     currentUser,
     settings,

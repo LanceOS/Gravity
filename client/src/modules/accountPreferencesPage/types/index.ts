@@ -3,7 +3,7 @@ import type { ComponentType } from 'react';
 import type { AIProvider, SavedApiCredential, WorkspaceSettings } from '../../../utils/settings';
 import type { User } from '../../../types/domain';
 
-export type SettingsCategoryId = 'general' | 'providers' | 'onboarding';
+export type SettingsCategoryId = 'general' | 'providers' | 'connections' | 'onboarding';
 
 export interface StatusMessage {
   success: boolean;
@@ -18,6 +18,7 @@ export interface AccountPreferencesCategoryMeta {
 }
 
 export interface AccountPreferencesPageProps {
+  initialCategory?: SettingsCategoryId;
   currentUser: User;
   settings: WorkspaceSettings;
   settingsLoading: boolean;

@@ -109,7 +109,6 @@ export function WorkspaceShellPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
   const [isCreateLabelModalOpen, setIsCreateLabelModalOpen] = useState(false);
-  const [isMcpOpen, setIsMcpOpen] = useState(false);
   const [sidebarActiveScope, setSidebarActiveScope] = useState<SidebarNavigationState['activeScope']>('workspace');
   const { isAgentOpen, isAgentClosing, handleOpenAgent, handleToggleAgent } = useAgentPanel();
   const [seedAiChatSessionId, setSeedAiChatSessionId] = useState('');
@@ -1076,7 +1075,6 @@ export function WorkspaceShellPage() {
       onOpenAccountPreferences: handleOpenAccountPreferences,
       onOpenProjectManager: isTeamWorkspace ? handleOpenTeamManager : handleOpenProjectManager,
       onOpenSettings: handleOpenSettings,
-      onOpenMcp: () => setIsMcpOpen(true),
       onSignOut: () => {
         void signOut();
       },
@@ -1089,11 +1087,7 @@ export function WorkspaceShellPage() {
   const isIssueSurfaceActive =
     !isWorkspaceProjectsListActive && !isTeamsManager && !isTeamProjectsManager && activeSection !== 'projects';
   const workspaceWebMcpRegistration = isWebMcpSupported ? (
-    <WorkspaceWebMcpRegistration
-      tickets={tickets}
-      users={users}
-      projects={projects}
-    />
+    <WorkspaceWebMcpRegistration workspaceId={activeWorkspaceId} />
   ) : null;
 
   return (
@@ -1278,11 +1272,6 @@ export function WorkspaceShellPage() {
 
       <AppShellOverlays
         onboarding={onboarding}
-        mcp={{
-          isOpen: isMcpOpen,
-          workspaceId: activeWorkspaceId,
-          onClose: () => setIsMcpOpen(false),
-        }}
           createProject={{
             isOpen: isCreateProjectModalOpen,
             loading: projectCreateLoading,

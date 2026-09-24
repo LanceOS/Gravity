@@ -369,7 +369,7 @@ export function patchTicketLabelAssignment(ticket: Ticket, labelId: string, isAs
     labelIds: nextLabelIdsList,
   };
 }
-export function normalizeTicketPayload(value: unknown): Ticket | null {
+export function normalizeTicketPayload(value: unknown): (Ticket & { subtasks?: Ticket[] }) | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return null;
   }
@@ -428,6 +428,11 @@ export function normalizeTicketPayload(value: unknown): Ticket | null {
     blockers: Array.isArray((data as { blockers?: unknown }).blockers)
       ? ((data as { blockers: unknown[] }).blockers as Ticket['blockers'])
       : undefined,
+    // Expanded parent snapshots carry hierarchy changes. Omitted subtasks in
+    // flat updates must preserve the cached expansion; [] explicitly clears it.
+    ...(Array.isArray(data.subtasks) ? {
+      subtasks: data.subtasks.map(normalizeTicketPayload).filter((ticket): ticket is Ticket => ticket !== null),
+    } : {}),
   };
 }
 export function normalizeCommentPayload(value: unknown): Comment | null {

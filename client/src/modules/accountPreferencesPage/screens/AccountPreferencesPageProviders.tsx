@@ -17,7 +17,7 @@ export function AccountPreferencesPageProviders({
   hasChanges,
   ...props
 }: PropsWithChildren<AccountPreferencesPageProps>) {
-  const { activeCategory, setActiveCategory } = useAccountPreferencesPageState(props.onResetProviderDraft);
+  const { activeCategory, setActiveCategory } = useAccountPreferencesPageState(props.onResetProviderDraft, props.initialCategory);
 
   return (
     <AccountPreferencesRuntimeContextProvider

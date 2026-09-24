@@ -403,7 +403,7 @@ describe('GeminiProvider', () => {
     expect(body.tools[0].functionDeclarations[0]).toMatchObject({
       name: 'my_tool',
       description: 'Desc',
-      parameters: { type: 'object' },
+      parametersJsonSchema: { type: 'object' },
     });
   });
 
@@ -457,6 +457,37 @@ describe('GeminiProvider', () => {
     );
     expect(fnResponseMsg).toBeDefined();
     expect(fnResponseMsg.parts[0].functionResponse.name).toBe('my_fn');
+  });
+
+  it('keeps parallel function responses in one turn with their original names and IDs', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      makeResponse({ candidates: [{ content: { parts: [{ text: 'done' }] } }] }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const signedPart = {
+      functionCall: { id: 'call_1', name: 'get_ticket', args: { ticketKey: 'APP-1' } },
+      thoughtSignature: 'opaque-signature',
+    };
+    const secondPart = { functionCall: { id: 'call_2', name: 'get_ticket', args: { ticketKey: 'APP-2' } } };
+    await provider.chat({
+      model: 'gemini-3-flash-preview', apiKey: 'gemini-key',
+      messages: [
+        { role: 'user', content: 'Compare APP-1 and APP-2.' },
+        { role: 'assistant', content: '', tool_calls: [
+          { id: 'call_1', name: 'get_ticket', arguments: signedPart.functionCall.args, geminiPart: signedPart },
+          { id: 'call_2', name: 'get_ticket', arguments: secondPart.functionCall.args, geminiPart: secondPart },
+        ] },
+        { role: 'tool', tool_call_id: 'call_1', content: '{"title":"First"}' },
+        { role: 'tool', tool_call_id: 'call_2', content: '{"title":"Second"}' },
+      ],
+    });
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    expect(body.contents).toHaveLength(3);
+    expect(body.contents[1]).toEqual({ role: 'model', parts: [signedPart, secondPart] });
+    expect(body.contents[2]).toEqual({ role: 'user', parts: [
+      { functionResponse: { name: 'get_ticket', id: 'call_1', response: { content: { title: 'First' } } } },
+      { functionResponse: { name: 'get_ticket', id: 'call_2', response: { content: { title: 'Second' } } } },
+    ] });
   });
 
   it('appends the api key as a query param on testConnection', async () => {

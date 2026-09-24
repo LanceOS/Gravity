@@ -19,7 +19,6 @@ function renderUserMenu(overrides: Partial<SidebarUserMenuSection> = {}) {
     onOpenAccountPreferences: vi.fn(),
     onOpenProjectManager: vi.fn(),
     onOpenSettings: vi.fn(),
-    onOpenMcp: vi.fn(),
     onSignOut: vi.fn(),
     ...overrides,
   };
@@ -55,6 +54,17 @@ describe('SidebarUserMenu', () => {
     await user.click(screen.getByText('Manage Projects'));
 
     expect(userMenu.onOpenProjectManager).toHaveBeenCalledTimes(1);
+    expect(onCloseUserDropdown).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps Account Preferences navigation without a separate external AI entry', async () => {
+    const user = userEvent.setup();
+    const { onCloseUserDropdown, userMenu } = renderUserMenu();
+
+    expect(screen.queryByRole('button', { name: 'Connect External AI' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Account Preferences' }));
+
+    expect(userMenu.onOpenAccountPreferences).toHaveBeenCalledTimes(1);
     expect(onCloseUserDropdown).toHaveBeenCalledTimes(1);
   });
 

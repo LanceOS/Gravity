@@ -29,7 +29,7 @@ const mocks = vi.hoisted(() => ({
   useWorkspaceSettings: vi.fn(),
   useTicketFilters: vi.fn(),
   useActiveView: vi.fn(),
-  registerWebMCPTools: vi.fn(() => null),
+  registerWebMCPTools: vi.fn(() => ({ dispose: vi.fn(), ready: Promise.resolve() })),
 }));
 
 vi.mock('../../context/auth/AuthContext', async (importOriginal) => {
@@ -113,7 +113,8 @@ vi.mock('../../context/ui/ActiveViewContext', () => ({
   useActiveView: mocks.useActiveView,
 }));
 
-vi.mock('../../utils/webmcp', () => ({
+vi.mock('../../utils/webmcp', async importOriginal => ({
+  ...await importOriginal<typeof import('../../utils/webmcp')>(),
   registerWebMCPTools: mocks.registerWebMCPTools,
 }));
 
@@ -487,7 +488,7 @@ function renderAppShell() {
 describe('AppShellPage theme integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    delete (navigator as any).modelContext;
+    delete (document as any).modelContext;
     window.localStorage.clear();
     window.localStorage.setItem('gravity_theme', 'dark');
     document.documentElement.className = '';

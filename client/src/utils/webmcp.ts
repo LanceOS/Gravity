@@ -1,149 +1,80 @@
-/**
- * WebMCP Browser Native Tool Registration
- * 
- * Provides client-side programmatic tool exposure to Chromium AI agents
- * using navigator.modelContext early preview APIs.
- */
+import { callMcpTool, type McpTool, type McpToolResult } from './mcp';
 
-interface WebMCPActions {
-  createTicket: (payload: any) => Promise<any>;
-  updateTicket: (id: string, updates: any) => Promise<void>;
-  addComment: (ticketId: string, body: string) => Promise<void>;
-  addBlocker: (ticketId: string, blockerId: string) => Promise<boolean>;
-  removeBlocker: (ticketId: string, blockerId: string) => Promise<boolean>;
-  getTickets: () => any[];
-  getUsers: () => any[];
-  getProjects: () => any[];
+export interface BrowserMcpTool {
+  name: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+  annotations?: McpTool['annotations'];
+  execute: (args: Record<string, unknown>, options?: { signal: AbortSignal }) => Promise<McpToolResult>;
 }
 
-export function registerWebMCPTools(actions: WebMCPActions): AbortController | null {
-  // 1. Feature detection
-  const nav = navigator as any;
-  if (!('modelContext' in nav) || !('registerTool' in nav.modelContext)) {
-    return null;
-  }
+interface BrowserModelContext {
+  registerTool: (tool: BrowserMcpTool, options: { signal: AbortSignal }) => Promise<void> | void;
+  unregisterTool?: (name: string) => void;
+}
 
+export interface WebMcpRegistration {
+  dispose: () => void;
+  ready: Promise<void>;
+}
 
+function getModelContext(): BrowserModelContext | undefined {
+  if (typeof document === 'undefined') return undefined;
+  return (document as Document & { modelContext?: BrowserModelContext }).modelContext;
+}
+
+export function supportsWebMcpRegistration() {
+  const context = getModelContext();
+  return typeof context?.registerTool === 'function';
+}
+
+/** Register only server-discovered tools and route execution through server policy. */
+export function registerWebMCPTools(workspaceId: string, tools: McpTool[]): WebMcpRegistration {
+  const context = getModelContext();
+  if (!supportsWebMcpRegistration() || !context) return { dispose: () => {}, ready: Promise.resolve() };
+  const registered: string[] = [];
   const controller = new AbortController();
-  const signal = controller.signal;
-
-  try {
-    // Tool 1: list-tickets
-    nav.modelContext.registerTool({
-      name: 'list-tickets',
-      description: 'Fetch the active project management tickets in the browser tab workspace.',
-      inputSchema: { type: 'object', properties: {} },
-      execute() {
-        return actions.getTickets();
-      },
-      annotations: { readOnlyHint: true }
-    }, { signal });
-
-    // Tool 2: create-ticket
-    nav.modelContext.registerTool({
-      name: 'create-ticket',
-      description: 'Create a new project ticket inside the current workspace.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          title: { type: 'string', description: 'The title of the ticket' },
-          description: { type: 'string', description: 'The description of the ticket (markdown supported)' },
-          status: { type: 'string', enum: ['backlog', 'todo', 'in_progress', 'in_review', 'done', 'canceled'] },
-          priority: { type: 'string', enum: ['no_priority', 'low', 'medium', 'high', 'urgent'] },
-          projectId: { type: 'string', description: 'The project ID, e.g. p-gravity' },
-          labelId: { type: 'string', description: 'The label ID, e.g. l-fe' }
-        },
-        required: ['title', 'projectId']
-      },
-      async execute(args: any) {
-        const result = await actions.createTicket(args);
-        return result ? `Ticket ${result.key} created successfully!` : 'Failed to create ticket';
+  const cleanup = () => {
+    controller.abort();
+    for (const name of registered.splice(0)) {
+      // Older implementations expose an explicit method; current drafts use the signal.
+      try { context.unregisterTool?.(name); }
+      catch (error) {
+        if (!(error instanceof DOMException && error.name === 'NotFoundError')) {
+          console.error(`Gravity: could not unregister WebMCP tool ${name}`, error);
+        }
       }
-    }, { signal });
-
-    // Tool 3: update-ticket
-    nav.modelContext.registerTool({
-      name: 'update-ticket',
-      description: 'Modify details of an existing ticket.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          id: { type: 'string', description: 'The database ID of the ticket' },
-          title: { type: 'string' },
-          description: { type: 'string' },
-          status: { type: 'string', enum: ['backlog', 'todo', 'in_progress', 'in_review', 'done', 'canceled'] },
-          priority: { type: 'string', enum: ['no_priority', 'low', 'medium', 'high', 'urgent'] }
+    }
+  };
+  const ready = (async () => {
+    for (const tool of tools) {
+      if (controller.signal.aborted) return;
+      const registration = context.registerTool({
+        name: tool.name,
+        description: tool.description,
+        inputSchema: tool.inputSchema,
+        annotations: {
+          readOnlyHint: tool.annotations?.readOnlyHint === true,
+          consequentialHint: tool.annotations?.destructiveHint === true,
+          untrustedContentHint: true,
         },
-        required: ['id']
-      },
-      async execute(args: any) {
-        const id = args.id;
-        const updates = { ...args };
-        delete updates.id;
-        
-        await actions.updateTicket(id, updates);
-        return `Ticket ID ${id} was updated.`;
-      }
-    }, { signal });
-
-    // Tool 4: add-blocker
-    nav.modelContext.registerTool({
-      name: 'add-blocker',
-      description: 'Add a blocker ticket relationship to an existing ticket.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          ticketId: { type: 'string', description: 'The database ID of the ticket' },
-          blockerId: { type: 'string', description: 'The database ID of the blocking ticket' }
+        execute: async (args, options) => {
+          if (controller.signal.aborted) throw new Error('This workspace tool is no longer available.');
+          // Return the server's result, including isError, only after execution finishes.
+          const signal = options?.signal ? AbortSignal.any([controller.signal, options.signal]) : controller.signal;
+          return callMcpTool(workspaceId, tool.name, args, signal);
         },
-        required: ['ticketId', 'blockerId']
-      },
-      async execute(args: any) {
-        const success = await actions.addBlocker(args.ticketId, args.blockerId);
-        return success ? `Blocker ${args.blockerId} added to ticket ${args.ticketId}.` : 'Failed to add blocker';
-      }
-    }, { signal });
-
-    // Tool 5: remove-blocker
-    nav.modelContext.registerTool({
-      name: 'remove-blocker',
-      description: 'Remove a blocker relationship from an existing ticket.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          ticketId: { type: 'string', description: 'The database ID of the ticket' },
-          blockerId: { type: 'string', description: 'The database ID of the blocking ticket' }
-        },
-        required: ['ticketId', 'blockerId']
-      },
-      async execute(args: any) {
-        const success = await actions.removeBlocker(args.ticketId, args.blockerId);
-        return success ? `Blocker ${args.blockerId} removed from ticket ${args.ticketId}.` : 'Failed to remove blocker';
-      }
-    }, { signal });
-
-    // Tool 6: add-comment
-    nav.modelContext.registerTool({
-      name: 'add-comment',
-      description: 'Post a comment on a ticket.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          ticketId: { type: 'string', description: 'The database ID of the ticket' },
-          body: { type: 'string', description: 'The comment text body' }
-        },
-        required: ['ticketId', 'body']
-      },
-      async execute(args: any) {
-        await actions.addComment(args.ticketId, args.body);
-        return 'Comment posted successfully.';
-      }
-    }, { signal });
-
-  } catch (error) {
-    console.error('Gravity: WebMCP tool registration failed:', error);
-  }
-
-  // Return the AbortController so that the parent hook can call controller.abort() on unmount!
-  return controller;
+      }, { signal: controller.signal });
+      // Current browsers reject the registration promise for invalid tools or
+      // permissions. Older synchronous implementations return undefined.
+      if (registration) await registration;
+      if (controller.signal.aborted) return;
+      registered.push(tool.name);
+    }
+  })().catch(error => {
+    cleanup();
+    throw error;
+  });
+  // Disposal must be available while the first registration is still pending.
+  return { dispose: cleanup, ready };
 }

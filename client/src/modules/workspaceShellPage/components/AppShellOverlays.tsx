@@ -2,7 +2,6 @@ import type { ReactNode } from 'react';
 import type { Cycle, Label, Project, Ticket, User } from '../../../types/domain';
 import { CreateTicketModal, LabelCreateOverlay } from '../../../modules/tickets';
 import { ProjectCreateOverlay } from '../../../components/WorkspaceProjectPanel';
-import { WorkspaceMcpModal } from '../../../modules/workspaces';
 
 type CreateTicketOverlayProps = {
   isOpen: boolean;
@@ -28,12 +27,6 @@ type CreateTicketOverlayProps = {
   }) => Promise<boolean>;
 };
 
-type WorkspaceMcpOverlayProps = {
-  isOpen: boolean;
-  workspaceId: string;
-  onClose: () => void;
-};
-
 type CreateProjectOverlayProps = {
   isOpen: boolean;
   loading: boolean;
@@ -53,7 +46,6 @@ type CreateLabelOverlayProps = {
 interface AppShellOverlaysProps {
   onboarding: ReactNode;
   createTicket?: CreateTicketOverlayProps;
-  mcp: WorkspaceMcpOverlayProps;
   createProject: CreateProjectOverlayProps;
   createLabel: CreateLabelOverlayProps;
 }
@@ -61,7 +53,6 @@ interface AppShellOverlaysProps {
 export function AppShellOverlays({
   onboarding,
   createTicket,
-  mcp,
   createProject,
   createLabel,
 }: AppShellOverlaysProps) {
@@ -82,8 +73,6 @@ export function AppShellOverlays({
       />
 
       {onboarding}
-
-      <WorkspaceMcpModal workspaceId={mcp.workspaceId} isOpen={mcp.isOpen} onClose={mcp.onClose} />
 
       <ProjectCreateOverlay
         isOpen={createProject.isOpen}

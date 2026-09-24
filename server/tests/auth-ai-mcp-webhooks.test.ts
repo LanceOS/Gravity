@@ -28,6 +28,12 @@ function parseMcpResult(response: { body: { result?: { content?: Array<{ text?: 
   return JSON.parse(text ?? '{}') as unknown;
 }
 
+function parseMcpToolError(response: { body: any }) {
+  expect(response.body.result?.isError).toBe(true);
+  expect(response.body).not.toHaveProperty('error');
+  return response.body.result.structuredContent.error;
+}
+
 describe('auth, AI, MCP, webhooks, and realtime routes', () => {
   beforeEach(async () => {
     process.env.OPENAI_API_KEY = 'env-openai-test-key';
@@ -251,7 +257,7 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
 
     expect(initializeResponse.status).toBe(200);
     expect(initializeResponse.body.result).toMatchObject({
-      protocolVersion: '2024-11-05',
+      protocolVersion: '2025-11-25',
       serverInfo: { name: 'gravity-mcp-server' },
     });
 
@@ -268,7 +274,7 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
     expect(toolsResponse.body.result.tools).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          name: 'add_comment',
+          name: 'create_comment',
           inputSchema: expect.objectContaining({ required: ['ticketKey', 'body'] }),
         }),
       ]),
@@ -277,27 +283,21 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
       expect.arrayContaining([
         expect.objectContaining({
           name: 'mark_ticket_blocked',
-          inputSchema: expect.objectContaining({ required: ['blocker_ticket_key', 'dependent_ticket_key'] }),
+          aliases: expect.arrayContaining(['add_ticket_dependency', 'add_dependency']),
+          inputSchema: expect.objectContaining({ anyOf: expect.arrayContaining([expect.objectContaining({ required: ['blocker_ticket_key', 'dependent_ticket_key'] })]) }),
         }),
         expect.objectContaining({
           name: 'unmark_ticket_blocked',
-          inputSchema: expect.objectContaining({ required: ['blocker_ticket_key', 'dependent_ticket_key'] }),
+          aliases: expect.arrayContaining(['remove_ticket_dependency', 'remove_dependency']),
+          inputSchema: expect.objectContaining({ anyOf: expect.arrayContaining([expect.objectContaining({ required: ['blocker_ticket_key', 'dependent_ticket_key'] })]) }),
         }),
         expect.objectContaining({
           name: 'preview_ticket_dependency',
           inputSchema: expect.objectContaining({ required: ['operation'] }),
         }),
         expect.objectContaining({
-          name: 'add_ticket_dependency',
-          inputSchema: expect.objectContaining({ required: ['blocker_ticket_key', 'dependent_ticket_key'] }),
-        }),
-        expect.objectContaining({
-          name: 'remove_ticket_dependency',
-          inputSchema: expect.objectContaining({ required: ['ticket_key', 'dependency_ticket_key'] }),
-        }),
-        expect.objectContaining({
           name: 'list_ticket_dependencies',
-          inputSchema: expect.objectContaining({ required: ['ticket_key'] }),
+          inputSchema: expect.objectContaining({ anyOf: expect.arrayContaining([expect.objectContaining({ required: ['ticket_key'] })]) }),
         }),
       ]),
     );
@@ -753,14 +753,14 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
         },
       });
       expect(duplicateResponse.status).toBe(200);
-      expect(duplicateResponse.body.error?.message).toContain(`${blockerTicket.key} already blocks ${dependentTicket.key}`);
-      expect(duplicateResponse.body.error?.code).toBe(-32602);
-      expect(duplicateResponse.body.error?.data).toMatchObject({
+      expect(parseMcpToolError(duplicateResponse).message).toContain(`${blockerTicket.key} already blocks ${dependentTicket.key}`);
+      expect(parseMcpToolError(duplicateResponse).code).toBe('INVALID_ARGUMENTS');
+      expect(parseMcpToolError(duplicateResponse).details).toMatchObject({
         ok: false,
         operation: 'add',
         status: 'duplicate',
       });
-      expect(duplicateResponse.body.error?.data?.suggestedFix).toContain('unmark_ticket_blocked');
+      expect(parseMcpToolError(duplicateResponse).details?.suggestedFix).toContain('unmark_ticket_blocked');
 
       const addDownstreamResponse = await ownerMcpRequest({
         jsonrpc: '2.0',
@@ -822,7 +822,7 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
         },
       });
       expect(missingTicketResponse.status).toBe(200);
-      expect(missingTicketResponse.body.error?.message).toContain('Ticket BAD-999 not found.');
+      expect(parseMcpToolError(missingTicketResponse).message).toContain('Ticket BAD-999 not found.');
 
       const circularResponse = await ownerMcpRequest({
         jsonrpc: '2.0',
@@ -837,8 +837,8 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
         },
       });
       expect(circularResponse.status).toBe(200);
-      expect(circularResponse.body.error?.message).toContain('circular dependency');
-      expect(circularResponse.body.error?.data).toMatchObject({
+      expect(parseMcpToolError(circularResponse).message).toContain('circular dependency');
+      expect(parseMcpToolError(circularResponse).details).toMatchObject({
         ok: false,
         operation: 'add',
         status: 'cycle',
@@ -1360,14 +1360,14 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
         },
       });
       expect(duplicateAdd.status).toBe(200);
-      expect(duplicateAdd.body.error?.message).toContain(`${blockerTicket.key} already blocks ${blockedTicket.key}`);
-      expect(duplicateAdd.body.error?.code).toBe(-32602);
-      expect(duplicateAdd.body.error?.data).toMatchObject({
+      expect(parseMcpToolError(duplicateAdd).message).toContain(`${blockerTicket.key} already blocks ${blockedTicket.key}`);
+      expect(parseMcpToolError(duplicateAdd).code).toBe('INVALID_ARGUMENTS');
+      expect(parseMcpToolError(duplicateAdd).details).toMatchObject({
         ok: false,
         operation: 'add',
         status: 'duplicate',
       });
-      expect(duplicateAdd.body.error?.data?.suggestedFix).toContain('unmark_ticket_blocked');
+      expect(parseMcpToolError(duplicateAdd).details?.suggestedFix).toContain('unmark_ticket_blocked');
       expect(emittedEvents).toHaveLength(eventCountBeforeFailure);
     } finally {
       unsubscribe();
@@ -1418,7 +1418,7 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
         },
       });
       expect(setLabelsFailure.status).toBe(200);
-      expect(setLabelsFailure.body.error?.message).toContain('do not exist');
+      expect(parseMcpToolError(setLabelsFailure).message).toContain('not found');
       expect(emittedEvents).toHaveLength(0);
     } finally {
       unsubscribe();
@@ -1714,9 +1714,9 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
     expect(filteredTools.some(t => t.name === 'add_dependency')).toBe(false);
     expect(filteredTools.some(t => t.name === 'add_ticket_dependency')).toBe(false);
     expect(filteredTools.some(t => t.name === 'unmark_ticket_blocked')).toBe(true);
-    expect(filteredTools.some(t => t.name === 'remove_ticket_dependency')).toBe(true);
-    expect(filteredTools.some(t => t.name === 'get_ticket_details')).toBe(true);
-    expect(filteredTools.some(t => t.name === 'read_ticket_details')).toBe(true);
+    expect(filteredTools.some(t => t.name === 'remove_ticket_dependency')).toBe(false);
+    expect(filteredTools.some(t => t.name === 'get_ticket')).toBe(true);
+    expect(filteredTools.some(t => t.name === 'read_ticket_details')).toBe(false);
 
     // 6. tools/call blocks calling disabled tools
     const callDisabled = await ownerMcpRequest({
@@ -1763,6 +1763,6 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
         },
       });
     expect(callEnabled.status).toBe(200);
-    expect(callEnabled.body.error.message).toContain('NONEXISTENT-TICKET not found');
+    expect(parseMcpToolError(callEnabled).message).toContain('NONEXISTENT-TICKET not found');
   });
 });

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { and, asc, desc, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm';
-import { Router } from 'express';
+import { Router, type Request } from 'express';
 import { db } from '../../db/index.js';
 import {
   authUsers,
@@ -55,6 +55,9 @@ import {
 import { getSidebarTree } from './services/sidebar.js';
 import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
 import { toolHandlers } from '../mcp/tool-handlers/registry.js';
+import { getToolDefinition, listCanonicalTools } from '../mcp/tools.js';
+import { getMcpWorkspaceRole } from '../mcp/access.js';
+import { getToolPolicyParents } from '../mcp/policy.js';
 import { env } from '../../env.js';
 
 function getParamString(param?: string | string[] | undefined): string {
@@ -71,6 +74,14 @@ const MCP_SCOPE_CALL_WILDCARD = 'tools/call:*';
 const MCP_SCOPE_CALL_PREFIX = 'tools/call:';
 const MCP_DEFAULT_CONNECTION_SCOPES = [MCP_SCOPE_LIST];
 const MCP_MAX_CONNECTION_TTL_SECONDS = 24 * 60 * 60;
+
+async function authorizeMcpManagementAccess(req: Request, workspaceId: string) {
+  const actorUserId = await resolveRequestActorUserId(req);
+  if (!actorUserId) return { allowed: false as const, status: 401, error: 'Authentication required.' };
+  const workspaceRole = await getMcpWorkspaceRole(workspaceId, actorUserId);
+  if (workspaceRole === null) return { allowed: false as const, status: 403, error: 'Access denied: not a member of the workspace.' };
+  return { allowed: true as const, workspaceRole };
+}
 
 function normalizeMcpScope(rawScope: unknown) {
   return typeof rawScope === 'string' ? rawScope.trim() : '';
@@ -111,12 +122,11 @@ function resolveAuthorizedMcpScopes(rawScopes: unknown, isPrivilegedRequestor: b
     }
 
     if (scope.startsWith(MCP_SCOPE_CALL_PREFIX)) {
-      if (!isPrivilegedRequestor) {
+      const toolName = scope.slice(MCP_SCOPE_CALL_PREFIX.length);
+      if (!isPrivilegedRequestor && !getToolDefinition(toolName)?.annotations?.readOnlyHint) {
         invalidScopes.push(scope);
         continue;
       }
-
-      const toolName = scope.slice(MCP_SCOPE_CALL_PREFIX.length);
       if (!toolName || !allowedToolNames.has(toolName)) {
         invalidScopes.push(scope);
         continue;
@@ -145,7 +155,7 @@ function resolveConnectionTokenTtl(rawTtlSeconds: unknown) {
     return null;
   }
 
-  if (rawTtlSeconds <= 0) {
+  if (rawTtlSeconds < 1 || !Number.isInteger(rawTtlSeconds)) {
     return null;
   }
 
@@ -664,11 +674,11 @@ type McpConnectionResponsePayload = {
   args: {
     mcpEndpoint: string;
     workspaceId: string;
-    transport: 'http-post';
+    transport: 'streamable-http';
     protocol: 'mcp-jsonrpc';
   };
   auth: {
-    scheme: 'one_time_token';
+    scheme: 'bearer';
     token: string;
     expiresAt: string;
     singleUse: boolean;
@@ -698,13 +708,13 @@ async function buildMcpConnectionResponse(
     single_use: token.singleUse,
     connection_type: token.connectionType,
     args: {
-      mcpEndpoint: `${env.betterAuthBaseUrl}/api/v1/mcp/sse`,
+      mcpEndpoint: `${env.betterAuthBaseUrl}/api/v1/mcp`,
       workspaceId,
-      transport: 'http-post',
+      transport: 'streamable-http',
       protocol: 'mcp-jsonrpc',
     },
     auth: {
-      scheme: 'one_time_token',
+      scheme: 'bearer',
       token: token.rawToken,
       expiresAt: token.expiresAt,
       singleUse: token.singleUse,
@@ -721,16 +731,23 @@ export function createWorkspacesRouter() {
   const router = Router();
   // Basic rate limiters: per-user (or per-ip fallback) and per-ip
   const createLimiter = env.redisEnabled ? createRedisRateLimiter : createRateLimiter;
+  const connectionUserKey = async (req: Request) => {
+    const actor = await resolveRequestActorUserId(req);
+    const clientIp = getRequestSourceIp(req) ?? req.ip;
+    return actor ? `user:${actor}` : `ip:${clientIp}`;
+  };
+  const connectionIpKey = (req: Request) => `ip:${getRequestSourceIp(req) ?? req.ip}`;
   const issuanceUserLimiter = createLimiter({
+    namespace: 'mcp.connection.issue.user',
     windowMs: 60_000,
     max: 10,
-    keyFn: async (req) => {
-      const actor = await resolveRequestActorUserId(req);
-      const clientIp = getRequestSourceIp(req) ?? req.ip;
-      return actor ? `user:${actor}` : `ip:${clientIp}`;
-    },
+    keyFn: connectionUserKey,
   });
-  const issuanceIpLimiter = createLimiter({ windowMs: 60_000, max: 60, keyFn: (req) => `ip:${getRequestSourceIp(req) ?? req.ip}` });
+  const issuanceIpLimiter = createLimiter({ namespace: 'mcp.connection.issue.ip', windowMs: 60_000, max: 60, keyFn: connectionIpKey });
+  // Removing old credentials must neither consume issuance capacity nor be
+  // blocked by generation attempts. Keep each operation's existing limits.
+  const revocationUserLimiter = createLimiter({ namespace: 'mcp.connection.revoke.user', windowMs: 60_000, max: 10, keyFn: connectionUserKey });
+  const revocationIpLimiter = createLimiter({ namespace: 'mcp.connection.revoke.ip', windowMs: 60_000, max: 60, keyFn: connectionIpKey });
   // Enforce CSRF Origin/Referer checks for state-changing requests by default.
   // `csrfProtect` allows Authorization header or service tokens to bypass when appropriate.
   router.use(csrfProtect());
@@ -1047,7 +1064,7 @@ export function createWorkspacesRouter() {
 
       await writeExportChunk(
         res,
-        `],"taskExport":${buildWorkspaceTaskExportSummary(exportedTaskCount, expectedTaskCount, true)}`
+        `],"taskExport":${buildWorkspaceTaskExportSummary(exportedTaskCount, expectedTaskCount, true)}}`
       );
       res.end();
     } catch (error) {
@@ -1057,7 +1074,7 @@ export function createWorkspacesRouter() {
         try {
           await writeExportChunk(
             res,
-            `],"taskExport":${buildWorkspaceTaskExportSummary(exportedTaskCount, expectedTaskCount, false, exportError.message)}`
+            `],"taskExport":${buildWorkspaceTaskExportSummary(exportedTaskCount, expectedTaskCount, false, exportError.message)}}`
           );
           res.end();
         } catch {
@@ -1465,7 +1482,24 @@ export function createWorkspacesRouter() {
     }
   });
 
-  // Create a short-lived MCP connection token bound to this workspace.
+  // Policy catalog includes disabled tools so settings can re-enable them.
+  router.get('/workspaces/:workspaceId/mcp/tools', async (req, res) => {
+    const workspaceId = getParamString(req.params.workspaceId);
+    const auth = await authorizeMcpManagementAccess(req, workspaceId);
+    if (!auth.allowed) {
+      res.status(auth.status).json({ error: auth.error });
+      return;
+    }
+    const privileged = auth.workspaceRole === 'owner' || auth.workspaceRole === 'admin';
+    res.json({ tools: listCanonicalTools().map((tool) => ({
+      ...tool,
+      scope: `${MCP_SCOPE_CALL_PREFIX}${tool.name}`,
+      allowedForConnection: privileged || tool.annotations?.readOnlyHint === true,
+      policyParents: getToolPolicyParents(tool.name),
+    })) });
+  });
+
+  // Create a reusable, scoped MCP connection credential bound to this workspace.
   router.post('/workspaces/:workspaceId/mcp/connection', issuanceUserLimiter, issuanceIpLimiter, async (req, res) => {
     const workspaceId = getParamString(req.params.workspaceId);
     if (!workspaceId) {
@@ -1479,7 +1513,7 @@ export function createWorkspacesRouter() {
     }
 
     try {
-      const auth = await authorizeWorkspaceAccess(req, workspaceId);
+      const auth = await authorizeMcpManagementAccess(req, workspaceId);
       if (!auth.allowed) {
         res.status(auth.status).json({ error: auth.error });
         return;
@@ -1490,7 +1524,17 @@ export function createWorkspacesRouter() {
         return;
       }
 
-      const { scopes, ttlSeconds, singleUse, connectionType } = req.body ?? {};
+      const { scopes, ttlSeconds, singleUse, connectionType, bindToIp } = req.body ?? {};
+      if (connectionType === 'oauth') {
+        res.status(400).json({ error: 'OAuth connections must be created through the sign-in and consent flow.' });
+        return;
+      }
+      if ((scopes !== undefined && (!Array.isArray(scopes) || scopes.some((scope: unknown) => typeof scope !== 'string')))
+        || (singleUse !== undefined && typeof singleUse !== 'boolean')
+        || (bindToIp !== undefined && typeof bindToIp !== 'boolean')) {
+        res.status(400).json({ error: 'Invalid connection scopes or options.' });
+        return;
+      }
       const resolvedTtlSeconds = resolveConnectionTokenTtl(ttlSeconds);
       if (resolvedTtlSeconds === null) {
         res
@@ -1498,7 +1542,11 @@ export function createWorkspacesRouter() {
           .json({ error: `Invalid ttlSeconds. Must be a positive number of seconds up to ${MCP_MAX_CONNECTION_TTL_SECONDS}.` });
         return;
       }
-      const sourceIp = getRequestSourceIp(req);
+      const sourceIp = bindToIp === true ? getRequestSourceIp(req) : null;
+      if (bindToIp === true && !sourceIp) {
+        res.status(400).json({ error: 'Cannot bind connection without a source IP.' });
+        return;
+      }
       const isPrivilegedRequestor = auth.workspaceRole === 'owner' || auth.workspaceRole === 'admin';
       let resolvedScopes: string[];
 
@@ -1514,8 +1562,8 @@ export function createWorkspacesRouter() {
         generatedBy: actorUserId,
         scopes: resolvedScopes,
         ttlSeconds: resolvedTtlSeconds,
-        singleUse: singleUse === false ? false : true,
-        connectionType: typeof connectionType === 'string' ? connectionType : 'http-post',
+        singleUse: singleUse === true,
+        connectionType: typeof connectionType === 'string' ? connectionType : 'streamable-http',
         sourceIp,
       });
 
@@ -1548,7 +1596,7 @@ export function createWorkspacesRouter() {
     }
 
     try {
-      const auth = await authorizeWorkspaceAccess(req, workspaceId);
+      const auth = await authorizeMcpManagementAccess(req, workspaceId);
       if (!auth.allowed) {
         res.status(auth.status).json({ error: auth.error });
         return;
@@ -1588,7 +1636,8 @@ export function createWorkspacesRouter() {
           .json({ error: `Invalid ttlSeconds. Must be a positive number of seconds up to ${MCP_MAX_CONNECTION_TTL_SECONDS}.` });
         return;
       }
-      const sourceIp = getRequestSourceIp(req);
+      // Preserve opt-in binding during rotation; do not bind an unbound token to the browser.
+      const sourceIp = tokenRow.sourceIp ? getRequestSourceIp(req) : null;
       const token = await refreshConnectionToken(tokenId, actorUserId, { ttlSeconds: resolvedTtlSeconds, sourceIp });
 
       if (!token) {
@@ -1608,7 +1657,7 @@ export function createWorkspacesRouter() {
     }
   });
 
-  router.post('/workspaces/:workspaceId/mcp/connection/:tokenId/revoke', issuanceUserLimiter, issuanceIpLimiter, async (req, res) => {
+  router.post('/workspaces/:workspaceId/mcp/connection/:tokenId/revoke', revocationUserLimiter, revocationIpLimiter, async (req, res) => {
     const workspaceId = getParamString(req.params.workspaceId);
     const tokenId = getParamString(req.params.tokenId);
     if (!workspaceId || !tokenId) {
@@ -1622,7 +1671,7 @@ export function createWorkspacesRouter() {
     }
 
     try {
-      const auth = await authorizeWorkspaceAccess(req, workspaceId);
+      const auth = await authorizeMcpManagementAccess(req, workspaceId);
       if (!auth.allowed) {
         res.status(auth.status).json({ error: auth.error });
         return;
@@ -1653,7 +1702,7 @@ export function createWorkspacesRouter() {
     }
   });
 
-  // List MCP connection tokens (metadata only) for a workspace - owner/admin only
+  // Members manage their own connections; owners/admins can manage the workspace inventory.
   router.get('/workspaces/:workspaceId/mcp/connections', async (req, res) => {
     const workspaceId = getParamString(req.params.workspaceId);
     if (!workspaceId) {
@@ -1667,18 +1716,17 @@ export function createWorkspacesRouter() {
     }
 
     try {
-      const auth = await authorizeWorkspaceAccess(req, workspaceId);
+      const auth = await authorizeMcpManagementAccess(req, workspaceId);
       if (!auth.allowed) {
         res.status(auth.status).json({ error: auth.error });
         return;
       }
 
-      if (auth.workspaceRole !== 'owner' && auth.workspaceRole !== 'admin') {
-        res.status(403).json({ error: 'Owner or admin access is required.' });
-        return;
-      }
-
-      const rows = await db.select().from(mcpConnectionTokens).where(eq(mcpConnectionTokens.workspaceId, workspaceId)).orderBy(desc(mcpConnectionTokens.createdAt));
+      const isPrivileged = auth.workspaceRole === 'owner' || auth.workspaceRole === 'admin';
+      const rows = await db.select().from(mcpConnectionTokens).where(
+        isPrivileged ? eq(mcpConnectionTokens.workspaceId, workspaceId)
+          : and(eq(mcpConnectionTokens.workspaceId, workspaceId), eq(mcpConnectionTokens.generatedBy, actorUserId)),
+      ).orderBy(desc(mcpConnectionTokens.createdAt));
 
       res.json(
         rows.map((r) => ({

@@ -271,6 +271,19 @@ async function renderRealtimeApp(workspaceId: string, userId: string) {
 }
 
 describe('MCP SSE pipeline', () => {
+  it('refreshes ticket details after an external agent acts as the viewing user', async () => {
+    const { memberUser, workspace, mainTicket } = seedRealtimeWorkspace();
+    const user = await renderRealtimeApp(workspace.id, memberUser.id);
+    await user.click(await screen.findByText(mainTicket.title));
+
+    await callMcpTool(workspace.id, memberUser.id, 'update_ticket', {
+      ticketKey: mainTicket.key,
+      title: 'Updated by my external connection',
+    });
+
+    expect(await screen.findByDisplayValue('Updated by my external connection')).toBeInTheDocument();
+  });
+
   it('refreshes the client UI from MCP mutation events without a refresh', async () => {
     const { memberUser, agentUser, workspace, project, mainTicket, dependencyTicket } = seedRealtimeWorkspace();
     const user = await renderRealtimeApp(workspace.id, memberUser.id);

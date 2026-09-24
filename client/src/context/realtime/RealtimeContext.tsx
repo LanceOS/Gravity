@@ -42,7 +42,6 @@ export function useRealtimeContextValue({
   const projects = projectContext?.projects || [];
   const projectLookup = projectContext?.projectLookup || new Map();
   const queryClient = useQueryClient();
-  const currentUserIdRef = useRef<string | undefined>(currentUserId ?? undefined);
   const activeTicketRef = useRef<Ticket | null>(activeTicket);
   const sseCoalescerRef = useRef<SseEventCoalescer | null>(null);
 
@@ -50,10 +49,6 @@ export function useRealtimeContextValue({
     () => resolveWorkspaceIdForSse(projects, projectLookup, activeProjectId),
     [activeProjectId, projectLookup, projects],
   );
-
-  useEffect(() => {
-    currentUserIdRef.current = currentUserId ?? undefined;
-  }, [currentUserId]);
 
   useEffect(() => {
     activeTicketRef.current = activeTicket;
@@ -248,10 +243,8 @@ export function useRealtimeContextValue({
           return;
         }
 
-        if (parsed.actorUserId && parsed.actorUserId === currentUserIdRef.current) {
-          return;
-        }
-
+        // A user's external agent or another tab can mutate the same workspace.
+        // Identity alone cannot distinguish an optimistic update from a new change.
         coalescer.enqueue({
           type: parsed.type,
           ticketKey: parsed.ticketKey,

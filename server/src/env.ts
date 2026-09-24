@@ -58,6 +58,7 @@ const envSchema = z.object({
   MCP_STDIO_WORKSPACE_ID: z.string().optional(),
   MCP_STDIO_ACTOR_USER_ID: z.string().optional(),
   MCP_AGENT_COMMAND: z.string().optional(),
+  MCP_EVENT_NAMESPACE: z.string().trim().max(128).optional(),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   ALLOW_ENV_AI_KEYS: z.preprocess((v) => {
     if (typeof v !== 'string') return v;
@@ -118,6 +119,7 @@ export const env = {
   mcpStdioWorkspaceId: parsed.MCP_STDIO_WORKSPACE_ID?.trim() || undefined,
   mcpStdioActorUserId: parsed.MCP_STDIO_ACTOR_USER_ID?.trim() || undefined,
   mcpAgentCommand: parsed.MCP_AGENT_COMMAND?.trim() || undefined,
+  mcpEventNamespace: parsed.MCP_EVENT_NAMESPACE || undefined,
   nodeEnv: parsed.NODE_ENV,
   allowEnvAiKeys: parsed.ALLOW_ENV_AI_KEYS,
   redisUrl: parsed.REDIS_URL,

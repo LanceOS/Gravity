@@ -1,12 +1,34 @@
 import { createHmac, randomBytes } from 'node:crypto';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, gt, isNull, or, sql } from 'drizzle-orm';
 import { db } from '../../db/index.js';
 import { mcpConnectionTokens } from '../../db/schema.js';
 import { createId } from '../../lib/platform.js';
 import { env } from '../../env.js';
 import { audit, securityAlert } from '../../lib/logger.js';
+import { isMcpWorkspaceMember } from './access.js';
 
 const DEFAULT_MCP_SCOPES = ['tools/list'];
+const DEFAULT_TOKEN_TTL_SECONDS = 24 * 60 * 60;
+
+function configuredSecrets() {
+  const current = process.env.BETTER_AUTH_SECRET ?? env.betterAuthSecret;
+  const configured = process.env.BETTER_AUTH_OLD_SECRETS;
+  const entries = configured === undefined ? env.betterAuthOldSecrets : configured.split(',');
+  const keyed: Record<string, string> = {};
+  const legacy: string[] = [];
+  for (const entry of entries) {
+    const item = entry.trim();
+    if (!item) continue;
+    // Plain legacy secrets can themselves contain ':' or '=' (including
+    // base64 padding). Keep the original value as a verification candidate;
+    // explicitly keyed tokens still require their matching map entry below.
+    legacy.push(item);
+    const match = item.match(/^([^=:\s]+)[=:](.+)$/);
+    if (match) keyed[match[1]] = match[2];
+  }
+  return { current, keyed, legacy };
+}
+
 
 type CreateOptions = {
   workspaceId: string;
@@ -49,12 +71,12 @@ export async function createConnectionToken(opts: CreateOptions): Promise<Connec
   const raw = randomBytes(32).toString('hex');
   const hmacKeyId = opts.hmacKeyId ?? 'env';
   // Determine secret for the given key id. Prefer mapped keyed secrets, fall back to current env secret.
-  const secretForKey = hmacKeyId !== 'env' && env.betterAuthOldSecretsMap && env.betterAuthOldSecretsMap[hmacKeyId]
-    ? env.betterAuthOldSecretsMap[hmacKeyId]
-    : env.betterAuthSecret;
+  const secrets = configuredSecrets();
+  const secretForKey = hmacKeyId === 'env' ? secrets.current : secrets.keyed[hmacKeyId];
+  if (!secretForKey) throw new Error('Unknown MCP signing key.');
   const tokenHash = createHmac('sha256', secretForKey).update(raw).digest('hex');
 
-  const expiresAt = opts.ttlSeconds ? new Date(Date.now() + opts.ttlSeconds * 1000) : new Date(Date.now() + 5 * 60 * 1000);
+  const expiresAt = opts.ttlSeconds ? new Date(Date.now() + opts.ttlSeconds * 1000) : new Date(Date.now() + DEFAULT_TOKEN_TTL_SECONDS * 1000);
   const normalizedScopes = opts.scopes ?? DEFAULT_MCP_SCOPES;
 
   await db.insert(mcpConnectionTokens).values({
@@ -64,11 +86,11 @@ export async function createConnectionToken(opts: CreateOptions): Promise<Connec
     hmacKeyId,
     scopes: normalizedScopes,
     expiresAt,
-    singleUse: opts.singleUse !== undefined ? opts.singleUse : true,
+    singleUse: opts.singleUse ?? false,
     status: 'active',
     generatedBy: opts.generatedBy,
     sourceIp: opts.sourceIp ?? null,
-    connectionType: opts.connectionType ?? 'http-post',
+    connectionType: opts.connectionType ?? 'streamable-http',
     createdAt: new Date(),
   });
 
@@ -79,8 +101,8 @@ export async function createConnectionToken(opts: CreateOptions): Promise<Connec
     workspaceId: opts.workspaceId,
     generatedBy: opts.generatedBy,
     scopes: normalizedScopes,
-    singleUse: opts.singleUse !== undefined ? opts.singleUse : true,
-    connectionType: opts.connectionType ?? 'http-post',
+    singleUse: opts.singleUse ?? false,
+    connectionType: opts.connectionType ?? 'streamable-http',
     sourceIp: opts.sourceIp ?? null,
     expiresAt: expiresAt.toISOString(),
     hmacKeyId,
@@ -92,8 +114,8 @@ export async function createConnectionToken(opts: CreateOptions): Promise<Connec
     rawToken: raw,
     expiresAt: expiresAt.toISOString(),
     scopes: normalizedScopes,
-    singleUse: opts.singleUse !== undefined ? opts.singleUse : true,
-    connectionType: opts.connectionType ?? 'http-post',
+    singleUse: opts.singleUse ?? false,
+    connectionType: opts.connectionType ?? 'streamable-http',
   };
 }
 
@@ -131,23 +153,22 @@ export async function refreshConnectionToken(
 ): Promise<ConnectionTokenPayload | null> {
   const rows = await db.select().from(mcpConnectionTokens).where(eq(mcpConnectionTokens.id, tokenId)).limit(1);
   const row = rows[0];
-  if (!row || row.status !== 'active' || (row.expiresAt && row.expiresAt <= new Date())) {
+  if (!row || row.connectionType === 'oauth' || row.status !== 'active' || (row.expiresAt && row.expiresAt <= new Date())) {
     return null;
   }
 
   const raw = randomBytes(32).toString('hex');
-  const hmacKeyId = row.hmacKeyId ?? 'env';
-  const secretForKey = hmacKeyId !== 'env' && env.betterAuthOldSecretsMap && env.betterAuthOldSecretsMap[hmacKeyId]
-    ? env.betterAuthOldSecretsMap[hmacKeyId]
-    : env.betterAuthSecret;
+  // Refresh moves credentials onto the current signing key.
+  const hmacKeyId = 'env';
+  const secretForKey = configuredSecrets().current;
   const tokenHash = createHmac('sha256', secretForKey).update(raw).digest('hex');
-  const expiresAt = opts.ttlSeconds ? new Date(Date.now() + opts.ttlSeconds * 1000) : new Date(Date.now() + 5 * 60 * 1000);
+  const expiresAt = opts.ttlSeconds ? new Date(Date.now() + opts.ttlSeconds * 1000) : new Date(Date.now() + DEFAULT_TOKEN_TTL_SECONDS * 1000);
 
   await db.update(mcpConnectionTokens).set({
     tokenHash,
     hmacKeyId,
     expiresAt,
-    sourceIp: opts.sourceIp ?? row.sourceIp,
+    sourceIp: opts.sourceIp === undefined ? row.sourceIp : opts.sourceIp,
   }).where(eq(mcpConnectionTokens.id, tokenId));
 
   // Audit: token refreshed
@@ -159,7 +180,7 @@ export async function refreshConnectionToken(
     scopes: row.scopes,
     singleUse: row.singleUse,
     connectionType: row.connectionType,
-    sourceIp: opts.sourceIp ?? row.sourceIp,
+    sourceIp: opts.sourceIp === undefined ? row.sourceIp : opts.sourceIp,
     expiresAt: expiresAt.toISOString(),
     maskedToken: masked,
   });
@@ -175,89 +196,24 @@ export async function refreshConnectionToken(
 }
 
 export async function verifyAndConsumeToken(rawToken: string, workspaceId: string, opts?: { sourceIp?: string | null }) {
-  // Build a keyed map of known secrets. Prefer reading from `process.env` so
-  // test helpers that mutate `process.env` are immediately reflected even if
-  // modules were previously imported. Fall back to the `env` module values.
-  const splitList = (value?: string) =>
-    (value ?? '')
-      .toString()
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean) as string[];
-
-  const rawOldSecrets = splitList(process.env.BETTER_AUTH_OLD_SECRETS ?? (Array.isArray(env.betterAuthOldSecrets) ? env.betterAuthOldSecrets.join(',') : ''));
-  const oldMap: Record<string, string> = {};
-  for (const item of rawOldSecrets) {
-    const m = item.match(/^([^=:\s]+)[=:](.+)$/);
-    if (m) oldMap[m[1]] = m[2];
-  }
-
-  const currentSecret = process.env.BETTER_AUTH_SECRET ?? env.betterAuthSecret;
-  const keyedSecrets: Record<string, string> = { env: currentSecret, ...(oldMap ?? {}) };
-  const fallbackSecrets = rawOldSecrets;
-
-  // (no-op) keep verification deterministic; do not log secrets in tests
+  const secrets = configuredSecrets();
+  const knownSecrets = [...new Set([secrets.current, ...Object.values(secrets.keyed), ...secrets.legacy])];
 
   const rowOrUpdated = await db.transaction(async (tx) => {
-    let matchedRow: any = null;
-
-    // First, try keyed secrets (prefer mapping by key id)
-    const keyedIds = ['env', ...Object.keys(env.betterAuthOldSecretsMap ?? {})].filter(Boolean);
-    for (const keyId of keyedIds) {
-      const secret = keyedSecrets[keyId];
-      if (!secret) continue;
-
+    let matchedRow: typeof mcpConnectionTokens.$inferSelect | null = null;
+    for (const secret of knownSecrets) {
       const tokenHash = createHmac('sha256', secret).update(rawToken).digest('hex');
-      const rows = await tx
-        .select()
-        .from(mcpConnectionTokens)
+      const [candidate] = await tx.select().from(mcpConnectionTokens)
         .where(and(eq(mcpConnectionTokens.tokenHash, tokenHash), eq(mcpConnectionTokens.workspaceId, workspaceId)))
         .limit(1);
-
-      if (!rows[0]) continue;
-
-      const candidate = rows[0];
-      const storedKeyId = candidate.hmacKeyId ?? 'env';
-      const preferredSecret = keyedSecrets[storedKeyId];
-
-      
-
-      // If the row records a key id that we can map to a secret, prefer verifying with that secret.
-      if (preferredSecret) {
-        const expected = createHmac('sha256', preferredSecret).update(rawToken).digest('hex');
-        if (expected === candidate.tokenHash) {
-          matchedRow = candidate;
-          
-          break;
-        }
-
-        // preferred secret didn't match; keep searching for other candidates
-        continue;
-      }
-
-      // No preferred secret mapping available; do not accept a candidate that
-      // references a key id we no longer have a mapping for. Continue searching
-      // so we only verify tokens against known secrets.
-      
-      continue;
-    }
-
-    // Fallback: try unkeyed legacy secrets (preserve original behavior for plain-list configs)
-    if (!matchedRow && fallbackSecrets.length) {
-      for (const secret of fallbackSecrets) {
-        // avoid re-checking secrets already covered by keyedSecrets
-        if (Object.values(keyedSecrets).includes(secret)) continue;
-        const tokenHash = createHmac('sha256', secret).update(rawToken).digest('hex');
-        const rows = await tx
-          .select()
-          .from(mcpConnectionTokens)
-          .where(and(eq(mcpConnectionTokens.tokenHash, tokenHash), eq(mcpConnectionTokens.workspaceId, workspaceId)))
-          .limit(1);
-        if (rows[0]) {
-          matchedRow = rows[0];
-          break;
-        }
-      }
+      if (!candidate) continue;
+      const keyId = candidate.hmacKeyId ?? 'env';
+      // Historically API-issued tokens record "env", not a stable key id.
+      // Retained keyed values must therefore also verify those older tokens.
+      // Explicit key ids still require their original mapping to be retained.
+      if (keyId !== 'env' && secrets.keyed[keyId] !== secret) continue;
+      matchedRow = candidate;
+      break;
     }
 
     if (!matchedRow) return null;
@@ -279,7 +235,11 @@ export async function verifyAndConsumeToken(rawToken: string, workspaceId: strin
       const updated = await tx
         .update(mcpConnectionTokens)
         .set({ status: 'used', usedAt: new Date(), usageCount: sql`coalesce(usage_count, 0) + 1` })
-        .where(and(eq(mcpConnectionTokens.id, row.id), eq(mcpConnectionTokens.status, 'active')))
+        .where(and(
+          eq(mcpConnectionTokens.id, row.id), eq(mcpConnectionTokens.status, 'active'),
+          eq(mcpConnectionTokens.tokenHash, row.tokenHash),
+          or(isNull(mcpConnectionTokens.expiresAt), gt(mcpConnectionTokens.expiresAt, new Date())),
+        ))
         .returning();
 
       return updated[0] ?? null;
@@ -289,7 +249,11 @@ export async function verifyAndConsumeToken(rawToken: string, workspaceId: strin
     const updatedMulti = await tx
       .update(mcpConnectionTokens)
       .set({ usedAt: new Date(), usageCount: sql`coalesce(usage_count, 0) + 1` })
-      .where(and(eq(mcpConnectionTokens.id, row.id), eq(mcpConnectionTokens.status, 'active')))
+      .where(and(
+          eq(mcpConnectionTokens.id, row.id), eq(mcpConnectionTokens.status, 'active'),
+          eq(mcpConnectionTokens.tokenHash, row.tokenHash),
+          or(isNull(mcpConnectionTokens.expiresAt), gt(mcpConnectionTokens.expiresAt, new Date())),
+        ))
       .returning();
 
     return updatedMulti[0] ?? null;
@@ -312,7 +276,19 @@ export async function verifyAndConsumeToken(rawToken: string, workspaceId: strin
     generatedBy: rowOrUpdated.generatedBy,
     scopes: rowOrUpdated.scopes,
     connectionType: rowOrUpdated.connectionType,
+    singleUse: rowOrUpdated.singleUse,
+    tokenHash: rowOrUpdated.tokenHash,
   };
+}
+
+/** Rechecks a token-authenticated stdio session after its initial handshake. */
+export async function verifyConnectionTokenSession(tokenId: string, workspaceId: string, generatedBy: string, expectedTokenHash: string | null) {
+  const [row] = await db.select().from(mcpConnectionTokens)
+    .where(and(eq(mcpConnectionTokens.id, tokenId), eq(mcpConnectionTokens.workspaceId, workspaceId), eq(mcpConnectionTokens.generatedBy, generatedBy)))
+    .limit(1);
+  if (!row || row.status !== 'active' || (row.expiresAt && row.expiresAt <= new Date()) || row.tokenHash !== expectedTokenHash) return null;
+  if (!await isMcpWorkspaceMember(workspaceId, generatedBy)) return null;
+  return row;
 }
 
 export default {};

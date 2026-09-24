@@ -5,7 +5,7 @@ import type { ToolHandler } from './types.js';
  * handlers here dynamically at startup so the MCP core is not coupled to
  * specific domains.
  */
-export const toolHandlers: Record<string, ToolHandler> = {};
+export const toolHandlers: Record<string, ToolHandler> = Object.create(null);
 
 export function registerToolHandlers(handlers: Record<string, ToolHandler>) {
   Object.assign(toolHandlers, handlers);

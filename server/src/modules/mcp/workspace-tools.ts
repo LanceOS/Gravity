@@ -8,12 +8,12 @@ import { workspaceSettings } from '../../db/schema.js';
  * @param workspaceId Workspace whose MCP tool settings should be loaded.
  * @return The list of MCP tool names disabled for the workspace.
  */
-export async function getDisabledTools(workspaceId: string): Promise<string[]> {
+export async function getDisabledTools(workspaceId: string, query: Pick<typeof db, 'select'> = db): Promise<string[]> {
   if (!workspaceId) {
     return [];
   }
 
-  const [settings] = await db
+  const [settings] = await query
     .select({ disabledMcpTools: workspaceSettings.disabledMcpTools })
     .from(workspaceSettings)
     .where(eq(workspaceSettings.workspaceId, workspaceId))

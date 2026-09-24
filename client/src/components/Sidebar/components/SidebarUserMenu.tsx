@@ -113,18 +113,6 @@ export function SidebarUserMenu({
           type="button"
           onClick={() => {
             onCloseUserDropdown();
-            userMenu.onOpenMcp();
-          }}
-          className={getMenuItemClassName(userMenu.activeArea)}
-        >
-          <Settings2 size={14} color="var(--color-primary)" />
-          <span>Connect External AI</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            onCloseUserDropdown();
             userMenu.onSignOut();
           }}
           className="sidebar-user-menu__item sidebar-user-menu__item--danger"

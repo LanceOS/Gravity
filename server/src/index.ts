@@ -2,6 +2,7 @@ import { createServer } from 'node:http';
 import { createApp } from './app.js';
 import { initializeDatabase } from './db/bootstrap.js';
 import { env } from './env.js';
+import { startMcpEventBridge } from './lib/mcp-event-bridge.js';
 import { start as startServiceTokens, stopAutoRefresh } from './lib/serviceTokens.js';
 
 async function main() {
@@ -11,6 +12,7 @@ async function main() {
   // This is explicit so importing the module has no side-effects.
   await startServiceTokens();
 
+  const stopMcpEventBridge = startMcpEventBridge();
   const app = createApp();
   const server = createServer(app);
 
@@ -47,6 +49,8 @@ async function main() {
     } catch (err) {
       console.error('Error while closing HTTP server:', err);
     }
+
+    await stopMcpEventBridge();
 
     try {
       const { pool } = await import('./db/index.js');

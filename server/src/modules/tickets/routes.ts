@@ -190,7 +190,7 @@ export function createTicketsRouter() {
   }
 
   async function emitRelationshipCleanupEvents(
-    relationshipCleanup: TicketRelationshipCleanupEffect,
+    relationshipCleanup: Pick<TicketRelationshipCleanupEffect, 'affectedTickets'>,
   ) {
     if (relationshipCleanup.affectedTickets.length === 0) {
       return;
@@ -199,7 +199,7 @@ export function createTicketsRouter() {
     const affectedTicketSnapshots = await Promise.all(
       relationshipCleanup.affectedTickets.map(async ({ id, projectId }) => {
         const [ticket, scope] = await Promise.all([
-          getTicketById(id, projectId),
+          getTicketDetails(id, projectId),
           getProjectScope(projectId),
         ]);
 
@@ -417,16 +417,21 @@ export function createTicketsRouter() {
           res.status(404).json({ error: 'Ticket not found.' });
           return;
         }
-        const { ticket: updated, relationshipCleanup } = updateResult;
+        const { ticket: updated, relationshipCleanup, hierarchyChange } = updateResult;
+        const eventTicket = updated.projectId !== projectId || hierarchyChange.affectedTickets.length > 0
+          ? await getTicketDetails(updated.id, updated.projectId)
+          : updated;
 
         // Cross-project moves stay within the same workspace; one broadcast suffices
         // for the owning workspace but we still send two payloads so the client can
         // refresh both project views.
-        emitWorkspaceEvent(workspaceId, 'tickets-updated', { projectId, ticket: updated }, userId);
+        emitWorkspaceEvent(workspaceId, 'tickets-updated', { projectId, ticket: eventTicket }, userId);
         if (updated.projectId !== projectId) {
-          emitWorkspaceEvent(workspaceId, 'tickets-updated', { projectId: updated.projectId, ticket: updated }, userId);
+          emitWorkspaceEvent(workspaceId, 'tickets-updated', { projectId: updated.projectId, ticket: eventTicket }, userId);
         }
-        await emitRelationshipCleanupEvents(relationshipCleanup);
+        await emitRelationshipCleanupEvents({ affectedTickets: [...new Map([
+          ...relationshipCleanup.affectedTickets, ...hierarchyChange.affectedTickets,
+        ].map(affected => [affected.id, affected])).values()] });
         res.json(updated);
       } catch (error) {
         if (error instanceof Error) {

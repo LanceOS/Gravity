@@ -1,48 +1,69 @@
-import { randomUUID } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
+import { AsyncLocalStorage } from 'node:async_hooks';
 
 const UUID_GLOBAL_REGEX = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi;
 const GRAVITY_ID_GLOBAL_REGEX = /\b(w|p|ti|co|wsi|wsr|d|c)-[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b/g;
 
-export class McpStateMap {
-  private static realToTemp = new Map<string, string>();
-  private static tempToReal = new Map<string, string>();
-  private static counters = new Map<string, number>();
+type ScopedReferences = { realToTemp: Map<string, string>; tempToReal: Map<string, string>; touchedAt: number };
+const scopeContext = new AsyncLocalStorage<string>();
+const scopes = new Map<string, ScopedReferences>();
+const MAX_SCOPES = 1000;
+const MAX_REFERENCES = 5000;
+const REFERENCE_TTL_MS = 60 * 60 * 1000;
 
+/** Legacy references are local to one workspace and actor, bounded, and ephemeral. */
+export function withMcpStateScope<T>(scope: string, callback: () => T): T {
+  return scopeContext.run(scope, callback);
+}
+
+function currentReferences(): ScopedReferences | undefined {
+  const scope = scopeContext.getStore();
+  if (!scope) return undefined;
+  const now = Date.now();
+  for (const [key, entry] of scopes) {
+    if (now - entry.touchedAt > REFERENCE_TTL_MS) scopes.delete(key);
+  }
+  let entry = scopes.get(scope);
+  if (!entry) entry = { realToTemp: new Map(), tempToReal: new Map(), touchedAt: now };
+  entry.touchedAt = now;
+  scopes.delete(scope);
+  scopes.set(scope, entry);
+  while (scopes.size > MAX_SCOPES) scopes.delete(scopes.keys().next().value!);
+  return entry;
+}
+
+export class McpStateMap {
   static clear() {
-    this.realToTemp.clear();
-    this.tempToReal.clear();
-    this.counters.clear();
+    const scope = scopeContext.getStore();
+    if (scope) scopes.delete(scope);
+    else scopes.clear();
   }
 
   static getAllRealToTemp(): [string, string][] {
-    return Array.from(this.realToTemp.entries());
-  }
-
-  private static getNextTempId(prefix: string): string {
-    const current = this.counters.get(prefix) ?? 0;
-    this.counters.set(prefix, current + 1);
-
-    let code = '';
-    let temp = current;
-    while (temp >= 0) {
-      code = String.fromCharCode(65 + (temp % 26)) + code;
-      temp = Math.floor(temp / 26) - 1;
-    }
-    return `Temp-${prefix}-${code}`;
+    return Array.from(currentReferences()?.realToTemp.entries() ?? []);
   }
 
   static getOrCreateTempId(realId: string, prefixHint: string): string {
-    if (this.realToTemp.has(realId)) {
-      return this.realToTemp.get(realId)!;
+    const state = currentReferences();
+    // Stable authorized IDs remain the default outside an explicitly scoped request.
+    if (!state) return realId;
+    const existing = state.realToTemp.get(realId);
+    if (existing) return existing;
+    // Never reuse expired references for another resource or actor.
+    const code = Array.from(randomBytes(16), (byte) => String.fromCharCode(65 + byte % 26)).join('');
+    const tempId = `Temp-${prefixHint}-${code}`;
+    state.realToTemp.set(realId, tempId);
+    state.tempToReal.set(tempId, realId);
+    if (state.realToTemp.size > MAX_REFERENCES) {
+      const first = state.realToTemp.entries().next().value!;
+      state.realToTemp.delete(first[0]);
+      state.tempToReal.delete(first[1]);
     }
-    const tempId = this.getNextTempId(prefixHint);
-    this.realToTemp.set(realId, tempId);
-    this.tempToReal.set(tempId, realId);
     return tempId;
   }
 
   static getRealId(tempId: string): string | undefined {
-    return this.tempToReal.get(tempId);
+    return currentReferences()?.tempToReal.get(tempId);
   }
 }
 
@@ -99,11 +120,9 @@ export function sanitize(obj: any, keyContext = '', parentObj?: any): any {
   }
 
   if (typeof obj === 'object') {
-    const copy: any = {};
-    for (const [k, v] of Object.entries(obj)) {
-      copy[k] = sanitize(v, k, obj);
-    }
-    return copy;
+    // Define JSON keys as own data properties, including __proto__. Assignment
+    // into {} would turn attacker-controlled values into inherited arguments.
+    return Object.fromEntries(Object.entries(obj).map(([key, value]) => [key, sanitize(value, key, obj)]));
   }
 
   return obj;
@@ -132,11 +151,7 @@ export function desanitize(obj: any): any {
   }
 
   if (typeof obj === 'object') {
-    const copy: any = {};
-    for (const [k, v] of Object.entries(obj)) {
-      copy[k] = desanitize(v);
-    }
-    return copy;
+    return Object.fromEntries(Object.entries(obj).map(([key, value]) => [key, desanitize(value)]));
   }
 
   return obj;

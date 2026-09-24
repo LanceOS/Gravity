@@ -16,6 +16,7 @@ import { subscribeToEvents } from '../realtime.js';
 import { createRateLimiter } from '../lib/rateLimit.js';
 import { createRedisRateLimiter } from '../lib/rateLimitRedis.js';
 import { env } from '../env.js';
+import { createOAuthConsentRouter } from '../modules/mcp/oauth.js';
 import { getRequestSourceIp } from '../lib/request-ip.js';
 
 export const SSE_EVENTS_IP_RATE_LIMIT_MAX = 30;
@@ -25,14 +26,24 @@ export function createApiRouter() {
   const router = Router();
   const createLimiter = env.redisEnabled ? createRedisRateLimiter : createRateLimiter;
   const eventsIpLimiter = createLimiter({
+    namespace: 'events.subscribe.ip',
     windowMs: SSE_EVENTS_IP_RATE_LIMIT_WINDOW_MS,
     max: SSE_EVENTS_IP_RATE_LIMIT_MAX,
     keyFn: (req) => `ip:${getRequestSourceIp(req) ?? req.ip}`,
   });
 
-  // Apply CSRF protection to state-changing API endpoints. Authorization headers
-  // and service tokens bypass the check.
-  router.use(csrfProtect());
+  // The workspace OAuth transport requires a bearer token and never uses a
+  // browser cookie. Let its first unauthenticated request reach the 401 OAuth
+  // challenge instead of rejecting discovery for a missing Origin header.
+  // Session-authenticated legacy MCP and every other API keep CSRF protection.
+  const protectCsrf = csrfProtect();
+  router.use((req, res, next) => {
+    if (req.method === 'POST' && /^\/workspaces\/[^/]+\/mcp\/?$/.test(req.path)) return next();
+    return protectCsrf(req, res, next);
+  });
+  // Handle the bearer-only challenge before workspace routers that also install
+  // CSRF middleware for their browser-driven management endpoints.
+  router.use(createMcpRouter());
 
   router.use(createHealthRouter());
   router.use(createUsersRouter());
@@ -43,7 +54,7 @@ export function createApiRouter() {
   router.use(createTicketsRouter());
   router.use(createChatsRouter());
   router.use(createAiRouter());
-  router.use(createMcpRouter());
+  router.use(createOAuthConsentRouter());
   router.use(createNotesRouter());
   router.use(createWebhookRouter());
   router.get('/events/subscribe', eventsIpLimiter, subscribeToEvents);

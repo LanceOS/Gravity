@@ -25,7 +25,7 @@ describe('MCP connection endpoints', () => {
       scopes: expect.any(Array),
       type: 'mcp_http',
       auth: {
-        scheme: 'one_time_token',
+        scheme: 'bearer',
         token: expect.any(String),
       },
       metadata: {
@@ -64,7 +64,7 @@ describe('MCP connection endpoints', () => {
       expires_at: expect.any(String),
       type: 'mcp_http',
       auth: {
-        scheme: 'one_time_token',
+        scheme: 'bearer',
         token: expect.any(String),
       },
     });
@@ -128,7 +128,7 @@ describe('MCP connection endpoints', () => {
       owner: { id: owner.id, name: owner.name, email: owner.email, role: owner.role, avatarUrl: owner.avatar },
     });
 
-    const createRes = await ownerApi.post(`/api/v1/workspaces/${workspace.id}/mcp/connection`).send({});
+    const createRes = await ownerApi.post(`/api/v1/workspaces/${workspace.id}/mcp/connection`).send({ singleUse: true });
     expect(createRes.status).toBe(201);
     const rawToken = createRes.body.auth.token;
 

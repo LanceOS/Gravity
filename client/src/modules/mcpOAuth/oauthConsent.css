@@ -1,0 +1,44 @@
+.oauth-consent {
+  width: 100%;
+  min-height: 100dvh;
+  height: 100%;
+  overflow-y: auto;
+  background: var(--color-surface-app);
+  color: var(--color-text-primary);
+  padding: clamp(16px, 5vw, 48px) 16px;
+  box-sizing: border-box;
+}
+
+.oauth-consent__card {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: clamp(20px, 4vw, 36px);
+  background: var(--color-surface-card);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  overflow-wrap: anywhere;
+}
+
+.oauth-consent__header h1 { margin: 8px 0; font-size: 24px; }
+.oauth-consent__brand { color: var(--color-primary); font-weight: 700; }
+.oauth-consent p { margin: 0; line-height: 1.6; font-size: 14px; }
+.oauth-consent__header p, .oauth-consent__description, .oauth-consent__deadline { color: var(--color-text-secondary); }
+.oauth-consent a { color: var(--color-primary); }
+.oauth-consent__summary { display: grid; gap: 8px; }
+.oauth-consent__host { font-family: monospace; }
+.oauth-consent__permissions { border: 0; margin: 0; padding: 0; min-width: 0; }
+.oauth-consent__permissions legend { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
+.oauth-consent__group { margin-top: 20px; }
+.oauth-consent__group h2 { margin: 0 0 6px; font-size: 15px; }
+.oauth-consent__tool { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--color-border-default); cursor: pointer; }
+.oauth-consent__tool input { margin-top: 3px; accent-color: var(--color-primary); flex-shrink: 0; }
+.oauth-consent__tool strong { font-size: 14px; }
+.oauth-consent__description { display: block; font-size: 13px; line-height: 1.5; margin-top: 3px; }
+.oauth-consent__permissions:disabled .oauth-consent__tool { cursor: default; opacity: 0.65; }
+.oauth-consent__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 12px; }
+.oauth-consent__selection-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.oauth-consent__account-link { font-size: 13px; align-self: flex-start; }
