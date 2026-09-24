@@ -13,6 +13,7 @@ import { getAssigneeAvatar, getStatusLabel, getStatusColor } from '../utils/Tick
 import { LIST_STATUS_ORDER } from '../utils/ticketView';
 import { safeAnime, prefersReducedMotion } from '../../../utils/animationUtils';
 import anime from 'animejs';
+import './TicketList.css';
 
 type TicketListItem =
   | {
@@ -49,8 +50,10 @@ const MAX_TICKETS_FOR_LIST_ANIMATION = 240;
 const VIRTUAL_LIST_THRESHOLD = 120;
 const LIST_DEFAULT_VIRTUAL_HEIGHT = 560;
 const STATUS_HEADER_ROW_HEIGHT = 34;
-const DESKTOP_TICKET_LIST_ROW_HEIGHT = 64;
-const MOBILE_TICKET_LIST_ROW_HEIGHT = 84;
+const TICKET_ROW_GAP_REM = 0.5;
+const TICKET_ROW_GAP = `${TICKET_ROW_GAP_REM}rem`;
+const DESKTOP_TICKET_ROW_HEIGHT = 44;
+const MOBILE_TICKET_ROW_HEIGHT = 76;
 const STATUS_LOAD_MORE_ROW_HEIGHT = 44;
 const GLOBAL_LOAD_MORE_ROW_HEIGHT = 50;
 const EMPTY_STATE_ROW_HEIGHT = 180;
@@ -101,6 +104,7 @@ export const TicketList = React.memo(({
   const listRef = useRef<HTMLDivElement>(null);
   const didRunListLoadAnimationRef = React.useRef(false);
   const [viewportHeight, setViewportHeight] = useState(0);
+  const [ticketRowGapPx, setTicketRowGapPx] = useState(13 * TICKET_ROW_GAP_REM);
   const isMobileTicketLayout = useIsMobileTicketLayout();
   const previousFilteredCountRef = useRef(filteredCount);
 
@@ -182,6 +186,8 @@ export const TicketList = React.memo(({
 
     const updateHeight = () => {
       setViewportHeight(listElement.clientHeight);
+      const rootFontSize = Number.parseFloat(window.getComputedStyle(document.documentElement).fontSize) || 13;
+      setTicketRowGapPx(rootFontSize * TICKET_ROW_GAP_REM);
     };
 
     updateHeight();
@@ -271,8 +277,8 @@ export const TicketList = React.memo(({
       return EMPTY_STATE_ROW_HEIGHT;
     }
 
-    return isMobileTicketLayout ? MOBILE_TICKET_LIST_ROW_HEIGHT : DESKTOP_TICKET_LIST_ROW_HEIGHT;
-  }, [isMobileTicketLayout]);
+    return (isMobileTicketLayout ? MOBILE_TICKET_ROW_HEIGHT : DESKTOP_TICKET_ROW_HEIGHT) + ticketRowGapPx;
+  }, [isMobileTicketLayout, ticketRowGapPx]);
 
   const renderVirtualRow = useCallback((item: TicketListItem, _index: number, style: React.CSSProperties) => {
     if (item.kind === 'status-header') {
@@ -339,12 +345,12 @@ export const TicketList = React.memo(({
       return (
         <div
           key={item.id}
+          className="ticket-list__virtual-row"
           style={{
             ...style,
             display: 'flex',
             flexDirection: 'column',
-            gap: '8px',
-            paddingBottom: '8px',
+            paddingBottom: TICKET_ROW_GAP,
             boxSizing: 'border-box',
           }}
         >
@@ -517,7 +523,7 @@ export const TicketList = React.memo(({
                   </span>
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: TICKET_ROW_GAP }}>
                     {visibleTickets.map((ticket) => {
                       const project = projectById?.[ticket.projectId];
                       const rowProps = {
