@@ -14,6 +14,8 @@
     "test:oauth-proxy": "node --test scripts/oauth-proxy.test.mjs",
     "install:production-csp-browser": "playwright install chromium",
     "test:production-csp": "node scripts/production-csp-browser-test.mjs",
+    "test:focus-accessibility": "node scripts/focus-accessibility-browser-test.mjs",
+    "install:focus-accessibility-browsers": "playwright install chromium firefox webkit",
     "test:editor-trusted-types": "node scripts/editor-trusted-types-browser-test.mjs"
   },
   "dependencies": {

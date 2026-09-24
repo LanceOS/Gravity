@@ -77,6 +77,29 @@ function SelectHarness() {
 }
 
 describe('library layout and utilities', () => {
+  it('ignores hidden, inert, disabled and negative-tabindex controls without checkVisibility', async () => {
+    const user = userEvent.setup();
+    const excluded = <>
+      <div hidden><button>Hidden action</button></div>
+      <div inert><button>Inert action</button></div>
+      <fieldset disabled><button>Disabled action</button></fieldset>
+      <button tabIndex={-1}>Programmatic action</button>
+      <button tabIndex={-2}>Other negative action</button>
+    </>;
+    render(<FocusTrap>
+      {excluded}
+      <button>First visible action</button>
+      <button>Last visible action</button>
+      {excluded}
+    </FocusTrap>);
+
+    expect(screen.getByRole('button', { name: 'First visible action' })).toHaveFocus();
+    await user.tab({ shift: true });
+    expect(screen.getByRole('button', { name: 'Last visible action' })).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole('button', { name: 'First visible action' })).toHaveFocus();
+  });
+
   it('renders layout primitives and a portal target', () => {
     const { container } = render(
       <div>

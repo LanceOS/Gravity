@@ -202,8 +202,17 @@ assert_production_csp "${FRONTEND_PUBLIC_URL}/"
 curl --fail --silent --show-error "${FRONTEND_PUBLIC_URL}/csp-contract-check" | grep -i '<html' >/dev/null
 assert_production_csp "${FRONTEND_PUBLIC_URL}/csp-contract-check"
 
-log 'Installing Chromium for the production CSP browser smoke test'
-npm exec --prefix "$ROOT_DIR" -- playwright install chromium
+log 'Installing browsers for accessibility and production CSP regression tests'
+# Hosted Ubuntu runners need WebKit/Firefox libraries as well as browser files.
+# Local runs can provision dependencies for their own distribution separately.
+if [[ "${GITHUB_ACTIONS:-false}" == "true" ]]; then
+  npm exec --prefix "$ROOT_DIR" -- playwright install --with-deps chromium firefox webkit
+else
+  npm exec --prefix "$ROOT_DIR" -- playwright install chromium firefox webkit
+fi
+
+log 'Validating focus and rendered accessibility across browser engines'
+npm run --prefix "$CLIENT_DIR" test:focus-accessibility
 
 log 'Validating editor Trusted Types enforcement and unsupported-browser fallback'
 npm run --prefix "$CLIENT_DIR" test:editor-trusted-types

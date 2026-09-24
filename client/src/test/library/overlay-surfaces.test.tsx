@@ -3,6 +3,17 @@ import { describe, expect, it, vi } from 'vitest';
 import { AIChatWindow, Drawer, Modal } from '@library';
 
 describe('library overlay surfaces', () => {
+  it('names each drawer from its own visible title', () => {
+    render(<>
+      <Drawer isOpen onClose={() => {}} title="Activity log">First drawer</Drawer>
+      <Drawer isOpen onClose={() => {}} title="Details">Second drawer</Drawer>
+    </>);
+
+    const activity = screen.getByRole('dialog', { name: 'Activity log' });
+    const details = screen.getByRole('dialog', { name: 'Details' });
+    expect(activity.getAttribute('aria-labelledby')).not.toBe(details.getAttribute('aria-labelledby'));
+  });
+
   it('uses overlay theme tokens for modal, drawer, and AI chat surfaces', () => {
     Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
       configurable: true,

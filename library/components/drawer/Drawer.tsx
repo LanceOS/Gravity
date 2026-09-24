@@ -25,6 +25,7 @@ export interface DrawerProps {
 }
 
 export function Drawer({ isOpen, onClose, title, children, style }: DrawerProps) {
+  const titleId = React.useId();
   const [isRendered, setIsRendered] = React.useState(isOpen);
   const backdropRef = React.useRef<HTMLDivElement>(null);
   const contentRef = React.useRef<HTMLDivElement>(null);
@@ -132,6 +133,7 @@ export function Drawer({ isOpen, onClose, title, children, style }: DrawerProps)
               ref={contentRef}
               role="dialog"
               aria-modal="true"
+              aria-labelledby={title ? titleId : undefined}
               style={{
                 width: '100%',
                 maxWidth: '400px',
@@ -153,7 +155,7 @@ export function Drawer({ isOpen, onClose, title, children, style }: DrawerProps)
                 }}
               >
                 {title && (
-                  <h2 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                  <h2 id={titleId} style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
                     {title}
                   </h2>
                 )}
