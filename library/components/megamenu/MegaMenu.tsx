@@ -1,4 +1,5 @@
 import React from 'react';
+import { DisclosureTrigger, dismissDisclosureOnEscape } from '../../utilities/disclosureTrigger';
 import { ClickAwayListener } from '../../utilities';
 import { Link } from '../link';
 
@@ -12,20 +13,25 @@ export interface MegaMenuColumn {
 
 export interface MegaMenuProps {
   trigger: React.ReactNode;
+  /** Compose a custom button component that forwards button props to its DOM button. */
+  triggerAsChild?: boolean;
   columns: MegaMenuColumn[];
 }
 
-export function MegaMenu({ trigger, columns }: MegaMenuProps) {
+export function MegaMenu({ trigger, triggerAsChild, columns }: MegaMenuProps) {
+  const contentId = React.useId();
   const [isOpen, setIsOpen] = React.useState(false);
 
   return (
     <ClickAwayListener onClickAway={() => setIsOpen(false)}>
-      <div style={{ position: 'relative' }}>
-        <div onClick={() => setIsOpen(!isOpen)} className="clickable" style={{ display: 'inline-block' }}>
-          {trigger}
-        </div>
+      <div style={{ position: 'relative' }}
+        onKeyDown={(event) => dismissDisclosureOnEscape(event, isOpen, () => setIsOpen(false))}>
+        <DisclosureTrigger asChild={triggerAsChild} trigger={trigger} isOpen={isOpen} contentId={contentId}
+          onToggle={() => setIsOpen((open) => !open)} />
         {isOpen && (
           <div
+            id={contentId}
+            inert={!isOpen}
             style={{
               position: 'absolute',
               top: '100%',

@@ -72,6 +72,7 @@ export interface ContextMenuRootProps {
 }
 
 export function ContextMenuRoot({ children, trigger, content, items }: ContextMenuRootProps) {
+  const menuId = useId();
   const [isOpen, setIsOpen] = React.useState(false);
   const [isRendered, setIsRendered] = React.useState(false);
   const [coords, setCoords] = React.useState({ x: 0, y: 0 });
@@ -79,9 +80,22 @@ export function ContextMenuRoot({ children, trigger, content, items }: ContextMe
   const [activeSubmenuId, setActiveSubmenuId] = React.useState<string | null>(null);
 
   const handleContextMenu = (e: React.MouseEvent) => {
+    if (e.defaultPrevented) return;
     e.preventDefault();
     e.stopPropagation();
     setCoords({ x: e.clientX, y: e.clientY });
+    setActiveSubmenuId(null);
+    setIsOpen(true);
+  };
+
+  const handleTriggerKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.defaultPrevented || !(event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10'))) return;
+    if (!(event.target instanceof HTMLElement) || event.target.matches(':disabled, [aria-disabled="true"]')) return;
+    event.preventDefault();
+    event.stopPropagation();
+    // Keyboard invocation belongs beside the focused target, not at (0, 0).
+    const rect = event.target.getBoundingClientRect();
+    setCoords({ x: rect.left, y: rect.bottom });
     setActiveSubmenuId(null);
     setIsOpen(true);
   };
@@ -217,6 +231,18 @@ export function ContextMenuRoot({ children, trigger, content, items }: ContextMe
 
   // Determine actual trigger and menu content
   const actualTrigger = trigger || children;
+  // Keep the wrapper layout-transparent for table rows and flex children. The
+  // actual target carries focus; keyboard events from complex children bubble.
+  const focusableTrigger = React.isValidElement<React.HTMLAttributes<HTMLElement>>(actualTrigger)
+    && actualTrigger.type !== React.Fragment
+    ? React.cloneElement(actualTrigger, {
+      tabIndex: actualTrigger.props.tabIndex ?? 0,
+      className: [actualTrigger.props.className, 'lib-focus-ring'].filter(Boolean).join(' '),
+      'aria-haspopup': 'menu',
+      'aria-expanded': isOpen,
+      'aria-controls': isOpen ? menuId : undefined,
+    })
+    : <span className="lib-focus-ring" tabIndex={0} aria-haspopup="menu" aria-expanded={isOpen} aria-controls={isOpen ? menuId : undefined}>{actualTrigger}</span>;
   const actualContent = content || (trigger ? children : null);
   const resolveActualContent = React.useCallback(() => {
     return typeof actualContent === 'function' ? actualContent() : actualContent;
@@ -298,14 +324,15 @@ export function ContextMenuRoot({ children, trigger, content, items }: ContextMe
   return (
     <ContextMenuContext.Provider value={contextValue}>
       <MenuLevelContext.Provider value={levelValue}>
-        <div onContextMenu={handleContextMenu} style={{ display: 'contents' }}>
-          {actualTrigger}
+        <div onContextMenu={handleContextMenu} onKeyDown={handleTriggerKeyDown} style={{ display: 'contents' }}>
+          {focusableTrigger}
         </div>
         {isRendered && (
           <Portal>
             <FocusTrap active={isOpen}>
               <ClickAwayListener onClickAway={closeMenu}>
                 <div
+                  id={menuId}
                   ref={setMenuElement}
                   role="menu"
                   aria-label="Context Menu"
