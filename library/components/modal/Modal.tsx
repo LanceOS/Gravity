@@ -27,11 +27,13 @@ export interface ModalProps {
 
 export function Modal({ isOpen, onClose, title, children, footer, style }: ModalProps) {
   const [isRendered, setIsRendered] = React.useState(isOpen);
-  const backdropRef = React.useRef<HTMLDivElement>(null);
-  const dialogRef = React.useRef<HTMLDivElement>(null);
+  // Portal mounts after our first commit; start animations when its DOM is attached.
+  const [backdropElement, setBackdropElement] = React.useState<HTMLDivElement | null>(null);
+  const [dialogElement, setDialogElement] = React.useState<HTMLDivElement | null>(null);
 
   React.useEffect(() => {
     const reducedMotion = shouldReduceMotion();
+    let closeTimeout: number | undefined;
 
     if (isOpen) {
       setIsRendered(true);
@@ -44,19 +46,19 @@ export function Modal({ isOpen, onClose, title, children, footer, style }: Modal
         return;
       }
 
-      if (backdropRef.current) {
-        anime.remove(backdropRef.current);
+      if (backdropElement) {
+        anime.remove(backdropElement);
         runAnime({
-          targets: backdropRef.current,
+          targets: backdropElement,
           opacity: [1, 0],
           duration: MODAL_DURATION,
           easing: MODAL_EASING,
         });
       }
-      if (dialogRef.current) {
-        anime.remove(dialogRef.current);
+      if (dialogElement) {
+        anime.remove(dialogElement);
         runAnime({
-          targets: dialogRef.current,
+          targets: dialogElement,
           opacity: [1, 0],
           translateY: ['0px', '10px'],
           duration: MODAL_DURATION,
@@ -64,53 +66,56 @@ export function Modal({ isOpen, onClose, title, children, footer, style }: Modal
         });
       }
 
-      window.setTimeout(() => {
+      closeTimeout = window.setTimeout(() => {
         setIsRendered(false);
       }, MODAL_DURATION);
     }
 
     return () => {
+      window.clearTimeout(closeTimeout);
       document.body.style.overflow = '';
     };
-  }, [isOpen, isRendered]);
+  }, [isOpen, isRendered, backdropElement, dialogElement]);
 
   React.useLayoutEffect(() => {
     if (!isOpen || !isRendered || shouldReduceMotion()) {
       return;
     }
 
-    if (backdropRef.current) {
-      backdropRef.current.style.opacity = '0';
+    if (backdropElement) {
+      anime.remove(backdropElement);
+      backdropElement.style.opacity = '0';
       runAnime({
-        targets: backdropRef.current,
+        targets: backdropElement,
         opacity: [0, 1],
         duration: MODAL_DURATION,
         easing: MODAL_EASING,
       });
     }
-    if (dialogRef.current) {
-      dialogRef.current.style.opacity = '0';
-      dialogRef.current.style.transform = 'translateY(10px)';
+    if (dialogElement) {
+      anime.remove(dialogElement);
+      dialogElement.style.opacity = '0';
+      dialogElement.style.transform = 'translateY(10px)';
       runAnime({
-        targets: dialogRef.current,
+        targets: dialogElement,
         opacity: [0, 1],
         translateY: ['10px', '0px'],
         duration: MODAL_DURATION,
         easing: MODAL_EASING,
       });
     }
-  }, [isOpen, isRendered]);
+  }, [isOpen, isRendered, backdropElement, dialogElement]);
 
   React.useEffect(() => {
     return () => {
-      if (backdropRef.current) {
-        anime.remove(backdropRef.current);
+      if (backdropElement) {
+        anime.remove(backdropElement);
       }
-      if (dialogRef.current) {
-        anime.remove(dialogRef.current);
+      if (dialogElement) {
+        anime.remove(dialogElement);
       }
     };
-  }, []);
+  }, [backdropElement, dialogElement]);
 
   if (!isRendered) return null;
 
@@ -118,7 +123,7 @@ export function Modal({ isOpen, onClose, title, children, footer, style }: Modal
     <Portal>
       <FocusTrap>
         <div
-          ref={backdropRef}
+          ref={setBackdropElement}
           style={{
             position: 'fixed',
             top: 0,
@@ -136,7 +141,7 @@ export function Modal({ isOpen, onClose, title, children, footer, style }: Modal
         >
           <ClickAwayListener onClickAway={onClose}>
             <div
-              ref={dialogRef}
+              ref={setDialogElement}
               role="dialog"
               aria-modal="true"
               aria-labelledby={title ? 'modal-title' : undefined}

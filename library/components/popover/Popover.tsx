@@ -28,7 +28,7 @@ export function Popover({ trigger, children, isOpen: controlledIsOpen, onOpenCha
   const isCurrentlyOpen = controlledIsOpen !== undefined ? controlledIsOpen : uncontrolledIsOpen;
 
   const triggerRef = React.useRef<HTMLDivElement>(null);
-  const popoverRef = React.useRef<HTMLDivElement>(null);
+  const [popoverElement, setPopoverElement] = React.useState<HTMLDivElement | null>(null);
 
   const [renderState, setRenderState] = React.useState({
     isOpen: isCurrentlyOpen,
@@ -55,10 +55,14 @@ export function Popover({ trigger, children, isOpen: controlledIsOpen, onOpenCha
   };
 
   const syncPosition = React.useCallback(() => {
-    if (!triggerRef.current || !popoverRef.current || !shouldRender) return;
+    if (!triggerRef.current || !popoverElement || !shouldRender) return;
 
+    // Clear alignment CSS offsets before measuring the portal in viewport coordinates.
+    popoverElement.style.position = 'fixed';
+    popoverElement.style.right = 'auto';
+    popoverElement.style.margin = '0';
     const triggerRect = triggerRef.current.getBoundingClientRect();
-    const popoverRect = popoverRef.current.getBoundingClientRect();
+    const popoverRect = popoverElement.getBoundingClientRect();
     const { left, top, maxHeight } = getDropdownPosition({
       triggerRect,
       floatingRect: popoverRect,
@@ -69,35 +73,25 @@ export function Popover({ trigger, children, isOpen: controlledIsOpen, onOpenCha
       fallbackHeight: 200,
     });
 
-    popoverRef.current.style.position = 'fixed';
-    popoverRef.current.style.left = `${left}px`;
-    popoverRef.current.style.top = `${top}px`;
-    popoverRef.current.style.margin = '0';
-    popoverRef.current.style.maxHeight = `${maxHeight}px`;
-    popoverRef.current.style.overflowY = 'auto';
-  }, [align, shouldRender]);
+    popoverElement.style.left = `${left}px`;
+    popoverElement.style.top = `${top}px`;
+    popoverElement.style.maxHeight = `${maxHeight}px`;
+    popoverElement.style.overflowY = 'auto';
+  }, [align, shouldRender, popoverElement]);
 
   const handleViewportChange = React.useCallback(
     (event?: Event) => {
       if (event instanceof Event) {
         const target = event.target;
-        if (target instanceof Node && popoverRef.current?.contains(target)) {
+        if (target instanceof Node && popoverElement?.contains(target)) {
           return;
         }
       }
 
       syncPosition();
     },
-    [syncPosition]
+    [syncPosition, popoverElement]
   );
-
-  const setPopoverElement = React.useCallback((node: HTMLDivElement | null) => {
-    popoverRef.current = node;
-
-    if (node) {
-      syncPosition();
-    }
-  }, [syncPosition]);
 
   React.useLayoutEffect(() => {
     if (shouldRender) {
@@ -112,7 +106,7 @@ export function Popover({ trigger, children, isOpen: controlledIsOpen, onOpenCha
   }, [shouldRender, handleViewportChange, syncPosition]);
 
   React.useEffect(() => {
-    if (shouldRender && popoverRef.current) {
+    if (shouldRender && popoverElement) {
       if (typeof ResizeObserver === 'undefined') {
         return undefined;
       }
@@ -120,13 +114,13 @@ export function Popover({ trigger, children, isOpen: controlledIsOpen, onOpenCha
       const resizeObserver = new ResizeObserver(() => {
         syncPosition();
       });
-      resizeObserver.observe(popoverRef.current);
+      resizeObserver.observe(popoverElement);
       return () => resizeObserver.disconnect();
     }
-  }, [shouldRender, syncPosition]);
+  }, [shouldRender, syncPosition, popoverElement]);
 
   React.useLayoutEffect(() => {
-    if (!shouldRender || isAnimatingOut || !popoverRef.current) {
+    if (!shouldRender || isAnimatingOut || !popoverElement) {
       return;
     }
 
@@ -134,20 +128,20 @@ export function Popover({ trigger, children, isOpen: controlledIsOpen, onOpenCha
       return;
     }
 
-    popoverRef.current.style.opacity = '0';
-    popoverRef.current.style.transform = 'translateY(-4px)';
-    anime.remove(popoverRef.current);
+    popoverElement.style.opacity = '0';
+    popoverElement.style.transform = 'translateY(-4px)';
+    anime.remove(popoverElement);
     runAnime({
-      targets: popoverRef.current,
+      targets: popoverElement,
       opacity: [0, 1],
       translateY: [-4, 0],
       duration: 150,
       easing: 'cubic-bezier(0.2, 0, 0.38, 1)',
     });
-  }, [shouldRender, isAnimatingOut]);
+  }, [shouldRender, isAnimatingOut, popoverElement]);
 
   React.useEffect(() => {
-    if (!isAnimatingOut || !popoverRef.current) {
+    if (!isAnimatingOut || !popoverElement) {
       return;
     }
 
@@ -160,9 +154,9 @@ export function Popover({ trigger, children, isOpen: controlledIsOpen, onOpenCha
       return;
     }
 
-    anime.remove(popoverRef.current);
+    anime.remove(popoverElement);
     runAnime({
-      targets: popoverRef.current,
+      targets: popoverElement,
       opacity: [1, 0],
       translateY: [0, -4],
       duration: 130,
@@ -175,15 +169,15 @@ export function Popover({ trigger, children, isOpen: controlledIsOpen, onOpenCha
         }));
       },
     });
-  }, [isAnimatingOut]);
+  }, [isAnimatingOut, popoverElement]);
 
   React.useEffect(() => {
     return () => {
-      if (popoverRef.current) {
-        anime.remove(popoverRef.current);
+      if (popoverElement) {
+        anime.remove(popoverElement);
       }
     };
-  }, []);
+  }, [popoverElement]);
 
   return (
     <ClickAwayListener onClickAway={() => setOpen(false)}>

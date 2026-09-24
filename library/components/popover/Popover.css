@@ -7,6 +7,7 @@
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-md);
   padding: var(--space-3);
+  width: max-content;
   min-width: 200px;
   margin-top: 8px;
   max-width: calc(100vw - 32px);
@@ -24,5 +25,4 @@
 
 .popover-content--align-center {
   left: 50%;
-  transform: translateX(-50%);
 }

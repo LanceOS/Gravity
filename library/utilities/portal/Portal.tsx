@@ -9,6 +9,7 @@ interface PortalProps {
 export function Portal({ children, container }: PortalProps) {
   const [mountNode, setMountNode] = React.useState<HTMLElement | null>(null);
 
+  // Match the server and first hydration render; resolve the host only after commit.
   React.useEffect(() => {
     setMountNode(container || document.body);
   }, [container]);

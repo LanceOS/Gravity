@@ -24,7 +24,7 @@ function shouldReduceMotion(): boolean {
 export function Tooltip({ content, children, style }: TooltipProps) {
   const [show, setShow] = React.useState(false);
   const [isRendered, setIsRendered] = React.useState(false);
-  const tooltipRef = React.useRef<HTMLDivElement>(null);
+  const [tooltipElement, setTooltipElement] = React.useState<HTMLDivElement | null>(null);
 
   React.useEffect(() => {
     if (show) {
@@ -35,9 +35,9 @@ export function Tooltip({ content, children, style }: TooltipProps) {
       } else if (shouldReduceMotion()) {
         setIsRendered(false);
       } else {
-        if (tooltipRef.current) {
+        if (tooltipElement) {
           runAnime({
-            targets: tooltipRef.current,
+            targets: tooltipElement,
             opacity: [1, 0],
             translateY: [0, -4],
             duration: TOOLTIP_DURATION,
@@ -51,35 +51,35 @@ export function Tooltip({ content, children, style }: TooltipProps) {
         }
       }
     }
-  }, [show, isRendered]);
+  }, [show, isRendered, tooltipElement]);
 
   React.useLayoutEffect(() => {
-    if (show && isRendered && tooltipRef.current) {
+    if (show && isRendered && tooltipElement) {
       if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
         return;
       }
       if (shouldReduceMotion()) {
         return;
       }
-      tooltipRef.current.style.opacity = '0';
-      tooltipRef.current.style.transform = 'translateY(4px)';
+      tooltipElement.style.opacity = '0';
+      tooltipElement.style.transform = 'translateY(4px)';
       runAnime({
-        targets: tooltipRef.current,
+        targets: tooltipElement,
         opacity: [0, 1],
         translateY: [4, 0],
         duration: TOOLTIP_DURATION,
         easing: TOOLTIP_EASING,
       });
     }
-  }, [show, isRendered]);
+  }, [show, isRendered, tooltipElement]);
 
   React.useEffect(() => {
     return () => {
-      if (tooltipRef.current) {
-        anime.remove(tooltipRef.current);
+      if (tooltipElement) {
+        anime.remove(tooltipElement);
       }
     };
-  }, []);
+  }, [tooltipElement]);
 
   return (
     <div
@@ -91,7 +91,7 @@ export function Tooltip({ content, children, style }: TooltipProps) {
       {isRendered && (
         <Portal>
           <div
-            ref={tooltipRef}
+            ref={setTooltipElement}
             role="tooltip"
             style={{
               position: 'absolute',
