@@ -1,5 +1,6 @@
 import React, { StrictMode, useEffect } from 'react';
 import { act, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { hydrateRoot } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
@@ -9,6 +10,60 @@ import { Drawer } from '@library/components/drawer/Drawer';
 import { Popover } from '@library/components/popover/Popover';
 
 describe('Portal lifecycle', () => {
+  it('preserves child state and focus when rerendered into the same container', async () => {
+    const user = userEvent.setup();
+    const target = document.createElement('aside');
+    document.body.append(target);
+    const view = (label: string) => <StrictMode><Portal container={target}>
+      <label>{label}<input aria-label="Draft" defaultValue="" /></label>
+    </Portal></StrictMode>;
+    const { rerender, unmount } = render(view('Initial label'));
+    try {
+      const input = within(target).getByRole('textbox', { name: 'Draft' });
+      await user.type(input, 'Unsaved draft');
+      rerender(view('Updated label'));
+      expect(within(target).getByText('Updated label')).toBeInTheDocument();
+      expect(within(target).getByRole('textbox')).toBe(input);
+      expect(input).toHaveValue('Unsaved draft');
+      expect(input).toHaveFocus();
+    } finally {
+      unmount();
+      target.remove();
+    }
+  });
+
+  it('moves and unmounts one portal without removing a sibling portal or host content', () => {
+    const shared = document.createElement('aside');
+    const destination = document.createElement('aside');
+    const hostContent = document.createElement('span');
+    hostContent.textContent = 'Host-owned content';
+    shared.append(hostContent);
+    document.body.append(shared, destination);
+    const view = (target: HTMLElement, showMoving = true) => <>
+      <Portal container={shared}><button>Stationary action</button></Portal>
+      {showMoving && <Portal container={target}><button>Moving action</button></Portal>}
+    </>;
+    const { rerender, unmount } = render(view(shared));
+    try {
+      const stationary = within(shared).getByRole('button', { name: 'Stationary action' });
+      expect(within(shared).getAllByRole('button')).toHaveLength(2);
+      rerender(view(destination));
+      expect(within(shared).queryByRole('button', { name: 'Moving action' })).toBeNull();
+      expect(within(destination).getByRole('button', { name: 'Moving action' })).toBeInTheDocument();
+      rerender(view(destination, false));
+      expect(destination).toBeEmptyDOMElement();
+      expect(within(shared).getByRole('button')).toBe(stationary);
+      expect(hostContent).toBeInTheDocument();
+      unmount();
+      expect(shared.childNodes).toHaveLength(1);
+      expect(shared.firstChild).toBe(hostContent);
+    } finally {
+      unmount();
+      shared.remove();
+      destination.remove();
+    }
+  });
+
   it('moves between custom containers and body, cleans children on unmount, and preserves host content', () => {
     const first = document.createElement('section');
     const second = document.createElement('section');
