@@ -6,6 +6,7 @@ import type { AIChatMessage } from './types';
 import { getWindowStyle, type AIChatWindowVariant } from './styles';
 import { runAnime } from '../../utilities';
 import anime from 'animejs';
+import { useReducedMotion } from '../../utilities/useReducedMotion';
 
 export interface AIChatWindowProps {
   title?: React.ReactNode;
@@ -42,9 +43,8 @@ export function AIChatWindow({
   const chatEndRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
   const windowRef = useRef<HTMLDivElement>(null);
-  const isReduced = typeof window === 'undefined'
-    ? false
-    : window.matchMedia('(prefers-reduced-motion: reduce)').matches || (typeof process !== 'undefined' && process.env.NODE_ENV === 'test');
+  const prefersReducedMotion = useReducedMotion();
+  const isReduced = prefersReducedMotion || (typeof process !== 'undefined' && process.env.NODE_ENV === 'test');
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -54,8 +54,8 @@ export function AIChatWindow({
   }, []);
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isGenerating]);
+    chatEndRef.current?.scrollIntoView({ behavior: isReduced ? 'auto' : 'smooth' });
+  }, [messages, isGenerating, isReduced]);
 
   useEffect(() => {
     const windowElement = windowRef.current;
@@ -197,7 +197,7 @@ export function AIChatWindow({
               fontSize: '11.5px',
               color: 'var(--color-text-secondary)',
               boxShadow: 'var(--shadow-sm)',
-              animation: 'pulse 2s infinite',
+              animation: isReduced ? 'none' : 'pulse 2s infinite',
             }}
           >
             <div

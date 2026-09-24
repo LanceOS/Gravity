@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AIChatWindow } from '@library';
 
@@ -12,7 +12,46 @@ afterEach(() => {
 });
 
 describe('AIChatWindow', () => {
-  it.each(['embedded', 'reduced motion'] as const)('restores visible styles when switching to %s mid-animation', (mode) => {
+  it('responds to live reduced-motion changes without a parent render and removes the listener', () => {
+    vi.stubEnv('NODE_ENV', 'development');
+    const scrollIntoView = vi.spyOn(HTMLElement.prototype, 'scrollIntoView');
+    const events = new EventTarget();
+    const mediaQuery = {
+      matches: false,
+      media: '(prefers-reduced-motion: reduce)',
+      addEventListener: vi.fn(events.addEventListener.bind(events)),
+      removeEventListener: vi.fn(events.removeEventListener.bind(events)),
+    };
+    vi.spyOn(window, 'matchMedia').mockReturnValue(mediaQuery as unknown as MediaQueryList);
+    const { container, unmount } = render(<AIChatWindow messages={[]} onSendMessage={() => {}} isGenerating />);
+    expect(scrollIntoView).toHaveBeenLastCalledWith({ behavior: 'smooth' });
+    const chatWindow = container.firstElementChild as HTMLElement;
+    chatWindow.style.opacity = '0.35';
+    chatWindow.style.transform = 'translateY(8px)';
+
+    act(() => {
+      mediaQuery.matches = true;
+      events.dispatchEvent(new Event('change'));
+    });
+
+    expect(animeMock.remove).toHaveBeenCalledWith(chatWindow);
+    expect(chatWindow.style.opacity).toBe('');
+    expect(chatWindow.style.transform).toBe('');
+    expect(screen.getByTestId('chat-generating-icon').style.animation).toBe('none');
+    expect(screen.getByText('Generating answer...').parentElement?.style.animation).toBe('none');
+    expect(scrollIntoView).toHaveBeenLastCalledWith({ behavior: 'auto' });
+
+    act(() => {
+      mediaQuery.matches = false;
+      events.dispatchEvent(new Event('change'));
+    });
+    expect(screen.getByTestId('chat-generating-icon').style.animation).not.toBe('none');
+    expect(scrollIntoView).toHaveBeenLastCalledWith({ behavior: 'smooth' });
+    unmount();
+    expect(mediaQuery.removeEventListener).toHaveBeenCalledWith('change', mediaQuery.addEventListener.mock.calls[0][1]);
+  });
+
+  it('restores visible styles when switching to embedded mid-animation', () => {
     vi.stubEnv('NODE_ENV', 'development');
     const props = { messages: [], onSendMessage: () => {} };
     const { container, rerender } = render(<AIChatWindow {...props} />);
@@ -20,11 +59,7 @@ describe('AIChatWindow', () => {
     chatWindow.style.opacity = '0.35';
     chatWindow.style.transform = 'translateY(8px)';
 
-    if (mode === 'reduced motion') {
-      const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
-      vi.spyOn(window, 'matchMedia').mockReturnValue({ ...mediaQuery, matches: true });
-    }
-    rerender(<AIChatWindow {...props} variant={mode === 'embedded' ? 'embedded' : 'floating'} />);
+    rerender(<AIChatWindow {...props} variant="embedded" />);
 
     expect(animeMock.remove).toHaveBeenCalledWith(chatWindow);
     expect(animeMock).toHaveBeenCalledTimes(1);

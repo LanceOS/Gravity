@@ -78,3 +78,17 @@ need focused profiling or behavior design before a larger change.
   backend during the requested port 9999 restart. The frontend output includes
   separate workspace, directory, account, and workspace settings chunks. The
   native binding failure above is limited to the host build environment tested.
+
+## Follow-up branch review
+
+Reviewed the complete branch diff against `main`; no GitHub PR existed at review
+time. Found and corrected a gap in reduced-motion handling: the chat read the
+preference during render without subscribing, so a live OS preference change did
+not cancel animation until an unrelated render. A subscribed hook now updates
+immediately and cleans up its listener. The generating pulse and automatic
+scrolling also respect the preference. The regression dispatches a media-query
+change without forcing a parent render, verifies both preference directions and
+listener cleanup, and failed before the fix.
+
+The focused review checks passed: 32 client tests, 10 server tests, and client
+TypeScript checking. No other actionable issues were found in the branch diff.
