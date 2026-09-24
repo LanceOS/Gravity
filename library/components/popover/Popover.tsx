@@ -1,10 +1,13 @@
 import React from 'react';
+import { DisclosureTrigger, dismissDisclosureOnEscape, useDisclosureTriggerId } from '../../utilities/disclosureTrigger';
 import { Portal, ClickAwayListener, getDropdownPosition, runAnime } from '../../utilities';
 import anime from 'animejs';
 import './Popover.css';
 
 export interface PopoverProps {
   trigger: React.ReactNode;
+  /** Compose a custom button component that forwards button props to its DOM button. */
+  triggerAsChild?: boolean;
   children: React.ReactNode;
   isOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -23,10 +26,12 @@ function shouldReduceMotion(): boolean {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
-export function Popover({ trigger, children, isOpen: controlledIsOpen, onOpenChange, style, align = 'left', contentClassName = '' }: PopoverProps) {
+export function Popover({ trigger, triggerAsChild, children, isOpen: controlledIsOpen, onOpenChange, style, align = 'left', contentClassName = '' }: PopoverProps) {
   const [uncontrolledIsOpen, setUncontrolledIsOpen] = React.useState(false);
   const isCurrentlyOpen = controlledIsOpen !== undefined ? controlledIsOpen : uncontrolledIsOpen;
 
+  const contentId = React.useId();
+  const triggerId = useDisclosureTriggerId(trigger, triggerAsChild);
   const triggerRef = React.useRef<HTMLDivElement>(null);
   const [popoverElement, setPopoverElement] = React.useState<HTMLDivElement | null>(null);
 
@@ -45,6 +50,14 @@ export function Popover({ trigger, children, isOpen: controlledIsOpen, onOpenCha
   }
 
   const { shouldRender, isAnimatingOut } = renderState;
+
+  React.useLayoutEffect(() => {
+    // Preserve a child's autofocus. Otherwise enter the portaled dialog without
+    // scrolling the page to the portal's position before it is measured.
+    if (isCurrentlyOpen && popoverElement && !popoverElement.contains(document.activeElement)) {
+      popoverElement.focus({ preventScroll: true });
+    }
+  }, [isCurrentlyOpen, popoverElement]);
 
   const setOpen = (open: boolean) => {
     if (onOpenChange) {
@@ -184,14 +197,19 @@ export function Popover({ trigger, children, isOpen: controlledIsOpen, onOpenCha
       <div 
         style={{ position: 'relative', display: 'inline-block', ...style }} 
         ref={triggerRef}
-        onClick={() => setOpen(!isCurrentlyOpen)}
+        onKeyDown={(event) => dismissDisclosureOnEscape(event, isCurrentlyOpen, () => setOpen(false))}
       >
-        {trigger}
+        <DisclosureTrigger id={triggerId} asChild={triggerAsChild} trigger={trigger} isOpen={isCurrentlyOpen} contentId={contentId}
+          hasPopup="dialog" onToggle={() => setOpen(!isCurrentlyOpen)} />
         {shouldRender && (
           <Portal>
             <div
+              id={contentId}
+              inert={!isCurrentlyOpen}
               ref={setPopoverElement}
               role="dialog"
+              aria-labelledby={triggerId}
+              tabIndex={-1}
               onClick={(e) => e.stopPropagation()}
               className={`popover-content popover-content--align-${align} ${contentClassName}`}
               style={{ zIndex: 1700 }}

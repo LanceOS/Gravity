@@ -75,12 +75,15 @@ async function verify(page, browserName, scenario, origin) {
     await semantics(page, browserName, [['button', 'Dropdown trigger'], ['button', 'Context target']]);
     await page.getByRole('button', { name: 'Dropdown trigger' }).focus();
     await focused(page, 'Dropdown trigger');
-    // Trigger keyboard semantics are GRAV-98. Only pointer opening is tested here.
-    await page.getByRole('button', { name: 'Dropdown trigger' }).click();
+    await page.keyboard.press('Enter');
     await page.getByRole('button', { name: 'Dropdown action' }).waitFor();
     await semantics(page, browserName, [['button', 'Dropdown trigger'], ['button', 'Dropdown action']]);
     await page.keyboard.press('Tab');
     await focused(page, 'Dropdown action');
+    await page.keyboard.press('Escape');
+    await focused(page, 'Dropdown trigger');
+    await page.keyboard.press('Space');
+    assert.equal(await page.getByRole('button', { name: 'Dropdown trigger' }).getAttribute('aria-expanded'), 'true');
     await page.getByRole('button', { name: 'Outside action' }).click();
     const target = page.getByRole('button', { name: 'Context target' });
     await target.focus();
@@ -91,6 +94,55 @@ async function verify(page, browserName, scenario, origin) {
     await focused(page, 'Last menu action');
     await page.keyboard.press('Escape');
     await focused(page, 'Context target');
+    for (const key of ['Shift+F10', 'ContextMenu']) {
+      await page.keyboard.press(key);
+      await focused(page, 'First menu action');
+      await page.keyboard.press('Escape');
+      await focused(page, 'Context target');
+    }
+    await page.getByText('Non-button context target', { exact: true }).focus();
+    await page.keyboard.press('Shift+F10');
+    await focused(page, 'Non-button menu action');
+    await page.keyboard.press('Escape');
+    await focused(page, 'Non-button context target');
+    return;
+  }
+  if (scenario === 'popover-autofocus') {
+    const trigger = page.getByRole('button', { name: 'Search labels' });
+    await trigger.click();
+    await focused(page, 'Search');
+    await page.keyboard.type('bug');
+    assert.equal(await page.getByRole('textbox', { name: 'Search' }).inputValue(), 'bug');
+    await semantics(page, browserName, [['dialog', 'Search labels'], ['textbox', 'Search'], ['button', 'Apply']]);
+    assert.equal(await trigger.getAttribute('id'), 'search-trigger');
+    await page.keyboard.press('Escape');
+    await focused(page, 'Search labels');
+    return;
+  }
+  if (scenario === 'triggers') {
+    for (const [name, actionRole, action] of [
+      ['Native dropdown trigger', 'button', 'Native dropdown action'],
+      ['Popover trigger', 'button', 'Popover action'],
+      ['Mega menu trigger', 'link', 'Mega menu action'],
+      ['Confirm trigger', 'button', 'No'],
+    ]) {
+      const trigger = page.getByRole('button', { name, exact: true });
+      await trigger.focus();
+      await page.keyboard.press('Enter');
+      await page.getByRole(actionRole, { name: action, exact: true }).waitFor();
+      assert.equal(await trigger.getAttribute('aria-expanded'), 'true');
+      await semantics(page, browserName, [['button', name], [actionRole, action]]);
+      await page.keyboard.press('Tab');
+      await focused(page, action);
+      await page.keyboard.press('Escape');
+      await focused(page, name);
+      assert.equal(await trigger.getAttribute('aria-expanded'), 'false');
+      await page.keyboard.press('Space');
+      assert.equal(await trigger.getAttribute('aria-expanded'), 'true');
+      await trigger.focus();
+      await page.keyboard.press('Space');
+      assert.equal(await trigger.getAttribute('aria-expanded'), 'false');
+    }
     return;
   }
   // Explicit focus makes return-focus checks independent of platform pointer-focus preferences.
@@ -136,7 +188,7 @@ try {
     assert.ok(engines[browserName], `Unknown browser: ${browserName}`);
     browser = await engines[browserName].launch({ headless: true });
     console.info(`[focus-accessibility] ${browserName} ${browser.version()}`);
-    for (const scenario of ['basic', 'legend', 'visible-override', ...['hidden', 'display', 'inert', 'fieldset', 'negative', 'negativeOther', 'input', 'invisible'].map((kind) => `excluded-${kind}`), 'modal', 'drawer', 'menus']) {
+    for (const scenario of ['basic', 'legend', 'visible-override', ...['hidden', 'display', 'inert', 'fieldset', 'negative', 'negativeOther', 'input', 'invisible'].map((kind) => `excluded-${kind}`), 'modal', 'drawer', 'menus', 'triggers', 'popover-autofocus']) {
       const page = await browser.newPage({ reducedMotion: 'reduce' });
       const errors = [];
       page.on('pageerror', (error) => errors.push(error.message));

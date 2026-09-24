@@ -1,38 +1,32 @@
 import React from 'react';
+import { DisclosureTrigger, dismissDisclosureOnEscape } from '../../utilities/disclosureTrigger';
 import { ClickAwayListener } from '../../utilities';
 
 export interface PopconfirmProps {
   title: string;
   onConfirm: () => void;
   children: React.ReactElement;
+  /** Compose a custom button component that forwards button props to its DOM button. */
+  triggerAsChild?: boolean;
   style?: React.CSSProperties;
 }
 
-interface ClickableTriggerProps {
-  onClick?: React.MouseEventHandler<Element>;
-}
-
 export const Popconfirm = React.forwardRef<HTMLDivElement, PopconfirmProps>(function Popconfirm(
-  { title, onConfirm, children, style },
+  { title, onConfirm, children, style, triggerAsChild },
   ref,
 ) {
   const [isOpen, setIsOpen] = React.useState(false);
-  // The public trigger contract remains broad; only its optional click handler
-  // is composed when cloning the element.
-  const trigger = children as React.ReactElement<ClickableTriggerProps>;
+  const contentId = React.useId();
 
   return (
     <ClickAwayListener onClickAway={() => setIsOpen(false)}>
-      <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
-        {React.cloneElement(trigger, {
-          onClick: (event: React.MouseEvent<Element>) => {
-            event.preventDefault();
-            setIsOpen((wasOpen) => !wasOpen);
-            trigger.props.onClick?.(event);
-          },
-        })}
+      <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}
+        onKeyDown={(event) => dismissDisclosureOnEscape(event, isOpen, () => setIsOpen(false))}>
+        <DisclosureTrigger asChild={triggerAsChild} trigger={children} isOpen={isOpen} contentId={contentId}
+          onToggle={() => setIsOpen((open) => !open)} />
         {isOpen && (
           <div
+            id={contentId}
             style={{
               position: 'absolute',
               bottom: '100%',

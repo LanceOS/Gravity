@@ -11,8 +11,10 @@ The real FocusTrap, Modal, Drawer, DropdownMenu and ContextMenu components are
 mounted in a production-bundled standalone fixture. No account or backend is
 needed. The wrappers retain `display: contents`: no loss of descendant roles or
 names was reproduced by the checks below, and ordinary focus traversal worked.
-Dropdown/context-menu keyboard **trigger** semantics remain GRAV-98. These tests
-open menus with pointer events; they do not establish trigger keyboard compliance.
+At the time of this audit, dropdown/context-menu keyboard **trigger** semantics
+remained GRAV-98 and menus were opened with pointer events. The subsequent
+[GRAV-98 trigger changes](InteractiveTriggers.md) extend this fixture with
+keyboard invocation and additional disclosure coverage.
 
 Two defects were reproduced before the fixes in Chromium and Firefox:
 

@@ -1,4 +1,5 @@
 import React from 'react';
+import { DisclosureTrigger, dismissDisclosureOnEscape } from '../../utilities/disclosureTrigger';
 import { ClickAwayListener, runAnime } from '../../utilities';
 import anime from 'animejs';
 
@@ -17,10 +18,13 @@ function shouldReduceMotion(): boolean {
 
 export interface DropdownMenuProps {
   trigger: React.ReactNode;
+  /** Compose a custom button component that forwards button props to its DOM button. */
+  triggerAsChild?: boolean;
   children: React.ReactNode;
 }
 
-export function DropdownMenu({ trigger, children }: DropdownMenuProps) {
+export function DropdownMenu({ trigger, triggerAsChild, children }: DropdownMenuProps) {
+  const contentId = React.useId();
   const [isOpen, setIsOpen] = React.useState(false);
   const [renderState, setRenderState] = React.useState({ shouldRender: false, isClosing: false });
   const menuRef = React.useRef<HTMLDivElement>(null);
@@ -91,12 +95,14 @@ export function DropdownMenu({ trigger, children }: DropdownMenuProps) {
 
   return (
     <ClickAwayListener onClickAway={() => setIsOpen(false)}>
-      <div style={{ position: 'relative', display: 'inline-block' }}>
-        <div onClick={() => setIsOpen(!isOpen)} className="clickable" style={{ display: 'contents' }}>
-          {trigger}
-        </div>
+      <div style={{ position: 'relative', display: 'inline-block' }}
+        onKeyDown={(event) => dismissDisclosureOnEscape(event, isOpen, () => setIsOpen(false))}>
+        <DisclosureTrigger asChild={triggerAsChild} trigger={trigger} isOpen={isOpen} contentId={contentId}
+          onToggle={() => setIsOpen((open) => !open)} />
         {renderState.shouldRender && (
           <div
+            id={contentId}
+            inert={!isOpen}
             ref={menuRef}
             style={{
               position: 'absolute',
