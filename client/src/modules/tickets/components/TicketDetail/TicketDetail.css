@@ -1,11 +1,9 @@
 .ticket-subtask-item {
-  transition: background var(--transition-fast), transform var(--transition-fast);
-  will-change: background, transform;
+  transition: background-color var(--transition-fast);
 }
 
 .ticket-subtask-item:hover {
   background: var(--color-base100);
-  transform: translateX(3px);
 }
 
 /* Extracted layout classes for TicketDetail */
@@ -14,17 +12,17 @@
   flex-direction: column;
   height: 100%;
   flex: 1 1 auto;
-  background: var(--color-surface-app);
+  background: transparent;
   overflow: hidden;
 }
 
 .ticket-detail__header {
-  padding: 12px 24px;
-  border-bottom: 1px solid var(--color-border-default);
+  padding: 16px 28px;
+  border-bottom: 1px solid var(--border-subtle);
   display: flex;
   align-items: center;
   gap: 12px;
-  background: var(--color-base50);
+  background: var(--surface-glass-subtle);
 }
 
 .ticket-detail__back-btn {
@@ -67,10 +65,10 @@
   min-width: 0;
   min-height: 0;
   overflow-y: auto;
-  padding: 24px 32px;
+  padding: 32px clamp(24px, 4vw, 64px);
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 28px;
 }
 
 .ticket-detail__comment-form {
@@ -94,10 +92,13 @@
   width: 320px;
   flex-shrink: 0;
   min-height: 0;
-  border-left: 1px solid var(--color-border-default);
-  background: var(--color-surface-app);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-lg);
+  background: var(--surface-glass);
+  box-shadow: var(--shadow-sm);
   overflow-y: auto;
   padding: 24px;
+  margin: 24px 24px 24px 0;
 }
 
 .ticket-detail__accordion-mobile {
@@ -107,7 +108,7 @@
 .ticket-detail__properties-grid {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 28px;
 }
 
 @media (max-width: 768px) {
@@ -128,8 +129,9 @@
   }
 
   .ticket-detail__content {
-    padding: 16px;
+    padding: 20px 16px;
     overflow-y: visible;
+    gap: 24px;
   }
 
   .ticket-detail__comment-form {
@@ -173,14 +175,13 @@
   justify-content: space-between;
   gap: 12px;
   padding: 0 0 6px;
-  border-bottom: 1px solid var(--color-border-default);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .ticket-relations__title {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
   color: var(--color-text-disabled);
   white-space: nowrap;
 }
@@ -193,7 +194,7 @@
   padding: 2px 7px;
   border-radius: 999px;
   background: var(--color-surface-overlay);
-  border: 1px solid var(--color-border-default);
+  border: 1px solid var(--border-subtle);
   color: var(--color-text-secondary);
   font-size: 10px;
   font-weight: 700;
@@ -213,10 +214,10 @@
   align-items: center;
   justify-content: center;
   gap: 4px;
-  height: 22px;
-  padding: 2px 10px;
+  min-height: 28px;
+  padding: 4px 10px;
   border-radius: 999px;
-  border: 1px dashed var(--color-border-default);
+  border: 1px solid var(--border-subtle);
   background: transparent;
   color: var(--color-text-secondary);
   font-size: 11px;
@@ -231,7 +232,6 @@
   border-color: var(--color-border-focus);
   color: var(--color-text-primary);
   outline: none;
-  transform: translateY(-1px);
 }
 
 .ticket-detail__inline-trigger:focus-visible {
@@ -251,9 +251,9 @@
   gap: 10px;
   width: 100%;
   padding: 7px 10px;
-  border: 1px solid var(--color-border-default);
-  border-radius: 6px;
-  background: var(--color-surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-glass-subtle);
   color: inherit;
   text-align: left;
   cursor: pointer;
@@ -287,7 +287,7 @@
   text-transform: uppercase;
   color: var(--color-text-secondary);
   background: var(--color-surface-overlay);
-  border: 1px solid var(--color-border-default);
+  border: 1px solid var(--border-subtle);
   white-space: nowrap;
 }
 
@@ -336,7 +336,7 @@
 
 .ticket-configurations__assignee-avatar {
   object-fit: cover;
-  border: 1px solid var(--color-border-default);
+  border: 1px solid var(--border-subtle);
 }
 
 .ticket-configurations__assignee-fallback {
@@ -360,5 +360,30 @@
 
   .ticket-configurations__ticket-title {
     white-space: normal;
+  }
+}
+
+
+.ticket-detail__section-heading {
+  display: flex;
+  align-items: center;
+  padding-bottom: 8px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.ticket-detail__sidebar-heading {
+  margin-bottom: 24px;
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+@media (min-width: 769px) and (max-width: 1100px) {
+  .ticket-detail__sidebar {
+    width: 280px;
+    padding: 20px;
+    margin: 20px 20px 20px 0;
   }
 }

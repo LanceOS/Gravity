@@ -521,8 +521,8 @@ describe('AppShellPage theme integration', () => {
     await waitFor(() => {
       expect(document.documentElement).toHaveAttribute('data-theme', 'marble-blue');
       expect(document.documentElement).toHaveAttribute('data-density', 'compact');
-      expect(document.documentElement.style.getPropertyValue('--color-surface-elevated')).toBe('rgba(255, 255, 255, 0.95)');
-      expect(document.documentElement.style.getPropertyValue('--color-overlay-scrim')).toBe('rgba(15, 23, 42, 0.7)');
+      expect(document.documentElement.style.getPropertyValue('--color-surface-elevated')).toBe('rgba(255, 255, 255, 0.94)');
+      expect(document.documentElement.style.getPropertyValue('--color-overlay-scrim')).toBe('rgba(30, 44, 65, 0.30)');
       expect(document.documentElement.style.getPropertyValue('--space-base-multiplier')).toBe('0.75');
       expect(window.localStorage.getItem('gravity_theme')).toBe('marble-blue');
     });

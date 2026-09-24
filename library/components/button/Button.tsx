@@ -1,5 +1,6 @@
 import React from 'react';
 import { cn } from '../../utilities';
+import './Button.css';
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'default' | 'primary' | 'secondary' | 'danger' | 'ghost' | 'link' | 'accent';
@@ -25,10 +26,10 @@ export function Button({
   ...props
 }: ButtonProps) {
   const sizePadding = {
-    xs: '4px 8px',
-    sm: '6px 12px',
-    md: '8px 16px',
-    lg: '10px 20px',
+    xs: '5px 10px',
+    sm: '7px 13px',
+    md: '9px 16px',
+    lg: '12px 22px',
   }[size];
 
   const sizeFontSize = {
@@ -38,11 +39,11 @@ export function Button({
     lg: '14px',
   }[size];
 
-  let bg = 'var(--color-surface-card)';
-  let color = 'var(--color-text-secondary)';
-  let border = '1px solid var(--color-border-default)';
-  let hoverBg = 'var(--color-base100)';
-  let activeBg = 'var(--color-border-default)';
+  let bg = 'var(--surface-glass-strong)';
+  let color = 'var(--color-text-primary)';
+  let border = '1px solid var(--border-glass)';
+  let hoverBg = 'var(--color-surface-card)';
+  let activeBg = 'var(--color-state-hover-overlay)';
 
   if (variant === 'primary' || variant === 'accent') {
     bg = 'var(--color-primary)';
@@ -53,7 +54,7 @@ export function Button({
   } else if (variant === 'secondary') {
     bg = 'var(--color-state-selected-bg)';
     color = 'var(--color-primary)';
-    border = '1px solid var(--color-border-focus)';
+    border = '1px solid transparent';
     hoverBg = 'var(--color-primary-light)';
     activeBg = 'var(--color-primary-light)';
   } else if (variant === 'danger') {
@@ -66,8 +67,8 @@ export function Button({
     bg = 'transparent';
     color = 'var(--color-text-secondary)';
     border = '1px solid transparent';
-    hoverBg = 'var(--color-base100)';
-    activeBg = 'var(--color-border-default)';
+    hoverBg = 'var(--color-state-hover-overlay)';
+    activeBg = 'var(--color-state-selected-bg)';
   } else if (variant === 'link') {
     bg = 'transparent';
     color = 'var(--color-primary)';
@@ -76,7 +77,10 @@ export function Button({
     activeBg = 'transparent';
   }
 
-  const baseStyle: React.CSSProperties = {
+  const baseStyle: React.CSSProperties & Record<'--lib-button-bg' | '--lib-button-hover-bg' | '--lib-button-active-bg', string> = {
+    '--lib-button-bg': bg,
+    '--lib-button-hover-bg': hoverBg,
+    '--lib-button-active-bg': activeBg,
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -84,8 +88,8 @@ export function Button({
     padding: sizePadding,
     fontSize: sizeFontSize,
     fontWeight: 500,
+    lineHeight: 1.35,
     borderRadius: 'var(--radius-sm)',
-    backgroundColor: bg,
     color: color,
     border: border,
     cursor: disabled || loading ? 'not-allowed' : 'pointer',
@@ -95,33 +99,16 @@ export function Button({
     width: fullWidth ? '100%' : 'auto',
     textAlign: 'center',
     userSelect: 'none',
-    boxShadow: 'none',
+    boxShadow: variant === 'default' || variant === 'primary' || variant === 'accent' ? 'var(--shadow-sm)' : 'none',
     ...style,
-  };
-
-  const [isHovered, setIsHovered] = React.useState(false);
-  const [isActive, setIsActive] = React.useState(false);
-
-  const currentBg = isActive ? activeBg : isHovered ? hoverBg : bg;
-  const currentStyle: React.CSSProperties = {
-    ...baseStyle,
-    backgroundColor: variant === 'link' ? 'transparent' : currentBg,
-    textDecoration: variant === 'link' && isHovered ? 'underline' : 'none',
   };
 
   return (
     <button
       type={type}
-      style={currentStyle}
+      style={baseStyle}
       disabled={disabled || loading}
-      onMouseEnter={() => !disabled && !loading && setIsHovered(true)}
-      onMouseLeave={() => {
-        setIsHovered(false);
-        setIsActive(false);
-      }}
-      onMouseDown={() => !disabled && !loading && setIsActive(true)}
-      onMouseUp={() => !disabled && !loading && setIsActive(false)}
-      className={cn('clickable lib-focus-ring', className)}
+      className={cn('lib-button clickable lib-focus-ring', variant === 'link' && 'lib-button--link', className)}
       {...props}
     >
       {loading && (

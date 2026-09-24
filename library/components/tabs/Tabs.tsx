@@ -22,9 +22,15 @@ export function Tabs({ items, defaultTab, style }: TabsProps) {
         aria-label="Tabs navigation"
         style={{
           display: 'flex',
-          borderBottom: '1px solid var(--color-border-default)',
-          gap: '16px',
-          marginBottom: '12px',
+          padding: '4px',
+          border: '1px solid var(--border-subtle)',
+          borderRadius: 'var(--radius-md)',
+          background: 'var(--surface-glass-subtle)',
+          width: 'fit-content',
+          maxWidth: '100%',
+          overflowX: 'auto',
+          gap: '4px',
+          marginBottom: '20px',
         }}
       >
         {items.map((item) => {
@@ -37,17 +43,19 @@ export function Tabs({ items, defaultTab, style }: TabsProps) {
               aria-controls={`panel-${item.id}`}
               id={`tab-${item.id}`}
               onClick={() => setActiveTab(item.id)}
-              className="clickable"
+              className="clickable lib-focus-ring"
               style={{
                 border: 'none',
-                background: 'none',
-                padding: '8px 4px',
+                background: isSelected ? 'var(--surface-glass-strong)' : 'transparent',
+                borderRadius: 'var(--radius-sm)',
+                boxShadow: isSelected ? 'var(--shadow-sm)' : 'none',
+                whiteSpace: 'nowrap',
+                padding: '8px 14px',
                 fontSize: '13px',
                 fontWeight: isSelected ? 500 : 400,
-                color: isSelected ? 'var(--color-primary)' : 'var(--color-text-disabled)',
+                color: isSelected ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                 cursor: 'pointer',
-                borderBottom: isSelected ? '2px solid var(--color-primary)' : '2px solid transparent',
-                transition: 'color var(--transition-fast), border-bottom-color var(--transition-fast)',
+                transition: 'color var(--transition-fast), background-color var(--transition-fast), box-shadow var(--transition-fast)',
               }}
             >
               {item.label}

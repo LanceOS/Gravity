@@ -131,7 +131,8 @@ export function Modal({ isOpen, onClose, title, children, footer, style }: Modal
             bottom: 0,
             left: 0,
             backgroundColor: 'var(--color-overlay-scrim)',
-            backdropFilter: 'blur(10px)',
+            backdropFilter: 'blur(6px)',
+            WebkitBackdropFilter: 'blur(6px)',
             zIndex: 1500,
             display: 'flex',
             alignItems: 'center',
@@ -148,9 +149,12 @@ export function Modal({ isOpen, onClose, title, children, footer, style }: Modal
               style={{
                 width: '100%',
                 maxWidth: '500px',
-                backgroundColor: 'var(--color-surface-overlay)',
-                border: '1px solid var(--color-border-default)',
-                borderRadius: 'var(--radius-lg)',
+                backgroundColor: 'var(--surface-glass-strong)',
+                border: '1px solid var(--border-glass)',
+                boxShadow: 'var(--shadow-xl)',
+                backdropFilter: 'blur(var(--glass-blur)) saturate(var(--glass-saturate))',
+                WebkitBackdropFilter: 'blur(var(--glass-blur)) saturate(var(--glass-saturate))',
+                borderRadius: 'var(--radius-xl)',
                 display: 'flex',
                 flexDirection: 'column',
                 maxHeight: 'calc(100vh - 32px)',
@@ -162,8 +166,8 @@ export function Modal({ isOpen, onClose, title, children, footer, style }: Modal
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  padding: '16px 20px',
-                  borderBottom: '1px solid var(--color-border-default)',
+                  padding: '22px 24px 16px',
+                  borderBottom: '1px solid var(--border-subtle)',
                 }}
               >
                 {title && (
@@ -176,24 +180,24 @@ export function Modal({ isOpen, onClose, title, children, footer, style }: Modal
                   onClick={onClose}
                   aria-label="Close dialog"
                   className="btn btn-ghost clickable"
-                  style={{ padding: '4px', minHeight: 'auto' }}
+                  style={{ padding: '6px', minHeight: 'auto', borderRadius: 'var(--radius-sm)' }}
                 >
                   <X size={16} />
                 </button>
               </div>
-              <div style={{ padding: '20px', overflowY: 'auto', flexGrow: 1, fontSize: '13px' }}>{children}</div>
+              <div style={{ padding: '24px', overflowY: 'auto', flexGrow: 1, fontSize: '13px' }}>{children}</div>
 
               {footer && (
                 <div
                   style={{
-                    padding: '12px 20px',
-                    borderTop: '1px solid var(--color-border-default)',
+                    padding: '16px 24px',
+                    borderTop: '1px solid var(--border-subtle)',
                     display: 'flex',
                     justifyContent: 'flex-end',
                     gap: '8px',
-                    backgroundColor: 'var(--color-surface-overlay)',
-                    borderBottomLeftRadius: 'var(--radius-lg)',
-                    borderBottomRightRadius: 'var(--radius-lg)',
+                    backgroundColor: 'var(--surface-glass-strong)',
+                    borderBottomLeftRadius: 'var(--radius-xl)',
+                    borderBottomRightRadius: 'var(--radius-xl)',
                   }}
                 >
                   {footer}

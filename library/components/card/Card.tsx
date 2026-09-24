@@ -1,4 +1,5 @@
 import React from 'react';
+import './Card.css';
 
 export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   title?: string;
@@ -12,22 +13,14 @@ export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
 export function Card({ title, extra, children, style, className = '', bodyStyle, ...props }: CardProps) {
   return (
     <div
-      className={className}
-      style={{
-        backgroundColor: 'var(--color-surface-card)',
-        border: '1px solid var(--color-border-default)',
-        borderRadius: 'var(--radius-md)',
-        display: 'flex',
-        flexDirection: 'column',
-        ...style,
-      }}
+      className={`card ${className}`.trim()}
+      style={style}
       {...props}
     >
       {(title || extra) && (
         <div
           style={{
-            padding: '12px 16px',
-            borderBottom: '1px solid var(--color-border-default)',
+            padding: '18px 20px 0',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
@@ -37,7 +30,7 @@ export function Card({ title, extra, children, style, className = '', bodyStyle,
           {extra}
         </div>
       )}
-      <div style={{ padding: '16px', fontSize: '13px', ...bodyStyle }}>{children}</div>
+      <div style={{ padding: '20px', fontSize: '13px', ...bodyStyle }}>{children}</div>
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { FolderPlus, LogOut, Sparkles, Ticket, Users } from 'lucide-react';
 import type { EmptyWorkspaceScreenProps } from '../types/EmptyWorkspaceScreen';
 import { normalizeInviteCode, normalizeProjectKey } from '../utils/EmptyWorkspaceScreen';
 import { TextInput, Textarea } from '@library';
+import './EmptyWorkspaceScreen.css';
 
 export const EmptyWorkspaceScreen: React.FC<EmptyWorkspaceScreenProps> = ({
   currentUser,
@@ -32,88 +33,41 @@ export const EmptyWorkspaceScreen: React.FC<EmptyWorkspaceScreenProps> = ({
   };
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '32px',
-        background: 'var(--color-surface-app)',
-        color: 'var(--color-text-secondary)',
-      }}
-    >
-      <div
-        style={{
-          width: '100%',
-          maxWidth: '1040px',
-          display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1.2fr) minmax(0, 1fr)',
-          gap: '24px',
-        }}
-      >
-        <section
-          style={{
-            padding: '36px',
-            border: '1px solid var(--color-border-default)',
-            borderRadius: '8px',
-            background: 'var(--color-surface-card)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '20px',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div
-              style={{
-                width: '52px',
-                height: '52px',
-                borderRadius: '8px',
-                display: 'grid',
-                placeItems: 'center',
-                background: 'var(--color-state-selected-bg)',
-                border: '1px solid var(--color-border-focus)',
-              }}
-            >
+    <div className="empty-workspace">
+      <div className="empty-workspace__layout">
+        <section className="empty-workspace__welcome">
+          <div className="empty-workspace__intro">
+            <div className="empty-workspace__mark">
               <Sparkles size={24} color="var(--color-primary)" />
             </div>
 
             <div>
-              <h1 style={{ fontSize: '30px', lineHeight: 1.1, color: 'var(--color-text-primary)' }}>
+              <h1 className="empty-workspace__title">
                 Welcome, {currentUser.name}
               </h1>
-              <p style={{ marginTop: '6px', color: 'var(--color-text-disabled)', fontSize: '14px' }}>
+              <p className="empty-workspace__description">
                 Your workspace is empty. Create your first project or join an existing one by invite.
               </p>
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '12px' }}>
-            <div style={infoCardStyle}>
+          <div className="empty-workspace__features">
+            <div className="empty-workspace__feature">
               <FolderPlus size={18} color="var(--color-primary)" />
               <span>Create the first project space</span>
             </div>
-            <div style={infoCardStyle}>
+            <div className="empty-workspace__feature">
               <Users size={18} color="var(--color-primary)" />
               <span>Join teammates by invite code</span>
             </div>
-            <div style={infoCardStyle}>
+            <div className="empty-workspace__feature">
               <Ticket size={18} color="var(--color-primary)" />
               <span>Add tickets after the project exists</span>
             </div>
           </div>
 
           {errorMessage && (
-            <div
-              style={{
-                padding: '12px 14px',
-                borderRadius: '6px',
-                border: '1px solid rgba(239, 68, 68, 0.2)',
-                background: 'rgba(239, 68, 68, 0.08)',
-                color: '#ef4444',
-                fontSize: '13px',
-              }}
-            >
+            <div className="empty-workspace__error" role="alert">
               {errorMessage}
             </div>
           )}
@@ -121,17 +75,16 @@ export const EmptyWorkspaceScreen: React.FC<EmptyWorkspaceScreenProps> = ({
           <button
             type="button"
             onClick={onSignOut}
-            className="btn"
-            style={{ alignSelf: 'flex-start', gap: '8px' }}
+            className="btn empty-workspace__sign-out"
           >
             <LogOut size={14} />
             Sign Out
           </button>
         </section>
 
-        <section style={{ display: 'grid', gap: '16px' }}>
-          <form onSubmit={handleCreateSubmit} style={panelStyle}>
-            <h2 style={panelTitleStyle}>Create Project</h2>
+        <section className="empty-workspace__forms">
+          <form onSubmit={handleCreateSubmit} className="empty-workspace__panel">
+            <h2 className="empty-workspace__panel-title">Create Project</h2>
 
             <TextInput
               label="Project Name"
@@ -164,8 +117,8 @@ export const EmptyWorkspaceScreen: React.FC<EmptyWorkspaceScreenProps> = ({
             </button>
           </form>
 
-          <form onSubmit={handleJoinSubmit} style={panelStyle}>
-            <h2 style={panelTitleStyle}>Join by Invite</h2>
+          <form onSubmit={handleJoinSubmit} className="empty-workspace__panel">
+            <h2 className="empty-workspace__panel-title">Join by Invite</h2>
 
             <TextInput
               label="Invite Code"
@@ -183,35 +136,4 @@ export const EmptyWorkspaceScreen: React.FC<EmptyWorkspaceScreenProps> = ({
       </div>
     </div>
   );
-};
-
-const infoCardStyle: React.CSSProperties = {
-  padding: '14px',
-  borderRadius: '8px',
-  border: '1px solid var(--color-border-default)',
-  background: 'var(--color-base50)',
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '10px',
-  fontSize: '13px',
-  color: 'var(--color-text-primary)',
-};
-
-const panelStyle: React.CSSProperties = {
-  padding: '24px',
-  borderRadius: '8px',
-  border: '1px solid var(--color-border-default)',
-  background: 'var(--color-surface-card)',
-  display: 'grid',
-  gap: '14px',
-};
-
-const panelTitleStyle: React.CSSProperties = {
-  fontSize: '18px',
-  color: 'var(--color-text-primary)',
-};
-
-const fieldStyle: React.CSSProperties = {
-  display: 'grid',
-  gap: '6px',
 };

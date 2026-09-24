@@ -3,10 +3,12 @@
   align-items: center;
   gap: 12px;
   padding: 10px 16px;
-  background: var(--color-surface-card);
-  border: 1px solid var(--color-border-default);
-  border-radius: 6px;
-  transition: border-color var(--transition-fast);
+  background: var(--surface-glass-subtle);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  min-height: 44px;
+  box-sizing: border-box;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
   cursor: pointer;
   contain: layout style;
   content-visibility: auto;
@@ -14,7 +16,8 @@
 }
 
 .ticket-row:hover {
-  border-color: var(--color-border-focus);
+  background: var(--surface-glass-strong);
+  border-color: var(--border-glass);
 }
 
 .ticket-row-priority {
@@ -48,9 +51,9 @@
   gap: 5px;
   font-size: 11px;
   font-weight: 500;
-  background: var(--color-surface-overlay);
-  border: 1px solid var(--color-border-default);
-  border-radius: 4px;
+  background: var(--surface-glass);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
   padding: 2px 7px;
   flex-shrink: 0;
   max-width: 120px;
@@ -89,7 +92,7 @@
   gap: 4px;
   font-size: 11px;
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-full);
   text-decoration: none;
   flex-shrink: 0;
 }
@@ -102,7 +105,7 @@
   color: var(--color-text-disabled);
   background: var(--color-base50);
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-full);
   flex-shrink: 0;
 }
 
@@ -111,7 +114,7 @@
   height: 22px;
   border-radius: 50%;
   background: var(--color-base50);
-  border: 1px solid var(--color-border-default);
+  border: 1px solid var(--border-subtle);
   display: flex;
   align-items: center;
   justify-content: center;

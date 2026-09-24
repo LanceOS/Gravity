@@ -75,8 +75,8 @@ export const TicketCommentsThread: React.FC<TicketCommentsThreadProps> = ({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
-      <div style={{ borderBottom: '1px solid var(--color-border-default)', paddingBottom: '6px' }}>
-        <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase' }}>
+      <div className="ticket-detail__section-heading">
+        <span>
           Activity Thread ({comments.length})
         </span>
       </div>
@@ -87,7 +87,7 @@ export const TicketCommentsThread: React.FC<TicketCommentsThreadProps> = ({
             <img
               src={comment.userAvatar || 'https://api.dicebear.com/7.x/bottts/svg?seed=guest'}
               alt={comment.userName}
-              style={{ width: '24px', height: '24px', borderRadius: '50%', border: '1px solid var(--color-border-default)' }}
+              style={{ width: '24px', height: '24px', borderRadius: '50%', border: '1px solid var(--border-subtle)' }}
             />
 
             <div style={{ flex: 1 }}>
@@ -129,8 +129,8 @@ export const TicketCommentsThread: React.FC<TicketCommentsThreadProps> = ({
                           right: 0,
                           zIndex: 200,
                           minWidth: '172px',
-                          background: 'var(--color-surface-card)',
-                          border: '1px solid var(--color-border-default)',
+                          background: 'var(--surface-glass-strong)',
+                          border: '1px solid var(--border-subtle)',
                           borderRadius: 'var(--radius-sm)',
                           boxShadow: 'var(--shadow-lg)',
                           padding: '4px',
@@ -207,7 +207,7 @@ export const TicketCommentsThread: React.FC<TicketCommentsThreadProps> = ({
                           <span>Copy Markdown</span>
                         </button>
 
-                        <div style={{ height: '1px', background: 'var(--color-border-default)', margin: '3px 6px' }} />
+                        <div style={{ height: '1px', background: 'var(--border-subtle)', margin: '3px 6px' }} />
 
                         <button
                           type="button"
@@ -240,8 +240,8 @@ export const TicketCommentsThread: React.FC<TicketCommentsThreadProps> = ({
                 style={{
                   fontSize: '13px',
                   color: 'var(--color-text-secondary)',
-                  background: 'var(--color-surface-card)',
-                  border: '1px solid var(--color-border-default)',
+                  background: 'var(--surface-glass-strong)',
+                  border: '1px solid var(--border-subtle)',
                   borderRadius: '6px',
                   padding: '10px 14px',
                   lineHeight: '1.5'

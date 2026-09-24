@@ -145,10 +145,10 @@ function ToastItemComponent({ item, onExited }: ToastItemComponentProps) {
   }, []);
 
   const typeColors = {
-    success: 'var(--color-base400)',
-    error: 'var(--color-text-primary)',
-    warning: 'var(--color-text-secondary)',
-    info: 'var(--color-text-primary)',
+    success: 'var(--color-success)',
+    error: 'var(--color-error)',
+    warning: 'var(--color-warning)',
+    info: 'var(--color-info)',
   };
 
   return (
@@ -157,10 +157,11 @@ function ToastItemComponent({ item, onExited }: ToastItemComponentProps) {
       style={{
         padding: '12px 16px',
         borderRadius: 'var(--radius-md)',
-        backgroundColor: 'var(--color-surface-card)',
-        border: '1px solid var(--color-border-default)',
-        borderLeft: `4px solid ${typeColors[item.type]}`,
-        boxShadow: 'var(--shadow-md)',
+        backgroundColor: 'var(--surface-glass-strong)',
+        border: '1px solid var(--border-glass)',
+        boxShadow: 'var(--shadow-lg)',
+        backdropFilter: 'blur(var(--glass-blur)) saturate(var(--glass-saturate))',
+        WebkitBackdropFilter: 'blur(var(--glass-blur)) saturate(var(--glass-saturate))',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -169,9 +170,12 @@ function ToastItemComponent({ item, onExited }: ToastItemComponentProps) {
         color: 'var(--color-text-primary)',
       }}
     >
-      <span>{item.message}</span>
+      <span aria-hidden="true" style={{ width: '7px', height: '7px', flexShrink: 0, borderRadius: '50%', background: typeColors[item.type] }} />
+      <span style={{ flex: 1 }}>{item.message}</span>
       <button
         type="button"
+        aria-label="Dismiss notification"
+        className="lib-focus-ring"
         onClick={() => {
           dismissToast(item.id);
         }}

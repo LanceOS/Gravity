@@ -15,8 +15,10 @@ export function Navbar({ brand, actions, children, style }: NavbarProps) {
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '12px 24px',
-        backgroundColor: 'var(--color-surface-card)',
-        borderBottom: '1px solid var(--color-border-default)',
+        backgroundColor: 'var(--surface-glass)',
+        backdropFilter: 'blur(var(--glass-blur)) saturate(var(--glass-saturate))',
+        WebkitBackdropFilter: 'blur(var(--glass-blur)) saturate(var(--glass-saturate))',
+        borderBottom: '1px solid var(--border-subtle)',
         width: '100%',
         ...style,
       }}

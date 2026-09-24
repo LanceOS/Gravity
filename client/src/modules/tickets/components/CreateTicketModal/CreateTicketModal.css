@@ -1,9 +1,9 @@
 .create-ticket-modal__dialog {
-  background: var(--color-surface-overlay);
+  background: var(--surface-glass-strong);
 }
 
 .create-ticket-modal__body {
-  padding: 24px 24px 0;
+  padding: 28px 28px 0;
 }
 
 .create-ticket-modal {
@@ -28,8 +28,9 @@
 }
 
 .create-ticket-modal__title-input {
-  font-size: 22px;
-  font-weight: 650;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.035em;
 }
 
 .create-ticket-modal__title-input.input {
@@ -77,11 +78,10 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px 16px;
   align-items: start;
-  padding: 16px;
-  border-radius: var(--radius-md);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.018), rgba(255, 255, 255, 0)),
-    var(--color-surface-card);
+  padding: 20px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-glass-subtle);
 }
 
 .create-ticket-modal__field {
@@ -134,7 +134,7 @@
   gap: 6px;
   flex-wrap: wrap;
   padding: 7px 8px;
-  border: 1px solid var(--color-border-default);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
   background: var(--color-surface-input);
 }
@@ -163,7 +163,7 @@
 
 .create-ticket-modal__label-add-button:hover,
 .create-ticket-modal__label-add-button:focus-visible {
-  background: var(--color-surface-overlay);
+  background: var(--surface-glass-strong);
   color: var(--color-text-primary);
   outline: none;
 }
@@ -180,9 +180,9 @@
 }
 
 .create-ticket-modal__footer {
-  padding: 12px 24px 24px;
+  padding: 16px 28px 28px;
   border-top: 0;
-  background: var(--color-surface-overlay);
+  background: transparent;
 }
 
 .create-ticket-modal__actions {

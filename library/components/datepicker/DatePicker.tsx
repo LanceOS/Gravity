@@ -53,11 +53,13 @@ export function DatePicker({ value, onChange, placeholder = 'Pick date', label }
               left: 0,
               zIndex: 1000,
               padding: '12px',
-              backgroundColor: 'var(--color-surface-card)',
-              border: '1px solid var(--color-border-default)',
+              backgroundColor: 'var(--surface-glass-strong)',
+              border: '1px solid var(--border-glass)',
               borderRadius: 'var(--radius-md)',
-              boxShadow: 'var(--shadow-md)',
-              marginTop: '4px',
+              boxShadow: 'var(--shadow-lg)',
+              backdropFilter: 'blur(var(--glass-blur)) saturate(var(--glass-saturate))',
+              WebkitBackdropFilter: 'blur(var(--glass-blur)) saturate(var(--glass-saturate))',
+              marginTop: '8px',
               width: '240px',
             }}
           >

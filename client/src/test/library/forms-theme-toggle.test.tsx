@@ -396,8 +396,8 @@ describe('library forms and theme toggle', () => {
     const toggle = screen.getByRole('button');
     expect(toggle).toHaveAttribute('title', 'Theme: system');
     expect(document.documentElement).toHaveAttribute('data-theme', 'marble-blue');
-    expect(document.documentElement.style.getPropertyValue('--color-surface-elevated')).toBe('rgba(255, 255, 255, 0.95)');
-    expect(document.documentElement.style.getPropertyValue('--color-overlay-scrim')).toBe('rgba(15, 23, 42, 0.7)');
+    expect(document.documentElement.style.getPropertyValue('--color-surface-elevated')).toBe('rgba(255, 255, 255, 0.94)');
+    expect(document.documentElement.style.getPropertyValue('--color-overlay-scrim')).toBe('rgba(30, 44, 65, 0.30)');
 
     await user.click(toggle);
     expect(toggle).toHaveAttribute('title', 'Theme: marble-blue');

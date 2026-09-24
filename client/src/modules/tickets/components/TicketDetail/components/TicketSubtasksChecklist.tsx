@@ -29,8 +29,8 @@ export const TicketSubtasksChecklist: React.FC<TicketSubtasksChecklistProps> = (
 }) => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--color-border-default)', paddingBottom: '6px' }}>
-        <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase' }}>
+      <div className="ticket-detail__section-heading">
+        <span>
           Sub-tasks Checklist
         </span>
 
@@ -48,7 +48,7 @@ export const TicketSubtasksChecklist: React.FC<TicketSubtasksChecklistProps> = (
       {subtasks.length > 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ flex: 1, height: '4px', background: 'var(--color-border-default)', borderRadius: '2px', overflow: 'hidden' }}>
+            <div style={{ flex: 1, height: '4px', background: 'var(--border-subtle)', borderRadius: '2px', overflow: 'hidden' }}>
               <div style={{ width: `${subtaskProgressPercent}%`, height: '100%', background: 'var(--color-primary)', transition: 'width 0.2s ease' }} />
             </div>
             <span style={{ fontSize: '11px', color: 'var(--color-text-disabled)', whiteSpace: 'nowrap' }}>

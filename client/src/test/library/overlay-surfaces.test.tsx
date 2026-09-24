@@ -38,11 +38,11 @@ describe('library overlay surfaces', () => {
     const chatSurface = chatInput.closest('form')?.parentElement?.parentElement;
 
     expect(modalSurface?.parentElement?.getAttribute('style')).toContain('background-color: var(--color-overlay-scrim)');
-    expect(modalSurface?.getAttribute('style')).toContain('background-color: var(--color-surface-overlay)');
+    expect(modalSurface?.getAttribute('style')).toContain('background-color: var(--surface-glass-strong)');
 
     expect(drawerSurface?.parentElement?.getAttribute('style')).toContain('background-color: var(--color-overlay-scrim)');
-    expect(drawerSurface?.getAttribute('style')).toContain('background-color: var(--color-surface-overlay)');
+    expect(drawerSurface?.getAttribute('style')).toContain('background-color: var(--surface-glass-strong)');
 
-    expect(chatSurface?.getAttribute('style')).toContain('background: var(--color-surface-elevated)');
+    expect(chatSurface?.getAttribute('style')).toContain('background: var(--surface-glass-strong)');
   });
 });

@@ -9,6 +9,7 @@ import type { AgentChatProps, QuickActionType, TicketAttachmentScopeMode } from 
 import { buildAttachedTicketModelContext, buildQuickActionPrompt } from '../utils/AgentChat';
 import { ChatContextProvider, useChat } from '../context/ChatContext';
 import { TicketContextAttachmentBar } from './TicketContextAttachmentBar';
+import './AgentChat.css';
 
 const CLOUD_MODELS: Record<string, string[]> = {
   openai: ['gpt-4o-mini', 'gpt-4o'],
@@ -135,23 +136,9 @@ const AgentChatInner: React.FC<AgentChatProps> = ({
           <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>{modelStatus === 'connected' ? 'Active' : modelStatus === 'checking' ? 'Checking' : 'Offline'}</span>
           <select
             value={model}
+            aria-label="AI model"
             onChange={(e) => setModel(e.target.value)}
-            style={{
-              fontSize: '13px',
-              fontWeight: 600,
-              background: 'transparent',
-              color: 'var(--color-text-primary)',
-              border: 'none',
-              outline: 'none',
-              cursor: 'pointer',
-              padding: 0,
-              fontFamily: 'inherit',
-              letterSpacing: 0,
-              textOverflow: 'ellipsis',
-              overflow: 'hidden',
-              whiteSpace: 'nowrap',
-            }}
-            className="clickable"
+            className="agent-chat__model-select clickable"
           >
             {cloudModelsList.map((m) => (
               <option key={m} value={m} style={{ background: 'var(--color-surface-card)', color: 'var(--color-text-primary)', fontSize: '12px', fontWeight: 500 }}>
@@ -175,8 +162,8 @@ const AgentChatInner: React.FC<AgentChatProps> = ({
           <>
             <button
               onClick={() => handleQuickAction('analyze')}
-              className="btn clickable"
-              style={{ padding: '4px 8px', fontSize: '10px', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--color-surface-card)', color: 'var(--color-text-primary)' }}
+              type="button"
+              className="agent-chat__quick-action clickable"
             >
               <FileText size={10} />
               <span>Analyze Ticket</span>
@@ -184,8 +171,8 @@ const AgentChatInner: React.FC<AgentChatProps> = ({
 
             <button
               onClick={() => handleQuickAction('subtasks')}
-              className="btn clickable"
-              style={{ padding: '4px 8px', fontSize: '10px', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--color-surface-card)', color: 'var(--color-text-primary)' }}
+              type="button"
+              className="agent-chat__quick-action clickable"
             >
               <ListPlus size={10} />
               <span>Create Checklist</span>
@@ -193,8 +180,8 @@ const AgentChatInner: React.FC<AgentChatProps> = ({
 
             <button
               onClick={() => handleQuickAction('release')}
-              className="btn clickable"
-              style={{ padding: '4px 8px', fontSize: '10px', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--color-surface-card)', color: 'var(--color-text-primary)' }}
+              type="button"
+              className="agent-chat__quick-action clickable"
             >
               <Sparkles size={10} />
               <span>Draft Release</span>

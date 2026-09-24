@@ -1,6 +1,7 @@
 import React, { DragEvent, useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import type { Ticket } from '../../../context/TicketContextContext';
 import { BOARD_COLUMNS } from '../utils/ticketView';
+import { TICKET_CARD_ROW_HEIGHT } from '../utils/ticketBoardLayout';
 import { Button, KanbanBoard, Flex } from '@library';
 import { Plus } from 'lucide-react';
 import { TicketCard } from './TicketCard';
@@ -117,22 +118,22 @@ export const TicketBoard = React.memo(({
         align="center"
         gap="8px"
         style={{
-          padding: '10px 20px 8px 20px',
+          padding: '14px 16px',
           width: '100%',
           boxSizing: 'border-box'
         }}
       >
         <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: col?.color }} />
-        <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
+        <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-primary)' }}>
           {title}
         </span>
         <span
           style={{
             fontSize: '10px',
             color: 'var(--color-text-disabled)',
-            background: 'var(--color-base50)',
-            padding: '1px 6px',
-            borderRadius: '4px',
+            background: 'var(--surface-glass)',
+            padding: '2px 7px',
+            borderRadius: 'var(--radius-full)',
             marginLeft: '4px'
           }}
         >
@@ -147,8 +148,8 @@ export const TicketBoard = React.memo(({
           style={{
             marginLeft: 'auto',
             color: 'var(--color-text-disabled)',
-            width: '20px',
-            minHeight: '20px',
+            width: '28px',
+            minHeight: '28px',
             padding: 0,
             border: 'none'
           }}
@@ -162,7 +163,7 @@ export const TicketBoard = React.memo(({
             size="sm"
             style={{
               color: 'var(--color-text-disabled)',
-              border: '1px dashed var(--color-border-default)',
+              border: '1px solid var(--border-subtle)',
               marginLeft: '6px',
               padding: '0 6px',
               minHeight: '22px',
@@ -248,16 +249,17 @@ export const TicketBoard = React.memo(({
     <Flex direction="column" style={{ height: '100%', flex: 1, overflow: 'hidden' }}>
 
       {/* Kanban Board Container */}
-      <div ref={boardRef} style={{ flex: 1, overflowY: 'hidden', background: 'var(--color-surface-app)' }}>
+      <div ref={boardRef} style={{ flex: 1, overflowY: 'hidden', background: 'transparent' }}>
         <KanbanBoard
           columns={BOARD_COLUMNS}
           cards={formattedCards}
+          cardRowHeight={TICKET_CARD_ROW_HEIGHT}
           onCardMove={handleCardMove}
           renderColumnHeader={renderColumnHeader}
         />
       </div>
       {hasMoreRowsValue ? (
-        <div style={{ padding: '8px 12px', borderTop: '1px solid var(--color-border-default)' }}>
+        <div style={{ padding: '8px 12px', borderTop: '1px solid var(--border-subtle)' }}>
           <Button variant="secondary" onClick={onLoadMore} disabled={!onLoadMore || loadingMoreRows}>
             {loadingMoreRows ? 'Loading more tickets…' : 'Load more tickets'}
           </Button>
