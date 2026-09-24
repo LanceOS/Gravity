@@ -58,39 +58,42 @@ export function AIChatWindow({
   }, [messages, isGenerating]);
 
   useEffect(() => {
-    if (isReduced) {
+    const windowElement = windowRef.current;
+    if (!windowElement) {
       return;
     }
-    if (windowRef.current) {
-      if (variant === 'floating' && isClosing) {
-        runAnime({
-          targets: windowRef.current,
-          opacity: [1, 0],
-          translateY: [0, 12],
-          duration: 180,
-          easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
-        });
-      } else if (variant === 'floating') {
-        windowRef.current.style.opacity = '0';
-        windowRef.current.style.transform = 'translateY(12px)';
-        runAnime({
-          targets: windowRef.current,
-          opacity: [0, 1],
-          translateY: [12, 0],
-          duration: 220,
-          easing: 'cubic-bezier(0.2, 0, 0.38, 1)',
-        });
-      }
+    if (isReduced || variant !== 'floating') {
+      // An interrupted animation may leave the window partially hidden or moved.
+      windowElement.style.opacity = '';
+      windowElement.style.transform = '';
+      return;
     }
-  }, [isClosing, isReduced, variant]);
+    if (isClosing) {
+      runAnime({
+        targets: windowElement,
+        opacity: [1, 0],
+        translateY: [0, 12],
+        duration: 180,
+        easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+      });
+    } else {
+      windowElement.style.opacity = '0';
+      windowElement.style.transform = 'translateY(12px)';
+      runAnime({
+        targets: windowElement,
+        opacity: [0, 1],
+        translateY: [12, 0],
+        duration: 220,
+        easing: 'cubic-bezier(0.2, 0, 0.38, 1)',
+      });
+    }
 
-  useEffect(() => {
+    // Capture the element before React clears its ref, and cancel an interrupted
+    // entrance/exit before the next animation starts.
     return () => {
-      if (windowRef.current) {
-        anime.remove(windowRef.current);
-      }
+      anime.remove(windowElement);
     };
-  }, []);
+  }, [isClosing, isReduced, variant]);
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

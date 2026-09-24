@@ -247,7 +247,8 @@ interface MarkdownBlock {
   text?: string;
 }
 
-export function FormattedMarkdown({ text, customTokenRegex, renderCustomToken, tone = 'default' }: FormattedMarkdownProps) {
+// Composer and streaming updates should only parse messages whose content changed.
+export const FormattedMarkdown = React.memo(function FormattedMarkdown({ text, customTokenRegex, renderCustomToken, tone = 'default' }: FormattedMarkdownProps) {
   if (!text) {
     return null;
   }
@@ -570,4 +571,4 @@ export function FormattedMarkdown({ text, customTokenRegex, renderCustomToken, t
       })}
     </div>
   );
-}
+});
