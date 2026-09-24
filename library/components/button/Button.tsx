@@ -1,5 +1,6 @@
 import React from 'react';
 import { cn } from '../../utilities';
+import './Button.css';
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'default' | 'primary' | 'secondary' | 'danger' | 'ghost' | 'link' | 'accent';
@@ -76,7 +77,10 @@ export function Button({
     activeBg = 'transparent';
   }
 
-  const baseStyle: React.CSSProperties = {
+  const baseStyle: React.CSSProperties & Record<'--lib-button-bg' | '--lib-button-hover-bg' | '--lib-button-active-bg', string> = {
+    '--lib-button-bg': bg,
+    '--lib-button-hover-bg': hoverBg,
+    '--lib-button-active-bg': activeBg,
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -86,7 +90,6 @@ export function Button({
     fontWeight: 500,
     lineHeight: 1.35,
     borderRadius: 'var(--radius-sm)',
-    backgroundColor: bg,
     color: color,
     border: border,
     cursor: disabled || loading ? 'not-allowed' : 'pointer',
@@ -100,29 +103,12 @@ export function Button({
     ...style,
   };
 
-  const [isHovered, setIsHovered] = React.useState(false);
-  const [isActive, setIsActive] = React.useState(false);
-
-  const currentBg = isActive ? activeBg : isHovered ? hoverBg : bg;
-  const currentStyle: React.CSSProperties = {
-    ...baseStyle,
-    backgroundColor: variant === 'link' ? 'transparent' : currentBg,
-    textDecoration: variant === 'link' && isHovered ? 'underline' : 'none',
-  };
-
   return (
     <button
       type={type}
-      style={currentStyle}
+      style={baseStyle}
       disabled={disabled || loading}
-      onMouseEnter={() => !disabled && !loading && setIsHovered(true)}
-      onMouseLeave={() => {
-        setIsHovered(false);
-        setIsActive(false);
-      }}
-      onMouseDown={() => !disabled && !loading && setIsActive(true)}
-      onMouseUp={() => !disabled && !loading && setIsActive(false)}
-      className={cn('clickable lib-focus-ring', className)}
+      className={cn('lib-button clickable lib-focus-ring', variant === 'link' && 'lib-button--link', className)}
       {...props}
     >
       {loading && (

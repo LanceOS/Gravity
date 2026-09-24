@@ -115,7 +115,8 @@ textarea {
   box-shadow: var(--shadow-md);
 }
 
-.clickable {
+/* A fallback for unstyled controls; component interaction styles take priority. */
+:where(.clickable) {
   cursor: pointer;
   transition:
     background-color var(--transition-fast),
@@ -124,15 +125,8 @@ textarea {
     opacity var(--transition-fast);
 }
 
-.clickable:not(button):not(.btn):hover,
-button.clickable:not(.btn):hover {
+:where(.clickable:not(.btn):not(:disabled):hover) {
   background-color: var(--color-base100);
-}
-
-.sidebar-menu-item:hover,
-.sidebar-dropdown-item:hover {
-  box-shadow: inset 0 0 0 999px var(--color-state-hover-overlay);
-  background-color: var(--color-base100) !important;
 }
 
 /* Buttons with Micro-interactions */
@@ -156,6 +150,7 @@ button.clickable:not(.btn):hover {
     color var(--transition-fast),
     background-color var(--transition-fast),
     border-color var(--transition-fast),
+    box-shadow var(--transition-fast),
     transform var(--transition-fast);
   outline: none;
   text-decoration: none;

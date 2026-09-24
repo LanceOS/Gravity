@@ -1,4 +1,4 @@
-.ticket-card.ticket-card.clickable:hover {
+.ticket-card.card:hover {
   border-color: var(--border-glass);
   background: var(--surface-glass-strong);
   box-shadow: var(--shadow-md);
