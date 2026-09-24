@@ -6,7 +6,7 @@ import coffeeTheme from '@library/themes/coffee.json';
 import honeyGlowTheme from '@library/themes/honey-glow.json';
 import marbleBlueTheme from '@library/themes/marble-blue.json';
 import midnightAzureTheme from '@library/themes/midnight-azure.json';
-import { applyResolvedTheme, applyThemeConfig, validateThemeConfig } from '@library/utilities/themeEngine';
+import { applyResolvedTheme, applyThemeConfig, validateThemeConfig } from '@library';
 
 const THEME_FIXTURES = [
   {

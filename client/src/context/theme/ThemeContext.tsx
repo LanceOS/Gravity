@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useLayoutEffect, useState } from 'react';
-import { applyThemePreference, getStoredThemePreference, resolveThemePreference, THEME_STORAGE_KEY } from '@library/utilities/themeEngine';
+import { applyThemePreference, getStoredThemePreference, resolveThemePreference, THEME_STORAGE_KEY } from '@library';
 import { DEFAULT_THEME, type ThemeContextState, type ThemeMode } from './ThemeContext.types';
 
 const ThemeContext = createContext<ThemeContextState | undefined>(undefined);

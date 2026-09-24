@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import '@library/styles/library.css'
 import './index.css'
 import App from './App.tsx'
-import { applyThemePreference, getStoredThemePreference } from '@library/utilities/themeEngine'
+import { applyThemePreference, getStoredThemePreference } from '@library'
 
 // Apply initial theme early to prevent FOUC
 applyThemePreference(getStoredThemePreference(), { persist: false });

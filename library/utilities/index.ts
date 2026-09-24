@@ -8,3 +8,4 @@ export * from './dateHelpers';
 export * from './sanitize';
 export * from './richtext';
 export * from './anime';
+export * from './themeEngine';
