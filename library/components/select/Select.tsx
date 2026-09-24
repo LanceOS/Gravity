@@ -61,7 +61,14 @@ function createSelectChangeEvent(nextValue: string) {
   } as React.ChangeEvent<HTMLSelectElement>;
 }
 
-export interface SelectProps extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>, 'onChange'> {
+export interface SelectProps extends React.AriaAttributes, Pick<
+  React.ButtonHTMLAttributes<HTMLButtonElement>,
+  'id' | 'className' | 'style' | 'disabled' | 'autoFocus' | 'title' | 'tabIndex' | 'onFocus' | 'onBlur' | 'onClick' | 'onKeyDown'
+> {
+  name?: string;
+  form?: string;
+  value?: React.SelectHTMLAttributes<HTMLSelectElement>['value'];
+  [attribute: `data-${string}`]: string | number | boolean | undefined;
   label?: string;
   error?: string;
   options: readonly SelectOption[];
@@ -82,13 +89,21 @@ export function Select({
   style,
   value,
   disabled,
+  name,
+  form,
+  autoFocus,
+  title,
+  tabIndex,
+  onFocus,
+  onBlur,
+  onClick,
+  onKeyDown,
   ...props
 }: SelectProps) {
-  const { name, ...triggerProps } = props;
-  const buttonProps = triggerProps as unknown as Omit<
-    React.ButtonHTMLAttributes<HTMLButtonElement>,
-    'onClick' | 'onKeyDown' | 'value' | 'defaultValue' | 'type'
-  >;
+  // Only metadata may pass through; native select props are not button props.
+  const metadataProps = Object.fromEntries(
+    Object.entries(props).filter(([key]) => key.startsWith('aria-') || key.startsWith('data-')),
+  );
   const generatedId = React.useId();
   const selectId = id || generatedId;
   const labelId = `${selectId}-label`;
@@ -200,8 +215,9 @@ export function Select({
     closeMenu();
   };
 
-  const handleTriggerClick = () => {
-    if (disabled) {
+  const handleTriggerClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    onClick?.(event);
+    if (event.defaultPrevented || disabled) {
       return;
     }
 
@@ -209,7 +225,8 @@ export function Select({
   };
 
   const handleTriggerKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
-    if (disabled) {
+    onKeyDown?.(event);
+    if (event.defaultPrevented || disabled) {
       return;
     }
 
@@ -271,13 +288,19 @@ export function Select({
         )}
 
         <button
+          {...metadataProps}
+          autoFocus={autoFocus}
+          title={title}
+          tabIndex={tabIndex}
+          onFocus={onFocus}
+          onBlur={onBlur}
           type="button"
           id={selectId}
           ref={triggerRef}
           className={cn('select-trigger', className)}
-          aria-labelledby={label ? labelId : undefined}
-          aria-invalid={error ? 'true' : undefined}
-          aria-errormessage={error ? errorId : undefined}
+          aria-labelledby={props['aria-labelledby'] ?? (label ? labelId : undefined)}
+          aria-invalid={error ? 'true' : props['aria-invalid']}
+          aria-errormessage={error ? errorId : props['aria-errormessage']}
           aria-haspopup="listbox"
           aria-expanded={isOpen}
           aria-controls={isOpen ? menuId : undefined}
@@ -285,7 +308,6 @@ export function Select({
           onClick={handleTriggerClick}
           onKeyDown={handleTriggerKeyDown}
           disabled={disabled}
-          {...buttonProps}
         >
           <span style={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
             {selectedOption?.color && (
@@ -301,7 +323,7 @@ export function Select({
           <ChevronDown size={14} className="select-trigger__icon" aria-hidden="true" />
         </button>
 
-        {name ? <input type="hidden" name={name} value={selectedValue} disabled={disabled} readOnly /> : null}
+        {name ? <input type="hidden" name={name} form={form} value={selectedValue} disabled={disabled} readOnly /> : null}
 
         {isOpen && (
           <Portal>
@@ -309,7 +331,7 @@ export function Select({
               ref={setMenuElement}
               id={menuId}
               role="listbox"
-              aria-labelledby={label ? labelId : undefined}
+              aria-labelledby={props['aria-labelledby'] ?? (label ? labelId : undefined)}
               className={cn('select-menu scroll-container')}
               style={menuStyle}
             >

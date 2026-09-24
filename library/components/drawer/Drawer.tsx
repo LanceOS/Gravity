@@ -27,11 +27,13 @@ export interface DrawerProps {
 export function Drawer({ isOpen, onClose, title, children, style }: DrawerProps) {
   const titleId = React.useId();
   const [isRendered, setIsRendered] = React.useState(isOpen);
-  const backdropRef = React.useRef<HTMLDivElement>(null);
-  const contentRef = React.useRef<HTMLDivElement>(null);
+  // Portal mounts after our first commit; start animations when its DOM is attached.
+  const [backdropElement, setBackdropElement] = React.useState<HTMLDivElement | null>(null);
+  const [contentElement, setContentElement] = React.useState<HTMLDivElement | null>(null);
 
   React.useEffect(() => {
     const reducedMotion = shouldReduceMotion();
+    let closeTimeout: number | undefined;
 
     if (isOpen) {
       setIsRendered(true);
@@ -44,69 +46,72 @@ export function Drawer({ isOpen, onClose, title, children, style }: DrawerProps)
         return;
       }
 
-      if (backdropRef.current) {
-        anime.remove(backdropRef.current);
+      if (backdropElement) {
+        anime.remove(backdropElement);
         runAnime({
-          targets: backdropRef.current,
+          targets: backdropElement,
           opacity: [1, 0],
           duration: DRAWER_DURATION,
           easing: DRAWER_EASING,
         });
       }
-      if (contentRef.current) {
-        anime.remove(contentRef.current);
+      if (contentElement) {
+        anime.remove(contentElement);
         runAnime({
-          targets: contentRef.current,
+          targets: contentElement,
           translateX: ['0%', '100%'],
           duration: DRAWER_DURATION,
           easing: DRAWER_EASING,
         });
       }
-      window.setTimeout(() => {
+      closeTimeout = window.setTimeout(() => {
         setIsRendered(false);
       }, DRAWER_DURATION);
     }
 
     return () => {
+      window.clearTimeout(closeTimeout);
       document.body.style.overflow = '';
     };
-  }, [isOpen, isRendered]);
+  }, [isOpen, isRendered, backdropElement, contentElement]);
 
   React.useLayoutEffect(() => {
     if (!isOpen || !isRendered || shouldReduceMotion()) {
       return;
     }
 
-    if (backdropRef.current) {
-      backdropRef.current.style.opacity = '0';
+    if (backdropElement) {
+      anime.remove(backdropElement);
+      backdropElement.style.opacity = '0';
       runAnime({
-        targets: backdropRef.current,
+        targets: backdropElement,
         opacity: [0, 1],
         duration: DRAWER_DURATION,
         easing: DRAWER_EASING,
       });
     }
-    if (contentRef.current) {
-      contentRef.current.style.transform = 'translateX(100%)';
+    if (contentElement) {
+      anime.remove(contentElement);
+      contentElement.style.transform = 'translateX(100%)';
       runAnime({
-        targets: contentRef.current,
+        targets: contentElement,
         translateX: ['100%', '0%'],
         duration: DRAWER_DURATION,
         easing: DRAWER_EASING,
       });
     }
-  }, [isOpen, isRendered]);
+  }, [isOpen, isRendered, backdropElement, contentElement]);
 
   React.useEffect(() => {
     return () => {
-      if (backdropRef.current) {
-        anime.remove(backdropRef.current);
+      if (backdropElement) {
+        anime.remove(backdropElement);
       }
-      if (contentRef.current) {
-        anime.remove(contentRef.current);
+      if (contentElement) {
+        anime.remove(contentElement);
       }
     };
-  }, []);
+  }, [backdropElement, contentElement]);
 
   if (!isRendered) return null;
 
@@ -114,7 +119,7 @@ export function Drawer({ isOpen, onClose, title, children, style }: DrawerProps)
     <Portal>
       <FocusTrap>
         <div
-          ref={backdropRef}
+          ref={setBackdropElement}
           style={{
             position: 'fixed',
             top: 0,
@@ -132,7 +137,7 @@ export function Drawer({ isOpen, onClose, title, children, style }: DrawerProps)
         >
           <ClickAwayListener onClickAway={onClose}>
             <div
-              ref={contentRef}
+              ref={setContentElement}
               role="dialog"
               aria-modal="true"
               aria-labelledby={title ? titleId : undefined}
