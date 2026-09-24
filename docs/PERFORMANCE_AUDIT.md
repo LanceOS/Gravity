@@ -67,10 +67,14 @@ need focused profiling or behavior design before a larger change.
   **5 tests**, including two additional regressions.
 - Full server suite: **59 files, 400 tests passed**. The suite used local HTTP
   listeners outside the sandbox for API tests.
-- Production bundling is blocked by the installed Rolldown 1.0.3 native Linux
+- Host production bundling is blocked by the installed Rolldown 1.0.3 native Linux
   binding crashing with `SIGILL` before application bundling. Reproduced on the
   unchanged route configuration and with an independent minimal virtual module
   (`SIGSEGV`); a debugger locates the failure inside the native binding. Node
   22/24 and execution outside the sandbox do not resolve it. No dependency or
   lockfile changes were made, and no bundle-size or end-user timing improvement
   is claimed.
+- Subsequent production builds inside Docker succeeded for both frontend and
+  backend during the requested port 9999 restart. The frontend output includes
+  separate workspace, directory, account, and workspace settings chunks. The
+  native binding failure above is limited to the host build environment tested.
