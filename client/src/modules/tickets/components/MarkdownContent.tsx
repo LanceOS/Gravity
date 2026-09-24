@@ -1,5 +1,4 @@
 import React, { useMemo } from 'react';
-import { CheckSquare, Square } from 'lucide-react';
 import type { MarkdownTextProps } from '../types/TicketDetail';
 import { useTicketListContext } from '../../../context/ticket/TicketListContext';
 import { useActiveProject } from '../../../context/project/ActiveProjectContext';

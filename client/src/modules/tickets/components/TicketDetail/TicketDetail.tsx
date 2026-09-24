@@ -19,7 +19,7 @@ import { TicketCommentsThread } from './components/TicketCommentsThread';
 import type { TicketWithRelations } from '../../utils/ticketRelations';
 import { buildTicketUrl, parseAllowedTicketHosts, sanitizeTicketUrlBase } from '../../utils/ticketUrl';
 import {
-  Trash2, Plus, ChevronLeft, CornerLeftUp, Send
+  Trash2, ChevronLeft, CornerLeftUp, Send
 } from 'lucide-react';
 import type { TicketDetailProps } from '../../types/TicketDetail';
 import { TicketContextMenu } from '../TicketContextMenu';

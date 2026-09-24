@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useProjectContext } from '../../../context/project/ProjectContext';
-import { Terminal, X, Play, Loader2, Sparkles, AlertCircle } from 'lucide-react';
+import { Terminal, X, Play, Loader2, AlertCircle } from 'lucide-react';
 import type { AgentLogEntry, AgentSimulatorProps } from '../types/AgentSimulator';
 import { delay, getInitialAgentLogs } from '../utils/AgentSimulator';
 import { Button, Textarea } from '@library';

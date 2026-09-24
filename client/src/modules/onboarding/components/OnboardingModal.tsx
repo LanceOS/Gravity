@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useCurrentUser } from '../../../context/auth/useCurrentUser';
 import { apiClient } from '../../../utils/apiClient';
 import { 
-  Sparkles, Database, Layers, CheckCircle, Terminal, 
+  Sparkles, Database, Layers, Terminal,
   ChevronRight, ChevronLeft, Check, HelpCircle
 } from 'lucide-react';
 import type { OnboardingModalProps } from '../types/OnboardingModal';
