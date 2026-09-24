@@ -96,12 +96,27 @@ export function DenseVirtualList<T>({
     endIndex: Math.max(-1, getScrollRange(0).endIndex),
   });
 
-  React.useEffect(() => {
-    setScrollRange(getScrollRange(0));
-  }, [items.length, height, rowHeight, buffer, getScrollRange]);
-
+  const containerRef = React.useRef<HTMLDivElement>(null);
   const rafIdRef = React.useRef<number | null>(null);
   const latestScrollTopRef = React.useRef(0);
+
+  React.useLayoutEffect(() => {
+    // A queued scroll frame still uses the previous item sizes and count.
+    if (rafIdRef.current !== null) {
+      window.cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = null;
+    }
+
+    // Keep rendered rows aligned with the viewport when pages or sizes change.
+    // Reading the DOM also accounts for the browser clamping a shorter list.
+    latestScrollTopRef.current = containerRef.current?.scrollTop ?? 0;
+    const nextRange = getScrollRange(latestScrollTopRef.current);
+    setScrollRange((previous) => (
+      previous.startIndex === nextRange.startIndex && previous.endIndex === nextRange.endIndex
+        ? previous
+        : nextRange
+    ));
+  }, [getScrollRange]);
 
   const onScroll = React.useCallback((e: React.UIEvent<HTMLDivElement>) => {
     latestScrollTopRef.current = e.currentTarget.scrollTop;
@@ -168,6 +183,7 @@ export function DenseVirtualList<T>({
 
   return (
     <div
+      ref={containerRef}
       onScroll={onScroll}
       style={{
         height: `${height}px`,

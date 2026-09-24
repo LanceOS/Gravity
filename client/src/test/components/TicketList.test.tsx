@@ -1,5 +1,5 @@
 import type { ButtonHTMLAttributes, ChangeEvent, CSSProperties, ReactNode, SelectHTMLAttributes } from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { TicketList } from '../../modules/tickets';
@@ -28,13 +28,7 @@ type MockSelectProps = Omit<SelectHTMLAttributes<HTMLSelectElement>, 'onChange'>
   onValueChange: (value: string) => void;
 };
 
-type MockDenseVirtualListProps = {
-  items: unknown[];
-  rowHeight: number | ((item: unknown, index: number) => number);
-  renderRow: (item: unknown, index: number, style: CSSProperties) => ReactNode;
-};
-
-vi.mock('@library', () => ({
+vi.mock('@library', async () => ({
   Button: ({ children, ...props }: MockButtonProps) => {
     const buttonProps = { ...props };
     delete buttonProps.variant;
@@ -51,14 +45,9 @@ vi.mock('@library', () => ({
       ))}
     </select>
   ),
-  DenseVirtualList: ({ items, rowHeight, renderRow }: MockDenseVirtualListProps) => (
-    <div data-testid="virtual-ticket-list">
-      {items.map((item, index) => {
-        const height = typeof rowHeight === 'function' ? rowHeight(item, index) : rowHeight;
-        return renderRow(item, index, { height: `${height}px` });
-      })}
-    </div>
-  ),
+  DenseVirtualList: (await vi.importActual<typeof import('../../../../library/components/densevirtuallist/DenseVirtualList')>(
+    '../../../../library/components/densevirtuallist/DenseVirtualList'
+  )).DenseVirtualList,
 }));
 
 vi.mock('../../modules/tickets/components/TicketRow', () => ({
@@ -192,6 +181,52 @@ describe('TicketList', () => {
     await user.click(screen.getByRole('button', { name: 'Load more 20 remaining' }));
 
     const firstTicketRow = screen.getByText('TicketRow GRA-1 avatar-1.png').closest('.ticket-list__row-desktop');
-    expect(firstTicketRow?.parentElement).toHaveStyle({ height: '64px' });
+    expect(firstTicketRow?.parentElement).toHaveStyle({ height: '50.5px' });
+  });
+
+  it('keeps tickets rendered at the current scroll position when loading more within a virtualized status', async () => {
+    const user = userEvent.setup();
+    const backlogTickets = Array.from({ length: 100 }, (_, index) => ({
+      ...backlogTicket,
+      id: `backlog-${index + 1}`,
+      key: `GRA-${index + 1}`,
+    }));
+    const doneTickets = Array.from({ length: 50 }, (_, index) => ({
+      ...doneTicket,
+      id: `done-${index + 1}`,
+      key: `DONE-${index + 1}`,
+    }));
+    const canceledTickets = Array.from({ length: 50 }, (_, index) => ({
+      ...doneTicket,
+      id: `canceled-${index + 1}`,
+      key: `CANCELED-${index + 1}`,
+      status: 'canceled' as const,
+    }));
+
+    renderTicketList({
+      filteredCount: 200,
+      groupedTickets: {
+        backlog: backlogTickets,
+        todo: [],
+        in_progress: [],
+        in_review: [],
+        done: doneTickets,
+        canceled: canceledTickets,
+      },
+    });
+
+    const list = screen.getByRole('grid');
+    fireEvent.scroll(list, { target: { scrollTop: 2000 } });
+
+    const loadMore = await screen.findByRole('button', { name: 'Load more 50 remaining' });
+    expect(screen.getByText('TicketRow GRA-50 avatar-1.png')).toBeInTheDocument();
+    expect(screen.queryByText('TicketRow GRA-51 avatar-1.png')).not.toBeInTheDocument();
+
+    await user.click(loadMore);
+
+    expect(list.scrollTop).toBe(2000);
+    expect(screen.getByText('TicketRow GRA-50 avatar-1.png')).toBeInTheDocument();
+    expect(screen.getByText('TicketRow GRA-51 avatar-1.png')).toBeInTheDocument();
+    expect(screen.queryByText('TicketRow GRA-1 avatar-1.png')).not.toBeInTheDocument();
   });
 });
