@@ -12,7 +12,7 @@
 .sidebar-navigation__list {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--sidebar-row-gap);
   margin-top: var(--space-1);
 }
 
@@ -129,7 +129,7 @@
 }
 
 .sidebar-navigation__group-toggle[aria-expanded='true'] svg {
-  transform: rotate(180deg);
+  transform: rotate(90deg);
 }
 
 .sidebar-navigation__icon-button {

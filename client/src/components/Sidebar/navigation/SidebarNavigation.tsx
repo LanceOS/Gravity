@@ -119,6 +119,7 @@ function SidebarNavigationCollapse({ collapsed, children }: SidebarNavigationCol
     <div
       className={joinClassNames('sidebar-navigation__collapse', collapsed && 'sidebar-navigation__collapse--collapsed')}
       aria-hidden={collapsed}
+      inert={collapsed}
     >
       <div className="sidebar-navigation__collapse-inner">
         {children}
