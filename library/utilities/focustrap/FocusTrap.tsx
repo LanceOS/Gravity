@@ -21,8 +21,21 @@ export function FocusTrap({ children, active = true }: FocusTrapProps) {
           'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
         )
       ).filter((el) => {
-        const style = window.getComputedStyle(el);
-        return style.display !== 'none' && style.visibility !== 'hidden';
+        // Native controls can also opt out of the tab order. :disabled includes
+        // disabled fieldsets, and inert applies to the whole ancestor subtree.
+        if (el.tabIndex < 0 || el.matches(':disabled') || el.closest('[inert]')) return false;
+        if (typeof el.checkVisibility === 'function') {
+          return el.checkVisibility({ visibilityProperty: true, contentVisibilityAuto: true });
+        }
+        // Older browsers (and DOM-only tests) lack checkVisibility. Checking
+        // just the control's display misses a display:none ancestor.
+        const visibility = window.getComputedStyle(el).visibility;
+        if (visibility === 'hidden' || visibility === 'collapse') return false;
+        for (let ancestor: HTMLElement | null = el; ancestor; ancestor = ancestor.parentElement) {
+          const style = window.getComputedStyle(ancestor);
+          if (style.display === 'none' || style.contentVisibility === 'hidden') return false;
+        }
+        return window.getComputedStyle(el).display !== 'contents';
       });
     };
 
