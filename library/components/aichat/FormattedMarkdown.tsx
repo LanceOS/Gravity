@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { CheckSquare, Square, Clipboard, Check } from 'lucide-react';
 import { safeExternalLinkProps } from '../../utilities/sanitize';
+import { useCopyToClipboard } from '../../utilities/useCopyToClipboard';
 
 export interface FormattedMarkdownProps {
   text: string;
@@ -156,17 +157,7 @@ interface CodeBlockProps {
 }
 
 export function CodeBlock({ code, language, toneStyles }: CodeBlockProps) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(code);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy code: ', err);
-    }
-  };
+  const { copy, copied, error } = useCopyToClipboard();
 
   return (
     <div
@@ -194,8 +185,9 @@ export function CodeBlock({ code, language, toneStyles }: CodeBlockProps) {
         <span>{language || 'code'}</span>
         <button
           type="button"
-          onClick={handleCopy}
-          aria-label="Copy code"
+          onClick={() => void copy(code)}
+          aria-label={error ? 'Copy failed. Retry copying code' : 'Copy code'}
+          aria-live="polite"
           style={{
             background: 'transparent',
             border: 'none',
@@ -219,7 +211,7 @@ export function CodeBlock({ code, language, toneStyles }: CodeBlockProps) {
           ) : (
             <>
               <Clipboard size={12} />
-              <span>Copy</span>
+              <span>{error ? 'Copy failed' : 'Copy'}</span>
             </>
           )}
         </button>

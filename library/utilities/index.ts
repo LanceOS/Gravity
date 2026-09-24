@@ -9,3 +9,4 @@ export * from './sanitize';
 export * from './richtext';
 export * from './anime';
 export * from './themeEngine';
+export * from './useCopyToClipboard';

@@ -26,14 +26,14 @@ interface TicketPropertiesGridProps {
   labels: Label[];
   cycles: Cycle[];
   ticketLink: string;
-  generatedBranchName: string;
+  onCopyBranchName: () => Promise<void>;
   onSelectTicket: (ticket: Ticket | null) => void;
   onUpdateTicket: (id: string, updates: Partial<Ticket>) => void;
   onAddDependency: (ticketId: string, dependencyId: string) => Promise<boolean>;
   onRemoveDependency: (ticketId: string, dependencyId: string) => Promise<boolean>;
   onAddBlocker: (ticketId: string, blockerId: string) => Promise<boolean>;
   onRemoveBlocker: (ticketId: string, blockerId: string) => Promise<boolean>;
-  copyToClipboard: (value: string, successMessage?: string) => Promise<void>;
+  copyToClipboard: (value: string, successMessage?: string) => Promise<boolean>;
   onSelectLabel?: (projectId: string, labelId: string) => void;
 }
 
@@ -48,7 +48,7 @@ export const TicketPropertiesGrid: React.FC<TicketPropertiesGridProps> = ({
   labels,
   cycles,
   ticketLink,
-  generatedBranchName,
+  onCopyBranchName,
   onSelectTicket,
   onUpdateTicket,
   onAddDependency,
@@ -119,7 +119,7 @@ export const TicketPropertiesGrid: React.FC<TicketPropertiesGridProps> = ({
     <div className="ticket-detail__properties-grid">
       <TicketUtilities
         ticketLink={ticketLink}
-        generatedBranchName={generatedBranchName}
+        onCopyBranchName={onCopyBranchName}
         description={activeTicket.description || ''}
         onCopy={copyToClipboard}
       />

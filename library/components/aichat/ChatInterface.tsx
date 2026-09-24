@@ -3,6 +3,7 @@ import { Send, Sparkles, User, Copy, RefreshCw, AlertCircle, Check, Loader2 } fr
 import { DenseTextarea } from '../densetextarea';
 import { FormattedMarkdown } from './FormattedMarkdown';
 import type { AIChatMessage } from './types';
+import { useCopyToClipboard } from '../../utilities/useCopyToClipboard';
 
 export interface ChatInterfaceProps {
   sessionId: string;
@@ -31,7 +32,9 @@ export function ChatInterface({
 }: ChatInterfaceProps) {
   const [input, setInput] = useState('');
   const [isFocused, setIsFocused] = useState(false);
-  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const { copy, copiedKey, error: copyError, reset: resetCopy } = useCopyToClipboard();
+
+  useEffect(() => { resetCopy(); }, [sessionId, resetCopy]);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const scrollPositionsRef = useRef<Record<string, number>>({});
@@ -93,16 +96,6 @@ export function ChatInterface({
     }
   };
 
-  const handleCopy = async (content: string, index: number) => {
-    try {
-      await navigator.clipboard.writeText(content);
-      setCopiedIndex(index);
-      setTimeout(() => setCopiedIndex(null), 2000);
-    } catch (err) {
-      console.error('Failed to copy message:', err);
-    }
-  };
-
   // Calculate word count
   const wordCount = input.trim().split(/\s+/).filter(Boolean).length;
   const characterCount = input.length;
@@ -123,6 +116,7 @@ export function ChatInterface({
         ...style,
       }}
     >
+      {copyError && <p role="alert">Unable to copy. Please select and copy the message manually.</p>}
       {/* Messages Scroll Container */}
       <div
         ref={scrollContainerRef}
@@ -237,7 +231,7 @@ export function ChatInterface({
                     <button
                       type="button"
                       aria-label="Copy message"
-                      onClick={() => handleCopy(m.content, idx)}
+                      onClick={() => copy(m.content, String(idx))}
                       style={{
                         background: 'transparent',
                         border: 'none',
@@ -254,7 +248,7 @@ export function ChatInterface({
                       onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-secondary)'; e.currentTarget.style.background = 'var(--color-base100)'; }}
                       onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-disabled)'; e.currentTarget.style.background = 'transparent'; }}
                     >
-                      {copiedIndex === idx ? (
+                      {copiedKey === String(idx) ? (
                         <>
                           <Check size={11} style={{ color: 'var(--color-success)' }} />
                           <span style={{ color: 'var(--color-success)' }}>Copied!</span>

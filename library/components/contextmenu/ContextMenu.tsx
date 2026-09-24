@@ -300,7 +300,7 @@ export function ContextMenuRoot({ children, trigger, content, items }: ContextMe
         </div>
         {isRendered && (
           <Portal>
-            <FocusTrap>
+            <FocusTrap active={isOpen}>
               <ClickAwayListener onClickAway={closeMenu}>
                 <div
                   ref={setMenuElement}

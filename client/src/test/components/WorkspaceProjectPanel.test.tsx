@@ -313,7 +313,6 @@ describe('WorkspaceProjectPanel', () => {
 
   it('opens a label editor, saves updates, and deletes the label', async () => {
     const user = userEvent.setup();
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     const orbitLabels = [
       {
         id: 'domain-2',
@@ -376,10 +375,15 @@ describe('WorkspaceProjectPanel', () => {
 
     await user.click(screen.getByRole('button', { name: 'Partner Ops' }));
     await user.click(screen.getByRole('button', { name: 'Delete Label' }));
+    const dialog = screen.getByRole('alertdialog', { name: 'Delete label "Partner Ops"?' });
+    expect(props.onDeleteLabel).not.toHaveBeenCalled();
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(props.onDeleteLabel).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Delete Label' }));
+    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete Label' }));
 
     await waitFor(() => {
       expect(props.onDeleteLabel).toHaveBeenCalledWith('domain-2');
-      expect(confirmSpy).toHaveBeenCalled();
     });
 
     await waitFor(() => {

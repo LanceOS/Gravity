@@ -21,6 +21,7 @@ type ModalDialogTone = 'default' | 'danger';
 
 interface ModalDialogContextValue {
   descriptionId: string;
+  setHasDescription: (value: boolean) => void;
   onClose: () => void;
   titleId: string;
 }
@@ -77,6 +78,7 @@ function ModalDialogRoot({
   const backdropRef = useRef<HTMLDivElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const [isRendered, setIsRendered] = useState(isOpen);
+  const [hasDescription, setHasDescription] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -179,6 +181,7 @@ function ModalDialogRoot({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         if (closeOnEscape) {
+          event.preventDefault();
           onClose();
         }
         return;
@@ -198,6 +201,7 @@ function ModalDialogRoot({
       });
 
       if (focusableElements.length === 0) {
+        panelRef.current.focus();
         event.preventDefault();
         return;
       }
@@ -205,13 +209,13 @@ function ModalDialogRoot({
       const firstElement = focusableElements[0];
       const lastElement = focusableElements[focusableElements.length - 1];
 
-      if (event.shiftKey && document.activeElement === firstElement) {
+      if (event.shiftKey && (document.activeElement === firstElement || !panelRef.current.contains(document.activeElement))) {
         lastElement.focus();
         event.preventDefault();
         return;
       }
 
-      if (!event.shiftKey && document.activeElement === lastElement) {
+      if (!event.shiftKey && (document.activeElement === lastElement || !panelRef.current.contains(document.activeElement))) {
         firstElement.focus();
         event.preventDefault();
       }
@@ -224,16 +228,20 @@ function ModalDialogRoot({
   }, [closeOnEscape, isOpen, onClose]);
 
   useEffect(() => {
-    if (!isOpen || !panelRef.current) {
+    if (!isOpen || !isRendered || !panelRef.current) {
       return;
     }
 
+    const previousFocus = document.activeElement;
     const firstFocusableElement = panelRef.current.querySelector<HTMLElement>(
       'button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
     );
 
-    firstFocusableElement?.focus();
-  }, [isOpen]);
+    (firstFocusableElement ?? panelRef.current).focus();
+    return () => {
+      if (previousFocus instanceof HTMLElement && previousFocus.isConnected) previousFocus.focus({ preventScroll: true });
+    };
+  }, [isOpen, isRendered]);
 
   if (!isRendered) {
     return null;
@@ -252,13 +260,15 @@ function ModalDialogRoot({
       <div
         aria-label={ariaLabel}
         aria-labelledby={ariaLabel ? undefined : titleId}
+        aria-describedby={hasDescription ? descriptionId : undefined}
+        tabIndex={-1}
         className={cn('modal-dialog__panel', `modal-dialog__panel--${size}`, panelClassName)}
         ref={panelRef}
         role={role}
         aria-modal="true"
         style={style}
       >
-        <ModalDialogContext.Provider value={{ descriptionId, onClose, titleId }}>
+        <ModalDialogContext.Provider value={{ descriptionId, setHasDescription, onClose, titleId }}>
           {children}
         </ModalDialogContext.Provider>
       </div>
@@ -286,7 +296,12 @@ function ModalDialogHeader({
   title,
   tone = 'default',
 }: ModalDialogHeaderProps) {
-  const { descriptionId, onClose, titleId } = useModalDialogContext();
+  const { descriptionId, setHasDescription, onClose, titleId } = useModalDialogContext();
+  const hasDescription = !!description;
+  useLayoutEffect(() => {
+    setHasDescription(hasDescription);
+    return () => setHasDescription(false);
+  }, [hasDescription, setHasDescription]);
 
   return (
     <header className={cn('modal-dialog__header', `modal-dialog__header--${tone}`, className)}>

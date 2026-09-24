@@ -5,6 +5,7 @@ import {
   MarkdownEditor,
   RichTextEditor,
   toast,
+  useCopyToClipboard,
   Accordion,
   createEmptyRichTextValue,
   isRichTextEmpty,
@@ -217,27 +218,23 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
     [activeTicket.branchName, activeTicket.key, activeTicket.title]
   );
 
+  const { copy } = useCopyToClipboard();
   const copyToClipboard = useCallback(async (value: string, successMessage?: string) => {
-    const isDev = Boolean(typeof import.meta !== 'undefined' && (import.meta as unknown as { env?: Record<string, unknown> }).env?.DEV);
+    const success = await copy(value);
+    toast.show(success ? successMessage || 'Copied to clipboard' : 'Failed to copy', success ? 'success' : 'error');
+    return success;
+  }, [copy]);
 
-    if (!navigator.clipboard?.writeText) {
-      if (isDev && console && console.warn) {
-        console.warn('Clipboard API not available in this environment; copy action skipped.');
-      }
-      if (toast?.show) toast.show('Clipboard not supported', 'warning');
-      return;
-    }
+  const handleCopyBranchName = async () => {
+    const copied = await copyToClipboard(generatedBranchName, 'Branch name copied');
+    if (!copied || activeTicket.status === 'in_progress') return;
 
     try {
-      await navigator.clipboard.writeText(value);
-      if (toast?.show) toast.show(successMessage || 'Copied to clipboard', 'success');
-    } catch (err) {
-      if (isDev && console && console.error) {
-        console.error('Failed to write to clipboard', err);
-      }
-      if (toast?.show) toast.show('Failed to copy', 'error');
+      await onUpdateTicket(activeTicket.id, { status: 'in_progress' });
+    } catch {
+      toast.show('Branch name copied, but the ticket could not be moved to In Progress', 'error');
     }
-  }, []);
+  };
 
   const handleDelete = () => {
     setIsDeleteConfirmOpen(true);
@@ -274,7 +271,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
       labels={labels}
       cycles={cycles}
       ticketLink={ticketLink}
-      generatedBranchName={generatedBranchName}
+      onCopyBranchName={handleCopyBranchName}
       onSelectTicket={onSelectTicket}
       onSelectLabel={onSelectLabel}
       onUpdateTicket={onUpdateTicket}

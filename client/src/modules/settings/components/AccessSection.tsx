@@ -1,67 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Mail } from 'lucide-react';
-import { Card, Stack, TextInput, Button, Badge } from '@library';
+import { Card, Stack, TextInput, Button, Badge, useCopyToClipboard } from '@library';
 import type { WorkspaceInvite } from '../types';
 import { useSettingsScreenContext } from '../../../context/settings/useSettingsScreenContext';
 
 const COPY_FEEDBACK_STORAGE_KEY = 'gravity_peer_invite_copy_feedback';
 const COPY_FEEDBACK_DURATION_MS = 2200;
-
-type CopyFeedbackState = {
-  key: string;
-  expiresAt: number;
-};
-
-function clearCopyFeedbackState() {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  try {
-    window.sessionStorage.removeItem(COPY_FEEDBACK_STORAGE_KEY);
-  } catch {
-    // sessionStorage may be unavailable in restricted/private modes.
-  }
-}
-
-function readCopyFeedbackState(): CopyFeedbackState | null {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-
-  try {
-    const rawValue = window.sessionStorage.getItem(COPY_FEEDBACK_STORAGE_KEY);
-    if (!rawValue) {
-      return null;
-    }
-
-    const parsed = JSON.parse(rawValue) as { key?: unknown; expiresAt?: unknown };
-    if (typeof parsed.key !== 'string' || typeof parsed.expiresAt !== 'number') {
-      clearCopyFeedbackState();
-      return null;
-    }
-
-    return {
-      key: parsed.key,
-      expiresAt: parsed.expiresAt,
-    };
-  } catch {
-    clearCopyFeedbackState();
-    return null;
-  }
-}
-
-function writeCopyFeedbackState(value: CopyFeedbackState) {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  try {
-    window.sessionStorage.setItem(COPY_FEEDBACK_STORAGE_KEY, JSON.stringify(value));
-  } catch {
-    // sessionStorage may be unavailable in restricted/private modes.
-  }
-}
 
 function getInviteStateLabel(invite: WorkspaceInvite) {
   if (invite.revokedAt) return 'Revoked';
@@ -79,57 +23,11 @@ export function AccessSection(): React.ReactNode {
 
   const latestInvite = invites[0] ?? null;
   const [label, setLabel] = useState('');
-  const [copiedField, setCopiedField] = useState<string | null>(null);
-
-  const scheduleCopyFeedbackReset = (key: string, expiresAt: number) => {
-    window.setTimeout(() => {
-      const savedValue = readCopyFeedbackState();
-      if (!savedValue) {
-        setCopiedField((current) => (current === key ? null : current));
-        return;
-      }
-
-      if (savedValue.key !== key || savedValue.expiresAt !== expiresAt) {
-        return;
-      }
-
-      clearCopyFeedbackState();
-      setCopiedField((current) => (current === key ? null : current));
-    }, Math.max(expiresAt - Date.now(), 0));
-  };
-
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      return undefined;
-    }
-
-    const savedValue = readCopyFeedbackState();
-    if (!savedValue) {
-      return undefined;
-    }
-
-    if (savedValue.expiresAt <= Date.now()) {
-      clearCopyFeedbackState();
-      return undefined;
-    }
-
-    setCopiedField(savedValue.key);
-    scheduleCopyFeedbackReset(savedValue.key, savedValue.expiresAt);
-
-    return undefined;
-  }, []);
-
-  const handleCopy = async (key: string, value: string) => {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopiedField(key);
-      const expiresAt = Date.now() + COPY_FEEDBACK_DURATION_MS;
-      writeCopyFeedbackState({ key, expiresAt });
-      scheduleCopyFeedbackReset(key, expiresAt);
-    } catch {
-      setCopiedField(null);
-    }
-  };
+  const { copy, copiedKey: copiedField, error: copyError } = useCopyToClipboard({
+    resetAfterMs: COPY_FEEDBACK_DURATION_MS,
+    storageKey: COPY_FEEDBACK_STORAGE_KEY,
+  });
+  const handleCopy = (key: string, value: string) => copy(value, key);
 
   const handleCreateInvite = async () => {
     const success = await onCreateInvite({
@@ -181,6 +79,8 @@ export function AccessSection(): React.ReactNode {
             Create Invite
           </Button>
         </div>
+
+        {copyError && <p role="alert">Unable to copy. Please select and copy the invite manually.</p>}
 
         {latestInvite && (
           <Stack gap="var(--space-md)" style={{ padding: 'var(--space-md)', borderRadius: 'var(--radius-md)', background: 'rgba(170, 59, 255, 0.02)', border: '1px solid rgba(170, 59, 255, 0.15)' }}>

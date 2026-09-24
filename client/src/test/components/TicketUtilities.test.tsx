@@ -7,11 +7,12 @@ describe('TicketUtilities', () => {
   it('renders the utility actions and forwards copy requests', async () => {
     const user = userEvent.setup();
     const onCopy = vi.fn();
+    const onCopyBranchName = vi.fn();
 
     render(
       <TicketUtilities
         ticketLink="https://tickets.placeholder.local/GRA-101"
-        generatedBranchName="feature/gra-101-fix-sync-retries"
+        onCopyBranchName={onCopyBranchName}
         description="Retry the event stream after disconnects."
         onCopy={onCopy}
       />
@@ -22,7 +23,8 @@ describe('TicketUtilities', () => {
     expect(onCopy).toHaveBeenCalledWith('https://tickets.placeholder.local/GRA-101', 'Ticket link copied');
 
     await user.click(screen.getByRole('button', { name: 'Copy Branch Name' }));
-    expect(onCopy).toHaveBeenCalledWith('feature/gra-101-fix-sync-retries', 'Branch name copied');
+    expect(onCopyBranchName).toHaveBeenCalledTimes(1);
+    expect(onCopy).toHaveBeenCalledTimes(1);
 
     await user.click(screen.getByRole('button', { name: 'Copy as Markdown' }));
     expect(onCopy).toHaveBeenCalledWith('Retry the event stream after disconnects.', 'Description copied');
