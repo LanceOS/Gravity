@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
+import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 
 import type { Project } from '../../../context/TicketContextContext';
 import type { ProjectSettingsFeedback } from '../types/WorkspaceProjectPanel';
@@ -65,6 +65,7 @@ export function useWorkspaceProjectPanelProjectState({
   const [isProjectSettingsSaving, setIsProjectSettingsSaving] = useState(false);
   const [settingsFeedback, setSettingsFeedback] = useState<ProjectSettingsFeedback>(null);
   const [githubRepoUrl, setGithubRepoUrl] = useState('');
+  const syncedSettings = useRef<{ projectId: string; url: string } | null>(null);
 
   const projectLookup = useMemo(() => createProjectLookup(projects), [projects]);
 
@@ -90,15 +91,20 @@ export function useWorkspaceProjectPanelProjectState({
   }, [activeProjectId, projects]);
 
   useEffect(() => {
-    if (!managedProject) {
-      setGithubRepoUrl('');
+    const projectId = managedProject?.id ?? '';
+    const url = managedProject?.githubRepoUrl ?? '';
+    const previous = syncedSettings.current;
+    if (previous?.projectId !== projectId) {
+      syncedSettings.current = { projectId, url };
+      setGithubRepoUrl(url);
       setSettingsFeedback(null);
       return;
     }
-
-    setGithubRepoUrl(managedProject.githubRepoUrl || '');
-    setSettingsFeedback(null);
-  }, [managedProject]);
+    // Preserve the draft during optimistic updates, rollback, and failed retries.
+    if (isProjectSettingsSaving || settingsFeedback?.type === 'error') return;
+    if (githubRepoUrl === previous.url) setGithubRepoUrl(url);
+    syncedSettings.current = { projectId, url };
+  }, [managedProject?.id, managedProject?.githubRepoUrl, githubRepoUrl, isProjectSettingsSaving, settingsFeedback?.type]);
 
   return {
     managedProjectId,

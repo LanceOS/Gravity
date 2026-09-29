@@ -98,6 +98,32 @@ describe('GitHub webhook reliability', () => {
     expect(await readTicket(ticket.id)).toMatchObject({ status: 'done', prStatus: 'merged' });
   });
 
+  it.each([`${repoUrl}/pull/42`, 'https://github.com/Test/Repo/pull/42/'])(
+    'merges a directly linked PR without a ticket key: %s', async prUrl => {
+      const { project, ticket } = await fixture();
+      await db.update(tickets).set({ status: 'in_progress', prStatus: 'open', prUrl }).where(eq(tickets.id, ticket.id));
+      const unrelated = await seedTicket(project.id, { id: 'unrelated', key: `${project.key}-2`, prUrl: `${repoUrl}/pull/420`, prStatus: 'open' });
+      const { project: otherProject } = await seedWorkspaceFixture({
+        workspace: { id: 'workspace-2', key: 'OTHER', workspaceKey: 'WS-OTHER' },
+        project: { id: 'project-2', key: 'OTHER', inviteCode: 'INV-OTHER' },
+      });
+      const outside = await seedTicket(otherProject.id, { id: 'outside', key: `${otherProject.key}-1`, prUrl, prStatus: 'open' });
+      const beforeUnrelated = await readTicket(unrelated.id);
+      const beforeOutside = await readTicket(outside.id);
+
+      const input = event('', { action: 'closed', merged: true });
+      expect(await processPullRequestEvent(input)).toEqual([
+        expect.objectContaining({ ticketId: ticket.id, commentAdded: true }),
+      ]);
+      expect(await readTicket(ticket.id)).toMatchObject({ status: 'done', prStatus: 'merged', prUrl: input.prUrl });
+      expect(await readTicket(unrelated.id)).toEqual(beforeUnrelated);
+      expect(await readTicket(outside.id)).toEqual(beforeOutside);
+      expect(await db.select().from(ticketPullRequests)).toHaveLength(1);
+      expect(await processPullRequestEvent(input)).toEqual([]);
+      expect(await db.select().from(comments)).toHaveLength(1);
+    },
+  );
+
   it('closes abandoned PRs without completing the ticket and permits a newer reopen', async () => {
     const { ticket } = await fixture();
     await processPullRequestEvent(event(ticket.key, { action: 'closed' }));

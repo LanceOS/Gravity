@@ -4,12 +4,14 @@ import { router } from './router';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from './utils/queryClient';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+import { Toast } from '@library';
 
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AppContextProviders>
         <RouterProvider router={router} />
+        <Toast />
       </AppContextProviders>
       <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>
