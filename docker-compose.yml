@@ -61,6 +61,7 @@ services:
     environment:
       PORT: ${PORT:-8080}
       NODE_ENV: ${NODE_ENV:-production}
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
       RUSTFS_ENDPOINT: ${RUSTFS_ENDPOINT:-http://rustfs:9000}
       RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:-admin}
       RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:-password}

@@ -29,7 +29,7 @@ export function createApiRouter() {
     namespace: 'events.subscribe.ip',
     windowMs: SSE_EVENTS_IP_RATE_LIMIT_WINDOW_MS,
     max: SSE_EVENTS_IP_RATE_LIMIT_MAX,
-    keyFn: (req) => `ip:${getRequestSourceIp(req) ?? req.ip}`,
+    keyFn: (req) => `ip:${getRequestSourceIp(req) ?? 'unknown'}`,
   });
 
   // The workspace OAuth transport requires a bearer token and never uses a

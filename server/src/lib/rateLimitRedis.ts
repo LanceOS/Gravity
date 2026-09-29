@@ -1,3 +1,4 @@
+import { getRequestSourceIp } from './request-ip.js';
 import type { Request, Response, NextFunction } from 'express';
 import { client as defaultClient } from './redis.js';
 import type { RedisClientType } from 'redis';
@@ -56,8 +57,8 @@ export function createRedisRateLimiter(options: RedisRateLimitOptions) {
         return next();
       }
 
-      const keyRaw = keyFn ? await keyFn(req) : req.ip;
-      const keyPart = String(keyRaw ?? req.ip);
+      const keyRaw = keyFn ? await keyFn(req) : getRequestSourceIp(req);
+      const keyPart = String(keyRaw ?? getRequestSourceIp(req) ?? 'unknown');
       const redisKey = `${prefix}${limiterId}:${keyPart}`;
       const now = Date.now();
       const member = `${now}:${Math.random().toString(36).slice(2, 10)}`;

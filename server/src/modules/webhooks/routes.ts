@@ -1,3 +1,4 @@
+import { getRequestSourceIp } from '../../lib/request-ip.js';
 import { Router } from 'express';
 import { env } from '../../env.js';
 import { verifyGitHubWebhookSignature } from '../../lib/webhookSignature.js';
@@ -29,7 +30,7 @@ export function createWebhookRouter() {
 
   router.post('/webhooks/github', async (req, res) => {
     // ── Finding #3: Per-IP rate limiting ─────────────────────────────────────
-    const clientIp = String(req.ip ?? req.socket?.remoteAddress ?? 'unknown');
+    const clientIp = String(getRequestSourceIp(req) ?? 'unknown');
     if (isRateLimited(clientIp)) {
       res.status(429).json({ error: 'Too many requests.' });
       return;

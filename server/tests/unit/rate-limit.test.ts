@@ -1,12 +1,16 @@
 import type { NextFunction, Request, Response } from 'express';
 import type { RedisClientType } from 'redis';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { _clearInMemoryRateLimitStore, createRateLimiter } from '../../src/lib/rateLimit.js';
 import { createRedisRateLimiter } from '../../src/lib/rateLimitRedis.js';
 
+vi.mock('../../src/env.js', () => ({ env: { trustedProxies: [] } }));
+vi.mock('../../src/lib/redis.js', () => ({ client: null }));
+afterEach(() => vi.restoreAllMocks());
+
 type Limiter = (req: Request, res: Response, next: NextFunction) => Promise<unknown>;
 
-async function invoke(limiter: Limiter, ip = 'test-client') {
+async function invoke(limiter: Limiter, ip = '192.0.2.1') {
   const response = {
     statusCode: 200,
     body: undefined as unknown,
@@ -16,7 +20,7 @@ async function invoke(limiter: Limiter, ip = 'test-client') {
     setHeader(name: string, value: string) { this.headers[name] = value; return this; },
   };
   const next = vi.fn();
-  await limiter({ ip } as Request, response as unknown as Response, next);
+  await limiter({ socket: { remoteAddress: ip } } as Request, response as unknown as Response, next);
   return { ...response, next };
 }
 
@@ -33,7 +37,7 @@ describe('rate limiter policy isolation and retry timing', () => {
     expect((await invoke(first)).statusCode).toBe(429);
     expect((await invoke(independent)).next).toHaveBeenCalledOnce();
     expect((await invoke(differentPolicy)).next).toHaveBeenCalledOnce();
-    expect((await invoke(first, 'other-client')).next).toHaveBeenCalledOnce();
+    expect((await invoke(first, '192.0.2.2')).next).toHaveBeenCalledOnce();
   });
 
   it('reports the oldest accepted request expiry and does not extend a full window on denial', async () => {
@@ -64,9 +68,9 @@ describe('rate limiter policy isolation and retry timing', () => {
     await invoke(createRedisRateLimiter(options));
     await invoke(createRedisRateLimiter(options));
     await invoke(createRedisRateLimiter({ ...options, namespace: 'credential:revoke' }));
-    await invoke(createRedisRateLimiter(options), 'other-client');
+    await invoke(createRedisRateLimiter(options), '192.0.2.2');
     const keys = evaluate.mock.calls.map(call => (call as unknown as [string, { keys: string[] }])[1].keys[0]);
-    expect(keys[0]).toBe('gravity:rl:rl:credential%3Acreate:5000:2:test-client');
+    expect(keys[0]).toBe('gravity:rl:rl:credential%3Acreate:5000:2:192.0.2.1');
     expect(keys[1]).toBe(keys[0]);
     expect(keys[2]).not.toBe(keys[0]);
     expect(keys[3]).not.toBe(keys[0]);

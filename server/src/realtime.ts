@@ -322,7 +322,7 @@ async function authenticateSseConnection(
   req: Request,
   workspaceId: string,
 ): Promise<SseAuthResult> {
-  const sourceIp = getRequestSourceIp(req) ?? req.ip ?? null;
+  const sourceIp = getRequestSourceIp(req);
   const token = firstQueryValue(req.query.token as any);
   if (token) {
     const tokenRow = await verifyAndConsumeToken(token, workspaceId, { sourceIp });
@@ -413,7 +413,7 @@ export async function subscribeToEvents(req: Request, res: Response) {
     // Never include the request URL, cookies, or query token in audit records.
     auditRejectedConnection({
       workspaceId,
-      sourceIp: getRequestSourceIp(req) ?? req.ip ?? null,
+      sourceIp: getRequestSourceIp(req),
       status: authAttempt.status,
       reason: authAttempt.status === 403 ? 'workspace_access_denied' : 'authentication_required_or_invalid',
     });

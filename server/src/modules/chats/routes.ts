@@ -27,7 +27,7 @@ const streamLimiter = createChatStreamLimiter({
   keyFn: async (req) => {
     const projectId = normalizeRouteParam(req.params.projectId);
     const actorUserId = await resolveRequestActorUserId(req);
-    const source = actorUserId ?? getRequestSourceIp(req) ?? req.ip;
+    const source = actorUserId ?? getRequestSourceIp(req) ?? 'unknown';
     return `ai-chat:${projectId}:${source ?? 'anonymous'}`;
   },
 });

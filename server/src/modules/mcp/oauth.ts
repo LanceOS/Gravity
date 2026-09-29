@@ -235,7 +235,7 @@ export function createOAuthAuthorizationRouter() {
   const createLimiter = env.redisEnabled ? createRedisRateLimiter : createRateLimiter;
   for (const [path, max, windowMs] of [['/authorize', 100, 900_000], ['/token', 50, 900_000], ['/register', 20, 3_600_000], ['/revoke', 50, 900_000]] as const) {
     router.use(path, createLimiter({ namespace: `mcp.oauth.${path.slice(1)}.ip`, max, windowMs,
-      keyFn: (req) => `ip:${getRequestSourceIp(req) ?? req.ip}` }));
+      keyFn: (req) => `ip:${getRequestSourceIp(req) ?? 'unknown'}` }));
   }
   router.use(mcpAuthRouter({ provider: gravityOAuthProvider, issuerUrl, scopesSupported,
     authorizationOptions: { rateLimit: false }, clientRegistrationOptions: { rateLimit: false },
