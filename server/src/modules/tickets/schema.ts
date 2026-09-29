@@ -1,4 +1,4 @@
-import { index, pgTable, primaryKey, text, timestamp, check } from 'drizzle-orm/pg-core';
+import { index, pgTable, primaryKey, jsonb, text, timestamp, check } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
 export const tickets = pgTable('tickets', {
@@ -40,11 +40,26 @@ export const ticketRelationships = pgTable('ticket_relationships', {
 // noSelfRef: check('ticket_relationships_no_self_ref', sql`ticket_id != blocked_ticket_id`),
 }));
 
+export interface CommentAutomation {
+  provider: 'github';
+  deliveryId: string;
+  prUrl: string;
+  action: string;
+  externalAuthor: string;
+  externalSender: string;
+  source?: 'webhook' | 'reconciliation';
+  actorUserId?: string;
+  evidence?: string[];
+  before?: { status: string; prStatus: string; prUrl: string | null };
+  after?: { status: string; prStatus: string; prUrl: string | null };
+}
+
 export const comments = pgTable('comments', {
   id: text('id').primaryKey(),
   ticketId: text('ticket_id').notNull(),
   userId: text('user_id').notNull(),
   body: text('body').notNull(),
+  automation: jsonb('automation').$type<CommentAutomation>(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   ticketIdIdx: index('comments_ticket_id_idx').on(table.ticketId),

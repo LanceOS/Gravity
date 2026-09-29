@@ -1578,10 +1578,11 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
       assigneeId: owner.id,
     });
 
-    const webhookResponse = await api().post('/api/v1/webhooks/github').set('x-github-event', 'pull_request').send({
+    const webhookResponse = await api().post('/api/v1/webhooks/github').set('x-github-event', 'pull_request').set('x-github-delivery', 'test-delivery-42').send({
       action: 'opened',
       pull_request: {
         number: 42,
+        updated_at: '2026-09-29T12:00:00Z',
         title: `${ticket.key} add webhook automation`,
         head: { ref: `feature/${ticket.key.toLowerCase()}-webhook` },
         html_url: 'https://github.com/test/repo/pull/42',

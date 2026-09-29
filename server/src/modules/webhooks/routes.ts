@@ -1,24 +1,9 @@
-import { eq, inArray } from 'drizzle-orm';
 import { Router } from 'express';
-import { db } from '../../db/index.js';
-import { projects, teams, tickets } from '../../db/schema.js';
 import { env } from '../../env.js';
-import { verifyGitHubWebhookSignature, isValidGitHubUrl, sanitizeGitHubLogin } from '../../lib/webhookSignature.js';
+import { verifyGitHubWebhookSignature } from '../../lib/webhookSignature.js';
 import { broadcastToWorkspace } from '../../realtime.js';
-import {
-  addCommentRecord,
-  getProjectScope,
-  getTicketById,
-  type TicketRelationshipCleanupEffect,
-  updateTicketRecordWithEffects,
-} from '../tickets/services/tickets.js';
-
-/** Maximum number of ticket keys to process from a single webhook delivery. */
-const MAX_KEYS_PER_WEBHOOK = 10;
-const SSE_WEBHOOK_ACTOR_ID = 'system:webhook';
-
-/** Ticket key pattern: one or more letters, a hyphen, one or more digits. */
-const TICKET_KEY_REGEX = /([A-Za-z]+)-(\d+)/g;
+import { getTicketById } from '../tickets/services/tickets.js';
+import { GITHUB_AUTOMATION_ACTOR, normalizeGitHubRepositoryUrl, normalizeGitHubPullRequestUrl, processPullRequestEvent, SUPPORTED_PR_ACTIONS } from './processPullRequest.js';
 
 // ── Finding #3: Simple per-IP rate limiter ────────────────────────────────────
 // Tracks request timestamps per IP. No external dependency required.
@@ -37,45 +22,6 @@ function isRateLimited(ip: string): boolean {
   timestamps.push(now);
   rateLimitMap.set(ip, timestamps);
   return false;
-}
-
-async function broadcastRelationshipCleanupEvents(relationshipCleanup: TicketRelationshipCleanupEffect) {
-  if (relationshipCleanup.affectedTickets.length === 0) {
-    return;
-  }
-
-  const affectedTicketSnapshots = await Promise.all(
-    relationshipCleanup.affectedTickets.map(async ({ id, projectId }) => {
-      const [ticket, scope] = await Promise.all([
-        getTicketById(id, projectId),
-        getProjectScope(projectId),
-      ]);
-
-      if (!scope) {
-        return null;
-      }
-
-      return {
-        projectId,
-        ticket,
-        ticketId: id,
-        workspaceId: scope.workspaceId,
-      };
-    }),
-  );
-
-  for (const snapshot of affectedTicketSnapshots) {
-    if (!snapshot) {
-      continue;
-    }
-
-    broadcastToWorkspace(snapshot.workspaceId, 'tickets-updated', {
-      projectId: snapshot.projectId,
-      ticketId: snapshot.ticketId,
-      ...(snapshot.ticket ? { ticket: snapshot.ticket } : {}),
-      actorUserId: SSE_WEBHOOK_ACTOR_ID,
-    });
-  }
 }
 
 export function createWebhookRouter() {
@@ -124,153 +70,41 @@ export function createWebhookRouter() {
     }
 
     const action = payload?.action;
+    if (!SUPPORTED_PR_ACTIONS.has(action)) {
+      res.json({ success: true });
+      return;
+    }
     const pr = payload?.pull_request;
-    if (!pr) {
-      res.status(400).json({ error: 'Missing pull_request payload.' });
+    const deliveryId = req.header('x-github-delivery');
+    const repoUrl = pr?.base?.repo?.html_url ?? payload?.repository?.html_url;
+    const updatedAt = typeof pr?.updated_at === 'string' ? new Date(pr.updated_at) : new Date(NaN);
+    if (!pr || !deliveryId || deliveryId.length > 255 || typeof repoUrl !== 'string'
+      || !normalizeGitHubRepositoryUrl(repoUrl)
+      || !Number.isSafeInteger(pr.number) || pr.number <= 0
+      || typeof pr.html_url !== 'string'
+      || normalizeGitHubPullRequestUrl(pr.html_url) !== `${normalizeGitHubRepositoryUrl(repoUrl)}/pull/${pr.number}` || !Number.isFinite(updatedAt.getTime())
+      || (action === 'closed' && typeof pr.merged !== 'boolean')) {
+      res.status(400).json({ error: 'Invalid pull request event, delivery ID, or source timestamp.' });
       return;
     }
-
-    // ── Finding #6: Validate prUrl before storing ─────────────────────────────
-    const rawPrUrl = String(pr.html_url || '');
-    const prUrl = isValidGitHubUrl(rawPrUrl) ? rawPrUrl : '';
-
-    const isMerged = Boolean(pr.merged);
-
-    // ── Repository URL resolution & project matching ──────────────────────────
-    const rawRepoUrl = String(pr.base?.repo?.html_url || payload?.repository?.html_url || '');
-    if (!rawRepoUrl) {
-      res.status(400).json({ error: 'Missing repository url.' });
-      return;
+    const effects = await processPullRequestEvent({
+      deliveryId, action, repoUrl, prUrl: pr.html_url, number: pr.number,
+      title: String(pr.title ?? ''), branch: String(pr.head?.ref ?? ''),
+      merged: pr.merged === true, sourceUpdatedAt: updatedAt,
+      externalAuthor: pr.user?.login, externalSender: payload.sender?.login,
+    });
+    // Durable work is committed before any realtime notification is sent.
+    for (const effect of effects) {
+      const ticket = await getTicketById(effect.ticketId, effect.projectId);
+      broadcastToWorkspace(effect.workspaceId, 'tickets-updated', {
+        projectId: effect.projectId, ticketId: effect.ticketId,
+        ...(ticket ? { ticket } : {}), actorUserId: GITHUB_AUTOMATION_ACTOR,
+      });
+      if (effect.commentAdded) broadcastToWorkspace(effect.workspaceId, 'comments-updated', {
+        ticketId: effect.ticketId, actorUserId: GITHUB_AUTOMATION_ACTOR,
+      });
     }
-
-    const linkedProjects = await db
-      .select({ id: projects.id, createdBy: projects.createdBy })
-      .from(projects)
-      .where(eq(projects.githubRepoUrl, rawRepoUrl));
-
-    if (linkedProjects.length === 0) {
-      // ── Finding #8: Uniform response — don't confirm project existence ──────
-      res.json({ success: true });
-      return;
-    }
-
-    const linkedProjectIds = linkedProjects.map((p) => p.id);
-    // Build a map from projectId -> createdBy to avoid a per-ticket DB query later.
-    const projectCreatedBy = new Map(linkedProjects.map((p) => [p.id, p.createdBy]));
-
-    // Build a map from projectId -> workspaceId for scoped SSE broadcasts.
-    const projectWorkspaceRows = await db
-      .select({ id: projects.id, workspaceId: teams.workspaceId })
-      .from(projects)
-      .innerJoin(teams, eq(teams.id, projects.teamId))
-      .where(inArray(projects.id, linkedProjectIds));
-    const projectWorkspaceMap = new Map(projectWorkspaceRows.map((r) => [r.id, r.workspaceId]));
-
-    // ── Ticket key extraction ─────────────────────────────────────────────────
-    const prTitle = String(pr.title || '');
-    const prBranch = String(pr.head?.ref || '');
-    const keysFound = new Set<string>();
-
-    let match: RegExpExecArray | null;
-
-    const titleRegex = new RegExp(TICKET_KEY_REGEX.source, 'g');
-    while ((match = titleRegex.exec(prTitle)) !== null) {
-      keysFound.add(match[0].toUpperCase());
-    }
-
-    const branchRegex = new RegExp(TICKET_KEY_REGEX.source, 'g');
-    while ((match = branchRegex.exec(prBranch)) !== null) {
-      keysFound.add(match[0].toUpperCase());
-    }
-
-    // ── Finding #7: Cap keys to avoid N+1 query storms ───────────────────────
-    const keysToProcess = [...keysFound].slice(0, MAX_KEYS_PER_WEBHOOK);
-
-    if (keysToProcess.length === 0) {
-      res.json({ success: true });
-      return;
-    }
-
-    // ── Finding #7 (continued): Batch ticket lookup instead of N sequential queries
-    const ticketRows = await db
-      .select()
-      .from(tickets)
-      .where(inArray(tickets.key, keysToProcess));
-
-    // Filter to only tickets that belong to a linked project.
-    const relevantTickets = ticketRows.filter((t) => linkedProjectIds.includes(t.projectId));
-
-    if (relevantTickets.length === 0) {
-      res.json({ success: true });
-      return;
-    }
-
-    // ── Finding #4: Sanitize attacker-controlled values used in comment text ──
-    const prNumber = Number.isInteger(Number(pr.number)) && Number(pr.number) > 0
-      ? Number(pr.number)
-      : 0;
-    const prAuthor = sanitizeGitHubLogin(pr.user?.login);
-
-    // Determine the action description for the comment body.
-    const eventDescription = action === 'closed' && isMerged ? 'merged' : String(action || 'updated');
-
-    // ── Status mapping per PR lifecycle action ────────────────────────────────
-    let nextPrStatus: 'open' | 'merged' | 'closed' | 'none' = 'none';
-    let nextTicketStatus: string | null = null; // null = leave unchanged
-
-    if (action === 'opened' || action === 'reopened') {
-      nextPrStatus = 'open';
-      nextTicketStatus = 'in_progress';
-    } else if (action === 'review_requested' || action === 'ready_for_review') {
-      nextPrStatus = 'open';
-      nextTicketStatus = 'in_review';
-    } else if (action === 'closed' && isMerged) {
-      nextPrStatus = 'merged';
-      nextTicketStatus = 'done';
-    } else if (action === 'closed') {
-      nextPrStatus = 'closed';
-      // Intentionally leave ticket status unchanged for abandoned PRs.
-    }
-
-    // ── Process each matched ticket ───────────────────────────────────────────
-    for (const ticket of relevantTickets) {
-      const updateResult = await updateTicketRecordWithEffects(
-        ticket.id,
-        {
-          prStatus: nextPrStatus,
-          prUrl: prUrl || null,
-          status: nextTicketStatus ?? ticket.status,
-        },
-        ticket.projectId,
-      );
-
-      if (!updateResult) continue;
-      const { ticket: updated, relationshipCleanup } = updateResult;
-
-      const workspaceId = projectWorkspaceMap.get(updated.projectId) ?? '';
-
-      // Reuse the already-loaded createdBy from the linked project rather than
-      // firing an additional DB query per ticket.
-      const commentUserId = updated.assigneeId || projectCreatedBy.get(updated.projectId);
-      if (commentUserId) {
-        const commentBody = `GitHub PR update: #${prNumber} was ${eventDescription} by ${prAuthor}${prUrl ? ` (${prUrl})` : ''}.`;
-
-        await addCommentRecord(updated.id, commentUserId, commentBody);
-        if (workspaceId) {
-          broadcastToWorkspace(workspaceId, 'comments-updated', { ticketId: updated.id, actorUserId: SSE_WEBHOOK_ACTOR_ID });
-        }
-
-        if (workspaceId) {
-          broadcastToWorkspace(workspaceId, 'tickets-updated', { projectId: updated.projectId, actorUserId: SSE_WEBHOOK_ACTOR_ID });
-        }
-      }
-
-      await broadcastRelationshipCleanupEvents(relationshipCleanup);
-    }
-
-    // ── Finding #8: Always return uniform success ─────────────────────────────
     res.json({ success: true });
   });
-
   return router;
 }
