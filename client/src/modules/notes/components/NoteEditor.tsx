@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useSyncExternalStore } from 'react';
 import { Check } from 'lucide-react';
 import {
+  Button,
   RichTextEditor,
   type RichTextEditorHandle,
   createEmptyRichTextValue,
@@ -8,6 +9,7 @@ import {
 } from '@library';
 import { useNote } from '../hooks/useNote';
 import './NoteEditor.css';
+import { readDraft, writeDraft, subscribeDraft } from './noteDrafts';
 
 interface NoteEditorProps {
   projectId: string;
@@ -28,9 +30,15 @@ function normalizeLegacyNoteBody(rawBody: string): string {
   return rawBody.replace(/^# ?\n/, '').trimStart();
 }
 
-export function NoteEditor({ projectId, noteId, onTitleChange }: NoteEditorProps) {
-  const { note, loading, saving, saveError, savedAt, saveNote, uploadMedia } = useNote(projectId, noteId);
+export function NoteEditor(props: NoteEditorProps) {
+  return <NoteEditorSession key={JSON.stringify([props.projectId, props.noteId])} {...props} />;
+}
 
+function NoteEditorSession({ projectId, noteId, onTitleChange }: NoteEditorProps) {
+  const { note, loading, saving, saveError, savedAt, saveNote, uploadMedia, reloadNote } = useNote(projectId, noteId);
+
+  const [reloading, setReloading] = useState(false);
+  const reloadingRef = useRef(false);
   const [isDragging, setIsDragging] = useState(false);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState(createEmptyRichTextValue());
@@ -40,16 +48,51 @@ export function NoteEditor({ projectId, noteId, onTitleChange }: NoteEditorProps
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const triggerSave = useCallback(() => {
-    if (!note) return;
+  const draftKey = note ? `gravity:note-draft:${JSON.stringify([note.userId, projectId, noteId])}` : null;
+  const versionRef = useRef<number>(0);
+  const draft = useSyncExternalStore(
+    useCallback(listener => subscribeDraft(draftKey, listener), [draftKey]),
+    useCallback(() => draftKey ? readDraft(draftKey) : null, [draftKey]),
+    () => null,
+  );
+  const dirty = !!draft;
+  const [reloadError, setReloadError] = useState<string | null>(null);
+  const mounted = useRef(true);
+  const pendingRef = useRef<string | null>(null);
 
-    const currentBody = bodyRef.current;
-    const currentTitle = titleRef.current.trim() || 'Untitled Note';
+  const preserveDraft = () => {
+    if (draftKey) writeDraft(draftKey, {
+      title: titleRef.current,
+      body: bodyRef.current,
+      version: readDraft(draftKey)?.version ?? versionRef.current,
+    });
+  };
 
-    if (currentBody !== note.body || currentTitle !== note.title) {
-      saveNote({ title: currentTitle, body: currentBody });
-    }
-  }, [note, saveNote]);
+  const triggerSave = useCallback((retry = false) => {
+    if (!note || !draftKey || reloadingRef.current) return;
+    const pendingDraft = readDraft(draftKey);
+    if (!pendingDraft) return;
+    const updates = { title: pendingDraft.title.trim() || 'Untitled Note', body: pendingDraft.body };
+    const snapshot = pendingDraft.revision!;
+    if (pendingRef.current === snapshot) return;
+    pendingRef.current = snapshot;
+    if (mounted.current) setReloadError(null);
+    Promise.resolve(saveNote(updates, pendingDraft.version, retry)).then((updated) => {
+      if (!updated) return;
+      versionRef.current = updated.version;
+      const retained = readDraft(draftKey);
+      if (retained && retained.revision === pendingDraft.revision) {
+        writeDraft(draftKey, null);
+      } else if (retained) {
+        writeDraft(draftKey, { ...retained, version: updated.version });
+      }
+      if (mounted.current) setReloadError(null);
+    }).catch(() => {
+      // The shared save queue exposes the failure; leave the draft intact.
+    }).finally(() => {
+      if (pendingRef.current === snapshot) pendingRef.current = null;
+    });
+  }, [note, draftKey, saveNote]);
 
   const triggerSaveRef = useRef(triggerSave);
   useEffect(() => {
@@ -69,6 +112,7 @@ export function NoteEditor({ projectId, noteId, onTitleChange }: NoteEditorProps
   const handleFileUpload = async (file: File) => {
     try {
       const url = await uploadMedia(file);
+      if (!mounted.current || reloadingRef.current) return;
       editorRef.current?.insertImage({ src: url, alt: file.name, title: file.name });
     } catch (err) {
       console.error('Failed to upload file:', err);
@@ -77,42 +121,88 @@ export function NoteEditor({ projectId, noteId, onTitleChange }: NoteEditorProps
 
   const noteLoaded = useRef(false);
   useEffect(() => {
-    noteLoaded.current = false;
-    setTitle('');
-    titleRef.current = '';
-    onTitleChange?.('');
-    setBody(createEmptyRichTextValue());
-    bodyRef.current = createEmptyRichTextValue();
-  }, [noteId, onTitleChange]);
-
-  useEffect(() => {
-    if (!note || noteLoaded.current) return;
+    if (!note || noteLoaded.current || !draftKey) return;
     noteLoaded.current = true;
-
-    const nextTitle = note.title ?? '';
-    const nextBody = normalizeLegacyNoteBody(note.body ?? createEmptyRichTextValue());
-
+    const draft = readDraft(draftKey);
+    const nextTitle = draft?.title ?? note.title ?? '';
+    const nextBody = draft?.body ?? normalizeLegacyNoteBody(note.body ?? createEmptyRichTextValue());
+    versionRef.current = draft?.version ?? note.version;
     setTitle(nextTitle);
     titleRef.current = nextTitle;
     onTitleChange?.(nextTitle);
     setBody(nextBody);
     bodyRef.current = nextBody;
-  }, [note, onTitleChange]);
+  }, [note, draftKey, onTitleChange]);
 
+  useEffect(() => {
+    // A save started by the previous mount may acknowledge the restored draft.
+    // Only advance a clean editor whose contents actually match that version.
+    if (!dirty && note && noteLoaded.current
+      && (titleRef.current.trim() || 'Untitled Note') === note.title
+      && bodyRef.current === normalizeLegacyNoteBody(note.body)) {
+      versionRef.current = note.version;
+    }
+  }, [dirty, note]);
 
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      triggerSaveRef.current();
+    };
+  }, []);
+
+  const downloadDraft = () => {
+    const url = URL.createObjectURL(new Blob([JSON.stringify({ title: titleRef.current, body: bodyRef.current }, null, 2)], { type: 'application/json' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `note-${noteId}-draft.json`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  };
+
+  const reload = async () => {
+    if (!window.confirm('Discard your local edits and load the server version? Download your draft first to keep a copy.')) return;
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    reloadingRef.current = true;
+    setReloading(true);
+    try {
+      const latest = await reloadNote();
+      if (!mounted.current) return;
+      if (draftKey) writeDraft(draftKey, null);
+      titleRef.current = latest.title;
+      bodyRef.current = normalizeLegacyNoteBody(latest.body);
+      versionRef.current = latest.version;
+      setTitle(titleRef.current);
+      setBody(bodyRef.current);
+      setReloadError(null);
+      onTitleChange?.(latest.title);
+    } catch (error) {
+      if (!mounted.current) return;
+      setReloadError(error instanceof Error ? error.message : 'Unable to reload note');
+    } finally {
+      reloadingRef.current = false;
+      if (mounted.current) setReloading(false);
+    }
+  };
 
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (reloadingRef.current || !noteLoaded.current) return;
     const newTitle = e.target.value;
     setTitle(newTitle);
     titleRef.current = newTitle;
     onTitleChange?.(newTitle);
+    preserveDraft();
     scheduleSave();
   };
 
   const handleBodyChange = (value?: string) => {
+    if (reloadingRef.current || !noteLoaded.current) return;
     const newBody = value || createEmptyRichTextValue();
     setBody(newBody);
     bodyRef.current = newBody;
+    preserveDraft();
     scheduleSave();
   };
 
@@ -153,15 +243,27 @@ export function NoteEditor({ projectId, noteId, onTitleChange }: NoteEditorProps
     >
       <div className="note-editor__header">
         <div className="note-editor__status" role="status">
-          {saveError ? (
+          {reloadError ? (
+            <span className="note-editor__status--error">Failed to reload: {reloadError}</span>
+          ) : saveError ? (
             <span className="note-editor__status--error">Failed to save: {saveError}</span>
           ) : saving ? (
             <span>Saving...</span>
+          ) : dirty ? (
+            <span>Unsaved changes — draft retained in this tab</span>
           ) : savedAt ? (
             <span><Check size={12} style={{ display: 'inline', marginRight: 4 }} /> Saved {savedAt.toLocaleTimeString()}</span>
           ) : null}
         </div>
       </div>
+
+      {(dirty || reloadError || saveError) && (
+        <div className="note-editor__recovery">
+          <Button size="sm" type="button" onClick={() => triggerSave(true)} disabled={saving || reloading}>Retry save</Button>
+          <Button size="sm" type="button" onClick={downloadDraft}>Download draft</Button>
+          <Button size="sm" type="button" onClick={reload} disabled={saving || reloading}>Reload server version</Button>
+        </div>
+      )}
 
       <input
         type="file"
@@ -178,6 +280,7 @@ export function NoteEditor({ projectId, noteId, onTitleChange }: NoteEditorProps
             className="note-editor__title-input"
             placeholder="Title..."
             aria-label="Note title"
+            disabled={!note || reloading}
             value={title}
             onChange={handleTitleChange}
             style={{ flex: 1 }}
@@ -185,6 +288,7 @@ export function NoteEditor({ projectId, noteId, onTitleChange }: NoteEditorProps
         </div>
 
         <RichTextEditor
+          readOnly={!note || reloading}
           ref={editorRef}
           value={body}
           onChange={handleBodyChange}
