@@ -241,7 +241,10 @@ export class NoteCleanupService {
     const orphanedFiles = mediaFiles.filter((file) => !referencedFiles.has(file));
     const deadLinks = [...referencedFiles].filter((file) => !mediaFileSet.has(file));
 
-    await Promise.all(orphanedFiles.map((file) => this.dependencies.deleteFile(metadata.bucketPath, file)));
+    // Keep deletion concurrency bounded even for multi-page inventories.
+    for (const file of orphanedFiles) {
+      await this.dependencies.deleteFile(metadata.bucketPath, file);
+    }
 
     return {
       cleanedFiles: orphanedFiles,

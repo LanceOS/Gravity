@@ -5,9 +5,11 @@ import {
   DeleteObjectCommand,
   ListObjectsV2Command,
   CreateBucketCommand,
+  type ListObjectsV2CommandOutput,
 } from '@aws-sdk/client-s3';
 import { env } from '../env.js';
 import { Transform } from 'node:stream';
+import { MAX_LISTED_FILES, MAX_LISTED_KEY_BYTES, MAX_LISTING_PAGES, LIST_PAGE_SIZE } from './object-list-limits.js';
 
 class SizeLimitStream extends Transform {
   private bytesRead = 0;
@@ -175,7 +177,6 @@ export class RustFS {
    * Deletes an entire bucket directory.
    */
   static async deleteBucket(bucketPath: string): Promise<void> {
-    const prefix = `${bucketPath}/`;
     const files = await this.listFiles(bucketPath);
     for (const file of files) {
       await this.deleteFile(bucketPath, file);
@@ -187,22 +188,52 @@ export class RustFS {
    */
   static async listFiles(bucketPath: string): Promise<string[]> {
     const prefix = `${bucketPath}/`;
-    const command = new ListObjectsV2Command({
-      Bucket: env.rustfsBucket,
-      Prefix: prefix,
-    });
-    try {
-      const response = await s3Client.send(command);
-      if (!response.Contents) return [];
-      
-      return response.Contents
-        .filter(item => item.Key && item.Key !== prefix)
-        .map(item => item.Key!.substring(prefix.length));
-    } catch (err: any) {
-      if (err.name === 'NoSuchBucket') {
-        return [];
+    const files: string[] = [];
+    const seenTokens = new Set<string>();
+    let continuationToken: string | undefined;
+    let keyBytes = 0;
+    for (let page = 0; page < MAX_LISTING_PAGES; page += 1) {
+      let response: ListObjectsV2CommandOutput;
+      try {
+        response = await s3Client.send(new ListObjectsV2Command({
+          Bucket: env.rustfsBucket,
+          Prefix: prefix,
+          MaxKeys: LIST_PAGE_SIZE,
+          ContinuationToken: continuationToken,
+        }));
+      } catch (err: unknown) {
+        // An absent bucket is empty only before pagination has begun. A bucket
+        // disappearing midway is a failed inventory, never a partial success.
+        if (page === 0 && err instanceof Error && err.name === 'NoSuchBucket') return [];
+        throw err;
       }
-      throw err;
+      if (typeof response.IsTruncated !== 'boolean') {
+        throw new Error('Object listing did not confirm whether the inventory is complete');
+      }
+      if ((response.Contents?.length ?? 0) > LIST_PAGE_SIZE) {
+        throw new Error('Object listing exceeded page size');
+      }
+      for (const item of response.Contents ?? []) {
+        if (typeof item.Key !== 'string' || !item.Key) {
+          throw new Error('Object listing returned an invalid key');
+        }
+        if (item.Key === prefix) continue;
+        if (!item.Key.startsWith(prefix)) throw new Error('Object listing returned an out-of-prefix key');
+        const file = item.Key.slice(prefix.length);
+        keyBytes += Buffer.byteLength(file);
+        if (files.length >= MAX_LISTED_FILES || keyBytes > MAX_LISTED_KEY_BYTES) {
+          throw new Error('Object listing exceeded inventory limits');
+        }
+        files.push(file);
+      }
+      if (!response.IsTruncated) return files;
+      const nextToken = response.NextContinuationToken;
+      if (!nextToken || Buffer.byteLength(nextToken) > 16 * 1024 || seenTokens.has(nextToken)) {
+        throw new Error('Object listing returned an invalid continuation token');
+      }
+      seenTokens.add(nextToken);
+      continuationToken = nextToken;
     }
+    throw new Error('Object listing exceeded page limit');
   }
 }

@@ -66,12 +66,15 @@ async function deleteLastTeamWithOwnedWork(teamId: string, workspaceId: string):
   });
   await invalidateTeamWorkspaceCache(teamId);
 
-  const cleanupResults = await Promise.allSettled(noteBucketPaths.map((bucketPath) => RustFS.deleteBucket(bucketPath)));
-  for (const result of cleanupResults) {
-    if (result.status === 'rejected') {
+  // Each prefix collects a bounded inventory before deleting. Do not multiply
+  // that bound by the number of notes in a team by starting all inventories at once.
+  for (const bucketPath of noteBucketPaths) {
+    try {
+      await RustFS.deleteBucket(bucketPath);
+    } catch (error) {
       // Best-effort cleanup keeps the database consistent even if object storage lags behind.
       // eslint-disable-next-line no-console
-      console.error('Failed to delete note bucket during team deletion:', result.reason);
+      console.error('Failed to delete note bucket during team deletion:', error);
     }
   }
 
