@@ -4,6 +4,8 @@ import { initializeDatabase } from './db/bootstrap.js';
 import { env } from './env.js';
 import { startMcpEventBridge } from './lib/mcp-event-bridge.js';
 import { start as startServiceTokens, stopAutoRefresh } from './lib/serviceTokens.js';
+import { beginServerShutdown } from './lib/server-lifecycle.js';
+import { closeHttpServer } from './lib/http-shutdown.js';
 
 async function main() {
   await initializeDatabase();
@@ -25,6 +27,7 @@ async function main() {
   const gracefulShutdown = async (reason: string) => {
     if (isShuttingDown) return;
     isShuttingDown = true;
+    beginServerShutdown();
     console.log(`Shutdown initiated: ${reason}`);
 
     // Fail-safe: force exit after timeout
@@ -36,20 +39,13 @@ async function main() {
     forceTimer.unref();
 
     try {
-      await new Promise<void>((resolve) => {
-        server.close((err) => {
-          if (err) {
-            console.error('Error closing HTTP server:', err);
-          } else {
-            console.log('HTTP server closed.');
-          }
-          resolve();
-        });
-      });
+      await closeHttpServer(server);
+      console.log('HTTP server closed.');
     } catch (err) {
       console.error('Error while closing HTTP server:', err);
     }
 
+    stopAutoRefresh();
     await stopMcpEventBridge();
 
     try {
@@ -71,8 +67,6 @@ async function main() {
     } catch (err) {
       console.error('Error shutting down Redis client:', err);
     }
-
-    stopAutoRefresh();
 
     clearTimeout(forceTimer);
 

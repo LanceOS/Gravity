@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Request, Response } from 'express';
+import { EventEmitter } from 'node:events';
 import * as requestAuth from '../src/modules/auth/utils/request-auth.js';
 import * as workspaceAccess from '../src/modules/mcp/access.js';
 import {
@@ -22,7 +23,7 @@ describe.each([false, true])('SSE denial audit failure (all sinks fail: %s)', (a
     const connections: Response[] = [];
     if (status === 429) {
       for (let i = 0; i < MAX_CONCURRENT_SSE_CONNECTIONS_PER_USER; i += 1) {
-        const connection = { end: vi.fn() } as unknown as Response;
+        const connection = Object.assign(new EventEmitter(), { destroy: vi.fn() }) as unknown as Response;
         addClient('audit-workspace', connection, {
           userId: 'audit-user', sourceIp: null, tokenId: null, authMethod: 'session',
         });

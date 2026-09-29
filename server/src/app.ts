@@ -8,6 +8,7 @@ import { createAuthCompatibilityRouter } from './modules/auth/routes.js';
 import { bootstrapMcpRegistries } from './modules/mcp/bootstrap.js';
 import path from 'path';
 import { createOAuthAuthorizationRouter } from './modules/mcp/oauth.js';
+import { isServerShuttingDown } from './lib/server-lifecycle.js';
 
 export { bootstrapMcpRegistries } from './modules/mcp/bootstrap.js';
 
@@ -54,9 +55,9 @@ export function createApp() {
   );
 
   app.get('/', (_req, res) => {
-    res.json({
+    res.status(isServerShuttingDown() ? 503 : 200).json({
       name: 'gravity-server',
-      status: 'ready',
+      status: isServerShuttingDown() ? 'shutting_down' : 'ready',
     });
   });
 

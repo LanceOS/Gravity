@@ -1,7 +1,7 @@
 import React from 'react';
 import { act, render, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { ActiveProjectProvider, useActiveProject } from '../../project/ActiveProjectContext';
 import { ProjectContext } from '../../project/ProjectContext';
 import type { ProjectContextType } from '../../project/ProjectContext.types';
@@ -188,7 +188,7 @@ function Probe() {
   return null;
 }
 
-function renderWithProviders(queryClient: QueryClient) {
+function renderWithProviders(queryClient: QueryClient, children?: React.ReactNode) {
   return render(
     <QueryClientProvider client={queryClient}>
       <ActiveProjectProvider>
@@ -196,6 +196,7 @@ function renderWithProviders(queryClient: QueryClient) {
           <ProjectContext.Provider value={projectContextValue}>
             <RealtimeProvider currentUserId="user-1">
               <Probe />
+              {children}
             </RealtimeProvider>
           </ProjectContext.Provider>
         </ActiveTicketHarness>
@@ -215,6 +216,38 @@ describe('RealtimeContext', () => {
     vi.clearAllMocks();
     vi.unstubAllGlobals();
     serviceRegistry.clear();
+  });
+
+  it.each(['init', 'resync-required'])('invalidates cached state after %s', async type => {
+    const queryClient = createQueryClient();
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+    vi.stubGlobal('EventSource', class {});
+    renderWithProviders(queryClient);
+    await waitFor(() => expect(currentProject).toBeDefined());
+    await act(async () => { currentProject!.setActiveProjectId('project-1'); });
+    await waitFor(() => expect(currentRealtime.workspaceId).toBe('workspace-1'));
+    invalidate.mockClear();
+    serviceRegistry.get('workspace-1')!.emitMessage({ type, data: {} });
+    await waitFor(() => expect(invalidate).toHaveBeenCalledWith());
+  });
+
+  it('refetches an open ticket with infinite stale time after an oversized event', async () => {
+    const queryClient = createQueryClient();
+    queryClient.setQueryData(queryKeys.ticketDetail('ticket-1'), { title: 'old title' });
+    const fetchTicket = vi.fn().mockResolvedValue({ title: 'updated large ticket' });
+    function Detail() {
+      const { data } = useQuery<{ title: string }>({ queryKey: queryKeys.ticketDetail('ticket-1'), queryFn: fetchTicket, staleTime: Infinity });
+      return <div data-testid="resynced-title">{data?.title}</div>;
+    }
+    vi.stubGlobal('EventSource', class {});
+    const view = renderWithProviders(queryClient, <Detail />);
+    await waitFor(() => expect(currentProject).toBeDefined());
+    await act(async () => { currentProject!.setActiveProjectId('project-1'); });
+    await waitFor(() => expect(currentRealtime.workspaceId).toBe('workspace-1'));
+    expect(fetchTicket).not.toHaveBeenCalled();
+    await act(async () => { serviceRegistry.get('workspace-1')!.emitMessage({ type: 'resync-required', data: {} }); });
+    await waitFor(() => expect(view.getByTestId('resynced-title').textContent).toBe('updated large ticket'));
+    expect(fetchTicket).toHaveBeenCalledOnce();
   });
 
   it('updates ticket caches from SSE events including the same user in another client', async () => {

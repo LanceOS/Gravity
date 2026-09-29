@@ -215,6 +215,10 @@ export function useRealtimeContextValue({
               queryClient.invalidateQueries({ queryKey: queryKeys.users() });
               break;
             case 'init':
+            case 'resync-required':
+              // A reconnect can follow dropped events, and large mutations are
+              // sent as bounded invalidations instead of full snapshots.
+              void queryClient.invalidateQueries();
               break;
 
             default:
