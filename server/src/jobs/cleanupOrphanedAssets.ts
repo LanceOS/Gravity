@@ -1,83 +1,28 @@
 import { fileURLToPath } from 'node:url';
-import { db } from '../db/index.js';
-import { noteMetadata } from '../modules/notes/schema.js';
+import { recoverAbandonedNoteRevisions } from '../modules/notes/services/notes.js';
 import { RustFS } from '../lib/rustfs.js';
-import { MAX_LISTED_FILES, MAX_LISTED_KEY_BYTES } from '../lib/object-list-limits.js';
+import { MetadataRepository, NotesRepository } from '../modules/notes/repositories.js';
+import { cleanupMedia, type CleanupOptions } from '../modules/notes/services/media-cleanup.js';
 
-async function runCleanup(dryRun = false) {
-  console.log('Starting orphaned asset cleanup', dryRun ? '(dry-run)' : '');
-
-  // Fetch all notes with their bucket paths
-  const rows = await db.select({ id: noteMetadata.id, bucketPath: noteMetadata.bucketPath }).from(noteMetadata);
-
-  const idToBucket = new Map<string, string>();
-  for (const r of rows) idToBucket.set(r.id, r.bucketPath);
-
-  // Scan all bodies and build a map of referenced files per bucket
-  const referenced = new Map<string, Set<string>>();
-
-  for (const r of rows) {
-    let body = '';
-    try {
-      body = await RustFS.readFileUtf8(r.bucketPath, 'body.md');
-    } catch (err: any) {
-      if (err.code === 'ENOENT') continue;
-      throw err;
-    }
-
-    const pattern = /\/api\/v1\/notes\/([^\/\s]+)\/media\/([^\s)\"]+)/g;
-    let m;
-    while ((m = pattern.exec(body)) !== null) {
-      const refNoteId = m[1];
-      const filename = decodeURIComponent(m[2]);
-      const targetBucket = idToBucket.get(refNoteId);
-      if (!targetBucket) continue;
-      if (!referenced.has(targetBucket)) referenced.set(targetBucket, new Set<string>());
-      referenced.get(targetBucket)!.add(filename);
-    }
-  }
-
-  const deleted: Array<{ bucket: string; file: string }> = [];
-  const orphanedFound: Array<{ bucket: string; file: string }> = [];
-
-  let plannedKeyBytes = 0;
-  // Complete every inventory before issuing the first destructive operation.
-  for (const r of rows) {
-    const files = await RustFS.listFiles(r.bucketPath);
-    for (const f of files) {
-      if (f === 'body.md') continue;
-      const refs = referenced.get(r.bucketPath);
-      const isReferenced = refs ? refs.has(f) : false;
-      if (!isReferenced) {
-        plannedKeyBytes += Buffer.byteLength(r.bucketPath) + Buffer.byteLength(f);
-        if (orphanedFound.length >= MAX_LISTED_FILES || plannedKeyBytes > MAX_LISTED_KEY_BYTES) {
-          throw new Error('Cleanup plan exceeded inventory limits');
-        }
-        orphanedFound.push({ bucket: r.bucketPath, file: f });
-      }
-    }
-  }
-
-  if (!dryRun) {
-    for (const entry of orphanedFound) {
-      await RustFS.deleteFile(entry.bucket, entry.file);
-      deleted.push(entry);
-    }
-  }
-  // S3 directories are virtual prefixes; there is no empty directory to delete.
-
-  console.log(`Orphaned files found: ${orphanedFound.length}`);
-  if (!dryRun) console.log(`Deleted files: ${deleted.length}`);
-  return { orphanedFound, deleted };
+async function runCleanup(dryRun = false, options: Omit<CleanupOptions, 'dryRun'> = {}) {
+  const media = await cleanupMedia({
+    listNotes: MetadataRepository.listNotesForMediaCleanup,
+    getBody: NotesRepository.getBody,
+    listFiles: bucket => RustFS.listFiles(bucket),
+    statFile: (bucket, file) => RustFS.statFile(bucket, file),
+    deleteFile: (bucket, file, etag) => RustFS.deleteFile(bucket, file, etag),
+  }, { ...options, dryRun });
+  const abandonedRevisions = await recoverAbandonedNoteRevisions(dryRun);
+  return { ...media, abandonedRevisions };
 }
 
 if (import.meta.url) {
   const __filename = fileURLToPath(import.meta.url);
   if (process.argv[1] === __filename) {
     const dry = process.argv.includes('--dry-run');
-    runCleanup(dry)
+    runCleanup(dry, { gracePeriodMs: process.env.NOTE_MEDIA_GRACE_MS === undefined ? undefined : Number(process.env.NOTE_MEDIA_GRACE_MS) })
       .then((res) => {
-        console.log('Cleanup complete.');
+        console.log('Cleanup complete.', res);
         process.exit(0);
       })
       .catch((err) => {
