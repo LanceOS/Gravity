@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { MetadataRepository, NotesRepository } from '../repositories.js';
+import { MetadataRepository, NotesRepository, NoteRevisionRepository, isNoteBodyFile } from '../repositories.js';
 import { RustFS } from '../../../lib/rustfs.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -10,7 +10,7 @@ type NoteMetadata = NonNullable<Awaited<ReturnType<typeof MetadataRepository.get
 
 export type NoteCleanupDependencies = {
   getMetadata: (id: string) => Promise<NoteMetadata | null>;
-  getBody: (bucketPath: string) => Promise<string>;
+  getBody: (bucketPath: string, bodyKey?: string) => Promise<string>;
   listFiles: (bucketPath: string) => Promise<string[]>;
   deleteFile: (bucketPath: string, filename: string) => Promise<void>;
 };
@@ -90,21 +90,16 @@ export async function createNote(
   const bucketPath = RustFS.getBucketPath(projectId, userId, noteUuid);
   const excerpt = extractExcerpt(body);
 
-  // Two-phase save: Create metadata first, then save body
-  const metadata = await MetadataRepository.createNoteMetadata({
-    id: noteId,
-    projectId,
-    userId,
-    title,
-    excerpt,
-    bucketPath,
-  });
-
+  const bodyKey = `.revisions/${randomUUID()}.md`;
+  await NoteRevisionRepository.stage(bucketPath, bodyKey);
+  let metadata;
   try {
-    await NotesRepository.saveBody(bucketPath, body);
+    await NotesRepository.saveBody(bucketPath, body, bodyKey);
+    metadata = await MetadataRepository.createNoteMetadata({
+      id: noteId, projectId, userId, title, excerpt, bucketPath, bodyKey,
+    });
   } catch (err) {
-    // If saving the body fails, rollback the metadata to keep consistency
-    await MetadataRepository.deleteNoteMetadata(noteId);
+    await discardRevision(bodyKey);
     throw err;
   }
 
@@ -118,10 +113,10 @@ export async function getNote(noteId: string, projectId: string) {
   }
 
   try {
-    const body = await NotesRepository.getBody(metadata.bucketPath);
+    const body = await NotesRepository.getBody(metadata.bucketPath, metadata.bodyKey);
     return { ...metadata, body };
   } catch (err: any) {
-    if (err.code === 'ENOENT') {
+    if (err.code === 'ENOENT' && metadata.bodyKey === 'body.md') {
       return { ...metadata, body: '' }; // Fallback if file is missing somehow
     }
     throw err;
@@ -139,36 +134,30 @@ export async function updateNote(
     throw new Error('NOT_FOUND');
   }
 
+  if (existing.version !== currentVersion) throw new Error('CONFLICT');
   const newExcerpt = updates.body !== undefined ? extractExcerpt(updates.body) : existing.excerpt;
-
-  // Update metadata (optimistic locking enforced inside MetadataRepository)
-  let updatedMeta;
-  try {
-    updatedMeta = await MetadataRepository.updateNoteMetadata(noteId, currentVersion, {
-      title: updates.title,
-      excerpt: newExcerpt,
-    });
-  } catch (err: any) {
-    if (err.message.includes('Optimistic locking failed')) {
-      throw new Error('CONFLICT');
-    }
-    throw err;
-  }
-
-  // If body is provided, overwrite the RustFS content
-  if (updates.body !== undefined) {
-    await NotesRepository.saveBody(existing.bucketPath, updates.body);
-  }
-
-  // Fetch updated body to return the complete object
+  const bodyKey = updates.body !== undefined ? `.revisions/${randomUUID()}.md` : undefined;
   let body = updates.body;
+  // Read the captured immutable pointer before committing title-only changes.
   if (body === undefined) {
     try {
-      body = await NotesRepository.getBody(existing.bucketPath);
-    } catch (e: any) {
-      if (e.code === 'ENOENT') body = '';
-      else throw e;
+      body = await NotesRepository.getBody(existing.bucketPath, existing.bodyKey);
+    } catch (err: any) {
+      if (err.code === 'ENOENT' && existing.bodyKey === 'body.md') body = '';
+      else throw err;
     }
+  }
+  if (bodyKey) await NoteRevisionRepository.stage(existing.bucketPath, bodyKey);
+  let updatedMeta;
+  try {
+    if (bodyKey) await NotesRepository.saveBody(existing.bucketPath, body, bodyKey);
+    updatedMeta = await MetadataRepository.updateNoteMetadata(noteId, currentVersion, {
+      title: updates.title, excerpt: newExcerpt, ...(bodyKey ? { bodyKey } : {}),
+    });
+  } catch (err: any) {
+    if (bodyKey) await discardRevision(bodyKey);
+    if (err.message.includes('Optimistic locking failed')) throw new Error('CONFLICT');
+    throw err;
   }
 
   return { ...updatedMeta, body };
@@ -217,13 +206,13 @@ export class NoteCleanupService {
 
     let body = '';
     try {
-      body = await this.dependencies.getBody(metadata.bucketPath);
+      body = await this.dependencies.getBody(metadata.bucketPath, metadata.bodyKey);
     } catch (e: any) {
-      if (e.code !== 'ENOENT') throw e;
+      if (e.code !== 'ENOENT' || metadata.bodyKey !== 'body.md') throw e;
     }
 
     const allFiles = await this.dependencies.listFiles(metadata.bucketPath);
-    const mediaFiles = allFiles.filter((f) => f !== 'body.md');
+    const mediaFiles = allFiles.filter((f) => !isNoteBodyFile(f));
     const mediaFileSet = new Set(mediaFiles);
 
     // Find all file references in the body (e.g. /api/v1/notes/:noteId/media/:filename)
@@ -261,4 +250,27 @@ export function createNoteCleanupService(dependencies?: Partial<NoteCleanupDepen
 
 export async function cleanupNoteMedia(noteId: string, projectId: string) {
   return noteCleanupService.cleanupNoteMedia(noteId, projectId);
+}
+
+// Never delete on an ambiguous DB failure alone: the transaction may have
+// committed. Only a durable abandonment claim authorizes object deletion.
+async function discardRevision(bodyKey: string): Promise<void> {
+  try {
+    const revision = await NoteRevisionRepository.abandon(bodyKey);
+    if (revision) await NotesRepository.deleteFile(revision.bucketPath, revision.bodyKey);
+  } catch (error) {
+    console.error('Note revision cleanup deferred to recovery:', error);
+  }
+}
+
+export async function recoverAbandonedNoteRevisions(dryRun = false, cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000)) {
+  const candidates = await NoteRevisionRepository.recoveryCandidates(cutoff);
+  if (dryRun) return candidates;
+  for (const candidate of candidates) {
+    const revision = await NoteRevisionRepository.abandon(candidate.bodyKey);
+    if (revision) await NotesRepository.deleteFile(revision.bucketPath, revision.bodyKey);
+  }
+  // Keep abandonment tombstones: a timed-out upload can still finish after
+  // deletion. Later recovery runs delete those objects again, never publish them.
+  return candidates;
 }

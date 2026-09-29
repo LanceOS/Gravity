@@ -1,6 +1,6 @@
-import { and, desc, asc, eq, sql } from 'drizzle-orm';
+import { and, desc, asc, eq, lt, or, sql } from 'drizzle-orm';
 import { db } from '../../db/index.js';
-import { noteMetadata } from './schema.js';
+import { noteBodyRevisions, noteMetadata } from './schema.js';
 import { RustFS } from '../../lib/rustfs.js';
 import { env } from '../../env.js';
 
@@ -23,6 +23,7 @@ export class MetadataRepository {
     title: string;
     excerpt?: string;
     bucketPath: string;
+    bodyKey?: string;
   }): Promise<NoteMetadata> {
     const excerpt = data.excerpt || '';
     const useSearchVector = typeof env.databaseUrl === 'string' && !env.databaseUrl.startsWith('pgmem://');
@@ -34,6 +35,7 @@ export class MetadataRepository {
       title: data.title,
       excerpt,
       bucketPath: data.bucketPath,
+      bodyKey: data.bodyKey,
     };
 
     if (useSearchVector) {
@@ -42,9 +44,10 @@ export class MetadataRepository {
       insertValues.searchVector = buildSearchVector(data.title, excerpt);
     }
 
-    const [record] = await db.insert(noteMetadata).values(insertValues).returning();
-
-    return record;
+    return commitRevision(data.bodyKey, data.bucketPath, async (tx) => {
+      const [record] = await tx.insert(noteMetadata).values(insertValues).returning();
+      return record;
+    });
   }
 
   /**
@@ -151,7 +154,7 @@ export class MetadataRepository {
   static async updateNoteMetadata(
     id: string,
     currentVersion: number,
-    updates: Partial<{ title: string; excerpt: string }>
+    updates: Partial<{ title: string; excerpt: string; bodyKey: string }>
   ): Promise<NoteMetadata> {
     const existing = await this.getNoteMetadata(id);
     if (!existing) throw new Error('Note not found');
@@ -159,29 +162,31 @@ export class MetadataRepository {
     const newTitle = updates.title ?? existing.title;
     const newExcerpt = updates.excerpt ?? existing.excerpt;
 
-    const [record] = await db
-      .update(noteMetadata)
-      .set({
-        ...(() => {
-          const base: Record<string, unknown> = {
-            ...updates,
-            version: currentVersion + 1,
-            updatedAt: new Date(),
-          };
-          if (!(typeof env.databaseUrl === 'string' && env.databaseUrl.startsWith('pgmem://'))) {
-            base.searchVector = buildSearchVector(newTitle, newExcerpt);
-          }
-          return base;
-        })(),
-      })
-      .where(and(eq(noteMetadata.id, id), eq(noteMetadata.version, currentVersion)))
-      .returning();
+    return commitRevision(updates.bodyKey, existing.bucketPath, async (tx) => {
+      const [record] = await tx
+        .update(noteMetadata)
+        .set({
+          ...(() => {
+            const base: Record<string, unknown> = {
+              ...updates,
+              version: currentVersion + 1,
+              updatedAt: new Date(),
+            };
+            if (!(typeof env.databaseUrl === 'string' && env.databaseUrl.startsWith('pgmem://'))) {
+              base.searchVector = buildSearchVector(newTitle, newExcerpt);
+            }
+            return base;
+          })(),
+        })
+        .where(and(eq(noteMetadata.id, id), eq(noteMetadata.version, currentVersion)))
+        .returning();
 
-    if (!record) {
-      throw new Error('Optimistic locking failed or note not found');
-    }
+      if (!record) {
+        throw new Error('Optimistic locking failed or note not found');
+      }
 
-    return record;
+      return record;
+    });
   }
 
   /**
@@ -196,23 +201,23 @@ export class NotesRepository {
   /**
    * Saves the markdown body of a note.
    */
-  static async saveBody(bucketPath: string, content: string): Promise<void> {
-    await RustFS.saveFile(bucketPath, 'body.md', content);
+  static async saveBody(bucketPath: string, content: string, bodyKey = 'body.md'): Promise<void> {
+    await RustFS.saveFile(bucketPath, bodyKey, content);
   }
 
   /**
    * Retrieves the markdown body of a note.
    */
-  static async getBody(bucketPath: string): Promise<string> {
-    return await RustFS.readFileUtf8(bucketPath, 'body.md');
+  static async getBody(bucketPath: string, bodyKey = 'body.md'): Promise<string> {
+    return await RustFS.readFileUtf8(bucketPath, bodyKey);
   }
 
   /**
    * Saves an attached file to the note's bucket.
    */
   static async saveAttachment(bucketPath: string, filename: string, content: string | Buffer): Promise<void> {
-    if (filename === 'body.md') {
-      throw new Error('Filename cannot be body.md');
+    if (isNoteBodyFile(filename)) {
+      throw new Error('Filename is reserved for note bodies');
     }
     await RustFS.saveFile(bucketPath, filename, content);
   }
@@ -226,8 +231,8 @@ export class NotesRepository {
     stream: NodeJS.ReadableStream,
     contentLength?: number
   ): Promise<void> {
-    if (filename === 'body.md') {
-      throw new Error('Filename cannot be body.md');
+    if (isNoteBodyFile(filename)) {
+      throw new Error('Filename is reserved for note bodies');
     }
     await RustFS.saveFileStream(bucketPath, filename, stream, contentLength);
   }
@@ -258,5 +263,51 @@ export class NotesRepository {
    */
   static async deleteBucket(bucketPath: string): Promise<void> {
     await RustFS.deleteBucket(bucketPath);
+  }
+}
+
+export function isNoteBodyFile(filename: string): boolean {
+  return filename === 'body.md' || filename.startsWith('.revisions/');
+}
+
+type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+async function commitRevision<T>(bodyKey: string | undefined, bucketPath: string, persist: (tx: Transaction) => Promise<T>): Promise<T> {
+  return db.transaction(async (tx) => {
+    if (bodyKey) {
+      // Recovery uses a conditional UPDATE of this same row. Holding its lock
+      // until the pointer commits makes publication and abandonment exclusive.
+      const [revision] = await tx.select().from(noteBodyRevisions)
+        .where(and(eq(noteBodyRevisions.bodyKey, bodyKey), eq(noteBodyRevisions.bucketPath, bucketPath)))
+        .for('update');
+      if (!revision || revision.state !== 'pending') throw new Error('REVISION_ABANDONED');
+    }
+    const result = await persist(tx);
+    if (bodyKey) {
+      await tx.update(noteBodyRevisions).set({ state: 'committed' })
+        .where(eq(noteBodyRevisions.bodyKey, bodyKey));
+    }
+    return result;
+  });
+}
+
+export class NoteRevisionRepository {
+  static async stage(bucketPath: string, bodyKey: string): Promise<void> {
+    await db.insert(noteBodyRevisions).values({ bucketPath, bodyKey });
+  }
+
+  static async abandon(bodyKey: string) {
+    const [revision] = await db.update(noteBodyRevisions).set({ state: 'abandoned' })
+      .where(and(eq(noteBodyRevisions.bodyKey, bodyKey), or(
+        eq(noteBodyRevisions.state, 'pending'), eq(noteBodyRevisions.state, 'abandoned'),
+      ))).returning();
+    return revision;
+  }
+
+  static async recoveryCandidates(cutoff: Date) {
+    return db.select().from(noteBodyRevisions).where(or(
+      eq(noteBodyRevisions.state, 'abandoned'),
+      and(eq(noteBodyRevisions.state, 'pending'), lt(noteBodyRevisions.createdAt, cutoff)),
+    ));
   }
 }

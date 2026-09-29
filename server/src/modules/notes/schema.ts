@@ -14,6 +14,7 @@ export const noteMetadata = pgTable('note_metadata', {
   title: text('title').notNull(),
   excerpt: text('excerpt').notNull().default(''),
   bucketPath: text('bucket_path').notNull(),
+  bodyKey: text('body_key').notNull().default('body.md'),
   searchVector: tsvector('search_vector'),
   version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -22,4 +23,15 @@ export const noteMetadata = pgTable('note_metadata', {
   projectIdUserIdIdx: index('note_metadata_project_id_user_id_idx').on(table.projectId, table.userId),
   projectIdUserIdUpdatedAtIdx: index('note_metadata_project_id_user_id_updated_at_idx').on(table.projectId, table.userId, table.updatedAt),
   searchIdx: index('note_metadata_search_idx').using('gin', table.searchVector),
+}));
+
+// Upload intents survive process crashes. Committed revisions are retained for
+// readers that already captured an older metadata snapshot.
+export const noteBodyRevisions = pgTable('note_body_revisions', {
+  bodyKey: text('body_key').primaryKey(),
+  bucketPath: text('bucket_path').notNull(),
+  state: text('state').notNull().default('pending'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  recoveryIdx: index('note_body_revisions_recovery_idx').on(table.state, table.createdAt),
 }));

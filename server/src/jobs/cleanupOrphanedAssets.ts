@@ -1,6 +1,8 @@
 import { fileURLToPath } from 'node:url';
 import { db } from '../db/index.js';
 import { noteMetadata } from '../modules/notes/schema.js';
+import { NotesRepository, isNoteBodyFile } from '../modules/notes/repositories.js';
+import { recoverAbandonedNoteRevisions } from '../modules/notes/services/notes.js';
 import { RustFS } from '../lib/rustfs.js';
 import { MAX_LISTED_FILES, MAX_LISTED_KEY_BYTES } from '../lib/object-list-limits.js';
 
@@ -8,7 +10,7 @@ async function runCleanup(dryRun = false) {
   console.log('Starting orphaned asset cleanup', dryRun ? '(dry-run)' : '');
 
   // Fetch all notes with their bucket paths
-  const rows = await db.select({ id: noteMetadata.id, bucketPath: noteMetadata.bucketPath }).from(noteMetadata);
+  const rows = await db.select({ id: noteMetadata.id, bucketPath: noteMetadata.bucketPath, bodyKey: noteMetadata.bodyKey }).from(noteMetadata);
 
   const idToBucket = new Map<string, string>();
   for (const r of rows) idToBucket.set(r.id, r.bucketPath);
@@ -19,9 +21,9 @@ async function runCleanup(dryRun = false) {
   for (const r of rows) {
     let body = '';
     try {
-      body = await RustFS.readFileUtf8(r.bucketPath, 'body.md');
+      body = await NotesRepository.getBody(r.bucketPath, r.bodyKey);
     } catch (err: any) {
-      if (err.code === 'ENOENT') continue;
+      if (err.code === 'ENOENT' && r.bodyKey === 'body.md') continue;
       throw err;
     }
 
@@ -45,7 +47,7 @@ async function runCleanup(dryRun = false) {
   for (const r of rows) {
     const files = await RustFS.listFiles(r.bucketPath);
     for (const f of files) {
-      if (f === 'body.md') continue;
+      if (isNoteBodyFile(f)) continue;
       const refs = referenced.get(r.bucketPath);
       const isReferenced = refs ? refs.has(f) : false;
       if (!isReferenced) {
@@ -64,11 +66,12 @@ async function runCleanup(dryRun = false) {
       deleted.push(entry);
     }
   }
+  const abandonedRevisions = await recoverAbandonedNoteRevisions(dryRun);
   // S3 directories are virtual prefixes; there is no empty directory to delete.
 
   console.log(`Orphaned files found: ${orphanedFound.length}`);
   if (!dryRun) console.log(`Deleted files: ${deleted.length}`);
-  return { orphanedFound, deleted };
+  return { orphanedFound, deleted, abandonedRevisions };
 }
 
 if (import.meta.url) {
