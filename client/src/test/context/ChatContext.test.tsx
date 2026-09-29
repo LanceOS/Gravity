@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { act, render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ChatContextProvider, useChat } from '../../modules/ai';
@@ -48,6 +48,8 @@ const TestComponent = () => {
     isGenerating,
     error,
     mcpTools,
+    cancelGeneration,
+    clearChat,
   } = useChat();
 
   return (
@@ -55,6 +57,8 @@ const TestComponent = () => {
       <div data-testid="is-generating">{isGenerating ? 'yes' : 'no'}</div>
       <div data-testid="error-state">{error || 'none'}</div>
       <div data-testid="tools-count">{mcpTools.length}</div>
+      <button data-testid="cancel-btn" onClick={cancelGeneration}>Stop</button>
+      <button data-testid="clear-btn" onClick={clearChat}>Clear</button>
       <button data-testid="send-btn" onClick={() => void sendMessage('Hello')}>Send</button>
       <div data-testid="msg-list">
         {messages.map((m, i) => (
@@ -145,5 +149,40 @@ describe('ChatContextProvider integration', () => {
     });
     expect(screen.getByText('Hello')).toBeInTheDocument();
     expect(screen.getByTestId('is-generating')).toHaveTextContent('no');
+  });
+});
+
+
+describe('chat UI cancellation', () => {
+  beforeEach(() => { mocks.fetch.mockReset(); vi.stubGlobal('fetch', mocks.fetch); });
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  it.each(['stop', 'clear', 'project', 'chat', 'unmount'] as const)('aborts on %s and ignores a late completion', async (action) => {
+    let signal: AbortSignal | undefined;
+    let finish!: (value: string) => void;
+    mocks.fetch.mockImplementation((_url, options) => {
+      signal = options.signal;
+      return Promise.resolve({ ok: true, text: () => new Promise<string>(resolve => { finish = resolve; }) });
+    });
+    const view = (projectId = 'p-1', chatId = 'chat-1') => (
+      <Wrapper><ChatContextProvider initialModel="gpt-4o-mini" settings={mockSettings}
+        projectId={projectId} seedChatSessionId={chatId}><TestComponent /></ChatContextProvider></Wrapper>
+    );
+    const { rerender, unmount } = render(view());
+    fireEvent.click(screen.getByTestId('send-btn'));
+    await waitFor(() => expect(finish).toBeDefined());
+    expect(signal?.aborted).toBe(false);
+    if (action === 'stop') fireEvent.click(screen.getByTestId('cancel-btn'));
+    if (action === 'clear') fireEvent.click(screen.getByTestId('clear-btn'));
+    if (action === 'project') rerender(view('p-2'));
+    if (action === 'chat') rerender(view('p-1', 'chat-2'));
+    if (action === 'unmount') unmount();
+    expect(signal?.aborted).toBe(true);
+    await act(async () => { finish('data: {"type":"done","message":"Late response"}\n\n'); });
+    expect(screen.queryByText('Late response')).not.toBeInTheDocument();
+    if (action !== 'unmount') {
+      expect(screen.getByTestId('is-generating')).toHaveTextContent('no');
+      expect(screen.getByTestId('error-state')).toHaveTextContent('none');
+    }
   });
 });

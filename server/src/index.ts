@@ -4,17 +4,11 @@ import { initializeDatabase } from './db/bootstrap.js';
 import { env } from './env.js';
 import { startMcpEventBridge } from './lib/mcp-event-bridge.js';
 import { start as startServiceTokens, stopAutoRefresh } from './lib/serviceTokens.js';
-import { beginServerShutdown } from './lib/server-lifecycle.js';
+import { beginServerInitialization, completeServerInitialization, beginServerShutdown } from './lib/server-lifecycle.js';
 import { closeHttpServer } from './lib/http-shutdown.js';
 
 async function main() {
-  await initializeDatabase();
-
-  // Initialize trusted service tokens and start periodic refresh.
-  // This is explicit so importing the module has no side-effects.
-  await startServiceTokens();
-
-  const stopMcpEventBridge = startMcpEventBridge();
+  let stopMcpEventBridge: () => Promise<void> = async () => {};
   const app = createApp();
   const server = createServer(app);
 
@@ -88,6 +82,24 @@ async function main() {
     console.error('Unhandled rejection, initiating shutdown:', reason);
     void gracefulShutdown('unhandledRejection');
   });
+
+  try {
+    await initializeDatabase();
+    beginServerInitialization();
+    // Bucket creation follows the existing first-write provisioning policy.
+    const { initializeObjectStorage } = await import('./lib/dependency-readiness.js');
+    await initializeObjectStorage();
+    await startServiceTokens();
+    if (!isShuttingDown) {
+      stopMcpEventBridge = startMcpEventBridge();
+      completeServerInitialization();
+    }
+  } catch (error) {
+    beginServerInitialization();
+    console.error('Server initialization failed:', error);
+    await gracefulShutdown('unhandledRejection');
+    return;
+  }
 
   // NOTE: Do not start the MCP stdio transport in the main HTTP server process.
   // MCP stdio requires exclusive use of stdout for JSON-RPC responses, but the

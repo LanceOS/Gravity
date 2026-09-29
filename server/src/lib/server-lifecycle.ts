@@ -1,4 +1,4 @@
-// Process-wide admission state. Shutdown is one-way; a new process starts ready.
+// Process-wide admission state. Initialization fails closed; shutdown is one-way.
 let shuttingDown = false;
 
 export function isServerShuttingDown(): boolean {
@@ -8,3 +8,8 @@ export function isServerShuttingDown(): boolean {
 export function beginServerShutdown(): void {
   shuttingDown = true;
 }
+
+let initialized = false;
+export function isServerInitialized(): boolean { return initialized; }
+export function beginServerInitialization(): void { initialized = false; }
+export function completeServerInitialization(): void { initialized = true; }

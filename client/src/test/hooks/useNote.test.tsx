@@ -146,11 +146,11 @@ describe('useNote', () => {
     } as Response);
 
     await act(async () => {
-      await result.current.saveNote({ title: 'Updated' });
+      await expect(result.current.saveNote({ title: 'Updated' })).rejects.toMatchObject({ status: 409 });
     });
 
     expect(result.current.saving).toBe(false);
-    expect(result.current.saveError).toBe('Version conflict. Please refresh the note.');
+    expect(result.current.saveError).toContain('Your local edits are preserved');
     expect(result.current.note).toEqual(mockNote);
   });
 

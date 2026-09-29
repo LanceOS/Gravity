@@ -65,16 +65,16 @@ case "$cmd" in
     ;;
   start)
     echo "Starting compose (detached)..."
-    compose up -d
+    compose up -d --wait --wait-timeout 180
     ;;
   rebuild)
     echo "Rebuilding and starting compose (detached)..."
-    compose up -d --build
+    compose up -d --build --wait --wait-timeout 180
     ;;
   restart)
     echo "Restarting compose: down then rebuild & start..."
     compose down --remove-orphans
-    compose up -d --build
+    compose up -d --build --wait --wait-timeout 180
     ;;
   status)
     compose ps

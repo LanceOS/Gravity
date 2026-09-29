@@ -2,6 +2,7 @@ import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NoteEditor } from '../../modules/notes/components/NoteEditor';
+import { writeDraft } from '../../modules/notes/components/noteDrafts';
 import { useNote } from '../../modules/notes/hooks/useNote';
 
 vi.mock('../../modules/notes/hooks/useNote', () => ({
@@ -58,6 +59,9 @@ describe('NoteEditor', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    writeDraft('gravity:note-draft:[null,"proj-1","note-1"]', null);
+    writeDraft('gravity:note-draft:[null,"proj-1","note-2"]', null);
+    mockSaveNote.mockResolvedValue(undefined);
     (useNote as any).mockReturnValue({
       note: { id: 'note-1', title: 'Test Title', body: 'Test body', version: 1 },
       loading: false,
@@ -121,7 +125,7 @@ describe('NoteEditor', () => {
     expect(mockSaveNote).toHaveBeenCalledWith({
       title: 'New Updated Title',
       body: 'Test body',
-    });
+    }, 1, false);
   });
 
   it('triggers debounced save when editor content updates', () => {
@@ -137,7 +141,7 @@ describe('NoteEditor', () => {
     expect(mockSaveNote).toHaveBeenCalledWith({
       title: 'Test Title',
       body: 'New body content',
-    });
+    }, 1, false);
   });
 
   it('displays saving state', () => {

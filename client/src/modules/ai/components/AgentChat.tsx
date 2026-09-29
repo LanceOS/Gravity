@@ -97,6 +97,7 @@ const AgentChatInner: React.FC<AgentChatProps> = ({
     setModel,
     modelStatus,
     sendMessage,
+    cancelGeneration,
     regenerate,
     retry,
     setMessages,
@@ -148,7 +149,8 @@ const AgentChatInner: React.FC<AgentChatProps> = ({
           </select>
         </div>
       }
-      onClose={onClose}
+      onClose={onClose ? () => { cancelGeneration(); onClose(); } : undefined}
+      onCancel={cancelGeneration}
       messages={messages}
       onSendMessage={handleSendMessage}
       isGenerating={isGenerating}

@@ -1,3 +1,4 @@
+import { PaginatedPickerResults } from './PaginatedPickerResults';
 import React, { useMemo, useState } from 'react';
 import { Button } from '@library';
 import { buildSearchableText, normalizeSearchTerm } from '../../../utils/search';
@@ -91,7 +92,7 @@ export const SearchableOptionPickerPopoverContent: React.FC<SearchableOptionPick
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+    <div data-ticket-picker style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
       <div
         style={{
           fontSize: '11px',
@@ -123,9 +124,8 @@ export const SearchableOptionPickerPopoverContent: React.FC<SearchableOptionPick
         autoFocus
       />
 
-      <div style={{ maxHeight: '160px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px', margin: '4px 0' }}>
-        {filteredOptions.length > 0 ? (
-          filteredOptions.map((option) => {
+      <PaginatedPickerResults items={filteredOptions} maxHeight={160} emptyLabel={emptyStateLabel}>
+          {(option) => {
             const isSelected = selectedIds.has(option.id);
             const defaultBackground = isSelected ? 'rgba(255,255,255,0.03)' : 'transparent';
             const rowStyle = {
@@ -241,13 +241,8 @@ export const SearchableOptionPickerPopoverContent: React.FC<SearchableOptionPick
                 {rowLabel}
               </label>
             );
-          })
-        ) : (
-          <div style={{ fontSize: '11px', color: 'var(--color-text-disabled)', textAlign: 'center', padding: '8px 0' }}>
-            {emptyStateLabel}
-          </div>
-        )}
-      </div>
+          }}
+      </PaginatedPickerResults>
 
       {onCreate && normalizedSearch && !hasExactMatch ? (
         <div style={{ borderTop: '1px solid var(--color-border-default)', paddingTop: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>

@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AIChatWindow } from '@library';
 
@@ -112,4 +112,16 @@ describe('AIChatWindow', () => {
 
     expect(screen.getByText('Attach ticket controls')).toBeInTheDocument();
   });
+});
+
+
+it('offers an enabled stop button while generating even with empty input', () => {
+  const onCancel = vi.fn();
+  const onSendMessage = vi.fn();
+  render(<AIChatWindow messages={[]} onSendMessage={onSendMessage} isGenerating onCancel={onCancel} />);
+  const stop = screen.getByRole('button', { name: 'Stop generation' });
+  expect(stop).toBeEnabled();
+  fireEvent.click(stop);
+  expect(onCancel).toHaveBeenCalledOnce();
+  expect(onSendMessage).not.toHaveBeenCalled();
 });

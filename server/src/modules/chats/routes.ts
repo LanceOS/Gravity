@@ -173,8 +173,8 @@ function normalizeChatMaxTokens(value: unknown) {
     return undefined;
   }
 
-  const parsed = Number.parseInt(String(value), 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
     return undefined;
   }
 
@@ -574,9 +574,16 @@ export function createChatsRouter() {
     });
 
     let closed = false;
-    req.on('close', () => {
+    const controller = new AbortController();
+    const onClose = () => {
       closed = true;
-    });
+      controller.abort();
+    };
+    // IncomingMessage.close also fires for a fully received POST body. The
+    // response socket closing is what indicates an abandoned generation.
+    res.on('close', onClose);
+    req.on('aborted', onClose);
+    if (res.destroyed || req.aborted) onClose();
 
     try {
       const response = await chatService.generateResponse({
@@ -588,6 +595,7 @@ export function createChatsRouter() {
         provider: requestedProvider || undefined,
         model: messageModel.length > 0 ? messageModel : undefined,
         maxTokens,
+        signal: controller.signal,
       });
 
       if (!closed) {
@@ -603,13 +611,15 @@ export function createChatsRouter() {
         });
       }
     } catch (error) {
-      if (!res.writableEnded) {
+      if (!closed && !res.writableEnded) {
         sendChatSseEvent(res, {
           type: 'error',
           message: error instanceof Error ? error.message : 'Failed to generate chat response.',
         });
       }
     } finally {
+      res.off('close', onClose);
+      req.off('aborted', onClose);
       res.end();
     }
   };

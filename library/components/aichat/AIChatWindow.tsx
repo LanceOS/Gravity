@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Cpu, Send, X, Sparkles } from 'lucide-react';
+import { Cpu, Send, X, Sparkles, Square } from 'lucide-react';
 import { DenseTextarea } from '../densetextarea';
 import { AIChatMessageBubble } from './AIChatMessage';
 import type { AIChatMessage } from './types';
@@ -11,6 +11,7 @@ import { useReducedMotion } from '../../utilities/useReducedMotion';
 export interface AIChatWindowProps {
   title?: React.ReactNode;
   onClose?: () => void;
+  onCancel?: () => void;
   messages: AIChatMessage[];
   onSendMessage: (text: string) => void;
   isGenerating?: boolean;
@@ -28,6 +29,7 @@ export interface AIChatWindowProps {
 export function AIChatWindow({
   title = 'AI Assistant',
   onClose,
+  onCancel,
   messages,
   onSendMessage,
   isGenerating = false,
@@ -322,9 +324,10 @@ export function AIChatWindow({
             }}
           />
           <button
-            type="submit"
-            aria-label="Send message"
-            disabled={!chatInput.trim() || isGenerating}
+            type={isGenerating && onCancel ? 'button' : 'submit'}
+            aria-label={isGenerating && onCancel ? 'Stop generation' : 'Send message'}
+            onClick={isGenerating ? onCancel : undefined}
+            disabled={isGenerating ? !onCancel : !chatInput.trim()}
             className="clickable"
             style={{
               width: '30px',
@@ -333,16 +336,16 @@ export function AIChatWindow({
               padding: 0,
               borderRadius: '50%',
               border: 'none',
-              background: chatInput.trim() && !isGenerating ? 'var(--color-primary)' : 'var(--color-base100)',
-              color: chatInput.trim() && !isGenerating ? 'var(--color-text-on-accent)' : 'var(--color-text-disabled)',
+              background: (isGenerating && onCancel) || (chatInput.trim() && !isGenerating) ? 'var(--color-primary)' : 'var(--color-base100)',
+              color: (isGenerating && onCancel) || (chatInput.trim() && !isGenerating) ? 'var(--color-text-on-accent)' : 'var(--color-text-disabled)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              cursor: chatInput.trim() && !isGenerating ? 'pointer' : 'not-allowed',
+              cursor: (isGenerating && onCancel) || (chatInput.trim() && !isGenerating) ? 'pointer' : 'not-allowed',
               transition: 'background-color var(--transition-fast), color var(--transition-fast)',
             }}
           >
-            <Send size={12} />
+            {isGenerating && onCancel ? <Square size={12} /> : <Send size={12} />}
           </button>
         </form>
         {inputAccessory && (
