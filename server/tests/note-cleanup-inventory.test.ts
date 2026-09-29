@@ -54,6 +54,7 @@ describe('cleanup inventory before deletion', () => {
   it('does not delete or report dead links if the note inventory is incomplete', async () => {
     const remove = vi.fn();
     const service = createNoteCleanupService({
+      listNotes: async () => [{ id: 'note', bucketPath: 'notes/note' }],
       getMetadata: async () => ({ id: 'note', projectId: 'project', bucketPath: 'notes/note' } as any),
       getBody: async () => '![asset](/api/v1/notes/note/media/later-page.png)',
       listFiles: async () => { throw new Error('listing interrupted'); },
@@ -72,6 +73,7 @@ describe('cleanup inventory before deletion', () => {
       --inFlight;
     });
     const service = createNoteCleanupService({
+      listNotes: async () => [{ id: 'note', bucketPath: 'notes/note' }],
       getMetadata: async () => ({ id: 'note', projectId: 'project', bucketPath: 'notes/note' } as any),
       getBody: async () => '![keep](/api/v1/notes/note/media/keep.png)',
       listFiles: async () => ['body.md', ...Array.from({ length: 1001 }, (_, i) => `orphan-${i}.png`), 'keep.png'],

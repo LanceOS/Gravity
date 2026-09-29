@@ -63,6 +63,7 @@ vi.mock('../src/lib/rustfs.js', () => {
         }
         return buf.toString('utf-8');
       },
+      statFile: async () => ({ lastModified: new Date(0), etag: '"test-version"' }),
       deleteFile: async (bucketPath: string, filename: string) => {
         const key = `${bucketPath}/${filename}`;
         memfs.delete(key);

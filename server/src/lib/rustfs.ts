@@ -2,6 +2,7 @@ import {
   S3Client,
   PutObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
   DeleteObjectCommand,
   ListObjectsV2Command,
   CreateBucketCommand,
@@ -162,11 +163,19 @@ export class RustFS {
   }
 
   /**
-   * Deletes a file from the specified bucket path.
+   * Reads the upload time and version used by fail-safe media cleanup.
    */
-  static async deleteFile(bucketPath: string, filename: string): Promise<void> {
+  static async statFile(bucketPath: string, filename: string) {
+    const result = await s3Client.send(new HeadObjectCommand({ Bucket: env.rustfsBucket, Key: `${bucketPath}/${filename}` }));
+    if (!result.LastModified || !result.ETag) throw new Error(`Missing object version: ${bucketPath}/${filename}`);
+    return { lastModified: result.LastModified, etag: result.ETag };
+  }
+
+  /** Deletes a file, optionally only if its current ETag matches. */
+  static async deleteFile(bucketPath: string, filename: string, etag?: string): Promise<void> {
     const key = `${bucketPath}/${filename}`;
     const command = new DeleteObjectCommand({
+      IfMatch: etag,
       Bucket: env.rustfsBucket,
       Key: key,
     });
