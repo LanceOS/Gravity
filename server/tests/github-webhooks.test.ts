@@ -238,6 +238,24 @@ describe('GitHub webhook reliability', () => {
     expect(await db.select().from(comments)).toHaveLength(0);
   });
 
+  it('reconciles a mixed-case tracked link without lowering PR-wide ordering', async () => {
+    const { project, ticket } = await fixture();
+    await db.update(tickets).set({ updatedAt: new Date('2026-09-28') }).where(eq(tickets.id, ticket.id));
+    await db.insert(ticketPullRequests).values({ ticketId: ticket.id,
+      prUrl: 'https://github.com/Test/Repo/pull/42/', repoUrl, status: 'open', phase: 'in_progress',
+      sourceUpdatedAt: new Date('2026-09-28'),
+    });
+    const latestTimestamp = new Date('2026-09-30');
+    await db.insert(githubPullRequests).values({ prUrl: `${repoUrl}/pull/42`, status: 'merged', phase: 'merged', sourceUpdatedAt: latestTimestamp });
+    const current = await readTicket(ticket.id);
+    expect(await processPullRequestEvent(event('', { action: 'closed', merged: true, reconciliation: {
+      projectId: project.id, ticketId: ticket.id, actorUserId: 'approver', reviewed: true, evidence: [],
+      mergedAt: new Date('2026-09-29'), expected: { ...current, updatedAt: current.updatedAt.toISOString() },
+    } }))).toHaveLength(1);
+    expect(await readTicket(ticket.id)).toMatchObject({ status: 'done', prStatus: 'merged' });
+    expect((await db.select().from(githubPullRequests))[0].sourceUpdatedAt).toEqual(latestTimestamp);
+  });
+
   it('acknowledges unsupported HTTP actions and requires identity/timestamps for supported ones', async () => {
     const app = createApp();
     for (const action of ['edited', 'synchronize', 'labeled']) {

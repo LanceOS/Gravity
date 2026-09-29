@@ -113,7 +113,10 @@ export async function processPullRequestEvent(input: PullRequestEvent): Promise<
       || latest.sourceUpdatedAt > event.sourceUpdatedAt
       || (latest.sourceUpdatedAt.getTime() === event.sourceUpdatedAt.getTime()
         && rank[latest.phase] > rank[phase]))) return [];
-    await tx.update(githubPullRequests).set({ status, phase, sourceUpdatedAt: event.sourceUpdatedAt })
+    await tx.update(githubPullRequests).set({
+      status, phase,
+      sourceUpdatedAt: new Date(Math.max(latest.sourceUpdatedAt.getTime(), event.sourceUpdatedAt.getTime())),
+    })
       .where(eq(githubPullRequests.prUrl, event.prUrl));
 
     const projectIds = linkedProjects.map(project => project.id);
@@ -153,7 +156,7 @@ export async function processPullRequestEvent(input: PullRequestEvent): Promise<
         if (ticket.status === 'canceled' || (existingPrUrl && existingPrUrl !== event.prUrl)
           || (ticket.prStatus === 'merged' && ticket.status !== 'done')
           || ticket.updatedAt > reconciliation.mergedAt
-          || otherLinks.some(link => link.prUrl !== event.prUrl && link.status === 'open')) {
+          || otherLinks.some(link => (normalizeGitHubPullRequestUrl(link.prUrl) ?? link.prUrl) !== event.prUrl && link.status === 'open')) {
           throw new PullRequestReconciliationError('protected');
         }
       }
