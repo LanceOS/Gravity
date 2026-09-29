@@ -5,6 +5,7 @@ import { getRequestSourceIp } from './lib/request-ip.js';
 import { resolveRequestActorUserId } from './modules/auth/utils/request-auth.js';
 import { verifyAndConsumeToken } from './modules/mcp/connection.js';
 import { isMcpWorkspaceMember } from './modules/mcp/access.js';
+import { isServerShuttingDown } from './lib/server-lifecycle.js';
 
 type SseAuthMethod = 'session' | 'token';
 
@@ -16,9 +17,15 @@ type SseConnectionRecord = {
   tokenAuth: boolean;
   authMethod: SseAuthMethod;
   connectedAt: Date;
+  cleanup: () => void;
+  backpressureTimer?: ReturnType<typeof setTimeout>;
 };
 
 export const MAX_CONCURRENT_SSE_CONNECTIONS_PER_USER = 5;
+export const MAX_SSE_BUFFERED_BYTES = 64 * 1024;
+export const SSE_HEARTBEAT_INTERVAL_MS = 15_000;
+export const SSE_SHUTDOWN_GRACE_MS = 1_000;
+export const SSE_DRAIN_TIMEOUT_MS = 5_000;
 
 type SseQueryValue = string | string[] | undefined;
 
@@ -122,6 +129,10 @@ export function addClient(
   res: Response,
   meta: { userId: string; sourceIp: string | null; tokenId: string | null; authMethod: SseAuthMethod },
 ): void {
+  if (isServerShuttingDown()) {
+    res.destroy();
+    return;
+  }
   let workspaceSet = clientsByWorkspace.get(workspaceId);
   if (!workspaceSet) {
     workspaceSet = new Set();
@@ -136,6 +147,7 @@ export function addClient(
     tokenAuth: meta.authMethod === 'token',
     authMethod: meta.authMethod,
     connectedAt: new Date(),
+    cleanup: () => {},
   };
 
   workspaceSet.add(res);
@@ -145,6 +157,25 @@ export function addClient(
   if (meta.tokenId) {
     addToSet(clientsByToken, meta.tokenId, res);
   }
+
+  const onClose = () => removeConnection(res, 'request_closed');
+  const onError = () => disconnectSseConnection(res, 'stream_error');
+  const onDrain = () => {
+    clearTimeout(record.backpressureTimer);
+    record.backpressureTimer = undefined;
+  };
+  res.once('close', onClose);
+  res.once('error', onError);
+  res.on('drain', onDrain);
+  const heartbeat = setInterval(() => writeSseFrame(res, ': heartbeat\n\n'), SSE_HEARTBEAT_INTERVAL_MS);
+  heartbeat.unref();
+  record.cleanup = () => {
+    clearInterval(heartbeat);
+    clearTimeout(record.backpressureTimer);
+    res.off('close', onClose);
+    res.off('error', onError);
+    res.off('drain', onDrain);
+  };
 
   audit('sse.connection.opened', {
     workspaceId,
@@ -165,6 +196,7 @@ function removeConnection(response: Response, reason: string): void {
   }
 
   sseConnectionMeta.delete(response);
+  meta.cleanup();
   removeFromSet(clientsByWorkspace, meta.workspaceId, response);
   removeFromSet(clientsByUser, meta.userId, response);
 
@@ -172,7 +204,14 @@ function removeConnection(response: Response, reason: string): void {
     removeFromSet(clientsByToken, meta.tokenId, response);
   }
 
-  audit('sse.connection.closed', buildDisconnectReason(meta, reason));
+  try {
+    audit('sse.connection.closed', buildDisconnectReason(meta, reason));
+  } catch {
+    securityAlert('security.audit_log_failed', {
+      failureReason: 'audit_sink_unavailable', failedAuditEvent: 'sse.connection.closed',
+      workspaceId: meta.workspaceId,
+    });
+  }
 }
 
 export function disconnectSseConnection(response: Response, reason: string): void {
@@ -181,11 +220,71 @@ export function disconnectSseConnection(response: Response, reason: string): voi
     return;
   }
 
-  try {
-    response.end();
-  } finally {
-    removeConnection(response, reason);
+  removeConnection(response, reason);
+  // Destroy slow/broken streams instead of asking end() to flush a stalled socket.
+  response.destroy();
+}
+
+/** No application queue: bound backpressure and let disconnected clients reconnect.
+ * Include UTF-8 byte size and Node's pending output before accepting a frame.
+ */
+function writeSseFrame(response: Response, frame: string): void {
+  const record = sseConnectionMeta.get(response);
+  if (!record) return;
+  if (response.destroyed || response.writableEnded) {
+    disconnectSseConnection(response, 'stream_closed');
+    return;
   }
+  if (response.writableLength + Buffer.byteLength(frame) > MAX_SSE_BUFFERED_BYTES) {
+    disconnectSseConnection(response, 'buffer_limit');
+    return;
+  }
+  if (record.backpressureTimer) {
+    disconnectSseConnection(response, 'slow_consumer');
+    return;
+  }
+  try {
+    if (!response.write(frame) && sseConnectionMeta.has(response)) {
+      // A single larger frame may reach Node's high-water mark even for a fast
+      // peer. Allow it to drain, but never enqueue another frame behind it.
+      record.backpressureTimer = setTimeout(() => {
+        disconnectSseConnection(response, 'slow_consumer');
+      }, SSE_DRAIN_TIMEOUT_MS);
+      record.backpressureTimer.unref();
+    }
+  } catch {
+    disconnectSseConnection(response, 'stream_error');
+  }
+}
+
+/** Keep the deadline until the transport closes, not merely the HTTP response. */
+export async function closeSseConnections(): Promise<void> {
+  await Promise.all(Array.from(sseConnectionMeta.keys(), response => new Promise<void>(resolve => {
+    const socket = response.socket;
+    removeConnection(response, 'server_shutdown');
+    if (!socket || socket.destroyed) {
+      response.destroy();
+      resolve();
+      return;
+    }
+    const onError = () => socket.destroy();
+    const onFinish = () => socket.end();
+    const timer = setTimeout(() => socket.destroy(), SSE_SHUTDOWN_GRACE_MS);
+    timer.unref();
+    const onClose = () => {
+      clearTimeout(timer);
+      response.off('error', onError);
+      response.off('finish', onFinish);
+      socket.off('error', onError);
+      resolve();
+    };
+    socket.once('close', onClose);
+    socket.on('error', onError);
+    response.on('error', onError);
+    // Response close/finish can precede socket closure on keep-alive streams.
+    response.once('finish', onFinish);
+    try { response.end(); } catch { socket.destroy(); }
+  })));
 }
 
 export function disconnectSseConnectionsByToken(tokenId: string): number {
@@ -291,6 +390,10 @@ mcpEventBus.subscribeAll((event) => {
  * @param res Express response to use as the long-lived SSE stream.
  */
 export async function subscribeToEvents(req: Request, res: Response) {
+  if (isServerShuttingDown()) {
+    res.status(503).json({ error: 'Server is shutting down.' });
+    return;
+  }
   const workspaceId =
     typeof req.query.workspaceId === 'string' ? req.query.workspaceId.trim() : '';
 
@@ -300,6 +403,12 @@ export async function subscribeToEvents(req: Request, res: Response) {
   }
 
   const authAttempt = await authenticateSseConnection(req, workspaceId);
+  // Authentication awaits database work; shutdown or peer closure may win that race.
+  if (res.destroyed || req.destroyed) return;
+  if (isServerShuttingDown()) {
+    res.status(503).json({ error: 'Server is shutting down.' });
+    return;
+  }
   if (!authAttempt.ok) {
     // Never include the request URL, cookies, or query token in audit records.
     auditRejectedConnection({
@@ -337,18 +446,24 @@ export async function subscribeToEvents(req: Request, res: Response) {
     authMethod: authAttempt.context.authMethod,
   });
 
-  res.write(
+  writeSseFrame(
+    res,
     `data: ${JSON.stringify({ type: 'init', message: 'Connected to Gravity live stream', workspaceId })}\n\n`,
   );
-
-  req.on('close', () => {
-    disconnectSseConnection(res, 'request_closed');
-  });
 }
 
 // ---------------------------------------------------------------------------
 // Broadcast helpers
 // ---------------------------------------------------------------------------
+
+// Oversized payloads become a constant-size cache invalidation, never a
+// disconnect of otherwise healthy subscribers. No user data is copied here.
+function encodeBroadcastFrame(payload: string): string {
+  const frame = `data: ${payload}\n\n`;
+  return Buffer.byteLength(frame) <= MAX_SSE_BUFFERED_BYTES
+    ? frame
+    : 'data: {"type":"resync-required","data":{}}\n\n';
+}
 
 /**
  * @description Broadcasts a typed SSE event to all clients subscribed to the
@@ -362,10 +477,10 @@ export function broadcastToWorkspace(workspaceId: string, type: string, data: un
   if (!clients || clients.size === 0) return;
 
   const payload = JSON.stringify({ type, data });
-  const line = `data: ${payload}\n\n`;
+  const line = encodeBroadcastFrame(payload);
 
   for (const client of clients) {
-    client.write(line);
+    writeSseFrame(client, line);
   }
 }
 
@@ -379,11 +494,11 @@ export function broadcastToWorkspace(workspaceId: string, type: string, data: un
  */
 export function broadcastEvent(type: string, data: unknown) {
   const payload = JSON.stringify({ type, data });
-  const line = `data: ${payload}\n\n`;
+  const line = encodeBroadcastFrame(payload);
 
   for (const clients of clientsByWorkspace.values()) {
     for (const client of clients) {
-      client.write(line);
+      writeSseFrame(client, line);
     }
   }
 }

@@ -356,6 +356,7 @@ export function useQuery<T>({ queryKey, queryFn, enabled = true, staleTime, gcTi
 
   const isStale = useMemo(() => {
     const sTime = staleTime ?? 0;
+    if (state.updatedAt === 0) return true;
     if (sTime === Infinity) return false;
     // For staleTime === 0, it's always stale if we have data.
     return state.updatedAt ? Date.now() - state.updatedAt >= sTime : true;
@@ -473,7 +474,7 @@ export function useQueries({ queries }: UseQueriesOptions) {
       const state = client.getOrCreateQuery(q.queryKey, { staleTime: q.staleTime, gcTime: q.gcTime });
       const enabled = q.enabled ?? true;
       const sTime = q.staleTime ?? 0;
-      const isStale = sTime === Infinity ? false : (state.updatedAt ? Date.now() - state.updatedAt >= sTime : true);
+      const isStale = state.updatedAt === 0 || (sTime !== Infinity && Date.now() - state.updatedAt >= sTime);
 
       if (enabled && state.fetchStatus === 'idle') {
         const shouldFetch = state.status === 'pending' || isStale;
