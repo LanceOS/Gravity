@@ -19,12 +19,14 @@ export class GeminiProvider implements IAiProvider {
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
       {
         method: 'POST',
+        signal: options.signal,
         headers: {
           'Content-Type': 'application/json',
           'x-goog-api-key': apiKey,
         },
         body: JSON.stringify({
           contents: this.mapMessages(messages),
+          generationConfig: { maxOutputTokens: options.maxTokens ?? 4096 },
           ...(systemText
             ? {
                 systemInstruction: {
@@ -36,7 +38,7 @@ export class GeminiProvider implements IAiProvider {
         }),
       },
       60000,
-      3, // 3 retries with exponential backoff for chat
+      0, // Never retry billable generations implicitly.
     );
 
     if (!response.ok) {
@@ -84,6 +86,7 @@ export class GeminiProvider implements IAiProvider {
     if (!response.ok) {
       throw new Error(await readErrorMessage(response, 'Gemini API key test failed.'));
     }
+    await response.body?.cancel();
   }
 
   async fetchModels(apiKey: string): Promise<string[]> {
