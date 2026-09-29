@@ -2,6 +2,7 @@ import { fileURLToPath } from 'node:url';
 import { db } from '../db/index.js';
 import { noteMetadata } from '../modules/notes/schema.js';
 import { RustFS } from '../lib/rustfs.js';
+import { MAX_LISTED_FILES, MAX_LISTED_KEY_BYTES } from '../lib/object-list-limits.js';
 
 async function runCleanup(dryRun = false) {
   console.log('Starting orphaned asset cleanup', dryRun ? '(dry-run)' : '');
@@ -39,6 +40,8 @@ async function runCleanup(dryRun = false) {
   const deleted: Array<{ bucket: string; file: string }> = [];
   const orphanedFound: Array<{ bucket: string; file: string }> = [];
 
+  let plannedKeyBytes = 0;
+  // Complete every inventory before issuing the first destructive operation.
   for (const r of rows) {
     const files = await RustFS.listFiles(r.bucketPath);
     for (const f of files) {
@@ -46,22 +49,22 @@ async function runCleanup(dryRun = false) {
       const refs = referenced.get(r.bucketPath);
       const isReferenced = refs ? refs.has(f) : false;
       if (!isReferenced) {
-        orphanedFound.push({ bucket: r.bucketPath, file: f });
-        if (!dryRun) {
-          await RustFS.deleteFile(r.bucketPath, f);
-          deleted.push({ bucket: r.bucketPath, file: f });
+        plannedKeyBytes += Buffer.byteLength(r.bucketPath) + Buffer.byteLength(f);
+        if (orphanedFound.length >= MAX_LISTED_FILES || plannedKeyBytes > MAX_LISTED_KEY_BYTES) {
+          throw new Error('Cleanup plan exceeded inventory limits');
         }
-      }
-    }
-
-    // Remove empty buckets
-    const remaining = await RustFS.listFiles(r.bucketPath);
-    if (remaining.length === 0) {
-      if (!dryRun) {
-        await RustFS.deleteBucket(r.bucketPath);
+        orphanedFound.push({ bucket: r.bucketPath, file: f });
       }
     }
   }
+
+  if (!dryRun) {
+    for (const entry of orphanedFound) {
+      await RustFS.deleteFile(entry.bucket, entry.file);
+      deleted.push(entry);
+    }
+  }
+  // S3 directories are virtual prefixes; there is no empty directory to delete.
 
   console.log(`Orphaned files found: ${orphanedFound.length}`);
   if (!dryRun) console.log(`Deleted files: ${deleted.length}`);

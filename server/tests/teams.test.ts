@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { db } from '../src/db/index.js';
 import { RustFS } from '../src/lib/rustfs.js';
 import { teams, projects, cycles, labels, noteMetadata, ticketLabels, tickets, workspaceMembers, workspaces, workspaceSettings } from '../src/db/schema.js';
@@ -138,7 +138,7 @@ describe('teams integration tests', () => {
     expect(team1Rows).toHaveLength(0);
   });
 
-  it('deletes the last team and its owned work when no reassignment target exists', async () => {
+  it.each([false, true])('deletes the last team with bounded storage cleanup (storage failure: %s)', async storageFailure => {
     const ownerApi = await createAuthenticatedApi({
       name: 'Last Team Owner',
       email: 'last-team-owner@example.com',
@@ -229,6 +229,26 @@ describe('teams integration tests', () => {
     expect(noteResponse.status).toBe(201);
     const noteBucketPath = noteResponse.body.bucketPath as string;
 
+    const extraBuckets: string[] = [];
+    for (const title of ['Additional note', 'Final note']) {
+      const response = await ownerApi.post('/api/v1/notes').set('X-Project-Id', projectId)
+        .send({ title, body: '# Additional note' });
+      expect(response.status).toBe(201);
+      extraBuckets.push(response.body.bucketPath);
+    }
+    const originalDeleteBucket = RustFS.deleteBucket.bind(RustFS);
+    let inFlight = 0;
+    let maximum = 0;
+    const cleanup = vi.spyOn(RustFS, 'deleteBucket').mockImplementation(async bucket => {
+      maximum = Math.max(maximum, ++inFlight);
+      try {
+        await new Promise(resolve => setImmediate(resolve));
+        if (storageFailure && bucket === extraBuckets[0]) throw new Error('inventory unavailable');
+        await originalDeleteBucket(bucket);
+      } finally { --inFlight; }
+    });
+    const logError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
     const deleteResponse = await ownerApi.delete(`/api/v1/teams/${teamId}`);
     expect(deleteResponse.status).toBe(200);
     expect(deleteResponse.body).toEqual({ success: true });
@@ -264,6 +284,11 @@ describe('teams integration tests', () => {
     expect(noteRows).toHaveLength(0);
 
     expect(await RustFS.listFiles(noteBucketPath)).toHaveLength(0);
+    expect(cleanup).toHaveBeenCalledTimes(3);
+    expect(maximum).toBe(1);
+    expect(logError).toHaveBeenCalledTimes(storageFailure ? 1 : 0);
+    expect(await RustFS.listFiles(extraBuckets[1])).toHaveLength(0);
+    expect(await RustFS.listFiles(extraBuckets[0])).toHaveLength(storageFailure ? 1 : 0);
   });
 
   it('queries team-scoped cycles, labels, and tickets via scope strategies', async () => {
