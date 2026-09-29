@@ -23,6 +23,7 @@ import {
   hasTicketDependencyRelation,
   hasCircularDependency,
   getTicketDetails,
+  getRelationshipCleanupSnapshots,
   listComments,
   listTicketBlockers,
   listTicketDependencies,
@@ -196,25 +197,7 @@ export function createTicketsRouter() {
       return;
     }
 
-    const affectedTicketSnapshots = await Promise.all(
-      relationshipCleanup.affectedTickets.map(async ({ id, projectId }) => {
-        const [ticket, scope] = await Promise.all([
-          getTicketDetails(id, projectId),
-          getProjectScope(projectId),
-        ]);
-
-        if (!scope) {
-          return null;
-        }
-
-        return {
-          projectId,
-          ticket,
-          ticketId: id,
-          workspaceId: scope.workspaceId,
-        };
-      }),
-    );
+    const affectedTicketSnapshots = await getRelationshipCleanupSnapshots(relationshipCleanup.affectedTickets);
 
     for (const snapshot of affectedTicketSnapshots) {
       if (!snapshot) {

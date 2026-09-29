@@ -381,7 +381,8 @@ export type ProjectScope = {
   hierarchyMode: 'flat' | 'teams';
 };
 
-export async function getProjectScope(projectId: string): Promise<ProjectScope | null> {
+async function getProjectScopes(projectIds: string[]): Promise<Map<string, ProjectScope>> {
+  if (projectIds.length === 0) return new Map();
   const rows = await db
     .select({
       id: projects.id,
@@ -391,20 +392,15 @@ export async function getProjectScope(projectId: string): Promise<ProjectScope |
     })
     .from(projects)
     .leftJoin(workspaceSettings, eq(workspaceSettings.workspaceId, projects.workspaceId))
-    .where(eq(projects.id, projectId))
-    .limit(1);
-
-  const row = rows[0];
-  if (!row) {
-    return null;
-  }
-
-  return {
-    id: row.id,
-    workspaceId: row.workspaceId,
-    teamId: row.teamId,
+    .where(inArray(projects.id, projectIds));
+  return new Map(rows.map((row) => [row.id, {
+    ...row,
     hierarchyMode: row.hierarchyMode === 'teams' ? 'teams' : 'flat',
-  };
+  }]));
+}
+
+export async function getProjectScope(projectId: string): Promise<ProjectScope | null> {
+  return (await getProjectScopes([projectId])).get(projectId) ?? null;
 }
 
 // Normalize status strings to canonical DB/application values.
@@ -568,26 +564,29 @@ export async function listWorkspaceTickets(projectIds: string[], filters: Ticket
   }));
 }
 
-export async function getTicketById(ticketId: string, projectId?: string) {
+async function getTicketRowById(ticketId: string, projectId?: string) {
   const rows = await db.select().from(tickets).where(projectId ? and(eq(tickets.id, ticketId), eq(tickets.projectId, projectId)) : eq(tickets.id, ticketId)).limit(1);
-  const row = rows[0];
-  if (!row) {
-    return null;
-  }
+  return rows[0] ?? null;
+}
 
+async function getTicketRowByKey(ticketKey: string) {
+  const rows = await db.select().from(tickets).where(eq(tickets.key, ticketKey.toUpperCase())).limit(1);
+  return rows[0] ?? null;
+}
+
+async function hydrateTicketRow(row: TicketRecord) {
   const { blockedIds, dependencyIds } = await getTicketRelationshipFlags([row]);
   return mapTicket(row, [], blockedIds.has(row.id), dependencyIds.has(row.id));
 }
 
-export async function getTicketByKey(ticketKey: string) {
-  const rows = await db.select().from(tickets).where(eq(tickets.key, ticketKey.toUpperCase())).limit(1);
-  const row = rows[0];
-  if (!row) {
-    return null;
-  }
+export async function getTicketById(ticketId: string, projectId?: string) {
+  const row = await getTicketRowById(ticketId, projectId);
+  return row ? hydrateTicketRow(row) : null;
+}
 
-  const { blockedIds, dependencyIds } = await getTicketRelationshipFlags([row]);
-  return mapTicket(row, [], blockedIds.has(row.id), dependencyIds.has(row.id));
+export async function getTicketByKey(ticketKey: string) {
+  const row = await getTicketRowByKey(ticketKey);
+  return row ? hydrateTicketRow(row) : null;
 }
 
 export async function getTicketRelationsByKey(ticketKey: string) {
@@ -784,13 +783,19 @@ export async function listComments(ticketId: string) {
 }
 
 export async function getTicketDetails(ticketId: string, projectId?: string) {
-  const ticket = await getTicketById(ticketId, projectId);
-  if (!ticket) {
-    return null;
-  }
+  const row = await getTicketRowById(ticketId, projectId);
+  return row ? getTicketDetailsFromRow(row) : null;
+}
 
-  const scope = await getProjectScope(ticket.projectId);
+async function getTicketDetailsFromRow(
+  row: TicketRecord,
+  loadedScope?: ProjectScope,
+  loadedFlags?: Awaited<ReturnType<typeof getTicketRelationshipFlags>>,
+) {
+  const scope = loadedScope ?? await getProjectScope(row.projectId);
   if (!scope) return null;
+  const flags = loadedFlags ?? await getTicketRelationshipFlags([row]);
+  const ticket = mapTicket(row, [], flags.blockedIds.has(row.id), flags.dependencyIds.has(row.id));
   const labelScope = scope.hierarchyMode === 'flat'
     ? eq(labels.projectId, scope.id)
     : and(eq(labels.teamId, scope.teamId), isNull(labels.projectId));
@@ -914,8 +919,40 @@ export async function getTicketDetails(ticketId: string, projectId?: string) {
 }
 
 export async function getTicketDetailsByKey(ticketKey: string) {
-  const ticket = await getTicketByKey(ticketKey);
-  return ticket ? getTicketDetails(ticket.id, ticket.projectId) : null;
+  const row = await getTicketRowByKey(ticketKey);
+  return row ? getTicketDetailsFromRow(row) : null;
+}
+
+// Bound both IN-list sizes and concurrent detail fan-out. Each detail itself
+// issues several parallel queries, so keep this deliberately conservative.
+const CLEANUP_BATCH_SIZE = 100;
+const CLEANUP_HYDRATION_CONCURRENCY = 2;
+
+export async function getRelationshipCleanupSnapshots(
+  affectedTickets: TicketRelationshipCleanupEffect['affectedTickets'],
+) {
+  const snapshots = [];
+  for (let offset = 0; offset < affectedTickets.length; offset += CLEANUP_BATCH_SIZE) {
+    const batch = affectedTickets.slice(offset, offset + CLEANUP_BATCH_SIZE);
+    const rows = await db.select().from(tickets).where(inArray(tickets.id, batch.map(({ id }) => id)));
+    const scopes = await getProjectScopes([...new Set(batch.map(({ projectId }) => projectId))]);
+    const flags = await getTicketRelationshipFlags(rows);
+    const rowsById = new Map(rows.map((row) => [row.id, row]));
+    for (let start = 0; start < batch.length; start += CLEANUP_HYDRATION_CONCURRENCY) {
+      snapshots.push(...await Promise.all(batch.slice(start, start + CLEANUP_HYDRATION_CONCURRENCY).map(async ({ id, projectId }) => {
+        const scope = scopes.get(projectId);
+        if (!scope) return null;
+        const row = rowsById.get(id);
+        return {
+          projectId,
+          ticketId: id,
+          workspaceId: scope.workspaceId,
+          ticket: row?.projectId === projectId ? await getTicketDetailsFromRow(row, scope, flags) : null,
+        };
+      })));
+    }
+  }
+  return snapshots;
 }
 
 export async function createTicketRecord(input: {
