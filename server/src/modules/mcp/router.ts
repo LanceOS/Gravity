@@ -75,7 +75,7 @@ export class McpRouterFactory {
           res.status(401).json({ error: 'Invalid token.' });
           return;
         }
-        const ipKey = `ip:${getRequestSourceIp(req) ?? req.ip}`;
+        const ipKey = `ip:${getRequestSourceIp(req) ?? 'unknown'}`;
         // Guessed workspace IDs must not let unauthenticated callers lock out its users.
         if (await isBlocked(ipKey)) {
           res.status(429).json({ error: 'Too many authentication attempts; try later.' });
@@ -119,7 +119,7 @@ export class McpRouterFactory {
   create() {
     const router = Router();
     const createLimiter = env.redisEnabled ? createRedisRateLimiter : createRateLimiter;
-    const transportIpLimiter = createLimiter({ namespace: 'mcp.transport.ip', windowMs: 60_000, max: 300, keyFn: (req) => `ip:${getRequestSourceIp(req) ?? req.ip}` });
+    const transportIpLimiter = createLimiter({ namespace: 'mcp.transport.ip', windowMs: 60_000, max: 300, keyFn: (req) => `ip:${getRequestSourceIp(req) ?? 'unknown'}` });
     const workspaceLimiter = createLimiter({ namespace: 'mcp.transport.workspace', windowMs: 60_000, max: 120, keyFn: (req) => `workspace:${requestWorkspaceId(req)}` });
     const paths = ['/mcp', '/mcp/sse', '/workspaces/:workspaceId/mcp'];
     router.get(paths, (_req, res) => { res.set('Allow', 'POST').status(405).end(); });

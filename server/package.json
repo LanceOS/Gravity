@@ -27,6 +27,7 @@
     "dotenv": "^16.5.0",
     "drizzle-orm": "^0.45.2",
     "express": "^5.1.0",
+    "ipaddr.js": "1.9.1",
     "jsdom": "^26.1.0",
     "markdown-it": "^14.2.0",
     "pg": "^8.16.0",

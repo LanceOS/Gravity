@@ -733,10 +733,10 @@ export function createWorkspacesRouter() {
   const createLimiter = env.redisEnabled ? createRedisRateLimiter : createRateLimiter;
   const connectionUserKey = async (req: Request) => {
     const actor = await resolveRequestActorUserId(req);
-    const clientIp = getRequestSourceIp(req) ?? req.ip;
+    const clientIp = getRequestSourceIp(req) ?? 'unknown';
     return actor ? `user:${actor}` : `ip:${clientIp}`;
   };
-  const connectionIpKey = (req: Request) => `ip:${getRequestSourceIp(req) ?? req.ip}`;
+  const connectionIpKey = (req: Request) => `ip:${getRequestSourceIp(req) ?? 'unknown'}`;
   const issuanceUserLimiter = createLimiter({
     namespace: 'mcp.connection.issue.user',
     windowMs: 60_000,

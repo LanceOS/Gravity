@@ -1,3 +1,4 @@
+import { getRequestSourceIp } from './request-ip.js';
 import type { Request, Response, NextFunction } from 'express';
 
 type RateLimitOptions = {
@@ -66,8 +67,8 @@ export function createRateLimiter(options: RateLimitOptions) {
 
   return async function rateLimiter(req: Request, res: Response, next: NextFunction) {
     try {
-      const keyRaw = keyFn ? await keyFn(req) : req.ip;
-      const key = String(keyRaw ?? req.ip);
+      const keyRaw = keyFn ? await keyFn(req) : getRequestSourceIp(req);
+      const key = String(keyRaw ?? getRequestSourceIp(req) ?? 'unknown');
       const compositeKey = `${limiterId}:${key}`;
       const now = Date.now();
       const windowStart = now - windowMs;
