@@ -740,6 +740,7 @@ async function readComments(ticketId: string, commentId?: string) {
       ticketId: comments.ticketId,
       userId: comments.userId,
       body: comments.body,
+      automation: comments.automation,
       createdAt: comments.createdAt,
       userName: authUsers.name,
       userImage: authUsers.image,
@@ -747,7 +748,7 @@ async function readComments(ticketId: string, commentId?: string) {
       authorRole: userProfiles.role,
     })
     .from(comments)
-    .innerJoin(authUsers, eq(authUsers.id, comments.userId))
+    .leftJoin(authUsers, eq(authUsers.id, comments.userId))
     .leftJoin(userProfiles, eq(userProfiles.userId, authUsers.id))
     .where(commentId !== undefined
       ? and(eq(comments.ticketId, ticketId), eq(comments.id, commentId))
@@ -765,14 +766,15 @@ async function readComments(ticketId: string, commentId?: string) {
     ticketId: String(row.ticketId),
     userId: String(row.userId),
     body: String(row.body),
+    automation: row.automation,
     createdAt: normalizeIsoDate(row.createdAt),
-    userName: String(row.userName ?? ''),
+    userName: String(row.userId === 'system:webhook' ? 'GitHub automation' : row.userName ?? ''),
     userAvatar: String(row.userAvatar ?? row.userImage ?? ''),
     author: {
       id: String(row.userId),
-      username: String(row.userName ?? ''),
+      username: String(row.userId === 'system:webhook' ? 'GitHub automation' : row.userName ?? ''),
       avatar_url: String(row.userAvatar ?? row.userImage ?? ''),
-      role: String(row.authorRole ?? 'guest_contributor'),
+      role: String(row.userId === 'system:webhook' ? 'system' : row.authorRole ?? 'guest_contributor'),
     },
   }));
 }
