@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, ilike, inArray, isNull, lte, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, lt, gte, ilike, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import { db } from '../../../db/index.js';
 import { authUsers, comments, tickets, ticketRelationships, userProfiles, projects, cycles, labels, ticketLabels, workspaceSettings, workspaceMembers, workspaces, projectMembers } from '../../../db/schema.js';
 import { createId, getProjectByKeyPrefix, nextTicketKey, normalizeIsoDate } from '../../../lib/platform.js';
@@ -31,6 +31,9 @@ const labelSelectFields = {
   sortOrder: labels.sortOrder,
 } as const;
 
+// Keep database timestamp precision in opaque cursors; Date truncates PostgreSQL microseconds.
+export const ticketSearchCreatedAt = Symbol('ticketSearchCreatedAt');
+
 export type TicketFilters = {
   status?: string;
   priority?: string;
@@ -47,6 +50,8 @@ export type TicketFilters = {
   labelMode?: 'all' | 'any';
   limit?: number;
   offset?: number;
+  order?: 'asc' | 'desc';
+  after?: { createdAt: string; id: string };
 };
 
 export type TicketRelationshipCleanupEffect = {
@@ -170,6 +175,13 @@ async function assertTicketRelationships(
 function buildTicketFilterConditions(projectIds: string[], filters: TicketFilters = {}) {
   const conditions = [inArray(tickets.projectId, projectIds)];
 
+  if (filters.after) {
+    const compare = filters.order === 'desc' ? lt : gt;
+    conditions.push(or(
+      compare(tickets.createdAt, sql`${filters.after.createdAt}::timestamptz`),
+      and(eq(tickets.createdAt, sql`${filters.after.createdAt}::timestamptz`), compare(tickets.id, filters.after.id)),
+    )!);
+  }
   if (filters.teamId) conditions.push(eq(projects.teamId, filters.teamId));
   if (filters.query) {
     const pattern = `%${filters.query.replace(/[\\%_]/g, '\\$&')}%`;
@@ -515,12 +527,14 @@ export async function listWorkspaceTickets(projectIds: string[], filters: Ticket
     return [];
   }
 
+  const direction = filters.order === 'desc' ? desc : asc;
   let query = db
-    .select({ ticket: tickets, projectName: projects.name })
+    .select({ ticket: tickets, projectName: projects.name, cursorCreatedAt: sql<string>`${tickets.createdAt}`
+      .mapWith((value: string | Date) => value instanceof Date ? value.toISOString() : value).as('cursor_created_at') })
     .from(tickets)
     .innerJoin(projects, eq(projects.id, tickets.projectId))
     .where(and(...buildTicketFilterConditions(projectIds, filters)))
-    .orderBy(asc(tickets.createdAt), asc(tickets.id))
+    .orderBy(direction(tickets.createdAt), direction(tickets.id))
     .$dynamic();
 
   if (typeof filters.limit === 'number' && filters.limit > 0) {
@@ -565,6 +579,7 @@ export async function listWorkspaceTickets(projectIds: string[], filters: Ticket
       dependencyIds.has(r.ticket.id),
     ),
     projectName: r.projectName,
+    [ticketSearchCreatedAt]: r.cursorCreatedAt,
   }));
 }
 
