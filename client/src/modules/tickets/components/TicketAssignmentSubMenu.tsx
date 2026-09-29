@@ -1,3 +1,4 @@
+import { PaginatedPickerResults } from './PaginatedPickerResults';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ContextMenu } from '@library';
 import type { Ticket } from '../../../context/TicketContextContext';
@@ -49,7 +50,7 @@ export function TicketAssignmentSubMenu({
   }, []);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '280px', maxWidth: '320px', overflowX: 'hidden' }}>
+    <div data-ticket-picker onKeyDown={(event) => { if (event.key === 'Tab') event.stopPropagation(); }} style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '280px', maxWidth: '320px', overflowX: 'hidden' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', padding: '2px 2px 0' }}>
         <div
           style={{
@@ -75,6 +76,10 @@ export function TicketAssignmentSubMenu({
         value={search}
         onChange={(event) => setSearch(event.target.value)}
         onKeyDown={(event) => {
+          if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            event.currentTarget.parentElement?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+          }
           if (event.key.startsWith('Arrow')) {
             event.stopPropagation();
           }
@@ -92,9 +97,8 @@ export function TicketAssignmentSubMenu({
         }}
       />
 
-      <div style={{ maxHeight: '220px', overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column', gap: '2px', paddingRight: '2px' }}>
-        {filteredTickets.length > 0 ? (
-          filteredTickets.map((ticket) => (
+      <PaginatedPickerResults items={filteredTickets} maxHeight={220} emptyLabel={emptyStateLabel} menu>
+          {(ticket) => (
             <ContextMenu.Item
               key={ticket.id}
               onClick={() => {
@@ -110,13 +114,8 @@ export function TicketAssignmentSubMenu({
                 </span>
               </span>
             </ContextMenu.Item>
-          ))
-        ) : (
-          <div style={{ fontSize: '11px', color: 'var(--color-text-disabled)', textAlign: 'center', padding: '8px 0' }}>
-            {emptyStateLabel}
-          </div>
-        )}
-      </div>
+          )}
+      </PaginatedPickerResults>
     </div>
   );
 }
