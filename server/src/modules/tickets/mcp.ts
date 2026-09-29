@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { asc, eq, and, inArray, isNull } from 'drizzle-orm';
 import { db } from '../../db/index.js';
 import { projects, labels, teams, ticketLabels, tickets } from '../../db/schema.js';
@@ -21,6 +22,7 @@ import {
   listTicketBlockers,
   listTicketDependencies,
   listTickets,
+  ticketSearchCreatedAt,
   listWorkspaceTickets,
   removeTicketDependencyRelation,
   updateCommentRecord,
@@ -125,7 +127,11 @@ export class TicketTools {
    * @return The matching ticket list for the requested workspace scope.
    * @throws When a requested project falls outside the authorized workspace.
    */
-  async listTickets(args: Record<string, unknown>, context: ToolExecutionContext, extra = 0) {
+  async listTickets(args: Record<string, unknown>, context: ToolExecutionContext) {
+    return (await this.listTicketPage(args, context)).rows;
+  }
+
+  private async listTicketPage(args: Record<string, unknown>, context: ToolExecutionContext, search = false) {
     const explicitProjectId = typeof args.projectId === 'string' ? args.projectId : undefined;
     const limit = typeof args.limit === 'number' ? args.limit : 50;
     const offset = typeof args.offset === 'number' ? args.offset : 0;
@@ -138,7 +144,7 @@ export class TicketTools {
       if (!team) throw new McpToolValidationError('Team not found in this workspace.');
     }
     const filters = {
-      limit: limit + extra,
+      limit: limit + (search ? 1 : 0),
       offset,
       teamId: typeof args.teamId === 'string' ? args.teamId : undefined,
       query: typeof args.query === 'string' ? args.query.trim() : undefined,
@@ -155,10 +161,36 @@ export class TicketTools {
       labelMode: (args.labelMode === 'all' || args.labelMode === 'any' ? args.labelMode : undefined) as 'all' | 'any' | undefined,
     };
 
+    const order = args.order ?? 'asc';
+    if (search && order !== 'asc' && order !== 'desc') {
+      throw new McpToolValidationError('order must be asc or desc.');
+    }
+    const { limit: _limit, offset: _offset, ...matchingFilters } = filters;
+    const fingerprint = createHash('sha256').update(JSON.stringify({
+      workspaceId: context.workspaceId, projectId: explicitProjectId ?? null,
+      ...matchingFilters, labels: [...(filters.labels ?? [])].sort(),
+      labelMode: filters.labelMode ?? 'any', order,
+    })).digest('hex');
+    let after: { createdAt: string; id: string } | undefined;
+    if (search && args.cursor !== undefined) {
+      try {
+        if (typeof args.cursor !== 'string' || args.cursor.length > 1024 || !/^[A-Za-z0-9_-]+$/.test(args.cursor)) throw new Error();
+        const decoded = JSON.parse(Buffer.from(args.cursor, 'base64url').toString('utf8'));
+        if (decoded?.version !== 1 || decoded.fingerprint !== fingerprint ||
+            typeof decoded.id !== 'string' || !decoded.id ||
+            typeof decoded.createdAt !== 'string' ||
+            decoded.createdAt.length > 64 || !Number.isFinite(Date.parse(decoded.createdAt))) throw new Error();
+        after = { createdAt: decoded.createdAt, id: decoded.id };
+      } catch {
+        throw new McpToolValidationError('Invalid ticket search cursor. Restart without a cursor and keep the same workspace, filters and order between pages. Legacy offset cursors are no longer supported.');
+      }
+    }
+    const serviceFilters = search ? { ...filters, offset: undefined, order: order as 'asc' | 'desc', after } : filters;
+
     // A single-project query can use the narrower service path; otherwise list the whole workspace.
     if (explicitProjectId) {
       await this.assertProjectInWorkspace(explicitProjectId, context.workspaceId);
-      return listTickets(explicitProjectId, filters);
+      return { rows: await listTickets(explicitProjectId, serviceFilters), fingerprint };
     }
 
     const validProjects = await db
@@ -167,25 +199,19 @@ export class TicketTools {
       .where(eq(projects.workspaceId, context.workspaceId));
     const projectIds = validProjects.map((project) => project.id);
 
-    return listWorkspaceTickets(projectIds, filters);
+    return { rows: await listWorkspaceTickets(projectIds, serviceFilters), fingerprint };
   }
 
   async searchTickets(args: Record<string, unknown>, context: ToolExecutionContext) {
-    let offset = 0;
-    if (args.cursor !== undefined) {
-      try {
-        const decoded = JSON.parse(Buffer.from(String(args.cursor), 'base64url').toString('utf8'));
-        if (!Number.isInteger(decoded.offset) || decoded.offset < 0 || decoded.offset > 1_000_000) throw new Error();
-        offset = decoded.offset;
-      } catch {
-        throw new McpToolValidationError('Invalid ticket search cursor.');
-      }
-    }
     const limit = typeof args.limit === 'number' ? args.limit : 50;
-    const rows = await this.listTickets({ ...args, offset }, context, 1);
+    const { rows, fingerprint } = await this.listTicketPage({ ...args, offset: 0 }, context, true);
+    const page = rows.slice(0, limit);
+    const last = page[page.length - 1];
     return {
-      tickets: rows.slice(0, limit),
-      nextCursor: rows.length > limit ? Buffer.from(JSON.stringify({ offset: offset + limit })).toString('base64url') : null,
+      tickets: page,
+      nextCursor: rows.length > limit ? Buffer.from(JSON.stringify({
+        version: 1, fingerprint, createdAt: last[ticketSearchCreatedAt], id: last.id,
+      })).toString('base64url') : null,
       scope: { workspaceId: context.workspaceId, projectId: args.projectId ?? null, teamId: args.teamId ?? null },
     };
   }
@@ -1780,8 +1806,8 @@ ticketToolDefinitions.push(
   { name: 'get_ticket', aliases: ['get_ticket_details', 'read_ticket_details'], description: 'Read a ticket and its authorized related details by ticket key.',
     inputSchema: { type: 'object', properties: { ticketKey: idSchema }, required: ['ticketKey'], additionalProperties: false },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
-  { name: 'search_tickets', description: 'Search workspace tickets with bounded pages ordered by creation time and ID. Pass nextCursor with the same filters for the next page.',
-    inputSchema: { type: 'object', properties: { ...searchProperties, cursor: { type: 'string', maxLength: 256 } }, additionalProperties: false },
+  { name: 'search_tickets', description: 'Search workspace tickets by createdAt and ID. Defaults to asc (oldest first); use desc and limit 1 for the newest ticket. Pages default to 50, maximum 100. Pass nextCursor with the same workspace, filters and order; page size may change. Legacy offset cursors must restart without a cursor. Inserts/deletes before the cursor do not shift pages; changes to creation times or filters are not a snapshot.',
+    inputSchema: { type: 'object', properties: { ...searchProperties, order: { type: 'string', enum: ['asc', 'desc'], description: 'Creation time and ID direction; defaults to asc for compatibility.' }, cursor: { type: 'string', maxLength: 1024 } }, additionalProperties: false },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
   focusedTool('set_ticket_status', 'Set only the ticket workflow status.', { status: statusSchema }, ['status']),
   focusedTool('set_ticket_priority', 'Set only the ticket priority.', { priority: prioritySchema }, ['priority']),
