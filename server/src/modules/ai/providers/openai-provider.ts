@@ -19,6 +19,7 @@ export class OpenAiProvider implements IAiProvider {
       `${this.getBaseUrl()}/v1/chat/completions`,
       {
         method: 'POST',
+        signal: options.signal,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`,
@@ -27,11 +28,14 @@ export class OpenAiProvider implements IAiProvider {
           model,
           messages: this.mapMessages(messages),
           stream: streamMode,
+          ...(this.isDeepSeek
+            ? { max_tokens: options.maxTokens ?? 4096 }
+            : { max_completion_tokens: options.maxTokens ?? 4096 }),
           ...(tools ? { tools: this.formatTools(tools) } : {}),
         }),
       },
       60000,
-      3, // 3 retries with exponential backoff for chat
+      0, // Never retry billable generations implicitly.
     );
 
     const providerLabel = this.isDeepSeek ? 'DeepSeek' : 'OpenAI';
@@ -40,7 +44,7 @@ export class OpenAiProvider implements IAiProvider {
     }
 
     if (streamMode) {
-      return this.consumeStreamingResponse(response, onChunk);
+      return this.consumeStreamingResponse(response, onChunk, options.signal);
     }
 
     const data = (await response.json()) as any;
@@ -74,7 +78,7 @@ export class OpenAiProvider implements IAiProvider {
     };
   }
 
-  private async consumeStreamingResponse(response: Response, onChunk?: (chunk: string) => Promise<void> | void) {
+  private async consumeStreamingResponse(response: Response, onChunk?: (chunk: string) => Promise<void> | void, signal?: AbortSignal) {
     if (!response.body) {
       throw new Error('Provider returned no response body for streaming mode.');
     }
@@ -85,72 +89,79 @@ export class OpenAiProvider implements IAiProvider {
     let content = '';
     const toolCallsByIndex = new Map<number, { id?: string; name?: string; arguments: string }>();
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) {
-        break;
-      }
-
-      buffer += decoder.decode(value, { stream: true });
-      let boundary = buffer.indexOf('\n\n');
-      while (boundary >= 0) {
-        const event = buffer.slice(0, boundary).trim();
-        buffer = buffer.slice(boundary + 2);
-
-        const dataLine = event
-          .split('\n')
-          .map((line) => line.trim())
-          .filter((line) => line.startsWith('data:'))
-          .map((line) => line.replace(/^data:\s*/, ''))
-          .join('\n');
-
-        if (!dataLine || dataLine === '[DONE]') {
-          boundary = buffer.indexOf('\n\n');
-          continue;
+    try {
+      while (true) {
+        signal?.throwIfAborted();
+        const { done, value } = await reader.read();
+        if (done) {
+          break;
         }
 
-        let parsed: any;
-        try {
-          parsed = JSON.parse(dataLine);
-        } catch (_error) {
-          boundary = buffer.indexOf('\n\n');
-          continue;
-        }
+        buffer += decoder.decode(value, { stream: true });
+        let boundary = buffer.indexOf('\n\n');
+        while (boundary >= 0) {
+          signal?.throwIfAborted();
+          const event = buffer.slice(0, boundary).trim();
+          buffer = buffer.slice(boundary + 2);
 
-        const delta = parsed.choices?.[0]?.delta;
-        const deltaContent = typeof delta?.content === 'string' ? delta.content : '';
-        if (deltaContent) {
-          content += deltaContent;
-          if (onChunk) {
-            await onChunk(deltaContent);
-          }
-        }
+          const dataLine = event
+            .split('\n')
+            .map((line) => line.trim())
+            .filter((line) => line.startsWith('data:'))
+            .map((line) => line.replace(/^data:\s*/, ''))
+            .join('\n');
 
-        const deltaToolCalls = Array.isArray(delta?.tool_calls) ? delta.tool_calls : [];
-        for (const rawCall of deltaToolCalls) {
-          const index = Number(rawCall?.index);
-          if (!Number.isInteger(index)) {
+          if (!dataLine || dataLine === '[DONE]') {
+            boundary = buffer.indexOf('\n\n');
             continue;
           }
 
-          const current = toolCallsByIndex.get(index) ?? { arguments: '' };
-          if (typeof rawCall?.id === 'string') {
-            current.id = rawCall.id;
+          let parsed: any;
+          try {
+            parsed = JSON.parse(dataLine);
+          } catch (_error) {
+            boundary = buffer.indexOf('\n\n');
+            continue;
           }
 
-          if (typeof rawCall?.function?.name === 'string') {
-            current.name = rawCall.function.name;
+          const delta = parsed.choices?.[0]?.delta;
+          const deltaContent = typeof delta?.content === 'string' ? delta.content : '';
+          if (deltaContent) {
+            content += deltaContent;
+            if (onChunk) {
+              await onChunk(deltaContent);
+            }
           }
 
-          if (typeof rawCall?.function?.arguments === 'string') {
-            current.arguments = `${current.arguments}${rawCall.function.arguments}`;
+          const deltaToolCalls = Array.isArray(delta?.tool_calls) ? delta.tool_calls : [];
+          for (const rawCall of deltaToolCalls) {
+            const index = Number(rawCall?.index);
+            if (!Number.isInteger(index)) {
+              continue;
+            }
+
+            const current = toolCallsByIndex.get(index) ?? { arguments: '' };
+            if (typeof rawCall?.id === 'string') {
+              current.id = rawCall.id;
+            }
+
+            if (typeof rawCall?.function?.name === 'string') {
+              current.name = rawCall.function.name;
+            }
+
+            if (typeof rawCall?.function?.arguments === 'string') {
+              current.arguments = `${current.arguments}${rawCall.function.arguments}`;
+            }
+
+            toolCallsByIndex.set(index, current);
           }
 
-          toolCallsByIndex.set(index, current);
+          boundary = buffer.indexOf('\n\n');
         }
-
-        boundary = buffer.indexOf('\n\n');
       }
+    } finally {
+      await reader.cancel().catch(() => {});
+      reader.releaseLock();
     }
 
     const toolCalls = Array.from(toolCallsByIndex.values())
@@ -198,6 +209,7 @@ export class OpenAiProvider implements IAiProvider {
     if (!response.ok) {
       throw new Error(await readErrorMessage(response, `${providerLabel} API key test failed.`));
     }
+    await response.body?.cancel();
   }
 
   async fetchModels(apiKey: string): Promise<string[]> {

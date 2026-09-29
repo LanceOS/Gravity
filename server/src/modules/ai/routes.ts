@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { aiService } from './index.js';
 import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
 import { systemPrompt } from './config/sysPrompt.js';
+import { acquireGeneration, GenerationBudget, GenerationConcurrencyError } from './utils/generation-budget.js';
+import { withAbort } from './utils/utils.js';
 
 const API_KEY_MASK = '••••••••••••';
 
@@ -59,6 +61,7 @@ function sanitizeAiError(
   provider: string,
   operation: 'models' | 'test' | 'chat',
 ): { status: number; message: string } {
+  if (error instanceof GenerationConcurrencyError) return { status: 429, message: error.message };
   const message = error instanceof Error ? error.message : 'Unexpected error.';
 
   if (message.includes('Unsupported provider')) {
@@ -202,12 +205,22 @@ export function createAiRouter() {
       messages = [{ role: 'system', content: systemPrompt }, ...messages];
     }
 
+    const controller = new AbortController();
+    const onClose = () => controller.abort();
+    res.on('close', onClose);
+    req.on('aborted', onClose);
+    if (res.destroyed || req.aborted) onClose();
+    const budget = new GenerationBudget(controller.signal);
+    let release: (() => void) | undefined;
     try {
-      const result = await aiService.chat(actorUserId, provider, {
-        model,
-        messages,
-        tools,
-      });
+      // The stateless legacy endpoint shares the same admission and I/O limits
+      // as project chat; it must not provide an unbounded alternate entry point.
+      release = acquireGeneration(actorUserId);
+      const maxTokens = budget.reserveProviderCall({ messages, tools });
+      const result = await withAbort(aiService.chat(actorUserId, provider, {
+        model, messages, tools, maxTokens, signal: budget.signal,
+      }), budget.signal);
+      budget.signal.throwIfAborted();
 
       res.json({
         message: {
@@ -217,9 +230,15 @@ export function createAiRouter() {
         },
       });
     } catch (error) {
+      if (controller.signal.aborted) return;
       console.error(`AI chat failed for provider ${provider}:`, error);
       const sanitized = sanitizeAiError(error, provider, 'chat');
       res.status(sanitized.status).json({ error: sanitized.message });
+    } finally {
+      res.off('close', onClose);
+      req.off('aborted', onClose);
+      budget.dispose();
+      release?.();
     }
   });
 
