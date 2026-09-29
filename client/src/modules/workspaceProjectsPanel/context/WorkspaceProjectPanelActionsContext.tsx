@@ -1,4 +1,5 @@
-import { createContext, type FormEvent, type JSX, useCallback, useContext, useMemo, type PropsWithChildren, useState } from 'react';
+import { createContext, type FormEvent, type JSX, useCallback, useContext, useMemo, type PropsWithChildren, useState, useRef } from 'react';
+import { toast } from '@library';
 
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
 import type { Label } from '../../../context/TicketContextContext';
@@ -38,6 +39,7 @@ export interface WorkspaceProjectPanelActionsContextValue {
   updateLabel: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   deleteLabel: () => Promise<void>;
   saveProjectSettings: (event: FormEvent<HTMLFormElement>) => Promise<void>;
+  canSaveProjectSettings: boolean;
   deleteProject: () => Promise<void>;
   isDeletingProject: boolean;
   canDeleteProject: boolean;
@@ -69,7 +71,15 @@ export function WorkspaceProjectPanelActionsContextProvider({
     setIsProjectSettingsSaving,
     setSettingsFeedback,
     githubRepoUrl,
+    settingsFeedback,
   } = useWorkspaceProjectPanelProjectStateContext();
+
+  const settingsSavePending = useRef(false);
+  const [savedSettings, setSavedSettings] = useState<{ projectId: string; url: string } | null>(null);
+  const savedUrl = savedSettings?.projectId === managedProject?.id
+    ? savedSettings?.url : (managedProject?.githubRepoUrl ?? '');
+  const canSaveProjectSettings = Boolean(managedProject)
+    && (settingsFeedback?.type === 'error' || githubRepoUrl.trim() !== savedUrl);
 
   const {
     isCreateModalOpen,
@@ -268,33 +278,42 @@ export function WorkspaceProjectPanelActionsContextProvider({
   const saveProjectSettings = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
-      if (!managedProject) {
+      if (!managedProject || settingsSavePending.current || !canSaveProjectSettings) {
         return;
       }
 
       const { url, error } = validateGithubRepoUrl(githubRepoUrl);
       if (error) {
         setSettingsFeedback(createProjectSettingsFeedback('error', error));
+        toast.show(error, 'error');
         return;
       }
 
+      settingsSavePending.current = true;
       setIsProjectSettingsSaving(true);
       setSettingsFeedback(null);
+      const savingToast = toast.show('Saving project settings…', 'info', 0);
 
       try {
         await onUpdateProject(managedProject.id, {
           githubRepoUrl: url || null,
         });
+        setSavedSettings({ projectId: managedProject.id, url: url || '' });
         setSettingsFeedback(createProjectSettingsFeedback('success', 'Project settings updated successfully.'));
+        toast.show('Project settings saved.', 'success');
       } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to update project settings.';
         setSettingsFeedback(
-          createProjectSettingsFeedback('error', error instanceof Error ? error.message : 'Failed to update project settings.')
+          createProjectSettingsFeedback('error', message)
         );
+        toast.show(message, 'error');
       } finally {
+        toast.dismiss(savingToast);
+        settingsSavePending.current = false;
         setIsProjectSettingsSaving(false);
       }
     },
-    [githubRepoUrl, managedProject, onUpdateProject, setIsProjectSettingsSaving, setSettingsFeedback]
+    [canSaveProjectSettings, githubRepoUrl, managedProject, onUpdateProject, setIsProjectSettingsSaving, setSettingsFeedback]
   );
 
   const deleteProject = useCallback(async () => {
@@ -330,6 +349,7 @@ export function WorkspaceProjectPanelActionsContextProvider({
       updateLabel,
       deleteLabel,
       saveProjectSettings,
+      canSaveProjectSettings,
       deleteProject,
       isDeletingProject,
       canDeleteProject,
@@ -345,6 +365,7 @@ export function WorkspaceProjectPanelActionsContextProvider({
       isDeletingProject,
       openCreateProjectModal,
       saveProjectSettings,
+      canSaveProjectSettings,
       selectProject,
       startEditingLabel,
       updateLabel,

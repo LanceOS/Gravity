@@ -127,11 +127,13 @@ export async function processPullRequestEvent(input: PullRequestEvent): Promise<
     const previousLinks = await tx.select({ ticketId: ticketPullRequests.ticketId }).from(ticketPullRequests)
       .where(eq(ticketPullRequests.prUrl, event.prUrl));
     const previousIds = previousLinks.map(link => link.ticketId);
-    if (!reconciliation && !keys.length && !previousIds.length) return [];
+    // UI/MCP writes can save a PR URL before any webhook association exists.
+    // Match that explicit link even if the PR title and branch have no ticket key.
     const matchedTickets = await tx.select().from(tickets).where(and(
       inArray(tickets.projectId, projectIds),
       reconciliation ? eq(tickets.id, reconciliation.ticketId) : or(keys.length ? inArray(tickets.key, keys) : undefined,
-        previousIds.length ? inArray(tickets.id, previousIds) : undefined),
+        previousIds.length ? inArray(tickets.id, previousIds) : undefined,
+        inArray(sql`lower(${tickets.prUrl})`, [event.prUrl, `${event.prUrl}/`])),
     )).orderBy(asc(tickets.id)).for('update');
     if (reconciliation && !matchedTickets.length) throw new PullRequestReconciliationError('stale');
     const effects = new Map<string, PullRequestEffect>();

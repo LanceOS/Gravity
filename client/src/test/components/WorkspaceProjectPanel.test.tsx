@@ -1,5 +1,6 @@
 import type { ButtonHTMLAttributes, ChangeEvent, ReactNode, TextareaHTMLAttributes } from 'react';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { toast } from '@library';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkspaceProjectPanel } from '../../modules/workspaces';
@@ -31,6 +32,7 @@ type MockTextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
 };
 
 vi.mock('@library', () => ({
+  toast: { show: vi.fn().mockReturnValue('saving-toast'), dismiss: vi.fn() },
   Button: ({ children, loading, ...props }: MockButtonProps) => <button {...props}>{loading ? 'Loading' : children}</button>,
   CircularColorInput: ({ label, value, onChange, ...props }: { label: string; value: string; onChange: (event: ChangeEvent<HTMLInputElement>) => void }) => (
     <label>
@@ -135,6 +137,48 @@ describe('WorkspaceProjectPanel', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.clearAllMocks();
+    vi.mocked(toast.show).mockReturnValue('saving-toast');
+  });
+
+  it('disables settings while saving and after success, and enables new edits', async () => {
+    let resolveSave!: () => void;
+    const onUpdateProject = vi.fn(() => new Promise<null>(resolve => { resolveSave = () => resolve(null); }));
+    renderWorkspaceProjectPanel({ onUpdateProject });
+    const save = screen.getByRole('button', { name: 'Save Settings' });
+    expect(save).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('GitHub Repository URL'), { target: { value: 'https://github.com/owner/repo' } });
+    expect(save).toBeEnabled();
+    fireEvent.submit(save.closest('form')!);
+    fireEvent.submit(save.closest('form')!);
+    expect(onUpdateProject).toHaveBeenCalledTimes(1);
+    expect(save).toBeDisabled();
+    expect(toast.show).toHaveBeenCalledWith('Saving project settings…', 'info', 0);
+    await act(async () => resolveSave());
+    expect(save).toBeDisabled();
+    expect(toast.show).toHaveBeenCalledWith('Project settings saved.', 'success');
+    expect(toast.dismiss).toHaveBeenCalledWith('saving-toast');
+    fireEvent.submit(save.closest('form')!);
+    expect(onUpdateProject).toHaveBeenCalledTimes(1);
+    fireEvent.change(screen.getByLabelText('GitHub Repository URL'), { target: { value: 'https://github.com/owner/another' } });
+    expect(save).toBeEnabled();
+  });
+
+  it('preserves the draft after an optimistic rollback and allows retry after failure', async () => {
+    let rejectSave!: (error: Error) => void;
+    const onUpdateProject = vi.fn().mockImplementationOnce(() => new Promise((_, reject) => { rejectSave = reject; })).mockResolvedValue(null);
+    const { props, rerender } = renderWorkspaceProjectPanel({ onUpdateProject });
+    const input = screen.getByLabelText('GitHub Repository URL');
+    fireEvent.change(input, { target: { value: 'https://github.com/owner/repo' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Settings' }));
+    rerender(<WorkspaceProjectPanel {...props} projects={projects.map(p => p.id === 'project-1' ? { ...p, githubRepoUrl: 'https://github.com/owner/repo' } : p)} />);
+    rerender(<WorkspaceProjectPanel {...props} projects={projects.map(p => ({ ...p }))} />);
+    await act(async () => rejectSave(new Error('Unable to save settings.')));
+    expect(input).toHaveValue('https://github.com/owner/repo');
+    expect(toast.show).toHaveBeenCalledWith('Unable to save settings.', 'error');
+    expect(screen.getByRole('button', { name: 'Save Settings' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Save Settings' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save Settings' })).toBeDisabled());
+    expect(onUpdateProject).toHaveBeenCalledTimes(2);
   });
 
   it('renders the project management hero, roster, and editor', async () => {

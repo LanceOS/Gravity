@@ -21,6 +21,10 @@ are ignored; ties prefer merged, closed, review, then open. A merged PR cannot
 be reopened by subsequent snapshots. Newer snapshots with unchanged lifecycle
 only advance the ordering timestamp and create no comment. Existing ticket/PR
 associations survive title or branch edits.
+Tickets also match by their saved PR URL within the configured repository's
+projects, including mixed-case URLs and a trailing slash. This lets a merge
+complete a ticket linked through the UI or MCP even when no earlier webhook
+created an association and the PR title/branch contains no ticket key.
 
 For multiple PRs, known open PRs take precedence over merged/closed PRs. A ticket
 becomes done once it has a merged PR and no known open PRs. Closing an abandoned
