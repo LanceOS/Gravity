@@ -92,3 +92,43 @@ listener cleanup, and failed before the fix.
 
 The focused review checks passed: 32 client tests, 10 server tests, and client
 TypeScript checking. No other actionable issues were found in the branch diff.
+
+## GRAV-231 — relationship cleanup and detail reads (September 29, 2026)
+
+Candidates 1 and 2 above are addressed: cleanup loads ticket rows, project scopes,
+and relationship flags in batches of 100, then hydrates at most two details at a
+time. ID/key detail reads share hydration of the already loaded database row.
+Event ordering, full detail payloads, missing-ticket refreshes, and omission of
+`actorUserId` on follow-up events are preserved.
+
+`server/tests/ticket-hydration.test.ts` measures actual SQL calls against pg-mem
+with a star of 1/100/1000 active affected tickets, one external blocker per ticket,
+and one comment per ticket. A test-only ten-slot semaphore models pool contention;
+each query yields one event-loop turn. The baseline measurement reproduced the
+previous route's unbounded `Promise.all` of detail and scope reads on the same
+fixtures. It is not a production PostgreSQL latency measurement.
+
+| Affected tickets | Queries before → after | Peak in-flight requests before → after | Simulated pool acquisitions that waited before → after |
+| --- | --- | --- | --- |
+| 1 | 16 → 15 | 6 → 6 | 0 → 0 |
+| 100 | 1,600 → 1,005 | 600 → 12 | 1,590 → 200 |
+| 1,000 | 16,000 → 10,050 | 6,000 → 12 | 15,990 → 2,000 |
+
+Aggregate simulated queue wait in one run was 0/744,164/63,110,209 ms before and
+0/2,042/14,328 ms after. These totals sum overlapping waits across queries, are
+sensitive to host load and pg-mem execution, and should not be read as elapsed
+request latency. Actual PostgreSQL pool wait remains unmeasured: no shared
+services or containers were started, stopped, or modified. The cap is per cleanup
+request, not a global limit across requests; nested detail queries still run in
+parallel and total detail work remains linear in the number of affected tickets.
+
+The minimal key-detail fixture now uses 14 queries (previously 17), with one
+primary ticket row lookup. Additional regressions cover populated assignee,
+cycle, labels, subtasks, both label hierarchy modes, moved/deleted rows, missing
+scopes, and the route's actor-free cleanup event payload.
+
+Reproduce the isolated checks with a dummy `NODE_IDENTITY_MASTER_KEY` environment
+value and `npm --workspace=server test -- tests/ticket-hydration.test.ts
+tests/dependencies.test.ts tests/unit/tickets.test.ts`; server typechecking uses
+`npm --workspace=server run typecheck`. HTTP route tests need permission to bind
+a temporary local test listener. No deployment or container scripts are used.
