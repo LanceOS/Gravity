@@ -1,3 +1,4 @@
+import { GithubReconciliation } from './GithubReconciliation';
 import { Button, TextInput } from '@library';
 import { useState } from 'react';
 import { Trash } from 'lucide-react';
@@ -103,6 +104,7 @@ export function WorkspaceProjectSettingsSection() {
           />
         ) : null}
       </FormSection.Root>
+      {managedProject.githubRepoUrl && <GithubReconciliation key={`${managedProject.id}:${managedProject.githubRepoUrl}`} projectId={managedProject.id} workspaceId={managedProject.workspaceId} />}
     </section>
   );
 }

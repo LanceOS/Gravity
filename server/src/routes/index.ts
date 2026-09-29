@@ -8,6 +8,7 @@ import { createUsersRouter } from '../modules/users/routes.js';
 import { createWorkspacesRouter } from '../modules/workspaces/routes.js';
 import { createMcpRouter } from '../modules/mcp/index.js';
 import { createNotesRouter } from '../modules/notes/routes.js';
+import { createGithubReconciliationRouter } from '../modules/github-reconciliation/routes.js';
 import { createWebhookRouter } from '../modules/webhooks/routes.js';
 import { createTeamsRouter } from '../modules/workspaces/teams-routes.js';
 import { createChatsRouter } from '../modules/chats/routes.js';
@@ -51,6 +52,7 @@ export function createApiRouter() {
   router.use(createWorkspacesRouter());
   router.use(createTeamsRouter());
   router.use(createProjectsRouter());
+  router.use(createGithubReconciliationRouter());
   router.use(createTicketsRouter());
   router.use(createChatsRouter());
   router.use(createAiRouter());

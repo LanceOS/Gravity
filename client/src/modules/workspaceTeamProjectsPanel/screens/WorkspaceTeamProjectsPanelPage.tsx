@@ -1,3 +1,4 @@
+import { GithubReconciliation } from '../../workspaceProjectsPanel/components/GithubReconciliation';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ProjectCreateOverlay } from '../../../components/WorkspaceProjectPanel';
@@ -317,6 +318,7 @@ export function WorkspaceTeamProjectsPanelPage({
           getSelectedItemTitle={(project) => project.name}
         >
           {(selectedProjectForEditor) => (
+            <>
             <FormSection.Root
               layout="none"
               className="workspace-team-projects-page__form"
@@ -419,6 +421,8 @@ export function WorkspaceTeamProjectsPanelPage({
                 ) : null}
               </FormSection.Actions>
             </FormSection.Root>
+            {selectedProjectForEditor.githubRepoUrl && <GithubReconciliation key={`${selectedProjectForEditor.id}:${selectedProjectForEditor.githubRepoUrl}`} projectId={selectedProjectForEditor.id} workspaceId={workspaceId} />}
+            </>
           )}
         </WorkspaceManagementEditorSection>
       </div>
