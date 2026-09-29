@@ -3,7 +3,7 @@ import { env } from '../../env.js';
 import { verifyGitHubWebhookSignature } from '../../lib/webhookSignature.js';
 import { broadcastToWorkspace } from '../../realtime.js';
 import { getTicketById } from '../tickets/services/tickets.js';
-import { GITHUB_AUTOMATION_ACTOR, normalizeGitHubRepositoryUrl, processPullRequestEvent, SUPPORTED_PR_ACTIONS } from './processPullRequest.js';
+import { GITHUB_AUTOMATION_ACTOR, normalizeGitHubRepositoryUrl, normalizeGitHubPullRequestUrl, processPullRequestEvent, SUPPORTED_PR_ACTIONS } from './processPullRequest.js';
 
 // ── Finding #3: Simple per-IP rate limiter ────────────────────────────────────
 // Tracks request timestamps per IP. No external dependency required.
@@ -81,7 +81,8 @@ export function createWebhookRouter() {
     if (!pr || !deliveryId || deliveryId.length > 255 || typeof repoUrl !== 'string'
       || !normalizeGitHubRepositoryUrl(repoUrl)
       || !Number.isSafeInteger(pr.number) || pr.number <= 0
-      || pr.html_url !== `${repoUrl}/pull/${pr.number}` || !Number.isFinite(updatedAt.getTime())
+      || typeof pr.html_url !== 'string'
+      || normalizeGitHubPullRequestUrl(pr.html_url) !== `${normalizeGitHubRepositoryUrl(repoUrl)}/pull/${pr.number}` || !Number.isFinite(updatedAt.getTime())
       || (action === 'closed' && typeof pr.merged !== 'boolean')) {
       res.status(400).json({ error: 'Invalid pull request event, delivery ID, or source timestamp.' });
       return;

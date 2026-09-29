@@ -476,6 +476,12 @@ export async function initializeDatabase() {
       id TEXT PRIMARY KEY,
       received_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+    CREATE TABLE IF NOT EXISTS github_pull_requests (
+      pr_url TEXT PRIMARY KEY,
+      status TEXT NOT NULL,
+      phase TEXT NOT NULL,
+      source_updated_at TIMESTAMPTZ NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS ticket_pull_requests (
       ticket_id TEXT NOT NULL REFERENCES tickets (id) ON DELETE CASCADE,
       pr_url TEXT NOT NULL,

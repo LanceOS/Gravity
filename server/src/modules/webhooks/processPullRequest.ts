@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray, or, sql } from 'drizzle-orm';
 import { db } from '../../db/index.js';
-import { comments, githubDeliveries, projects, teams, ticketPullRequests, ticketRelationships, tickets } from '../../db/schema.js';
+import { comments, githubDeliveries, githubPullRequests, projects, teams, ticketPullRequests, ticketRelationships, tickets } from '../../db/schema.js';
 import { createId } from '../../lib/platform.js';
 import { sanitizeGitHubLogin } from '../../lib/webhookSignature.js';
 
@@ -48,6 +48,12 @@ export function normalizeGitHubRepositoryUrl(value: string): string | null {
   return match ? `https://github.com/${match[1]}/${match[2].replace(/\.git$/i, '')}`.toLowerCase() : null;
 }
 
+export function normalizeGitHubPullRequestUrl(value: string): string | null {
+  const match = /^https:\/\/github\.com\/([a-z0-9-]+)\/([a-z0-9_.-]+)\/pull\/([1-9][0-9]*)\/?$/i.exec(value);
+  if (!match || !Number.isSafeInteger(Number(match[3]))) return null;
+  return `https://github.com/${match[1]}/${match[2]}/pull/${match[3]}`.toLowerCase();
+}
+
 const rank: Record<string, number> = { in_progress: 0, in_review: 1, closed: 2, merged: 3 };
 
 /** Process one authenticated snapshot. All durable effects commit together; publish SSE after return.
@@ -57,7 +63,7 @@ export async function processPullRequestEvent(input: PullRequestEvent): Promise<
   if (!SUPPORTED_PR_ACTIONS.has(input.action)) return [];
   const normalizedRepo = normalizeGitHubRepositoryUrl(input.repoUrl);
   const event = { ...input, repoUrl: normalizedRepo ?? input.repoUrl,
-    prUrl: input.prUrl.toLowerCase() };
+    prUrl: normalizeGitHubPullRequestUrl(input.prUrl) ?? '' };
 
   if (!event.deliveryId || event.deliveryId.length > 255 || !normalizedRepo
     || !Number.isSafeInteger(event.number) || event.number <= 0
@@ -96,6 +102,20 @@ export async function processPullRequestEvent(input: PullRequestEvent): Promise<
       if (reconciliation) throw new PullRequestReconciliationError('stale');
       return [];
     }
+    // Seed and lock a PR-wide ordering record even if this payload has no ticket
+    // key. Otherwise an older payload can introduce a new stale association.
+    await tx.insert(githubPullRequests).values({
+      prUrl: event.prUrl, status, phase, sourceUpdatedAt: event.sourceUpdatedAt,
+    }).onConflictDoNothing();
+    const [latest] = await tx.select().from(githubPullRequests)
+      .where(eq(githubPullRequests.prUrl, event.prUrl)).for('update');
+    if (!reconciliation && ((latest.status === 'merged' && status !== 'merged')
+      || latest.sourceUpdatedAt > event.sourceUpdatedAt
+      || (latest.sourceUpdatedAt.getTime() === event.sourceUpdatedAt.getTime()
+        && rank[latest.phase] > rank[phase]))) return [];
+    await tx.update(githubPullRequests).set({ status, phase, sourceUpdatedAt: event.sourceUpdatedAt })
+      .where(eq(githubPullRequests.prUrl, event.prUrl));
+
     const projectIds = linkedProjects.map(project => project.id);
     const scopes = await tx.select({ projectId: projects.id, workspaceId: teams.workspaceId })
       .from(projects).innerJoin(teams, eq(teams.id, projects.teamId)).where(inArray(projects.id, projectIds));
@@ -121,15 +141,16 @@ export async function processPullRequestEvent(input: PullRequestEvent): Promise<
     };
 
     for (const ticket of matchedTickets) {
+      const existingPrUrl = ticket.prUrl ? normalizeGitHubPullRequestUrl(ticket.prUrl) ?? ticket.prUrl : null;
       if (reconciliation) {
-        if (ticket.status === 'done' && ticket.prStatus === 'merged' && ticket.prUrl === event.prUrl) continue;
+        if (ticket.status === 'done' && ticket.prStatus === 'merged' && existingPrUrl === event.prUrl) continue;
         const { expected } = reconciliation;
         if (ticket.updatedAt.toISOString() !== expected.updatedAt
           || (['status', 'prStatus', 'prUrl', 'key', 'title', 'branchName'] as const).some(key => ticket[key] !== expected[key])) {
           throw new PullRequestReconciliationError('stale');
         }
         const otherLinks = await tx.select().from(ticketPullRequests).where(eq(ticketPullRequests.ticketId, ticket.id));
-        if (ticket.status === 'canceled' || (ticket.prUrl && ticket.prUrl !== event.prUrl)
+        if (ticket.status === 'canceled' || (existingPrUrl && existingPrUrl !== event.prUrl)
           || (ticket.prStatus === 'merged' && ticket.status !== 'done')
           || ticket.updatedAt > reconciliation.mergedAt
           || otherLinks.some(link => link.prUrl !== event.prUrl && link.status === 'open')) {
@@ -145,12 +166,12 @@ export async function processPullRequestEvent(input: PullRequestEvent): Promise<
         || previous.sourceUpdatedAt > event.sourceUpdatedAt
         || (previous.sourceUpdatedAt.getTime() === event.sourceUpdatedAt.getTime()
           && rank[previous.phase] >= rank[phase]))) continue;
-      if (!reconciliation && !previous && ticket.prUrl === event.prUrl && ticket.prStatus === 'merged' && status !== 'merged') continue;
+      if (!reconciliation && !previous && existingPrUrl === event.prUrl && ticket.prStatus === 'merged' && status !== 'merged') continue;
 
       // Preserve a legacy/manual link when a second PR starts being tracked.
-      if (ticket.prUrl && ticket.prUrl !== event.prUrl && ['open', 'merged', 'closed'].includes(ticket.prStatus)) {
+      if (existingPrUrl && existingPrUrl !== event.prUrl && ['open', 'merged', 'closed'].includes(ticket.prStatus)) {
         await tx.insert(ticketPullRequests).values({
-          ticketId: ticket.id, prUrl: ticket.prUrl, repoUrl: event.repoUrl,
+          ticketId: ticket.id, prUrl: existingPrUrl, repoUrl: existingPrUrl.split('/pull/')[0],
           status: ticket.prStatus, phase: ticket.prStatus === 'open'
             ? (ticket.status === 'in_review' ? 'in_review' : 'in_progress') : ticket.prStatus,
           sourceUpdatedAt: new Date(0),

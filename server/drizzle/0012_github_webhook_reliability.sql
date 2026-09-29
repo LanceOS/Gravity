@@ -12,3 +12,9 @@ CREATE TABLE IF NOT EXISTS ticket_pull_requests (
   PRIMARY KEY (ticket_id, pr_url)
 );
 ALTER TABLE comments ADD COLUMN IF NOT EXISTS automation JSONB;
+CREATE TABLE IF NOT EXISTS github_pull_requests (
+  pr_url TEXT PRIMARY KEY,
+  status TEXT NOT NULL,
+  phase TEXT NOT NULL,
+  source_updated_at TIMESTAMPTZ NOT NULL
+);

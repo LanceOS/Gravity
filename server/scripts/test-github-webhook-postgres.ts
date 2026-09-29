@@ -45,6 +45,7 @@ try {
   assert.equal((await pool.query("SELECT status FROM tickets WHERE id = 't1'")).rows[0].status, 'in_progress');
   assert.equal((await pool.query("SELECT status FROM ticket_pull_requests WHERE ticket_id = 't1'")).rows[0].status, 'open');
   assert.equal((await pool.query("SELECT * FROM github_deliveries WHERE id = 'merge'")).rowCount, 0);
+  assert.equal((await pool.query("SELECT status FROM github_pull_requests WHERE pr_url = $1", [input.prUrl])).rows[0].status, 'open');
   assert.equal((await pool.query('SELECT * FROM ticket_relationships')).rowCount, 1);
   assert.equal((await pool.query('SELECT * FROM comments')).rowCount, 1);
   await pool.query('DROP TRIGGER reject_comment ON comments; DROP FUNCTION reject_comment()');
@@ -65,6 +66,11 @@ try {
     processPullRequestEvent({ ...secondTicket, deliveryId: 'stale-2', number: 2, prUrl: `${repoUrl}/pull/2` }),
   ]);
   assert.equal((await pool.query("SELECT status FROM tickets WHERE id = 't2'")).rows[0].status, 'done');
+  // New associations cannot bypass ordering established by a different ticket.
+  await db.insert(tickets).values({ id: 't3', key: 'TEST-3', title: 'New association', projectId: 'p' });
+  assert.deepEqual(await processPullRequestEvent({ ...input, deliveryId: 'late-new-association', title: 'TEST-3' }), []);
+  assert.equal((await pool.query("SELECT status FROM tickets WHERE id = 't3'")).rows[0].status, 'todo');
+  assert.equal((await pool.query("SELECT * FROM ticket_pull_requests WHERE ticket_id = 't3'")).rowCount, 0);
   console.log('PostgreSQL webhook checks passed: concurrent deduplication, atomic rollback/retry, multiple PR ordering.');
 } finally {
   await pool.end();

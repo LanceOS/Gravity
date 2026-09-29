@@ -12,7 +12,11 @@ PostgreSQL transaction. Failed processing releases the claim through rollback,
 so GitHub can retry. Project row locks serialize concurrent deliveries with other
 ticket writes. Realtime notifications happen after commit.
 
-PR snapshots use canonical repository/PR URLs as identities. Older timestamps
+PR snapshots use canonical repository/PR URLs as identities, including comparisons
+against existing mixed-case links. PR-wide ordering is persisted in
+`github_pull_requests`, independently of ticket associations and even when a
+snapshot has no ticket key. This prevents delayed payloads from creating stale
+associations on other tickets. Older timestamps
 are ignored; ties prefer merged, closed, review, then open. A merged PR cannot
 be reopened by subsequent snapshots. Newer snapshots with unchanged lifecycle
 only advance the ordering timestamp and create no comment. Existing ticket/PR

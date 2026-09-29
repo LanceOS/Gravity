@@ -3,9 +3,9 @@ import { describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../src/app.js';
 import { db } from '../src/db/index.js';
-import { comments, githubDeliveries, projects, ticketPullRequests, ticketRelationships, tickets } from '../src/db/schema.js';
+import { comments, githubDeliveries, githubPullRequests, projects, ticketPullRequests, ticketRelationships, tickets } from '../src/db/schema.js';
 import { listComments } from '../src/modules/tickets/services/tickets.js';
-import { processPullRequestEvent, type PullRequestEvent } from '../src/modules/webhooks/processPullRequest.js';
+import { normalizeGitHubPullRequestUrl, processPullRequestEvent, type PullRequestEvent } from '../src/modules/webhooks/processPullRequest.js';
 import { seedTicket, seedWorkspaceFixture } from './helpers/test-helpers.js';
 
 const repoUrl = 'https://github.com/test/repo';
@@ -184,6 +184,58 @@ describe('GitHub webhook reliability', () => {
     const { project, ticket } = await fixture();
     await db.update(projects).set({ githubRepoUrl: 'https://github.com/Test/Repo.git/' }).where(eq(projects.id, project.id));
     expect(await processPullRequestEvent(event(ticket.key))).toHaveLength(1);
+  });
+
+  it.each([
+    ['https://github.com/Test/Repo/pull/42/', 'https://github.com/test/repo/pull/42'],
+    ['https://github.com/test/repo/pull/42', 'https://github.com/test/repo/pull/42'],
+    ['https://github.com/test/repo/issues/42', null],
+    ['https://github.com/test/repo/pull/0', null],
+    ['https://github.com/test/repo/pull/42?query=true', null],
+    ['https://github.com.evil.test/test/repo/pull/42', null],
+  ])('canonicalizes PR identity %s', (value, expected) => {
+    expect(normalizeGitHubPullRequestUrl(value)).toBe(expected);
+  });
+
+  it('merges a mixed-case legacy link without creating a phantom open PR', async () => {
+    const { ticket } = await fixture();
+    await db.update(tickets).set({ status: 'in_progress', prStatus: 'open', prUrl: 'https://github.com/Test/Repo/pull/42/' }).where(eq(tickets.id, ticket.id));
+    await processPullRequestEvent(event(ticket.key, { action: 'closed', merged: true }));
+    expect(await readTicket(ticket.id)).toMatchObject({ status: 'done', prStatus: 'merged', prUrl: `${repoUrl}/pull/42` });
+    expect(await db.select().from(ticketPullRequests)).toHaveLength(1);
+  });
+
+  it('accepts a canonical-equivalent link for reconciliation while checking the raw snapshot', async () => {
+    const { project, ticket } = await fixture();
+    await db.update(tickets).set({ prStatus: 'open', prUrl: 'https://github.com/Test/Repo/pull/42/', updatedAt: new Date('2026-09-28') }).where(eq(tickets.id, ticket.id));
+    const current = await readTicket(ticket.id);
+    const input = event('', { action: 'closed', merged: true, reconciliation: {
+      projectId: project.id, ticketId: ticket.id, actorUserId: 'approver', reviewed: true, evidence: [],
+      mergedAt: new Date('2026-09-29'), expected: { ...current, updatedAt: current.updatedAt.toISOString() },
+    } });
+    expect(await processPullRequestEvent(input)).toHaveLength(1);
+    expect(await readTicket(ticket.id)).toMatchObject({ status: 'done', prStatus: 'merged', prUrl: input.prUrl });
+    await db.update(tickets).set({ prUrl: 'https://github.com/Test/Repo/pull/42/' }).where(eq(tickets.id, ticket.id));
+    expect(await processPullRequestEvent(input)).toEqual([]);
+    expect(await db.select().from(comments)).toHaveLength(1);
+  });
+
+  it.each(['closed', 'ready_for_review'])('rejects stale new ticket associations after a newer %s snapshot', async action => {
+    const { project, ticket } = await fixture();
+    const other = await seedTicket(project.id, { id: 'ticket-2', key: `${project.key}-2`, status: 'todo' });
+    await processPullRequestEvent(event(ticket.key, { action, merged: action === 'closed' }));
+    expect(await processPullRequestEvent(event(other.key, { deliveryId: 'delayed-open', sourceUpdatedAt: new Date('2026-09-28') }))).toEqual([]);
+    expect(await readTicket(other.id)).toMatchObject({ status: 'todo', prStatus: 'none' });
+    expect(await db.select().from(ticketPullRequests)).toHaveLength(1);
+  });
+
+  it('retains PR-wide ordering even when the newest snapshot has no ticket key', async () => {
+    const { ticket } = await fixture();
+    await processPullRequestEvent(event('', { action: 'closed', merged: true }));
+    expect(await db.select().from(githubPullRequests)).toHaveLength(1);
+    expect(await processPullRequestEvent(event(ticket.key, { deliveryId: 'delayed-open', sourceUpdatedAt: new Date('2026-09-28') }))).toEqual([]);
+    expect(await readTicket(ticket.id)).toMatchObject({ status: 'todo', prStatus: 'none' });
+    expect(await db.select().from(comments)).toHaveLength(0);
   });
 
   it('acknowledges unsupported HTTP actions and requires identity/timestamps for supported ones', async () => {
