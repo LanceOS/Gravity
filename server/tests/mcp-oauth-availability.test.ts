@@ -22,7 +22,7 @@ describe('OAuth issuer availability', () => {
   it('starts on a private HTTP host and preserves health and manual MCP while clearly disabling OAuth', async () => {
     env.betterAuthBaseUrl = 'http://192.168.1.50:9999';
     const { workspace, owner } = await seedWorkspaceFixture();
-    const health = await api().get('/api/v1/health');
+    const health = await api().get('/api/v1/health/live');
     expect(health.status).toBe(200);
     expect(health.body.status).toBe('ok');
 

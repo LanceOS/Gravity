@@ -17,20 +17,18 @@ describe('createApp', () => {
     });
   });
 
-  it('returns the health payload', async () => {
-    const response = await request(createApp()).get('/api/v1/health');
+  it('returns the lightweight liveness payload', async () => {
+    const response = await request(createApp()).get('/api/v1/health/live');
 
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({
       status: 'ok',
       service: 'gravity-server',
-      nodeEnv: expect.any(String),
-      authBaseUrl: expect.any(String),
     });
   });
 
   it('sets X-Content-Type-Options: nosniff on API responses', async () => {
-    const response = await request(createApp()).get('/api/v1/health');
+    const response = await request(createApp()).get('/api/v1/health/live');
 
     expect(response.headers['x-content-type-options']).toBe('nosniff');
   });

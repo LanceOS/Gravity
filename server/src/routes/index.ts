@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import { createAiRouter } from '../modules/ai/routes.js';
-import { createHealthRouter } from '../modules/health/routes.js';
 import { createProjectsRouter } from '../modules/workspaces/projects-routes.js';
 import { createSettingsRouter } from '../modules/settings/routes.js';
 import { createTicketsRouter } from '../modules/tickets/routes.js';
@@ -46,7 +45,6 @@ export function createApiRouter() {
   // CSRF middleware for their browser-driven management endpoints.
   router.use(createMcpRouter());
 
-  router.use(createHealthRouter());
   router.use(createUsersRouter());
   router.use(createSettingsRouter());
   router.use(createWorkspacesRouter());
