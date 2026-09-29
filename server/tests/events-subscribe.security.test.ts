@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import http from 'node:http';
 import { AddressInfo } from 'node:net';
+import { and, eq } from 'drizzle-orm';
+import { db } from '../src/db/index.js';
+import { workspaceMembers } from '../src/db/schema.js';
+import { client as redisClient, setClient } from '../src/lib/redis.js';
+import { isWorkspaceMember } from '../src/modules/workspaces/services/membership.js';
+import { createConnectionToken } from '../src/modules/mcp/connection.js';
 import { createApp } from '../src/app.js';
 import { _clearInMemoryRateLimitStore } from '../src/lib/rateLimit.js';
 import * as logger from '../src/lib/logger.js';
@@ -223,9 +229,46 @@ describe('SSE endpoint security', () => {
   });
 
   it('requires session cookie validation and blocks unauthenticated subscribers', async () => {
+    const auditSpy = vi.spyOn(logger, 'audit').mockImplementation(() => {});
     const response = await readSseChunk('/api/v1/events/subscribe?workspaceId=workspace-1');
     expect(response.statusCode).toBe(401);
     expect(parseSseErrorBody(response.chunk).error).toBe('Authentication required.');
+    expect(auditSpy).toHaveBeenCalledWith('sse.connection.rejected', expect.objectContaining({
+      workspaceId: 'workspace-1', status: 401, reason: 'authentication_required_or_invalid',
+    }));
+  });
+
+  it.each(['session', 'token'] as const)('rejects removed members despite stale cached membership (%s)', async (method) => {
+    const memberApi = await createAuthenticatedApi({
+      name: 'Removed SSE Member', email: 'sse-removed@example.com', role: 'member',
+    });
+    const { workspace } = await seedWorkspaceFixture();
+    await db.insert(workspaceMembers).values({ workspaceId: workspace.id, userId: memberApi.user.id, role: 'member' });
+    const token = await createConnectionToken({ workspaceId: workspace.id, generatedBy: memberApi.user.id });
+    await db.delete(workspaceMembers).where(and(
+      eq(workspaceMembers.workspaceId, workspace.id), eq(workspaceMembers.userId, memberApi.user.id),
+    ));
+
+    const previousClient = redisClient;
+    const auditSpy = vi.spyOn(logger, 'audit').mockImplementation(() => {});
+    // Model delayed cache population or failed invalidation following removal.
+    setClient({ isOpen: true, isReady: true, get: async () => JSON.stringify('member') } as never);
+    try {
+      expect(await isWorkspaceMember(workspace.id, memberApi.user.id)).toBe(true);
+      const query = method === 'token' ? `&token=${encodeURIComponent(token.rawToken)}` : '';
+      const response = await readSseChunk(`/api/v1/events/subscribe?workspaceId=${workspace.id}${query}`, {
+        headers: method === 'session' ? { Cookie: memberApi.sessionCookie } : {},
+      });
+      expect(response.statusCode).toBe(403);
+      expect(parseSseErrorBody(response.chunk).error).toBe('Access denied: not a member of the workspace.');
+      expect(auditSpy).toHaveBeenCalledWith('sse.connection.rejected', expect.objectContaining({
+        workspaceId: workspace.id, status: 403, reason: 'workspace_access_denied',
+      }));
+      expect(JSON.stringify(auditSpy.mock.calls)).not.toContain(token.rawToken);
+      expect(JSON.stringify(auditSpy.mock.calls)).not.toContain(memberApi.sessionCookie);
+    } finally {
+      setClient(previousClient);
+    }
   });
 
   it('enforces workspace membership for session-authenticated SSE subscriptions', async () => {

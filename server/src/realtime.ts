@@ -1,10 +1,10 @@
 import type { Request, Response } from 'express';
 import { mcpEventBus } from './lib/mcp-event-bus.js';
-import { audit } from './lib/logger.js';
+import { audit, securityAlert } from './lib/logger.js';
 import { getRequestSourceIp } from './lib/request-ip.js';
 import { resolveRequestActorUserId } from './modules/auth/utils/request-auth.js';
 import { verifyAndConsumeToken } from './modules/mcp/connection.js';
-import { isWorkspaceMember } from './modules/workspaces/services/membership.js';
+import { isMcpWorkspaceMember } from './modules/mcp/access.js';
 
 type SseAuthMethod = 'session' | 'token';
 
@@ -21,6 +21,26 @@ type SseConnectionRecord = {
 export const MAX_CONCURRENT_SSE_CONNECTIONS_PER_USER = 5;
 
 type SseQueryValue = string | string[] | undefined;
+
+function auditRejectedConnection(data: {
+  workspaceId: string;
+  userId?: string;
+  sourceIp: string | null;
+  status: number;
+  reason: string;
+}): void {
+  try {
+    audit('sse.connection.rejected', data);
+  } catch {
+    // Logging failures must not interrupt the rejection response. Do not copy
+    // the sink's error, which may contain sensitive configuration, into alerts.
+    securityAlert('security.audit_log_failed', {
+      failureReason: 'audit_sink_unavailable',
+      failedAuditEvent: 'sse.connection.rejected',
+      workspaceId: data.workspaceId,
+    });
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Workspace-scoped SSE client registry
@@ -211,7 +231,7 @@ async function authenticateSseConnection(
       return { ok: false, status: 401, error: 'Invalid or expired token.' };
     }
 
-    const isMember = await isWorkspaceMember(workspaceId, tokenRow.generatedBy);
+    const isMember = await isMcpWorkspaceMember(workspaceId, tokenRow.generatedBy);
     if (!isMember) {
       return { ok: false, status: 403, error: 'Access denied: not a member of the workspace.' };
     }
@@ -232,7 +252,7 @@ async function authenticateSseConnection(
     return { ok: false, status: 401, error: 'Authentication required.' };
   }
 
-  const isMember = await isWorkspaceMember(workspaceId, actorUserId);
+  const isMember = await isMcpWorkspaceMember(workspaceId, actorUserId);
   if (!isMember) {
     return { ok: false, status: 403, error: 'Access denied: not a member of the workspace.' };
   }
@@ -281,11 +301,25 @@ export async function subscribeToEvents(req: Request, res: Response) {
 
   const authAttempt = await authenticateSseConnection(req, workspaceId);
   if (!authAttempt.ok) {
+    // Never include the request URL, cookies, or query token in audit records.
+    auditRejectedConnection({
+      workspaceId,
+      sourceIp: getRequestSourceIp(req) ?? req.ip ?? null,
+      status: authAttempt.status,
+      reason: authAttempt.status === 403 ? 'workspace_access_denied' : 'authentication_required_or_invalid',
+    });
     res.status(authAttempt.status).json({ error: authAttempt.error });
     return;
   }
 
   if (!hasRoomForSseConnection(authAttempt.context.userId)) {
+    auditRejectedConnection({
+      workspaceId,
+      userId: authAttempt.context.userId,
+      sourceIp: authAttempt.context.sourceIp,
+      status: 429,
+      reason: 'connection_limit_reached',
+    });
     res.status(429).json({ error: 'Too many concurrent SSE connections for this user.' });
     return;
   }
