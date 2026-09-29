@@ -19,7 +19,7 @@
 .note-editor__status {
   font-size: 0.75rem;
   color: var(--color-text-disabled);
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .note-editor__status--error {
@@ -150,4 +150,11 @@
   .note-editor__content {
     padding: 16px 20px 32px;
   }
+}
+
+.note-editor__recovery {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 24px 8px;
 }
