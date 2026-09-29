@@ -27,6 +27,7 @@ function makeResponse(body: unknown, ok = true, status = 200): Response {
 
 describe('fetchWithTimeout utility', () => {
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
@@ -37,7 +38,9 @@ describe('fetchWithTimeout utility', () => {
     expect(res.ok).toBe(true);
   });
 
-  it('aborts and rejects when the request exceeds the timeout', async () => {
+  it('aborts and rejects with TimeoutError when the request exceeds the timeout', async () => {
+    vi.useFakeTimers();
+    const onAbort = vi.fn();
     // Simulate a fetch that never resolves until aborted
     vi.stubGlobal(
       'fetch',
@@ -45,12 +48,22 @@ describe('fetchWithTimeout utility', () => {
         (_url: string, init: RequestInit) =>
           new Promise<never>((_res, reject) => {
             const signal = init.signal as AbortSignal;
-            signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
+            signal.addEventListener('abort', () => {
+              onAbort(signal.reason);
+              reject(new DOMException('Aborted', 'AbortError'));
+            });
           }),
       ),
     );
 
-    await expect(fetchWithTimeout('http://example.com', {}, 1)).rejects.toThrow(/abort/i);
+    const rejection = expect(fetchWithTimeout('http://example.com', {}, 100)).rejects.toMatchObject({
+      name: 'TimeoutError',
+      message: 'Provider timed out',
+    });
+    await vi.advanceTimersByTimeAsync(100);
+    await rejection;
+    expect(onAbort).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ name: 'TimeoutError' }));
+    expect(vi.getTimerCount()).toBe(0);
   });
 });
 
