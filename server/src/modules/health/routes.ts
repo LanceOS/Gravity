@@ -1,18 +1,24 @@
 import { Router } from 'express';
-import { env } from '../../env.js';
-import { isServerShuttingDown } from '../../lib/server-lifecycle.js';
+import { isServerInitialized, isServerShuttingDown } from '../../lib/server-lifecycle.js';
+import type { Readiness } from '../../lib/readiness.js';
 
-export function createHealthRouter() {
+export function createHealthRouter(check: () => Promise<Readiness> = async () => {
+  if (!isServerInitialized() || isServerShuttingDown()) {
+    return { status: 'unavailable', checks: { lifecycle: { required: true, status: 'unavailable' } } };
+  }
+  const { checkReadiness } = await import('../../lib/dependency-readiness.js');
+  return checkReadiness();
+}) {
   const router = Router();
-
-  router.get('/health', (_req, res) => {
-    res.status(isServerShuttingDown() ? 503 : 200).json({
-      status: isServerShuttingDown() ? 'shutting_down' : 'ok',
-      service: 'gravity-server',
-      nodeEnv: env.nodeEnv,
-      authBaseUrl: env.betterAuthBaseUrl,
-    });
+  router.get('/health/live', (_req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ status: 'ok', service: 'gravity-server' });
   });
-
+  // Keep the old endpoint as a readiness alias for existing monitoring.
+  router.get(['/health', '/health/ready'], async (_req, res) => {
+    const result = await check();
+    res.setHeader('Cache-Control', 'no-store');
+    res.status(result.status === 'unavailable' ? 503 : 200).json(result);
+  });
   return router;
 }

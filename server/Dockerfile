@@ -42,4 +42,8 @@ COPY --from=builder --chown=node:node /app/client/dist ./server/public
 COPY --chown=node:node docker/.env.example ./server/.env.example
 WORKDIR /app/server
 EXPOSE 8080
+
+HEALTHCHECK --interval=10s --timeout=4s --start-period=60s --retries=6 \
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||8080)+'/api/v1/health/ready',{signal:AbortSignal.timeout(3000)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+
 CMD ["node", "dist/index.js"]

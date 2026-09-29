@@ -1,3 +1,4 @@
+import { initializeSchema } from './schema-version.js';
 import { getMigrations } from 'better-auth/db/migration';
 import { auth } from '../modules/auth/auth.js';
 import { env } from '../env.js';
@@ -17,7 +18,8 @@ async function hasConstraint(constraintName: string) {
     );
 
     return (result.rowCount ?? 0) > 0;
-  } catch {
+  } catch (error) {
+    if (!env.databaseUrl.startsWith('pgmem://')) throw error;
     return false;
   }
 }
@@ -36,7 +38,8 @@ async function hasTable(tableName: string) {
     );
 
     return (result.rowCount ?? 0) > 0;
-  } catch {
+  } catch (error) {
+    if (!env.databaseUrl.startsWith('pgmem://')) throw error;
     return false;
   }
 }
@@ -56,7 +59,8 @@ async function hasColumn(tableName: string, columnName: string) {
     );
 
     return (result.rowCount ?? 0) > 0;
-  } catch {
+  } catch (error) {
+    if (!env.databaseUrl.startsWith('pgmem://')) throw error;
     return false;
   }
 }
@@ -267,6 +271,10 @@ export async function migrateLegacyTicketDependenciesTable() {
 }
 
 export async function initializeDatabase() {
+  await initializeSchema(pool, bootstrapDatabase);
+}
+
+async function bootstrapDatabase() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS user_profiles (
       user_id TEXT PRIMARY KEY,
@@ -629,6 +637,7 @@ export async function initializeDatabase() {
     `).catch((err) => {
       // eslint-disable-next-line no-console
       console.error('Failed to backfill ticket dependency relations:', err);
+      throw err;
     });
   }
 
@@ -653,6 +662,7 @@ export async function initializeDatabase() {
   `).catch((err) => {
     // eslint-disable-next-line no-console
     console.error('Failed to bootstrap default teams:', err);
+    throw err;
   });
 
   if (hasProjectsTable) {
@@ -665,6 +675,7 @@ export async function initializeDatabase() {
     `).catch((err) => {
       // eslint-disable-next-line no-console
       console.error('Failed to backfill project team assignments:', err);
+      throw err;
     });
   }
 
@@ -682,6 +693,7 @@ export async function initializeDatabase() {
     `).catch((err) => {
       // eslint-disable-next-line no-console
       console.error('Failed to backfill cycle team assignments:', err);
+      throw err;
     });
   }
 
@@ -697,6 +709,7 @@ export async function initializeDatabase() {
     `).catch((err) => {
       // eslint-disable-next-line no-console
       console.error('Failed to run labels team backfill:', err);
+      throw err;
     });
   }
 
@@ -704,6 +717,7 @@ export async function initializeDatabase() {
     await migrateFlatWorkspaceTicketLabelAssignments().catch((err) => {
       // eslint-disable-next-line no-console
       console.error('Failed to migrate ticket label assignments for project-based workspaces:', err);
+      throw err;
     });
   }
 
@@ -714,6 +728,7 @@ export async function initializeDatabase() {
       `).catch((err) => {
         // eslint-disable-next-line no-console
         console.error('Failed to relax legacy label project_id constraint:', err);
+        throw err;
       });
     }
 
@@ -728,6 +743,7 @@ export async function initializeDatabase() {
       `).catch((err) => {
         // eslint-disable-next-line no-console
         console.error('Failed to migrate domains into labels:', err);
+        throw err;
       });
     } else {
       await pool.query(`
@@ -740,6 +756,7 @@ export async function initializeDatabase() {
       `).catch((err) => {
         // eslint-disable-next-line no-console
         console.error('Failed to migrate domains into labels:', err);
+        throw err;
       });
     }
 
@@ -757,6 +774,7 @@ export async function initializeDatabase() {
       `).catch((err) => {
         // eslint-disable-next-line no-console
         console.error('Failed to migrate ticket domain assignments into ticket labels:', err);
+        throw err;
       });
     }
   }
@@ -765,6 +783,7 @@ export async function initializeDatabase() {
     await migrateFlatWorkspaceTicketLabelAssignments().catch((err) => {
       // eslint-disable-next-line no-console
       console.error('Failed to migrate ticket label assignments for project-based workspaces:', err);
+      throw err;
     });
   }
 
@@ -772,6 +791,7 @@ export async function initializeDatabase() {
     await mergeDuplicateTeamLabels(pool).catch((err) => {
       // eslint-disable-next-line no-console
       console.error('Failed to merge duplicate labels during team migration:', err);
+      throw err;
     });
 
     await pool.query(`
@@ -780,6 +800,7 @@ export async function initializeDatabase() {
     `).catch((err) => {
       // eslint-disable-next-line no-console
       console.error('Failed to ensure unique team label names:', err);
+      throw err;
     });
   }
 
@@ -790,6 +811,7 @@ export async function initializeDatabase() {
   `).catch((err) => {
     // eslint-disable-next-line no-console
     console.error('Failed to clean up orphaned records without team_id:', err);
+    throw err;
   });
 
   await pool.query(`
@@ -799,6 +821,7 @@ export async function initializeDatabase() {
   `).catch((err) => {
     // eslint-disable-next-line no-console
     console.error('Failed to enforce team ownership on workspace records:', err);
+    throw err;
   });
 
   await ensureConstraint(
@@ -808,6 +831,7 @@ export async function initializeDatabase() {
   ).catch((err) => {
     // eslint-disable-next-line no-console
     console.error('Failed to ensure teams workspace foreign key:', err);
+    throw err;
   });
 
   await ensureConstraint(
@@ -817,6 +841,7 @@ export async function initializeDatabase() {
   ).catch((err) => {
     // eslint-disable-next-line no-console
     console.error('Failed to ensure projects team foreign key:', err);
+    throw err;
   });
 
   await ensureConstraint(
@@ -826,6 +851,7 @@ export async function initializeDatabase() {
   ).catch((err) => {
     // eslint-disable-next-line no-console
     console.error('Failed to ensure cycles team foreign key:', err);
+    throw err;
   });
 
   await ensureConstraint(
@@ -835,6 +861,7 @@ export async function initializeDatabase() {
   ).catch((err) => {
     // eslint-disable-next-line no-console
     console.error('Failed to ensure labels project foreign key:', err);
+    throw err;
   });
 
   await ensureConstraint(
@@ -844,6 +871,7 @@ export async function initializeDatabase() {
   ).catch((err) => {
     // eslint-disable-next-line no-console
     console.error('Failed to ensure labels team foreign key:', err);
+    throw err;
   });
 
   if (!env.databaseUrl.startsWith('pgmem://')) {
@@ -874,6 +902,7 @@ export async function initializeDatabase() {
     `).catch((err) => {
       // eslint-disable-next-line no-console
       console.error('Failed to ensure flat workspace label scope guard:', err);
+      throw err;
     });
   }
 

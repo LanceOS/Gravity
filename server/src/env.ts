@@ -67,6 +67,8 @@ const envSchema = z.object({
     if (s === 'false' || s === '0' || s === '') return false;
     return v;
   }, z.boolean()).default(false),
+  REDIS_REQUIRED: z.enum(['true', 'false']).default('false'),
+  OBJECT_STORAGE_REQUIRED: z.enum(['true', 'false']).default('true'),
   REDIS_URL: z.string().default('redis://localhost:6379'),
   REDIS_ENABLED: z.preprocess((v) => {
     if (typeof v !== 'string') return v;
@@ -122,6 +124,8 @@ export const env = {
   mcpEventNamespace: parsed.MCP_EVENT_NAMESPACE || undefined,
   nodeEnv: parsed.NODE_ENV,
   allowEnvAiKeys: parsed.ALLOW_ENV_AI_KEYS,
+  redisRequired: parsed.REDIS_REQUIRED === 'true',
+  objectStorageRequired: parsed.OBJECT_STORAGE_REQUIRED === 'true',
   redisUrl: parsed.REDIS_URL,
   redisEnabled: parsed.REDIS_ENABLED,
   betterAuthOldSecrets: splitList(parsed.BETTER_AUTH_OLD_SECRETS),

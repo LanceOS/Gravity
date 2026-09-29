@@ -8,6 +8,8 @@ import { createAuthCompatibilityRouter } from './modules/auth/routes.js';
 import { bootstrapMcpRegistries } from './modules/mcp/bootstrap.js';
 import path from 'path';
 import { createOAuthAuthorizationRouter } from './modules/mcp/oauth.js';
+import { createHealthRouter } from './modules/health/routes.js';
+import { requireInitializedServer } from './lib/admission.js';
 import { isServerShuttingDown } from './lib/server-lifecycle.js';
 
 export { bootstrapMcpRegistries } from './modules/mcp/bootstrap.js';
@@ -53,6 +55,9 @@ export function createApp() {
       credentials: true,
     }),
   );
+
+  app.use('/api/v1', createHealthRouter());
+  app.use(requireInitializedServer);
 
   app.get('/', (_req, res) => {
     res.status(isServerShuttingDown() ? 503 : 200).json({

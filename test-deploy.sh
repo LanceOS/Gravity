@@ -113,7 +113,7 @@ if [[ "$ACTION" == "up" ]]; then
   fi
   
   log_info "Bringing up the stack in STATIC/TESTING mode (no hot-reloading)..."
-  exec $COMPOSE_CMD up --build "${ADDITIONAL_ARGS[@]}"
+  exec $COMPOSE_CMD up --build --wait --wait-timeout 180 "${ADDITIONAL_ARGS[@]}"
 else
   log_info "Stopping the stack..."
   exec $COMPOSE_CMD down "${ADDITIONAL_ARGS[@]}"

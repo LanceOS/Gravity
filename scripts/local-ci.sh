@@ -186,13 +186,13 @@ log 'Starting compose stack for smoke validation'
 compose up -d --build
 
 log 'Waiting for backend health endpoint'
-wait_for_url "${BACKEND_PUBLIC_URL}/api/v1/health"
+wait_for_url "${BACKEND_PUBLIC_URL}/api/v1/health/ready"
 
 log 'Waiting for frontend root page'
 wait_for_url "${FRONTEND_PUBLIC_URL}/"
 
 log 'Validating backend response payload'
-curl --fail --silent --show-error "${BACKEND_PUBLIC_URL}/api/v1/health" | grep '"status":"ok"' >/dev/null
+curl --fail --silent --show-error "${BACKEND_PUBLIC_URL}/api/v1/health/ready" | grep -E '"status":"(ok|degraded)"' >/dev/null
 
 log 'Validating frontend response payload'
 curl --fail --silent --show-error "${FRONTEND_PUBLIC_URL}/" | grep -i '<html' >/dev/null
