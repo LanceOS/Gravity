@@ -18,6 +18,7 @@ export interface ChatContextType {
   regenerate: () => Promise<void>;
   retry: () => Promise<void>;
   clearChat: () => void;
+  cancelGeneration: () => void;
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   setChatSessionId: (chatId: string) => void;
 }
@@ -77,9 +78,11 @@ async function postChatCompletionSse(
   projectId: string,
   chatId: string,
   payload: { message: string; provider: string; model?: string; context?: string },
+  signal: AbortSignal,
 ) {
   const response = await apiClient.raw(`/projects/${encodeURIComponent(projectId)}/chats/${encodeURIComponent(chatId)}/stream`, {
     method: 'POST',
+    signal,
     headers: { Accept: 'text/event-stream' },
     body: JSON.stringify(payload),
   });
@@ -157,6 +160,19 @@ export const ChatContextProvider: React.FC<ChatProviderProps> = ({
 
   const chatSessionIdRef = useRef(seedChatSessionId || '');
   const cloudContextVersionRef = useRef(0);
+  const activeGenerationRef = useRef<AbortController | null>(null);
+  const cancelGeneration = () => {
+    activeGenerationRef.current?.abort();
+    activeGenerationRef.current = null;
+    cloudContextVersionRef.current += 1;
+    setIsGenerating(false);
+  };
+
+  useEffect(() => () => {
+    activeGenerationRef.current?.abort();
+    activeGenerationRef.current = null;
+    cloudContextVersionRef.current += 1;
+  }, []);
   const lastProjectResetKeyRef = useRef(projectId ?? '');
 
   useEffect(() => {
@@ -165,6 +181,7 @@ export const ChatContextProvider: React.FC<ChatProviderProps> = ({
 
   useEffect(() => {
     const nextChatSessionId = seedChatSessionId || '';
+    if (nextChatSessionId !== chatSessionIdRef.current) cancelGeneration();
     chatSessionIdRef.current = nextChatSessionId;
     setChatSessionId(nextChatSessionId);
     setMessages(seedMessages && seedMessages.length > 0 ? seedMessages : getInitialMessages());
@@ -178,7 +195,7 @@ export const ChatContextProvider: React.FC<ChatProviderProps> = ({
     }
     lastProjectResetKeyRef.current = nextResetKey;
 
-    cloudContextVersionRef.current += 1;
+    cancelGeneration();
     chatSessionIdRef.current = '';
     setChatSessionId('');
     setErrorState(null);
@@ -223,7 +240,7 @@ export const ChatContextProvider: React.FC<ChatProviderProps> = ({
       .catch(console.error);
   }, [workspaceId]);
 
-  const ensureCloudChatSession = async (requestContextVersion: number) => {
+  const ensureCloudChatSession = async (requestContextVersion: number, signal: AbortSignal) => {
     const activeProjectId = projectId?.trim() || '';
     if (!activeProjectId) {
       throw new Error(CLOUD_PROJECT_REQUIRED_MESSAGE);
@@ -233,7 +250,7 @@ export const ChatContextProvider: React.FC<ChatProviderProps> = ({
       return chatSessionIdRef.current;
     }
 
-    const session = await apiClient.post<{ id?: string }>(`/projects/${encodeURIComponent(activeProjectId)}/chats`, {});
+    const session = await apiClient.post<{ id?: string }>(`/projects/${encodeURIComponent(activeProjectId)}/chats`, {}, { signal });
     if (!session.id) {
       throw new Error('Failed to create chat session.');
     }
@@ -254,7 +271,9 @@ export const ChatContextProvider: React.FC<ChatProviderProps> = ({
     autoRunMessages?: Message[],
     options: SendMessageOptions = {},
   ) => {
-    if (!autoRunMessages && (!textToSend.trim() || isGenerating)) return;
+    if (activeGenerationRef.current || !textToSend.trim()) return;
+    const controller = new AbortController();
+    activeGenerationRef.current = controller;
 
     setErrorState(null);
     const normalizedModelContext = options.modelContext?.trim();
@@ -265,12 +284,12 @@ export const ChatContextProvider: React.FC<ChatProviderProps> = ({
     };
     const newMessages: Message[] = autoRunMessages || [...messages, userMessage];
     setMessages(newMessages);
-    if (!autoRunMessages) setIsGenerating(true);
+    setIsGenerating(true);
     const requestContextVersion = cloudContextVersionRef.current;
 
     try {
       const activeProjectId = projectId?.trim() || '';
-      const chatId = await ensureCloudChatSession(requestContextVersion);
+      const chatId = await ensureCloudChatSession(requestContextVersion, controller.signal);
       if (cloudContextVersionRef.current !== requestContextVersion) {
         return;
       }
@@ -279,8 +298,8 @@ export const ChatContextProvider: React.FC<ChatProviderProps> = ({
         provider: settings.aiProvider,
         ...(model ? { model } : {}),
         ...(normalizedModelContext ? { context: normalizedModelContext } : {}),
-      });
-      if (cloudContextVersionRef.current !== requestContextVersion) {
+      }, controller.signal);
+      if (controller.signal.aborted || cloudContextVersionRef.current !== requestContextVersion) {
         return;
       }
       const aiResponse = doneEvent.message || '';
@@ -291,6 +310,7 @@ export const ChatContextProvider: React.FC<ChatProviderProps> = ({
         setMessages([...newMessages, { role: 'system', content: `Sorry, I got an empty response from ${getProviderName(settings.aiProvider)}.` }]);
       }
     } catch (error) {
+      if (controller.signal.aborted) return;
       const providerLabel = getProviderName(settings.aiProvider);
       console.error(error);
 
@@ -319,7 +339,8 @@ export const ChatContextProvider: React.FC<ChatProviderProps> = ({
       setErrorState(errorContent);
       setMessages([...newMessages, { role: 'system', content: errorContent }]);
     } finally {
-      if (!autoRunMessages) {
+      if (activeGenerationRef.current === controller) {
+        activeGenerationRef.current = null;
         setIsGenerating(false);
       }
     }
@@ -350,6 +371,7 @@ export const ChatContextProvider: React.FC<ChatProviderProps> = ({
   };
 
   const clearChat = () => {
+    cancelGeneration();
     setMessages(getInitialMessages());
     setErrorState(null);
   };
@@ -367,8 +389,13 @@ export const ChatContextProvider: React.FC<ChatProviderProps> = ({
     regenerate,
     retry,
     clearChat,
+    cancelGeneration,
     setMessages,
-    setChatSessionId,
+    setChatSessionId: (id) => {
+      if (id !== chatSessionIdRef.current) cancelGeneration();
+      chatSessionIdRef.current = id;
+      setChatSessionId(id);
+    },
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

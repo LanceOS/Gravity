@@ -94,6 +94,7 @@ export class AiService {
     this.getProvider(provider);
 
     return this.withProviderCredential(userId, provider, async (decryptedKey) => {
+      options.signal?.throwIfAborted();
       const providerInst = this.getProvider(provider);
       return providerInst.chat({ ...options, apiKey: decryptedKey });
     });

@@ -19,6 +19,7 @@ export class AnthropicProvider implements IAiProvider {
       'https://api.anthropic.com/v1/messages',
       {
         method: 'POST',
+        signal: options.signal,
         headers: {
           'Content-Type': 'application/json',
           'x-api-key': apiKey,
@@ -34,7 +35,7 @@ export class AnthropicProvider implements IAiProvider {
         }),
       },
       60000,
-      3, // 3 retries with exponential backoff for chat
+      0, // Never retry billable generations implicitly.
     );
 
     if (!response.ok) {
@@ -79,6 +80,7 @@ export class AnthropicProvider implements IAiProvider {
     if (!response.ok) {
       throw new Error(await readErrorMessage(response, 'Anthropic API key test failed.'));
     }
+    await response.body?.cancel();
   }
 
   async fetchModels(apiKey: string): Promise<string[]> {

@@ -1,51 +1,105 @@
-/**
- * Performs an HTTP fetch request with a specified timeout and exponential backoff retry.
- * @param {string} url - The URL to request.
- * @param {RequestInit} init - Standard fetch request parameters.
- * @param {number} timeoutMs - Timeout in milliseconds.
- * @param {number} maxRetries - Maximum number of retry attempts for network/timeout errors or transient codes (429, 5xx).
- * @return {Promise<Response>} The fetch response.
- */
+/** Wait for I/O without losing caller cancellation while it is pending. */
+export function withAbort<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const abort = () => { cleanup(); reject(signal.reason); };
+    const cleanup = () => signal.removeEventListener('abort', abort);
+    signal.addEventListener('abort', abort, { once: true });
+    operation.then(value => { cleanup(); resolve(value); }, error => { cleanup(); reject(error); });
+    if (signal.aborted) abort();
+  });
+}
+
+/** One deadline covers headers, retries, backoff and consumption of the body. */
 export async function fetchWithTimeout(
   url: string,
   init: RequestInit = {},
   timeoutMs = 10000,
   maxRetries = 0,
 ): Promise<Response> {
-  let attempt = 0;
-  while (true) {
-    attempt++;
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-
-    try {
-      const response = await fetch(url, { ...init, signal: controller.signal });
-      
-      const isTransient = response.status === 429 || [502, 503, 504].includes(response.status);
-      if (isTransient && attempt <= maxRetries) {
-        const delay = Math.min(10000, 500 * Math.pow(2, attempt - 1)) + Math.random() * 200;
-        clearTimeout(timer);
-        await new Promise((resolve) => setTimeout(resolve, delay));
+  const controller = new AbortController();
+  const abort = () => controller.abort(init.signal?.reason);
+  init.signal?.addEventListener('abort', abort, { once: true });
+  if (init.signal?.aborted) abort();
+  const timer = setTimeout(() => controller.abort(new DOMException('Provider timed out', 'TimeoutError')), timeoutMs);
+  timer.unref?.();
+  const cleanup = () => {
+    clearTimeout(timer);
+    init.signal?.removeEventListener('abort', abort);
+  };
+  const signal = controller.signal;
+  try {
+    for (let attempt = 0; ; attempt++) {
+      signal.throwIfAborted();
+      let response: Response;
+      try {
+        response = await withAbort(fetch(url, { ...init, signal }).then(result => {
+          // A transport may resolve headers concurrently with cancellation.
+          if (signal.aborted) void result.body?.cancel(signal.reason).catch(() => {});
+          return result;
+        }), signal);
+      } catch (error) {
+        signal.throwIfAborted();
+        if (attempt >= maxRetries) throw error;
+        await backoff(attempt, signal);
         continue;
       }
-      
-      clearTimeout(timer);
-      return response;
-    } catch (error) {
-      const isAbort = error instanceof DOMException && error.name === 'AbortError';
-      const isNetwork = error instanceof Error && !isAbort;
-      
-      if ((isAbort || isNetwork) && attempt <= maxRetries) {
-        const delay = Math.min(10000, 500 * Math.pow(2, attempt - 1)) + Math.random() * 200;
-        clearTimeout(timer);
-        await new Promise((resolve) => setTimeout(resolve, delay));
+      if ((response.status === 429 || [502, 503, 504].includes(response.status)) && attempt < maxRetries) {
+        if (response.body) await withAbort(response.body.cancel(), signal);
+        await backoff(attempt, signal);
         continue;
       }
-      
-      clearTimeout(timer);
-      throw error;
+      if (!response.body) { cleanup(); return response; }
+      const reader = response.body.getReader();
+      let finished = false;
+      const finish = () => {
+        finished = true;
+        cleanup();
+        signal.removeEventListener('abort', abortBody);
+      };
+      let bodyController: ReadableStreamDefaultController<Uint8Array>;
+      const abortBody = () => {
+        if (finished) return;
+        finish();
+        bodyController.error(signal.reason);
+        void reader.cancel(signal.reason).catch(() => {});
+      };
+      const body = new ReadableStream<Uint8Array>({
+        start(streamController) {
+          bodyController = streamController;
+          signal.addEventListener('abort', abortBody, { once: true });
+          if (signal.aborted) abortBody();
+        },
+        async pull(streamController) {
+          try {
+            const { done, value } = await reader.read();
+            if (finished) return;
+            if (done) { finish(); streamController.close(); }
+            else streamController.enqueue(value);
+          } catch (error) {
+            if (!finished) { finish(); streamController.error(error); }
+          }
+        },
+        cancel(reason) {
+          finish();
+          controller.abort(reason);
+          void reader.cancel(reason).catch(() => {});
+        },
+      });
+      return new Response(body, { status: response.status, statusText: response.statusText, headers: response.headers });
     }
+  } catch (error) {
+    cleanup();
+    throw error;
   }
+}
+
+async function backoff(attempt: number, signal: AbortSignal) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await withAbort(new Promise<void>(resolve => {
+      timer = setTimeout(resolve, Math.min(10000, 500 * 2 ** attempt) + Math.random() * 200);
+    }), signal);
+  } finally { clearTimeout(timer); }
 }
 
 /**

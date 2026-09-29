@@ -10,6 +10,8 @@ import { executeTool as defaultExecuteTool } from '../../mcp/tool-executor.js';
 import { getDisabledTools } from '../../mcp/workspace-tools.js';
 import { getAvailableTools, isToolDisabled } from '../../mcp/policy.js';
 import { McpToolValidationError } from '../../mcp/errors.js';
+import { withAbort } from '../../ai/utils/utils.js';
+import { acquireGeneration, GenerationBudget, GenerationLimitError } from '../../ai/utils/generation-budget.js';
 import type { McpToolDefinition } from '../../mcp/types.js';
 
 type ChatProvider = 'openai' | 'anthropic' | 'gemini' | 'deepseek';
@@ -23,6 +25,7 @@ type AiClient = {
       messages: Message[];
       tools?: any[];
       maxTokens?: number;
+      signal?: AbortSignal;
       onChunk?: (chunk: string) => Promise<void> | void;
     },
   ): Promise<{ content: string; toolCalls?: any[] }>;
@@ -44,6 +47,7 @@ type ChatGenerationInput = {
   provider?: string;
   model?: string;
   maxTokens?: number;
+  signal?: AbortSignal;
   onChunk?: (chunk: string) => Promise<void> | void;
   requireStreamingProvider?: boolean;
 };
@@ -251,7 +255,32 @@ export class ChatService {
   }
 
   async generateResponse(input: ChatGenerationInput): Promise<ChatGenerationResult> {
-    const context = await this.loadContext(input.projectId, input.chatId, input.userId);
+    const release = acquireGeneration(input.userId, input.chatId);
+    const budget = new GenerationBudget(input.signal);
+    let authorized = false;
+    try {
+      const context = await this.loadContext(input.projectId, input.chatId, input.userId);
+      authorized = true;
+      budget.signal.throwIfAborted();
+      return await this.generateTurn(input, context, budget);
+    } catch (error) {
+      if (authorized) {
+        const canceled = budget.signal.aborted && budget.signal.reason?.name === 'AbortError';
+        await this.appendMessage(input.chatId, 'assistant',
+          canceled ? 'Generation canceled. Any actions already completed remain in effect.'
+            : 'Generation failed. Any actions already completed remain in effect.', {
+            source: 'ai', status: canceled ? 'canceled' : 'failed',
+            fallback: true, fallbackReason: canceled ? 'canceled' : this.toFallbackReason(error),
+          });
+      }
+      throw error;
+    } finally {
+      budget.dispose();
+      release();
+    }
+  }
+
+  private async generateTurn(input: ChatGenerationInput, context: ProjectContext, budget: GenerationBudget): Promise<ChatGenerationResult> {
     const settings = await getUserSettingsRecord(input.userId);
 
     const resolvedProvider = this.resolveProvider(input.provider, settings.aiProvider);
@@ -278,6 +307,7 @@ export class ChatService {
       const hasUserMessage = conversationRows.some((row) => row.role === 'user');
       isFirstUserMessage = !hasUserMessage;
 
+      budget.signal.throwIfAborted();
       insertedUserMessage = await this.appendMessage(input.chatId, 'user', userMessageText, {
           source: 'chat-client',
           provider: resolvedProvider,
@@ -286,6 +316,7 @@ export class ChatService {
       insertedUserMessageId = insertedUserMessage.id;
       conversationRows.push(insertedUserMessage);
 
+      budget.signal.throwIfAborted();
       await db
         .update(chatSessions)
         .set({ updatedAt: new Date() })
@@ -294,6 +325,7 @@ export class ChatService {
       if (isFirstUserMessage && context.session.title === CHAT_TITLE_DEFAULT) {
         const derivedTitle = this.buildChatTitleFromMessage(userMessageText);
         if (derivedTitle) {
+          budget.signal.throwIfAborted();
           await db
             .update(chatSessions)
             .set({ title: derivedTitle })
@@ -350,7 +382,9 @@ export class ChatService {
       }),
     ];
 
+    budget.signal.throwIfAborted();
     const modelResult = await this.generateWithToolLoop({
+      budget,
       userId: input.userId,
       chatId: input.chatId,
       workspaceId: context.project.workspaceId,
@@ -366,11 +400,14 @@ export class ChatService {
     if (input.onChunk && supportsStreaming && modelResult.streamed === false && modelResult.content.length > 0) {
       const chunkSize = Math.max(1, env.aiStreamChunkSize ?? 48);
       for (let i = 0; i < modelResult.content.length; i += chunkSize) {
+        budget.signal.throwIfAborted();
         await input.onChunk(modelResult.content.slice(i, i + chunkSize));
       }
     }
 
+    budget.signal.throwIfAborted();
     const assistant = await this.appendMessage(input.chatId, 'assistant', modelResult.content, {
+      status: modelResult.fallback ? 'failed' : 'completed',
       source: 'ai',
       provider: resolvedProvider,
       model: resolvedModel,
@@ -510,6 +547,7 @@ Only operate in the workspace/project above.`,
   }
 
   private async generateWithToolLoop(params: {
+    budget: GenerationBudget;
     userId: string;
     chatId: string;
     workspaceId: string;
@@ -526,6 +564,7 @@ Only operate in the workspace/project above.`,
     const forwardChunk =
       params.onChunk && params.enableStreaming
         ? async (chunk: string) => {
+            params.budget.signal.throwIfAborted();
             streamedFromModel = true;
             await params.onChunk?.(chunk);
           }
@@ -533,7 +572,7 @@ Only operate in the workspace/project above.`,
 
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
       try {
-        const modelResponse = await this.ai.chat(params.userId, params.provider, {
+        const modelResponse = await this.callModel(params, {
           model: params.model,
           messages,
           tools: params.toolDefinitions,
@@ -561,25 +600,26 @@ Only operate in the workspace/project above.`,
 
         const calls = modelResponse.toolCalls.map((call) => ({ ...call }));
         messages = [...messages, { role: 'assistant', content: modelResponse.content || '', tool_calls: calls }];
-        const toolResults: Array<{ id: string; name: string; result: unknown }> = [];
         for (const toolCall of calls) {
-          const toolOutput = await this.safeExecuteTool(params.userId, params.workspaceId, toolCall);
+          params.budget.reserveToolCall();
+          const toolOutput = await this.safeExecuteTool(params.userId, params.workspaceId, toolCall, params.budget.signal);
+          // Persist before checking cancellation: an in-flight mutation can
+          // commit after disconnect and must never be described as rolled back.
+          await this.appendMessage(params.chatId, 'system',
+            `Tool output (${toolCall.name}): ${safeStringify(toolOutput.result)}`, {
+              source: 'tool', toolCall, toolCalls: [toolCall],
+              toolResults: [{ id: toolCall.id, name: toolCall.name, result: toolOutput.result }],
+            });
+          params.budget.signal.throwIfAborted();
           messages = [...messages, {
             role: 'tool', name: toolCall.name,
             content: safeStringify(toolOutput.result), tool_call_id: toolCall.id,
           }];
-          toolResults.push({ id: toolCall.id, name: toolCall.name, result: toolOutput.result });
         }
-        // Storage role is retained for backwards-compatible clients; replay above
-        // reconstructs typed tool exchanges and never forwards it as system data.
-        await this.appendMessage(params.chatId, 'system',
-          `Tool output (${calls.map((call) => call.name).join(', ')}): ${safeStringify(toolResults.map((entry) => entry.result))}`, {
-            source: 'tool', toolCalls: calls, toolResults,
-            ...(calls.length === 1 ? { toolCall: calls[0] } : {}),
-          });
 
         continue;
       } catch (error) {
+        params.budget.signal.throwIfAborted();
         return {
           content: this.toFallbackContent(error),
           toolCalls: undefined,
@@ -598,6 +638,7 @@ Only operate in the workspace/project above.`,
 
   private async synthesizeFinalAnswer(
     params: {
+      budget: GenerationBudget;
       userId: string;
       provider: ChatProvider;
       model: string;
@@ -609,7 +650,7 @@ Only operate in the workspace/project above.`,
     getStreamedFromModel: () => boolean,
   ): Promise<ChatModelResult> {
     try {
-      const finalResponse = await this.ai.chat(params.userId, params.provider, {
+      const finalResponse = await this.callModel(params, {
         model: params.model,
         messages,
         // No tools — force a text-only response
@@ -635,6 +676,7 @@ Only operate in the workspace/project above.`,
         streamed: params.enableStreaming ? getStreamedFromModel() : false,
       };
     } catch (error) {
+      params.budget.signal.throwIfAborted();
       return {
         content: this.toFallbackContent(error),
         toolCalls: undefined,
@@ -645,10 +687,22 @@ Only operate in the workspace/project above.`,
     }
   }
 
+  private async callModel(
+    params: { userId: string; provider: ChatProvider; budget: GenerationBudget },
+    options: Parameters<AiClient['chat']>[2],
+  ) {
+    const maxTokens = params.budget.reserveProviderCall(options);
+    const signal = params.budget.signal;
+    const result = await withAbort(this.ai.chat(params.userId, params.provider, { ...options, maxTokens, signal }), signal);
+    signal.throwIfAborted();
+    return result;
+  }
+
   private async safeExecuteTool(
     userId: string,
     workspaceId: string,
     call: { id: string; name: string; arguments: unknown },
+    signal: AbortSignal,
   ) {
     try {
       const args = this.normalizeToolArgs(call.arguments);
@@ -656,6 +710,7 @@ Only operate in the workspace/project above.`,
       if (isToolDisabled(call.name, disabled)) {
         throw new Error(`MCP tool "${call.name}" is disabled in this workspace.`);
       }
+      signal.throwIfAborted();
       const result = await this.executeToolFn(call.name, args as Record<string, unknown>, workspaceId, userId);
       return {
         toolCallId: call.id,
@@ -737,6 +792,7 @@ Only operate in the workspace/project above.`,
   }
 
   private toFallbackReason(error: unknown) {
+    if (error instanceof GenerationLimitError) return error.reason;
     if (isTimeoutError(error)) {
       return 'timeout';
     }
@@ -750,6 +806,12 @@ Only operate in the workspace/project above.`,
 
   private toFallbackContent(error: unknown) {
     const reason = this.toFallbackReason(error);
+    if (reason === 'tool_limit' || reason === 'provider_call_limit') {
+      return 'I reached the generation action limit. Any actions already completed remain in effect.';
+    }
+    if (reason === 'input_limit') {
+      return 'The conversation or tool results exceeded the request size limit. Please start a shorter conversation. Any actions already completed remain in effect.';
+    }
     if (reason === 'timeout') {
       return 'The AI request timed out. Please try again.';
     }

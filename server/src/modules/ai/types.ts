@@ -12,6 +12,7 @@ export interface ChatOptions {
   tools?: any[];
   apiKey?: string;
   maxTokens?: number;
+  signal?: AbortSignal;
   onChunk?: (chunk: string) => Promise<void> | void;
 }
 

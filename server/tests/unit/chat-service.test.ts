@@ -800,3 +800,135 @@ describe('ChatService MCP integration regressions', () => {
     expect(parts).toContainEqual(expect.objectContaining({ functionResponse: expect.objectContaining({ id: 'gemini-call', name: 'list_tickets' }) }));
   });
 });
+
+describe('generation cancellation and budgets', () => {
+  afterEach(() => { mcpToolsList.splice(0); vi.useRealTimers(); });
+
+  async function rows(chatId: string) {
+    return db.select().from(chatMessages).where(eq(chatMessages.sessionId, chatId));
+  }
+
+  it('cancels a pending provider and persists canceled state without a tool round', async () => {
+    const fixture = await createChatFixture();
+    const controller = new AbortController();
+    let started!: () => void;
+    const waiting = new Promise<void>(resolve => { started = resolve; });
+    let providerSignal: AbortSignal | undefined;
+    const ai = { chat: vi.fn(async (_user, _provider, options) => {
+      providerSignal = options.signal;
+      started();
+      return new Promise<{ content: string }>(() => {});
+    }) };
+    const executeTool = vi.fn();
+    const service = new ChatService({ ai, executeTool });
+    const generation = service.generateResponse({ ...fixture, message: 'Start', signal: controller.signal });
+    const rejected = expect(generation).rejects.toMatchObject({ name: 'AbortError' });
+    await waiting;
+    controller.abort();
+    await rejected;
+    expect(providerSignal?.aborted).toBe(true);
+    expect(ai.chat).toHaveBeenCalledOnce();
+    expect(executeTool).not.toHaveBeenCalled();
+    expect((await rows(fixture.chatId)).find(row => asJsonMetadata(row.metadata).status === 'canceled')?.content)
+      .toContain('already completed remain in effect');
+    // The concurrency slot is released even when the provider stub never settles.
+    const next = await new ChatService({ ai: { chat: vi.fn().mockResolvedValue({ content: 'Done' }) } })
+      .generateResponse({ ...fixture, message: 'Retry' });
+    expect(next.content).toBe('Done');
+    expect((await rows(fixture.chatId)).some(row => asJsonMetadata(row.metadata).status === 'completed')).toBe(true);
+  });
+
+  it('preserves a committed tool and starts no further tool or provider after cancellation', async () => {
+    const fixture = await createChatFixture();
+    const controller = new AbortController();
+    const ai = { chat: vi.fn().mockResolvedValue({ content: '', toolCalls: [
+      { id: 'first', name: 'create_ticket', arguments: {} },
+      { id: 'second', name: 'create_ticket', arguments: {} },
+    ] }) };
+    const executeTool = vi.fn(async () => { controller.abort(); return { id: 'committed-ticket' }; });
+    await expect(new ChatService({ ai, executeTool }).generateResponse({ ...fixture, message: 'Create', signal: controller.signal }))
+      .rejects.toMatchObject({ name: 'AbortError' });
+    expect(executeTool).toHaveBeenCalledOnce();
+    expect(ai.chat).toHaveBeenCalledOnce();
+    const stored = await rows(fixture.chatId);
+    expect(stored.find(row => asJsonMetadata(row.metadata).source === 'tool')?.content).toContain('committed-ticket');
+    expect(stored.filter(row => asJsonMetadata(row.metadata).status === 'canceled')).toHaveLength(1);
+  });
+
+  it('retains the concurrency slot until an in-flight tool settles after disconnect', async () => {
+    const fixture = await createChatFixture();
+    const controller = new AbortController();
+    let started!: () => void;
+    let finish!: (result: unknown) => void;
+    const waiting = new Promise<void>(resolve => { started = resolve; });
+    const ai = { chat: vi.fn().mockResolvedValue({ content: '', toolCalls: [{ id: 'one', name: 'create_ticket', arguments: {} }] }) };
+    const executeTool = vi.fn(() => { started(); return new Promise(resolve => { finish = resolve; }); });
+    const service = new ChatService({ ai, executeTool });
+    const generation = service.generateResponse({ ...fixture, message: 'Create', signal: controller.signal });
+    const rejected = expect(generation).rejects.toMatchObject({ name: 'AbortError' });
+    await waiting;
+    controller.abort();
+    await expect(service.generateResponse({ ...fixture, message: 'Duplicate' })).rejects.toThrow('concurrency limit');
+    finish({ id: 'committed-after-disconnect' });
+    await rejected;
+    expect((await rows(fixture.chatId)).find(row => asJsonMetadata(row.metadata).source === 'tool')?.content)
+      .toContain('committed-after-disconnect');
+    expect(ai.chat).toHaveBeenCalledOnce();
+  });
+
+  it('does not start another provider round after the final tool in a round cancels', async () => {
+    const fixture = await createChatFixture();
+    const controller = new AbortController();
+    const ai = { chat: vi.fn().mockResolvedValue({ content: '', toolCalls: [{ id: 'one', name: 'list_tickets', arguments: {} }] }) };
+    const executeTool = vi.fn(async () => { controller.abort(); return []; });
+    await expect(new ChatService({ ai, executeTool }).generateResponse({ ...fixture, message: 'List', signal: controller.signal }))
+      .rejects.toMatchObject({ name: 'AbortError' });
+    expect(ai.chat).toHaveBeenCalledOnce();
+    expect(executeTool).toHaveBeenCalledOnce();
+  });
+
+  it('enforces the deadline while a provider is waiting and records failed rather than canceled', async () => {
+    const fixture = await createChatFixture();
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    let started!: () => void;
+    const waiting = new Promise<void>(resolve => { started = resolve; });
+    const ai = { chat: vi.fn(async () => { started(); return new Promise<{ content: string }>(() => {}); }) };
+    const generation = new ChatService({ ai }).generateResponse({ ...fixture, message: 'Wait' });
+    const rejected = expect(generation).rejects.toMatchObject({ name: 'TimeoutError' });
+    await waiting;
+    await vi.advanceTimersByTimeAsync(120000);
+    await rejected;
+    const stored = await rows(fixture.chatId);
+    expect(stored.find(row => asJsonMetadata(row.metadata).status === 'failed')?.metadata)
+      .toMatchObject({ fallbackReason: 'timeout' });
+  });
+
+  it('clamps client token allowances and stops oversized tool batches at twelve calls', async () => {
+    const fixture = await createChatFixture();
+    const ai = { chat: vi.fn().mockResolvedValue({ content: '', toolCalls: Array.from({ length: 20 }, (_, i) =>
+      ({ id: `call-${i}`, name: 'list_tickets', arguments: {} })) }) };
+    const executeTool = vi.fn().mockResolvedValue([]);
+    const result = await new ChatService({ ai, executeTool }).generateResponse({ ...fixture, message: 'List', maxTokens: 999999999 });
+    expect(ai.chat.mock.calls[0][2].maxTokens).toBe(4096);
+    expect(ai.chat).toHaveBeenCalledOnce();
+    expect(executeTool).toHaveBeenCalledTimes(12);
+    expect(result.fallbackReason).toBe('tool_limit');
+    expect(result.fallback).toBe(true);
+    expect((await rows(fixture.chatId)).find(row => asJsonMetadata(row.metadata).status === 'failed')).toBeDefined();
+  });
+
+  it('rejects simultaneous generations for the same chat before starting provider work', async () => {
+    const fixture = await createChatFixture();
+    const controller = new AbortController();
+    let started!: () => void;
+    const waiting = new Promise<void>(resolve => { started = resolve; });
+    const ai = { chat: vi.fn(async () => { started(); return new Promise<{ content: string }>(() => {}); }) };
+    const generation = new ChatService({ ai }).generateResponse({ ...fixture, message: 'Start', signal: controller.signal });
+    const rejected = expect(generation).rejects.toMatchObject({ name: 'AbortError' });
+    await waiting;
+    await expect(new ChatService({ ai }).generateResponse({ ...fixture, message: 'Duplicate' })).rejects.toThrow('concurrency limit');
+    controller.abort();
+    await rejected;
+    expect(ai.chat).toHaveBeenCalledOnce();
+  });
+});
