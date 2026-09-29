@@ -13,6 +13,10 @@ function buildSearchVector(title: string, excerpt: string) {
 }
 
 export class MetadataRepository {
+  static async listNotesForMediaCleanup() {
+    return db.select().from(noteMetadata);
+  }
+
   /**
    * Creates a new note metadata record.
    */

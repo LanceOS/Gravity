@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { MetadataRepository, NotesRepository, NoteRevisionRepository, isNoteBodyFile } from '../repositories.js';
+import { MetadataRepository, NotesRepository, NoteRevisionRepository } from '../repositories.js';
 import { RustFS } from '../../../lib/rustfs.js';
+import { cleanupMedia, type CleanupOptions, type MediaCleanupDependencies } from './media-cleanup.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -8,11 +9,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 type NoteMetadata = NonNullable<Awaited<ReturnType<typeof MetadataRepository.getNoteMetadata>>>;
 
-export type NoteCleanupDependencies = {
+export type NoteCleanupDependencies = MediaCleanupDependencies & {
   getMetadata: (id: string) => Promise<NoteMetadata | null>;
-  getBody: (bucketPath: string, bodyKey?: string) => Promise<string>;
-  listFiles: (bucketPath: string) => Promise<string[]>;
-  deleteFile: (bucketPath: string, filename: string) => Promise<void>;
 };
 
 function extractRichTextExcerpt(body: string): string | null {
@@ -188,56 +186,24 @@ export class NoteCleanupService {
   constructor(dependencies?: Partial<NoteCleanupDependencies>) {
     this.dependencies = {
       getMetadata: MetadataRepository.getNoteMetadata,
+      listNotes: MetadataRepository.listNotesForMediaCleanup,
       getBody: NotesRepository.getBody,
+      statFile: (bucket, file) => RustFS.statFile(bucket, file),
       listFiles: RustFS.listFiles,
-      deleteFile: NotesRepository.deleteFile,
+      deleteFile: (bucket, file, etag) => RustFS.deleteFile(bucket, file, etag),
       ...dependencies,
     };
   }
 
-  async cleanupNoteMedia(noteId: string, projectId: string): Promise<{
-    cleanedFiles: string[];
-    deadLinks: string[];
-  }> {
+  async cleanupNoteMedia(noteId: string, projectId: string, options: CleanupOptions = {}) {
     const metadata = await this.dependencies.getMetadata(noteId);
-    if (!metadata || metadata.projectId !== projectId) {
-      throw new Error('NOT_FOUND');
-    }
-
-    let body = '';
-    try {
-      body = await this.dependencies.getBody(metadata.bucketPath, metadata.bodyKey);
-    } catch (e: any) {
-      if (e.code !== 'ENOENT' || metadata.bodyKey !== 'body.md') throw e;
-    }
-
-    const allFiles = await this.dependencies.listFiles(metadata.bucketPath);
-    const mediaFiles = allFiles.filter((f) => !isNoteBodyFile(f));
-    const mediaFileSet = new Set(mediaFiles);
-
-    // Find all file references in the body (e.g. /api/v1/notes/:noteId/media/:filename)
-    const referencePattern = new RegExp(`/api/v1/notes/${noteId}/media/([^\\s)"]+)`, 'g');
-    const referencedFiles = new Set<string>();
-    let match;
-    while ((match = referencePattern.exec(body)) !== null) {
-      try {
-        referencedFiles.add(decodeURIComponent(match[1]));
-      } catch {
-        referencedFiles.add(match[1]);
-      }
-    }
-
-    const orphanedFiles = mediaFiles.filter((file) => !referencedFiles.has(file));
-    const deadLinks = [...referencedFiles].filter((file) => !mediaFileSet.has(file));
-
-    // Keep deletion concurrency bounded even for multi-page inventories.
-    for (const file of orphanedFiles) {
-      await this.dependencies.deleteFile(metadata.bucketPath, file);
-    }
-
+    if (!metadata || metadata.projectId !== projectId) throw new Error('NOT_FOUND');
+    const result = await cleanupMedia(this.dependencies, options, metadata);
     return {
-      cleanedFiles: orphanedFiles,
-      deadLinks,
+      cleanedFiles: result.deleted.map(entry => entry.file),
+      orphanedFiles: result.orphanedFound.map(entry => entry.file),
+      deferredFiles: result.deferred.map(entry => entry.file),
+      deadLinks: result.deadLinks,
     };
   }
 }
@@ -248,8 +214,8 @@ export function createNoteCleanupService(dependencies?: Partial<NoteCleanupDepen
   return new NoteCleanupService(dependencies);
 }
 
-export async function cleanupNoteMedia(noteId: string, projectId: string) {
-  return noteCleanupService.cleanupNoteMedia(noteId, projectId);
+export async function cleanupNoteMedia(noteId: string, projectId: string, options: CleanupOptions = {}) {
+  return noteCleanupService.cleanupNoteMedia(noteId, projectId, options);
 }
 
 // Never delete on an ambiguous DB failure alone: the transaction may have

@@ -393,13 +393,16 @@ export function createNotesRouter() {
 
     try {
       const noteId = normalizeRouteParam(req.params.noteId);
-      const result = await cleanupNoteMedia(noteId, projectId);
+      const result = await cleanupNoteMedia(noteId, projectId, { dryRun: req.query.dryRun === 'true' });
       res.json(result);
     } catch (error: any) {
       if (error.message === 'NOT_FOUND') {
         res.status(404).json({ error: 'Note not found.' });
       } else {
-        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to cleanup media.' });
+        // The global scan can fail on a note outside the caller's project.
+        // Keep its identifiers and storage path in server diagnostics only.
+        console.error('Note media cleanup blocked', error);
+        res.status(500).json({ error: 'Media cleanup blocked; see server diagnostics.' });
       }
     }
   });

@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { RustFS } from '../src/lib/rustfs.js';
 import { api, createAuthenticatedApi, seedWorkspaceFixture } from './helpers/test-helpers.js';
 
 describe('notes routes', () => {
@@ -96,6 +97,37 @@ describe('notes routes', () => {
       .get(`/api/v1/notes/${noteId}`)
       .set('x-project-id', project.id);
     expect(getDeletedResponse.status).toBe(404);
+  });
+
+  it('supports cleanup dry run, preserves recent uploads, and reports missing bodies', async () => {
+    const ownerApi = await createAuthenticatedApi({ name: 'Cleanup Owner', email: 'cleanup@example.com', role: 'owner' });
+    const { project } = await seedWorkspaceFixture({ owner: {
+      id: ownerApi.user.id, name: ownerApi.user.name, email: ownerApi.user.email,
+      role: 'owner', avatarUrl: ownerApi.user.avatar,
+    } });
+    const created = await ownerApi.post('/api/v1/notes').set('x-project-id', project.id)
+      .send({ title: 'Cleanup', body: 'No attachment yet' });
+    expect(created.status).toBe(201);
+    const { id, bucketPath } = created.body;
+    await RustFS.saveFile(bucketPath, 'pending.png', 'pending upload');
+    const remove = vi.spyOn(RustFS, 'deleteFile');
+    const stat = vi.spyOn(RustFS, 'statFile').mockResolvedValue({ lastModified: new Date(), etag: 'new' });
+    const dry = await ownerApi.post(`/api/v1/notes/${id}/cleanup?dryRun=true`).set('x-project-id', project.id);
+    expect(dry.status).toBe(200);
+    expect(dry.body).toMatchObject({ cleanedFiles: [], orphanedFiles: ['pending.png'] });
+    expect(remove).not.toHaveBeenCalled();
+    expect(stat).not.toHaveBeenCalled();
+    const cleanup = await ownerApi.post(`/api/v1/notes/${id}/cleanup`).set('x-project-id', project.id);
+    expect(cleanup.status).toBe(200);
+    expect(cleanup.body).toMatchObject({ cleanedFiles: [], deferredFiles: ['pending.png'] });
+    expect(remove).not.toHaveBeenCalled();
+    vi.spyOn(RustFS, 'readFileUtf8').mockRejectedValue(Object.assign(new Error('missing'), { code: 'ENOENT' }));
+    const diagnostic = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const missing = await ownerApi.post(`/api/v1/notes/${id}/cleanup`).set('x-project-id', project.id);
+    expect(missing.status).toBe(500);
+    expect(missing.body.error).toBe('Media cleanup blocked; see server diagnostics.');
+    expect(diagnostic).toHaveBeenCalledWith('Note media cleanup blocked', expect.objectContaining({ message: expect.stringContaining(`cannot read or parse body for note ${id}`) }));
+    expect(remove).not.toHaveBeenCalled();
   });
 
   it('enforces workspace/project authorization', async () => {

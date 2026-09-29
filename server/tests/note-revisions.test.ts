@@ -125,10 +125,10 @@ describe('immutable note revisions', () => {
     await db.update(noteBodyRevisions).set({ createdAt: new Date(0) }).where(eq(noteBodyRevisions.bodyKey, old));
     await NotesRepository.saveBody('orphaned-create', 'uncommitted', old);
     await NotesRepository.saveBody('active-create', 'pending', recent);
-    expect(await recoverAbandonedNoteRevisions(true)).toHaveLength(1);
+    expect((await runCleanup(true)).abandonedRevisions).toHaveLength(1);
     expect(await NotesRepository.getBody('orphaned-create', old)).toBe('uncommitted');
     expect((await revisions()).every(r => r.state === 'pending')).toBe(true);
-    await recoverAbandonedNoteRevisions();
+    expect((await runCleanup()).abandonedRevisions).toHaveLength(1);
     await expect(NotesRepository.getBody('orphaned-create', old)).rejects.toThrow('ENOENT');
     expect(await NotesRepository.getBody('active-create', recent)).toBe('pending');
   });
@@ -218,8 +218,14 @@ describe('immutable note revisions', () => {
     await NotesRepository.deleteFile(note.bucketPath, note.bodyKey);
     await expect(getNote(note.id, 'project')).rejects.toThrow('ENOENT');
     const remove = vi.spyOn(RustFS, 'deleteFile');
-    await expect(cleanupNoteMedia(note.id, 'project')).rejects.toThrow('ENOENT');
-    await expect(runCleanup()).rejects.toThrow('ENOENT');
+    await expect(cleanupNoteMedia(note.id, 'project')).rejects.toMatchObject({
+      message: expect.stringContaining(`cannot read or parse body for note ${note.id}`),
+      cause: expect.objectContaining({ code: 'ENOENT' }),
+    });
+    await expect(runCleanup()).rejects.toMatchObject({
+      message: expect.stringContaining(`cannot read or parse body for note ${note.id}`),
+      cause: expect.objectContaining({ code: 'ENOENT' }),
+    });
     expect(remove).not.toHaveBeenCalled();
   });
 });
