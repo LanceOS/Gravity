@@ -1,3 +1,4 @@
+import { createDateSortCache } from './dateSortCache';
 import type { Cycle, Label, Project, Ticket, User } from '../../../context/TicketContextContext';
 import { normalizeSearchTerm, normalizeSearchToken } from '../../../utils/search';
 import { BOARD_COLUMNS, LIST_STATUS_ORDER } from '../../../utils/ticketOptions';
@@ -42,7 +43,7 @@ interface TicketSearchIndex {
 }
 
 const ticketSearchCache = new WeakMap<Ticket, TicketSearchIndex>();
-const dateParseCache = new Map<string, number | null>();
+const dateParseCache = createDateSortCache();
 
 function getSearchIndex(ticket: Ticket): TicketSearchIndex {
   const cached = ticketSearchCache.get(ticket);
@@ -71,15 +72,7 @@ function getSearchIndex(ticket: Ticket): TicketSearchIndex {
 }
 
 function parseDateForSort(value: string): number | null {
-  const cached = dateParseCache.get(value);
-  if (cached !== undefined) {
-    return cached;
-  }
-
-  const parsed = Date.parse(value);
-  const parsedValue = Number.isNaN(parsed) ? null : parsed;
-  dateParseCache.set(value, parsedValue);
-  return parsedValue;
+  return dateParseCache.parse(value);
 }
 
 type DateForSortValue = string | number;
