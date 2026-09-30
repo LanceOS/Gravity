@@ -308,7 +308,7 @@ export class McpStdioSession {
       if (token && workspaceId) {
         try {
           const { verifyAndConsumeToken } = await import('./connection.js');
-          const tokenRow = await verifyAndConsumeToken(token, workspaceId, {});
+          const tokenRow = await verifyAndConsumeToken(token, workspaceId, { allowSingleUse: false });
           if (!tokenRow || tokenRow.singleUse) {
             this.recordHandshakeFailure();
             this.send(createMcpErrorResponse(payload.id ?? null, -32001, 'Invalid or expired token.'));
