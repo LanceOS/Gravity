@@ -572,27 +572,31 @@ export async function getWorkspaceSummary(workspaceId: string, userId?: string) 
   return { ...summary, memberRole };
 }
 
-export async function nextTicketKey(projectId: string) {
-  const projectRows = await db.select({ key: projects.key }).from(projects).where(eq(projects.id, projectId)).limit(1);
+type TicketKeyTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/** Allocate only within the transaction that inserts the ticket. */
+export async function nextTicketKey(tx: TicketKeyTransaction, projectId: string) {
+  const projectRows = await tx.select({ key: projects.key }).from(projects).where(eq(projects.id, projectId)).limit(1);
   const project = projectRows[0];
 
   if (!project) {
     throw new Error('Project not found.');
   }
 
-  const existing = await db.execute(sql`
-    SELECT key
-    FROM tickets
-    WHERE project_id = ${projectId}
-      AND key LIKE ${`${normalizeEntityKey(project.key)}-%`}
+  const prefix = normalizeEntityKey(project.key);
+  // Match INSERT/trigger lock order: tickets table, then counter. Otherwise a
+  // bootstrap backfill can hold tickets while waiting for our counter, as we
+  // wait to insert the ticket. ROW EXCLUSIVE locks are mutually compatible.
+  await tx.execute(sql`LOCK TABLE tickets IN ROW EXCLUSIVE MODE`);
+  // Keys are globally unique even when projects in different workspaces share
+  // a prefix. Keep this row forever, independently of project/ticket lifetimes.
+  const allocated = await tx.execute(sql`
+    INSERT INTO ticket_key_counters (prefix, last_value) VALUES (${prefix}, 1)
+    ON CONFLICT (prefix) DO UPDATE
+      SET last_value = ticket_key_counters.last_value + 1
+    RETURNING last_value
   `);
-
-  const maxValue = (existing.rows as Array<{ key: string }>).reduce((highest, row) => {
-    const numeric = Number(row.key.split('-').pop() ?? 0);
-    return Number.isFinite(numeric) && numeric > highest ? numeric : highest;
-  }, 0);
-
-  return `${normalizeEntityKey(project.key)}-${maxValue + 1}`;
+  return `${prefix}-${allocated.rows[0].last_value}`;
 }
 
 export async function getProjectByKeyPrefix(prefix: string) {

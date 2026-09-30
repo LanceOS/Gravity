@@ -14,6 +14,11 @@ async function createPool() {
       }
 
       const normalizedQuery = query.trim().toLowerCase();
+      // pg-mem has no table locks. Real PostgreSQL regressions cover the
+      // allocator/backfill lock ordering; do not emulate it in memory.
+      if (normalizedQuery === 'lock table tickets in row exclusive mode') {
+        return [];
+      }
       if (normalizedQuery.startsWith('create index ') || normalizedQuery.startsWith('create unique index ')) {
         return [];
       }

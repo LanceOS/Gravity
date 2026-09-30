@@ -409,6 +409,15 @@ export async function seedTicket(
     updatedAt: new Date(),
   });
 
+  // pg-mem does not execute the PostgreSQL explicit-key reservation trigger.
+  // Keep seeded fixtures equivalent to production inserts for allocator tests.
+  const keyParts = /^([\s\S]*)-([0-9]+)$/.exec(ticket.key);
+  if (env.databaseUrl.startsWith('pgmem://') && keyParts) {
+    await pool.query(`INSERT INTO ticket_key_counters (prefix, last_value) VALUES ($1, $2)
+      ON CONFLICT (prefix) DO UPDATE SET last_value = GREATEST(ticket_key_counters.last_value, EXCLUDED.last_value)`,
+      [keyParts[1], keyParts[2]]);
+  }
+
   if (ticket.labelIds.length > 0) {
     await db.insert(ticketLabels).values(
       ticket.labelIds.map((labelId) => ({
