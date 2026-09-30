@@ -1,4 +1,6 @@
-import express, { Router } from 'express';
+import { noteQuery, validateNoteRequest } from './contracts.js';
+import { noteErrorContext, noteErrorHandler, logNoteFailure } from './errors.js';
+import { Router } from 'express';
 import { getProjectIdFromRequest } from '../../lib/platform.js';
 import { authorizeProjectAccess } from '../workspaces/services/membership.js';
 import { createNote, deleteNote, getNote, listNotes, updateNote, searchNotes, cleanupNoteMedia } from './services/notes.js';
@@ -7,14 +9,15 @@ import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
 
 export function createNotesRouter() {
   const router = Router();
+  router.use('/notes', noteErrorContext);
 
   function normalizeRouteParam(value: string | string[]) {
     return Array.isArray(value) ? value[0] ?? '' : value;
   }
 
-  router.post('/notes', async (req, res) => {
+  router.post('/notes', validateNoteRequest, async (req, res) => {
     const projectId = getProjectIdFromRequest(req);
-    if (!projectId || !req.body?.title || !req.body?.body) {
+    if (!projectId) {
       res.status(400).json({ error: 'Project ID, title, and body are required.' });
       return;
     }
@@ -29,11 +32,12 @@ export function createNotesRouter() {
       const created = await createNote(projectId, auth.userId, req.body.title, req.body.body);
       res.status(201).json(created);
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create note.' });
+      logNoteFailure(res, error, req.route.path);
+      res.status(500).json({ error: 'Failed to create note.' });
     }
   });
 
-  router.get('/notes/search', async (req, res) => {
+  router.get('/notes/search', validateNoteRequest, async (req, res) => {
     const projectId = getProjectIdFromRequest(req);
     if (!projectId) {
       res.status(400).json({ error: 'Project ID is required.' });
@@ -53,17 +57,16 @@ export function createNotesRouter() {
     }
 
     try {
-      const limit = Number(req.query.limit) || 50;
-      const offset = Number(req.query.offset) || 0;
-      const sort = (req.query.sort === 'asc' ? 'asc' : 'desc') as 'desc' | 'asc';
+      const { limit, offset, sort } = noteQuery.parse(req.query);
       const notesList = await searchNotes(projectId, auth.userId, query, limit, offset, sort);
       res.json(notesList);
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to search notes.' });
+      logNoteFailure(res, error, req.route.path);
+      res.status(500).json({ error: 'Failed to search notes.' });
     }
   });
 
-  router.get('/notes', async (req, res) => {
+  router.get('/notes', validateNoteRequest, async (req, res) => {
     const projectId = getProjectIdFromRequest(req);
     if (!projectId) {
       res.status(400).json({ error: 'Project ID is required.' });
@@ -77,17 +80,16 @@ export function createNotesRouter() {
     }
 
     try {
-      const limit = Number(req.query.limit) || 50;
-      const offset = Number(req.query.offset) || 0;
-      const sort = (req.query.sort === 'asc' ? 'asc' : 'desc') as 'desc' | 'asc';
+      const { limit, offset, sort } = noteQuery.parse(req.query);
       const notesList = await listNotes(projectId, auth.userId, limit, offset, sort);
       res.json(notesList);
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load notes.' });
+      logNoteFailure(res, error, req.route.path);
+      res.status(500).json({ error: 'Failed to load notes.' });
     }
   });
 
-  router.get('/notes/:noteId', async (req, res) => {
+  router.get('/notes/:noteId', validateNoteRequest, async (req, res) => {
     const projectId = getProjectIdFromRequest(req);
     if (!projectId) {
       res.status(400).json({ error: 'Project ID is required.' });
@@ -111,11 +113,12 @@ export function createNotesRouter() {
 
       res.json(note);
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load note.' });
+      logNoteFailure(res, error, req.route.path);
+      res.status(500).json({ error: 'Failed to load note.' });
     }
   });
 
-  router.patch('/notes/:noteId', async (req, res) => {
+  router.patch('/notes/:noteId', validateNoteRequest, async (req, res) => {
     const projectId = getProjectIdFromRequest(req);
     if (!projectId) {
       res.status(400).json({ error: 'Project ID is required.' });
@@ -130,12 +133,7 @@ export function createNotesRouter() {
 
     try {
       const noteId = normalizeRouteParam(req.params.noteId);
-      const currentVersion = Number(req.body.version);
-      
-      if (isNaN(currentVersion)) {
-        res.status(400).json({ error: 'Current version is required for optimistic locking.' });
-        return;
-      }
+      const currentVersion = req.body.version;
 
       const updated = await updateNote(noteId, projectId, currentVersion, {
         title: req.body.title,
@@ -149,12 +147,13 @@ export function createNotesRouter() {
       } else if (error.message === 'CONFLICT') {
         res.status(409).json({ error: 'Version conflict. Note has been modified by another process.' });
       } else {
-        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to update note.' });
+        logNoteFailure(res, error, req.route.path);
+        res.status(500).json({ error: 'Failed to update note.' });
       }
     }
   });
 
-  router.delete('/notes/:noteId', async (req, res) => {
+  router.delete('/notes/:noteId', validateNoteRequest, async (req, res) => {
     const projectId = getProjectIdFromRequest(req);
     if (!projectId) {
       res.status(400).json({ error: 'Project ID is required.' });
@@ -178,14 +177,15 @@ export function createNotesRouter() {
 
       res.json({ success: true });
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to delete note.' });
+      logNoteFailure(res, error, req.route.path);
+      res.status(500).json({ error: 'Failed to delete note.' });
     }
   });
 
   const FILENAME_REGEX = /^[a-zA-Z0-9_.-]+$/;
   const ALLOWED_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp', '.gif', '.mp4', '.webm', '.mp3', '.wav', '.ogg', '.pdf', '.txt', '.md'];
 
-  router.post('/notes/:noteId/media', async (req, res) => {
+  router.post('/notes/:noteId/media', validateNoteRequest, async (req, res) => {
     const projectId = getProjectIdFromRequest(req);
     if (!projectId) {
       res.status(400).json({ error: 'Project ID is required.' });
@@ -200,7 +200,7 @@ export function createNotesRouter() {
 
     try {
       const noteId = normalizeRouteParam(req.params.noteId);
-      const filename = req.query.filename ? String(req.query.filename) : `upload-${Date.now()}`;
+      const filename = req.query.filename as string;
 
       if (!FILENAME_REGEX.test(filename)) {
         res.status(400).json({ error: 'Invalid filename format.' });
@@ -213,21 +213,8 @@ export function createNotesRouter() {
         return;
       }
 
-      const contentLengthHeader = req.headers['content-length'];
-      if (!contentLengthHeader) {
-        res.status(411).json({ error: 'Content-Length header is required.' });
-        return;
-      }
-      const contentLength = parseInt(contentLengthHeader, 10);
-      if (isNaN(contentLength) || contentLength < 0) {
-        res.status(400).json({ error: 'Invalid Content-Length.' });
-        return;
-      }
-      if (contentLength > 10 * 1024 * 1024) {
-        res.status(413).json({ error: 'Payload Too Large. Max limit is 10MB.' });
-        return;
-      }
-      
+      const contentLength = Number(req.headers['content-length']);
+
       const noteMeta = await MetadataRepository.getNoteMetadata(noteId);
       if (!noteMeta || noteMeta.projectId !== projectId) {
         res.status(404).json({ error: 'Note not found.' });
@@ -246,11 +233,12 @@ export function createNotesRouter() {
       
       res.status(201).json({ url: `/api/v1/notes/${encodeURIComponent(noteId)}/media/${encodeURIComponent(filename)}?projectId=${encodeURIComponent(projectId)}` });
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to upload media.' });
+      logNoteFailure(res, error, req.route.path);
+      res.status(500).json({ error: 'Failed to upload media.' });
     }
   });
 
-  router.get('/notes/:noteId/media/:filename', async (req, res) => {
+  router.get('/notes/:noteId/media/:filename', validateNoteRequest, async (req, res) => {
     // Do not cache either media or authorization failures across sessions.
     res.setHeader('Cache-Control', 'private, no-store');
     try {
@@ -324,13 +312,16 @@ export function createNotesRouter() {
       }
 
       stream.on('error', (err: any) => {
+        if (res.headersSent) { logNoteFailure(res, err, req.route.path); res.destroy(); return; }
         if (err.code === 'ENOENT') {
           if (!res.headersSent) {
             res.status(404).json({ error: 'Media not found.' });
           }
         } else {
           if (!res.headersSent) {
-            res.status(500).json({ error: err.message || 'Stream error.' });
+            logNoteFailure(res, err, req.route.path);
+            res.removeHeader('Content-Disposition');
+            res.status(500).json({ error: 'Failed to load media.' });
           }
         }
       });
@@ -341,12 +332,13 @@ export function createNotesRouter() {
       if (error.code === 'ENOENT') {
         res.status(404).json({ error: 'Media not found.' });
       } else {
-        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load media.' });
+        logNoteFailure(res, error, req.route.path);
+        res.status(500).json({ error: 'Failed to load media.' });
       }
     }
   });
 
-  router.delete('/notes/:noteId/media/:filename', async (req, res) => {
+  router.delete('/notes/:noteId/media/:filename', validateNoteRequest, async (req, res) => {
     const projectId = getProjectIdFromRequest(req);
     if (!projectId) {
       res.status(400).json({ error: 'Project ID is required.' });
@@ -387,11 +379,12 @@ export function createNotesRouter() {
 
       res.json({ deleted: existed, remainingReferences: [] });
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to delete media.' });
+      logNoteFailure(res, error, req.route.path);
+      res.status(500).json({ error: 'Failed to delete media.' });
     }
   });
 
-  router.post('/notes/:noteId/cleanup', async (req, res) => {
+  router.post('/notes/:noteId/cleanup', validateNoteRequest, async (req, res) => {
     const projectId = getProjectIdFromRequest(req);
     if (!projectId) {
       res.status(400).json({ error: 'Project ID is required.' });
@@ -413,12 +406,13 @@ export function createNotesRouter() {
         res.status(404).json({ error: 'Note not found.' });
       } else {
         // The global scan can fail on a note outside the caller's project.
-        // Keep its identifiers and storage path in server diagnostics only.
-        console.error('Note media cleanup blocked', error);
+        // Log only safe diagnostic metadata; never the arbitrary exception text.
+        logNoteFailure(res, error, req.route.path);
         res.status(500).json({ error: 'Media cleanup blocked; see server diagnostics.' });
       }
     }
   });
 
+  router.use(noteErrorHandler);
   return router;
 }
