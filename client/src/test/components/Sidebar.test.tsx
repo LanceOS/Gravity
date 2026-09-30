@@ -5,12 +5,6 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { Sidebar } from '../../components/Sidebar/Sidebar.tsx';
 import type { SidebarProps } from '../../components/Sidebar/types';
-
-type SidebarHeaderMockProps = {
-  workspace: SidebarProps['workspace'];
-  onOpenCreateTicket: () => void;
-};
-
 type SidebarProjectsSectionMockProps = {
   section: SidebarProps['projects'];
   projectsCollapsed: boolean;
@@ -35,7 +29,7 @@ type SidebarUserMenuMockProps = {
 
 vi.mock('../../components/Sidebar/components', () => ({
 
-  SidebarProjectsSection: ({
+  SidebarProjectsSection: function MockSidebarProjectsSection({
     section,
     projectsCollapsed,
     collapsedProjects,
@@ -43,8 +37,7 @@ vi.mock('../../components/Sidebar/components', () => ({
     onToggleProjectsCollapsed,
     onToggleProject,
     onToggleTeam,
-  }: SidebarProjectsSectionMockProps) => (
-    (() => {
+  }: SidebarProjectsSectionMockProps) {
       const safeCollapsedProjects = collapsedProjects ?? {};
       const safeCollapsedTeams = collapsedTeams ?? {};
       const activeTeamId = section?.activeTeamId ?? 'team-1';
@@ -116,8 +109,7 @@ vi.mock('../../components/Sidebar/components', () => ({
           </button>
         </div>
       );
-    })()
-  ),
+    },
   SidebarAgentTools: ({ tools }: SidebarAgentToolsMockProps) => (
     <div>
       <button type="button" onClick={tools.onOpenSimulator}>
@@ -282,8 +274,7 @@ describe('Sidebar', () => {
   });
 
   it('renders project-based workspace context menu and hides New Team', async () => {
-    const user = userEvent.setup();
-    const { props, rerender, container } = renderSidebar();
+    const { props, rerender } = renderSidebar();
     
     rerender(<Sidebar {...props} projects={{ ...props.projects, hierarchyMode: 'flat', onOpenCreateTeam: vi.fn() }} />);
 
@@ -300,7 +291,7 @@ describe('Sidebar', () => {
   it('renders teams workspace context menu and shows New Team', async () => {
     const user = userEvent.setup();
     const onOpenCreateTeamMock = vi.fn();
-    const { props, rerender, container } = renderSidebar();
+    const { props, rerender } = renderSidebar();
 
     rerender(<Sidebar {...props} projects={{ ...props.projects, hierarchyMode: 'teams', onOpenCreateTeam: onOpenCreateTeamMock }} />);
 

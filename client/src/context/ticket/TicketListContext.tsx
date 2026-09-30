@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../../utils/apiClient';
 import { CACHE_CONFIGS, queryKeys } from '../../utils/queryClient';
@@ -34,10 +34,9 @@ export function useTicketListContextValue({
   const { activeProjectId } = useActiveProject();
   const { filters } = useTicketFilters();
   const [activeTicket, setActiveTicket] = useState<Ticket | null>(null);
-  const previousTicketsRef = useRef<Ticket[] | undefined>(undefined);
   const currentUserId = currentUser?.id ?? null;
-  const previousUserIdRef = useRef<string | null>(currentUserId);
-  const hasUserChanged = previousUserIdRef.current !== currentUserId;
+  const [previous, setPrevious] = useState<{ userId: string | null; tickets?: Ticket[] }>({ userId: currentUserId });
+  const hasUserChanged = previous.userId !== currentUserId;
   const isProjectScopeAligned = !filters.projectId || filters.projectId === activeProjectId;
 
   const ticketsQuery = useQuery({
@@ -50,35 +49,27 @@ export function useTicketListContextValue({
     ...CACHE_CONFIGS.ticketsList,
   });
 
-  const tickets = hasUserChanged ? [] : ticketsQuery.data ?? previousTicketsRef.current ?? [];
-
   useEffect(() => {
-    if (!hasUserChanged && Array.isArray(ticketsQuery.data)) {
-      previousTicketsRef.current = ticketsQuery.data;
-    }
-  }, [hasUserChanged, ticketsQuery.data]);
-
-  useEffect(() => {
-    if (previousUserIdRef.current === currentUserId) {
-      return;
-    }
-
-    previousTicketsRef.current = undefined;
+    if (!hasUserChanged) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Commit the user transition alongside AuthProvider's cache clear; render stays masked until then.
+    setPrevious({ userId: currentUserId });
     setActiveTicket(null);
-    previousUserIdRef.current = currentUserId;
-  }, [currentUserId]);
+  }, [currentUserId, hasUserChanged]);
+  if (!hasUserChanged && Array.isArray(ticketsQuery.data) && ticketsQuery.data !== previous.tickets) {
+    setPrevious({ userId: currentUserId, tickets: ticketsQuery.data });
+  }
+  const tickets = useMemo(
+    () => hasUserChanged ? [] : ticketsQuery.data ?? previous.tickets ?? [],
+    [hasUserChanged, ticketsQuery.data, previous.tickets],
+  );
 
   const ticketMap = useMemo(() => createTicketMap(tickets), [tickets]);
   const ticketById = useMemo(() => createTicketByIdMap(tickets), [tickets]);
   const ticketsByProject = useMemo(() => createTicketsByProjectMap(tickets), [tickets]);
   const ticketsByParentId = useMemo(() => createTicketsByParentMap(tickets), [tickets]);
 
-  useEffect(() => {
-    const syncedActiveTicket = resolveSyncedActiveTicket(activeTicket, ticketById);
-    if (syncedActiveTicket) {
-      setActiveTicket(syncedActiveTicket);
-    }
-  }, [activeTicket, setActiveTicket, ticketById]);
+  const syncedActiveTicket = resolveSyncedActiveTicket(activeTicket, ticketById);
+  if (syncedActiveTicket) setActiveTicket(syncedActiveTicket);
 
   return useMemo(() => ({
     tickets,

@@ -34,6 +34,7 @@ export function useIsMobileTicketLayout(): boolean {
     }
 
     const mediaQuery = window.matchMedia(MOBILE_LAYOUT_QUERY);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Synchronize the initial media-query snapshot when installing the external matchMedia subscription.
     setIsMobile(mediaQuery.matches);
 
     const onMatchChange = (event: MediaQueryListEvent | MediaQueryList) => {

@@ -110,33 +110,33 @@ describe('TicketContextMenu', () => {
         moveTicket: moveTicketMock,
         deleteTicket: deleteTicketMock,
       }}>
-        <ProjectContext.Provider value={projectContextValue as any}>
+        <ProjectContext.Provider value={projectContextValue as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any}>
           <TicketListContext.Provider value={{
             tickets: [ticket, dependencyTargetTicket, blockerTargetTicket],
             ticketMap: new Map(),
             isLoading: false,
-          } as any}>
+          } as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any}>
             <UserDirectoryContext.Provider value={{
               users: [],
               isLoading: false,
-            } as any}>
+            } as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any}>
               <TicketRelationsContext.Provider value={{
                 activeTicketDetail: null,
                 addTicketDependency: addTicketDependencyMock,
                 addTicketBlocker: addTicketBlockerMock,
                 removeTicketDependency: vi.fn(),
                 removeTicketBlocker: vi.fn(),
-              } as any}>
+              } as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any}>
                 <LabelContext.Provider value={{
                   labels: [],
                   globalLabels: [],
                   labelsByProject: new Map(),
                   assignLabelToTicket: vi.fn(),
                   unassignLabelFromTicket: vi.fn(),
-                } as any}>
+                } as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any}>
                   <CycleContext.Provider value={{
                     cycles: [],
-                  } as any}>
+                  } as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any}>
                     <TicketContextMenu ticket={ticket}>
                       <div data-testid="ticket-trigger">Trigger Context Menu</div>
                     </TicketContextMenu>
@@ -202,33 +202,33 @@ describe('TicketContextMenu', () => {
         moveTicket: moveTicketMock,
         deleteTicket: deleteTicketMock,
       }}>
-        <ProjectContext.Provider value={projectContextValue as any}>
+        <ProjectContext.Provider value={projectContextValue as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any}>
           <TicketListContext.Provider value={{
             tickets: [ticket, unrelatedProjectTicket],
             ticketMap: new Map(),
             isLoading: false,
-          } as any}>
+          } as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any}>
             <UserDirectoryContext.Provider value={{
               users: [],
               isLoading: false,
-            } as any}>
+            } as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any}>
               <TicketRelationsContext.Provider value={{
                 activeTicketDetail: null,
                 addTicketDependency: addTicketDependencyMock,
                 addTicketBlocker: addTicketBlockerMock,
                 removeTicketDependency: vi.fn(),
                 removeTicketBlocker: vi.fn(),
-              } as any}>
+              } as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any}>
                 <LabelContext.Provider value={{
                   labels: [],
                   globalLabels: [],
                   labelsByProject: new Map(),
                   assignLabelToTicket: vi.fn(),
                   unassignLabelFromTicket: vi.fn(),
-                } as any}>
+                } as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any}>
                   <CycleContext.Provider value={{
                     cycles: [],
-                  } as any}>
+                  } as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any}>
                     <TicketContextMenu
                       ticket={ticket}
                       availableTickets={[ticket, dependencyTargetTicket, blockerTargetTicket]}
@@ -294,33 +294,33 @@ describe('TicketContextMenu', () => {
         moveTicket: moveTicketMock,
         deleteTicket: deleteTicketMock,
       }}>
-        <ProjectContext.Provider value={projectContextValue as any}>
+        <ProjectContext.Provider value={projectContextValue as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any}>
           <TicketListContext.Provider value={{
             tickets: [ticket, longTitleTicket],
             ticketMap: new Map(),
             isLoading: false,
-          } as any}>
+          } as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any}>
             <UserDirectoryContext.Provider value={{
               users: [],
               isLoading: false,
-            } as any}>
+            } as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any}>
               <TicketRelationsContext.Provider value={{
                 activeTicketDetail: null,
                 addTicketDependency: vi.fn().mockResolvedValue(true),
                 addTicketBlocker: vi.fn().mockResolvedValue(true),
                 removeTicketDependency: vi.fn(),
                 removeTicketBlocker: vi.fn(),
-              } as any}>
+              } as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any}>
                 <LabelContext.Provider value={{
                   labels: [],
                   globalLabels: [],
                   labelsByProject: new Map(),
                   assignLabelToTicket: vi.fn(),
                   unassignLabelFromTicket: vi.fn(),
-                } as any}>
+                } as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any}>
                   <CycleContext.Provider value={{
                     cycles: [],
-                  } as any}>
+                  } as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any}>
                     <TicketContextMenu
                       ticket={ticket}
                       availableTickets={[ticket, longTitleTicket]}
@@ -358,23 +358,23 @@ describe('TicketContextMenu', () => {
 
   it('renders children unchanged when the mutation provider is absent', () => {
     render(
-      <ProjectContext.Provider value={makeProjectContext([project1]) as any}>
+      <ProjectContext.Provider value={makeProjectContext([project1]) as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any}>
         <TicketListContext.Provider value={{
           tickets: [ticket],
           ticketMap: new Map(),
           isLoading: false,
-        } as any}>
+        } as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any}>
           <UserDirectoryContext.Provider value={{
             users: [],
             isLoading: false,
-          } as any}>
+          } as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any}>
             <TicketRelationsContext.Provider value={{
               activeTicketDetail: null,
               addTicketDependency: vi.fn(),
               addTicketBlocker: vi.fn(),
               removeTicketDependency: vi.fn(),
               removeTicketBlocker: vi.fn(),
-            } as any}>
+            } as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any}>
               <TicketContextMenu ticket={ticket}>
                 <div data-testid="ticket-trigger">Trigger Context Menu</div>
               </TicketContextMenu>

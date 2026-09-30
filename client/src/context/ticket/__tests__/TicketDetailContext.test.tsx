@@ -1,11 +1,17 @@
+import { queryKeys } from '../../../utils/queryClient';
 import React from 'react';
-import { render, waitFor } from '@testing-library/react';
+import { render, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider as BaseQueryClientProvider } from '@tanstack/react-query';
 import { useTicketDetailContextValue } from '../TicketDetailContext';
 import type { TicketDetailContextType } from '../TicketDetailContext.types';
 import type { Comment, Ticket } from '../../../types/domain';
 import type { TicketWithRelations } from '../../../modules/tickets/utils/ticketRelations';
+
+// Exercise guarded render-time state reconciliation with React's replayed renders.
+function QueryClientProvider(props: React.ComponentProps<typeof BaseQueryClientProvider>) {
+  return <React.StrictMode><BaseQueryClientProvider {...props} /></React.StrictMode>;
+}
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -307,4 +313,23 @@ describe('TicketDetailContext', () => {
       expect(currentValue.comments).toEqual([]);
     });
   });
+});
+
+
+it('retains detail and comment identities across equivalent StrictMode rerenders', () => {
+  const queryClient = createQueryClient();
+  const activeTicket = makeTicket();
+  const detail = makeTicketWithRelations();
+  const comments = [makeComment()];
+  queryClient.setQueryData(queryKeys.ticketDetail(activeTicket.id), detail);
+  queryClient.setQueryData(queryKeys.comments(activeTicket.id), comments);
+  const props = { activeTicket, setActiveTicket: vi.fn(), activeProjectId: 'project-1', isAuthenticated: true };
+  const { result, rerender } = renderHook(() => useTicketDetailContextValue(props), {
+    wrapper: ({ children }) => <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>,
+  });
+  const value = result.current;
+  rerender();
+  expect(result.current).toBe(value);
+  expect(result.current.activeTicketDetail).toBe(detail);
+  expect(result.current.comments).toBe(comments);
 });

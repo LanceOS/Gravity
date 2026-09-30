@@ -1,1 +1,1 @@
-export { WorkspaceTeamProjectsPage } from '../../modules/workspaceTeamProjectsPage/screens/WorkspaceTeamProjectsPage';
+export { WorkspaceTeamProjectsPage } from '../../modules/workspaceTeamProjectsPage';

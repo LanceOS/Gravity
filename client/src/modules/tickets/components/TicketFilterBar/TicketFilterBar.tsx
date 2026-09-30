@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Filter } from 'lucide-react';
 import type { Ticket } from '../../../../context/TicketContextContext';
-import type { TicketFilters, TicketListSort } from '../../utils/ticketView';
+import type { TicketListSort } from '../../utils/ticketView';
 import { Button, Select, DenseTextInput, Popover, Badge } from '@library';
 import {
   PRIORITY_FILTER_OPTIONS,
@@ -14,8 +14,6 @@ import './TicketFilterBar.css';
 export const TicketFilterBar: React.FC<TicketFilterBarProps> = ({
   filters,
   onFilterChange,
-  hasActiveFilters,
-  onClearFilters,
   filteredCount,
   totalCount,
   listSort,
@@ -26,7 +24,7 @@ export const TicketFilterBar: React.FC<TicketFilterBarProps> = ({
   users,
 }) => {
   const availableLabels = labels ?? domains ?? [];
-  const selectedLabelIds = filters.labels ?? [];
+  const selectedLabelIds = React.useMemo(() => filters.labels ?? [], [filters.labels]);
   const selectedLabelIdsSet = React.useMemo(() => new Set(selectedLabelIds), [selectedLabelIds]);
   const activeCount = [
     filters.priority,
@@ -39,9 +37,11 @@ export const TicketFilterBar: React.FC<TicketFilterBarProps> = ({
   const hasActivePopoverFilters = activeCount > 0;
   const [searchValue, setSearchValue] = useState(filters.search);
 
-  useEffect(() => {
+  const [previousSearch, setPreviousSearch] = useState(filters.search);
+  if (previousSearch !== filters.search) {
+    setPreviousSearch(filters.search);
     setSearchValue(filters.search);
-  }, [filters.search]);
+  }
 
   useEffect(() => {
     const timer = window.setTimeout(() => {

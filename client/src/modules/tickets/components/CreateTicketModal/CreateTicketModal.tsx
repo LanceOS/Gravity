@@ -52,6 +52,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
   // Reset form state when modal opens
   useEffect(() => {
     if (isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Opening the retained modal initializes a fresh editable ticket draft from the selected project/parent.
       setTitle('');
       setDescription(createEmptyRichTextValue());
       setProjectId(parentTicket ? parentTicket.projectId : defaultProjectId);
@@ -64,14 +65,10 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
     }
   }, [isOpen, parentTicket, defaultProjectId, initialStatus]);
 
-  // `projectId` is initialized from props via useState above. The modal
-  // component is mounted/unmounted when opened, so remounting will reset
-  // the initial value. Removing the synchronous setState in an effect
-  // avoids cascading renders.
-
-  useEffect(() => {
-    setLabelIds((currentLabelIds) => currentLabelIds.filter((labelId) => projectLabelIds.has(labelId)));
-  }, [projectLabelIds]);
+  // Prune labels from a previous project before committing the draft UI.
+  if (labelIds.some(labelId => !projectLabelIds.has(labelId))) {
+    setLabelIds(labelIds.filter(labelId => projectLabelIds.has(labelId)));
+  }
 
   const handleSubmit = useCallback(async (e?: React.SubmitEvent<HTMLFormElement>) => {
     if (e) e.preventDefault();

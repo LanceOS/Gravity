@@ -4,13 +4,13 @@ import { describe, it, expect } from 'vitest';
 import { TicketList } from '../../modules/tickets/components/TicketList';
 import type { TicketsByStatus } from '../../modules/tickets/utils/ticketView';
 
-function makeTicket(overrides: Partial<any> = {}) {
+function makeTicket(overrides: Partial</* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any> = {}) {
   return {
     id: overrides.id || 'ticket-1',
     key: overrides.key || 'GRA-1',
     title: overrides.title || 'A ticket',
     description: overrides.description || '',
-    status: (overrides.status as any) || 'backlog',
+    status: (overrides.status as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) || 'backlog',
     priority: overrides.priority || 'no_priority',
     projectId: overrides.projectId || '',
     domainId: overrides.domainId ?? null,

@@ -66,7 +66,12 @@ export function WorkspaceTeamsPage({
   const [reassignTeamById, setReassignTeamById] = useState<Record<string, string>>({});
   const pendingActionRef = useRef(false);
   const [savedTeamDraft, setSavedTeamDraft] = useState<string | null>(null);
-  useEffect(() => { setSavedTeamDraft(null); }, [selectedTeam?.id, selectedTeam?.name, selectedTeam?.description, selectedTeam?.color]);
+  const teamBaselineKey = JSON.stringify([selectedTeam?.id, selectedTeam?.name, selectedTeam?.description, selectedTeam?.color]);
+  const [previousTeamBaselineKey, setPreviousTeamBaselineKey] = useState(teamBaselineKey);
+  if (previousTeamBaselineKey !== teamBaselineKey) {
+    setPreviousTeamBaselineKey(teamBaselineKey);
+    setSavedTeamDraft(null);
+  }
   const teamDraftKey = JSON.stringify([selectedTeamId, editDraft]);
   const teamUnchanged = savedTeamDraft === teamDraftKey || (selectedTeam?.name === editDraft.name.trim() && (selectedTeam.description || '') === editDraft.description.trim() && (selectedTeam.color || DEFAULT_TEAM_COLOR) === editDraft.color);
   const [savingAction, setSavingAction] = useState('');
@@ -83,6 +88,7 @@ export function WorkspaceTeamsPage({
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('create') === 'true') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Consume the browser URL create intent once on mount and update history after opening the modal.
       setIsCreateModalOpen(true);
       const newUrl = window.location.pathname;
       window.history.replaceState({}, '', newUrl);
@@ -90,6 +96,7 @@ export function WorkspaceTeamsPage({
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- A team switch discards the previous team label draft and closes its editor.
     setLabelDraft({ name: '', color: DEFAULT_TEAM_LABEL_COLOR, description: '' });
     setIsCreateLabelOpen(false);
   }, [selectedTeamId]);
@@ -158,7 +165,7 @@ export function WorkspaceTeamsPage({
     }
   };
 
-  handleCreateTeamRef.current = handleCreateTeam;
+  useEffect(() => { handleCreateTeamRef.current = handleCreateTeam; });
 
   const handleUpdateTeam = async (teamId: string) => {
     if (pendingActionRef.current || teamUnchanged) return;

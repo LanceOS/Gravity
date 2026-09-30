@@ -71,25 +71,18 @@ vi.mock('../../../services/sseService', () => ({
 vi.mock('../../../services/SseEventCoalescer', () => ({
   SseEventCoalescer: class MockSseEventCoalescer {
     public destroy = vi.fn();
-    private readonly onFlush: (events: any[]) => void;
+    private readonly onFlush: (events: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any[]) => void;
 
-    constructor(onFlush: (events: any[]) => void) {
+    constructor(onFlush: (events: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any[]) => void) {
       this.onFlush = onFlush;
     }
 
-    enqueue(event: any) {
+    enqueue(event: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) {
       if (!event) return;
       this.onFlush([event]);
     }
   },
 }));
-
-function jsonResponse(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json' },
-  });
-}
 
 function createQueryClient() {
   return new QueryClient({
@@ -456,7 +449,7 @@ describe('RealtimeContext', () => {
   it('invalidates the active ticket comment cache and cleans up listeners on workspace change', async () => {
     const queryClient = createQueryClient();
     queryClient.setQueryData(queryKeys.tickets('project-1'), [] as Ticket[]);
-    queryClient.setQueryData(queryKeys.users(), [] as any[]);
+    queryClient.setQueryData(queryKeys.users(), [] as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any[]);
     const invalidateQueriesSpy = vi.spyOn(queryClient, 'invalidateQueries');
     vi.stubGlobal('EventSource', class {});
 

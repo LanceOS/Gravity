@@ -35,7 +35,7 @@ describe('ChatInterface', () => {
             configurable: true,
             writable: true,
           });
-        } catch (e) {
+        } catch {
           // ignore
         }
       }
@@ -51,7 +51,7 @@ describe('ChatInterface', () => {
             configurable: true,
             writable: true,
           });
-        } catch (e) {
+        } catch {
           // ignore
         }
       }

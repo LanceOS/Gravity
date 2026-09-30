@@ -67,11 +67,11 @@ describe('CycleContext', () => {
       id: 'user-session-1',
     };
     vi.mocked(useAuth).mockReturnValue({
-      currentUser: user as any,
+      currentUser: user as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any,
       loading: false,
       isAuthenticated: true,
       signOut: vi.fn(),
-    } as any);
+    } as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any);
 
     const fetchMock = vi.fn((url) => {
       if (url.includes('/cycles')) {
@@ -103,11 +103,11 @@ describe('CycleContext', () => {
       id: 'user-session-1',
     };
     vi.mocked(useAuth).mockReturnValue({
-      currentUser: user as any,
+      currentUser: user as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any,
       loading: false,
       isAuthenticated: true,
       signOut: vi.fn(),
-    } as any);
+    } as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any);
 
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);

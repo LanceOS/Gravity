@@ -6,11 +6,18 @@ import { TicketAssignmentSubMenu } from '../../src/modules/tickets/components/Ti
 import { sortTicketsForList } from '../../src/modules/tickets/utils/ticketView';
 import type { Ticket } from '../../src/context/TicketContextContext';
 
-const config = (window as any).pickerConfig as { count: number; kind: string };
+declare global {
+  interface Window {
+    pickerConfig: { count: number; kind: string };
+    churnDates: () => void;
+    ready: boolean;
+  }
+}
+const config = window.pickerConfig;
 const options = Array.from({ length: config.count }, (_, i) => ({ id: `${i}`, label: `Option ${i}` }));
 const tickets = options.map(o => ({ id: o.id, key: `GRA-${o.id}`, title: o.label })) as Ticket[];
 let update = 0;
-(window as any).churnDates = () => {
+window.churnDates = () => {
   for (let i = 0; i < 100000; i++) {
     const date = new Date(1700000000000 + update++).toISOString();
     sortTicketsForList([{ createdAt: date, updatedAt: date } as Ticket], {}, 'newest');
@@ -18,7 +25,7 @@ let update = 0;
 };
 function Fixture() {
   const [selected, setSelected] = useState(new Set<string>());
-  useLayoutEffect(() => { (window as any).ready = true; }, []);
+  useLayoutEffect(() => { window.ready = true; }, []);
   return <>
     <div id="view">
       {config.kind === 'assignment' ? <ContextMenu.Root trigger={<button>Open assignment</button>}>

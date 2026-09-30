@@ -1,3 +1,4 @@
+import type { TicketWithRelations } from '../modules/tickets/utils/ticketRelations';
 import { useQuery } from '@tanstack/react-query';
 import { useCurrentUser } from '../context/auth/useCurrentUser';
 import { useTicketListContext } from '../context/ticket/TicketListContext';
@@ -19,7 +20,7 @@ export function useTicketByKey(ticketKey: string) {
 
   const query = useQuery({
     queryKey: queryKeys.ticket(normalizedKey, currentUser?.id),
-    queryFn: async () => apiClient.get<any>(`/tickets/key/${normalizedKey}`, {
+    queryFn: async () => apiClient.get<TicketWithRelations>(`/tickets/key/${normalizedKey}`, {
       headers: currentUser?.id ? { 'X-User-Id': currentUser.id } : undefined,
     }),
     enabled: !!normalizedKey && !localTicket,

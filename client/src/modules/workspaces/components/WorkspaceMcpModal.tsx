@@ -81,6 +81,12 @@ export function WorkspaceMcpModal({ workspaceId, workspaceName, isOpen, onClose,
   const { copy, copiedKey: copied, error: copyError, reset: resetCopy } = useCopyToClipboard();
   const setupId = useId();
   const requestVersion = useRef(0);
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    if (!isOpen) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [isOpen]);
   const generatedConnectionRef = useRef<HTMLDivElement>(null);
   const allowedTools = useMemo(() => catalog.tools.filter(tool => tool.allowedForConnection !== false), [catalog.tools]);
   const generationInput = JSON.stringify([workspaceId, ttlSeconds, [...selectedTools].sort()]);
@@ -88,6 +94,7 @@ export function WorkspaceMcpModal({ workspaceId, workspaceName, isOpen, onClose,
   const configText = result ? JSON.stringify(buildMcpClientConfig(result), null, 2) : '';
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- A newly loaded workspace catalog seeds the editable tool selection with read-only defaults.
     setSelectedTools(allowedTools.filter(tool => tool.annotations?.readOnlyHint === true).map(tool => tool.name));
   }, [allowedTools]);
 
@@ -96,6 +103,7 @@ export function WorkspaceMcpModal({ workspaceId, workspaceName, isOpen, onClose,
   }, [result]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- The abortable OAuth setup request owns its loading, error, and result state.
     setOAuthSetup(null);
     setOAuthSetupError(null);
     setOAuthSetupLoading(false);
@@ -114,6 +122,7 @@ export function WorkspaceMcpModal({ workspaceId, workspaceName, isOpen, onClose,
 
   useEffect(() => {
     const version = ++requestVersion.current;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Opening or changing the workspace starts a new request generation and clears previous connection secrets/results.
     setResult(null);
     setClientMode('headers');
     setShowGeneratedSuccess(false);
@@ -135,6 +144,7 @@ export function WorkspaceMcpModal({ workspaceId, workspaceName, isOpen, onClose,
     }).finally(() => {
       if (requestVersion.current === version) setConnectionsLoading(false);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Cleanup must invalidate the current request generation, not restore a captured value.
     return () => { controller.abort(); requestVersion.current++; };
   }, [isOpen, workspaceId, mcp, showConnections, resetCopy]);
 
@@ -341,7 +351,7 @@ export function WorkspaceMcpModal({ workspaceId, workspaceName, isOpen, onClose,
             {!connectionsLoading && connections.length === 0 && <p>No connections yet.</p>}
             {connections.map(connection => {
               const revoked = connection.status === 'revoked' || Boolean(connection.revokedAt);
-              const expired = Boolean(connection.expiresAt && new Date(connection.expiresAt).getTime() <= Date.now());
+              const expired = Boolean(connection.expiresAt && new Date(connection.expiresAt).getTime() <= now);
               return (
                 <div key={connection.id} style={{ paddingBlock: 'var(--space-sm)', borderBottom: '1px solid var(--color-border-default)' }}>
                   <p>{connection.id} · {revoked ? 'Revoked' : expired ? 'Expired' : connection.status}</p>

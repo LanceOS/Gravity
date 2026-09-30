@@ -6,8 +6,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkspaceTeamsPage } from '../../modules/workspaceTeamsPage/screens/WorkspaceTeamsPage.tsx';
 import type { SidebarTeam, SidebarTree } from '../../types/domain.ts';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 const apiMocks = vi.hoisted(() => ({
   post: vi.fn(),
   patch: vi.fn(),
@@ -20,10 +18,10 @@ vi.mock('../../utils/apiClient', () => ({
 
 vi.mock('../../modules/workspaces', () => ({
   WorkspaceHeader: Object.assign(
-    ({ children }: any) => <header>{children}</header>,
+    ({ children }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => <header>{children}</header>,
     {
-      Top: ({ children }: any) => <div>{children}</div>,
-      Title: ({ children }: any) => <h1>{children}</h1>,
+      Top: ({ children }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => <div>{children}</div>,
+      Title: ({ children }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => <h1>{children}</h1>,
     }
   ),
 }));

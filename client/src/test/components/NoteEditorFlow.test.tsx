@@ -22,7 +22,7 @@ vi.mock('@library', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@library')>();
   return {
     ...actual,
-    Button: ({ children, onClick, ...rest }: any) => (
+    Button: ({ children, onClick, ...rest }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => (
       <button type="button" onClick={onClick} {...rest}>{children}</button>
     ),
   };
@@ -33,11 +33,11 @@ vi.mock('../../modules/tickets/components/TicketDetail', () => ({ TicketDetail: 
 vi.mock('../../modules/tickets/components/TicketFilterBar', () => ({ TicketFilterBar: () => null }));
 vi.mock('../../modules/workspaces', () => ({
   WorkspaceHeader: Object.assign(
-    ({ children }: any) => <div>{children}</div>,
+    ({ children }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => <div>{children}</div>,
     {
-      Top: ({ children }: any) => <div>{children}</div>,
-      Bottom: ({ children }: any) => <div>{children}</div>,
-      Title: ({ children }: any) => <h1>{children}</h1>,
+      Top: ({ children }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => <div>{children}</div>,
+      Bottom: ({ children }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => <div>{children}</div>,
+      Title: ({ children }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => <h1>{children}</h1>,
       ViewToggle: () => null,
     },
   ),
@@ -74,7 +74,7 @@ const baseProject = {
   defaultProjectId: null,
 };
 
-function buildProps(overrides: Record<string, any> = {}) {
+function buildProps(overrides: Record<string, /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any> = {}) {
   return {
     activeContext: 'notes' as const,
     activeNoteId: '',
@@ -114,7 +114,7 @@ function buildProps(overrides: Record<string, any> = {}) {
   };
 }
 
-function renderWorkspacePage(props: any) {
+function renderWorkspacePage(props: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {

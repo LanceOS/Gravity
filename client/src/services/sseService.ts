@@ -327,60 +327,60 @@ export class SseService {
   private attachSourceListener(
     source: EventSource,
     eventType: 'message' | 'error' | 'open',
-    handler: any
+    handler: ((event: MessageEvent) => void) | ((event: Event) => void)
   ): void {
-    const sourceAsAny = source as unknown as {
-      addEventListener?: (type: string, listener: any) => void;
+    const sourceWithOptionalListeners = source as unknown as {
+      addEventListener?: (type: string, listener: EventListener) => void;
       onmessage?: ((event: MessageEvent) => void) | null;
       onerror?: ((event: Event) => void) | null;
       onopen?: ((event: Event) => void) | null;
     };
 
-    if (typeof sourceAsAny.addEventListener === 'function') {
-      sourceAsAny.addEventListener(eventType, handler as EventListener);
+    if (typeof sourceWithOptionalListeners.addEventListener === 'function') {
+      sourceWithOptionalListeners.addEventListener(eventType, handler as EventListener);
       return;
     }
 
     if (eventType === 'message') {
-      sourceAsAny.onmessage = handler as (event: MessageEvent) => void;
+      sourceWithOptionalListeners.onmessage = handler as (event: MessageEvent) => void;
       return;
     }
     if (eventType === 'error') {
-      sourceAsAny.onerror = handler as (event: Event) => void;
+      sourceWithOptionalListeners.onerror = handler as (event: Event) => void;
       return;
     }
     if (eventType === 'open') {
-      sourceAsAny.onopen = handler as (event: Event) => void;
+      sourceWithOptionalListeners.onopen = handler as (event: Event) => void;
     }
   }
 
   private removeSourceListener(
     source: EventSource,
     eventType: 'message' | 'error' | 'open',
-    handler: any
+    handler: ((event: MessageEvent) => void) | ((event: Event) => void)
   ): void {
-    const sourceAsAny = source as unknown as {
-      removeEventListener?: (type: string, listener: any) => void;
+    const sourceWithOptionalListeners = source as unknown as {
+      removeEventListener?: (type: string, listener: EventListener) => void;
       onmessage?: ((event: MessageEvent) => void) | null;
       onerror?: ((event: Event) => void) | null;
       onopen?: ((event: Event) => void) | null;
     };
 
-    if (typeof sourceAsAny.removeEventListener === 'function') {
-      sourceAsAny.removeEventListener(eventType, handler as EventListener);
+    if (typeof sourceWithOptionalListeners.removeEventListener === 'function') {
+      sourceWithOptionalListeners.removeEventListener(eventType, handler as EventListener);
       return;
     }
 
     if (eventType === 'message') {
-      sourceAsAny.onmessage = null;
+      sourceWithOptionalListeners.onmessage = null;
       return;
     }
     if (eventType === 'error') {
-      sourceAsAny.onerror = null;
+      sourceWithOptionalListeners.onerror = null;
       return;
     }
     if (eventType === 'open') {
-      sourceAsAny.onopen = null;
+      sourceWithOptionalListeners.onopen = null;
     }
   }
 }

@@ -1,5 +1,5 @@
 import { type JSX, type ReactNode } from 'react';
-import { WorkspaceHeader } from '../../modules/workspaces/components/WorkspaceHeader';
+import { WorkspaceHeader } from '../../modules/workspaces';
 import './WorkspacePageLayout.css';
 
 type WorkspacePageBodyOverflow = 'hidden' | 'auto' | 'visible';

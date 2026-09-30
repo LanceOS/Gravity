@@ -10,9 +10,11 @@ export interface AccountPreferencesPageState {
 export function useAccountPreferencesPageState(onResetProviderDraft: () => void, initialCategory: SettingsCategoryId = 'general'): AccountPreferencesPageState {
   const [activeCategory, setActiveCategory] = useState<SettingsCategoryId>(initialCategory);
 
-  useEffect(() => {
+  const [previousInitialCategory, setPreviousInitialCategory] = useState(initialCategory);
+  if (previousInitialCategory !== initialCategory) {
+    setPreviousInitialCategory(initialCategory);
     setActiveCategory(initialCategory);
-  }, [initialCategory]);
+  }
 
   useEffect(() => {
     if (activeCategory !== 'providers') {

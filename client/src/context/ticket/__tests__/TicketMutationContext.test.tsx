@@ -74,6 +74,7 @@ function jsonResponse(body: unknown, status = 200) {
 let currentActions: TicketMutationContextType;
 
 function Probe() {
+  // eslint-disable-next-line react-hooks/globals -- Test probe exposes the rendered context to assertions outside React.
   currentActions = useTicketMutations();
   return null;
 }
@@ -276,7 +277,7 @@ describe('TicketMutationProvider', () => {
       isBlocked: false,
       isDependency: false,
     });
-    expect(queryClient.getQueryData<any>(queryKeys.ticketDetail(baseTicket.id))).toMatchObject({
+    expect(queryClient.getQueryData</* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any>(queryKeys.ticketDetail(baseTicket.id))).toMatchObject({
       id: baseTicket.id,
       status: 'done',
       isBlocked: false,

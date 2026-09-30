@@ -144,7 +144,7 @@ export function WorkspacePage({
 }: WorkspacePageProps) {
   const [activeNoteTitle, setActiveNoteTitle] = useState('');
   const [notesSort, setNotesSort] = useState<'desc' | 'asc'>('desc');
-  const labels = labelItems ?? domainItems ?? [];
+  const labels = useMemo(() => labelItems ?? domainItems ?? [], [labelItems, domainItems]);
   const filteredTickets = useMemo(() => profileComputation('WorkspacePage:filterTickets', () => filterTickets(tickets, filters)), [tickets, filters]);
   const hasFiltersApplied = useMemo(() => hasActiveTicketFilters(filters), [filters]);
   const headerTitle = useMemo(

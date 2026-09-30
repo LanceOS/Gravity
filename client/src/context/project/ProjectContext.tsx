@@ -54,7 +54,7 @@ export function useProjectContextValue({
       }
       throw error;
     }
-  }, [currentUser?.id]);
+  }, [currentUser]);
 
   const projectsQuery = useQuery({
     queryKey: queryKeys.projects(currentUser?.id),
@@ -63,7 +63,7 @@ export function useProjectContextValue({
     ...CACHE_CONFIGS.metadata,
   });
 
-  const projects = Array.isArray(projectsQuery.data) ? projectsQuery.data : [];
+  const projects = useMemo(() => Array.isArray(projectsQuery.data) ? projectsQuery.data : [], [projectsQuery.data]);
   const projectLookup = useMemo(() => createProjectLookup(projects), [projects]);
   const projectById = useMemo(() => createProjectById(projects), [projects]);
   const projectsByWorkspaceId = useMemo(() => createProjectsByWorkspaceId(projects), [projects]);

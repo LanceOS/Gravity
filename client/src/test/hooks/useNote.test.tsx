@@ -59,7 +59,7 @@ describe('useNote', () => {
   });
 
   it('handles fetch error gracefully', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
       ok: false,
     } as Response);
 

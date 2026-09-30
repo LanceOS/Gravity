@@ -1,8 +1,9 @@
+import type { SessionUser } from './sessionUser';
 import { useMemo } from 'react';
 import type { User } from '../../types/domain';
 import { authClient } from './authClient';
 
-function mapSessionUserToCurrentUser(sessionUser: any): User | null {
+function mapSessionUserToCurrentUser(sessionUser: SessionUser | null | undefined): User | null {
   if (!sessionUser?.id) {
     return null;
   }

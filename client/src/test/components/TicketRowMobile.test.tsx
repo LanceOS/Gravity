@@ -68,8 +68,8 @@ describe('TicketRowMobile', () => {
         ticket={ticketWithoutMeta}
         onClick={vi.fn()}
         priority={ticketWithoutMeta.priority}
-        priorityIcon={null as any}
-        assigneeAvatar={null as any}
+        priorityIcon={null as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any}
+        assigneeAvatar={null as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any}
       />
     );
 
@@ -85,8 +85,8 @@ describe('TicketRowMobile', () => {
         ticket={{ ...mockTicket, status: 'done' }}
         onClick={vi.fn()}
         priority={mockTicket.priority}
-        priorityIcon={null as any}
-        assigneeAvatar={null as any}
+        priorityIcon={null as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any}
+        assigneeAvatar={null as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any}
       />
     );
 

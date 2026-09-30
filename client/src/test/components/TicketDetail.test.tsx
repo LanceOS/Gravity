@@ -4,7 +4,6 @@ import type {
   ChangeEvent,
   ReactNode,
   SelectHTMLAttributes,
-  TextareaHTMLAttributes,
 } from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -33,12 +32,6 @@ type MockTextInputProps = React.InputHTMLAttributes<HTMLInputElement> & {
   value: string;
   onChange: (event: ChangeEvent<HTMLInputElement>) => void;
 };
-
-type MockTextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
-  value: string;
-  onChange: (event: ChangeEvent<HTMLTextAreaElement>) => void;
-};
-
 const editorTestOptions = vi.hoisted(() => ({ realTitleEditor: false }));
 
 const mockAssignLabel = vi.fn().mockResolvedValue(true);
@@ -82,8 +75,8 @@ vi.mock('@library', async (importOriginal) => {
         ],
     });
 
-  const MockRichTextEditor = forwardRef<any, any>(function MockRichTextEditor(
-    { value, onChange, placeholder, className, minHeight, autoFocus, toolbarMode, surface, onBlur }: any,
+  const MockRichTextEditor = forwardRef</* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any, any>(function MockRichTextEditor(
+    { value, onChange, placeholder, className, minHeight, autoFocus, toolbarMode, surface, onBlur }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any,
     ref,
   ) {
     const [text, setText] = useState(() => {
@@ -148,8 +141,8 @@ vi.mock('@library', async (importOriginal) => {
       </select>
     ),
     TextInput: ({ value, onChange, ...props }: MockTextInputProps) => <input value={value} onChange={onChange} {...props} />,
-    Textarea: ({ value, onChange, autoGrow, inputStyle, ...props }: any) => <textarea value={value} onChange={onChange} {...props} />,
-    MarkdownEditor: ({ value, onSave, placeholder, ...props }: any) => {
+    Textarea: ({ value, onChange, autoGrow, inputStyle, ...props }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => <textarea value={value} onChange={onChange} {...props} />,
+    MarkdownEditor: ({ value, onSave, placeholder, ...props }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => {
       const [editing, setEditing] = useState(false);
       if (editorTestOptions.realTitleEditor) return <actual.MarkdownEditor {...props} value={value} onSave={onSave} placeholder={placeholder} />;
       if (!editing) {

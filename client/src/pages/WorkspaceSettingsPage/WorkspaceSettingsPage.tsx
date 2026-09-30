@@ -1,1 +1,1 @@
-export { WorkspaceSettingsPageRoute } from '../../modules/workspaceSettingsPage/screens/WorkspaceSettingsPage';
+export { WorkspaceSettingsPageRoute } from '../../modules/workspaceSettingsPage';

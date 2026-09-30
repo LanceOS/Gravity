@@ -532,9 +532,9 @@ export function patchTicketInAllCaches(
     });
   }
 
-  queryClient.setQueryData<TicketWithRelations>(queryKeys.ticketDetail(ticketId), (existing) => {
+  queryClient.setQueryData<Ticket>(queryKeys.ticketDetail(ticketId), (existing) => {
     if (!existing || existing.id !== ticketId) {
-      return existing as any;
+      return existing;
     }
     return patchFn(existing);
   });
@@ -553,7 +553,7 @@ export function patchTicketInAllCaches(
 
       queryClient.setQueryData<Ticket>([...queryKey], (existing) => {
         if (!existing || typeof existing !== 'object' || !(existing as { id?: string }).id) {
-          return existing as any;
+          return existing;
         }
         return patchFn(existing as Ticket);
       });

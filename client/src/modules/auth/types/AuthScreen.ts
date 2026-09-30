@@ -1,1 +1,1 @@
-export interface AuthScreenProps {}
+export type AuthScreenProps = Record<string, never>;

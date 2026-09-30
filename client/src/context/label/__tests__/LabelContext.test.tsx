@@ -98,11 +98,11 @@ describe('LabelContext', () => {
   it('fetches labels and builds derived maps correctly', async () => {
     const user = { id: 'user-session-1' };
     vi.mocked(useAuth).mockReturnValue({
-      currentUser: user as any,
+      currentUser: user as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any,
       loading: false,
       isAuthenticated: true,
       signOut: vi.fn(),
-    } as any);
+    } as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any);
 
     const fetchMock = vi.fn((url) => {
       if (url.includes('/labels')) {
@@ -129,11 +129,11 @@ describe('LabelContext', () => {
   it('provides label crud functions', async () => {
     const user = { id: 'user-session-1' };
     vi.mocked(useAuth).mockReturnValue({
-      currentUser: user as any,
+      currentUser: user as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any,
       loading: false,
       isAuthenticated: true,
       signOut: vi.fn(),
-    } as any);
+    } as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any);
 
     const fetchMock = vi.fn((url, init) => {
       if (url.includes('/labels') && init?.method === 'POST') {
@@ -160,7 +160,7 @@ describe('LabelContext', () => {
   });
   it('sends only the selected team and refreshes its label caches', async () => {
     const invalidate = vi.spyOn(QueryClient.prototype, 'invalidateQueries');
-    vi.mocked(useAuth).mockReturnValue({ currentUser: { id: 'user-1' } } as any);
+    vi.mocked(useAuth).mockReturnValue({ currentUser: { id: 'user-1' } } as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any);
     const fetchMock = vi.fn((_url, init) => Promise.resolve(jsonResponse(init?.method === 'POST'
       ? { id: 'team-label', teamId: 'team-2', projectId: null, name: 'Team bug' } : [])));
     vi.stubGlobal('fetch', fetchMock);

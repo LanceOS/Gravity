@@ -4,22 +4,22 @@ import { describe, expect, it, vi } from 'vitest';
 import { TicketFilterBar } from '../../modules/tickets/components/TicketFilterBar/TicketFilterBar';
 
 vi.mock('@library', () => ({
-  Button: ({ children, onClick }: any) => <button onClick={onClick}>{children}</button>,
-  Select: ({ options, onValueChange, value, 'aria-label': ariaLabel }: any) => (
+  Button: ({ children, onClick }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => <button onClick={onClick}>{children}</button>,
+  Select: ({ options, onValueChange, value, 'aria-label': ariaLabel }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => (
     <select aria-label={ariaLabel} value={value} onChange={(e) => onValueChange(e.target.value)}>
-      {options.map((opt: any) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+      {options.map((opt: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
     </select>
   ),
-  DenseTextInput: ({ value, onChange, placeholder }: any) => (
+  DenseTextInput: ({ value, onChange, placeholder }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => (
     <input placeholder={placeholder} value={value} onChange={onChange} />
   ),
-  Popover: ({ trigger, children }: any) => (
+  Popover: ({ trigger, children }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => (
     <div data-testid="popover">
       <div data-testid="popover-trigger">{trigger}</div>
       <div data-testid="popover-content">{children}</div>
     </div>
   ),
-  Badge: ({ children }: any) => <span data-testid="badge">{children}</span>,
+  Badge: ({ children }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => <span data-testid="badge">{children}</span>,
 }));
 
 describe('TicketFilterBar', () => {

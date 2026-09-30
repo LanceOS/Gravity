@@ -10,9 +10,9 @@ describe('Label filter navigation E2E', () => {
     const user = userEvent.setup();
 
     // Prepare mock DB state
-    const currentUser = { id: 'usr-1', name: 'E2E User', email: 'e2e@gravity.test', tutorial_completed: 1 } as any;
+    const currentUser = { id: 'usr-1', name: 'E2E User', email: 'e2e@gravity.test', tutorial_completed: 1 } as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any;
     dbState.currentUser = currentUser;
-    dbState.accountSettings = { userId: currentUser.id, theme: 'dark', projectLayout: 'standard', notificationsEnabled: true } as any;
+    dbState.accountSettings = { userId: currentUser.id, theme: 'dark', projectLayout: 'standard', notificationsEnabled: true } as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any;
     dbState.workspaces = [{ id: 'wsp-1', name: 'E2E Workspace', defaultProjectId: 'prj-1', role: 'owner' }];
     dbState.projects = [{ id: 'prj-1', workspaceId: 'wsp-1', name: 'E2E Project', key: 'TST' }];
     dbState.labels = [
@@ -103,9 +103,9 @@ describe('Label filter navigation E2E', () => {
     const user = userEvent.setup();
 
     // Prepare mock DB state
-    const currentUser = { id: 'usr-2', name: 'E2E User 2', email: 'e2e2@gravity.test', tutorial_completed: 1 } as any;
+    const currentUser = { id: 'usr-2', name: 'E2E User 2', email: 'e2e2@gravity.test', tutorial_completed: 1 } as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any;
     dbState.currentUser = currentUser;
-    dbState.accountSettings = { userId: currentUser.id, theme: 'dark', projectLayout: 'standard', notificationsEnabled: true } as any;
+    dbState.accountSettings = { userId: currentUser.id, theme: 'dark', projectLayout: 'standard', notificationsEnabled: true } as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any;
     dbState.workspaces = [{ id: 'wsp-2', name: 'E2E Workspace 2', defaultProjectId: 'prj-2', role: 'owner' }];
     dbState.projects = [{ id: 'prj-2', workspaceId: 'wsp-2', name: 'E2E Project 2', key: 'TST' }];
     dbState.labels = [{ id: 'lbl-frontend', projectId: 'prj-2', name: 'Frontend', color: '#6B7280', description: '', sortOrder: 0 }];
@@ -166,9 +166,9 @@ describe('Label filter navigation E2E', () => {
     const user = userEvent.setup();
 
     // Prepare mock DB state
-    const currentUser = { id: 'usr-3', name: 'E2E User 3', email: 'e3@gravity.test', tutorial_completed: 1 } as any;
+    const currentUser = { id: 'usr-3', name: 'E2E User 3', email: 'e3@gravity.test', tutorial_completed: 1 } as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any;
     dbState.currentUser = currentUser;
-    dbState.accountSettings = { userId: currentUser.id, theme: 'dark', projectLayout: 'standard', notificationsEnabled: true } as any;
+    dbState.accountSettings = { userId: currentUser.id, theme: 'dark', projectLayout: 'standard', notificationsEnabled: true } as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any;
     dbState.workspaces = [{ id: 'wsp-3', name: 'E2E Workspace 3', defaultProjectId: 'prj-3', role: 'owner' }];
     dbState.projects = [{ id: 'prj-3', workspaceId: 'wsp-3', name: 'E2E Project 3', key: 'TST' }];
     dbState.labels = [

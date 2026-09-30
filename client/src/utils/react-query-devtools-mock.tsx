@@ -15,7 +15,7 @@ export const ReactQueryDevtools: React.FC<ReactQueryDevtoolsProps> = ({ initialI
 
     const updateCacheKeys = () => {
       const keys: { key: string; status: string }[] = [];
-      const cache = (queryClient as any).cache as Map<string, any>;
+      const cache = queryClient.cache;
       for (const [serialized, state] of cache.entries()) {
         keys.push({
           key: serialized,

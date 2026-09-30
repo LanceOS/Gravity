@@ -10,6 +10,7 @@ export function useMcpCatalog(workspaceId?: string, enabled = true) {
   useEffect(() => {
     if (!workspaceId || !enabled) return;
     const controller = new AbortController();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Publish loading for this abortable workspace catalog request before its response arrives.
     setState({ workspaceId, tools: [], loading: true, error: null });
     void apiClient.get<{ tools: McpTool[] }>(`/workspaces/${encodeURIComponent(workspaceId)}/mcp/tools`, { signal: controller.signal })
       .then(data => {

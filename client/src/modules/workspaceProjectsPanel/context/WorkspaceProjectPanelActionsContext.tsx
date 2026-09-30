@@ -1,5 +1,5 @@
 import { toast } from '@library';
-import { createContext, type FormEvent, type JSX, useCallback, useEffect, useContext, useMemo, type PropsWithChildren, useRef, useState } from 'react';
+import { createContext, type FormEvent, type JSX, useCallback, useContext, useMemo, type PropsWithChildren, useRef, useState } from 'react';
 
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
 import type { Label } from '../../../context/TicketContextContext';
@@ -93,9 +93,7 @@ export function WorkspaceProjectPanelActionsContextProvider({
     setEditingLabelColor,
     editingLabelDescription,
     setEditingLabelDescription,
-    editingLabelError,
     setEditingLabelError,
-    editingLabelLoading,
     setEditingLabelLoading,
     nextLabelSortOrder,
     activeLabel,
@@ -105,8 +103,18 @@ export function WorkspaceProjectPanelActionsContextProvider({
   const pendingActions = useRef(new Set<string>());
   const [savedProjectInput, setSavedProjectInput] = useState<string | null>(null);
   const [savedLabelInput, setSavedLabelInput] = useState<string | null>(null);
-  useEffect(() => { setSavedProjectInput(null); }, [managedProject?.id, managedProject?.githubRepoUrl]);
-  useEffect(() => { setSavedLabelInput(null); }, [activeLabel?.id, activeLabel?.name, activeLabel?.color, activeLabel?.description]);
+  const projectBaselineKey = JSON.stringify([managedProject?.id, managedProject?.githubRepoUrl]);
+  const [previousProjectBaselineKey, setPreviousProjectBaselineKey] = useState(projectBaselineKey);
+  if (previousProjectBaselineKey !== projectBaselineKey) {
+    setPreviousProjectBaselineKey(projectBaselineKey);
+    setSavedProjectInput(null);
+  }
+  const labelBaselineKey = JSON.stringify([activeLabel?.id, activeLabel?.name, activeLabel?.color, activeLabel?.description]);
+  const [previousLabelBaselineKey, setPreviousLabelBaselineKey] = useState(labelBaselineKey);
+  if (previousLabelBaselineKey !== labelBaselineKey) {
+    setPreviousLabelBaselineKey(labelBaselineKey);
+    setSavedLabelInput(null);
+  }
   const projectInput = JSON.stringify([managedProject?.id, githubRepoUrl.trim()]);
   const labelInput = JSON.stringify([editingLabelId, editingLabelName.trim(), editingLabelColor, editingLabelDescription.trim()]);
   const projectSettingsUnchanged = savedProjectInput === projectInput || githubRepoUrl.trim() === (managedProject?.githubRepoUrl || '');

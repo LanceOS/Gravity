@@ -44,8 +44,8 @@ export const TicketRelationsSection: React.FC<TicketRelationsSectionProps> = ({
   onAddBlocker,
   onRemoveBlocker,
 }) => {
-  const dependencyLinks = activeTicketDetail?.dependencies || [];
-  const blockerLinks = activeTicketDetail?.blockers || [];
+  const dependencyLinks = useMemo(() => activeTicketDetail?.dependencies || [], [activeTicketDetail?.dependencies]);
+  const blockerLinks = useMemo(() => activeTicketDetail?.blockers || [], [activeTicketDetail?.blockers]);
   const canManageBlockers = typeof onAddBlocker === 'function' && typeof onRemoveBlocker === 'function';
 
   const dependencyTicketIds = useMemo(() => new Set(dependencyLinks.map((dependency) => dependency.id)), [dependencyLinks]);

@@ -1,7 +1,7 @@
 import React from 'react';
 import { act, render, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider as BaseQueryClientProvider } from '@tanstack/react-query';
 import { ActiveProjectProvider, useActiveProject } from '../../project/ActiveProjectContext';
 import { TicketFiltersContext, TicketFiltersProvider, useTicketFilters } from '../../filters/TicketFiltersContext';
 import { initialFilters, type TicketFiltersState } from '../../shared/filters';
@@ -10,6 +10,11 @@ import { TicketListProvider, useTicketListContext } from '../TicketListContext';
 import type { TicketListContextType } from '../TicketListContext.types';
 import type { Ticket } from '../../../types/domain';
 import { queryKeys } from '../../../utils/queryClient';
+
+// Exercise guarded render-time state reconciliation with React's replayed renders.
+function QueryClientProvider(props: React.ComponentProps<typeof BaseQueryClientProvider>) {
+  return <React.StrictMode><BaseQueryClientProvider {...props} /></React.StrictMode>;
+}
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -119,6 +124,7 @@ function Probe() {
   const project = useActiveProject();
   const filtersContext = useTicketFilters();
   const { setFilters: nextFilters } = filtersContext;
+  // eslint-disable-next-line react-hooks/globals -- Test probe exposes the rendered context to assertions outside React.
   setFilters = nextFilters;
 
   React.useEffect(() => {
@@ -457,7 +463,9 @@ describe('TicketListContext', () => {
     function Probe() {
       const value = useTicketListContext();
       const project = useActiveProject();
+      // eslint-disable-next-line react-hooks/globals -- Test probe exposes the rendered context to assertions outside React.
       localValue = value;
+      // eslint-disable-next-line react-hooks/globals -- Test probe exposes the rendered context to assertions outside React.
       localProject = project;
 
       return null;
@@ -485,4 +493,57 @@ describe('TicketListContext', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+});
+
+it('masks prior-user tickets until a parent auth effect clears the cache', async () => {
+  const queryClient = createQueryClient();
+  queryClient.setQueryData(queryKeys.tickets('project-1'), projectOneTickets);
+  vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => {})));
+  const commits: Array<{ userId: string; value: TicketListContextType }> = [];
+
+  function CommitProbe({ userId }: { userId: string }) {
+    const value = useTicketListContext();
+    React.useLayoutEffect(() => { commits.push({ userId, value }); }, [userId, value]);
+    return <Probe />;
+  }
+
+  function AuthBoundary({ user, children }: { user: typeof currentUser; children: React.ReactNode }) {
+    const previousId = React.useRef(user.id);
+    React.useEffect(() => {
+      if (previousId.current !== user.id) queryClient.clear();
+      previousId.current = user.id;
+    }, [user.id]);
+    return children;
+  }
+
+  function Tree({ user }: { user: typeof currentUser }) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <AuthBoundary user={user}>
+          <ActiveProjectProvider>
+            <TicketFiltersProvider>
+              <TicketListProvider currentUser={user}>
+                <CommitProbe userId={user.id} />
+              </TicketListProvider>
+            </TicketFiltersProvider>
+          </ActiveProjectProvider>
+        </AuthBoundary>
+      </QueryClientProvider>
+    );
+  }
+
+  const { rerender } = render(<Tree user={currentUser} />);
+  act(() => currentProject!.setActiveProjectId('project-1'));
+  await waitFor(() => expect(currentValue.tickets).toEqual(projectOneTickets));
+  act(() => currentValue.setActiveTicket(projectOneTickets[0]));
+  commits.length = 0;
+  rerender(<Tree user={switchedUser} />);
+  await waitFor(() => expect(currentValue.tickets).toEqual([]));
+  const newUserCommits = commits.filter(commit => commit.userId === switchedUser.id);
+  expect(newUserCommits.length).toBeGreaterThan(0);
+  for (const { value } of newUserCommits) {
+    expect(value.tickets).toEqual([]);
+    expect(value.activeTicket).toBeNull();
+  }
+  vi.unstubAllGlobals();
 });

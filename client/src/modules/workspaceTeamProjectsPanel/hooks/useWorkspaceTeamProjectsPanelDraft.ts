@@ -1,4 +1,4 @@
-import { useState, type Dispatch, type SetStateAction } from 'react';
+import { type Dispatch, type SetStateAction } from 'react';
 import { getProjectDraft } from '../utils/WorkspaceTeamProjectsPanelUtils';
 import type { Project } from '../../../types/domain';
 import type { WorkspaceTeamProjectsPanelDraft } from '../types/WorkspaceTeamProjectsPanel';

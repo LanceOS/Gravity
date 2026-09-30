@@ -51,7 +51,7 @@ export function WorkspaceTeamProjectsPanelPage({
     sidebarTree,
   });
 
-  const { selectedProjectId, setSelectedProjectId, selectedProject } = useWorkspaceTeamProjectsPanelSelection({
+  const { setSelectedProjectId, selectedProject } = useWorkspaceTeamProjectsPanelSelection({
     projects: sortedProjects,
     activeProjectId,
   });
@@ -64,7 +64,12 @@ export function WorkspaceTeamProjectsPanelPage({
   const [projectCreateError, setProjectCreateError] = useState<string | null>(null);
   const pendingProject = useRef(false);
   const [savedProjectDraft, setSavedProjectDraft] = useState<string | null>(null);
-  useEffect(() => { setSavedProjectDraft(null); }, [selectedProject?.id, selectedProject?.name, selectedProject?.description, selectedProject?.githubRepoUrl, selectedProject?.status]);
+  const projectBaselineKey = JSON.stringify([selectedProject?.id, selectedProject?.name, selectedProject?.description, selectedProject?.githubRepoUrl, selectedProject?.status]);
+  const [previousProjectBaselineKey, setPreviousProjectBaselineKey] = useState(projectBaselineKey);
+  if (previousProjectBaselineKey !== projectBaselineKey) {
+    setPreviousProjectBaselineKey(projectBaselineKey);
+    setSavedProjectDraft(null);
+  }
   const projectDraftKey = JSON.stringify([selectedProject?.id, projectDraft]);
   const projectUnchanged = savedProjectDraft === projectDraftKey || (selectedProject?.name === projectDraft.name.trim() && (selectedProject.description || '') === projectDraft.description.trim() && (selectedProject.githubRepoUrl || '') === projectDraft.githubRepoUrl.trim() && selectedProject.status === projectDraft.status);
   const [savingProjectId, setSavingProjectId] = useState('');
@@ -75,6 +80,7 @@ export function WorkspaceTeamProjectsPanelPage({
     if (!selectedProject) {
       return;
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Clear operation feedback when the externally selected project changes.
     setFeedback(null);
   }, [selectedProject]);
 

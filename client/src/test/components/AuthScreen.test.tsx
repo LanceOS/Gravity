@@ -125,9 +125,14 @@ describe('AuthScreen', () => {
     expect(screen.queryByText('Invalid email or password.')).not.toBeInTheDocument();
   });
 
-  it('surfaces thrown authentication errors', async () => {
+  it.each([
+    [new Error('Auth service unavailable'), 'Auth service unavailable'],
+    [{ message: 'Transport error' }, 'Transport error'],
+    [new Error(''), 'An error occurred during authentication.'],
+    [null, 'An error occurred during authentication.'],
+  ])('surfaces thrown authentication errors (%j)', async (error, message) => {
     const user = userEvent.setup();
-    mockAuthClient.signIn.email.mockRejectedValue(new Error('Auth service unavailable'));
+    mockAuthClient.signIn.email.mockRejectedValue(error);
 
     render(<AuthScreen />);
 
@@ -135,6 +140,6 @@ describe('AuthScreen', () => {
     await user.type(screen.getByLabelText('Password'), 'secret123');
     await user.click(screen.getByRole('button', { name: 'Sign In' }));
 
-    expect(await screen.findByText('Auth service unavailable')).toBeInTheDocument();
+    expect(await screen.findByText(message as string)).toBeInTheDocument();
   });
 });

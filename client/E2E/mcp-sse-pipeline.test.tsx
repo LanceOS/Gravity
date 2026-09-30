@@ -198,7 +198,7 @@ function seedRealtimeWorkspace(): SeededWorkspace {
   dbState.accountSettings = {
     userId: memberUser.id,
     theme: 'dark',
-    projectLayout: 'standard' as any,
+    projectLayout: 'standard' as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any,
     notificationsEnabled: true,
   };
   dbState.workspaces = [workspace];

@@ -2,7 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { renderMockApp } from './renderMockApp';
-import { dbState, resetMockDb } from './setup';
+import { dbState } from './setup';
 import { router } from '../src/router';
 
 describe('Relationship cleanup on status transition to done E2E', () => {
@@ -10,7 +10,7 @@ describe('Relationship cleanup on status transition to done E2E', () => {
     const user = userEvent.setup();
 
     // 1. Seed mock DB
-    dbState.currentUser = { id: 'usr-1', name: 'E2E User', email: 'e2e@gravity.test', tutorial_completed: 1 } as any;
+    dbState.currentUser = { id: 'usr-1', name: 'E2E User', email: 'e2e@gravity.test', tutorial_completed: 1 } as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any;
     const workspace = { id: 'wsp-1', name: 'E2E Workspace', defaultProjectId: 'prj-1', role: 'owner' };
     const project = { id: 'prj-1', workspaceId: 'wsp-1', name: 'E2E Project', key: 'TST' };
     dbState.workspaces.push(workspace);

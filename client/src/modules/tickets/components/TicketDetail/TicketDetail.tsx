@@ -1,5 +1,4 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import type { Ticket } from '../../../../context/TicketContextContext';
 import {
   Button,
   MarkdownEditor,
@@ -40,13 +39,12 @@ function TicketDescriptionEditor({
 }: { 
   initialDescription: string | null; 
   ticketId: string; 
-  onUpdateTicket: (id: string, updates: any) => Promise<boolean | void>;
+  onUpdateTicket: (id: string, updates: { description: string }) => Promise<boolean | void>;
 }) {
   const [editingDescriptionBody, setEditingDescriptionBody] = useState(() => initialDescription || createEmptyRichTextValue());
   const lastSavedDescriptionRef = useRef(initialDescription || createEmptyRichTextValue());
   const pendingDescription = useRef(false);
   const currentBody = useRef(editingDescriptionBody);
-  currentBody.current = editingDescriptionBody;
   const [saveFailed, setSaveFailed] = useState(false);
 
   useEffect(() => {
@@ -87,7 +85,10 @@ function TicketDescriptionEditor({
     <RichTextEditor
       key={`desc-${ticketId}`}
       value={editingDescriptionBody}
-      onChange={setEditingDescriptionBody}
+      onChange={value => {
+        currentBody.current = value;
+        setEditingDescriptionBody(value);
+      }}
       onBlur={() => void saveDescription()}
       placeholder="Describe your issue..."
       className="ticket-detail__description-editor"

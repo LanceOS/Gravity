@@ -1,1 +1,1 @@
-export { WorkspaceDirectoryPage } from '../../modules/workspaceDirectoryPage/screens/WorkspaceDirectoryPage';
+export { WorkspaceDirectoryPage } from '../../modules/workspaceDirectoryPage';

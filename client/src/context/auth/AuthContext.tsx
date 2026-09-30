@@ -1,3 +1,4 @@
+import type { SessionUser } from './sessionUser';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type FC, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { authClient } from './authClient';
@@ -12,7 +13,7 @@ export interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-function normalizeCurrentUser(session: { user?: any } | null | undefined): User | null {
+function normalizeCurrentUser(session: { user?: SessionUser } | null | undefined): User | null {
   if (!session?.user) {
     return null;
   }
@@ -23,7 +24,7 @@ function normalizeCurrentUser(session: { user?: any } | null | undefined): User 
     email: session.user.email,
     avatar: session.user.image || '',
     role: 'user',
-    tutorial_completed: (session.user as any).tutorialCompleted ?? (session.user as any).tutorial_completed ?? false,
+    tutorial_completed: session.user.tutorialCompleted ?? session.user.tutorial_completed ?? false,
   };
 }
 

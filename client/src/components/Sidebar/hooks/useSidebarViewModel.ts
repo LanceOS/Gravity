@@ -53,19 +53,9 @@ export function useSidebarViewModel(
     };
   }, []);
 
-  useEffect(() => {
-    if (!activeProjectId) {
-      return;
-    }
-
-    setCollapsedProjects((previous) => {
-      if (previous[activeProjectId] !== undefined) {
-        return previous;
-      }
-
-      return { ...previous, [activeProjectId]: false };
-    });
-  }, [activeProjectId]);
+  if (activeProjectId && collapsedProjects[activeProjectId] === undefined) {
+    setCollapsedProjects({ ...collapsedProjects, [activeProjectId]: false });
+  }
 
   const cancelPendingProjectSelection = (collapsePendingProject = false) => {
     const pending = pendingProjectSelectionRef.current;

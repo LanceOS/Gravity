@@ -49,7 +49,7 @@ function coerceTheme(value: string | null | undefined): ThemeMode | undefined {
   return isThemeMode(value) ? value : undefined;
 }
 
-function shallowEqual<T extends Record<string, any>>(objA: T, objB: T): boolean {
+function shallowEqual<T extends Record<string, unknown>>(objA: T, objB: T): boolean {
   if (Object.is(objA, objB)) return true;
   if (typeof objA !== 'object' || objA === null || typeof objB !== 'object' || objB === null) return false;
 
@@ -138,6 +138,7 @@ export function useAccountSettings({
       return;
     }
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Signing out clears the local editable account draft and credential state.
     setSettings(normalizeWorkspaceSettings(null, activeView, theme));
     setOriginalSettings(null);
     setSaveError(null);
@@ -149,6 +150,8 @@ export function useAccountSettings({
   }, [currentUser, activeView, theme]);
 
   const currentUserId = currentUser?.id;
+  const defaultsRef = useRef({ activeView, theme });
+  useEffect(() => { defaultsRef.current = { activeView, theme }; }, [activeView, theme]);
 
   useEffect(() => {
     if (!currentUserId) {
@@ -157,6 +160,7 @@ export function useAccountSettings({
 
     let cancelled = false;
     const requestId = ++loadRequestId.current;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- The user-scoped HTTP request owns loading/error state and must publish its start before settling.
     setSettingsLoading(true);
     setSaveError(null);
     setSettingsHydrated(false);
@@ -167,18 +171,18 @@ export function useAccountSettings({
       }
     }, ACCOUNT_SETTINGS_HYDRATION_TIMEOUT_MS);
 
-    apiClient.get<any>(`/settings/${currentUserId}`)
+    apiClient.get<Partial<WorkspaceSettings> & { savedCredentials?: unknown }>(`/settings/${currentUserId}`)
       .then((data) => {
         if (cancelled || requestId <= saveRequestId.current) {
           return;
         }
 
         const normalizedTheme = coerceTheme(data.theme);
-        const nextTheme = normalizedTheme ?? theme;
+        const nextTheme = normalizedTheme ?? defaultsRef.current.theme;
 
         const normalized = normalizeWorkspaceSettings(
           data,
-          activeView,
+          defaultsRef.current.activeView,
           nextTheme
         );
         setSettings(normalized);
@@ -268,7 +272,7 @@ export function useAccountSettings({
         apiKey: keyAction === 'update' ? normalizedApiKey : undefined,
       };
 
-      const data = await apiClient.patch<any>(`/settings/${currentUser.id}`, payload);
+      const data = await apiClient.patch<Partial<WorkspaceSettings> & { savedCredentials?: unknown }>(`/settings/${currentUser.id}`, payload);
 
       if (currentSaveRequestId !== saveRequestId.current) {
         return;
@@ -312,7 +316,7 @@ export function useAccountSettings({
         setSaveLoading(false);
       }
     }
-  }, [currentUser, activeView, settings, apiKeyState, setTheme, setView]);
+  }, [currentUser, activeView, settings, apiKeyState, setTheme, setView, theme]);
 
   const removeCredential = useCallback(async (provider: WorkspaceSettings['aiProvider']) => {
     if (!currentUser) {
@@ -325,7 +329,7 @@ export function useAccountSettings({
     setSaveError(null);
 
     try {
-      const data = await apiClient.patch<any>(`/settings/${currentUser.id}`, {
+      const data = await apiClient.patch<Partial<WorkspaceSettings> & { savedCredentials?: unknown }>(`/settings/${currentUser.id}`, {
         credentialProvider: provider,
         keyAction: 'clear',
       });
@@ -386,7 +390,7 @@ export function useAccountSettings({
     setTestResult(null);
 
     try {
-      const data = await apiClient.post<any>('/ai/test-connection', {
+      const data = await apiClient.post<{ connected: boolean; message: string }>('/ai/test-connection', {
         provider: settings.aiProvider,
         apiKey: keyAction === 'update' ? normalizedApiKey : undefined,
       });

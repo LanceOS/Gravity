@@ -10,7 +10,7 @@ vi.mock('../../utils/apiClient', async importOriginal => ({
   apiClient: mocks,
 }));
 vi.mock('../../modules/workspaces/components/WorkspaceMcpModal', () => ({
-  WorkspaceMcpModal: ({ isOpen, workspaceId, workspaceName, showConnections, onClose, onConnectionsChanged }: any) => isOpen ? (
+  WorkspaceMcpModal: ({ isOpen, workspaceId, workspaceName, showConnections, onClose, onConnectionsChanged }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => isOpen ? (
     <div role="dialog" aria-label={`Connect ${workspaceName}`}>
       <span>{workspaceId}</span>
       <span>{showConnections ? 'Duplicate inventory' : 'Generate only'}</span>

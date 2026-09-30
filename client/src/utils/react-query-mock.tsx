@@ -7,10 +7,12 @@ export function keepPreviousData<T>(_data: T): T {
 // --- Types ---
 
 export type QueryKey = readonly unknown[];
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Promise rejections are unconstrained; preserve the compatibility API's error payloads for caller narrowing.
+type QueryError = any;
 
-type QueryState<T = any> = {
+type QueryState<T = unknown> = {
   data: T | undefined;
-  error: any;
+  error: QueryError;
   status: 'pending' | 'success' | 'error';
   fetchStatus: 'fetching' | 'idle';
   updatedAt: number;
@@ -40,7 +42,7 @@ function isKeyMatch(queryKey: QueryKey, targetKey: QueryKey): boolean {
     const b = targetKey[i];
     if (typeof a === 'object' && a !== null && typeof b === 'object' && b !== null) {
       for (const key in b) {
-        if ((a as any)[key] !== (b as any)[key]) return false;
+        if ((a as Record<string, unknown>)[key] !== (b as Record<string, unknown>)[key]) return false;
       }
     } else if (a !== b) {
       return false;
@@ -59,18 +61,27 @@ function matchesFilters(queryKey: QueryKey, filters?: QueryFilters): boolean {
   return filters?.exact ? isExactKeyMatch(queryKey, targetKey) : isKeyMatch(queryKey, targetKey);
 }
 
+interface QueryOptions {
+  staleTime?: number;
+  gcTime?: number;
+  retry?: boolean | number;
+  refetchOnWindowFocus?: boolean;
+  refetchOnReconnect?: boolean;
+  refetchOnMount?: boolean | 'always';
+}
+
 // --- QueryClient ---
 
 export class QueryClient {
-  private cache = new Map<string, QueryState>();
-  private defaultOptions: any;
+  readonly cache = new Map<string, QueryState>();
+  private defaultOptions: { queries?: QueryOptions; mutations?: Record<string, unknown> };
   private globalSubscribers = new Set<() => void>();
 
-  constructor(config: { defaultOptions?: any } = {}) {
+  constructor(config: { defaultOptions?: { queries?: QueryOptions; mutations?: Record<string, unknown> } } = {}) {
     this.defaultOptions = config.defaultOptions || {};
   }
 
-  public getOrCreateQuery<T>(key: QueryKey, options: any = {}): QueryState<T> {
+  public getOrCreateQuery<T>(key: QueryKey, options: QueryOptions = {}): QueryState<T> {
     const serialized = serializeKey(key);
     if (!this.cache.has(serialized)) {
       const defaultStaleTime = this.defaultOptions.queries?.staleTime ?? 0;
@@ -135,10 +146,10 @@ export class QueryClient {
     return results;
   }
 
-  public setQueryData<T>(key: QueryKey, updater: T | ((old: T | undefined) => T)): T {
+  public setQueryData<T>(key: QueryKey, updater: T | ((old: T | undefined) => T | undefined)): T | undefined {
     const state = this.getOrCreateQuery<T>(key);
     const oldData = state.data;
-    const newData = typeof updater === 'function' ? (updater as Function)(oldData) : updater;
+    const newData = typeof updater === 'function' ? (updater as (old: T | undefined) => T | undefined)(oldData) : updater;
 
     this.updateQueryState<T>(key, (prev) => ({
       ...prev,
@@ -150,7 +161,7 @@ export class QueryClient {
   }
 
   public invalidateQueries(filters?: QueryFilters) {
-    for (const [serialized, state] of this.cache.entries()) {
+    for (const serialized of this.cache.keys()) {
       const queryKey = JSON.parse(serialized) as QueryKey;
       if (matchesFilters(queryKey, filters)) {
         this.updateQueryState(queryKey, () => ({
@@ -238,7 +249,7 @@ export class QueryClient {
     };
   }
 
-  public fetchQuery<T>(key: QueryKey, queryFn: () => Promise<T>, options: any = {}): Promise<T> {
+  public fetchQuery<T>(key: QueryKey, queryFn: () => Promise<T>, options: QueryOptions = {}): Promise<T> {
     const state = this.getOrCreateQuery<T>(key, options);
 
     if (state.promise) {
@@ -296,7 +307,7 @@ export class QueryClient {
   public async prefetchQuery<T>(options: { queryKey: QueryKey; queryFn: () => Promise<T>; staleTime?: number; gcTime?: number }): Promise<void> {
     try {
       await this.fetchQuery(options.queryKey, options.queryFn, options);
-    } catch (e) {
+    } catch {
       // prefetchQuery ignores errors
     }
   }
@@ -331,7 +342,7 @@ interface UseQueryOptions<T> {
   enabled?: boolean;
   staleTime?: number;
   gcTime?: number;
-  retry?: boolean | number | ((failureCount: number, error: any) => boolean);
+  retry?: boolean | number | ((failureCount: number, error: QueryError) => boolean);
 }
 
 interface UseIsFetchingOptions {
@@ -342,7 +353,8 @@ interface UseIsFetchingOptions {
 export function useQuery<T>({ queryKey, queryFn, enabled = true, staleTime, gcTime }: UseQueryOptions<T>) {
   const client = useQueryClient();
 
-  const stableQueryKey = useMemo(() => queryKey, [JSON.stringify(queryKey)]);
+  const serializedKey = serializeKey(queryKey);
+  const stableQueryKey = useMemo(() => JSON.parse(serializedKey) as QueryKey, [serializedKey]);
 
   const getSnapshot = useCallback(() => {
     return client.getOrCreateQuery<T>(stableQueryKey, { staleTime, gcTime });
@@ -354,34 +366,31 @@ export function useQuery<T>({ queryKey, queryFn, enabled = true, staleTime, gcTi
     getSnapshot
   );
 
-  const isStale = useMemo(() => {
-    const sTime = staleTime ?? 0;
-    if (state.updatedAt === 0) return true;
-    if (sTime === Infinity) return false;
-    // For staleTime === 0, it's always stale if we have data.
-    return state.updatedAt ? Date.now() - state.updatedAt >= sTime : true;
-  }, [state.updatedAt, staleTime]);
-
   const queryFnRef = useRef(queryFn);
   useEffect(() => {
     queryFnRef.current = queryFn;
   }, [queryFn]);
 
-  const hasFetchedOnMount = useRef(false);
-
   const triggerFetch = useCallback(() => {
     client.fetchQuery<T>(stableQueryKey, queryFnRef.current, { staleTime, gcTime }).catch(console.error);
   }, [client, stableQueryKey, staleTime, gcTime]);
 
+  // Zero-stale-time queries refetch on mount/key changes, but a successful
+  // fetch must not itself retrigger the effect in a loop.
+  const invalidated = (staleTime ?? 0) === 0 || state.updatedAt === 0;
   useEffect(() => {
-    hasFetchedOnMount.current = true;
-    if (enabled && state.fetchStatus === 'idle') {
-      const shouldFetch = state.status === 'pending' || isStale;
+    // Read the current cache snapshot when the key/options change. Depending
+    // on fetchStatus would immediately refetch every settled staleTime=0 query.
+    const current = client.getOrCreateQuery<T>(stableQueryKey, { staleTime, gcTime });
+    const sTime = staleTime ?? 0;
+    const isStale = invalidated || (sTime !== Infinity && sTime > 0 && Date.now() - current.updatedAt >= sTime);
+    if (enabled && current.fetchStatus === 'idle') {
+      const shouldFetch = current.status === 'pending' || isStale;
       if (shouldFetch) {
         triggerFetch();
       }
     }
-  }, [enabled, stableQueryKey, isStale, triggerFetch]);
+  }, [client, enabled, stableQueryKey, staleTime, gcTime, invalidated, triggerFetch]);
 
   return {
     data: state.data,
@@ -397,7 +406,7 @@ export function useQuery<T>({ queryKey, queryFn, enabled = true, staleTime, gcTi
 interface UseQueriesOptions {
   queries: Array<{
     queryKey: QueryKey;
-    queryFn?: () => Promise<any>;
+    queryFn?: () => Promise<unknown>;
     enabled?: boolean;
     staleTime?: number;
     gcTime?: number;
@@ -407,7 +416,10 @@ interface UseQueriesOptions {
 export function useQueries({ queries }: UseQueriesOptions) {
   const client = useQueryClient();
 
-  const serializedKeys = JSON.stringify(queries.map((q) => q.queryKey));
+  const serializedKeys = JSON.stringify(queries.map((q) => [q.queryKey, q.enabled, q.staleTime, q.gcTime]));
+  const queriesRef = useRef(queries);
+  useEffect(() => { queriesRef.current = queries; }, [queries]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- useQueries accepts heterogeneous result types, matching the compatibility API.
   const lastResultsRef = useRef<any[]>([]);
 
   const getSnapshot = useCallback(() => {
@@ -445,7 +457,7 @@ export function useQueries({ queries }: UseQueriesOptions) {
     const resultsWithRefetch = nextResults.map((res, idx) => ({
       ...res,
       refetch: () => {
-        const q = queries[idx];
+        const q = queriesRef.current[idx];
         if (q && q.queryFn) {
           client.fetchQuery(q.queryKey, q.queryFn, { staleTime: q.staleTime, gcTime: q.gcTime }).catch(console.error);
         }
@@ -454,14 +466,14 @@ export function useQueries({ queries }: UseQueriesOptions) {
 
     lastResultsRef.current = resultsWithRefetch;
     return resultsWithRefetch;
-  }, [client, serializedKeys]);
+  }, [client, queries]);
 
   const subscribe = useCallback((callback: () => void) => {
     const unsubscribes = queries.map((q) => client.subscribe(q.queryKey, callback));
     return () => {
       unsubscribes.forEach((unsub) => unsub());
     };
-  }, [client, serializedKeys]);
+  }, [client, queries]);
 
   const results = useSyncExternalStore(
     subscribe,
@@ -470,7 +482,7 @@ export function useQueries({ queries }: UseQueriesOptions) {
   );
 
   useEffect(() => {
-    queries.forEach((q) => {
+    queriesRef.current.forEach((q) => {
       const state = client.getOrCreateQuery(q.queryKey, { staleTime: q.staleTime, gcTime: q.gcTime });
       const enabled = q.enabled ?? true;
       const sTime = q.staleTime ?? 0;
@@ -494,11 +506,11 @@ interface UseMutationOptions<TData, TVariables, TContext> {
   mutationFn: (variables: TVariables) => Promise<TData>;
   onMutate?: (variables: TVariables) => Promise<TContext | undefined> | TContext | undefined;
   onSuccess?: (data: TData, variables: TVariables, context: TContext | undefined) => Promise<unknown> | unknown;
-  onError?: (error: any, variables: TVariables, context: TContext | undefined) => Promise<unknown> | unknown;
-  onSettled?: (data: TData | undefined, error: any | null, variables: TVariables, context: TContext | undefined) => Promise<unknown> | unknown;
+  onError?: (error: QueryError, variables: TVariables, context: TContext | undefined) => Promise<unknown> | unknown;
+  onSettled?: (data: TData | undefined, error: QueryError | null, variables: TVariables, context: TContext | undefined) => Promise<unknown> | unknown;
 }
 
-export function useMutation<TData = any, TVariables = any, TContext = any>({
+export function useMutation<TData = unknown, TVariables = void, TContext = unknown>({
   mutationFn,
   onMutate,
   onSuccess,
@@ -507,14 +519,14 @@ export function useMutation<TData = any, TVariables = any, TContext = any>({
 }: UseMutationOptions<TData, TVariables, TContext>) {
   const [state, setState] = useState({
     data: undefined as TData | undefined,
-    error: null as any,
+    error: null as QueryError,
     isPending: false,
     isSuccess: false,
     isError: false,
     variables: undefined as TVariables | undefined,
   });
 
-  const mutateAsync = useCallback(async (variables: TVariables = undefined as any): Promise<TData> => {
+  const mutateAsync = useCallback(async (variables: TVariables = undefined as TVariables): Promise<TData> => {
     setState({
       data: undefined,
       error: null,
@@ -580,10 +592,8 @@ export function useMutation<TData = any, TVariables = any, TContext = any>({
 
 export function useIsFetching(filters?: UseIsFetchingOptions) {
   const client = useQueryClient();
-  const stableFilters = useMemo(
-    () => filters,
-    [JSON.stringify(filters ?? {})]
-  );
+  const serializedFilters = JSON.stringify(filters ?? {});
+  const stableFilters = useMemo(() => JSON.parse(serializedFilters) as UseIsFetchingOptions, [serializedFilters]);
 
   const getSnapshot = useCallback(() => client.getIsFetching(stableFilters), [client, stableFilters]);
 
@@ -598,15 +608,15 @@ export function useIsFetching(filters?: UseIsFetchingOptions) {
 
 interface UseInfiniteQueryOptions<TData> {
   queryKey: QueryKey;
-  queryFn: (context: { pageParam?: any }) => Promise<TData>;
-  initialPageParam?: any;
-  getNextPageParam: (lastPage: TData, allPages: TData[]) => any | undefined;
+  queryFn: (context: { pageParam?: unknown }) => Promise<TData>;
+  initialPageParam?: unknown;
+  getNextPageParam: (lastPage: TData, allPages: TData[]) => unknown;
   enabled?: boolean;
   staleTime?: number;
   gcTime?: number;
 }
 
-export function useInfiniteQuery<TData = any>({
+export function useInfiniteQuery<TData = unknown>({
   queryKey,
   queryFn,
   initialPageParam,
@@ -617,10 +627,11 @@ export function useInfiniteQuery<TData = any>({
 }: UseInfiniteQueryOptions<TData>) {
   const client = useQueryClient();
 
-  const stableQueryKey = useMemo(() => queryKey, [JSON.stringify(queryKey)]);
+  const serializedKey = serializeKey(queryKey);
+  const stableQueryKey = useMemo(() => JSON.parse(serializedKey) as QueryKey, [serializedKey]);
 
   const getSnapshot = useCallback(() => {
-    const st = client.getOrCreateQuery<{ pages: TData[]; pageParams: any[] }>(stableQueryKey, {
+    const st = client.getOrCreateQuery<{ pages: TData[]; pageParams: unknown[] }>(stableQueryKey, {
       staleTime: staleTime ?? 0,
       gcTime: gcTime ?? 5 * 60 * 1000,
     });
@@ -628,7 +639,7 @@ export function useInfiniteQuery<TData = any>({
       st.data = { pages: [], pageParams: [initialPageParam] };
     }
     return st;
-  }, [client, stableQueryKey, initialPageParam]);
+  }, [client, stableQueryKey, initialPageParam, gcTime, staleTime]);
 
   const state = useSyncExternalStore(
     useCallback(cb => client.subscribe(stableQueryKey, cb), [client, stableQueryKey]),
@@ -638,7 +649,7 @@ export function useInfiniteQuery<TData = any>({
 
   const [isFetchingNextPage, setIsFetchingNextPage] = useState(false);
 
-  const fetchPage = useCallback(async (pageParam: any, isNext: boolean) => {
+  const fetchPage = useCallback(async (pageParam: unknown, isNext: boolean) => {
     if (!enabled) return;
     
     if (isNext) {
@@ -651,7 +662,7 @@ export function useInfiniteQuery<TData = any>({
 
     try {
       const data = await queryFn({ pageParam });
-      client.updateQueryState<{ pages: TData[]; pageParams: any[] }>(stableQueryKey, (currentState) => {
+      client.updateQueryState<{ pages: TData[]; pageParams: unknown[] }>(stableQueryKey, (currentState) => {
         const currentData = currentState.data || { pages: [], pageParams: [] };
         let nextPages = [...currentData.pages];
         let nextParams = [...currentData.pageParams];
