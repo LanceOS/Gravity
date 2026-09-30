@@ -218,6 +218,69 @@ describe('TicketUpdateBatchManager', () => {
     expect(onError.mock.calls[0][1].snapshot).toBe('canonical server snapshot');
   });
 
+  it('returns each batch outcome without waiting for or adopting later outcomes', async () => {
+    const { queue, manager, send } = setup();
+    const first = deferred<string>();
+    const second = deferred<string>();
+    send.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    const firstResult = queue({ title: 'first' });
+    const running = manager.flush('one');
+    await Promise.resolve();
+    const secondResult = queue({ title: 'second' });
+    const mergedResult = queue({ priority: 'high' });
+    void manager.flush('one');
+    first.resolve('saved');
+    await expect(firstResult).resolves.toBe(true);
+    let secondSettled = false;
+    void secondResult.then(() => { secondSettled = true; });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(secondSettled).toBe(false);
+    second.reject(new Error('offline'));
+    await expect(secondResult).resolves.toBe(false);
+    await expect(mergedResult).resolves.toBe(false);
+    await running;
+  });
+
+  it('settles cancelled pending edits as unsuccessful', async () => {
+    const { queue, manager } = setup();
+    const cancelled = queue({ title: 'cancel' });
+    manager.cancel('one');
+    await expect(cancelled).resolves.toBe(false);
+    const disposed = queue({ title: 'dispose' });
+    manager.dispose();
+    await expect(disposed).resolves.toBe(false);
+  });
+
+  it.each(['success', 'error'] as const)('rebases reentrant edits from the %s callback', async (outcome) => {
+    const { queue, manager, send, onSuccess, onError } = setup();
+    if (outcome === 'error') send.mockRejectedValueOnce(new Error('offline'));
+    let reentrant!: Promise<boolean>;
+    const callback = outcome === 'success' ? onSuccess : onError;
+    callback.mockImplementationOnce(() => {
+      reentrant = queue({ priority: 'high' }, 'one', 'optimistic');
+      void manager.flush('one');
+    });
+    queue({ title: 'first' });
+    await manager.flush('one');
+    await expect(reentrant).resolves.toBe(true);
+    expect(send.mock.calls[1][0].snapshot).toBe('original');
+    expect(send.mock.calls[1][0].updates).toEqual({ priority: 'high' });
+  });
+
+  it('settles active callers on disposal without waiting for transport', async () => {
+    const { queue, manager, send, onSuccess } = setup();
+    const response = deferred<string>();
+    send.mockReturnValueOnce(response.promise);
+    const outcome = queue({ title: 'first' });
+    const running = manager.flush('one');
+    await Promise.resolve();
+    manager.dispose();
+    await expect(outcome).resolves.toBe(false);
+    response.resolve('late');
+    await running;
+    expect(onSuccess).not.toHaveBeenCalled();
+  });
+
   it('releases the queue even if a consumer callback throws', async () => {
     const { queue, manager, onSuccess, send } = setup();
     onSuccess.mockImplementationOnce(() => { throw new Error('callback'); });
