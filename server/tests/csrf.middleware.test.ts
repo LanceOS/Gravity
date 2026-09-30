@@ -60,16 +60,18 @@ describe('CSRF middleware', () => {
     expect(res._getStatus()).toBe(200);
   });
 
-  it('allows when Authorization header present', () => {
-    const mw = csrfProtect(undefined, { enforceInTest: true });
-    const req = makeReq({ authorization: 'Bearer token' }, 'POST');
+  it('does not let an Authorization header bypass a disallowed Origin', () => {
+    const mw = csrfProtect(['https://example.com'], { enforceInTest: true });
+    const req = makeReq({ authorization: 'Bearer token', origin: 'https://attacker.example' }, 'POST');
     const res = makeRes();
     let nextCalled = false;
     mw(req, res, () => {
       nextCalled = true;
     });
 
-    expect(nextCalled).toBe(true);
+    expect(nextCalled).toBe(false);
+    expect(res._getStatus()).toBe(403);
+    expect(res._getBody()).toEqual({ error: 'Invalid Origin or Referer header.' });
   });
 
   it('allows safe methods without Origin', () => {

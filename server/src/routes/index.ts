@@ -33,12 +33,15 @@ export function createApiRouter() {
   });
 
   // The workspace OAuth transport requires a bearer token and never uses a
-  // browser cookie. Let its first unauthenticated request reach the 401 OAuth
-  // challenge instead of rejecting discovery for a missing Origin header.
-  // Session-authenticated legacy MCP and every other API keep CSRF protection.
+  // browser cookie. Let its initial request reach the OAuth challenge. The
+  // legacy MCP paths can also use browser sessions, so skip CSRF there only
+  // when a complete Bearer credential selects the token-authenticated path.
+  // Its handler validates the token and rejects any supplied untrusted Origin.
   const protectCsrf = csrfProtect();
   router.use((req, res, next) => {
     if (req.method === 'POST' && /^\/workspaces\/[^/]+\/mcp\/?$/.test(req.path)) return next();
+    if (req.method === 'POST' && /^\/mcp(?:\/sse)?\/?$/.test(req.path)
+      && /^Bearer\s+\S+$/i.test(req.get('authorization')?.trim() ?? '')) return next();
     return protectCsrf(req, res, next);
   });
   // Handle the bearer-only challenge before workspace routers that also install
