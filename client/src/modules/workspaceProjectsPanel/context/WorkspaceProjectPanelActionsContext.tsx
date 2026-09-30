@@ -1,3 +1,4 @@
+import { toast } from '@library';
 import { createContext, type FormEvent, type JSX, useCallback, useEffect, useContext, useMemo, type PropsWithChildren, useRef, useState } from 'react';
 
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
@@ -29,6 +30,7 @@ type WorkspaceProjectPanelActionOptions = WorkspaceProjectPanelActionCallbacks &
 
 export interface WorkspaceProjectPanelActionsContextValue {
   projectSettingsUnchanged: boolean;
+  canSaveProjectSettings: boolean;
   labelUnchanged: boolean;
   isCreateProjectModalOpen: boolean;
   openCreateProjectModal: () => void;
@@ -108,6 +110,7 @@ export function WorkspaceProjectPanelActionsContextProvider({
   const projectInput = JSON.stringify([managedProject?.id, githubRepoUrl.trim()]);
   const labelInput = JSON.stringify([editingLabelId, editingLabelName.trim(), editingLabelColor, editingLabelDescription.trim()]);
   const projectSettingsUnchanged = savedProjectInput === projectInput || githubRepoUrl.trim() === (managedProject?.githubRepoUrl || '');
+  const canSaveProjectSettings = Boolean(managedProject) && !projectSettingsUnchanged;
   const labelUnchanged = savedLabelInput === labelInput || (activeLabel?.name === editingLabelName.trim() && activeLabel.color === editingLabelColor && (activeLabel.description || '') === editingLabelDescription.trim());
   const [labelToDelete, setLabelToDelete] = useState<Label | null>(null);
   const [isDeletingProject, setIsDeletingProject] = useState(false);
@@ -302,6 +305,7 @@ export function WorkspaceProjectPanelActionsContextProvider({
       pendingActions.current.add('project');
       setIsProjectSettingsSaving(true);
       setSettingsFeedback(null);
+      const savingToast = toast.show('Saving project settings…', 'info', 0);
 
       try {
         await onUpdateProject(managedProject.id, {
@@ -314,6 +318,7 @@ export function WorkspaceProjectPanelActionsContextProvider({
           createProjectSettingsFeedback('error', error instanceof Error ? error.message : 'Failed to update project settings.')
         );
       } finally {
+        toast.dismiss(savingToast);
         pendingActions.current.delete('project');
         setIsProjectSettingsSaving(false);
       }
@@ -345,6 +350,7 @@ export function WorkspaceProjectPanelActionsContextProvider({
   const contextValue = useMemo(
     () => ({
       projectSettingsUnchanged,
+      canSaveProjectSettings,
       labelUnchanged,
       isCreateProjectModalOpen: isCreateModalOpen,
       openCreateProjectModal,
@@ -362,6 +368,7 @@ export function WorkspaceProjectPanelActionsContextProvider({
     }),
     [
       projectSettingsUnchanged,
+      canSaveProjectSettings,
       labelUnchanged,
       closeCreateProjectModal,
       createLabel,

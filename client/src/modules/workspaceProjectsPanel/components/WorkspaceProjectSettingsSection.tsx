@@ -8,9 +8,9 @@ import { useWorkspaceProjectPanelProjectStateContext } from '../context/Workspac
 import { WorkspaceProjectDeleteModal } from './WorkspaceProjectDeleteModal';
 
 export function WorkspaceProjectSettingsSection() {
-  const { managedProject, isProjectSettingsSaving, settingsFeedback: stateSettingsFeedback, setGithubRepoUrl, githubRepoUrl } =
+  const { managedProject, isProjectSettingsSaving, settingsFeedback: stateSettingsFeedback, setSettingsFeedback, setGithubRepoUrl, githubRepoUrl } =
     useWorkspaceProjectPanelProjectStateContext();
-  const { projectSettingsUnchanged, saveProjectSettings, deleteProject, isDeletingProject, canDeleteProject } = useWorkspaceProjectPanelActionsContext();
+  const { saveProjectSettings, canSaveProjectSettings, deleteProject, isDeletingProject, canDeleteProject } = useWorkspaceProjectPanelActionsContext();
   const [isDeleteProjectModalOpen, setIsDeleteProjectModalOpen] = useState(false);
 
   const handleOpenDeleteProjectModal = () => {
@@ -53,12 +53,13 @@ export function WorkspaceProjectSettingsSection() {
         <TextInput
           label="GitHub Repository URL"
           value={githubRepoUrl}
-          onChange={(event) => setGithubRepoUrl(event.target.value)}
+          onChange={(event) => {
+            setGithubRepoUrl(event.target.value);
+            setSettingsFeedback(null);
+          }}
           placeholder="https://github.com/owner/repository"
           disabled={isProjectSettingsSaving}
           type="url"
-          pattern="https://github\\.com/.+/.+"
-          title="Must be a full HTTPS GitHub repository URL (https://github.com/owner/repo)"
         />
 
         <FormSection.Actions
@@ -66,8 +67,8 @@ export function WorkspaceProjectSettingsSection() {
           align="between"
           style={{ minHeight: '36px' }}
         >
-          <Button type="submit" variant="primary" loading={isProjectSettingsSaving} disabled={projectSettingsUnchanged} style={{ minHeight: '36px' }}>
-            Save Settings
+          <Button type="submit" variant="primary" loading={isProjectSettingsSaving} disabled={isProjectSettingsSaving || !canSaveProjectSettings} style={{ minHeight: '36px' }}>
+            {isProjectSettingsSaving ? 'Saving…' : 'Save Settings'}
           </Button>
 
           {canDeleteProject ? (
