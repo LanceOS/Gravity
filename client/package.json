@@ -19,7 +19,10 @@
     "test:editor-trusted-types": "node scripts/editor-trusted-types-browser-test.mjs",
     "test:sidebar-browser": "node scripts/sidebar-browser-test.mjs",
     "test:hover-browser": "node scripts/hover-browser-test.mjs",
-    "test:ticket-performance": "node scripts/ticket-performance-browser-test.mjs"
+    "test:ticket-performance": "node scripts/ticket-performance-browser-test.mjs",
+    "test:portal-browser": "node scripts/portal-browser-test.mjs",
+    "test:browser-dependencies": "node --test scripts/locked-browser-dependencies.test.mjs",
+    "test:tooltip-provenance": "node scripts/tooltip-provenance-regression.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.28.0",

@@ -326,7 +326,8 @@ describe('TicketMutationProvider', () => {
     });
 
     expect(queryClient.getQueryData<Ticket[]>(queryKeys.tickets('project-1'))).toEqual([baseTicket]);
-    expect(setActiveTicket).toHaveBeenCalledWith(baseTicket);
+    const rollback = setActiveTicket.mock.calls.at(-1)?.[0];
+    expect(rollback({ ...baseTicket, title: 'Broken update' })).toEqual(baseTicket);
 
     const deleteResponse = new Response(null, { status: 204 });
     fetchMock.mockResolvedValueOnce(deleteResponse);
@@ -580,6 +581,259 @@ describe('TicketMutationProvider', () => {
       await saving;
     });
     expect(client.getQueryData(queryKeys.tickets(baseTicket.projectId))).toEqual([sibling]);
+  });
+
+  it.each([[200, true], [500, true], [200, false], [500, false]] as const)('preserves pending fields before debounce (status %s, ID detail %s)', async (status, hasIdDetail) => {
+    vi.useFakeTimers();
+    configureContext();
+    const client = createQueryClient();
+    client.setQueryData(queryKeys.tickets(baseTicket.projectId), [baseTicket]);
+    if (hasIdDetail) client.setQueryData(queryKeys.ticketDetail(baseTicket.id), baseTicket);
+    client.setQueryData(queryKeys.ticket(baseTicket.key), baseTicket);
+    let finish!: (response: Response) => void;
+    const fetchMock = vi.fn<(url: string, options: RequestInit) => Promise<Response>>(() => new Promise<Response>(resolve => { finish = resolve; }));
+    vi.stubGlobal('fetch', fetchMock);
+    renderWithProvider(client);
+    let saving!: Promise<boolean | void>;
+    let settled = false;
+    await act(async () => {
+      await currentActions.updateTicket(baseTicket.id, { title: 'Draft title' }, { immediate: false });
+      saving = currentActions.updateTicket(baseTicket.id, { priority: 'high' });
+      void saving.then(() => { settled = true; });
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body as string)).toEqual({ title: 'Draft title', priority: 'high' });
+    expect(settled).toBe(false);
+    expect(client.getQueryData(queryKeys.ticket(baseTicket.key))).toMatchObject({ title: 'Draft title', priority: 'high' });
+    await act(async () => {
+      finish(jsonResponse(status === 200 ? { ...baseTicket, title: 'Draft title', priority: 'high' } : { error: 'Offline' }, status));
+      expect(await saving).toBe(status === 200);
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(client.getQueryData(queryKeys.ticket(baseTicket.key))).toMatchObject({
+      title: status === 200 ? 'Draft title' : baseTicket.title,
+      priority: status === 200 ? 'high' : baseTicket.priority,
+    });
+  });
+
+  it.each([
+    [200, 200], [500, 200], [200, 500], [500, 500],
+  ])('serializes immediate saves behind debounced requests and isolates outcomes (%s, %s)', async (firstStatus, secondStatus) => {
+    vi.useFakeTimers();
+    configureContext();
+    const client = createQueryClient();
+    client.setQueryData(queryKeys.tickets(baseTicket.projectId), [baseTicket]);
+    client.setQueryData(queryKeys.ticketDetail(baseTicket.id), baseTicket);
+    let finishFirst!: (response: Response) => void;
+    let finishSecond!: (response: Response) => void;
+    const fetchMock = vi.fn()
+      .mockImplementationOnce(() => new Promise<Response>(resolve => { finishFirst = resolve; }))
+      .mockImplementationOnce(() => new Promise<Response>(resolve => { finishSecond = resolve; }));
+    vi.stubGlobal('fetch', fetchMock);
+    renderWithProvider(client);
+    let saving!: Promise<boolean | void>;
+    let settled = false;
+    await act(async () => {
+      await currentActions.updateTicket(baseTicket.id, { title: 'Older title' }, { immediate: false });
+      await vi.advanceTimersByTimeAsync(TICKET_UPDATE_DEBOUNCE_MS);
+      saving = currentActions.updateTicket(baseTicket.id, { title: 'Newer title', priority: 'high' });
+      void saving.then(() => { settled = true; });
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(settled).toBe(false);
+    await act(async () => {
+      finishFirst(jsonResponse(firstStatus === 200 ? { ...baseTicket, title: 'Older title' } : { error: 'First failed' }, firstStatus));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ title: 'Newer title', priority: 'high' });
+    expect(settled).toBe(false);
+    expect(client.getQueryData(queryKeys.ticketDetail(baseTicket.id))).toMatchObject({ title: 'Newer title', priority: 'high' });
+    await act(async () => {
+      finishSecond(jsonResponse(secondStatus === 200 ? { ...baseTicket, title: 'Newer title', priority: 'high' } : { error: 'Second failed' }, secondStatus));
+      expect(await saving).toBe(secondStatus === 200);
+    });
+    expect(client.getQueryData(queryKeys.ticketDetail(baseTicket.id))).toMatchObject({
+      title: secondStatus === 200 ? 'Newer title' : firstStatus === 200 ? 'Older title' : baseTicket.title,
+      priority: secondStatus === 200 ? 'high' : baseTicket.priority,
+    });
+  });
+
+  it.each(['local', 'remote'])('settles queued immediate saves when %s deletion interrupts an in-flight save', async (source) => {
+    vi.useFakeTimers();
+    configureContext();
+    const client = createQueryClient();
+    const root = { ...baseTicket, id: 'root', key: 'GRA-0' };
+    const child = { ...baseTicket, parentId: root.id };
+    client.setQueryData(queryKeys.tickets(baseTicket.projectId), [root, child]);
+    client.setQueryData(queryKeys.ticketDetail(child.id), child);
+    let finish!: (response: Response) => void;
+    const fetchMock = vi.fn()
+      .mockImplementationOnce(() => new Promise<Response>(resolve => { finish = resolve; }))
+      .mockResolvedValueOnce(jsonResponse({ deletedTickets: [root, child] }));
+    vi.stubGlobal('fetch', fetchMock);
+    renderWithProvider(client);
+    let saving!: Promise<boolean | void>;
+    await act(async () => {
+      await currentActions.updateTicket(child.id, { title: 'Older' }, { immediate: false });
+      await vi.advanceTimersByTimeAsync(TICKET_UPDATE_DEBOUNCE_MS);
+      saving = currentActions.updateTicket(child.id, { title: 'Newer' });
+      if (source === 'local') await currentActions.deleteTicket(root.id);
+      else removeSseTicketSubtree(client, [root, child]);
+      finish(jsonResponse({ ...child, title: 'Older' }));
+      expect(await saving).toBe(false);
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(source === 'local' ? 2 : 1);
+    expect(client.getQueryData(queryKeys.tickets(baseTicket.projectId))).toEqual([]);
+    expect(client.getQueryData(queryKeys.ticketDetail(child.id))).toBeUndefined();
+  });
+
+  it('keeps reentrant optimistic edits newer across list and detail caches', async () => {
+    configureContext();
+    const client = createQueryClient();
+    client.setQueryData(queryKeys.tickets(baseTicket.projectId), [baseTicket]);
+    client.setQueryData(queryKeys.ticketDetail(baseTicket.id), baseTicket);
+    let finish!: (response: Response) => void;
+    const fetchMock = vi.fn(() => new Promise<Response>(resolve => { finish = resolve; }));
+    vi.stubGlobal('fetch', fetchMock);
+    renderWithProvider(client);
+    const original = client.setQueryData.bind(client);
+    let reentered = false;
+    let nested!: Promise<boolean | void>;
+    vi.spyOn(client, 'setQueryData').mockImplementation((...args) => {
+      const result = original(...args);
+      if (!reentered) {
+        reentered = true;
+        nested = currentActions.updateTicket(baseTicket.id, { title: 'Newer', priority: 'high' });
+      }
+      return result;
+    });
+    let outer!: Promise<boolean | void>;
+    await act(async () => { outer = currentActions.updateTicket(baseTicket.id, { title: 'Older' }); });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    for (const key of [queryKeys.tickets(baseTicket.projectId), queryKeys.ticketDetail(baseTicket.id)]) {
+      const data = client.getQueryData<Ticket | Ticket[]>(key);
+      expect(Array.isArray(data) ? data[0] : data).toMatchObject({ title: 'Newer', priority: 'high' });
+    }
+    await act(async () => {
+      finish(jsonResponse({ ...baseTicket, title: 'Newer', priority: 'high' }));
+      expect(await outer).toBe(true);
+      expect(await nested).toBe(true);
+    });
+  });
+
+  it.each([200, 500])('preserves reentrant edits during response reconciliation (%s)', async (status) => {
+    vi.useFakeTimers();
+    configureContext();
+    const client = createQueryClient();
+    client.setQueryData(queryKeys.tickets(baseTicket.projectId), [baseTicket]);
+    client.setQueryData(queryKeys.ticketDetail(baseTicket.id), baseTicket);
+    let finish!: (response: Response) => void;
+    const fetchMock = vi.fn()
+      .mockImplementationOnce(() => new Promise<Response>(resolve => { finish = resolve; }))
+      .mockResolvedValueOnce(jsonResponse({ error: 'Second failed' }, 500));
+    vi.stubGlobal('fetch', fetchMock);
+    renderWithProvider(client);
+    let first!: Promise<boolean | void>;
+    await act(async () => { first = currentActions.updateTicket(baseTicket.id, { title: 'Older' }); });
+    const original = client.setQueryData.bind(client);
+    let reentered = false;
+    let nested!: Promise<boolean | void>;
+    vi.spyOn(client, 'setQueryData').mockImplementation((...args) => {
+      const result = original(...args);
+      if (!reentered) {
+        reentered = true;
+        nested = currentActions.updateTicket(baseTicket.id, { title: 'Newer' });
+      }
+      return result;
+    });
+    await act(async () => {
+      finish(jsonResponse(status === 200 ? { ...baseTicket, title: 'Confirmed' } : { error: 'First failed' }, status));
+      expect(await first).toBe(status === 200);
+      expect(await nested).toBe(false);
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    for (const key of [queryKeys.tickets(baseTicket.projectId), queryKeys.ticketDetail(baseTicket.id)]) {
+      const data = client.getQueryData<Ticket | Ticket[]>(key);
+      expect(Array.isArray(data) ? data[0] : data).toMatchObject({ title: status === 200 ? 'Confirmed' : baseTicket.title });
+    }
+  });
+
+  it('keeps active state and caches consistent across multiple immediate callers', async () => {
+    vi.useFakeTimers();
+    configureContext();
+    let active: Ticket | null = baseTicket;
+    mocks.useActiveTicket.mockImplementation(function useTestActiveTicket() {
+      const [activeTicket, setActiveTicket] = React.useState<Ticket | null>(baseTicket);
+      React.useEffect(() => { active = activeTicket; }, [activeTicket]);
+      return { activeTicket, setActiveTicket };
+    });
+    const client = createQueryClient();
+    client.setQueryData(queryKeys.tickets(baseTicket.projectId), [baseTicket]);
+    client.setQueryData(queryKeys.ticketDetail(baseTicket.id), baseTicket);
+    let finishFirst!: (response: Response) => void;
+    let finishSecond!: (response: Response) => void;
+    const fetchMock = vi.fn()
+      .mockImplementationOnce(() => new Promise<Response>(resolve => { finishFirst = resolve; }))
+      .mockImplementationOnce(() => new Promise<Response>(resolve => { finishSecond = resolve; }));
+    vi.stubGlobal('fetch', fetchMock);
+    renderWithProvider(client);
+    let first!: Promise<boolean | void>;
+    let second!: Promise<boolean | void>;
+    let third!: Promise<boolean | void>;
+    await act(async () => {
+      first = currentActions.updateTicket(baseTicket.id, { title: 'First' });
+      second = currentActions.updateTicket(baseTicket.id, { title: 'Second' });
+      third = currentActions.updateTicket(baseTicket.id, { priority: 'high' });
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      finishFirst(jsonResponse({ ...baseTicket, title: 'Confirmed first' }));
+      expect(await first).toBe(true);
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ title: 'Second', priority: 'high' });
+    expect(active).toMatchObject({ title: 'Second', priority: 'high' });
+    await act(async () => {
+      finishSecond(jsonResponse({ error: 'Offline' }, 500));
+      expect(await second).toBe(false);
+      expect(await third).toBe(false);
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(active).toMatchObject({ title: 'Confirmed first', priority: baseTicket.priority });
+    expect(client.getQueryData(queryKeys.ticketDetail(baseTicket.id))).toMatchObject({ title: 'Confirmed first', priority: baseTicket.priority });
+    expect(client.getQueryData(queryKeys.tickets(baseTicket.projectId))).toMatchObject([{ title: 'Confirmed first', priority: baseTicket.priority }]);
+  });
+
+  it('limits immediate failure rollback to the edited fields and ticket', async () => {
+    configureContext();
+    const client = createQueryClient();
+    const other = { ...baseTicket, id: 'other', key: 'GRA-2' };
+    client.setQueryData(queryKeys.tickets(baseTicket.projectId), [baseTicket, other]);
+    let finish!: (response: Response) => void;
+    const fetchMock = vi.fn()
+      .mockImplementationOnce(() => new Promise<Response>(resolve => { finish = resolve; }))
+      .mockResolvedValueOnce(jsonResponse({ ...other, title: 'Other saved' }));
+    vi.stubGlobal('fetch', fetchMock);
+    renderWithProvider(client);
+    let saving!: Promise<boolean | void>;
+    await act(async () => {
+      saving = currentActions.updateTicket(baseTicket.id, { title: 'Failed' });
+      await currentActions.updateTicket(other.id, { title: 'Other saved' });
+      client.setQueryData<Ticket[]>(queryKeys.tickets(baseTicket.projectId), tickets => (tickets ?? []).map(ticket =>
+        ticket.id === baseTicket.id ? { ...ticket, description: 'Independent edit' } : ticket));
+      finish(jsonResponse({ error: 'Offline' }, 500));
+      expect(await saving).toBe(false);
+    });
+    expect(client.getQueryData(queryKeys.tickets(baseTicket.projectId))).toMatchObject([
+      { title: baseTicket.title, description: 'Independent edit' }, { title: 'Other saved' },
+    ]);
   });
 
   it('delegates moveTicket to the injected move hook', async () => {

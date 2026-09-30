@@ -1,11 +1,13 @@
+import { ensureLockedBrowserDependencies } from './locked-browser-dependencies.mjs';
+await ensureLockedBrowserDependencies(import.meta.url);
 // Isolated production fixture: no API, database, service changes, or containers.
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { build } from 'esbuild';
-import { chromium } from 'playwright';
+const { build } = await import('esbuild');
+const { chromium } = await import('playwright');
 
 const root = fileURLToPath(new URL('../..', import.meta.url));
 const outDir = await mkdtemp(resolve(tmpdir(), 'gravity-picker-performance-'));

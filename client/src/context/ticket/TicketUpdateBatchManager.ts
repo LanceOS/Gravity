@@ -8,6 +8,7 @@ export interface TicketUpdateBatch<Updates, Snapshot> {
 interface PendingBatch<Updates, Snapshot> extends TicketUpdateBatch<Updates, Snapshot> {
   timer: ReturnType<typeof setTimeout> | null;
   flushRequested: boolean;
+  waiters: Array<(saved: boolean) => void>;
 }
 
 export interface TicketUpdateBatchManagerOptions<Updates, Snapshot, Result> {
@@ -30,6 +31,8 @@ export interface TicketUpdateBatchManagerOptions<Updates, Snapshot, Result> {
 export class TicketUpdateBatchManager<Updates extends object, Snapshot, Result> {
   private pending = new Map<string, PendingBatch<Updates, Snapshot>>();
   private inFlight = new Map<string, Promise<void>>();
+  private active = new Map<string, PendingBatch<Updates, Snapshot>>();
+  private settlingSnapshots = new Map<string, Snapshot>();
   private generation = 0;
   private disposed = false;
   private readonly options: TicketUpdateBatchManagerOptions<Updates, Snapshot, Result>;
@@ -43,17 +46,23 @@ export class TicketUpdateBatchManager<Updates extends object, Snapshot, Result> 
     this.disposed = false;
   }
 
-  queue(batch: TicketUpdateBatch<Updates, Snapshot>) {
+  /** Each caller receives the outcome of the batch containing its edit. */
+  queue(batch: TicketUpdateBatch<Updates, Snapshot>): Promise<boolean> {
     if (this.disposed) throw new Error('TicketUpdateBatchManager is disposed');
-    if (Object.keys(batch.updates).length === 0) return;
+    if (Object.keys(batch.updates).length === 0) return Promise.resolve(true);
+    let settle!: (saved: boolean) => void;
+    const result = new Promise<boolean>(resolve => { settle = resolve; });
     const previous = this.pending.get(batch.id);
     if (previous?.timer != null) clearTimeout(previous.timer);
     const next: PendingBatch<Updates, Snapshot> = {
       ...batch,
-      snapshot: previous ? previous.snapshot : batch.snapshot,
+      snapshot: this.settlingSnapshots.has(batch.id)
+        ? this.settlingSnapshots.get(batch.id)!
+        : previous ? previous.snapshot : batch.snapshot,
       updates: { ...previous?.updates, ...batch.updates },
       flushRequested: previous?.flushRequested ?? false,
       timer: null,
+      waiters: [...previous?.waiters ?? [], settle],
     };
     this.pending.set(batch.id, next);
     next.timer = setTimeout(() => {
@@ -61,6 +70,19 @@ export class TicketUpdateBatchManager<Updates extends object, Snapshot, Result> 
       // flush callers still receive callback errors; transport errors use onError.
       void this.flush(batch.id).catch(() => {});
     }, this.options.debounceMs);
+    return result;
+  }
+
+  /** Read at cache-write time: callbacks may synchronously enqueue another edit. */
+  getPendingUpdates(id: string): Partial<Updates> {
+    return this.pending.get(id)?.updates ?? {};
+  }
+
+  getOptimisticUpdates(id: string): Partial<Updates> {
+    return {
+      ...(!this.settlingSnapshots.has(id) ? this.active.get(id)?.updates : undefined),
+      ...this.pending.get(id)?.updates,
+    };
   }
 
   /** Flush this ticket (or all tickets), waiting for requested follow-up batches. */
@@ -83,7 +105,9 @@ export class TicketUpdateBatchManager<Updates extends object, Snapshot, Result> 
     }
     if (!batch) return;
     this.pending.delete(id);
+    this.active.set(id, batch);
     const generation = this.generation;
+    let saved = false;
     // Defer execution until the promise is registered, including synchronous send errors.
     const work = Promise.resolve().then(async () => {
       if (generation !== this.generation) return;
@@ -92,20 +116,26 @@ export class TicketUpdateBatchManager<Updates extends object, Snapshot, Result> 
         result = await this.options.send(batch);
       } catch (error) {
         if (generation !== this.generation) return;
+        this.settlingSnapshots.set(id, batch.snapshot);
         const followUp = this.pending.get(id);
         if (followUp) followUp.snapshot = batch.snapshot;
         this.options.onError(error, batch, followUp);
         return;
       }
       if (generation !== this.generation) return;
+      const snapshot = this.options.getSnapshotAfterSuccess
+        ? this.options.getSnapshotAfterSuccess(result, batch) : batch.snapshot;
+      this.settlingSnapshots.set(id, snapshot);
       const followUp = this.pending.get(id);
-      if (followUp && this.options.getSnapshotAfterSuccess) {
-        followUp.snapshot = this.options.getSnapshotAfterSuccess(result, batch);
-      }
+      if (followUp && this.options.getSnapshotAfterSuccess) followUp.snapshot = snapshot;
       this.options.onSuccess(result, batch, followUp);
+      saved = true;
     }).finally(async () => {
+      for (const settle of batch.waiters) settle(saved);
       if (generation !== this.generation) return;
       this.inFlight.delete(id);
+      this.active.delete(id);
+      this.settlingSnapshots.delete(id);
       if (this.pending.get(id)?.flushRequested) await this.flush(id);
     });
     this.inFlight.set(id, work);
@@ -121,6 +151,7 @@ export class TicketUpdateBatchManager<Updates extends object, Snapshot, Result> 
     const batch = this.pending.get(id);
     if (batch?.timer != null) clearTimeout(batch.timer);
     this.pending.delete(id);
+    for (const settle of batch?.waiters ?? []) settle(false);
   }
 
   /** Cancel timers and suppress callbacks from requests in the old lifecycle. */
@@ -129,5 +160,10 @@ export class TicketUpdateBatchManager<Updates extends object, Snapshot, Result> 
     this.disposed = true;
     this.generation++;
     this.inFlight.clear();
+    for (const batch of this.active.values()) {
+      for (const settle of batch.waiters) settle(false);
+    }
+    this.active.clear();
+    this.settlingSnapshots.clear();
   }
 }

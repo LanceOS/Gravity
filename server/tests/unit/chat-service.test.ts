@@ -1,3 +1,4 @@
+import { CredentialsUnavailableError, CREDENTIALS_DISABLED_MESSAGE } from '../../src/modules/auth/kms/availability.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { asc, eq } from 'drizzle-orm';
 import { ChatService, isStreamingChatProvider, isSupportedChatProvider } from '../../src/modules/chats/services/chat-service.js';
@@ -53,6 +54,15 @@ function asJsonMetadata(metadata: unknown) {
 }
 
 describe('ChatService', () => {
+  it('explains disabled credentials in project chat responses', async () => {
+    const fixture = await createChatFixture();
+    const ai = { chat: vi.fn().mockRejectedValue(new CredentialsUnavailableError()) };
+    const result = await new ChatService({ ai }).generateResponse({ ...fixture, message: 'Hello' });
+    expect(result.fallback).toBe(true);
+    expect(result.fallbackReason).toBe('credentials_disabled');
+    expect(result.content).toBe(CREDENTIALS_DISABLED_MESSAGE);
+  });
+
   beforeEach(() => {
     mcpToolsList.splice(0, mcpToolsList.length);
     vi.clearAllMocks();

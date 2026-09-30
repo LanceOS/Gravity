@@ -1,11 +1,13 @@
+import { ensureLockedBrowserDependencies } from './locked-browser-dependencies.mjs';
+await ensureLockedBrowserDependencies(import.meta.url);
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { extname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { chromium, firefox, webkit } from 'playwright';
-import { build } from 'vite';
+const { chromium, firefox, webkit } = await import('playwright');
+const { build } = await import('vite');
 
 const outDir = await mkdtemp(resolve(tmpdir(), 'gravity-focus-accessibility-'));
 const engines = { chromium, firefox, webkit };

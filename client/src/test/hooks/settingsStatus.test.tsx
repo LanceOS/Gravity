@@ -22,6 +22,21 @@ function deferred<T>() {
 beforeEach(() => vi.clearAllMocks());
 
 describe('settings persistence status', () => {
+  it('retains disabled credential availability while saving unrelated preferences', async () => {
+    const disabled = { ...account, encryptedCredentialsAvailable: false };
+    vi.mocked(apiClient.get).mockResolvedValue(disabled);
+    const setTheme = vi.fn(); const setView = vi.fn();
+    const { result } = renderHook(() => useAccountSettings({ currentUser: user, activeView: 'board', theme: 'dark', setTheme, setView }));
+    await waitFor(() => expect(result.current.settingsHydrated).toBe(true));
+    expect(result.current.settings.encryptedCredentialsAvailable).toBe(false);
+    act(() => result.current.updateSettings({ defaultView: 'list' }));
+    vi.mocked(apiClient.patch).mockResolvedValue({ ...disabled, defaultView: 'list' });
+    await act(async () => { await result.current.saveSettings(); });
+    expect(result.current.settings.encryptedCredentialsAvailable).toBe(false);
+    expect(result.current.settings.defaultView).toBe('list');
+    expect(result.current.hasChanges).toBe(false);
+  });
+
   it('keeps workspace edits on failure, permits retry, then becomes clean after confirmation', async () => {
     vi.mocked(apiClient.get).mockImplementation(async path => path.endsWith('/settings') ? { ...workspace } : [] as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any);
     const client = new QueryClient();

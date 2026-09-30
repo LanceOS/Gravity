@@ -13,11 +13,17 @@ Generate each secret independently with `openssl rand -hex 32` (256 random bits)
 requires at least 32 UTF-8 bytes and rejects known test/placeholder values.
 Hex and base64 encodings of 32 random bytes are suitable. Length checks cannot
 prove entropy: do not use passwords or repeated/predictable strings.
-`LOCAL_TESTING_KEK` is required only in development/test, where the local KMS
+`LOCAL_TESTING_KEK` is required only in development/test with credential features enabled, where the local KMS
 provider accepts exactly 64 hex characters or exactly 32 raw UTF-8 bytes; base64
 is not supported for this key. Production does not use this key: its KMS provider
-is currently unconfigured, so encrypted credential storage/use is unavailable.
-Passing preflight does not enable those features (tracked by GRAV-247). Do not switch a public deployment
+is unsupported. `ENCRYPTED_CREDENTIALS_MODE` accepts only `disabled` or `required`.
+Production defaults to `disabled`; development/test default to `required`.
+Production `required` fails preflight and startup before any listener opens, even
+if a local key is present. Disabled mode reports a startup/preflight warning and
+exposes `encryptedCredentialsAvailable: false` in account settings. Credential
+writes and cloud AI calls return an explicit unavailable error; saved key metadata
+and deletion remain available. Production Compose defaults to `disabled`; the
+development Compose override defaults to `required` (use `NODE_ENV=development`). Do not switch a public deployment
 to development mode to work around this limitation.
 Do not regenerate existing encryption keys casually: stored credentials and node
 identities need their original keys to remain readable.

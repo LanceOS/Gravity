@@ -42,7 +42,9 @@ describe('RustFS Security & Performance Endpoints', () => {
       .send(content);
 
     expect(uploadRes.status).toBe(201);
-    expect(uploadRes.body.url).toBe(`/api/v1/notes/${noteId}/media/test-image.png`);
+    expect(uploadRes.body.url).toBe(
+      `/api/v1/notes/${encodeURIComponent(noteId)}/media/test-image.png?projectId=${encodeURIComponent(project.id)}`,
+    );
 
     // 2. Reject Path Traversal on Upload
     const traversalUploadRes = await ownerApi
@@ -77,12 +79,11 @@ describe('RustFS Security & Performance Endpoints', () => {
     expect(largeContentRes.status).toBe(400);
     expect(largeContentRes.body.code).toBe('INVALID_INPUT');
 
-    // 5. Download verification (headers)
-    const downloadRes = await ownerApi
-      .get(`/api/v1/notes/${noteId}/media/test-image.png`)
-      .set('x-project-id', project.id);
+    // 5. Download the returned URL without a project header, as a browser would.
+    const downloadRes = await ownerApi.get(uploadRes.body.url);
 
     expect(downloadRes.status).toBe(200);
+    expect(downloadRes.body).toEqual(Buffer.from(content));
     expect(downloadRes.headers['content-type']).toBe('image/png');
     expect(downloadRes.headers['content-security-policy']).toBe("default-src 'none'; sandbox");
     expect(downloadRes.headers['content-disposition']).toBe('inline');
@@ -90,18 +91,21 @@ describe('RustFS Security & Performance Endpoints', () => {
     // 6. Download verification for attachment (non-inline safe type)
     // Upload text file first
     const txtContent = 'Some text';
-    await ownerApi
+    const txtUploadRes = await ownerApi
       .post(`/api/v1/notes/${noteId}/media?filename=doc.txt`)
       .set('x-project-id', project.id)
       .set('Content-Type', 'text/plain')
       .set('Content-Length', String(txtContent.length))
       .send(txtContent);
 
-    const downloadTxtRes = await ownerApi
-      .get(`/api/v1/notes/${noteId}/media/doc.txt`)
-      .set('x-project-id', project.id);
+    expect(txtUploadRes.status).toBe(201);
+    expect(txtUploadRes.body.url).toBe(
+      `/api/v1/notes/${encodeURIComponent(noteId)}/media/doc.txt?projectId=${encodeURIComponent(project.id)}`,
+    );
+    const downloadTxtRes = await ownerApi.get(txtUploadRes.body.url);
 
     expect(downloadTxtRes.status).toBe(200);
+    expect(downloadTxtRes.text).toBe(txtContent);
     expect(downloadTxtRes.headers['content-type']).toBe('text/plain');
     expect(downloadTxtRes.headers['content-security-policy']).toBe("default-src 'none'; sandbox");
     expect(downloadTxtRes.headers['content-disposition']).toBe('attachment; filename="doc.txt"');
@@ -119,7 +123,7 @@ describe('RustFS Security & Performance Endpoints', () => {
       .set('x-project-id', project.id);
 
     expect(deleteRes.status).toBe(200);
-    expect(deleteRes.body).toEqual({ deleted: true, remainingReferences: [] });
+    expect(deleteRes.body).toEqual({ deleted: true, blocked: false, remainingReferences: [] });
 
     // 9. Path Traversal reject on Delete
     const traversalDeleteRes = await ownerApi

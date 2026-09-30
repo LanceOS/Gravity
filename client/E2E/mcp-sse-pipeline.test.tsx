@@ -1,9 +1,9 @@
-import React from 'react';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import App from '../src/App';
+import { renderMockApp } from './renderMockApp';
 import { router } from '../src/router';
+import { queryClient } from '../src/utils/queryClient';
 import {
   addWorkspaceMember,
   dbState,
@@ -261,10 +261,10 @@ async function renderRealtimeApp(workspaceId: string, userId: string) {
   const ws = dbState.workspaces.find((w) => w.id === workspaceId);
   const projectId = ws?.defaultProjectId || 'prj-realtime';
   await router.navigate(`/workspaces/${workspaceId}/projects/${projectId}/tickets`);
-  render(<App />);
+  await renderMockApp();
 
   await waitFor(() => {
-    expect(getActiveMockSseSource(workspaceId, userId)).toBeTruthy();
+    expect(getActiveMockSseSource(workspaceId, userId)?.readyState).toBe(1);
   });
 
   return user;
@@ -275,6 +275,7 @@ describe('MCP SSE pipeline', () => {
     const { memberUser, workspace, mainTicket } = seedRealtimeWorkspace();
     const user = await renderRealtimeApp(workspace.id, memberUser.id);
     await user.click(await screen.findByText(mainTicket.title));
+    expect(await screen.findByDisplayValue(mainTicket.title)).toBeInTheDocument();
 
     await callMcpTool(workspace.id, memberUser.id, 'update_ticket', {
       ticketKey: mainTicket.key,
@@ -292,6 +293,7 @@ describe('MCP SSE pipeline', () => {
     expect(mainTicketCard).toBeInTheDocument();
 
     await user.click(mainTicketCard);
+    expect(await screen.findByDisplayValue(mainTicket.title)).toBeInTheDocument();
 
     const sidebar = await screen.findByTestId('desktop-sidebar');
     expect(within(sidebar).getByText('No labels assigned')).toBeInTheDocument();
@@ -374,9 +376,19 @@ describe('MCP SSE pipeline', () => {
     // Open detail view of the ticket to verify input value
     const mainTicketCard = await screen.findByText(mainTicket.title);
     await user.click(mainTicketCard);
+    expect(await screen.findByDisplayValue(mainTicket.title)).toBeInTheDocument();
 
+    const deniedSubscription = await fetch(`/api/v1/events/subscribe?workspaceId=${workspace.id}`, {
+      headers: { 'X-Mock-User-Id': nonMemberUser.id },
+    });
+    expect(deniedSubscription.status).toBe(403);
+
+    // EventSource captures the connecting user's identity. Restore the viewing
+    // member immediately so subsequent UI requests still belong to that session.
     dbState.currentUser = nonMemberUser;
-    const deniedSource = new EventSource(`/api/v1/events/subscribe?workspaceId=${workspace.id}`) as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any;
+    const deniedSource = new EventSource(`/api/v1/events/subscribe?workspaceId=${workspace.id}`);
+    dbState.currentUser = memberUser;
+    expect(deniedSource.readyState).toBe(2);
     const deniedMessageSpy = vi.fn();
     deniedSource.addEventListener('message', deniedMessageSpy);
 
@@ -402,6 +414,7 @@ describe('MCP SSE pipeline', () => {
     // Open detail view of the ticket to verify input value
     const mainTicketCard = await screen.findByText(mainTicket.title);
     await user.click(mainTicketCard);
+    expect(await screen.findByDisplayValue(mainTicket.title)).toBeInTheDocument();
 
     const initialSource = getActiveMockSseSource(workspace.id, memberUser.id);
     expect(initialSource).toBeTruthy();
@@ -431,7 +444,10 @@ describe('MCP SSE pipeline', () => {
     const mainTicketCard = await screen.findByText(mainTicket.title);
     expect(mainTicketCard).toBeInTheDocument();
     await user.click(mainTicketCard);
+    expect(await screen.findByDisplayValue(mainTicket.title)).toBeInTheDocument();
 
+    // Finish initial detail/relations requests before counting event-driven reads.
+    await waitFor(() => expect(queryClient.isFetching()).toBe(0));
     const fetchMock = vi.mocked(globalThis.fetch);
     fetchMock.mockClear();
 

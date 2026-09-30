@@ -58,6 +58,7 @@ export function CloudProviderSection({
     () => getProviderOption(resolvedSettings.aiProvider),
     [resolvedSettings.aiProvider]
   );
+  const credentialsDisabled = resolvedSettings.encryptedCredentialsAvailable === false;
   const hasStoredApiKey = isStoredApiKey(resolvedSettings.apiKey);
 
   return (
@@ -70,8 +71,14 @@ export function CloudProviderSection({
           </p>
         </div>
 
+        {credentialsDisabled && <Alert type="warning">
+          Encrypted credentials and cloud AI are disabled on this server. Contact your administrator.
+          You can still remove saved keys below.
+        </Alert>}
+
         <Grid columns={isMobile ? 1 : '1.5fr 3fr'} gap="var(--space-md)">
           <Select
+            disabled={credentialsDisabled}
             label="Provider"
             value={resolvedSettings.aiProvider}
             onValueChange={(value) => resolvedOnChangeSettings({ aiProvider: value as AIProvider })}
@@ -79,6 +86,7 @@ export function CloudProviderSection({
           />
 
           <TextInput
+            disabled={credentialsDisabled}
             label={providerOption.keyLabel}
             type="password"
             autoComplete="new-password"
@@ -89,10 +97,10 @@ export function CloudProviderSection({
         </Grid>
 
         <div className="account-preferences-page__action-row">
-          <Button variant="default" onClick={resolvedOnTestApiKey} loading={resolvedTesting}>
+          <Button variant="default" onClick={resolvedOnTestApiKey} loading={resolvedTesting} disabled={credentialsDisabled}>
             Test {providerOption.label}
           </Button>
-          <Button variant="accent" onClick={resolvedOnSaveSettings} loading={resolvedSaveLoading} disabled={!resolvedHasProviderChanges}>
+          <Button variant="accent" onClick={resolvedOnSaveSettings} loading={resolvedSaveLoading} disabled={credentialsDisabled || !resolvedHasProviderChanges}>
             Save Key
           </Button>
         </div>

@@ -11,6 +11,7 @@ export interface WorkspaceSettings {
   apiKey: string;
   aiProvider: AIProvider;
   tutorialCompleted?: boolean;
+  encryptedCredentialsAvailable?: boolean;
 }
 
 export interface SavedApiCredential {
@@ -81,5 +82,6 @@ export const normalizeWorkspaceSettings = (
   projectLayout: raw?.projectLayout === 'condensed' ? 'condensed' : 'standard',
   apiKey: typeof raw?.apiKey === 'string' ? raw.apiKey : DEFAULT_WORKSPACE_SETTINGS.apiKey,
   aiProvider: isAIProvider(raw?.aiProvider) ? raw.aiProvider : DEFAULT_WORKSPACE_SETTINGS.aiProvider,
+  encryptedCredentialsAvailable: raw?.encryptedCredentialsAvailable !== false,
   tutorialCompleted: typeof raw?.tutorialCompleted === 'boolean' ? raw.tutorialCompleted : undefined,
 });

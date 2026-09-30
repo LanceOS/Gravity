@@ -508,6 +508,19 @@ describe('AccountPreferencesPage', () => {
     expect(screen.getByText('Tutorial will replay on next load.')).toBeInTheDocument();
   });
 
+  it('disables credential controls and explains unavailable cloud AI', async () => {
+    const user = userEvent.setup();
+    renderAccountPreferencesPage({
+      settings: { defaultView: 'board', theme: 'dark', projectLayout: 'standard', aiProvider: 'openai', apiKey: '', encryptedCredentialsAvailable: false },
+      hasProviderChanges: true,
+    });
+    await user.click(screen.getByRole('button', { name: /Cloud AI/i }));
+    expect(screen.getByText(/Encrypted credentials and cloud AI are disabled/)).toBeInTheDocument();
+    expect(screen.getByLabelText('API Key')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Test OpenAI' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save Key' })).toBeDisabled();
+  });
+
   it('shows saved cloud keys with active and inactive tags', async () => {
     const user = userEvent.setup();
 

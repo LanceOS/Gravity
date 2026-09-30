@@ -1,8 +1,7 @@
-import React from 'react';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect } from 'vitest';
-import App from '../src/App';
+import { renderMockApp } from './renderMockApp';
 import { dbState } from './setup';
 import { router } from '../src/router';
 
@@ -68,7 +67,7 @@ describe('Label filter navigation E2E', () => {
     window.localStorage.setItem('gravity_theme', 'dark');
 
     await router.navigate('/workspaces/wsp-1/projects/prj-1/tickets');
-    render(<App />);
+    await renderMockApp();
 
     // Wait for ticket to appear in the board/list
     const ticketCard = await screen.findByText('Frontend bug');
@@ -138,7 +137,7 @@ describe('Label filter navigation E2E', () => {
     window.localStorage.setItem('gravity_theme', 'dark');
 
     await router.navigate('/workspaces/wsp-2/projects/prj-2/tickets');
-    render(<App />);
+    await renderMockApp();
 
     const ticketCard = await screen.findByText('Open detail ticket');
     expect(ticketCard).toBeInTheDocument();
@@ -224,14 +223,14 @@ describe('Label filter navigation E2E', () => {
     window.localStorage.setItem('gravity_theme', 'dark');
 
     await router.navigate('/workspaces/wsp-3/projects/prj-3/tickets');
-    render(<App />);
+    await renderMockApp();
 
     // Ensure both tickets are present initially
     expect(await screen.findByText('Frontend only ticket')).toBeInTheDocument();
     expect(await screen.findByText('Backend only ticket')).toBeInTheDocument();
 
     // Click the Frontend label in the sidebar
-    const labelButton = await screen.findByRole('button', { name: /Frontend/i });
+    const labelButton = await within(screen.getByRole('complementary')).findByRole('button', { name: /^Frontend\s+1$/i });
     await user.click(labelButton);
 
     // Header should update
