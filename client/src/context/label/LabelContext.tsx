@@ -117,9 +117,9 @@ export const LabelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   const createLabelMutation = useMutation({
-    mutationFn: async (labelInput: { name: string; color?: string; description?: string; projectId?: string; sortOrder?: number }) => {
-      const projectId = labelInput.projectId || activeProjectIdRef.current;
-      const cachedProjectLabels = queryClient.getQueryData<Label[]>(queryKeys.labels(projectId));
+    mutationFn: async (labelInput: { name: string; color?: string; description?: string; projectId?: string; teamId?: string; sortOrder?: number }) => {
+      const projectId = labelInput.teamId ? '' : labelInput.projectId || activeProjectIdRef.current;
+      const cachedProjectLabels = queryClient.getQueryData<Label[]>(labelInput.teamId ? ['teamLabels', labelInput.teamId] : queryKeys.labels(projectId));
       const existingProjectLabels: Label[] = Array.isArray(cachedProjectLabels)
         ? cachedProjectLabels
         : projectId === activeProjectIdRef.current
@@ -130,7 +130,7 @@ export const LabelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         existingProjectLabels.reduce((maxSortOrder, label) => Math.max(maxSortOrder, Number(label.sortOrder ?? 0)), -1) + 1;
 
       return apiClient.post<Label>(`/labels`, {
-        projectId,
+        ...(labelInput.teamId ? { teamId: labelInput.teamId } : { projectId }),
         name: labelInput.name,
         color: labelInput.color || '#6B7280',
         description: labelInput.description || '',
@@ -140,12 +140,19 @@ export const LabelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     onSuccess: (label) => {
       toast.show('Label created.', 'success');
       if (label?.id) {
-        invalidateLabelQueries(label.id, label.projectId);
+        if (label.teamId && !label.projectId) {
+          void queryClient.invalidateQueries({ queryKey: ['teamLabels', label.teamId] });
+          for (const project of projects.filter((project) => project.teamId === label.teamId)) {
+            void queryClient.invalidateQueries({ queryKey: queryKeys.labels(project.id), exact: true });
+          }
+        } else {
+          invalidateLabelQueries(label.id, label.projectId);
+        }
       }
     },
   });
 
-  const createLabel = useCallback(async (labelInput: { name: string; color?: string; description?: string; projectId?: string; sortOrder?: number }) => {
+  const createLabel = useCallback(async (labelInput: { name: string; color?: string; description?: string; projectId?: string; teamId?: string; sortOrder?: number }) => {
     try {
       return await createLabelMutation.mutateAsync(labelInput);
     } catch (e) {

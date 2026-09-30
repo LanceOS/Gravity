@@ -1051,7 +1051,10 @@ export function WorkspaceShellPage() {
       onOpenSimulator: () => {},
       onOpenCreateTicket: activeSection === 'workspace' ? handleOpenCreateTicket : () => navigate(`/workspaces/${activeWorkspaceId}`),
       onOpenCreateProject: handleOpenCreateProject,
-      onOpenCreateLabel: handleOpenCreateLabel,
+      onOpenCreateLabel: () => {
+        setLabelCreateError(null);
+        handleOpenCreateLabel();
+      },
       aiProvider: accountSettings.aiProvider,
     },
     userMenu: {
@@ -1277,12 +1280,20 @@ export function WorkspaceShellPage() {
             },
           }}
           createLabel={{
+            scope: {
+              kind: isTeamWorkspace ? 'team' : 'project',
+              options: isTeamWorkspace
+                ? (sidebarTree?.teams ?? []).map((team) => ({ value: team.id, label: team.name }))
+                : activeWorkspaceProjects.map((project) => ({ value: project.id, label: project.name })),
+              defaultId: isTeamWorkspace ? sidebarActiveTeamId : (projectIdParam || activeProjectId),
+            },
             isOpen: isCreateLabelModalOpen,
             loading: labelCreateLoading,
-            errorMessage: labelCreateError,
+            errorMessage: labelCreateErrorState.message,
             onClose: () => setIsCreateLabelModalOpen(false),
             onSubmitLabel: async (label) => {
               await handleCreateLabel(label);
+              void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceSidebarTree(activeWorkspaceId) });
               setIsCreateLabelModalOpen(false);
             },
           }}

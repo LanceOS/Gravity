@@ -1,26 +1,35 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Tag } from 'lucide-react';
-import { Button, CircularColorInput, TextInput, Textarea } from '@library';
+import { Button, CircularColorInput, Select, TextInput, Textarea } from '@library';
 import { FormSection } from '../../../components/FormSection';
 import { ModalDialog } from '../../../components/ModalDialog';
 
 const DEFAULT_LABEL_COLOR = '#3b82f6';
 
+export interface LabelCreateScope {
+  kind: 'team' | 'project';
+  options: { value: string; label: string }[];
+  defaultId: string;
+}
+
 export interface LabelCreateOverlayProps {
+  scope?: LabelCreateScope;
   isOpen?: boolean;
   loading?: boolean;
   errorMessage?: string | null;
   onClose: () => void;
-  onSubmitLabel: (label: { name: string; color: string; description: string }) => Promise<void>;
+  onSubmitLabel: (label: { name: string; color: string; description: string; teamId?: string; projectId?: string }) => Promise<void>;
 }
 
 export function LabelCreateOverlay({
   isOpen,
+  scope,
   loading,
   errorMessage,
   onClose,
   onSubmitLabel,
 }: LabelCreateOverlayProps) {
+  const [scopeId, setScopeId] = useState('');
   const [labelName, setLabelName] = useState('');
   const [labelColor, setLabelColor] = useState(DEFAULT_LABEL_COLOR);
   const [labelDescription, setLabelDescription] = useState('');
@@ -35,7 +44,7 @@ export function LabelCreateOverlay({
   const submissionPending = useRef(false);
   const handleSubmit = async (event?: React.FormEvent<HTMLFormElement>) => {
     event?.preventDefault();
-    if (submissionPending.current || loading) return;
+    if (!isOpen || submissionPending.current || loading) return;
     setFormError(null);
 
     if (!labelName.trim()) {
@@ -43,9 +52,15 @@ export function LabelCreateOverlay({
       return;
     }
 
+    if (scope && !scope.options.some((option) => option.value === scopeId)) {
+      setFormError(`Please select a ${scope.kind}.`);
+      return;
+    }
+
     submissionPending.current = true;
     try {
       await onSubmitLabel({
+        ...(scope ? { [scope.kind === 'team' ? 'teamId' : 'projectId']: scopeId } : {}),
         name: labelName.trim(),
         color: labelColor,
         description: labelDescription.trim(),
@@ -60,16 +75,25 @@ export function LabelCreateOverlay({
     }
   };
 
+  const wasOpen = useRef(false);
+  const previousScopeKind = useRef(scope?.kind);
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !wasOpen.current) {
+      setScopeId(scope?.defaultId ?? '');
       setLabelName('');
       setLabelColor(DEFAULT_LABEL_COLOR);
       setLabelDescription('');
       setFormError(null);
+    } else if (isOpen && (!scopeId || previousScopeKind.current !== scope?.kind)) {
+      // Scope metadata may arrive after the dialog opens. Preserve entered text.
+      setScopeId(scope?.defaultId ?? '');
     }
-  }, [isOpen]);
+    previousScopeKind.current = scope?.kind;
+    wasOpen.current = !!isOpen;
+  }, [isOpen, scope?.defaultId, scope?.kind, scopeId]);
 
   useEffect(() => {
+    if (!isOpen) return;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         handleClose();
@@ -83,7 +107,7 @@ export function LabelCreateOverlay({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleClose, handleSubmit]);
+  }, [isOpen, handleClose, handleSubmit]);
 
   const feedbackMessage = formError || errorMessage;
 
@@ -102,6 +126,17 @@ export function LabelCreateOverlay({
       <ModalDialog.Body>
         <FormSection.Root id="label-create-form" noValidate onSubmit={handleSubmit}>
           {feedbackMessage ? <ModalDialog.Feedback type="error">{feedbackMessage}</ModalDialog.Feedback> : null}
+
+          {scope && (
+            <Select
+              label={scope.kind === 'team' ? 'Team' : 'Project'}
+              placeholder={`Select a ${scope.kind}`}
+              options={scope.options}
+              value={scopeId}
+              onValueChange={setScopeId}
+              disabled={loading}
+            />
+          )}
 
           <TextInput
             label="Label Name"
