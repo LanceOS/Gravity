@@ -1032,5 +1032,18 @@ async function bootstrapDatabase() {
     CREATE INDEX IF NOT EXISTS chat_messages_session_id_created_at_idx
       ON chat_messages (session_id, created_at);
   `);
+  // NOT VALID preserves legacy orphan data for a separate repair, while
+  // enforcing all new references and deletes immediately on PostgreSQL.
+  const ticketFkValidation = env.databaseUrl.startsWith('pgmem://') ? '' : ' NOT VALID';
+  if (!env.databaseUrl.startsWith('pgmem://')) {
+    // pg-mem recurses infinitely on TRUNCATE CASCADE with self-referencing FKs.
+    // The native PostgreSQL subtree regression covers this constraint and locks.
+    await ensureConstraint('tickets', 'tickets_parent_id_tickets_id_fk',
+      'FOREIGN KEY (parent_id) REFERENCES tickets(id) ON DELETE NO ACTION' + ticketFkValidation);
+  }
+  await ensureConstraint('comments', 'comments_ticket_id_tickets_id_fk',
+    'FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE' + ticketFkValidation);
+  await ensureConstraint('ticket_labels', 'ticket_labels_ticket_id_tickets_id_fk',
+    'FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE' + ticketFkValidation);
   await migrateTicketKeyCounters(pool, env.databaseUrl.startsWith('pgmem://'));
 }

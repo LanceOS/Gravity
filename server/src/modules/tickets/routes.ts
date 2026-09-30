@@ -19,7 +19,7 @@ import {
   getTicketById,
   getTicketByKey,
   getTicketRelationsByKey,
-  deleteTicketRecord,
+  deleteTicketRecordWithEffects,
   hasTicketDependencyRelation,
   hasCircularDependency,
   getTicketDetails,
@@ -448,18 +448,19 @@ export function createTicketsRouter() {
     await withTicketAccess(req, res, normalizeRouteParam(req.params.ticketId), async (ticket, userId, workspaceId) => {
       try {
         const ticketId = normalizeRouteParam(req.params.ticketId);
-        const deleted = await deleteTicketRecord(ticketId, ticket.projectId);
+        const deleted = await deleteTicketRecordWithEffects(ticketId, ticket.projectId);
         if (!deleted) {
           res.status(404).json({ error: 'Ticket not found.' });
           return;
         }
 
-        emitWorkspaceEvent(workspaceId, 'tickets-updated', {
+        emitWorkspaceEvent(workspaceId, 'ticket.deleted', {
           projectId: ticket.projectId,
-          ticket: ticket,
           ticketId: ticket.id,
+          ticketKey: ticket.key,
+          deletedTickets: deleted.deletedTickets,
         }, userId);
-        res.json({ success: true });
+        res.json({ success: true, deletedTickets: deleted.deletedTickets });
       } catch (error) {
         res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to delete ticket.' });
       }

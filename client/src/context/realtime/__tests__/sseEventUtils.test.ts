@@ -2,7 +2,7 @@ import { QueryClient } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
 import { queryKeys } from '../../../utils/queryClient';
 import type { Ticket } from '../../../types/domain';
-import { removeSseTicketEntries } from '../sseEventUtils';
+import { removeSseTicketEntries, removeSseTicketSubtree } from '../sseEventUtils';
 
 function makeTicket(overrides: Partial<Ticket>): Ticket {
   return {
@@ -35,6 +35,32 @@ function createQueryClient() {
 }
 
 describe('sseEventUtils', () => {
+  it('removes a complete deletion batch and invalidates surviving relation snapshots', () => {
+    const client = createQueryClient();
+    const invalidate = vi.spyOn(client, 'invalidateQueries');
+    const root = makeTicket({ id: 'root', key: 'ABC-1' });
+    const child = makeTicket({ id: 'child', key: 'ABC-2', parentId: 'root' });
+    const grandchild = makeTicket({ id: 'grandchild', key: 'ABC-3', parentId: 'child' });
+    const survivor = makeTicket({ id: 'survivor', key: 'ABC-4' });
+    // Descendants can be cached only as details, absent from the current list.
+    client.setQueryData(queryKeys.tickets('project-1'), [root, survivor]);
+    for (const ticket of [root, child, grandchild, survivor]) {
+      client.setQueryData(queryKeys.ticketDetail(ticket.id), ticket);
+      client.setQueryData(queryKeys.ticket(ticket.key, 'actor'), ticket);
+      client.setQueryData(queryKeys.comments(ticket.id), [{ id: 'comment' }]);
+    }
+    expect(removeSseTicketSubtree(client, [root, child, grandchild])).toBe(true);
+    expect(client.getQueryData(queryKeys.tickets('project-1'))).toEqual([survivor]);
+    for (const ticket of [root, child, grandchild]) {
+      expect(client.getQueryData(queryKeys.ticketDetail(ticket.id))).toBeUndefined();
+      expect(client.getQueryData(queryKeys.ticket(ticket.key, 'actor'))).toBeUndefined();
+      expect(client.getQueryData(queryKeys.comments(ticket.id))).toBeUndefined();
+    }
+    expect(client.getQueryData(queryKeys.ticketDetail(survivor.id))).toEqual(survivor);
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['tickets'] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.ticketDetails() });
+  });
+
   it('removes user-scoped ticket caches from exact key queries', () => {
     const queryClient = createQueryClient();
     const removeSpy = vi.spyOn(queryClient, 'removeQueries');

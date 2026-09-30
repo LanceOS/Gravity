@@ -3,6 +3,7 @@ import type { Comment, Ticket } from '../../types/domain';
 import type { TicketWithRelations } from '../../modules/tickets/utils/ticketRelations';
 import {
   combineTicketDetails,
+  invalidateAggregateTicketQueries,
   findCachedTicketByKeyOrId,
   getListQueryProjectId,
   normalizeCommentPayload,
@@ -130,6 +131,23 @@ export function removeSseTicketEntries(
       }
     }
   }
+}
+
+/** Apply the committed deletion batch, including descendants absent from list caches. */
+export function removeSseTicketSubtree(queryClient: QueryClient, deletedTickets: unknown): boolean {
+  if (!Array.isArray(deletedTickets) || deletedTickets.length === 0) return false;
+  const entries = deletedTickets.filter((entry): entry is { id: string; key: string; projectId: string } =>
+    isRecord(entry) && typeof entry.id === 'string' && typeof entry.key === 'string' && typeof entry.projectId === 'string');
+  if (entries.length === 0) return false;
+  for (const ticket of entries) removeSseTicketEntries(queryClient, ticket.key, ticket.id, ticket.projectId);
+  // Survivors can have changed parent/subtask and dependency snapshots, including
+  // references from other projects. Mark inactive detail caches stale as well.
+  void queryClient.invalidateQueries({ queryKey: ['tickets'] });
+  void queryClient.invalidateQueries({ queryKey: queryKeys.ticketDetails() });
+  for (const projectId of new Set(entries.map(ticket => ticket.projectId))) {
+    invalidateAggregateTicketQueries(queryClient, projectId);
+  }
+  return true;
 }
 
 export function upsertTicketInListCachesFromSse(

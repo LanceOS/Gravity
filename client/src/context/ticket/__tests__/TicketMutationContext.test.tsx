@@ -289,6 +289,22 @@ describe('TicketMutationProvider', () => {
     expect(invalidateQueriesSpy).toHaveBeenCalledWith({ queryKey: ['teamTickets', 'team-1'] });
   });
 
+  it('reconciles deleted descendants from the response without a realtime connection', async () => {
+    const client = createQueryClient();
+    const child = { ...baseTicket, id: 'child', key: 'ABC-2', parentId: baseTicket.id };
+    client.setQueryData(queryKeys.tickets('project-1'), [baseTicket, child]);
+    client.setQueryData(queryKeys.ticketDetail(child.id), child);
+    client.setQueryData(queryKeys.comments(child.id), [{ id: 'comment' }]);
+    const { setActiveTicket } = configureContext({ activeTicket: child });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ success: true, deletedTickets: [baseTicket, child] })));
+    renderWithProvider(client);
+    await act(async () => { await currentActions.deleteTicket(baseTicket.id); });
+    expect(client.getQueryData(queryKeys.tickets('project-1'))).toEqual([]);
+    expect(client.getQueryData(queryKeys.ticketDetail(child.id))).toBeUndefined();
+    expect(client.getQueryData(queryKeys.comments(child.id))).toBeUndefined();
+    expect(setActiveTicket).toHaveBeenCalledWith(null);
+  });
+
   it('rolls back failed updates and clears the active ticket on delete', async () => {
     const queryClient = createQueryClient();
     queryClient.setQueryData(queryKeys.tickets('project-1'), [baseTicket]);

@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import * as realtime from '../src/realtime.js';
+import { describe, expect, it, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import {
   api,
@@ -390,7 +391,7 @@ describe('projects and tickets routes', () => {
       email: 'test@example.com',
       role: 'owner',
     });
-    const { owner, project } = await seedWorkspaceFixture({
+    const { owner, project, workspace } = await seedWorkspaceFixture({
       owner: { id: ownerApi.user.id, name: ownerApi.user.name, email: ownerApi.user.email, role: 'owner', avatarUrl: ownerApi.user.avatar }
     });
 
@@ -504,12 +505,18 @@ describe('projects and tickets routes', () => {
     expect(listCommentsResponse.status).toBe(200);
     expect(listCommentsResponse.body).toHaveLength(1);
 
+    const child = await seedTicket(project.id, { id: 'deleted-child', key: 'GRV-901', parentId: createTicketResponse.body.id });
+    const grandchild = await seedTicket(project.id, { id: 'deleted-grandchild', key: 'GRV-902', parentId: child.id });
+    const broadcast = vi.spyOn(realtime, 'broadcastToWorkspace');
     const deleteResponse = await ownerApi
       .delete(`/api/v1/tickets/${createTicketResponse.body.id}`)
       .query({ projectId: project.id });
 
     expect(deleteResponse.status).toBe(200);
-    expect(deleteResponse.body).toEqual({ success: true });
+    const deletedTickets = [createTicketResponse.body, child, grandchild].map(({ id, key }) => ({ id, key, projectId: project.id }));
+    expect(deleteResponse.body).toEqual({ success: true, deletedTickets });
+    expect(broadcast).toHaveBeenCalledWith(workspace.id, 'ticket.deleted', expect.objectContaining({ deletedTickets }));
+    expect(broadcast).not.toHaveBeenCalledWith(workspace.id, 'tickets-updated', expect.anything());
   });
 
   it('resolves ticket details by its key prefix/key and validates access', async () => {

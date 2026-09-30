@@ -11,7 +11,7 @@ import {
   createTicketRecord,
   createTicketDependencyRelation,
   deleteCommentRecord,
-  deleteTicketRecord,
+  deleteTicketRecordWithEffects,
   getTicketById,
   getTicketByKey,
   getTicketDetailsByKey,
@@ -351,7 +351,7 @@ export class TicketTools {
 
     await this.assertProjectInWorkspace(ticket.projectId, context.workspaceId);
 
-    const deleted = await deleteTicketRecord(ticket.id, ticket.projectId);
+    const deleted = await deleteTicketRecordWithEffects(ticket.id, ticket.projectId);
     if (!deleted) {
       throw new Error(`Ticket ${ticketKey} not found.`);
     }
@@ -369,7 +369,7 @@ export class TicketTools {
         ticketKey,
         actorUserId: context.actorUserId,
         timestamp: new Date().toISOString(),
-        data: { ticketId: ticket.id, ticket },
+        data: { ticketId: ticket.id, deletedTickets: deleted.deletedTickets },
       });
 
     return { success: true };

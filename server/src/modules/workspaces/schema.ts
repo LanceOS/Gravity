@@ -1,3 +1,4 @@
+import { tickets } from '../tickets/schema.js';
 import { sql } from 'drizzle-orm';
 import { boolean, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
 
@@ -141,7 +142,7 @@ export const labels = pgTable('labels', {
 }));
 
 export const ticketLabels = pgTable('ticket_labels', {
-  ticketId: text('ticket_id').notNull(),
+  ticketId: text('ticket_id').notNull().references(() => tickets.id, { onDelete: 'cascade' }),
   labelId: text('label_id').notNull(),
 }, (table) => ({
   pk: primaryKey({ columns: [table.ticketId, table.labelId] }),

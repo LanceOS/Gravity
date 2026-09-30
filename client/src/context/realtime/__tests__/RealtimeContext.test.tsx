@@ -345,19 +345,25 @@ describe('RealtimeContext', () => {
       },
     ]);
 
+    const deletedChild = { ...updatedTicket, id: 'deleted-child', key: 'GRA-2', parentId: updatedTicket.id };
+    queryClient.setQueryData(queryKeys.ticketDetail(deletedChild.id), deletedChild);
+    await act(async () => { currentActiveTicket!.setActiveTicket(deletedChild); });
+
     service!.emitMessage({
       type: 'ticket.deleted',
       actorUserId: 'user-2',
       ticketKey: updatedTicket.key,
       ticketId: updatedTicket.id,
       projectId: updatedTicket.projectId,
-      data: { ticket: updatedTicket },
+      data: { deletedTickets: [updatedTicket, deletedChild] },
     });
 
     await waitFor(() => {
       expect(queryClient.getQueryData<Ticket[]>(queryKeys.tickets('project-1'))).toEqual([]);
       expect(queryClient.getQueryData<Ticket>(queryKeys.ticketDetail('ticket-1'))).toBeUndefined();
       expect(queryClient.getQueryData(queryKeys.comments('ticket-1'))).toBeUndefined();
+      expect(queryClient.getQueryData(queryKeys.ticketDetail(deletedChild.id))).toBeUndefined();
+      expect(currentActiveTicket?.activeTicket).toBeNull();
     });
   });
 

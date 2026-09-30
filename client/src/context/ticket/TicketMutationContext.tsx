@@ -4,6 +4,7 @@ import { useActiveProject } from '../project/ActiveProjectContext';
 import { useTicketFilters } from '../filters/TicketFiltersContext';
 import { useActiveTicket } from './ActiveTicketContext';
 import { useMoveTicket } from '../utils/useMoveTicket';
+import { removeSseTicketSubtree } from '../realtime/sseEventUtils';
 import { queryKeys } from '../../utils/queryClient';
 import { apiClient } from '../../utils/apiClient';
 import {
@@ -334,10 +335,16 @@ export const TicketMutationProvider: React.FC<{ children: React.ReactNode }> = (
 
   const deleteTicketMutation = useMutation({
     mutationFn: async (id: string) => {
-      await apiClient.delete(`/tickets/${id}`, {
+      return apiClient.delete<{ deletedTickets?: Array<{ id: string; key: string; projectId: string }> }>(`/tickets/${id}`, {
         headers: { 'X-Project-Id': activeProjectIdRef.current },
         skipContentTypeHeader: true,
       });
+    },
+    onSuccess: (result) => {
+      removeSseTicketSubtree(queryClient, result?.deletedTickets);
+      if (result?.deletedTickets?.some(ticket => ticket.id === activeTicketRef.current?.id)) {
+        setActiveTicket(null);
+      }
     },
     onMutate: async (id) => {
       const projId = activeProjectIdRef.current;
