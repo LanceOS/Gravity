@@ -30,3 +30,8 @@ describe('getMcpStdioContext', () => {
     });
   });
 });
+
+it('defaults to disabled handshakes with a bounded attempt window', async () => {
+  const { getMcpStdioHandshakeConfig } = await import('../src/modules/mcp/stdio-config.js');
+  expect(getMcpStdioHandshakeConfig({})).toEqual({ enabled: false, maxAttempts: 20, windowMs: 60000 });
+});
