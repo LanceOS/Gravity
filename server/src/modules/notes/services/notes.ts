@@ -1,7 +1,9 @@
 import { randomUUID } from 'node:crypto';
+import { withNoteReferenceLock } from '../reference-lock.js';
 import { MetadataRepository, NotesRepository, NoteRevisionRepository } from '../repositories.js';
 import { RustFS } from '../../../lib/rustfs.js';
 import { cleanupMedia, type CleanupOptions, type MediaCleanupDependencies } from './media-cleanup.js';
+import { assertNoteAttachmentsUnshared, validateMediaReferences } from './media-deletion.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -95,7 +97,7 @@ export async function createNote(
     await NotesRepository.saveBody(bucketPath, body, bodyKey);
     metadata = await MetadataRepository.createNoteMetadata({
       id: noteId, projectId, userId, title, excerpt, bucketPath, bodyKey,
-    });
+    }, tx => validateMediaReferences(body, tx));
   } catch (err) {
     await discardRevision(bodyKey);
     throw err;
@@ -151,7 +153,7 @@ export async function updateNote(
     if (bodyKey) await NotesRepository.saveBody(existing.bucketPath, body, bodyKey);
     updatedMeta = await MetadataRepository.updateNoteMetadata(noteId, currentVersion, {
       title: updates.title, excerpt: newExcerpt, ...(bodyKey ? { bodyKey } : {}),
-    });
+    }, updates.body !== undefined ? tx => validateMediaReferences(updates.body!, tx) : undefined);
   } catch (err: any) {
     if (bodyKey) await discardRevision(bodyKey);
     if (err.message.includes('Optimistic locking failed')) throw new Error('CONFLICT');
@@ -162,13 +164,24 @@ export async function updateNote(
 }
 
 export async function deleteNote(noteId: string, projectId: string) {
-  const metadata = await MetadataRepository.getNoteMetadata(noteId);
-  if (!metadata || metadata.projectId !== projectId) {
-    return false;
-  }
+  const deleted = await withNoteReferenceLock(async tx => {
+    const metadata = await MetadataRepository.getNoteMetadata(noteId, tx);
+    if (!metadata || metadata.projectId !== projectId) return null;
+    await assertNoteAttachmentsUnshared(metadata, tx);
+    await MetadataRepository.deleteNoteMetadata(noteId, tx);
+    return metadata;
+  });
+  if (!deleted) return false;
 
-  await NotesRepository.deleteBucket(metadata.bucketPath);
-  await MetadataRepository.deleteNoteMetadata(noteId);
+  // Only remove storage after metadata deletion is acknowledged. A DB failure
+  // must not leave a visible note whose committed body was already destroyed.
+  try {
+    await NotesRepository.deleteBucket(deleted.bucketPath);
+  } catch (error) {
+    // The note is deleted; a partial object cleanup cannot roll that back.
+    // Durable retry of these orphaned prefixes is tracked in GRAV-257.
+    console.error('Deleted note storage cleanup failed', { noteId });
+  }
   return true;
 }
 
