@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ThemeProvider, useTheme } from '../ThemeContext';
+import { THEME_STORAGE_KEY } from '../../../constants/storage';
 
 let renderCount = 0;
 
@@ -52,7 +53,7 @@ describe('ThemeContext', () => {
   });
 
   it('hydrates from storage and persists theme changes', () => {
-    window.localStorage.setItem('gravity_theme', 'coffee');
+    window.localStorage.setItem(THEME_STORAGE_KEY, 'coffee');
 
     render(
       <ThemeProvider>
@@ -68,7 +69,7 @@ describe('ThemeContext', () => {
 
     expect(screen.getByTestId('theme')).toHaveTextContent('midnight-azure');
     expect(document.documentElement).toHaveAttribute('data-theme', 'midnight-azure');
-    expect(window.localStorage.getItem('gravity_theme')).toBe('midnight-azure');
+    expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe('midnight-azure');
     expect(renderCount).toBe(2);
   });
 
@@ -86,7 +87,7 @@ describe('ThemeContext', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Set Midnight Azure' }));
 
     expect(screen.getByTestId('theme')).toHaveTextContent('midnight-azure');
-    expect(window.localStorage.getItem('gravity_theme')).toBe('midnight-azure');
+    expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe('midnight-azure');
     expect(renderCount).toBe(2);
   });
 });

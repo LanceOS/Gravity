@@ -49,7 +49,7 @@ export function Cascader({ options, value, onChange, placeholder = 'Select path'
           <span style={{ fontSize: '13px' }}>
             {value.length > 0 ? value.join(' / ') : placeholder}
           </span>
-          <ChevronDown size={14} className="select-trigger__icon" />
+          <ChevronDown size={14} className="select-trigger__icon" aria-hidden="true" />
         </button>
         {isOpen && (
           <div

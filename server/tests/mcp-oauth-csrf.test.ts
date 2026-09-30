@@ -9,6 +9,8 @@ describe('OAuth discovery under production CSRF protection', () => {
     const account = await createAuthenticatedApi({ email: 'oauth-production-csrf@example.com' });
     await db.insert(workspaces).values({ id: 'csrf-oauth', name: 'OAuth', key: 'OAUTH', workspaceKey: 'private-key', createdBy: account.user.id });
     const oldEnvironment = env.nodeEnv;
+    const oldDevAuthBypass = process.env.ALLOW_DEV_AUTH_BYPASS;
+    process.env.ALLOW_DEV_AUTH_BYPASS = 'false';
     env.nodeEnv = 'production';
     try {
       const endpoint = '/api/v1/workspaces/csrf-oauth/mcp';
@@ -23,12 +25,25 @@ describe('OAuth discovery under production CSRF protection', () => {
       const browser = await account.post(endpoint).set('Origin', new URL(env.betterAuthBaseUrl).origin).send(body);
       expect(browser.status).toBe(401);
 
+      const smuggledCredential = await account.post('/api/v1/workspaces/csrf-oauth/mcp/connection')
+        .set('Authorization', 'Bearer not-a-session-credential')
+        .set('Origin', 'https://attacker.example').send({});
+      expect(smuggledCredential.status).toBe(403);
+      expect(smuggledCredential.body).toEqual({ error: 'Invalid Origin or Referer header.' });
+
+      const bearerOnly = await api().post('/api/v1/workspaces/csrf-oauth/mcp/connection')
+        .set('Authorization', `Bearer ${account.user.id}`)
+        .set('Origin', new URL(env.betterAuthBaseUrl).origin).send({});
+      expect(bearerOnly.status).toBe(401);
+
       const legacy = await account.post('/api/v1/mcp').set('X-Workspace-Id', 'csrf-oauth').send(body);
       expect(legacy.status).toBe(403);
       const consent = await account.post('/api/v1/mcp/oauth/requests/unknown').send({ approved: true });
       expect(consent.status).toBe(403);
     } finally {
       env.nodeEnv = oldEnvironment;
+      if (oldDevAuthBypass === undefined) delete process.env.ALLOW_DEV_AUTH_BYPASS;
+      else process.env.ALLOW_DEV_AUTH_BYPASS = oldDevAuthBypass;
     }
   });
 

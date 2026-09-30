@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { createRef, type ReactElement, StrictMode, useState } from 'react';
+import { createRef, StrictMode, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import {
   AspectRatio,
@@ -214,7 +214,7 @@ describe('library layout and utilities', () => {
     const user = userEvent.setup();
     const onClickAway = vi.fn();
     const listenerRef = createRef<HTMLDivElement>();
-    const clickAwayChild: ReactElement = (
+    const clickAwayChild = (
       <div data-testid="click-away-root">
         <button type="button">Inside target</button>
       </div>

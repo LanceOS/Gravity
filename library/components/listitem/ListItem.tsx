@@ -29,7 +29,7 @@ export function ListItem({ children, icon, onClick, selected = false, style, cla
         ...style
       }}
     >
-      {icon && <span style={{ display: 'inline-flex', flexShrink: 0 }}>{icon}</span>}
+      {icon && <span aria-hidden="true" style={{ display: 'inline-flex', flexShrink: 0 }}>{icon}</span>}
       <div style={{ flexGrow: 1, minWidth: 0 }}>{children}</div>
     </li>
   );

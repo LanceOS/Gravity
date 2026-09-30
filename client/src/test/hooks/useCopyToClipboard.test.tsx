@@ -1,6 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useCopyToClipboard } from '@library';
+import { COPY_FEEDBACK_STORAGE_KEY } from '../../constants/storage';
 
 const clipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
 const execCommandDescriptor = Object.getOwnPropertyDescriptor(document, 'execCommand');
@@ -111,7 +112,7 @@ describe('useCopyToClipboard', () => {
   it('invalidates pending copies on reset and unmount', async () => {
     const pending = deferred();
     writeText.mockReturnValue(pending.promise);
-    const { result, unmount } = renderHook(() => useCopyToClipboard({ storageKey: 'feedback' }));
+    const { result, unmount } = renderHook(() => useCopyToClipboard({ storageKey: COPY_FEEDBACK_STORAGE_KEY }));
     let copying!: Promise<boolean>;
     act(() => { copying = result.current.copy('secret'); });
     act(() => { result.current.reset(); });
@@ -122,29 +123,29 @@ describe('useCopyToClipboard', () => {
     act(() => { copying = result.current.copy('another secret'); });
     unmount();
     await act(async () => { next.resolve(); await copying; });
-    expect(sessionStorage.getItem('feedback')).toBeNull();
+    expect(sessionStorage.getItem(COPY_FEEDBACK_STORAGE_KEY)).toBeNull();
     expect(vi.getTimerCount()).toBe(0);
   });
 
   it('preserves only feedback metadata across remounts for the remaining timeout', async () => {
-    const first = renderHook(() => useCopyToClipboard({ storageKey: 'feedback' }));
+    const first = renderHook(() => useCopyToClipboard({ storageKey: COPY_FEEDBACK_STORAGE_KEY }));
     await act(async () => { await first.result.current.copy('secret invite', 'invite-url'); });
-    expect(sessionStorage.getItem('feedback')).not.toContain('secret invite');
+    expect(sessionStorage.getItem(COPY_FEEDBACK_STORAGE_KEY)).not.toContain('secret invite');
     act(() => { vi.advanceTimersByTime(1500); });
     first.unmount();
     expect(vi.getTimerCount()).toBe(0);
-    const second = renderHook(() => useCopyToClipboard({ storageKey: 'feedback' }));
+    const second = renderHook(() => useCopyToClipboard({ storageKey: COPY_FEEDBACK_STORAGE_KEY }));
     expect(second.result.current.copiedKey).toBe('invite-url');
     act(() => { vi.advanceTimersByTime(500); });
     expect(second.result.current.status).toBe('idle');
-    expect(sessionStorage.getItem('feedback')).toBeNull();
+    expect(sessionStorage.getItem(COPY_FEEDBACK_STORAGE_KEY)).toBeNull();
   });
 
   it('still copies when optional storage is unavailable', async () => {
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('Disabled'); });
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('Disabled'); });
     vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => { throw new Error('Disabled'); });
-    const { result } = renderHook(() => useCopyToClipboard({ storageKey: 'feedback' }));
+    const { result } = renderHook(() => useCopyToClipboard({ storageKey: COPY_FEEDBACK_STORAGE_KEY }));
     await act(async () => { expect(await result.current.copy('text')).toBe(true); });
     expect(result.current.copied).toBe(true);
   });

@@ -3,6 +3,7 @@ import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NoteEditor } from '../../modules/notes/components/NoteEditor';
 import { writeDraft } from '../../modules/notes/components/noteDrafts';
+import { getNoteDraftStorageKey } from '../../constants/storage';
 import { useNote } from '../../modules/notes/hooks/useNote';
 
 vi.mock('../../modules/notes/hooks/useNote', () => ({
@@ -68,8 +69,8 @@ describe('NoteEditor', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    writeDraft('gravity:note-draft:["user-1","proj-1","note-1"]', null);
-    writeDraft('gravity:note-draft:["user-1","proj-1","note-2"]', null);
+    writeDraft(getNoteDraftStorageKey('user-1', 'proj-1', 'note-1'), null);
+    writeDraft(getNoteDraftStorageKey('user-1', 'proj-1', 'note-2'), null);
     mockSaveNote.mockResolvedValue(undefined);
     vi.mocked(useNote, { partial: true, deep: true }).mockReturnValue({
       note: makeNote({ id: 'note-1', title: 'Test Title', body: 'Test body', version: 1 }),

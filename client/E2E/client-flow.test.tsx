@@ -4,13 +4,14 @@ import { describe, expect, it } from 'vitest';
 import { renderMockApp } from './renderMockApp';
 import { dbState } from './setup';
 import { router } from '../src/router';
+import { THEME_STORAGE_KEY } from '../src/constants/storage';
 
 describe('Gravity Client End-to-End User Journey', () => {
   it('should successfully execute the complete user flow from registration to ticket updates and theme changes', async () => {
     const user = userEvent.setup();
 
     // Set initial theme in localStorage to 'dark' to match E2E expectations
-    window.localStorage.setItem('gravity_theme', 'dark');
+    window.localStorage.setItem(THEME_STORAGE_KEY, 'dark');
 
     // Start with a fresh render of the full Application
     await router.navigate('/');

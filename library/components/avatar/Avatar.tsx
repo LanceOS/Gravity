@@ -52,7 +52,7 @@ export function Avatar({ src, name, size = 'md', style }: AvatarProps) {
       ) : name ? (
         getInitials()
       ) : (
-        <User size={16} />
+        <User size={16} aria-hidden="true" />
       )}
     </div>
   );

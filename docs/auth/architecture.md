@@ -41,7 +41,7 @@ Authentication state is accessed reactively using the `authClient.useSession()` 
 
 ## 3. Security & Persistence
 
-- **Session Storage**: We rely exclusively on Better-Auth's native HttpOnly cookies. We do **not** cache `gravity_user` credentials or session tokens in `localStorage`. This eliminates a major vector for Cross-Site Scripting (XSS) attacks.
+- **Session Storage**: We rely exclusively on Better-Auth's native HttpOnly, SameSite=Lax cookies. We do **not** cache `gravity_user` credentials or session tokens in `localStorage`. This prevents page JavaScript from directly reading the browser session credential. MCP connection credentials are separate: the user explicitly generates and copies one, and the connection dialog holds it in page memory until closed; an XSS flaw could read it while displayed. See [CSRF and credential handling](../CSRF_IMPLEMENTATION.md#mcp-compatibility-note-short).
 - **Base URLs**: Strictly locked to environment origins and validated via standard URL parsing.
 
 ---

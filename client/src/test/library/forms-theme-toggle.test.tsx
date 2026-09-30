@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { describe, expect, it } from 'vitest';
+import { THEME_STORAGE_KEY } from '../../constants/storage';
 import {
   Autocomplete,
   AvatarUpload,
@@ -382,10 +383,46 @@ describe('library forms and theme toggle', () => {
     expect(screen.getByText('Avatar value: avatar.png')).toBeInTheDocument();
   });
 
+  it('uses and cleans up modern and legacy system theme change listeners', () => {
+    window.localStorage.removeItem('gravity_theme');
+
+    const modernMediaQuery = {
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    };
+    const legacyMediaQuery = {
+      matches: false,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+    };
+    const matchMedia = vi.spyOn(window, 'matchMedia')
+      .mockReturnValue(modernMediaQuery as unknown as MediaQueryList);
+
+    const modern = render(<ThemeToggle />);
+    expect(modernMediaQuery.addEventListener).toHaveBeenCalledWith('change', expect.any(Function));
+    modern.unmount();
+    expect(modernMediaQuery.removeEventListener).toHaveBeenCalledWith(
+      'change',
+      modernMediaQuery.addEventListener.mock.calls[0][1]
+    );
+
+    window.localStorage.removeItem('gravity_theme');
+    matchMedia.mockReturnValue(legacyMediaQuery as unknown as MediaQueryList);
+    const legacy = render(<ThemeToggle />);
+    expect(legacyMediaQuery.addListener).toHaveBeenCalledWith(expect.any(Function));
+    legacy.unmount();
+    expect(legacyMediaQuery.removeListener).toHaveBeenCalledWith(
+      legacyMediaQuery.addListener.mock.calls[0][0]
+    );
+
+    matchMedia.mockRestore();
+  });
+
   it('cycles and persists theme selection', async () => {
     const user = userEvent.setup();
 
-    window.localStorage.removeItem('gravity_theme');
+    window.localStorage.removeItem(THEME_STORAGE_KEY);
     document.documentElement.className = '';
     document.documentElement.removeAttribute('data-theme');
     document.documentElement.style.removeProperty('--color-surface-elevated');
@@ -402,7 +439,7 @@ describe('library forms and theme toggle', () => {
     await user.click(toggle);
     expect(toggle).toHaveAttribute('title', 'Theme: marble-blue');
     expect(document.documentElement).toHaveAttribute('data-theme', 'marble-blue');
-    expect(window.localStorage.getItem('gravity_theme')).toBe('marble-blue');
+    expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe('marble-blue');
 
     await user.click(toggle);
     expect(toggle).toHaveAttribute('title', 'Theme: dark');
@@ -413,20 +450,20 @@ describe('library forms and theme toggle', () => {
     await user.click(toggle);
     expect(toggle).toHaveAttribute('title', 'Theme: coal-black');
     expect(document.documentElement).toHaveAttribute('data-theme', 'coal-black');
-    expect(window.localStorage.getItem('gravity_theme')).toBe('coal-black');
+    expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe('coal-black');
 
     await user.click(toggle);
     expect(toggle).toHaveAttribute('title', 'Theme: coffee');
     expect(document.documentElement).toHaveAttribute('data-theme', 'coffee');
-    expect(window.localStorage.getItem('gravity_theme')).toBe('coffee');
+    expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe('coffee');
 
     await user.click(toggle);
     expect(toggle).toHaveAttribute('title', 'Theme: midnight-azure');
     expect(document.documentElement).toHaveAttribute('data-theme', 'midnight-azure');
-    expect(window.localStorage.getItem('gravity_theme')).toBe('midnight-azure');
+    expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe('midnight-azure');
 
     await user.click(toggle);
     expect(toggle).toHaveAttribute('title', 'Theme: system');
-    expect(window.localStorage.getItem('gravity_theme')).toBe('system');
+    expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe('system');
   });
 });

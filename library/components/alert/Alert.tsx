@@ -10,10 +10,10 @@ export interface AlertProps {
 
 export function Alert({ type = 'info', title, children, style }: AlertProps) {
   const typeIcons = {
-    success: <CheckCircle2 size={16} style={{ color: 'var(--color-text-success)' }} />,
-    error: <AlertCircle size={16} style={{ color: 'var(--color-text-error)' }} />,
-    warning: <AlertTriangle size={16} style={{ color: 'var(--color-text-warning)' }} />,
-    info: <Info size={16} style={{ color: 'var(--color-text-info)' }} />,
+    success: <CheckCircle2 size={16} style={{ color: 'var(--color-text-success)' }} aria-hidden="true" />,
+    error: <AlertCircle size={16} style={{ color: 'var(--color-text-error)' }} aria-hidden="true" />,
+    warning: <AlertTriangle size={16} style={{ color: 'var(--color-text-warning)' }} aria-hidden="true" />,
+    info: <Info size={16} style={{ color: 'var(--color-text-info)' }} aria-hidden="true" />,
   };
 
   const bgColors = {
@@ -44,7 +44,9 @@ export function Alert({ type = 'info', title, children, style }: AlertProps) {
         ...style,
       }}
     >
-      <div style={{ marginTop: '2px' }}>{typeIcons[type]}</div>
+      <div role="img" aria-label={type.charAt(0).toUpperCase() + type.slice(1)} style={{ marginTop: '2px' }}>
+        {typeIcons[type]}
+      </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
         {title && <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{title}</span>}
         <div style={{ color: 'var(--color-text-secondary)' }}>{children}</div>

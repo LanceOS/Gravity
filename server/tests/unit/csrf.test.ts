@@ -4,14 +4,14 @@ import { describe, it, expect } from 'vitest';
 import { csrfProtect } from '../../src/lib/csrf.js';
 
 describe('csrfProtect middleware', () => {
-  it('allows requests with Authorization header (bypass)', async () => {
+  it('does not bypass a missing Origin for requests with an Authorization header', async () => {
     const app = express();
     app.use(express.json());
     app.post('/test', csrfProtect(undefined, { enforceInTest: true }), (req, res) => res.json({ ok: true }));
 
     const res = await request(app).post('/test').set('Authorization', 'Bearer abc').send({});
-    expect(res.status).toBe(200);
-    expect(res.body).toEqual({ ok: true });
+    expect(res.status).toBe(403);
+    expect(res.body).toEqual({ error: 'Missing Origin or Referer header.' });
   });
 
   it('allows requests with x-service-token when provided in options', async () => {

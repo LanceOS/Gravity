@@ -1,3 +1,5 @@
+import { PERFORMANCE_PROFILE_STORAGE_KEY } from '../constants/storage';
+
 let profileFlagCache: boolean | null = null;
 
 function readProfileFlag(): boolean {
@@ -11,7 +13,7 @@ function readProfileFlag(): boolean {
   }
 
   try {
-    profileFlagCache = window.localStorage.getItem('gravity-perf-profile') === '1';
+    profileFlagCache = window.localStorage.getItem(PERFORMANCE_PROFILE_STORAGE_KEY) === '1';
     return profileFlagCache;
   } catch {
     profileFlagCache = false;

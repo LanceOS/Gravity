@@ -56,7 +56,7 @@ export function FileUploader({ onFileSelect, label }: FileUploaderProps) {
           onChange={(e) => e.target.files && onFileSelect(e.target.files)}
           style={{ display: 'none' }}
         />
-        <Upload size={24} style={{ color: 'var(--color-text-disabled)', marginBottom: '8px' }} />
+        <Upload size={24} style={{ color: 'var(--color-text-disabled)', marginBottom: '8px' }} aria-hidden="true" />
         <p style={{ fontSize: '13px', margin: 0 }}>Drag and drop files here, or click to upload</p>
       </div>
     </div>

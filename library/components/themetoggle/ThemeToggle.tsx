@@ -19,8 +19,14 @@ export function ThemeToggle() {
     if (theme === 'system') {
       const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
       const handleSystemChange = () => applyTheme('system');
-      mediaQuery.addEventListener('change', handleSystemChange);
-      return () => mediaQuery.removeEventListener('change', handleSystemChange);
+
+      if (typeof mediaQuery.addEventListener === 'function') {
+        mediaQuery.addEventListener('change', handleSystemChange);
+        return () => mediaQuery.removeEventListener('change', handleSystemChange);
+      }
+
+      mediaQuery.addListener(handleSystemChange);
+      return () => mediaQuery.removeListener(handleSystemChange);
     }
   }, [theme]);
 
@@ -52,11 +58,11 @@ export function ThemeToggle() {
         cursor: 'pointer',
       }}
     >
-      {theme === 'marble-blue' && <Sun size={15} style={{ color: 'var(--color-text-secondary)' }} />}
+      {theme === 'marble-blue' && <Sun size={15} style={{ color: 'var(--color-text-secondary)' }} aria-hidden="true" />}
       {(theme === 'dark' || theme === 'coal-black' || theme === 'coffee' || theme === 'midnight-azure') && (
-        <Moon size={15} style={{ color: 'var(--color-primary)' }} />
+        <Moon size={15} style={{ color: 'var(--color-primary)' }} aria-hidden="true" />
       )}
-      {theme === 'system' && <Laptop size={15} style={{ color: 'var(--color-text-disabled)' }} />}
+      {theme === 'system' && <Laptop size={15} style={{ color: 'var(--color-text-disabled)' }} aria-hidden="true" />}
     </button>
   );
 }

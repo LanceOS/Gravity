@@ -1,6 +1,6 @@
-export type WorkspaceDefaultView = 'board' | 'list';
+import { WORKSPACE_DEFAULT_VIEW_STORAGE_KEY } from '../constants/storage';
 
-const WORKSPACE_DEFAULT_VIEW_KEY = 'gravity_active_view';
+export type WorkspaceDefaultView = 'board' | 'list';
 
 const isWorkspaceDefaultView = (value: unknown): value is WorkspaceDefaultView =>
   value === 'board' || value === 'list';
@@ -11,7 +11,7 @@ export const getStoredWorkspaceDefaultView = (): WorkspaceDefaultView => {
   }
 
   try {
-    const storedView = window.localStorage.getItem(WORKSPACE_DEFAULT_VIEW_KEY);
+    const storedView = window.localStorage.getItem(WORKSPACE_DEFAULT_VIEW_STORAGE_KEY);
     return isWorkspaceDefaultView(storedView) ? storedView : 'board';
   } catch {
     return 'board';
@@ -24,7 +24,7 @@ export const setStoredWorkspaceDefaultView = (view: WorkspaceDefaultView): void 
   }
 
   try {
-    window.localStorage.setItem(WORKSPACE_DEFAULT_VIEW_KEY, view);
+    window.localStorage.setItem(WORKSPACE_DEFAULT_VIEW_STORAGE_KEY, view);
   } catch {
     // localStorage may be unavailable in restricted/private modes.
   }

@@ -41,7 +41,7 @@ export function DatePicker({ value, onChange, placeholder = 'Pick date', label }
           style={{ minHeight: '36px' }}
         >
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
-            <Calendar size={14} className="select-trigger__icon" />
+            <Calendar size={14} className="select-trigger__icon" aria-hidden="true" />
             {value ? value.toLocaleDateString() : placeholder}
           </span>
         </button>
