@@ -3,6 +3,7 @@ import { getProjectIdFromRequest } from '../../lib/platform.js';
 import { authorizeProjectAccess } from '../workspaces/services/membership.js';
 import { createNote, deleteNote, getNote, listNotes, updateNote, searchNotes, cleanupNoteMedia } from './services/notes.js';
 import { MetadataRepository, NotesRepository } from './repositories.js';
+import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
 
 export function createNotesRouter() {
   const router = Router();
@@ -243,35 +244,47 @@ export function createNotesRouter() {
         throw uploadErr;
       }
       
-      res.status(201).json({ url: `/api/v1/notes/${noteId}/media/${encodeURIComponent(filename)}` });
+      res.status(201).json({ url: `/api/v1/notes/${encodeURIComponent(noteId)}/media/${encodeURIComponent(filename)}?projectId=${encodeURIComponent(projectId)}` });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to upload media.' });
     }
   });
 
   router.get('/notes/:noteId/media/:filename', async (req, res) => {
-    const projectId = getProjectIdFromRequest(req);
-    if (!projectId) {
-      res.status(400).json({ error: 'Project ID is required.' });
-      return;
-    }
-
-    const auth = await authorizeProjectAccess(req, projectId);
-    if (!auth.allowed) {
-      res.status(auth.status).json({ error: auth.error });
-      return;
-    }
-
+    // Do not cache either media or authorization failures across sessions.
+    res.setHeader('Cache-Control', 'private, no-store');
     try {
       const noteId = normalizeRouteParam(req.params.noteId);
       const filename = normalizeRouteParam(req.params.filename);
+      let projectId = getProjectIdFromRequest(req);
+      let noteMeta = null;
 
+      if (!projectId) {
+        // Legacy note bodies contain bare media URLs. Authenticate before
+        // resolving their scope, then apply the same project membership check.
+        if (!await resolveRequestActorUserId(req)) {
+          res.status(401).json({ error: 'Authentication required.' });
+          return;
+        }
+        noteMeta = await MetadataRepository.getNoteMetadata(noteId);
+        if (!noteMeta) {
+          res.status(404).json({ error: 'Note not found.' });
+          return;
+        }
+        projectId = noteMeta.projectId;
+      }
+
+      const auth = await authorizeProjectAccess(req, projectId);
+      if (!auth.allowed) {
+        res.status(auth.status).json({ error: auth.error });
+        return;
+      }
       if (!FILENAME_REGEX.test(filename)) {
         res.status(400).json({ error: 'Invalid filename format.' });
         return;
       }
-      
-      const noteMeta = await MetadataRepository.getNoteMetadata(noteId);
+
+      noteMeta ??= await MetadataRepository.getNoteMetadata(noteId);
       if (!noteMeta || noteMeta.projectId !== projectId) {
         res.status(404).json({ error: 'Note not found.' });
         return;
