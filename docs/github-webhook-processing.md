@@ -58,3 +58,7 @@ Validation:
   claims, project locking, rollback after an injected comment failure, and retry.
   Run it with `DATABASE_URL` set to a disposable `gravity_webhook_test_*`
   database on an existing PostgreSQL service; the caller creates/drops that database.
+
+Deliveries require signatures by default in every environment. See
+[deployment configuration](deployment-configuration.md) for signing secrets and
+the explicit loopback-only local fixture opt-in.

@@ -70,9 +70,9 @@ services:
       # Important: load sensitive values from ../.env via `env_file`.
       # Avoid interpolating DATABASE_URL and secrets in the compose file
       # so the container receives the values directly from the env_file.
-      BETTER_AUTH_BASE_URL: ${GRAVITY_BACKEND_PUBLIC_URL:-http://localhost:8080}
-      CORS_ORIGINS: ${GRAVITY_FRONTEND_PUBLIC_URL:-http://localhost:5173}
-      TRUSTED_ORIGINS: ${GRAVITY_FRONTEND_PUBLIC_URL:-http://localhost:5173},${GRAVITY_BACKEND_PUBLIC_URL:-http://localhost:8080}
+      BETTER_AUTH_BASE_URL: ${BETTER_AUTH_BASE_URL:-${GRAVITY_FRONTEND_PUBLIC_URL:-http://localhost:5173}}
+      CORS_ORIGINS: ${CORS_ORIGINS:-${GRAVITY_FRONTEND_PUBLIC_URL:-http://localhost:5173}}
+      TRUSTED_ORIGINS: ${TRUSTED_ORIGINS:-${GRAVITY_FRONTEND_PUBLIC_URL:-http://localhost:5173}}
       NODE_ENV: ${NODE_ENV:-production}
       TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
       RUSTFS_ENDPOINT: ${RUSTFS_ENDPOINT:-http://rustfs:9000}

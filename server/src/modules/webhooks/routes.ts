@@ -1,3 +1,4 @@
+import { allowLocalWebhookBypass } from '../../lib/local-webhook-bypass.js';
 import { getRequestSourceIp } from '../../lib/request-ip.js';
 import { Router } from 'express';
 import { env } from '../../env.js';
@@ -47,9 +48,9 @@ export function createWebhookRouter() {
         res.status(401).json({ error: 'Invalid webhook signature.' });
         return;
       }
-    } else if (env.nodeEnv === 'production') {
-      // In production, reject all webhook requests if no secret is configured
-      // to prevent accidental unauthenticated delivery acceptance.
+    } else if (!allowLocalWebhookBypass(env.allowUnsignedLocalWebhooks, env.nodeEnv, req.socket.remoteAddress,
+      Object.keys(req.headers).some(name => name === 'forwarded' || name.startsWith('x-forwarded-') || name === 'x-real-ip'))) {
+      // Default to signed deliveries in every environment.
       res.status(503).json({ error: 'Webhook secret not configured.' });
       return;
     }

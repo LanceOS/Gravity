@@ -17,6 +17,7 @@ beforeEach(() => {
       DATABASE_URL: 'postgresql://unused/unused',
       BETTER_AUTH_SECRET: 'test-secret',
       NODE_IDENTITY_MASTER_KEY: 'test-key',
+      LOCAL_TESTING_KEK: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
     },
   });
 });
