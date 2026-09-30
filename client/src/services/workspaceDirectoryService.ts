@@ -13,7 +13,7 @@ type WorkspaceActivityResponse = {
 export interface WorkspaceDirectoryService {
   listWorkspaces(userId: string): Promise<WorkspaceSummary[]>;
   createWorkspace(ownerId: string, input: CreateWorkspaceInput): Promise<WorkspaceSummary>;
-  requestJoinByInvite(userId: string, inviteCode: string, message?: string): Promise<void>;
+  requestJoinByInvite(userId: string, inviteCode: string, message?: string): Promise<{ status?: 'approved' | 'pending' } | void>;
   logWorkspaceMemberActivity(workspaceId: string, userId: string): Promise<string | null>;
 }
 
@@ -66,8 +66,8 @@ export class DefaultWorkspaceDirectoryService implements WorkspaceDirectoryServi
     return normalizeWorkspaceCreateResponse(data);
   }
 
-  async requestJoinByInvite(userId: string, inviteCode: string, message?: string): Promise<void> {
-    await this.client.post<{ success: boolean }>('/workspaces/invites/' + encodeURIComponent(inviteCode) + '/join-requests', {
+  async requestJoinByInvite(userId: string, inviteCode: string, message?: string): Promise<{ status?: 'approved' | 'pending' } | void> {
+    return this.client.post<{ status?: 'approved' | 'pending' }>('/workspaces/invites/' + encodeURIComponent(inviteCode) + '/join-requests', {
       userId,
       message: message || '',
     }, {

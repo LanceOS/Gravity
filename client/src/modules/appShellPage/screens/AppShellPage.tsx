@@ -10,7 +10,6 @@ import { LoadingPage } from '../../loadingPage';
 import { WorkspaceDirectoryPage } from '../../workspaceDirectoryPage';
 import { usePendingWorkspaceInvite, useWorkspaceDirectoryState } from '../../workspaceShellPage/hooks';
 import { apiClient } from '../../../utils/apiClient';
-import { patchTutorialCompleted } from '../../../utils/tutorialApi';
 import './AppShellPage.css';
 
 export function AppShellPage() {
@@ -91,8 +90,9 @@ function AppShellLandingPage() {
   };
 
   const handleRequestJoin = async (inviteCode: string, message?: string) => {
-    await requestJoinByInvite(inviteCode, message);
-    navigate('/workspaces');
+    const sent = await requestJoinByInvite(inviteCode, message);
+    if (sent) navigate('/workspaces');
+    return sent;
   };
 
   const handleSelectWorkspace = (workspaceId: string) => {
@@ -111,11 +111,6 @@ function AppShellLandingPage() {
     <OnboardingModal
       onComplete={async () => {
         setTutorialCompleted(true);
-        try {
-          await patchTutorialCompleted(currentUser.id, true);
-        } catch (e) {
-          // Ignore
-        }
       }}
     />
     ) : null;

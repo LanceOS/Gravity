@@ -9,7 +9,6 @@ import { useWorkspaceSettings } from '../../../hooks/useWorkspaceSettings';
 import { useAuth } from '../../../context/auth/AuthContext';
 import { useActiveView } from '../../../context/ui/ActiveViewContext';
 import { LoadingPage } from '../../../pages/LoadingPage/LoadingPage';
-import { patchTutorialCompleted } from '../../../utils/tutorialApi';
 
 export function WorkspaceSettingsPageRoute() {
   const { workspaceId = '' } = useParams<{ workspaceId: string }>();
@@ -38,6 +37,7 @@ export function WorkspaceSettingsPageRoute() {
     settingsLoading,
     saveLoading: settingsSaveLoading,
     saveSuccess: settingsSaveSuccess,
+    hasChanges,
     saveError: settingsSaveError,
     members: workspaceMembers,
     invites: workspaceInvites,
@@ -108,11 +108,6 @@ export function WorkspaceSettingsPageRoute() {
       <OnboardingModal
         onComplete={async () => {
           setLocalTutorialCompleted(true);
-          try {
-            await patchTutorialCompleted(currentUser.id, true);
-          } catch (e) {
-            // Ignore
-          }
         }}
       />
     ) : null;
@@ -134,6 +129,7 @@ export function WorkspaceSettingsPageRoute() {
         settingsLoading={settingsLoading}
         saveLoading={settingsSaveLoading}
         saveSuccess={settingsSaveSuccess}
+        hasChanges={hasChanges}
         saveError={settingsSaveError}
         inviteError={workspaceInviteError}
         invitesLoading={workspaceInvitesLoading}

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Tag } from 'lucide-react';
 import { Button, CircularColorInput, TextInput, Textarea } from '@library';
 import { FormSection } from '../../../components/FormSection';
@@ -32,8 +32,10 @@ export function LabelCreateOverlay({
     }
   };
 
+  const submissionPending = useRef(false);
   const handleSubmit = async (event?: React.FormEvent<HTMLFormElement>) => {
     event?.preventDefault();
+    if (submissionPending.current || loading) return;
     setFormError(null);
 
     if (!labelName.trim()) {
@@ -41,6 +43,7 @@ export function LabelCreateOverlay({
       return;
     }
 
+    submissionPending.current = true;
     try {
       await onSubmitLabel({
         name: labelName.trim(),
@@ -52,6 +55,8 @@ export function LabelCreateOverlay({
       // Server-side submission errors are surfaced via the parent-provided
       // errorMessage prop. Keep formError reserved for client-side validation
       // so a generic fallback here does not mask a later, more specific error.
+    } finally {
+      submissionPending.current = false;
     }
   };
 

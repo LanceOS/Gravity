@@ -44,7 +44,6 @@ import { useWorkspaceViewMode } from '../hooks/useWorkspaceViewMode';
 import type { AppSection } from '../types/AppShell';
 import { LoadingPage } from '../../loadingPage';
 import { CACHE_CONFIGS, queryKeys } from '../../../utils/queryClient';
-import { patchTutorialCompleted } from '../../../utils/tutorialApi';
 import { ChatHistoryHeaderRow, ChatHistoryMenuButton, getChatSession, toChatMessages, useChatSessionsList } from '../../chats';
 import type { Message } from '../../ai';
 import {
@@ -967,11 +966,6 @@ export function WorkspaceShellPage() {
     <OnboardingModal
       onComplete={async () => {
         setLocalTutorialCompleted(true);
-        try {
-          await patchTutorialCompleted(currentUser.id, true);
-        } catch {
-          // Ignore
-        }
       }}
     />
   ) : null;

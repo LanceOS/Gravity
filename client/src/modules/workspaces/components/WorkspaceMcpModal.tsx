@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { Button, Select, Tabs, TextInput, useCopyToClipboard } from '@library';
+import { Button, toast, Select, Tabs, TextInput, useCopyToClipboard } from '@library';
 import { FormSection } from '../../../components/FormSection';
 import { ModalDialog } from '../../../components/ModalDialog';
 import useWorkspaceMcp from '../../../hooks/useWorkspaceMcp';
@@ -67,6 +67,8 @@ export function WorkspaceMcpModal({ workspaceId, workspaceName, isOpen, onClose,
   const [oauthSetupLoading, setOAuthSetupLoading] = useState(false);
   const [oauthSetupError, setOAuthSetupError] = useState<string | null>(null);
   const [oauthSetupVersion, setOAuthSetupVersion] = useState(0);
+  const createPending = useRef(false);
+  const [generatedInput, setGeneratedInput] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [connectionsLoading, setConnectionsLoading] = useState(false);
   const [revokingId, setRevokingId] = useState<string | null>(null);
@@ -81,6 +83,8 @@ export function WorkspaceMcpModal({ workspaceId, workspaceName, isOpen, onClose,
   const requestVersion = useRef(0);
   const generatedConnectionRef = useRef<HTMLDivElement>(null);
   const allowedTools = useMemo(() => catalog.tools.filter(tool => tool.allowedForConnection !== false), [catalog.tools]);
+  const generationInput = JSON.stringify([workspaceId, ttlSeconds, [...selectedTools].sort()]);
+  const generationComplete = result !== null && generatedInput === generationInput;
   const configText = result ? JSON.stringify(buildMcpClientConfig(result), null, 2) : '';
 
   useEffect(() => {
@@ -139,7 +143,9 @@ export function WorkspaceMcpModal({ workspaceId, workspaceName, isOpen, onClose,
     void Promise.resolve().then(() => onConnectionsChanged?.()).catch(() => {});
   }
 
-  async function handleCreate() {
+  async function handleCreate(regenerate = false) {
+    if (createPending.current || (generationComplete && !regenerate)) return;
+    createPending.current = true;
     const version = requestVersion.current;
     setLoading(true);
     setShowGeneratedSuccess(false);
@@ -152,6 +158,8 @@ export function WorkspaceMcpModal({ workspaceId, workspaceName, isOpen, onClose,
       notifyConnectionsChanged();
       if (requestVersion.current !== version) return;
       setResult(payload);
+      setGeneratedInput(generationInput);
+      toast.show('Connection generated. Copy or download the configuration to connect your client.', 'success');
       setShowGeneratedSuccess(true);
       if (showConnections) try {
         const list = await mcp.listConnections();
@@ -160,8 +168,13 @@ export function WorkspaceMcpModal({ workspaceId, workspaceName, isOpen, onClose,
         if (requestVersion.current === version) setError('Your connection was generated, but the connection list could not be refreshed. You can still use the configuration below.');
       }
     } catch (err) {
-      if (requestVersion.current === version) setError(connectionRequestError(err, 'Unable to generate connection.'));
+      if (requestVersion.current === version) {
+        const message = connectionRequestError(err, 'Unable to generate connection.');
+        setError(message);
+        toast.show(`${message} Please try again.`, 'error');
+      }
     } finally {
+      createPending.current = false;
       if (requestVersion.current === version) setLoading(false);
     }
   }
@@ -186,12 +199,17 @@ export function WorkspaceMcpModal({ workspaceId, workspaceName, isOpen, onClose,
     setError(null);
     try {
       await mcp.revokeConnection(id);
+      toast.show('Connection revoked.', 'success');
       notifyConnectionsChanged();
       if (requestVersion.current !== version) return;
       if (result?.id === id) { setResult(null); setShowGeneratedSuccess(false); resetCopy(); }
       setConnections(items => items.map(item => item.id === id ? { ...item, status: 'revoked', revokedAt: new Date().toISOString() } : item));
     } catch (err) {
-      if (requestVersion.current === version) setError(connectionRequestError(err, 'Unable to revoke connection.'));
+      if (requestVersion.current === version) {
+        const message = connectionRequestError(err, 'Unable to revoke connection.');
+        setError(message);
+        toast.show(`${message} Please try again.`, 'error');
+      }
     } finally {
       if (requestVersion.current === version) setRevokingId(null);
     }
@@ -339,7 +357,8 @@ export function WorkspaceMcpModal({ workspaceId, workspaceName, isOpen, onClose,
       <ModalDialog.Footer>
         <ModalDialog.Actions>
           <Button type="button" variant="secondary" onClick={handleClose}>Close</Button>
-          {clientMode === 'headers' && <Button type="button" variant="primary" onClick={handleCreate} loading={loading} disabled={loading || catalog.loading || Boolean(catalog.error) || !workspaceId || selectedTools.length === 0}>
+          {clientMode === 'headers' && generationComplete && <Button type="button" variant="secondary" disabled={loading || catalog.loading || Boolean(catalog.error)} onClick={() => void handleCreate(true)}>Generate another connection</Button>}
+          {clientMode === 'headers' && <Button type="button" variant="primary" onClick={() => void handleCreate()} loading={loading} disabled={generationComplete || loading || catalog.loading || Boolean(catalog.error) || !workspaceId || selectedTools.length === 0}>
             {loading ? 'Generating…' : 'Generate connection'}
           </Button>}
         </ModalDialog.Actions>

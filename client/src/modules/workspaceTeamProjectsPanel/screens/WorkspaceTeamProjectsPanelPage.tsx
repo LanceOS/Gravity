@@ -1,5 +1,5 @@
 import { GithubReconciliation } from '../../workspaceProjectsPanel/components/GithubReconciliation';
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ProjectCreateOverlay } from '../../../components/WorkspaceProjectPanel';
 import { Button, TextInput, Textarea } from '@library';
@@ -62,6 +62,11 @@ export function WorkspaceTeamProjectsPanelPage({
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [projectCreateLoading, setProjectCreateLoading] = useState(false);
   const [projectCreateError, setProjectCreateError] = useState<string | null>(null);
+  const pendingProject = useRef(false);
+  const [savedProjectDraft, setSavedProjectDraft] = useState<string | null>(null);
+  useEffect(() => { setSavedProjectDraft(null); }, [selectedProject?.id, selectedProject?.name, selectedProject?.description, selectedProject?.githubRepoUrl, selectedProject?.status]);
+  const projectDraftKey = JSON.stringify([selectedProject?.id, projectDraft]);
+  const projectUnchanged = savedProjectDraft === projectDraftKey || (selectedProject?.name === projectDraft.name.trim() && (selectedProject.description || '') === projectDraft.description.trim() && (selectedProject.githubRepoUrl || '') === projectDraft.githubRepoUrl.trim() && selectedProject.status === projectDraft.status);
   const [savingProjectId, setSavingProjectId] = useState('');
   const [deletingProjectId, setDeletingProjectId] = useState('');
   const [feedback, setFeedback] = useState<WorkspaceTeamProjectsPanelFeedback | null>(null);
@@ -74,11 +79,14 @@ export function WorkspaceTeamProjectsPanelPage({
   }, [selectedProject]);
 
   const handleCreateProject = async (project: { name: string; description: string; key: string }) => {
+    if (pendingProject.current) return;
     if (!team) {
-      setProjectCreateError('Unable to create this project yet. Please refresh and retry.');
-      return;
+      const message = 'Unable to create this project yet. Please refresh and retry.';
+      setProjectCreateError(message);
+      throw new Error(message);
     }
 
+    pendingProject.current = true;
     setProjectCreateLoading(true);
     setProjectCreateError(null);
 
@@ -92,6 +100,7 @@ export function WorkspaceTeamProjectsPanelPage({
         status: 'active',
       });
 
+      if (!createdProject?.id) throw new Error('Project was not created. Please try again.');
       if (createdProject?.id) {
         addProjectToTeam(queryClient, workspaceId, team.id, {
           ...createdProject,
@@ -107,7 +116,9 @@ export function WorkspaceTeamProjectsPanelPage({
       setFeedback(createWorkspaceTeamProjectsPanelFeedback('success', 'Project created.'));
     } catch (error) {
       setProjectCreateError(error instanceof Error ? error.message : 'Failed to create project.');
+      throw error;
     } finally {
+      pendingProject.current = false;
       setProjectCreateLoading(false);
     }
   };
@@ -115,7 +126,7 @@ export function WorkspaceTeamProjectsPanelPage({
   const handleSaveProject = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (!selectedProject || !team) {
+    if (!selectedProject || !team || pendingProject.current || savingProjectId || projectUnchanged) {
       return;
     }
 
@@ -125,17 +136,9 @@ export function WorkspaceTeamProjectsPanelPage({
       return;
     }
 
+    pendingProject.current = true;
     setSavingProjectId(selectedProject.id);
     setFeedback(null);
-
-    // Optimistically update the sidebar tree while the request is in-flight.
-    updateProjectInTeam(queryClient, workspaceId, team.id, selectedProject.id, (project) => ({
-      ...project,
-      name: projectDraft.name.trim(),
-      description: projectDraft.description.trim(),
-      githubRepoUrl: githubRepoUrl || null,
-      status: projectDraft.status,
-    }));
 
     onUpdateProject(selectedProject.id, {
       name: projectDraft.name.trim(),
@@ -147,6 +150,8 @@ export function WorkspaceTeamProjectsPanelPage({
         if (updatedProject) {
           setSelectedProjectId(updatedProject.id);
         }
+        updateProjectInTeam(queryClient, workspaceId, team.id, selectedProject.id, project => ({ ...project, name: projectDraft.name.trim(), description: projectDraft.description.trim(), githubRepoUrl: githubRepoUrl || null, status: projectDraft.status }));
+        setSavedProjectDraft(projectDraftKey);
         setFeedback(createWorkspaceTeamProjectsPanelFeedback('success', 'Project updated.'));
         void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceSidebarTree(workspaceId) });
       })
@@ -160,6 +165,7 @@ export function WorkspaceTeamProjectsPanelPage({
         );
       })
       .finally(() => {
+        pendingProject.current = false;
         setSavingProjectId('');
       });
   };
@@ -186,20 +192,12 @@ export function WorkspaceTeamProjectsPanelPage({
     setDeletingProjectId(projectId);
     setFeedback(null);
 
-    // Optimistically update sidebar tree
-    removeProjectFromTeam(queryClient, workspaceId, team.id, projectId);
-
-    setFeedback(createWorkspaceTeamProjectsPanelFeedback('success', 'Project deleted successfully.'));
-
-    const remainingProjects = sortedProjects.filter((value) => value.id !== projectId);
-    if (remainingProjects.length > 0) {
-      setSelectedProjectId(remainingProjects[0].id);
-    } else {
-      setSelectedProjectId('');
-    }
-
-    // Fire and forget
     onDeleteProject(projectId)
+      .then(() => {
+        removeProjectFromTeam(queryClient, workspaceId, team.id, projectId);
+        setFeedback(createWorkspaceTeamProjectsPanelFeedback('success', 'Project deleted successfully.'));
+        setSelectedProjectId(sortedProjects.find(project => project.id !== projectId)?.id || '');
+      })
       .catch((error) => {
         setFeedback(
           createWorkspaceTeamProjectsPanelFeedback(
@@ -382,7 +380,7 @@ export function WorkspaceTeamProjectsPanelPage({
                     size="sm"
                     loading={savingProjectId === selectedProjectForEditor.id}
                     disabled={
-                      savingProjectId === selectedProjectForEditor.id || deletingProjectId === selectedProjectForEditor.id
+                      savingProjectId === selectedProjectForEditor.id || deletingProjectId === selectedProjectForEditor.id || projectUnchanged
                     }
                   >
                     <Save size={13} />

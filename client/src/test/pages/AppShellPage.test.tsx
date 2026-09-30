@@ -1048,15 +1048,9 @@ describe('AppShellPage', () => {
 
     await user.click(screen.getByRole('button', { name: 'Complete onboarding' }));
     
-    // Assert that the PATCH request was sent
+    // Persistence belongs to the modal; this callback only closes it.
     await waitFor(() => {
-      expect(mocks.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/tutorial'),
-        expect.objectContaining({
-          method: 'PATCH',
-          body: JSON.stringify({ completed: true }),
-      })
-      );
+      expect(screen.queryByText('OnboardingModal')).not.toBeInTheDocument();
     });
   });
 
@@ -1134,13 +1128,7 @@ describe('AppShellPage', () => {
 
     await user.click(screen.getByRole('button', { name: 'Complete onboarding' }));
     await waitFor(() => {
-      expect(mocks.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/v1/users/user-1/tutorial'),
-        expect.objectContaining({
-          method: 'PATCH',
-          body: JSON.stringify({ completed: true }),
-        }),
-      );
+      expect(screen.queryByText('OnboardingModal')).not.toBeInTheDocument();
       expect(screen.queryByText('OnboardingModal')).not.toBeInTheDocument();
       expect(screen.getByTestId('location-display').textContent).toBe('/workspaces/workspace-1');
       expect(screen.getByTestId('workspace-page-state')).toHaveAttribute('data-ticket-count', '1');

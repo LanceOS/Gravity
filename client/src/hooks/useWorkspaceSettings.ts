@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { queryClient, queryKeys, CACHE_CONFIGS } from '../utils/queryClient';
+import { toast } from '@library';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { queryKeys, CACHE_CONFIGS } from '../utils/queryClient';
 import { ApiError, apiClient } from '../utils/apiClient';
 import type { User } from '../context/TicketContextContext';
 import type { WorkspaceJoinMode } from './useWorkspaceDirectory';
@@ -92,6 +93,11 @@ function normalizeWorkspaceInvite(invite: Record<string, unknown>): WorkspaceInv
 }
 
 export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWorkspaceSettingsOptions) {
+  const queryClient = useQueryClient();
+  const savingRef = useRef(false);
+  const draftRevision = useRef(0);
+  const submittedRevision = useRef(0);
+  const baselineSettings = useRef<WorkspaceAdminSettings | null>(null);
   const [draftSettings, setDraftSettings] = useState<WorkspaceAdminSettings | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveErrorState, setSaveError] = useState<string | null>(null);
@@ -146,11 +152,14 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
 
   // Sync draft settings with query data
   useEffect(() => {
-    if (settingsQuery.data) {
-      setDraftSettings(settingsQuery.data);
-    } else {
-      setDraftSettings(null);
-    }
+    const previousBaseline = baselineSettings.current;
+    const nextBaseline = settingsQuery.data ?? null;
+    baselineSettings.current = nextBaseline;
+    setDraftSettings(current => {
+      const hasLocalEdits = current?.workspaceId === activeWorkspaceId &&
+        JSON.stringify(current) !== JSON.stringify(previousBaseline);
+      return nextBaseline && hasLocalEdits ? current : nextBaseline;
+    });
   }, [settingsQuery.data, activeWorkspaceId]);
 
   // Workspace Members Query
@@ -256,13 +265,17 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
         disabledMcpTools: Array.isArray(data.disabledMcpTools) ? data.disabledMcpTools : payload.disabledMcpTools || [],
       } as WorkspaceAdminSettings;
     },
-    onSuccess: (data) => {
+    onSuccess: (data, submitted) => {
+      baselineSettings.current = data;
+      setDraftSettings(current => JSON.stringify(current) === JSON.stringify(submitted) ? data : current);
       queryClient.setQueryData(queryKeys.workspaceSettings(activeWorkspaceId), data);
-      setSaveSuccess(true);
+      setSaveSuccess(draftRevision.current === submittedRevision.current);
+      toast.show('Workspace settings saved.', 'success');
       setSaveError(null);
     },
     onError: (err: Error) => {
       setSaveError(err.message || 'Failed to save workspace settings.');
+      toast.show(`Failed to save workspace settings: ${err.message} Please try again.`, 'error');
     },
   });
 
@@ -280,11 +293,13 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
       return normalizeWorkspaceInvite(data as Record<string, unknown>);
     },
     onSuccess: async () => {
+      toast.show('Invite created.', 'success');
       await refreshWorkspaceAdmin();
       setInviteError(null);
     },
     onError: (err: Error) => {
       setInviteError(err.message || 'Failed to create invite.');
+      toast.show(`Failed to create invite: ${err.message} Please try again.`, 'error');
     },
   });
 
@@ -298,11 +313,13 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
       });
     },
     onSuccess: async () => {
+      toast.show('Invite revoked.', 'success');
       await refreshWorkspaceAdmin();
       setInviteError(null);
     },
     onError: (err: Error) => {
       setInviteError(err.message || 'Failed to revoke invite.');
+      toast.show(`Failed to revoke invite: ${err.message} Please try again.`, 'error');
     },
   });
 
@@ -316,11 +333,13 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
       });
     },
     onSuccess: async () => {
+      toast.show('Join request approved.', 'success');
       await refreshWorkspaceAdmin();
       setInviteError(null);
     },
     onError: (err: Error) => {
       setInviteError(err.message || 'Failed to approve join request.');
+      toast.show(`Failed to approve join request: ${err.message} Please try again.`, 'error');
     },
   });
 
@@ -335,6 +354,7 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
     },
     onError: (err: Error) => {
       setDeleteError(err.message || 'Failed to delete workspace.');
+      toast.show(`Failed to delete workspace: ${err.message} Please try again.`, 'error');
     },
   });
 
@@ -368,25 +388,36 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
       anchor.remove();
       window.URL.revokeObjectURL(url);
     },
+    onSuccess: () => { toast.show('Task export downloaded.', 'success'); },
     onMutate: () => {
       setExportError(null);
     },
     onError: (err: Error) => {
       setExportError(err.message || 'Failed to export tasks.');
+      toast.show(`Failed to export tasks: ${err.message} Please try again.`, 'error');
     },
   });
 
   // --- Exposed Callbacks ---
 
   const updateSettings = useCallback((updates: Partial<WorkspaceAdminSettings>) => {
+    draftRevision.current++;
     setDraftSettings((current) => (current ? { ...current, ...updates } : { ...defaultSettings(activeWorkspaceId), ...updates }));
     setSaveSuccess(false);
     setSaveError(null);
   }, [activeWorkspaceId]);
 
   const saveSettings = useCallback(async () => {
-    if (!draftSettings) return;
-    await saveSettingsMutation.mutateAsync(draftSettings);
+    if (!draftSettings || savingRef.current) return;
+    savingRef.current = true;
+    submittedRevision.current = draftRevision.current;
+    try {
+      await saveSettingsMutation.mutateAsync(draftSettings);
+    } catch {
+      // Mutation owns error feedback; event handlers must not leak rejections.
+    } finally {
+      savingRef.current = false;
+    }
   }, [draftSettings, saveSettingsMutation]);
 
   const createInvite = useCallback(async (input: CreateWorkspaceInviteInput) => {
@@ -446,6 +477,7 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
   return {
     settings: draftSettings || defaultSettings(activeWorkspaceId),
     settingsLoading,
+    hasChanges: Boolean(draftSettings && settingsQuery.data && JSON.stringify(draftSettings) !== JSON.stringify(settingsQuery.data)),
     saveLoading: saveSettingsMutation.isPending,
     saveSuccess,
     saveError,

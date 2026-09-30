@@ -1,4 +1,5 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { toast } from '@library';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -117,6 +118,31 @@ describe('WorkspaceTeamsPage', () => {
 
     await user.click(screen.getByRole('button', { name: 'Back to Workspace' }));
     expect(props.onBackToWorkspace).toHaveBeenCalledTimes(1);
+  });
+
+  it('waits for team saves, retains failed drafts, and disables completed saves until edited', async () => {
+    const user = userEvent.setup();
+    renderWorkspaceTeamsPage();
+    await user.click(screen.getByRole('button', { name: /Engineering/ }));
+    const name = screen.getByLabelText('Team Name');
+    expect(screen.getByRole('button', { name: 'Save Team' })).toBeDisabled();
+    await user.clear(name);
+    await user.type(name, 'Engineering updated');
+    let reject!: (error: Error) => void;
+    apiMocks.patch.mockImplementationOnce(() => new Promise((_resolve, rej) => { reject = rej; }));
+    const notification = vi.spyOn(toast, 'show').mockReturnValue('test');
+    await user.click(screen.getByRole('button', { name: 'Save Team' }));
+    expect(screen.getByRole('button', { name: 'Saving...' })).toBeDisabled();
+    expect(notification).not.toHaveBeenCalled();
+    await act(async () => { reject(new Error('Offline')); });
+    expect(name).toHaveValue('Engineering updated');
+    expect(screen.getByRole('button', { name: 'Save Team' })).toBeEnabled();
+    await user.click(screen.getByRole('button', { name: 'Save Team' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save Team' })).toBeDisabled());
+    expect(notification).toHaveBeenLastCalledWith('Team saved.', 'success');
+    await user.type(name, ' again');
+    expect(screen.getByRole('button', { name: 'Save Team' })).toBeEnabled();
+    notification.mockRestore();
   });
 
   it('prompts the owner to create the first team when none exist', () => {

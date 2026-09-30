@@ -45,6 +45,29 @@ describe('useWorkspaceDirectory', () => {
     vi.unstubAllGlobals();
   });
 
+  it('distinguishes approved access from a pending join request and prevents duplicates', async () => {
+    const user = { id: 'join-user', name: 'User', email: 'user@example.com', avatar: '', role: 'member', tutorial_completed: 1 };
+    const request = createDeferred<{ status: 'approved' }>();
+    const service = {
+      listWorkspaces: vi.fn().mockResolvedValue([]),
+      createWorkspace: vi.fn(),
+      requestJoinByInvite: vi.fn().mockReturnValueOnce(request.promise).mockResolvedValueOnce({ status: 'pending' }),
+      logWorkspaceMemberActivity: vi.fn(),
+    };
+    const { result } = renderHook(() => useWorkspaceDirectory({ currentUser: user, workspaceDirectoryService: service }));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    let joining!: Promise<boolean>;
+    act(() => { joining = result.current.requestJoinByInvite('INVITE'); });
+    expect(result.current.pendingAction).toBe('join');
+    await act(async () => { expect(await result.current.requestJoinByInvite('INVITE')).toBe(false); });
+    expect(service.requestJoinByInvite).toHaveBeenCalledTimes(1);
+    await act(async () => { request.resolve({ status: 'approved' }); expect(await joining).toBe(true); });
+    expect(result.current.successMessage).toContain('Workspace access approved');
+    expect(service.listWorkspaces).toHaveBeenCalledTimes(2);
+    await act(async () => { await result.current.requestJoinByInvite('OTHER'); });
+    expect(result.current.successMessage).toContain('owner must approve');
+  });
+
   it('ignores stale responses from a previous user refresh', async () => {
     const firstUser = {
       id: 'user-a',

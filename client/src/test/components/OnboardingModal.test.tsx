@@ -43,6 +43,7 @@ vi.mock('../../context/cycle/CycleContext', () => ({
 }));
 
 vi.mock('@library', () => ({
+  toast: { show: vi.fn() },
   Button: ({ children, leftIcon, rightIcon, ...props }: MockButtonProps) => {
     const buttonProps = { ...props };
     delete buttonProps.variant;
@@ -86,7 +87,7 @@ describe('OnboardingModal', () => {
   it('walks through the tour, supports back navigation, and completes on finish', async () => {
     const user = userEvent.setup();
     const onComplete = vi.fn();
-    mocks.fetch.mockResolvedValue({ ok: true });
+    mocks.fetch.mockImplementation(async () => new Response(JSON.stringify({ success: true }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
 
     render(<OnboardingModal onComplete={onComplete} />);
 
@@ -122,7 +123,7 @@ describe('OnboardingModal', () => {
     });
   });
 
-  it('falls back to completion when the skip request throws', async () => {
+  it('preserves the tour and permits retry when saving fails', async () => {
     const user = userEvent.setup();
     const onComplete = vi.fn();
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -133,9 +134,13 @@ describe('OnboardingModal', () => {
     await user.click(screen.getByRole('button', { name: /no thanks, skip it/i }));
 
     await waitFor(() => {
-      expect(onComplete).toHaveBeenCalledTimes(1);
+      expect(mocks.fetch).toHaveBeenCalledTimes(1);
+      expect(onComplete).not.toHaveBeenCalled();
     });
 
+    mocks.fetch.mockImplementation(async () => new Response(JSON.stringify({ success: true }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    await user.click(screen.getByRole('button', { name: /no thanks, skip it/i }));
+    await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
     consoleErrorSpy.mockRestore();
   });
 });

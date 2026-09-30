@@ -8,7 +8,6 @@ import {
   useCopyToClipboard,
   Accordion,
   createEmptyRichTextValue,
-  isRichTextEmpty,
 } from '@library';
 import generateBranchName from '../../../../utils/branch';
 import { safeAnime, prefersReducedMotion } from '../../../../utils/animationUtils';
@@ -19,14 +18,13 @@ import { TicketCommentsThread } from './components/TicketCommentsThread';
 import type { TicketWithRelations } from '../../utils/ticketRelations';
 import { buildTicketUrl, parseAllowedTicketHosts, sanitizeTicketUrlBase } from '../../utils/ticketUrl';
 import {
-  Trash2, ChevronLeft, CornerLeftUp, Send
+  Trash2, ChevronLeft, CornerLeftUp
 } from 'lucide-react';
 import type { TicketDetailProps } from '../../types/TicketDetail';
 import { TicketContextMenu } from '../TicketContextMenu';
 import { WorkspacePageLayout } from '../../../../layouts/WorkspacePageLayout/WorkspacePageLayout';
 import { ConfirmDialog } from '../../../../components/ConfirmDialog';
 import { useIsMobileTicketLayout } from '../useMobileTicketLayout';
-import { CommentEditor } from '../CommentEditor/CommentEditor';
 import './TicketDetail.css';
 
 const CLIENT_ENV = typeof import.meta !== 'undefined'
@@ -42,98 +40,62 @@ function TicketDescriptionEditor({
 }: { 
   initialDescription: string | null; 
   ticketId: string; 
-  onUpdateTicket: (id: string, updates: any) => void; 
+  onUpdateTicket: (id: string, updates: any) => Promise<boolean | void>;
 }) {
   const [editingDescriptionBody, setEditingDescriptionBody] = useState(() => initialDescription || createEmptyRichTextValue());
-  const lastSavedDescriptionRef = useRef(initialDescription);
-  const prevDescriptionRef = useRef(initialDescription);
-  const descriptionTicketIdRef = useRef(ticketId);
+  const lastSavedDescriptionRef = useRef(initialDescription || createEmptyRichTextValue());
+  const pendingDescription = useRef(false);
+  const currentBody = useRef(editingDescriptionBody);
+  currentBody.current = editingDescriptionBody;
+  const [saveFailed, setSaveFailed] = useState(false);
 
   useEffect(() => {
-    const isNewTicket = descriptionTicketIdRef.current !== ticketId;
+    // Refresh pristine editors without replacing pending or failed local drafts.
+    if (pendingDescription.current || currentBody.current !== lastSavedDescriptionRef.current) return;
     const nextDescription = initialDescription || createEmptyRichTextValue();
+    lastSavedDescriptionRef.current = nextDescription;
+    currentBody.current = nextDescription;
+    setEditingDescriptionBody(nextDescription);
+  }, [initialDescription]);
 
-    if (isNewTicket) {
-      descriptionTicketIdRef.current = ticketId;
-      setEditingDescriptionBody(nextDescription);
-      lastSavedDescriptionRef.current = initialDescription;
-      prevDescriptionRef.current = initialDescription;
-    } else {
-      const wasSavedByUs = initialDescription === lastSavedDescriptionRef.current;
-      if (!wasSavedByUs && initialDescription !== prevDescriptionRef.current) {
-        setEditingDescriptionBody(nextDescription);
-        lastSavedDescriptionRef.current = initialDescription;
-        prevDescriptionRef.current = initialDescription;
-      } else {
-        prevDescriptionRef.current = initialDescription;
-      }
+  const saveDescription = useCallback(async function saveCurrentDescription() {
+    const submitted = currentBody.current;
+    if (pendingDescription.current || submitted === lastSavedDescriptionRef.current) return;
+    pendingDescription.current = true;
+    setSaveFailed(false);
+    let confirmed = false;
+    try {
+      const saved = await onUpdateTicket(ticketId, { description: submitted });
+      if (saved === false) { setSaveFailed(true); return; }
+      lastSavedDescriptionRef.current = submitted;
+      confirmed = true;
+    } catch {
+      setSaveFailed(true);
+    } finally {
+      pendingDescription.current = false;
+      if (confirmed && currentBody.current !== submitted) void saveCurrentDescription();
     }
-  }, [ticketId, initialDescription]);
+  }, [ticketId, onUpdateTicket]);
 
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (editingDescriptionBody !== lastSavedDescriptionRef.current) {
-        lastSavedDescriptionRef.current = editingDescriptionBody;
-        void onUpdateTicket(ticketId, { description: editingDescriptionBody });
-      }
-    }, 1500);
+    const timeoutId = setTimeout(() => { void saveDescription(); }, 1500);
     return () => clearTimeout(timeoutId);
-  }, [editingDescriptionBody, ticketId, onUpdateTicket]);
-
-  const handleDescriptionBlur = useCallback(() => {
-    if (editingDescriptionBody !== lastSavedDescriptionRef.current) {
-      lastSavedDescriptionRef.current = editingDescriptionBody;
-      void onUpdateTicket(ticketId, { description: editingDescriptionBody });
-    }
-  }, [editingDescriptionBody, ticketId, onUpdateTicket]);
+  }, [editingDescriptionBody, saveDescription]);
 
   return (
+    <>
     <RichTextEditor
       key={`desc-${ticketId}`}
       value={editingDescriptionBody}
       onChange={setEditingDescriptionBody}
-      onBlur={handleDescriptionBlur}
+      onBlur={() => void saveDescription()}
       placeholder="Describe your issue..."
       className="ticket-detail__description-editor"
       surface="bare"
       toolbarMode="bubble"
     />
-  );
-}
-
-function TicketCommentForm({
-  ticketId,
-  onAddComment,
-}: {
-  ticketId: string;
-  onAddComment: (ticketId: string, commentInput: string) => void;
-}) {
-  const [commentInput, setCommentInput] = useState(createEmptyRichTextValue());
-
-  const handlePostComment = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!isRichTextEmpty(commentInput)) {
-      onAddComment(ticketId, commentInput);
-      setCommentInput(createEmptyRichTextValue());
-    }
-  };
-
-  return (
-    <form onSubmit={handlePostComment} className="ticket-detail__comment-form">
-      <CommentEditor
-        placeholder="Post updates, links, or mention PRs..."
-        value={commentInput}
-        onChange={setCommentInput}
-        className="ticket-detail__comment-editor"
-      />
-      <Button
-        type="submit"
-        variant="primary"
-      >
-        <Send size={12} />
-        <span>Comment</span>
-      </Button>
-    </form>
+    {saveFailed && <Button onClick={() => void saveDescription()}>Retry description save</Button>}
+    </>
   );
 }
 
@@ -230,7 +192,8 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
     if (!copied || activeTicket.status === 'in_progress') return;
 
     try {
-      await onUpdateTicket(activeTicket.id, { status: 'in_progress' });
+      const saved = await onUpdateTicket(activeTicket.id, { status: 'in_progress' });
+      if (saved === false) return;
     } catch {
       toast.show('Branch name copied, but the ticket could not be moved to In Progress', 'error');
     }
@@ -363,6 +326,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
 
             <div>
               <MarkdownEditor
+                key={activeTicket.id}
                 value={activeTicket.title}
                 onSave={(newTitle) => onUpdateTicket(activeTicket.id, { title: newTitle })}
                 singleLine={true}
@@ -375,7 +339,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
               <div className="ticket-detail__section-heading">Description</div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
-                <TicketDescriptionEditor
+                <TicketDescriptionEditor key={activeTicket.id}
                   initialDescription={activeTicket.description || null}
                   ticketId={activeTicket.id}
                   onUpdateTicket={onUpdateTicket}
@@ -395,6 +359,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             />
 
             <TicketCommentsThread
+              key={activeTicket.id}
               activeTicket={activeTicket}
               comments={comments}
               onAddComment={onAddComment}

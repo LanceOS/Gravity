@@ -1,5 +1,5 @@
-import { createContext, type FormEvent, type JSX, useCallback, useContext, useMemo, type PropsWithChildren, useState, useRef } from 'react';
 import { toast } from '@library';
+import { createContext, type FormEvent, type JSX, useCallback, useEffect, useContext, useMemo, type PropsWithChildren, useRef, useState } from 'react';
 
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
 import type { Label } from '../../../context/TicketContextContext';
@@ -29,6 +29,9 @@ type WorkspaceProjectPanelActionOptions = WorkspaceProjectPanelActionCallbacks &
 };
 
 export interface WorkspaceProjectPanelActionsContextValue {
+  projectSettingsUnchanged: boolean;
+  canSaveProjectSettings: boolean;
+  labelUnchanged: boolean;
   isCreateProjectModalOpen: boolean;
   openCreateProjectModal: () => void;
   closeCreateProjectModal: () => void;
@@ -39,7 +42,6 @@ export interface WorkspaceProjectPanelActionsContextValue {
   updateLabel: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   deleteLabel: () => Promise<void>;
   saveProjectSettings: (event: FormEvent<HTMLFormElement>) => Promise<void>;
-  canSaveProjectSettings: boolean;
   deleteProject: () => Promise<void>;
   isDeletingProject: boolean;
   canDeleteProject: boolean;
@@ -71,15 +73,7 @@ export function WorkspaceProjectPanelActionsContextProvider({
     setIsProjectSettingsSaving,
     setSettingsFeedback,
     githubRepoUrl,
-    settingsFeedback,
   } = useWorkspaceProjectPanelProjectStateContext();
-
-  const settingsSavePending = useRef(false);
-  const [savedSettings, setSavedSettings] = useState<{ projectId: string; url: string } | null>(null);
-  const savedUrl = savedSettings?.projectId === managedProject?.id
-    ? savedSettings?.url : (managedProject?.githubRepoUrl ?? '');
-  const canSaveProjectSettings = Boolean(managedProject)
-    && (settingsFeedback?.type === 'error' || githubRepoUrl.trim() !== savedUrl);
 
   const {
     isCreateModalOpen,
@@ -108,6 +102,16 @@ export function WorkspaceProjectPanelActionsContextProvider({
     clearLabelEditor,
   } = useWorkspaceProjectPanelLabelStateContext();
 
+  const pendingActions = useRef(new Set<string>());
+  const [savedProjectInput, setSavedProjectInput] = useState<string | null>(null);
+  const [savedLabelInput, setSavedLabelInput] = useState<string | null>(null);
+  useEffect(() => { setSavedProjectInput(null); }, [managedProject?.id, managedProject?.githubRepoUrl]);
+  useEffect(() => { setSavedLabelInput(null); }, [activeLabel?.id, activeLabel?.name, activeLabel?.color, activeLabel?.description]);
+  const projectInput = JSON.stringify([managedProject?.id, githubRepoUrl.trim()]);
+  const labelInput = JSON.stringify([editingLabelId, editingLabelName.trim(), editingLabelColor, editingLabelDescription.trim()]);
+  const projectSettingsUnchanged = savedProjectInput === projectInput || githubRepoUrl.trim() === (managedProject?.githubRepoUrl || '');
+  const canSaveProjectSettings = Boolean(managedProject) && !projectSettingsUnchanged;
+  const labelUnchanged = savedLabelInput === labelInput || (activeLabel?.name === editingLabelName.trim() && activeLabel.color === editingLabelColor && (activeLabel.description || '') === editingLabelDescription.trim());
   const [labelToDelete, setLabelToDelete] = useState<Label | null>(null);
   const [isDeletingProject, setIsDeletingProject] = useState(false);
   const canDeleteProject = !!onDeleteProject;
@@ -144,6 +148,7 @@ export function WorkspaceProjectPanelActionsContextProvider({
   const createLabel = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
+      if (pendingActions.current.has('createLabel')) return;
       setLabelFormError(null);
 
       const { value, error } = buildValidatedLabelPayload({
@@ -157,6 +162,7 @@ export function WorkspaceProjectPanelActionsContextProvider({
         return;
       }
 
+      pendingActions.current.add('createLabel');
       try {
         await onCreateLabel({
           projectId: managedProject.id,
@@ -171,6 +177,8 @@ export function WorkspaceProjectPanelActionsContextProvider({
         setLabelDescription('');
       } catch (error) {
         setLabelFormError(error instanceof Error ? error.message : 'Failed to create label.');
+      } finally {
+        pendingActions.current.delete('createLabel');
       }
     },
     [
@@ -214,6 +222,8 @@ export function WorkspaceProjectPanelActionsContextProvider({
         return;
       }
 
+      if (pendingActions.current.has('updateLabel') || labelUnchanged) return;
+      pendingActions.current.add('updateLabel');
       setEditingLabelLoading(true);
       setEditingLabelError(null);
 
@@ -223,13 +233,17 @@ export function WorkspaceProjectPanelActionsContextProvider({
           color: value.color,
           description: value.description,
         });
+        setSavedLabelInput(labelInput);
       } catch (error) {
         setEditingLabelError(error instanceof Error ? error.message : 'Failed to update label.');
       } finally {
+        pendingActions.current.delete('updateLabel');
         setEditingLabelLoading(false);
       }
     },
     [
+      labelInput,
+      labelUnchanged,
       editingLabelColor,
       editingLabelDescription,
       editingLabelId,
@@ -278,18 +292,17 @@ export function WorkspaceProjectPanelActionsContextProvider({
   const saveProjectSettings = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
-      if (!managedProject || settingsSavePending.current || !canSaveProjectSettings) {
+      if (!managedProject || pendingActions.current.has('project') || projectSettingsUnchanged) {
         return;
       }
 
       const { url, error } = validateGithubRepoUrl(githubRepoUrl);
       if (error) {
         setSettingsFeedback(createProjectSettingsFeedback('error', error));
-        toast.show(error, 'error');
         return;
       }
 
-      settingsSavePending.current = true;
+      pendingActions.current.add('project');
       setIsProjectSettingsSaving(true);
       setSettingsFeedback(null);
       const savingToast = toast.show('Saving project settings…', 'info', 0);
@@ -298,22 +311,19 @@ export function WorkspaceProjectPanelActionsContextProvider({
         await onUpdateProject(managedProject.id, {
           githubRepoUrl: url || null,
         });
-        setSavedSettings({ projectId: managedProject.id, url: url || '' });
+        setSavedProjectInput(projectInput);
         setSettingsFeedback(createProjectSettingsFeedback('success', 'Project settings updated successfully.'));
-        toast.show('Project settings saved.', 'success');
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Failed to update project settings.';
         setSettingsFeedback(
-          createProjectSettingsFeedback('error', message)
+          createProjectSettingsFeedback('error', error instanceof Error ? error.message : 'Failed to update project settings.')
         );
-        toast.show(message, 'error');
       } finally {
         toast.dismiss(savingToast);
-        settingsSavePending.current = false;
+        pendingActions.current.delete('project');
         setIsProjectSettingsSaving(false);
       }
     },
-    [canSaveProjectSettings, githubRepoUrl, managedProject, onUpdateProject, setIsProjectSettingsSaving, setSettingsFeedback]
+    [projectInput, projectSettingsUnchanged, githubRepoUrl, managedProject, onUpdateProject, setIsProjectSettingsSaving, setSettingsFeedback]
   );
 
   const deleteProject = useCallback(async () => {
@@ -339,6 +349,9 @@ export function WorkspaceProjectPanelActionsContextProvider({
 
   const contextValue = useMemo(
     () => ({
+      projectSettingsUnchanged,
+      canSaveProjectSettings,
+      labelUnchanged,
       isCreateProjectModalOpen: isCreateModalOpen,
       openCreateProjectModal,
       closeCreateProjectModal,
@@ -349,12 +362,14 @@ export function WorkspaceProjectPanelActionsContextProvider({
       updateLabel,
       deleteLabel,
       saveProjectSettings,
-      canSaveProjectSettings,
       deleteProject,
       isDeletingProject,
       canDeleteProject,
     }),
     [
+      projectSettingsUnchanged,
+      canSaveProjectSettings,
+      labelUnchanged,
       closeCreateProjectModal,
       createLabel,
       createProject,
@@ -365,7 +380,6 @@ export function WorkspaceProjectPanelActionsContextProvider({
       isDeletingProject,
       openCreateProjectModal,
       saveProjectSettings,
-      canSaveProjectSettings,
       selectProject,
       startEditingLabel,
       updateLabel,

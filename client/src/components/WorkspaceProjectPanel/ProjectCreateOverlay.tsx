@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { FolderPlus } from 'lucide-react';
 import { Button, TextInput, Textarea } from '@library';
 import { FormSection } from '../FormSection';
@@ -82,9 +82,11 @@ export function ProjectCreateOverlay({
     }
   }, [isOpen, resetForm]);
 
+  const submissionPending = useRef(false);
   const handleSubmit = useCallback(
     async (event?: FormEvent<HTMLFormElement>) => {
       event?.preventDefault();
+      if (submissionPending.current || loading) return;
       setFormError(null);
 
       const { value, error } = buildValidatedPayload({
@@ -98,6 +100,7 @@ export function ProjectCreateOverlay({
         return;
       }
 
+      submissionPending.current = true;
       try {
         await onSubmitProject({
           name: value.name,
@@ -107,9 +110,11 @@ export function ProjectCreateOverlay({
         resetForm();
       } catch (error) {
         setFormError(error instanceof Error ? error.message : 'Failed to create project.');
+      } finally {
+        submissionPending.current = false;
       }
     },
-    [onSubmitProject, projectDescription, projectKey, projectName, resetForm]
+    [loading, onSubmitProject, projectDescription, projectKey, projectName, resetForm]
   );
 
   useEffect(() => {

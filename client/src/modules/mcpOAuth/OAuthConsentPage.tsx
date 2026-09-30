@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Alert, Button } from '@library';
+import { toast, Alert, Button } from '@library';
 import { useAuth } from '../../context/auth/AuthContext';
 import { ApiError } from '../../utils/apiClient';
 import { mcpToolLabel } from '../../utils/mcp';
@@ -98,10 +98,12 @@ function ConsentRequest({ requestId, accountEmail }: { requestId: string; accoun
       const result = await submitOAuthConsent(requestId, approved ? { approved, scopes } : { approved });
       if (!active.current) return;
       setCompleted(true);
+      toast.show(approved ? 'Permissions saved. Returning to your AI client.' : 'Connection declined. Returning to your AI client.', 'success');
       redirectToOAuthClient(result.redirectUrl);
     } catch (submitError) {
       if (!active.current) return;
       setError(consentError(submitError));
+      toast.show(consentError(submitError), 'error');
       setUnavailable(submitError instanceof ApiError && [401, 403, 404, 409, 410].includes(submitError.status));
     } finally {
       pending.current = false;

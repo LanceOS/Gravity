@@ -4,7 +4,7 @@ import { RichTextEditor } from '../richtext';
 
 export interface MarkdownEditorProps {
   value: string;
-  onSave: (newValue: string) => void;
+  onSave: (newValue: string) => void | Promise<boolean | void>;
   placeholder?: string;
   minHeight?: string;
   className?: string;
@@ -25,21 +25,43 @@ export const MarkdownEditor = ({
 }: MarkdownEditorProps) => {
   const normalizedValue = singleLine ? normalizeSingleLineContent(value) : value;
   const [internalValue, setInternalValue] = useState(normalizedValue);
+  const currentValueRef = useRef(internalValue);
+  currentValueRef.current = internalValue;
+  const pendingRef = useRef(false);
+  const queuedValueRef = useRef<string | null>(null);
+  const dirtyRef = useRef(false);
   const valueRef = useRef(normalizedValue);
 
   useEffect(() => {
     const nextValue = singleLine ? normalizeSingleLineContent(value) : value;
-    if (nextValue !== valueRef.current) {
+    if (!dirtyRef.current && !pendingRef.current && nextValue !== valueRef.current) {
       setInternalValue(nextValue);
       valueRef.current = nextValue;
     }
   }, [value, singleLine]);
 
-  const handleBlur = () => {
+  const handleBlur = async () => {
     const finalValue = singleLine ? normalizeSingleLineContent(internalValue) : internalValue;
-    if (finalValue !== valueRef.current) {
-      valueRef.current = finalValue;
-      onSave(finalValue);
+    queuedValueRef.current = finalValue;
+    if (pendingRef.current) return;
+    pendingRef.current = true;
+    try {
+      while (queuedValueRef.current !== null) {
+        const submitted = queuedValueRef.current;
+        queuedValueRef.current = null;
+        if (submitted !== valueRef.current) {
+          const saved = await onSave(submitted);
+          if (saved === false) return;
+          valueRef.current = submitted;
+        }
+        const currentValue = singleLine ? normalizeSingleLineContent(currentValueRef.current) : currentValueRef.current;
+        dirtyRef.current = currentValue !== valueRef.current;
+      }
+    } catch {
+      // The mutation owns error feedback; keep the draft for the next blur/retry.
+    } finally {
+      queuedValueRef.current = null;
+      pendingRef.current = false;
     }
   };
 
@@ -49,7 +71,7 @@ export const MarkdownEditor = ({
         <input
           type="text"
           value={internalValue}
-          onChange={(event) => setInternalValue(event.target.value)}
+          onChange={(event) => { dirtyRef.current = true; setInternalValue(event.target.value); }}
           onBlur={handleBlur}
           onKeyDown={(event) => {
             if (event.key === 'Escape' || event.key === 'Enter') {
@@ -65,6 +87,7 @@ export const MarkdownEditor = ({
             const start = input.selectionStart || 0;
             const end = input.selectionEnd || 0;
             const nextValue = internalValue.substring(0, start) + normalized + internalValue.substring(end);
+            dirtyRef.current = true;
             setInternalValue(nextValue);
           }}
           placeholder={placeholder}
@@ -88,7 +111,7 @@ export const MarkdownEditor = ({
     <div className={cn('markdown-editor-wrapper', className)} style={{ width: '100%', position: 'relative' }}>
       <RichTextEditor
         value={internalValue}
-        onChange={setInternalValue}
+        onChange={value => { dirtyRef.current = true; setInternalValue(value); }}
         onBlur={handleBlur}
         placeholder={placeholder}
         minHeight={minHeight}

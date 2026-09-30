@@ -6,7 +6,6 @@ import { useTheme } from '../../settings';
 import { useAuth } from '../../../context/auth/AuthContext';
 import { useActiveView } from '../../../context/ui/ActiveViewContext';
 import { isOnboardingNeeded, SETTINGS_CATEGORY_IDS } from '../utils/accountPreferences';
-import { patchTutorialCompleted } from '../../../utils/tutorialApi';
 import type { AccountPreferencesRouteState, SettingsCategoryId } from '../types';
 
 export function useAccountPreferencesPageRoute(): AccountPreferencesRouteState {
@@ -86,11 +85,6 @@ export function useAccountPreferencesPageRoute(): AccountPreferencesRouteState {
       }
 
       setLocalTutorialCompleted(true);
-      try {
-        await patchTutorialCompleted(currentUser.id, true);
-      } catch (e) {
-        // Ignore
-      }
     },
   };
 }

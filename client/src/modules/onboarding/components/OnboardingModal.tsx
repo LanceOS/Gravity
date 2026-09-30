@@ -1,3 +1,4 @@
+import { useActionStatus } from '../../../hooks/useActionStatus';
 import React, { useState } from 'react';
 import { useCurrentUser } from '../../../context/auth/useCurrentUser';
 import { apiClient } from '../../../utils/apiClient';
@@ -13,19 +14,19 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
   const { currentUser } = useCurrentUser();
   const [step, setStep] = useState(0); // 0: Question, 1-4: Tour steps
 
+  const completion = useActionStatus(currentUser?.id);
   const handleSkip = async () => {
     if (!currentUser?.id) {
       onComplete();
       return;
     }
 
-    try {
-      await apiClient.patch(`/users/${currentUser.id}/tutorial`, { completed: true });
-      onComplete();
-    } catch (e) {
-      console.error(e);
-      onComplete(); // fallback
-    }
+    const saved = await completion.run(
+      () => apiClient.patch(`/users/${currentUser.id}/tutorial`, { completed: true }),
+      'Tour preference saved.',
+      'Unable to save your tour preference.',
+    );
+    if (saved) onComplete();
   };
 
   const handleNext = () => {
@@ -56,10 +57,10 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
             Would you like a quick 1-minute tour of your new production-grade, multi-tenant project management workspace?
           </p>
           <Flex gap="var(--space-md)" style={{ width: '100%', marginTop: '12px' }}>
-            <Button variant="default" fullWidth onClick={handleSkip}>
+            <Button variant="default" fullWidth onClick={handleSkip} loading={completion.pending} disabled={completion.completed}>
               No thanks, skip it
             </Button>
-            <Button variant="primary" fullWidth onClick={() => setStep(1)} leftIcon={<Sparkles size={16} />}>
+            <Button variant="primary" fullWidth disabled={completion.pending} onClick={() => setStep(1)} leftIcon={<Sparkles size={16} />}>
               Let's do it!
             </Button>
           </Flex>
@@ -135,13 +136,14 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
         )}
 
         <Flex justify="space-between" align="center" style={{ width: '100%', marginTop: '20px' }}>
-          <Button variant="default" onClick={handleBack} leftIcon={<ChevronLeft size={16} />}>
+          <Button variant="default" onClick={handleBack} disabled={completion.pending} leftIcon={<ChevronLeft size={16} />}>
             Back
           </Button>
           
           <Button 
             variant="primary" 
             onClick={handleNext}
+            loading={completion.pending} disabled={completion.completed}
             rightIcon={step === LAST_ONBOARDING_STEP ? <Check size={16} /> : <ChevronRight size={16} />}
           >
             {step === LAST_ONBOARDING_STEP ? 'Finish Tour' : 'Next'}

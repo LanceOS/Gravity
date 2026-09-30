@@ -138,6 +138,7 @@ export const LabelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }, { projectId });
     },
     onSuccess: (label) => {
+      toast.show('Label created.', 'success');
       if (label?.id) {
         invalidateLabelQueries(label.id, label.projectId);
       }
@@ -148,6 +149,7 @@ export const LabelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     try {
       return await createLabelMutation.mutateAsync(labelInput);
     } catch (e) {
+      toast.show(`${e instanceof Error ? e.message : 'Label operation failed.'} Please try again.`, 'error');
       console.error(e);
       throw e;
     }
@@ -162,6 +164,7 @@ export const LabelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return { previousLabelProjectId: cachedLabel?.projectId };
     },
     onSuccess: (updatedLabel, { id }) => {
+      toast.show('Label saved.', 'success');
       invalidateLabelQueries(id, updatedLabel?.projectId);
       return updatedLabel;
     },
@@ -176,6 +179,7 @@ export const LabelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     try {
       return await updateLabelMutation.mutateAsync({ id, updates });
     } catch (e) {
+      toast.show(`${e instanceof Error ? e.message : 'Label operation failed.'} Please try again.`, 'error');
       console.error(e);
       throw e;
     }
@@ -200,6 +204,7 @@ export const LabelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       await deleteLabelMutation.mutateAsync(id);
       return true;
     } catch (e) {
+      toast.show(`${e instanceof Error ? e.message : 'Label operation failed.'} Please try again.`, 'error');
       console.error(e);
       return false;
     }

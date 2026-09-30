@@ -39,6 +39,8 @@ type MockTextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
   onChange: (event: ChangeEvent<HTMLTextAreaElement>) => void;
 };
 
+const editorTestOptions = vi.hoisted(() => ({ realTitleEditor: false }));
+
 const mockAssignLabel = vi.fn().mockResolvedValue(true);
 const mockUnassignLabel = vi.fn().mockResolvedValue(true);
 const mockCreateLabel = vi.fn().mockResolvedValue({ id: 'label-3', name: 'New Label', color: '#6B7280' });
@@ -147,8 +149,9 @@ vi.mock('@library', async (importOriginal) => {
     ),
     TextInput: ({ value, onChange, ...props }: MockTextInputProps) => <input value={value} onChange={onChange} {...props} />,
     Textarea: ({ value, onChange, autoGrow, inputStyle, ...props }: any) => <textarea value={value} onChange={onChange} {...props} />,
-    MarkdownEditor: ({ value, onSave, placeholder }: any) => {
+    MarkdownEditor: ({ value, onSave, placeholder, ...props }: any) => {
       const [editing, setEditing] = useState(false);
+      if (editorTestOptions.realTitleEditor) return <actual.MarkdownEditor {...props} value={value} onSave={onSave} placeholder={placeholder} />;
       if (!editing) {
         return (
           <div onClick={() => setEditing(true)}>{value || placeholder}</div>
@@ -841,5 +844,109 @@ describe('TicketDetail', () => {
     const parentBtn = screen.getAllByRole('button', { name: 'GRA-100 - Parent Ticket Title' })[0];
     await user.click(parentBtn);
     expect(props.onSelectTicket).toHaveBeenCalledWith(parentTicket);
+  });
+});
+
+
+describe('Ticket description refreshes', () => {
+  it('displays refreshed same-ticket data without saving it back', () => {
+    const { props, rerender } = renderTicketDetail();
+    rerender(<TicketDetail {...props} activeTicket={{ ...props.activeTicket, description: 'Refreshed server description' }} />);
+    const editor = screen.getByTestId('Describe your issue...');
+    expect(editor).toHaveValue('Refreshed server description');
+    fireEvent.blur(editor);
+    expect(props.onUpdateTicket).not.toHaveBeenCalled();
+  });
+
+  it('preserves unsaved local edits when same-ticket data refreshes', () => {
+    const { props, rerender } = renderTicketDetail();
+    const editor = screen.getByTestId('Describe your issue...');
+    fireEvent.change(editor, { target: { value: 'Local draft' } });
+    rerender(<TicketDetail {...props} activeTicket={{ ...props.activeTicket, description: 'Refreshed server description' }} />);
+    expect(editor).toHaveValue('Local draft');
+  });
+
+  it('preserves pending saves and accepts later refreshes once the draft is saved', async () => {
+    let resolveSave!: (saved: boolean) => void;
+    const onUpdateTicket = vi.fn(() => new Promise<boolean>(resolve => { resolveSave = resolve; }));
+    const { props, rerender } = renderTicketDetail({ onUpdateTicket });
+    const editor = screen.getByTestId('Describe your issue...');
+    fireEvent.change(editor, { target: { value: 'Local draft' } });
+    fireEvent.blur(editor);
+    rerender(<TicketDetail {...props} activeTicket={{ ...props.activeTicket, description: 'Refresh during save' }} />);
+    expect(editor).toHaveValue('Local draft');
+    await act(async () => resolveSave(true));
+    rerender(<TicketDetail {...props} activeTicket={{ ...props.activeTicket, description: 'Refresh after save' }} />);
+    expect(editor).toHaveValue('Refresh after save');
+    fireEvent.blur(editor);
+    expect(onUpdateTicket).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves a failed draft across refreshes and allows retry', async () => {
+    const onUpdateTicket = vi.fn().mockResolvedValueOnce(false).mockResolvedValue(true);
+    const { props, rerender } = renderTicketDetail({ onUpdateTicket });
+    const editor = screen.getByTestId('Describe your issue...');
+    fireEvent.change(editor, { target: { value: 'Local draft' } });
+    fireEvent.blur(editor);
+    await screen.findByRole('button', { name: 'Retry description save' });
+    rerender(<TicketDetail {...props} activeTicket={{ ...props.activeTicket, description: 'Refreshed server description' }} />);
+    expect(editor).toHaveValue('Local draft');
+    fireEvent.click(screen.getByRole('button', { name: 'Retry description save' }));
+    await waitFor(() => expect(onUpdateTicket).toHaveBeenCalledTimes(2));
+    expect(onUpdateTicket.mock.calls[1]).toEqual(onUpdateTicket.mock.calls[0]);
+  });
+});
+
+
+describe('Ticket editor sessions', () => {
+  it('isolates a failed title draft when navigating to another ticket', async () => {
+    editorTestOptions.realTitleEditor = true;
+    try {
+      const onUpdateTicket = vi.fn().mockResolvedValueOnce(false).mockResolvedValue(true);
+      const { props, rerender } = renderTicketDetail({ onUpdateTicket });
+      fireEvent.change(screen.getByDisplayValue(props.activeTicket.title), { target: { value: 'Failed draft A' } });
+      await act(async () => fireEvent.blur(screen.getByDisplayValue('Failed draft A')));
+      rerender(<TicketDetail {...props} activeTicket={{ ...props.activeTicket, id: 'ticket-other', title: 'Ticket B' }} />);
+      expect(screen.queryByDisplayValue('Failed draft A')).not.toBeInTheDocument();
+      await act(async () => fireEvent.blur(screen.getByDisplayValue('Ticket B')));
+      expect(onUpdateTicket).toHaveBeenCalledTimes(1);
+      fireEvent.change(screen.getByDisplayValue('Ticket B'), { target: { value: 'Updated B' } });
+      await act(async () => fireEvent.blur(screen.getByDisplayValue('Updated B')));
+      expect(onUpdateTicket).toHaveBeenLastCalledWith('ticket-other', { title: 'Updated B' });
+    } finally {
+      editorTestOptions.realTitleEditor = false;
+    }
+  });
+
+  it('allows identical comments in new sessions on the same and different tickets', async () => {
+    const { props, rerender } = renderTicketDetail();
+    const post = async () => {
+      fireEvent.change(screen.getByPlaceholderText('Post updates, links, or mention PRs...'), { target: { value: 'Verified' } });
+      expect(screen.getByRole('button', { name: 'Comment' })).toBeEnabled();
+      await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Comment' })));
+    };
+    await post();
+    await post();
+    expect(props.onAddComment).toHaveBeenCalledTimes(2);
+    rerender(<TicketDetail {...props} activeTicket={{ ...props.activeTicket, id: 'ticket-other', title: 'Ticket B' }} />);
+    await post();
+    expect(props.onAddComment).toHaveBeenCalledTimes(3);
+    expect(props.onAddComment).toHaveBeenLastCalledWith('ticket-other', expect.stringContaining('Verified'));
+  });
+
+  it('does not let an old pending comment clear a new ticket draft', async () => {
+    let resolvePost!: () => void;
+    const onAddComment = vi.fn(() => new Promise<void>(resolve => { resolvePost = resolve; }));
+    const { props, rerender } = renderTicketDetail({ onAddComment });
+    fireEvent.change(screen.getByPlaceholderText('Post updates, links, or mention PRs...'), { target: { value: 'Verified' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Comment' }));
+    rerender(<TicketDetail {...props} activeTicket={{ ...props.activeTicket, id: 'ticket-other', title: 'Ticket B' }} />);
+    const editor = screen.getByPlaceholderText('Post updates, links, or mention PRs...');
+    expect(editor).toHaveValue('');
+    fireEvent.change(editor, { target: { value: 'Verified' } });
+    await act(async () => resolvePost());
+    expect(editor).toHaveValue('Verified');
+    expect(screen.getByRole('button', { name: 'Comment' })).toBeEnabled();
+    expect(onAddComment).toHaveBeenCalledTimes(1);
   });
 });

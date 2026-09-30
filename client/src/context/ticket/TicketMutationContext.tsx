@@ -165,6 +165,7 @@ export const TicketMutationProvider: React.FC<{ children: React.ReactNode }> = (
         projectId: pendingBatch.projectId,
       });
       applyConfirmedTicketUpdate(updatedTicket);
+      toast.show('Ticket saved.', 'success');
 
       inFlightTicketUpdateBatchesRef.current.delete(ticketId);
 
@@ -175,6 +176,7 @@ export const TicketMutationProvider: React.FC<{ children: React.ReactNode }> = (
       }
     } catch (e) {
       console.error('Error updating ticket on server, rolling back:', e);
+      toast.show('Unable to save ticket. Please try again.', 'error');
       inFlightTicketUpdateBatchesRef.current.delete(ticketId);
 
       // Rollback cache
@@ -205,7 +207,10 @@ export const TicketMutationProvider: React.FC<{ children: React.ReactNode }> = (
   ) => {
     const cachedTicket = findCachedTicketByKeyOrId(queryClient, undefined, id, activeProjectIdRef.current);
     const projectId = cachedTicket?.projectId || activeProjectIdRef.current;
-    if (!projectId) return;
+    if (!projectId) {
+      toast.show('Select a project before saving this ticket.', 'error');
+      return false;
+    }
 
     if (updates.status) {
       updates = {
@@ -247,12 +252,14 @@ export const TicketMutationProvider: React.FC<{ children: React.ReactNode }> = (
         });
       }
 
-      void updateTicketMutation.mutateAsync({
+      return updateTicketMutation.mutateAsync({
         id,
         updates,
         projectId,
       }).then((updatedTicket) => {
         applyConfirmedTicketUpdate(updatedTicket);
+        toast.show('Ticket saved.', 'success');
+        return true;
       }).catch((error) => {
         console.error('Error updating ticket on server, rolling back:', error);
         queryClient.setQueryData<Ticket[]>(queryKeys.tickets(projectId), [...previousTickets]);
@@ -263,8 +270,9 @@ export const TicketMutationProvider: React.FC<{ children: React.ReactNode }> = (
 
         const message = error instanceof Error ? error.message : 'Failed to update ticket';
         if (toast?.show) {
-          toast.show(message, 'error');
+          toast.show(`${message} Please try again.`, 'error');
         }
+        return false;
       });
 
       return;

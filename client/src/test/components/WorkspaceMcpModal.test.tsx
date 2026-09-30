@@ -138,6 +138,8 @@ describe('WorkspaceMcpModal', () => {
     await user.click(screen.getByRole('tab', { name: 'JSON' }));
     const config = (screen.getByLabelText('Client configuration') as HTMLTextAreaElement).value;
 
+    expect(screen.getByRole('button', { name: 'Generate connection' })).toBeDisabled();
+    await user.click(screen.getByLabelText('Assign Ticket (write)'));
     await user.click(screen.getByRole('button', { name: 'Generate connection' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Too many connection requests. Try again in 42 seconds.');
     expect(screen.queryByText(/Connection generated successfully/)).not.toBeInTheDocument();

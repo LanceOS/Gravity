@@ -1,3 +1,4 @@
+import { toast } from '@library';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { User } from '../context/TicketContextContext';
 import { ApiError } from '../utils/apiClient';
@@ -48,6 +49,7 @@ export function useWorkspaceDirectory({
   const [pendingAction, setPendingAction] = useState<'create' | 'join' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const actionPending = useRef(false);
   const refreshRequestIdRef = useRef(0);
 
   const refreshWorkspaces = useCallback(async () => {
@@ -115,6 +117,8 @@ export function useWorkspaceDirectory({
       return null;
     }
 
+    if (actionPending.current) return null;
+    actionPending.current = true;
     setPendingAction('create');
     setError(null);
     setSuccessMessage(null);
@@ -122,13 +126,16 @@ export function useWorkspaceDirectory({
     try {
       const data = await workspaceDirectoryService.createWorkspace(currentUser.id, input);
       setSuccessMessage('Workspace created.');
+      toast.show('Workspace created.', 'success');
       await refreshWorkspaces();
       return data;
     } catch (createError) {
       const message = createError instanceof Error ? createError.message : 'Failed to create workspace.';
       setError(message);
+      toast.show(`${message} Please try again.`, 'error');
       return null;
     } finally {
+      actionPending.current = false;
       setPendingAction(null);
     }
   }, [currentUser, refreshWorkspaces, workspaceDirectoryService]);
@@ -138,19 +145,28 @@ export function useWorkspaceDirectory({
       return false;
     }
 
+    if (actionPending.current) return false;
+    actionPending.current = true;
     setPendingAction('join');
     setError(null);
     setSuccessMessage(null);
 
     try {
-      await workspaceDirectoryService.requestJoinByInvite(currentUser.id, inviteCode, message);
-      setSuccessMessage('Join request sent. The workspace owner must approve it before you can connect.');
+      const result = await workspaceDirectoryService.requestJoinByInvite(currentUser.id, inviteCode, message);
+      const notice = result?.status === 'approved'
+        ? 'Workspace access approved. You can open it from the directory.'
+        : 'Join request sent. The workspace owner must approve it before you can connect.';
+      setSuccessMessage(notice);
+      toast.show(notice, 'success');
+      if (result?.status === 'approved') await refreshWorkspaces();
       return true;
     } catch (joinError) {
       const messageText = joinError instanceof Error ? joinError.message : 'Failed to send workspace join request.';
       setError(messageText);
+      toast.show(`${messageText} Check your invite code and try again.`, 'error');
       return false;
     } finally {
+      actionPending.current = false;
       setPendingAction(null);
     }
   }, [currentUser, workspaceDirectoryService, refreshWorkspaces]);

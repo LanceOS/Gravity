@@ -1,6 +1,6 @@
 import './GithubReconciliation.css';
 import { useRef, useState } from 'react';
-import { Button, TextInput } from '@library';
+import { toast, Button, TextInput } from '@library';
 import { applyGithubReconciliation, previewGithubReconciliation, type ReconciliationPreview, type ReconciliationResult } from '../../../services/githubReconciliation';
 
 /** Mount with a project/repository key so previews and credentials never follow project selection. */
@@ -19,8 +19,15 @@ export function GithubReconciliation({ projectId, workspaceId }: { projectId: st
     if (pending.current) return;
     pending.current = true; setBusy(true); setFeedback(''); setPreview(null); setResults(null); setSelected({}); setReviewed({});
     setStartPage(page);
-    try { setPreview(await previewGithubReconciliation(projectId, page, maxPages, credential)); }
-    catch (error) { setFeedback(error instanceof Error ? error.message : 'Preview failed.'); }
+    try {
+      setPreview(await previewGithubReconciliation(projectId, page, maxPages, credential));
+      toast.show('GitHub preview ready. Review the matches before applying updates.', 'success');
+    }
+    catch (error) {
+      const message = error instanceof Error ? error.message : 'Preview failed.';
+      setFeedback(message);
+      toast.show(`${message} Check repository access and try again.`, 'error');
+    }
     finally { pending.current = false; setBusy(false); }
   };
   const apply = async () => {
@@ -32,7 +39,12 @@ export function GithubReconciliation({ projectId, workspaceId }: { projectId: st
       setSelected({});
       setPreview(null);
       setCredential('');
-    } catch (error) { setFeedback(error instanceof Error ? error.message : 'Apply failed.'); }
+      toast.show('Reconciliation finished. Review the outcome for each selected match below.', 'success');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Apply failed.';
+      setFeedback(message);
+      toast.show(`${message} Review your selections and try again.`, 'error');
+    }
     finally { pending.current = false; setBusy(false); }
   };
   const count = Object.values(selected).filter(Boolean).length;

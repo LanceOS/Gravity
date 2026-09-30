@@ -19,7 +19,7 @@ interface TicketDetailRouteProps {
   activeTicketDetail: TicketWithRelations | null;
   onSelectTicket: (ticket: Ticket | null) => void;
   onSelectLabel?: (projectId: string, labelId: string) => void;
-  onUpdateTicket: (id: string, updates: Partial<Ticket>, options?: { immediate?: boolean }) => Promise<void>;
+  onUpdateTicket: (id: string, updates: Partial<Ticket>, options?: { immediate?: boolean }) => Promise<boolean | void>;
   onDeleteTicket: (ticketId: string) => Promise<void>;
   onAddComment: (ticketId: string, body: string) => Promise<void>;
   onUpdateComment: (ticketId: string, commentId: string, body: string) => Promise<void>;

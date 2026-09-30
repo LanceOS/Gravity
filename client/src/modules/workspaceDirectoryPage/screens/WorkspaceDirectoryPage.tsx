@@ -23,7 +23,7 @@ interface WorkspaceDirectoryPageProps {
   errorMessage: string | null;
   successMessage: string | null;
   onCreateWorkspace: (input: CreateWorkspaceInput) => Promise<void>;
-  onRequestJoin: (inviteCode: string, message?: string) => Promise<void>;
+  onRequestJoin: (inviteCode: string, message?: string) => Promise<boolean | void>;
   onOpenWorkspace: (workspaceId: string) => void;
   onOpenSettings: (workspaceId: string) => void;
   onOpenAccountPreferences: () => void;
@@ -62,6 +62,7 @@ export function WorkspaceDirectoryPage({
   const [workspaceDescription, setWorkspaceDescription] = useState('');
   const [workspaceAccessKey, setWorkspaceAccessKey] = useState('');
   const [inviteCode, setInviteCode] = useState('');
+  const [sentJoinInput, setSentJoinInput] = useState<string | null>(null);
   const [requestMessage, setRequestMessage] = useState('');
   const [hierarchyMode, setHierarchyMode] = useState<'teams' | 'flat'>('flat');
 
@@ -85,7 +86,9 @@ export function WorkspaceDirectoryPage({
 
   const handleJoinSubmit = async (event: React.SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
-    await onRequestJoin(inviteCode, requestMessage);
+    if (pendingAction || sentJoinInput === JSON.stringify([inviteCode, requestMessage])) return;
+    const sent = await onRequestJoin(inviteCode, requestMessage);
+    if (sent === true) setSentJoinInput(JSON.stringify([inviteCode, requestMessage]));
   };
 
   const createJoinPanel = (
@@ -194,7 +197,7 @@ export function WorkspaceDirectoryPage({
               placeholder="Purpose of this workspace..."
             />
 
-            <Button type="submit" variant="primary" fullWidth loading={pendingAction === 'create'} style={{ marginTop: 'var(--space-sm)' }}>
+            <Button type="submit" variant="primary" fullWidth disabled={pendingAction !== null} loading={pendingAction === 'create'} style={{ marginTop: 'var(--space-sm)' }}>
               Create Workspace
             </Button>
           </Stack>
@@ -226,7 +229,7 @@ export function WorkspaceDirectoryPage({
               placeholder="Brief note to workspace owner..."
             />
 
-            <Button type="submit" variant="primary" fullWidth loading={pendingAction === 'join'} style={{ marginTop: 'var(--space-sm)' }}>
+            <Button type="submit" variant="primary" fullWidth disabled={pendingAction !== null || sentJoinInput === JSON.stringify([inviteCode, requestMessage])} loading={pendingAction === 'join'} style={{ marginTop: 'var(--space-sm)' }}>
               Send Join Request
             </Button>
           </Stack>

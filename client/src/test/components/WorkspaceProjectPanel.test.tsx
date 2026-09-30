@@ -155,7 +155,9 @@ describe('WorkspaceProjectPanel', () => {
     expect(toast.show).toHaveBeenCalledWith('Saving project settings…', 'info', 0);
     await act(async () => resolveSave());
     expect(save).toBeDisabled();
-    expect(toast.show).toHaveBeenCalledWith('Project settings saved.', 'success');
+    expect(screen.getByText('Project settings updated successfully.')).toBeInTheDocument();
+    // Shared project mutations own result toasts; this layer owns only progress.
+    expect(toast.show).toHaveBeenCalledTimes(1);
     expect(toast.dismiss).toHaveBeenCalledWith('saving-toast');
     fireEvent.submit(save.closest('form')!);
     expect(onUpdateProject).toHaveBeenCalledTimes(1);
@@ -174,7 +176,8 @@ describe('WorkspaceProjectPanel', () => {
     rerender(<WorkspaceProjectPanel {...props} projects={projects.map(p => ({ ...p }))} />);
     await act(async () => rejectSave(new Error('Unable to save settings.')));
     expect(input).toHaveValue('https://github.com/owner/repo');
-    expect(toast.show).toHaveBeenCalledWith('Unable to save settings.', 'error');
+    expect(screen.getByText('Unable to save settings.')).toBeInTheDocument();
+    expect(toast.show).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('button', { name: 'Save Settings' })).toBeEnabled();
     fireEvent.click(screen.getByRole('button', { name: 'Save Settings' }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Save Settings' })).toBeDisabled());
@@ -510,4 +513,30 @@ describe('WorkspaceProjectPanel', () => {
       expect(screen.getAllByRole('button', { name: 'Shared' })).toHaveLength(1);
     });
   });
+});
+
+it('allows restoring a previously saved repository after a newer server update', async () => {
+  const { props, rerender } = renderWorkspaceProjectPanel();
+  const savedUrl = 'https://github.com/org/saved';
+  fireEvent.change(screen.getByLabelText('GitHub Repository URL'), { target: { value: savedUrl } });
+  fireEvent.submit(screen.getByRole('button', { name: 'Save Settings' }).closest('form')!);
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Save Settings' })).toBeDisabled());
+  rerender(<WorkspaceProjectPanel {...props} projects={projects.map(project => project.id === 'project-1' ? { ...project, githubRepoUrl: savedUrl } : project)} />);
+  rerender(<WorkspaceProjectPanel {...props} projects={projects.map(project => project.id === 'project-1' ? { ...project, githubRepoUrl: 'https://github.com/org/newer' } : project)} />);
+  fireEvent.change(screen.getByLabelText('GitHub Repository URL'), { target: { value: savedUrl } });
+  expect(screen.getByRole('button', { name: 'Save Settings' })).toBeEnabled();
+});
+
+it('allows restoring a previously saved label after a newer server update', async () => {
+  const user = userEvent.setup();
+  const label = { id: 'restore-label', projectId: 'project-1', name: 'Original', color: '#f97316', description: '', sortOrder: 0 };
+  const { props, rerender } = renderWorkspaceProjectPanel({ labels: [label] });
+  await user.click(screen.getByRole('button', { name: 'Original' }));
+  fireEvent.change(screen.getAllByLabelText('Label Name')[0], { target: { value: 'Saved' } });
+  await user.click(screen.getByRole('button', { name: 'Save Label' }));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Save Label' })).toBeDisabled());
+  rerender(<WorkspaceProjectPanel {...props} labels={[{ ...label, name: 'Saved' }]} />);
+  rerender(<WorkspaceProjectPanel {...props} labels={[{ ...label, name: 'Newer' }]} />);
+  fireEvent.change(screen.getAllByLabelText('Label Name')[0], { target: { value: 'Saved' } });
+  expect(screen.getByRole('button', { name: 'Save Label' })).toBeEnabled();
 });
